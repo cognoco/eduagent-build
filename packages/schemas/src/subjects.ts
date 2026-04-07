@@ -106,7 +106,7 @@ export const curriculumTopicSchema = z.object({
   sortOrder: z.number().int(),
   relevance: topicRelevanceSchema,
   estimatedMinutes: z.number().int(),
-  bookId: z.string().uuid().nullable().optional(),
+  bookId: z.string().uuid(),
   chapter: z.string().nullable().optional(),
   skipped: z.boolean(),
   source: curriculumTopicSourceSchema.optional(),

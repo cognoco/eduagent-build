@@ -236,6 +236,35 @@ export async function getSubjectRetention(
   };
 }
 
+/**
+ * Returns the count of overdue retention cards across ALL subjects for a profile.
+ * Used by recall notifications and daily plan — unlike getSubjectRetention() which
+ * requires a subjectId, this aggregates across the entire profile.
+ */
+export async function getProfileOverdueCount(
+  db: Database,
+  profileId: string
+): Promise<{ overdueCount: number; topTopicIds: string[] }> {
+  const repo = createScopedRepository(db, profileId);
+  const now = new Date();
+
+  const allCards = await repo.retentionCards.findMany(
+    lt(retentionCards.nextReviewAt, now)
+  );
+
+  // Sort by nextReviewAt ascending (most overdue first) and take top 3 IDs
+  const sorted = allCards.slice().sort((a, b) => {
+    const aTime = a.nextReviewAt?.getTime() ?? 0;
+    const bTime = b.nextReviewAt?.getTime() ?? 0;
+    return aTime - bTime;
+  });
+
+  return {
+    overdueCount: sorted.length,
+    topTopicIds: sorted.slice(0, 3).map((c) => c.topicId),
+  };
+}
+
 export async function getTopicRetention(
   db: Database,
   profileId: string,
@@ -460,8 +489,21 @@ export async function startRelearn(
 
   const subjectId = curriculum?.subjectId ?? null;
 
-  // Mark topic as needs deepening if not already
+  // Verify topic belongs to one of the profile's subjects (IDOR prevention).
   const repo = createScopedRepository(db, profileId);
+  if (subjectId) {
+    const ownedSubject = await repo.subjects.findFirst(
+      eq(subjects.id, subjectId)
+    );
+    if (!ownedSubject) {
+      throw new NotFoundError('Topic');
+    }
+  } else {
+    // Topic doesn't exist or has no curriculum chain — reject
+    throw new NotFoundError('Topic');
+  }
+
+  // Mark topic as needs deepening if not already
   const existing = await repo.needsDeepeningTopics.findMany(
     eq(needsDeepeningTopics.topicId, input.topicId)
   );

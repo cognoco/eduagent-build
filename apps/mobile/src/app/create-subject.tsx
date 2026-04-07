@@ -10,7 +10,7 @@ import {
   ActivityIndicator,
   Pressable,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useCreateSubject } from '../hooks/use-subjects';
@@ -37,6 +37,10 @@ type ResolveState =
 export default function CreateSubjectScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { returnTo, chatTopic } = useLocalSearchParams<{
+    returnTo?: string;
+    chatTopic?: string;
+  }>();
   const colors = useThemeColors();
   const createSubject = useCreateSubject();
   const resolveSubject = useResolveSubject();
@@ -76,6 +80,21 @@ export default function CreateSubjectScreen() {
           ...(rawInput ? { rawInput } : {}),
           ...(focus ? { focus, focusDescription } : {}),
         });
+
+        // BUG-236: When invoked from chat, return to the session with the new
+        // subject so the user can continue learning the topic they asked about.
+        if (returnTo === 'chat') {
+          router.replace({
+            pathname: '/(learner)/session',
+            params: {
+              mode: 'freeform',
+              subjectId: result.subject.id,
+              subjectName: result.subject.name,
+              ...(chatTopic ? { topicName: chatTopic } : {}),
+            },
+          } as never);
+          return;
+        }
 
         if (result.structureType === 'focused_book' && result.bookId) {
           router.replace({
@@ -124,7 +143,7 @@ export default function CreateSubjectScreen() {
         setResolveState({ phase: 'idle' });
       }
     },
-    [createSubject, router, originalInput]
+    [createSubject, router, originalInput, returnTo, chatTopic]
   );
 
   const resolveInput = useCallback(
@@ -174,9 +193,24 @@ export default function CreateSubjectScreen() {
       focus?: string;
     }) => {
       setName(suggestion.name);
-      await doCreate(suggestion.name, undefined, suggestion.focus);
+      // [BUG-237] When the user's original input (e.g. "Easter") differs from
+      // the picked suggestion name (e.g. "World History"), the original input
+      // IS the focus topic.  Without this, the API receives only "World History"
+      // with no focus hint and bulk-generates generic books.
+      const effectiveFocus =
+        suggestion.focus ??
+        (originalInput &&
+        originalInput.toLowerCase() !== suggestion.name.toLowerCase()
+          ? originalInput
+          : undefined);
+      await doCreate(
+        suggestion.name,
+        originalInput || undefined,
+        effectiveFocus,
+        effectiveFocus ? suggestion.description : undefined
+      );
     },
-    [doCreate]
+    [doCreate, originalInput]
   );
 
   const onAcceptSuggestion = useCallback(async () => {

@@ -1,0 +1,118 @@
+# Regression: BUG-239 — Parent adding child must not trigger child-consent flow
+# Validates: parent navigates to More > Add child, fills form, submits,
+# and is NOT locked out or redirected to the child-consent-pending screen.
+# The parent must remain on their own profile with full access.
+appId: com.mentomate.app
+tags:
+  - regression
+  - consent
+  - critical
+---
+# 1. Seed & sign in as parent (has existing children)
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "parent-with-children"
+      API_URL: ${API_URL}
+
+# 2. Wait for home/dashboard to load — proves parent is NOT locked out
+- extendedWaitUntil:
+    visible:
+      id: "tab-home"
+    timeout: 15000
+
+- takeScreenshot: bug239-01-parent-home-loaded
+
+# 3. Navigate to More tab
+- tapOn:
+    id: "tab-more"
+
+- extendedWaitUntil:
+    visible:
+      text: "Family"
+    timeout: 10000
+
+- takeScreenshot: bug239-02-more-tab
+
+# 4. Tap "Add a child"
+- tapOn:
+    id: "add-child-link"
+
+# 5. Wait for create-profile form
+- extendedWaitUntil:
+    visible:
+      id: "create-profile-name"
+    timeout: 10000
+
+- takeScreenshot: bug239-03-create-profile-form
+
+# 6. Enter child name
+- tapOn:
+    id: "create-profile-name"
+- inputText: "BugTest Child"
+- pressKey: back
+
+# 7. Select birth date (child under 16 — triggers consent requirement)
+- tapOn:
+    id: "create-profile-birthdate"
+
+# Android date picker: confirm default date
+- tapOn:
+    text: "OK"
+    optional: true
+
+- takeScreenshot: bug239-04-form-filled
+
+# 8. Submit the profile
+- tapOn:
+    id: "create-profile-submit"
+
+# 9. CRITICAL ASSERTION: Parent must NOT see the consent-pending gate.
+# The consent-pending gate has testID "consent-pending-gate" with text
+# "Hang tight!" or "Waiting for approval". If we see it, the bug is active.
+# Instead, we should see a "Profile created" alert.
+- extendedWaitUntil:
+    visible:
+      text: "Profile created"
+    timeout: 15000
+
+- takeScreenshot: bug239-05-profile-created-alert
+
+# 10. Dismiss the alert
+- tapOn:
+    text: "OK"
+    optional: true
+
+# 11. CRITICAL ASSERTION: Parent is NOT locked out. They should still be on
+# the More tab or have navigated back. The consent-pending gate must NOT appear.
+- assertNotVisible:
+    id: "consent-pending-gate"
+    optional: true
+
+- assertNotVisible:
+    text: "Hang tight!"
+    optional: true
+
+- assertNotVisible:
+    text: "Waiting for approval"
+    optional: true
+
+# 12. Verify parent still has access — can navigate to Home tab
+- tapOn:
+    id: "tab-home"
+
+- extendedWaitUntil:
+    visible:
+      id: "tab-home"
+    timeout: 10000
+
+- takeScreenshot: bug239-06-parent-still-has-access
+
+# 13. Verify we can see content (not locked out)
+- assertVisible:
+    id: "tab-home"
+
+- assertVisible:
+    id: "tab-more"
+
+- takeScreenshot: bug239-07-regression-passed

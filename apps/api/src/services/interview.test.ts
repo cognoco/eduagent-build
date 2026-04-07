@@ -41,6 +41,7 @@ jest.mock('./curriculum', () => ({
       estimatedMinutes: 45,
     },
   ]),
+  ensureDefaultBook: jest.fn().mockResolvedValue('book-1'),
 }));
 
 import type { Database } from '@eduagent/database';
@@ -717,9 +718,7 @@ describe('persistCurriculum', () => {
 
     const db = createMockDb();
     // Override the subjects.findFirst mock to return null (ownership check fails)
-    (
-      db.query.subjects.findFirst as jest.Mock
-    ).mockResolvedValueOnce(null);
+    (db.query.subjects.findFirst as jest.Mock).mockResolvedValueOnce(null);
 
     const attackerProfileId = 'attacker-profile-id';
 

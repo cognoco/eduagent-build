@@ -282,4 +282,125 @@ describe('classifySubject', () => {
     expect(result.candidates[0].confidence).toBe(1);
     expect(result.candidates[1].confidence).toBe(0);
   });
+
+  // BUG-233: Cultural topics should not be rejected — they must either match
+  // an enrolled subject or suggest a new one via suggestedSubjectName
+  describe('BUG-233: cultural and cross-disciplinary topics', () => {
+    it('suggests Religious Studies for Easter when no enrolled subject matches', async () => {
+      mockListSubjects.mockResolvedValueOnce([
+        makeSubject('sub-001', 'Mathematics'),
+        makeSubject('sub-002', 'Physics'),
+      ]);
+
+      llmResponse({
+        matches: [],
+        suggestedSubjectName: 'Religious Studies',
+      });
+
+      const result = await classifySubject(
+        FAKE_DB,
+        PROFILE_ID,
+        'please teach me about Easter'
+      );
+
+      expect(result.candidates).toEqual([]);
+      expect(result.needsConfirmation).toBe(true);
+      expect(result.suggestedSubjectName).toBe('Religious Studies');
+    });
+
+    it('matches Easter to History when History is enrolled', async () => {
+      mockListSubjects.mockResolvedValueOnce([
+        makeSubject('sub-001', 'History'),
+        makeSubject('sub-002', 'Mathematics'),
+      ]);
+
+      llmResponse({
+        matches: [{ subjectName: 'History', confidence: 0.7 }],
+        suggestedSubjectName: null,
+      });
+
+      const result = await classifySubject(
+        FAKE_DB,
+        PROFILE_ID,
+        'please teach me about Easter'
+      );
+
+      expect(result.candidates).toHaveLength(1);
+      expect(result.candidates[0].subjectName).toBe('History');
+    });
+
+    it.each([
+      ['Christmas', 'Religious Studies'],
+      ['Ramadan', 'Religious Studies'],
+      ['Diwali', 'Cultural Studies'],
+      ['Thanksgiving', 'History'],
+    ])(
+      'suggests a subject for %s when no enrolled subject matches',
+      async (topic, expectedSuggestion) => {
+        mockListSubjects.mockResolvedValueOnce([
+          makeSubject('sub-001', 'Mathematics'),
+          makeSubject('sub-002', 'Physics'),
+        ]);
+
+        llmResponse({
+          matches: [],
+          suggestedSubjectName: expectedSuggestion,
+        });
+
+        const result = await classifySubject(
+          FAKE_DB,
+          PROFILE_ID,
+          `teach me about ${topic}`
+        );
+
+        expect(result.suggestedSubjectName).toBe(expectedSuggestion);
+        expect(result.needsConfirmation).toBe(true);
+      }
+    );
+
+    it('provides suggestedSubjectName when LLM returns no matches for a valid topic', async () => {
+      // Must have 2+ subjects to trigger LLM classification (single subject auto-matches)
+      mockListSubjects.mockResolvedValueOnce([
+        makeSubject('sub-001', 'Mathematics'),
+        makeSubject('sub-002', 'Physics'),
+      ]);
+
+      llmResponse({
+        matches: [],
+        suggestedSubjectName: 'World History',
+      });
+
+      const result = await classifySubject(
+        FAKE_DB,
+        PROFILE_ID,
+        'tell me about the Roman Empire'
+      );
+
+      // The key assertion: suggestedSubjectName must never be null for valid topics
+      expect(result.suggestedSubjectName).not.toBeNull();
+      expect(result.suggestedSubjectName).toBe('World History');
+    });
+
+    it('sends the updated prompt with cross-disciplinary matching guidance', async () => {
+      mockListSubjects.mockResolvedValueOnce([
+        makeSubject('sub-001', 'History'),
+        makeSubject('sub-002', 'Mathematics'),
+      ]);
+
+      llmResponse({
+        matches: [{ subjectName: 'History', confidence: 0.6 }],
+        suggestedSubjectName: null,
+      });
+
+      await classifySubject(
+        FAKE_DB,
+        PROFILE_ID,
+        'teach me about Easter'
+      );
+
+      const systemMessage = mockRouteAndCall.mock.calls[0]?.[0]?.[0];
+      expect(systemMessage?.content).toContain('cross-disciplinary');
+      expect(systemMessage?.content).toContain('Cultural topics');
+    });
+  });
 });

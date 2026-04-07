@@ -60,7 +60,12 @@ function createMockDb({
   findFirstResult = undefined as ReturnType<typeof mockConsentRow> | undefined,
   insertReturning = [] as ReturnType<typeof mockConsentRow>[],
 } = {}): Database {
-  const updateWhere = jest.fn().mockResolvedValue(undefined);
+  // Atomic update chain: update().set().where().returning()
+  // returning() resolves with the row (simulates 1 matched row)
+  const updateReturning = jest
+    .fn()
+    .mockResolvedValue(findFirstResult ? [findFirstResult] : []);
+  const updateWhere = jest.fn().mockReturnValue({ returning: updateReturning });
   const updateSet = jest.fn().mockReturnValue({ where: updateWhere });
   const deleteWhere = jest.fn().mockResolvedValue(undefined);
   const deleteFn = jest.fn().mockReturnValue({ where: deleteWhere });
@@ -221,6 +226,56 @@ describe('requestConsent', () => {
 
     // Verify counter rollback was attempted
     expect(db.update).toHaveBeenCalled();
+  });
+
+  // BUG-240: Consent email link must use the API origin, never APP_URL
+  it('passes tokenUrl starting with the provided appUrl to formatConsentRequestEmail [BUG-240]', async () => {
+    const { formatConsentRequestEmail: mockFormat } = jest.requireMock(
+      './notifications'
+    ) as { formatConsentRequestEmail: jest.Mock };
+    mockFormat.mockClear();
+
+    const row = mockConsentRow();
+    const db = createMockDb({ insertReturning: [row] });
+    await requestConsent(
+      db,
+      {
+        childProfileId: '550e8400-e29b-41d4-a716-446655440000',
+        parentEmail: 'parent@example.com',
+        consentType: 'GDPR',
+      },
+      'https://api.mentomate.com'
+    );
+
+    expect(mockFormat).toHaveBeenCalledTimes(1);
+    const tokenUrl = mockFormat.mock.calls[0][3] as string;
+    expect(tokenUrl).toMatch(
+      /^https:\/\/api\.mentomate\.com\/v1\/consent-page\?token=/
+    );
+  });
+
+  // BUG-240 break test: the tokenUrl must NEVER contain www.mentomate.com or app.mentomate.com
+  it('never produces a consent link pointing to APP_URL domains [BUG-240]', async () => {
+    const { formatConsentRequestEmail: mockFormat } = jest.requireMock(
+      './notifications'
+    ) as { formatConsentRequestEmail: jest.Mock };
+    mockFormat.mockClear();
+
+    const row = mockConsentRow();
+    const db = createMockDb({ insertReturning: [row] });
+    await requestConsent(
+      db,
+      {
+        childProfileId: '550e8400-e29b-41d4-a716-446655440000',
+        parentEmail: 'parent@example.com',
+        consentType: 'GDPR',
+      },
+      'https://api.mentomate.com'
+    );
+
+    const tokenUrl = mockFormat.mock.calls[0][3] as string;
+    expect(tokenUrl).not.toContain('app.mentomate.com');
+    expect(tokenUrl).not.toContain('www.mentomate.com');
   });
 
   it('returns consent state with correct consent type for COPPA (backward compat)', async () => {

@@ -16,6 +16,7 @@ import {
   profiles,
   subjects,
   curricula,
+  curriculumBooks,
   curriculumTopics,
   learningSessions,
   sessionEvents,
@@ -133,10 +134,16 @@ async function seedScenario(options?: {
       })
       .returning();
 
+    const [book] = await db
+      .insert(curriculumBooks)
+      .values({ subjectId: subject!.id, title: 'Test Book', sortOrder: 1 })
+      .returning();
+
     const [topic] = await db
       .insert(curriculumTopics)
       .values({
         curriculumId: curriculum!.id,
+        bookId: book!.id,
         title: 'Photosynthesis',
         description: 'How plants convert light into energy',
         sortOrder: 1,

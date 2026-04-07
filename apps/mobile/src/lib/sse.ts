@@ -25,6 +25,12 @@ export interface StreamDoneEvent {
   escalationRung?: number;
   /** Present on interview done events; absent on learning sessions. */
   isComplete?: boolean;
+  /** LLM-estimated response time for adaptive silence detection. */
+  expectedResponseMinutes?: number;
+  /** Whether the LLM offered a note prompt to the learner. */
+  notePrompt?: boolean;
+  /** Whether the note prompt is a post-session prompt. */
+  notePromptPostSession?: boolean;
 }
 
 export type StreamEvent = StreamChunkEvent | StreamDoneEvent;

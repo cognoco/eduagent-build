@@ -12,7 +12,8 @@
  * 5. Fabricated profile IDs are rejected
  */
 
-import { subjects } from '@eduagent/database';
+import { eq } from 'drizzle-orm';
+import { subjects, profiles, subscriptions } from '@eduagent/database';
 
 import { jwtMock, configureValidJWT } from './mocks';
 import {
@@ -98,6 +99,26 @@ async function seedSubject(
     profileId: subject!.profileId,
     name: subject!.name,
   };
+}
+
+/**
+ * Seeds a family-tier subscription so the billing guard allows
+ * non-first profile creation on this account.
+ */
+async function seedFamilySubscription(profileId: string) {
+  const db = createIntegrationDb();
+  const profile = await db.query.profiles.findFirst({
+    where: eq(profiles.id, profileId),
+    columns: { accountId: true },
+  });
+  if (!profile) throw new Error('Profile not found for subscription seed');
+
+  // Account creation auto-provisions a 'plus' trial subscription,
+  // so we UPDATE the existing row to 'family' tier instead of inserting.
+  await db
+    .update(subscriptions)
+    .set({ tier: 'family', status: 'active' })
+    .where(eq(subscriptions.accountId, profile.accountId));
 }
 
 async function listSubjectsForUser(input: {
@@ -189,6 +210,7 @@ describe('Integration: Profile Isolation (P0-006)', () => {
       displayName: 'Owner Profile',
       birthYear: 2000,
     });
+    await seedFamilySubscription(ownerProfile.id);
     const secondProfile = await createProfile({
       userId: PRIMARY_USER_ID,
       email: PRIMARY_EMAIL,
@@ -224,6 +246,7 @@ describe('Integration: Profile Isolation (P0-006)', () => {
       displayName: 'Owner Profile',
       birthYear: 2000,
     });
+    await seedFamilySubscription(ownerProfile.id);
     const secondProfile = await createProfile({
       userId: PRIMARY_USER_ID,
       email: PRIMARY_EMAIL,

@@ -34,6 +34,7 @@ import { subjectRoutes } from './routes/subjects';
 import { interviewRoutes } from './routes/interview';
 import { curriculumRoutes } from './routes/curriculum';
 import { bookRoutes } from './routes/books';
+import { noteRoutes } from './routes/notes';
 import { sessionRoutes } from './routes/sessions';
 import { parkingLotRoutes } from './routes/parking-lot';
 import { homeworkRoutes } from './routes/homework';
@@ -45,6 +46,7 @@ import { settingsRoutes } from './routes/settings';
 import { vocabularyRoutes } from './routes/vocabulary';
 import { languageProgressRoutes } from './routes/language-progress';
 import { coachingCardRoutes } from './routes/coaching-card';
+import { dailyPlanRoutes } from './routes/daily-plan';
 import { homeCardRoutes } from './routes/home-cards';
 import { celebrationRoutes } from './routes/celebrations';
 import { dashboardRoutes } from './routes/dashboard';
@@ -177,6 +179,7 @@ const routes = api
   .route('/', interviewRoutes)
   .route('/', curriculumRoutes)
   .route('/', bookRoutes)
+  .route('/', noteRoutes)
   .route('/', sessionRoutes)
   .route('/', parkingLotRoutes)
   .route('/', homeworkRoutes)
@@ -188,6 +191,7 @@ const routes = api
   .route('/', vocabularyRoutes)
   .route('/', languageProgressRoutes)
   .route('/', coachingCardRoutes)
+  .route('/', dailyPlanRoutes)
   .route('/', homeCardRoutes)
   .route('/', celebrationRoutes)
   .route('/', dashboardRoutes)

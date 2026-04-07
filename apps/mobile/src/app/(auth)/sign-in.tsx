@@ -172,9 +172,10 @@ export default function SignInScreen() {
       SESSION_TRANSITION_MS - getTransitionElapsed()
     );
     const timer = setTimeout(() => {
-      console.warn(
-        `[AUTH-DEBUG] transitioning TIMEOUT after ${SESSION_TRANSITION_MS}ms — falling back to sign-in form`
-      );
+      if (__DEV__)
+        console.warn(
+          `[AUTH-DEBUG] transitioning TIMEOUT after ${SESSION_TRANSITION_MS}ms — falling back to sign-in form`
+        );
       clearTransitionState();
       setIsTransitioning(false);
       setError(
@@ -205,121 +206,6 @@ export default function SignInScreen() {
     },
     [setError]
   );
-
-  const onSSOPress = useCallback(
-    async (strategy: SupportedSSOStrategy) => {
-      clearVerificationFlow();
-      setError('');
-      setOauthLoading(strategy);
-
-      try {
-        const { createdSessionId } = await startSSOFlow({
-          strategy,
-          redirectUrl: Linking.createURL('/sso-callback', {
-            scheme: 'mentomate',
-          }),
-        });
-
-        if (createdSessionId && setActive) {
-          const activated = await activateSession(createdSessionId, 'oauth');
-          if (!activated) {
-            return;
-          }
-          void SecureStore.setItemAsync(HAS_SIGNED_IN_KEY, 'true');
-          // Auth layout guard handles navigation once isSignedIn propagates.
-          return;
-        }
-
-        setError('Sign-in could not be completed. Please try again.');
-      } catch (err: unknown) {
-        setError(extractClerkError(err));
-      } finally {
-        setOauthLoading(null);
-      }
-    },
-    [clearVerificationFlow, setActive, startSSOFlow]
-  );
-
-  const activateSession = useCallback(
-    async (
-      sessionId: string | null,
-      context: 'oauth' | 'password' | 'verification'
-    ): Promise<boolean> => {
-      if (!sessionId) {
-        setError('No session was created. Please try again.');
-        return false;
-      }
-      if (!setActive) {
-        setError('Authentication not loaded. Please try again.');
-        return false;
-      }
-
-      try {
-        if (__DEV__)
-          console.log(
-            `[AUTH-DEBUG] activateSession → calling setActive(${sessionId}) context=${context}`
-          );
-        await setActive({ session: sessionId });
-        if (__DEV__)
-          console.log('[AUTH-DEBUG] activateSession → setActive resolved OK');
-      } catch (e) {
-        if (__DEV__)
-          console.warn('[AUTH-DEBUG] activateSession → setActive THREW', e);
-        setPendingSessionActivationId(sessionId);
-        setActivationFailureContext(context);
-        setError('Could not activate your session. Please try again.');
-        return false;
-      }
-
-      // Show "Signing you in…" spinner immediately — before clearing form
-      // state, so the user never sees a flash of the empty sign-in form.
-      // The module-level timestamp lets this survive component remounts
-      // if the redirect briefly bounces back.
-      markSessionActivated();
-      setIsTransitioning(true);
-
-      setPendingSessionActivationId(null);
-      setActivationFailureContext(null);
-      setPendingVerification(null);
-      setVerificationOffer(null);
-      setCode('');
-      void SecureStore.setItemAsync(HAS_SIGNED_IN_KEY, 'true');
-      // Don't navigate explicitly — the auth layout guard redirects to
-      // /(learner)/home once Clerk's useAuth() state propagates with
-      // isSignedIn: true.  Calling router.replace() here races with Clerk's
-      // React state update: the learner layout renders before isSignedIn
-      // flips, sees !isSignedIn, and bounces back to sign-in.
-      return true;
-    },
-    [setActive]
-  );
-
-  const retrySessionActivation = useCallback(async () => {
-    if (!pendingSessionActivationId || !activationFailureContext) {
-      return;
-    }
-    if (!isLoaded || !setActive) {
-      setError('Authentication not ready. Please reload and try again.');
-      return;
-    }
-
-    setError('');
-    setLoading(true);
-    try {
-      await activateSession(
-        pendingSessionActivationId,
-        activationFailureContext
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [
-    activateSession,
-    activationFailureContext,
-    isLoaded,
-    pendingSessionActivationId,
-    setActive,
-  ]);
 
   const getVerificationStep = useCallback(
     (attempt: SignInAttemptLike) => {
@@ -466,6 +352,182 @@ export default function SignInScreen() {
     },
     [clearVerificationFlow, getVerificationStep, startVerificationFlow]
   );
+
+  const onSSOPress = useCallback(
+    async (strategy: SupportedSSOStrategy) => {
+      if (!isLoaded) return;
+      clearVerificationFlow();
+      setError('');
+      setOauthLoading(strategy);
+
+      try {
+        const ssoResult = await startSSOFlow({
+          strategy,
+          redirectUrl: Linking.createURL('/sso-callback', {
+            scheme: 'mentomate',
+          }),
+        });
+
+        const {
+          createdSessionId,
+          signIn: ssoSignIn,
+          signUp: ssoSignUp,
+        } = ssoResult;
+
+        if (__DEV__)
+          console.log(
+            `[AUTH-DEBUG] SSO result → createdSessionId=${
+              createdSessionId ?? 'null'
+            }` +
+              ` | signIn.status=${ssoSignIn?.status ?? 'null'}` +
+              ` | signUp.status=${ssoSignUp?.status ?? 'null'}` +
+              ` | signUp.createdSessionId=${
+                ssoSignUp?.createdSessionId ?? 'null'
+              }`
+          );
+
+        // Session ID may be on the top level, or on signUp for new users
+        const sessionId =
+          createdSessionId ?? ssoSignUp?.createdSessionId ?? null;
+
+        if (sessionId) {
+          const activated = await activateSession(sessionId, 'oauth');
+          if (!activated) {
+            return;
+          }
+          void SecureStore.setItemAsync(HAS_SIGNED_IN_KEY, 'true');
+          // Auth layout guard handles navigation once isSignedIn propagates.
+          return;
+        }
+
+        // SSO returned but no session — provide specific diagnostics
+        if (ssoSignIn?.status) {
+          if (__DEV__)
+            console.warn(
+              `[AUTH-DEBUG] SSO signIn incomplete: status=${ssoSignIn.status}`,
+              JSON.stringify(
+                ssoSignIn.supportedFirstFactors?.map(
+                  (f: Record<string, unknown>) => f.strategy
+                )
+              )
+            );
+          await handleIncompleteSignIn(ssoSignIn);
+          return;
+        }
+
+        if (ssoSignUp?.status && ssoSignUp.status !== 'complete') {
+          if (__DEV__)
+            console.warn(
+              `[AUTH-DEBUG] SSO signUp incomplete: status=${ssoSignUp.status}` +
+                ` | missingFields=${JSON.stringify(
+                  ssoSignUp.missingFields ?? []
+                )}`
+            );
+          setError(
+            `Sign-up via ${
+              strategy === 'oauth_google' ? 'Google' : 'SSO'
+            } needs additional information. Please sign up with email instead.`
+          );
+          return;
+        }
+
+        setError('Sign-in could not be completed. Please try again.');
+      } catch (err: unknown) {
+        if (__DEV__) console.warn('[AUTH-DEBUG] SSO flow threw:', err);
+        setError(extractClerkError(err));
+      } finally {
+        setOauthLoading(null);
+      }
+    },
+    [
+      clearVerificationFlow,
+      handleIncompleteSignIn,
+      isLoaded,
+      setActive,
+      startSSOFlow,
+    ]
+  );
+
+  const activateSession = useCallback(
+    async (
+      sessionId: string | null,
+      context: 'oauth' | 'password' | 'verification'
+    ): Promise<boolean> => {
+      if (!sessionId) {
+        setError('No session was created. Please try again.');
+        return false;
+      }
+      if (!setActive) {
+        setError('Authentication not loaded. Please try again.');
+        return false;
+      }
+
+      try {
+        if (__DEV__)
+          console.log(
+            `[AUTH-DEBUG] activateSession → calling setActive(${sessionId}) context=${context}`
+          );
+        await setActive({ session: sessionId });
+        if (__DEV__)
+          console.log('[AUTH-DEBUG] activateSession → setActive resolved OK');
+      } catch (e) {
+        if (__DEV__)
+          console.warn('[AUTH-DEBUG] activateSession → setActive THREW', e);
+        setPendingSessionActivationId(sessionId);
+        setActivationFailureContext(context);
+        setError('Could not activate your session. Please try again.');
+        return false;
+      }
+
+      // Show "Signing you in…" spinner immediately — before clearing form
+      // state, so the user never sees a flash of the empty sign-in form.
+      // The module-level timestamp lets this survive component remounts
+      // if the redirect briefly bounces back.
+      markSessionActivated();
+      setIsTransitioning(true);
+
+      setPendingSessionActivationId(null);
+      setActivationFailureContext(null);
+      setPendingVerification(null);
+      setVerificationOffer(null);
+      setCode('');
+      void SecureStore.setItemAsync(HAS_SIGNED_IN_KEY, 'true');
+      // Don't navigate explicitly — the auth layout guard redirects to
+      // /(learner)/home once Clerk's useAuth() state propagates with
+      // isSignedIn: true.  Calling router.replace() here races with Clerk's
+      // React state update: the learner layout renders before isSignedIn
+      // flips, sees !isSignedIn, and bounces back to sign-in.
+      return true;
+    },
+    [setActive]
+  );
+
+  const retrySessionActivation = useCallback(async () => {
+    if (!pendingSessionActivationId || !activationFailureContext) {
+      return;
+    }
+    if (!isLoaded || !setActive) {
+      setError('Authentication not ready. Please reload and try again.');
+      return;
+    }
+
+    setError('');
+    setLoading(true);
+    try {
+      await activateSession(
+        pendingSessionActivationId,
+        activationFailureContext
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [
+    activateSession,
+    activationFailureContext,
+    isLoaded,
+    pendingSessionActivationId,
+    setActive,
+  ]);
 
   const onSignInPress = useCallback(async () => {
     if (!isLoaded || !canSubmit || !signIn) return;

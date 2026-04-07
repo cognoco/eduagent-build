@@ -4,6 +4,7 @@ import {
   isExpoPushToken,
   formatReviewReminderBody,
   formatDailyReminderBody,
+  formatRecallNudge,
   MAX_DAILY_PUSH,
   type NotificationPayload,
   type EmailPayload,
@@ -279,5 +280,42 @@ describe('sendEmail', () => {
     });
 
     expect(result).toEqual({ sent: false, reason: 'network_error' });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// formatRecallNudge
+// ---------------------------------------------------------------------------
+
+describe('formatRecallNudge', () => {
+  it('returns third-person copy for guardian role', () => {
+    const result = formatRecallNudge(2, 'Algebra', 'guardian', 'Emma');
+    expect(result.title).toBe('Review reminder');
+    expect(result.body).toContain('Emma');
+    expect(result.body).toContain('2 topics');
+  });
+
+  it('uses fallback child name when childName omitted for guardian', () => {
+    const result = formatRecallNudge(1, 'Chemistry', 'guardian');
+    expect(result.body).toContain('Your learner');
+  });
+
+  it('returns topic title as notification title for single fading topic (self_learner)', () => {
+    const result = formatRecallNudge(1, 'Quadratic Equations', 'self_learner');
+    expect(result.title).toBe('Quadratic Equations');
+    expect(result.body).toContain('fade');
+  });
+
+  it('returns count-based title for multiple fading topics (self_learner)', () => {
+    const result = formatRecallNudge(3, 'Algebra', 'self_learner');
+    expect(result.title).toBe('3 topics need a refresh');
+    expect(result.body).toContain('Algebra');
+    expect(result.body).toContain('6 minutes');
+  });
+
+  it('uses singular topic in guardian body for count=1', () => {
+    const result = formatRecallNudge(1, 'Physics', 'guardian', 'Sam');
+    expect(result.body).toContain('1 topic');
+    expect(result.body).not.toContain('topics');
   });
 });

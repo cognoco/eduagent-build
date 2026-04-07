@@ -127,6 +127,8 @@ function mockCurriculumRow(
 // Mock topic row
 // ---------------------------------------------------------------------------
 
+const BOOK_ID = 'book-1';
+
 function mockTopicRow(
   overrides?: Partial<{
     id: string;
@@ -136,6 +138,7 @@ function mockTopicRow(
     relevance: string;
     estimatedMinutes: number;
     skipped: boolean;
+    bookId: string;
   }>
 ) {
   return {
@@ -147,6 +150,7 @@ function mockTopicRow(
     relevance: overrides?.relevance ?? 'core',
     estimatedMinutes: overrides?.estimatedMinutes ?? 30,
     skipped: overrides?.skipped ?? false,
+    bookId: overrides?.bookId ?? BOOK_ID,
     createdAt: NOW,
     updatedAt: NOW,
   };
@@ -170,6 +174,7 @@ function createMockDb({
   topicsFindMany = [] as ReturnType<typeof mockTopicRow>[],
   topicFindFirst = undefined as ReturnType<typeof mockTopicRow> | undefined,
   insertReturning = [] as unknown[],
+  bookFindFirst = { id: BOOK_ID } as { id: string } | undefined,
 } = {}): Database {
   const db = {
     query: {
@@ -185,6 +190,9 @@ function createMockDb({
       curriculumTopics: {
         findMany: jest.fn().mockResolvedValue(topicsFindMany),
         findFirst: jest.fn().mockResolvedValue(topicFindFirst),
+      },
+      curriculumBooks: {
+        findFirst: jest.fn().mockResolvedValue(bookFindFirst),
       },
     },
     update: jest.fn().mockReturnValue({
@@ -329,7 +337,7 @@ describe('getCurriculum', () => {
       sortOrder: 3,
       relevance: 'recommended',
       estimatedMinutes: 45,
-      bookId: null,
+      bookId: BOOK_ID,
       chapter: null,
       skipped: true,
     });
@@ -622,6 +630,9 @@ describe('challengeCurriculum', () => {
         curricula: { findFirst: curriculaFindFirst },
         onboardingDrafts: { findFirst: jest.fn().mockResolvedValue(undefined) },
         curriculumTopics: { findMany: topicsFindMany },
+        curriculumBooks: {
+          findFirst: jest.fn().mockResolvedValue({ id: BOOK_ID }),
+        },
       },
       insert: jest.fn().mockReturnValue({
         values: jest.fn().mockReturnValue({

@@ -11,6 +11,11 @@ jest.mock('./exchanges', () => ({
   streamExchange: jest.fn(),
   detectUnderstandingCheck: jest.fn().mockReturnValue(false),
   estimateExpectedResponseMinutes: jest.fn().mockReturnValue(2),
+  extractNotePrompt: jest.fn().mockReturnValue({
+    cleanResponse: 'Hello world! This is the full response.',
+    notePrompt: null,
+    notePromptPostSession: null,
+  }),
 }));
 
 jest.mock('./escalation', () => ({

@@ -1,18 +1,14 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Alert, Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import { useQueries } from '@tanstack/react-query';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import type { Subject, CurriculumTopic } from '@eduagent/schemas';
+import type { Subject } from '@eduagent/schemas';
 import type { RetentionStatus } from '../../components/progress';
 import {
   BookPageFlipAnimation,
   BrandCelebration,
-  PenWritingAnimation,
 } from '../../components/common';
-import { ShelfView } from '../../components/library/ShelfView';
-import { ChapterTopicList } from '../../components/library/ChapterTopicList';
 import type {
   LibraryTab,
   ShelfItem,
@@ -38,12 +34,7 @@ import { useAllBooks } from '../../hooks/use-all-books';
 import { useThemeColors } from '../../lib/theme';
 import { useSubjects, useUpdateSubject } from '../../hooks/use-subjects';
 import { useOverallProgress } from '../../hooks/use-progress';
-import { useCurriculum } from '../../hooks/use-curriculum';
-import {
-  useBooks,
-  useBookWithTopics,
-  useGenerateBookTopics,
-} from '../../hooks/use-books';
+import { useNoteTopicIds } from '../../hooks/use-notes';
 import { useApiClient } from '../../lib/api-client';
 import { useProfile } from '../../lib/profile';
 import { combinedSignal } from '../../lib/query-timeout';
@@ -80,12 +71,6 @@ function getTopicRetention(topic: SubjectRetentionTopic): RetentionStatus {
   return 'weak';
 }
 
-function findSuggestedNext(topics: CurriculumTopic[]): string | undefined {
-  return [...topics]
-    .filter((topic) => !topic.skipped)
-    .sort((a, b) => a.sortOrder - b.sortOrder)[0]?.id;
-}
-
 function SubjectStatusPill({
   status,
 }: {
@@ -119,14 +104,7 @@ export default function LibraryScreen() {
   const themeColors = useThemeColors();
   const apiClient = useApiClient();
   const { activeProfile } = useProfile();
-  const { subjectId: routeSubjectId } = useLocalSearchParams<{
-    subjectId?: string;
-  }>();
 
-  const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(
-    routeSubjectId ?? null
-  );
-  const [selectedBookId, setSelectedBookId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<LibraryTab>('shelves');
   const [shelvesTabState, setShelvesTabState] = useState<ShelvesTabState>(
     SHELVES_TAB_INITIAL_STATE
@@ -139,82 +117,16 @@ export default function LibraryScreen() {
   );
   const [showManageSubjects, setShowManageSubjects] = useState(false);
   const [pendingSubjectId, setPendingSubjectId] = useState<string | null>(null);
-  const [bookGenerationState, setBookGenerationState] = useState<
-    'idle' | 'slow' | 'timed_out'
-  >('idle');
 
   const subjectsQuery = useSubjects({ includeInactive: true });
   const progressQuery = useOverallProgress();
   const updateSubject = useUpdateSubject();
-  const booksQuery = useBooks(selectedSubjectId ?? undefined);
-  const curriculumQuery = useCurriculum(selectedSubjectId ?? '');
-  const bookQuery = useBookWithTopics(
-    selectedSubjectId ?? undefined,
-    selectedBookId ?? undefined
-  );
-  const generateBookTopics = useGenerateBookTopics(
-    selectedSubjectId ?? undefined,
-    selectedBookId ?? undefined
-  );
   const allBooksQuery = useAllBooks();
-
-  useEffect(() => {
-    if (routeSubjectId) {
-      setSelectedSubjectId(routeSubjectId);
-      setSelectedBookId(null);
-    }
-  }, [routeSubjectId]);
-
-  // Auto-generate topics when selecting an un-generated book
-  useEffect(() => {
-    if (!selectedSubjectId || !selectedBookId) return;
-    const book = booksQuery.data?.find((entry) => entry.id === selectedBookId);
-    if (book && !book.topicsGenerated && !generateBookTopics.isPending) {
-      generateBookTopics.mutate({});
-    }
-  }, [
-    selectedSubjectId,
-    selectedBookId,
-    booksQuery.data,
-    generateBookTopics,
-    generateBookTopics.isPending,
-  ]);
-
-  // Guard against stale generateBookTopics data from a previously selected book
-  const generatedBook =
-    generateBookTopics.data?.book.id === selectedBookId
-      ? generateBookTopics.data
-      : null;
-  const activeBook = bookQuery.data ?? generatedBook ?? null;
-
-  useEffect(() => {
-    const waitingForBookTopics =
-      !!selectedBookId &&
-      (generateBookTopics.isPending || (bookQuery.isLoading && !activeBook));
-    if (!waitingForBookTopics) {
-      setBookGenerationState('idle');
-      return undefined;
-    }
-
-    const slowTimer = setTimeout(() => {
-      setBookGenerationState((current) =>
-        current === 'idle' ? 'slow' : current
-      );
-    }, 60_000);
-    const timeoutTimer = setTimeout(() => {
-      setBookGenerationState('timed_out');
-    }, 90_000);
-
-    return () => {
-      clearTimeout(slowTimer);
-      clearTimeout(timeoutTimer);
-    };
-  }, [
-    activeBook,
-    bookQuery.isLoading,
-    generateBookTopics.isPending,
-    selectedBookId,
-  ]);
+  const noteTopicIdsQuery = useNoteTopicIds();
+  const noteIdSet = useMemo(
+    () => new Set(noteTopicIdsQuery.data?.topicIds ?? []),
+    [noteTopicIdsQuery.data]
+  );
 
   const retentionQueries = useQueries({
     queries: (subjectsQuery.data ?? []).map((subject) => ({
@@ -255,9 +167,10 @@ export default function LibraryScreen() {
         lastReviewedAt: topic.lastReviewedAt,
         repetitions: topic.repetitions,
         failureCount: topic.failureCount,
+        hasNote: noteIdSet.has(topic.topicId),
       }));
     });
-  }, [retentionQueries, subjectsQuery.data]);
+  }, [retentionQueries, subjectsQuery.data, noteIdSet]);
 
   const progressBySubjectId = useMemo(
     () =>
@@ -283,40 +196,10 @@ export default function LibraryScreen() {
     [subjectsQuery.data?.length, allBooksQuery.books.length, allTopics.length]
   );
 
-  const selectedSubject =
-    subjectsQuery.data?.find((subject) => subject.id === selectedSubjectId) ??
-    null;
-  const selectedBook =
-    booksQuery.data?.find((book) => book.id === selectedBookId) ?? null;
-  const flatSubjectTopics =
-    curriculumQuery.data?.topics
-      ?.filter((topic) => !topic.bookId)
-      .sort((a, b) => a.sortOrder - b.sortOrder) ?? [];
-  const canGoBack = selectedSubjectId !== null;
-  const headerTitle = selectedBookId
-    ? activeBook?.book.title ?? selectedBook?.title ?? 'Book'
-    : selectedSubjectId
-    ? selectedSubject?.name ?? 'Shelf'
-    : 'Library';
-
   const handleRetry = (): void => {
     void subjectsQuery.refetch();
     void progressQuery.refetch();
     retentionQueries.forEach((query) => void query.refetch());
-    void booksQuery.refetch();
-    void bookQuery.refetch();
-    void curriculumQuery.refetch();
-  };
-
-  const handleBack = (): void => {
-    if (selectedBookId) {
-      setSelectedBookId(null);
-      return;
-    }
-    if (selectedSubjectId) {
-      setSelectedSubjectId(null);
-      return;
-    }
   };
 
   const handleTabChange = (tab: LibraryTab): void => {
@@ -343,17 +226,6 @@ export default function LibraryScreen() {
     }
   };
 
-  const retryBookGeneration = (): void => {
-    generateBookTopics.reset();
-    setBookGenerationState('idle');
-    generateBookTopics.mutate({});
-  };
-
-  const cancelBookGeneration = (): void => {
-    setBookGenerationState('idle');
-    setSelectedBookId(null);
-  };
-
   const openTopic = (topicId: string, subjectId: string): void => {
     router.push({
       pathname: '/(learner)/session',
@@ -373,52 +245,7 @@ export default function LibraryScreen() {
       );
     }
 
-    if (
-      selectedBookId &&
-      (generateBookTopics.isError || bookGenerationState === 'timed_out')
-    ) {
-      return (
-        <View
-          className="bg-surface rounded-card px-4 py-8 items-center"
-          testID="book-generation-error"
-        >
-          <Text className="text-body font-semibold text-text-primary text-center mb-2">
-            We couldn&apos;t finish that book right now
-          </Text>
-          <Text className="text-body-sm text-text-secondary text-center mb-5">
-            {generateBookTopics.isError
-              ? formatApiError(generateBookTopics.error)
-              : 'The topic generator took too long. Try again or go back to your shelf.'}
-          </Text>
-          <Pressable
-            onPress={retryBookGeneration}
-            className="bg-primary rounded-button px-6 py-3 items-center min-h-[48px] justify-center mb-3"
-            testID="book-generation-retry"
-          >
-            <Text className="text-text-inverse text-body font-semibold">
-              Retry
-            </Text>
-          </Pressable>
-          <Pressable
-            onPress={cancelBookGeneration}
-            className="bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
-            testID="book-generation-cancel"
-          >
-            <Text className="text-text-primary text-body font-semibold">
-              Cancel
-            </Text>
-          </Pressable>
-        </View>
-      );
-    }
-
-    if (
-      subjectsQuery.isError ||
-      progressQuery.isError ||
-      booksQuery.isError ||
-      bookQuery.isError ||
-      curriculumQuery.isError
-    ) {
+    if (subjectsQuery.isError || progressQuery.isError) {
       return (
         <View
           className="flex-1 items-center justify-center px-5 py-12"
@@ -436,136 +263,6 @@ export default function LibraryScreen() {
               Retry
             </Text>
           </Pressable>
-        </View>
-      );
-    }
-
-    if (
-      selectedBookId &&
-      (generateBookTopics.isPending || (bookQuery.isLoading && !activeBook))
-    ) {
-      return (
-        <View
-          className="bg-surface rounded-card px-4 py-8 items-center"
-          testID="book-building"
-        >
-          <PenWritingAnimation size={80} color={themeColors.accent} />
-          <Text className="text-body font-semibold text-text-primary text-center mt-4">
-            Writing your {selectedBook?.title ?? 'book'}...
-          </Text>
-          {!!selectedBook?.description && (
-            <Text className="text-body-sm text-text-secondary text-center mt-2">
-              {selectedBook.description}
-            </Text>
-          )}
-          {bookGenerationState === 'slow' && (
-            <Text className="text-body-sm text-text-secondary text-center mt-3">
-              This is taking a little longer than usual.
-            </Text>
-          )}
-          <View className="flex-row gap-3 mt-5">
-            <Pressable
-              onPress={cancelBookGeneration}
-              className="bg-surface-elevated rounded-button px-5 py-3 min-h-[48px] items-center justify-center"
-              testID="book-generation-cancel-button"
-            >
-              <Text className="text-body font-semibold text-text-primary">
-                Cancel
-              </Text>
-            </Pressable>
-            {bookGenerationState === 'slow' && (
-              <Pressable
-                onPress={handleRetry}
-                className="bg-primary rounded-button px-5 py-3 min-h-[48px] items-center justify-center"
-                testID="book-generation-refresh-button"
-              >
-                <Text className="text-body font-semibold text-text-inverse">
-                  Check again
-                </Text>
-              </Pressable>
-            )}
-          </View>
-        </View>
-      );
-    }
-
-    if (selectedBookId && activeBook && selectedSubjectId) {
-      return (
-        <ChapterTopicList
-          topics={activeBook.topics}
-          suggestedNextId={findSuggestedNext(activeBook.topics)}
-          onTopicPress={(topicId) => openTopic(topicId, selectedSubjectId)}
-        />
-      );
-    }
-
-    if (selectedSubjectId && booksQuery.isLoading) {
-      return (
-        <View className="py-8 items-center" testID="library-topic-loading">
-          <BookPageFlipAnimation size={80} color={themeColors.accent} />
-          <Text className="text-body-sm text-text-secondary mt-3">
-            Loading this shelf...
-          </Text>
-        </View>
-      );
-    }
-
-    if (selectedSubjectId && booksQuery.data && booksQuery.data.length > 0) {
-      return (
-        <ShelfView
-          books={booksQuery.data}
-          suggestedBookId={
-            booksQuery.data.find((book) => !book.topicsGenerated)?.id ??
-            booksQuery.data[0]?.id
-          }
-          summaries={
-            selectedBook && activeBook
-              ? {
-                  [selectedBook.id]: {
-                    status: activeBook.status,
-                    topicCount: activeBook.topics.filter(
-                      (topic) => !topic.skipped
-                    ).length,
-                    completedCount: activeBook.completedTopicCount ?? 0,
-                  },
-                }
-              : undefined
-          }
-          onBookPress={(bookId) => {
-            setSelectedBookId(bookId);
-          }}
-        />
-      );
-    }
-
-    if (selectedSubjectId && flatSubjectTopics.length > 0) {
-      return (
-        <ChapterTopicList
-          topics={flatSubjectTopics}
-          suggestedNextId={findSuggestedNext(flatSubjectTopics)}
-          onTopicPress={(topicId) => openTopic(topicId, selectedSubjectId)}
-        />
-      );
-    }
-
-    if (
-      selectedSubjectId &&
-      booksQuery.data &&
-      booksQuery.data.length === 0 &&
-      flatSubjectTopics.length === 0
-    ) {
-      return (
-        <View
-          className="bg-surface rounded-card px-4 py-6 items-center"
-          testID="library-shelf-empty"
-        >
-          <Text className="text-body font-semibold text-text-primary text-center mb-2">
-            No topics on this shelf yet
-          </Text>
-          <Text className="text-body-sm text-text-secondary text-center">
-            We haven&apos;t added any lessons here yet. Try another shelf or
-            come back after your curriculum is ready.
-          </Text>
         </View>
       );
     }
@@ -593,8 +290,10 @@ export default function LibraryScreen() {
             state={shelvesTabState}
             onStateChange={setShelvesTabState}
             onShelfPress={(subjectId) => {
-              setSelectedSubjectId(subjectId);
-              setSelectedBookId(null);
+              router.push({
+                pathname: '/(learner)/shelf/[subjectId]',
+                params: { subjectId },
+              } as never);
             }}
             onAddSubject={() => router.push('/create-subject')}
           />
@@ -606,8 +305,10 @@ export default function LibraryScreen() {
             state={booksTabState}
             onStateChange={setBooksTabState}
             onBookPress={(subjectId, bookId) => {
-              setSelectedSubjectId(subjectId);
-              setSelectedBookId(bookId);
+              router.push({
+                pathname: '/(learner)/shelf/[subjectId]/book/[bookId]',
+                params: { subjectId, bookId },
+              } as never);
             }}
             onAddSubject={() => router.push('/create-subject')}
           />
@@ -617,6 +318,7 @@ export default function LibraryScreen() {
             topics={allTopics}
             subjects={subjectList}
             books={bookList}
+            noteTopicIds={noteIdSet}
             state={topicsTabState}
             onStateChange={setTopicsTabState}
             onTopicPress={(topicId, subjectId) => openTopic(topicId, subjectId)}
@@ -631,56 +333,32 @@ export default function LibraryScreen() {
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
       <View className="px-5 pt-4 pb-3 flex-row items-center justify-between">
         <View className="flex-row items-center flex-1 me-3">
-          {canGoBack && (
-            <Pressable
-              onPress={handleBack}
-              className="me-3 p-2 -ms-2"
-              accessibilityLabel="Back"
-            >
-              <Ionicons
-                name="arrow-back"
-                size={24}
-                color={themeColors.accent}
-              />
-            </Pressable>
-          )}
           <View className="flex-1">
-            <Text className="text-h1 font-bold text-text-primary">
-              {headerTitle}
-            </Text>
+            <Text className="text-h1 font-bold text-text-primary">Library</Text>
             <Text className="text-body-sm text-text-secondary mt-1">
-              {selectedBookId
-                ? `${activeBook?.topics.length ?? 0} topics`
-                : selectedSubjectId
-                ? booksQuery.data && booksQuery.data.length > 0
-                  ? `${booksQuery.data.length} books`
-                  : `${flatSubjectTopics.length} topics`
-                : `${subjectsQuery.data?.length ?? 0} subjects`}
+              {`${subjectsQuery.data?.length ?? 0} subjects`}
             </Text>
           </View>
         </View>
 
-        {(subjectsQuery.data?.length ?? 0) > 0 &&
-          !selectedSubjectId &&
-          !selectedBookId && (
-            <Pressable
-              onPress={() => setShowManageSubjects(true)}
-              className="rounded-full bg-surface-elevated px-4 py-2"
-              testID="manage-subjects-button"
-            >
-              <Text className="text-body-sm font-semibold text-primary">
-                Manage
-              </Text>
-            </Pressable>
-          )}
+        {(subjectsQuery.data?.length ?? 0) > 0 && (
+          <Pressable
+            onPress={() => setShowManageSubjects(true)}
+            className="rounded-full bg-surface-elevated px-4 py-2"
+            testID="manage-subjects-button"
+          >
+            <Text className="text-body-sm font-semibold text-primary">
+              Manage
+            </Text>
+          </Pressable>
+        )}
       </View>
 
       <ScrollView
         className="flex-1 px-5"
         contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
       >
-        {!selectedSubjectId &&
-          !!progressQuery.data?.subjects.length &&
+        {!!progressQuery.data?.subjects.length &&
           progressQuery.data.subjects.every(
             (subject) =>
               subject.topicsTotal > 0 &&

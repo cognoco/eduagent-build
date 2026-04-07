@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
+import type { DailyPlanItem } from '@eduagent/schemas';
 import { useContinueSuggestion } from './use-progress';
 import { useStreaks } from './use-streaks';
+import { useDailyPlan } from './use-daily-plan';
 
 interface CoachingCardState {
   headline: string;
@@ -10,6 +12,7 @@ interface CoachingCardState {
   primaryRoute: string;
   secondaryRoute: string;
   isLoading: boolean;
+  planItems: DailyPlanItem[];
   /** When true, show celebration animation + "Add a new subject" CTA (Story 10.15). */
   isCurriculumComplete?: boolean;
 }
@@ -23,8 +26,9 @@ export function useCoachingCard(defaultSubjectId?: string): CoachingCardState {
   const { data: suggestion, isLoading: suggestionLoading } =
     useContinueSuggestion();
   const { data: streak, isLoading: streakLoading } = useStreaks();
+  const { data: dailyPlan, isLoading: planLoading } = useDailyPlan();
 
-  const isLoading = suggestionLoading || streakLoading;
+  const isLoading = suggestionLoading || streakLoading || planLoading;
 
   return useMemo(() => {
     const freeformRoute = defaultSubjectId
@@ -39,6 +43,7 @@ export function useCoachingCard(defaultSubjectId?: string): CoachingCardState {
         primaryRoute: '',
         secondaryRoute: '',
         isLoading: true,
+        planItems: [],
       };
     }
 
@@ -56,6 +61,7 @@ export function useCoachingCard(defaultSubjectId?: string): CoachingCardState {
           : freeformRoute,
         secondaryRoute: freeformRoute,
         isLoading: false,
+        planItems: dailyPlan?.items ?? [],
       };
     }
 
@@ -69,6 +75,7 @@ export function useCoachingCard(defaultSubjectId?: string): CoachingCardState {
         primaryRoute: `/session?mode=practice&subjectId=${suggestion.subjectId}&topicId=${suggestion.topicId}`,
         secondaryRoute: freeformRoute,
         isLoading: false,
+        planItems: dailyPlan?.items ?? [],
       };
     }
 
@@ -83,6 +90,7 @@ export function useCoachingCard(defaultSubjectId?: string): CoachingCardState {
         secondaryRoute: '/(learner)/library',
         isLoading: false,
         isCurriculumComplete: true,
+        planItems: dailyPlan?.items ?? [],
       };
     }
 
@@ -123,6 +131,7 @@ export function useCoachingCard(defaultSubjectId?: string): CoachingCardState {
       primaryRoute: freeformRoute,
       secondaryRoute: freeformRoute,
       isLoading: false,
+      planItems: dailyPlan?.items ?? [],
     };
-  }, [isLoading, suggestion, streak, defaultSubjectId]);
+  }, [isLoading, suggestion, streak, dailyPlan, defaultSubjectId]);
 }

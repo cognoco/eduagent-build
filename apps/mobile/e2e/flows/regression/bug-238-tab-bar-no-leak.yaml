@@ -1,0 +1,74 @@
+# Regression: BUG-238 — shelf/[subjectId] must not appear as a tab
+#
+# Root cause: The shelf/ route directory under (learner) was auto-discovered
+# by Expo Router and rendered as a 4th tab item because it lacked a
+# Tabs.Screen entry with href:null in the layout.
+#
+# This test verifies that only 3 tabs (Home, Library, More) are visible
+# in the bottom tab bar and no raw route paths leak through.
+#
+# Tags: regression, smoke, library
+appId: com.mentomate.app
+tags:
+  - regression
+  - smoke
+  - library
+---
+# ── Setup ────────────────────────────────────────────────────────────
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "basic"
+      API_URL: ${API_URL}
+
+# Wait for home screen to fully load
+- extendedWaitUntil:
+    visible:
+      id: "home-scroll-view"
+    timeout: 15000
+
+- takeScreenshot: bug-238-01-home-loaded
+
+# ── Verify only 3 tabs visible ──────────────────────────────────────
+
+# The 3 legitimate tab buttons should be present
+- assertVisible:
+    id: "tab-home"
+
+- assertVisible:
+    id: "tab-library"
+
+- assertVisible:
+    id: "tab-more"
+
+# ── Assert no route path leak ───────────────────────────────────────
+
+# "shelf" must NOT appear as visible text anywhere in the tab bar.
+# If Expo Router leaks the route, it renders "shelf/[subjec..." as a label.
+- assertNotVisible: "shelf"
+
+- takeScreenshot: bug-238-02-tab-bar-clean
+
+# ── Navigate to Library and re-check ────────────────────────────────
+
+- tapOn:
+    id: "tab-library"
+
+- extendedWaitUntil:
+    visible:
+      text: "Library"
+    timeout: 10000
+
+# After navigating to library, verify tabs are still clean
+- assertVisible:
+    id: "tab-home"
+
+- assertVisible:
+    id: "tab-library"
+
+- assertVisible:
+    id: "tab-more"
+
+- assertNotVisible: "shelf"
+
+- takeScreenshot: bug-238-03-library-tabs-clean

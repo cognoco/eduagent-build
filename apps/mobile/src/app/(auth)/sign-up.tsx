@@ -131,23 +131,43 @@ export default function SignUpScreen() {
 
   const onSSOPress = useCallback(
     async (strategy: SupportedSSOStrategy) => {
+      if (!isLoaded) return;
       clearActivationFailure();
       setError('');
       setOauthLoading(strategy);
 
       try {
-        const { createdSessionId } = await startSSOFlow({
+        const ssoResult = await startSSOFlow({
           strategy,
           redirectUrl: Linking.createURL('/sso-callback', {
             scheme: 'mentomate',
           }),
         });
 
-        if (createdSessionId && setActive) {
-          const activated = await activateCreatedSession(
-            createdSessionId,
-            'oauth'
+        const {
+          createdSessionId,
+          signIn: ssoSignIn,
+          signUp: ssoSignUp,
+        } = ssoResult;
+
+        if (__DEV__)
+          console.log(
+            `[AUTH-DEBUG] sign-up SSO result → createdSessionId=${
+              createdSessionId ?? 'null'
+            }` +
+              ` | signIn.status=${ssoSignIn?.status ?? 'null'}` +
+              ` | signUp.status=${ssoSignUp?.status ?? 'null'}` +
+              ` | signUp.createdSessionId=${
+                ssoSignUp?.createdSessionId ?? 'null'
+              }`
           );
+
+        // Session ID may be on top level or on signUp for new OAuth users
+        const sessionId =
+          createdSessionId ?? ssoSignUp?.createdSessionId ?? null;
+
+        if (sessionId) {
+          const activated = await activateCreatedSession(sessionId, 'oauth');
           if (!activated) {
             return;
           }
@@ -155,14 +175,27 @@ export default function SignUpScreen() {
           return;
         }
 
+        if (__DEV__)
+          console.warn(
+            `[AUTH-DEBUG] sign-up SSO: no session created.` +
+              ` signIn.status=${ssoSignIn?.status ?? 'null'}` +
+              ` signUp.status=${ssoSignUp?.status ?? 'null'}`
+          );
         setError('Sign-up could not be completed. Please try again.');
       } catch (err: unknown) {
+        if (__DEV__) console.warn('[AUTH-DEBUG] sign-up SSO threw:', err);
         setError(extractClerkError(err));
       } finally {
         setOauthLoading(null);
       }
     },
-    [activateCreatedSession, clearActivationFailure, setActive, startSSOFlow]
+    [
+      activateCreatedSession,
+      clearActivationFailure,
+      isLoaded,
+      setActive,
+      startSSOFlow,
+    ]
   );
 
   const onSignUpPress = useCallback(async () => {
@@ -173,10 +206,22 @@ export default function SignUpScreen() {
     setLoading(true);
 
     try {
+      if (__DEV__)
+        console.log(
+          `[AUTH-DEBUG] signUp.create → email=${emailAddress.trim()}`
+        );
       await signUp.create({ emailAddress, password });
+      if (__DEV__)
+        console.log(
+          `[AUTH-DEBUG] signUp.create → status=${signUp.status}` +
+            ` | createdSessionId=${signUp.createdSessionId ?? 'null'}`
+        );
       await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
+      if (__DEV__)
+        console.log('[AUTH-DEBUG] prepareEmailAddressVerification → OK');
       setPendingVerification(true);
     } catch (err: unknown) {
+      if (__DEV__) console.warn('[AUTH-DEBUG] signUp flow threw:', err);
       setError(extractClerkError(err));
     } finally {
       setLoading(false);

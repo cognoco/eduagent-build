@@ -67,6 +67,7 @@ import {
   updateRetentionFromSession,
   evaluateRecallQuality,
   ensureRetentionCard,
+  getProfileOverdueCount,
 } from './retention-data';
 
 const NOW = new Date('2026-02-15T10:00:00.000Z');
@@ -1648,5 +1649,61 @@ describe('evaluateRecallQuality', () => {
       'Topic'
     );
     expect(result).toBe(3);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getProfileOverdueCount
+// ---------------------------------------------------------------------------
+
+describe('getProfileOverdueCount', () => {
+  it('returns correct count and top topic IDs', async () => {
+    const now = new Date();
+    const overduePast = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000); // 2 days ago
+    const overdueRecent = new Date(now.getTime() - 1 * 60 * 60 * 1000); // 1 hour ago
+    const future = new Date(now.getTime() + 24 * 60 * 60 * 1000); // tomorrow
+
+    const mockRepo = {
+      retentionCards: {
+        findMany: jest.fn().mockResolvedValue([
+          { topicId: 'topic-old', nextReviewAt: overduePast },
+          { topicId: 'topic-recent', nextReviewAt: overdueRecent },
+          { topicId: 'topic-future', nextReviewAt: future },
+        ]),
+      },
+    };
+    (createScopedRepository as jest.Mock).mockReturnValue(mockRepo);
+
+    // Note: the query filters by lt(nextReviewAt, now) — but since we mock
+    // findMany directly, all cards are returned and we filter in-query.
+    // To test the correct count, pretend only overdue cards come back:
+    (mockRepo.retentionCards.findMany as jest.Mock).mockResolvedValue([
+      { topicId: 'topic-old', nextReviewAt: overduePast },
+      { topicId: 'topic-recent', nextReviewAt: overdueRecent },
+    ]);
+
+    const db = {} as unknown as Database;
+    const { overdueCount, topTopicIds } = await getProfileOverdueCount(
+      db,
+      'profile-1'
+    );
+
+    expect(overdueCount).toBe(2);
+    // Most overdue first
+    expect(topTopicIds[0]).toBe('topic-old');
+    expect(topTopicIds[1]).toBe('topic-recent');
+  });
+
+  it('returns empty state when no overdue cards', async () => {
+    const mockRepo = {
+      retentionCards: { findMany: jest.fn().mockResolvedValue([]) },
+    };
+    (createScopedRepository as jest.Mock).mockReturnValue(mockRepo);
+
+    const db = {} as unknown as Database;
+    const result = await getProfileOverdueCount(db, 'profile-1');
+
+    expect(result.overdueCount).toBe(0);
+    expect(result.topTopicIds).toHaveLength(0);
   });
 });

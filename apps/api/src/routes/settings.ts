@@ -36,7 +36,7 @@ type SettingsRouteEnv = {
     CLERK_JWKS_URL?: string;
     RESEND_API_KEY?: string;
     EMAIL_FROM?: string;
-    APP_URL?: string;
+    API_ORIGIN?: string;
   };
   Variables: {
     user: AuthUser;
@@ -132,6 +132,13 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
   .post('/settings/notify-parent-subscribe', async (c) => {
     const db = c.get('db');
     const profileId = requireProfileId(c.get('profileId'));
+    // API_ORIGIN must be set — falling back to c.req.url would allow Host header
+    // injection (OWASP A03) since Cloudflare Workers populate it from the
+    // attacker-supplied Host header.
+    const apiOrigin = c.env.API_ORIGIN;
+    if (!apiOrigin) {
+      throw new Error('API_ORIGIN env var is required');
+    }
     const result = await notifyParentToSubscribe(
       db,
       profileId,
@@ -139,7 +146,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
         resendApiKey: c.env.RESEND_API_KEY,
         emailFrom: c.env.EMAIL_FROM,
       },
-      c.env.APP_URL
+      apiOrigin
     );
     return c.json(result);
   })

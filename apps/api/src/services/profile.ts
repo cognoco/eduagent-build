@@ -4,7 +4,7 @@
 // ---------------------------------------------------------------------------
 
 import { eq, and, asc } from 'drizzle-orm';
-import { profiles, type Database } from '@eduagent/database';
+import { profiles, familyLinks, type Database } from '@eduagent/database';
 import type {
   ProfileCreateInput,
   ProfileUpdateInput,
@@ -34,6 +34,7 @@ import {
   getConsentStatus,
   checkConsentRequired,
   createPendingConsentState,
+  createGrantedConsentState,
 } from './consent';
 
 // ---------------------------------------------------------------------------
@@ -129,13 +130,19 @@ export async function findOwnerProfile(
  * owner profile (isOwner = true). Subsequent profiles are non-owner.
  *
  * Consent is determined by age alone (GDPR-everywhere, Story 10.19).
- * If consent is required, a PENDING consent state row is created automatically.
+ * If consent is required:
+ * - When `parentProfileId` is provided (parent adding child directly),
+ *   consent is recorded as GRANTED immediately — the parent IS the consenting
+ *   adult, so no email loop is needed. A family_link row is also created.
+ * - Otherwise (child self-registering), a PENDING consent state is created and
+ *   the child must go through the email-based consent request flow.
  */
 export async function createProfile(
   db: Database,
   accountId: string,
   input: ProfileCreateInput,
-  isOwner?: boolean
+  isOwner?: boolean,
+  parentProfileId?: string
 ): Promise<Profile> {
   // BD-06: When birthDate is present, it is the single source of truth for birthYear.
   // This prevents a mismatch where consent/persona are computed from one value
@@ -178,15 +185,29 @@ export async function createProfile(
     })
     .returning();
 
-  // Server-side consent determination: if consent is required, create PENDING state
+  // Server-side consent determination: if consent is required, record it.
+  // When a parent creates a child (parentProfileId set), consent is GRANTED
+  // immediately — the parent IS the consenting adult (BUG-239 fix).
+  // Otherwise (child self-registering), create PENDING state for the
+  // email-based consent request flow.
   let consentStatus: Profile['consentStatus'] = null;
   if (consentCheck?.required && consentCheck.consentType) {
-    const state = await createPendingConsentState(
-      db,
-      row!.id,
-      consentCheck.consentType
-    );
-    consentStatus = state.status;
+    if (parentProfileId) {
+      const state = await createGrantedConsentState(
+        db,
+        row!.id,
+        consentCheck.consentType,
+        parentProfileId
+      );
+      consentStatus = state.status;
+    } else {
+      const state = await createPendingConsentState(
+        db,
+        row!.id,
+        consentCheck.consentType
+      );
+      consentStatus = state.status;
+    }
   }
 
   return mapProfileRow(row!, consentStatus);
@@ -264,4 +285,24 @@ export async function getProfileAge(
   });
   const currentYear = new Date().getUTCFullYear();
   return profile?.birthYear ? Math.max(5, currentYear - profile.birthYear) : 12;
+}
+
+// ---------------------------------------------------------------------------
+// Role resolution (used by recall notifications + daily plan)
+// ---------------------------------------------------------------------------
+
+export type ProfileRole = 'guardian' | 'self_learner';
+
+/**
+ * Determines whether a profile is a guardian or self-learner by checking
+ * the family_links table. A profile with any child links is a guardian.
+ */
+export async function resolveProfileRole(
+  db: Database,
+  profileId: string
+): Promise<ProfileRole> {
+  const childLink = await db.query.familyLinks.findFirst({
+    where: eq(familyLinks.parentProfileId, profileId),
+  });
+  return childLink ? 'guardian' : 'self_learner';
 }

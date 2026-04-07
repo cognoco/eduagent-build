@@ -13,6 +13,7 @@ const envSchema = z.object({
   OPENAI_API_KEY: z.string().min(1).optional(),
   ANTHROPIC_API_KEY: z.string().min(1).optional(),
   APP_URL: z.string().url().default('https://www.mentomate.com'),
+  API_ORIGIN: z.string().url().optional(), // Required at runtime by consent/settings routes
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
 
   // Stripe — optional. Dormant until web client added; mobile uses RevenueCat IAP.
@@ -59,6 +60,7 @@ const PRODUCTION_REQUIRED_KEYS: readonly (keyof Env)[] = [
   'VOYAGE_API_KEY',
   'RESEND_API_KEY',
   'REVENUECAT_WEBHOOK_SECRET',
+  'API_ORIGIN',
 ] as const;
 
 /**

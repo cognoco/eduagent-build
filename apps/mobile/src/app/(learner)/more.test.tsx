@@ -32,6 +32,7 @@ jest.mock('../../hooks/use-account', () => ({
 
 jest.mock('../../hooks/use-subscription', () => ({
   useSubscription: () => ({ data: { tier: 'free' } }),
+  useFamilySubscription: () => ({ data: null }),
 }));
 
 const mockNotifData = {

@@ -2,28 +2,28 @@
 
 **Author:** Zuzka + Claude
 **Date:** 2026-03-30
-**Status:** Partially implemented (6 of 12 stories complete as of 2026-04-01)
+**Status:** COMPLETE (12 of 12 stories implemented as of 2026-04-06)
 
 ---
 
-## Implementation Status (2026-04-01)
+## Implementation Status (2026-04-06)
 
 | Story | Title | Status | Notes |
 |-------|-------|--------|-------|
-| 14.1 | Coaching card dismissal | NOT STARTED | Co-designs with Epic 12.7, blocked on persona removal |
+| 14.1 | Coaching card dismissal | DONE | useHomeCards + HomeActionCard wired into LearnerScreen. Dismiss hides per session, tracked server-side. 3+ dismissals deprioritized via applyInteractionAdjustments. |
 | 14.2 | "I don't remember" on recall tests | DONE | Hint then remediation flow implemented |
 | 14.3 | "Add my own topic" to curriculum | DONE | LLM normalization + user confirmation + `source: 'user'` |
 | 14.4 | "Something else" on ambiguous suggestions | DONE | Clarification input + "Just use my words" escape hatch |
-| 14.5 | Per-message feedback | NOT STARTED | |
-| 14.6 | Quick-action chips | NOT STARTED | |
-| 14.7 | Topic switch mid-session | NOT STARTED | |
-| 14.8 | Escalation visibility + difficulty nudge | NOT STARTED | |
+| 14.5 | Per-message feedback | DONE | Feedback affordance on AI messages, system-injected correction, sessionEvents tracking |
+| 14.6 | Quick-action chips | DONE | Contextual chips below AI messages: "I know this", "Explain differently", "Too easy", "Too hard" |
+| 14.7 | Topic switch mid-session | DONE | "Switch Topic" in session menu, bottom sheet topic picker, seamless session transition |
+| 14.8 | Escalation visibility + difficulty nudge | DONE | Difficulty indicator in session header, "Guided"/"Independent" label, tooltip |
 | 14.9 | Problem card preview + OCR correction | DONE | Client-side heuristic split, editable cards, merge/split, "Add problem I missed" |
 | 14.10 | "Help me" vs "Check my answer" per problem | DONE | Two chips, concise responses, teen gets shorter, AI never gives direct answer |
 | 14.11 | Multi-problem session flow | DONE | All problems sent to LLM, "Next problem" chip, problem counter, camera in chat |
 | 14.12 | Homework learning extraction | DONE | Inngest step, LLM reads conversation, structured JSON in `metadata.homeworkSummary` |
 
-**Summary:** Phase A is 3/4 complete (14.1 blocked). Phase B homework overhaul (14.9-14.12) is fully complete. Phase C session agency (14.5-14.8) is not started.
+**Summary:** All 12 stories complete. Phase A (4/4), Phase B homework overhaul (4/4), Phase C session agency (4/4).
 
 ---
 
@@ -166,7 +166,7 @@ Specific gaps:
 
 ### Phase A — Low Effort, High Impact (Pre-Launch Recommended)
 
-#### Story 14.1: Coaching Card Dismissal — `NOT STARTED` (blocked on Epic 12.7)
+#### Story 14.1: Coaching Card Dismissal — `DONE`
 
 As a returning learner,
 I want to dismiss coaching card suggestions I don't need,
@@ -244,7 +244,7 @@ So that I don't have to pick a subject I didn't want.
 
 ### Phase B — Medium Effort, High Impact (Post-Launch)
 
-#### Story 14.5: Per-Message Feedback — `NOT STARTED`
+#### Story 14.5: Per-Message Feedback — `DONE`
 
 As a learner in a session,
 I want to tell the AI when something is wrong or unhelpful,
@@ -264,7 +264,7 @@ So that it adjusts in real-time instead of me having to start over.
 
 ---
 
-#### Story 14.6: Quick-Action Chips — `NOT STARTED`
+#### Story 14.6: Quick-Action Chips — `DONE`
 
 As a learner in a session,
 I want quick ways to redirect the AI without typing,
@@ -284,7 +284,7 @@ So that I can say "I know this" or "too hard" with one tap.
 
 ---
 
-#### Story 14.7: Topic Switch Mid-Session — `NOT STARTED`
+#### Story 14.7: Topic Switch Mid-Session — `DONE`
 
 As a learner who wants to study a different topic,
 I want to switch without leaving the session screen,
@@ -303,7 +303,7 @@ So that I stay in flow instead of navigating back and forth.
 
 ---
 
-#### Story 14.8: Escalation Visibility + Difficulty Nudge — `NOT STARTED`
+#### Story 14.8: Escalation Visibility + Difficulty Nudge — `DONE`
 
 As a learner who wants more or less challenge,
 I want to see the AI's current difficulty level and nudge it,
@@ -481,7 +481,7 @@ So that I can understand their progress and where they need support.
 
 ```
 Phase A (pre-launch, parallelizable):
-  14.1  (Dismiss coaching card)        ─── NOT STARTED — blocked on Epic 12.7
+  14.1  (Dismiss coaching card)        ─── DONE (2026-04-06)
   14.2  (I don't remember)             ─── DONE
   14.3  (Add my own topic)             ─── DONE
   14.4  (Something else)               ─── DONE
@@ -493,15 +493,13 @@ Phase B — Homework Overhaul (high priority, sequential):
   14.12 (Learning extraction + parent) ─── DONE
 
 Phase C — Session Agency (post-launch):
-  14.5  (Per-message feedback)         ─── NOT STARTED
-  14.6  (Quick-action chips)           ─── NOT STARTED — depends on 14.5
-  14.7  (Topic switch mid-session)     ─── NOT STARTED
-  14.8  (Escalation visibility)        ─── NOT STARTED — depends on 14.6
+  14.5  (Per-message feedback)         ─── DONE (2026-04-03)
+  14.6  (Quick-action chips)           ─── DONE (2026-04-03)
+  14.7  (Topic switch mid-session)     ─── DONE (2026-04-03)
+  14.8  (Escalation visibility)        ─── DONE (2026-04-03)
 ```
 
-Phase A: 3/4 complete. 14.1 blocked on Epic 12.7 (persona removal co-design).
-Phase B: COMPLETE. All homework overhaul stories implemented.
-Phase C: Not started. These are post-launch enhancements.
+All phases COMPLETE. Epic 14 fully implemented as of 2026-04-06.
 
 ---
 

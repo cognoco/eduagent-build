@@ -44,6 +44,9 @@ function createMockDb({
       curriculumTopics: {
         findMany: jest.fn().mockResolvedValue(topicsFindMany),
       },
+      curriculumBooks: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'book-1' }),
+      },
     },
     select: jest.fn().mockReturnValue(selectFromChain),
     insert: jest.fn().mockReturnValue({

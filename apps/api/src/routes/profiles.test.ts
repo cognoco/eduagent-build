@@ -19,7 +19,13 @@ jest.mock('../middleware/jwt', () => ({
 // ---------------------------------------------------------------------------
 
 jest.mock('@eduagent/database', () => ({
-  createDatabase: jest.fn().mockReturnValue({}),
+  createDatabase: jest.fn().mockReturnValue({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    transaction: jest.fn().mockImplementation(async (cb: (tx: any) => any) => {
+      const tx = { execute: jest.fn().mockResolvedValue(undefined) };
+      return cb(tx);
+    }),
+  }),
 }));
 
 // ---------------------------------------------------------------------------
@@ -37,6 +43,13 @@ jest.mock('../services/account', () => ({
 }));
 
 jest.mock('../services/profile', () => ({
+  ProfileValidationError: class ProfileValidationError extends Error {
+    field: string;
+    constructor(field: string, message: string) {
+      super(message);
+      this.field = field;
+    }
+  },
   listProfiles: jest.fn().mockResolvedValue([]),
   createProfile: jest
     .fn()
@@ -93,6 +106,7 @@ import { app } from '../index';
 
 const TEST_ENV = {
   CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',
+  DATABASE_URL: 'postgresql://mock/test',
 };
 
 const AUTH_HEADERS = {

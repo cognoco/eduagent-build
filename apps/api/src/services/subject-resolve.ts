@@ -63,7 +63,7 @@ Input: "jjjjj"
 Rules:
 - Keep descriptions short (under 15 words), child-friendly, exciting
 - For ambiguous: always give 2-4 genuinely different angles, not synonyms
-- Each ambiguous suggestion should have its own "focus" if it narrows the subject
+- EVERY ambiguous suggestion MUST include a "focus" field — this is the specific topic within the broad subject that matches the user's original input. Without it the app cannot create the right book.
 - resolvedName is null for ambiguous and no_match
 - displayMessage uses **bold** for the key term
 - NEVER combine subject and focus into a single name with dashes or colons`;

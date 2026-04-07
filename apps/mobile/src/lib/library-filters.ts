@@ -71,6 +71,7 @@ export interface EnrichedTopic {
   lastReviewedAt: string | null;
   repetitions: number;
   failureCount: number;
+  hasNote: boolean;
 }
 
 export type TopicsSortKey =
@@ -85,6 +86,7 @@ export interface TopicsFilters {
   bookIds: string[];
   retention: RetentionStatus[];
   needsAttention: boolean;
+  hasNotes: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -305,12 +307,18 @@ export function filterTopics(
   items: EnrichedTopic[],
   filters: TopicsFilters
 ): EnrichedTopic[] {
-  const { subjectIds, bookIds, retention, needsAttention } = filters;
+  const { subjectIds, bookIds, retention, needsAttention, hasNotes } = filters;
   const hasSubjects = subjectIds.length > 0;
   const hasBooks = bookIds.length > 0;
   const hasRetention = retention.length > 0;
 
-  if (!hasSubjects && !hasBooks && !hasRetention && !needsAttention) {
+  if (
+    !hasSubjects &&
+    !hasBooks &&
+    !hasRetention &&
+    !needsAttention &&
+    !hasNotes
+  ) {
     return items;
   }
 
@@ -320,6 +328,7 @@ export function filterTopics(
       return false;
     if (hasRetention && !retention.includes(item.retention)) return false;
     if (needsAttention && item.failureCount < 3) return false;
+    if (hasNotes && !item.hasNote) return false;
     return true;
   });
 }
@@ -359,4 +368,16 @@ export function sortTopics(
       break;
   }
   return sorted;
+}
+
+// ---------------------------------------------------------------------------
+// Topics — note filter (standalone helper)
+// ---------------------------------------------------------------------------
+
+export function filterTopicsByNotes(
+  topics: EnrichedTopic[],
+  hasNotes: boolean
+): EnrichedTopic[] {
+  if (!hasNotes) return topics;
+  return topics.filter((t) => t.hasNote);
 }

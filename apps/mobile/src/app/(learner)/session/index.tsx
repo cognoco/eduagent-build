@@ -43,7 +43,7 @@ import { useNetworkStatus } from '../../../hooks/use-network-status';
 import { useApiReachability } from '../../../hooks/use-api-reachability';
 import { useCelebrationLevel } from '../../../hooks/use-settings';
 import { useCelebration } from '../../../hooks/use-celebration';
-import { useSubjects } from '../../../hooks/use-subjects';
+import { useSubjects, useCreateSubject } from '../../../hooks/use-subjects';
 import { useCurriculum } from '../../../hooks/use-curriculum';
 import {
   celebrationForReason,
@@ -51,8 +51,12 @@ import {
   normalizeMilestoneTrackerState,
   useMilestoneTracker,
 } from '../../../hooks/use-milestone-tracker';
+import { Ionicons } from '@expo/vector-icons';
 import { useApiClient } from '../../../lib/api-client';
 import { formatApiError } from '../../../lib/format-api-error';
+import { useThemeColors } from '../../../lib/theme';
+import { NoteInput } from '../../../components/library/NoteInput';
+import { useUpsertNote } from '../../../hooks/use-notes';
 import { getVoiceLocaleForLanguage } from '../../../lib/language-locales';
 import { useProfile } from '../../../lib/profile';
 import {
@@ -128,6 +132,8 @@ interface PendingSubjectResolution {
     subjectId: string;
     subjectName: string;
   }>;
+  /** When the classifier cannot match an enrolled subject, it suggests a new one */
+  suggestedSubjectName?: string | null;
 }
 
 const CONFIRMATION_BY_CHIP: Partial<Record<ContextualQuickChipId, string>> = {
@@ -289,6 +295,7 @@ export default function SessionScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { activeProfile } = useProfile();
+  const colors = useThemeColors();
 
   const effectiveMode = mode ?? 'freeform';
   const initialHomeworkProblems = useMemo(
@@ -365,7 +372,10 @@ export default function SessionScreen() {
   const [confirmationToast, setConfirmationToast] = useState<string | null>(
     null
   );
+  const [notePromptOffered, setNotePromptOffered] = useState(false);
+  const [showNoteInput, setShowNoteInput] = useState(false);
 
+  const sessionNoteSavedRef = useRef(false);
   const animationCleanupRef = useRef<(() => void) | null>(null);
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastAiAtRef = useRef<number | null>(null);
@@ -390,6 +400,7 @@ export default function SessionScreen() {
   const parkingLot = useParkingLot(activeSessionId ?? '');
   const addParkingLotItem = useAddParkingLotItem(activeSessionId ?? '');
   const { data: availableSubjects = [] } = useSubjects();
+  const createSubject = useCreateSubject();
   const {
     milestonesReached,
     trackerState,
@@ -428,6 +439,9 @@ export default function SessionScreen() {
       setConsumedQuickChipMessageId(null);
       setMessageFeedback({});
       setConfirmationToast(null);
+      setNotePromptOffered(false);
+      setShowNoteInput(false);
+      sessionNoteSavedRef.current = false;
       hasHydratedRecoveryRef.current = false;
       resetMilestones();
       setHomeworkProblemsState(initialHomeworkProblems);
@@ -488,6 +502,7 @@ export default function SessionScreen() {
 
   const apiClient = useApiClient();
   const classifySubject = useClassifySubject();
+  const upsertNote = useUpsertNote(effectiveSubjectId || undefined, undefined);
   const startSession = useStartSession(effectiveSubjectId);
   const closeSession = useCloseSession(activeSessionId ?? '');
   const { stream: streamMessage } = useStreamMessage(activeSessionId ?? '');
@@ -839,7 +854,8 @@ export default function SessionScreen() {
     (
       text: string,
       prompt: string,
-      candidates: Array<{ subjectId: string; subjectName: string }>
+      candidates: Array<{ subjectId: string; subjectName: string }>,
+      suggestedSubjectName?: string | null
     ) => {
       const dedupedCandidates = candidates.filter(
         (candidate, index, all) =>
@@ -854,6 +870,7 @@ export default function SessionScreen() {
         originalText: text,
         prompt,
         candidates: dedupedCandidates,
+        suggestedSubjectName,
       });
       setMessages((prev) => [
         ...prev,
@@ -978,20 +995,39 @@ export default function SessionScreen() {
             });
 
             setMessages((prev) =>
-              prev.map((m) =>
-                m.id === streamId
-                  ? {
-                      ...m,
-                      streaming: false,
-                      eventId: result.aiEventId,
-                      escalationRung: result.escalationRung,
-                    }
-                  : m
-              )
+              prev.map((m) => {
+                if (m.id !== streamId) return m;
+                // Strip notePrompt JSON annotation from visible message text
+                let content = m.content;
+                if (result.notePrompt) {
+                  content = content
+                    .replace(
+                      /\n?\{"notePrompt":\s*true(?:,\s*"postSession":\s*true)?\}\s*$/,
+                      ''
+                    )
+                    .trimEnd();
+                }
+                return {
+                  ...m,
+                  content,
+                  streaming: false,
+                  eventId: result.aiEventId,
+                  escalationRung: result.escalationRung,
+                };
+              })
             );
             setIsStreaming(false);
             setExchangeCount(result.exchangeCount);
             setEscalationRung(result.escalationRung);
+
+            // Handle note prompt triggers
+            if (result.notePrompt && !notePromptOffered) {
+              setNotePromptOffered(true);
+            }
+            if (result.notePromptPostSession) {
+              setShowNoteInput(true);
+            }
+
             if (previousAiAt) {
               setResponseHistory((prev) => [
                 ...prev,
@@ -1081,6 +1117,7 @@ export default function SessionScreen() {
       ensureSession,
       homeworkMode,
       homeworkProblemsState,
+      notePromptOffered,
       scheduleSilencePrompt,
       streamMessage,
       subjectId,
@@ -1151,6 +1188,59 @@ export default function SessionScreen() {
     ]
   );
 
+  // BUG-233: Create a new subject from the classifier's suggestion
+  const handleCreateSuggestedSubject = useCallback(async () => {
+    if (
+      !pendingSubjectResolution?.suggestedSubjectName ||
+      isStreaming ||
+      pendingClassification
+    ) {
+      return;
+    }
+
+    const suggestedName = pendingSubjectResolution.suggestedSubjectName;
+    const originalText = pendingSubjectResolution.originalText;
+
+    setPendingSubjectResolution(null);
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: createLocalMessageId('ai'),
+        role: 'ai',
+        content: `Adding ${suggestedName} and getting started...`,
+        isSystemPrompt: true,
+      },
+    ]);
+
+    try {
+      const result = await createSubject.mutateAsync({
+        name: suggestedName,
+        rawInput: originalText,
+      });
+      setClassifiedSubject({
+        subjectId: result.subject.id,
+        subjectName: result.subject.name,
+      });
+      setShowWrongSubjectChip(false);
+      await continueWithMessage(originalText, {
+        sessionSubjectId: result.subject.id,
+        sessionSubjectName: result.subject.name,
+      });
+    } catch {
+      showConfirmation(
+        `Could not create ${suggestedName}. Please try again or pick an existing subject.`
+      );
+    }
+  }, [
+    continueWithMessage,
+    createLocalMessageId,
+    createSubject,
+    isStreaming,
+    pendingClassification,
+    pendingSubjectResolution,
+    showConfirmation,
+  ]);
+
   const handleSend = useCallback(
     async (text: string) => {
       if (isStreaming || pendingClassification) return;
@@ -1207,15 +1297,34 @@ export default function SessionScreen() {
               setTopicSwitcherSubjectId(subjectCandidates[0].subjectId);
             }
             setShowWrongSubjectChip(false);
+
+            // BUG-233: When the classifier suggests a new subject and no enrolled
+            // subject matched, show the suggestion instead of a dead-end message
+            const suggested = result.suggestedSubjectName ?? null;
+            let promptMessage: string;
+            if (result.candidates.length > 1) {
+              promptMessage = `This sounds like it could be ${subjectCandidates
+                .slice(0, 3)
+                .map((candidate) => candidate.subjectName)
+                .join(' or ')}. Which one are we working on?`;
+            } else if (
+              suggested &&
+              result.candidates.length === 0
+            ) {
+              promptMessage =
+                subjectCandidates.length > 0
+                  ? `This sounds like ${suggested}. Pick a subject below, or tap "+ ${suggested}" to add it.`
+                  : `This sounds like ${suggested}. Tap below to add it and start learning.`;
+            } else {
+              promptMessage =
+                "I couldn't place that yet. Pick the closest subject and we'll get moving.";
+            }
+
             openSubjectResolution(
               text,
-              result.candidates.length > 1
-                ? `This sounds like it could be ${subjectCandidates
-                    .slice(0, 3)
-                    .map((candidate) => candidate.subjectName)
-                    .join(' or ')}. Which one are we working on?`
-                : "I couldn't place that yet. Pick the closest subject and we'll get moving.",
-              subjectCandidates
+              promptMessage,
+              subjectCandidates,
+              suggested
             );
             return;
           }
@@ -1226,16 +1335,18 @@ export default function SessionScreen() {
           }));
           setShowWrongSubjectChip(false);
           setClassifyError(
-            'Could not identify the subject automatically. Pick one below and we’ll keep going.'
+            fallbackCandidates.length > 0
+              ? "Could not identify the subject automatically. Pick one below and we'll keep going."
+              : 'Could not identify the subject. Create a new subject to get started.'
           );
-          if (fallbackCandidates.length > 0) {
-            openSubjectResolution(
-              text,
-              "I couldn't place that yet. Pick the closest subject and we'll get moving.",
-              fallbackCandidates
-            );
-            return;
-          }
+          openSubjectResolution(
+            text,
+            fallbackCandidates.length > 0
+              ? "I couldn’t place that yet. Pick the closest subject and we’ll get moving."
+              : "I couldn’t figure out the subject. You can create a new one and we’ll pick up from there.",
+            fallbackCandidates
+          );
+          return;
         } finally {
           setPendingClassification(false);
         }
@@ -1750,38 +1861,109 @@ export default function SessionScreen() {
   );
 
   const subjectResolutionAccessory = pendingSubjectResolution ? (
-    <View className="bg-surface border-t border-surface-elevated px-4 py-3">
+    <View
+      className="bg-surface border-t border-surface-elevated px-4 py-3"
+      style={{ paddingBottom: pendingSubjectResolution.candidates.length === 0 ? 16 : undefined }}
+    >
       <Text className="text-body-sm font-semibold text-text-primary">
         Pick the subject
       </Text>
       <Text className="text-body-sm text-text-secondary mt-1 mb-3">
         {pendingSubjectResolution.prompt}
       </Text>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: 8 }}
-        testID="session-subject-resolution"
-      >
-        {pendingSubjectResolution.candidates.map((candidate) => (
+      {pendingSubjectResolution.candidates.length > 0 ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ gap: 8 }}
+          testID="session-subject-resolution"
+        >
+          {pendingSubjectResolution.candidates.map((candidate) => (
+            <Pressable
+              key={candidate.subjectId}
+              onPress={() => void handleResolveSubject(candidate)}
+              disabled={isStreaming || pendingClassification}
+              className="rounded-full bg-surface-elevated px-4 py-2"
+              accessibilityRole="button"
+              accessibilityLabel={`Choose ${candidate.subjectName}`}
+              accessibilityState={{
+                disabled: isStreaming || pendingClassification,
+              }}
+              testID={`subject-resolution-${candidate.subjectId}`}
+            >
+              <Text className="text-body-sm font-semibold text-text-primary">
+                {candidate.subjectName}
+              </Text>
+            </Pressable>
+          ))}
+          {/* BUG-233: When classifier suggests a subject, offer to create it inline */}
+          {pendingSubjectResolution.suggestedSubjectName && (
+            <Pressable
+              onPress={() => void handleCreateSuggestedSubject()}
+              disabled={isStreaming || pendingClassification || createSubject.isPending}
+              className="rounded-full bg-primary/20 px-4 py-2"
+              accessibilityRole="button"
+              accessibilityLabel={`Add ${pendingSubjectResolution.suggestedSubjectName} as a new subject`}
+              accessibilityState={{
+                disabled: isStreaming || pendingClassification || createSubject.isPending,
+              }}
+              testID="subject-resolution-create-new"
+            >
+              <Text className="text-body-sm font-semibold text-primary">
+                {createSubject.isPending
+                  ? 'Adding...'
+                  : `+ ${pendingSubjectResolution.suggestedSubjectName}`}
+              </Text>
+            </Pressable>
+          )}
+          {/* BUG-236: Generic new-subject escape hatch — returns to chat after creation */}
           <Pressable
-            key={candidate.subjectId}
-            onPress={() => void handleResolveSubject(candidate)}
+            onPress={() =>
+              router.push({
+                pathname: '/create-subject',
+                params: {
+                  returnTo: 'chat',
+                  chatTopic: pendingSubjectResolution.originalText,
+                },
+              } as never)
+            }
             disabled={isStreaming || pendingClassification}
-            className="rounded-full bg-surface-elevated px-4 py-2"
+            className="rounded-full border border-border px-4 py-2"
             accessibilityRole="button"
-            accessibilityLabel={`Choose ${candidate.subjectName}`}
+            accessibilityLabel="Create a new subject"
             accessibilityState={{
               disabled: isStreaming || pendingClassification,
             }}
-            testID={`subject-resolution-${candidate.subjectId}`}
+            testID="subject-resolution-new"
           >
-            <Text className="text-body-sm font-semibold text-text-primary">
-              {candidate.subjectName}
+            <Text className="text-body-sm font-semibold text-primary">
+              + New subject
             </Text>
           </Pressable>
-        ))}
-      </ScrollView>
+        </ScrollView>
+      ) : (
+        /* BUG-234: Zero-candidates fallback with BUG-236 returnTo=chat */
+        <Pressable
+          onPress={() => {
+            setPendingSubjectResolution(null);
+            router.push({
+              pathname: '/create-subject',
+              params: {
+                returnTo: 'chat',
+                chatTopic: pendingSubjectResolution.originalText,
+              },
+            } as never);
+          }}
+          className="rounded-button bg-primary py-3 items-center min-h-[44px] justify-center"
+          accessibilityRole="button"
+          accessibilityLabel="Create a new subject"
+          testID="subject-resolution-create-new"
+        >
+          <Text className="text-body-sm font-semibold text-text-inverse">
+            Create a new subject
+          </Text>
+        </Pressable>
+      )}
     </View>
   ) : null;
 
@@ -2058,6 +2240,68 @@ export default function SessionScreen() {
                     Go Home
                   </Text>
                 </Pressable>
+              </View>
+            )}
+            {notePromptOffered &&
+              !showNoteInput &&
+              !sessionNoteSavedRef.current && (
+                <Pressable
+                  className="bg-primary/10 rounded-lg px-4 py-3 mx-4 mb-2 flex-row items-center"
+                  onPress={() => setShowNoteInput(true)}
+                  testID="session-note-prompt"
+                  accessibilityRole="button"
+                  accessibilityLabel="Write a note"
+                >
+                  <Ionicons
+                    name="document-text-outline"
+                    size={18}
+                    color={colors.primary}
+                  />
+                  <Text className="text-body text-primary font-semibold ml-2">
+                    Write a note
+                  </Text>
+                </Pressable>
+              )}
+            {showNoteInput && (
+              <View className="px-4 mb-2">
+                <NoteInput
+                  onSave={(content) => {
+                    if (!topicId) {
+                      Alert.alert(
+                        'Cannot save note',
+                        'No topic selected for this session.'
+                      );
+                      return;
+                    }
+                    const separator = !sessionNoteSavedRef.current
+                      ? `--- ${new Date().toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                        })} ---\n`
+                      : '';
+                    upsertNote.mutate(
+                      {
+                        topicId,
+                        content: `${separator}${content}`,
+                        append: true,
+                      },
+                      {
+                        onSuccess: () => {
+                          sessionNoteSavedRef.current = true;
+                          setShowNoteInput(false);
+                        },
+                        onError: (err) => {
+                          Alert.alert(
+                            "Couldn't save your note",
+                            formatApiError(err)
+                          );
+                        },
+                      }
+                    );
+                  }}
+                  onCancel={() => setShowNoteInput(false)}
+                  saving={upsertNote.isPending}
+                />
               </View>
             )}
             {exchangeCount === 0 && (

@@ -30,9 +30,9 @@ type ConsentRouteEnv = {
   Bindings: {
     DATABASE_URL: string;
     CLERK_JWKS_URL?: string;
-    APP_URL?: string;
     RESEND_API_KEY?: string;
     EMAIL_FROM?: string;
+    API_ORIGIN?: string;
   };
   Variables: {
     user: AuthUser;
@@ -76,10 +76,17 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
         );
       }
 
-      const appUrl = c.env.APP_URL ?? 'https://www.mentomate.com';
+      // BUG-240: Consent page is served by THIS API worker at /v1/consent-page.
+      // API_ORIGIN must be set — falling back to c.req.url would allow Host header
+      // injection (OWASP A03) since Cloudflare Workers populate it from the
+      // attacker-supplied Host header.
+      const apiOrigin = c.env.API_ORIGIN;
+      if (!apiOrigin) {
+        throw new Error('API_ORIGIN env var is required');
+      }
       let result;
       try {
-        result = await requestConsent(db, input, appUrl, {
+        result = await requestConsent(db, input, apiOrigin, {
           resendApiKey: c.env.RESEND_API_KEY,
           emailFrom: c.env.EMAIL_FROM,
         });

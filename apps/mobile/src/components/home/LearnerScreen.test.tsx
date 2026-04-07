@@ -31,6 +31,30 @@ jest.mock('../../hooks/use-subjects', () => ({
   useSubjects: () => ({ data: mockSubjects, isLoading: false }),
 }));
 
+const mockMutate = jest.fn();
+let mockHomeCards:
+  | {
+      cards: Array<{
+        id: string;
+        title: string;
+        subtitle: string;
+        primaryLabel: string;
+        secondaryLabel?: string;
+        badge?: string;
+        priority: number;
+        compact?: boolean;
+        subjectId?: string;
+        topicId?: string;
+      }>;
+      coldStart: boolean;
+    }
+  | undefined;
+
+jest.mock('../../hooks/use-home-cards', () => ({
+  useHomeCards: () => ({ data: mockHomeCards, isLoading: false }),
+  useTrackHomeCardInteraction: () => ({ mutate: mockMutate }),
+}));
+
 const { LearnerScreen } = require('./LearnerScreen');
 
 const defaultProps = {
@@ -43,6 +67,7 @@ describe('LearnerScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockSubjects = [];
+    mockHomeCards = undefined;
   });
 
   it('renders greeting with profile name', () => {
@@ -130,6 +155,92 @@ describe('LearnerScreen', () => {
       render(<LearnerScreen {...defaultProps} />);
 
       expect(screen.queryByTestId('learner-back')).toBeNull();
+    });
+  });
+
+  describe('coaching cards', () => {
+    it('renders coaching cards from API', () => {
+      mockHomeCards = {
+        cards: [
+          {
+            id: 'study',
+            title: 'Continue Math',
+            subtitle: 'Algebra basics',
+            primaryLabel: 'Continue topic',
+            badge: 'Continue',
+            priority: 80,
+            subjectId: 's1',
+            topicId: 't1',
+          },
+        ],
+        coldStart: false,
+      };
+
+      render(<LearnerScreen {...defaultProps} />);
+
+      expect(screen.getByText('Continue Math')).toBeTruthy();
+      expect(screen.getByText('Algebra basics')).toBeTruthy();
+    });
+
+    it('hides coaching cards section when no cards', () => {
+      mockHomeCards = undefined;
+
+      render(<LearnerScreen {...defaultProps} />);
+
+      expect(screen.queryByTestId('coaching-cards')).toBeNull();
+    });
+
+    it('dismisses card on tap and tracks interaction', () => {
+      mockHomeCards = {
+        cards: [
+          {
+            id: 'study',
+            title: 'Continue Math',
+            subtitle: 'Pick up where you left off',
+            primaryLabel: 'Continue',
+            priority: 80,
+          },
+        ],
+        coldStart: false,
+      };
+
+      render(<LearnerScreen {...defaultProps} />);
+
+      expect(screen.getByText('Continue Math')).toBeTruthy();
+
+      fireEvent.press(screen.getByTestId('coaching-card-study-dismiss'));
+
+      expect(screen.queryByText('Continue Math')).toBeNull();
+      expect(mockMutate).toHaveBeenCalledWith({
+        cardId: 'study',
+        interactionType: 'dismiss',
+      });
+    });
+
+    it('navigates on primary tap and tracks interaction', () => {
+      mockHomeCards = {
+        cards: [
+          {
+            id: 'homework',
+            title: 'Homework help',
+            subtitle: 'Snap a question',
+            primaryLabel: 'Open camera',
+            priority: 76,
+            compact: true,
+          },
+        ],
+        coldStart: false,
+      };
+
+      render(<LearnerScreen {...defaultProps} />);
+
+      fireEvent.press(screen.getByTestId('coaching-card-homework-primary'));
+
+      expect(mockPush).toHaveBeenCalledWith('/(learner)/homework/camera');
+      expect(mockMutate).toHaveBeenCalledWith({
+        cardId: 'homework',
+        interactionType: 'tap',
+      });
     });
   });
 });

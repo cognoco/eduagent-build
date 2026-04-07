@@ -51,6 +51,7 @@ const topic1: EnrichedTopic = {
   lastReviewedAt: '2026-04-04T10:00:00Z',
   repetitions: 5,
   failureCount: 0,
+  hasNote: false,
 };
 
 const topic2: EnrichedTopic = {
@@ -66,6 +67,7 @@ const topic2: EnrichedTopic = {
   lastReviewedAt: '2026-03-01T10:00:00Z',
   repetitions: 1,
   failureCount: 4,
+  hasNote: false,
 };
 
 const defaultState: TopicsTabState = TOPICS_TAB_INITIAL_STATE;
@@ -87,6 +89,7 @@ describe('TopicsTab', () => {
     topics: [topic1, topic2],
     subjects,
     books,
+    noteTopicIds: new Set<string>(),
     state: defaultState,
     onStateChange: jest.fn(),
     onTopicPress: jest.fn(),
@@ -210,6 +213,7 @@ describe('TopicsTab', () => {
         bookIds: [],
         retention: [],
         needsAttention: false,
+        hasNotes: false,
       },
     };
     render(
@@ -235,6 +239,7 @@ describe('TopicsTab', () => {
         bookIds: [],
         retention: [],
         needsAttention: false,
+        hasNotes: false,
       },
     };
     render(
@@ -254,6 +259,7 @@ describe('TopicsTab', () => {
         bookIds: [],
         retention: [],
         needsAttention: false,
+        hasNotes: false,
       },
     });
   });
@@ -267,6 +273,7 @@ describe('TopicsTab', () => {
         bookIds: [],
         retention: [],
         needsAttention: false,
+        hasNotes: false,
       },
     });
   });

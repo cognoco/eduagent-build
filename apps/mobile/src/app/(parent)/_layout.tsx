@@ -8,6 +8,7 @@ import { useProfile } from '../../lib/profile';
 import { useThemeColors, useTokenVars } from '../../lib/theme';
 import { usePushTokenRegistration } from '../../hooks/use-push-token-registration';
 import { useRevenueCatIdentity } from '../../hooks/use-revenuecat';
+import { useSubscription } from '../../hooks/use-subscription';
 
 const iconMap: Record<
   string,
@@ -79,6 +80,10 @@ function CreateProfileGate(): React.ReactElement {
 function NoChildrenGate(): React.ReactElement {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { data: subscription } = useSubscription();
+
+  const needsUpgrade =
+    subscription?.tier === 'free' || subscription?.tier === 'plus';
 
   return (
     <View
@@ -87,24 +92,42 @@ function NoChildrenGate(): React.ReactElement {
       testID="no-children-gate"
     >
       <Text className="text-h1 font-bold text-text-primary mb-3 text-center">
-        Add a child to get started
+        {needsUpgrade
+          ? 'Upgrade to add children'
+          : 'Add a child to get started'}
       </Text>
       <Text className="text-body text-text-secondary text-center mb-8">
-        Create or link a child profile to see learning progress here. You can
-        still open More to manage your account.
+        {needsUpgrade
+          ? 'Child profiles are available on Family and Pro plans. Upgrade to create profiles for your children.'
+          : 'Create or link a child profile to see learning progress here. You can still open More to manage your account.'}
       </Text>
-      <Pressable
-        onPress={() => router.push('/create-profile')}
-        className="bg-primary rounded-button py-3.5 px-8 items-center w-full mb-3"
-        style={{ minHeight: 48 }}
-        testID="add-child-cta"
-        accessibilityRole="button"
-        accessibilityLabel="Add a child profile"
-      >
-        <Text className="text-body font-semibold text-text-inverse">
-          Add a child
-        </Text>
-      </Pressable>
+      {needsUpgrade ? (
+        <Pressable
+          onPress={() => router.push('/(learner)/subscription')}
+          className="bg-primary rounded-button py-3.5 px-8 items-center w-full mb-3"
+          style={{ minHeight: 48 }}
+          testID="upgrade-cta"
+          accessibilityRole="button"
+          accessibilityLabel="View subscription plans"
+        >
+          <Text className="text-body font-semibold text-text-inverse">
+            View plans
+          </Text>
+        </Pressable>
+      ) : (
+        <Pressable
+          onPress={() => router.push('/create-profile')}
+          className="bg-primary rounded-button py-3.5 px-8 items-center w-full mb-3"
+          style={{ minHeight: 48 }}
+          testID="add-child-cta"
+          accessibilityRole="button"
+          accessibilityLabel="Add a child profile"
+        >
+          <Text className="text-body font-semibold text-text-inverse">
+            Add a child
+          </Text>
+        </Pressable>
+      )}
       <Pressable
         onPress={() => router.replace('/(parent)/more')}
         className="py-3.5 px-8 items-center w-full"
@@ -262,6 +285,13 @@ export default function ParentLayout() {
             href: null,
             // href:null + display:none hides tab; tabBarButton:() => null
             // cannot be combined with href (Expo Router throws render error)
+            tabBarItemStyle: { display: 'none' },
+          }}
+        />
+        <Tabs.Screen
+          name="shelf"
+          options={{
+            href: null,
             tabBarItemStyle: { display: 'none' },
           }}
         />

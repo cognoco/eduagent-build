@@ -26,9 +26,17 @@ Rules:
 - confidence should be 0.0-1.0 where 1.0 = certain match
 - If the text clearly matches one subject, return that with high confidence (>= 0.8)
 - If the text could match multiple subjects, return all with their respective confidences
-- If the text doesn't match any enrolled subject, return empty matches and suggest a subject name
+- If the text doesn't match any enrolled subject, return empty matches AND ALWAYS suggest a subject name in "suggestedSubjectName" — never leave it null when matches is empty
 - Match against the EXACT subject names provided — don't invent new ones for matches
-- Be generous with matching — "solve 2x + 5 = 15" matches "Algebra", "Math", "Mathematics" etc.
+- Be VERY generous with matching — think broadly about what relates to each subject:
+  - Cultural topics (Easter, Christmas, Ramadan, Diwali, Thanksgiving) relate to History, Religious Studies, Social Studies, Cultural Studies
+  - Current events relate to Social Studies, Geography, Politics, Civics
+  - Animals, plants, weather relate to Biology, Science, Nature Studies, Geography
+  - Music, art, film relate to Art, Music, Cultural Studies, Media Studies
+  - Sports relate to Physical Education, Biology (biomechanics), Physics (motion)
+  - Cooking, nutrition relate to Chemistry, Biology, Home Economics
+  - "solve 2x + 5 = 15" matches "Algebra", "Math", "Mathematics" etc.
+- When the topic is cross-disciplinary, prefer matching to an enrolled subject with even moderate relevance (confidence >= 0.4) over returning no matches
 `;
 
 export async function classifySubject(

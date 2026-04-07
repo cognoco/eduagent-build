@@ -179,7 +179,7 @@ describe('consent-web routes', () => {
       expect(html).toContain('/consent-page/deny-confirm?token=valid-token');
     });
 
-    it('approve link does NOT include onclick confirm dialog', async () => {
+    it('approve button is a POST form, not a GET link', async () => {
       const res = await app.request(
         '/v1/consent-page?token=valid-token',
         {},
@@ -188,10 +188,10 @@ describe('consent-web routes', () => {
 
       expect(res.status).toBe(200);
       const html = await res.text();
-      // The approve button should not have an onclick handler
-      const approveMatch = html.match(/<a[^>]*approved=true[^>]*>/);
-      expect(approveMatch).not.toBeNull();
-      expect(approveMatch![0]).not.toContain('onclick');
+      // Approve is now a POST form (CSRF-safe), not a GET link
+      expect(html).toContain('method="POST"');
+      expect(html).toContain('value="true"');
+      expect(html).not.toContain('onclick');
     });
   });
 
@@ -241,26 +241,35 @@ describe('consent-web routes', () => {
       expect(html).toContain('Are you sure?');
       expect(html).toContain('permanently deleted');
       expect(html).toContain("Emma's account");
-      // Confirm deny links to the actual confirm endpoint
-      expect(html).toContain(
-        '/consent-page/confirm?token=valid-token&approved=false'
-      );
+      // Confirm deny uses a POST form (CSRF-safe)
+      expect(html).toContain('method="POST"');
+      expect(html).toContain('action="/v1/consent-page/confirm"');
+      expect(html).toContain('value="false"');
       // Go back links to the consent page
       expect(html).toContain('/consent-page?token=valid-token');
     });
   });
 
   // -------------------------------------------------------------------------
-  // GET /v1/consent-page/confirm
+  // POST /v1/consent-page/confirm (changed from GET — CSRF prevention)
   // -------------------------------------------------------------------------
 
-  describe('GET /v1/consent-page/confirm', () => {
-    it('returns 400 when token is missing', async () => {
-      const res = await app.request(
-        '/v1/consent-page/confirm?approved=true',
-        {},
+  describe('POST /v1/consent-page/confirm', () => {
+    function postConfirm(body: Record<string, string>) {
+      const form = new URLSearchParams(body);
+      return app.request(
+        '/v1/consent-page/confirm',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: form.toString(),
+        },
         TEST_ENV
       );
+    }
+
+    it('returns 400 when token is missing', async () => {
+      const res = await postConfirm({ approved: 'true' });
 
       expect(res.status).toBe(400);
       const html = await res.text();
@@ -268,11 +277,7 @@ describe('consent-web routes', () => {
     });
 
     it('returns 400 when approved param is missing', async () => {
-      const res = await app.request(
-        '/v1/consent-page/confirm?token=some-token',
-        {},
-        TEST_ENV
-      );
+      const res = await postConfirm({ token: 'some-token' });
 
       expect(res.status).toBe(400);
       const html = await res.text();
@@ -280,11 +285,10 @@ describe('consent-web routes', () => {
     });
 
     it('renders approval landing with real child name', async () => {
-      const res = await app.request(
-        '/v1/consent-page/confirm?token=valid-token&approved=true',
-        {},
-        TEST_ENV
-      );
+      const res = await postConfirm({
+        token: 'valid-token',
+        approved: 'true',
+      });
 
       expect(res.status).toBe(200);
       const html = await res.text();
@@ -296,11 +300,10 @@ describe('consent-web routes', () => {
     });
 
     it('renders denial landing with real child name', async () => {
-      const res = await app.request(
-        '/v1/consent-page/confirm?token=valid-token&approved=false',
-        {},
-        TEST_ENV
-      );
+      const res = await postConfirm({
+        token: 'valid-token',
+        approved: 'false',
+      });
 
       expect(res.status).toBe(200);
       const html = await res.text();
@@ -322,11 +325,7 @@ describe('consent-web routes', () => {
         return Promise.resolve('Emma');
       });
 
-      await app.request(
-        '/v1/consent-page/confirm?token=valid-token&approved=false',
-        {},
-        TEST_ENV
-      );
+      await postConfirm({ token: 'valid-token', approved: 'false' });
 
       expect(getChildNameByToken).toHaveBeenCalledTimes(1);
       expect(processConsentResponse).toHaveBeenCalledTimes(1);
@@ -341,11 +340,10 @@ describe('consent-web routes', () => {
       };
       getChildNameByToken.mockResolvedValueOnce(null);
 
-      const res = await app.request(
-        '/v1/consent-page/confirm?token=valid-token&approved=true',
-        {},
-        TEST_ENV
-      );
+      const res = await postConfirm({
+        token: 'valid-token',
+        approved: 'true',
+      });
 
       expect(res.status).toBe(200);
       const html = await res.text();
@@ -358,11 +356,10 @@ describe('consent-web routes', () => {
       ) as { processConsentResponse: jest.Mock };
       mockProcess.mockRejectedValueOnce(new Error('Invalid consent token'));
 
-      const res = await app.request(
-        '/v1/consent-page/confirm?token=bad-token&approved=true',
-        {},
-        TEST_ENV
-      );
+      const res = await postConfirm({
+        token: 'bad-token',
+        approved: 'true',
+      });
 
       expect(res.status).toBe(404);
       const html = await res.text();

@@ -171,6 +171,65 @@ export async function createPendingConsentState(
   return mapConsentRow(row!);
 }
 
+/**
+ * Creates a CONSENTED consent state row immediately (no email required).
+ *
+ * Used when a parent directly creates a child profile — the parent IS the
+ * consenting adult, so consent is recorded inline. This avoids the
+ * child-initiated consent request loop (BUG-239).
+ *
+ * GDPR compliance: persists consentType, timestamp (requestedAt + respondedAt),
+ * and the consenting parent's profileId via the familyLinks row.
+ */
+export async function createGrantedConsentState(
+  db: Database,
+  profileId: string,
+  consentType: ConsentType,
+  parentProfileId: string
+): Promise<ConsentState> {
+  const now = new Date();
+
+  // Wrap consent state + family link in a transaction so they succeed or
+  // fail atomically. Without this, a familyLinks failure would leave the
+  // child CONSENTED but with no parent link for revocation/management.
+  const row = await db.transaction(async (tx) => {
+    const [consentRow] = await tx
+      .insert(consentStates)
+      .values({
+        profileId,
+        consentType,
+        status: 'CONSENTED',
+        respondedAt: now,
+      })
+      .onConflictDoUpdate({
+        target: [consentStates.profileId, consentStates.consentType],
+        set: {
+          status: 'CONSENTED',
+          respondedAt: now,
+          // Clear stale token/email from any prior PARENTAL_CONSENT_REQUESTED row
+          consentToken: null,
+          expiresAt: null,
+          parentEmail: null,
+          updatedAt: sql`now()`,
+        },
+      })
+      .returning();
+
+    // Create family link so parent can manage consent (revocation, etc.)
+    await tx
+      .insert(familyLinks)
+      .values({
+        parentProfileId,
+        childProfileId: profileId,
+      })
+      .onConflictDoNothing();
+
+    return consentRow;
+  });
+
+  return mapConsentRow(row!);
+}
+
 /** Maximum number of consent resends (PRD lines 415, 420) */
 const MAX_CONSENT_RESENDS = 3;
 
@@ -319,11 +378,13 @@ export async function processConsentResponse(
     throw new ConsentTokenExpiredError();
   }
 
-  // 2. Update status
+  // 2. Atomic status transition — WHERE clause prevents TOCTOU race.
+  //    Two concurrent submissions both pass the in-memory guard above,
+  //    but only the first UPDATE will match the non-terminal status.
   const newStatus = approved ? 'CONSENTED' : 'WITHDRAWN';
   const now = new Date();
 
-  await db
+  const [updated] = await db
     .update(consentStates)
     .set({
       status: newStatus,
@@ -333,9 +394,15 @@ export async function processConsentResponse(
     .where(
       and(
         eq(consentStates.id, row.id),
-        eq(consentStates.profileId, row.profileId)
+        eq(consentStates.profileId, row.profileId),
+        sql`${consentStates.status} NOT IN ('CONSENTED', 'WITHDRAWN')`
       )
-    );
+    )
+    .returning();
+
+  if (!updated) {
+    throw new ConsentAlreadyProcessedError();
+  }
 
   // 3. If denied (FR10): cascade-delete the child's profile.
   //    CASCADE FKs handle all child data (subjects, sessions, etc.)

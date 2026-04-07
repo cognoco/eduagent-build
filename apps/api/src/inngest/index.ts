@@ -11,6 +11,8 @@ import { quotaReset } from './functions/quota-reset';
 import { topupExpiryReminder } from './functions/topup-expiry-reminder';
 import { subjectAutoArchive } from './functions/subject-auto-archive';
 import { bookPreGeneration } from './functions/book-pre-generation';
+import { recallNudge } from './functions/recall-nudge';
+import { recallNudgeSend } from './functions/recall-nudge-send';
 
 export {
   inngest,
@@ -26,6 +28,8 @@ export {
   topupExpiryReminder,
   subjectAutoArchive,
   bookPreGeneration,
+  recallNudge,
+  recallNudgeSend,
 };
 
 // All Inngest functions to register with the serve handler
@@ -42,4 +46,6 @@ export const functions = [
   topupExpiryReminder,
   subjectAutoArchive,
   bookPreGeneration,
+  recallNudge,
+  recallNudgeSend,
 ];

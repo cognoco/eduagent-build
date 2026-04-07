@@ -40,6 +40,7 @@ export function buildCurriculumTopic(
     sortOrder: counter,
     relevance: 'core',
     estimatedMinutes: 30,
+    bookId: uuidv7(),
     skipped: false,
     ...overrides,
   };

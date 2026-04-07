@@ -307,3 +307,25 @@ export const homeCardInteractionSchema = z.object({
 export type HomeCardInteractionInput = z.infer<
   typeof homeCardInteractionSchema
 >;
+
+// ---------------------------------------------------------------------------
+// Daily Learning Plan (recall notifications + home screen plan)
+// ---------------------------------------------------------------------------
+
+export const dailyPlanItemSchema = z.object({
+  type: z.enum(['review', 'continue', 'streak']),
+  title: z.string(),
+  subtitle: z.string(),
+  estimatedMinutes: z.number().int().optional(),
+  route: z.string(),
+  topicId: z.string().uuid().optional(),
+  subjectId: z.string().uuid().optional(),
+});
+export type DailyPlanItem = z.infer<typeof dailyPlanItemSchema>;
+
+export const dailyPlanSchema = z.object({
+  greeting: z.string(),
+  items: z.array(dailyPlanItemSchema).max(4),
+  streakDays: z.number().int(),
+});
+export type DailyPlan = z.infer<typeof dailyPlanSchema>;

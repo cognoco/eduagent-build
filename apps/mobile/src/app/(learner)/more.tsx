@@ -8,6 +8,7 @@ import type { LearningMode } from '@eduagent/schemas';
 // import { AccentPicker } from '../../components/common';
 import { useProfile } from '../../lib/profile';
 import { useExportData } from '../../hooks/use-account';
+import { useFamilySubscription } from '../../hooks/use-subscription';
 import { AccountSecurity } from '../../components/account-security';
 import {
   useNotificationSettings,
@@ -137,6 +138,9 @@ export default function MoreScreen() {
   const exportData = useExportData();
 
   const { data: subscription } = useSubscription();
+  const { data: familyData } = useFamilySubscription(
+    subscription?.tier === 'family' || subscription?.tier === 'pro'
+  );
   const { data: notifPrefs, isLoading: notifLoading } =
     useNotificationSettings();
   const updateNotifications = useUpdateNotificationSettings();
@@ -188,6 +192,46 @@ export default function MoreScreen() {
       Alert.alert('Export failed', 'Please try again later.');
     }
   }, [exportData]);
+
+  const handleAddChild = useCallback(() => {
+    if (!subscription) return; // still loading — don't bypass billing gate
+    const tier = subscription?.tier;
+    if (tier === 'free' || tier === 'plus') {
+      Alert.alert(
+        'Upgrade required',
+        'Adding child profiles requires a Family or Pro subscription.',
+        [
+          {
+            text: 'View plans',
+            onPress: () => router.push('/(learner)/subscription'),
+          },
+          { text: 'Cancel', style: 'cancel' },
+        ]
+      );
+      return;
+    }
+
+    if (familyData && familyData.profileCount >= familyData.maxProfiles) {
+      Alert.alert(
+        'Profile limit reached',
+        `Your ${tier === 'pro' ? 'Pro' : 'Family'} plan supports up to ${
+          familyData.maxProfiles
+        } profiles.`,
+        tier === 'family'
+          ? [
+              {
+                text: 'View plans',
+                onPress: () => router.push('/(learner)/subscription'),
+              },
+              { text: 'OK', style: 'cancel' },
+            ]
+          : [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    router.push('/create-profile');
+  }, [subscription, familyData, router]);
 
   const displayName =
     activeProfile?.displayName ??
@@ -297,7 +341,7 @@ export default function MoreScreen() {
               Family
             </Text>
             <Pressable
-              onPress={() => router.push('/create-profile')}
+              onPress={handleAddChild}
               className="bg-surface rounded-card px-4 py-3.5 mb-2"
               accessibilityLabel="Add a child profile"
               accessibilityRole="button"
