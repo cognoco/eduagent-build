@@ -217,7 +217,6 @@ export async function precomputeHomeCards(
         'Start a freeform session when you want to switch gears or follow curiosity.',
       primaryLabel: 'Start session',
       priority: 54,
-      subjectId: firstActiveSubject?.id,
       compact: true,
     });
   }
