@@ -326,7 +326,8 @@ export default function SessionScreen() {
     effectiveMode,
     sessionExperience,
     initialProblemText,
-    topicName ?? undefined
+    topicName ?? undefined,
+    subjectName ?? undefined
   );
 
   const { isOffline } = useNetworkStatus();
@@ -2145,6 +2146,7 @@ export default function SessionScreen() {
     const feedbackTestIdSuffix = message.eventId ?? message.id;
     const contextualQuickChips =
       userMessageCount > 0 &&
+      message.id !== 'opening' &&
       message.id === latestAiMessageId &&
       message.id !== consumedQuickChipMessageId
         ? getContextualQuickChips(message)

@@ -104,6 +104,65 @@ describe('getOpeningMessage', () => {
     });
   });
 
+  describe('subject-aware opening (subjectName provided, no topicName)', () => {
+    it('includes subject name for first session', () => {
+      const msg = getOpeningMessage(
+        'freeform',
+        0,
+        undefined,
+        undefined,
+        'Biology — Botany'
+      );
+      expect(msg).toContain('Biology — Botany');
+    });
+
+    it('includes subject name for early session', () => {
+      const msg = getOpeningMessage(
+        'freeform',
+        1,
+        undefined,
+        undefined,
+        'Biology — Botany'
+      );
+      expect(msg).toContain('Biology — Botany');
+    });
+
+    it('includes subject name for experienced session', () => {
+      const msg = getOpeningMessage(
+        'freeform',
+        10,
+        undefined,
+        undefined,
+        'Biology — Botany'
+      );
+      expect(msg).toContain('Biology — Botany');
+    });
+
+    it('topicName takes priority over subjectName', () => {
+      const msg = getOpeningMessage(
+        'learning',
+        0,
+        undefined,
+        'Photosynthesis',
+        'Biology — Botany'
+      );
+      expect(msg).toContain('Photosynthesis');
+      expect(msg).not.toContain('Biology — Botany');
+    });
+
+    it('problemText takes priority over subjectName', () => {
+      const msg = getOpeningMessage(
+        'homework',
+        0,
+        'Solve 2+2',
+        undefined,
+        'Biology — Botany'
+      );
+      expect(msg).not.toContain('Biology — Botany');
+      expect(msg).toContain('work through this together');
+    });
+  });
+
   it('produces distinct messages across all tiers for each mode', () => {
     for (const mode of modes) {
       const tiers = [

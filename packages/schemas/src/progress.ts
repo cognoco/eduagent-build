@@ -286,6 +286,7 @@ export const homeCardSchema = z.object({
   subjectId: z.string().uuid().optional(),
   subjectName: z.string().optional(),
   topicId: z.string().uuid().optional(),
+  topicName: z.string().optional(),
 });
 export type HomeCard = z.infer<typeof homeCardSchema>;
 

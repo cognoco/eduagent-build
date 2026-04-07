@@ -15,14 +15,28 @@ import { getGreeting } from '../../lib/greeting';
 import { useThemeColors } from '../../lib/theme';
 import { IntentCard } from './IntentCard';
 
+function encodeParam(value: string | undefined): string {
+  return value ? encodeURIComponent(value) : '';
+}
+
+function appendNameParams(card: HomeCard): string {
+  let params = '';
+  if (card.subjectName)
+    params += `&subjectName=${encodeParam(card.subjectName)}`;
+  if (card.topicName) params += `&topicName=${encodeParam(card.topicName)}`;
+  return params;
+}
+
 function getCardPrimaryRoute(card: HomeCard): string {
   switch (card.id) {
     case 'study':
       return card.topicId
-        ? `/(learner)/session?mode=practice&subjectId=${card.subjectId}&topicId=${card.topicId}`
+        ? `/(learner)/session?mode=practice&subjectId=${
+            card.subjectId
+          }&topicId=${card.topicId}${appendNameParams(card)}`
         : `/(learner)/session?mode=freeform${
             card.subjectId ? `&subjectId=${card.subjectId}` : ''
-          }`;
+          }${appendNameParams(card)}`;
     case 'homework':
       return '/(learner)/homework/camera';
     case 'review':
@@ -33,7 +47,7 @@ function getCardPrimaryRoute(card: HomeCard): string {
     case 'ask':
       return `/(learner)/session?mode=freeform${
         card.subjectId ? `&subjectId=${card.subjectId}` : ''
-      }`;
+      }${appendNameParams(card)}`;
     default:
       return '/(learner)/learn-new';
   }

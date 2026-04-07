@@ -170,6 +170,7 @@ export async function precomputeHomeCards(
       subjectId: continueSuggestion?.subjectId ?? firstActiveSubject?.id,
       subjectName: continueSuggestion?.subjectName ?? firstActiveSubject?.name,
       topicId: continueSuggestion?.topicId,
+      topicName: continueSuggestion?.topicTitle,
     });
 
     cards.push({

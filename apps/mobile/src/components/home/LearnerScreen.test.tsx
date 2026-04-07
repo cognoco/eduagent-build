@@ -44,7 +44,9 @@ let mockHomeCards:
         priority: number;
         compact?: boolean;
         subjectId?: string;
+        subjectName?: string;
         topicId?: string;
+        topicName?: string;
       }>;
       coldStart: boolean;
     }
@@ -241,6 +243,66 @@ describe('LearnerScreen', () => {
         cardId: 'homework',
         interactionType: 'tap',
       });
+    });
+
+    it('passes subjectName and topicName in study card navigation URL', () => {
+      mockHomeCards = {
+        cards: [
+          {
+            id: 'study',
+            title: 'Continue Math',
+            subtitle: 'Algebra basics',
+            primaryLabel: 'Continue topic',
+            badge: 'Continue',
+            priority: 80,
+            subjectId: 's1',
+            subjectName: 'Math',
+            topicId: 't1',
+            topicName: 'Algebra basics',
+          },
+        ],
+        coldStart: false,
+      };
+
+      render(<LearnerScreen {...defaultProps} />);
+
+      fireEvent.press(screen.getByTestId('coaching-card-study-primary'));
+
+      expect(mockPush).toHaveBeenCalledWith(
+        expect.stringContaining('subjectName=Math')
+      );
+      expect(mockPush).toHaveBeenCalledWith(
+        expect.stringContaining('topicName=Algebra%20basics')
+      );
+    });
+
+    it('passes subjectName without topicName for study card without topic', () => {
+      mockHomeCards = {
+        cards: [
+          {
+            id: 'study',
+            title: 'Study Biology',
+            subtitle: 'Jump back into practice',
+            primaryLabel: 'Practice now',
+            badge: 'Study',
+            priority: 68,
+            subjectId: 's2',
+            subjectName: 'Biology — Botany',
+          },
+        ],
+        coldStart: false,
+      };
+
+      render(<LearnerScreen {...defaultProps} />);
+
+      fireEvent.press(screen.getByTestId('coaching-card-study-primary'));
+
+      expect(mockPush).toHaveBeenCalledWith(
+        expect.stringContaining('subjectName=Biology%20%E2%80%94%20Botany')
+      );
+      expect(mockPush).toHaveBeenCalledWith(
+        expect.not.stringContaining('topicName=')
+      );
     });
   });
 });
