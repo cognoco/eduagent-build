@@ -180,28 +180,28 @@ export function LearnerScreen({
             />
           ))}
         </View>
-      ) : null}
-
-      <View className="gap-4">
-        <IntentCard
-          title="Learn something new!"
-          onPress={() => router.push('/(learner)/learn-new' as never)}
-          testID="intent-learn-new"
-        />
-        <IntentCard
-          title="Help with assignment?"
-          subtitle="Take a picture and we'll look at it together"
-          onPress={() => router.push('/(learner)/homework/camera' as never)}
-          testID="intent-homework"
-        />
-        {hasLibraryContent ? (
+      ) : (
+        <View className="gap-4">
           <IntentCard
-            title="Repeat & review"
-            onPress={() => router.push('/(learner)/library' as never)}
-            testID="intent-review"
+            title="Learn something new!"
+            onPress={() => router.push('/(learner)/learn-new' as never)}
+            testID="intent-learn-new"
           />
-        ) : null}
-      </View>
+          <IntentCard
+            title="Help with assignment?"
+            subtitle="Take a picture and we'll look at it together"
+            onPress={() => router.push('/(learner)/homework/camera' as never)}
+            testID="intent-homework"
+          />
+          {hasLibraryContent ? (
+            <IntentCard
+              title="Repeat & review"
+              onPress={() => router.push('/(learner)/library' as never)}
+              testID="intent-review"
+            />
+          ) : null}
+        </View>
+      )}
     </ScrollView>
   );
 }
