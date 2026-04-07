@@ -74,14 +74,21 @@ function clampConfidence(value: unknown): number {
   return Math.max(0, Math.min(1, value));
 }
 
+/** Strip markdown code fences that LLMs commonly wrap around JSON. */
+function stripCodeFences(raw: string): string {
+  const fenced = raw.trim().match(/^```(?:\w*)\s*\n?([\s\S]*?)\n?\s*```$/);
+  return fenced ? fenced[1]!.trim() : raw.trim();
+}
+
 function parseOcrResponse(raw: string): OcrResult {
-  const trimmed = raw.trim();
+  const stripped = stripCodeFences(raw);
   try {
-    const parsed = JSON.parse(trimmed) as {
+    const parsed = JSON.parse(stripped) as {
       text?: unknown;
       confidence?: unknown;
     };
-    const text = typeof parsed.text === 'string' ? parsed.text.trim() : trimmed;
+    const text =
+      typeof parsed.text === 'string' ? parsed.text.trim() : stripped;
     return {
       text,
       confidence: clampConfidence(parsed.confidence),
@@ -89,7 +96,7 @@ function parseOcrResponse(raw: string): OcrResult {
     };
   } catch {
     return {
-      text: trimmed,
+      text: stripped,
       confidence: 0.75,
       regions: [],
     };

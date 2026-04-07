@@ -442,8 +442,11 @@ export default function CameraScreen(): React.ReactNode {
             <Ionicons name="close" size={28} color="white" />
           </Pressable>
 
-          {/* Capture guide overlay */}
-          <View className="flex-1 items-center justify-center px-6">
+          {/* Capture guide overlay — box-none so close button receives touches */}
+          <View
+            className="flex-1 items-center justify-center px-6"
+            pointerEvents="box-none"
+          >
             <View className="w-full aspect-[4/3] border-2 border-dashed border-primary/60 rounded-card items-center justify-center">
               <Text className="text-white/70 text-body-sm text-center">
                 Center your homework

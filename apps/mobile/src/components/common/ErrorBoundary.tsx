@@ -25,6 +25,14 @@ export class ErrorBoundary extends Component<
   }
 
   override componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
+    console.error(
+      '[ErrorBoundary] Caught error:',
+      error.message,
+      '\nStack:',
+      error.stack,
+      '\nComponent stack:',
+      errorInfo.componentStack
+    );
     Sentry.captureException(error, {
       extra: { componentStack: errorInfo.componentStack },
     });
