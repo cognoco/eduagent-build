@@ -14,6 +14,7 @@ import {
   accounts,
   subjects,
   curricula,
+  curriculumBooks,
   curriculumTopics,
   retentionCards,
   learningSessions,
@@ -125,11 +126,17 @@ async function seedCurriculum(
     })
     .returning();
 
+  const [book] = await db
+    .insert(curriculumBooks)
+    .values({ subjectId, title: 'Test Book', sortOrder: 1 })
+    .returning();
+
   const topics = await db
     .insert(curriculumTopics)
     .values(
       topicTitles.map((title, index) => ({
         curriculumId: curriculum!.id,
+        bookId: book!.id,
         title,
         description: `${title} description`,
         sortOrder: index + 1,

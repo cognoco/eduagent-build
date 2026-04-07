@@ -20,6 +20,7 @@
 
 import {
   curricula,
+  curriculumBooks,
   curriculumTopics,
   retentionCards,
 } from '@eduagent/database';
@@ -100,12 +101,18 @@ async function seedCurriculumWithTopics(
     .values({ subjectId })
     .returning({ id: curricula.id });
 
+  const [book] = await db
+    .insert(curriculumBooks)
+    .values({ subjectId, title: 'Test Book', sortOrder: 1 })
+    .returning();
+
   const topicIds: string[] = [];
   for (let i = 0; i < topicTitles.length; i++) {
     const [topic] = await db
       .insert(curriculumTopics)
       .values({
         curriculumId: curriculum!.id,
+        bookId: book!.id,
         title: topicTitles[i]!,
         description: `Description for ${topicTitles[i]}`,
         sortOrder: i + 1,

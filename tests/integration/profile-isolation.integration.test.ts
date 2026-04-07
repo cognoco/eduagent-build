@@ -12,7 +12,13 @@
  * 5. Fabricated profile IDs are rejected
  */
 
-import { subjects } from '@eduagent/database';
+import { eq } from 'drizzle-orm';
+import {
+  subjects,
+  profiles,
+  subscriptions,
+  quotaPools,
+} from '@eduagent/database';
 
 import { jwtMock, configureValidJWT } from './mocks';
 import {
@@ -98,6 +104,39 @@ async function seedSubject(
     profileId: subject!.profileId,
     name: subject!.name,
   };
+}
+
+/**
+ * Seeds a family-tier subscription so the billing guard allows
+ * non-first profile creation on this account.
+ */
+async function seedFamilySubscription(profileId: string) {
+  const db = createIntegrationDb();
+  const profile = await db.query.profiles.findFirst({
+    where: eq(profiles.id, profileId),
+    columns: { accountId: true },
+  });
+  if (!profile) throw new Error('Profile not found for subscription seed');
+
+  const [subscription] = await db
+    .insert(subscriptions)
+    .values({
+      accountId: profile.accountId,
+      tier: 'family',
+      status: 'active',
+      currentPeriodStart: new Date('2026-04-01T00:00:00.000Z'),
+      currentPeriodEnd: new Date('2026-05-01T00:00:00.000Z'),
+    })
+    .returning();
+
+  await db.insert(quotaPools).values({
+    subscriptionId: subscription!.id,
+    monthlyLimit: 1500,
+    usedThisMonth: 0,
+    dailyLimit: null,
+    usedToday: 0,
+    cycleResetAt: new Date('2026-05-01T00:00:00.000Z'),
+  });
 }
 
 async function listSubjectsForUser(input: {
@@ -189,6 +228,7 @@ describe('Integration: Profile Isolation (P0-006)', () => {
       displayName: 'Owner Profile',
       birthYear: 2000,
     });
+    await seedFamilySubscription(ownerProfile.id);
     const secondProfile = await createProfile({
       userId: PRIMARY_USER_ID,
       email: PRIMARY_EMAIL,
@@ -224,6 +264,7 @@ describe('Integration: Profile Isolation (P0-006)', () => {
       displayName: 'Owner Profile',
       birthYear: 2000,
     });
+    await seedFamilySubscription(ownerProfile.id);
     const secondProfile = await createProfile({
       userId: PRIMARY_USER_ID,
       email: PRIMARY_EMAIL,

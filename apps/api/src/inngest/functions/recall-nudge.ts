@@ -3,7 +3,7 @@
 // local ~8 AM, then fans out per-profile events for independent delivery.
 // ---------------------------------------------------------------------------
 
-import { sql, eq, lt, and, or, isNull } from 'drizzle-orm';
+import { sql, eq, lt, and, or, exists, notExists } from 'drizzle-orm';
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
 import {
@@ -11,7 +11,6 @@ import {
   accounts,
   retentionCards,
   notificationPreferences,
-  consentStates,
 } from '@eduagent/database';
 
 export const recallNudge = inngest.createFunction(
@@ -51,11 +50,19 @@ export const recallNudge = inngest.createFunction(
             eq(notificationPreferences.pushEnabled, true)
           )
         )
-        .leftJoin(consentStates, eq(consentStates.profileId, profiles.id))
         .where(
           and(
-            // Consent: CONSENTED or no consent record (adults)
-            or(eq(consentStates.status, 'CONSENTED'), isNull(consentStates.id)),
+            // Consent: at least one CONSENTED record, or no consent records at all (adults).
+            // Uses EXISTS/NOT EXISTS instead of LEFT JOIN to avoid row multiplication
+            // when a profile has multiple consent_states rows (different consentType).
+            or(
+              exists(
+                sql`SELECT 1 FROM consent_states cs WHERE cs.profile_id = ${profiles.id} AND cs.status = 'CONSENTED'`
+              ),
+              notExists(
+                sql`SELECT 1 FROM consent_states cs WHERE cs.profile_id = ${profiles.id}`
+              )
+            ),
             // Timezone bucketing: local time within 07:30–08:30 (single 1h window)
             // Prevents duplicate nudges across hourly cron runs while still
             // covering half-hour timezone offsets (UTC+5:30, etc.)
