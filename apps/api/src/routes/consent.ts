@@ -32,6 +32,7 @@ type ConsentRouteEnv = {
     CLERK_JWKS_URL?: string;
     RESEND_API_KEY?: string;
     EMAIL_FROM?: string;
+    API_ORIGIN?: string;
   };
   Variables: {
     user: AuthUser;
@@ -76,10 +77,9 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
       }
 
       // BUG-240: Consent page is served by THIS API worker at /v1/consent-page.
-      // Derive URL from the request origin so the link always resolves to the
-      // correct API domain (api.mentomate.com / api-stg.mentomate.com / localhost).
-      // Using c.env.APP_URL is WRONG — it points to the marketing site.
-      const apiOrigin = new URL(c.req.url).origin;
+      // Use trusted API_ORIGIN config to prevent Host header injection (OWASP A03).
+      // Falls back to request origin only for local dev where API_ORIGIN is unset.
+      const apiOrigin = c.env.API_ORIGIN || new URL(c.req.url).origin;
       let result;
       try {
         result = await requestConsent(db, input, apiOrigin, {

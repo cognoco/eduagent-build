@@ -59,14 +59,14 @@ export default function ShelfScreen() {
   const totalCount = subjectProgress?.topicsTotal ?? 0;
   const progressRatio = totalCount > 0 ? completedCount / totalCount : 0;
 
-  // Determine the suggested book: first IN_PROGRESS, then first NOT_STARTED
+  // Determine the suggested book: first IN_PROGRESS, then first NOT_STARTED.
+  // Uses topicsGenerated as a heuristic (matches useAllBooks pattern):
+  // books with generated topics are IN_PROGRESS, others are NOT_STARTED.
   const getBookStatus = (bookId: string): BookProgressStatus => {
-    // Without per-book status from API, derive from book data
-    // Books without topicsGenerated are effectively not started
     const book = books.find((b) => b.id === bookId);
     if (!book) return 'NOT_STARTED';
     if (!book.topicsGenerated) return 'NOT_STARTED';
-    return 'NOT_STARTED';
+    return 'IN_PROGRESS';
   };
 
   const suggestedBookId = (() => {

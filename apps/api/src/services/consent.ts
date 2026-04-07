@@ -188,32 +188,44 @@ export async function createGrantedConsentState(
   parentProfileId: string
 ): Promise<ConsentState> {
   const now = new Date();
-  const [row] = await db
-    .insert(consentStates)
-    .values({
-      profileId,
-      consentType,
-      status: 'CONSENTED',
-      respondedAt: now,
-    })
-    .onConflictDoUpdate({
-      target: [consentStates.profileId, consentStates.consentType],
-      set: {
+
+  // Wrap consent state + family link in a transaction so they succeed or
+  // fail atomically. Without this, a familyLinks failure would leave the
+  // child CONSENTED but with no parent link for revocation/management.
+  const row = await db.transaction(async (tx) => {
+    const [consentRow] = await tx
+      .insert(consentStates)
+      .values({
+        profileId,
+        consentType,
         status: 'CONSENTED',
         respondedAt: now,
-        updatedAt: sql`now()`,
-      },
-    })
-    .returning();
+      })
+      .onConflictDoUpdate({
+        target: [consentStates.profileId, consentStates.consentType],
+        set: {
+          status: 'CONSENTED',
+          respondedAt: now,
+          // Clear stale token/email from any prior PARENTAL_CONSENT_REQUESTED row
+          consentToken: null,
+          expiresAt: null,
+          parentEmail: null,
+          updatedAt: sql`now()`,
+        },
+      })
+      .returning();
 
-  // Create family link so parent can manage consent (revocation, etc.)
-  await db
-    .insert(familyLinks)
-    .values({
-      parentProfileId,
-      childProfileId: profileId,
-    })
-    .onConflictDoNothing();
+    // Create family link so parent can manage consent (revocation, etc.)
+    await tx
+      .insert(familyLinks)
+      .values({
+        parentProfileId,
+        childProfileId: profileId,
+      })
+      .onConflictDoNothing();
+
+    return consentRow;
+  });
 
   return mapConsentRow(row!);
 }

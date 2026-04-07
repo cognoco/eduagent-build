@@ -63,7 +63,14 @@ const LLM_ROUTE_PATTERNS = [
   /\/subjects\/[^/]+\/interview\/stream\/?$/,
 ];
 
-function isLlmRoute(path: string): boolean {
+function isLlmRoute(path: string, method: string): boolean {
+  // Interview routes only consume LLM quota on POST (creating an interview).
+  // GET /interview fetches existing state and must not trigger a decrement.
+  if (method === 'GET') {
+    return LLM_ROUTE_PATTERNS.filter(
+      (p) => !p.source.includes('interview')
+    ).some((pattern) => pattern.test(path));
+  }
   return LLM_ROUTE_PATTERNS.some((pattern) => pattern.test(path));
 }
 
@@ -122,8 +129,8 @@ async function safeWriteKV(
 
 export const meteringMiddleware = createMiddleware<MeteringEnv>(
   async (c, next) => {
-    // Only apply to LLM-consuming routes
-    if (!isLlmRoute(c.req.path)) {
+    // Only apply to LLM-consuming routes (method-aware to avoid charging GET)
+    if (!isLlmRoute(c.req.path, c.req.method)) {
       await next();
       return;
     }

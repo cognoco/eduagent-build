@@ -21,7 +21,7 @@ import { getSubscriptionByAccountId, canAddProfile } from '../services/billing';
 
 type ProfileEnv = {
   Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
-  Variables: { user: AuthUser; db: Database; account: Account };
+  Variables: { user: AuthUser; db: Database; account: Account; profileId: string | undefined };
 };
 
 export const profileRoutes = new Hono<ProfileEnv>()
@@ -54,13 +54,17 @@ export const profileRoutes = new Hono<ProfileEnv>()
       }
     }
 
-    // BUG-239: When an owner (parent) creates a non-first profile (child),
+    // BUG-239: When the owner (parent) creates a non-first profile (child),
     // pass the parent's profileId so consent can be granted immediately
     // instead of entering the child-initiated consent request loop.
+    // Security: verify the CALLER's active profile matches the owner profile.
+    // A child authenticated under the same Clerk account must not bypass
+    // consent by creating sibling profiles.
     let parentProfileId: string | undefined;
     if (!isFirstProfile) {
       const ownerProfile = existingProfiles.find((p) => p.isOwner);
-      if (ownerProfile) {
+      const callerProfileId = c.get('profileId');
+      if (ownerProfile && callerProfileId === ownerProfile.id) {
         parentProfileId = ownerProfile.id;
       }
     }
