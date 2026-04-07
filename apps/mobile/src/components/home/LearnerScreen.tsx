@@ -45,9 +45,7 @@ function getCardPrimaryRoute(card: HomeCard): string {
     case 'curriculum_complete':
       return '/(learner)/learn-new';
     case 'ask':
-      return `/(learner)/session?mode=freeform${
-        card.subjectId ? `&subjectId=${card.subjectId}` : ''
-      }${appendNameParams(card)}`;
+      return '/(learner)/session?mode=freeform';
     default:
       return '/(learner)/learn-new';
   }
