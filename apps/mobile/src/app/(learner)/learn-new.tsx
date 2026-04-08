@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IntentCard } from '../../components/home/IntentCard';
 import { useProfile } from '../../lib/profile';
 import {
+  clearSessionRecoveryMarker,
   isRecoveryMarkerFresh,
   readSessionRecoveryMarker,
   type SessionRecoveryMarker,
@@ -29,12 +30,18 @@ export default function LearnNewScreen(): React.ReactElement {
       try {
         const marker = await readSessionRecoveryMarker(activeProfile?.id);
         if (!cancelled) {
-          const freshMarker =
-            marker && isRecoveryMarkerFresh(marker) ? marker : null;
-          setRecoveryMarker(freshMarker);
-          setExpiredRecoveryMarker(
-            marker && !isRecoveryMarkerFresh(marker) ? marker : null
-          );
+          if (marker && isRecoveryMarkerFresh(marker)) {
+            setRecoveryMarker(marker);
+            setExpiredRecoveryMarker(null);
+          } else if (marker) {
+            setRecoveryMarker(null);
+            setExpiredRecoveryMarker(marker);
+            // Clear from storage — show the notice once, not forever
+            void clearSessionRecoveryMarker(activeProfile?.id);
+          } else {
+            setRecoveryMarker(null);
+            setExpiredRecoveryMarker(null);
+          }
         }
       } catch {
         if (!cancelled) {
@@ -107,13 +114,24 @@ export default function LearnNewScreen(): React.ReactElement {
             className="bg-surface rounded-card px-4 py-4"
             testID="intent-expired-recovery"
           >
-            <Text className="text-body font-semibold text-text-primary">
-              Your last session timed out
-            </Text>
-            <Text className="text-body-sm text-text-secondary mt-2">
+            <View className="flex-row items-start justify-between">
+              <Text className="text-body font-semibold text-text-primary flex-1">
+                Your last session ended
+              </Text>
+              <Pressable
+                onPress={() => setExpiredRecoveryMarker(null)}
+                className="ml-2 min-w-[32px] min-h-[32px] items-center justify-center"
+                accessibilityLabel="Dismiss"
+                accessibilityRole="button"
+                testID="dismiss-expired-recovery"
+              >
+                <Ionicons name="close" size={18} color={colors.textSecondary} />
+              </Pressable>
+            </View>
+            <Text className="text-body-sm text-text-secondary mt-1">
               {expiredRecoveryMarker.subjectName
-                ? `Your recovery window for ${expiredRecoveryMarker.subjectName} expired after 30 minutes, but you can start a new session anytime.`
-                : 'Your recovery window expired after 30 minutes, but you can start a new session anytime.'}
+                ? `Your ${expiredRecoveryMarker.subjectName} session expired, but you can start a new one anytime.`
+                : 'Your session expired, but you can start a new one anytime.'}
             </Text>
           </View>
         ) : null}
