@@ -15,6 +15,7 @@ import {
 } from '../services/suggestions';
 import { getSessionTranscript } from '../services/session';
 import { routeAndCall } from '../services/llm';
+import { inngest } from '../inngest/client';
 
 type FilingRouteEnv = {
   Bindings: { DATABASE_URL: string };
@@ -93,6 +94,18 @@ export const filingRoutes = new Hono<FilingRouteEnv>().post(
     if (body.usedTopicSuggestionId) {
       await markTopicSuggestionUsed(db, body.usedTopicSuggestionId);
     }
+
+    // Fire async suggestion generation (non-blocking)
+    void inngest.send({
+      name: 'app/filing.completed',
+      data: {
+        bookId: result.bookId,
+        topicTitle: result.topicTitle,
+        profileId,
+        sessionId: body.sessionId,
+        timestamp: new Date().toISOString(),
+      },
+    });
 
     return c.json(result, 200);
   }

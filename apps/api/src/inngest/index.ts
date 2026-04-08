@@ -13,6 +13,8 @@ import { subjectAutoArchive } from './functions/subject-auto-archive';
 import { bookPreGeneration } from './functions/book-pre-generation';
 import { recallNudge } from './functions/recall-nudge';
 import { recallNudgeSend } from './functions/recall-nudge-send';
+import { postSessionSuggestions } from './functions/post-session-suggestions';
+import { freeformFilingRetry } from './functions/freeform-filing';
 
 export {
   inngest,
@@ -30,6 +32,8 @@ export {
   bookPreGeneration,
   recallNudge,
   recallNudgeSend,
+  postSessionSuggestions,
+  freeformFilingRetry,
 };
 
 // All Inngest functions to register with the serve handler
@@ -48,4 +52,6 @@ export const functions = [
   bookPreGeneration,
   recallNudge,
   recallNudgeSend,
+  postSessionSuggestions,
+  freeformFilingRetry,
 ];
