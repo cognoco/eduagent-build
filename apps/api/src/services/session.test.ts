@@ -39,6 +39,8 @@ jest.mock('./subject', () => ({
 jest.mock('./prior-learning', () => ({
   fetchPriorTopics: jest.fn(),
   buildPriorLearningContext: jest.fn(),
+  fetchCrossSubjectHighlights: jest.fn(),
+  buildCrossSubjectContext: jest.fn(),
 }));
 
 jest.mock('./retention-data', () => ({
@@ -90,7 +92,12 @@ import { processExchange, streamExchange } from './exchanges';
 import { evaluateEscalation } from './escalation';
 import { evaluateSummary } from './summaries';
 import { getSubject } from './subject';
-import { fetchPriorTopics, buildPriorLearningContext } from './prior-learning';
+import {
+  fetchPriorTopics,
+  buildPriorLearningContext,
+  fetchCrossSubjectHighlights,
+  buildCrossSubjectContext,
+} from './prior-learning';
 import { retrieveRelevantMemory } from './memory';
 import { getTeachingPreference } from './retention-data';
 
@@ -334,6 +341,8 @@ beforeEach(() => {
     topicsIncluded: 0,
     truncated: false,
   });
+  (fetchCrossSubjectHighlights as jest.Mock).mockResolvedValue([]);
+  (buildCrossSubjectContext as jest.Mock).mockReturnValue('');
 });
 
 // ---------------------------------------------------------------------------

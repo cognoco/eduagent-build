@@ -48,6 +48,9 @@ export async function retrieveRelevantMemory(
   limit?: number
 ): Promise<MemoryRetrievalResult> {
   if (!voyageApiKey) {
+    console.warn(
+      '[memory] VOYAGE_API_KEY not provided — embedding retrieval skipped for this exchange'
+    );
     return EMPTY_RESULT;
   }
 
@@ -110,7 +113,8 @@ function formatMemoryContext(contents: string[]): string {
   lines.push(
     '',
     'Use this context to connect to concepts the learner has encountered before.',
-    'Reference their prior learning naturally, without explicitly saying "from your past sessions".'
+    'Reference their prior learning naturally — e.g. "Remember when we talked about X?" or "This connects to what you learned about Y."',
+    'Weave references in conversationally. The learner should feel you genuinely remember them.'
   );
 
   return lines.join('\n');

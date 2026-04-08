@@ -48,7 +48,12 @@ import {
 } from './escalation';
 import { createPendingSessionSummary, evaluateSummary } from './summaries';
 import { getSubject } from './subject';
-import { fetchPriorTopics, buildPriorLearningContext } from './prior-learning';
+import {
+  fetchPriorTopics,
+  buildPriorLearningContext,
+  fetchCrossSubjectHighlights,
+  buildCrossSubjectContext,
+} from './prior-learning';
 import { retrieveRelevantMemory } from './memory';
 import { getTeachingPreference } from './retention-data';
 import { shouldTriggerEvaluate } from './evaluate';
@@ -703,6 +708,7 @@ async function prepareExchangeContext(
     teachingPref,
     metadataRows,
     learningModeRecord,
+    crossSubjectHighlights,
   ] = await Promise.all([
     Promise.resolve(staticContext.subject),
     session.topicId
@@ -751,6 +757,8 @@ async function prepareExchangeContext(
       : Promise.resolve([]),
     // Learning mode: affects LLM tutoring style (casual vs serious)
     getLearningMode(db, profileId),
+    // Story 16.0: Cross-subject learning highlights for broader context
+    fetchCrossSubjectHighlights(db, profileId, session.subjectId),
   ]);
 
   const topic = topicRows[0];
@@ -936,6 +944,8 @@ async function prepareExchangeContext(
 
   // 5. Build prior learning context (FR40 — bridge FR)
   const priorLearning = buildPriorLearningContext(priorTopics);
+  const crossSubjectContext =
+    buildCrossSubjectContext(crossSubjectHighlights) || undefined;
   const learningHistoryParts = [
     topic?.bookId && topic?.id
       ? await getCachedBookLearningHistoryContext(
@@ -971,6 +981,7 @@ async function prepareExchangeContext(
       profile?.birthYear ?? birthYearFromDateLike(profile?.birthDate ?? null),
     workedExampleLevel: interleavedTopics ? undefined : workedExampleLevel,
     priorLearningContext: priorLearning.contextText || undefined,
+    crossSubjectContext,
     learningHistoryContext,
     embeddingMemoryContext: memory.context || undefined,
     pedagogyMode: subject?.pedagogyMode ?? 'socratic',

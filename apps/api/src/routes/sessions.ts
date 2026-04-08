@@ -111,7 +111,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
           profileId,
           c.req.param('sessionId'),
           c.req.valid('json'),
-          { llmTier }
+          { llmTier, voyageApiKey: c.env.VOYAGE_API_KEY }
         );
         return c.json(result);
       } catch (err) {
@@ -166,7 +166,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
           profileId,
           sessionId,
           input,
-          { llmTier }
+          { llmTier, voyageApiKey: c.env.VOYAGE_API_KEY }
         );
 
         return streamSSE(c, async (sseStream) => {

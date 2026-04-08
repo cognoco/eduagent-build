@@ -3,11 +3,12 @@
 // Pure business logic + DB-aware fetch (FR40 bridge)
 // ---------------------------------------------------------------------------
 
-import { eq, and, desc, isNotNull } from 'drizzle-orm';
+import { eq, and, ne, desc, isNotNull } from 'drizzle-orm';
 import {
   learningSessions,
   sessionSummaries,
   curriculumTopics,
+  subjects,
   type Database,
 } from '@eduagent/database';
 
@@ -140,7 +141,8 @@ function formatTopicsForContext(topics: PriorTopic[]): string {
   lines.push(
     '',
     'Use this context to connect new concepts to what the learner already knows.',
-    'Reference their own summaries when building bridges to new material.'
+    'Reference their own summaries when building bridges — e.g. "You described X as [their words], which connects to what we are learning now."',
+    'Make the learner feel known. A good teacher says "Remember when we covered...?" — do the same.'
   );
 
   return lines.join('\n');
@@ -207,4 +209,91 @@ export async function fetchPriorTopics(
   }
 
   return topics;
+}
+
+// ---------------------------------------------------------------------------
+// Cross-Subject Highlights — Story 16.0 Fix C
+// Gives the LLM awareness of the learner's broader learning journey
+// across subjects, enabling cross-disciplinary connections.
+// ---------------------------------------------------------------------------
+
+/** A brief highlight from another subject */
+export interface CrossSubjectHighlight {
+  title: string;
+  subjectName: string;
+}
+
+/**
+ * Fetches recent completed topics from OTHER subjects (not the current one).
+ * Returns titles only (no summaries) to keep token budget low (~200 tokens).
+ */
+export async function fetchCrossSubjectHighlights(
+  db: Database,
+  profileId: string,
+  currentSubjectId: string,
+  limit = 5
+): Promise<CrossSubjectHighlight[]> {
+  const rows = await db
+    .select({
+      topicId: learningSessions.topicId,
+      title: curriculumTopics.title,
+      subjectName: subjects.name,
+    })
+    .from(learningSessions)
+    .innerJoin(
+      curriculumTopics,
+      eq(curriculumTopics.id, learningSessions.topicId)
+    )
+    .innerJoin(subjects, eq(subjects.id, learningSessions.subjectId))
+    .where(
+      and(
+        eq(learningSessions.profileId, profileId),
+        eq(learningSessions.status, 'completed'),
+        ne(learningSessions.subjectId, currentSubjectId),
+        isNotNull(learningSessions.topicId)
+      )
+    )
+    .orderBy(desc(learningSessions.endedAt))
+    .limit(limit * 2); // fetch extra to account for deduplication
+
+  // Deduplicate by subject:title
+  const seen = new Set<string>();
+  const highlights: CrossSubjectHighlight[] = [];
+
+  for (const row of rows) {
+    const key = `${row.subjectName}:${row.title}`.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    highlights.push({ title: row.title, subjectName: row.subjectName });
+    if (highlights.length >= limit) break;
+  }
+
+  return highlights;
+}
+
+/**
+ * Formats cross-subject highlights into a context block for prompt injection.
+ * Returns empty string if no highlights — safe for conditional injection.
+ */
+export function buildCrossSubjectContext(
+  highlights: CrossSubjectHighlight[]
+): string {
+  if (highlights.length === 0) return '';
+
+  const lines = [
+    'The learner is also studying other subjects. Recent topics from their broader learning:',
+    '',
+  ];
+
+  for (const h of highlights) {
+    lines.push(`- ${h.subjectName}: ${h.title}`);
+  }
+
+  lines.push(
+    '',
+    'If any of these connect to the current topic, mention the link naturally.',
+    'Cross-subject connections deepen understanding.'
+  );
+
+  return lines.join('\n');
 }
