@@ -78,6 +78,8 @@ export interface ExchangeContext {
   homeworkMode?: HomeworkMode;
   /** Subscription-derived LLM tier — controls model routing (flash/standard/premium) */
   llmTier?: LLMTier;
+  /** Original free-text input the learner typed when starting this session (CFLF) */
+  rawInput?: string | null;
 }
 
 /** Result of processing a single exchange */
@@ -237,6 +239,13 @@ export function buildSystemPrompt(context: ExchangeContext): string {
 
   // Subject
   sections.push(`Subject: ${context.subjectName}`);
+
+  // Learner's original question / intent (CFLF)
+  if (context.rawInput) {
+    sections.push(
+      `The learner originally asked: "${context.rawInput}". Keep your teaching anchored to this intent.`
+    );
+  }
 
   // Session type
   if (isLanguageMode) {

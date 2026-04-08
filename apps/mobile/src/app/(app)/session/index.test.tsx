@@ -146,6 +146,13 @@ jest.mock('../../../hooks/use-notes', () => ({
   }),
 }));
 
+jest.mock('../../../hooks/use-filing', () => ({
+  useFiling: () => ({
+    mutateAsync: jest.fn(),
+    isPending: false,
+  }),
+}));
+
 jest.mock('../../../hooks/use-streaks', () => ({
   useStreaks: () => ({ data: { longestStreak: 1 } }),
 }));
