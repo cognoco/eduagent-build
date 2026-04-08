@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Pressable,
   Text,
@@ -11,9 +12,19 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import type { BookProgressStatus } from '@eduagent/schemas';
 import { BookCard } from '../../../../components/library/BookCard';
+import { SuggestionCard } from '../../../../components/library/SuggestionCard';
+import { useBookSuggestions } from '../../../../hooks/use-book-suggestions';
 import { useBooks } from '../../../../hooks/use-books';
+import { useFiling } from '../../../../hooks/use-filing';
 import { useSubjects } from '../../../../hooks/use-subjects';
 import { useThemeColors } from '../../../../lib/theme';
+
+interface BookSuggestion {
+  id: string;
+  title: string;
+  emoji?: string | null;
+  description?: string | null;
+}
 
 export default function ShelfScreen() {
   const router = useRouter();
@@ -28,12 +39,32 @@ export default function ShelfScreen() {
   const books = booksQuery.data ?? [];
   const subject = subjectsQuery.data?.find((s) => s.id === subjectId);
 
+  const { data: rawBookSuggestions } = useBookSuggestions(subjectId);
+  const bookSuggestions = (rawBookSuggestions ?? []) as BookSuggestion[];
+  const filing = useFiling();
+
+  const handlePickBookSuggestion = async (suggestion: BookSuggestion) => {
+    try {
+      const result = await filing.mutateAsync({
+        rawInput: suggestion.title,
+        selectedSuggestion: suggestion.title,
+        pickedSuggestionId: suggestion.id,
+      });
+      router.push({
+        pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
+        params: { subjectId: result.shelfId, bookId: result.bookId },
+      } as never);
+    } catch {
+      Alert.alert('Error', "Couldn't set up that book.", [{ text: 'OK' }]);
+    }
+  };
+
   // Single-book auto-skip: navigate directly to the book screen
   useEffect(() => {
     if (booksQuery.data && booksQuery.data.length === 1 && subjectId) {
       const onlyBook = booksQuery.data[0]!;
       router.replace({
-        pathname: '/(learner)/shelf/[subjectId]/book/[bookId]',
+        pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
         params: { subjectId, bookId: onlyBook.id },
       } as never);
     }
@@ -189,7 +220,7 @@ export default function ShelfScreen() {
         <Pressable
           onPress={() =>
             router.push({
-              pathname: '/(learner)/subject/[subjectId]',
+              pathname: '/(app)/subject/[subjectId]',
               params: { subjectId },
             } as never)
           }
@@ -204,6 +235,45 @@ export default function ShelfScreen() {
           />
         </Pressable>
       </View>
+
+      {/* Study next suggestions */}
+      {bookSuggestions.length > 0 && (
+        <View className="px-4 mb-4">
+          <Text className="text-sm font-semibold text-text-muted mb-3">
+            Study next
+          </Text>
+          <View className="flex-row gap-3">
+            {bookSuggestions.slice(0, 2).map((suggestion) => (
+              <SuggestionCard
+                key={suggestion.id}
+                title={suggestion.title}
+                emoji={suggestion.emoji}
+                description={suggestion.description}
+                onPress={() => void handlePickBookSuggestion(suggestion)}
+                testID={`shelf-suggestion-${suggestion.id}`}
+              />
+            ))}
+          </View>
+        </View>
+      )}
+
+      {/* Browse all link when more than 2 suggestions */}
+      {bookSuggestions.length > 2 && (
+        <Pressable
+          onPress={() =>
+            router.push({
+              pathname: '/(app)/pick-book/[subjectId]',
+              params: { subjectId },
+            } as never)
+          }
+          className="mx-4 mb-4 border border-dashed border-border rounded-xl py-3 items-center"
+          testID="shelf-browse-all-suggestions"
+          accessibilityRole="button"
+          accessibilityLabel="Browse all suggestions"
+        >
+          <Text className="text-text-muted">Browse all suggestions</Text>
+        </Pressable>
+      )}
 
       {/* Book list */}
       <FlatList
@@ -220,7 +290,7 @@ export default function ShelfScreen() {
             highlighted={item.id === suggestedBookId}
             onPress={() =>
               router.push({
-                pathname: '/(learner)/shelf/[subjectId]/book/[bookId]',
+                pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
                 params: { subjectId, bookId: item.id },
               } as never)
             }
