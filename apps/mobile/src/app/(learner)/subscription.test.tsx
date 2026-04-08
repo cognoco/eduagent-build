@@ -180,7 +180,7 @@ function makeMockPackage(overrides?: Record<string, unknown>) {
     product: {
       identifier: 'mentomate_monthly',
       title: 'MentoMate Plus Monthly',
-      description: '500 questions per month',
+      description: '700 questions per month',
       price: 9.99,
       priceString: '$9.99',
       currencyCode: 'USD',

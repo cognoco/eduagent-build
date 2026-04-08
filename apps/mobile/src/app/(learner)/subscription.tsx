@@ -55,7 +55,7 @@ const TIER_LABELS: Record<SubscriptionTier, string> = {
 
 const TIER_LIMITS: Record<SubscriptionTier, string> = {
   free: '10 questions/day, 100/month',
-  plus: '500 questions/month',
+  plus: '700 questions/month',
   family: '1,500 questions/month (shared)',
   pro: '3,000 questions/month',
 };
@@ -77,7 +77,7 @@ const TIER_FEATURES: Array<{
   {
     tier: 'plus',
     features: [
-      '500 questions per month, no daily limit',
+      '700 questions per month, no daily limit',
       'All Free features',
       'Premium AI mentor',
       'Detailed progress analytics',

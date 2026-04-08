@@ -85,9 +85,9 @@ describe('useSubscription', () => {
             status: 'active',
             trialEndsAt: null,
             currentPeriodEnd: '2026-03-18T00:00:00Z',
-            monthlyLimit: 500,
+            monthlyLimit: 700,
             usedThisMonth: 42,
-            remainingQuestions: 458,
+            remainingQuestions: 658,
           },
         }),
         { status: 200 }
@@ -104,7 +104,7 @@ describe('useSubscription', () => {
 
     expect(mockFetch).toHaveBeenCalled();
     expect(result.current.data?.tier).toBe('plus');
-    expect(result.current.data?.remainingQuestions).toBe(458);
+    expect(result.current.data?.remainingQuestions).toBe(658);
   });
 
   it('returns free-tier defaults when no subscription', async () => {

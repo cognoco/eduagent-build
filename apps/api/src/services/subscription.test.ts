@@ -26,7 +26,7 @@ describe('getTierConfig', () => {
   it('returns correct config for plus tier', () => {
     const config = getTierConfig('plus');
 
-    expect(config.monthlyQuota).toBe(500);
+    expect(config.monthlyQuota).toBe(700);
     expect(config.dailyLimit).toBeNull();
     expect(config.maxProfiles).toBe(1);
     expect(config.priceMonthly).toBe(18.99);
