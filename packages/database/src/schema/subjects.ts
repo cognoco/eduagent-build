@@ -35,6 +35,12 @@ export const curriculumTopicSourceEnum = pgEnum('curriculum_topic_source', [
   'user',
 ]);
 
+export const filedFromEnum = pgEnum('filed_from', [
+  'pre_generated',
+  'session_filing',
+  'freeform_filing',
+]);
+
 export const subjects = pgTable(
   'subjects',
   {
@@ -136,6 +142,11 @@ export const curriculumTopics = pgTable('curriculum_topics', {
   cefrSublevel: text('cefr_sublevel'),
   targetWordCount: integer('target_word_count'),
   targetChunkCount: integer('target_chunk_count'),
+  filedFrom: filedFromEnum('filed_from').notNull().default('pre_generated'),
+  sessionId: uuid('session_id'),
+  // FK to learning_sessions(id) is defined in migration SQL only.
+  // DO NOT add a JS .references(() => learningSessions.id) here —
+  // sessions.ts already imports from subjects.ts, creating a circular dep.
   createdAt: timestamp('created_at', { withTimezone: true })
     .notNull()
     .defaultNow(),
