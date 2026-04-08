@@ -119,7 +119,19 @@ export default function DashboardScreen() {
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
       <View className="px-5 pt-4 pb-2">
-        <Text className="text-h1 font-bold text-text-primary">Home</Text>
+        <Pressable
+          onPress={() => router.back()}
+          className="mb-2 self-start"
+          hitSlop={12}
+          testID="dashboard-back"
+          accessibilityLabel="Back to home"
+          accessibilityRole="button"
+        >
+          <Text className="text-body text-accent">← Back</Text>
+        </Pressable>
+        <Text className="text-h1 font-bold text-text-primary">
+          Child progress
+        </Text>
         <Text className="text-body-sm text-text-secondary mt-1">
           {isDemo
             ? "Here's what your dashboard will look like"
