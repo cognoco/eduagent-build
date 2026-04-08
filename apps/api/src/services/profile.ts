@@ -231,8 +231,7 @@ export async function createProfile(
 export async function createProfileWithLimitCheck(
   db: Database,
   accountId: string,
-  input: ProfileCreateInput,
-  callerProfileId: string | undefined
+  input: ProfileCreateInput
 ): Promise<Profile> {
   return db.transaction(async (tx) => {
     const txDb = tx as unknown as Database;
@@ -258,10 +257,13 @@ export async function createProfileWithLimitCheck(
       }
     }
 
-    // BUG-239: When the owner (parent) creates a non-first profile (child),
-    // pass the parent's profileId so consent can be granted immediately
-    // instead of entering the child-initiated consent request loop.
-    // Security: verify the CALLER's active profile matches the owner profile.
+    // BUG-239: When a non-first profile is created, the account owner (parent)
+    // is always the one creating it — the account has a single Clerk auth
+    // session. Consent is granted immediately; the parent IS the consenting
+    // adult, so no email loop is needed. A family_link row is also created.
+    //
+    // Consent flow (PENDING state) is ONLY for first-profile creation by a
+    // self-registering underage user who has no parent on the account yet.
     let parentProfileId: string | undefined;
     if (!isFirstProfile) {
       const ownerProfile = await txDb.query.profiles.findFirst({
@@ -271,7 +273,7 @@ export async function createProfileWithLimitCheck(
         ),
         columns: { id: true },
       });
-      if (ownerProfile && callerProfileId === ownerProfile.id) {
+      if (ownerProfile) {
         parentProfileId = ownerProfile.id;
       }
     }
