@@ -38,6 +38,7 @@ import {
 } from '../../../hooks/use-sessions';
 import { useClassifySubject } from '../../../hooks/use-classify-subject';
 import { useResolveSubject } from '../../../hooks/use-resolve-subject';
+import { useFiling } from '../../../hooks/use-filing';
 import { useStreaks } from '../../../hooks/use-streaks';
 import { useOverallProgress } from '../../../hooks/use-progress';
 import { useNetworkStatus } from '../../../hooks/use-network-status';
@@ -385,8 +386,14 @@ export default function SessionScreen() {
   );
   const [notePromptOffered, setNotePromptOffered] = useState(false);
   const [showNoteInput, setShowNoteInput] = useState(false);
+  const [showFilingPrompt, setShowFilingPrompt] = useState(false);
+  const [filingDismissed, setFilingDismissed] = useState(false);
 
   const sessionNoteSavedRef = useRef(false);
+  const closedSessionRef = useRef<{
+    wallClockSeconds: number;
+    fastCelebrations: PendingCelebration[];
+  } | null>(null);
   const animationCleanupRef = useRef<(() => void) | null>(null);
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastAiAtRef = useRef<number | null>(null);
@@ -452,6 +459,9 @@ export default function SessionScreen() {
       setConfirmationToast(null);
       setNotePromptOffered(false);
       setShowNoteInput(false);
+      setShowFilingPrompt(false);
+      setFilingDismissed(false);
+      closedSessionRef.current = null;
       sessionNoteSavedRef.current = false;
       hasHydratedRecoveryRef.current = false;
       resetMilestones();
@@ -515,6 +525,7 @@ export default function SessionScreen() {
   const classifySubject = useClassifySubject();
   const resolveSubject = useResolveSubject();
   const upsertNote = useUpsertNote(effectiveSubjectId || undefined, undefined);
+  const filing = useFiling();
   const startSession = useStartSession(effectiveSubjectId);
   const closeSession = useCloseSession(activeSessionId ?? '');
   const { stream: streamMessage } = useStreamMessage(activeSessionId ?? '');
@@ -1534,6 +1545,35 @@ export default function SessionScreen() {
     syncHomeworkMetadata,
   ]);
 
+  const navigateToSessionSummary = useCallback(() => {
+    const saved = closedSessionRef.current;
+    if (!activeSessionId || !saved) return;
+    router.replace({
+      pathname: `/session-summary/${activeSessionId}`,
+      params: {
+        subjectName: effectiveSubjectName ?? '',
+        exchangeCount: String(exchangeCount),
+        escalationRung: String(escalationRung),
+        subjectId: effectiveSubjectId ?? '',
+        topicId: topicId ?? '',
+        wallClockSeconds: String(saved.wallClockSeconds),
+        milestones: serializeMilestones(milestonesReached),
+        fastCelebrations: serializeCelebrations(saved.fastCelebrations),
+        sessionType: effectiveMode === 'homework' ? 'homework' : 'learning',
+      },
+    } as never);
+  }, [
+    activeSessionId,
+    router,
+    effectiveSubjectName,
+    effectiveSubjectId,
+    topicId,
+    exchangeCount,
+    escalationRung,
+    milestonesReached,
+    effectiveMode,
+  ]);
+
   const handleEndSession = useCallback(async () => {
     if (!activeSessionId || isClosing) return;
 
@@ -1551,21 +1591,32 @@ export default function SessionScreen() {
             });
             const fastCelebrations = await fetchFastCelebrations();
             await clearSessionRecoveryMarker(activeProfile?.id);
-            router.replace({
-              pathname: `/session-summary/${activeSessionId}`,
-              params: {
-                subjectName: effectiveSubjectName ?? '',
-                exchangeCount: String(exchangeCount),
-                escalationRung: String(escalationRung),
-                subjectId: effectiveSubjectId ?? '',
-                topicId: topicId ?? '',
-                wallClockSeconds: String(result.wallClockSeconds),
-                milestones: serializeMilestones(milestonesReached),
-                fastCelebrations: serializeCelebrations(fastCelebrations),
-                sessionType:
-                  effectiveMode === 'homework' ? 'homework' : 'learning',
-              },
-            } as never);
+
+            // Store close result for deferred navigation
+            closedSessionRef.current = {
+              wallClockSeconds: result.wallClockSeconds,
+              fastCelebrations,
+            };
+
+            // Freeform/homework: show filing prompt before navigating
+            if (effectiveMode === 'freeform' || effectiveMode === 'homework') {
+              setShowFilingPrompt(true);
+            } else {
+              router.replace({
+                pathname: `/session-summary/${activeSessionId}`,
+                params: {
+                  subjectName: effectiveSubjectName ?? '',
+                  exchangeCount: String(exchangeCount),
+                  escalationRung: String(escalationRung),
+                  subjectId: effectiveSubjectId ?? '',
+                  topicId: topicId ?? '',
+                  wallClockSeconds: String(result.wallClockSeconds),
+                  milestones: serializeMilestones(milestonesReached),
+                  fastCelebrations: serializeCelebrations(fastCelebrations),
+                  sessionType: 'learning',
+                },
+              } as never);
+            }
           } catch (err: unknown) {
             setIsClosing(false);
             Alert.alert(
@@ -1600,6 +1651,7 @@ export default function SessionScreen() {
     fetchFastCelebrations,
     activeProfile?.id,
     milestonesReached,
+    effectiveMode,
   ]);
 
   const handleQuickChip = useCallback(
@@ -2291,6 +2343,83 @@ export default function SessionScreen() {
         textToSpeechLanguage={languageVoiceLocale}
         footer={
           <>
+            {showFilingPrompt && !filingDismissed && (
+              <View
+                className="px-4 py-6 bg-surface-elevated rounded-t-2xl"
+                testID="filing-prompt"
+              >
+                <Text className="text-lg font-semibold text-text-primary mb-2">
+                  Add to your library?
+                </Text>
+                <Text className="text-body-sm text-text-secondary mb-4">
+                  We can organize what you learned into your library.
+                </Text>
+                <View className="flex-row gap-3">
+                  <Pressable
+                    onPress={async () => {
+                      try {
+                        const result = await filing.mutateAsync({
+                          sessionId: activeSessionId ?? undefined,
+                          sessionMode: effectiveMode as 'freeform' | 'homework',
+                        });
+                        setShowFilingPrompt(false);
+                        router.replace({
+                          pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
+                          params: {
+                            subjectId: result.shelfId,
+                            bookId: result.bookId,
+                          },
+                        } as never);
+                      } catch {
+                        Alert.alert(
+                          "Couldn't add to library",
+                          'Your session is still saved.',
+                          [
+                            {
+                              text: 'OK',
+                              onPress: () => {
+                                setFilingDismissed(true);
+                                navigateToSessionSummary();
+                              },
+                            },
+                          ]
+                        );
+                      }
+                    }}
+                    disabled={filing.isPending}
+                    className="flex-1 bg-primary rounded-xl py-3 items-center min-h-[44px] justify-center"
+                    testID="filing-prompt-accept"
+                    accessibilityRole="button"
+                    accessibilityLabel={
+                      filing.isPending
+                        ? 'Adding to library'
+                        : 'Yes, add to library'
+                    }
+                  >
+                    {filing.isPending ? (
+                      <ActivityIndicator color="white" />
+                    ) : (
+                      <Text className="text-text-inverse font-semibold">
+                        Yes, add it
+                      </Text>
+                    )}
+                  </Pressable>
+                  <Pressable
+                    onPress={() => {
+                      setFilingDismissed(true);
+                      navigateToSessionSummary();
+                    }}
+                    disabled={filing.isPending}
+                    className="px-4 py-3 min-h-[44px] justify-center"
+                    testID="filing-prompt-dismiss"
+                    accessibilityRole="button"
+                    accessibilityLabel="No thanks, skip"
+                  >
+                    <Text className="text-text-secondary">No thanks</Text>
+                  </Pressable>
+                </View>
+              </View>
+            )}
             {sessionExpired && (
               <View className="bg-surface rounded-card p-4 mt-2 mb-4">
                 <Text className="text-body font-semibold text-text-primary mb-2">

@@ -454,6 +454,7 @@ function mapSessionRow(
     endedAt: row.endedAt?.toISOString() ?? null,
     durationSeconds: row.durationSeconds ?? null,
     wallClockSeconds: row.wallClockSeconds ?? null,
+    rawInput: row.rawInput ?? null,
     ...(metadata ? { metadata } : {}),
   };
 }
@@ -683,6 +684,25 @@ async function checkExchangeLimit(
   }
 }
 
+/**
+ * CFLF-23: Merge per-message memory context with rawInput-based pre-session
+ * memory context. De-duplicates when both sources return the same underlying
+ * text (the per-message memory may overlap with rawInput memory on the first
+ * exchange). Returns empty string when neither source has content.
+ */
+function mergeMemoryContexts(
+  messageMemory: string,
+  rawInputMemory: string
+): string {
+  if (!messageMemory && !rawInputMemory) return '';
+  if (!rawInputMemory) return messageMemory;
+  if (!messageMemory) return rawInputMemory;
+  // Both have content — concatenate with a separator.
+  // The prompt builder already handles a single embeddingMemoryContext block,
+  // so we merge here to avoid duplicating the header text.
+  return `${messageMemory}\n\n---\nAdditional context from the learner's original question:\n${rawInputMemory}`;
+}
+
 async function prepareExchangeContext(
   db: Database,
   profileId: string,
@@ -709,6 +729,10 @@ async function prepareExchangeContext(
   );
 
   // 2. Load all supplementary data in parallel (all independent after session load)
+  // CFLF-23: For freeform sessions with rawInput, also scan prior sessions
+  // by the learner's original intent so the very first exchange has rich context.
+  const isFreeformWithRawInput = !session.topicId && !!session.rawInput;
+
   const [
     subject,
     topicRows,
@@ -721,6 +745,7 @@ async function prepareExchangeContext(
     metadataRows,
     learningModeRecord,
     crossSubjectHighlights,
+    rawInputMemory,
   ] = await Promise.all([
     Promise.resolve(staticContext.subject),
     session.topicId
@@ -771,6 +796,17 @@ async function prepareExchangeContext(
     getLearningMode(db, profileId),
     // Story 16.0: Cross-subject learning highlights for broader context
     fetchCrossSubjectHighlights(db, profileId, session.subjectId),
+    // CFLF-23: Pre-session similarity scan — uses rawInput for freeform sessions
+    // Graceful degradation: if Voyage API is down, returns empty (never breaks session)
+    isFreeformWithRawInput
+      ? retrieveRelevantMemory(
+          db,
+          profileId,
+          session.rawInput!,
+          options?.voyageApiKey,
+          5
+        )
+      : Promise.resolve({ context: '', topicIds: [] }),
   ]);
 
   const topic = topicRows[0];
@@ -995,7 +1031,9 @@ async function prepareExchangeContext(
     priorLearningContext: priorLearning.contextText || undefined,
     crossSubjectContext,
     learningHistoryContext,
-    embeddingMemoryContext: memory.context || undefined,
+    // CFLF-23: Merge per-message memory with rawInput-based pre-session memory
+    embeddingMemoryContext:
+      mergeMemoryContexts(memory.context, rawInputMemory.context) || undefined,
     pedagogyMode: subject?.pedagogyMode ?? 'socratic',
     nativeLanguage: teachingPref?.nativeLanguage ?? undefined,
     languageCode: subject?.languageCode ?? undefined,
@@ -1020,6 +1058,8 @@ async function prepareExchangeContext(
     homeworkMode: options?.homeworkMode,
     // Subscription-derived LLM tier — controls model routing
     llmTier: options?.llmTier,
+    // CFLF: Original learner input so the LLM stays anchored to intent
+    rawInput: session.rawInput,
   };
 
   return { session, context, effectiveRung, hintCount, lastAiResponseAt };

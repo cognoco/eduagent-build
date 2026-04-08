@@ -187,6 +187,7 @@ async function executeSteps(
       return fn();
     }),
     sleep: jest.fn(),
+    waitForEvent: jest.fn().mockResolvedValue(null),
   };
 
   const handler = (sessionCompleted as any).fn;
