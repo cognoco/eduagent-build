@@ -112,7 +112,7 @@ export default function CreateSubjectScreen() {
 
         if (result.structureType === 'broad') {
           router.replace({
-            pathname: '/(app)/library',
+            pathname: '/(app)/pick-book/[subjectId]',
             params: {
               subjectId: result.subject.id,
             },
