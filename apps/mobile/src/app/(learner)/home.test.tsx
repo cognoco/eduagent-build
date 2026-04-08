@@ -83,7 +83,7 @@ describe('HomeScreen intent router', () => {
   //   expect(screen.queryByTestId('learner-screen')).toBeNull();
   // });
 
-  it('renders LearnerScreen even for owner with linked children (layout redirects parents)', () => {
+  it('renders ParentGateway for owner with linked children', () => {
     mockProfiles = [
       { id: 'p1', displayName: 'Maria', isOwner: true },
       { id: 'c1', displayName: 'Emma', isOwner: false },
@@ -92,7 +92,8 @@ describe('HomeScreen intent router', () => {
 
     render(<HomeScreen />);
 
-    expect(screen.getByTestId('learner-screen')).toBeTruthy();
+    expect(screen.getByTestId('parent-gateway')).toBeTruthy();
+    expect(screen.queryByTestId('learner-screen')).toBeNull();
   });
 
   it('renders LearnerScreen when active profile is a child (non-owner)', () => {
