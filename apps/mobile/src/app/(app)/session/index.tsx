@@ -288,6 +288,7 @@ export default function SessionScreen() {
     problemText,
     homeworkProblems,
     ocrText,
+    rawInput,
   } = useLocalSearchParams<{
     mode?: string;
     subjectId?: string;
@@ -298,6 +299,7 @@ export default function SessionScreen() {
     problemText?: string;
     homeworkProblems?: string;
     ocrText?: string;
+    rawInput?: string;
   }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -327,7 +329,8 @@ export default function SessionScreen() {
     sessionExperience,
     initialProblemText,
     topicName ?? undefined,
-    subjectName ?? undefined
+    subjectName ?? undefined,
+    rawInput ?? undefined
   );
 
   const { isOffline } = useNetworkStatus();
@@ -1575,7 +1578,7 @@ export default function SessionScreen() {
                 {
                   text: 'Go Home',
                   onPress: () => {
-                    router.replace('/(learner)/home' as never);
+                    router.replace('/(app)/home' as never);
                   },
                 },
               ]
@@ -1795,7 +1798,7 @@ export default function SessionScreen() {
         setShowWrongSubjectChip(false);
         setShowTopicSwitcher(false);
         router.replace({
-          pathname: '/(learner)/session',
+          pathname: '/(app)/session',
           params: {
             mode: effectiveMode === 'freeform' ? 'learning' : effectiveMode,
             subjectId: nextSubjectId,
@@ -2298,7 +2301,7 @@ export default function SessionScreen() {
                   or your library.
                 </Text>
                 <Pressable
-                  onPress={() => router.replace('/(learner)/home' as never)}
+                  onPress={() => router.replace('/(app)/home' as never)}
                   className="bg-primary rounded-button py-3 items-center"
                   testID="session-expired-go-home"
                   accessibilityRole="button"

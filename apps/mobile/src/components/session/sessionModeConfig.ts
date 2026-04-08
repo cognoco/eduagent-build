@@ -105,10 +105,18 @@ export function getOpeningMessage(
   sessionExperience: number,
   problemText?: string,
   topicName?: string,
-  subjectName?: string
+  subjectName?: string,
+  rawInput?: string
 ): string {
   if (problemText) {
     return "Got it. Let's work through this together. I'll keep it brief and clear.";
+  }
+
+  if (rawInput && topicName) {
+    return `Let's explore ${rawInput}! I'll start with something interesting.`;
+  }
+  if (rawInput && !topicName) {
+    return `I see you're curious about "${rawInput}" — let's dive in!`;
   }
 
   if (topicName) {
