@@ -15,8 +15,6 @@ import { PenWritingAnimation } from '../../../../../components/common';
 import { SuggestionCard } from '../../../../../components/library/SuggestionCard';
 import { SessionRow } from '../../../../../components/library/SessionRow';
 import { ChapterDivider } from '../../../../../components/library/ChapterDivider';
-import { NoteDisplay } from '../../../../../components/library/NoteDisplay';
-import { NoteInput } from '../../../../../components/library/NoteInput';
 import {
   useBookWithTopics,
   useGenerateBookTopics,
@@ -26,11 +24,7 @@ import {
   type BookSession,
 } from '../../../../../hooks/use-book-sessions';
 import { useTopicSuggestions } from '../../../../../hooks/use-topic-suggestions';
-import {
-  useBookNotes,
-  useUpsertNote,
-  useDeleteNote,
-} from '../../../../../hooks/use-notes';
+import { useBookNotes } from '../../../../../hooks/use-notes';
 import { useSubjects } from '../../../../../hooks/use-subjects';
 import { formatApiError } from '../../../../../lib/format-api-error';
 import { useThemeColors } from '../../../../../lib/theme';
@@ -111,8 +105,6 @@ export default function BookScreen() {
   const suggestionsQuery = useTopicSuggestions(subjectId, bookId);
   const notesQuery = useBookNotes(subjectId, bookId);
   const generateMutation = useGenerateBookTopics(subjectId, bookId);
-  const upsertMutation = useUpsertNote(subjectId, bookId);
-  const deleteMutation = useDeleteNote(subjectId, bookId);
   const subjectsQuery = useSubjects();
   const subjectName = subjectsQuery.data?.find((s) => s.id === subjectId)?.name;
 
@@ -194,64 +186,6 @@ export default function BookScreen() {
     () => new Set(notes.map((n) => n.topicId)),
     [notes]
   );
-  const noteByTopicId = useMemo(() => {
-    const map = new Map<string, { content: string; updatedAt: string }>();
-    for (const n of notes) {
-      map.set(n.topicId, { content: n.content, updatedAt: n.updatedAt });
-    }
-    return map;
-  }, [notes]);
-
-  // --- Inline note editing ---
-  const [expandedNoteTopicId, setExpandedNoteTopicId] = useState<string | null>(
-    null
-  );
-  const [editingNoteTopicId, setEditingNoteTopicId] = useState<string | null>(
-    null
-  );
-
-  const handleNoteSave = useCallback(
-    (topicId: string, content: string) => {
-      upsertMutation.mutate(
-        { topicId, content },
-        {
-          onSuccess: () => {
-            setEditingNoteTopicId(null);
-            setExpandedNoteTopicId(null);
-          },
-          onError: (error) => {
-            Alert.alert('Could not save note', formatApiError(error));
-          },
-        }
-      );
-    },
-    [upsertMutation]
-  );
-
-  const handleNoteDelete = useCallback(
-    (topicId: string) => {
-      Alert.alert('Delete note?', 'This cannot be undone.', [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => {
-            deleteMutation.mutate(topicId, {
-              onSuccess: () => {
-                setExpandedNoteTopicId(null);
-                setEditingNoteTopicId(null);
-              },
-              onError: (error) => {
-                Alert.alert('Could not delete note', formatApiError(error));
-              },
-            });
-          },
-        },
-      ]);
-    },
-    [deleteMutation]
-  );
-
   // --- Sessions data ---
   const sessions = sessionsQuery.data ?? [];
   const sessionCount = sessions.length;
@@ -693,38 +627,6 @@ export default function BookScreen() {
                     testID={`session-${s.id}`}
                   />
                 ))}
-          </View>
-        )}
-
-        {/* Inline note panel (when expanding from session row) */}
-        {expandedNoteTopicId && (
-          <View className="px-5 mt-2 mb-4" testID="note-panel">
-            {editingNoteTopicId === expandedNoteTopicId ? (
-              <NoteInput
-                initialValue={
-                  noteByTopicId.get(expandedNoteTopicId)?.content ?? ''
-                }
-                saving={upsertMutation.isPending}
-                onSave={(content) =>
-                  handleNoteSave(expandedNoteTopicId, content)
-                }
-                onCancel={() => setEditingNoteTopicId(null)}
-              />
-            ) : noteByTopicId.has(expandedNoteTopicId) ? (
-              <NoteDisplay
-                content={noteByTopicId.get(expandedNoteTopicId)!.content}
-                onEdit={() => setEditingNoteTopicId(expandedNoteTopicId)}
-                onDelete={() => handleNoteDelete(expandedNoteTopicId)}
-              />
-            ) : (
-              <NoteInput
-                saving={upsertMutation.isPending}
-                onSave={(content) =>
-                  handleNoteSave(expandedNoteTopicId, content)
-                }
-                onCancel={() => setExpandedNoteTopicId(null)}
-              />
-            )}
           </View>
         )}
 
