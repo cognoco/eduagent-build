@@ -194,6 +194,7 @@ export const learningSessionSchema = z.object({
   durationSeconds: z.number().int().nullable(),
   wallClockSeconds: z.number().int().nullable(),
   metadata: sessionMetadataSchema.optional(),
+  rawInput: z.string().nullable().optional(),
 });
 export type LearningSession = z.infer<typeof learningSessionSchema>;
 

@@ -23,5 +23,8 @@ export * from './progress.ts';
 // Subscription & Billing (Epic 5)
 export * from './billing.ts';
 
+// Filing (Conversation-First Flow)
+export * from './filing.ts';
+
 // Topic Notes
 export * from './notes.ts';

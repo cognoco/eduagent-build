@@ -349,3 +349,25 @@ export const subjectClassifyResultSchema = z.object({
   suggestedSubjectName: z.string().nullable().optional(),
 });
 export type SubjectClassifyResult = z.infer<typeof subjectClassifyResultSchema>;
+
+// --- Book & Topic Suggestions (Conversation-First Flow) ---
+
+export const bookSuggestionSchema = z.object({
+  id: z.string().uuid(),
+  subjectId: z.string().uuid(),
+  title: z.string(),
+  emoji: z.string().nullable(),
+  description: z.string().nullable(),
+  createdAt: z.string().datetime(),
+  pickedAt: z.string().datetime().nullable(),
+});
+export type BookSuggestion = z.infer<typeof bookSuggestionSchema>;
+
+export const topicSuggestionSchema = z.object({
+  id: z.string().uuid(),
+  bookId: z.string().uuid(),
+  title: z.string(),
+  createdAt: z.string().datetime(),
+  usedAt: z.string().datetime().nullable(),
+});
+export type TopicSuggestion = z.infer<typeof topicSuggestionSchema>;
