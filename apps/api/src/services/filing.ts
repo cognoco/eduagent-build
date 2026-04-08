@@ -9,17 +9,21 @@
  * No Hono imports — pure business logic.
  */
 
-import { eq, and } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import type { Database } from '@eduagent/database';
 import {
   subjects,
+  curricula,
   curriculumBooks,
   curriculumTopics,
+  generateUUIDv7,
 } from '@eduagent/database';
 import {
   filingResponseSchema,
+  type FiledFrom,
   type FilingRequest,
   type FilingResponse,
+  type FilingResult,
   type LibraryIndex,
 } from '@eduagent/schemas';
 import type { ChatMessage, RouteResult } from './llm/types';
@@ -292,4 +296,203 @@ export async function fileToLibrary(
   const validated = filingResponseSchema.parse(parsed);
 
   return validated;
+}
+
+// ---------------------------------------------------------------------------
+// Resolution logic — create/reuse DB records from filing response
+// ---------------------------------------------------------------------------
+
+interface ResolveFilingInput {
+  profileId: string;
+  filingResponse: FilingResponse;
+  filedFrom: FiledFrom;
+  sessionId?: string;
+}
+
+export async function resolveFilingResult(
+  db: Database,
+  input: ResolveFilingInput
+): Promise<FilingResult> {
+  const { profileId, filingResponse, filedFrom, sessionId } = input;
+
+  // Wrap ALL writes in a single transaction to prevent orphaned records.
+  // Uses the PgTransaction → Database cast pattern.
+  return await db.transaction(async (tx) => {
+    const txDb = tx as unknown as Database;
+
+    // --- 1. Resolve shelf (subject) ---
+    let shelfId: string;
+    let shelfName: string;
+    let isNewShelf = false;
+
+    if ('id' in filingResponse.shelf) {
+      const existing = await txDb.query.subjects.findFirst({
+        where: and(
+          eq(subjects.id, filingResponse.shelf.id),
+          eq(subjects.profileId, profileId)
+        ),
+      });
+      if (!existing)
+        throw new Error(`Shelf not found: ${filingResponse.shelf.id}`);
+      shelfId = existing.id;
+      shelfName = existing.name;
+    } else {
+      // Case-insensitive name match + FOR UPDATE to prevent concurrent creation
+      const [existing] = await txDb
+        .select()
+        .from(subjects)
+        .where(
+          and(
+            eq(subjects.profileId, profileId),
+            sql`lower(${subjects.name}) = lower(${filingResponse.shelf.name})`,
+            eq(subjects.status, 'active')
+          )
+        )
+        .for('update')
+        .limit(1);
+      if (existing) {
+        shelfId = existing.id;
+        shelfName = existing.name;
+      } else {
+        const newId = generateUUIDv7();
+        await txDb.insert(subjects).values({
+          id: newId,
+          profileId,
+          name: filingResponse.shelf.name,
+          status: 'active',
+        });
+        shelfId = newId;
+        shelfName = filingResponse.shelf.name;
+        isNewShelf = true;
+      }
+    }
+
+    // --- 2. Ensure curriculum exists for this shelf ---
+    const existingCurriculum = await txDb.query.curricula.findFirst({
+      where: eq(curricula.subjectId, shelfId),
+    });
+    let curriculumId: string;
+    if (existingCurriculum) {
+      curriculumId = existingCurriculum.id;
+    } else {
+      const newCurrId = generateUUIDv7();
+      await txDb
+        .insert(curricula)
+        .values({ id: newCurrId, subjectId: shelfId, version: 1 });
+      curriculumId = newCurrId;
+    }
+
+    // --- 3. Resolve book ---
+    let bookId: string;
+    let bookName: string;
+    let isNewBook = false;
+
+    if ('id' in filingResponse.book) {
+      const existing = await txDb.query.curriculumBooks.findFirst({
+        where: and(
+          eq(curriculumBooks.id, filingResponse.book.id),
+          eq(curriculumBooks.subjectId, shelfId)
+        ),
+      });
+      if (!existing)
+        throw new Error(`Book not found: ${filingResponse.book.id}`);
+      bookId = existing.id;
+      bookName = existing.title;
+    } else {
+      // Case-insensitive book name dedup within shelf
+      const [existing] = await txDb
+        .select()
+        .from(curriculumBooks)
+        .where(
+          and(
+            eq(curriculumBooks.subjectId, shelfId),
+            sql`lower(${curriculumBooks.title}) = lower(${filingResponse.book.name})`
+          )
+        )
+        .for('update')
+        .limit(1);
+      if (existing) {
+        bookId = existing.id;
+        bookName = existing.title;
+      } else {
+        const allBooks = await txDb.query.curriculumBooks.findMany({
+          where: eq(curriculumBooks.subjectId, shelfId),
+        });
+        const maxOrder = allBooks.reduce(
+          (max, b) => Math.max(max, b.sortOrder),
+          -1
+        );
+
+        const newId = generateUUIDv7();
+        await txDb.insert(curriculumBooks).values({
+          id: newId,
+          subjectId: shelfId,
+          title: filingResponse.book.name,
+          description: filingResponse.book.description,
+          emoji: filingResponse.book.emoji,
+          sortOrder: maxOrder + 1,
+          topicsGenerated: true,
+        });
+        bookId = newId;
+        bookName = filingResponse.book.name;
+        isNewBook = true;
+      }
+    }
+
+    // --- 4. Resolve chapter name ---
+    let chapterName: string;
+    let isNewChapter = false;
+
+    if ('existing' in filingResponse.chapter) {
+      chapterName = filingResponse.chapter.existing;
+    } else {
+      const existingTopic = await txDb.query.curriculumTopics.findFirst({
+        where: and(
+          eq(curriculumTopics.bookId, bookId),
+          sql`lower(${curriculumTopics.chapter}) = lower(${filingResponse.chapter.name})`
+        ),
+      });
+      chapterName = filingResponse.chapter.name;
+      isNewChapter = !existingTopic;
+    }
+
+    // --- 5. Create topic ---
+    const topicId = generateUUIDv7();
+    const existingTopics = await txDb.query.curriculumTopics.findMany({
+      where: eq(curriculumTopics.bookId, bookId),
+    });
+    const maxTopicOrder = existingTopics.reduce(
+      (max, t) => Math.max(max, t.sortOrder),
+      -1
+    );
+
+    await txDb.insert(curriculumTopics).values({
+      id: topicId,
+      curriculumId,
+      bookId,
+      title: filingResponse.topic.title,
+      description: filingResponse.topic.description,
+      chapter: chapterName,
+      sortOrder: maxTopicOrder + 1,
+      relevance: 'core',
+      estimatedMinutes: 15,
+      filedFrom,
+      sessionId: sessionId ?? null,
+    });
+
+    return {
+      shelfId,
+      shelfName,
+      bookId,
+      bookName,
+      chapter: chapterName,
+      topicId,
+      topicTitle: filingResponse.topic.title,
+      isNew: {
+        shelf: isNewShelf,
+        book: isNewBook,
+        chapter: isNewChapter,
+      },
+    };
+  });
 }

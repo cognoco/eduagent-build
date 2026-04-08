@@ -2,6 +2,7 @@ import {
   buildLibraryIndex,
   formatLibraryIndexForPrompt,
   fileToLibrary,
+  resolveFilingResult,
 } from './filing';
 import type { LibraryIndex } from '@eduagent/schemas';
 
@@ -225,5 +226,16 @@ describe('fileToLibrary — seed taxonomy', () => {
     const messages = mockRouteAndCall.mock.calls[0][0];
     const systemMsg = messages.find((m: any) => m.role === 'system');
     expect(systemMsg.content).toContain('Mathematics, Science, History');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// resolveFilingResult — export verification
+// Real integration validation happens in Task 26
+// ---------------------------------------------------------------------------
+
+describe('resolveFilingResult', () => {
+  it('is exported and callable', () => {
+    expect(typeof resolveFilingResult).toBe('function');
   });
 });
