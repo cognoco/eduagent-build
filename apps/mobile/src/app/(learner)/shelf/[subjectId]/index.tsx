@@ -1,10 +1,15 @@
 import { useEffect } from 'react';
-import { FlatList, Pressable, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  Text,
+  View,
+} from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import type { BookProgressStatus } from '@eduagent/schemas';
-import { BookPageFlipAnimation } from '../../../../components/common';
 import { BookCard } from '../../../../components/library/BookCard';
 import { useBooks } from '../../../../hooks/use-books';
 import { useSubjects } from '../../../../hooks/use-subjects';
@@ -115,7 +120,7 @@ export default function ShelfScreen() {
         style={{ paddingTop: insets.top }}
         testID="shelf-loading"
       >
-        <BookPageFlipAnimation size={80} color={themeColors.accent} />
+        <ActivityIndicator size="large" color={themeColors.accent} />
         <Text className="text-body-sm text-text-secondary mt-3">
           Loading this shelf...
         </Text>
