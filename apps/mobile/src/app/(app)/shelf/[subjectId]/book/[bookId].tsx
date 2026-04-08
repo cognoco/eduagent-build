@@ -12,13 +12,20 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import type { CurriculumTopic } from '@eduagent/schemas';
 import { PenWritingAnimation } from '../../../../../components/common';
-import { CollapsibleChapter } from '../../../../../components/library/CollapsibleChapter';
+import { SuggestionCard } from '../../../../../components/library/SuggestionCard';
+import { SessionRow } from '../../../../../components/library/SessionRow';
+import { ChapterDivider } from '../../../../../components/library/ChapterDivider';
 import { NoteDisplay } from '../../../../../components/library/NoteDisplay';
 import { NoteInput } from '../../../../../components/library/NoteInput';
 import {
   useBookWithTopics,
   useGenerateBookTopics,
 } from '../../../../../hooks/use-books';
+import {
+  useBookSessions,
+  type BookSession,
+} from '../../../../../hooks/use-book-sessions';
+import { useTopicSuggestions } from '../../../../../hooks/use-topic-suggestions';
 import {
   useBookNotes,
   useUpsertNote,
@@ -32,28 +39,46 @@ import { useThemeColors } from '../../../../../lib/theme';
 // Helpers
 // ---------------------------------------------------------------------------
 
-function groupTopicsByChapter(
-  topics: CurriculumTopic[]
-): Map<string, CurriculumTopic[]> {
-  const map = new Map<string, CurriculumTopic[]>();
-  for (const topic of topics) {
-    const chapter = topic.chapter ?? 'Topics';
-    const existing = map.get(chapter);
-    if (existing) {
-      existing.push(topic);
-    } else {
-      map.set(chapter, [topic]);
-    }
-  }
-  return map;
+function formatRelativeDate(isoDate: string): string {
+  const now = Date.now();
+  const then = new Date(isoDate).getTime();
+  const diffMs = now - then;
+  if (diffMs < 0) return 'just now';
+
+  const seconds = Math.floor(diffMs / 1000);
+  if (seconds < 60) return 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months}mo`;
+  const years = Math.floor(months / 12);
+  return `${years}y`;
 }
 
-function findSuggestedNext(
-  topics: CurriculumTopic[],
-  completedIds: Set<string>
-): CurriculumTopic | undefined {
-  const sorted = [...topics].sort((a, b) => a.sortOrder - b.sortOrder);
-  return sorted.find((t) => !t.skipped && !completedIds.has(t.id));
+interface GroupedChapter {
+  chapter: string;
+  sessions: BookSession[];
+}
+
+function groupSessionsByChapter(sessions: BookSession[]): GroupedChapter[] {
+  const map = new Map<string, BookSession[]>();
+  for (const s of sessions) {
+    const key = s.chapter ?? 'Topics';
+    const group = map.get(key);
+    if (group) {
+      group.push(s);
+    } else {
+      map.set(key, [s]);
+    }
+  }
+  return Array.from(map.entries()).map(([chapter, items]) => ({
+    chapter,
+    sessions: items,
+  }));
 }
 
 // ---------------------------------------------------------------------------
@@ -82,6 +107,8 @@ export default function BookScreen() {
 
   // --- Data queries (called unconditionally for rules-of-hooks) ---
   const bookQuery = useBookWithTopics(subjectId, bookId);
+  const sessionsQuery = useBookSessions(subjectId, bookId);
+  const suggestionsQuery = useTopicSuggestions(subjectId, bookId);
   const notesQuery = useBookNotes(subjectId, bookId);
   const generateMutation = useGenerateBookTopics(subjectId, bookId);
   const upsertMutation = useUpsertNote(subjectId, bookId);
@@ -95,7 +122,6 @@ export default function BookScreen() {
 
   const book = bookQuery.data?.book ?? null;
   const topics = bookQuery.data?.topics ?? [];
-  const status = bookQuery.data?.status ?? 'NOT_STARTED';
   const completedTopicCount = bookQuery.data?.completedTopicCount ?? 0;
 
   const needsGeneration = book !== null && !book.topicsGenerated;
@@ -184,11 +210,6 @@ export default function BookScreen() {
     null
   );
 
-  const handleNotePress = useCallback((topicId: string) => {
-    setExpandedNoteTopicId((prev) => (prev === topicId ? null : topicId));
-    setEditingNoteTopicId(null);
-  }, []);
-
   const handleNoteSave = useCallback(
     (topicId: string, content: string) => {
       upsertMutation.mutate(
@@ -231,45 +252,157 @@ export default function BookScreen() {
     [deleteMutation]
   );
 
-  // --- Derived data for main view ---
-  const completedIds = useMemo(() => {
-    const sorted = [...topics].sort((a, b) => a.sortOrder - b.sortOrder);
+  // --- Sessions data ---
+  const sessions = sessionsQuery.data ?? [];
+  const sessionCount = sessions.length;
+  const noteCount = notes.length;
+
+  // --- Completed topic IDs (derived from sessions) ---
+  const completedTopicIds = useMemo(() => {
     const ids = new Set<string>();
-    for (let i = 0; i < completedTopicCount && i < sorted.length; i++) {
-      ids.add(sorted[i]!.id);
+    for (const s of sessions) {
+      if (s.topicId) ids.add(s.topicId);
     }
     return ids;
-  }, [topics, completedTopicCount]);
+  }, [sessions]);
 
-  const suggestedNext = useMemo(
-    () => findSuggestedNext(topics, completedIds),
-    [topics, completedIds]
-  );
-
-  const chapters = useMemo(() => groupTopicsByChapter(topics), [topics]);
-
-  // Figure out which chapter should start expanded (first incomplete chapter)
-  const firstIncompleteChapter = useMemo(() => {
-    for (const [chapterTitle, chapterTopics] of chapters) {
-      const chapterCompleted = chapterTopics.filter((t) =>
-        completedIds.has(t.id)
-      ).length;
-      if (chapterCompleted < chapterTopics.length) {
-        return chapterTitle;
+  // --- Suggestion cards: combine API suggestions + pre-generated uncovered topics, max 2 ---
+  const suggestionCards = useMemo(() => {
+    const apiSuggestions: Array<{
+      id: string;
+      title: string;
+      type: 'suggestion';
+    }> = [];
+    if (Array.isArray(suggestionsQuery.data)) {
+      for (const s of suggestionsQuery.data as Array<{
+        id: string;
+        title: string;
+      }>) {
+        apiSuggestions.push({ id: s.id, title: s.title, type: 'suggestion' });
       }
     }
-    return null;
-  }, [chapters, completedIds]);
 
-  // --- Topic press: navigate to session ---
-  const handleTopicPress = useCallback(
-    (topicId: string, _topicName: string) => {
-      router.push({
-        pathname: '/(learner)/session',
-        params: { mode: 'learning', subjectId, topicId },
-      } as never);
+    const preGenerated: Array<{
+      id: string;
+      title: string;
+      type: 'topic';
+    }> = topics
+      .filter(
+        (t: CurriculumTopic) => !completedTopicIds.has(t.id) && !t.skipped
+      )
+      .slice(0, 2)
+      .map((t: CurriculumTopic) => ({
+        id: t.id,
+        title: t.title,
+        type: 'topic' as const,
+      }));
+
+    // API suggestions first, then pre-generated, max 2 total
+    const combined = [...apiSuggestions, ...preGenerated].slice(0, 2);
+    return combined;
+  }, [suggestionsQuery.data, topics, completedTopicIds]);
+
+  // --- Session list grouped by chapter ---
+  const groupedSessions = useMemo(
+    () => groupSessionsByChapter(sessions),
+    [sessions]
+  );
+  const showChapterDividers = sessionCount >= 4;
+
+  // --- Session press: navigate to transcript/session ---
+  const handleSessionPress = useCallback(
+    (session: BookSession) => {
+      if (session.topicId) {
+        router.push({
+          pathname: '/(app)/session',
+          params: { mode: 'learning', subjectId, topicId: session.topicId },
+        } as never);
+      }
     },
     [router, subjectId]
+  );
+
+  // --- Long-press context menu on session ---
+  const handleSessionLongPress = useCallback((session: BookSession) => {
+    Alert.alert(session.topicTitle, undefined, [
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => {
+          // Deletion would require a separate API endpoint.
+          // For now, show a not-yet-available message.
+          Alert.alert(
+            'Not available yet',
+            'Session deletion will be available in a future update.'
+          );
+        },
+      },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  }, []);
+
+  // --- Start learning: navigate to session with first suggestion or first uncovered topic ---
+  const handleStartLearning = useCallback(() => {
+    // Try first suggestion card (which may be a pre-generated topic)
+    if (suggestionCards.length > 0) {
+      const first = suggestionCards[0]!;
+      if (first.type === 'topic') {
+        router.push({
+          pathname: '/(app)/session',
+          params: { mode: 'learning', subjectId, topicId: first.id },
+        } as never);
+        return;
+      }
+    }
+    // Fallback: find first uncovered topic
+    const sorted = [...topics].sort(
+      (a: CurriculumTopic, b: CurriculumTopic) => a.sortOrder - b.sortOrder
+    );
+    const next = sorted.find(
+      (t: CurriculumTopic) => !completedTopicIds.has(t.id) && !t.skipped
+    );
+    if (next) {
+      router.push({
+        pathname: '/(app)/session',
+        params: { mode: 'learning', subjectId, topicId: next.id },
+      } as never);
+      return;
+    }
+    // All topics covered — start a new session on the first topic
+    if (sorted.length > 0) {
+      router.push({
+        pathname: '/(app)/session',
+        params: { mode: 'learning', subjectId, topicId: sorted[0]!.id },
+      } as never);
+    }
+  }, [suggestionCards, topics, completedTopicIds, router, subjectId]);
+
+  // --- Suggestion press ---
+  const handleSuggestionPress = useCallback(
+    (card: { id: string; type: string }) => {
+      if (card.type === 'topic') {
+        router.push({
+          pathname: '/(app)/session',
+          params: { mode: 'learning', subjectId, topicId: card.id },
+        } as never);
+      } else {
+        // For API-generated suggestions, find matching topic or start generic session
+        const matchingTopic = topics.find(
+          (t: CurriculumTopic) => t.id === card.id
+        );
+        if (matchingTopic) {
+          router.push({
+            pathname: '/(app)/session',
+            params: {
+              mode: 'learning',
+              subjectId,
+              topicId: matchingTopic.id,
+            },
+          } as never);
+        }
+      }
+    },
+    [router, subjectId, topics]
   );
 
   // --- Screen states ---
@@ -431,10 +564,7 @@ export default function BookScreen() {
     );
   }
 
-  // 4. Main view (topics loaded)
-  const totalTopics = topics.length;
-  const progressRatio = totalTopics > 0 ? completedTopicCount / totalTopics : 0;
-
+  // 4. Main view — session-based workspace
   return (
     <View
       className="flex-1 bg-background"
@@ -459,96 +589,114 @@ export default function BookScreen() {
 
         {/* Book info */}
         <View className="px-5 pb-4">
-          {book?.emoji && <Text className="text-4xl mb-2">{book.emoji}</Text>}
-          <Text className="text-h1 font-bold text-text-primary mb-1">
-            {book?.title ?? 'Book'}
-          </Text>
-          {subjectName && (
-            <Text className="text-body-sm text-text-secondary">
-              {subjectName}
-            </Text>
-          )}
+          <View className="flex-row items-center mb-1">
+            {book?.emoji && <Text className="text-3xl me-3">{book.emoji}</Text>}
+            <View className="flex-1">
+              <Text
+                className="text-h2 font-bold text-text-primary"
+                numberOfLines={2}
+              >
+                {book?.title ?? 'Book'}
+              </Text>
+              {subjectName && (
+                <Text className="text-body-sm text-text-secondary mt-0.5">
+                  {subjectName}
+                </Text>
+              )}
+            </View>
+          </View>
 
-          {/* Progress bar */}
-          {totalTopics > 0 && (
-            <View className="mt-3">
-              <View className="flex-row items-center justify-between mb-2">
-                <Text className="text-caption text-text-secondary">
-                  {completedTopicCount}/{totalTopics} topics completed
+          {/* Stats row */}
+          <View className="flex-row items-center mt-3 gap-4">
+            <View className="flex-row items-center">
+              <Ionicons
+                name="chatbubbles-outline"
+                size={14}
+                color={themeColors.textSecondary}
+              />
+              <Text className="text-caption text-text-secondary ms-1">
+                {sessionCount} {sessionCount === 1 ? 'session' : 'sessions'}
+              </Text>
+            </View>
+            {noteCount > 0 && (
+              <View className="flex-row items-center">
+                <Ionicons
+                  name="document-text-outline"
+                  size={14}
+                  color={themeColors.textSecondary}
+                />
+                <Text className="text-caption text-text-secondary ms-1">
+                  {noteCount} {noteCount === 1 ? 'note' : 'notes'}
                 </Text>
               </View>
-              <View className="h-2 bg-surface-elevated rounded-full overflow-hidden">
-                <View
-                  className="h-2 bg-primary rounded-full"
-                  style={{ width: `${Math.round(progressRatio * 100)}%` }}
-                />
-              </View>
-            </View>
-          )}
-        </View>
-
-        {/* Completion celebration */}
-        {status === 'COMPLETED' && (
-          <View
-            className="mx-5 mb-4 bg-success/10 rounded-card px-4 py-3"
-            testID="book-completed-banner"
-          >
-            <Text className="text-body font-semibold text-success text-center">
-              You've covered everything here!
-            </Text>
-          </View>
-        )}
-
-        {/* Continue CTA */}
-        {suggestedNext && status !== 'COMPLETED' && (
-          <View className="px-5 mb-4">
-            <Pressable
-              onPress={() =>
-                handleTopicPress(suggestedNext.id, suggestedNext.title)
-              }
-              className="bg-primary rounded-button px-5 py-4 flex-row items-center justify-center min-h-[48px]"
-              testID="book-continue-cta"
-              accessibilityLabel={`Continue: ${suggestedNext.title}`}
-            >
-              <Ionicons
-                name="play-circle"
-                size={20}
-                color={themeColors.textInverse}
-                style={{ marginRight: 8 }}
-              />
-              <Text
-                className="text-body font-semibold text-text-inverse flex-1"
-                numberOfLines={1}
-              >
-                Continue: {suggestedNext.title}
+            )}
+            {completedTopicCount > 0 && topics.length > 0 && (
+              <Text className="text-caption text-text-secondary">
+                {completedTopicCount}/{topics.length} topics
               </Text>
-            </Pressable>
+            )}
+          </View>
+        </View>
+
+        {/* Study next suggestions — max 2 cards */}
+        {suggestionCards.length > 0 && (
+          <View className="px-5 mb-4">
+            <Text className="text-body-sm font-semibold text-text-secondary mb-2 uppercase tracking-wide">
+              Study next
+            </Text>
+            <View className="flex-row gap-3">
+              {suggestionCards.map((card) => (
+                <SuggestionCard
+                  key={card.id}
+                  title={card.title}
+                  onPress={() => handleSuggestionPress(card)}
+                  testID={`suggestion-${card.id}`}
+                />
+              ))}
+            </View>
           </View>
         )}
 
-        {/* Chapters */}
-        <View className="px-5">
-          {[...chapters.entries()].map(([chapterTitle, chapterTopics]) => {
-            const chapterCompleted = chapterTopics.filter((t) =>
-              completedIds.has(t.id)
-            ).length;
-            return (
-              <CollapsibleChapter
-                key={chapterTitle}
-                title={chapterTitle}
-                topics={chapterTopics}
-                completedCount={chapterCompleted}
-                initiallyExpanded={chapterTitle === firstIncompleteChapter}
-                suggestedNextId={suggestedNext?.id}
-                onTopicPress={handleTopicPress}
-                noteTopicIds={noteTopicIds}
-                onNotePress={handleNotePress}
-              />
-            );
-          })}
-        </View>
+        {/* Session list */}
+        {sessions.length > 0 && (
+          <View className="mb-4">
+            <Text className="text-body-sm font-semibold text-text-secondary mb-1 px-5 uppercase tracking-wide">
+              Past sessions
+            </Text>
+            {showChapterDividers
+              ? groupedSessions.map((group) => (
+                  <View key={group.chapter}>
+                    <ChapterDivider name={group.chapter} />
+                    {group.sessions.map((s) => (
+                      <SessionRow
+                        key={s.id}
+                        title={s.topicTitle}
+                        relativeDate={formatRelativeDate(s.createdAt)}
+                        hasNote={
+                          s.topicId != null && noteTopicIds.has(s.topicId)
+                        }
+                        onPress={() => handleSessionPress(s)}
+                        onLongPress={() => handleSessionLongPress(s)}
+                        testID={`session-${s.id}`}
+                      />
+                    ))}
+                  </View>
+                ))
+              : sessions.map((s) => (
+                  <SessionRow
+                    key={s.id}
+                    title={s.topicTitle}
+                    relativeDate={formatRelativeDate(s.createdAt)}
+                    hasNote={s.topicId != null && noteTopicIds.has(s.topicId)}
+                    onPress={() => handleSessionPress(s)}
+                    onLongPress={() => handleSessionLongPress(s)}
+                    testID={`session-${s.id}`}
+                  />
+                ))}
+          </View>
+        )}
 
-        {/* Inline note panel */}
+        {/* Inline note panel (when expanding from session row) */}
         {expandedNoteTopicId && (
           <View className="px-5 mt-2 mb-4" testID="note-panel">
             {editingNoteTopicId === expandedNoteTopicId ? (
@@ -580,6 +728,23 @@ export default function BookScreen() {
           </View>
         )}
 
+        {/* Empty state — no sessions yet */}
+        {sessions.length === 0 && !needsGeneration && topics.length > 0 && (
+          <View className="px-5 py-8 items-center" testID="book-empty-sessions">
+            <Ionicons
+              name="book-outline"
+              size={40}
+              color={themeColors.textSecondary}
+            />
+            <Text className="text-body text-text-secondary text-center mt-3 mb-1">
+              No sessions yet
+            </Text>
+            <Text className="text-body-sm text-text-secondary text-center mb-4">
+              Pick a topic above to start learning
+            </Text>
+          </View>
+        )}
+
         {/* Empty topics state */}
         {topics.length === 0 && !needsGeneration && (
           <View className="px-5 py-8 items-center" testID="book-empty-topics">
@@ -598,6 +763,31 @@ export default function BookScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* Floating "Start learning" button */}
+      {topics.length > 0 && (
+        <View
+          className="absolute bottom-0 left-0 right-0 px-5 bg-background border-t border-border"
+          style={{ paddingBottom: Math.max(insets.bottom, 16), paddingTop: 12 }}
+        >
+          <Pressable
+            onPress={handleStartLearning}
+            className="bg-primary rounded-button px-5 py-4 flex-row items-center justify-center min-h-[48px]"
+            testID="book-start-learning"
+            accessibilityLabel="Start learning"
+          >
+            <Ionicons
+              name="add-circle-outline"
+              size={20}
+              color={themeColors.textInverse}
+              style={{ marginRight: 8 }}
+            />
+            <Text className="text-body font-semibold text-text-inverse">
+              Start learning
+            </Text>
+          </Pressable>
+        </View>
+      )}
     </View>
   );
 }
