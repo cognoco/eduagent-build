@@ -85,12 +85,13 @@ export default function CreateSubjectScreen() {
         // subject so the user can continue learning the topic they asked about.
         if (returnTo === 'chat') {
           router.replace({
-            pathname: '/(learner)/session',
+            pathname: '/(app)/session',
             params: {
               mode: 'freeform',
               subjectId: result.subject.id,
               subjectName: result.subject.name,
               ...(chatTopic ? { topicName: chatTopic } : {}),
+              ...(rawInput ? { rawInput } : {}),
             },
           } as never);
           return;
@@ -98,7 +99,7 @@ export default function CreateSubjectScreen() {
 
         if (result.structureType === 'focused_book' && result.bookId) {
           router.replace({
-            pathname: '/(learner)/onboarding/interview',
+            pathname: '/(app)/onboarding/interview',
             params: {
               subjectId: result.subject.id,
               subjectName: result.subject.name,
@@ -111,7 +112,7 @@ export default function CreateSubjectScreen() {
 
         if (result.structureType === 'broad') {
           router.replace({
-            pathname: '/(learner)/library',
+            pathname: '/(app)/library',
             params: {
               subjectId: result.subject.id,
             },
@@ -121,7 +122,7 @@ export default function CreateSubjectScreen() {
 
         if (result.subject.pedagogyMode === 'four_strands') {
           router.replace({
-            pathname: '/(learner)/onboarding/language-setup',
+            pathname: '/(app)/onboarding/language-setup',
             params: {
               subjectId: result.subject.id,
               languageCode: result.subject.languageCode ?? '',
@@ -132,7 +133,7 @@ export default function CreateSubjectScreen() {
         }
 
         router.replace({
-          pathname: '/(learner)/onboarding/interview',
+          pathname: '/(app)/onboarding/interview',
           params: {
             subjectId: result.subject.id,
             subjectName: result.subject.name,

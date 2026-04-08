@@ -7,6 +7,7 @@ import { eq, and, notInArray, sql } from 'drizzle-orm';
 import {
   subjects,
   curriculumBooks,
+  bookSuggestions,
   learningSessions,
   createScopedRepository,
   type Database,
@@ -19,11 +20,7 @@ import type {
   Subject,
   SubjectStructureType,
 } from '@eduagent/schemas';
-import {
-  createBooks,
-  ensureCurriculum,
-  persistNarrowTopics,
-} from './curriculum';
+import { ensureCurriculum, persistNarrowTopics } from './curriculum';
 import { detectLanguageSubject } from './language-detect';
 import {
   generateLanguageCurriculum,
@@ -101,6 +98,7 @@ export interface CreatedSubjectWithStructure {
   bookTitle?: string;
   bookCount?: number;
   topicCount?: number;
+  suggestionCount?: number;
   /** True when LLM classification failed and we fell back to narrow */
   classificationFailed?: boolean;
 }
@@ -225,16 +223,21 @@ export async function createSubjectWithStructure(
 
     if (structure.type === 'broad') {
       await ensureCurriculum(db, subject.id);
-      const books = await createBooks(
-        db,
-        profileId,
-        subject.id,
-        structure.books
-      );
+      // Store as suggestions, NOT real books — learner picks from picker screen
+      const suggestionValues = structure.books.map((book) => ({
+        subjectId: subject.id,
+        title: book.title,
+        emoji: book.emoji,
+        description: book.description,
+      }));
+      if (suggestionValues.length > 0) {
+        await db.insert(bookSuggestions).values(suggestionValues);
+      }
       return {
         subject,
         structureType: 'broad',
-        ...(books.length > 0 ? { bookCount: books.length } : {}),
+        bookCount: 0,
+        suggestionCount: suggestionValues.length,
       };
     }
 

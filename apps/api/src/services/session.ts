@@ -599,6 +599,7 @@ export async function startSession(
         ...(input.metadata ?? {}),
         inputMode: input.inputMode ?? input.metadata?.inputMode ?? 'text',
       },
+      rawInput: input.rawInput ?? null,
     })
     .returning();
 
