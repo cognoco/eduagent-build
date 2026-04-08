@@ -1,13 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import type { CurriculumTopic } from '@eduagent/schemas';
-import {
-  BookPageFlipAnimation,
-  PenWritingAnimation,
-} from '../../../../../components/common';
+import { PenWritingAnimation } from '../../../../../components/common';
 import { CollapsibleChapter } from '../../../../../components/library/CollapsibleChapter';
 import { NoteDisplay } from '../../../../../components/library/NoteDisplay';
 import { NoteInput } from '../../../../../components/library/NoteInput';
@@ -20,6 +24,7 @@ import {
   useUpsertNote,
   useDeleteNote,
 } from '../../../../../hooks/use-notes';
+import { useSubjects } from '../../../../../hooks/use-subjects';
 import { formatApiError } from '../../../../../lib/format-api-error';
 import { useThemeColors } from '../../../../../lib/theme';
 
@@ -81,6 +86,8 @@ export default function BookScreen() {
   const generateMutation = useGenerateBookTopics(subjectId, bookId);
   const upsertMutation = useUpsertNote(subjectId, bookId);
   const deleteMutation = useDeleteNote(subjectId, bookId);
+  const subjectsQuery = useSubjects();
+  const subjectName = subjectsQuery.data?.find((s) => s.id === subjectId)?.name;
 
   // --- Generation auto-trigger ---
   const [genPhase, setGenPhase] = useState<GenerationPhase>('idle');
@@ -299,7 +306,7 @@ export default function BookScreen() {
         style={{ paddingTop: insets.top }}
         testID="book-loading"
       >
-        <BookPageFlipAnimation size={80} color={themeColors.accent} />
+        <ActivityIndicator size="large" color={themeColors.accent} />
         <Text className="text-body-sm text-text-secondary mt-3">
           Loading book...
         </Text>
@@ -456,6 +463,11 @@ export default function BookScreen() {
           <Text className="text-h1 font-bold text-text-primary mb-1">
             {book?.title ?? 'Book'}
           </Text>
+          {subjectName && (
+            <Text className="text-body-sm text-text-secondary">
+              {subjectName}
+            </Text>
+          )}
 
           {/* Progress bar */}
           {totalTopics > 0 && (

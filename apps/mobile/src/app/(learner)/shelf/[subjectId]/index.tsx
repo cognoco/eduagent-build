@@ -1,7 +1,6 @@
 import { useEffect } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Pressable,
   Text,
@@ -14,47 +13,20 @@ import type { BookProgressStatus } from '@eduagent/schemas';
 import { BookCard } from '../../../../components/library/BookCard';
 import { useBooks } from '../../../../hooks/use-books';
 import { useSubjects } from '../../../../hooks/use-subjects';
-import { useOverallProgress } from '../../../../hooks/use-progress';
 import { useThemeColors } from '../../../../lib/theme';
 
-// Module-level debug tracker — survives the crash
-let _lastStep = 'module-load';
-
 export default function ShelfScreen() {
-  _lastStep = 'start';
   const router = useRouter();
-  _lastStep = 'after-useRouter';
   const insets = useSafeAreaInsets();
-  _lastStep = 'after-useSafeAreaInsets';
   const themeColors = useThemeColors();
-  _lastStep = 'after-useThemeColors';
   const params = useLocalSearchParams<{ subjectId: string }>();
   const subjectId = params.subjectId;
-  _lastStep = 'after-useLocalSearchParams(' + subjectId + ')';
 
   const booksQuery = useBooks(subjectId);
-  _lastStep = 'after-useBooks';
   const subjectsQuery = useSubjects();
-  _lastStep = 'after-useSubjects';
-  const progressQuery = useOverallProgress();
-  _lastStep = 'after-useOverallProgress';
 
   const books = booksQuery.data ?? [];
-  _lastStep = 'after-books-derive';
   const subject = subjectsQuery.data?.find((s) => s.id === subjectId);
-  _lastStep = 'after-subject-find';
-  const subjectProgress = (progressQuery.data?.subjects ?? []).find(
-    (s: { subjectId: string }) => s.subjectId === subjectId
-  );
-  _lastStep = 'after-subjectProgress-find';
-
-  // Show debug alert on mount so we know the component rendered
-  useEffect(() => {
-    Alert.alert(
-      'Shelf Debug',
-      `Reached: ${_lastStep}\nsubjectId: ${subjectId}\nbooksLoading: ${booksQuery.isLoading}\nsubjectsLoading: ${subjectsQuery.isLoading}\nprogressLoading: ${progressQuery.isLoading}`
-    );
-  }, []);
 
   // Single-book auto-skip: navigate directly to the book screen
   useEffect(() => {
@@ -66,8 +38,6 @@ export default function ShelfScreen() {
       } as never);
     }
   }, [booksQuery.data, subjectId, router]);
-
-  _lastStep = 'before-guards';
 
   // Guard: param must exist
   if (!subjectId) {
@@ -98,31 +68,19 @@ export default function ShelfScreen() {
     return null;
   }
 
-  _lastStep = 'before-isLoading';
-
-  const isLoading =
-    booksQuery.isLoading || subjectsQuery.isLoading || progressQuery.isLoading;
+  const isLoading = booksQuery.isLoading || subjectsQuery.isLoading;
 
   const failedQuery = booksQuery.isError
     ? booksQuery
     : subjectsQuery.isError
     ? subjectsQuery
-    : progressQuery.isError
-    ? progressQuery
     : null;
   const isError = failedQuery !== null;
-
-  _lastStep = 'before-handlers';
 
   const handleRetry = (): void => {
     void booksQuery.refetch();
     void subjectsQuery.refetch();
-    void progressQuery.refetch();
   };
-
-  const completedCount = subjectProgress?.topicsCompleted ?? 0;
-  const totalCount = subjectProgress?.topicsTotal ?? 0;
-  const progressRatio = totalCount > 0 ? completedCount / totalCount : 0;
 
   const getBookStatus = (bookId: string): BookProgressStatus => {
     const book = books.find((b) => b.id === bookId);
@@ -139,8 +97,6 @@ export default function ShelfScreen() {
     return null;
   })();
 
-  _lastStep = 'before-render-states';
-
   if (isLoading) {
     return (
       <View
@@ -151,9 +107,6 @@ export default function ShelfScreen() {
         <ActivityIndicator size="large" color={themeColors.accent} />
         <Text className="text-body-sm text-text-secondary mt-3">
           Loading this shelf...
-        </Text>
-        <Text className="text-caption text-text-tertiary mt-1">
-          debug: {_lastStep}
         </Text>
         <Pressable
           onPress={() => router.back()}
@@ -204,8 +157,6 @@ export default function ShelfScreen() {
     );
   }
 
-  _lastStep = 'before-main-render';
-
   return (
     <View
       className="flex-1 bg-background"
@@ -253,23 +204,6 @@ export default function ShelfScreen() {
           />
         </Pressable>
       </View>
-
-      {/* Subject progress bar */}
-      {totalCount > 0 && (
-        <View className="px-5 pb-4">
-          <View className="flex-row items-center justify-between mb-2">
-            <Text className="text-caption text-text-secondary">
-              {completedCount}/{totalCount} topics completed
-            </Text>
-          </View>
-          <View className="h-2 bg-surface-elevated rounded-full overflow-hidden">
-            <View
-              className="h-2 bg-primary rounded-full"
-              style={{ width: `${Math.round(progressRatio * 100)}%` }}
-            />
-          </View>
-        </View>
-      )}
 
       {/* Book list */}
       <FlatList
