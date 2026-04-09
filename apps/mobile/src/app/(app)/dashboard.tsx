@@ -111,7 +111,7 @@ export default function DashboardScreen() {
       return;
     }
     router.push({
-      pathname: '/(parent)/child/[profileId]',
+      pathname: '/(app)/child/[profileId]',
       params: { profileId },
     } as never);
   };
@@ -184,7 +184,7 @@ export default function DashboardScreen() {
             </Pressable>
             <View className="flex-row gap-3 mt-3">
               <Pressable
-                onPress={() => router.replace('/(parent)/library' as never)}
+                onPress={() => router.replace('/(app)/library' as never)}
                 className="bg-surface rounded-button px-5 py-3 min-h-[48px] items-center justify-center"
                 accessibilityRole="button"
                 accessibilityLabel="Open parent library"
@@ -195,7 +195,7 @@ export default function DashboardScreen() {
                 </Text>
               </Pressable>
               <Pressable
-                onPress={() => router.replace('/(parent)/more' as never)}
+                onPress={() => router.replace('/(app)/more' as never)}
                 className="bg-surface rounded-button px-5 py-3 min-h-[48px] items-center justify-center"
                 accessibilityRole="button"
                 accessibilityLabel="Open parent settings"
@@ -213,7 +213,7 @@ export default function DashboardScreen() {
             {renderChildCards(dashboard.children, handleDrillDown)}
             {isDemo && (
               <Pressable
-                onPress={() => router.push('/(parent)/more' as never)}
+                onPress={() => router.push('/(app)/more' as never)}
                 className="bg-accent rounded-button mt-6 py-3 min-h-[48px] items-center justify-center"
                 accessibilityRole="button"
                 accessibilityLabel="Link your child's account to get started"
@@ -237,7 +237,7 @@ export default function DashboardScreen() {
         {__DEV__ && (
           <Pressable
             onPress={() => {
-              router.replace('/(learner)/home' as never);
+              router.replace('/(app)/home' as never);
               InteractionManager.runAfterInteractions(() => setPersona('teen'));
             }}
             className="mt-6 items-center py-3 min-h-[44px] justify-center"

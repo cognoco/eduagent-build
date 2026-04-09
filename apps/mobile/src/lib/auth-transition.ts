@@ -2,7 +2,7 @@
  * Shared session-activation flag for auth screens.
  *
  * After setActive() succeeds in sign-in or sign-up, the auth layout guard
- * fires a redirect to /(learner)/home.  If the learner layout bounces back
+ * fires a redirect to /(app)/home.  If the learner layout bounces back
  * (e.g. isSignedIn not yet propagated, or stale-token 401 → signOut), the
  * sign-in screen remounts with fresh state — showing a confusing empty form.
  *

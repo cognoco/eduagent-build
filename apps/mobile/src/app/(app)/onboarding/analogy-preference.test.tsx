@@ -79,7 +79,7 @@ describe('AnalogyPreferenceScreen', () => {
     fireEvent.press(screen.getByTestId('analogy-skip-button'));
 
     expect(mockReplace).toHaveBeenCalledWith({
-      pathname: '/(learner)/onboarding/curriculum-review',
+      pathname: '/(app)/onboarding/curriculum-review',
       params: { subjectId: 'subject-1' },
     });
   });
@@ -92,7 +92,7 @@ describe('AnalogyPreferenceScreen', () => {
     // No domain selected, should navigate directly without mutation
     expect(mockMutate).not.toHaveBeenCalled();
     expect(mockReplace).toHaveBeenCalledWith({
-      pathname: '/(learner)/onboarding/curriculum-review',
+      pathname: '/(app)/onboarding/curriculum-review',
       params: { subjectId: 'subject-1' },
     });
   });
@@ -120,7 +120,7 @@ describe('AnalogyPreferenceScreen', () => {
     });
 
     expect(mockReplace).toHaveBeenCalledWith({
-      pathname: '/(learner)/onboarding/curriculum-review',
+      pathname: '/(app)/onboarding/curriculum-review',
       params: { subjectId: 'subject-1' },
     });
   });

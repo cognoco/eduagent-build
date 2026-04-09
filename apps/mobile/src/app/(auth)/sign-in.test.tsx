@@ -610,7 +610,7 @@ describe('SignInScreen', () => {
   //
   // FIX: Auth screens must NEVER call router.replace() or router.push()
   // after setActive().  The (auth)/_layout guard reactively redirects to
-  // /(learner)/home when useAuth().isSignedIn becomes true.
+  // /(app)/home when useAuth().isSignedIn becomes true.
   //
   // These tests verify that contract holds for EVERY auth completion path.
   // If you add a new sign-in method, add a test here proving it does NOT

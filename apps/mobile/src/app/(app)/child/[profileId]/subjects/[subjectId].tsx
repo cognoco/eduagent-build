@@ -83,7 +83,7 @@ export default function SubjectTopicsScreen() {
               key={topic.topicId}
               onPress={() =>
                 router.push({
-                  pathname: '/(parent)/child/[profileId]/topic/[topicId]',
+                  pathname: '/(app)/child/[profileId]/topic/[topicId]',
                   params: {
                     profileId: profileId!,
                     topicId: topic.topicId,

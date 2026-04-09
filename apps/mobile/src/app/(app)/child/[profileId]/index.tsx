@@ -163,7 +163,7 @@ export default function ChildDetailScreen() {
           access to it.
         </Text>
         <Pressable
-          onPress={() => router.replace('/(parent)/dashboard' as never)}
+          onPress={() => router.replace('/(app)/dashboard' as never)}
           className="bg-primary rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
           accessibilityRole="button"
           accessibilityLabel="Back to parent dashboard"
@@ -225,8 +225,7 @@ export default function ChildDetailScreen() {
                 onPress={() => {
                   if (!profileId) return;
                   router.push({
-                    pathname:
-                      '/(parent)/child/[profileId]/subjects/[subjectId]',
+                    pathname: '/(app)/child/[profileId]/subjects/[subjectId]',
                     params: {
                       profileId,
                       subjectId: subject.name,
@@ -298,7 +297,7 @@ export default function ChildDetailScreen() {
               onPress={() => {
                 if (!profileId) return;
                 router.push({
-                  pathname: '/(parent)/child/[profileId]/session/[sessionId]',
+                  pathname: '/(app)/child/[profileId]/session/[sessionId]',
                   params: {
                     profileId,
                     sessionId: session.sessionId,

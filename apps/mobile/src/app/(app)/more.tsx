@@ -134,7 +134,7 @@ export default function MoreScreen() {
   const router = useRouter();
   const { signOut } = useAuth();
   const { user } = useUser();
-  const { activeProfile } = useProfile();
+  const { activeProfile, profiles } = useProfile();
   const exportData = useExportData();
 
   const { data: subscription } = useSubscription();
@@ -204,7 +204,7 @@ export default function MoreScreen() {
         [
           {
             text: 'View plans',
-            onPress: () => router.push('/(learner)/subscription'),
+            onPress: () => router.push('/(app)/subscription'),
           },
           { text: 'Cancel', style: 'cancel' },
         ]
@@ -222,7 +222,7 @@ export default function MoreScreen() {
           ? [
               {
                 text: 'View plans',
-                onPress: () => router.push('/(learner)/subscription'),
+                onPress: () => router.push('/(app)/subscription'),
               },
               { text: 'OK', style: 'cancel' },
             ]
@@ -233,6 +233,10 @@ export default function MoreScreen() {
 
     router.push('/create-profile');
   }, [subscription, familyData, router]);
+
+  const linkedChildren = activeProfile?.isOwner
+    ? profiles.filter((p) => p.id !== activeProfile.id && !p.isOwner)
+    : [];
 
   const displayName =
     activeProfile?.displayName ??
@@ -322,7 +326,7 @@ export default function MoreScreen() {
         />
 
         <Pressable
-          onPress={() => router.push('/(learner)/homework/camera')}
+          onPress={() => router.push('/(app)/homework/camera')}
           className="bg-surface rounded-card px-4 py-3.5 mb-2 mt-2"
           accessibilityLabel="Start homework help session"
           accessibilityRole="button"
@@ -341,6 +345,15 @@ export default function MoreScreen() {
             <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2 mt-6">
               Family
             </Text>
+            {linkedChildren.length > 0 && (
+              <SettingsRow
+                label="Child progress"
+                value={`${linkedChildren.length} ${
+                  linkedChildren.length === 1 ? 'child' : 'children'
+                }`}
+                onPress={() => router.push('/(app)/dashboard')}
+              />
+            )}
             <Pressable
               onPress={handleAddChild}
               className="bg-surface rounded-card px-4 py-3.5 mb-2"
@@ -375,7 +388,7 @@ export default function MoreScreen() {
                   .toUpperCase()}${subscription.tier.slice(1)}`
               : undefined
           }
-          onPress={() => router.push('/(learner)/subscription')}
+          onPress={() => router.push('/(app)/subscription')}
         />
         <SettingsRow label="Help & Support" />
         <SettingsRow

@@ -242,7 +242,7 @@ describe('TopicDetailScreen', () => {
     fireEvent.press(screen.getByTestId('start-review-button'));
 
     expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/(learner)/session',
+      pathname: '/(app)/session',
       params: { mode: 'practice', subjectId: 'sub-1', topicId: 'topic-1' },
     });
   });
@@ -269,7 +269,7 @@ describe('TopicDetailScreen', () => {
     fireEvent.press(screen.getByTestId('request-retest-button'));
 
     expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/(learner)/topic/recall-test',
+      pathname: '/(app)/topic/recall-test',
       params: { subjectId: 'sub-1', topicId: 'topic-1' },
     });
   });
@@ -321,7 +321,7 @@ describe('TopicDetailScreen', () => {
     fireEvent.press(screen.getByTestId('start-learning-button'));
 
     expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/(learner)/session',
+      pathname: '/(app)/session',
       params: { mode: 'freeform', subjectId: 'sub-1', topicId: 'topic-1' },
     });
   });
@@ -373,7 +373,7 @@ describe('TopicDetailScreen', () => {
     fireEvent.press(screen.getByTestId('continue-learning-button'));
 
     expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/(learner)/session',
+      pathname: '/(app)/session',
       params: { mode: 'freeform', subjectId: 'sub-1', topicId: 'topic-1' },
     });
   });
@@ -424,7 +424,7 @@ describe('TopicDetailScreen', () => {
     fireEvent.press(screen.getByTestId('continue-learning-button'));
 
     expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/(learner)/session',
+      pathname: '/(app)/session',
       params: { mode: 'freeform', subjectId: 'sub-1', topicId: 'topic-1' },
     });
   });
@@ -451,7 +451,7 @@ describe('TopicDetailScreen', () => {
     fireEvent.press(screen.getByTestId('relearn-button'));
 
     expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/(learner)/topic/relearn',
+      pathname: '/(app)/topic/relearn',
       params: { subjectId: 'sub-1', topicId: 'topic-1' },
     });
   });

@@ -20,7 +20,7 @@ export default function Index() {
   }
 
   if (isSignedIn) {
-    return <Redirect href="/(learner)/home" />;
+    return <Redirect href="/(app)/home" />;
   }
 
   return <Redirect href="/(auth)/sign-in" />;

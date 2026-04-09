@@ -35,7 +35,7 @@ export default function AnalogyPreferenceScreen() {
 
   const navigateToCurriculum = (): void => {
     router.replace({
-      pathname: '/(learner)/onboarding/curriculum-review',
+      pathname: '/(app)/onboarding/curriculum-review',
       params: { subjectId },
     } as never);
   };

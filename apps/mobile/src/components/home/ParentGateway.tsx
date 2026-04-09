@@ -72,12 +72,12 @@ export function ParentGateway({
         <IntentCard
           title="Check child's progress"
           subtitle={getChildHighlight(dashboard)}
-          onPress={() => router.push('/(parent)/dashboard' as never)}
+          onPress={() => router.push('/(app)/dashboard' as never)}
           testID="gateway-check-progress"
         />
         <IntentCard
           title="Learn something"
-          onPress={() => router.push('/(learner)/learn' as never)}
+          onPress={() => router.push('/(app)/learn' as never)}
           testID="gateway-learn"
         />
       </View>

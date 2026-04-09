@@ -2,17 +2,17 @@ import { formatApiError } from './format-api-error';
 
 /*
  * Screens updated with formatApiError (Story 10.4):
- *   - (learner)/session/index.tsx — session start + streaming errors
- *   - (learner)/homework/camera.tsx — OCR error fallback
- *   - (parent)/dashboard.tsx — dashboard load error
+ *   - (app)/session/index.tsx — session start + streaming errors
+ *   - (app)/homework/camera.tsx — OCR error fallback
+ *   - (app)/dashboard.tsx — dashboard load error
  *   - session-summary/[sessionId].tsx — summary submission error
  *   - consent.tsx — consent request fallback
  *   - create-profile.tsx — profile creation fallback
  *   - delete-account.tsx — account deletion / cancel fallback
  *   - create-subject.tsx — subject creation fallback
- *   - (learner)/onboarding/curriculum-review.tsx — curriculum challenge error
- *   - (learner)/topic/recall-test.tsx — recall test error
- *   - (learner)/subscription.tsx — generic purchase error fallback
+ *   - (app)/onboarding/curriculum-review.tsx — curriculum challenge error
+ *   - (app)/topic/recall-test.tsx — recall test error
+ *   - (app)/subscription.tsx — generic purchase error fallback
  *   - hooks/use-homework-ocr.ts — OCR catch fallback
  *
  * E2E note: Error messages are hard to trigger deterministically in E2E.

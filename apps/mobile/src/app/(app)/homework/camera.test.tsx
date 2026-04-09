@@ -290,7 +290,7 @@ describe('CameraScreen', () => {
 
     expect(mockRouter.replace).toHaveBeenCalledWith(
       expect.objectContaining({
-        pathname: '/(learner)/session',
+        pathname: '/(app)/session',
         params: expect.objectContaining({
           mode: 'homework',
           subjectId: 'sub-123',
@@ -330,7 +330,7 @@ describe('CameraScreen', () => {
 
     expect(mockRouter.replace).toHaveBeenCalledWith(
       expect.objectContaining({
-        pathname: '/(learner)/session',
+        pathname: '/(app)/session',
         params: expect.objectContaining({
           mode: 'homework',
           subjectId: 'sub-123',
@@ -397,7 +397,7 @@ describe('CameraScreen', () => {
 
     expect(mockRouter.replace).toHaveBeenCalledWith(
       expect.objectContaining({
-        pathname: '/(learner)/session',
+        pathname: '/(app)/session',
         params: expect.objectContaining({
           subjectId: 'sub-created',
           subjectName: 'Biology',

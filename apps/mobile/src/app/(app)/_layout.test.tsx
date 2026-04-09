@@ -101,11 +101,11 @@ describe('LearnerLayout', () => {
   // Auth guard — redirects unauthenticated users to sign-in.
   //
   // This is the guard that caused the navigation race condition: after
-  // setActive(), if router.replace('/(learner)/home') fired before Clerk's
+  // setActive(), if router.replace('/(app)/home') fired before Clerk's
   // React state propagated, this guard saw isSignedIn: false and bounced
   // the user back to an empty sign-in screen.  The fix removed explicit
   // navigation from auth screens — the auth layout guard now handles it
-  // reactively.  These tests verify the learner-side guard still works.
+  // reactively.  These tests verify the app layout guard still works.
   // ---------------------------------------------------------------------------
 
   it('redirects to sign-in when user is not authenticated', () => {

@@ -228,7 +228,7 @@ export default function LibraryScreen() {
 
   const openTopic = (topicId: string, subjectId: string): void => {
     router.push({
-      pathname: '/(learner)/session',
+      pathname: '/(app)/session',
       params: { mode: 'learning', subjectId, topicId },
     } as never);
   };
@@ -291,7 +291,7 @@ export default function LibraryScreen() {
             onStateChange={setShelvesTabState}
             onShelfPress={(subjectId) => {
               router.push({
-                pathname: '/(learner)/shelf/[subjectId]',
+                pathname: '/(app)/shelf/[subjectId]',
                 params: { subjectId },
               } as never);
             }}
@@ -306,7 +306,7 @@ export default function LibraryScreen() {
             onStateChange={setBooksTabState}
             onBookPress={(subjectId, bookId) => {
               router.push({
-                pathname: '/(learner)/shelf/[subjectId]/book/[bookId]',
+                pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
                 params: { subjectId, bookId },
               } as never);
             }}

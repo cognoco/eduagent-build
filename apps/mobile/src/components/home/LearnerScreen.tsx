@@ -77,19 +77,19 @@ export function LearnerScreen({
       <View className="gap-4">
         <IntentCard
           title="Learn something new!"
-          onPress={() => router.push('/(learner)/learn-new' as never)}
+          onPress={() => router.push('/(app)/learn-new' as never)}
           testID="intent-learn-new"
         />
         <IntentCard
           title="Help with assignment?"
           subtitle="Take a picture and we'll look at it together"
-          onPress={() => router.push('/(learner)/homework/camera' as never)}
+          onPress={() => router.push('/(app)/homework/camera' as never)}
           testID="intent-homework"
         />
         {hasLibraryContent ? (
           <IntentCard
             title="Repeat & review"
-            onPress={() => router.push('/(learner)/library' as never)}
+            onPress={() => router.push('/(app)/library' as never)}
             testID="intent-review"
           />
         ) : null}

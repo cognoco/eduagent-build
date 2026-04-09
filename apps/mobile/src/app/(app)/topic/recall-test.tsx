@@ -127,7 +127,7 @@ export default function RecallTestScreen() {
   const handleRelearnTopic = useCallback(() => {
     if (!topicId || !subjectId) return;
     router.push({
-      pathname: '/(learner)/topic/relearn',
+      pathname: '/(app)/topic/relearn',
       params: { topicId, subjectId },
     });
   }, [router, topicId, subjectId]);
@@ -207,7 +207,7 @@ export default function RecallTestScreen() {
       onReviewRetest={handleReviewRetest}
       onRelearnTopic={handleRelearnTopic}
       isLearner
-      onBookPress={() => router.push('/(learner)/library')}
+      onBookPress={() => router.push('/(app)/library')}
     />
   ) : inputDisabled ? (
     <View className="mt-4 items-center">

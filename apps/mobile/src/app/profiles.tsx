@@ -36,7 +36,7 @@ export default function ProfilesScreen() {
         [
           {
             text: 'View plans',
-            onPress: () => router.push('/(learner)/subscription'),
+            onPress: () => router.push('/(app)/subscription'),
           },
           { text: 'Cancel', style: 'cancel' },
         ]
@@ -54,7 +54,7 @@ export default function ProfilesScreen() {
           ? [
               {
                 text: 'View plans',
-                onPress: () => router.push('/(learner)/subscription'),
+                onPress: () => router.push('/(app)/subscription'),
               },
               { text: 'OK', style: 'cancel' },
             ]

@@ -297,6 +297,10 @@ The gap: no precomputed aggregation layer that turns this raw data into queryabl
 - **FR235.5:** Growth chart uses `GET /v1/progress/history?granularity=weekly` for the last 8 weeks. Shows topics mastered (all subjects) as bars. For language learners, vocabulary count is shown as a second series.
 - **FR235.6:** Recent milestones section shows the last 5 milestones from the `milestones` table, most recent first.
 - **FR235.7:** Empty state (new user, no sessions): "Start your first session and watch your progress grow here!" with a "Start learning" button navigating to the learning entry point.
+- **FR235.8:** **Open-ended denominator handling (Conversation-First compatibility):** Subject cards adapt their progress display based on topic origin:
+  - **Pre-generated topics (fixed denominator):** Show "8/15 topics" with a fill bar toward the total. `topicsNotStarted` is meaningful.
+  - **Session-filed topics (open denominator):** Show "4 topics explored" with NO fill bar and NO denominator. The count only grows. `topicsNotStarted` is zero (there are no "not started" topics if topics are only created through sessions).
+  - **Mixed books (both pre-generated and session-filed):** Show the pre-generated fill bar ("5/10 curriculum topics") AND a secondary "+ 3 explored" count for session-filed topics.
 
 ### FR236: Subject Progress Detail Screen
 
@@ -334,6 +338,9 @@ The gap: no precomputed aggregation layer that turns this raw data into queryabl
 - **FR236.4:** For language subjects, vocabulary breakdown by CEFR level is shown. For non-language subjects, the vocabulary section is hidden.
 - **FR236.5:** Time spent shows data from the subject breakdown in the latest progress snapshot.
 - **FR236.6:** Growth chart shows per-subject progress over time. Uses `GET /v1/progress/history` filtered client-side to the selected subject's data.
+- **FR236.7:** **Dynamic topic display (Conversation-First compatibility):** Session-filed topics (where `filed_from = 'session_filing' | 'freeform_filing'`) are displayed alongside pre-generated topics in the topic list with the same color coding. The key difference:
+  - Pre-generated topics can have the **Grey** (not started) state. Session-filed topics cannot — they always have at least one session by definition.
+  - The topic count header adapts: "8/15 topics" (pre-generated denominator) vs. "4 topics explored" (session-filed, no denominator).
 
 ### FR237: Milestone Celebrations (Meaningful)
 
@@ -347,6 +354,7 @@ The gap: no precomputed aggregation layer that turns this raw data into queryabl
   | `streak_length` | "30 days in a row! Your brain is getting stronger every day." |
   | `subject_mastered` | "You mastered every topic in Fractions! You own this." |
   | `book_completed` | "You finished the Ancient Egypt book! Ready for the next adventure?" |
+  | `topics_explored` | "You've explored 10 topics in Geography! Your curiosity is building something amazing." |
   | `learning_time` | "You've spent 10 hours learning! That's more than most people ever invest." |
   | `cefr_level_up` | "You reached A2 in Spanish! You can now have basic conversations." |
 - **FR237.3:** Celebrations include a before/after comparison where data permits:
@@ -457,10 +465,14 @@ The gap: no precomputed aggregation layer that turns this raw data into queryabl
 
 ### FR241: Progress Refresh on Session Complete
 
-- **FR241.1:** The existing `session-completed` Inngest function gains a new step: after session summary and coaching card precomputation, trigger a progress snapshot refresh for the session's profile.
+- **FR241.1:** The existing `session-completed` Inngest function gains a new step: trigger a progress snapshot refresh for the session's profile. **Ordering constraint:** This step MUST run AFTER post-session filing (Conversation-First, Flow 3) and learner profile analysis (Epic 16) in the Inngest chain, because:
+  - Filing creates new topics → the snapshot must count them
+  - Memory analysis may flag struggles → coaching cards can reference them
+  See the agreed Inngest chain ordering in Epic 16 AD5.
 - **FR241.2:** The refresh is a lightweight re-computation of today's snapshot (same logic as FR231, but for a single profile). Debounced: if a snapshot was computed in the last 5 minutes, skip.
 - **FR241.3:** After the snapshot is computed, run milestone detection (FR234) for the profile. Any new milestones are written to the `milestones` table and added to `pendingCelebrations` in the coaching card cache.
 - **FR241.4:** This ensures that when a child finishes a session and returns to the progress screen, the numbers are up to date — not 24 hours stale.
+- **FR241.5:** The aggregation query for `topicsTotal` MUST distinguish topic origin: `topicsTotal` counts only `filed_from = 'pre_generated'` (or NULL for legacy topics). `topicsExplored` counts `filed_from IN ('session_filing', 'freeform_filing')`. This prevents session-filed topics from inflating the denominator of pre-generated fill bars.
 
 ---
 
@@ -498,6 +510,32 @@ If the LLM call fails, the report still generates with data but without the narr
 ### AD5: No External Email Service at Launch
 
 FR239 (weekly push) and FR240 (monthly report) use push notifications only at launch. Email digest is listed as "optional" in the stories and is deferred until an email provider (e.g., Resend, Postmark) is integrated. The architecture supports it — the report data is stored and ready to template into an email — but the integration is out of scope.
+
+### AD6: Shared Post-Session Inngest Chain Ordering (Cross-Epic)
+
+After `session.completed` fires, multiple epics add steps. The agreed ordering is:
+
+```
+session.completed →
+  1. Session summary                           (existing)
+  2. Retention update                          (existing)
+  3. Post-session filing (Conversation-First, Flow 3 only)
+  4. Learner profile analysis (Epic 16)
+  5. Progress snapshot refresh + milestone detection (Epic 15, this epic)
+  6. Coaching card precomputation               (existing)
+  7. Suggestion generation (Conversation-First)
+```
+
+**Key constraint:** Steps 3-4 MUST run before step 5 (this epic's contribution). Filing creates new topics and memory analysis may flag struggles — both must complete before the snapshot counts them or coaching cards reference them.
+
+### AD7: Dynamic vs. Fixed Topic Counting (Cross-Epic — Conversation-First)
+
+The Conversation-First spec introduces session-filed topics with `filed_from = 'session_filing' | 'freeform_filing'`. These topics have no fixed denominator — the child can always explore more. This epic's progress metrics must distinguish the two counting models:
+
+- **`topicsTotal`**: counts only pre-generated topics (`filed_from = 'pre_generated'` or NULL). This provides the fixed denominator for curriculum fill bars.
+- **`topicsExplored`**: counts session-filed topics. This is an ever-growing count with no denominator.
+- **`topicsNotStarted`**: only meaningful for pre-generated topics. For session-filed subjects, this is always 0.
+- **Milestones**: `book_completed` / `subject_mastered` apply only to pre-generated topic sets. The new `topics_explored` milestone type handles session-filed subjects.
 
 ---
 
@@ -906,6 +944,8 @@ Phase B and Phase C can run in parallel. All of Phase C depends on Phase A but s
 | **Epic 12** (Persona Removal) | No dependency. Progress screens don't use persona. Age-derived behavior (warm vs. concise copy) can use `birthYear` if needed for celebration tone. |
 | **Epic 13** (Session Lifecycle) | Session events and `learning_sessions` are the raw data source for aggregation. The `session-completed` Inngest chain (Epic 13) gains the snapshot refresh step (FR241). Wall-clock time and active time are both captured. |
 | **Epic 14** (Human Agency) | Coaching cards reference progress via milestone celebrations (FR234.5). The existing coaching card type system is extended, not replaced. Cards like "You're close to mastering X" can use inventory data. |
+| **Epic 16** (Adaptive Memory) | Epic 16's FR numbers are FR243–FR251 (renumbered to avoid collision with this epic's FR234–FR241). Struggle/strength data in the learning profile can cross-reference progress statistics. The Inngest chain ordering (AD6) ensures memory analysis runs before the progress snapshot refresh. |
+| **Conversation-First** (Learning Flow) | Session-filed topics introduce open-ended denominators (AD7). `topicsTotal` counts pre-generated topics only; `topicsExplored` counts session-filed topics. `book_completed`/`subject_mastered` milestones apply only to pre-generated topics; `topics_explored` milestones handle dynamic books. Snapshot refresh must run after post-session filing (AD6). |
 
 ---
 

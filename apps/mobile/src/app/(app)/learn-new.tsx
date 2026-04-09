@@ -91,9 +91,7 @@ export default function LearnNewScreen(): React.ReactElement {
         />
         <IntentCard
           title="Just ask anything"
-          onPress={() =>
-            router.push('/(learner)/session?mode=freeform' as never)
-          }
+          onPress={() => router.push('/(app)/session?mode=freeform' as never)}
           testID="intent-freeform"
         />
         {recoveryMarker ? (
@@ -102,7 +100,7 @@ export default function LearnNewScreen(): React.ReactElement {
             subtitle={recoveryMarker.subjectName}
             onPress={() =>
               router.push({
-                pathname: '/(learner)/session',
+                pathname: '/(app)/session',
                 params: { sessionId: recoveryMarker.sessionId },
               } as never)
             }

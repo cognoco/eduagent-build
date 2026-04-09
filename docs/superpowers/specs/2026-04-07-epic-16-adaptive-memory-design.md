@@ -3,8 +3,10 @@
 **Author:** Zuzka + Claude
 **Date:** 2026-04-07
 **Status:** Draft
-**FRs:** FR234–FR242
+**FRs:** FR243–FR251
 **Dependencies:** Epic 13 (session lifecycle), Epic 7 (library infrastructure), LLM router (`services/llm/router.ts`)
+
+> **Note on FR numbering:** This epic's original requirement IDs (234–242) were renumbered to 243–251 to avoid collision with Epic 15 (FR230–FR241). All internal references use the new numbering.
 
 ---
 
@@ -40,23 +42,23 @@ Memory in this spec means something specific: the AI mentor building an understa
 
 | Story | Title | Phase | Status | FRs |
 |-------|-------|-------|--------|-----|
-| 16.1 | Child Learning Profile Schema | A | PLANNED | FR234 |
-| 16.2 | Session Analysis Inngest Function | A | PLANNED | FR235 |
-| 16.3 | Memory Context Injection | A | PLANNED | FR236 |
-| 16.4 | Interest Detection & Tagging | B | PLANNED | FR237 |
-| 16.5 | Struggle Pattern Detection | B | PLANNED | FR238 |
-| 16.6 | Explanation Effectiveness Tracking | B | PLANNED | FR239 |
-| 16.7 | "What My Mentor Knows" Screen | C | PLANNED | FR240 |
-| 16.8 | Parent Memory Visibility | C | PLANNED | FR241 |
-| 16.9 | Memory Warm-Start for New Subjects | C | PLANNED | FR242 |
+| 16.1 | Child Learning Profile Schema | A | PLANNED | FR243 |
+| 16.2 | Session Analysis Inngest Function | A | PLANNED | FR244 |
+| 16.3 | Memory Context Injection | A | PLANNED | FR245 |
+| 16.4 | Interest Detection & Tagging | B | PLANNED | FR246 |
+| 16.5 | Struggle Pattern Detection | B | PLANNED | FR247 |
+| 16.6 | Explanation Effectiveness Tracking | B | PLANNED | FR248 |
+| 16.7 | "What My Mentor Knows" Screen | C | PLANNED | FR249 |
+| 16.8 | Parent Memory Visibility | C | PLANNED | FR250 |
+| 16.9 | Memory Warm-Start for New Subjects | C | PLANNED | FR251 |
 
 ---
 
 ## Functional Requirements
 
-### FR234: Child Learning Profile Schema
+### FR243: Child Learning Profile Schema
 
-- **FR234.1:** New `learning_profiles` table:
+- **FR243.1:** New `learning_profiles` table:
   ```
   learning_profiles
   ├── id               UUID, primary key
@@ -69,28 +71,28 @@ Memory in this spec means something specific: the AI mentor building an understa
   ├── strengths        JSONB, default '[]'    — { subject, topics, confidence }[]
   ├── struggles        JSONB, default '[]'    — { subject, topic, lastSeen, attempts, confidence }[]
   ├── communicationNotes JSONB, default '[]'  — string[] ("responds well to humor", "prefers short explanations")
-  ├── memoryEnabled    boolean, default true   — opt-out toggle (FR241)
+  ├── memoryEnabled    boolean, default true   — opt-out toggle (FR250)
   ├── version          integer, default 1      — incremented on every update (optimistic concurrency)
   ├── createdAt        timestamp
   └── updatedAt        timestamp
   ```
-- **FR234.2:** One `learning_profiles` row per profile. Created lazily on first session analysis (Story 16.2), not on profile creation.
-- **FR234.3:** All fields are AI-inferred. No user-facing form writes to this table. The only user-facing writes are deletions (Story 16.7, 16.8) and the `memoryEnabled` toggle (Story 16.8).
-- **FR234.4:** Each entry in `interests`, `strengths`, `struggles`, and `communicationNotes` carries an implicit confidence level. The `strengths` and `struggles` arrays include an explicit `confidence: 'low' | 'medium' | 'high'` field. Only `high` confidence entries are injected into prompts (FR236). `medium` entries are visible in the "What My Mentor Knows" screen (FR240) but not used for prompt construction.
-- **FR234.5:** `interests` array is capped at 20 entries. Oldest entries are evicted when the cap is reached. `struggles` entries older than 90 days without recurrence are archived (removed from active array, preserved in a `_history` audit if needed for export).
-- **FR234.6:** Profile-scoped read/write via `createScopedRepository(profileId)`. No cross-profile access to learning profiles.
+- **FR243.2:** One `learning_profiles` row per profile. Created lazily on first session analysis (Story 16.2), not on profile creation.
+- **FR243.3:** All fields are AI-inferred. No user-facing form writes to this table. The only user-facing writes are deletions (Story 16.7, 16.8) and the `memoryEnabled` toggle (Story 16.8).
+- **FR243.4:** Each entry in `interests`, `strengths`, `struggles`, and `communicationNotes` carries an implicit confidence level. The `strengths` and `struggles` arrays include an explicit `confidence: 'low' | 'medium' | 'high'` field. Only `high` confidence entries are injected into prompts (FR245). `medium` entries are visible in the "What My Mentor Knows" screen (FR249) but not used for prompt construction.
+- **FR243.5:** `interests` array is capped at 20 entries. Oldest entries are evicted when the cap is reached. `struggles` entries older than 90 days without recurrence are archived (removed from active array, preserved in a `_history` audit if needed for export).
+- **FR243.6:** Profile-scoped read/write via `createScopedRepository(profileId)`. No cross-profile access to learning profiles.
 
-### FR235: Session Analysis Inngest Function
+### FR244: Session Analysis Inngest Function
 
-- **FR235.1:** New Inngest function `session/analyze-learner-profile` triggered by the existing `session.completed` event. Runs as a step in the post-session Inngest chain (after retention update, before coaching card precomputation).
-- **FR235.2:** The function reads the session's `sessionEvents` (the full interaction transcript) and sends them to a dedicated LLM call via `services/llm/router.ts` with a structured output schema.
-- **FR235.3:** LLM analysis prompt extracts:
+- **FR244.1:** New Inngest function `session/analyze-learner-profile` triggered by the existing `session.completed` event. Runs as a step in the post-session Inngest chain (after retention update, before coaching card precomputation).
+- **FR244.2:** The function reads the session's `sessionEvents` (the full interaction transcript) and sends them to a dedicated LLM call via `services/llm/router.ts` with a structured output schema.
+- **FR244.3:** LLM analysis prompt extracts:
   - **Explanation effectiveness:** Which explanation styles led to understanding (child responded correctly, said "I get it", moved on quickly) vs. confusion (child asked again, said "I don't understand", needed re-explanation)?
   - **Interest signals:** Did the child mention hobbies, enthusiasms, or preferences? ("I love space", "dinosaurs are cool", "I play football")
   - **Struggle signals:** Did the child repeatedly fail or express confusion on a specific concept?
   - **Communication preferences:** Did the child respond better to humor, short answers, long explanations, examples, stories?
   - **Engagement level:** Was the child engaged (fast responses, follow-up questions, enthusiasm markers) or disengaged (short answers, topic avoidance)?
-- **FR235.4:** LLM structured output schema:
+- **FR244.4:** LLM structured output schema:
   ```typescript
   {
     explanationEffectiveness: {
@@ -104,24 +106,24 @@ Memory in this spec means something specific: the AI mentor building an understa
     confidence: 'low' | 'medium' | 'high'  // overall confidence in this analysis
   }
   ```
-- **FR235.5:** Updates to the learning profile are **incremental merge, not replace**:
-  - `interests`: append new, deduplicate, respect cap (FR234.5)
+- **FR244.5:** Updates to the learning profile are **incremental merge, not replace**:
+  - `interests`: append new, deduplicate, respect cap (FR243.5)
   - `strengths` / `struggles`: upsert by subject+topic, increment `attempts` on struggles, update `lastSeen`
   - `learningStyle`: only update a field if the new signal has higher confidence than the existing value. Require 3+ corroborating sessions before setting `learningStyle` fields.
   - `communicationNotes`: append, deduplicate by semantic similarity (simple string match, not LLM-based)
-- **FR235.6:** If `memoryEnabled = false` on the profile, the Inngest function short-circuits — no LLM call, no updates.
-- **FR235.7:** The analysis LLM call uses a budget model (not premium). Target latency: under 5 seconds. This is background processing — no user-facing latency impact.
-- **FR235.8:** Emit a structured metric on each analysis run: `learner_profile.analysis.completed` with `{ profileId, sessionId, fieldsUpdated: string[], confidence }`. Enables monitoring of how frequently profiles are updated and with what confidence.
+- **FR244.6:** If `memoryEnabled = false` on the profile, the Inngest function short-circuits — no LLM call, no updates.
+- **FR244.7:** The analysis LLM call uses a budget model (not premium). Target latency: under 5 seconds. This is background processing — no user-facing latency impact.
+- **FR244.8:** Emit a structured metric on each analysis run: `learner_profile.analysis.completed` with `{ profileId, sessionId, fieldsUpdated: string[], confidence }`. Enables monitoring of how frequently profiles are updated and with what confidence.
 
-### FR236: Memory Context Injection
+### FR245: Memory Context Injection
 
-- **FR236.1:** Modify `buildSystemPrompt()` to include a "learner memory" block when a `learning_profiles` row exists for the current profile AND `memoryEnabled = true`.
-- **FR236.2:** The memory block is constructed from the learning profile with these priorities (highest first):
+- **FR245.1:** Modify `buildSystemPrompt()` to include a "learner memory" block when a `learning_profiles` row exists for the current profile AND `memoryEnabled = true`.
+- **FR245.2:** The memory block is constructed from the learning profile with these priorities (highest first):
   1. Active struggles relevant to the current subject/topic (if any match)
   2. Learning style preferences (if set with high confidence)
   3. Top 3-5 interests (most recent first)
   4. Communication notes (max 2, most recent)
-- **FR236.3:** Memory block format is natural language, not structured data. Example:
+- **FR245.3:** Memory block format is natural language, not structured data. Example:
   ```
   About this learner:
   - They learn best with story-based explanations and prefer thorough, step-by-step pace
@@ -129,95 +131,95 @@ Memory in this spec means something specific: the AI mentor building an understa
   - They've been working hard on fractions (struggled in 3 recent sessions) — be extra patient and try different approaches
   - They respond well to humor and prefer short explanations
   ```
-- **FR236.4:** Total memory block budget: 500 tokens maximum. If the full profile exceeds this, prioritize by the order in FR236.2 and truncate.
-- **FR236.5:** The system prompt includes a meta-instruction for the LLM: "Use the learner memory naturally in conversation. Reference their interests when generating examples. Use their preferred explanation style. Do NOT explicitly tell the learner you are reading from a profile — weave it in naturally."
-- **FR236.6:** For subjects where no learning profile data is relevant (new subject, no matching struggles), the memory block is omitted entirely — no empty placeholder.
-- **FR236.7:** Memory injection is additive to the existing learning history block (FR163 from Epic 7). The learning history block covers what topics the learner has studied. The memory block covers how the learner learns best. Both are injected.
+- **FR245.4:** Total memory block budget: 500 tokens maximum. If the full profile exceeds this, prioritize by the order in FR245.2 and truncate.
+- **FR245.5:** The system prompt includes a meta-instruction for the LLM: "Use the learner memory naturally in conversation. Reference their interests when generating examples. Use their preferred explanation style. Do NOT explicitly tell the learner you are reading from a profile — weave it in naturally."
+- **FR245.6:** For subjects where no learning profile data is relevant (new subject, no matching struggles), the memory block is omitted entirely — no empty placeholder.
+- **FR245.7:** Memory injection is additive to the existing learning history block (FR163 from Epic 7). The learning history block covers what topics the learner has studied. The memory block covers how the learner learns best. Both are injected.
 
-### FR237: Interest Detection & Tagging
+### FR246: Interest Detection & Tagging
 
-- **FR237.1:** The session analysis function (FR235) detects interest signals from natural conversation. Interest signals include:
+- **FR246.1:** The session analysis function (FR244) detects interest signals from natural conversation. Interest signals include:
   - Explicit statements: "I love space", "dinosaurs are cool", "I play football"
   - Enthusiastic engagement: rapid follow-up questions about a topic, requests for more information
   - Repeated references to a theme across messages within a session
-- **FR237.2:** Detected interests are stored as plain strings in the `interests` array, not categorized or taxonomized. "space", "dinosaurs", "football", "Minecraft" — not "Science > Astronomy" or "Sports > Football".
-- **FR237.3:** The mentor uses interests for example generation: "Let's use a space mission to understand fractions" or "Imagine dinosaurs dividing their territory — that's what fractions do." The meta-instruction in FR236.5 covers this — no per-interest prompting needed.
-- **FR237.4:** Interests that haven't been referenced or reinforced in 60+ days are demoted (moved to end of array, eventually evicted by cap).
+- **FR246.2:** Detected interests are stored as plain strings in the `interests` array, not categorized or taxonomized. "space", "dinosaurs", "football", "Minecraft" — not "Science > Astronomy" or "Sports > Football".
+- **FR246.3:** The mentor uses interests for example generation: "Let's use a space mission to understand fractions" or "Imagine dinosaurs dividing their territory — that's what fractions do." The meta-instruction in FR245.5 covers this — no per-interest prompting needed.
+- **FR246.4:** Interests that haven't been referenced or reinforced in 60+ days are demoted (moved to end of array, eventually evicted by cap).
 
-### FR238: Struggle Pattern Detection
+### FR247: Struggle Pattern Detection
 
-- **FR238.1:** A "struggle" is flagged when a child shows confusion on the same concept across 3+ sessions. Single-session confusion is normal learning — it does not trigger a struggle flag.
-- **FR238.2:** Struggle detection runs as part of the session analysis (FR235). The analysis LLM compares the current session's struggle signals against the existing `struggles` array in the learning profile.
-- **FR238.3:** When a new struggle is detected:
+- **FR247.1:** A "struggle" is flagged when a child shows confusion on the same concept across 3+ sessions. Single-session confusion is normal learning — it does not trigger a struggle flag.
+- **FR247.2:** Struggle detection runs as part of the session analysis (FR244). The analysis LLM compares the current session's struggle signals against the existing `struggles` array in the learning profile.
+- **FR247.3:** When a new struggle is detected:
   - Increment `attempts` counter on the existing struggle entry (or create a new entry)
   - Update `lastSeen` timestamp
   - Set confidence to `medium` after 3 sessions, `high` after 5 sessions
-- **FR238.4:** When a struggle is resolved (child demonstrates understanding in a subsequent session), the struggle entry's confidence is downgraded one level. After 3 consecutive sessions without the struggle appearing, the entry is removed.
-- **FR238.5:** The memory context (FR236) adjusts the mentor's behavior on known struggles:
+- **FR247.4:** When a struggle is resolved (child demonstrates understanding in a subsequent session), the struggle entry's confidence is downgraded one level. After 3 consecutive sessions without the struggle appearing, the entry is removed.
+- **FR247.5:** The memory context (FR245) adjusts the mentor's behavior on known struggles:
   - Slower pace, more patient
   - Try a different explanation style than what previously failed
   - Check prerequisites before diving in
   - Acknowledge growth: "Last time fractions were tricky — let's see how you do now!"
-- **FR238.6:** Parent notification: when a struggle reaches `high` confidence (5+ sessions), emit an event that can surface on the parent dashboard: "{Child} has been working hard on {topic} — they may need some extra support." Implementation: add a `struggle_flagged` coaching card type for parent profiles.
+- **FR247.6:** Parent notification: when a struggle reaches `high` confidence (5+ sessions), emit an event that can surface on the parent dashboard: "{Child} has been working hard on {topic} — they may need some extra support." Implementation: add a `struggle_flagged` coaching card type for parent profiles.
 
-### FR239: Explanation Effectiveness Tracking
+### FR248: Explanation Effectiveness Tracking
 
-- **FR239.1:** During session analysis (FR235), the LLM classifies each explanation attempt in the transcript as effective or ineffective based on the child's response:
+- **FR248.1:** During session analysis (FR244), the LLM classifies each explanation attempt in the transcript as effective or ineffective based on the child's response:
   - **Effective signals:** correct follow-up answer, "oh I get it", "that makes sense", moves on quickly, asks a deeper question
   - **Ineffective signals:** "I don't understand", asks the same question again, gives wrong answer after explanation, disengages
-- **FR239.2:** Each explanation attempt is also tagged with its style: `stories`, `examples`, `diagrams`, `analogies`, `step-by-step`, `humor`. The analysis LLM determines the style from the transcript.
-- **FR239.3:** Effectiveness data feeds into the `learningStyle.preferredExplanations` field. After 5+ data points, the profile records which styles are most effective. After 10+ data points with a clear pattern, confidence is set to `high`.
-- **FR239.4:** The mentor actively varies explanation styles until the profile has enough data. Early sessions should try different approaches to build the model faster. The system prompt includes: "Try different explanation styles — stories, examples, analogies — and observe which ones click."
-- **FR239.5:** Effectiveness tracking respects subject boundaries where appropriate. A child who learns math best with visual examples may learn history best with stories. If cross-subject patterns emerge, they are recorded at the profile level. If subject-specific patterns emerge, they are recorded with subject context in the `strengths`/`struggles` arrays.
+- **FR248.2:** Each explanation attempt is also tagged with its style: `stories`, `examples`, `diagrams`, `analogies`, `step-by-step`, `humor`. The analysis LLM determines the style from the transcript.
+- **FR248.3:** Effectiveness data feeds into the `learningStyle.preferredExplanations` field. After 5+ data points, the profile records which styles are most effective. After 10+ data points with a clear pattern, confidence is set to `high`.
+- **FR248.4:** The mentor actively varies explanation styles until the profile has enough data. Early sessions should try different approaches to build the model faster. The system prompt includes: "Try different explanation styles — stories, examples, analogies — and observe which ones click."
+- **FR248.5:** Effectiveness tracking respects subject boundaries where appropriate. A child who learns math best with visual examples may learn history best with stories. If cross-subject patterns emerge, they are recorded at the profile level. If subject-specific patterns emerge, they are recorded with subject context in the `strengths`/`struggles` arrays.
 
-### FR240: "What My Mentor Knows" Screen
+### FR249: "What My Mentor Knows" Screen
 
-- **FR240.1:** New screen accessible from the child's profile settings. Route: `/(tabs)/more/mentor-memory`.
-- **FR240.2:** The screen displays the learning profile in age-appropriate, friendly language:
+- **FR249.1:** New screen accessible from the child's profile settings. Route: `/(tabs)/more/mentor-memory`.
+- **FR249.2:** The screen displays the learning profile in age-appropriate, friendly language:
   - **Learning style:** "Your mentor noticed you learn best with stories and examples!" (only shown if learningStyle fields are set)
   - **Interests:** "Your mentor picked up that you like: space, dinosaurs, football" (shown as tappable chips)
   - **Strengths:** "You're doing great at: Ancient Egypt, multiplication" (shown as a list with subject context)
   - **Struggles:** "You've been working hard on: fractions, verb conjugation" (positive framing — "working hard on", not "struggling with")
   - **Communication notes:** "Your mentor thinks you like humor and prefer short explanations"
-- **FR240.3:** Each memory item has a delete action (swipe-to-delete or tap-to-remove). Deleting an item removes it from the `learning_profiles` JSONB immediately. The mentor will not use it again.
-- **FR240.4:** Empty state: "Your mentor is still getting to know you! After a few sessions, you'll see what they've learned about how you like to learn." No dead end — back navigation always available.
-- **FR240.5:** Copy is age-adapted using `birthYear`:
+- **FR249.3:** Each memory item has a delete action (swipe-to-delete or tap-to-remove). Deleting an item removes it from the `learning_profiles` JSONB immediately. The mentor will not use it again.
+- **FR249.4:** Empty state: "Your mentor is still getting to know you! After a few sessions, you'll see what they've learned about how you like to learn." No dead end — back navigation always available.
+- **FR249.5:** Copy is age-adapted using `birthYear`:
   - Under 10: "Your mentor noticed you really like stories about animals!"
   - 10-14: "Your mentor thinks you learn best with real-world examples."
   - 15+: "Learning preferences: example-based explanations, thorough pace."
-- **FR240.6:** The screen includes a "This is wrong" action on each item that allows the child to correct the inference. Tapping "This is wrong" removes the item and records the correction so the analysis function does not re-infer it from old sessions. Implementation: store a `suppressedInferences: string[]` array on the learning profile.
+- **FR249.6:** The screen includes a "This is wrong" action on each item that allows the child to correct the inference. Tapping "This is wrong" removes the item and records the correction so the analysis function does not re-infer it from old sessions. Implementation: store a `suppressedInferences: string[]` array on the learning profile.
 
-### FR241: Parent Memory Visibility
+### FR250: Parent Memory Visibility
 
-- **FR241.1:** Parent dashboard gains a "What the mentor knows" section for each linked child. Route: `/(parent)/dashboard/[childId]/mentor-memory`.
-- **FR241.2:** The parent sees the same data as the child (FR240) plus additional metadata:
+- **FR250.1:** Parent dashboard gains a "What the mentor knows" section for each linked child. Route: `/(parent)/dashboard/[childId]/mentor-memory`.
+- **FR250.2:** The parent sees the same data as the child (FR249) plus additional metadata:
   - When each inference was first recorded
   - How many sessions contributed to each inference
   - Confidence level for each item
-- **FR241.3:** The parent can:
-  - Remove specific memory items (same as child, FR240.3)
+- **FR250.3:** The parent can:
+  - Remove specific memory items (same as child, FR249.3)
   - Toggle `memoryEnabled` off entirely — the mentor reverts to stateless mode
   - Export all memory data as JSON (GDPR Article 20 — data portability)
   - Delete all memory data (GDPR Article 17 — right to erasure). This deletes the `learning_profiles` row entirely.
-- **FR241.4:** When `memoryEnabled` is toggled off:
+- **FR250.4:** When `memoryEnabled` is toggled off:
   - The `learning_profiles` row is preserved but the `memoryEnabled` flag prevents all reads and writes
-  - The session analysis Inngest function short-circuits (FR235.6)
-  - The memory context block is omitted from prompts (FR236.1)
+  - The session analysis Inngest function short-circuits (FR244.6)
+  - The memory context block is omitted from prompts (FR245.1)
   - A confirmation dialog warns: "The mentor will stop learning about {child}'s preferences. Sessions will still work, but the mentor won't remember what works best."
-- **FR241.5:** When `memoryEnabled` is toggled back on, the preserved profile data is immediately active again. No data is lost during the off period (but no new data was collected either).
-- **FR241.6:** GDPR compliance: all learning profile data is included in the existing data export pipeline (`services/export.ts`). The "Delete all data" action in account settings already cascades to the learning profile via the FK on `profileId`.
+- **FR250.5:** When `memoryEnabled` is toggled back on, the preserved profile data is immediately active again. No data is lost during the off period (but no new data was collected either).
+- **FR250.6:** GDPR compliance: all learning profile data is included in the existing data export pipeline (`services/export.ts`). The "Delete all data" action in account settings already cascades to the learning profile via the FK on `profileId`.
 
-### FR242: Memory Warm-Start for New Subjects
+### FR251: Memory Warm-Start for New Subjects
 
-- **FR242.1:** When a child starts a new subject, the memory context injection (FR236) uses the existing profile data to bootstrap the experience. Cross-subject signals that transfer:
+- **FR251.1:** When a child starts a new subject, the memory context injection (FR245) uses the existing profile data to bootstrap the experience. Cross-subject signals that transfer:
   - Learning style preferences (explanation style, pace, challenge response)
   - Interests (for example generation in the new subject)
   - Communication notes (humor preference, explanation length preference)
-- **FR242.2:** Cross-subject signals that do NOT transfer:
+- **FR251.2:** Cross-subject signals that do NOT transfer:
   - Strengths (subject-specific)
   - Struggles (subject-specific — struggling with fractions says nothing about history)
-- **FR242.3:** The mentor references the warm-start naturally: "I know you like examples with animals, so let's explore Spanish vocabulary with animal names!" The meta-instruction in FR236.5 covers this.
-- **FR242.4:** Warm-start quality degrades gracefully. A child with 50 sessions across 3 subjects gets a rich warm-start. A child with 2 sessions in 1 subject gets a minimal warm-start. A brand new child gets no warm-start — the default age + subject context still works.
+- **FR251.3:** The mentor references the warm-start naturally: "I know you like examples with animals, so let's explore Spanish vocabulary with animal names!" The meta-instruction in FR245.5 covers this.
+- **FR251.4:** Warm-start quality degrades gracefully. A child with 50 sessions across 3 subjects gets a rich warm-start. A child with 2 sessions in 1 subject gets a minimal warm-start. A brand new child gets no warm-start — the default age + subject context still works.
 
 ---
 
@@ -241,7 +243,7 @@ Session analysis uses an LLM call, not regex patterns or keyword matching. Reaso
 - The LLM already has the pedagogical reasoning to classify explanation styles
 - Budget model keeps cost low (~$0.002/analysis). At 10 sessions/day/user, this is $0.60/month/user — well within margin.
 
-Trade-off: LLM hallucination risk. Mitigated by confidence thresholds (FR234.4) and the 3-session corroboration requirement for learning style fields (FR235.5).
+Trade-off: LLM hallucination risk. Mitigated by confidence thresholds (FR243.4) and the 3-session corroboration requirement for learning style fields (FR244.5).
 
 ### AD3: Background Processing Only — No In-Session Analysis
 
@@ -256,7 +258,7 @@ The trade-off is that the current session cannot benefit from its own analysis. 
 
 ### AD4: Natural Language Memory Block, Not Structured Data in Prompts
 
-The memory context injected into the system prompt (FR236.3) is formatted as natural language, not JSON or structured data. Reasons:
+The memory context injected into the system prompt (FR245.3) is formatted as natural language, not JSON or structured data. Reasons:
 
 - LLMs respond better to natural language context than to structured data blobs
 - Natural language encourages the LLM to weave memories into conversation naturally
@@ -268,7 +270,7 @@ The memory context injected into the system prompt (FR236.3) is formatted as nat
 The learning profile is a single JSONB document per learner, not a vector store of memory fragments. Reasons:
 
 - The profile is small enough to read in full (< 2KB even for a rich profile)
-- The 500-token prompt budget means we are always selecting a small subset — simple priority ordering (FR236.2) works
+- The 500-token prompt budget means we are always selecting a small subset — simple priority ordering (FR245.2) works
 - Vector search adds infrastructure complexity (pgvector is already used for session embeddings but adding memory fragments to the embedding pipeline is a different retrieval pattern)
 - If the profile grows beyond what priority ordering can handle, vector search can be added later as an optimization — not a prerequisite
 
@@ -302,7 +304,7 @@ So that the mentor can accumulate understanding over time and reference it in fu
 **When** using `createScopedRepository(profileId)`
 **Then** only the current profile's learning profile is returned — no cross-profile access
 
-**FRs:** FR234
+**FRs:** FR243
 
 **Failure Modes:**
 
@@ -349,7 +351,7 @@ So that the learner's profile is incrementally enriched after every interaction.
 **Then** the failure does not affect other steps in the session completion chain
 **And** `captureException` reports the failure to Sentry
 
-**FRs:** FR235
+**FRs:** FR244
 
 **Failure Modes:**
 
@@ -394,15 +396,15 @@ So that each session feels like continuing a relationship, not starting from scr
 **Then** total additional context stays within a reasonable budget
 **And** the two blocks serve complementary purposes: history = what was studied, memory = how the learner learns
 
-**FRs:** FR236
+**FRs:** FR245
 
 **Failure Modes:**
 
 | State | Trigger | User sees | Recovery |
 |-------|---------|-----------|----------|
 | Learning profile read fails | DB error | Session starts without memory | Graceful fallback — stateless session, log error |
-| Memory block exceeds 500 tokens | Very rich profile | Truncated memory | Priority-ordered truncation (FR236.2), no user impact |
-| Stale memory (wrong preference) | Outdated inference | Suboptimal example style | Child corrects via "This is wrong" (FR240.6), profile updates on next session |
+| Memory block exceeds 500 tokens | Very rich profile | Truncated memory | Priority-ordered truncation (FR245.2), no user impact |
+| Stale memory (wrong preference) | Outdated inference | Suboptimal example style | Child corrects via "This is wrong" (FR249.6), profile updates on next session |
 
 ---
 
@@ -434,13 +436,13 @@ So that future sessions use examples and contexts that resonate with me.
 **When** a new session starts in any subject
 **Then** the mentor can reference interests in examples: "Imagine the dinosaurs are sharing pizza — that's how fractions work!"
 
-**FRs:** FR237
+**FRs:** FR246
 
 **Failure Modes:**
 
 | State | Trigger | User sees | Recovery |
 |-------|---------|-----------|----------|
-| False positive interest | Child mentions topic in passing | Irrelevant example in future session | Child deletes via "What My Mentor Knows" (FR240.3) |
+| False positive interest | Child mentions topic in passing | Irrelevant example in future session | Child deletes via "What My Mentor Knows" (FR249.3) |
 | Interest missed | Subtle signal | No personalization | Profile builds over time — no single session is critical |
 
 ---
@@ -477,7 +479,7 @@ So that I get different approaches and more patience instead of the same explana
 **When** the session system prompt is built
 **Then** the memory block includes: "Be extra patient with [topic] — try a different explanation approach than before"
 
-**FRs:** FR238
+**FRs:** FR247
 
 **Failure Modes:**
 
@@ -519,14 +521,14 @@ So that the mentor converges on the most effective teaching approach over time.
 **Then** the system prompt includes: "Try different explanation styles — stories, examples, analogies — and observe which ones click"
 **And** early sessions actively vary approaches to build the model
 
-**FRs:** FR239
+**FRs:** FR248
 
 **Failure Modes:**
 
 | State | Trigger | User sees | Recovery |
 |-------|---------|-----------|----------|
 | Wrong style inferred | Small sample size or atypical sessions | Suboptimal explanations | 3-session corroboration requirement. Child can override via "This is wrong." |
-| Style varies by subject | Child likes stories for history, examples for math | Misapplied style | Subject-specific tracking (FR239.5) catches this with enough data. |
+| Style varies by subject | Child likes stories for history, examples for math | Misapplied style | Subject-specific tracking (FR248.5) catches this with enough data. |
 | Style changes over time | Child matures, preferences shift | Stale preference | Recency weighting in analysis. Old data naturally ages out. |
 
 ---
@@ -568,7 +570,7 @@ So that I feel in control and can correct anything that's wrong.
 **When** viewing memory items
 **Then** copy uses more direct language: "Learning preferences: example-based explanations, thorough pace"
 
-**FRs:** FR240
+**FRs:** FR249
 
 **Failure Modes:**
 
@@ -617,7 +619,7 @@ So that I can ensure the AI's understanding is appropriate and correct.
 **Then** preserved profile data becomes immediately active
 **And** the next session analysis resumes updating the profile
 
-**FRs:** FR241
+**FRs:** FR250
 
 **Failure Modes:**
 
@@ -657,7 +659,7 @@ So that the first session in a new subject benefits from everything learned in o
 **Then** the warm-start provides a meaningfully personalized first session
 **And** the mentor uses the preferred explanation style from day one
 
-**FRs:** FR242
+**FRs:** FR251
 
 **Failure Modes:**
 
@@ -717,7 +719,8 @@ Phase C: (16.7 → 16.8) || 16.9           ── depends on Phase A, parallel w
 |------|-------------|
 | **Epic 13** (Session Lifecycle) | The `session.completed` event (Epic 13) triggers the memory analysis Inngest function (Story 16.2). The session close flow must emit this event reliably. No changes needed to Epic 13 — the event already exists. |
 | **Epic 14** (Human Agency) | "I don't remember" feedback during recall tests (Story 14.2) feeds into struggle detection (Story 16.5). Per-message feedback (Story 14.5) — thumbs up/down on AI responses — corroborates explanation effectiveness tracking (Story 16.6). |
-| **Epic 15** (Visible Progress) | Struggle and strength data in the learning profile can cross-reference progress statistics. A child who progresses quickly in a subject confirms a "strength" inference. A child who stalls confirms a "struggle" inference. No direct code dependency — data lives in the same DB. |
+| **Epic 15** (Visible Progress) | Struggle and strength data in the learning profile can cross-reference progress statistics. A child who progresses quickly in a subject confirms a "strength" inference. A child who stalls confirms a "struggle" inference. Epic 15's FR numbers are FR230–FR250; this epic uses FR243–FR251 (renumbered to avoid collision). Inngest chain ordering (AD5) ensures memory analysis runs at position 4, before Epic 15's snapshot refresh at position 5. |
+| **Conversation-First** (Learning Flow) | Freeform sessions (Flow 3) may have no subject — the analysis function handles this via FR244.9 (subject: null in struggles). The `rawInput` field is used as a strong interest signal (FR246.5). The Inngest chain ordering (AD5) places memory analysis after post-session filing but before the progress snapshot. System prompt token budget (AD6) is shared across all three specs. |
 | **Epic 6** (Language Learning) | Vocabulary mastery data feeds into the strength/struggle model. A child mastering A1 vocabulary is a strength signal. A child failing fluency drills on the same words is a struggle signal. The session analysis function should be aware of `pedagogyMode = 'four_strands'` when analyzing language sessions. |
 | **Epic 7** (Library) | The learning profile complements the learning history block (FR163). Epic 7 tells the mentor what was studied. Epic 16 tells the mentor how the learner learns. Both are injected into `buildSystemPrompt()`. |
 | **Epic 12** (Persona Removal) | `birthYear` on the profiles table replaces persona for age-appropriate behavior. The learning profile adds behavioral understanding on top — the mentor adapts not just to age but to individual learning patterns. The `learningStyle` fields in the profile are persona-independent. |
@@ -728,14 +731,14 @@ Phase C: (16.7 → 16.8) || 16.9           ── depends on Phase A, parallel w
 
 | Risk | Severity | Mitigation |
 |------|----------|------------|
-| **LLM hallucination in analysis** — the analysis function infers wrong preferences from ambiguous conversation | Medium | Confidence thresholds (FR234.4). 3-session corroboration for learning style (FR235.5). Child/parent can delete incorrect inferences (FR240, FR241). Low-confidence signals are logged but not applied. |
+| **LLM hallucination in analysis** — the analysis function infers wrong preferences from ambiguous conversation | Medium | Confidence thresholds (FR243.4). 3-session corroboration for learning style (FR244.5). Child/parent can delete incorrect inferences (FR249, FR250). Low-confidence signals are logged but not applied. |
 | **Privacy / GDPR compliance** — storing behavioral inferences about children requires clear consent and deletion controls | High | Story 16.8 addresses this directly: full visibility, export, deletion, opt-out. All data cascades on profile deletion. Data included in existing export pipeline. Consent state checked before first analysis. |
-| **Prompt bloat** — injecting too much memory context degrades LLM response quality | Medium | Hard cap at 500 tokens (FR236.4). Priority ordering ensures the most relevant signals are injected first. Memory block omitted when irrelevant. Monitored via token count metrics. |
+| **Prompt bloat** — injecting too much memory context degrades LLM response quality | Medium | Hard cap at 500 tokens (FR245.4). Priority ordering ensures the most relevant signals are injected first. Memory block omitted when irrelevant. Monitored via token count metrics. |
 | **Cold start** — new users get no benefit from memory features | Low | Acceptable by design. Default age + subject context still works (identical to today). Memory adds value gradually — noticeable after 5+ sessions, meaningful after 20+. |
-| **Stale preferences** — learner's style changes over time but old data persists | Medium | Recency weighting in analysis. 60-day interest demotion (FR237.4). 90-day struggle archival (FR234.5). Confidence degrades on contradicting signals. User can always delete. |
+| **Stale preferences** — learner's style changes over time but old data persists | Medium | Recency weighting in analysis. 60-day interest demotion (FR246.4). 90-day struggle archival (FR243.5). Confidence degrades on contradicting signals. User can always delete. |
 | **Cost of analysis LLM calls** — per-session background LLM call adds to operational costs | Low | Budget model (~$0.002/analysis). At scale: 10 sessions/day/user = $0.60/month/user. Well within margin. Can be further optimized by skipping very short sessions (< 5 exchanges). |
 | **Analysis function failures blocking session chain** — if the memory analysis step fails, it should not block retention, coaching, or other post-session processing | Medium | The analysis step is isolated within the Inngest chain. Failures are caught, logged to Sentry, and retried independently. Other steps proceed regardless. |
-| **Cross-subject style transfer is wrong** — math and history may require different explanation styles | Medium | Subject-specific tracking in `struggles` and `strengths` (FR239.5). Cross-subject transfer is limited to general preferences (pace, humor, explanation length). Subject-specific patterns override general patterns when enough data exists. |
+| **Cross-subject style transfer is wrong** — math and history may require different explanation styles | Medium | Subject-specific tracking in `struggles` and `strengths` (FR248.5). Cross-subject transfer is limited to general preferences (pace, humor, explanation length). Subject-specific patterns override general patterns when enough data exists. |
 
 ---
 
@@ -751,7 +754,7 @@ Phase C: (16.7 → 16.8) || 16.9           ── depends on Phase A, parallel w
 | Profile model | `profiles` table | `birthYear` for age-appropriate copy. `profileId` for scoping. FK for cascade delete. |
 | Scoped repository | `createScopedRepository(profileId)` | Profile-scoped reads/writes for learning profile data. Existing pattern. |
 | Data export | `services/export.ts` | GDPR data export already exists. Learning profile data added to the export payload. |
-| Coaching card precomputation | `services/coaching-cards.ts` | Parent struggle notifications (FR238.6) use the existing coaching card infrastructure. |
+| Coaching card precomputation | `services/coaching-cards.ts` | Parent struggle notifications (FR247.6) use the existing coaching card infrastructure. |
 
 ---
 

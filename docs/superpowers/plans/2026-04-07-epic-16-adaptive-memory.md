@@ -4,6 +4,8 @@
 
 **Reviewed:** 2026-04-07. Adversarial review found 14 issues (4 HIGH, 6 MEDIUM, 4 LOW). All resolved in this revision — see [Review Changelog](#review-changelog) at the end of the plan.
 
+**Spec alignment:** 2026-04-08. FR renumbering (FR234–FR242 → FR243–FR251), plus new requirements FR244.9 (freeform session handling), FR246.5 (rawInput interest signal), shared Inngest chain ordering (Epic 15 AD6), and shared token budget (AD6). Conversation-First cross-references added.
+
 **Goal:** Build a learner memory system that analyzes session transcripts post-session, accumulates a learning profile (interests, struggles, explanation preferences), and injects that profile into future system prompts — making the AI mentor feel like it truly knows each child.
 
 **Architecture:** New `learning_profiles` table with JSONB fields stores per-profile learning data. A new Inngest step in the `session-completed` chain sends the transcript to a budget LLM for structured analysis. `buildSystemPrompt()` gains a "learner memory" block capped at 500 tokens. Two new mobile screens expose the profile to children and parents with delete/opt-out controls.
@@ -26,8 +28,8 @@
 | `apps/api/src/services/learner-profile.test.ts` | Unit tests for merge logic, memory block formatting, token budget |
 | `apps/api/src/routes/learner-profile.ts` | Hono route handlers: GET profile, DELETE items, DELETE all (self + parent), PATCH memoryEnabled |
 | `apps/api/src/routes/learner-profile.test.ts` | Route handler tests (IDOR, GDPR self-delete, toggle, item delete) |
-| `apps/mobile/src/app/(learner)/mentor-memory.tsx` | Child-facing "What My Mentor Knows" screen |
-| `apps/mobile/src/app/(parent)/child/[profileId]/mentor-memory.tsx` | Parent-facing memory visibility screen |
+| `apps/mobile/src/app/(app)/mentor-memory.tsx` | Child-facing "What My Mentor Knows" screen |
+| `apps/mobile/src/app/(app)/child/[profileId]/mentor-memory.tsx` | Parent-facing memory visibility screen |
 | `apps/mobile/src/hooks/use-learner-profile.ts` | React Query hooks for learner profile API |
 
 ### Modified Files
@@ -42,8 +44,8 @@
 | `apps/api/src/services/session.ts` | Load learning profile in `prepareExchangeContext()` parallel query, build memory context |
 | `apps/api/src/services/export.ts` | Include `learning_profiles` in GDPR data export |
 | `apps/api/src/index.ts` | Register `learnerProfileRoutes` |
-| `apps/mobile/src/app/(learner)/more.tsx` | Add "What My Mentor Knows" settings row |
-| `apps/mobile/src/app/(parent)/child/[profileId]/index.tsx` | Add "What the mentor knows" link |
+| `apps/mobile/src/app/(app)/more.tsx` | Add "What My Mentor Knows" settings row |
+| `apps/mobile/src/app/(app)/child/[profileId]/index.tsx` | Add "What the mentor knows" link |
 
 ---
 
@@ -106,7 +108,7 @@ export const strengthEntrySchema = z.object({
 export type StrengthEntry = z.infer<typeof strengthEntrySchema>;
 
 export const struggleEntrySchema = z.object({
-  subject: z.string(),
+  subject: z.string().nullable(), // FR244.9: null for freeform sessions without a subject
   topic: z.string(),
   lastSeen: z.string(), // ISO 8601
   attempts: z.number().int().min(1),
@@ -148,10 +150,10 @@ export const sessionAnalysisOutputSchema = z.object({
     .array(z.object({ topic: z.string(), subject: z.string() }))
     .nullable(),
   struggles: z
-    .array(z.object({ topic: z.string(), subject: z.string() }))
+    .array(z.object({ topic: z.string(), subject: z.string().nullable() }))
     .nullable(),
   resolvedTopics: z
-    .array(z.object({ topic: z.string(), subject: z.string() }))
+    .array(z.object({ topic: z.string(), subject: z.string().nullable() }))
     .nullable(),
   communicationNotes: z.array(z.string()).nullable(),
   engagementLevel: engagementLevelSchema.nullable(),
@@ -569,6 +571,36 @@ describe('mergeStruggles', () => {
     const result = mergeStruggles(existing, incoming, suppressed);
     expect(result).toHaveLength(0);
   });
+
+  // FR244.9: Freeform session handling
+  it('creates a struggle with null subject for freeform sessions', () => {
+    const existing: StruggleEntry[] = [];
+    const incoming = [{ topic: 'fractions', subject: null }];
+    const result = mergeStruggles(existing, incoming, []);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      topic: 'fractions',
+      subject: null,
+      attempts: 1,
+      confidence: 'low',
+    });
+  });
+
+  it('upserts null-subject struggles by topic match', () => {
+    const existing: StruggleEntry[] = [
+      {
+        topic: 'fractions',
+        subject: null,
+        lastSeen: '2026-03-01T00:00:00Z',
+        attempts: 2,
+        confidence: 'low',
+      },
+    ];
+    const incoming = [{ topic: 'fractions', subject: null }];
+    const result = mergeStruggles(existing, incoming, []);
+    expect(result[0]!.attempts).toBe(3);
+    expect(result[0]!.confidence).toBe('medium');
+  });
 });
 
 describe('shouldUpdateLearningStyle', () => {
@@ -693,6 +725,8 @@ const MAX_COMMUNICATION_NOTES = 10;
 const MAX_STRUGGLES = 30;
 const STRUGGLE_ARCHIVAL_DAYS = 90;
 const INTEREST_DEMOTION_DAYS = 60;
+// AD6 (Epic 15): Shared system prompt token budget is ~1,000 across all specs.
+// This epic's memory block gets 500 of that budget.
 const MEMORY_BLOCK_TOKEN_BUDGET = 500;
 // Rough estimate: 1 token ≈ 4 chars
 const MEMORY_BLOCK_CHAR_BUDGET = MEMORY_BLOCK_TOKEN_BUDGET * 4;
@@ -708,7 +742,7 @@ const LEARNING_STYLE_CORROBORATION_THRESHOLD = 3;
 // ---------------------------------------------------------------------------
 
 /**
- * Merges incoming interests, maintains a timestamps map for FR237.4 (60-day demotion).
+ * Merges incoming interests, maintains a timestamps map for FR246.4 (60-day demotion).
  * Stale interests (not seen in 60+ days) are demoted to the front of the array
  * so they get evicted first when the 20-entry cap is reached.
  */
@@ -737,7 +771,7 @@ export function mergeInterests(
     updatedTimestamps[normalized] = now;
   }
 
-  // FR237.4: Demote stale interests (60+ days) to front of array
+  // FR246.4: Demote stale interests (60+ days) to front of array
   const cutoff = new Date(
     Date.now() - INTEREST_DEMOTION_DAYS * 24 * 60 * 60 * 1000
   ).toISOString();
@@ -769,7 +803,7 @@ export function mergeInterests(
  */
 export function mergeStrengths(
   existing: StrengthEntry[],
-  incoming: { topic: string; subject: string }[],
+  incoming: { topic: string; subject: string | null }[],
   suppressed: string[]
 ): StrengthEntry[] {
   const suppressedSet = new Set(
@@ -779,9 +813,11 @@ export function mergeStrengths(
 
   for (const signal of incoming) {
     if (suppressedSet.has(signal.topic.toLowerCase().trim())) continue;
+    // FR244.9: skip strength signals with no subject — strengths are subject-specific
+    if (!signal.subject) continue;
 
     const idx = result.findIndex(
-      (e) => e.subject.toLowerCase() === signal.subject.toLowerCase()
+      (e) => (e.subject ?? '').toLowerCase() === (signal.subject ?? '').toLowerCase()
     );
 
     if (idx >= 0) {
@@ -806,7 +842,7 @@ export function mergeStrengths(
 }
 
 /**
- * FR234.5: Archive struggles older than 90 days.
+ * FR243.5: Archive struggles older than 90 days.
  * Removes entries whose lastSeen is beyond the archival threshold.
  */
 export function archiveStaleStruggles(
@@ -820,7 +856,7 @@ export function archiveStaleStruggles(
 
 export function mergeStruggles(
   existing: StruggleEntry[],
-  incoming: { topic: string; subject: string }[],
+  incoming: { topic: string; subject: string | null }[],
   suppressed: string[]
 ): StruggleEntry[] {
   const suppressedSet = new Set(
@@ -831,10 +867,11 @@ export function mergeStruggles(
   for (const signal of incoming) {
     if (suppressedSet.has(signal.topic.toLowerCase().trim())) continue;
 
+    // FR244.9: subject may be null for freeform sessions
     const idx = result.findIndex(
       (e) =>
         e.topic.toLowerCase() === signal.topic.toLowerCase() &&
-        e.subject.toLowerCase() === signal.subject.toLowerCase()
+        (e.subject ?? '').toLowerCase() === (signal.subject ?? '').toLowerCase()
     );
 
     if (idx >= 0) {
@@ -900,7 +937,7 @@ export function shouldUpdateLearningStyle(
 }
 
 // ---------------------------------------------------------------------------
-// Memory Block Construction (FR236)
+// Memory Block Construction (FR245)
 // ---------------------------------------------------------------------------
 
 interface MemoryBlockProfile {
@@ -922,10 +959,11 @@ export function buildMemoryBlock(
   const lines: string[] = [];
 
   // Priority 1: Active struggles relevant to current subject (high confidence only)
+  // FR244.9: subject may be null for freeform-filed struggles — include them when no currentSubject filter
   const relevantStruggles = profile.struggles.filter(
     (s) =>
       s.confidence !== 'low' &&
-      (!currentSubject || s.subject.toLowerCase() === currentSubject.toLowerCase())
+      (!currentSubject || (s.subject ?? '').toLowerCase() === currentSubject.toLowerCase())
   );
   if (relevantStruggles.length > 0) {
     const struggleTopics = relevantStruggles.map((s) => s.topic).join(', ');
@@ -1033,9 +1071,9 @@ export async function applyAnalysis(
   db: Database,
   profileId: string,
   analysis: SessionAnalysisOutput,
-  subjectName: string
+  subjectName: string | null  // FR244.9: null for freeform sessions
 ): Promise<void> {
-  // FR235.4: Low confidence analysis is logged but not applied
+  // FR244.4: Low confidence analysis is logged but not applied
   if (analysis.confidence === 'low') return;
 
   const profile = await getOrCreateLearningProfile(db, profileId);
@@ -1069,12 +1107,12 @@ export async function applyAnalysis(
       analysis.struggles,
       suppressed
     );
-    // FR234.5: Archive struggles older than 90 days
+    // FR243.5: Archive struggles older than 90 days
     struggles = archiveStaleStruggles(struggles);
     updates.struggles = struggles;
   }
 
-  // FR238.4: Resolve struggles where learner demonstrated mastery
+  // FR247.4: Resolve struggles where learner demonstrated mastery
   if (analysis.resolvedTopics?.length) {
     const currentStruggles =
       (updates.struggles as StruggleEntry[]) ??
@@ -1215,11 +1253,12 @@ export async function deleteMemoryItem(
     case 'struggles': {
       const arr = (profile.struggles as StruggleEntry[]) ?? [];
       // Use both topic and subject to disambiguate across subjects
+      // FR244.9: subject may be null for freeform struggles
       updates.struggles = arr.filter(
         (s) =>
           !(
             s.topic.toLowerCase() === value.toLowerCase() &&
-            (!subject || s.subject.toLowerCase() === subject.toLowerCase())
+            (!subject || (s.subject ?? '').toLowerCase() === subject.toLowerCase())
           )
       );
       break;
@@ -1227,7 +1266,7 @@ export async function deleteMemoryItem(
     case 'strengths': {
       const arr = (profile.strengths as any[]) ?? [];
       updates.strengths = arr.filter(
-        (s) => s.subject.toLowerCase() !== value.toLowerCase()
+        (s) => (s.subject ?? '').toLowerCase() !== value.toLowerCase()
       );
       break;
     }
@@ -1322,7 +1361,11 @@ git commit -m "feat(api): add learner profile service with merge logic and memor
 **Files:**
 - Modify: `apps/api/src/inngest/functions/session-completed.ts`
 
-This task adds a new `analyze-learner-profile` step to the existing session-completed Inngest chain. The step runs after `write-coaching-card` and before `update-dashboard`.
+This task adds a new `analyze-learner-profile` step to the existing session-completed Inngest chain. Per the shared Inngest chain ordering (Epic 15 AD6), this step runs at **position 4** — after post-session filing (position 3, Conversation-First) and before the progress snapshot refresh (position 5, Epic 15).
+
+> **FR244.9 (Freeform session handling):** Sessions from Conversation-First Flow 3 may have no subject. The analysis function must handle `subjectId = null` — run analysis on the transcript regardless, store struggles with `subject: null` when unfiled, and use the filing result (topic → subject mapping) when available from the preceding step 3.
+>
+> **FR246.5 (rawInput as interest signal):** The session's `rawInput` field (the learner's initial free-text prompt) is treated as a strong interest signal alongside the transcript. Include it in the analysis payload so the LLM can detect interests from what the learner chose to explore.
 
 - [ ] **Step 1: Write the analysis prompt and service function**
 
@@ -1330,7 +1373,7 @@ Add to `apps/api/src/services/learner-profile.ts`:
 
 ```typescript
 // ---------------------------------------------------------------------------
-// Session Analysis LLM Call (FR235)
+// Session Analysis LLM Call (FR244)
 // ---------------------------------------------------------------------------
 
 import { routeAndCall } from './llm';
@@ -1348,8 +1391,8 @@ Your output MUST be valid JSON matching this schema:
   } | null,
   "interests": ["string"] | null,
   "strengths": [{"topic": "string", "subject": "string"}] | null,
-  "struggles": [{"topic": "string", "subject": "string"}] | null,
-  "resolvedTopics": [{"topic": "string", "subject": "string"}] | null,
+  "struggles": [{"topic": "string", "subject": "string | null"}] | null,
+  "resolvedTopics": [{"topic": "string", "subject": "string | null"}] | null,
   "communicationNotes": ["string"] | null,
   "engagementLevel": "high" | "medium" | "low" | null,
   "confidence": "low" | "medium" | "high"
@@ -1364,16 +1407,19 @@ Rules:
 - "communicationNotes": Observations like "responds well to humor", "prefers short explanations", "gets frustrated with repetition". Only flag clear patterns.
 - "confidence": Your overall confidence in this analysis. Use "low" if the session was too short or ambiguous to extract meaningful signals.
 - Return null for any field where you found no signal.
+- If the subject is "Unknown" or "Freeform", still extract interests, communication notes, and engagement — use null for subject in struggle/strength entries that lack clear subject context.
 
 Subject: {subject}
-Topic: {topic}`;
+Topic: {topic}
+Raw input (the learner's initial prompt — treat as a strong interest signal): {rawInput}`;
 
 const MAX_TRANSCRIPT_EVENTS = 100;
 
 export async function analyzeSessionTranscript(
   transcript: Array<{ eventType: string; content: string }>,
-  subjectName: string,
-  topicTitle: string | null
+  subjectName: string | null,
+  topicTitle: string | null,
+  rawInput?: string | null
 ): Promise<SessionAnalysisOutput | null> {
   // Truncate very long transcripts
   const conversationEvents = transcript
@@ -1389,16 +1435,18 @@ export async function analyzeSessionTranscript(
     .map((e) => `${e.eventType === 'user_message' ? 'Learner' : 'Mentor'}: ${e.content}`)
     .join('\n\n');
 
+  // FR244.9: Handle freeform sessions with no subject
   const systemPrompt = SESSION_ANALYSIS_PROMPT
-    .replace('{subject}', subjectName)
-    .replace('{topic}', topicTitle ?? 'General');
+    .replace('{subject}', subjectName ?? 'Freeform')
+    .replace('{topic}', topicTitle ?? 'General')
+    .replace('{rawInput}', rawInput ?? '(none)');
 
   const messages: ChatMessage[] = [
     { role: 'system', content: systemPrompt },
     { role: 'user', content: transcriptText },
   ];
 
-  // Use rung 1 (budget model) — this is background processing (FR235.7)
+  // Use rung 1 (budget model) — this is background processing (FR244.7)
   const result = await routeAndCall(messages, 1, {});
   if (!result?.response) return null;
 
@@ -1436,16 +1484,17 @@ import {
 } from '../../services/learner-profile';
 ```
 
-Then add the new step after `write-coaching-card` (after step 2, before step 3 — the dashboard update). Insert between the `write-coaching-card` step and the `update-dashboard` step:
+Then add the new step at **position 4** in the Inngest chain (per Epic 15 AD6: shared ordering). This runs after post-session filing (position 3) and before the progress snapshot refresh (position 5):
 
 ```typescript
-    // Step 2b: Analyze session for learner profile signals (Epic 16, FR235)
+    // Step 4: Analyze session for learner profile signals (Epic 16, FR244)
+    // Position 4 in shared Inngest chain (Epic 15 AD6)
     outcomes.push(
       await step.run('analyze-learner-profile', async () =>
         runIsolated('analyze-learner-profile', profileId, async () => {
           const db = getStepDatabase();
 
-          // FR235.6: Short-circuit if memory disabled
+          // FR244.6: Short-circuit if memory disabled
           const existingProfile = await getLearningProfile(db, profileId);
           if (existingProfile?.memoryEnabled === false) return;
 
@@ -1459,19 +1508,28 @@ Then add the new step after `write-coaching-card` (after step 2, before step 3 �
             columns: { eventType: true, content: true },
           });
 
-          // Load subject name for analysis context
-          const [subjectRow] = await db
-            .select({ name: subjects.name })
-            .from(subjects)
-            .where(eq(subjects.id, subjectId))
-            .limit(1);
+          // FR244.9: Handle freeform sessions — subjectId may be null
+          const [subjectRow] = subjectId
+            ? await db
+                .select({ name: subjects.name })
+                .from(subjects)
+                .where(eq(subjects.id, subjectId))
+                .limit(1)
+            : [null];
 
-          const topicTitle = await loadTopicTitle(db, topicId);
+          const topicTitle = topicId ? await loadTopicTitle(db, topicId) : null;
+
+          // FR246.5: Load rawInput as strong interest signal
+          const sessionRow = await db.query.learningSessions.findFirst({
+            where: eq(learningSessions.id, sessionId),
+            columns: { rawInput: true },
+          });
 
           const analysis = await analyzeSessionTranscript(
             transcriptEvents,
-            subjectRow?.name ?? 'Unknown',
-            topicTitle
+            subjectRow?.name ?? null,
+            topicTitle,
+            sessionRow?.rawInput
           );
 
           if (!analysis) return;
@@ -1480,7 +1538,7 @@ Then add the new step after `write-coaching-card` (after step 2, before step 3 �
             db,
             profileId,
             analysis,
-            subjectRow?.name ?? 'Unknown'
+            subjectRow?.name ?? null
           );
         })
       )
@@ -1517,7 +1575,7 @@ git commit -m "feat(api): add analyze-learner-profile Inngest step with LLM anal
 In `apps/api/src/services/exchanges.ts`, add a new field to the `ExchangeContext` interface (after `embeddingMemoryContext`):
 
 ```typescript
-  /** Learner memory context — adaptive memory block from learning profile (Epic 16, FR236) */
+  /** Learner memory context — adaptive memory block from learning profile (Epic 16, FR245) */
   learnerMemoryContext?: string;
 ```
 
@@ -1526,7 +1584,7 @@ In `apps/api/src/services/exchanges.ts`, add a new field to the `ExchangeContext
 In `buildSystemPrompt()`, add the learner memory block injection after the embedding memory context block (after line ~281 — `context.embeddingMemoryContext`):
 
 ```typescript
-  // Learner memory context (Epic 16, FR236)
+  // Learner memory context (Epic 16, FR245)
   if (context.learnerMemoryContext) {
     sections.push(context.learnerMemoryContext);
   }
@@ -1556,7 +1614,7 @@ Add the variable to the destructuring:
 Then after the parallel queries complete (near line ~960 where `ExchangeContext` is built), construct the memory block and add it to the context:
 
 ```typescript
-    // Epic 16: Build learner memory context (FR236)
+    // Epic 16: Build learner memory context (FR245)
     const learnerMemoryContext = learningProfileRow
       ? buildMemoryBlock(
           {
@@ -1641,7 +1699,7 @@ Expected: No errors
 
 ```bash
 git add apps/api/src/services/export.ts packages/schemas/src/account.ts
-git commit -m "feat(api): include learning profiles in GDPR data export [Epic-16, FR241.6]"
+git commit -m "feat(api): include learning profiles in GDPR data export [Epic-16, FR250.6]"
 ```
 
 ---
@@ -1655,9 +1713,9 @@ git commit -m "feat(api): include learning profiles in GDPR data export [Epic-16
 **Files:**
 - Test: `apps/api/src/services/learner-profile.test.ts`
 
-> **Note:** FR237.4 (60-day interest demotion) is now fully implemented in Task 5's `mergeInterests` via the `interestTimestamps` JSONB column. This task verifies the prompt coverage and adds any additional edge-case tests.
+> **Note:** FR246.4 (60-day interest demotion) is now fully implemented in Task 5's `mergeInterests` via the `interestTimestamps` JSONB column. This task verifies the prompt coverage and adds any additional edge-case tests.
 
-- [ ] **Step 1: Verify the analysis prompt in Task 6 covers interest detection (FR237.1–FR237.3)**
+- [ ] **Step 1: Verify the analysis prompt in Task 6 covers interest detection (FR246.1–FR246.3)**
 
 Verify the `SESSION_ANALYSIS_PROMPT` includes:
 - Explicit statement detection
@@ -1745,6 +1803,21 @@ describe('resolveStruggle', () => {
     const result = resolveStruggle(struggles, 'fractions', 'Math');
     expect(result).toHaveLength(0);
   });
+
+  // FR244.9: Freeform session handling
+  it('resolves a null-subject struggle', () => {
+    const struggles: StruggleEntry[] = [
+      {
+        subject: null,
+        topic: 'fractions',
+        lastSeen: '2026-03-01T00:00:00Z',
+        attempts: 5,
+        confidence: 'high',
+      },
+    ];
+    const result = resolveStruggle(struggles, 'fractions', null);
+    expect(result[0]!.confidence).toBe('medium');
+  });
 });
 ```
 
@@ -1761,13 +1834,14 @@ Add to `apps/api/src/services/learner-profile.ts`:
 export function resolveStruggle(
   struggles: StruggleEntry[],
   topic: string,
-  subject: string
+  subject: string | null  // FR244.9: null for freeform sessions
 ): StruggleEntry[] {
+  const subjectLower = (subject ?? '').toLowerCase();
   return struggles
     .map((s) => {
       if (
         s.topic.toLowerCase() === topic.toLowerCase() &&
-        s.subject.toLowerCase() === subject.toLowerCase()
+        (s.subject ?? '').toLowerCase() === subjectLower
       ) {
         const downgraded: ConfidenceLevel =
           s.confidence === 'high'
@@ -1783,14 +1857,13 @@ export function resolveStruggle(
       // Remove entries that were already low and got "downgraded" again
       if (
         s.topic.toLowerCase() === topic.toLowerCase() &&
-        s.subject.toLowerCase() === subject.toLowerCase() &&
+        (s.subject ?? '').toLowerCase() === subjectLower &&
         s.confidence === 'low'
       ) {
-        // Keep if it was already low before this resolution (original had low confidence)
         const original = struggles.find(
           (o) =>
             o.topic.toLowerCase() === topic.toLowerCase() &&
-            o.subject.toLowerCase() === subject.toLowerCase()
+            (o.subject ?? '').toLowerCase() === subjectLower
         );
         if (original?.confidence === 'low') return false; // Remove — resolved
       }
@@ -1905,7 +1978,7 @@ export function updateLearningStyleFromEffectiveness(
 In the `applyAnalysis` function, after the existing merge updates, add:
 
 ```typescript
-  // FR239: Update learning style from explanation effectiveness
+  // FR248: Update learning style from explanation effectiveness
   if (analysis.explanationEffectiveness) {
     const currentStyle = (profile.learningStyle as LearningStyle) ?? null;
     // Use dedicated counter (not version, which increments on every mutation)
@@ -1939,7 +2012,7 @@ git commit -m "feat(api): add explanation effectiveness tracking with learning s
 
 ---
 
-### Task 12: "Try Different Styles" Prompt for New Users (Story 16.6 — FR239.4)
+### Task 12: "Try Different Styles" Prompt for New Users (Story 16.6 — FR248.4)
 
 **Files:**
 - Modify: `apps/api/src/services/learner-profile.ts` (buildMemoryBlock)
@@ -1988,7 +2061,7 @@ Expected: First test FAILS (exploration prompt not yet in buildMemoryBlock)
 In `buildMemoryBlock()`, after the learning style section but before the meta-instruction, add:
 
 ```typescript
-  // FR239.4: Encourage style exploration for profiles without established preferences
+  // FR248.4: Encourage style exploration for profiles without established preferences
   if (!style || !style.preferredExplanations?.length) {
     lines.push(
       '- Try different explanation styles — stories, examples, analogies — and observe which ones click'
@@ -2005,7 +2078,7 @@ Expected: All tests PASS
 
 ```bash
 git add apps/api/src/services/learner-profile.ts apps/api/src/services/learner-profile.test.ts
-git commit -m "feat(api): add exploration prompt for new learners without style data [Epic-16, FR239.4]"
+git commit -m "feat(api): add exploration prompt for new learners without style data [Epic-16, FR248.4]"
 ```
 
 ---
@@ -2210,7 +2283,7 @@ describe('learner-profile routes', () => {
     });
   });
 
-  describe('GET /learner-profile/:profileId (parent)', () => {
+  describe('GET /learner-profile/:profileId (app)', () => {
     it('returns 403 if no family link exists', async () => {
       const parent = await createTestProfile('parent');
       const stranger = await createTestProfile('child');
@@ -2425,13 +2498,13 @@ git commit -m "feat(mobile): add React Query hooks for learner profile API [Epic
 ### Task 15: "What My Mentor Knows" Screen — Child (Story 16.7)
 
 **Files:**
-- Create: `apps/mobile/src/app/(learner)/mentor-memory.tsx`
-- Modify: `apps/mobile/src/app/(learner)/more.tsx`
+- Create: `apps/mobile/src/app/(app)/mentor-memory.tsx`
+- Modify: `apps/mobile/src/app/(app)/more.tsx`
 
 - [ ] **Step 1: Write the mentor memory screen**
 
 ```tsx
-// apps/mobile/src/app/(learner)/mentor-memory.tsx
+// apps/mobile/src/app/(app)/mentor-memory.tsx
 import {
   View,
   Text,
@@ -2696,7 +2769,7 @@ export default function MentorMemoryScreen() {
             >
               {(profile.strengths as any[]).map((s: any) => (
                 <View
-                  key={`${s.subject}-${s.topics?.join(',')}`}
+                  key={`${s.subject ?? 'general'}-${s.topics?.join(',')}`}
                   className="flex-row items-center justify-between bg-surface rounded-card px-4 py-3 mb-2"
                 >
                   <View className="flex-1">
@@ -2704,14 +2777,14 @@ export default function MentorMemoryScreen() {
                       {s.topics?.join(', ')}
                     </Text>
                     <Text className="text-body-sm text-text-secondary">
-                      {s.subject}
+                      {s.subject ?? 'General'}
                     </Text>
                   </View>
                   <Pressable
                     onPress={() =>
-                      handleDelete('strengths', s.subject, true)
+                      handleDelete('strengths', s.subject ?? '', true)
                     }
-                    accessibilityLabel={`Remove strength ${s.subject}`}
+                    accessibilityLabel={`Remove strength ${s.subject ?? 'General'}`}
                     accessibilityRole="button"
                     hitSlop={8}
                   >
@@ -2733,16 +2806,18 @@ export default function MentorMemoryScreen() {
             >
               {(profile.struggles as any[]).map((s: any) => (
                 <View
-                  key={`${s.subject}-${s.topic}`}
+                  key={`${s.subject ?? 'general'}-${s.topic}`}
                   className="flex-row items-center justify-between bg-surface rounded-card px-4 py-3 mb-2"
                 >
                   <View className="flex-1">
                     <Text className="text-body text-text-primary">
                       {s.topic}
                     </Text>
-                    <Text className="text-body-sm text-text-secondary">
-                      {s.subject}
-                    </Text>
+                    {s.subject && (
+                      <Text className="text-body-sm text-text-secondary">
+                        {s.subject}
+                      </Text>
+                    )}
                   </View>
                   <Pressable
                     onPress={() =>
@@ -2799,7 +2874,7 @@ export default function MentorMemoryScreen() {
 
 - [ ] **Step 2: Add navigation link in the learner more screen**
 
-In `apps/mobile/src/app/(learner)/more.tsx`, add a new `SettingsRow` in the appropriate section (e.g., after the Learning Mode section, before the Account section):
+In `apps/mobile/src/app/(app)/more.tsx`, add a new `SettingsRow` in the appropriate section (e.g., after the Learning Mode section, before the Account section):
 
 ```tsx
         {/* Mentor Memory — Epic 16 */}
@@ -2808,7 +2883,7 @@ In `apps/mobile/src/app/(learner)/more.tsx`, add a new `SettingsRow` in the appr
         </Text>
         <SettingsRow
           label="What my mentor knows"
-          onPress={() => router.push('/(learner)/mentor-memory')}
+          onPress={() => router.push('/(app)/mentor-memory')}
         />
 ```
 
@@ -2820,7 +2895,7 @@ Expected: No errors
 - [ ] **Step 4: Commit**
 
 ```bash
-git add apps/mobile/src/app/(learner)/mentor-memory.tsx apps/mobile/src/app/(learner)/more.tsx
+git add apps/mobile/src/app/(app)/mentor-memory.tsx apps/mobile/src/app/(app)/more.tsx
 git commit -m "feat(mobile): add 'What My Mentor Knows' screen for learners [Epic-16, Story-16.7]"
 ```
 
@@ -2829,13 +2904,13 @@ git commit -m "feat(mobile): add 'What My Mentor Knows' screen for learners [Epi
 ### Task 16: Parent Memory Visibility Screen (Story 16.8)
 
 **Files:**
-- Create: `apps/mobile/src/app/(parent)/child/[profileId]/mentor-memory.tsx`
-- Modify: `apps/mobile/src/app/(parent)/child/[profileId]/index.tsx`
+- Create: `apps/mobile/src/app/(app)/child/[profileId]/mentor-memory.tsx`
+- Modify: `apps/mobile/src/app/(app)/child/[profileId]/index.tsx`
 
 - [ ] **Step 1: Write the parent mentor memory screen**
 
 ```tsx
-// apps/mobile/src/app/(parent)/child/[profileId]/mentor-memory.tsx
+// apps/mobile/src/app/(app)/child/[profileId]/mentor-memory.tsx
 import {
   View,
   Text,
@@ -3080,7 +3155,7 @@ export default function ParentMentorMemoryScreen() {
               </Text>
               {(profile.struggles as any[]).map((s: any) => (
                 <View
-                  key={`${s.subject}-${s.topic}`}
+                  key={`${s.subject ?? 'general'}-${s.topic}`}
                   className="bg-surface rounded-card px-4 py-3 mb-2"
                 >
                   <View className="flex-row items-center justify-between">
@@ -3089,7 +3164,7 @@ export default function ParentMentorMemoryScreen() {
                         {s.topic}
                       </Text>
                       <Text className="text-body-sm text-text-secondary">
-                        {s.subject} · {s.attempts} session{s.attempts > 1 ? 's' : ''} · confidence: {s.confidence}
+                        {s.subject ? `${s.subject} · ` : ''}{s.attempts} session{s.attempts > 1 ? 's' : ''} · confidence: {s.confidence}
                       </Text>
                     </View>
                     <Pressable
@@ -3116,7 +3191,7 @@ export default function ParentMentorMemoryScreen() {
               </Text>
               {(profile.strengths as any[]).map((s: any) => (
                 <View
-                  key={`${s.subject}-${s.topics?.join(',')}`}
+                  key={`${s.subject ?? 'general'}-${s.topics?.join(',')}`}
                   className="flex-row items-center justify-between bg-surface rounded-card px-4 py-3 mb-2"
                 >
                   <View className="flex-1">
@@ -3124,12 +3199,12 @@ export default function ParentMentorMemoryScreen() {
                       {s.topics?.join(', ')}
                     </Text>
                     <Text className="text-body-sm text-text-secondary">
-                      {s.subject} · confidence: {s.confidence}
+                      {s.subject ?? 'General'} · confidence: {s.confidence}
                     </Text>
                   </View>
                   <Pressable
-                    onPress={() => handleDeleteItem('strengths', s.subject)}
-                    accessibilityLabel={`Remove strength: ${s.subject}`}
+                    onPress={() => handleDeleteItem('strengths', s.subject ?? '')}
+                    accessibilityLabel={`Remove strength: ${s.subject ?? 'General'}`}
                     accessibilityRole="button"
                     hitSlop={8}
                   >
@@ -3203,14 +3278,14 @@ export default function ParentMentorMemoryScreen() {
 
 - [ ] **Step 2: Add navigation link in child profile screen**
 
-In `apps/mobile/src/app/(parent)/child/[profileId]/index.tsx`, add a new section or pressable row:
+In `apps/mobile/src/app/(app)/child/[profileId]/index.tsx`, add a new section or pressable row:
 
 ```tsx
         {/* Mentor Memory — Epic 16 */}
         <Pressable
           onPress={() =>
             router.push(
-              `/(parent)/child/${profileId}/mentor-memory`
+              `/(app)/child/${profileId}/mentor-memory`
             )
           }
           className="bg-surface rounded-card px-4 py-3.5 mb-2"
@@ -3231,7 +3306,7 @@ Expected: No errors
 - [ ] **Step 4: Commit**
 
 ```bash
-git add apps/mobile/src/app/(parent)/child/[profileId]/mentor-memory.tsx apps/mobile/src/app/(parent)/child/[profileId]/index.tsx
+git add apps/mobile/src/app/(app)/child/[profileId]/mentor-memory.tsx apps/mobile/src/app/(app)/child/[profileId]/index.tsx
 git commit -m "feat(mobile): add parent memory visibility screen with GDPR controls [Epic-16, Story-16.8]"
 ```
 
@@ -3294,6 +3369,51 @@ describe('buildMemoryBlock — cross-subject warm-start', () => {
     const block = buildMemoryBlock(profile as any, 'Math', null);
     expect(block).toContain('fractions');
   });
+
+  // FR244.9: Freeform session handling
+  it('includes null-subject struggles when no currentSubject filter', () => {
+    const profile = {
+      learningStyle: null,
+      interests: [],
+      strengths: [],
+      struggles: [
+        {
+          subject: null,
+          topic: 'time management',
+          attempts: 3,
+          confidence: 'medium' as const,
+          lastSeen: '2026-04-01T00:00:00Z',
+        },
+      ],
+      communicationNotes: [],
+      memoryEnabled: true,
+    };
+    // No currentSubject filter — null-subject struggles should appear
+    const block = buildMemoryBlock(profile as any, null, null);
+    expect(block).toContain('time management');
+  });
+
+  it('excludes null-subject struggles when currentSubject is specified', () => {
+    const profile = {
+      learningStyle: null,
+      interests: [],
+      strengths: [],
+      struggles: [
+        {
+          subject: null,
+          topic: 'time management',
+          attempts: 3,
+          confidence: 'medium' as const,
+          lastSeen: '2026-04-01T00:00:00Z',
+        },
+      ],
+      communicationNotes: [],
+      memoryEnabled: true,
+    };
+    // currentSubject is 'Math' — null-subject struggles don't match
+    const block = buildMemoryBlock(profile as any, 'Math', null);
+    expect(block).not.toContain('time management');
+  });
 });
 ```
 
@@ -3355,38 +3475,43 @@ Expected: All existing integration tests PASS (the new Inngest step is isolated 
 
 | Spec Requirement | Task | Verified By |
 |-----------------|------|-------------|
-| FR234: learning_profiles table | Tasks 1-4 | `tsc --noEmit` + migration SQL review |
-| FR234.4: Confidence thresholds | Task 5 | `test: mergeStruggles 'upgrades to high confidence at 5+ attempts'` |
-| FR234.5: Interest cap (20) | Task 5 | `test: mergeInterests 'respects the 20-entry cap by evicting oldest'` |
-| FR234.5: Struggle archival (90d) | Task 5 | `test: archiveStaleStruggles 'removes struggles older than 90 days'` — `archiveStaleStruggles()` called in `applyAnalysis()` |
-| FR234.6: Profile-scoped reads | Task 3 | `repository.ts:learningProfiles.findFirst` uses `scopedWhere` |
-| FR235: Session analysis Inngest function | Task 6 | `step.run('analyze-learner-profile')` in session-completed.ts |
-| FR235.5: Incremental merge, not replace | Task 5 | `test: mergeInterests`, `test: mergeStruggles`, `test: mergeStrengths` — all merge, never overwrite |
-| FR235.6: memoryEnabled short-circuit | Task 6 | `if (existingProfile?.memoryEnabled === false) return;` in step code |
-| FR235.7: Budget model | Task 6 | `routeAndCall(messages, 1, {})` — rung 1 = budget tier |
-| FR236: Memory context injection | Task 7 | `context.learnerMemoryContext` in `ExchangeContext` + `buildSystemPrompt()` |
-| FR236.2: Priority ordering | Task 5 | `buildMemoryBlock()`: struggles → style → interests → communication |
-| FR236.3: Natural language format | Task 5 | `test: buildMemoryBlock 'includes the meta-instruction for natural weaving'` |
-| FR236.4: 500-token budget | Task 5 | Section-aware truncation drops lowest-priority sections, preserves meta-instruction |
-| FR236.5: Meta-instruction preserved | Task 5 | `META_INSTRUCTION` constant always appended; truncation pops `lines`, never slices |
-| FR237: Interest detection | Tasks 6, 9 | LLM prompt rules + `mergeInterests()` |
-| FR237.4: Interest demotion (60d) | Task 5 | `test: mergeInterests 'demotes interests older than 60 days'` — uses `interestTimestamps` JSONB |
-| FR238: Struggle pattern detection | Tasks 6, 10 | LLM prompt `struggles` + `resolvedTopics` fields |
-| FR238.4: Struggle resolution | Tasks 5, 10 | `resolveStruggle()` called from `applyAnalysis()` via `analysis.resolvedTopics` |
-| FR239: Explanation effectiveness | Tasks 6, 11 | `updateLearningStyleFromEffectiveness()` + `effectivenessSessionCount` (dedicated counter) |
-| FR239.4: Style exploration prompt | Task 12 | `test: buildMemoryBlock 'includes style variation prompt when no learning style is set'` |
-| FR240: "What My Mentor Knows" screen | Task 15 | `mentor-memory.tsx` with `MemoryChip` (remove + suppress actions) |
-| FR240.3: Delete action | Tasks 13, 15 | `DELETE /learner-profile/item` + `subject` disambiguator for struggles |
-| FR240.4: Empty state | Task 15 | `testID="empty-state"` with age-adapted guidance text |
-| FR240.5: Age-adapted copy | Task 15 | `computeAgeBracket(birthYear)` → `copy(child, teen, adult)` |
-| FR240.6: "This is wrong" + suppressedInferences | Tasks 5, 13, 15 | `suppress: true` → `suppressedInferences` array, checked in all merge functions |
-| FR241: Parent memory visibility | Task 16 | `(parent)/child/[profileId]/mentor-memory.tsx` |
-| FR241.3: Toggle, export, delete all | Tasks 13, 16 | `PATCH /memory-enabled`, `DELETE /all`, `handleExport` |
-| FR241.4: memoryEnabled toggle confirmation | Task 16 | `Alert.alert('Disable memory?', ...)` with cancel option |
-| FR241.6: GDPR data export | Task 8 | `learningProfileRows` in `generateExport()` |
-| FR241.6: GDPR self-delete (child) | Task 13 | `DELETE /learner-profile/all` (no `:profileId` = self) |
-| FR242: Memory warm-start | Task 17 | `test: buildMemoryBlock 'includes cross-subject signals'` — struggles filtered by subject, rest always included |
+| FR243: learning_profiles table | Tasks 1-4 | `tsc --noEmit` + migration SQL review |
+| FR243.4: Confidence thresholds | Task 5 | `test: mergeStruggles 'upgrades to high confidence at 5+ attempts'` |
+| FR243.5: Interest cap (20) | Task 5 | `test: mergeInterests 'respects the 20-entry cap by evicting oldest'` |
+| FR243.5: Struggle archival (90d) | Task 5 | `test: archiveStaleStruggles 'removes struggles older than 90 days'` — `archiveStaleStruggles()` called in `applyAnalysis()` |
+| FR243.6: Profile-scoped reads | Task 3 | `repository.ts:learningProfiles.findFirst` uses `scopedWhere` |
+| FR244: Session analysis Inngest function | Task 6 | `step.run('analyze-learner-profile')` in session-completed.ts |
+| FR244.5: Incremental merge, not replace | Task 5 | `test: mergeInterests`, `test: mergeStruggles`, `test: mergeStrengths` — all merge, never overwrite |
+| FR244.6: memoryEnabled short-circuit | Task 6 | `if (existingProfile?.memoryEnabled === false) return;` in step code |
+| FR244.7: Budget model | Task 6 | `routeAndCall(messages, 1, {})` — rung 1 = budget tier |
+| FR245: Memory context injection | Task 7 | `context.learnerMemoryContext` in `ExchangeContext` + `buildSystemPrompt()` |
+| FR245.2: Priority ordering | Task 5 | `buildMemoryBlock()`: struggles → style → interests → communication |
+| FR245.3: Natural language format | Task 5 | `test: buildMemoryBlock 'includes the meta-instruction for natural weaving'` |
+| FR245.4: 500-token budget | Task 5 | Section-aware truncation drops lowest-priority sections, preserves meta-instruction |
+| FR245.5: Meta-instruction preserved | Task 5 | `META_INSTRUCTION` constant always appended; truncation pops `lines`, never slices |
+| FR244.9: Freeform session handling | Task 6 | `subjectId` null guard + `subjectName: string | null` in `applyAnalysis()` + `struggleEntrySchema.subject.nullable()` |
+| FR246: Interest detection | Tasks 6, 9 | LLM prompt rules + `mergeInterests()` |
+| FR246.4: Interest demotion (60d) | Task 5 | `test: mergeInterests 'demotes interests older than 60 days'` — uses `interestTimestamps` JSONB |
+| FR246.5: rawInput as interest signal | Task 6 | `sessionRow?.rawInput` passed to `analyzeSessionTranscript()` + `{rawInput}` placeholder in LLM prompt |
+| FR247: Struggle pattern detection | Tasks 6, 10 | LLM prompt `struggles` + `resolvedTopics` fields |
+| FR247.4: Struggle resolution | Tasks 5, 10 | `resolveStruggle()` called from `applyAnalysis()` via `analysis.resolvedTopics` |
+| FR248: Explanation effectiveness | Tasks 6, 11 | `updateLearningStyleFromEffectiveness()` + `effectivenessSessionCount` (dedicated counter) |
+| FR248.4: Style exploration prompt | Task 12 | `test: buildMemoryBlock 'includes style variation prompt when no learning style is set'` |
+| FR249: "What My Mentor Knows" screen | Task 15 | `mentor-memory.tsx` with `MemoryChip` (remove + suppress actions) |
+| FR249.3: Delete action | Tasks 13, 15 | `DELETE /learner-profile/item` + `subject` disambiguator for struggles |
+| FR249.4: Empty state | Task 15 | `testID="empty-state"` with age-adapted guidance text |
+| FR249.5: Age-adapted copy | Task 15 | `computeAgeBracket(birthYear)` → `copy(child, teen, adult)` |
+| FR249.6: "This is wrong" + suppressedInferences | Tasks 5, 13, 15 | `suppress: true` → `suppressedInferences` array, checked in all merge functions |
+| FR250: Parent memory visibility | Task 16 | `(app)/child/[profileId]/mentor-memory.tsx` |
+| FR250.3: Toggle, export, delete all | Tasks 13, 16 | `PATCH /memory-enabled`, `DELETE /all`, `handleExport` |
+| FR250.4: memoryEnabled toggle confirmation | Task 16 | `Alert.alert('Disable memory?', ...)` with cancel option |
+| FR250.6: GDPR data export | Task 8 | `learningProfileRows` in `generateExport()` |
+| FR250.3: GDPR self-delete (child) | Task 13 | `DELETE /learner-profile/all` (no `:profileId` = self) |
+| FR251: Memory warm-start | Task 17 | `test: buildMemoryBlock 'includes cross-subject signals'` — struggles filtered by subject, rest always included |
 | Strengths population | Tasks 5, 6 | `mergeStrengths()` in `applyAnalysis()` + LLM `strengths` field |
+| Epic 15 AD6: Inngest chain ordering | Task 6 | Step runs at position 4 (after filing, before snapshot). Comment in step code. |
+| Epic 15 AD6: Shared token budget | Task 5 | `MEMORY_BLOCK_TOKEN_BUDGET = 500` within ~1,000 shared budget. Comment in constants. |
+| Conversation-First cross-refs | Tasks 1, 6 | `struggleEntrySchema.subject.nullable()`, `rawInput` in analysis, null subject handling |
 
 ---
 
@@ -3396,10 +3521,10 @@ Expected: All existing integration tests PASS (the new Inngest step is isolated 
 
 | # | Severity | Finding | Resolution |
 |---|----------|---------|------------|
-| 1 | **HIGH** | `resolveStruggle()` never called — FR238.4 unimplemented | Added `resolvedTopics` to `sessionAnalysisOutputSchema`, LLM prompt, and `applyAnalysis()`. `resolveStruggle` is now called when LLM detects mastery. |
+| 1 | **HIGH** | `resolveStruggle()` never called — FR247.4 unimplemented | Added `resolvedTopics` to `sessionAnalysisOutputSchema`, LLM prompt, and `applyAnalysis()`. `resolveStruggle` is now called when LLM detects mastery. |
 | 2 | **HIGH** | `strengths` never populated — UI sections dead | Added `strengths` to `sessionAnalysisOutputSchema`, LLM prompt rules, `mergeStrengths()` function, and `applyAnalysis()` merge path. |
 | 3 | **HIGH** | Interest demotion (60-day) impossible — no timestamps | Added `interestTimestamps` JSONB column + map tracking. `mergeInterests` now returns `{ interests, timestamps }`, demotes stale entries to front for cap-based eviction. |
-| 4 | **MEDIUM** | Struggle 90-day archival missing — FR234.5 | Added `archiveStaleStruggles()` function, called in `applyAnalysis()` after merge. Tests verify removal of entries beyond 90-day cutoff. |
+| 4 | **MEDIUM** | Struggle 90-day archival missing — FR243.5 | Added `archiveStaleStruggles()` function, called in `applyAnalysis()` after merge. Tests verify removal of entries beyond 90-day cutoff. |
 | 5 | **HIGH** | `version` as corroboration proxy overcounted | Added `effectivenessSessionCount` column (integer, default 0). Incremented only when `explanationEffectiveness` data is present. `updateLearningStyleFromEffectiveness` uses this counter. |
 | 6 | **HIGH** | `useApiClient` imported from wrong path (`api` vs `api-client`) | Fixed import to `'../lib/api-client'` matching actual codebase export. |
 | 7 | **MEDIUM** | Route test file listed but never created | Added Step 4-5 in Task 13: full route test suite covering GET, DELETE, PATCH, IDOR checks, and child self-delete. |

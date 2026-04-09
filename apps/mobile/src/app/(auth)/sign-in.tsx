@@ -493,7 +493,7 @@ export default function SignInScreen() {
       setCode('');
       void SecureStore.setItemAsync(HAS_SIGNED_IN_KEY, 'true');
       // Don't navigate explicitly — the auth layout guard redirects to
-      // /(learner)/home once Clerk's useAuth() state propagates with
+      // /(app)/home once Clerk's useAuth() state propagates with
       // isSignedIn: true.  Calling router.replace() here races with Clerk's
       // React state update: the learner layout renders before isSignedIn
       // flips, sees !isSignedIn, and bounces back to sign-in.
@@ -705,7 +705,7 @@ export default function SignInScreen() {
   }, [clearVerificationFlow]);
 
   // After setActive() succeeds, show a spinner until the auth layout guard
-  // redirects to /(learner)/home.  This prevents the user from ever seeing
+  // redirects to /(app)/home.  This prevents the user from ever seeing
   // a flash of the empty sign-in form during the Clerk state propagation.
   if (isTransitioning) {
     return (

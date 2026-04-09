@@ -106,7 +106,7 @@ describe('InterviewScreen', () => {
     fireEvent.press(screen.getByTestId('view-curriculum-button'));
     expect(mockReplace).toHaveBeenCalledWith(
       expect.objectContaining({
-        pathname: '/(learner)/onboarding/analogy-preference',
+        pathname: '/(app)/onboarding/analogy-preference',
       })
     );
   });

@@ -877,7 +877,7 @@ function ConsentPendingGate(): React.ReactElement {
   );
 }
 
-export default function LearnerLayout() {
+export default function AppLayout() {
   const { isLoaded, isSignedIn } = useAuth();
   const colors = useThemeColors();
   const tokenVars = useTokenVars();
@@ -926,13 +926,13 @@ export default function LearnerLayout() {
 
   if (__DEV__)
     console.log(
-      `[AUTH-DEBUG] (learner) layout | isLoaded=${isLoaded} | isSignedIn=${isSignedIn}`
+      `[AUTH-DEBUG] (app) layout | isLoaded=${isLoaded} | isSignedIn=${isSignedIn}`
     );
   if (!isLoaded) return null;
   if (!isSignedIn) {
     if (__DEV__)
       console.warn(
-        '[AUTH-DEBUG] (learner) layout → NOT signed in, bouncing to sign-in'
+        '[AUTH-DEBUG] (app) layout → NOT signed in, bouncing to sign-in'
       );
     return <Redirect href="/(auth)/sign-in" />;
   }
@@ -954,9 +954,9 @@ export default function LearnerLayout() {
   // No profile exists — show gate that pushes to profile creation modal
   if (!activeProfile) return <CreateProfileGate />;
 
-  // Linked-parent accounts intentionally enter through /(learner)/home now.
+  // Linked-parent accounts intentionally enter through /(app)/home now.
   // home.tsx renders ParentGateway for owners with child profiles and routes
-  // them to /(parent)/dashboard only when they explicitly choose progress
+  // them to /(app)/dashboard only when they explicitly choose progress
   // management. That keeps the adaptive home flow reachable.
 
   // Gate: block app access when parental consent is pending (COPPA/GDPR)
@@ -1096,6 +1096,20 @@ export default function LearnerLayout() {
             href: null,
             tabBarItemStyle: { display: 'none' },
             tabBarStyle: { display: 'none' },
+          }}
+        />
+        <Tabs.Screen
+          name="dashboard"
+          options={{
+            href: null,
+            tabBarItemStyle: { display: 'none' },
+          }}
+        />
+        <Tabs.Screen
+          name="child/[profileId]"
+          options={{
+            href: null,
+            tabBarItemStyle: { display: 'none' },
           }}
         />
       </Tabs>

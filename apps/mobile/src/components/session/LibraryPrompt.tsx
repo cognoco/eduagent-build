@@ -6,7 +6,7 @@ export function LibraryPrompt(): React.JSX.Element {
 
   return (
     <Pressable
-      onPress={() => router.push('/(learner)/library' as never)}
+      onPress={() => router.push('/(app)/library' as never)}
       testID="session-library-link"
       accessibilityRole="link"
       accessibilityLabel="Go to the Library"

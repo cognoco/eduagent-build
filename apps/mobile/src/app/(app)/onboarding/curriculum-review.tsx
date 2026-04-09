@@ -348,7 +348,7 @@ export default function CurriculumScreen() {
           <Pressable
             onPress={() =>
               router.push({
-                pathname: '/(learner)/topic/recall-test',
+                pathname: '/(app)/topic/recall-test',
                 params: {
                   subjectId,
                   topicId: firstAvailableTopic.id,
@@ -365,7 +365,7 @@ export default function CurriculumScreen() {
           <Pressable
             onPress={() =>
               router.push({
-                pathname: '/(learner)/session',
+                pathname: '/(app)/session',
                 params: {
                   mode: 'learning',
                   subjectId,
@@ -400,7 +400,7 @@ export default function CurriculumScreen() {
           <Pressable
             onPress={() =>
               router.push({
-                pathname: '/(learner)/session',
+                pathname: '/(app)/session',
                 params: {
                   mode: 'learning',
                   subjectId,
@@ -416,7 +416,7 @@ export default function CurriculumScreen() {
             </Text>
           </Pressable>
           <Pressable
-            onPress={() => router.replace('/(learner)/home')}
+            onPress={() => router.replace('/(app)/home')}
             className="py-3 items-center mt-2"
             testID="go-home-button"
             accessibilityLabel="Go to home screen"

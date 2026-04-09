@@ -96,14 +96,14 @@ describe('LearnerScreen', () => {
       render(<LearnerScreen {...defaultProps} />);
 
       fireEvent.press(screen.getByTestId('intent-learn-new'));
-      expect(mockPush).toHaveBeenCalledWith('/(learner)/learn-new');
+      expect(mockPush).toHaveBeenCalledWith('/(app)/learn-new');
     });
 
     it('navigates to homework camera on "Help with assignment?"', () => {
       render(<LearnerScreen {...defaultProps} />);
 
       fireEvent.press(screen.getByTestId('intent-homework'));
-      expect(mockPush).toHaveBeenCalledWith('/(learner)/homework/camera');
+      expect(mockPush).toHaveBeenCalledWith('/(app)/homework/camera');
     });
 
     it('navigates to library on "Repeat & review"', () => {
@@ -112,7 +112,7 @@ describe('LearnerScreen', () => {
       render(<LearnerScreen {...defaultProps} />);
 
       fireEvent.press(screen.getByTestId('intent-review'));
-      expect(mockPush).toHaveBeenCalledWith('/(learner)/library');
+      expect(mockPush).toHaveBeenCalledWith('/(app)/library');
     });
   });
 

@@ -75,7 +75,7 @@ export default function LanguageSetup() {
         startingLevel,
       });
       router.replace({
-        pathname: '/(learner)/onboarding/curriculum-review',
+        pathname: '/(app)/onboarding/curriculum-review',
         params: { subjectId },
       } as never);
     } catch (err: unknown) {

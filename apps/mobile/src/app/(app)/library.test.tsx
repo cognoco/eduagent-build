@@ -200,7 +200,7 @@ describe('LibraryScreen', () => {
     fireEvent.press(screen.getByTestId('topic-row-topic-1'));
 
     expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/(learner)/session',
+      pathname: '/(app)/session',
       params: {
         mode: 'learning',
         subjectId: 'sub-1',
@@ -224,7 +224,7 @@ describe('LibraryScreen', () => {
     fireEvent.press(screen.getByTestId('subject-card-sub-1'));
 
     expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/(learner)/shelf/[subjectId]',
+      pathname: '/(app)/shelf/[subjectId]',
       params: { subjectId: 'sub-1' },
     });
   });
@@ -384,7 +384,7 @@ describe('LibraryScreen', () => {
     fireEvent.press(screen.getByTestId('book-card-book-1'));
 
     expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/(learner)/shelf/[subjectId]/book/[bookId]',
+      pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
       params: { subjectId: 'sub-1', bookId: 'book-1' },
     });
   });

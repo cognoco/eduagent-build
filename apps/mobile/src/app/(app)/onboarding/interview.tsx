@@ -223,7 +223,7 @@ export default function InterviewScreen() {
             interviewComplete
               ? () =>
                   router.replace({
-                    pathname: '/(learner)/onboarding/analogy-preference',
+                    pathname: '/(app)/onboarding/analogy-preference',
                     params: {
                       subjectId,
                       ...(bookId ? { bookId } : {}),
@@ -246,7 +246,7 @@ export default function InterviewScreen() {
             <Pressable
               onPress={() =>
                 router.replace({
-                  pathname: '/(learner)/onboarding/analogy-preference',
+                  pathname: '/(app)/onboarding/analogy-preference',
                   params: {
                     subjectId,
                     ...(bookId ? { bookId } : {}),

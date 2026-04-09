@@ -170,7 +170,7 @@ export default function TopicDetailScreen() {
               key={session.sessionId}
               onPress={() =>
                 router.push({
-                  pathname: '/(parent)/child/[profileId]/session/[sessionId]',
+                  pathname: '/(app)/child/[profileId]/session/[sessionId]',
                   params: {
                     profileId: profileId!,
                     sessionId: session.sessionId,

@@ -32,8 +32,8 @@ export function useCoachingCard(defaultSubjectId?: string): CoachingCardState {
 
   return useMemo(() => {
     const freeformRoute = defaultSubjectId
-      ? `/(learner)/session?mode=freeform&subjectId=${defaultSubjectId}`
-      : '/(learner)/session?mode=freeform';
+      ? `/(app)/session?mode=freeform&subjectId=${defaultSubjectId}`
+      : '/(app)/session?mode=freeform';
     if (isLoading) {
       return {
         headline: 'Preparing your session...',
@@ -87,7 +87,7 @@ export function useCoachingCard(defaultSubjectId?: string): CoachingCardState {
         primaryLabel: 'Add a new subject',
         secondaryLabel: 'Keep reviewing',
         primaryRoute: '/create-subject',
-        secondaryRoute: '/(learner)/library',
+        secondaryRoute: '/(app)/library',
         isLoading: false,
         isCurriculumComplete: true,
         planItems: dailyPlan?.items ?? [],

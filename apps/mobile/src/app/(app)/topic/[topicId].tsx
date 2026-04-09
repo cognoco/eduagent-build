@@ -362,7 +362,7 @@ export default function TopicDetailScreen() {
             <Pressable
               onPress={() =>
                 router.push({
-                  pathname: '/(learner)/session',
+                  pathname: '/(app)/session',
                   params: {
                     mode: 'freeform',
                     subjectId,
@@ -385,7 +385,7 @@ export default function TopicDetailScreen() {
               <Pressable
                 onPress={() =>
                   router.push({
-                    pathname: '/(learner)/session',
+                    pathname: '/(app)/session',
                     params: {
                       mode: 'freeform',
                       subjectId,
@@ -405,7 +405,7 @@ export default function TopicDetailScreen() {
               <Pressable
                 onPress={() =>
                   router.push({
-                    pathname: '/(learner)/session',
+                    pathname: '/(app)/session',
                     params: {
                       mode: 'practice',
                       subjectId,
@@ -429,7 +429,7 @@ export default function TopicDetailScreen() {
               <Pressable
                 onPress={() =>
                   router.push({
-                    pathname: '/(learner)/session',
+                    pathname: '/(app)/session',
                     params: {
                       mode: 'practice',
                       subjectId,
@@ -449,7 +449,7 @@ export default function TopicDetailScreen() {
               <Pressable
                 onPress={() =>
                   router.push({
-                    pathname: '/(learner)/session',
+                    pathname: '/(app)/session',
                     params: {
                       mode: 'freeform',
                       subjectId,
@@ -472,7 +472,7 @@ export default function TopicDetailScreen() {
             <Pressable
               onPress={() =>
                 router.push({
-                  pathname: '/(learner)/topic/recall-test',
+                  pathname: '/(app)/topic/recall-test',
                   params: {
                     subjectId,
                     topicId,
@@ -494,7 +494,7 @@ export default function TopicDetailScreen() {
               <Pressable
                 onPress={() =>
                   router.push({
-                    pathname: '/(learner)/topic/relearn',
+                    pathname: '/(app)/topic/relearn',
                     params: {
                       subjectId,
                       topicId,

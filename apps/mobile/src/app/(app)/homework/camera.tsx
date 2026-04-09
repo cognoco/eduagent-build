@@ -181,7 +181,7 @@ export default function CameraScreen(): React.ReactNode {
       sourceOcrText?: string
     ) => {
       router.replace({
-        pathname: '/(learner)/session',
+        pathname: '/(app)/session',
         params: {
           mode: 'homework',
           subjectId: sid,

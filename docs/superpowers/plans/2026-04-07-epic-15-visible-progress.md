@@ -12,6 +12,35 @@
 
 **Branch:** Create `epic-15-visible-progress` from `main`.
 
+**Cross-Epic Dependency (Conversation-First):** Tasks 3, 5, 6, 8, 9 reference `curriculumTopics.filedFrom` — a column defined in the Conversation-First spec (`docs/superpowers/plans/2026-04-08-conversation-first-learning-flow.md`). The `filed_from` column must be present in the Drizzle schema and database before these tasks compile. If Epic 15 ships before Conversation-First, the `filed_from` column migration must be extracted and applied as a prerequisite, or the FILTER clauses must degrade to treat all topics as pre-generated (`topicsExplored = 0`).
+
+---
+
+## Spec Update (2026-04-08) — Conversation-First Compatibility
+
+> The following spec changes were applied on 2026-04-08 and integrated inline into this plan:
+>
+> 1. **SubjectProgressMetrics:** Added `topicsExplored` field alongside `topicsTotal` (Task 2, 3)
+> 2. **SubjectInventory.topics:** `total` is now `number | null` (null for pure session-filed subjects), added `explored` count (Task 2, 6)
+> 3. **FR234.6 (new):** `book_completed`/`subject_mastered` milestones restricted to pre-generated topics; new `topics_explored` milestone type for dynamic books (Task 5, 10)
+> 4. **FR235.8 (new):** Open-ended denominator handling — "4 topics explored" (no fill bar) vs "8/15 topics" (fill bar) (Task 8)
+> 5. **FR236.7 (new):** Session-filed topics in subject detail view — no "not started" state possible (Task 9)
+> 6. **FR237.2 updated:** Added `topics_explored` celebration copy (Task 10)
+> 7. **FR241.1 updated:** Snapshot refresh ordering constraint — MUST run AFTER filing + memory analysis (Task 6)
+> 8. **FR241.5 (new):** Aggregation query must distinguish `filed_from` for correct counting (Task 3, 6)
+> 9. **AD6 (new):** Shared post-session Inngest chain ordering (7 steps, agreed positions) (Task 6)
+> 10. **AD7 (new):** Dynamic vs. fixed topic counting explanation (Task 3, 6, 8)
+>
+> **Additional fixes applied during plan review (F-1 through F-8):**
+> - F-1 (CRITICAL): Session-complete step must be BEFORE coaching cards, not after (Task 6)
+> - F-2 (HIGH): Added missing `notificationLog` import to routes file (Task 6)
+> - F-3 (HIGH): Declared `filed_from` column as cross-epic dependency on Conversation-First (header)
+> - F-4 (HIGH): Added `?? 0` fallbacks for `topicsExplored` in JSONB reads (Tasks 5, 6)
+> - F-5 (MEDIUM): Fixed missing `and`/`gte`/`lte`/`progressSnapshots` imports (Task 12)
+> - F-6 (MEDIUM): Weekly push now includes explored topics delta, avoids false "took a break" (Task 11)
+> - F-7 (LOW): Added `filed_from` test case for pre-generated vs session-filed counting (Task 3)
+> - F-8 (LOW): Added `topicsExplored` to `ProgressDataPoint` + `buildHistory` (Tasks 2, 6)
+
 ---
 
 ## Adversarial Review Findings (2026-04-07)
@@ -74,11 +103,11 @@
 | `apps/api/src/inngest/functions/monthly-report-cron.ts` | Inngest cron: monthly report generation (1st of month 10:00 UTC) |
 | `apps/api/src/routes/snapshot-progress.ts` | Routes: inventory, history, refresh, milestones |
 | `apps/api/src/routes/snapshot-progress.test.ts` | Route integration tests |
-| `apps/mobile/src/app/(learner)/progress.tsx` | My Learning Journey screen |
-| `apps/mobile/src/app/(learner)/progress.test.tsx` | Tests for journey screen |
-| `apps/mobile/src/app/(learner)/progress/_layout.tsx` | Progress tab layout (for nested routes) |
-| `apps/mobile/src/app/(learner)/progress/[subjectId].tsx` | Subject Progress Detail screen |
-| `apps/mobile/src/app/(learner)/progress/[subjectId].test.tsx` | Tests for subject detail |
+| `apps/mobile/src/app/(app)/progress.tsx` | My Learning Journey screen |
+| `apps/mobile/src/app/(app)/progress.test.tsx` | Tests for journey screen |
+| `apps/mobile/src/app/(app)/progress/_layout.tsx` | Progress tab layout (for nested routes) |
+| `apps/mobile/src/app/(app)/progress/[subjectId].tsx` | Subject Progress Detail screen |
+| `apps/mobile/src/app/(app)/progress/[subjectId].test.tsx` | Tests for subject detail |
 | `apps/mobile/src/components/progress/ProgressBar.tsx` | Reusable progress bar component |
 | `apps/mobile/src/components/progress/GrowthChart.tsx` | Weekly growth bar chart |
 | `apps/mobile/src/components/progress/MilestoneCard.tsx` | Milestone list item |
@@ -101,7 +130,7 @@
 | `packages/database/src/schema/progress.ts` | Add `weekly_progress` + `monthly_report` to `notificationTypeEnum`; add `weeklyProgressPush` column to `notificationPreferences` |
 | `packages/schemas/src/progress.ts` | Add `milestone_celebration` to coaching card types + `weeklyProgressPush` to notification prefs |
 | `apps/api/src/services/coaching-cards.ts` | Add `milestone_celebration` card type with highest priority |
-| `apps/mobile/src/app/(learner)/_layout.tsx` | Add Progress tab to learner tab bar |
+| `apps/mobile/src/app/(app)/_layout.tsx` | Add Progress tab to learner tab bar |
 
 ---
 
@@ -337,6 +366,7 @@ export const subjectProgressMetricsSchema = z.object({
   topicsAttempted: z.number().int(),
   topicsMastered: z.number().int(),
   topicsTotal: z.number().int(),
+  topicsExplored: z.number().int(),         // session-filed topics (FR241.5)
   vocabularyTotal: z.number().int(),
   vocabularyMastered: z.number().int(),
   sessionsCount: z.number().int(),
@@ -388,7 +418,8 @@ export const subjectInventorySchema = z.object({
   subjectName: z.string(),
   pedagogyMode: z.enum(['socratic', 'four_strands']),
   topics: z.object({
-    total: z.number().int(),
+    total: z.number().int().nullable(),     // null for pure session-filed subjects (AD7)
+    explored: z.number().int(),              // session-filed topic count (FR241.5)
     mastered: z.number().int(),
     inProgress: z.number().int(),
     notStarted: z.number().int(),
@@ -431,6 +462,7 @@ export const progressDataPointSchema = z.object({
   date: z.string(),
   topicsMastered: z.number().int(),
   topicsAttempted: z.number().int(),
+  topicsExplored: z.number().int(),        // [F-8] session-filed topics for growth charts
   vocabularyTotal: z.number().int(),
   vocabularyMastered: z.number().int(),
   totalSessions: z.number().int(),
@@ -459,6 +491,7 @@ export const milestoneTypeSchema = z.enum([
   'streak_length',
   'subject_mastered',
   'book_completed',
+  'topics_explored',               // FR234.6: dynamic books (session-filed topics)
   'learning_time',
   'cefr_level_up',
 ]);
@@ -749,6 +782,22 @@ describe('computeProgressSnapshot', () => {
     expect(metrics.currentStreak).toBe(7);
     expect(metrics.longestStreak).toBe(14);
   });
+
+  it('distinguishes pre-generated vs session-filed topics via filed_from (FR241.5)', async () => {
+    const subjectId = await seedSubject(db, profileId, { name: 'Geography', pedagogyMode: 'socratic' });
+    // Pre-generated topics (filed_from = NULL)
+    await seedTopic(db, subjectId, 'Rivers');
+    await seedTopic(db, subjectId, 'Mountains');
+    // Session-filed topics
+    await seedTopic(db, subjectId, 'Volcanoes', { filedFrom: 'session_filing' });
+    await seedTopic(db, subjectId, 'Earthquakes', { filedFrom: 'freeform_filing' });
+    await seedTopic(db, subjectId, 'Glaciers', { filedFrom: 'session_filing' });
+
+    const metrics = await computeProgressSnapshot(db, profileId);
+    const geo = metrics.subjects.find(s => s.subjectId === subjectId)!;
+    expect(geo.topicsTotal).toBe(2);      // only pre-generated
+    expect(geo.topicsExplored).toBe(3);   // only session-filed
+  });
 });
 
 describe('upsertSnapshot', () => {
@@ -853,11 +902,14 @@ export async function computeProgressSnapshot(
     sessionAggs.map((a) => [a.subjectId, a])
   );
 
-  // 3. Topic counts per subject — total from curriculum, mastered from assessments
+  // 3. Topic counts per subject — distinguish pre-generated vs session-filed (FR241.5, AD7)
+  // topicsTotal: only pre-generated topics (filed_from IS NULL or 'pre_generated') — fixed denominator
+  // topicsExplored: only session-filed topics (filed_from IN ('session_filing', 'freeform_filing')) — open count
   const topicTotals = await db
     .select({
       subjectId: curriculumBooks.subjectId,
-      topicsTotal: count(curriculumTopics.id),
+      topicsTotal: sql<number>`COUNT(*) FILTER (WHERE ${curriculumTopics.filedFrom} IS NULL OR ${curriculumTopics.filedFrom} = 'pre_generated')`,
+      topicsExplored: sql<number>`COUNT(*) FILTER (WHERE ${curriculumTopics.filedFrom} IN ('session_filing', 'freeform_filing'))`,
     })
     .from(curriculumTopics)
     .innerJoin(curriculumBooks, eq(curriculumTopics.bookId, curriculumBooks.id))
@@ -865,7 +917,7 @@ export async function computeProgressSnapshot(
     .groupBy(curriculumBooks.subjectId);
 
   const topicTotalBySubject = new Map(
-    topicTotals.map((t) => [t.subjectId, Number(t.topicsTotal)])
+    topicTotals.map((t) => [t.subjectId, { total: Number(t.topicsTotal), explored: Number(t.topicsExplored) }])
   );
 
   // Topics mastered (assessment.status = 'passed') grouped by subject
@@ -978,7 +1030,7 @@ export async function computeProgressSnapshot(
   const subjectMetrics: SubjectProgressMetrics[] = profileSubjects.map(
     (subj) => {
       const sess = sessionBySubject.get(subj.id);
-      const totalTopics = topicTotalBySubject.get(subj.id) ?? 0;
+      const topicCounts = topicTotalBySubject.get(subj.id) ?? { total: 0, explored: 0 };
       const mastered = masteredBySubject.get(subj.id) ?? 0;
       const attempted = attemptedBySubject.get(subj.id) ?? 0;
       const vocab = vocabBySubject.get(subj.id) ?? { total: 0, mastered: 0 };
@@ -989,7 +1041,8 @@ export async function computeProgressSnapshot(
         pedagogyMode: subj.pedagogyMode as 'socratic' | 'four_strands',
         topicsAttempted: attempted,
         topicsMastered: mastered,
-        topicsTotal: totalTopics,
+        topicsTotal: topicCounts.total,      // pre-generated only (AD7)
+        topicsExplored: topicCounts.explored, // session-filed only (FR241.5)
         vocabularyTotal: vocab.total,
         vocabularyMastered: vocab.mastered,
         sessionsCount: Number(sess?.sessionCount ?? 0),
@@ -1358,7 +1411,7 @@ git commit -m "feat(api): add daily progress snapshot Inngest cron [EP-15, FR231
 // apps/api/src/services/milestone-detection.test.ts
 import { describe, it, expect } from 'vitest';
 import { getTestDatabase, seedProfile, seedSubject } from '../../test/helpers';
-import { detectMilestones, VOCABULARY_THRESHOLDS, TOPIC_THRESHOLDS } from './milestone-detection';
+import { detectMilestones, VOCABULARY_THRESHOLDS, TOPIC_THRESHOLDS, TOPICS_EXPLORED_THRESHOLDS } from './milestone-detection';
 import { milestones } from '@eduagent/database';
 import { eq } from 'drizzle-orm';
 import type { ProgressMetrics } from '@eduagent/schemas';
@@ -1426,6 +1479,27 @@ describe('detectMilestones', () => {
     const timeMilestones = rows.filter(r => r.milestoneType === 'learning_time');
     expect(timeMilestones).toHaveLength(2); // 1h (60min) and 5h (300min)
   });
+
+  it('creates topics_explored milestones for session-filed subjects (FR234.6)', async () => {
+    const db = getTestDatabase();
+    const profileId = await seedProfile(db);
+
+    const metrics = makeMetrics({
+      subjects: [{
+        subjectId: 's1', subjectName: 'Geography', pedagogyMode: 'socratic',
+        topicsAttempted: 12, topicsMastered: 8, topicsTotal: 0,
+        topicsExplored: 12, // all session-filed
+        vocabularyTotal: 0, vocabularyMastered: 0,
+        sessionsCount: 15, activeMinutes: 200, lastSessionAt: null,
+      }],
+    });
+    await detectMilestones(db, profileId, metrics);
+
+    const rows = await db.select().from(milestones).where(eq(milestones.profileId, profileId));
+    const exploredMilestones = rows.filter(r => r.milestoneType === 'topics_explored');
+    expect(exploredMilestones).toHaveLength(2); // 5 and 10
+    expect(exploredMilestones.every(m => m.subjectId === 's1')).toBe(true);
+  });
 });
 ```
 
@@ -1457,6 +1531,7 @@ export const TOPIC_THRESHOLDS = [5, 10, 25, 50];
 export const SESSION_THRESHOLDS = [10, 25, 50, 100, 250];
 export const STREAK_THRESHOLDS = [7, 14, 30, 60, 100];
 export const LEARNING_TIME_THRESHOLDS_MINUTES = [60, 300, 600, 1500, 3000, 6000]; // 1h, 5h, 10h, 25h, 50h, 100h
+export const TOPICS_EXPLORED_THRESHOLDS = [5, 10, 25, 50, 100]; // FR234.6: dynamic books
 
 interface MilestoneCandidate {
   milestoneType: MilestoneType;
@@ -1543,8 +1618,11 @@ export async function detectMilestones(
     }
   }
 
-  // Per-subject milestones: subject_mastered (all topics mastered)
+  // Per-subject milestones: subject_mastered (pre-generated topics only — FR234.6)
+  // book_completed and subject_mastered apply ONLY to pre-generated topic sets.
+  // Session-filed subjects use topics_explored milestones instead.
   for (const subj of metrics.subjects) {
+    // subject_mastered: only when ALL pre-generated topics are mastered (AD7)
     if (
       subj.topicsTotal > 0 &&
       subj.topicsMastered >= subj.topicsTotal
@@ -1557,11 +1635,25 @@ export async function detectMilestones(
         metadata: { subjectName: subj.subjectName },
       });
     }
+
+    // topics_explored: milestone for session-filed/dynamic books (FR234.6)
+    // [F-4] JSONB backward compat: old snapshots lack topicsExplored
+    const explored = subj.topicsExplored ?? 0;
+    for (const t of TOPICS_EXPLORED_THRESHOLDS) {
+      if (explored >= t) {
+        candidates.push({
+          milestoneType: 'topics_explored',
+          threshold: t,
+          subjectId: subj.subjectId,
+          bookId: null,
+          metadata: { subjectName: subj.subjectName, topicsExplored: explored },
+        });
+      }
+    }
   }
 
   // [AR-5] TODO — Phase D stretch: book_completed and cefr_level_up
-  // These milestone types are declared in the schema but not yet detected.
-  // book_completed: requires tracking per-book topic completion (needs bookId in metrics)
+  // book_completed: restricted to pre-generated topics (FR234.6), requires per-book tracking
   // cefr_level_up: requires CEFR proficiency estimation integrated into snapshot aggregation
   // Do NOT remove from milestoneTypeSchema — they are forward-declared for schema stability.
 
@@ -1664,14 +1756,20 @@ git commit -m "feat(api): add milestone detection service [EP-15, FR234]"
 
 - [ ] **Step 1: Add snapshot refresh step to session-completed**
 
-At the end of the session-completed Inngest function (after the existing `queue-celebrations` step), add a new isolated step:
+**Ordering constraint (FR241.1, AD6):** This step MUST be placed at **position 5** in the shared post-session Inngest chain — AFTER post-session filing (position 3) and learner profile analysis (position 4), but **BEFORE** coaching card precomputation (position 6). This ordering is critical: `detectMilestones` writes milestone rows that coaching card precomputation reads via `getUncelebratedMilestones`. If snapshot refresh runs after coaching cards, new milestones won't appear until the next session.
+
+```
+Chain positions:  ...3 (filing) → 4 (memory) → **5 (this step)** → 6 (coaching cards) → 7 (suggestions)
+```
+
+Insert this step **before** the existing `queue-celebrations`/coaching card precomputation step:
 
 ```typescript
 // In session-completed.ts — add import
 import { computeProgressSnapshot, upsertSnapshot, getLatestSnapshot } from '../../services/snapshot-aggregation';
 import { detectMilestones } from '../../services/milestone-detection';
 
-// Add as the final step in the function:
+// Insert BEFORE the coaching card precomputation step (position 5 per AD6):
 outcomes.push(
   await step.run('refresh-progress-snapshot', async () =>
     runIsolated('refresh-progress-snapshot', profileId, async () => {
@@ -1727,6 +1825,7 @@ import {
   vocabulary,
   vocabularyRetentionCards,
   progressSnapshots,
+  notificationLog,            // [F-2] needed for logRefresh() rate-limit tracking
 } from '@eduagent/database';
 import { eq, and, gte, lte, desc } from 'drizzle-orm';
 import type {
@@ -1885,15 +1984,20 @@ async function buildInventory(
         estimatedProficiency = estimateProficiency(subj.vocabularyMastered, subj.vocabularyTotal);
       }
 
+      // FR235.8, AD7: total is null for pure session-filed subjects (no pre-generated topics)
+      // [F-4] JSONB backward compat: old snapshots lack topicsExplored — default to 0
+      const explored = subj.topicsExplored ?? 0;
+      const hasPreGenerated = subj.topicsTotal > 0;
       return {
         subjectId: subj.subjectId,
         subjectName: subj.subjectName,
         pedagogyMode: subj.pedagogyMode,
         topics: {
-          total: subj.topicsTotal,
+          total: hasPreGenerated ? subj.topicsTotal : null,
+          explored,
           mastered: subj.topicsMastered,
           inProgress: subj.topicsAttempted - subj.topicsMastered,
-          notStarted: Math.max(0, subj.topicsTotal - subj.topicsAttempted),
+          notStarted: hasPreGenerated ? Math.max(0, subj.topicsTotal - subj.topicsAttempted) : 0,
         },
         vocabulary: {
           total: subj.vocabularyTotal,
@@ -1952,6 +2056,11 @@ function emptyMetrics(): ProgressMetrics {
   };
 }
 
+// [F-8] Helper: sum topicsExplored across subjects (with JSONB backward compat)
+function sumExplored(m: ProgressMetrics): number {
+  return m.subjects.reduce((sum, s) => sum + (s.topicsExplored ?? 0), 0);
+}
+
 async function buildHistory(
   db: Database,
   profileId: string,
@@ -1970,6 +2079,7 @@ async function buildHistory(
         date: s.snapshotDate,
         topicsMastered: m.topicsMastered,
         topicsAttempted: m.topicsAttempted,
+        topicsExplored: sumExplored(m),
         vocabularyTotal: m.vocabularyTotal,
         vocabularyMastered: m.vocabularyMastered,
         totalSessions: m.totalSessions,
@@ -1991,6 +2101,7 @@ async function buildHistory(
         date: weekKey,
         topicsMastered: m.topicsMastered,
         topicsAttempted: m.topicsAttempted,
+        topicsExplored: sumExplored(m),
         vocabularyTotal: m.vocabularyTotal,
         vocabularyMastered: m.vocabularyMastered,
         totalSessions: m.totalSessions,
@@ -2047,7 +2158,7 @@ pnpm exec nx run api:typecheck
 
 ```bash
 git add apps/api/src/routes/snapshot-progress.ts apps/api/src/routes/snapshot-progress.test.ts apps/api/src/inngest/functions/session-completed.ts apps/api/src/index.ts
-git commit -m "feat(api): add progress inventory, history, refresh endpoints + session-complete hook [EP-15, FR231-233, FR241]"
+git commit -m "feat(api): add progress inventory, history, refresh endpoints + session-complete hook [EP-15, FR231-233, FR241, FR241.5]"
 ```
 
 ---
@@ -2222,14 +2333,14 @@ git commit -m "feat(api): add parent access to inventory, history, reports + das
 ### Task 8: Progress Tab + My Learning Journey Screen
 
 **Files:**
-- Create: `apps/mobile/src/app/(learner)/progress.tsx`
-- Create: `apps/mobile/src/app/(learner)/progress.test.tsx`
+- Create: `apps/mobile/src/app/(app)/progress.tsx`
+- Create: `apps/mobile/src/app/(app)/progress.test.tsx`
 - Create: `apps/mobile/src/hooks/use-progress.ts`
 - Create: `apps/mobile/src/components/progress/SubjectCard.tsx`
 - Create: `apps/mobile/src/components/progress/ProgressBar.tsx`
 - Create: `apps/mobile/src/components/progress/GrowthChart.tsx`
 - Create: `apps/mobile/src/components/progress/MilestoneCard.tsx`
-- Modify: `apps/mobile/src/app/(learner)/_layout.tsx`
+- Modify: `apps/mobile/src/app/(app)/_layout.tsx`
 
 - [ ] **Step 1: Create React Query hooks for progress endpoints**
 
@@ -2347,7 +2458,7 @@ Create `SubjectCard.tsx`, `GrowthChart.tsx`, `MilestoneCard.tsx` similarly — e
 - [ ] **Step 3: Create My Learning Journey screen**
 
 ```typescript
-// apps/mobile/src/app/(learner)/progress.tsx
+// apps/mobile/src/app/(app)/progress.tsx
 import React from 'react';
 import { View, Text, ScrollView, Pressable, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -2410,7 +2521,7 @@ export default function ProgressScreen() {
           Start your first session and watch your progress grow here!
         </Text>
         <Pressable
-          onPress={() => router.push('/(learner)/home')}
+          onPress={() => router.push('/(app)/home')}
           className="bg-primary rounded-button py-3.5 px-8"
           accessibilityRole="button"
           testID="start-learning-button"
@@ -2461,7 +2572,7 @@ export default function ProgressScreen() {
       {data.subjects.map((subj) => (
         <Pressable
           key={subj.subjectId}
-          onPress={() => router.push(`/(learner)/progress/${subj.subjectId}`)}
+          onPress={() => router.push(`/(app)/progress/${subj.subjectId}`)}
           className="mx-5 mb-3 p-4 bg-surface-elevated rounded-card"
           testID={`subject-card-${subj.subjectId}`}
           accessibilityRole="button"
@@ -2469,15 +2580,24 @@ export default function ProgressScreen() {
           <Text className="text-body font-semibold text-text-primary mb-1">
             {subj.subjectName}
           </Text>
-          <ProgressBar
-            value={subj.topics.mastered}
-            total={subj.topics.total}
-            color="teal"
-          />
+          {/* FR235.8: Conditional fill bar — only when pre-generated denominator exists */}
+          {subj.topics.total != null && (
+            <ProgressBar
+              value={subj.topics.mastered}
+              total={subj.topics.total}
+              color="teal"
+            />
+          )}
           <Text className="text-caption text-text-secondary mt-1">
             {subj.pedagogyMode === 'four_strands'
               ? `${subj.vocabulary.total} words`
-              : `${subj.topics.mastered}/${subj.topics.total} topics`}
+              : subj.topics.total != null
+                ? `${subj.topics.mastered}/${subj.topics.total} topics`
+                : `${subj.topics.explored} topics explored`}
+            {/* Mixed books: show pre-generated fill + session-filed count */}
+            {subj.topics.total != null && subj.topics.explored > 0
+              ? ` + ${subj.topics.explored} explored`
+              : ''}
             {' · '}
             {subj.activeMinutes} min
           </Text>
@@ -2517,7 +2637,7 @@ export default function ProgressScreen() {
 
 - [ ] **Step 4: Add Progress tab to learner layout**
 
-In `apps/mobile/src/app/(learner)/_layout.tsx`:
+In `apps/mobile/src/app/(app)/_layout.tsx`:
 
 1. Add to `iconMap`:
 ```typescript
@@ -2540,7 +2660,7 @@ Progress: { focused: 'stats-chart', default: 'stats-chart-outline' },
 
 - [ ] **Step 5: Write tests for the progress screen**
 
-Test in `apps/mobile/src/app/(learner)/progress.test.tsx`:
+Test in `apps/mobile/src/app/(app)/progress.test.tsx`:
 - Empty state renders start button
 - Populated state renders hero stat, subject cards, growth chart
 - Subject card tap navigates to subject detail
@@ -2565,14 +2685,14 @@ git commit -m "feat(mobile): add My Learning Journey screen with Progress tab [E
 ### Task 9: Subject Progress Detail Screen
 
 **Files:**
-- Create: `apps/mobile/src/app/(learner)/progress/_layout.tsx`
-- Create: `apps/mobile/src/app/(learner)/progress/[subjectId].tsx`
-- Create: `apps/mobile/src/app/(learner)/progress/[subjectId].test.tsx`
+- Create: `apps/mobile/src/app/(app)/progress/_layout.tsx`
+- Create: `apps/mobile/src/app/(app)/progress/[subjectId].tsx`
+- Create: `apps/mobile/src/app/(app)/progress/[subjectId].test.tsx`
 
 - [ ] **Step 1: Create progress stack layout**
 
 ```typescript
-// apps/mobile/src/app/(learner)/progress/_layout.tsx
+// apps/mobile/src/app/(app)/progress/_layout.tsx
 import { Stack } from 'expo-router';
 
 export default function ProgressLayout() {
@@ -2582,7 +2702,7 @@ export default function ProgressLayout() {
 
 - [ ] **Step 2: Create Subject Progress Detail screen**
 
-`apps/mobile/src/app/(learner)/progress/[subjectId].tsx`:
+`apps/mobile/src/app/(app)/progress/[subjectId].tsx`:
 
 Screen shows:
 - Back button + subject name header
@@ -2591,11 +2711,17 @@ Screen shows:
 - Time spent (this week + total from snapshot)
 - Growth chart (subject-specific, filtered from history data)
 
+**FR236.7 — Session-filed topic display (Conversation-First compatibility):**
+- Session-filed topics (`filed_from = 'session_filing' | 'freeform_filing'`) appear in the topic list alongside pre-generated topics with the same color coding.
+- Key difference: session-filed topics can NEVER have the Grey "not started" state — they always have at least one session by definition.
+- The topic count header adapts: "8/15 topics" (pre-generated denominator) vs. "4 topics explored" (session-filed, no denominator).
+- When `topics.total` is null, the header omits the denominator entirely.
+
 Uses `useInventory()` to get subject data and `useProgressHistory()` for the chart. Topic list comes from a new endpoint or is derived from the inventory's subject detail — the inventory already has topic counts but not individual topic status. For individual topic status, use the existing `GET /v1/subjects/:subjectId/progress` endpoint which returns `TopicProgress[]`.
 
 - [ ] **Step 3: Write tests for the subject detail screen**
 
-Test topic list rendering, CEFR vocabulary section visibility, and navigation to review session for orange topics.
+Test topic list rendering, CEFR vocabulary section visibility, navigation to review session for orange topics, and FR236.7: session-filed topics show no "not started" state + adaptive header ("X topics explored" vs "X/Y topics").
 
 - [ ] **Step 4: Add progress route group to learner layout tabs**
 
@@ -2665,6 +2791,7 @@ function getMilestoneCelebrationTitle(type: string, threshold: number): string {
     case 'streak_length': return `${threshold}-day streak!`;
     case 'subject_mastered': return 'Subject mastered!';
     case 'book_completed': return 'Book completed!';
+    case 'topics_explored': return `${threshold} topics explored!`;
     case 'learning_time': return `${Math.round(threshold / 60)} hours of learning!`;
     case 'cefr_level_up': return 'Level up!';
     default: return 'Milestone reached!';
@@ -2689,6 +2816,8 @@ function getMilestoneCelebrationBody(
       return `You mastered every topic in ${(metadata as any)?.subjectName ?? 'this subject'}! You own this.`;
     case 'book_completed':
       return `You finished the ${(metadata as any)?.bookTitle ?? 'book'}! Ready for the next adventure?`;
+    case 'topics_explored':
+      return `You've explored ${threshold} topics in ${(metadata as any)?.subjectName ?? 'this subject'}! Your curiosity is building something amazing.`;
     case 'learning_time': {
       const hours = Math.round(threshold / 60);
       return `You've spent ${hours} hours learning! That's more than most people ever invest.`;
@@ -2760,7 +2889,7 @@ describe('weekly-progress-push', () => {
     const previousMetrics = makeMetrics({ topicsMastered: 10, vocabularyTotal: 35, totalSessions: 3 });
 
     const result = generateWeeklyNotification('Emma', currentMetrics, previousMetrics);
-    expect(result.body).toContain('2 new topics');
+    expect(result.body).toContain('2 new topic');
     expect(result.body).toContain('15 new words');
   });
 
@@ -2771,6 +2900,25 @@ describe('weekly-progress-push', () => {
     const result = generateWeeklyNotification('Emma', current, previous);
     expect(result.body).toContain('took a break');
     expect(result.body).toContain('still mastered 10 topics');
+  });
+
+  it('includes explored topics for session-filed subjects (F-6)', () => {
+    const current = makeMetrics({
+      topicsMastered: 10, vocabularyTotal: 50, totalSessions: 8,
+      subjects: [{ subjectId: 's1', subjectName: 'Geography', pedagogyMode: 'socratic',
+        topicsAttempted: 5, topicsMastered: 0, topicsTotal: 0, topicsExplored: 5,
+        vocabularyTotal: 0, vocabularyMastered: 0, sessionsCount: 3, activeMinutes: 60, lastSessionAt: null }],
+    });
+    const previous = makeMetrics({
+      topicsMastered: 10, vocabularyTotal: 50, totalSessions: 5,
+      subjects: [{ subjectId: 's1', subjectName: 'Geography', pedagogyMode: 'socratic',
+        topicsAttempted: 0, topicsMastered: 0, topicsTotal: 0, topicsExplored: 0,
+        vocabularyTotal: 0, vocabularyMastered: 0, sessionsCount: 0, activeMinutes: 0, lastSessionAt: null }],
+    });
+
+    const result = generateWeeklyNotification('Emma', current, previous);
+    expect(result.body).toContain('5 new topics explored');
+    expect(result.body).not.toContain('took a break');
   });
 });
 ```
@@ -2818,8 +2966,14 @@ export function generateWeeklyNotification(
   const vocabDelta = current.vocabularyTotal - previous.vocabularyTotal;
   const sessionDelta = current.totalSessions - previous.totalSessions;
 
-  // Zero activity this week
-  if (topicDelta === 0 && vocabDelta === 0 && sessionDelta === 0) {
+  // [F-6] Compute explored delta from per-subject topicsExplored sums
+  const currentExplored = current.subjects.reduce((s, subj) => s + (subj.topicsExplored ?? 0), 0);
+  const previousExplored = previous.subjects.reduce((s, subj) => s + (subj.topicsExplored ?? 0), 0);
+  const exploredDelta = currentExplored - previousExplored;
+
+  // Zero activity this week — check sessionDelta AND exploredDelta to avoid
+  // misrepresenting exploration-only weeks as "took a break"
+  if (topicDelta === 0 && vocabDelta === 0 && sessionDelta === 0 && exploredDelta === 0) {
     return {
       title,
       body: `${childName} took a break this week. Their knowledge is safe — they've still mastered ${current.topicsMastered} topics!`,
@@ -2827,11 +2981,12 @@ export function generateWeeklyNotification(
   }
 
   const parts: string[] = [];
-  if (topicDelta > 0) parts.push(`${topicDelta} new topic${topicDelta > 1 ? 's' : ''}`);
+  if (topicDelta > 0) parts.push(`${topicDelta} new topic${topicDelta > 1 ? 's' : ''} mastered`);
+  if (exploredDelta > 0) parts.push(`${exploredDelta} new topic${exploredDelta > 1 ? 's' : ''} explored`);
   if (vocabDelta > 0) parts.push(`${vocabDelta} new words`);
   if (sessionDelta > 0) parts.push(`${sessionDelta} session${sessionDelta > 1 ? 's' : ''} this week`);
 
-  return { title, body: `Mastered ${parts.join(', ')}.` };
+  return { title, body: parts.join(', ') + '.' };
 }
 
 export const weeklyProgressPush = inngest.createFunction(
@@ -3155,8 +3310,8 @@ import { generateMonthlyReportData, generateReportHighlights } from '../../servi
 import { getSnapshotsInRange } from '../../services/snapshot-aggregation';
 import { sendPushNotification } from '../../services/notifications';
 import { captureException } from '../../services/sentry';
-import { familyLinks, profiles, monthlyReports } from '@eduagent/database';
-import { eq } from 'drizzle-orm';
+import { familyLinks, profiles, monthlyReports, progressSnapshots } from '@eduagent/database';
+import { eq, and, gte, lte } from 'drizzle-orm';   // [F-5] all used in innerJoin
 import type { ProgressMetrics } from '@eduagent/schemas';
 
 export const monthlyReportCron = inngest.createFunction(

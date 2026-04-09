@@ -23,6 +23,7 @@ jest.mock('../../lib/theme', () => ({
 jest.mock('../../lib/profile', () => ({
   useProfile: () => ({
     activeProfile: { id: 'profile-1', displayName: 'Alex', isOwner: true },
+    profiles: [{ id: 'profile-1', displayName: 'Alex', isOwner: true }],
   }),
 }));
 

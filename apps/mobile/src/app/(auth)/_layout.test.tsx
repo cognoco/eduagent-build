@@ -19,7 +19,7 @@ describe('AuthRoutesLayout', () => {
     jest.clearAllMocks();
   });
 
-  it('redirects to (learner)/home when user is signed in', () => {
+  it('redirects to (app)/home when user is signed in', () => {
     (useAuth as jest.Mock).mockReturnValue({
       isLoaded: true,
       isSignedIn: true,
@@ -28,7 +28,7 @@ describe('AuthRoutesLayout', () => {
     render(<AuthLayout />);
 
     const redirect = screen.getByTestId('redirect');
-    expect(redirect.props.children).toBe('/(learner)/home');
+    expect(redirect.props.children).toBe('/(app)/home');
   });
 
   it('renders Stack when user is not signed in', () => {
@@ -74,7 +74,7 @@ describe('AuthRoutesLayout', () => {
 
     // Guard fires → user lands in learner home
     const redirect = screen.getByTestId('redirect');
-    expect(redirect.props.children).toBe('/(learner)/home');
+    expect(redirect.props.children).toBe('/(app)/home');
     expect(screen.queryByTestId('stack')).toBeNull();
   });
 

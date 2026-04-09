@@ -470,7 +470,7 @@ function ChildPaywall(): React.ReactElement {
         </Text>
 
         <Pressable
-          onPress={() => router.push('/(learner)/library')}
+          onPress={() => router.push('/(app)/library')}
           className="bg-surface rounded-button py-3.5 px-8 items-center w-full"
           testID="browse-library-button"
           accessibilityRole="button"

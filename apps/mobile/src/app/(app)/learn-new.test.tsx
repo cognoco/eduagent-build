@@ -81,7 +81,7 @@ describe('LearnNewScreen', () => {
     render(<LearnNewScreen />);
 
     fireEvent.press(screen.getByTestId('intent-freeform'));
-    expect(mockPush).toHaveBeenCalledWith('/(learner)/session?mode=freeform');
+    expect(mockPush).toHaveBeenCalledWith('/(app)/session?mode=freeform');
   });
 
   it('navigates to session with sessionId on resume', async () => {
@@ -97,7 +97,7 @@ describe('LearnNewScreen', () => {
     fireEvent.press(resumeCta);
 
     expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/(learner)/session',
+      pathname: '/(app)/session',
       params: { sessionId: 'sess-1' },
     });
   });
