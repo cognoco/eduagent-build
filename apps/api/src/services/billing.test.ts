@@ -152,7 +152,6 @@ function mockProfileRow(
     id: overrides?.id ?? 'profile-1',
     accountId: overrides?.accountId ?? accountId,
     displayName: overrides?.displayName ?? 'Test',
-    personaType: 'LEARNER',
     isOwner: overrides?.isOwner ?? true,
     createdAt: NOW,
     updatedAt: NOW,

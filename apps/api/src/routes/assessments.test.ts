@@ -40,7 +40,6 @@ jest.mock('../services/profile', () => ({
     id: 'test-profile-id',
     accountId: 'test-account-id',
     displayName: 'Test User',
-    personaType: 'LEARNER',
     isOwner: false,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),

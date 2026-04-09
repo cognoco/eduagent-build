@@ -30,7 +30,7 @@ describe('auth routes', () => {
         body: JSON.stringify({
           email: 'new@example.com',
           password: 'securePass123',
-          birthDate: '2010-05-15',
+          birthYear: 2010,
           location: 'EU',
         }),
       });
