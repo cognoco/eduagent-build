@@ -18,9 +18,15 @@ export const topicSuggestionRoutes = new Hono<TopicSuggestionsEnv>().get(
   async (c) => {
     const profileId = requireProfileId(c.get('profileId'));
     const db = c.get('db');
+    const subjectId = c.req.param('subjectId');
     const bookId = c.req.param('bookId');
 
-    const suggestions = await getUnusedTopicSuggestions(db, profileId, bookId);
+    const suggestions = await getUnusedTopicSuggestions(
+      db,
+      profileId,
+      bookId,
+      subjectId
+    );
     return c.json(suggestions, 200);
   }
 );

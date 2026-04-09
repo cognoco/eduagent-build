@@ -124,8 +124,9 @@ export const filingRoutes = new Hono<FilingRouteEnv>().post(
       await markTopicSuggestionUsed(db, profileId, body.usedTopicSuggestionId);
     }
 
-    // Fire async suggestion generation (non-blocking)
-    inngest
+    // Fire async suggestion generation — await to prevent silent event loss
+    // (session-completed chain waits 60s for this event via waitForEvent)
+    await inngest
       .send({
         name: 'app/filing.completed',
         data: {
