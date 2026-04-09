@@ -85,9 +85,9 @@ describe('useSubscription', () => {
             status: 'active',
             trialEndsAt: null,
             currentPeriodEnd: '2026-03-18T00:00:00Z',
-            monthlyLimit: 500,
+            monthlyLimit: 700,
             usedThisMonth: 42,
-            remainingQuestions: 458,
+            remainingQuestions: 658,
           },
         }),
         { status: 200 }
@@ -104,7 +104,7 @@ describe('useSubscription', () => {
 
     expect(mockFetch).toHaveBeenCalled();
     expect(result.current.data?.tier).toBe('plus');
-    expect(result.current.data?.remainingQuestions).toBe(458);
+    expect(result.current.data?.remainingQuestions).toBe(658);
   });
 
   it('returns free-tier defaults when no subscription', async () => {
@@ -113,12 +113,12 @@ describe('useSubscription', () => {
         JSON.stringify({
           subscription: {
             tier: 'free',
-            status: 'trial',
+            status: 'active',
             trialEndsAt: null,
             currentPeriodEnd: null,
-            monthlyLimit: 50,
+            monthlyLimit: 100,
             usedThisMonth: 0,
-            remainingQuestions: 50,
+            remainingQuestions: 100,
           },
         }),
         { status: 200 }
@@ -134,7 +134,7 @@ describe('useSubscription', () => {
     });
 
     expect(result.current.data?.tier).toBe('free');
-    expect(result.current.data?.monthlyLimit).toBe(50);
+    expect(result.current.data?.monthlyLimit).toBe(100);
   });
 
   it('handles API errors', async () => {
@@ -203,8 +203,8 @@ describe('useUsage', () => {
       new Response(
         JSON.stringify({
           usage: {
-            monthlyLimit: 50,
-            usedThisMonth: 55,
+            monthlyLimit: 100,
+            usedThisMonth: 105,
             remainingQuestions: 0,
             topUpCreditsRemaining: 0,
             warningLevel: 'exceeded',

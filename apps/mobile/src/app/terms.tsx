@@ -104,11 +104,11 @@ export default function TermsOfServiceScreen() {
 
         <Section title="6. Subscriptions &amp; Payments">
           <Paragraph>
-            MentoMate offers a free trial with limited usage. Paid subscriptions
-            are available through Apple App Store or Google Play Store.
-            Subscription terms, pricing, and cancellation are governed by the
-            respective app store policies. Refunds are handled by the app store
-            through which you subscribed.
+            MentoMate offers a free tier with limited daily and monthly usage.
+            Paid subscriptions are available through Apple App Store or Google
+            Play Store. Subscription terms, pricing, and cancellation are
+            governed by the respective app store policies. Refunds are handled
+            by the app store through which you subscribed.
           </Paragraph>
         </Section>
 

@@ -113,13 +113,13 @@ describe('ParentGateway', () => {
     render(<ParentGateway {...defaultProps} />);
 
     fireEvent.press(screen.getByTestId('gateway-check-progress'));
-    expect(mockPush).toHaveBeenCalledWith('/(parent)/dashboard');
+    expect(mockPush).toHaveBeenCalledWith('/(app)/dashboard');
   });
 
   it('navigates to learn route on "Learn something"', () => {
     render(<ParentGateway {...defaultProps} />);
 
     fireEvent.press(screen.getByTestId('gateway-learn'));
-    expect(mockPush).toHaveBeenCalledWith('/(learner)/learn');
+    expect(mockPush).toHaveBeenCalledWith('/(app)/learn');
   });
 });

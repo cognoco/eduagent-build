@@ -373,7 +373,7 @@ describe('Integration: Learning Session Lifecycle', () => {
       );
 
       expect(res.status).toBe(200);
-      expect(res.headers.get('X-Quota-Remaining')).toBe('499');
+      expect(res.headers.get('X-Quota-Remaining')).toBe('699');
       const body = await res.json();
       expect(body.response).toEqual(expect.any(String));
       expect(body.response.length).toBeGreaterThan(0);

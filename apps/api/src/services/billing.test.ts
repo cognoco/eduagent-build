@@ -1230,7 +1230,7 @@ describe('handleTierChange', () => {
     expect(db.update).toHaveBeenCalled();
   });
 
-  it('handles mid-cycle downgrade: Family(800/1500) -> Plus(500) = 0 remaining', async () => {
+  it('handles mid-cycle downgrade: Family(800/1500) -> Plus(700) = 0 remaining', async () => {
     const sub = mockSubscriptionRow({ tier: 'family', status: 'active' });
     const pool = mockQuotaPoolRow({ usedThisMonth: 800, monthlyLimit: 1500 });
     const db = createMockDb({
@@ -1244,7 +1244,7 @@ describe('handleTierChange', () => {
     expect(result!.previousTier).toBe('family');
     expect(result!.newTier).toBe('plus');
     expect(result!.usedThisCycle).toBe(800);
-    expect(result!.newMonthlyLimit).toBe(500);
+    expect(result!.newMonthlyLimit).toBe(700);
     expect(result!.remainingQuestions).toBe(0);
   });
 
@@ -1259,7 +1259,7 @@ describe('handleTierChange', () => {
     const result = await handleTierChange(db, subscriptionId, 'plus');
 
     expect(result).not.toBeNull();
-    expect(result!.remainingQuestions).toBe(500);
+    expect(result!.remainingQuestions).toBe(700);
   });
 });
 

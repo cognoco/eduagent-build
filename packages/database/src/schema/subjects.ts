@@ -35,6 +35,12 @@ export const curriculumTopicSourceEnum = pgEnum('curriculum_topic_source', [
   'user',
 ]);
 
+export const filedFromEnum = pgEnum('filed_from', [
+  'pre_generated',
+  'session_filing',
+  'freeform_filing',
+]);
+
 export const subjects = pgTable(
   'subjects',
   {
@@ -136,6 +142,11 @@ export const curriculumTopics = pgTable('curriculum_topics', {
   cefrSublevel: text('cefr_sublevel'),
   targetWordCount: integer('target_word_count'),
   targetChunkCount: integer('target_chunk_count'),
+  filedFrom: filedFromEnum('filed_from').notNull().default('pre_generated'),
+  sessionId: uuid('session_id'),
+  // FK to learning_sessions(id) is defined in migration SQL only.
+  // DO NOT add a JS .references(() => learningSessions.id) here —
+  // sessions.ts already imports from subjects.ts, creating a circular dep.
   createdAt: timestamp('created_at', { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -181,3 +192,41 @@ export const curriculumAdaptations = pgTable('curriculum_adaptations', {
     .notNull()
     .defaultNow(),
 });
+
+export const bookSuggestions = pgTable(
+  'book_suggestions',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .$defaultFn(() => generateUUIDv7()),
+    subjectId: uuid('subject_id')
+      .notNull()
+      .references(() => subjects.id, { onDelete: 'cascade' }),
+    title: text('title').notNull(),
+    emoji: text('emoji'),
+    description: text('description'),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    pickedAt: timestamp('picked_at', { withTimezone: true }),
+  },
+  (table) => [index('book_suggestions_subject_id_idx').on(table.subjectId)]
+);
+
+export const topicSuggestions = pgTable(
+  'topic_suggestions',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .$defaultFn(() => generateUUIDv7()),
+    bookId: uuid('book_id')
+      .notNull()
+      .references(() => curriculumBooks.id, { onDelete: 'cascade' }),
+    title: text('title').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    usedAt: timestamp('used_at', { withTimezone: true }),
+  },
+  (table) => [index('topic_suggestions_book_id_idx').on(table.bookId)]
+);

@@ -144,6 +144,7 @@ export const learningSessions = pgTable(
     durationSeconds: integer('duration_seconds'),
     wallClockSeconds: integer('wall_clock_seconds'),
     metadata: jsonb('metadata').default({}),
+    rawInput: text('raw_input'),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

@@ -54,6 +54,8 @@ interface ChatShellProps {
   onInputModeChange?: (mode: 'text' | 'voice') => void;
   speechRecognitionLanguage?: string;
   textToSpeechLanguage?: string;
+  /** Compact controls rendered below the text input (e.g. Switch topic / Park it). */
+  belowInput?: React.ReactNode;
   /** Optional testID for the message scroll area (used by E2E flows). */
   messagesTestID?: string;
 }
@@ -119,6 +121,7 @@ export function ChatShell({
   onInputModeChange,
   speechRecognitionLanguage,
   textToSpeechLanguage,
+  belowInput,
   messagesTestID,
 }: ChatShellProps) {
   const router = useRouter();
@@ -369,11 +372,16 @@ export function ChatShell({
         >
           <Ionicons name="chevron-back" size={24} color={colors.primary} />
         </Pressable>
-        <View className="flex-1">
-          <Text className="text-body font-semibold text-text-primary">
+        <View className="flex-1 min-w-[60px]">
+          <Text
+            className="text-body font-semibold text-text-primary"
+            numberOfLines={1}
+          >
             {title}
           </Text>
-          <Text className="text-caption text-text-secondary">{subtitle}</Text>
+          <Text className="text-caption text-text-secondary" numberOfLines={1}>
+            {subtitle}
+          </Text>
         </View>
         {headerRightContent}
       </View>
@@ -550,6 +558,7 @@ export function ChatShell({
           </View>
         </View>
       )}
+      {belowInput}
     </KeyboardAvoidingView>
   );
 }

@@ -42,12 +42,7 @@ export const profileRoutes = new Hono<ProfileEnv>()
     const input = c.req.valid('json');
 
     try {
-      const profile = await createProfileWithLimitCheck(
-        db,
-        account.id,
-        input,
-        c.get('profileId')
-      );
+      const profile = await createProfileWithLimitCheck(db, account.id, input);
 
       return c.json({ profile }, 201);
     } catch (err) {

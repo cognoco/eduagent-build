@@ -11,10 +11,8 @@ export default function AuthRoutesLayout() {
     console.log(`[AUTH-DEBUG] (auth) layout | isSignedIn=${isSignedIn}`);
   if (isSignedIn) {
     if (__DEV__)
-      console.log(
-        '[AUTH-DEBUG] (auth) layout → redirecting to /(learner)/home'
-      );
-    return <Redirect href="/(learner)/home" />;
+      console.log('[AUTH-DEBUG] (auth) layout → redirecting to /(app)/home');
+    return <Redirect href="/(app)/home" />;
   }
 
   return (

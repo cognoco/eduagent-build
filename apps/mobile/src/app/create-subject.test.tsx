@@ -134,7 +134,7 @@ describe('CreateSubjectScreen', () => {
     });
 
     expect(mockReplace).toHaveBeenCalledWith({
-      pathname: '/(learner)/onboarding/interview',
+      pathname: '/(app)/onboarding/interview',
       params: {
         subjectId: 'subject-1',
         subjectName: 'leaf cutter ants',
@@ -221,7 +221,7 @@ describe('CreateSubjectScreen', () => {
 
     // Should navigate to interview with the focused book
     expect(mockReplace).toHaveBeenCalledWith({
-      pathname: '/(learner)/onboarding/interview',
+      pathname: '/(app)/onboarding/interview',
       params: {
         subjectId: 'subject-wh',
         subjectName: 'World History',
@@ -237,8 +237,16 @@ describe('CreateSubjectScreen', () => {
       status: 'ambiguous',
       displayMessage: '**Easter** can be studied from different angles.',
       suggestions: [
-        { name: 'World History', description: 'History of Easter', focus: 'Easter Traditions' },
-        { name: 'Religious Studies', description: 'Easter theology', focus: 'Easter in Christianity' },
+        {
+          name: 'World History',
+          description: 'History of Easter',
+          focus: 'Easter Traditions',
+        },
+        {
+          name: 'Religious Studies',
+          description: 'Easter theology',
+          focus: 'Easter in Christianity',
+        },
       ],
     });
 
@@ -273,7 +281,65 @@ describe('CreateSubjectScreen', () => {
     });
   });
 
-  it('routes broad subjects straight to the library shelf', async () => {
+  it('splits combined LLM names like "Biology — Botany" and derives focus', async () => {
+    // LLM returns combined name despite prompt instructions saying not to
+    mockResolveSubjectMutateAsync.mockResolvedValueOnce({
+      status: 'ambiguous',
+      displayMessage: '**Tea** can be studied from different angles.',
+      suggestions: [
+        {
+          name: 'Biology — Botany',
+          description: 'Study of tea plants and cultivation',
+        },
+        {
+          name: 'History',
+          description: 'Tea trade routes and cultural impact',
+        },
+      ],
+    });
+
+    mockCreateSubjectMutateAsync.mockResolvedValueOnce({
+      subject: { id: 'subject-botany', name: 'Botany' },
+      structureType: 'focused_book',
+      bookId: 'book-tea',
+      bookTitle: 'tea',
+      bookCount: 1,
+    });
+
+    render(<CreateSubjectScreen />);
+
+    fireEvent.changeText(screen.getByTestId('create-subject-name'), 'tea');
+    fireEvent.press(screen.getByTestId('create-subject-submit'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('subject-suggestion-option-0')).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByTestId('subject-suggestion-option-0'));
+
+    await waitFor(() => {
+      // Should split "Biology — Botany" → subjectName "Botany", focus "tea"
+      expect(mockCreateSubjectMutateAsync).toHaveBeenCalledWith({
+        name: 'Botany',
+        rawInput: 'tea',
+        focus: 'tea',
+        focusDescription: 'Study of tea plants and cultivation',
+      });
+    });
+
+    // Should navigate to interview (focused_book path), not library
+    expect(mockReplace).toHaveBeenCalledWith({
+      pathname: '/(app)/onboarding/interview',
+      params: {
+        subjectId: 'subject-botany',
+        subjectName: 'Botany',
+        bookId: 'book-tea',
+        bookTitle: 'tea',
+      },
+    });
+  });
+
+  it('routes broad subjects to the picker screen', async () => {
     mockResolveSubjectMutateAsync.mockResolvedValueOnce({
       status: 'direct_match',
       resolvedName: 'History',
@@ -297,7 +363,7 @@ describe('CreateSubjectScreen', () => {
 
     await waitFor(() => {
       expect(mockReplace).toHaveBeenCalledWith({
-        pathname: '/(learner)/library',
+        pathname: '/(app)/pick-book/[subjectId]',
         params: { subjectId: 'subject-history' },
       });
     });
@@ -332,7 +398,7 @@ describe('CreateSubjectScreen', () => {
 
     await waitFor(() => {
       expect(mockReplace).toHaveBeenCalledWith({
-        pathname: '/(learner)/session',
+        pathname: '/(app)/session',
         params: {
           mode: 'freeform',
           subjectId: 'subject-world-history',
@@ -342,13 +408,13 @@ describe('CreateSubjectScreen', () => {
       });
     });
 
-    // Must NOT navigate to library — that was the bug
+    // Must NOT navigate to picker or library — that was the bug
     expect(mockReplace).not.toHaveBeenCalledWith(
-      expect.objectContaining({ pathname: '/(learner)/library' })
+      expect.objectContaining({ pathname: '/(app)/pick-book/[subjectId]' })
     );
   });
 
-  it('[BUG-236] routes to library when no returnTo param (default behavior)', async () => {
+  it('[BUG-236] routes to picker when no returnTo param (default behavior)', async () => {
     // No returnTo param — normal Library-originated flow
     mockSearchParams = {};
 
@@ -370,22 +436,19 @@ describe('CreateSubjectScreen', () => {
 
     render(<CreateSubjectScreen />);
 
-    fireEvent.changeText(
-      screen.getByTestId('create-subject-name'),
-      'Biology'
-    );
+    fireEvent.changeText(screen.getByTestId('create-subject-name'), 'Biology');
     fireEvent.press(screen.getByTestId('create-subject-submit'));
 
     await waitFor(() => {
       expect(mockReplace).toHaveBeenCalledWith({
-        pathname: '/(learner)/library',
+        pathname: '/(app)/pick-book/[subjectId]',
         params: { subjectId: 'subject-biology' },
       });
     });
 
     // Must NOT navigate to session
     expect(mockReplace).not.toHaveBeenCalledWith(
-      expect.objectContaining({ pathname: '/(learner)/session' })
+      expect.objectContaining({ pathname: '/(app)/session' })
     );
   });
 });

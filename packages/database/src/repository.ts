@@ -19,6 +19,9 @@ import {
   notificationPreferences,
   learningModes,
   sessionEmbeddings,
+  bookSuggestions,
+  topicSuggestions,
+  curriculumBooks,
 } from './schema/index';
 
 export function createScopedRepository(db: Database, profileId: string) {
@@ -244,6 +247,38 @@ export function createScopedRepository(db: Database, profileId: string) {
       async findFirst(extraWhere?: SQL) {
         return db.query.sessionEmbeddings.findFirst({
           where: scopedWhere(sessionEmbeddings, extraWhere),
+        });
+      },
+    },
+    bookSuggestions: {
+      async findBySubject(subjectId: string) {
+        const subject = await db.query.subjects.findFirst({
+          where: and(
+            eq(subjects.id, subjectId),
+            eq(subjects.profileId, profileId)
+          ),
+        });
+        if (!subject) return [];
+        return db.query.bookSuggestions.findMany({
+          where: eq(bookSuggestions.subjectId, subjectId),
+        });
+      },
+    },
+    topicSuggestions: {
+      async findByBook(bookId: string) {
+        const book = await db.query.curriculumBooks.findFirst({
+          where: eq(curriculumBooks.id, bookId),
+        });
+        if (!book) return [];
+        const subject = await db.query.subjects.findFirst({
+          where: and(
+            eq(subjects.id, book.subjectId),
+            eq(subjects.profileId, profileId)
+          ),
+        });
+        if (!subject) return [];
+        return db.query.topicSuggestions.findMany({
+          where: eq(topicSuggestions.bookId, bookId),
         });
       },
     },

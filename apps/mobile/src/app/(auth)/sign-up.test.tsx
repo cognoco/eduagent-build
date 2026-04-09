@@ -119,7 +119,7 @@ describe('SignUpScreen', () => {
     });
   });
 
-  it('completes verification and navigates to learner home', async () => {
+  it('completes verification and navigates to app home', async () => {
     mockCreate.mockResolvedValue(undefined);
     mockPrepareVerification.mockResolvedValue(undefined);
     mockAttemptVerification.mockResolvedValue({

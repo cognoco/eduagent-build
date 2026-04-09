@@ -12,6 +12,7 @@ import {
   persistBookTopics,
   claimBookForGeneration,
 } from '../services/curriculum';
+import { getBookSessions } from '../services/session';
 import { generateBookTopics } from '../services/book-generation';
 import { getProfileAge } from '../services/profile';
 import { inngest } from '../inngest/client';
@@ -145,5 +146,17 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
         }
         throw error;
       }
+    }
+  )
+  .get(
+    '/subjects/:subjectId/books/:bookId/sessions',
+    zValidator('param', bookParamSchema),
+    async (c) => {
+      const db = c.get('db');
+      const profileId = requireProfileId(c.get('profileId'));
+      const { bookId } = c.req.valid('param');
+
+      const sessions = await getBookSessions(db, profileId, bookId);
+      return c.json({ sessions });
     }
   );

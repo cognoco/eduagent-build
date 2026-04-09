@@ -166,7 +166,7 @@ export function ProfileProvider({
       // added here to be reset on switch. 'profiles' is excluded because it
       // belongs to the account (not the individual profile) — resetting it
       // causes isProfileLoading→true which triggers `return null` in the
-      // learner layout, blanking the entire screen (blank-screen bug).
+      // app layout, blanking the entire screen (blank-screen bug).
       const PROFILE_SCOPED_KEYS = [
         'subjects',
         'progress',

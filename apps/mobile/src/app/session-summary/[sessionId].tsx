@@ -221,7 +221,7 @@ export default function SessionSummaryScreen() {
               onPress: () => {
                 void (async () => {
                   await maybePromptForRecall();
-                  router.replace('/(learner)/home');
+                  router.replace('/(app)/home');
                 })();
               },
             },
@@ -241,7 +241,7 @@ export default function SessionSummaryScreen() {
               onPress: () => {
                 void (async () => {
                   await maybePromptForRecall();
-                  router.replace('/(learner)/home');
+                  router.replace('/(app)/home');
                 })();
               },
             },
@@ -252,7 +252,7 @@ export default function SessionSummaryScreen() {
                   try {
                     await updateLearningMode.mutateAsync('casual');
                     await maybePromptForRecall();
-                    router.replace('/(learner)/home');
+                    router.replace('/(app)/home');
                   } catch {
                     Alert.alert(
                       "Couldn't switch right now",
@@ -263,7 +263,7 @@ export default function SessionSummaryScreen() {
                           onPress: () => {
                             void (async () => {
                               await maybePromptForRecall();
-                              router.replace('/(learner)/home');
+                              router.replace('/(app)/home');
                             })();
                           },
                         },
@@ -280,25 +280,25 @@ export default function SessionSummaryScreen() {
     }
 
     await maybePromptForRecall();
-    router.replace('/(learner)/home');
+    router.replace('/(app)/home');
   };
 
   const handleGoToLibrary = (): void => {
     if (topicId && subjectId) {
       router.replace({
-        pathname: '/(learner)/topic/[topicId]',
+        pathname: '/(app)/topic/[topicId]',
         params: { topicId, subjectId },
       } as never);
     } else if (fallbackSession?.topicId && fallbackSession.subjectId) {
       router.replace({
-        pathname: '/(learner)/topic/[topicId]',
+        pathname: '/(app)/topic/[topicId]',
         params: {
           topicId: fallbackSession.topicId,
           subjectId: fallbackSession.subjectId,
         },
       } as never);
     } else {
-      router.replace('/(learner)/library');
+      router.replace('/(app)/library');
     }
   };
 
@@ -470,7 +470,7 @@ export default function SessionSummaryScreen() {
               onPress={() => {
                 void (async () => {
                   await maybePromptForRecall();
-                  router.replace('/(learner)/home');
+                  router.replace('/(app)/home');
                 })();
               }}
               testID="recall-bridge-done-button"

@@ -91,20 +91,32 @@ const FAMILIAR_SESSIONS: Record<string, string> = {
  *
  * When a topic name is provided (e.g. from the library), the greeting is
  * tailored to that topic so the learner knows the session is contextual.
+ * When only a subject name is available (e.g. from a home screen card),
+ * the greeting references the subject so the learner sees continuity.
  *
  * @param mode - Session mode (homework, learning, practice, freeform)
  * @param sessionExperience - longestStreak from streaks API (proxy for experience)
  * @param problemText - Optional pre-filled problem text (homework OCR)
  * @param topicName - Optional topic title when launched from the library
+ * @param subjectName - Optional subject name when launched from a home card
  */
 export function getOpeningMessage(
   mode: string,
   sessionExperience: number,
   problemText?: string,
-  topicName?: string
+  topicName?: string,
+  subjectName?: string,
+  rawInput?: string
 ): string {
   if (problemText) {
     return "Got it. Let's work through this together. I'll keep it brief and clear.";
+  }
+
+  if (rawInput && topicName) {
+    return `Let's explore ${rawInput}! I'll start with something interesting.`;
+  }
+  if (rawInput && !topicName) {
+    return `I see you're curious about "${rawInput}" — let's dive in!`;
   }
 
   if (topicName) {
@@ -115,6 +127,16 @@ export function getOpeningMessage(
       return `Let's dive into "${topicName}". Ready to start, or is there something specific you'd like to focus on?`;
     }
     return `"${topicName}" — ready when you are. Want me to start, or do you have a preference?`;
+  }
+
+  if (subjectName) {
+    if (sessionExperience <= 0) {
+      return `Let's work on ${subjectName} together. Where would you like to start?`;
+    }
+    if (sessionExperience <= 2) {
+      return `Back to ${subjectName} — want to pick up where we left off, or try something new?`;
+    }
+    return `${subjectName} — ready when you are. What shall we work on?`;
   }
 
   if (sessionExperience <= 0) {

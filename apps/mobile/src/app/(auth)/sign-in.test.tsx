@@ -605,12 +605,12 @@ describe('SignInScreen', () => {
   // Navigation contract — regression guard for sign-in bounce-back bug.
   //
   // BUG (2026-04-05): After successful verification, router.replace() fired
-  // before Clerk's React state propagated.  The learner layout guard saw
+  // before Clerk's React state propagated.  The app layout guard saw
   // isSignedIn: false and bounced the user to an empty sign-in screen.
   //
   // FIX: Auth screens must NEVER call router.replace() or router.push()
   // after setActive().  The (auth)/_layout guard reactively redirects to
-  // /(learner)/home when useAuth().isSignedIn becomes true.
+  // /(app)/home when useAuth().isSignedIn becomes true.
   //
   // These tests verify that contract holds for EVERY auth completion path.
   // If you add a new sign-in method, add a test here proving it does NOT

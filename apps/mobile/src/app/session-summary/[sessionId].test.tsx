@@ -220,7 +220,7 @@ describe('SessionSummaryScreen', () => {
 
     fireEvent.press(screen.getByTestId('continue-button'));
     await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith('/(learner)/home');
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
     });
   });
 
@@ -265,7 +265,7 @@ describe('SessionSummaryScreen', () => {
 
     await waitFor(() => {
       expect(mockOnSuccessfulRecall).toHaveBeenCalled();
-      expect(mockReplace).toHaveBeenCalledWith('/(learner)/home');
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
     });
   });
 
@@ -279,7 +279,7 @@ describe('SessionSummaryScreen', () => {
 
     await waitFor(() => {
       expect(mockSkipMutateAsync).toHaveBeenCalled();
-      expect(mockReplace).toHaveBeenCalledWith('/(learner)/home');
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
     });
   });
 
@@ -324,7 +324,7 @@ describe('SessionSummaryScreen', () => {
 
     await waitFor(() => {
       expect(mockUpdateLearningModeMutateAsync).toHaveBeenCalledWith('casual');
-      expect(mockReplace).toHaveBeenCalledWith('/(learner)/home');
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
     });
   });
 
@@ -359,7 +359,7 @@ describe('SessionSummaryScreen', () => {
     fireEvent.press(screen.getByTestId('recall-bridge-done-button'));
 
     await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith('/(learner)/home');
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
     });
   });
 
@@ -377,7 +377,7 @@ describe('SessionSummaryScreen', () => {
 
     await waitFor(() => {
       expect(mockSkipMutateAsync).toHaveBeenCalled();
-      expect(mockReplace).toHaveBeenCalledWith('/(learner)/home');
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
     });
 
     expect(mockRecallBridgeMutateAsync).not.toHaveBeenCalled();

@@ -1207,7 +1207,7 @@ export function getUpgradePrompt(params: {
       reason: 'quota_cap_reached',
       suggestedTier: 'plus',
       message:
-        "You've reached your free plan limit. Upgrade to Plus for 500 questions/month.",
+        "You've reached your free plan limit. Upgrade to Plus for 700 questions/month.",
     };
   }
 

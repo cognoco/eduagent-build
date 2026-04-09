@@ -1,0 +1,2 @@
+CREATE INDEX "book_suggestions_subject_id_idx" ON "book_suggestions" USING btree ("subject_id");--> statement-breakpoint
+CREATE INDEX "topic_suggestions_book_id_idx" ON "topic_suggestions" USING btree ("book_id");

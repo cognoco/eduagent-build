@@ -41,7 +41,7 @@ const TIER_CONFIGS: Record<SubscriptionState['tier'], TierConfig> = {
     topUpAmount: 0,
   },
   plus: {
-    monthlyQuota: 500,
+    monthlyQuota: 700,
     dailyLimit: null,
     maxProfiles: 1,
     premiumModelProfiles: 1,

@@ -3,7 +3,18 @@
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
-import { eq, and, asc, desc, inArray, lt, isNotNull, sql } from 'drizzle-orm';
+import {
+  eq,
+  and,
+  asc,
+  desc,
+  inArray,
+  lt,
+  isNotNull,
+  sql,
+  or,
+  gte,
+} from 'drizzle-orm';
 import {
   learningSessions,
   sessionEvents,
@@ -12,6 +23,7 @@ import {
   curricula,
   curriculumBooks,
   curriculumTopics,
+  topicNotes,
   profiles,
   retentionCards,
   vocabulary,
@@ -48,7 +60,12 @@ import {
 } from './escalation';
 import { createPendingSessionSummary, evaluateSummary } from './summaries';
 import { getSubject } from './subject';
-import { fetchPriorTopics, buildPriorLearningContext } from './prior-learning';
+import {
+  fetchPriorTopics,
+  buildPriorLearningContext,
+  fetchCrossSubjectHighlights,
+  buildCrossSubjectContext,
+} from './prior-learning';
 import { retrieveRelevantMemory } from './memory';
 import { getTeachingPreference } from './retention-data';
 import { shouldTriggerEvaluate } from './evaluate';
@@ -320,6 +337,11 @@ async function buildBookLearningHistoryContext(
   });
   if (!book) return undefined;
 
+  // Fetch shelf (subject) name for richer context
+  const subject = await db.query.subjects.findFirst({
+    where: eq(subjects.id, book.subjectId),
+  });
+
   const curriculum = await db.query.curricula.findFirst({
     where: eq(curricula.subjectId, book.subjectId),
     orderBy: desc(curricula.version),
@@ -338,20 +360,38 @@ async function buildBookLearningHistoryContext(
 
   // Filter to completed/auto_closed sessions with endedAt in SQL to
   // avoid loading abandoned sessions into memory.
-  const sessions = await db
-    .select({
-      topicId: learningSessions.topicId,
-      endedAt: learningSessions.endedAt,
-    })
-    .from(learningSessions)
-    .where(
-      and(
-        eq(learningSessions.profileId, profileId),
-        inArray(learningSessions.topicId, topicIds),
-        inArray(learningSessions.status, ['completed', 'auto_closed']),
-        isNotNull(learningSessions.endedAt)
+  const [sessions, notes] = await Promise.all([
+    db
+      .select({
+        topicId: learningSessions.topicId,
+        endedAt: learningSessions.endedAt,
+      })
+      .from(learningSessions)
+      .where(
+        and(
+          eq(learningSessions.profileId, profileId),
+          inArray(learningSessions.topicId, topicIds),
+          inArray(learningSessions.status, ['completed', 'auto_closed']),
+          isNotNull(learningSessions.endedAt)
+        )
+      ),
+    // Fetch recent topic notes for this book (last 3, full text)
+    db
+      .select({
+        topicId: topicNotes.topicId,
+        content: topicNotes.content,
+        updatedAt: topicNotes.updatedAt,
+      })
+      .from(topicNotes)
+      .where(
+        and(
+          inArray(topicNotes.topicId, topicIds),
+          eq(topicNotes.profileId, profileId)
+        )
       )
-    );
+      .orderBy(desc(topicNotes.updatedAt))
+      .limit(3),
+  ]);
 
   const latestByTopic = new Map<string, Date>();
   for (const session of sessions) {
@@ -363,23 +403,66 @@ async function buildBookLearningHistoryContext(
     }
   }
 
-  const lines = topics
-    .filter((topic) => topic.id !== currentTopicId)
-    .map((topic) => {
-      const latest = latestByTopic.get(topic.id);
-      if (!latest) return null;
-      return `- ${topic.title} — ${formatLearningRecency(latest)}`;
-    })
-    .filter((line): line is string => line != null)
-    .slice(0, 10);
+  // Build chapter groupings with topic summaries
+  const chapterMap = new Map<string, typeof topics>();
+  for (const topic of topics) {
+    if (topic.id === currentTopicId) continue;
+    const chapter = topic.chapter ?? 'General';
+    const list = chapterMap.get(chapter) ?? [];
+    list.push(topic);
+    chapterMap.set(chapter, list);
+  }
 
-  if (lines.length === 0) return undefined;
+  const sections: string[] = [];
 
-  return [
-    `Learning history in this book (${book.title}):`,
-    ...lines,
-    'Build on these naturally when they help the learner connect ideas.',
-  ].join('\n');
+  // Header with shelf and book info
+  const shelfName = subject?.name ?? 'Unknown';
+  sections.push(`Shelf: ${shelfName}`);
+  sections.push(
+    `Book: ${book.title}${book.description ? ` — "${book.description}"` : ''}`
+  );
+
+  // Chapter groupings
+  if (chapterMap.size > 0) {
+    sections.push('Chapters:');
+    for (const [chapterName, chapterTopics] of chapterMap.entries()) {
+      const coveredTopics = chapterTopics
+        .filter((t) => latestByTopic.has(t.id))
+        .slice(0, 5);
+      if (coveredTopics.length > 0) {
+        const topicNames = coveredTopics.map((t) => {
+          const recency = formatLearningRecency(latestByTopic.get(t.id)!);
+          return `${t.title} (${recency})`;
+        });
+        sections.push(`- ${chapterName}: ${topicNames.join(', ')}`);
+      }
+    }
+  }
+
+  // Recent notes
+  if (notes.length > 0) {
+    const topicTitleMap = new Map(topics.map((t) => [t.id, t.title]));
+    sections.push('Recent notes:');
+    for (const note of notes) {
+      const title = topicTitleMap.get(note.topicId) ?? 'Unknown';
+      // Truncate note content to avoid token blowup
+      const content =
+        note.content.length > 200
+          ? note.content.slice(0, 200) + '...'
+          : note.content;
+      sections.push(`- ${title}: "${content}"`);
+    }
+  }
+
+  // Only return if there is meaningful content beyond headers
+  const hasTopicHistory = latestByTopic.size > 0;
+  const hasNotes = notes.length > 0;
+  if (!hasTopicHistory && !hasNotes) return undefined;
+
+  sections.push(
+    'Build on these naturally when they help the learner connect ideas.'
+  );
+  return sections.join('\n');
 }
 
 async function buildHomeworkLibraryContext(
@@ -438,6 +521,7 @@ function mapSessionRow(
     endedAt: row.endedAt?.toISOString() ?? null,
     durationSeconds: row.durationSeconds ?? null,
     wallClockSeconds: row.wallClockSeconds ?? null,
+    rawInput: row.rawInput ?? null,
     ...(metadata ? { metadata } : {}),
   };
 }
@@ -594,6 +678,7 @@ export async function startSession(
         ...(input.metadata ?? {}),
         inputMode: input.inputMode ?? input.metadata?.inputMode ?? 'text',
       },
+      rawInput: input.rawInput ?? null,
     })
     .returning();
 
@@ -666,6 +751,33 @@ async function checkExchangeLimit(
   }
 }
 
+/**
+ * CFLF-23: Merge per-message memory context with rawInput-based pre-session
+ * memory context. De-duplicates when both sources return the same underlying
+ * text (the per-message memory may overlap with rawInput memory on the first
+ * exchange). Returns empty string when neither source has content.
+ */
+function mergeMemoryContexts(
+  messageMemory: string,
+  rawInputMemory: string
+): string {
+  if (!messageMemory && !rawInputMemory) return '';
+  if (!rawInputMemory) return messageMemory;
+  if (!messageMemory) return rawInputMemory;
+
+  // Deduplicate: if both strings are identical, return just one.
+  if (messageMemory === rawInputMemory) return messageMemory;
+
+  // Partial overlap: if one is a substring of the other, keep the longer one.
+  if (messageMemory.includes(rawInputMemory)) return messageMemory;
+  if (rawInputMemory.includes(messageMemory)) return rawInputMemory;
+
+  // Both have unique content — concatenate with a separator.
+  // The prompt builder already handles a single embeddingMemoryContext block,
+  // so we merge here to avoid duplicating the header text.
+  return `${messageMemory}\n\n---\nAdditional context from the learner's original question:\n${rawInputMemory}`;
+}
+
 async function prepareExchangeContext(
   db: Database,
   profileId: string,
@@ -692,6 +804,10 @@ async function prepareExchangeContext(
   );
 
   // 2. Load all supplementary data in parallel (all independent after session load)
+  // CFLF-23: For freeform sessions with rawInput, also scan prior sessions
+  // by the learner's original intent so the very first exchange has rich context.
+  const isFreeformWithRawInput = !session.topicId && !!session.rawInput;
+
   const [
     subject,
     topicRows,
@@ -703,6 +819,8 @@ async function prepareExchangeContext(
     teachingPref,
     metadataRows,
     learningModeRecord,
+    crossSubjectHighlights,
+    rawInputMemory,
   ] = await Promise.all([
     Promise.resolve(staticContext.subject),
     session.topicId
@@ -751,6 +869,19 @@ async function prepareExchangeContext(
       : Promise.resolve([]),
     // Learning mode: affects LLM tutoring style (casual vs serious)
     getLearningMode(db, profileId),
+    // Story 16.0: Cross-subject learning highlights for broader context
+    fetchCrossSubjectHighlights(db, profileId, session.subjectId),
+    // CFLF-23: Pre-session similarity scan — uses rawInput for freeform sessions
+    // Graceful degradation: if Voyage API is down, returns empty (never breaks session)
+    isFreeformWithRawInput
+      ? retrieveRelevantMemory(
+          db,
+          profileId,
+          session.rawInput!,
+          options?.voyageApiKey,
+          5
+        )
+      : Promise.resolve({ context: '', topicIds: [] }),
   ]);
 
   const topic = topicRows[0];
@@ -936,6 +1067,8 @@ async function prepareExchangeContext(
 
   // 5. Build prior learning context (FR40 — bridge FR)
   const priorLearning = buildPriorLearningContext(priorTopics);
+  const crossSubjectContext =
+    buildCrossSubjectContext(crossSubjectHighlights) || undefined;
   const learningHistoryParts = [
     topic?.bookId && topic?.id
       ? await getCachedBookLearningHistoryContext(
@@ -971,8 +1104,11 @@ async function prepareExchangeContext(
       profile?.birthYear ?? birthYearFromDateLike(profile?.birthDate ?? null),
     workedExampleLevel: interleavedTopics ? undefined : workedExampleLevel,
     priorLearningContext: priorLearning.contextText || undefined,
+    crossSubjectContext,
     learningHistoryContext,
-    embeddingMemoryContext: memory.context || undefined,
+    // CFLF-23: Merge per-message memory with rawInput-based pre-session memory
+    embeddingMemoryContext:
+      mergeMemoryContexts(memory.context, rawInputMemory.context) || undefined,
     pedagogyMode: subject?.pedagogyMode ?? 'socratic',
     nativeLanguage: teachingPref?.nativeLanguage ?? undefined,
     languageCode: subject?.languageCode ?? undefined,
@@ -997,6 +1133,8 @@ async function prepareExchangeContext(
     homeworkMode: options?.homeworkMode,
     // Subscription-derived LLM tier — controls model routing
     llmTier: options?.llmTier,
+    // CFLF: Original learner input so the LLM stays anchored to intent
+    rawInput: session.rawInput,
   };
 
   return { session, context, effectiveRung, hintCount, lastAiResponseAt };
@@ -2054,4 +2192,86 @@ export async function submitSummary(
       status: finalStatus,
     },
   };
+}
+
+// ---------------------------------------------------------------------------
+// Book Sessions — sessions grouped by topic for the Book screen [CFLF-18]
+// ---------------------------------------------------------------------------
+
+export interface BookSession {
+  id: string;
+  topicId: string | null;
+  topicTitle: string;
+  chapter: string | null;
+  createdAt: string;
+}
+
+/**
+ * Returns completed sessions for a specific book, filtered by minimum quality:
+ * at least 3 exchanges OR 60+ active seconds. Profile ownership is verified
+ * through the subjects table parent chain.
+ */
+export async function getBookSessions(
+  db: Database,
+  profileId: string,
+  bookId: string
+): Promise<BookSession[]> {
+  const rows = await db
+    .select({
+      id: learningSessions.id,
+      topicId: learningSessions.topicId,
+      topicTitle: curriculumTopics.title,
+      chapter: curriculumTopics.chapter,
+      createdAt: learningSessions.createdAt,
+      exchangeCount: learningSessions.exchangeCount,
+      durationSeconds: learningSessions.durationSeconds,
+    })
+    .from(learningSessions)
+    .innerJoin(
+      curriculumTopics,
+      eq(learningSessions.topicId, curriculumTopics.id)
+    )
+    .innerJoin(subjects, eq(learningSessions.subjectId, subjects.id))
+    .where(
+      and(
+        eq(curriculumTopics.bookId, bookId),
+        eq(subjects.profileId, profileId),
+        eq(learningSessions.status, 'completed'),
+        or(
+          gte(learningSessions.exchangeCount, 3),
+          gte(learningSessions.durationSeconds, 60)
+        )
+      )
+    )
+    .orderBy(desc(learningSessions.createdAt));
+
+  return rows.map((r) => ({
+    id: r.id,
+    topicId: r.topicId,
+    topicTitle: r.topicTitle,
+    chapter: r.chapter,
+    createdAt: r.createdAt.toISOString(),
+  }));
+}
+
+/**
+ * Backfill topicId on a learning session after post-session filing.
+ * Without this, freeform-filed sessions won't appear in getBookSessions
+ * because that query joins on learningSessions.topicId.
+ */
+export async function backfillSessionTopicId(
+  db: Database,
+  profileId: string,
+  sessionId: string,
+  topicId: string
+): Promise<void> {
+  await db
+    .update(learningSessions)
+    .set({ topicId })
+    .where(
+      and(
+        eq(learningSessions.id, sessionId),
+        eq(learningSessions.profileId, profileId)
+      )
+    );
 }

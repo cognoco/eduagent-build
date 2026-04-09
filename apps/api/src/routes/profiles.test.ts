@@ -216,6 +216,33 @@ describe('profile routes', () => {
       expect(res.status).toBe(400);
     });
 
+    it('returns 403 when profile limit is exceeded', async () => {
+      const {
+        createProfileWithLimitCheck,
+        ProfileLimitError,
+      } = require('../services/profile');
+      (createProfileWithLimitCheck as jest.Mock).mockRejectedValueOnce(
+        new ProfileLimitError()
+      );
+
+      const res = await app.request(
+        '/v1/profiles',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            displayName: 'Test User',
+            birthYear: 2010,
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body.message).toMatch(/upgrade/i);
+    });
+
     it('returns 400 when no age field is provided', async () => {
       const res = await app.request(
         '/v1/profiles',

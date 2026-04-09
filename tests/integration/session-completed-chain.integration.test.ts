@@ -79,6 +79,7 @@ async function executeChain(
   const mockStep = {
     run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
     sleep: jest.fn(),
+    waitForEvent: jest.fn().mockResolvedValue(null),
   };
 
   const handler = (sessionCompleted as any).fn;

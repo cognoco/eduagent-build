@@ -26,19 +26,12 @@ const EXEMPT_SCREENS: string[] = [
   // Root redirect — no UI, just redirects
   'index.tsx',
   // Tab screens — bottom tab navigation provides navigation
-  '(learner)/home.tsx',
-  '(learner)/library.tsx',
-  '(learner)/more.tsx',
-  '(parent)/dashboard.tsx',
-  '(parent)/more.tsx',
-  '(parent)/library.tsx',
+  '(app)/home.tsx',
+  '(app)/library.tsx',
+  '(app)/more.tsx',
   // Sign-in is the auth entry point — no "back" since there's nowhere
   // to go when unauthenticated. Has links to sign-up and forgot-password.
   '(auth)/sign-in.tsx',
-  // Parent re-exports — pure re-exports of learner screens; navigation
-  // lives entirely in the target file, not the re-export wrapper.
-  '(parent)/shelf/[subjectId]/index.tsx',
-  '(parent)/shelf/[subjectId]/book/[bookId].tsx',
 ];
 
 function getAllScreenFiles(dir: string): string[] {

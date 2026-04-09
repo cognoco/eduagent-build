@@ -7,6 +7,7 @@ import { eq, and, notInArray, sql } from 'drizzle-orm';
 import {
   subjects,
   curriculumBooks,
+  bookSuggestions,
   learningSessions,
   createScopedRepository,
   type Database,
@@ -19,11 +20,7 @@ import type {
   Subject,
   SubjectStructureType,
 } from '@eduagent/schemas';
-import {
-  createBooks,
-  ensureCurriculum,
-  persistNarrowTopics,
-} from './curriculum';
+import { ensureCurriculum, persistNarrowTopics } from './curriculum';
 import { detectLanguageSubject } from './language-detect';
 import {
   generateLanguageCurriculum,
@@ -101,6 +98,7 @@ export interface CreatedSubjectWithStructure {
   bookTitle?: string;
   bookCount?: number;
   topicCount?: number;
+  suggestionCount?: number;
   /** True when LLM classification failed and we fell back to narrow */
   classificationFailed?: boolean;
 }
@@ -125,8 +123,18 @@ export async function createSubjectWithStructure(
   profileId: string,
   input: SubjectCreateInput
 ): Promise<CreatedSubjectWithStructure> {
+  // Server-side focus inference: if rawInput ("tea") differs from name ("Botany"),
+  // the rawInput IS the focus even if the client didn't send it explicitly.
+  // This prevents falling through to the broad path and generating 8+ generic books.
+  const effectiveFocus =
+    input.focus ??
+    (input.rawInput && input.rawInput.toLowerCase() !== input.name.toLowerCase()
+      ? input.rawInput
+      : undefined);
+  const effectiveFocusDescription = input.focusDescription ?? undefined;
+
   // Focused book path: input combines a broad subject with a specific focus area
-  if (input.focus) {
+  if (effectiveFocus) {
     const existingSubject = await findExistingSubjectByName(
       db,
       profileId,
@@ -145,7 +153,7 @@ export async function createSubjectWithStructure(
     const existingBook = await db.query.curriculumBooks.findFirst({
       where: and(
         eq(curriculumBooks.subjectId, targetSubject.id),
-        sql`LOWER(${curriculumBooks.title}) = LOWER(${input.focus})`
+        sql`LOWER(${curriculumBooks.title}) = LOWER(${effectiveFocus})`
       ),
     });
     if (existingBook) {
@@ -171,8 +179,8 @@ export async function createSubjectWithStructure(
       .insert(curriculumBooks)
       .values({
         subjectId: targetSubject.id,
-        title: input.focus,
-        description: input.focusDescription ?? null,
+        title: effectiveFocus,
+        description: effectiveFocusDescription ?? null,
         emoji: null,
         sortOrder: nextOrder,
         topicsGenerated: false,
@@ -183,7 +191,7 @@ export async function createSubjectWithStructure(
       subject: targetSubject,
       structureType: 'focused_book',
       bookId: bookRow!.id,
-      bookTitle: input.focus,
+      bookTitle: effectiveFocus,
       bookCount: 1,
     };
   }
@@ -215,16 +223,21 @@ export async function createSubjectWithStructure(
 
     if (structure.type === 'broad') {
       await ensureCurriculum(db, subject.id);
-      const books = await createBooks(
-        db,
-        profileId,
-        subject.id,
-        structure.books
-      );
+      // Store as suggestions, NOT real books — learner picks from picker screen
+      const suggestionValues = structure.books.map((book) => ({
+        subjectId: subject.id,
+        title: book.title,
+        emoji: book.emoji,
+        description: book.description,
+      }));
+      if (suggestionValues.length > 0) {
+        await db.insert(bookSuggestions).values(suggestionValues);
+      }
       return {
         subject,
         structureType: 'broad',
-        ...(books.length > 0 ? { bookCount: books.length } : {}),
+        bookCount: 0,
+        suggestionCount: suggestionValues.length,
       };
     }
 

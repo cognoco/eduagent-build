@@ -85,12 +85,13 @@ export default function CreateSubjectScreen() {
         // subject so the user can continue learning the topic they asked about.
         if (returnTo === 'chat') {
           router.replace({
-            pathname: '/(learner)/session',
+            pathname: '/(app)/session',
             params: {
               mode: 'freeform',
               subjectId: result.subject.id,
               subjectName: result.subject.name,
               ...(chatTopic ? { topicName: chatTopic } : {}),
+              ...(rawInput ? { rawInput } : {}),
             },
           } as never);
           return;
@@ -98,7 +99,7 @@ export default function CreateSubjectScreen() {
 
         if (result.structureType === 'focused_book' && result.bookId) {
           router.replace({
-            pathname: '/(learner)/onboarding/interview',
+            pathname: '/(app)/onboarding/interview',
             params: {
               subjectId: result.subject.id,
               subjectName: result.subject.name,
@@ -111,7 +112,7 @@ export default function CreateSubjectScreen() {
 
         if (result.structureType === 'broad') {
           router.replace({
-            pathname: '/(learner)/library',
+            pathname: '/(app)/pick-book/[subjectId]',
             params: {
               subjectId: result.subject.id,
             },
@@ -121,7 +122,7 @@ export default function CreateSubjectScreen() {
 
         if (result.subject.pedagogyMode === 'four_strands') {
           router.replace({
-            pathname: '/(learner)/onboarding/language-setup',
+            pathname: '/(app)/onboarding/language-setup',
             params: {
               subjectId: result.subject.id,
               languageCode: result.subject.languageCode ?? '',
@@ -132,7 +133,7 @@ export default function CreateSubjectScreen() {
         }
 
         router.replace({
-          pathname: '/(learner)/onboarding/interview',
+          pathname: '/(app)/onboarding/interview',
           params: {
             subjectId: result.subject.id,
             subjectName: result.subject.name,
@@ -192,19 +193,31 @@ export default function CreateSubjectScreen() {
       description: string;
       focus?: string;
     }) => {
-      setName(suggestion.name);
       // [BUG-237] When the user's original input (e.g. "Easter") differs from
       // the picked suggestion name (e.g. "World History"), the original input
       // IS the focus topic.  Without this, the API receives only "World History"
       // with no focus hint and bulk-generates generic books.
+      //
+      // Also handle LLM returning combined names like "Biology — Botany" or
+      // "Biology: Botany" — split and use the second part as the subject name
+      // with the original input as focus.
+      let subjectName = suggestion.name;
+      let suggestionFocus = suggestion.focus;
+      const dashMatch = suggestion.name.match(/^(.+?)\s*[—–:]\s*(.+)$/);
+      if (dashMatch?.[2] && !suggestionFocus) {
+        subjectName = dashMatch[2].trim();
+        suggestionFocus = originalInput || dashMatch[2].trim();
+      }
+
+      setName(subjectName);
       const effectiveFocus =
-        suggestion.focus ??
+        suggestionFocus ??
         (originalInput &&
-        originalInput.toLowerCase() !== suggestion.name.toLowerCase()
+        originalInput.toLowerCase() !== subjectName.toLowerCase()
           ? originalInput
           : undefined);
       await doCreate(
-        suggestion.name,
+        subjectName,
         originalInput || undefined,
         effectiveFocus,
         effectiveFocus ? suggestion.description : undefined

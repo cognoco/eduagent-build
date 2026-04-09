@@ -92,6 +92,18 @@ export const sessionCompleted = inngest.createFunction(
       sessionType,
     } = event.data;
 
+    // AD6: Wait for filing to complete before progressing, so that the
+    // progress snapshot captures topic placement from the filing step.
+    // Freeform sessions (no topicId) and homework sessions trigger filing
+    // as a separate async step; we give it up to 60 s to land.
+    if (sessionType === 'homework' || !topicId) {
+      await step.waitForEvent('wait-for-filing', {
+        event: 'app/filing.completed',
+        match: 'data.sessionId',
+        timeout: '60s',
+      });
+    }
+
     const outcomes: StepOutcome[] = [];
     let previousLanguageProgress: Awaited<
       ReturnType<typeof getCurrentLanguageProgress>

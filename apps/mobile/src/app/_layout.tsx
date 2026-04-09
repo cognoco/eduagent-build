@@ -211,8 +211,7 @@ function ThemedContent({ colorScheme }: { colorScheme: ColorScheme }) {
       {isOffline && <OfflineBanner />}
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(auth)" />
-        <Stack.Screen name="(learner)" />
-        <Stack.Screen name="(parent)" />
+        <Stack.Screen name="(app)" />
         <Stack.Screen name="sso-callback" />
         <Stack.Screen
           name="assessment"
