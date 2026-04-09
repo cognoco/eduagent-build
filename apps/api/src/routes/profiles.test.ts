@@ -63,13 +63,10 @@ jest.mock('../services/profile', () => ({
       accountId,
       displayName: input.displayName,
       avatarUrl: input.avatarUrl ?? null,
-      birthDate: input.birthDate ?? null,
-      birthYear:
-        input.birthYear ??
-        (input.birthDate ? Number(input.birthDate.slice(0, 4)) : null),
-      personaType: input.personaType ?? 'LEARNER',
+      birthYear: input.birthYear ?? null,
       location: null,
       isOwner: false,
+      hasPremiumLlm: false,
       consentStatus: null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -79,11 +76,10 @@ jest.mock('../services/profile', () => ({
     accountId: 'test-account-id',
     displayName: 'Test User',
     avatarUrl: null,
-    birthDate: null,
     birthYear: null,
-    personaType: 'LEARNER',
     location: null,
     isOwner: false,
+    hasPremiumLlm: false,
     consentStatus: null,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -93,11 +89,10 @@ jest.mock('../services/profile', () => ({
     accountId: 'test-account-id',
     displayName: 'Updated Name',
     avatarUrl: null,
-    birthDate: null,
     birthYear: null,
-    personaType: 'LEARNER',
     location: null,
     isOwner: false,
+    hasPremiumLlm: false,
     consentStatus: null,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -159,8 +154,7 @@ describe('profile routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({
             displayName: 'Test User',
-            personaType: 'LEARNER',
-            birthDate: '2008-06-15',
+            birthYear: 2008,
           }),
         },
         TEST_ENV
@@ -171,7 +165,6 @@ describe('profile routes', () => {
       const body = await res.json();
       expect(body.profile).toBeDefined();
       expect(body.profile.displayName).toBe('Test User');
-      expect(body.profile.personaType).toBe('LEARNER');
       expect(body.profile.birthYear).toBe(2008);
       expect(body.profile.accountId).toBeDefined();
       expect(body.profile.createdAt).toBeDefined();
@@ -206,8 +199,7 @@ describe('profile routes', () => {
           method: 'POST',
           headers: AUTH_HEADERS,
           body: JSON.stringify({
-            personaType: 'TEEN',
-            birthDate: '2014-03-10',
+            birthYear: 2014,
           }),
         },
         TEST_ENV

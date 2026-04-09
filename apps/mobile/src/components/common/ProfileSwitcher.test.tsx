@@ -7,7 +7,6 @@ const makeProfile = (overrides: Partial<Profile> = {}): Profile => ({
   accountId: '00000000-0000-0000-0000-000000000099',
   displayName: 'Alex',
   avatarUrl: null,
-  birthDate: null,
   birthYear: 2010,
   location: null,
   isOwner: true,

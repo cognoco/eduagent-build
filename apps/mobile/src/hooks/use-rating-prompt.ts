@@ -60,13 +60,7 @@ export function useRatingPrompt(): {
     if (!activeProfile) return;
 
     if (activeProfile.birthYear == null) return;
-    if (
-      computeAgeBracket(
-        activeProfile.birthYear,
-        activeProfile.birthDate ?? undefined
-      ) === 'adult'
-    )
-      return;
+    if (computeAgeBracket(activeProfile.birthYear) === 'adult') return;
 
     const profileId = activeProfile.id;
 

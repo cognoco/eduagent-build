@@ -44,7 +44,6 @@ import type {
   SessionMetadata,
   SessionAnalyticsEventInput,
 } from '@eduagent/schemas';
-import { birthYearFromDateLike } from '@eduagent/schemas';
 import {
   processExchange,
   streamExchange,
@@ -1100,8 +1099,7 @@ async function prepareExchangeContext(
     sessionType: session.sessionType as 'learning' | 'homework' | 'interleaved',
     escalationRung: effectiveRung,
     exchangeHistory,
-    birthYear:
-      profile?.birthYear ?? birthYearFromDateLike(profile?.birthDate ?? null),
+    birthYear: profile?.birthYear ?? null,
     workedExampleLevel: interleavedTopics ? undefined : workedExampleLevel,
     priorLearningContext: priorLearning.contextText || undefined,
     crossSubjectContext,

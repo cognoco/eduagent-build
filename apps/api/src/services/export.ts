@@ -243,9 +243,7 @@ export async function generateExport(
       accountId: row.accountId,
       displayName: row.displayName,
       avatarUrl: row.avatarUrl ?? null,
-      birthDate: row.birthDate
-        ? row.birthDate.toISOString().split('T')[0]!
-        : null,
+      birthYear: row.birthYear ?? null,
       location: row.location ?? null,
       isOwner: row.isOwner,
       hasPremiumLlm: row.hasPremiumLlm,

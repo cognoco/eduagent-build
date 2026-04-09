@@ -866,14 +866,12 @@ describe('processMessage', () => {
     );
   });
 
-  it('derives birthYear from the profile birth date', async () => {
+  it('passes birthYear from the profile to exchange context', async () => {
     setupScopedRepo({
       sessionFindFirst: mockSessionRow({ topicId: null }),
     });
     const db = createMockDb({
-      profileSelectResults: [
-        { birthDate: new Date('2014-06-15T00:00:00.000Z') },
-      ],
+      profileSelectResults: [{ birthYear: 2014 }],
     });
     await processMessage(db, profileId, sessionId, {
       message: 'Hey there',
