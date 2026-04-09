@@ -58,7 +58,7 @@ export class ErrorBoundary extends Component<
           <Text className="text-body text-text-secondary text-center mb-4">
             {this.state.error?.message ?? 'An unexpected error occurred.'}
           </Text>
-          {this.state.componentStack && (
+          {__DEV__ && this.state.componentStack && (
             <View className="bg-surface rounded-card px-3 py-2 mb-4 w-full">
               <Text className="text-caption text-text-tertiary font-mono">
                 {this.state.componentStack.trim().slice(0, 500)}

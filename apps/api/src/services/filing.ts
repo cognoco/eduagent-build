@@ -17,6 +17,7 @@ import {
   curriculumBooks,
   curriculumTopics,
   generateUUIDv7,
+  createScopedRepository,
 } from '@eduagent/database';
 import {
   filingResponseSchema,
@@ -38,12 +39,10 @@ export async function buildLibraryIndex(
   db: Database,
   profileId: string
 ): Promise<LibraryIndex> {
-  const activeSubjects = await db.query.subjects.findMany({
-    where: and(
-      eq(subjects.profileId, profileId),
-      eq(subjects.status, 'active')
-    ),
-  });
+  const repo = createScopedRepository(db, profileId);
+  const activeSubjects = await repo.subjects.findMany(
+    eq(subjects.status, 'active')
+  );
 
   if (activeSubjects.length === 0) {
     return { shelves: [] };

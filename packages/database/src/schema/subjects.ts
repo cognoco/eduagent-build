@@ -193,32 +193,40 @@ export const curriculumAdaptations = pgTable('curriculum_adaptations', {
     .defaultNow(),
 });
 
-export const bookSuggestions = pgTable('book_suggestions', {
-  id: uuid('id')
-    .primaryKey()
-    .$defaultFn(() => generateUUIDv7()),
-  subjectId: uuid('subject_id')
-    .notNull()
-    .references(() => subjects.id, { onDelete: 'cascade' }),
-  title: text('title').notNull(),
-  emoji: text('emoji'),
-  description: text('description'),
-  createdAt: timestamp('created_at', { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  pickedAt: timestamp('picked_at', { withTimezone: true }),
-});
+export const bookSuggestions = pgTable(
+  'book_suggestions',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .$defaultFn(() => generateUUIDv7()),
+    subjectId: uuid('subject_id')
+      .notNull()
+      .references(() => subjects.id, { onDelete: 'cascade' }),
+    title: text('title').notNull(),
+    emoji: text('emoji'),
+    description: text('description'),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    pickedAt: timestamp('picked_at', { withTimezone: true }),
+  },
+  (table) => [index('book_suggestions_subject_id_idx').on(table.subjectId)]
+);
 
-export const topicSuggestions = pgTable('topic_suggestions', {
-  id: uuid('id')
-    .primaryKey()
-    .$defaultFn(() => generateUUIDv7()),
-  bookId: uuid('book_id')
-    .notNull()
-    .references(() => curriculumBooks.id, { onDelete: 'cascade' }),
-  title: text('title').notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  usedAt: timestamp('used_at', { withTimezone: true }),
-});
+export const topicSuggestions = pgTable(
+  'topic_suggestions',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .$defaultFn(() => generateUUIDv7()),
+    bookId: uuid('book_id')
+      .notNull()
+      .references(() => curriculumBooks.id, { onDelete: 'cascade' }),
+    title: text('title').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    usedAt: timestamp('used_at', { withTimezone: true }),
+  },
+  (table) => [index('topic_suggestions_book_id_idx').on(table.bookId)]
+);

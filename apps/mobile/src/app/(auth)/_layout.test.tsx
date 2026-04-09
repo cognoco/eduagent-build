@@ -72,7 +72,7 @@ describe('AuthRoutesLayout', () => {
 
     rerender(<AuthLayout />);
 
-    // Guard fires → user lands in learner home
+    // Guard fires → user lands in app home
     const redirect = screen.getByTestId('redirect');
     expect(redirect.props.children).toBe('/(app)/home');
     expect(screen.queryByTestId('stack')).toBeNull();

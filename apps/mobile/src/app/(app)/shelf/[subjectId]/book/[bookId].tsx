@@ -156,7 +156,13 @@ export default function BookScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [needsGeneration]);
 
+  const retryTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
   const handleRetryGeneration = () => {
+    // Clear any leftover retry timers before starting new ones
+    for (const t of retryTimersRef.current) clearTimeout(t);
+    retryTimersRef.current = [];
+
     alreadyPending.current = false;
     setGenPhase('idle');
 
@@ -165,24 +171,32 @@ export default function BookScreen() {
       () => setGenPhase('timed_out'),
       TIMEOUT_THRESHOLD_MS
     );
+    retryTimersRef.current = [slowTimer, timeoutTimer];
 
     generateMutation.mutate(undefined, {
       onSuccess: () => {
         setGenPhase('idle');
         alreadyPending.current = false;
-        clearTimeout(slowTimer);
-        clearTimeout(timeoutTimer);
+        for (const t of retryTimersRef.current) clearTimeout(t);
+        retryTimersRef.current = [];
         void bookQuery.refetch();
       },
       onError: (error) => {
         setGenPhase('timed_out');
         alreadyPending.current = false;
-        clearTimeout(slowTimer);
-        clearTimeout(timeoutTimer);
+        for (const t of retryTimersRef.current) clearTimeout(t);
+        retryTimersRef.current = [];
         Alert.alert('Generation failed', formatApiError(error));
       },
     });
   };
+
+  // Cleanup retry timers on unmount
+  useEffect(() => {
+    return () => {
+      for (const t of retryTimersRef.current) clearTimeout(t);
+    };
+  }, []);
 
   // --- Notes ---
   const notes = notesQuery.data?.notes ?? [];
@@ -295,6 +309,12 @@ export default function BookScreen() {
         } as never);
         return;
       }
+      // API-generated suggestion — pass title as rawInput for contextual opening
+      router.push({
+        pathname: '/(app)/session',
+        params: { mode: 'learning', subjectId, rawInput: first.title },
+      } as never);
+      return;
     }
     // Fallback: find first uncovered topic
     const sorted = [...topics].sort(
@@ -334,33 +354,18 @@ export default function BookScreen() {
 
   // --- Suggestion press ---
   const handleSuggestionPress = useCallback(
-    (card: { id: string; type: string }) => {
+    (card: { id: string; title: string; type: string }) => {
       if (card.type === 'topic') {
         router.push({
           pathname: '/(app)/session',
           params: { mode: 'learning', subjectId, topicId: card.id },
         } as never);
       } else {
-        // For API-generated suggestions, find matching topic or start generic session
-        const matchingTopic = topics.find(
-          (t: CurriculumTopic) => t.id === card.id
-        );
-        if (matchingTopic) {
-          router.push({
-            pathname: '/(app)/session',
-            params: {
-              mode: 'learning',
-              subjectId,
-              topicId: matchingTopic.id,
-            },
-          } as never);
-        } else {
-          Alert.alert(
-            'Topic not found',
-            'This suggestion may have expired. Try refreshing.',
-            [{ text: 'OK' }]
-          );
-        }
+        // For API-generated suggestions, pass title as rawInput for contextual session
+        router.push({
+          pathname: '/(app)/session',
+          params: { mode: 'learning', subjectId, rawInput: card.title },
+        } as never);
       }
     },
     [router, subjectId, topics]

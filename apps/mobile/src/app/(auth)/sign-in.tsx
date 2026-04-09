@@ -495,7 +495,7 @@ export default function SignInScreen() {
       // Don't navigate explicitly — the auth layout guard redirects to
       // /(app)/home once Clerk's useAuth() state propagates with
       // isSignedIn: true.  Calling router.replace() here races with Clerk's
-      // React state update: the learner layout renders before isSignedIn
+      // React state update: the app layout renders before isSignedIn
       // flips, sees !isSignedIn, and bounces back to sign-in.
       return true;
     },

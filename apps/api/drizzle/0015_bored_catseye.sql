@@ -22,4 +22,8 @@ ALTER TABLE "curriculum_topics" ADD COLUMN "session_id" uuid;--> statement-break
 ALTER TABLE "learning_sessions" ADD COLUMN "raw_input" text;--> statement-breakpoint
 ALTER TABLE "book_suggestions" ADD CONSTRAINT "book_suggestions_subject_id_subjects_id_fk" FOREIGN KEY ("subject_id") REFERENCES "public"."subjects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "topic_suggestions" ADD CONSTRAINT "topic_suggestions_book_id_curriculum_books_id_fk" FOREIGN KEY ("book_id") REFERENCES "public"."curriculum_books"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+-- HAND-CRAFTED FK: This constraint is NOT in the Drizzle snapshot because adding
+-- .references(() => learningSessions.id) to curriculumTopics.sessionId would create
+-- a circular import (subjects.ts ↔ sessions.ts). The snapshot omits it, so future
+-- `drizzle-kit generate` runs will NOT touch it — but verify after regeneration.
 ALTER TABLE "curriculum_topics" ADD CONSTRAINT "curriculum_topics_session_id_fk" FOREIGN KEY ("session_id") REFERENCES "public"."learning_sessions"("id") ON DELETE set null ON UPDATE no action;

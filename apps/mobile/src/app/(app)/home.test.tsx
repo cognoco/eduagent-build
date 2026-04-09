@@ -68,21 +68,6 @@ describe('HomeScreen intent router', () => {
     expect(screen.queryByTestId('parent-gateway')).toBeNull();
   });
 
-  // ParentGateway branch commented out (PR109-03) — _layout.tsx redirects parents
-  // before this screen renders. Uncomment when adaptive home is re-enabled.
-  // it('renders ParentGateway when owner profile has linked children', () => {
-  //   mockProfiles = [
-  //     { id: 'p1', displayName: 'Maria', isOwner: true },
-  //     { id: 'c1', displayName: 'Emma', isOwner: false },
-  //   ];
-  //   mockActiveProfile = mockProfiles[0] ?? null;
-  //
-  //   render(<HomeScreen />);
-  //
-  //   expect(screen.getByTestId('parent-gateway')).toBeTruthy();
-  //   expect(screen.queryByTestId('learner-screen')).toBeNull();
-  // });
-
   it('renders ParentGateway for owner with linked children', () => {
     mockProfiles = [
       { id: 'p1', displayName: 'Maria', isOwner: true },

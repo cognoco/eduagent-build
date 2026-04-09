@@ -92,12 +92,11 @@ export default function PickBookScreen(): React.ReactElement {
           bookId: result.bookId,
         },
       } as never);
-    } catch {
-      Alert.alert(
-        'Something went wrong',
-        "Couldn't set up that topic. Try again?",
-        [{ text: 'OK' }]
-      );
+    } catch (err) {
+      Alert.alert('Something went wrong', formatApiError(err), [
+        { text: 'Try again', onPress: () => void handleCustomSubmit() },
+        { text: 'Go back', onPress: () => router.back() },
+      ]);
     }
   };
 

@@ -69,9 +69,9 @@ jest.mock('expo-secure-store', () => ({
   setItemAsync: jest.fn(),
 }));
 
-const LearnerLayout = require('./_layout').default;
+const AppLayout = require('./_layout').default;
 
-describe('LearnerLayout', () => {
+describe('AppLayout', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (useAuth as jest.Mock).mockReturnValue({
@@ -91,7 +91,7 @@ describe('LearnerLayout', () => {
   });
 
   it('keeps linked-parent accounts in the learner tab shell for adaptive home', () => {
-    render(<LearnerLayout />);
+    render(<AppLayout />);
 
     expect(screen.getByTestId('tabs')).toBeTruthy();
     expect(screen.queryByTestId('redirect')).toBeNull();
@@ -114,7 +114,7 @@ describe('LearnerLayout', () => {
       isSignedIn: false,
     });
 
-    render(<LearnerLayout />);
+    render(<AppLayout />);
 
     const redirect = screen.getByTestId('redirect');
     expect(redirect.props.children).toBe('/(auth)/sign-in');
@@ -127,7 +127,7 @@ describe('LearnerLayout', () => {
       isSignedIn: undefined,
     });
 
-    render(<LearnerLayout />);
+    render(<AppLayout />);
 
     // Should render nothing — no redirect, no tabs, no flash
     expect(screen.queryByTestId('redirect')).toBeNull();
@@ -143,7 +143,7 @@ describe('LearnerLayout', () => {
       acknowledgeProfileRemoval: jest.fn(),
     });
 
-    render(<LearnerLayout />);
+    render(<AppLayout />);
 
     expect(screen.getByTestId('profile-loading')).toBeTruthy();
     expect(screen.queryByTestId('tabs')).toBeNull();

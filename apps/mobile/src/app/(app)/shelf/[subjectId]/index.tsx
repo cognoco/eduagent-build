@@ -17,6 +17,7 @@ import { useBookSuggestions } from '../../../../hooks/use-book-suggestions';
 import { useBooks } from '../../../../hooks/use-books';
 import { useFiling } from '../../../../hooks/use-filing';
 import { useSubjects } from '../../../../hooks/use-subjects';
+import { formatApiError } from '../../../../lib/format-api-error';
 import { useThemeColors } from '../../../../lib/theme';
 
 export default function ShelfScreen() {
@@ -52,8 +53,14 @@ export default function ShelfScreen() {
           autoStart: 'true',
         },
       } as never);
-    } catch {
-      Alert.alert('Error', "Couldn't set up that book.", [{ text: 'OK' }]);
+    } catch (err) {
+      Alert.alert('Error', formatApiError(err), [
+        {
+          text: 'Try again',
+          onPress: () => void handlePickBookSuggestion(suggestion),
+        },
+        { text: 'Go back', onPress: () => router.back() },
+      ]);
     }
   };
 

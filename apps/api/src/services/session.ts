@@ -2253,3 +2253,25 @@ export async function getBookSessions(
     createdAt: r.createdAt.toISOString(),
   }));
 }
+
+/**
+ * Backfill topicId on a learning session after post-session filing.
+ * Without this, freeform-filed sessions won't appear in getBookSessions
+ * because that query joins on learningSessions.topicId.
+ */
+export async function backfillSessionTopicId(
+  db: Database,
+  profileId: string,
+  sessionId: string,
+  topicId: string
+): Promise<void> {
+  await db
+    .update(learningSessions)
+    .set({ topicId })
+    .where(
+      and(
+        eq(learningSessions.id, sessionId),
+        eq(learningSessions.profileId, profileId)
+      )
+    );
+}

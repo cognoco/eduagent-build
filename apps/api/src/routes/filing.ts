@@ -13,8 +13,12 @@ import {
   markBookSuggestionPicked,
   markTopicSuggestionUsed,
 } from '../services/suggestions';
-import { getSessionTranscript } from '../services/session';
+import {
+  getSessionTranscript,
+  backfillSessionTopicId,
+} from '../services/session';
 import { routeAndCall } from '../services/llm';
+import { captureException } from '../services/sentry';
 import { inngest } from '../inngest/client';
 
 type FilingRouteEnv = {
@@ -68,7 +72,8 @@ export const filingRoutes = new Hono<FilingRouteEnv>().post(
         libraryIndex,
         routeAndCall
       );
-    } catch {
+    } catch (err) {
+      console.error('[filing] fileToLibrary failed:', err);
       return c.json(
         { code: 'FILING_FAILED', message: "Couldn't organize this topic." },
         500
@@ -101,6 +106,16 @@ export const filingRoutes = new Hono<FilingRouteEnv>().post(
       );
     }
 
+    // Backfill topicId on the session so it appears in getBookSessions
+    if (body.sessionId && result.topicId) {
+      await backfillSessionTopicId(
+        db,
+        profileId,
+        body.sessionId,
+        result.topicId
+      );
+    }
+
     // Mark suggestion as picked/used (prevents reappearing in picker)
     if (body.pickedSuggestionId) {
       await markBookSuggestionPicked(db, profileId, body.pickedSuggestionId);
@@ -122,10 +137,10 @@ export const filingRoutes = new Hono<FilingRouteEnv>().post(
         },
       })
       .catch((err) => {
-        console.error(
-          '[filing] Failed to dispatch filing.completed event:',
-          err
-        );
+        captureException(err, {
+          profileId,
+          extra: { event: 'app/filing.completed', bookId: result.bookId },
+        });
       });
 
     return c.json(result, 200);

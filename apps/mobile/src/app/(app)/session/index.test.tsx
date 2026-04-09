@@ -1,4 +1,5 @@
 import React from 'react';
+import { Alert } from 'react-native';
 import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import SessionScreen from './index';
@@ -38,6 +39,8 @@ jest.mock('../../../components/session', () => ({
     onInputModeChange,
     onSend,
     renderMessageActions,
+    rightAction,
+    footer,
   }: {
     subtitle?: string;
     messages?: Array<{ id: string; content: string }>;
@@ -54,6 +57,8 @@ jest.mock('../../../components/session', () => ({
       streaming?: boolean;
       isSystemPrompt?: boolean;
     }) => React.ReactNode;
+    rightAction?: React.ReactNode;
+    footer?: React.ReactNode;
   }) => {
     const { View, Text, Pressable } = require('react-native');
     return (
@@ -68,6 +73,8 @@ jest.mock('../../../components/session', () => ({
         ))}
         {inputAccessory}
         {belowInput}
+        {rightAction}
+        {footer}
         <Pressable
           testID="mock-set-voice-mode"
           onPress={() => onInputModeChange?.('voice')}
@@ -146,9 +153,10 @@ jest.mock('../../../hooks/use-notes', () => ({
   }),
 }));
 
+const mockFilingMutateAsync = jest.fn();
 jest.mock('../../../hooks/use-filing', () => ({
   useFiling: () => ({
-    mutateAsync: jest.fn(),
+    mutateAsync: mockFilingMutateAsync,
     isPending: false,
   }),
 }));
@@ -240,6 +248,7 @@ const { readSessionRecoveryMarker: mockReadSessionRecoveryMarker } =
     readSessionRecoveryMarker: jest.Mock;
   };
 
+const mockCelebrationsPendingGet = jest.fn();
 jest.mock('../../../lib/api-client', () => ({
   useApiClient: () => ({
     sessions: {
@@ -254,6 +263,14 @@ jest.mock('../../../lib/api-client', () => ({
         sessions: {
           $post: mockDirectStartSession,
         },
+      },
+    },
+    celebrations: {
+      pending: {
+        $get: mockCelebrationsPendingGet,
+      },
+      seen: {
+        $post: jest.fn().mockResolvedValue({ ok: true }),
       },
     },
   }),
@@ -333,6 +350,15 @@ describe('SessionScreen homework flow', () => {
       }
     );
     mockRecordSystemPrompt.mockResolvedValue({ ok: true });
+    mockCloseSession.mockResolvedValue({ wallClockSeconds: 120 });
+    mockCelebrationsPendingGet.mockResolvedValue({
+      ok: true,
+      json: async () => ({ pendingCelebrations: [] }),
+    });
+    mockFilingMutateAsync.mockResolvedValue({
+      shelfId: 'shelf-1',
+      bookId: 'book-1',
+    });
     mockSetSessionInputMode.mockResolvedValue({
       session: { id: 'session-1', inputMode: 'voice' },
     });
@@ -668,5 +694,127 @@ describe('SessionScreen homework flow', () => {
       expect(screen.getByTestId('subject-resolution-new')).toBeTruthy();
       expect(screen.getByText('+ New subject')).toBeTruthy();
     });
+  });
+
+  describe('post-session filing prompt', () => {
+    /**
+     * Helper: renders a freeform session, sends a message to start it,
+     * then triggers end-session via the Alert "I'm Done" callback to
+     * get `showFilingPrompt` set to true.
+     */
+    async function renderAndTriggerFilingPrompt() {
+      // Use freeform mode (no subjectId) so filing prompt shows on close
+      (useLocalSearchParams as jest.Mock).mockReturnValue({
+        mode: 'freeform',
+      });
+      mockClassifySubject.mockResolvedValue({
+        candidates: [
+          { subjectId: 'subject-1', subjectName: 'Math', confidence: 0.95 },
+        ],
+        needsConfirmation: false,
+        resolvedSubjectId: 'subject-1',
+      });
+
+      // Spy on Alert.alert so we can invoke the "I'm Done" button callback
+      const alertSpy = jest.spyOn(Alert, 'alert');
+
+      const screen = render(<SessionScreen />);
+
+      // Send a message to start the session and get exchangeCount > 0
+      fireEvent.press(screen.getByTestId('manual-send-button'));
+      await flushAsyncWork();
+
+      await waitFor(() => {
+        expect(mockStream).toHaveBeenCalledTimes(1);
+      });
+
+      // The end-session button should now be visible (exchangeCount > 0)
+      const endButton = screen.getByTestId('end-session-button');
+      fireEvent.press(endButton);
+
+      // Alert.alert was called with "Ready to wrap up?" — invoke the "I'm Done" callback
+      await waitFor(() => {
+        expect(alertSpy).toHaveBeenCalledWith(
+          'Ready to wrap up?',
+          expect.any(String),
+          expect.any(Array)
+        );
+      });
+
+      const buttons = alertSpy.mock.calls[0]![2] as Array<{
+        text: string;
+        onPress?: () => void;
+      }>;
+      const doneButton = buttons.find((b) => b.text === "I'm Done");
+
+      // Invoke the "I'm Done" callback — this calls closeSession, then sets showFilingPrompt
+      await act(async () => {
+        doneButton?.onPress?.();
+      });
+      await flushAsyncWork();
+
+      // Advance timers to let fetchFastCelebrations polling resolve
+      await act(async () => {
+        jest.runAllTimers();
+      });
+      await flushAsyncWork();
+
+      alertSpy.mockRestore();
+
+      return screen;
+    }
+
+    it('renders filing prompt when a freeform session is closed', async () => {
+      const screen = await renderAndTriggerFilingPrompt();
+
+      await waitFor(() => {
+        expect(screen.getByTestId('filing-prompt')).toBeTruthy();
+        expect(screen.getByTestId('filing-prompt-accept')).toBeTruthy();
+        expect(screen.getByTestId('filing-prompt-dismiss')).toBeTruthy();
+      });
+    }, 15000);
+
+    it('accept button calls filing mutateAsync and navigates to book screen', async () => {
+      const screen = await renderAndTriggerFilingPrompt();
+
+      await waitFor(() => {
+        expect(screen.getByTestId('filing-prompt-accept')).toBeTruthy();
+      });
+
+      fireEvent.press(screen.getByTestId('filing-prompt-accept'));
+      await flushAsyncWork();
+
+      await waitFor(() => {
+        expect(mockFilingMutateAsync).toHaveBeenCalledWith({
+          sessionId: 'session-1',
+          sessionMode: 'freeform',
+        });
+        expect(mockReplace).toHaveBeenCalledWith(
+          expect.objectContaining({
+            pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
+            params: { subjectId: 'shelf-1', bookId: 'book-1' },
+          })
+        );
+      });
+    }, 15000);
+
+    it('dismiss button navigates to session summary', async () => {
+      const screen = await renderAndTriggerFilingPrompt();
+
+      await waitFor(() => {
+        expect(screen.getByTestId('filing-prompt-dismiss')).toBeTruthy();
+      });
+
+      fireEvent.press(screen.getByTestId('filing-prompt-dismiss'));
+      await flushAsyncWork();
+
+      await waitFor(() => {
+        expect(mockReplace).toHaveBeenCalledWith(
+          expect.objectContaining({
+            pathname: '/session-summary/session-1',
+          })
+        );
+      });
+    }, 15000);
   });
 });

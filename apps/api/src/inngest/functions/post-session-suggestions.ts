@@ -6,6 +6,7 @@ import {
   curriculumTopics,
   curriculumBooks,
   topicSuggestions,
+  subjects,
 } from '@eduagent/database';
 import { routeAndCall } from '../../services/llm';
 
@@ -17,6 +18,10 @@ const filingCompletedDataSchema = z.object({
   timestamp: z.string().optional(),
 });
 
+const suggestionsResponseSchema = z.object({
+  suggestions: z.array(z.string().min(1).max(200)).max(2),
+});
+
 export const postSessionSuggestions = inngest.createFunction(
   {
     id: 'post-session-suggestions',
@@ -24,14 +29,12 @@ export const postSessionSuggestions = inngest.createFunction(
   },
   { event: 'app/filing.completed' },
   async ({ event, step }) => {
-    const { bookId, topicTitle } = filingCompletedDataSchema.parse(event.data);
+    const { bookId, topicTitle, profileId } = filingCompletedDataSchema.parse(
+      event.data
+    );
 
     const result = await step.run('generate-suggestions', async () => {
       const db = getStepDatabase();
-
-      const existingTopics = await db.query.curriculumTopics.findMany({
-        where: eq(curriculumTopics.bookId, bookId),
-      });
 
       const book = await db.query.curriculumBooks.findFirst({
         where: eq(curriculumBooks.id, bookId),
@@ -39,6 +42,20 @@ export const postSessionSuggestions = inngest.createFunction(
 
       if (!book)
         return { status: 'skipped' as const, reason: 'book not found' };
+
+      // Verify book belongs to the profile (defense-in-depth)
+      const ownerSubject = await db.query.subjects.findFirst({
+        where: and(
+          eq(subjects.id, book.subjectId),
+          eq(subjects.profileId, profileId)
+        ),
+      });
+      if (!ownerSubject)
+        return { status: 'skipped' as const, reason: 'ownership mismatch' };
+
+      const existingTopics = await db.query.curriculumTopics.findMany({
+        where: eq(curriculumTopics.bookId, bookId),
+      });
 
       // Dedup: skip if >= 2 unused suggestions already exist for this book
       const existing = await db
@@ -82,8 +99,14 @@ Suggest exactly 2 new topic titles that would be natural next steps within this 
           .replace(/\n?```$/, '');
       }
 
-      const parsed = JSON.parse(jsonStr);
-      const titles: string[] = parsed.suggestions?.slice(0, 2) ?? [];
+      const parsed = suggestionsResponseSchema.safeParse(JSON.parse(jsonStr));
+      if (!parsed.success) {
+        return {
+          status: 'skipped' as const,
+          reason: 'invalid LLM response',
+        };
+      }
+      const titles = parsed.data.suggestions;
 
       if (titles.length === 0) {
         return {

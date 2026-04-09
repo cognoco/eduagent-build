@@ -13,7 +13,7 @@ export function useTopicSuggestions(
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['topic-suggestions', bookId, activeProfile?.id],
+    queryKey: ['topic-suggestions', subjectId, bookId, activeProfile?.id],
     queryFn: async ({ signal: querySignal }) => {
       if (!subjectId || !bookId)
         throw new Error('subjectId and bookId are required');
