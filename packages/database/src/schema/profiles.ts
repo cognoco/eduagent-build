@@ -9,6 +9,7 @@ import {
   unique,
   index,
   check,
+  foreignKey,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { generateUUIDv7 } from '../utils/uuid';
@@ -54,8 +55,8 @@ export const profiles = pgTable(
       .references(() => accounts.id, { onDelete: 'cascade' }),
     displayName: text('display_name').notNull(),
     avatarUrl: text('avatar_url'),
-    birthDate: timestamp('birth_date', { mode: 'date' }),
-    birthYear: integer('birth_year'),
+    birthYear: integer('birth_year').notNull(),
+    birthYearSetBy: uuid('birth_year_set_by'),
     location: locationTypeEnum('location'),
     isOwner: boolean('is_owner').notNull().default(false),
     hasPremiumLlm: boolean('has_premium_llm').notNull().default(false),
@@ -66,7 +67,13 @@ export const profiles = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (table) => [index('profiles_account_id_idx').on(table.accountId)]
+  (table) => [
+    index('profiles_account_id_idx').on(table.accountId),
+    foreignKey({
+      columns: [table.birthYearSetBy],
+      foreignColumns: [table.id],
+    }).onDelete('set null'),
+  ]
 );
 
 export const familyLinks = pgTable(
