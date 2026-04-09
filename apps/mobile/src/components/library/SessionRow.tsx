@@ -1,5 +1,6 @@
 import { Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useThemeColors } from '../../lib/theme';
 
 interface SessionRowProps {
   emoji?: string | null;
@@ -20,6 +21,8 @@ export function SessionRow({
   onLongPress,
   testID,
 }: SessionRowProps) {
+  const colors = useThemeColors();
+
   return (
     <Pressable
       onPress={onPress}
@@ -30,7 +33,7 @@ export function SessionRow({
       accessibilityRole="button"
       accessibilityLabel={`${title}${
         hasNote ? ', has note' : ''
-      }, ${relativeDate} ago`}
+      }, ${relativeDate}`}
     >
       <Text className="text-body me-3">{emoji ?? '📖'}</Text>
 
@@ -40,7 +43,11 @@ export function SessionRow({
 
       {hasNote ? (
         <View testID="session-note-indicator" className="me-2">
-          <Ionicons name="document-text" size={14} color="currentColor" />
+          <Ionicons
+            name="document-text"
+            size={14}
+            color={colors.textSecondary}
+          />
         </View>
       ) : null}
 

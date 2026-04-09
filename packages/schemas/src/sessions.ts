@@ -143,7 +143,7 @@ export const sessionStartSchema = z.object({
   verificationType: z.enum(['standard', 'evaluate', 'teach_back']).optional(),
   inputMode: inputModeSchema.default('text'),
   metadata: sessionMetadataSchema.optional(),
-  rawInput: z.string().max(500).optional(),
+  rawInput: z.string().max(500).nullable().optional(),
 });
 export type SessionStartInput = z.infer<typeof sessionStartSchema>;
 

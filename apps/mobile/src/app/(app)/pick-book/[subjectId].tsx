@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,19 +11,13 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import type { BookSuggestion } from '@eduagent/schemas';
 import { useBookSuggestions } from '../../../hooks/use-book-suggestions';
 import { useFiling } from '../../../hooks/use-filing';
 import { useSubjects } from '../../../hooks/use-subjects';
 import { SuggestionCard } from '../../../components/library/SuggestionCard';
 import { useThemeColors } from '../../../lib/theme';
 import { formatApiError } from '../../../lib/format-api-error';
-
-interface BookSuggestion {
-  id: string;
-  title: string;
-  emoji?: string | null;
-  description?: string | null;
-}
 
 export default function PickBookScreen(): React.ReactElement {
   const router = useRouter();
@@ -37,8 +31,19 @@ export default function PickBookScreen(): React.ReactElement {
 
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [customText, setCustomText] = useState('');
+  const [showSkip, setShowSkip] = useState(false);
 
-  const suggestions = (suggestionsQuery.data ?? []) as BookSuggestion[];
+  // M-9: Filing overlay timeout — show skip button after 15 seconds
+  useEffect(() => {
+    if (filing.isPending) {
+      const timer = setTimeout(() => setShowSkip(true), 15_000);
+      return () => clearTimeout(timer);
+    }
+    setShowSkip(false);
+    return undefined;
+  }, [filing.isPending]);
+
+  const suggestions = suggestionsQuery.data ?? [];
   const subject = subjects?.find((s) => s.id === subjectId);
 
   const handlePickSuggestion = async (suggestion: BookSuggestion) => {
@@ -74,8 +79,11 @@ export default function PickBookScreen(): React.ReactElement {
     const trimmed = customText.trim();
     if (!trimmed) return;
     try {
+      // M-10: Include subject name as context so the filing LLM places
+      // the custom topic within the correct shelf/subject.
       const result = await filing.mutateAsync({
         rawInput: trimmed,
+        selectedSuggestion: subject?.name ?? null,
       });
       router.push({
         pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
@@ -305,6 +313,18 @@ export default function PickBookScreen(): React.ReactElement {
           <Text className="text-body-sm text-text-secondary mt-3">
             Organizing your library...
           </Text>
+          {showSkip && (
+            <Pressable
+              onPress={() => router.back()}
+              className="mt-6 bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
+              testID="pick-book-filing-skip"
+              accessibilityLabel="Skip and start learning anyway"
+            >
+              <Text className="text-body font-semibold text-text-primary">
+                Skip — start learning anyway
+              </Text>
+            </Pressable>
+          )}
         </View>
       ) : null}
     </View>

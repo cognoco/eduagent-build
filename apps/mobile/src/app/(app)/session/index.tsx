@@ -784,6 +784,7 @@ export default function SessionScreen() {
             topicId: topicId ?? undefined,
             sessionType,
             inputMode,
+            ...(rawInput ? { rawInput } : {}),
             ...(effectiveMode === 'homework' && homeworkProblemsState.length > 0
               ? {
                   metadata: {
@@ -810,6 +811,7 @@ export default function SessionScreen() {
           topicId: topicId ?? undefined,
           sessionType,
           inputMode,
+          ...(rawInput ? { rawInput } : {}),
           ...(effectiveMode === 'homework' && homeworkProblemsState.length > 0
             ? {
                 metadata: {

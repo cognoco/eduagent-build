@@ -1,4 +1,5 @@
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
+import type { BookSuggestion } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
@@ -6,7 +7,7 @@ import { assertOk } from '../lib/assert-ok';
 
 export function useBookSuggestions(
   subjectId: string | undefined
-): UseQueryResult<unknown[]> {
+): UseQueryResult<BookSuggestion[]> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
 
@@ -20,7 +21,7 @@ export function useBookSuggestions(
           'book-suggestions'
         ].$get({ param: { subjectId } }, { init: { signal } });
         await assertOk(res);
-        return await res.json();
+        return (await res.json()) as BookSuggestion[];
       } finally {
         cleanup();
       }

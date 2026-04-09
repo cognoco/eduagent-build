@@ -76,36 +76,57 @@ export const filingRoutes = new Hono<FilingRouteEnv>().post(
     }
 
     // Resolve into actual DB records
+    // Note: 'pre_generated' is only set via the migration default on existing rows.
+    // The filing route always produces 'session_filing' or 'freeform_filing'.
     const filedFrom = sessionTranscript
       ? ('freeform_filing' as const)
       : ('session_filing' as const);
 
-    const result = await resolveFilingResult(db, {
-      profileId,
-      filingResponse,
-      filedFrom,
-      sessionId: body.sessionId,
-    });
+    let result;
+    try {
+      result = await resolveFilingResult(db, {
+        profileId,
+        filingResponse,
+        filedFrom,
+        sessionId: body.sessionId,
+      });
+    } catch (err) {
+      console.error('[filing] resolveFilingResult failed:', err);
+      return c.json(
+        {
+          code: 'FILING_RESOLUTION_FAILED',
+          message: "Couldn't organize this topic. Please try again.",
+        },
+        500
+      );
+    }
 
     // Mark suggestion as picked/used (prevents reappearing in picker)
     if (body.pickedSuggestionId) {
-      await markBookSuggestionPicked(db, body.pickedSuggestionId);
+      await markBookSuggestionPicked(db, profileId, body.pickedSuggestionId);
     }
     if (body.usedTopicSuggestionId) {
-      await markTopicSuggestionUsed(db, body.usedTopicSuggestionId);
+      await markTopicSuggestionUsed(db, profileId, body.usedTopicSuggestionId);
     }
 
     // Fire async suggestion generation (non-blocking)
-    void inngest.send({
-      name: 'app/filing.completed',
-      data: {
-        bookId: result.bookId,
-        topicTitle: result.topicTitle,
-        profileId,
-        sessionId: body.sessionId,
-        timestamp: new Date().toISOString(),
-      },
-    });
+    inngest
+      .send({
+        name: 'app/filing.completed',
+        data: {
+          bookId: result.bookId,
+          topicTitle: result.topicTitle,
+          profileId,
+          sessionId: body.sessionId,
+          timestamp: new Date().toISOString(),
+        },
+      })
+      .catch((err) => {
+        console.error(
+          '[filing] Failed to dispatch filing.completed event:',
+          err
+        );
+      });
 
     return c.json(result, 200);
   }

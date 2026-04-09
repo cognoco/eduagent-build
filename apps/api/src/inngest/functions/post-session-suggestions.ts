@@ -1,4 +1,5 @@
-import { eq } from 'drizzle-orm';
+import { eq, and, isNull, count } from 'drizzle-orm';
+import { z } from 'zod';
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
 import {
@@ -8,6 +9,14 @@ import {
 } from '@eduagent/database';
 import { routeAndCall } from '../../services/llm';
 
+const filingCompletedDataSchema = z.object({
+  bookId: z.string(),
+  topicTitle: z.string(),
+  profileId: z.string(),
+  sessionId: z.string().optional(),
+  timestamp: z.string().optional(),
+});
+
 export const postSessionSuggestions = inngest.createFunction(
   {
     id: 'post-session-suggestions',
@@ -15,11 +24,7 @@ export const postSessionSuggestions = inngest.createFunction(
   },
   { event: 'app/filing.completed' },
   async ({ event, step }) => {
-    const { bookId, topicTitle } = event.data as {
-      bookId: string;
-      topicTitle: string;
-      profileId: string;
-    };
+    const { bookId, topicTitle } = filingCompletedDataSchema.parse(event.data);
 
     const result = await step.run('generate-suggestions', async () => {
       const db = getStepDatabase();
@@ -34,6 +39,23 @@ export const postSessionSuggestions = inngest.createFunction(
 
       if (!book)
         return { status: 'skipped' as const, reason: 'book not found' };
+
+      // Dedup: skip if >= 2 unused suggestions already exist for this book
+      const existing = await db
+        .select({ count: count() })
+        .from(topicSuggestions)
+        .where(
+          and(
+            eq(topicSuggestions.bookId, bookId),
+            isNull(topicSuggestions.usedAt)
+          )
+        );
+      if (existing[0] && existing[0].count >= 2) {
+        return {
+          status: 'skipped' as const,
+          reason: 'suggestions already exist',
+        };
+      }
 
       const topicList = existingTopics.map((t) => t.title).join(', ');
 

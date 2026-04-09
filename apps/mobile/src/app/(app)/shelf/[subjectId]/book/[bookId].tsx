@@ -95,9 +95,13 @@ export default function BookScreen() {
   const params = useLocalSearchParams<{
     subjectId: string;
     bookId: string;
+    readOnly?: string;
+    autoStart?: string;
   }>();
   const subjectId = params.subjectId;
   const bookId = params.bookId;
+  const isReadOnly = params.readOnly === 'true';
+  const autoStart = params.autoStart;
 
   // --- Data queries (called unconditionally for rules-of-hooks) ---
   const bookQuery = useBookWithTopics(subjectId, bookId);
@@ -243,22 +247,26 @@ export default function BookScreen() {
   );
   const showChapterDividers = sessionCount >= 4;
 
-  // --- Session press: navigate to transcript/session ---
+  // --- Session press: navigate to session summary/transcript ---
   const handleSessionPress = useCallback(
     (session: BookSession) => {
-      if (session.topicId) {
-        router.push({
-          pathname: '/(app)/session',
-          params: { mode: 'learning', subjectId, topicId: session.topicId },
-        } as never);
-      }
+      router.push({
+        pathname: '/session-summary/[sessionId]',
+        params: { sessionId: session.id },
+      } as never);
     },
-    [router, subjectId]
+    [router]
   );
 
   // --- Long-press context menu on session ---
   const handleSessionLongPress = useCallback((session: BookSession) => {
     Alert.alert(session.topicTitle, undefined, [
+      {
+        text: 'Move to different book',
+        onPress: () => {
+          Alert.alert('Coming soon', 'This feature is not available yet.');
+        },
+      },
       {
         text: 'Delete',
         style: 'destructive',
@@ -311,6 +319,19 @@ export default function BookScreen() {
     }
   }, [suggestionCards, topics, completedTopicIds, router, subjectId]);
 
+  // --- Auto-start session when navigated with autoStart=true (M-12) ---
+  const autoStartTriggered = useRef(false);
+  useEffect(() => {
+    if (
+      autoStart === 'true' &&
+      !autoStartTriggered.current &&
+      topics.length > 0
+    ) {
+      autoStartTriggered.current = true;
+      handleStartLearning();
+    }
+  }, [autoStart, topics, handleStartLearning]);
+
   // --- Suggestion press ---
   const handleSuggestionPress = useCallback(
     (card: { id: string; type: string }) => {
@@ -333,6 +354,12 @@ export default function BookScreen() {
               topicId: matchingTopic.id,
             },
           } as never);
+        } else {
+          Alert.alert(
+            'Topic not found',
+            'This suggestion may have expired. Try refreshing.',
+            [{ text: 'OK' }]
+          );
         }
       }
     },
@@ -666,8 +693,8 @@ export default function BookScreen() {
         )}
       </ScrollView>
 
-      {/* Floating "Start learning" button */}
-      {topics.length > 0 && (
+      {/* Floating "Start learning" button — hidden in read-only mode */}
+      {topics.length > 0 && !isReadOnly && (
         <View
           className="absolute bottom-0 left-0 right-0 px-5 bg-background border-t border-border"
           style={{ paddingBottom: Math.max(insets.bottom, 16), paddingTop: 12 }}

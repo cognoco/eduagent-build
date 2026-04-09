@@ -23,6 +23,7 @@ import {
   curricula,
   curriculumBooks,
   curriculumTopics,
+  topicNotes,
   profiles,
   retentionCards,
   vocabulary,
@@ -336,6 +337,11 @@ async function buildBookLearningHistoryContext(
   });
   if (!book) return undefined;
 
+  // Fetch shelf (subject) name for richer context
+  const subject = await db.query.subjects.findFirst({
+    where: eq(subjects.id, book.subjectId),
+  });
+
   const curriculum = await db.query.curricula.findFirst({
     where: eq(curricula.subjectId, book.subjectId),
     orderBy: desc(curricula.version),
@@ -354,20 +360,38 @@ async function buildBookLearningHistoryContext(
 
   // Filter to completed/auto_closed sessions with endedAt in SQL to
   // avoid loading abandoned sessions into memory.
-  const sessions = await db
-    .select({
-      topicId: learningSessions.topicId,
-      endedAt: learningSessions.endedAt,
-    })
-    .from(learningSessions)
-    .where(
-      and(
-        eq(learningSessions.profileId, profileId),
-        inArray(learningSessions.topicId, topicIds),
-        inArray(learningSessions.status, ['completed', 'auto_closed']),
-        isNotNull(learningSessions.endedAt)
+  const [sessions, notes] = await Promise.all([
+    db
+      .select({
+        topicId: learningSessions.topicId,
+        endedAt: learningSessions.endedAt,
+      })
+      .from(learningSessions)
+      .where(
+        and(
+          eq(learningSessions.profileId, profileId),
+          inArray(learningSessions.topicId, topicIds),
+          inArray(learningSessions.status, ['completed', 'auto_closed']),
+          isNotNull(learningSessions.endedAt)
+        )
+      ),
+    // Fetch recent topic notes for this book (last 3, full text)
+    db
+      .select({
+        topicId: topicNotes.topicId,
+        content: topicNotes.content,
+        updatedAt: topicNotes.updatedAt,
+      })
+      .from(topicNotes)
+      .where(
+        and(
+          inArray(topicNotes.topicId, topicIds),
+          eq(topicNotes.profileId, profileId)
+        )
       )
-    );
+      .orderBy(desc(topicNotes.updatedAt))
+      .limit(3),
+  ]);
 
   const latestByTopic = new Map<string, Date>();
   for (const session of sessions) {
@@ -379,23 +403,66 @@ async function buildBookLearningHistoryContext(
     }
   }
 
-  const lines = topics
-    .filter((topic) => topic.id !== currentTopicId)
-    .map((topic) => {
-      const latest = latestByTopic.get(topic.id);
-      if (!latest) return null;
-      return `- ${topic.title} — ${formatLearningRecency(latest)}`;
-    })
-    .filter((line): line is string => line != null)
-    .slice(0, 10);
+  // Build chapter groupings with topic summaries
+  const chapterMap = new Map<string, typeof topics>();
+  for (const topic of topics) {
+    if (topic.id === currentTopicId) continue;
+    const chapter = topic.chapter ?? 'General';
+    const list = chapterMap.get(chapter) ?? [];
+    list.push(topic);
+    chapterMap.set(chapter, list);
+  }
 
-  if (lines.length === 0) return undefined;
+  const sections: string[] = [];
 
-  return [
-    `Learning history in this book (${book.title}):`,
-    ...lines,
-    'Build on these naturally when they help the learner connect ideas.',
-  ].join('\n');
+  // Header with shelf and book info
+  const shelfName = subject?.name ?? 'Unknown';
+  sections.push(`Shelf: ${shelfName}`);
+  sections.push(
+    `Book: ${book.title}${book.description ? ` — "${book.description}"` : ''}`
+  );
+
+  // Chapter groupings
+  if (chapterMap.size > 0) {
+    sections.push('Chapters:');
+    for (const [chapterName, chapterTopics] of chapterMap.entries()) {
+      const coveredTopics = chapterTopics
+        .filter((t) => latestByTopic.has(t.id))
+        .slice(0, 5);
+      if (coveredTopics.length > 0) {
+        const topicNames = coveredTopics.map((t) => {
+          const recency = formatLearningRecency(latestByTopic.get(t.id)!);
+          return `${t.title} (${recency})`;
+        });
+        sections.push(`- ${chapterName}: ${topicNames.join(', ')}`);
+      }
+    }
+  }
+
+  // Recent notes
+  if (notes.length > 0) {
+    const topicTitleMap = new Map(topics.map((t) => [t.id, t.title]));
+    sections.push('Recent notes:');
+    for (const note of notes) {
+      const title = topicTitleMap.get(note.topicId) ?? 'Unknown';
+      // Truncate note content to avoid token blowup
+      const content =
+        note.content.length > 200
+          ? note.content.slice(0, 200) + '...'
+          : note.content;
+      sections.push(`- ${title}: "${content}"`);
+    }
+  }
+
+  // Only return if there is meaningful content beyond headers
+  const hasTopicHistory = latestByTopic.size > 0;
+  const hasNotes = notes.length > 0;
+  if (!hasTopicHistory && !hasNotes) return undefined;
+
+  sections.push(
+    'Build on these naturally when they help the learner connect ideas.'
+  );
+  return sections.join('\n');
 }
 
 async function buildHomeworkLibraryContext(
@@ -697,7 +764,15 @@ function mergeMemoryContexts(
   if (!messageMemory && !rawInputMemory) return '';
   if (!rawInputMemory) return messageMemory;
   if (!messageMemory) return rawInputMemory;
-  // Both have content — concatenate with a separator.
+
+  // Deduplicate: if both strings are identical, return just one.
+  if (messageMemory === rawInputMemory) return messageMemory;
+
+  // Partial overlap: if one is a substring of the other, keep the longer one.
+  if (messageMemory.includes(rawInputMemory)) return messageMemory;
+  if (rawInputMemory.includes(messageMemory)) return rawInputMemory;
+
+  // Both have unique content — concatenate with a separator.
   // The prompt builder already handles a single embeddingMemoryContext block,
   // so we merge here to avoid duplicating the header text.
   return `${messageMemory}\n\n---\nAdditional context from the learner's original question:\n${rawInputMemory}`;

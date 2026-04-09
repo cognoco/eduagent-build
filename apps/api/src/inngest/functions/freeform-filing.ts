@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
 import {
@@ -6,6 +7,13 @@ import {
   resolveFilingResult,
 } from '../../services/filing';
 import { routeAndCall } from '../../services/llm';
+
+const filingRetryDataSchema = z.object({
+  profileId: z.string(),
+  sessionId: z.string(),
+  sessionTranscript: z.string(),
+  sessionMode: z.enum(['freeform', 'homework']),
+});
 
 export const freeformFilingRetry = inngest.createFunction(
   {
@@ -16,12 +24,7 @@ export const freeformFilingRetry = inngest.createFunction(
   { event: 'app/filing.retry' },
   async ({ event, step }) => {
     const { profileId, sessionId, sessionTranscript, sessionMode } =
-      event.data as {
-        profileId: string;
-        sessionId: string;
-        sessionTranscript: string;
-        sessionMode: 'freeform' | 'homework';
-      };
+      filingRetryDataSchema.parse(event.data);
 
     const result = await step.run('retry-filing', async () => {
       const db = getStepDatabase();
@@ -52,6 +55,7 @@ export const freeformFilingRetry = inngest.createFunction(
           bookId: result.bookId,
           topicTitle: result.topicTitle,
           profileId,
+          sessionId,
           timestamp: new Date().toISOString(),
         },
       });

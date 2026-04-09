@@ -1,4 +1,5 @@
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
+import type { TopicSuggestion } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
@@ -7,7 +8,7 @@ import { assertOk } from '../lib/assert-ok';
 export function useTopicSuggestions(
   subjectId: string | undefined,
   bookId: string | undefined
-): UseQueryResult<unknown[]> {
+): UseQueryResult<TopicSuggestion[]> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
 
@@ -22,7 +23,7 @@ export function useTopicSuggestions(
           'topic-suggestions'
         ].$get({ param: { subjectId, bookId } }, { init: { signal } });
         await assertOk(res);
-        return await res.json();
+        return (await res.json()) as TopicSuggestion[];
       } finally {
         cleanup();
       }

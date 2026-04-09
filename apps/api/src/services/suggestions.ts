@@ -56,12 +56,29 @@ export async function getAllBookSuggestions(
 
 export async function markBookSuggestionPicked(
   db: Database,
+  profileId: string,
   suggestionId: string
-) {
-  await db
+): Promise<boolean> {
+  // Verify ownership through parent chain: bookSuggestions → subjects.profileId
+  const suggestion = await db.query.bookSuggestions.findFirst({
+    where: eq(bookSuggestions.id, suggestionId),
+  });
+  if (!suggestion) return false;
+
+  const subject = await db.query.subjects.findFirst({
+    where: and(
+      eq(subjects.id, suggestion.subjectId),
+      eq(subjects.profileId, profileId)
+    ),
+  });
+  if (!subject) return false;
+
+  const rows = await db
     .update(bookSuggestions)
     .set({ pickedAt: new Date() })
-    .where(eq(bookSuggestions.id, suggestionId));
+    .where(eq(bookSuggestions.id, suggestionId))
+    .returning({ id: bookSuggestions.id });
+  return rows.length > 0;
 }
 
 export async function getUnusedTopicSuggestions(
@@ -91,10 +108,33 @@ export async function getUnusedTopicSuggestions(
 
 export async function markTopicSuggestionUsed(
   db: Database,
+  profileId: string,
   suggestionId: string
-) {
-  await db
+): Promise<boolean> {
+  // Verify ownership through parent chain:
+  // topicSuggestions → curriculumBooks → subjects.profileId
+  const suggestion = await db.query.topicSuggestions.findFirst({
+    where: eq(topicSuggestions.id, suggestionId),
+  });
+  if (!suggestion) return false;
+
+  const book = await db.query.curriculumBooks.findFirst({
+    where: eq(curriculumBooks.id, suggestion.bookId),
+  });
+  if (!book) return false;
+
+  const subject = await db.query.subjects.findFirst({
+    where: and(
+      eq(subjects.id, book.subjectId),
+      eq(subjects.profileId, profileId)
+    ),
+  });
+  if (!subject) return false;
+
+  const rows = await db
     .update(topicSuggestions)
     .set({ usedAt: new Date() })
-    .where(eq(topicSuggestions.id, suggestionId));
+    .where(eq(topicSuggestions.id, suggestionId))
+    .returning({ id: topicSuggestions.id });
+  return rows.length > 0;
 }

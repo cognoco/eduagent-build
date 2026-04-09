@@ -1,6 +1,5 @@
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import { Alert } from 'react-native';
-
 import PickBookScreen from './[subjectId]';
 
 // --- Mocks ---
@@ -24,27 +23,31 @@ jest.mock('expo-router', () => ({
 
 const mockMutateAsync = jest.fn();
 
+const mockRefetch = jest.fn();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockUseBookSuggestions = jest.fn((): any => ({
+  data: [
+    {
+      id: 'sug-1',
+      title: 'Europe',
+      emoji: null,
+      description: 'European geography',
+    },
+    {
+      id: 'sug-2',
+      title: 'Asia',
+      emoji: null,
+      description: 'Asian geography',
+    },
+  ],
+  isLoading: false,
+  isError: false,
+  error: null,
+  refetch: mockRefetch,
+}));
+
 jest.mock('../../../hooks/use-book-suggestions', () => ({
-  useBookSuggestions: () => ({
-    data: [
-      {
-        id: 'sug-1',
-        title: 'Europe',
-        emoji: null,
-        description: 'European geography',
-      },
-      {
-        id: 'sug-2',
-        title: 'Asia',
-        emoji: null,
-        description: 'Asian geography',
-      },
-    ],
-    isLoading: false,
-    isError: false,
-    error: null,
-    refetch: jest.fn(),
-  }),
+  useBookSuggestions: () => mockUseBookSuggestions(),
 }));
 
 jest.mock('../../../hooks/use-subjects', () => ({
@@ -144,5 +147,51 @@ describe('PickBookScreen', () => {
     const { getByText, getByTestId } = render(<PickBookScreen />);
     fireEvent.press(getByText('Something else...'));
     expect(getByTestId('pick-book-custom-input')).toBeTruthy();
+  });
+
+  it('shows loading spinner when suggestions are loading', () => {
+    mockUseBookSuggestions.mockReturnValueOnce({
+      data: undefined,
+      isLoading: true,
+      isError: false,
+      error: null,
+      refetch: mockRefetch,
+    });
+
+    const { getByTestId } = render(<PickBookScreen />);
+    expect(getByTestId('pick-book-loading')).toBeTruthy();
+  });
+
+  it('shows error message and retry button on fetch error', () => {
+    mockUseBookSuggestions.mockReturnValueOnce({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      error: null,
+      refetch: mockRefetch,
+    });
+
+    const { getByTestId, getByText } = render(<PickBookScreen />);
+    expect(getByTestId('pick-book-error')).toBeTruthy();
+    expect(getByText('Retry')).toBeTruthy();
+    expect(getByTestId('pick-book-back-button')).toBeTruthy();
+  });
+
+  it('shows empty state with free text input when suggestions are empty', () => {
+    mockUseBookSuggestions.mockReturnValueOnce({
+      data: [],
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: mockRefetch,
+    });
+
+    const { getByTestId, getByText } = render(<PickBookScreen />);
+    expect(getByTestId('pick-book-empty')).toBeTruthy();
+    expect(
+      getByText('No suggestions yet. Type what you want to learn below.')
+    ).toBeTruthy();
+    // "Something else..." custom input should still be accessible
+    expect(getByText('Something else...')).toBeTruthy();
   });
 });

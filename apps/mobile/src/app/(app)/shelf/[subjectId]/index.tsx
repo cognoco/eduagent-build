@@ -10,7 +10,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import type { BookProgressStatus } from '@eduagent/schemas';
+import type { BookProgressStatus, BookSuggestion } from '@eduagent/schemas';
 import { BookCard } from '../../../../components/library/BookCard';
 import { SuggestionCard } from '../../../../components/library/SuggestionCard';
 import { useBookSuggestions } from '../../../../hooks/use-book-suggestions';
@@ -18,13 +18,6 @@ import { useBooks } from '../../../../hooks/use-books';
 import { useFiling } from '../../../../hooks/use-filing';
 import { useSubjects } from '../../../../hooks/use-subjects';
 import { useThemeColors } from '../../../../lib/theme';
-
-interface BookSuggestion {
-  id: string;
-  title: string;
-  emoji?: string | null;
-  description?: string | null;
-}
 
 export default function ShelfScreen() {
   const router = useRouter();
@@ -40,7 +33,7 @@ export default function ShelfScreen() {
   const subject = subjectsQuery.data?.find((s) => s.id === subjectId);
 
   const { data: rawBookSuggestions } = useBookSuggestions(subjectId);
-  const bookSuggestions = (rawBookSuggestions ?? []) as BookSuggestion[];
+  const bookSuggestions = rawBookSuggestions ?? [];
   const filing = useFiling();
 
   const handlePickBookSuggestion = async (suggestion: BookSuggestion) => {
@@ -50,9 +43,14 @@ export default function ShelfScreen() {
         selectedSuggestion: suggestion.title,
         pickedSuggestionId: suggestion.id,
       });
+      // M-12: Pass autoStart so the book screen begins a session immediately
       router.push({
         pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
-        params: { subjectId: result.shelfId, bookId: result.bookId },
+        params: {
+          subjectId: result.shelfId,
+          bookId: result.bookId,
+          autoStart: 'true',
+        },
       } as never);
     } catch {
       Alert.alert('Error', "Couldn't set up that book.", [{ text: 'OK' }]);

@@ -163,6 +163,45 @@ describe('getOpeningMessage', () => {
     });
   });
 
+  describe('rawInput-aware opening messages', () => {
+    it('uses rawInput with topicName for exploration message', () => {
+      const msg = getOpeningMessage(
+        'learning',
+        3,
+        undefined,
+        'Tea & caffeine',
+        'Botany',
+        'tea'
+      );
+      expect(msg).toContain('tea');
+    });
+
+    it('uses rawInput without topicName for curiosity message', () => {
+      const msg = getOpeningMessage(
+        'learning',
+        3,
+        undefined,
+        undefined,
+        undefined,
+        'tea'
+      );
+      expect(msg).toContain('tea');
+    });
+
+    it('prioritizes problemText over rawInput', () => {
+      const msg = getOpeningMessage(
+        'homework',
+        3,
+        'solve x+2=5',
+        'Algebra',
+        'Math',
+        'help with homework'
+      );
+      expect(msg).not.toContain('homework');
+      expect(msg).toContain('work through');
+    });
+  });
+
   it('produces distinct messages across all tiers for each mode', () => {
     for (const mode of modes) {
       const tiers = [

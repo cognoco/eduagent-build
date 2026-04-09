@@ -238,4 +238,10 @@ describe('resolveFilingResult', () => {
   it('is exported and callable', () => {
     expect(typeof resolveFilingResult).toBe('function');
   });
+
+  // TODO: Add integration tests with real DB fixtures for:
+  // - Creating new shelf/book/chapter/topic
+  // - Reusing existing shelf/book by case-insensitive name match
+  // - Concurrent creation race (FOR UPDATE locking)
+  // - Invalid shelf/book ID from LLM (error path)
 });

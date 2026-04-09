@@ -40,12 +40,17 @@ export async function findSimilarTopics(
   validateEmbedding(embedding);
   const vectorStr = `[${embedding.join(',')}]`;
 
+  // Filter by cosine distance < 0.5 to exclude clearly irrelevant matches.
+  // Cosine distance 0.5 corresponds to ~50% similarity.
+  const maxDistance = 0.5;
+
   const baseQuery = profileId
     ? sql`
         SELECT id, topic_id AS "topicId", content,
                embedding <=> ${vectorStr}::vector AS distance
         FROM session_embeddings
         WHERE profile_id = ${profileId}
+          AND embedding <=> ${vectorStr}::vector < ${maxDistance}
         ORDER BY distance ASC
         LIMIT ${limit}
       `
@@ -53,6 +58,7 @@ export async function findSimilarTopics(
         SELECT id, topic_id AS "topicId", content,
                embedding <=> ${vectorStr}::vector AS distance
         FROM session_embeddings
+        WHERE embedding <=> ${vectorStr}::vector < ${maxDistance}
         ORDER BY distance ASC
         LIMIT ${limit}
       `;

@@ -86,6 +86,7 @@ export function useStartSession(subjectId: string): UseMutationResult<
     verificationType?: 'standard' | 'evaluate' | 'teach_back';
     inputMode?: 'text' | 'voice';
     metadata?: SessionMetadata;
+    rawInput?: string;
   }
 > {
   const client = useApiClient();
@@ -99,6 +100,7 @@ export function useStartSession(subjectId: string): UseMutationResult<
       verificationType?: 'standard' | 'evaluate' | 'teach_back';
       inputMode?: 'text' | 'voice';
       metadata?: SessionMetadata;
+      rawInput?: string;
     }): Promise<SessionStartResult> => {
       const res = await client.subjects[':subjectId'].sessions.$post({
         param: { subjectId },

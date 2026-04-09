@@ -9,7 +9,7 @@
  * No Hono imports — pure business logic.
  */
 
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and, sql, inArray, desc } from 'drizzle-orm';
 import type { Database } from '@eduagent/database';
 import {
   subjects,
@@ -49,19 +49,47 @@ export async function buildLibraryIndex(
     return { shelves: [] };
   }
 
+  // Fetch all books and topics in bulk (3 queries total, no N+1)
+  const subjectIds = activeSubjects.map((s) => s.id);
+
+  const allBooks = await db.query.curriculumBooks.findMany({
+    where: inArray(curriculumBooks.subjectId, subjectIds),
+    orderBy: desc(curriculumBooks.createdAt),
+  });
+
+  const bookIds = allBooks.map((b) => b.id);
+  const allTopics =
+    bookIds.length > 0
+      ? await db.query.curriculumTopics.findMany({
+          where: inArray(curriculumTopics.bookId, bookIds),
+          orderBy: desc(curriculumTopics.createdAt),
+        })
+      : [];
+
+  // Group books by subjectId
+  const booksBySubject = new Map<string, (typeof allBooks)[number][]>();
+  for (const book of allBooks) {
+    const list = booksBySubject.get(book.subjectId) ?? [];
+    list.push(book);
+    booksBySubject.set(book.subjectId, list);
+  }
+
+  // Group topics by bookId
+  const topicsByBook = new Map<string, (typeof allTopics)[number][]>();
+  for (const topic of allTopics) {
+    const list = topicsByBook.get(topic.bookId) ?? [];
+    list.push(topic);
+    topicsByBook.set(topic.bookId, list);
+  }
+
   const shelves: LibraryIndex['shelves'] = [];
 
   for (const subject of activeSubjects) {
-    const books = await db.query.curriculumBooks.findMany({
-      where: eq(curriculumBooks.subjectId, subject.id),
-    });
-
+    const books = booksBySubject.get(subject.id) ?? [];
     const indexBooks: LibraryIndex['shelves'][number]['books'] = [];
 
     for (const book of books) {
-      const topics = await db.query.curriculumTopics.findMany({
-        where: eq(curriculumTopics.bookId, book.id),
-      });
+      const topics = topicsByBook.get(book.id) ?? [];
 
       // Group topics by chapter
       const chapterMap = new Map<
@@ -95,18 +123,22 @@ export async function buildLibraryIndex(
     });
   }
 
-  // Truncate if too many topics: distribute evenly across shelves
+  // Truncate if too many topics: distribute proportionally based on each
+  // shelf's share of total topics so larger shelves keep more context.
   const totalTopics = countTopics(shelves);
   if (totalTopics > MAX_TOPIC_SUMMARIES) {
-    const perShelfBudget = Math.max(
-      1,
-      Math.floor(MAX_TOPIC_SUMMARIES / shelves.length)
-    );
-
     for (const shelf of shelves) {
-      let shelfKept = 0;
-      const shelfBudget = perShelfBudget;
+      const shelfTopicCount = shelf.books.reduce(
+        (sum, b) =>
+          sum + b.chapters.reduce((cSum, c) => cSum + c.topics.length, 0),
+        0
+      );
+      const shelfBudget = Math.max(
+        1,
+        Math.round(MAX_TOPIC_SUMMARIES * (shelfTopicCount / totalTopics))
+      );
 
+      let shelfKept = 0;
       for (const book of shelf.books) {
         for (const chapter of book.chapters) {
           const remaining = Math.max(0, shelfBudget - shelfKept);
@@ -166,7 +198,12 @@ export function formatLibraryIndexForPrompt(index: LibraryIndex): string {
  * XML tags — without escaping, a user can close the tag and inject instructions.
  */
 function escapeXml(str: string): string {
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
 }
 
 export type LLMCaller = (
@@ -424,6 +461,8 @@ export async function resolveFilingResult(
         );
 
         const newId = generateUUIDv7();
+        // topicsGenerated=true prevents the legacy generateBookTopics pipeline from running.
+        // Filed books create topics via the filing mechanism, not pre-generation.
         await txDb.insert(curriculumBooks).values({
           id: newId,
           subjectId: shelfId,

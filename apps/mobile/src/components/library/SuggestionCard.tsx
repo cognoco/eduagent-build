@@ -22,7 +22,7 @@ export function SuggestionCard({
       className="flex-1 min-w-[140px] max-w-[48%] rounded-card border border-border bg-surface-elevated p-4"
       style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
       accessibilityRole="button"
-      accessibilityLabel={title}
+      accessibilityLabel={description ? `${title}: ${description}` : title}
     >
       {emoji ? <Text className="text-2xl mb-2">{emoji}</Text> : null}
       <Text
