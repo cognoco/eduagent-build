@@ -14,7 +14,6 @@ import type {
 
 const HOME_SURFACE_TTL_MS = 24 * 60 * 60 * 1000;
 const HOME_SURFACE_CACHE_KIND = 'home_surface_cache_v1';
-const MAX_HOME_CARD_EVENTS = 40;
 
 type HomeCardInteractionEvent = {
   cardId: HomeCardId;
@@ -232,44 +231,6 @@ export async function mergeHomeSurfaceCacheData(
       .where(eq(coachingCardCache.profileId, profileId));
 
     return next;
-  });
-}
-
-export async function recordHomeCardInteraction(
-  db: Database,
-  profileId: string,
-  input: {
-    cardId: HomeCardId;
-    interactionType: HomeCardInteractionType;
-  }
-): Promise<void> {
-  const occurredAt = new Date().toISOString();
-
-  await mergeHomeSurfaceCacheData(db, profileId, (current) => {
-    const interactionStats = normalizeInteractionStats(
-      current.interactionStats
-    );
-    const countsKey =
-      input.interactionType === 'tap' ? 'tapsByCardId' : 'dismissalsByCardId';
-    const counts = interactionStats[countsKey];
-
-    interactionStats[countsKey] = {
-      ...counts,
-      [input.cardId]: (counts[input.cardId] ?? 0) + 1,
-    };
-    interactionStats.events = [
-      ...interactionStats.events,
-      {
-        cardId: input.cardId,
-        interactionType: input.interactionType,
-        occurredAt,
-      },
-    ].slice(-MAX_HOME_CARD_EVENTS);
-
-    return {
-      ...current,
-      interactionStats,
-    };
   });
 }
 

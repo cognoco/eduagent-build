@@ -125,29 +125,3 @@ export function getTierConfig(tier: SubscriptionState['tier']): TierConfig {
 export function isValidTransition(from: string, to: string): boolean {
   return VALID_TRANSITIONS.has(`${from}->${to}`);
 }
-
-/**
- * Determines whether a subscription should be downgraded to free tier on expiry.
- *
- * Returns true when the subscription is in expired or cancelled status,
- * indicating the user should revert to the free tier.
- */
-export function shouldDowngradeOnExpiry(state: SubscriptionState): boolean {
-  return state.status === 'expired' || state.status === 'cancelled';
-}
-
-/**
- * Returns the number of trial days remaining.
- * Returns 0 if the trial has already expired.
- */
-export function getTrialDaysRemaining(trialEndsAt: string): number {
-  const now = Date.now();
-  const endMs = new Date(trialEndsAt).getTime();
-  const diffMs = endMs - now;
-
-  if (diffMs <= 0) {
-    return 0;
-  }
-
-  return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-}
