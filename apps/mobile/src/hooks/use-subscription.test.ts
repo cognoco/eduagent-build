@@ -482,7 +482,7 @@ describe('useJoinByokWaitlist', () => {
     queryClient.clear();
   });
 
-  it('calls POST /byok-waitlist with email', async () => {
+  it('calls POST /byok-waitlist without email body (account email used server-side)', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
         JSON.stringify({
@@ -498,7 +498,7 @@ describe('useJoinByokWaitlist', () => {
     });
 
     await act(async () => {
-      result.current.mutate({ email: 'user@example.com' });
+      result.current.mutate();
     });
 
     await waitFor(() => {
@@ -509,7 +509,7 @@ describe('useJoinByokWaitlist', () => {
     expect(result.current.data?.email).toBe('user@example.com');
   });
 
-  it('handles validation error', async () => {
+  it('handles API error', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response('API error 422', {
         status: 422,
@@ -522,7 +522,7 @@ describe('useJoinByokWaitlist', () => {
     });
 
     await act(async () => {
-      result.current.mutate({ email: 'not-an-email' });
+      result.current.mutate();
     });
 
     await waitFor(() => {

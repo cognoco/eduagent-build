@@ -261,13 +261,13 @@ export function usePurchaseTopUp(): UseMutationResult<
 export function useJoinByokWaitlist(): UseMutationResult<
   ByokWaitlistResult,
   Error,
-  { email: string }
+  void
 > {
   const client = useApiClient();
 
   return useMutation({
-    mutationFn: async (input: { email: string }) => {
-      const res = await client['byok-waitlist'].$post({ json: input });
+    mutationFn: async () => {
+      const res = await client['byok-waitlist'].$post({ json: {} });
       await assertOk(res);
       return (await res.json()) as ByokWaitlistResult;
     },

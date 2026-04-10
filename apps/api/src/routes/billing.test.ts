@@ -679,13 +679,13 @@ describe('billing routes', () => {
   // -------------------------------------------------------------------------
 
   describe('POST /v1/byok-waitlist', () => {
-    it('returns 201 with valid email', async () => {
+    it('returns 201 and uses account email (not caller-supplied email)', async () => {
       const res = await app.request(
         '/v1/byok-waitlist',
         {
           method: 'POST',
           headers: AUTH_HEADERS,
-          body: JSON.stringify({ email: 'test@example.com' }),
+          body: JSON.stringify({}),
         },
         TEST_ENV
       );
@@ -694,21 +694,8 @@ describe('billing routes', () => {
 
       const body = await res.json();
       expect(body.message).toBe('Added to BYOK waitlist');
+      // email comes from the authenticated account, not from the request body
       expect(body.email).toBe('test@example.com');
-    });
-
-    it('returns 400 with invalid email', async () => {
-      const res = await app.request(
-        '/v1/byok-waitlist',
-        {
-          method: 'POST',
-          headers: AUTH_HEADERS,
-          body: JSON.stringify({ email: 'not-an-email' }),
-        },
-        TEST_ENV
-      );
-
-      expect(res.status).toBe(400);
     });
 
     it('returns 401 without auth header', async () => {
@@ -716,7 +703,7 @@ describe('billing routes', () => {
         '/v1/byok-waitlist',
         {
           method: 'POST',
-          body: JSON.stringify({ email: 'test@example.com' }),
+          body: JSON.stringify({}),
           headers: { 'Content-Type': 'application/json' },
         },
         TEST_ENV
@@ -897,63 +884,13 @@ describe('billing routes', () => {
   });
 
   // -------------------------------------------------------------------------
-  // POST /v1/subscription/family/remove
+  // POST /v1/subscription/family/remove — DISABLED (CR-21)
+  // Route is commented out until the invite/claim flow exists.
+  // All requests return 404.
   // -------------------------------------------------------------------------
 
-  describe('POST /v1/subscription/family/remove', () => {
-    it('removes a profile from the family subscription', async () => {
-      mockGetSubscriptionByAccountId.mockResolvedValue(
-        mockSubscription({ tier: 'family' })
-      );
-      mockRemoveProfileFromSubscription.mockResolvedValue({
-        removedProfileId: '550e8400-e29b-41d4-a716-446655440000',
-      });
-
-      const res = await app.request(
-        '/v1/subscription/family/remove',
-        {
-          method: 'POST',
-          headers: AUTH_HEADERS,
-          body: JSON.stringify({
-            profileId: '550e8400-e29b-41d4-a716-446655440000',
-            newAccountId: '660e8400-e29b-41d4-a716-446655440000',
-          }),
-        },
-        TEST_ENV
-      );
-
-      expect(res.status).toBe(200);
-
-      const body = await res.json();
-      expect(body.message).toContain('removed from family');
-      expect(body.removedProfileId).toBe(
-        '550e8400-e29b-41d4-a716-446655440000'
-      );
-    });
-
-    it('returns 403 when profile cannot be removed', async () => {
-      mockGetSubscriptionByAccountId.mockResolvedValue(mockSubscription());
-      mockRemoveProfileFromSubscription.mockResolvedValue(null);
-
-      const res = await app.request(
-        '/v1/subscription/family/remove',
-        {
-          method: 'POST',
-          headers: AUTH_HEADERS,
-          body: JSON.stringify({
-            profileId: '550e8400-e29b-41d4-a716-446655440000',
-            newAccountId: '660e8400-e29b-41d4-a716-446655440000',
-          }),
-        },
-        TEST_ENV
-      );
-
-      expect(res.status).toBe(403);
-    });
-
-    it('returns 404 when no subscription exists', async () => {
-      mockGetSubscriptionByAccountId.mockResolvedValue(null);
-
+  describe('POST /v1/subscription/family/remove (disabled — CR-21)', () => {
+    it('returns 404 because the route is not registered', async () => {
       const res = await app.request(
         '/v1/subscription/family/remove',
         {
@@ -968,37 +905,6 @@ describe('billing routes', () => {
       );
 
       expect(res.status).toBe(404);
-    });
-
-    it('returns 400 with invalid body', async () => {
-      const res = await app.request(
-        '/v1/subscription/family/remove',
-        {
-          method: 'POST',
-          headers: AUTH_HEADERS,
-          body: JSON.stringify({ profileId: 'not-uuid' }),
-        },
-        TEST_ENV
-      );
-
-      expect(res.status).toBe(400);
-    });
-
-    it('returns 401 without auth header', async () => {
-      const res = await app.request(
-        '/v1/subscription/family/remove',
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            profileId: '550e8400-e29b-41d4-a716-446655440000',
-            newAccountId: '660e8400-e29b-41d4-a716-446655440000',
-          }),
-          headers: { 'Content-Type': 'application/json' },
-        },
-        TEST_ENV
-      );
-
-      expect(res.status).toBe(401);
     });
   });
 });

@@ -758,7 +758,7 @@ describe('SubscriptionScreen', () => {
     expect(screen.getByText(/Parent \(owner\), Alex, Mia/)).toBeTruthy();
   });
 
-  it('joins the BYOK waitlist and clears the email field on success', async () => {
+  it('joins the BYOK waitlist using account email on success', async () => {
     mockMutateAsyncByokWaitlist.mockResolvedValue({
       message: 'Added to BYOK waitlist',
       email: 'user@example.com',
@@ -766,24 +766,16 @@ describe('SubscriptionScreen', () => {
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
-    fireEvent.changeText(
-      screen.getByTestId('byok-waitlist-email-input'),
-      'user@example.com'
-    );
     fireEvent.press(screen.getByTestId('join-byok-waitlist-button'));
 
     await waitFor(() => {
-      expect(mockMutateAsyncByokWaitlist).toHaveBeenCalledWith({
-        email: 'user@example.com',
-      });
+      // No email argument — the API uses the authenticated account email (CR-17)
+      expect(mockMutateAsyncByokWaitlist).toHaveBeenCalledWith();
     });
 
     expect(Alert.alert).toHaveBeenCalledWith(
       'Waitlist',
       'You have been added to the BYOK waitlist.'
-    );
-    expect(screen.getByTestId('byok-waitlist-email-input').props.value).toBe(
-      ''
     );
   });
 
@@ -792,10 +784,6 @@ describe('SubscriptionScreen', () => {
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
-    fireEvent.changeText(
-      screen.getByTestId('byok-waitlist-email-input'),
-      'user@example.com'
-    );
     fireEvent.press(screen.getByTestId('join-byok-waitlist-button'));
 
     await waitFor(() => {

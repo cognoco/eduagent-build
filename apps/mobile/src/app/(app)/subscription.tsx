@@ -4,7 +4,6 @@ import {
   Text,
   Pressable,
   ScrollView,
-  TextInput,
   Alert,
   ActivityIndicator,
   Linking,
@@ -493,7 +492,6 @@ export default function SubscriptionScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const colors = useThemeColors();
-  const [byokEmail, setByokEmail] = useState('');
   const { activeProfile } = useProfile();
 
   const queryClient = useQueryClient();
@@ -725,16 +723,13 @@ export default function SubscriptionScreen() {
   // ---------------------------------------------------------------------------
 
   const handleByokSubmit = useCallback(async () => {
-    const email = byokEmail.trim();
-    if (!email) return;
     try {
-      await byokWaitlist.mutateAsync({ email });
+      await byokWaitlist.mutateAsync();
       Alert.alert('Waitlist', 'You have been added to the BYOK waitlist.');
-      setByokEmail('');
     } catch {
       Alert.alert('Error', 'Could not join waitlist. Try again.');
     }
-  }, [byokEmail, byokWaitlist]);
+  }, [byokWaitlist]);
 
   // ---------------------------------------------------------------------------
   // Child profile gate — child sees the child-friendly paywall
@@ -1176,42 +1171,29 @@ export default function SubscriptionScreen() {
             <View className="bg-surface rounded-card px-4 py-3.5">
               <Text className="text-body-sm text-text-secondary mb-3">
                 Use your own API key to unlock unlimited questions. Join the
-                waitlist to be notified when available.
+                waitlist to be notified when available. We'll use your account
+                email.
               </Text>
-              <View className="flex-row">
-                <TextInput
-                  value={byokEmail}
-                  onChangeText={setByokEmail}
-                  placeholder="your@email.com"
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  className="flex-1 bg-background rounded-button px-3 py-2.5 text-body text-text-primary me-2"
-                  placeholderTextColor={colors.muted}
-                  accessibilityLabel="Email for BYOK waitlist"
-                  testID="byok-waitlist-email-input"
-                />
-                <Pressable
-                  onPress={handleByokSubmit}
-                  disabled={byokWaitlist.isPending || !byokEmail.trim()}
-                  className="bg-primary rounded-button px-4 py-2.5 justify-center"
-                  accessibilityLabel="Join BYOK waitlist"
-                  accessibilityRole="button"
-                  testID="join-byok-waitlist-button"
-                >
-                  {byokWaitlist.isPending ? (
-                    <ActivityIndicator
-                      size="small"
-                      color={colors.textInverse}
-                      testID="join-byok-waitlist-loading"
-                    />
-                  ) : (
-                    <Text className="text-text-inverse text-body font-semibold">
-                      Join
-                    </Text>
-                  )}
-                </Pressable>
-              </View>
+              <Pressable
+                onPress={handleByokSubmit}
+                disabled={byokWaitlist.isPending}
+                className="bg-primary rounded-button px-4 py-2.5 items-center justify-center"
+                accessibilityLabel="Join BYOK waitlist"
+                accessibilityRole="button"
+                testID="join-byok-waitlist-button"
+              >
+                {byokWaitlist.isPending ? (
+                  <ActivityIndicator
+                    size="small"
+                    color={colors.textInverse}
+                    testID="join-byok-waitlist-loading"
+                  />
+                ) : (
+                  <Text className="text-text-inverse text-body font-semibold">
+                    Join Waitlist
+                  </Text>
+                )}
+              </Pressable>
             </View>
           </View>
         </ScrollView>
