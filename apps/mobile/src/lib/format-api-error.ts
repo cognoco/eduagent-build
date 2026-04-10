@@ -29,7 +29,8 @@ function isGenericServerMessage(message: string): boolean {
     normalized === 'bad gateway' ||
     normalized === 'service unavailable' ||
     normalized === 'gateway timeout' ||
-    normalized === 'server error'
+    normalized === 'server error' ||
+    normalized === 'request failed'
   );
 }
 

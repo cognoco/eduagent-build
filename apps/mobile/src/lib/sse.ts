@@ -184,7 +184,9 @@ export function streamSSEViaXHR(
   }
 
   // Detect HTTP errors as soon as headers arrive (readyState 2) — prevents
-  // onprogress from parsing error response bodies as SSE data.
+  // onprogress from parsing error response bodies as SSE data.  We set the
+  // error and `done` flag here but do NOT wake the generator yet — onloadend
+  // will enrich the error with the full response body and then resolve.
   xhr.onreadystatechange = () => {
     if (xhr.readyState === 2 && xhr.status >= 400) {
       streamError = new Error(
@@ -192,9 +194,6 @@ export function streamSSEViaXHR(
       ) as Error & { status?: number };
       (streamError as Error & { status?: number }).status = xhr.status;
       done = true;
-      const r = resolve;
-      resolve = null;
-      r?.();
     }
   };
 
