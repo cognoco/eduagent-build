@@ -9,8 +9,6 @@ jest.mock('../services/profile', () => ({
         id: 'valid-profile-id',
         accountId: 'test-account-id',
         displayName: 'Test',
-        personaType: 'LEARNER',
-        birthDate: '2014-06-15',
         birthYear: 2014,
         location: 'EU',
         consentStatus: 'CONSENTED',
@@ -24,8 +22,6 @@ jest.mock('../services/profile', () => ({
         id: 'owner-profile-id',
         accountId: 'test-account-id',
         displayName: 'Owner',
-        personaType: 'LEARNER',
-        birthDate: '2014-06-15',
         birthYear: 2014,
         location: 'EU',
         consentStatus: 'CONSENTED',
@@ -137,33 +133,5 @@ describe('profileScopeMiddleware', () => {
     expect(res.status).toBe(200);
     expect(body.profileId).toBeNull();
     expect(body.profileMeta).toBeNull();
-  });
-
-  it('passes birthYear: null in profileMeta when profile has null birthYear', async () => {
-    const { findOwnerProfile } = jest.requireMock('../services/profile');
-
-    findOwnerProfile.mockResolvedValueOnce({
-      id: 'null-birth-profile',
-      accountId: 'test-account-id',
-      displayName: 'NullBirth',
-      personaType: 'LEARNER',
-      birthDate: null,
-      birthYear: null,
-      location: 'US',
-      consentStatus: 'PENDING',
-    });
-
-    const app = createApp();
-    const res = await app.request('/test');
-    const body = await res.json();
-
-    expect(res.status).toBe(200);
-    expect(body.profileId).toBe('null-birth-profile');
-    expect(body.profileMeta).toEqual({
-      birthYear: null,
-      location: 'US',
-      consentStatus: 'PENDING',
-      hasPremiumLlm: false,
-    });
   });
 });

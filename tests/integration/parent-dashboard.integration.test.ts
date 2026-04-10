@@ -281,7 +281,7 @@ describe('Integration: GET /v1/dashboard/children/:profileId', () => {
     expect(body.child.displayName).toBe('Test Child');
   });
 
-  it('returns null child when no family link exists', async () => {
+  it('returns 403 when no family link exists', async () => {
     const parentProfileId = await createProfile(
       PARENT_USER_ID,
       PARENT_EMAIL,
@@ -294,7 +294,7 @@ describe('Integration: GET /v1/dashboard/children/:profileId', () => {
       'Test Child',
       2004
     );
-    // No family link!
+    // No family link — assertParentAccess rejects with 403
 
     configureValidJWT(jwt, { sub: PARENT_USER_ID, email: PARENT_EMAIL });
     const res = await app.request(
@@ -303,9 +303,7 @@ describe('Integration: GET /v1/dashboard/children/:profileId', () => {
       TEST_ENV
     );
 
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.child).toBeNull();
+    expect(res.status).toBe(403);
   });
 });
 
@@ -353,7 +351,7 @@ describe('Integration: GET /v1/dashboard/children/:profileId/sessions', () => {
     expect(body.sessions[0].wallClockSeconds).toBe(1800);
   });
 
-  it('returns empty sessions when no family link exists', async () => {
+  it('returns 403 when no family link exists', async () => {
     const parentProfileId = await createProfile(
       PARENT_USER_ID,
       PARENT_EMAIL,
@@ -366,7 +364,7 @@ describe('Integration: GET /v1/dashboard/children/:profileId/sessions', () => {
       'Test Child',
       2004
     );
-    // No family link
+    // No family link — assertParentAccess rejects with 403
 
     configureValidJWT(jwt, { sub: PARENT_USER_ID, email: PARENT_EMAIL });
     const res = await app.request(
@@ -375,9 +373,7 @@ describe('Integration: GET /v1/dashboard/children/:profileId/sessions', () => {
       TEST_ENV
     );
 
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.sessions).toHaveLength(0);
+    expect(res.status).toBe(403);
   });
 
   it('returns 401 without auth', async () => {

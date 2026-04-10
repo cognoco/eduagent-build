@@ -1,10 +1,13 @@
-jest.mock('@eduagent/database', () => {
-  const actual = jest.requireActual('@eduagent/database');
-  return {
-    ...actual,
+import { createDatabaseModuleMock } from '../test-utils/database-module';
+
+const mockDatabaseModule = createDatabaseModuleMock({
+  includeActual: true,
+  exports: {
     createScopedRepository: jest.fn(),
-  };
+  },
 });
+
+jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
 jest.mock('./exchanges', () => ({
   processExchange: jest.fn(),
@@ -240,6 +243,9 @@ function createMockDb({
       },
       sessionEvents: {
         findMany: jest.fn().mockResolvedValue(findManyEvents),
+      },
+      learningProfiles: {
+        findFirst: jest.fn().mockResolvedValue(null),
       },
     },
   } as unknown as Database;
@@ -866,14 +872,12 @@ describe('processMessage', () => {
     );
   });
 
-  it('derives birthYear from the profile birth date', async () => {
+  it('passes birthYear from the profile to exchange context', async () => {
     setupScopedRepo({
       sessionFindFirst: mockSessionRow({ topicId: null }),
     });
     const db = createMockDb({
-      profileSelectResults: [
-        { birthDate: new Date('2014-06-15T00:00:00.000Z') },
-      ],
+      profileSelectResults: [{ birthYear: 2014 }],
     });
     await processMessage(db, profileId, sessionId, {
       message: 'Hey there',

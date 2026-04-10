@@ -32,10 +32,6 @@ import {
   generateUUIDv7,
   type Database,
 } from '@eduagent/database';
-import {
-  birthDateFromBirthYear,
-  birthYearFromDateLike,
-} from '@eduagent/schemas';
 import { listSubjects } from './subject';
 import { getTierConfig } from './subscription';
 
@@ -331,7 +327,6 @@ async function createBaseProfile(
     displayName: string;
     birthYear: number;
     isOwner?: boolean;
-    birthDate?: Date;
   }
 ): Promise<string> {
   const profileId = generateUUIDv7();
@@ -342,7 +337,6 @@ async function createBaseProfile(
     displayName: opts.displayName,
     birthYear: opts.birthYear,
     isOwner: opts.isOwner ?? true,
-    birthDate: opts.birthDate ?? birthDateFromBirthYear(opts.birthYear),
   });
   return profileId;
 }
@@ -1584,7 +1578,7 @@ export async function debugAccountsByEmail(
           return {
             id: prof.id,
             displayName: prof.displayName,
-            birthYear: birthYearFromDateLike(prof.birthDate),
+            birthYear: prof.birthYear,
             isOwner: prof.isOwner,
             subjects: subjectRows.map((s) => ({
               id: s.id,

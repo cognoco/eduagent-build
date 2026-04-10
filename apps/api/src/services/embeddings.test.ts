@@ -6,6 +6,20 @@ import {
 } from './embeddings';
 import type { Database } from '@eduagent/database';
 
+function mockDatabaseModuleFactory() {
+  const { createDatabaseModuleMock } =
+    require('../test-utils/database-module') as typeof import('../test-utils/database-module');
+
+  return createDatabaseModuleMock({
+    exports: {
+      storeEmbedding: jest.fn().mockResolvedValue(undefined),
+      sessionEvents: {},
+    },
+  }).module;
+}
+
+jest.mock('@eduagent/database', () => mockDatabaseModuleFactory());
+
 // ---------------------------------------------------------------------------
 // Voyage AI fetch mock helpers
 // ---------------------------------------------------------------------------
@@ -222,11 +236,6 @@ describe('extractSessionContent', () => {
 // ---------------------------------------------------------------------------
 // storeSessionEmbedding
 // ---------------------------------------------------------------------------
-
-jest.mock('@eduagent/database', () => ({
-  storeEmbedding: jest.fn().mockResolvedValue(undefined),
-  sessionEvents: {},
-}));
 
 describe('storeSessionEmbedding', () => {
   const sampleVector = Array.from({ length: 1024 }, (_, i) => i * 0.001);

@@ -1,0 +1,2 @@
+ALTER TABLE "profiles" ADD COLUMN "birth_year_set_by" uuid;--> statement-breakpoint
+ALTER TABLE "profiles" ADD CONSTRAINT "profiles_birth_year_set_by_profiles_id_fk" FOREIGN KEY ("birth_year_set_by") REFERENCES "public"."profiles"("id") ON DELETE set null ON UPDATE no action;

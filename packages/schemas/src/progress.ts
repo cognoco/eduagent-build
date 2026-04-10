@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { milestoneTypeSchema } from './snapshots';
 
 export const learningModeSchema = z.enum(['serious', 'casual']);
 export type LearningMode = z.infer<typeof learningModeSchema>;
@@ -61,6 +62,7 @@ export type XpSummary = z.infer<typeof xpSummarySchema>;
 export const notificationPrefsSchema = z.object({
   reviewReminders: z.boolean(),
   dailyReminders: z.boolean(),
+  weeklyProgressPush: z.boolean().optional(),
   pushEnabled: z.boolean(),
   maxDailyPush: z.number().int().min(1).max(10).optional(),
 });
@@ -119,6 +121,21 @@ export const topicProgressSchema = z.object({
 });
 export type TopicProgress = z.infer<typeof topicProgressSchema>;
 
+export const dashboardChildProgressSchema = z.object({
+  snapshotDate: z.string(),
+  topicsMastered: z.number().int(),
+  vocabularyTotal: z.number().int(),
+  minutesThisWeek: z.number().int(),
+  weeklyDeltaTopicsMastered: z.number().int().nullable(),
+  weeklyDeltaVocabularyTotal: z.number().int().nullable(),
+  weeklyDeltaTopicsExplored: z.number().int().nullable(),
+  engagementTrend: z.enum(['growing', 'steady', 'quiet']),
+  guidance: z.string().nullable(),
+});
+export type DashboardChildProgress = z.infer<
+  typeof dashboardChildProgressSchema
+>;
+
 export const dashboardChildSchema = z.object({
   profileId: z.string().uuid(),
   displayName: z.string(),
@@ -132,6 +149,7 @@ export const dashboardChildSchema = z.object({
   trend: z.enum(['up', 'down', 'stable']),
   subjects: z.array(
     z.object({
+      subjectId: z.string().uuid().optional(),
       name: z.string(),
       retentionStatus: z.enum(['strong', 'fading', 'weak']),
       rawInput: z.string().nullable().optional(),
@@ -139,6 +157,7 @@ export const dashboardChildSchema = z.object({
   ),
   guidedVsImmediateRatio: z.number().min(0).max(1),
   retentionTrend: z.enum(['improving', 'declining', 'stable']),
+  progress: dashboardChildProgressSchema.nullable().optional(),
 });
 export type DashboardChild = z.infer<typeof dashboardChildSchema>;
 
@@ -169,6 +188,7 @@ export const coachingCardTypeSchema = z.enum([
   'curriculum_complete',
   'continue_book',
   'book_suggestion',
+  'milestone_celebration',
 ]);
 export type CoachingCardType = z.infer<typeof coachingCardTypeSchema>;
 
@@ -246,6 +266,17 @@ export const bookSuggestionCardSchema = z.object({
 });
 export type BookSuggestionCard = z.infer<typeof bookSuggestionCardSchema>;
 
+export const milestoneCelebrationCardSchema = z.object({
+  ...baseCoachingCardFields,
+  type: z.literal('milestone_celebration'),
+  milestoneId: z.string().uuid(),
+  milestoneType: milestoneTypeSchema,
+  threshold: z.number().int(),
+});
+export type MilestoneCelebrationCard = z.infer<
+  typeof milestoneCelebrationCardSchema
+>;
+
 export const coachingCardSchema = z.discriminatedUnion('type', [
   streakCardSchema,
   insightCardSchema,
@@ -254,6 +285,7 @@ export const coachingCardSchema = z.discriminatedUnion('type', [
   curriculumCompleteCardSchema,
   continueBookCardSchema,
   bookSuggestionCardSchema,
+  milestoneCelebrationCardSchema,
 ]);
 export type CoachingCard = z.infer<typeof coachingCardSchema>;
 

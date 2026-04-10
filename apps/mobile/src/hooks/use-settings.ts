@@ -24,6 +24,7 @@ import { assertOk } from '../lib/assert-ok';
 interface NotificationPrefs {
   reviewReminders: boolean;
   dailyReminders: boolean;
+  weeklyProgressPush: boolean;
   pushEnabled: boolean;
   maxDailyPush: number;
 }

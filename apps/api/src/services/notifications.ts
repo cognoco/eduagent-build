@@ -33,7 +33,10 @@ export interface NotificationPayload {
     | 'consent_warning'
     | 'consent_expired'
     | 'subscribe_request'
-    | 'recall_nudge';
+    | 'recall_nudge'
+    | 'weekly_progress'
+    | 'monthly_report'
+    | 'progress_refresh';
 }
 
 export interface NotificationResult {

@@ -2,9 +2,11 @@
 // Trial Expiry — Tests (Story 5.2: Reverse Trial Soft Landing)
 // ---------------------------------------------------------------------------
 
-jest.mock('@eduagent/database', () => ({
-  createDatabase: jest.fn(() => ({})),
-}));
+import { createDatabaseModuleMock } from '../../test-utils/database-module';
+
+const mockDatabaseModule = createDatabaseModuleMock();
+
+jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
 jest.mock('../../services/subscription', () => ({
   getTierConfig: jest.fn().mockReturnValue({

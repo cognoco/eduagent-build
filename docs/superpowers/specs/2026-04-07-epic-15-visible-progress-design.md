@@ -143,7 +143,7 @@ The gap: no precomputed aggregation layer that turns this raw data into queryabl
   - `streaks` — current/longest
   - `curriculum_topics` — total topics per subject (for "X of Y" display)
 - **FR231.3:** The cron processes profiles in batches of 50 to avoid connection pool exhaustion. Each profile's snapshot is an independent transaction.
-- **FR231.4:** On first run for a profile (no existing snapshots), backfill a single snapshot for "today" capturing the current state. No historical backfill — the growth curve starts from the day this feature ships.
+- **FR231.4:** On first run for a profile (no existing snapshots), backfill a single snapshot for "today" capturing the current state. **[UX-1] One-time historical backfill:** On first deployment, run a backfill job that reconstructs approximate weekly snapshots from existing `learning_sessions`, `assessments`, `vocabulary`, and `streaks` tables. For each active profile, generate one snapshot per week going back to the profile's first session date (using the end-of-week state). This ensures existing users see a meaningful growth curve on day one. The backfill is approximate (vocabulary retention health may not be perfectly reconstructable) but far better than starting at zero. The backfill runs once as an Inngest event, not on the cron schedule.
 - **FR231.5:** The cron emits a structured metric (`progress.snapshot.computed`) per profile for observability. Errors per profile are caught and logged but do not abort the batch.
 - **FR231.6:** Manual trigger endpoint `POST /v1/progress/refresh` (authenticated, scoped to own profile) re-computes the snapshot for today. Used after a session completes to update progress immediately rather than waiting for the daily cron. Rate-limited to 10 calls per hour per profile.
 
@@ -254,7 +254,7 @@ The gap: no precomputed aggregation layer that turns this raw data into queryabl
 
 ### FR235: My Learning Journey Screen (Child-Facing)
 
-- **FR235.1:** New screen accessible from the learner tab bar or home screen. Route: `(learner)/progress.tsx`.
+- **FR235.1:** New screen accessible from the learner tab bar or home screen. Route: `(app)/progress.tsx`.
 - **FR235.2:** Screen layout:
   ```
   ┌─────────────────────────────┐
@@ -293,18 +293,26 @@ The gap: no precomputed aggregation layer that turns this raw data into queryabl
   - Language-only learner: "You know X words"
   - Non-language-only learner: "You've mastered X topics"
   - Mixed: "You've mastered X topics and know Y words"
+  - **[UX-5] Beginner threshold:** When the primary count is below 20, switch to trajectory framing: "You've started learning Spanish! X words and counting..." or "You're building your knowledge! X topics and counting..." The emphasis shifts from the (small) absolute number to the forward momentum. Above 20, use the standard phrasing.
 - **FR235.4:** Subject cards are tappable — navigate to subject progress detail (FR236).
-- **FR235.5:** Growth chart uses `GET /v1/progress/history?granularity=weekly` for the last 8 weeks. Shows topics mastered (all subjects) as bars. For language learners, vocabulary count is shown as a second series.
-- **FR235.6:** Recent milestones section shows the last 5 milestones from the `milestones` table, most recent first.
+- **FR235.5:** Growth chart uses `GET /v1/progress/history?granularity=weekly` for the last 8 weeks. Shows topics mastered (all subjects) as bars. For language learners, vocabulary count is shown as a second series. **[UX-13] Adaptive chart window:** When fewer than 4 data points exist, shrink the chart window to match the data span (minimum 4-week view). Below 2 data points, replace the chart entirely with a simple narrative: "You started X days ago — keep going and watch your growth appear here!" This avoids the sad single-bar-on-an-8-week-chart problem.
+- **FR235.6:** Recent milestones section shows the last 5 milestones from the `milestones` table, most recent first. **[UX-12]** If more than 5 milestones exist, show a "View all milestones" link at the bottom that navigates to a dedicated milestones list screen (`(app)/progress/milestones.tsx`) showing the full collection, grouped by type or chronologically.
 - **FR235.7:** Empty state (new user, no sessions): "Start your first session and watch your progress grow here!" with a "Start learning" button navigating to the learning entry point.
 - **FR235.8:** **Open-ended denominator handling (Conversation-First compatibility):** Subject cards adapt their progress display based on topic origin:
   - **Pre-generated topics (fixed denominator):** Show "8/15 topics" with a fill bar toward the total. `topicsNotStarted` is meaningful.
   - **Session-filed topics (open denominator):** Show "4 topics explored" with NO fill bar and NO denominator. The count only grows. `topicsNotStarted` is zero (there are no "not started" topics if topics are only created through sessions).
-  - **Mixed books (both pre-generated and session-filed):** Show the pre-generated fill bar ("5/10 curriculum topics") AND a secondary "+ 3 explored" count for session-filed topics.
+  - **[UX-10] Mixed books (both pre-generated and session-filed):** On the **journey screen** subject cards, show a single merged count: "11 topics explored" (pre-generated mastered + session-filed). The fill bar shows only the pre-generated ratio. The implementation detail of topic origin is reserved for the **subject detail screen** (FR236.7), where users who drill in can see the full breakdown. This prevents leaking implementation details into the summary view.
+
+- **FR235.9 (new) [UX-3]:** **Forward-momentum CTAs.** Each subject card on the journey screen includes a contextual action button:
+  - If the subject has a review-due retention card: "Review" → navigates to the review session for the most overdue card.
+  - If the subject has unstarted pre-generated topics: "Continue" → navigates to the next unmastered topic.
+  - Otherwise: "Explore" → navigates to the subject's learning entry point.
+  - Additionally, the bottom of the progress screen shows a prominent CTA: "Keep learning" that routes to whatever subject/topic is most beneficial right now (review-due takes priority, then least-recently-practiced subject).
+- **FR235.10 (new) [UX-15]:** **Vocabulary browser.** The vocabulary count on subject cards and the hero stat is tappable. Tapping navigates to a vocabulary browser screen (`(app)/progress/vocabulary.tsx`) showing the full list of known words grouped by CEFR level, with mastery status (mastered vs. learning). This satisfies the "let me see my collection" desire. For non-language subjects, the tap target is hidden.
 
 ### FR236: Subject Progress Detail Screen
 
-- **FR236.1:** Route: `(learner)/progress/[subjectId].tsx`. Reached by tapping a subject card on the journey screen.
+- **FR236.1:** Route: `(app)/progress/[subjectId].tsx`. Reached by tapping a subject card on the journey screen.
 - **FR236.2:** Screen layout:
   ```
   ┌─────────────────────────────┐
@@ -334,8 +342,8 @@ The gap: no precomputed aggregation layer that turns this raw data into queryabl
   - **Green** (mastered): assessment passed
   - **Teal** (in progress): at least one session, not yet mastered
   - **Grey** (not started): no sessions
-  - **Orange** (review due): mastered but retention card is overdue
-- **FR236.4:** For language subjects, vocabulary breakdown by CEFR level is shown. For non-language subjects, the vocabulary section is hidden.
+  - **[UX-2] Green with refresh badge** (review due): mastered but retention card is overdue. The bar stays **green** (mastery is preserved visually) with a small "refresh" icon (🔄) or "Review" badge overlaid. This replaces the original orange design — mastered topics must never visually regress in color, per Design Principle 4 ("progress survives bad days"). The badge is a gentle nudge, not a punishment.
+- **FR236.4:** For language subjects, vocabulary breakdown by CEFR level is shown. For non-language subjects, the vocabulary section is hidden. **[UX-6]** CEFR levels are displayed with kid-friendly labels: "Beginner (A1)" → "You can name things and say simple sentences", "Elementary (A2)" → "You can have basic conversations", "Intermediate (B1)" → "You can handle most everyday situations". The CEFR code appears in parentheses for parents who understand the system. The `estimatedProficiency` field in the inventory response gains a companion `proficiencyLabel: string` with the plain-language description.
 - **FR236.5:** Time spent shows data from the subject breakdown in the latest progress snapshot.
 - **FR236.6:** Growth chart shows per-subject progress over time. Uses `GET /v1/progress/history` filtered client-side to the selected subject's data.
 - **FR236.7:** **Dynamic topic display (Conversation-First compatibility):** Session-filed topics (where `filed_from = 'session_filing' | 'freeform_filing'`) are displayed alongside pre-generated topics in the topic list with the same color coding. The key difference:
@@ -363,6 +371,10 @@ The gap: no precomputed aggregation layer that turns this raw data into queryabl
   The "before" date is the earliest snapshot in `progress_snapshots` for the profile.
 - **FR237.4:** Celebration respects the learner's `celebrationLevel` preference (from `learningModes` table): `all` = show all, `big_only` = show only thresholds at the 100/500/1000 level and subject/book completions, `off` = suppress all but still record milestones.
 - **FR237.5:** The celebration screen has a "Share" concept: the stats are formatted as a shareable card (screenshot-friendly). No external sharing API needed — just a visually appealing layout that parents will screenshot.
+- **FR237.6 (new) [UX-11]:** **Age-adapted celebration copy.** Celebration messages use `birthYear` from the learner profile to select a copy tier:
+  - **Younger tier (< 12 years):** Warm, playful, exclamation-heavy. "You learned your 100th word! Remember when you started with zero? 🎉"
+  - **Older tier (12+ years):** Concise, respectful, no patronizing tone. "100 words — solid milestone. Your vocabulary is growing fast."
+  - The milestone detection service passes `birthYear` to the copy generator. Default to younger tier if `birthYear` is unknown.
 
 ### FR238: Parent Progress Dashboard Enhancement
 
@@ -387,19 +399,21 @@ The gap: no precomputed aggregation layer that turns this raw data into queryabl
   - "Knows Z words (W new this week)" (language subjects only)
   - "Studied N subjects, M minutes this week"
   - Engagement trend indicator: up arrow / stable / down arrow
+  - **[UX-7]** When engagement trend is `declining`, pair with a gentle actionable suggestion instead of a bare down-arrow: "Quiet week — maybe suggest a quick session on [their most-recent subject]?" When `stable` or `increasing`, no action needed — just the indicator.
 - **FR238.4:** Tapping a child's progress card navigates to `GET /v1/dashboard/:childProfileId/inventory` displayed in a dedicated child progress detail screen within the parent tab.
 
 ### FR239: Weekly Progress Push Notification
 
-- **FR239.1:** New Inngest cron job (`progress/weekly-summary`) runs every Monday at 09:00 UTC. For each parent profile with linked children and push notifications enabled, sends a summary push notification.
+- **FR239.1:** New Inngest cron job (`progress/weekly-summary`) runs every Monday at 09:00 UTC. For each parent profile with linked children and push notifications enabled, sends a summary push notification. **[UX-9] Timezone-aware delivery:** If the profile has a `timezone` field (from device locale), schedule delivery at 09:00 local time. The cron runs hourly on Mondays (`:00` each hour) and processes profiles whose local time is 09:00. If no timezone is available, fall back to 09:00 UTC. This prevents 01:00 AM deliveries for distant timezones.
 - **FR239.2:** Push notification content per child:
   - Title: "{childName}'s week in learning"
   - Body: "Mastered 2 new topics, learned 15 new words. 5 sessions this week."
-  - If engagement declined: "Alex hasn't practiced Spanish in 2 weeks. A gentle nudge might help!" (tone: supportive, not guilt-inducing)
+  - **[UX-8]** ~~If engagement declined: "Alex hasn't practiced Spanish in 2 weeks. A gentle nudge might help!"~~ **Removed from push notifications.** Inactivity mentions belong in the in-app dashboard only (FR238.3), never in push. Push notifications must always lead with something positive. If a child had zero activity, the push says: "{childName}'s knowledge is safe — still knows X topics!" If ALL children were inactive this week, skip the push entirely for that parent.
 - **FR239.3:** The push notification deep-links to the parent dashboard for the specific child.
 - **FR239.4:** New notification type `weekly_progress` added to `notificationTypeEnum`. Logged in `notification_log` for deduplication and analytics.
 - **FR239.5:** Parents can disable weekly progress pushes independently of other notification types. New boolean `weeklyProgressPush` on `notification_preferences` (default: true).
 - **FR239.6:** If a child had zero activity in the past week, the notification shifts to encouragement: "{childName} took a break this week. Their knowledge is safe — they've still mastered X topics!" This reinforces that progress doesn't disappear.
+- **FR239.7 (new) [UX-4]:** **Batched multi-child notifications.** Parents with multiple children receive ONE weekly push notification, not one per child. The notification body batches all children: "Weekly update: Emma mastered 2 topics, Alex learned 15 words, Max took a break." Tapping deep-links to the parent dashboard overview. This prevents notification spam for multi-child families and respects the parent's attention.
 
 ### FR240: Monthly Learning Report
 
@@ -427,7 +441,7 @@ The gap: no precomputed aggregation layer that turns this raw data into queryabl
 
     // Highlights (LLM-generated, warm tone)
     highlights: string[];              // max 3, e.g. "Mastered all of Ancient Egypt!"
-    areasForGrowth: string[];          // max 2, e.g. "Spanish practice dropped off mid-month"
+    nextSteps: string[];               // [UX-14] max 2, reframed from "areasForGrowth" — forward-looking with gentle action, e.g. "Spanish is ready for a comeback — try a quick vocab session!"
 
     // Per-subject detail
     subjects: SubjectMonthlyDetail[];
@@ -657,7 +671,7 @@ So that I feel proud of my progress and motivated to keep learning.
 
 **Given** a learner taps a subject card
 **When** navigating
-**Then** the app routes to `(learner)/progress/[subjectId].tsx` (Subject Progress Detail)
+**Then** the app routes to `(app)/progress/[subjectId].tsx` (Subject Progress Detail)
 
 **Given** a brand-new learner with no sessions
 **When** they visit the progress screen
@@ -841,7 +855,7 @@ So that I stay engaged with their learning without having to open the app every 
 |-------|---------|-----------|----------|
 | Push delivery fails | Expired token | No notification | Token refresh on next app open; notification logged as failed |
 | Snapshot unavailable for child | Cron didn't run | Notification skipped for that child | Retry next week; snapshot cron has its own retry |
-| Multiple children, mixed activity | Normal | One notification per child (not batched) | Parents with 3+ children see 3+ notifications — acceptable |
+| Multiple children, mixed activity | Normal | [UX-4] One batched notification per parent with all children summarized | Single tap → dashboard overview |
 
 ---
 
@@ -959,9 +973,33 @@ Phase B and Phase C can run in parallel. All of Phase C depends on Phase A but s
 | **Privacy: parent sees wrong child's data** | Low | Critical — data leak | `familyLinks` verification on every parent-facing endpoint (same pattern as existing dashboard). Integration tests with cross-parent access attempts. |
 | **Milestone detection triggers too many celebrations** | Medium | Low — annoyance | `celebrationLevel` preference respects user choice. Big milestones only by default for `big_only`. Reasonable thresholds (not every single word). |
 | **Monthly report LLM call fails** | Medium | Low — report still useful | Data-only fallback. LLM adds warmth but isn't required. Report generates without narrative if LLM times out. |
-| **Push notification fatigue** | Medium | Medium — parent disables all push | Independent `weeklyProgressPush` toggle. One notification per child per week — not per day. Tone is supportive, never nagging. |
+| **Push notification fatigue** | Medium | Medium — parent disables all push | Independent `weeklyProgressPush` toggle. [UX-4] Batched: one notification per parent per week (not per child). Tone is always positive — inactivity nudges appear in-app only, never in push. |
 | **JSONB schema evolution breaks old snapshots** | Low | Medium — chart gaps | TypeScript interface with optional fields and defaults. Old snapshots missing new fields render as 0/null. No migration needed for JSONB additions. |
 | **Vocabulary count drops when subject deleted** | Low | Low — confusing chart | Milestones are permanent (AD3). Charts may show a dip — acceptable and accurate. "Total ever learned" metric can be added as a separate field if needed. |
+
+---
+
+## UX Refinements (2026-04-09) — End-User Perspective Review
+
+> 15 findings identified during end-user perspective review. All fixes are integrated inline into the relevant FRs above and tagged `[UX-N]` where applied.
+
+| # | Severity | Finding | Fix location |
+|---|----------|---------|--------------|
+| UX-1 | **HIGH** | No historical backfill for existing users — the "Visible Progress" feature launches with a blank growth chart for loyal users who've been using the app for months. Their actual learning journey is invisible. | FR231.4 — added one-time historical backfill from existing source tables |
+| UX-2 | **HIGH** | Orange "review due" color on mastered topics directly contradicts Design Principle 4 ("progress survives bad days"). Green turning to orange feels like regression. | FR236.3 — mastered stays green with a subtle refresh badge instead |
+| UX-3 | **HIGH** | Progress screen is a read-only museum — shows data but offers no "Continue" or "Start next" CTA. No forward momentum. | FR235.9 (new) — subject cards gain a primary action CTA |
+| UX-4 | **HIGH** | Push notification spam for multi-child families: one push per child per week. 3 kids = 3 separate Monday pushes. Parents will disable all notifications. | FR239.7 (new) — batch into one notification per parent |
+| UX-5 | **MEDIUM** | Small numbers are embarrassing, not motivating. "You know 3 words" on a big bold hero stat feels mocking to a beginner. | FR235.3 — threshold-based framing: below 20, emphasize trajectory |
+| UX-6 | **MEDIUM** | "A1.3" CEFR proficiency is academic jargon. Meaningless to children and most parents. | FR232.2, FR236.4 — add kid-friendly label alongside CEFR code |
+| UX-7 | **MEDIUM** | "Engagement trend: declining" is a judgment with no guidance. Parent feels anxiety but gets no actionable advice. | FR238.3 — pair trend with a gentle suggested action |
+| UX-8 | **MEDIUM** | "A gentle nudge might help!" in push notifications is guilt-inducing despite claiming to be supportive. | FR239.2 — inactivity mentions in-app only, never in push. Push always leads with positive. |
+| UX-9 | **MEDIUM** | Monday 09:00 UTC is not Monday morning for all timezones. US West Coast receives the push at 01:00 AM. | FR239.1 — use profile timezone when available, bucket by region otherwise |
+| UX-10 | **MEDIUM** | Mixed pre-generated + session-filed display ("5/10 curriculum topics + 3 explored") leaks implementation details. A 9-year-old has no mental model for this distinction. | FR235.8 — simplify to single merged count on journey screen; show breakdown on detail screen only |
+| UX-11 | **MEDIUM** | Milestone celebrations don't adjust for age. "You learned your 10th word!" is patronizing to a 14-year-old. | FR237.6 (new) — two copy tiers: warm/playful (<12) and concise/respectful (12+) |
+| UX-12 | **LOW** | Only last 5 milestones visible, no "View all." Kids love collecting things — cutting off at 5 leaves engagement on the table. | FR235.6 — add "View all milestones" link to dedicated milestones list |
+| UX-13 | **LOW** | Growth chart with 1-2 data points looks pathetic. The "near-empty" state (not zero, just sparse) is demoralizing. | FR235.5 — adaptive chart window: match to data span, minimum 4-week view |
+| UX-14 | **LOW** | Monthly report "areas for growth" uses school report-card language. "Spanish practice dropped off" diagnoses but doesn't help. | FR240.3 — reframe as "what's coming next" with gentle action suggestion |
+| UX-15 | **LOW** | No vocabulary drill-down. "You know 112 words" but you can't see which ones. Knowledge count without browsable detail. | FR235.10 (new) — vocabulary count tappable → vocabulary browser grouped by CEFR level |
 
 ---
 

@@ -87,7 +87,9 @@ describe('LearnNewScreen', () => {
   it('navigates to session with sessionId on resume', async () => {
     mockReadSessionRecoveryMarker.mockResolvedValue({
       sessionId: 'sess-1',
+      subjectId: 'subject-1',
       subjectName: 'Math',
+      mode: 'learning',
       updatedAt: new Date().toISOString(),
     });
 
@@ -98,7 +100,12 @@ describe('LearnNewScreen', () => {
 
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/session',
-      params: { sessionId: 'sess-1' },
+      params: {
+        sessionId: 'sess-1',
+        subjectId: 'subject-1',
+        subjectName: 'Math',
+        mode: 'learning',
+      },
     });
   });
 

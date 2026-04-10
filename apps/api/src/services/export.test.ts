@@ -3,7 +3,6 @@ import { dataExportSchema } from '@eduagent/schemas';
 import { generateExport } from './export';
 
 const NOW = new Date('2025-01-15T10:00:00.000Z');
-const BIRTH = new Date('1990-06-15T00:00:00.000Z');
 
 function mockAccountRow() {
   return {
@@ -23,9 +22,10 @@ function mockProfileRow(id: string, displayName: string) {
     accountId: 'account-1',
     displayName,
     avatarUrl: null,
-    birthDate: BIRTH,
-    personaType: 'LEARNER' as const,
+    birthYear: 1990,
+    location: null,
     isOwner: false,
+    hasPremiumLlm: false,
     createdAt: NOW,
     updatedAt: NOW,
   };
@@ -71,6 +71,7 @@ function createMockDb({
   subscriptions = [] as Record<string, unknown>[],
   quotaPools = [] as Record<string, unknown>[],
   topUpCredits = [] as Record<string, unknown>[],
+  learningProfiles = [] as Record<string, unknown>[],
 } = {}): Database {
   return {
     query: {
@@ -146,6 +147,9 @@ function createMockDb({
       topUpCredits: {
         findMany: jest.fn().mockResolvedValue(topUpCredits),
       },
+      learningProfiles: {
+        findMany: jest.fn().mockResolvedValue(learningProfiles),
+      },
     },
   } as unknown as Database;
 }
@@ -209,7 +213,7 @@ describe('generateExport', () => {
 
     expect(result.profiles).toHaveLength(1);
     expect(result.profiles[0].displayName).toBe('Alice');
-    expect(result.profiles[0].birthDate).toBe('1990-06-15');
+    expect(result.profiles[0].birthYear).toBe(1990);
     expect(result.profiles[0].createdAt).toBe('2025-01-15T10:00:00.000Z');
   });
 

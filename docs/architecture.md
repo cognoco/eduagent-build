@@ -1647,3 +1647,142 @@ Detox/Maestro setup on CI with Expo is notoriously finicky — device farms, bui
 **Next Phase:** Epics & Stories (`/bmad:bmm:workflows:create-epics-stories`)
 
 **Document Maintenance:** Update this architecture when major technical decisions are made during implementation.
+
+---
+
+## Post-MVP Platform Decision: Web Port Analysis
+
+_Added 2026-04-10. Not part of the original MVP architecture. Recorded here so future planning inherits the analysis instead of repeating the discovery work._
+
+**Status:** Deferred. Current recommendation if/when web becomes a priority: **Option A (Parent Control Center)** with forward-compatible foundation.
+
+### Context
+
+Question raised: how much work to turn the Expo mobile app into a web app, given that the kid-facing learning flow is voice-first and kids do not type? This section records the codebase audit and two viable product shapes so the analysis survives beyond the conversation.
+
+### Current Web Readiness Audit (snapshot 2026-04-10)
+
+Expo SDK 54 already ships partial web scaffolding:
+
+- `react-native-web@0.21.2` and `react-dom@19.1.0` present in `apps/mobile/package.json`
+- `app.json` has a `web` block configured for the Metro bundler
+- No `web` build script, no `.web.tsx` variants, one `Platform.select` call total
+
+The foundation is primed but nothing runs on web today.
+
+**Native-only modules that need handling:**
+
+| Module | Current use | Web path |
+|---|---|---|
+| `@clerk/clerk-expo` | Auth | Swap to `@clerk/clerk-react` |
+| `expo-secure-store` | Clerk token cache | httpOnly cookie or `localStorage` |
+| `expo-speech-recognition` | STT voice input | **Out of scope for web** (Safari inadequate, kid flow stays mobile-only) |
+| `expo-speech` | TTS voice output | `window.speechSynthesis` only if Option B activates |
+| `react-native-purchases` | RevenueCat IAP | Activate dormant Stripe web checkout |
+| `expo-camera`, `expo-image-picker` | Homework capture | `<input type="file" capture>` + `getUserMedia` |
+| `expo-file-system`, `expo-image-manipulator` | Image handling | Canvas API + Blob/File |
+| `expo-notifications` | Push | Service Worker + Web Push (deferred — not in scope) |
+
+**Already web-compatible (no work):**
+
+- Hono API + `@eduagent/schemas` typed RPC client — platform-neutral
+- Expo Router — first-class web support via Metro
+- NativeWind + Tailwind — compiles to real CSS on web
+- `Pressable`, `ScrollView`, RN core primitives — shimmed by `react-native-web`
+- Shared design tokens, dark-first theme — platform-neutral
+- `react-native-svg`, `react-native-gesture-handler`, `react-native-reanimated` — all have web builds
+
+**Screen and component inventory:**
+
+- 55 screen files under `apps/mobile/src/app/` (Expo Router)
+- 71 component files under `apps/mobile/src/components/`
+- 18 animated components using `react-native-reanimated`
+- 8 files with `StyleSheet.create` (rest uses NativeWind) — ports freely
+
+### Two Viable Options
+
+**Option A — Parent Control Center** (RECOMMENDED)
+
+Web = parent-facing dashboard, settings, billing, child management, progress reports, monthly summaries. **No session/learning flow on web.** Kids stay mobile.
+
+- Relative scope: **~10-15%** of mobile codebase
+- Ports ~15-20 screens out of 55 (the parent-facing subset only)
+- Reuses `apps/api/src/routes/dashboard.ts`, `learner-profile.ts`, `snapshot-progress.ts`, and `services/monthly-report.ts` wholesale
+- Activates dormant Stripe web checkout (parents expect to pay from a browser, not the App Store)
+- Zero risk to the voice-first kid UX — web literally cannot run the learning flow, so it cannot accidentally degrade it
+- Positioning: _"Parents get the big screen for oversight, kids get the phone for learning"_
+
+**Option B — Text-Mode Learning**
+
+Web = full learning flow, but keyboard-driven. TTS via `window.speechSynthesis`, no STT.
+
+- Relative scope: **~20-25%** of mobile codebase
+- Requires a _new_ text-input session UI with no mobile equivalent (mobile is voice-first — there is no typing affordance to port)
+- Two divergent session UIs to maintain from that point forward: voice-first mobile + type-first web
+- Engagement risk: teens comparing the two may find mobile "more fun"
+- Defer until concrete demand exists
+
+### Path Dependency: Option A → Option B
+
+**The foundation layer in Option A is a strict subset of Option B.** If Option A is built first with forward-compatible choices (below), almost nothing is redone to add Option B later.
+
+**Inherited for free (100% reuse from A to B):**
+
+- Expo web build, Metro config, routing shell
+- Clerk-on-web swap, browser token storage
+- Hono RPC client wiring
+- NativeWind → CSS pipeline
+- Shared primitives, error boundaries, loading/empty/offline states
+- Stripe web checkout + entitlement sync
+- Design tokens, theme system
+- Sentry web SDK, analytics
+
+**New work in Option B on top of Option A:**
+
+- Remaining ~35-40 screens (session flow, chat, library, homework)
+- Text-mode session UI (genuinely new — no mobile precedent)
+- TTS swap (`expo-speech` → `window.speechSynthesis`)
+- Animation audit of the 18 reanimated components
+- Homework photo upload via browser APIs
+- Responsive layouts tuned for teens on phone browsers
+
+**Net cost comparison:**
+
+| Path | Relative scope | Notes |
+|---|---|---|
+| A now, stop | ~10-15% | Parent-only validates whether web has demand |
+| A now, B later | ~20-25% total | Same total as doing B directly — IF forward-compatible choices below are made |
+| B directly | ~20-25% | No incremental validation step, no market signal |
+
+### Forward-Compatible Choices (if taking Option A)
+
+Small decisions at build time that cost ~nothing but preserve Option B optionality. These are the trap: narrow Option A choices silently corner you, while forward-compatible ones have zero marginal cost.
+
+| Area | Narrow (A only) | Forward-compatible |
+|---|---|---|
+| Route structure | `/dashboard` at root | `/(parent)/dashboard` — reserve `(learn)` group for later |
+| Clerk role handling | Assume parent only | Use existing `family_links` role check (post-Epic-12) — works for kid accounts too |
+| Layout | Fixed desktop sidebar | Responsive from day one |
+| Token storage | Parent-scoped cookie | Session cookie that works for any role |
+| Design language | "Serious dashboard" aesthetic | Extend existing teal/lavender tokens, no separate theme |
+| Root path | `/` = dashboard | Keep `/` free for future marketing + session entry |
+
+**Key enabler:** the `family_links` role model (post-Epic-12) means the auth middleware doesn't need to know whether the session is parent or kid — the _route layout_ decides what to render. Adding Option B later becomes a matter of adding the kid-role branch to the same pipeline, not re-plumbing auth.
+
+### Recommended Decision
+
+**Defer web entirely until post-MVP.** If/when web is prioritized, build **Option A** with the forward-compatible choices above. Revisit Option B only if there is concrete demand (parent feedback requesting kid web access, competitive pressure, SEO/marketing-driven acquisition requiring a playable demo).
+
+### Triggers to Revisit
+
+- Parents on phone-only plans report missing big-screen oversight → Option A
+- Marketing needs a playable demo at `/try` for acquisition → Option B fragment
+- School/district sales conversation requires web delivery → Option B plus admin shell (separate epic)
+- iPad Safari Web Speech API reaches parity → changes the voice-on-web math entirely, reconsider Option B scope
+
+### Explicit Non-Decisions
+
+- Push notifications on web: not analyzed, assumed deferred
+- Offline-first support on web: not analyzed (mobile uses AsyncStorage patterns that don't map cleanly to IndexedDB)
+- Progressive Web App (installable, service worker): not considered
+- Marketing landing page: treated as a separate surface (Next.js or static), not a port of this app

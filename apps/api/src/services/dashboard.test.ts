@@ -12,30 +12,50 @@ const mockSessionEventsFindMany = jest.fn();
 const mockSubjectsFindMany = jest.fn();
 const mockCurriculaFindFirst = jest.fn();
 const mockCurriculumTopicsFindMany = jest.fn();
+const mockProgressSnapshotsFindFirst = jest.fn();
+const mockProgressSnapshotsFindMany = jest.fn();
+const mockMilestonesFindMany = jest.fn();
 
-jest.mock('@eduagent/database', () => ({
-  familyLinks: {
-    parentProfileId: 'parent_profile_id',
-    childProfileId: 'child_profile_id',
+import { createDatabaseModuleMock } from '../test-utils/database-module';
+
+const mockDatabaseModule = createDatabaseModuleMock({
+  exports: {
+    familyLinks: {
+      parentProfileId: 'parent_profile_id',
+      childProfileId: 'child_profile_id',
+    },
+    profiles: { id: 'id' },
+    learningSessions: {
+      id: 'id',
+      profileId: 'profile_id',
+      startedAt: 'started_at',
+    },
+    sessionEvents: {
+      profileId: 'profile_id',
+      eventType: 'event_type',
+      sessionId: 'session_id',
+      createdAt: 'created_at',
+    },
+    subjects: {
+      profileId: 'profile_id',
+    },
+    curricula: { subjectId: 'subject_id' },
+    curriculumTopics: { curriculumId: 'curriculum_id' },
+    // Epic 15: snapshot-aggregation references these column objects in eq()
+    // calls. Column names don't matter for the mock — drizzle-orm's eq() only
+    // needs the column reference to exist so it can build a query object.
+    progressSnapshots: {
+      profileId: 'profile_id',
+      snapshotDate: 'snapshot_date',
+    },
+    milestones: {
+      profileId: 'profile_id',
+      createdAt: 'created_at',
+    },
   },
-  profiles: { id: 'id' },
-  learningSessions: {
-    id: 'id',
-    profileId: 'profile_id',
-    startedAt: 'started_at',
-  },
-  sessionEvents: {
-    profileId: 'profile_id',
-    eventType: 'event_type',
-    sessionId: 'session_id',
-    createdAt: 'created_at',
-  },
-  subjects: {
-    profileId: 'profile_id',
-  },
-  curricula: { subjectId: 'subject_id' },
-  curriculumTopics: { curriculumId: 'curriculum_id' },
-}));
+});
+
+jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
 const mockGetOverallProgress = jest.fn();
 const mockGetTopicProgress = jest.fn();
@@ -252,6 +272,16 @@ function createMockDb() {
       curriculumTopics: {
         findMany: mockCurriculumTopicsFindMany,
       },
+      // Snapshot aggregation reads these when building child progress —
+      // mocks default to empty so the legacy getChildrenForParent path still
+      // works without needing a snapshot row.
+      progressSnapshots: {
+        findFirst: mockProgressSnapshotsFindFirst,
+        findMany: mockProgressSnapshotsFindMany,
+      },
+      milestones: {
+        findMany: mockMilestonesFindMany,
+      },
     },
   } as unknown;
 }
@@ -265,6 +295,11 @@ const TOPIC_ID_2 = '00000000-0000-0000-0000-000000000006';
 
 beforeEach(() => {
   jest.clearAllMocks();
+  // Snapshot aggregation defaults — legacy getChildrenForParent tests expect
+  // no snapshot rows, so builders fall back to the old non-snapshot path.
+  mockProgressSnapshotsFindFirst.mockResolvedValue(null);
+  mockProgressSnapshotsFindMany.mockResolvedValue([]);
+  mockMilestonesFindMany.mockResolvedValue([]);
 });
 
 // ---------------------------------------------------------------------------
@@ -446,15 +481,19 @@ describe('countGuidedMetrics', () => {
 // ---------------------------------------------------------------------------
 
 describe('getChildDetail', () => {
-  it('returns null when no parent-child link exists', async () => {
+  // [EP15-I5] Break test — previously returned null (and the route
+  // serialized that as 200 `{ child: null }`, masking IDOR as a benign
+  // not-found). Now throws ForbiddenError so app.onError converts to 403.
+  it('throws ForbiddenError when no parent-child link exists', async () => {
     const { getChildDetail } = await importDbFunctions();
+    const { ForbiddenError } = await import('../errors');
     const db = createMockDb();
 
     mockFamilyLinksFindFirst.mockResolvedValue(null);
 
-    const result = await getChildDetail(db as never, PARENT_ID, CHILD_ID);
-
-    expect(result).toBeNull();
+    await expect(
+      getChildDetail(db as never, PARENT_ID, CHILD_ID)
+    ).rejects.toBeInstanceOf(ForbiddenError);
     expect(mockFamilyLinksFindFirst).toHaveBeenCalled();
   });
 
@@ -499,20 +538,19 @@ describe('getChildDetail', () => {
 // ---------------------------------------------------------------------------
 
 describe('getChildSubjectTopics', () => {
-  it('returns empty when no parent-child link exists', async () => {
+  // [EP15-I5] Break test — `[]` on access denial masked forbidden as
+  // "child has no topics yet". Routes returned 200 with empty array,
+  // giving no feedback that the user had lost access (or never had it).
+  it('throws ForbiddenError when no parent-child link exists', async () => {
     const { getChildSubjectTopics } = await importDbFunctions();
+    const { ForbiddenError } = await import('../errors');
     const db = createMockDb();
 
     mockFamilyLinksFindFirst.mockResolvedValue(null);
 
-    const result = await getChildSubjectTopics(
-      db as never,
-      PARENT_ID,
-      CHILD_ID,
-      SUBJECT_ID
-    );
-
-    expect(result).toEqual([]);
+    await expect(
+      getChildSubjectTopics(db as never, PARENT_ID, CHILD_ID, SUBJECT_ID)
+    ).rejects.toBeInstanceOf(ForbiddenError);
   });
 
   it('returns empty when no curriculum exists for the subject', async () => {
@@ -587,15 +625,19 @@ const SESSION_ID_1 = '00000000-0000-0000-0000-000000000010';
 const SESSION_ID_2 = '00000000-0000-0000-0000-000000000011';
 
 describe('getChildSessions', () => {
-  it('returns empty array when no parent-child link exists', async () => {
+  // [EP15-I5] Break test — sessions list is more sensitive than topic
+  // progress because it contains transcript previews. Masking forbidden
+  // as empty here is a particularly bad IDOR posture.
+  it('throws ForbiddenError when no parent-child link exists', async () => {
     const { getChildSessions } = await importDbFunctions();
+    const { ForbiddenError } = await import('../errors');
     const db = createMockDb();
 
     mockFamilyLinksFindFirst.mockResolvedValue(null);
 
-    const result = await getChildSessions(db as never, PARENT_ID, CHILD_ID);
-
-    expect(result).toEqual([]);
+    await expect(
+      getChildSessions(db as never, PARENT_ID, CHILD_ID)
+    ).rejects.toBeInstanceOf(ForbiddenError);
     expect(mockFamilyLinksFindFirst).toHaveBeenCalled();
     expect(mockSessionsFindMany).not.toHaveBeenCalled();
   });
@@ -676,20 +718,20 @@ describe('getChildSessions', () => {
 // ---------------------------------------------------------------------------
 
 describe('getChildSessionTranscript', () => {
-  it('returns null when no parent-child link exists', async () => {
+  // [EP15-I5] Break test — transcripts contain full conversation history.
+  // Access denial must be a 403, not a 200 with null body. Note the
+  // "returns null when session does not belong to child" test further down
+  // is still correct — that null means "access granted but 404", not "forbidden".
+  it('throws ForbiddenError when no parent-child link exists', async () => {
     const { getChildSessionTranscript } = await importDbFunctions();
+    const { ForbiddenError } = await import('../errors');
     const db = createMockDb();
 
     mockFamilyLinksFindFirst.mockResolvedValue(null);
 
-    const result = await getChildSessionTranscript(
-      db as never,
-      PARENT_ID,
-      CHILD_ID,
-      SESSION_ID_1
-    );
-
-    expect(result).toBeNull();
+    await expect(
+      getChildSessionTranscript(db as never, PARENT_ID, CHILD_ID, SESSION_ID_1)
+    ).rejects.toBeInstanceOf(ForbiddenError);
     expect(mockSessionsFindFirst).not.toHaveBeenCalled();
   });
 

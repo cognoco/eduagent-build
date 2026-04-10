@@ -17,6 +17,7 @@ import {
   precomputeCoachingCard,
   writeCoachingCardCache,
 } from '../../services/coaching-cards';
+import { refreshProgressSnapshot } from '../../services/snapshot-aggregation';
 import { insertSessionXpEntry } from '../../services/xp';
 import { extractAndStoreHomeworkSummary } from '../../services/homework-summary';
 import {
@@ -32,12 +33,18 @@ import { captureException } from '../../services/sentry';
 import { queueCelebration } from '../../services/celebrations';
 import {
   curriculumTopics,
+  learningSessions,
   retentionCards,
   sessionEvents,
   subjects,
 } from '@eduagent/database';
 import { and, asc, eq } from 'drizzle-orm';
 import { verificationTypeSchema } from '@eduagent/schemas';
+import {
+  analyzeSessionTranscript,
+  applyAnalysis,
+  getLearningProfile,
+} from '../../services/learner-profile';
 
 // ---------------------------------------------------------------------------
 // Step error isolation — each step catches its own errors so that a failure
@@ -413,10 +420,26 @@ export const sessionCompleted = inngest.createFunction(
     );
 
     // Step 2: Write coaching card / session summary
+    // Runs before analyze-learner-profile so the next session's home screen
+    // opens with a fresh coaching card even if LLM profile analysis is slow.
+    // [EP15-C3 RESOLVED]: Plan F-1 mandated memory → snapshot → cards, but
+    // computeProgressMetrics never reads learning_profiles — the pipelines
+    // are independent. Latency-first order confirmed correct; plan AD6 amended.
     outcomes.push(
       await step.run('write-coaching-card', async () =>
         runIsolated('write-coaching-card', profileId, async () => {
           const db = getStepDatabase();
+          // [EP15-I6] Schema guard removed — migration 0020 makes the table
+          // unconditionally present in all environments. Tests must seed the
+          // real schema rather than relying on `db.query` shape checks.
+          //
+          // [EP15-C4 AR-13] Pass sessionEndedAt so refreshProgressSnapshot
+          // can debounce: if two completions for the same profile land in
+          // the same minute, the second one sees the first's snapshot was
+          // already updated after the session ended and returns it cached.
+          await refreshProgressSnapshot(db, profileId, {
+            sessionEndedAt: timestamp ? new Date(timestamp) : new Date(),
+          });
           await createPendingSessionSummary(
             db,
             sessionId,
@@ -432,7 +455,81 @@ export const sessionCompleted = inngest.createFunction(
       )
     );
 
-    // Step 3: Update dashboard — streaks + XP
+    // Step 3: Analyze learner transcript and update learning profile (Epic 16).
+    // [EP15-M3]: runs AFTER write-coaching-card — profile analysis is background
+    // enrichment and must not delay user-facing coaching card. EP15-C3 confirmed
+    // this ordering is safe: snapshot pipeline never reads learning_profiles.
+    outcomes.push(
+      await step.run('analyze-learner-profile', async () =>
+        runIsolated('analyze-learner-profile', profileId, async () => {
+          const db = getStepDatabase();
+          const existingProfile = await getLearningProfile(db, profileId);
+
+          if (!existingProfile) {
+            return;
+          }
+
+          // Consent gate: memoryConsentStatus is NOT NULL (defaults to
+          // 'pending') for all rows after migration 0019, so the consent
+          // check is authoritative. `memoryEnabled` governs injection only.
+          if (
+            existingProfile.memoryConsentStatus !== 'granted' ||
+            existingProfile.memoryCollectionEnabled === false
+          ) {
+            return;
+          }
+
+          const transcriptEvents = await db.query.sessionEvents.findMany({
+            where: and(
+              eq(sessionEvents.sessionId, sessionId),
+              eq(sessionEvents.profileId, profileId)
+            ),
+            orderBy: asc(sessionEvents.createdAt),
+            columns: {
+              eventType: true,
+              content: true,
+            },
+          });
+
+          const [subjectRow] = subjectId
+            ? await db
+                .select({ name: subjects.name })
+                .from(subjects)
+                .where(eq(subjects.id, subjectId))
+                .limit(1)
+            : [null];
+
+          const topicTitle = topicId ? await loadTopicTitle(db, topicId) : null;
+          const sessionRow = await db.query.learningSessions.findFirst({
+            where: and(
+              eq(learningSessions.id, sessionId),
+              eq(learningSessions.profileId, profileId)
+            ),
+            columns: { rawInput: true },
+          });
+
+          const analysis = await analyzeSessionTranscript(
+            transcriptEvents,
+            subjectRow?.name ?? null,
+            topicTitle,
+            sessionRow?.rawInput
+          );
+
+          if (!analysis) {
+            return;
+          }
+
+          await applyAnalysis(
+            db,
+            profileId,
+            analysis,
+            subjectRow?.name ?? null
+          );
+        })
+      )
+    );
+
+    // Step 4: Update dashboard — streaks + XP
     // FR86: Only count toward Honest Streak when recall quality >= 3 (pass)
     // XP insertion still runs for any completed session.
     let updatedStreak: { currentStreak: number; longestStreak: number } | null =
@@ -471,7 +568,7 @@ export const sessionCompleted = inngest.createFunction(
       })
     );
 
-    // Step 4: Generate and store session embedding
+    // Step 5: Generate and store session embedding
     outcomes.push(
       await step.run('generate-embeddings', async () =>
         runIsolated('generate-embeddings', profileId, async () => {
@@ -490,7 +587,7 @@ export const sessionCompleted = inngest.createFunction(
       )
     );
 
-    // Step 5: Extract parent-facing homework summary (Story 14.12)
+    // Step 6: Extract parent-facing homework summary (Story 14.12)
     outcomes.push(
       await step.run('extract-homework-summary', async () => {
         if (sessionType !== 'homework') {
@@ -506,7 +603,7 @@ export const sessionCompleted = inngest.createFunction(
       })
     );
 
-    // Step 6: Track consecutive summary skips (FR94 — Casual Explorer prompt)
+    // Step 7: Track consecutive summary skips (FR94 — Casual Explorer prompt)
     outcomes.push(
       await step.run('track-summary-skips', async () =>
         runIsolated('track-summary-skips', profileId, async () => {

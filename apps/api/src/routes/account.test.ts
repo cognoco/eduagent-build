@@ -29,16 +29,22 @@ jest.mock('../inngest/client', () => ({
 // Mock database module — middleware creates a stub db per request
 // ---------------------------------------------------------------------------
 
-jest.mock('@eduagent/database', () => ({
-  createDatabase: jest.fn().mockReturnValue({
+import { createDatabaseModuleMock } from '../test-utils/database-module';
+
+const mockDatabaseModule = createDatabaseModuleMock({
+  db: {
     query: {
       profiles: {
         findMany: jest.fn().mockResolvedValue([]),
       },
     },
-  }),
-  profiles: { accountId: 'accountId' },
-}));
+  },
+  exports: {
+    profiles: { accountId: 'accountId' },
+  },
+});
+
+jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
 // ---------------------------------------------------------------------------
 // Mock account, deletion, and export services — no DB interaction

@@ -11,36 +11,44 @@ const mockDbUpdate = jest.fn().mockReturnValue({
     .mockReturnValue({ where: jest.fn().mockResolvedValue(undefined) }),
 });
 
-jest.mock('@eduagent/database', () => ({
-  createDatabase: jest.fn(() => ({
-    query: {
-      quotaPools: { findMany: mockFindManyQuotaPools },
-      subscriptions: { findFirst: mockFindFirstSubscription },
-    },
-    execute: (...args: unknown[]) => mockDbExecute(...args),
-    update: (...args: unknown[]) => {
-      // Route to returning mock for daily reset, plain mock for monthly
-      const result = mockDbUpdate(...args);
-      return {
-        ...result,
-        set: jest.fn().mockReturnValue({
-          where: jest.fn().mockReturnValue({
-            returning: jest.fn().mockResolvedValue([]),
-          }),
+import { createDatabaseModuleMock } from '../../test-utils/database-module';
+
+const mockQuotaResetDb = {
+  query: {
+    quotaPools: { findMany: mockFindManyQuotaPools },
+    subscriptions: { findFirst: mockFindFirstSubscription },
+  },
+  execute: (...args: unknown[]) => mockDbExecute(...args),
+  update: (...args: unknown[]) => {
+    // Route to returning mock for daily reset, plain mock for monthly
+    const result = mockDbUpdate(...args);
+    return {
+      ...result,
+      set: jest.fn().mockReturnValue({
+        where: jest.fn().mockReturnValue({
+          returning: jest.fn().mockResolvedValue([]),
         }),
-      };
+      }),
+    };
+  },
+};
+
+const mockDatabaseModule = createDatabaseModuleMock({
+  db: mockQuotaResetDb,
+  exports: {
+    quotaPools: {
+      cycleResetAt: 'cycle_reset_at',
+      id: 'id',
+      subscriptionId: 'subscription_id',
+      usedToday: 'used_today',
     },
-  })),
-  quotaPools: {
-    cycleResetAt: 'cycle_reset_at',
-    id: 'id',
-    subscriptionId: 'subscription_id',
-    usedToday: 'used_today',
+    subscriptions: {
+      id: 'id',
+    },
   },
-  subscriptions: {
-    id: 'id',
-  },
-}));
+});
+
+jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
 jest.mock('../../services/subscription', () => ({
   getTierConfig: jest.fn((tier: string) => {

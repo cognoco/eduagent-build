@@ -44,7 +44,6 @@ import {
 } from './consent';
 
 const NOW = new Date('2025-01-15T10:00:00.000Z');
-const BIRTH = new Date('1990-01-15T00:00:00.000Z');
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -56,10 +55,10 @@ function mockProfileRow(
     accountId: string;
     displayName: string;
     avatarUrl: string | null;
-    birthDate: Date | null;
     birthYear: number | null;
     location: 'EU' | 'US' | 'OTHER' | null;
     isOwner: boolean;
+    hasPremiumLlm: boolean;
   }>
 ) {
   return {
@@ -67,10 +66,10 @@ function mockProfileRow(
     accountId: overrides?.accountId ?? 'account-123',
     displayName: overrides?.displayName ?? 'Test User',
     avatarUrl: overrides?.avatarUrl ?? null,
-    birthDate: overrides?.birthDate ?? null,
     birthYear: overrides?.birthYear ?? null,
     location: overrides?.location ?? null,
     isOwner: overrides?.isOwner ?? false,
+    hasPremiumLlm: overrides?.hasPremiumLlm ?? false,
     createdAt: NOW,
     updatedAt: NOW,
   };
@@ -157,7 +156,6 @@ describe('createProfile', () => {
     expect(result).toHaveProperty('accountId');
     expect(result).toHaveProperty('displayName');
     expect(result).toHaveProperty('avatarUrl');
-    expect(result).toHaveProperty('birthDate');
     expect(result).toHaveProperty('birthYear');
     expect(result).toHaveProperty('isOwner');
     expect(result).toHaveProperty('createdAt');
@@ -205,18 +203,17 @@ describe('createProfile', () => {
       accountId: 'acct-1',
       displayName: 'Custom Name',
       avatarUrl: 'https://example.com/avatar.png',
-      birthDate: BIRTH,
+      birthYear: 1990,
     });
     const db = createMockDb({ insertReturning: [row] });
     const result = await createProfile(db, 'acct-1', {
       displayName: 'Custom Name',
       avatarUrl: 'https://example.com/avatar.png',
-      birthDate: '1990-01-15',
+      birthYear: 1990,
     });
 
     expect(result.displayName).toBe('Custom Name');
     expect(result.avatarUrl).toBe('https://example.com/avatar.png');
-    expect(result.birthDate).toBe('1990-01-15');
     expect(result.birthYear).toBe(1990);
     expect(result.accountId).toBe('acct-1');
   });
@@ -310,36 +307,6 @@ describe('createProfile', () => {
     expect(createPendingConsentState).toHaveBeenCalledWith(db, row.id, 'GDPR');
     expect(createGrantedConsentState).not.toHaveBeenCalled();
     expect(result.consentStatus).toBe('PENDING');
-  });
-
-  it('stores a derived legacy birthDate for birthYear-only input', async () => {
-    const row = mockProfileRow();
-    const db = createMockDb({ insertReturning: [row] });
-
-    const result = await createProfile(
-      db,
-      'account-123',
-      { displayName: 'No BD', birthYear: 2008 },
-      false
-    );
-
-    const insertCall = (db.insert as jest.Mock).mock.results[0].value;
-    const valuesCall = insertCall.values as jest.Mock;
-    const insertedValues = valuesCall.mock.calls[0][0];
-
-    expect(checkConsentRequired).toHaveBeenCalledWith(2008);
-    expect(createPendingConsentState).not.toHaveBeenCalled();
-    expect(result.consentStatus).toBeNull();
-    expect(insertedValues.birthDate).toBeInstanceOf(Date);
-    expect(insertedValues.birthDate.toISOString()).toContain('2008-01-01');
-  });
-
-  it('throws when neither birthDate nor birthYear is provided', async () => {
-    const db = createMockDb({ insertReturning: [mockProfileRow()] });
-
-    await expect(
-      createProfile(db, 'account-123', { displayName: 'Missing Age' })
-    ).rejects.toThrow('Profile birthYear or birthDate is required');
   });
 });
 

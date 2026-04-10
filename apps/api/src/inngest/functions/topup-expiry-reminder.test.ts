@@ -5,21 +5,27 @@
 const mockFindExpiringTopUpCredits = jest.fn().mockResolvedValue([]);
 const mockInngestSend = jest.fn().mockResolvedValue(undefined);
 
-jest.mock('@eduagent/database', () => ({
-  createDatabase: jest.fn(() => ({
+import { createDatabaseModuleMock } from '../../test-utils/database-module';
+
+const mockDatabaseModule = createDatabaseModuleMock({
+  db: {
     query: {
       topUpCredits: {
         findMany: mockFindExpiringTopUpCredits,
       },
     },
-  })),
-  topUpCredits: {
-    remaining: 'remaining',
-    expiresAt: 'expires_at',
-    subscriptionId: 'subscription_id',
-    purchasedAt: 'purchased_at',
   },
-}));
+  exports: {
+    topUpCredits: {
+      remaining: 'remaining',
+      expiresAt: 'expires_at',
+      subscriptionId: 'subscription_id',
+      purchasedAt: 'purchased_at',
+    },
+  },
+});
+
+jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
 jest.mock('../client', () => ({
   inngest: {

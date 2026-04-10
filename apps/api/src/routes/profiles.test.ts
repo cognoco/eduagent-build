@@ -18,15 +18,18 @@ jest.mock('../middleware/jwt', () => ({
 // Mock database module — middleware creates a stub db per request
 // ---------------------------------------------------------------------------
 
-jest.mock('@eduagent/database', () => ({
-  createDatabase: jest.fn().mockReturnValue({
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    transaction: jest.fn().mockImplementation(async (cb: (tx: any) => any) => {
-      const tx = { execute: jest.fn().mockResolvedValue(undefined) };
-      return cb(tx);
-    }),
+import {
+  createDatabaseModuleMock,
+  createTransactionalMockDb,
+} from '../test-utils/database-module';
+
+const mockDatabaseModule = createDatabaseModuleMock({
+  db: createTransactionalMockDb({
+    execute: jest.fn().mockResolvedValue(undefined),
   }),
-}));
+});
+
+jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
 // ---------------------------------------------------------------------------
 // Mock account & profile services — pure stubs, no DB interaction
@@ -63,13 +66,10 @@ jest.mock('../services/profile', () => ({
       accountId,
       displayName: input.displayName,
       avatarUrl: input.avatarUrl ?? null,
-      birthDate: input.birthDate ?? null,
-      birthYear:
-        input.birthYear ??
-        (input.birthDate ? Number(input.birthDate.slice(0, 4)) : null),
-      personaType: input.personaType ?? 'LEARNER',
+      birthYear: input.birthYear ?? null,
       location: null,
       isOwner: false,
+      hasPremiumLlm: false,
       consentStatus: null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -79,11 +79,10 @@ jest.mock('../services/profile', () => ({
     accountId: 'test-account-id',
     displayName: 'Test User',
     avatarUrl: null,
-    birthDate: null,
     birthYear: null,
-    personaType: 'LEARNER',
     location: null,
     isOwner: false,
+    hasPremiumLlm: false,
     consentStatus: null,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -93,11 +92,10 @@ jest.mock('../services/profile', () => ({
     accountId: 'test-account-id',
     displayName: 'Updated Name',
     avatarUrl: null,
-    birthDate: null,
     birthYear: null,
-    personaType: 'LEARNER',
     location: null,
     isOwner: false,
+    hasPremiumLlm: false,
     consentStatus: null,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -159,8 +157,7 @@ describe('profile routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({
             displayName: 'Test User',
-            personaType: 'LEARNER',
-            birthDate: '2008-06-15',
+            birthYear: 2008,
           }),
         },
         TEST_ENV
@@ -171,7 +168,6 @@ describe('profile routes', () => {
       const body = await res.json();
       expect(body.profile).toBeDefined();
       expect(body.profile.displayName).toBe('Test User');
-      expect(body.profile.personaType).toBe('LEARNER');
       expect(body.profile.birthYear).toBe(2008);
       expect(body.profile.accountId).toBeDefined();
       expect(body.profile.createdAt).toBeDefined();
@@ -206,8 +202,7 @@ describe('profile routes', () => {
           method: 'POST',
           headers: AUTH_HEADERS,
           body: JSON.stringify({
-            personaType: 'TEEN',
-            birthDate: '2014-03-10',
+            birthYear: 2014,
           }),
         },
         TEST_ENV
@@ -243,7 +238,7 @@ describe('profile routes', () => {
       expect(body.message).toMatch(/upgrade/i);
     });
 
-    it('returns 400 when no age field is provided', async () => {
+    it('returns 400 when birthYear is missing (Zod rejects undefined)', async () => {
       const res = await app.request(
         '/v1/profiles',
         {
@@ -257,6 +252,29 @@ describe('profile routes', () => {
       );
 
       expect(res.status).toBe(400);
+      // Error body must reference the birthYear field so regressions
+      // that accept missing birthYear are caught.
+      const raw = await res.text();
+      expect(raw).toContain('birthYear');
+    });
+
+    it('returns 400 when birthYear is null (Zod rejects wrong type)', async () => {
+      const res = await app.request(
+        '/v1/profiles',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            displayName: 'Test User',
+            birthYear: null,
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(400);
+      const raw = await res.text();
+      expect(raw).toContain('birthYear');
     });
   });
 

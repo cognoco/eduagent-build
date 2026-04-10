@@ -22,12 +22,18 @@ const mockDbInsert = jest.fn().mockReturnValue({
   }),
 });
 
-jest.mock('@eduagent/database', () => ({
-  createDatabase: jest.fn().mockReturnValue({
+import { createDatabaseModuleMock } from '../test-utils/database-module';
+
+const mockDatabaseModule = createDatabaseModuleMock({
+  db: {
     insert: (...args: unknown[]) => mockDbInsert(...args),
-  }),
-  byokWaitlist: { email: 'email' },
-}));
+  },
+  exports: {
+    byokWaitlist: { email: 'email' },
+  },
+});
+
+jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
 jest.mock('../services/account', () => ({
   findOrCreateAccount: jest.fn().mockResolvedValue({

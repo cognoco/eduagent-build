@@ -10,13 +10,16 @@
   "exclude": ["dist", "**/*.test.ts", "**/*.spec.ts"],
   "references": [
     {
-      "path": "../../packages/database/tsconfig.lib.json"
+      "path": "../../packages/test-utils/tsconfig.lib.json"
+    },
+    {
+      "path": "../../packages/schemas/tsconfig.lib.json"
     },
     {
       "path": "../../packages/retention/tsconfig.lib.json"
     },
     {
-      "path": "../../packages/schemas/tsconfig.lib.json"
+      "path": "../../packages/database/tsconfig.lib.json"
     }
   ]
 }

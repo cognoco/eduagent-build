@@ -2,13 +2,16 @@
 // EVALUATE Data Service — Tests (FR128-133)
 // ---------------------------------------------------------------------------
 
-jest.mock('@eduagent/database', () => {
-  const actual = jest.requireActual('@eduagent/database');
-  return {
-    ...actual,
+import { createDatabaseModuleMock } from '../test-utils/database-module';
+
+const mockDatabaseModule = createDatabaseModuleMock({
+  includeActual: true,
+  exports: {
     createScopedRepository: jest.fn(),
-  };
+  },
 });
+
+jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
 jest.mock('./evaluate', () => ({
   shouldTriggerEvaluate: jest.fn(),

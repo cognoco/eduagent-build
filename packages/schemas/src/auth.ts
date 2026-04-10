@@ -9,7 +9,7 @@ import { z } from 'zod';
 export const registerSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8).max(128),
-  birthDate: z.string().date().optional(),
+  birthYear: z.number().int().optional(),
   location: z.enum(['EU', 'US', 'OTHER']).optional(),
 });
 

@@ -10,14 +10,7 @@ import type {
   ProfileUpdateInput,
   Profile,
 } from '@eduagent/schemas';
-import {
-  birthDateFromBirthYear,
-  birthYearFromDateLike,
-} from '@eduagent/schemas';
-
-export type ProfileValidationCode =
-  | 'BIRTH_YEAR_REQUIRED'
-  | 'CHILD_AGE_VIOLATION';
+export type ProfileValidationCode = 'CHILD_AGE_VIOLATION';
 
 export class ProfileValidationError extends Error {
   code: ProfileValidationCode;
@@ -58,10 +51,7 @@ function mapProfileRow(
     accountId: row.accountId,
     displayName: row.displayName,
     avatarUrl: row.avatarUrl ?? null,
-    birthDate: row.birthDate
-      ? row.birthDate.toISOString().split('T')[0]!
-      : null,
-    birthYear: row.birthYear ?? birthYearFromDateLike(row.birthDate),
+    birthYear: row.birthYear,
     location: row.location ?? null,
     isOwner: row.isOwner,
     hasPremiumLlm: row.hasPremiumLlm,
@@ -152,19 +142,7 @@ export async function createProfile(
   isOwner?: boolean,
   parentProfileId?: string
 ): Promise<Profile> {
-  // BD-06: When birthDate is present, it is the single source of truth for birthYear.
-  // This prevents a mismatch where consent/persona are computed from one value
-  // but a different value is persisted.
-  const birthYear = input.birthDate
-    ? birthYearFromDateLike(input.birthDate)!
-    : input.birthYear ?? null;
-  if (birthYear == null) {
-    throw new ProfileValidationError(
-      'BIRTH_YEAR_REQUIRED',
-      'birthYear',
-      'Profile birthYear or birthDate is required'
-    );
-  }
+  const birthYear = input.birthYear;
 
   // Pre-compute consent check (single call — used for both age gate and consent state)
   const consentCheck = checkConsentRequired(birthYear);
@@ -185,9 +163,6 @@ export async function createProfile(
       displayName: input.displayName,
       avatarUrl: input.avatarUrl ?? null,
       birthYear,
-      birthDate: input.birthDate
-        ? new Date(input.birthDate)
-        : birthDateFromBirthYear(birthYear),
       location: input.location ?? null,
       isOwner: isOwner ?? false,
     })

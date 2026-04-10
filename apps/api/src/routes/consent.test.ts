@@ -48,9 +48,11 @@ jest.mock('../middleware/jwt', () => ({
 // Mock database module — middleware creates a stub db per request
 // ---------------------------------------------------------------------------
 
-jest.mock('@eduagent/database', () => ({
-  createDatabase: jest.fn().mockReturnValue({}),
-}));
+import { createDatabaseModuleMock } from '../test-utils/database-module';
+
+const mockDatabaseModule = createDatabaseModuleMock();
+
+jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
 // ---------------------------------------------------------------------------
 // Mock account + consent services — no DB interaction
@@ -78,8 +80,6 @@ jest.mock('../services/profile', () => ({
     accountId: 'test-account-id',
     displayName: 'Test User',
     avatarUrl: null,
-    birthDate: null,
-    personaType: 'TEEN',
     isOwner: false,
     consentStatus: null,
     createdAt: new Date().toISOString(),

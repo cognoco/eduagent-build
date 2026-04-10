@@ -151,13 +151,14 @@ export default function MoreScreen() {
   const updateCelebrationLevel = useUpdateCelebrationLevel();
 
   const pushEnabled = notifPrefs?.pushEnabled ?? false;
-  const weeklyDigest = notifPrefs?.dailyReminders ?? false;
+  const weeklyDigest = notifPrefs?.weeklyProgressPush ?? false;
 
   const handleTogglePush = useCallback(
     (value: boolean) => {
       updateNotifications.mutate({
         reviewReminders: notifPrefs?.reviewReminders ?? false,
         dailyReminders: notifPrefs?.dailyReminders ?? false,
+        weeklyProgressPush: notifPrefs?.weeklyProgressPush ?? true,
         pushEnabled: value,
       });
     },
@@ -168,7 +169,8 @@ export default function MoreScreen() {
     (value: boolean) => {
       updateNotifications.mutate({
         reviewReminders: notifPrefs?.reviewReminders ?? false,
-        dailyReminders: value,
+        dailyReminders: notifPrefs?.dailyReminders ?? false,
+        weeklyProgressPush: value,
         pushEnabled: notifPrefs?.pushEnabled ?? false,
       });
     },
@@ -378,6 +380,10 @@ export default function MoreScreen() {
           label="Profile"
           value={displayName}
           onPress={() => router.push('/profiles')}
+        />
+        <SettingsRow
+          label="What My Mentor Knows"
+          onPress={() => router.push('/(app)/mentor-memory')}
         />
         <SettingsRow
           label="Subscription"

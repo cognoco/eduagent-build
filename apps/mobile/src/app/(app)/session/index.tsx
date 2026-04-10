@@ -1277,7 +1277,8 @@ export default function SessionScreen() {
       ]);
       setResumedBanner(false);
 
-      // Classify subject from first message when none was provided
+      // Classify subject from first message when none was provided.
+      // Freeform sessions auto-pick the best match silently (no picker).
       let sessionSubjectId: string | undefined;
       let sessionSubjectName: string | undefined;
       if (!subjectId && !classifiedSubject && messages.length <= 1) {
@@ -1303,6 +1304,27 @@ export default function SessionScreen() {
                 isSystemPrompt: true,
               },
             ]);
+          } else if (effectiveMode === 'freeform') {
+            // Freeform: auto-pick the best candidate without prompting
+            const best =
+              result.candidates[0] ??
+              (availableSubjects[0]
+                ? {
+                    subjectId: availableSubjects[0].id,
+                    subjectName: availableSubjects[0].name,
+                  }
+                : undefined);
+            if (best) {
+              setClassifiedSubject({
+                subjectId: best.subjectId,
+                subjectName: best.subjectName,
+              });
+              setShowWrongSubjectChip(true);
+              sessionSubjectId = best.subjectId;
+              sessionSubjectName = best.subjectName;
+            }
+            // If no candidates at all, proceed without subject —
+            // continueWithMessage will show an appropriate error.
           } else {
             const subjectCandidates =
               result.candidates.length > 0
@@ -1379,47 +1401,61 @@ export default function SessionScreen() {
             return;
           }
         } catch {
-          const fallbackCandidates = availableSubjects.map((candidate) => ({
-            subjectId: candidate.id,
-            subjectName: candidate.name,
-          }));
-          setShowWrongSubjectChip(false);
-
-          if (fallbackCandidates.length > 0) {
-            setClassifyError(
-              "Could not identify the subject automatically. Pick one below and we'll keep going."
-            );
-            openSubjectResolution(
-              text,
-              'Pick the subject that fits best:',
-              fallbackCandidates
-            );
-          } else {
-            // No enrolled subjects — try resolve for suggestions
-            try {
-              const resolveResult = await resolveSubject.mutateAsync({
-                rawInput: text,
+          if (effectiveMode === 'freeform') {
+            // Freeform: on classification failure, auto-pick first enrolled subject
+            const fallback = availableSubjects[0];
+            if (fallback) {
+              setClassifiedSubject({
+                subjectId: fallback.id,
+                subjectName: fallback.name,
               });
-              openSubjectResolution(
-                text,
-                resolveResult.displayMessage ||
-                  'Pick a subject that fits, or create your own.',
-                [],
-                null,
-                resolveResult.suggestions ?? []
-              );
-            } catch {
-              setClassifyError(
-                'Could not identify the subject. Create a new subject to get started.'
-              );
-              openSubjectResolution(
-                text,
-                "I couldn't figure out the subject. You can create a new one below.",
-                []
-              );
+              setShowWrongSubjectChip(true);
+              sessionSubjectId = fallback.id;
+              sessionSubjectName = fallback.name;
             }
+          } else {
+            const fallbackCandidates = availableSubjects.map((candidate) => ({
+              subjectId: candidate.id,
+              subjectName: candidate.name,
+            }));
+            setShowWrongSubjectChip(false);
+
+            if (fallbackCandidates.length > 0) {
+              setClassifyError(
+                "Could not identify the subject automatically. Pick one below and we'll keep going."
+              );
+              openSubjectResolution(
+                text,
+                'Pick the subject that fits best:',
+                fallbackCandidates
+              );
+            } else {
+              // No enrolled subjects — try resolve for suggestions
+              try {
+                const resolveResult = await resolveSubject.mutateAsync({
+                  rawInput: text,
+                });
+                openSubjectResolution(
+                  text,
+                  resolveResult.displayMessage ||
+                    'Pick a subject that fits, or create your own.',
+                  [],
+                  null,
+                  resolveResult.suggestions ?? []
+                );
+              } catch {
+                setClassifyError(
+                  'Could not identify the subject. Create a new subject to get started.'
+                );
+                openSubjectResolution(
+                  text,
+                  "I couldn't figure out the subject. You can create a new one below.",
+                  []
+                );
+              }
+            }
+            return;
           }
-          return;
         } finally {
           setPendingClassification(false);
         }
@@ -1438,6 +1474,7 @@ export default function SessionScreen() {
       subjectId,
       classifiedSubject,
       messages.length,
+      effectiveMode,
       classifySubject,
       resolveSubject,
       availableSubjects,

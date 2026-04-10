@@ -517,7 +517,7 @@ Story 7.5 (map view) ships when list-with-chapters needs a richer visual. Story 
 | Epic | Interaction |
 |---|---|
 | **Epic 3** (retention) | SM-2 unchanged. Knowledge signals are a separate concept from retention cards — signals track exposure, SM-2 tracks recall strength. Both inform the LLM. |
-| **Epic 12** (persona removal) | No dependency. Library navigation doesn't use persona. Age-adaptive styling (FR167.2) uses `birthYear` (aligns with Epic 12's shift from persona to age-derived behavior). If Epic 12 is deferred, use `birthDate` for age calculation instead. |
+| **Epic 12** (persona removal) | No dependency. Library navigation doesn't use persona. Age-adaptive styling (FR167.2) uses `birthYear` (aligns with Epic 12's shift from persona to age-derived behavior). Epic 12 is now complete — `birthYear` is the sole age field. |
 | **Epic 12.7** (home cards) | Coaching card types from FR165 are designed to work with both the current single coaching card system and Epic 12.7's future multi-card home screen. When 12.7 ships, these become home card types in the ranked system. No blocking dependency. |
 | **Epic 13** (session lifecycle) | Session completion triggers knowledge signal matching (Story 7.2). Book completion can use Epic 13's celebration system if available, but it's not a blocker — a completed badge on the book card works without it. |
 | **Homework feature** | Story 7.2 directly integrates homework sessions into the knowledge map. Homework sessions produce knowledge signals that update Library progress. |

@@ -1,0 +1,390 @@
+// ---------------------------------------------------------------------------
+// learner-profile routes — IDOR, GDPR self-delete, toggle, and consent guards
+// ---------------------------------------------------------------------------
+// Covers the four critical paths called out by the Epic 16 code review:
+// (1) cross-family parent cannot access another family's child (403)
+// (2) self delete-all triggers the hard-delete service and returns 200
+// (3) memory-enabled toggle persists via the service
+// (4) parent-only /:profileId/consent and /:profileId/item guards fire on
+//     unauthorized access, and succeed only with a valid family link
+// ---------------------------------------------------------------------------
+
+// Mock JWT module so auth middleware passes with a valid token.
+jest.mock('../middleware/jwt', () => ({
+  decodeJWTHeader: jest.fn().mockReturnValue({ alg: 'RS256', kid: 'test-kid' }),
+  fetchJWKS: jest.fn().mockResolvedValue({
+    keys: [{ kty: 'RSA', kid: 'test-kid', n: 'fake-n', e: 'AQAB' }],
+  }),
+  verifyJWT: jest.fn().mockResolvedValue({
+    sub: 'user_test',
+    email: 'test@example.com',
+    exp: Math.floor(Date.now() / 1000) + 3600,
+  }),
+}));
+
+jest.mock('inngest/hono', () => ({
+  serve: jest.fn().mockReturnValue(jest.fn()),
+}));
+
+jest.mock('../inngest/client', () => ({
+  inngest: {
+    send: jest.fn().mockResolvedValue(undefined),
+    createFunction: jest.fn().mockReturnValue(jest.fn()),
+  },
+}));
+
+// Minimal database stub — middleware creates it per request.
+import { createDatabaseModuleMock } from '../test-utils/database-module';
+
+const mockDatabaseModule = createDatabaseModuleMock();
+
+jest.mock('@eduagent/database', () => mockDatabaseModule.module);
+
+jest.mock('../services/account', () => ({
+  findOrCreateAccount: jest.fn().mockResolvedValue({
+    id: 'test-account-id',
+    clerkUserId: 'user_test',
+    email: 'test@example.com',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }),
+}));
+
+// profile-scope middleware calls getProfile(...) to resolve X-Profile-Id to
+// a verified profileId on the account. We return a profile owned by the
+// account regardless of which id is sent so the middleware accepts the
+// header and writes it to the context.
+jest.mock('../services/profile', () => ({
+  findOwnerProfile: jest.fn().mockResolvedValue(null),
+  getProfile: jest
+    .fn()
+    .mockImplementation(async (_db: unknown, profileId: string) => ({
+      id: profileId,
+      birthYear: null,
+      location: null,
+      consentStatus: 'CONSENTED',
+    })),
+}));
+
+// Family-access is the IDOR choke point. The route calls assertParentAccess
+// which throws ForbiddenError on denial; we drive that decision here.
+const mockHasParentAccess = jest.fn();
+jest.mock('../services/family-access', () => ({
+  hasParentAccess: (...args: unknown[]) => mockHasParentAccess(...args),
+  assertParentAccess: async (...args: unknown[]) => {
+    const allowed = await mockHasParentAccess(...args);
+    if (!allowed) {
+      const { ForbiddenError } = jest.requireActual('../errors') as {
+        ForbiddenError: new (msg?: string) => Error;
+      };
+      throw new ForbiddenError('You do not have access to this child profile.');
+    }
+  },
+}));
+
+// Learner-profile service mocks — record calls so assertions can verify
+// the route reached the service with the right (parent/child) profileId.
+const mockGetOrCreateLearningProfile = jest.fn();
+const mockDeleteAllMemory = jest.fn();
+const mockDeleteMemoryItem = jest.fn();
+const mockToggleMemoryEnabled = jest.fn();
+const mockToggleMemoryCollection = jest.fn();
+const mockToggleMemoryInjection = jest.fn();
+const mockGrantMemoryConsent = jest.fn();
+const mockUnsuppressInference = jest.fn();
+const mockBuildHumanReadableMemoryExport = jest.fn();
+
+jest.mock('../services/learner-profile', () => ({
+  getOrCreateLearningProfile: (...args: unknown[]) =>
+    mockGetOrCreateLearningProfile(...args),
+  deleteAllMemory: (...args: unknown[]) => mockDeleteAllMemory(...args),
+  deleteMemoryItem: (...args: unknown[]) => mockDeleteMemoryItem(...args),
+  toggleMemoryEnabled: (...args: unknown[]) => mockToggleMemoryEnabled(...args),
+  toggleMemoryCollection: (...args: unknown[]) =>
+    mockToggleMemoryCollection(...args),
+  toggleMemoryInjection: (...args: unknown[]) =>
+    mockToggleMemoryInjection(...args),
+  grantMemoryConsent: (...args: unknown[]) => mockGrantMemoryConsent(...args),
+  unsuppressInference: (...args: unknown[]) => mockUnsuppressInference(...args),
+  buildHumanReadableMemoryExport: (...args: unknown[]) =>
+    mockBuildHumanReadableMemoryExport(...args),
+}));
+
+jest.mock('../services/learner-input', () => ({
+  parseLearnerInput: jest.fn().mockResolvedValue({
+    success: true,
+    message: 'Got it!',
+    fieldsUpdated: ['interests'],
+  }),
+}));
+
+import { app } from '../index';
+
+const TEST_ENV = {
+  CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',
+};
+
+const PARENT_PROFILE_ID = '770e8400-e29b-41d4-a716-446655440000';
+const OWN_CHILD_PROFILE_ID = '770e8400-e29b-41d4-a716-446655440001';
+const OTHER_FAMILY_CHILD_ID = '770e8400-e29b-41d4-a716-446655440099';
+
+const PARENT_HEADERS = {
+  Authorization: 'Bearer valid.jwt.token',
+  'Content-Type': 'application/json',
+  'X-Profile-Id': PARENT_PROFILE_ID,
+};
+
+const MINIMAL_PROFILE = {
+  id: 'learning-profile-id',
+  profileId: OWN_CHILD_PROFILE_ID,
+  learningStyle: null,
+  interests: [],
+  strengths: [],
+  struggles: [],
+  communicationNotes: [],
+  suppressedInferences: [],
+  interestTimestamps: {},
+  effectivenessSessionCount: 0,
+  memoryEnabled: true,
+  memoryCollectionEnabled: false,
+  memoryInjectionEnabled: true,
+  memoryConsentStatus: 'pending',
+  consentPromptDismissedAt: null,
+  version: 1,
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+};
+
+describe('learner-profile routes', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockHasParentAccess.mockReset();
+    mockGetOrCreateLearningProfile.mockResolvedValue(MINIMAL_PROFILE);
+    mockDeleteAllMemory.mockResolvedValue(undefined);
+    mockDeleteMemoryItem.mockResolvedValue(undefined);
+    mockToggleMemoryEnabled.mockResolvedValue(undefined);
+    mockToggleMemoryCollection.mockResolvedValue(undefined);
+    mockToggleMemoryInjection.mockResolvedValue(undefined);
+    mockGrantMemoryConsent.mockResolvedValue(undefined);
+    mockUnsuppressInference.mockResolvedValue(undefined);
+    mockBuildHumanReadableMemoryExport.mockReturnValue('Memory export text');
+  });
+
+  // -------------------------------------------------------------------------
+  // IDOR — parent-only child routes must 403 without a family link
+  // -------------------------------------------------------------------------
+
+  describe('IDOR protection on /learner-profile/:profileId/* routes', () => {
+    beforeEach(() => {
+      mockHasParentAccess.mockResolvedValue(false);
+    });
+
+    it('returns 403 on GET /learner-profile/:profileId for another family', async () => {
+      const res = await app.request(
+        `/v1/learner-profile/${OTHER_FAMILY_CHILD_ID}`,
+        { headers: PARENT_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(403);
+      expect(mockGetOrCreateLearningProfile).not.toHaveBeenCalled();
+      expect(mockHasParentAccess).toHaveBeenCalledWith(
+        undefined,
+        PARENT_PROFILE_ID,
+        OTHER_FAMILY_CHILD_ID
+      );
+    });
+
+    it('returns 403 on DELETE /learner-profile/:profileId/all for another family', async () => {
+      const res = await app.request(
+        `/v1/learner-profile/${OTHER_FAMILY_CHILD_ID}/all`,
+        { method: 'DELETE', headers: PARENT_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(403);
+      expect(mockDeleteAllMemory).not.toHaveBeenCalled();
+    });
+
+    it('returns 403 on DELETE /learner-profile/:profileId/item for another family', async () => {
+      const res = await app.request(
+        `/v1/learner-profile/${OTHER_FAMILY_CHILD_ID}/item`,
+        {
+          method: 'DELETE',
+          headers: PARENT_HEADERS,
+          body: JSON.stringify({ category: 'interests', value: 'space' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(403);
+      expect(mockDeleteMemoryItem).not.toHaveBeenCalled();
+    });
+
+    it('returns 403 on PATCH /learner-profile/:profileId/memory-enabled for another family', async () => {
+      const res = await app.request(
+        `/v1/learner-profile/${OTHER_FAMILY_CHILD_ID}/memory-enabled`,
+        {
+          method: 'PATCH',
+          headers: PARENT_HEADERS,
+          body: JSON.stringify({ memoryEnabled: false }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(403);
+      expect(mockToggleMemoryEnabled).not.toHaveBeenCalled();
+    });
+
+    it('returns 403 on POST /learner-profile/:profileId/consent for another family', async () => {
+      const res = await app.request(
+        `/v1/learner-profile/${OTHER_FAMILY_CHILD_ID}/consent`,
+        {
+          method: 'POST',
+          headers: PARENT_HEADERS,
+          body: JSON.stringify({ consent: 'granted' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(403);
+      expect(mockGrantMemoryConsent).not.toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Happy path — valid family link lets the parent reach the service
+  // -------------------------------------------------------------------------
+
+  describe('parent with valid family link', () => {
+    beforeEach(() => {
+      mockHasParentAccess.mockResolvedValue(true);
+    });
+
+    it('returns 200 and the child profile on GET /learner-profile/:profileId', async () => {
+      const res = await app.request(
+        `/v1/learner-profile/${OWN_CHILD_PROFILE_ID}`,
+        { headers: PARENT_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      expect(mockGetOrCreateLearningProfile).toHaveBeenCalledWith(
+        undefined,
+        OWN_CHILD_PROFILE_ID
+      );
+      const body = (await res.json()) as { profile: { id: string } };
+      expect(body.profile.profileId).toBe(OWN_CHILD_PROFILE_ID);
+    });
+
+    it('persists consent grant on POST /learner-profile/:profileId/consent', async () => {
+      const res = await app.request(
+        `/v1/learner-profile/${OWN_CHILD_PROFILE_ID}/consent`,
+        {
+          method: 'POST',
+          headers: PARENT_HEADERS,
+          body: JSON.stringify({ consent: 'granted' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      expect(mockGrantMemoryConsent).toHaveBeenCalledWith(
+        undefined,
+        OWN_CHILD_PROFILE_ID,
+        'granted'
+      );
+    });
+
+    it('includes human-readable text on GET /learner-profile/:profileId/export-text', async () => {
+      const res = await app.request(
+        `/v1/learner-profile/${OWN_CHILD_PROFILE_ID}/export-text`,
+        { headers: PARENT_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { text: string };
+      expect(body.text).toBe('Memory export text');
+      expect(mockBuildHumanReadableMemoryExport).toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Self-scoped routes — learner acts on their own profile (no family check)
+  // -------------------------------------------------------------------------
+
+  describe('self-scoped /learner-profile/* routes', () => {
+    it('calls deleteAllMemory with the authenticated profileId on DELETE /learner-profile/all', async () => {
+      const res = await app.request(
+        '/v1/learner-profile/all',
+        { method: 'DELETE', headers: PARENT_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      expect(mockDeleteAllMemory).toHaveBeenCalledWith(
+        undefined,
+        PARENT_PROFILE_ID
+      );
+      // Family-link check is not required for self-scoped routes.
+      expect(mockHasParentAccess).not.toHaveBeenCalled();
+    });
+
+    it('calls toggleMemoryEnabled on PATCH /learner-profile/memory-enabled', async () => {
+      const res = await app.request(
+        '/v1/learner-profile/memory-enabled',
+        {
+          method: 'PATCH',
+          headers: PARENT_HEADERS,
+          body: JSON.stringify({ memoryEnabled: false }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      expect(mockToggleMemoryEnabled).toHaveBeenCalledWith(
+        undefined,
+        PARENT_PROFILE_ID,
+        false
+      );
+    });
+
+    it('calls deleteMemoryItem with suppress flag on DELETE /learner-profile/item', async () => {
+      const res = await app.request(
+        '/v1/learner-profile/item',
+        {
+          method: 'DELETE',
+          headers: PARENT_HEADERS,
+          body: JSON.stringify({
+            category: 'interests',
+            value: 'dinosaurs',
+            suppress: true,
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      expect(mockDeleteMemoryItem).toHaveBeenCalledWith(
+        undefined,
+        PARENT_PROFILE_ID,
+        'interests',
+        'dinosaurs',
+        true,
+        undefined
+      );
+    });
+
+    it('returns 401 without auth header', async () => {
+      const res = await app.request(
+        '/v1/learner-profile',
+        { headers: { 'X-Profile-Id': PARENT_PROFILE_ID } },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(401);
+      expect(mockGetOrCreateLearningProfile).not.toHaveBeenCalled();
+    });
+  });
+});

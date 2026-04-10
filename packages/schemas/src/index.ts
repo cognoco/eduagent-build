@@ -19,6 +19,7 @@ export * from './assessments.ts';
 
 // Progress, Motivation & Dashboard (Epic 4)
 export * from './progress.ts';
+export * from './snapshots.ts';
 
 // Subscription & Billing (Epic 5)
 export * from './billing.ts';
@@ -28,3 +29,6 @@ export * from './filing.ts';
 
 // Topic Notes
 export * from './notes.ts';
+
+// Adaptive Memory (Epic 16)
+export * from './learning-profiles.ts';

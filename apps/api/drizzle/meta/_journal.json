@@ -120,6 +120,34 @@
       "when": 1775723430036,
       "tag": "0016_overrated_nuke",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1775763738938,
+      "tag": "0017_drop_birth_date_not_null_birth_year",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1775763758398,
+      "tag": "0018_add_birth_year_set_by",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1775765355940,
+      "tag": "0019_dizzy_shooting_star",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1775801863166,
+      "tag": "0020_lyrical_blue_blade",
+      "breakpoints": true
     }
   ]
 }

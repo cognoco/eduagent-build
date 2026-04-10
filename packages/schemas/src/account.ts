@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { profileSchema } from './profiles.ts';
 import { consentStatusSchema, consentTypeSchema } from './consent.ts';
+import { learningProfileSchema } from './learning-profiles.ts';
 
 export const accountDeletionResponseSchema = z.object({
   message: z.string(),
@@ -59,6 +60,7 @@ export const dataExportSchema = z.object({
   topUpCredits: z.array(z.record(z.string(), z.unknown())).optional(),
   needsDeepeningTopics: z.array(z.record(z.string(), z.unknown())).optional(),
   familyLinks: z.array(z.record(z.string(), z.unknown())).optional(),
+  learningProfiles: z.array(learningProfileSchema).optional(),
   exportedAt: z.string().datetime(),
 });
 

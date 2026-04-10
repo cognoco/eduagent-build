@@ -35,6 +35,7 @@ const iconMap: Record<
 > = {
   Home: { focused: 'home', default: 'home-outline' },
   Book: { focused: 'book', default: 'book-outline' },
+  Progress: { focused: 'stats-chart', default: 'stats-chart-outline' },
   More: { focused: 'menu', default: 'menu-outline' },
 };
 
@@ -71,19 +72,16 @@ const PENDING_CONSENT_STATUSES = new Set([
  *   pending/withdrawn consent screen can switch back to their own profile.
  */
 function canSwitchFromConsentGate(
-  activeProfile: { id: string; birthYear?: number | null } | null,
-  profiles: ReadonlyArray<{ id: string; birthYear?: number | null }>
+  activeProfile: { id: string; birthYear: number } | null,
+  profiles: ReadonlyArray<{ id: string; birthYear: number }>
 ): boolean {
-  if (!activeProfile?.birthYear) return false;
+  if (!activeProfile) return false;
   const currentYear = new Date().getFullYear();
   const age = currentYear - activeProfile.birthYear;
   if (age < 18) return false;
   // Must have at least one OTHER profile that belongs to a minor
   return profiles.some(
-    (p) =>
-      p.id !== activeProfile.id &&
-      p.birthYear != null &&
-      currentYear - p.birthYear < 18
+    (p) => p.id !== activeProfile.id && currentYear - p.birthYear < 18
   );
 }
 
@@ -1018,6 +1016,17 @@ export default function AppLayout() {
           }}
         />
         <Tabs.Screen
+          name="progress"
+          options={{
+            title: 'Progress',
+            tabBarButtonTestID: 'tab-progress',
+            tabBarAccessibilityLabel: 'Progress Tab',
+            tabBarIcon: ({ focused }) => (
+              <TabIcon name="Progress" focused={focused} />
+            ),
+          }}
+        />
+        <Tabs.Screen
           name="more"
           options={{
             title: 'More',
@@ -1099,10 +1108,19 @@ export default function AppLayout() {
           }}
         />
         <Tabs.Screen
+          name="mentor-memory"
+          options={{
+            href: null,
+            tabBarItemStyle: { display: 'none' },
+            tabBarButton: () => null,
+          }}
+        />
+        <Tabs.Screen
           name="pick-book"
           options={{
             href: null,
             tabBarItemStyle: { display: 'none' },
+            tabBarButton: () => null,
           }}
         />
         <Tabs.Screen
@@ -1114,6 +1132,13 @@ export default function AppLayout() {
         />
         <Tabs.Screen
           name="child/[profileId]"
+          options={{
+            href: null,
+            tabBarItemStyle: { display: 'none' },
+          }}
+        />
+        <Tabs.Screen
+          name="progress/[subjectId]"
           options={{
             href: null,
             tabBarItemStyle: { display: 'none' },

@@ -13,20 +13,16 @@ import { forbidden } from '../errors';
 /**
  * Profile metadata injected into Hono context by profileScopeMiddleware.
  *
- * MIGRATION DEPENDENCY: `birthYear` is populated from the `birth_year` column
- * added by migration `0006_watery_birth_year.sql`. The service layer
- * (`mapProfileRow`) falls back to `birthYearFromDateLike(birthDate)` when
- * the column is NULL, but if the migration hasn't run at all the column
- * won't exist and queries will 500. **Always apply pending migrations
- * before deploying a Workers bundle that references new schema columns.**
+ * `birthYear` is populated from the `birth_year` column, which is NOT NULL
+ * post-Epic 12 (migration 0017). Consumers can rely on it being a real year.
  *
- * Consumers that depend on `birthYear` being non-null:
+ * Consumers that depend on `birthYear`:
  *   - LLM context injection (system prompt age bracketing)
  *   - Sentry age-gating (under-13 PII scrubbing)
  *   - Consent checks (GDPR under-16 / COPPA under-13)
  */
 export interface ProfileMeta {
-  birthYear: number | null;
+  birthYear: number;
   location: 'EU' | 'US' | 'OTHER' | null;
   consentStatus:
     | 'PENDING'
@@ -83,7 +79,7 @@ export const profileScopeMiddleware = createMiddleware<ProfileScopeEnv>(
           if (owner) {
             c.set('profileId', owner.id);
             c.set('profileMeta', {
-              birthYear: owner.birthYear ?? null,
+              birthYear: owner.birthYear,
               location: owner.location,
               consentStatus: owner.consentStatus,
               hasPremiumLlm: owner.hasPremiumLlm ?? false,
@@ -113,7 +109,7 @@ export const profileScopeMiddleware = createMiddleware<ProfileScopeEnv>(
     }
     c.set('profileId', profile.id);
     c.set('profileMeta', {
-      birthYear: profile.birthYear ?? null,
+      birthYear: profile.birthYear,
       location: profile.location,
       consentStatus: profile.consentStatus,
       hasPremiumLlm: profile.hasPremiumLlm ?? false,

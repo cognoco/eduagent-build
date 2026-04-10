@@ -39,13 +39,6 @@ function formatDateForDisplay(date: Date): string {
   });
 }
 
-function formatDateForApi(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-}
-
 const MAX_DATE = new Date();
 const MIN_DATE = new Date(
   MAX_DATE.getFullYear() - 100,
@@ -108,8 +101,7 @@ export default function CreateProfileScreen() {
     try {
       const body = {
         displayName: trimmedName,
-        birthYear: birthYear ?? undefined,
-        birthDate: formatDateForApi(birthDate),
+        birthYear: birthYear!,
       };
 
       const res = await client.profiles.$post({ json: body });
