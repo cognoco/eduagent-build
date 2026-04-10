@@ -132,6 +132,10 @@ function mapCefrLabel(
   return sublevel ? `${base} ${sublevel}` : base;
 }
 
+// NOTE [EP15-C3]: This function deliberately does NOT read learning_profiles.
+// The snapshot and memory-analysis pipelines are independent — if you add
+// learning_profiles reads here, revisit step ordering in session-completed.ts
+// (memory must run before snapshot if the snapshot consumes its output).
 async function loadProgressState(
   db: Database,
   profileId: string

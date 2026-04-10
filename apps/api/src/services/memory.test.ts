@@ -1,8 +1,5 @@
-import { retrieveRelevantMemory } from './memory';
-import { createDatabaseModuleMock } from '../test-utils/database-module';
-
 // ---------------------------------------------------------------------------
-// Mocks
+// Mocks — must be declared before SUT import
 // ---------------------------------------------------------------------------
 
 const mockGenerateEmbedding = jest.fn();
@@ -11,6 +8,9 @@ jest.mock('./embeddings', () => ({
 }));
 
 const mockFindSimilarTopics = jest.fn();
+
+import { createDatabaseModuleMock } from '../test-utils/database-module';
+
 const mockDatabaseModule = createDatabaseModuleMock({
   exports: {
     findSimilarTopics: (...args: unknown[]) => mockFindSimilarTopics(...args),
@@ -18,6 +18,10 @@ const mockDatabaseModule = createDatabaseModuleMock({
 });
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
+
+// SUT import must come AFTER mock setup so the mock factory can access
+// mockDatabaseModule when @eduagent/database is first required.
+import { retrieveRelevantMemory } from './memory';
 
 const mockDb = {} as Parameters<typeof retrieveRelevantMemory>[0];
 
