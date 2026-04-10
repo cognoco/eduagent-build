@@ -1112,7 +1112,6 @@ export default function AppLayout() {
           options={{
             href: null,
             tabBarItemStyle: { display: 'none' },
-            tabBarButton: () => null,
           }}
         />
         <Tabs.Screen
@@ -1120,7 +1119,6 @@ export default function AppLayout() {
           options={{
             href: null,
             tabBarItemStyle: { display: 'none' },
-            tabBarButton: () => null,
           }}
         />
         <Tabs.Screen
