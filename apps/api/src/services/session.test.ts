@@ -241,6 +241,9 @@ function createMockDb({
       sessionEvents: {
         findMany: jest.fn().mockResolvedValue(findManyEvents),
       },
+      learningProfiles: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
     },
   } as unknown as Database;
 }

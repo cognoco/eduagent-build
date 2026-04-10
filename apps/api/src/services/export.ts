@@ -26,6 +26,7 @@ import {
   parkingLotItems,
   needsDeepeningTopics,
   familyLinks,
+  learningProfiles,
   subscriptions,
   quotaPools,
   topUpCredits,
@@ -213,6 +214,13 @@ export async function generateExport(
         })
       : [];
 
+  const learningProfileRows =
+    profileIds.length > 0
+      ? await db.query.learningProfiles.findMany({
+          where: inArray(learningProfiles.profileId, profileIds),
+        })
+      : [];
+
   const subscriptionRows = await db.query.subscriptions.findMany({
     where: eq(subscriptions.accountId, accountId),
   });
@@ -281,6 +289,13 @@ export async function generateExport(
     topUpCredits: topUpCreditRows as Record<string, unknown>[],
     needsDeepeningTopics: needsDeepeningTopicRows as Record<string, unknown>[],
     familyLinks: familyLinkRows as Record<string, unknown>[],
+    learningProfiles: learningProfileRows.map((row) => ({
+      ...row,
+      consentPromptDismissedAt:
+        row.consentPromptDismissedAt?.toISOString() ?? null,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+    })) as DataExport['learningProfiles'],
     exportedAt: new Date().toISOString(),
   };
 }

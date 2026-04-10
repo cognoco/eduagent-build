@@ -41,6 +41,7 @@ import { homeworkRoutes } from './routes/homework';
 import { assessmentRoutes } from './routes/assessments';
 import { retentionRoutes } from './routes/retention';
 import { progressRoutes } from './routes/progress';
+import { snapshotProgressRoutes } from './routes/snapshot-progress';
 import { streakRoutes } from './routes/streaks';
 import { settingsRoutes } from './routes/settings';
 import { vocabularyRoutes } from './routes/vocabulary';
@@ -56,6 +57,7 @@ import { revenuecatWebhookRoute } from './routes/revenuecat-webhook';
 import { filingRoutes } from './routes/filing';
 import { bookSuggestionRoutes } from './routes/book-suggestions';
 import { topicSuggestionRoutes } from './routes/topic-suggestions';
+import { learnerProfileRoutes } from './routes/learner-profile';
 
 type Bindings = {
   ENVIRONMENT: string;
@@ -188,6 +190,7 @@ const routes = api
   .route('/', assessmentRoutes)
   .route('/', retentionRoutes)
   .route('/', progressRoutes)
+  .route('/', snapshotProgressRoutes)
   .route('/', streakRoutes)
   .route('/', settingsRoutes)
   .route('/', vocabularyRoutes)
@@ -202,7 +205,8 @@ const routes = api
   .route('/', testSeedRoutes)
   .route('/', filingRoutes)
   .route('/', bookSuggestionRoutes)
-  .route('/', topicSuggestionRoutes);
+  .route('/', topicSuggestionRoutes)
+  .route('/', learnerProfileRoutes);
 
 // ---------------------------------------------------------------------------
 // App — mounts routes under /v1 for the actual Cloudflare Worker runtime.

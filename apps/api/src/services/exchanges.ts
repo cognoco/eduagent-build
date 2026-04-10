@@ -43,6 +43,7 @@ export interface ExchangeContext {
   crossSubjectContext?: string;
   learningHistoryContext?: string;
   embeddingMemoryContext?: string;
+  learnerMemoryContext?: string;
   workedExampleLevel?: 'full' | 'fading' | 'problem_first';
   /** Teaching method preference for adaptive teaching (FR58) */
   teachingPreference?: string;
@@ -294,6 +295,24 @@ export function buildSystemPrompt(context: ExchangeContext): string {
   // Embedding memory context (pgvector semantic retrieval)
   if (context.embeddingMemoryContext) {
     sections.push(context.embeddingMemoryContext);
+  }
+
+  if (context.learnerMemoryContext) {
+    sections.push(context.learnerMemoryContext);
+  }
+
+  const memorySectionCount = [
+    context.priorLearningContext,
+    context.crossSubjectContext,
+    learningHistory,
+    context.embeddingMemoryContext,
+    context.learnerMemoryContext,
+  ].filter((section) => Boolean(section)).length;
+
+  if (memorySectionCount > 1) {
+    sections.push(
+      'Memory hygiene: if multiple context sections overlap, use the overlap once and avoid repeating the same detail back to the learner.'
+    );
   }
 
   // SM-2 retention awareness

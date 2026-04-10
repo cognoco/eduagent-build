@@ -35,6 +35,7 @@ const iconMap: Record<
 > = {
   Home: { focused: 'home', default: 'home-outline' },
   Book: { focused: 'book', default: 'book-outline' },
+  Progress: { focused: 'stats-chart', default: 'stats-chart-outline' },
   More: { focused: 'menu', default: 'menu-outline' },
 };
 
@@ -1018,6 +1019,17 @@ export default function AppLayout() {
           }}
         />
         <Tabs.Screen
+          name="progress"
+          options={{
+            title: 'Progress',
+            tabBarButtonTestID: 'tab-progress',
+            tabBarAccessibilityLabel: 'Progress Tab',
+            tabBarIcon: ({ focused }) => (
+              <TabIcon name="Progress" focused={focused} />
+            ),
+          }}
+        />
+        <Tabs.Screen
           name="more"
           options={{
             title: 'More',
@@ -1114,6 +1126,13 @@ export default function AppLayout() {
         />
         <Tabs.Screen
           name="child/[profileId]"
+          options={{
+            href: null,
+            tabBarItemStyle: { display: 'none' },
+          }}
+        />
+        <Tabs.Screen
+          name="progress/[subjectId]"
           options={{
             href: null,
             tabBarItemStyle: { display: 'none' },

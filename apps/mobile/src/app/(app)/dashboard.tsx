@@ -62,6 +62,15 @@ function renderChildCards(
     trend: string;
     retentionTrend?: string;
     subjects: { name: string; retentionStatus: string }[];
+    progress?: {
+      topicsMastered: number;
+      vocabularyTotal: number;
+      weeklyDeltaTopicsMastered: number | null;
+      weeklyDeltaVocabularyTotal: number | null;
+      weeklyDeltaTopicsExplored: number | null;
+      engagementTrend: 'growing' | 'steady' | 'quiet';
+      guidance: string | null;
+    } | null;
   }[],
   onDrillDown: (profileId: string) => void
 ): React.ReactNode {
@@ -78,6 +87,7 @@ function renderChildCards(
       retentionTrend={
         child.retentionTrend as 'improving' | 'declining' | 'stable' | undefined
       }
+      progress={child.progress}
       subjects={child.subjects.map((s) => ({
         name: s.name,
         retentionStatus: s.retentionStatus as RetentionStatus,

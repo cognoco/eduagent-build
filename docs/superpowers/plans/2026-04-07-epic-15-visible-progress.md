@@ -432,6 +432,8 @@ export const subjectInventorySchema = z.object({
     byCefrLevel: z.record(z.string(), z.number().int()),
   }),
   estimatedProficiency: z.string().nullable(),
+  proficiencyLabel: z.string().nullable(),   // [SA-4/UX-6] Kid-friendly label, e.g. "Beginner — you can name things"
+  retentionCardsDue: z.number().int(),       // [SA-1/FR235.9] Per-subject review-due count for Review CTA
   lastSessionAt: z.string().datetime().nullable(),
   activeMinutes: z.number().int(),
 });
@@ -542,7 +544,7 @@ export const monthlyReportDataSchema = z.object({
   thisMonth: monthMetricsSchema,
   lastMonth: monthMetricsSchema.nullable(),
   highlights: z.array(z.string()).max(3),
-  areasForGrowth: z.array(z.string()).max(2),
+  nextSteps: z.array(z.string()).max(2),
   subjects: z.array(subjectMonthlyDetailSchema),
   headlineStat: z.object({
     label: z.string(),
@@ -605,8 +607,8 @@ export const coachingCardTypeSchema = z.enum([
 Add the milestone celebration card schema:
 
 ```typescript
-export const milestoneCelebrationCardSchema = z.object({
-  ...baseCoachingCardFields,
+// [AR2-10] FIXED: z.object() does not support spread. Use .extend() instead.
+export const milestoneCelebrationCardSchema = baseCoachingCardSchema.extend({
   type: z.literal('milestone_celebration'),
   milestoneId: z.string().uuid(),
   milestoneType: z.string(),
@@ -908,7 +910,8 @@ export async function computeProgressSnapshot(
   const topicTotals = await db
     .select({
       subjectId: curriculumBooks.subjectId,
-      topicsTotal: sql<number>`COUNT(*) FILTER (WHERE ${curriculumTopics.filedFrom} IS NULL OR ${curriculumTopics.filedFrom} = 'pre_generated')`,
+      // [AR2-7] FIXED: filedFrom is NOT NULL DEFAULT 'pre_generated' — removed dead IS NULL branch
+      topicsTotal: sql<number>`COUNT(*) FILTER (WHERE ${curriculumTopics.filedFrom} = 'pre_generated')`,
       topicsExplored: sql<number>`COUNT(*) FILTER (WHERE ${curriculumTopics.filedFrom} IN ('session_filing', 'freeform_filing'))`,
     })
     .from(curriculumTopics)
@@ -1397,6 +1400,27 @@ git add apps/api/src/inngest/functions/daily-snapshot.ts apps/api/src/inngest/fu
 git commit -m "feat(api): add daily progress snapshot Inngest cron [EP-15, FR231]"
 ```
 
+- [ ] **Step 8 [UX-1]: Historical backfill Inngest event**
+
+Create a one-time backfill function (`apps/api/src/inngest/functions/backfill-snapshots.ts`) that:
+1. Finds all profiles with `learning_sessions` but no `progress_snapshots`.
+2. For each profile, identifies the earliest session date.
+3. Iterates week by week from that date to today, computing a snapshot using the same aggregation logic as the daily cron but with a historical date filter.
+4. Upserts one `progress_snapshots` row per week (using the last day of each week as `snapshotDate`).
+5. Processes in batches of 20 profiles to avoid timeouts.
+6. Triggered once via `POST /v1/admin/backfill-snapshots` or manually from the Inngest dashboard.
+
+This ensures existing users see a growth curve from their first session on the day the feature ships. The backfill is approximate (retention card health at historical points cannot be perfectly reconstructed) but vastly better than starting at zero.
+
+**[AR2-13] Known limitation:** Because retention card `intervalDays` and `nextReviewAt` are live values (not historical), backfilled snapshots will show today's retention health projected backward. This creates a visible discontinuity in the growth chart at the transition between backfilled and real daily snapshots. Acceptable trade-off: the alternative (blank charts) is worse for user engagement. Consider smoothing the transition in the GrowthChart component by interpolating the first real data point with the last backfilled one.
+
+**Implementation note:** This step is specified as prose rather than full code because the backfill logic depends heavily on the final shape of Tasks 3/5/6. Implementers should write this as a proper Inngest function with `step.run` batches, matching the patterns in `daily-snapshot.ts`.
+
+```bash
+git add apps/api/src/inngest/functions/backfill-snapshots.ts
+git commit -m "feat(api): one-time historical snapshot backfill for existing users [EP-15, UX-1]"
+```
+
 ---
 
 ### Task 5: Milestone Detection Service
@@ -1762,7 +1786,7 @@ git commit -m "feat(api): add milestone detection service [EP-15, FR234]"
 Chain positions:  ...3 (filing) → 4 (memory) → **5 (this step)** → 6 (coaching cards) → 7 (suggestions)
 ```
 
-Insert this step **before** the existing `queue-celebrations`/coaching card precomputation step:
+Insert this step **before** the existing `write-coaching-card` step [AR2-14] (originally referenced as `queue-celebrations` — corrected to match actual step name in session-completed.ts):
 
 ```typescript
 // In session-completed.ts — add import
@@ -1824,10 +1848,12 @@ import {
   familyLinks,
   vocabulary,
   vocabularyRetentionCards,
+  retentionCards,              // [AR2-12] needed for countRetentionCardsDue
+  assessments,                 // [AR2-12] needed for countRetentionCardsDue subject join
   progressSnapshots,
   notificationLog,            // [F-2] needed for logRefresh() rate-limit tracking
 } from '@eduagent/database';
-import { eq, and, gte, lte, desc } from 'drizzle-orm';
+import { eq, and, gte, lte, desc, sql, count } from 'drizzle-orm'; // [AR2-12] added sql, count
 import type {
   KnowledgeInventory,
   ProgressHistory,
@@ -1848,7 +1874,8 @@ type Env = {
 // [AR-3] FIXED: In-memory Map is useless on CF Workers (stateless isolates).
 // Use DB-backed rate limiting via notificationLog, matching existing patterns
 // in notifications.ts (getRecentNotificationCount).
-import { getRecentNotificationCount } from '../services/notifications';
+// [AR2-2] FIXED: Function lives in settings.ts, not notifications.ts.
+import { getRecentNotificationCount } from '../services/settings';
 
 const REFRESH_RATE_LIMIT = 10; // max refreshes per hour
 
@@ -1963,7 +1990,7 @@ async function buildInventory(
         const cefrRows = await db
           .select({
             cefrLevel: vocabulary.cefrLevel,
-            count: db.$count(vocabulary),
+            count: count(vocabulary.id), // [AR2-6] FIXED: db.$count() not valid Drizzle select expr
           })
           .from(vocabulary)
           .where(
@@ -2007,6 +2034,13 @@ async function buildInventory(
           byCefrLevel,
         },
         estimatedProficiency,
+        // [SA-4] FR236.4/UX-6: Kid-friendly proficiency label
+        proficiencyLabel: estimatedProficiency
+          ? getProficiencyLabel(estimatedProficiency)
+          : null,
+        // [SA-1] FR235.9: Per-subject review-due count for Review CTA
+        // [AR2-8] Uses COUNT(DISTINCT) to prevent double-counting with multiple assessments
+        retentionCardsDue: await countRetentionCardsDue(db, profileId, subj.subjectId),
         lastSessionAt: subj.lastSessionAt,
         activeMinutes: subj.activeMinutes,
       };
@@ -2033,6 +2067,10 @@ async function buildInventory(
 // [AR-10] FIXED: Removed unused byCefrLevel parameter. The function only uses
 // totalMastered for a volume-based heuristic. If CEFR distribution is needed
 // for a more accurate estimate, add it in a follow-up with actual logic.
+// [AR2-15] NOTE: These thresholds are a rough volume-based heuristic, NOT aligned
+// with CEFR's actual criteria (which include grammar, comprehension, production).
+// Suitable as a motivational indicator; should NOT be presented as an official
+// proficiency assessment. Plan to refine with language pedagogy research.
 function estimateProficiency(
   totalMastered: number,
   totalVocab: number
@@ -2043,6 +2081,39 @@ function estimateProficiency(
   if (totalMastered >= 100) return 'A2';
   if (totalMastered >= 25) return 'A1';
   return null;
+}
+
+// [SA-4] FR236.4/UX-6: Kid-friendly proficiency labels alongside CEFR codes
+function getProficiencyLabel(cefrCode: string): string {
+  const labels: Record<string, string> = {
+    'A1': 'Beginner — you can name things and say simple sentences',
+    'A2': 'Elementary — you can have basic conversations',
+    'B1': 'Intermediate — you can handle most everyday situations',
+    'B2': 'Upper Intermediate — you can discuss complex topics',
+  };
+  return labels[cefrCode] ?? cefrCode;
+}
+
+// [SA-1] FR235.9: Count retention cards due for review per subject
+// [AR2-8] FIXED: Use COUNT(DISTINCT) to prevent double-counting when a topic
+// has multiple assessment records (e.g., failed → retried → passed).
+async function countRetentionCardsDue(
+  db: Database,
+  profileId: string,
+  subjectId: string
+): Promise<number> {
+  const result = await db
+    .select({ count: sql<number>`COUNT(DISTINCT ${retentionCards.id})` })
+    .from(retentionCards)
+    .innerJoin(assessments, eq(retentionCards.topicId, assessments.topicId))
+    .where(
+      and(
+        eq(retentionCards.profileId, profileId),
+        eq(assessments.subjectId, subjectId),
+        lte(retentionCards.nextReviewAt, sql`NOW()`)
+      )
+    );
+  return Number(result[0]?.count ?? 0);
 }
 
 function emptyMetrics(): ProgressMetrics {
@@ -2534,17 +2605,28 @@ export default function ProgressScreen() {
     );
   }
 
-  // Hero stat logic — FR235.3
+  // Hero stat logic — FR235.3 + [UX-5] beginner threshold
   const hasLanguage = data.subjects.some(s => s.pedagogyMode === 'four_strands');
   const hasNonLanguage = data.subjects.some(s => s.pedagogyMode === 'socratic');
+  const BEGINNER_THRESHOLD = 20;
 
   let heroText: string;
   if (hasLanguage && hasNonLanguage) {
-    heroText = `You've mastered ${data.global.topicsMastered} topics and know ${data.global.vocabularyTotal} words`;
+    const topicsPart = data.global.topicsMastered < BEGINNER_THRESHOLD
+      ? `${data.global.topicsMastered} topics and counting`
+      : `mastered ${data.global.topicsMastered} topics`;
+    const wordsPart = data.global.vocabularyTotal < BEGINNER_THRESHOLD
+      ? `${data.global.vocabularyTotal} words and counting`
+      : `know ${data.global.vocabularyTotal} words`;
+    heroText = `You've ${topicsPart} and ${wordsPart}`;
   } else if (hasLanguage) {
-    heroText = `You know ${data.global.vocabularyTotal} words`;
+    heroText = data.global.vocabularyTotal < BEGINNER_THRESHOLD
+      ? `You've started learning! ${data.global.vocabularyTotal} words and counting...`
+      : `You know ${data.global.vocabularyTotal} words`;
   } else {
-    heroText = `You've mastered ${data.global.topicsMastered} topics`;
+    heroText = data.global.topicsMastered < BEGINNER_THRESHOLD
+      ? `You're building your knowledge! ${data.global.topicsMastered} topics and counting...`
+      : `You've mastered ${data.global.topicsMastered} topics`;
   }
 
   return (
@@ -2588,24 +2670,29 @@ export default function ProgressScreen() {
               color="teal"
             />
           )}
+          {/* [UX-10] Simplified topic display — no implementation details on summary cards */}
           <Text className="text-caption text-text-secondary mt-1">
             {subj.pedagogyMode === 'four_strands'
               ? `${subj.vocabulary.total} words`
               : subj.topics.total != null
-                ? `${subj.topics.mastered}/${subj.topics.total} topics`
+                ? `${subj.topics.mastered + (subj.topics.explored ?? 0)} topics explored`
                 : `${subj.topics.explored} topics explored`}
-            {/* Mixed books: show pre-generated fill + session-filed count */}
-            {subj.topics.total != null && subj.topics.explored > 0
-              ? ` + ${subj.topics.explored} explored`
-              : ''}
             {' · '}
             {subj.activeMinutes} min
+          </Text>
+          {/* [UX-3] Forward-momentum CTA — [SA-1] FR235.9: three-way (Review/Continue/Explore) */}
+          <Text className="text-caption font-semibold mt-2" style={{ color: colors.accent }}>
+            {subj.retentionCardsDue > 0
+              ? 'Review →'
+              : subj.topics.notStarted > 0
+                ? 'Continue →'
+                : 'Explore →'}
           </Text>
         </Pressable>
       ))}
 
-      {/* Growth chart */}
-      {history.data && history.data.dataPoints.length > 0 && (
+      {/* [UX-13] Growth chart — adaptive window */}
+      {history.data && history.data.dataPoints.length >= 2 && (
         <>
           <Text className="text-label uppercase text-text-secondary px-5 mt-4 mb-3">
             Your Growth
@@ -2614,9 +2701,19 @@ export default function ProgressScreen() {
             <GrowthChart
               dataPoints={history.data.dataPoints}
               hasLanguage={hasLanguage}
+              // [UX-13] Chart adapts to data span — minimum 4-week view
+              maxWeeks={Math.max(4, history.data.dataPoints.length)}
             />
           </View>
         </>
+      )}
+      {/* [UX-13] Near-empty state: < 2 data points → narrative instead of chart */}
+      {history.data && history.data.dataPoints.length > 0 && history.data.dataPoints.length < 2 && (
+        <View className="mx-5 mb-4 p-4 bg-surface-elevated rounded-card">
+          <Text className="text-body text-text-secondary text-center">
+            You started learning recently — keep going and watch your growth appear here!
+          </Text>
+        </View>
       )}
 
       {/* Recent milestones */}
@@ -2628,8 +2725,47 @@ export default function ProgressScreen() {
           {milestoneQuery.data.milestones.map((m) => (
             <MilestoneCard key={m.id} milestone={m} />
           ))}
+          {/* [UX-12] View all milestones link */}
+          {milestoneQuery.data.milestones.length >= 5 && (
+            <Pressable
+              onPress={() => router.push('/(app)/progress/milestones')}
+              className="px-5 py-2"
+              accessibilityRole="link"
+            >
+              <Text className="text-caption font-semibold" style={{ color: colors.accent }}>
+                View all milestones →
+              </Text>
+            </Pressable>
+          )}
         </>
       )}
+
+      {/* [UX-3] Global forward-momentum CTA — [SA-1] FR235.9: smart routing */}
+      {/* Priority: review-due subject → least-recently-practiced subject → home */}
+      <Pressable
+        onPress={() => {
+          const reviewSubject = data.subjects.find(s => s.retentionCardsDue > 0);
+          if (reviewSubject) {
+            router.push(`/(app)/learn/${reviewSubject.subjectId}/review`);
+          } else {
+            const leastRecent = [...data.subjects]
+              .filter(s => s.lastSessionAt)
+              .sort((a, b) => (a.lastSessionAt ?? '').localeCompare(b.lastSessionAt ?? ''))[0];
+            if (leastRecent) {
+              router.push(`/(app)/learn/${leastRecent.subjectId}`);
+            } else {
+              router.push('/(app)/home');
+            }
+          }
+        }}
+        className="mx-5 mt-6 mb-4 py-3.5 bg-primary rounded-button items-center"
+        accessibilityRole="button"
+        testID="keep-learning-button"
+      >
+        <Text className="text-body font-semibold text-text-inverse">
+          Keep learning
+        </Text>
+      </Pressable>
     </ScrollView>
   );
 }
@@ -2665,18 +2801,52 @@ Test in `apps/mobile/src/app/(app)/progress.test.tsx`:
 - Populated state renders hero stat, subject cards, growth chart
 - Subject card tap navigates to subject detail
 - Error state renders retry button
+- [SA-1] Review CTA shown when `retentionCardsDue > 0`; Continue when `notStarted > 0`; Explore otherwise
+- [SA-1] "Keep learning" button routes to review subject when review-due, otherwise least-recent
+- [UX-5] Beginner threshold: count < 20 shows "and counting..." framing
+
+- [ ] **Step 5a [SA-2]: Create vocabulary browser screen (FR235.10 / UX-15)**
+
+Create `apps/mobile/src/app/(app)/progress/vocabulary.tsx`:
+
+- Receives `subjectId` as a query param (or shows all subjects if none).
+- Calls a new React Query hook `useVocabularyBrowser(subjectId)` that fetches `GET /v1/subjects/:subjectId/vocabulary` (existing endpoint).
+- Groups vocabulary items by CEFR level (A1, A2, B1, B2).
+- Each group shows: level header with kid-friendly label (from `getProficiencyLabel`), word count, and a flat list of vocabulary items with mastery status (green dot = mastered, teal dot = learning, grey = new).
+- Add `useVocabularyBrowser` hook to `apps/mobile/src/hooks/use-progress.ts`.
+- Empty state: "Keep learning and your vocabulary will grow here!"
+
+On the journey screen (progress.tsx), make the vocabulary count in the hero stat and subject cards tappable:
+
+```typescript
+// In hero stat — wrap in Pressable for language learners:
+<Pressable onPress={() => router.push('/(app)/progress/vocabulary')}>
+  <Text>... {data.global.vocabularyTotal} words ...</Text>
+</Pressable>
+```
+
+- [ ] **Step 5b [SA-3]: Create milestones list screen (UX-12)**
+
+Create `apps/mobile/src/app/(app)/progress/milestones.tsx`:
+
+- Full milestones collection using `useMilestones(50)`.
+- Grouped chronologically (most recent first) or by type (vocabulary, streaks, topics).
+- Each item renders using the existing `MilestoneCard` component.
+- Empty state: "Complete sessions to earn milestones!"
+- Header: "All Milestones" with back button.
+- No new API endpoint needed — reuses `GET /v1/progress/milestones?limit=50`.
 
 - [ ] **Step 6: Run mobile tests + typecheck**
 
 ```bash
-cd apps/mobile && pnpm exec jest --findRelatedTests src/app/\(learner\)/progress.tsx --no-coverage
+cd apps/mobile && pnpm exec jest --findRelatedTests src/app/\(app\)/progress.tsx --no-coverage
 cd apps/mobile && pnpm exec tsc --noEmit
 ```
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add apps/mobile/src/app/\(learner\)/progress.tsx apps/mobile/src/app/\(learner\)/progress.test.tsx apps/mobile/src/hooks/use-progress.ts apps/mobile/src/components/progress/ apps/mobile/src/app/\(learner\)/_layout.tsx
+git add apps/mobile/src/app/\(app\)/progress.tsx apps/mobile/src/app/\(app\)/progress.test.tsx apps/mobile/src/hooks/use-progress.ts apps/mobile/src/components/progress/ apps/mobile/src/app/\(learner\)/_layout.tsx
 git commit -m "feat(mobile): add My Learning Journey screen with Progress tab [EP-15, FR235]"
 ```
 
@@ -2730,14 +2900,14 @@ In `_layout.tsx`, register the `progress` screen. Since it's now a folder with `
 - [ ] **Step 5: Run tests + typecheck**
 
 ```bash
-cd apps/mobile && pnpm exec jest --findRelatedTests src/app/\(learner\)/progress/\[subjectId\].tsx --no-coverage
+cd apps/mobile && pnpm exec jest --findRelatedTests src/app/\(app\)/progress/\[subjectId\].tsx --no-coverage
 cd apps/mobile && pnpm exec tsc --noEmit
 ```
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add apps/mobile/src/app/\(learner\)/progress/
+git add apps/mobile/src/app/\(app\)/progress/
 git commit -m "feat(mobile): add Subject Progress Detail screen [EP-15, FR236]"
 ```
 
@@ -2775,12 +2945,49 @@ if (uncelebrated.length > 0) {
     milestoneType: newest.milestoneType,
     threshold: newest.threshold,
     celebrationCopy: getMilestoneCelebrationBody(newest.milestoneType, newest.threshold, newest.metadata),
-    beforeAfter: null, // Populated from snapshot comparison
+    // [SA-5] FR237.3: Populate beforeAfter from earliest snapshot
+    beforeAfter: await (async () => {
+      try {
+        const earliestSnapshot = await db
+          .select()
+          .from(progressSnapshots)
+          .where(eq(progressSnapshots.profileId, profileId))
+          .orderBy(progressSnapshots.snapshotDate) // ascending = earliest first
+          .limit(1);
+        const latestSnapshot = await getLatestSnapshot(db, profileId);
+
+        if (earliestSnapshot[0] && latestSnapshot) {
+          const earlyMetrics = earliestSnapshot[0].metrics as ProgressMetrics;
+          const currentMetrics = latestSnapshot.metrics as ProgressMetrics;
+          const beforeValue =
+            newest.milestoneType === 'vocabulary_count' ? earlyMetrics.vocabularyTotal :
+            newest.milestoneType === 'topic_mastered_count' ? earlyMetrics.topicsMastered :
+            newest.milestoneType === 'session_count' ? earlyMetrics.totalSessions :
+            newest.milestoneType === 'learning_time' ? earlyMetrics.totalActiveMinutes :
+            0;
+          const currentValue =
+            newest.milestoneType === 'vocabulary_count' ? currentMetrics.vocabularyTotal :
+            newest.milestoneType === 'topic_mastered_count' ? currentMetrics.topicsMastered :
+            newest.milestoneType === 'session_count' ? currentMetrics.totalSessions :
+            newest.milestoneType === 'learning_time' ? currentMetrics.totalActiveMinutes :
+            newest.threshold;
+
+          return {
+            beforeDate: earliestSnapshot[0].snapshotDate,
+            beforeValue,
+            currentValue,
+          };
+        }
+      } catch {
+        // Non-critical — celebration still works without comparison
+      }
+      return null;
+    })(),
   };
 }
 ```
 
-- [ ] **Step 2: Add celebration copy templates — FR237.2**
+- [ ] **Step 2: Add celebration copy templates — FR237.2 + [UX-11] age-adapted tiers**
 
 ```typescript
 function getMilestoneCelebrationTitle(type: string, threshold: number): string {
@@ -2798,34 +3005,68 @@ function getMilestoneCelebrationTitle(type: string, threshold: number): string {
   }
 }
 
+// [UX-11] Two copy tiers based on birthYear
+type CopyTier = 'younger' | 'older';
+
+function getCopyTier(birthYear: number | null): CopyTier {
+  if (!birthYear) return 'younger'; // default to warm/playful
+  const age = new Date().getFullYear() - birthYear;
+  return age >= 12 ? 'older' : 'younger';
+}
+
 function getMilestoneCelebrationBody(
   type: string,
   threshold: number,
-  metadata: Record<string, unknown> | null
+  metadata: Record<string, unknown> | null,
+  birthYear: number | null = null           // [UX-11] FR237.6
 ): string {
+  const tier = getCopyTier(birthYear);
+  const subjectName = (metadata as any)?.subjectName ?? 'this subject';
+  const bookTitle = (metadata as any)?.bookTitle ?? 'book';
+
+  // [UX-11] Younger tier: warm, playful, exclamation-heavy
+  // Older tier: concise, respectful, no patronizing language
   switch (type) {
     case 'vocabulary_count':
-      return `You learned your ${threshold}th word! Remember when you started with zero?`;
+      return tier === 'younger'
+        ? `You learned your ${threshold}th word! Remember when you started with zero?`
+        : `${threshold} words — solid milestone. Your vocabulary is growing fast.`;
     case 'topic_mastered_count':
-      return `You've mastered ${threshold} topics! That's like finishing a whole textbook chapter.`;
+      return tier === 'younger'
+        ? `You've mastered ${threshold} topics! That's like finishing a whole textbook chapter.`
+        : `${threshold} topics mastered. That's real, measurable progress.`;
     case 'session_count':
-      return `${threshold} learning sessions! You've built a real habit.`;
+      return tier === 'younger'
+        ? `${threshold} learning sessions! You've built a real habit.`
+        : `${threshold} sessions in. Consistency pays off.`;
     case 'streak_length':
-      return `${threshold} days in a row! Your brain is getting stronger every day.`;
+      return tier === 'younger'
+        ? `${threshold} days in a row! Your brain is getting stronger every day.`
+        : `${threshold}-day streak. That's discipline.`;
     case 'subject_mastered':
-      return `You mastered every topic in ${(metadata as any)?.subjectName ?? 'this subject'}! You own this.`;
+      return tier === 'younger'
+        ? `You mastered every topic in ${subjectName}! You own this.`
+        : `${subjectName} — fully mastered. Well done.`;
     case 'book_completed':
-      return `You finished the ${(metadata as any)?.bookTitle ?? 'book'}! Ready for the next adventure?`;
+      return tier === 'younger'
+        ? `You finished the ${bookTitle}! Ready for the next adventure?`
+        : `Finished ${bookTitle}. What's next?`;
     case 'topics_explored':
-      return `You've explored ${threshold} topics in ${(metadata as any)?.subjectName ?? 'this subject'}! Your curiosity is building something amazing.`;
+      return tier === 'younger'
+        ? `You've explored ${threshold} topics in ${subjectName}! Your curiosity is building something amazing.`
+        : `${threshold} topics explored in ${subjectName}. Your curiosity is paying off.`;
     case 'learning_time': {
       const hours = Math.round(threshold / 60);
-      return `You've spent ${hours} hours learning! That's more than most people ever invest.`;
+      return tier === 'younger'
+        ? `You've spent ${hours} hours learning! That's more than most people ever invest.`
+        : `${hours} hours invested in learning. That adds up.`;
     }
     case 'cefr_level_up':
-      return `You reached a new level! You can now understand more than before.`;
+      return tier === 'younger'
+        ? `You reached a new level! You can now understand more than before.`
+        : `New proficiency level unlocked. You're leveling up.`;
     default:
-      return 'Amazing achievement!';
+      return tier === 'younger' ? 'Amazing achievement!' : 'Milestone reached.';
   }
 }
 ```
@@ -2880,7 +3121,7 @@ git commit -m "feat(api): integrate milestone celebrations with coaching card sy
 // apps/api/src/inngest/functions/weekly-progress-push.test.ts
 import { describe, it, expect, vi } from 'vitest';
 import { getTestDatabase, seedProfile, seedFamilyLink, seedNotificationPrefs } from '../../../test/helpers';
-import { generateWeeklyNotification } from './weekly-progress-push';
+import { generateWeeklyNotification, batchChildNotifications } from './weekly-progress-push';
 import type { ProgressMetrics } from '@eduagent/schemas';
 
 describe('weekly-progress-push', () => {
@@ -2893,13 +3134,37 @@ describe('weekly-progress-push', () => {
     expect(result.body).toContain('15 new words');
   });
 
-  it('generates preservation message when child had zero activity', () => {
+  it('[UX-8] generates positive preservation message when child had zero activity', () => {
     const current = makeMetrics({ topicsMastered: 10, vocabularyTotal: 50, totalSessions: 5 });
     const previous = makeMetrics({ topicsMastered: 10, vocabularyTotal: 50, totalSessions: 5 });
 
     const result = generateWeeklyNotification('Emma', current, previous);
-    expect(result.body).toContain('took a break');
-    expect(result.body).toContain('still mastered 10 topics');
+    expect(result.body).toContain('knowledge is safe');
+    expect(result.body).toContain('10 topics');
+    // [UX-8] Must NOT contain guilt-inducing language
+    expect(result.body).not.toContain('nudge');
+    expect(result.body).not.toContain('hasn\'t practiced');
+  });
+
+  it('[UX-4] batches multiple children into one notification', () => {
+    const summaries = [
+      { name: 'Emma', body: '2 new topics mastered, 15 new words.', hadActivity: true },
+      { name: 'Alex', body: '5 new topics explored.', hadActivity: true },
+    ];
+    const result = batchChildNotifications(summaries);
+    expect(result).not.toBeNull();
+    expect(result!.title).toBe('Weekly learning update');
+    expect(result!.body).toContain('Emma');
+    expect(result!.body).toContain('Alex');
+  });
+
+  it('[UX-8] skips push entirely when ALL children inactive', () => {
+    const summaries = [
+      { name: 'Emma', body: "Emma's knowledge is safe — still knows 50 words and 10 topics!", hadActivity: false },
+      { name: 'Alex', body: "Alex's knowledge is safe — still knows 30 words and 5 topics!", hadActivity: false },
+    ];
+    const result = batchChildNotifications(summaries);
+    expect(result).toBeNull();
   });
 
   it('includes explored topics for session-filed subjects (F-6)', () => {
@@ -2942,10 +3207,11 @@ import { captureException } from '../../services/sentry';
 import {
   familyLinks,
   profiles,
+  accounts,                    // [AR2-1] timezone lives on accounts, not profiles
   notificationPreferences,
   type Database,
 } from '@eduagent/database';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm'; // [AR2-1] sql for timezone CASE expression
 import type { ProgressMetrics } from '@eduagent/schemas';
 
 export function generateWeeklyNotification(
@@ -2971,12 +3237,11 @@ export function generateWeeklyNotification(
   const previousExplored = previous.subjects.reduce((s, subj) => s + (subj.topicsExplored ?? 0), 0);
   const exploredDelta = currentExplored - previousExplored;
 
-  // Zero activity this week — check sessionDelta AND exploredDelta to avoid
-  // misrepresenting exploration-only weeks as "took a break"
+  // [UX-8] Zero activity → positive preservation message (no guilt, no "nudge")
   if (topicDelta === 0 && vocabDelta === 0 && sessionDelta === 0 && exploredDelta === 0) {
     return {
       title,
-      body: `${childName} took a break this week. Their knowledge is safe — they've still mastered ${current.topicsMastered} topics!`,
+      body: `${childName}'s knowledge is safe — still knows ${current.vocabularyTotal > 0 ? `${current.vocabularyTotal} words and ` : ''}${current.topicsMastered} topics!`,
     };
   }
 
@@ -2989,31 +3254,69 @@ export function generateWeeklyNotification(
   return { title, body: parts.join(', ') + '.' };
 }
 
+/**
+ * [UX-4] Batch multiple children into one notification body.
+ * Returns null if ALL children were inactive (skip push entirely per UX-8).
+ */
+export function batchChildNotifications(
+  childSummaries: Array<{ name: string; body: string; hadActivity: boolean }>
+): { title: string; body: string } | null {
+  // [UX-8] If ALL children inactive, skip the push entirely
+  if (childSummaries.every(c => !c.hadActivity)) return null;
+
+  if (childSummaries.length === 1) {
+    return { title: childSummaries[0]!.body.includes('safe') ? 'Weekly update' : `${childSummaries[0]!.name}'s week`, body: childSummaries[0]!.body };
+  }
+
+  const title = 'Weekly learning update';
+  const lines = childSummaries.map(c => `${c.name}: ${c.body}`);
+  return { title, body: lines.join(' | ') };
+}
+
 export const weeklyProgressPush = inngest.createFunction(
   {
     id: 'progress-weekly-push',
     name: 'Send weekly progress push to parents',
   },
-  { cron: '0 9 * * 1' }, // Monday 09:00 UTC
+  // [UX-9/SA-9] Runs hourly on Mondays. Each run processes parents whose local 09:00 matches.
+  { cron: '0 * * * 1' }, // Every hour on Mondays
   async ({ step }) => {
-    // Step 1: Get all parent profiles with push enabled + weeklyProgressPush = true
+    // [SA-9] FR239.1/UX-9: Timezone-aware filtering.
+    // The cron fires every hour on Monday. Each invocation determines the current UTC hour
+    // and only processes profiles whose timezone makes it 09:00 locally.
+    const currentUtcHour = new Date().getUTCHours();
+
+    // Step 1: Get parent profiles whose local 09:00 matches this UTC hour
     const parentProfiles = await step.run('get-parents', async () => {
       const db = getStepDatabase();
+
+      // [SA-9] Query profiles where push is enabled AND weeklyProgressPush is true.
+      // [AR2-1] FIXED: timezone lives on `accounts` table, not `profiles`.
+      // Must join profiles → accounts via profiles.accountId to access timezone.
       const rows = await db
         .select({
           parentProfileId: notificationPreferences.profileId,
         })
         .from(notificationPreferences)
+        .innerJoin(profiles, eq(profiles.id, notificationPreferences.profileId))
+        .innerJoin(accounts, eq(accounts.id, profiles.accountId))
         .where(
           and(
             eq(notificationPreferences.pushEnabled, true),
-            eq(notificationPreferences.weeklyProgressPush, true)
+            eq(notificationPreferences.weeklyProgressPush, true),
+            // Timezone filter: EXTRACT(HOUR FROM NOW() AT TIME ZONE tz) = 9
+            // For NULL timezone, only match at UTC hour 9
+            sql`CASE
+              WHEN ${accounts.timezone} IS NOT NULL
+              THEN EXTRACT(HOUR FROM NOW() AT TIME ZONE ${accounts.timezone}) = 9
+              ELSE ${currentUtcHour} = 9
+            END`
           )
         );
       return rows.map((r) => r.parentProfileId);
     });
 
-    // Step 2: For each parent, find linked children and send notifications
+    // Step 2: [UX-4] For each parent, batch ALL children into ONE push notification
     let sent = 0;
     let skipped = 0;
 
@@ -3025,6 +3328,9 @@ export const weeklyProgressPush = inngest.createFunction(
           where: eq(familyLinks.parentProfileId, parentId),
         });
 
+        // Collect summaries for all children, then batch
+        const childSummaries: Array<{ name: string; body: string; hadActivity: boolean }> = [];
+
         for (const link of children) {
           try {
             const childProfile = await db.query.profiles.findFirst({
@@ -3032,7 +3338,6 @@ export const weeklyProgressPush = inngest.createFunction(
             });
             if (!childProfile) continue;
 
-            // Get current and 7-days-ago snapshot
             const latest = await getLatestSnapshot(db, link.childProfileId);
             if (!latest) { skipped++; continue; }
 
@@ -3046,23 +3351,48 @@ export const weeklyProgressPush = inngest.createFunction(
               ? (previousSnapshots[0].metrics as ProgressMetrics)
               : null;
 
-            const { title, body } = generateWeeklyNotification(
+            const notification = generateWeeklyNotification(
               childProfile.displayName ?? 'Your child',
               latest.metrics as ProgressMetrics,
               previous
             );
 
-            // [AR-11] FIXED: No `as any` — Step 4 (extend type) must run BEFORE this code.
-            await sendPushNotification(db, {
-              profileId: parentId,
-              title,
-              body,
-              type: 'weekly_progress',
+            // [AR2-4] FIXED: hadActivity must check ALL deltas, not just totalSessions.
+            // Otherwise a child with vocab growth but no new sessions is marked "inactive",
+            // and if ALL children have this pattern, the batch is incorrectly skipped (UX-8).
+            const currentMetrics = latest.metrics as ProgressMetrics;
+            const hadActivity = previous
+              ? (
+                  currentMetrics.totalSessions > previous.totalSessions ||
+                  currentMetrics.topicsMastered > previous.topicsMastered ||
+                  currentMetrics.vocabularyTotal > previous.vocabularyTotal ||
+                  currentMetrics.subjects.reduce((s, subj) => s + (subj.topicsExplored ?? 0), 0) >
+                    previous.subjects.reduce((s, subj) => s + (subj.topicsExplored ?? 0), 0)
+                )
+              : true;
+
+            childSummaries.push({
+              name: childProfile.displayName ?? 'Your child',
+              body: notification.body,
+              hadActivity,
             });
-            sent++;
           } catch (err) {
             captureException(err, { parentId, childId: link.childProfileId });
             skipped++;
+          }
+        }
+
+        // [UX-4] Batch into single push. [UX-8] Skip if ALL inactive.
+        if (childSummaries.length > 0) {
+          const batched = batchChildNotifications(childSummaries);
+          if (batched) {
+            await sendPushNotification(db, {
+              profileId: parentId,
+              title: batched.title,
+              body: batched.body,
+              type: 'weekly_progress',
+            });
+            sent++;
           }
         }
       });
@@ -3243,7 +3573,7 @@ export function generateMonthlyReportData(
     thisMonth: thisMonthMetrics,
     lastMonth: lastMonthMetrics,
     highlights: [], // Populated by LLM call
-    areasForGrowth: [],
+    nextSteps: [],
     subjects: subjectDetails,
     headlineStat: {
       label: headlineLabel,
@@ -3257,15 +3587,16 @@ export function generateMonthlyReportData(
  * Generate LLM highlights for a monthly report.
  * Falls back gracefully if LLM fails.
  */
+// [SA-8] FR240.4: Returns highlights, nextSteps, AND a relatable comparison for headlineStat.
 export async function generateReportHighlights(
   reportData: MonthlyReportData
-): Promise<{ highlights: string[]; areasForGrowth: string[] }> {
+): Promise<{ highlights: string[]; nextSteps: string[]; comparison: string | null }> {
   try {
     const messages: ChatMessage[] = [
       {
         role: 'system',
         content:
-          'You are writing a warm, encouraging monthly learning report for a parent about their child. Generate 2-3 highlights (specific achievements) and 0-2 areas for growth (supportive tone, never critical). Return JSON: { "highlights": [...], "areasForGrowth": [...] }',
+          'You are writing a warm, encouraging monthly learning report for a parent about their child. Generate: (1) 2-3 highlights (specific achievements), (2) 0-2 forward-looking next steps (actionable suggestions with a supportive tone — "Spanish is ready for a comeback!" not "Spanish practice dropped off"), (3) a single "equivalent" comparison that makes the progress tangible and relatable (e.g., "That\'s like reading 2 textbook chapters" or "Enough vocabulary to order food at a restaurant"). Return JSON: { "highlights": [...], "nextSteps": [...], "equivalent": "..." }',
       },
       {
         role: 'user',
@@ -3288,13 +3619,15 @@ export async function generateReportHighlights(
     const parsed = JSON.parse(result.text);
     return {
       highlights: (parsed.highlights ?? ['Great progress this month!']).slice(0, 3),
-      areasForGrowth: (parsed.areasForGrowth ?? []).slice(0, 2),
+      nextSteps: (parsed.nextSteps ?? []).slice(0, 2),     // [UX-14] forward-looking, not judgmental
+      comparison: parsed.equivalent ?? null,                // [SA-8] FR240.4: LLM "equivalent" for headlineStat
     };
   } catch (err) {
     captureException(err, { context: 'monthly-report-highlights' });
     return {
       highlights: ['Great progress this month!'],
-      areasForGrowth: [],
+      nextSteps: [],
+      comparison: null,   // [SA-8] Arithmetic fallback in headlineStat.comparison stands
     };
   }
 }
@@ -3332,19 +3665,21 @@ export const monthlyReportCron = inngest.createFunction(
       const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
       const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
 
+      // [AR2-3] FIXED: INNER JOIN produced ~30 rows per pair (one per daily snapshot).
+      // Replaced with EXISTS subquery to get exactly 1 row per parent-child pair.
       const links = await db
         .select({
           parentId: familyLinks.parentProfileId,
           childId: familyLinks.childProfileId,
         })
         .from(familyLinks)
-        .innerJoin(
-          progressSnapshots,
-          and(
-            eq(progressSnapshots.profileId, familyLinks.childProfileId),
-            gte(progressSnapshots.snapshotDate, lastMonthStart.toISOString().slice(0, 10)),
-            lte(progressSnapshots.snapshotDate, lastMonthEnd.toISOString().slice(0, 10))
-          )
+        .where(
+          sql`EXISTS (
+            SELECT 1 FROM ${progressSnapshots}
+            WHERE ${progressSnapshots.profileId} = ${familyLinks.childProfileId}
+              AND ${progressSnapshots.snapshotDate} >= ${lastMonthStart.toISOString().slice(0, 10)}
+              AND ${progressSnapshots.snapshotDate} <= ${lastMonthEnd.toISOString().slice(0, 10)}
+          )`
         );
 
       return links;
@@ -3395,22 +3730,30 @@ export const monthlyReportGenerate = inngest.createFunction(
 
           const monthLabel = lastMonthStart.toLocaleString('en', { month: 'long', year: 'numeric' });
 
-          // Get last day snapshots for this month and previous month
+          // [AR2-9] FIXED: Use a 3-day range instead of exact-date match.
+          // If the daily cron missed the exact last day (cron failure, timezone edge),
+          // the exact-date query would return empty and silently skip the report.
+          // Now fetches last 3 days of the month and takes the most recent snapshot.
+          const thisMonthRangeStart = new Date(lastMonthEnd);
+          thisMonthRangeStart.setDate(thisMonthRangeStart.getDate() - 2); // 3-day window
           const thisMonthSnapshots = await getSnapshotsInRange(
             db, pair.childId,
-            lastMonthEnd.toISOString().slice(0, 10),
+            thisMonthRangeStart.toISOString().slice(0, 10),
             lastMonthEnd.toISOString().slice(0, 10)
           );
+          const prevMonthRangeStart = new Date(twoMonthsAgoEnd);
+          prevMonthRangeStart.setDate(prevMonthRangeStart.getDate() - 2);
           const prevMonthSnapshots = await getSnapshotsInRange(
             db, pair.childId,
-            twoMonthsAgoEnd.toISOString().slice(0, 10),
+            prevMonthRangeStart.toISOString().slice(0, 10),
             twoMonthsAgoEnd.toISOString().slice(0, 10)
           );
 
-          const thisMonthMetrics = thisMonthSnapshots[0]?.metrics as ProgressMetrics | undefined;
+          // Take the most recent snapshot in each range (getSnapshotsInRange returns ordered by date asc)
+          const thisMonthMetrics = thisMonthSnapshots.at(-1)?.metrics as ProgressMetrics | undefined;
           if (!thisMonthMetrics) return; // No data for this month
 
-          const prevMonthMetrics = prevMonthSnapshots[0]?.metrics as ProgressMetrics | null ?? null;
+          const prevMonthMetrics = prevMonthSnapshots.at(-1)?.metrics as ProgressMetrics | null ?? null;
 
           // Generate report data
           let reportData = generateMonthlyReportData(
@@ -3421,8 +3764,17 @@ export const monthlyReportGenerate = inngest.createFunction(
           );
 
           // Enrich with LLM highlights
-          const { highlights, areasForGrowth } = await generateReportHighlights(reportData);
-          reportData = { ...reportData, highlights, areasForGrowth };
+          // Enrich with LLM highlights + [SA-8] FR240.4 equivalent comparison
+          const { highlights, nextSteps, comparison } = await generateReportHighlights(reportData);
+          reportData = {
+            ...reportData,
+            highlights,
+            nextSteps,
+            // [SA-8] Override arithmetic comparison with LLM "equivalent" if available
+            headlineStat: comparison
+              ? { ...reportData.headlineStat, comparison }
+              : reportData.headlineStat,
+          };
 
           // Store report
           await db
@@ -3444,12 +3796,15 @@ export const monthlyReportGenerate = inngest.createFunction(
             type: 'monthly_report',
           });
 
+          // [AR2-11] FIXED: return inside step.run so Inngest sees the correct status.
+          // Previously, { status: 'ok' } was at the function handler level (outside step.run),
+          // meaning Inngest always got 'ok' even when the step caught an error.
+          return { status: 'ok' };
         } catch (err) {
           captureException(err, { parentId: pair.parentId, childId: pair.childId });
           return { status: 'failed' };
         }
       });
-      return { status: 'ok' };
   }
 );
 ```
@@ -3479,9 +3834,58 @@ git commit -m "feat(api): add monthly learning report generation with LLM highli
 
 ---
 
+### Task 14 [SA-6]: Parent Dashboard Mobile Update (FR238)
+
+> **NOTE: This task was stripped by a linter during branch switching. Re-added from SA-6 finding.**
+
+**Files:**
+- Modify: `apps/mobile/src/app/(app)/parent/dashboard.tsx`
+- Create: `apps/mobile/src/app/(app)/parent/child-progress/[childProfileId].tsx`
+- Create: `apps/mobile/src/app/(app)/parent/child-progress/[childProfileId].test.tsx`
+- Modify: `apps/mobile/src/hooks/use-dashboard.ts`
+
+**Requirements:**
+1. Extend dashboard hook to expose `progress` fields from Task 7's API changes.
+2. Update parent dashboard per-child cards to render: topics mastered + weekly delta, vocabulary + delta, engagement trend with [UX-7] actionable guidance ("Quiet week — maybe suggest a quick session on [subject]?").
+3. Make child cards tappable → navigate to `/(app)/parent/child-progress/${child.profileId}`.
+4. Create child progress detail screen reusing `SubjectCard`, `ProgressBar`, `GrowthChart` from Task 8 — no "Keep learning" CTA (parent can't learn for the child).
+5. Write tests for dashboard progress deltas, declining trend guidance, child detail rendering.
+
+```bash
+git add apps/mobile/src/app/\(app\)/parent/
+git commit -m "feat(mobile): add parent dashboard progress fields + child progress detail screen [EP-15, FR238, SA-6]"
+```
+
+---
+
+### Task 15 [SA-7]: Monthly Report Mobile Screen (FR240.5, FR240.7)
+
+> **NOTE: This task was stripped by a linter during branch switching. Re-added from SA-7 finding.**
+
+**Files:**
+- Create: `apps/mobile/src/app/(app)/parent/reports/[childProfileId].tsx`
+- Create: `apps/mobile/src/app/(app)/parent/reports/detail/[reportId].tsx`
+- Modify: `apps/mobile/src/hooks/use-progress.ts` (add report hooks)
+
+**Requirements:**
+1. Add `useChildReports(childProfileId)` and `useReportDetail(childProfileId, reportId)` React Query hooks.
+2. Create reports list screen: month labels, headline stat preview, "New" badge for unviewed reports.
+3. Create report detail screen (FR240.7 — screenshot-worthy): large headline stat + LLM comparison, month-over-month bar, per-subject breakdown, highlights, nextSteps. [FR237.5] Screenshot-friendly layout: clean numbers, warm language, visually appealing for parent sharing.
+4. Mark report as viewed on mount via API.
+5. Add navigation from child progress detail → "Monthly Reports" link.
+6. Handle push notification deep-link to most recent report.
+7. Write tests for list rendering, "New" badge, detail sections, viewedAt marking.
+
+```bash
+git add apps/mobile/src/app/\(app\)/parent/reports/ apps/mobile/src/hooks/use-progress.ts
+git commit -m "feat(mobile): add monthly learning report list + detail screens [EP-15, FR240.5, FR240.7, SA-7]"
+```
+
+---
+
 ## Final Verification
 
-### Task 13: Integration Tests + Full Validation
+### Task 16: Integration Tests + Full Validation
 
 - [ ] **Step 1: Run full API test suite**
 
@@ -3504,7 +3908,7 @@ cd apps/mobile && pnpm exec tsc --noEmit
 - [ ] **Step 4: Run mobile tests for new screens**
 
 ```bash
-cd apps/mobile && pnpm exec jest --findRelatedTests src/app/\(learner\)/progress.tsx src/app/\(learner\)/progress/\[subjectId\].tsx --no-coverage
+cd apps/mobile && pnpm exec jest --findRelatedTests src/app/\(app\)/progress.tsx src/app/\(app\)/progress/\[subjectId\].tsx --no-coverage
 ```
 
 - [ ] **Step 5: Run integration tests for snapshot accuracy**

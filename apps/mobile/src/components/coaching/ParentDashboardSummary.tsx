@@ -20,6 +20,15 @@ interface ParentDashboardSummaryProps {
   totalTimeThisWeek: number;
   totalTimeLastWeek: number;
   retentionTrend?: 'improving' | 'declining' | 'stable';
+  progress?: {
+    topicsMastered: number;
+    vocabularyTotal: number;
+    weeklyDeltaTopicsMastered: number | null;
+    weeklyDeltaVocabularyTotal: number | null;
+    weeklyDeltaTopicsExplored: number | null;
+    engagementTrend: 'growing' | 'steady' | 'quiet';
+    guidance: string | null;
+  } | null;
   onDrillDown: () => void;
   isLoading?: boolean;
 }
@@ -121,6 +130,7 @@ export function ParentDashboardSummary({
   totalTimeThisWeek,
   totalTimeLastWeek,
   retentionTrend,
+  progress,
   onDrillDown,
   isLoading,
 }: ParentDashboardSummaryProps): ReactNode {
@@ -189,6 +199,43 @@ export function ParentDashboardSummary({
           No data yet
         </Text>
       )}
+      {progress ? (
+        <View className="mt-3 gap-2">
+          <View className="flex-row flex-wrap gap-2">
+            <View className="bg-background rounded-full px-3 py-1.5">
+              <Text className="text-caption font-semibold text-text-primary">
+                {progress.topicsMastered} topics
+                {progress.weeklyDeltaTopicsMastered != null
+                  ? ` • +${progress.weeklyDeltaTopicsMastered} this week`
+                  : ''}
+              </Text>
+            </View>
+            {progress.vocabularyTotal > 0 ? (
+              <View className="bg-background rounded-full px-3 py-1.5">
+                <Text className="text-caption font-semibold text-text-primary">
+                  {progress.vocabularyTotal} words
+                  {progress.weeklyDeltaVocabularyTotal != null
+                    ? ` • +${progress.weeklyDeltaVocabularyTotal}`
+                    : ''}
+                </Text>
+              </View>
+            ) : null}
+            {progress.weeklyDeltaTopicsExplored != null &&
+            progress.weeklyDeltaTopicsExplored > 0 ? (
+              <View className="bg-background rounded-full px-3 py-1.5">
+                <Text className="text-caption font-semibold text-text-primary">
+                  +{progress.weeklyDeltaTopicsExplored} explored
+                </Text>
+              </View>
+            ) : null}
+          </View>
+          {progress.guidance ? (
+            <Text className="text-caption text-text-secondary">
+              {progress.guidance}
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
       {subjects.length > 0 && (
         <View className="flex-row flex-wrap gap-2 mt-2">
           {subjects.map((subject) => (

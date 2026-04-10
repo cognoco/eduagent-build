@@ -158,7 +158,7 @@ jobs:
       - name: Run database migrations
         working-directory: packages/database
         env:
-          DATABASE_URL: ${{ github.event_name == 'push' && secrets.DATABASE_URL_STAGING || secrets.DATABASE_URL_PRODUCTION }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
           DEPLOY_ENV="${{ github.event_name == 'push' && 'staging' || inputs.api_environment }}"
           echo "Running migrations on ${DEPLOY_ENV} database..."

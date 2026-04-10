@@ -3,13 +3,20 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useCallback } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
+  GrowthChart,
   RetentionSignal,
+  SubjectCard,
   type RetentionStatus,
 } from '../../../../components/progress';
 import {
   useChildDetail,
   useChildSessions,
 } from '../../../../hooks/use-dashboard';
+import {
+  useChildInventory,
+  useChildProgressHistory,
+  useChildReports,
+} from '../../../../hooks/use-progress';
 import { useCelebration } from '../../../../hooks/use-celebration';
 import {
   useMarkCelebrationsSeen,
@@ -20,6 +27,11 @@ import {
   useRevokeConsent,
   useRestoreConsent,
 } from '../../../../hooks/use-consent';
+import {
+  useChildLearnerProfile,
+  useGrantMemoryConsent,
+} from '../../../../hooks/use-learner-profile';
+import { MemoryConsentPrompt } from '../../../../components/memory-consent-prompt';
 
 function SubjectSkeleton(): React.ReactNode {
   return (
@@ -44,6 +56,47 @@ function formatSessionDate(iso: string): string {
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+  });
+}
+
+function formatWeekLabel(iso: string): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  return d.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
+function buildGrowthData(
+  history:
+    | {
+        dataPoints: Array<{
+          date: string;
+          topicsMastered: number;
+          vocabularyTotal: number;
+        }>;
+      }
+    | null
+    | undefined
+) {
+  const points = history?.dataPoints ?? [];
+
+  return points.slice(-8).map((point, index) => {
+    const previous = points[index - 1];
+    return {
+      label: formatWeekLabel(point.date),
+      value: Math.max(
+        0,
+        point.topicsMastered - (previous?.topicsMastered ?? 0)
+      ),
+      secondaryValue:
+        point.vocabularyTotal > 0
+          ? Math.max(
+              0,
+              point.vocabularyTotal - (previous?.vocabularyTotal ?? 0)
+            )
+          : undefined,
+    };
   });
 }
 
@@ -81,14 +134,21 @@ export default function ChildDetailScreen() {
     isError: sessionsError,
     refetch: refetchSessions,
   } = useChildSessions(profileId);
+  const { data: inventory } = useChildInventory(profileId);
+  const { data: history } = useChildProgressHistory(profileId, {
+    granularity: 'weekly',
+  });
+  const { data: reports } = useChildReports(profileId);
   const pendingCelebrations = usePendingCelebrations({
     profileId,
     viewer: 'parent',
   });
   const markCelebrationsSeen = useMarkCelebrationsSeen();
   const { data: consentData } = useChildConsentStatus(profileId);
+  const { data: learnerProfile } = useChildLearnerProfile(profileId);
   const revokeConsent = useRevokeConsent(profileId);
   const restoreConsent = useRestoreConsent(profileId);
+  const grantMemoryConsent = useGrantMemoryConsent();
   const { CelebrationOverlay } = useCelebration({
     queue: pendingCelebrations.data ?? [],
     celebrationLevel: 'all',
@@ -208,11 +268,101 @@ export default function ChildDetailScreen() {
         contentContainerStyle={{ paddingBottom: 24 }}
         testID="child-detail-scroll"
       >
+        {child?.progress ? (
+          <View className="bg-coaching-card rounded-card p-4 mt-4">
+            <Text className="text-h3 font-semibold text-text-primary">
+              Visible progress
+            </Text>
+            <Text className="text-body-sm text-text-secondary mt-1">
+              {child.progress.topicsMastered} topics mastered
+              {child.progress.vocabularyTotal > 0
+                ? ` • ${child.progress.vocabularyTotal} words known`
+                : ''}
+            </Text>
+            <View className="flex-row flex-wrap gap-2 mt-3">
+              {child.progress.weeklyDeltaTopicsMastered != null ? (
+                <View className="bg-background rounded-full px-3 py-1.5">
+                  <Text className="text-caption font-semibold text-text-primary">
+                    +{child.progress.weeklyDeltaTopicsMastered} topics this week
+                  </Text>
+                </View>
+              ) : null}
+              {child.progress.weeklyDeltaVocabularyTotal != null &&
+              child.progress.vocabularyTotal > 0 ? (
+                <View className="bg-background rounded-full px-3 py-1.5">
+                  <Text className="text-caption font-semibold text-text-primary">
+                    +{child.progress.weeklyDeltaVocabularyTotal} words
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+            {child.progress.guidance ? (
+              <Text className="text-caption text-text-secondary mt-3">
+                {child.progress.guidance}
+              </Text>
+            ) : null}
+            <Pressable
+              onPress={() => {
+                if (!profileId) return;
+                router.push({
+                  pathname: '/(app)/child/[profileId]/reports',
+                  params: { profileId },
+                } as never);
+              }}
+              className="bg-background rounded-button px-4 py-3 mt-4 items-center"
+              accessibilityRole="button"
+              accessibilityLabel="Open monthly reports"
+              testID="child-reports-link"
+            >
+              <Text className="text-body font-semibold text-text-primary">
+                Monthly reports
+                {reports && reports.length > 0 ? ` (${reports.length})` : ''}
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
+
+        {history ? (
+          <View className="mt-4">
+            <GrowthChart
+              title="Recent growth"
+              subtitle="Weekly changes in topics mastered and vocabulary"
+              data={buildGrowthData(history)}
+              emptyMessage="Progress becomes easier to spot after a few more sessions."
+            />
+          </View>
+        ) : null}
+
         {isLoading ? (
           <>
             <SubjectSkeleton />
             <SubjectSkeleton />
             <SubjectSkeleton />
+          </>
+        ) : inventory?.subjects && inventory.subjects.length > 0 ? (
+          <>
+            <Text className="text-h3 font-semibold text-text-primary mt-4 mb-2">
+              Subjects
+            </Text>
+            {inventory.subjects.map((subject) => (
+              <View key={subject.subjectId} className="mt-3">
+                <SubjectCard
+                  subject={subject}
+                  onPress={() => {
+                    if (!profileId) return;
+                    router.push({
+                      pathname: '/(app)/child/[profileId]/subjects/[subjectId]',
+                      params: {
+                        profileId,
+                        subjectId: subject.subjectId,
+                        subjectName: subject.subjectName,
+                      },
+                    } as never);
+                  }}
+                  testID={`subject-card-${subject.subjectId}`}
+                />
+              </View>
+            ))}
           </>
         ) : child?.subjects && child.subjects.length > 0 ? (
           <>
@@ -221,14 +371,15 @@ export default function ChildDetailScreen() {
             </Text>
             {child.subjects.map((subject) => (
               <Pressable
-                key={subject.name}
+                key={subject.subjectId ?? subject.name}
                 onPress={() => {
-                  if (!profileId) return;
+                  if (!profileId || !subject.subjectId) return;
                   router.push({
                     pathname: '/(app)/child/[profileId]/subjects/[subjectId]',
                     params: {
                       profileId,
-                      subjectId: subject.name,
+                      subjectId: subject.subjectId,
+                      subjectName: subject.name,
                     },
                   } as never);
                 }}
@@ -346,6 +497,49 @@ export default function ChildDetailScreen() {
             </Text>
           </View>
         )}
+
+        <Text className="text-h3 font-semibold text-text-primary mt-6 mb-2">
+          Mentor Memory
+        </Text>
+        {learnerProfile?.memoryConsentStatus === 'pending' && profileId ? (
+          <View className="mb-3">
+            <MemoryConsentPrompt
+              childName={child?.displayName}
+              isPending={grantMemoryConsent.isPending}
+              onGrant={() =>
+                void grantMemoryConsent.mutateAsync({
+                  childProfileId: profileId,
+                  consent: 'granted',
+                })
+              }
+              onDecline={() =>
+                void grantMemoryConsent.mutateAsync({
+                  childProfileId: profileId,
+                  consent: 'declined',
+                })
+              }
+            />
+          </View>
+        ) : null}
+        <Pressable
+          onPress={() => {
+            if (!profileId) return;
+            router.push({
+              pathname: '/(app)/child/[profileId]/mentor-memory',
+              params: { profileId },
+            } as never);
+          }}
+          className="bg-surface rounded-card p-4 mt-1"
+          accessibilityRole="button"
+          accessibilityLabel="View what the mentor knows"
+        >
+          <Text className="text-body font-medium text-text-primary">
+            What the mentor knows
+          </Text>
+          <Text className="text-body-sm text-text-secondary mt-1">
+            Review what has been remembered and adjust privacy controls.
+          </Text>
+        </Pressable>
 
         {/* Consent Management */}
         {consentData?.consentStatus != null && (

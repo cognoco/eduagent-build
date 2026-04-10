@@ -2,6 +2,7 @@
 
 > Amendments to the existing Epic 16 plan based on memory system audit.
 > These changes should be integrated into the main plan before implementation begins.
+> **Status:** Cross-referenced from main plan (2026-04-09). Story 16.0 is IMPLEMENTED. Amendments 1-5 are noted in the main plan's Prerequisites section — apply during implementation.
 
 ---
 

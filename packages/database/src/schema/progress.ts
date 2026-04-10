@@ -82,6 +82,7 @@ export const notificationPreferences = pgTable('notification_preferences', {
     .unique(),
   reviewReminders: boolean('review_reminders').notNull().default(false),
   dailyReminders: boolean('daily_reminders').notNull().default(false),
+  weeklyProgressPush: boolean('weekly_progress_push').notNull().default(true),
   pushEnabled: boolean('push_enabled').notNull().default(false),
   maxDailyPush: integer('max_daily_push').notNull().default(3),
   expoPushToken: text('expo_push_token'),
@@ -104,6 +105,9 @@ export const notificationTypeEnum = pgEnum('notification_type', [
   'consent_expired',
   'subscribe_request',
   'recall_nudge',
+  'weekly_progress',
+  'monthly_report',
+  'progress_refresh',
 ]);
 
 export const notificationLog = pgTable(

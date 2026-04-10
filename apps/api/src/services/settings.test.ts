@@ -71,6 +71,7 @@ describe('getNotificationPrefs', () => {
       dailyReminders: false,
       pushEnabled: false,
       maxDailyPush: 3,
+      weeklyProgressPush: true,
     });
   });
 
@@ -109,6 +110,7 @@ describe('upsertNotificationPrefs', () => {
       dailyReminders: false,
       pushEnabled: true,
       maxDailyPush: 7,
+      weeklyProgressPush: true,
     });
     expect(db.insert).toHaveBeenCalled();
     expect(db.update).not.toHaveBeenCalled();
@@ -134,6 +136,7 @@ describe('upsertNotificationPrefs', () => {
       dailyReminders: true,
       pushEnabled: true,
       maxDailyPush: 3,
+      weeklyProgressPush: true,
     });
     expect(db.update).toHaveBeenCalled();
     expect(db.insert).not.toHaveBeenCalled();

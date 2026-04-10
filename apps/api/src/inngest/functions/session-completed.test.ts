@@ -14,6 +14,13 @@ jest.mock('@eduagent/database', () => {
           sessionEvents: { findMany: jest.fn().mockResolvedValue([]) },
           curriculumTopics: { findFirst: jest.fn().mockResolvedValue(null) },
           subjects: { findFirst: jest.fn().mockResolvedValue(null) },
+          learningProfiles: {
+            findFirst: jest.fn().mockResolvedValue({
+              memoryConsentStatus: 'pending',
+              memoryCollectionEnabled: false,
+              memoryEnabled: false,
+            }),
+          },
           streaks: { findFirst: jest.fn().mockResolvedValue(null) },
         },
         select: chainable,
@@ -34,6 +41,8 @@ jest.mock('@eduagent/database', () => {
       repetitions: col('repetitions'),
     },
     curriculumTopics: { id: col('id'), title: col('title') },
+    learningProfiles: { profileId: col('profileId') },
+    learningSessions: { id: col('id'), profileId: col('profileId') },
     subjects: { id: col('id'), profileId: col('profileId') },
     streaks: { profileId: col('profileId') },
   };
@@ -162,6 +171,13 @@ jest.mock('../../services/verification-completion', () => ({
     mockProcessTeachBackCompletion(...args),
 }));
 
+const mockRefreshProgressSnapshot = jest.fn().mockResolvedValue(undefined);
+
+jest.mock('../../services/snapshot-aggregation', () => ({
+  refreshProgressSnapshot: (...args: unknown[]) =>
+    mockRefreshProgressSnapshot(...args),
+}));
+
 const mockCaptureException = jest.fn();
 
 jest.mock('../../services/sentry', () => ({
@@ -270,6 +286,7 @@ describe('sessionCompleted', () => {
       'update-needs-deepening',
       'check-milestone-completion',
       'write-coaching-card',
+      'analyze-learner-profile',
       'update-dashboard',
       'generate-embeddings',
       'extract-homework-summary',
@@ -287,6 +304,7 @@ describe('sessionCompleted', () => {
       .filter((o: any) => o.status !== 'skipped')
       .map((o: any) => o.status);
     expect(statuses).toEqual([
+      'ok',
       'ok',
       'ok',
       'ok',
@@ -477,6 +495,13 @@ describe('sessionCompleted', () => {
             curriculumTopics: { findFirst: jest.fn().mockResolvedValue(null) },
             subjects: {
               findFirst: jest.fn().mockResolvedValue(subjectData),
+            },
+            learningProfiles: {
+              findFirst: jest.fn().mockResolvedValue({
+                memoryConsentStatus: 'pending',
+                memoryCollectionEnabled: false,
+                memoryEnabled: false,
+              }),
             },
             streaks: { findFirst: jest.fn().mockResolvedValue(null) },
           },

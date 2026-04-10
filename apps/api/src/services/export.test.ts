@@ -71,6 +71,7 @@ function createMockDb({
   subscriptions = [] as Record<string, unknown>[],
   quotaPools = [] as Record<string, unknown>[],
   topUpCredits = [] as Record<string, unknown>[],
+  learningProfiles = [] as Record<string, unknown>[],
 } = {}): Database {
   return {
     query: {
@@ -145,6 +146,9 @@ function createMockDb({
       },
       topUpCredits: {
         findMany: jest.fn().mockResolvedValue(topUpCredits),
+      },
+      learningProfiles: {
+        findMany: jest.fn().mockResolvedValue(learningProfiles),
       },
     },
   } as unknown as Database;

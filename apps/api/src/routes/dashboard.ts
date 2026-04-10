@@ -1,10 +1,17 @@
 import { Hono } from 'hono';
+import { z } from 'zod';
+import { zValidator } from '@hono/zod-validator';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
 import {
   getChildrenForParent,
+  getChildInventory,
   getChildDetail,
+  getChildProgressHistory,
+  getChildReportDetail,
+  getChildReports,
+  markChildReportViewed,
   getChildSubjectTopics,
   getChildSessions,
   getChildSessionTranscript,
@@ -18,6 +25,12 @@ type DashboardRouteEnv = {
     profileId: string | undefined;
   };
 };
+
+const historyQuerySchema = z.object({
+  from: z.string().optional(),
+  to: z.string().optional(),
+  granularity: z.enum(['daily', 'weekly']).optional(),
+});
 
 export const dashboardRoutes = new Hono<DashboardRouteEnv>()
   // Get parent dashboard data
@@ -38,6 +51,38 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     const child = await getChildDetail(db, parentProfileId, childProfileId);
     return c.json({ child });
   })
+
+  .get('/dashboard/children/:profileId/inventory', async (c) => {
+    const db = c.get('db');
+    const parentProfileId = requireProfileId(c.get('profileId'));
+    const childProfileId = c.req.param('profileId');
+
+    const inventory = await getChildInventory(
+      db,
+      parentProfileId,
+      childProfileId
+    );
+    return c.json({ inventory });
+  })
+
+  .get(
+    '/dashboard/children/:profileId/progress-history',
+    zValidator('query', historyQuerySchema),
+    async (c) => {
+      const db = c.get('db');
+      const parentProfileId = requireProfileId(c.get('profileId'));
+      const childProfileId = c.req.param('profileId');
+      const query = c.req.valid('query');
+
+      const history = await getChildProgressHistory(
+        db,
+        parentProfileId,
+        childProfileId,
+        query
+      );
+      return c.json({ history });
+    }
+  )
 
   // Get child's subject detail
   .get('/dashboard/children/:profileId/subjects/:subjectId', async (c) => {
@@ -87,6 +132,40 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
       return c.json({ transcript });
     }
   )
+
+  .get('/dashboard/children/:profileId/reports', async (c) => {
+    const db = c.get('db');
+    const parentProfileId = requireProfileId(c.get('profileId'));
+    const childProfileId = c.req.param('profileId');
+
+    const reports = await getChildReports(db, parentProfileId, childProfileId);
+    return c.json({ reports });
+  })
+
+  .get('/dashboard/children/:profileId/reports/:reportId', async (c) => {
+    const db = c.get('db');
+    const parentProfileId = requireProfileId(c.get('profileId'));
+    const childProfileId = c.req.param('profileId');
+    const reportId = c.req.param('reportId');
+
+    const report = await getChildReportDetail(
+      db,
+      parentProfileId,
+      childProfileId,
+      reportId
+    );
+    return c.json({ report });
+  })
+
+  .post('/dashboard/children/:profileId/reports/:reportId/view', async (c) => {
+    const db = c.get('db');
+    const parentProfileId = requireProfileId(c.get('profileId'));
+    const childProfileId = c.req.param('profileId');
+    const reportId = c.req.param('reportId');
+
+    await markChildReportViewed(db, parentProfileId, childProfileId, reportId);
+    return c.json({ viewed: true });
+  })
 
   // Get demo mode fixture data
   .get('/dashboard/demo', async (c) => {

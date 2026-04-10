@@ -15,6 +15,15 @@ import { recallNudge } from './functions/recall-nudge';
 import { recallNudgeSend } from './functions/recall-nudge-send';
 import { postSessionSuggestions } from './functions/post-session-suggestions';
 import { freeformFilingRetry } from './functions/freeform-filing';
+import {
+  dailySnapshotCron,
+  dailySnapshotRefresh,
+} from './functions/daily-snapshot';
+import { weeklyProgressPush } from './functions/weekly-progress-push';
+import {
+  monthlyReportCron,
+  monthlyReportGenerate,
+} from './functions/monthly-report-cron';
 
 export {
   inngest,
@@ -34,6 +43,11 @@ export {
   recallNudgeSend,
   postSessionSuggestions,
   freeformFilingRetry,
+  dailySnapshotCron,
+  dailySnapshotRefresh,
+  weeklyProgressPush,
+  monthlyReportCron,
+  monthlyReportGenerate,
 };
 
 // All Inngest functions to register with the serve handler
@@ -54,4 +68,9 @@ export const functions = [
   recallNudgeSend,
   postSessionSuggestions,
   freeformFilingRetry,
+  dailySnapshotCron,
+  dailySnapshotRefresh,
+  weeklyProgressPush,
+  monthlyReportCron,
+  monthlyReportGenerate,
 ];

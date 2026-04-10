@@ -17,10 +17,25 @@ import {
 import type {
   DashboardChild,
   HomeworkSummary,
+  KnowledgeInventory,
+  MonthlyReportRecord,
+  MonthlyReportSummary,
+  ProgressHistory,
   SessionMetadata,
   TopicProgress,
 } from '@eduagent/schemas';
 import { getOverallProgress, getTopicProgress } from './progress';
+import {
+  buildKnowledgeInventory,
+  buildProgressHistory,
+  getLatestSnapshot,
+  getLatestSnapshotOnOrBefore,
+} from './snapshot-aggregation';
+import {
+  getMonthlyReportForParentChild,
+  listMonthlyReportsForParentChild,
+  markMonthlyReportViewed,
+} from './monthly-report';
 
 export interface DashboardInput {
   childProfileId: string;
@@ -203,6 +218,122 @@ function formatSessionDisplayTitle(
   }
 }
 
+function isoDate(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+function subtractDays(date: Date, days: number): Date {
+  const result = new Date(date);
+  result.setUTCDate(result.getUTCDate() - days);
+  return result;
+}
+
+function sumTopicsExplored(metrics: {
+  subjects: Array<{ topicsExplored?: number }>;
+}): number {
+  return metrics.subjects.reduce(
+    (sum, subject) => sum + (subject.topicsExplored ?? 0),
+    0
+  );
+}
+
+function buildProgressGuidance(
+  childName: string,
+  subjectNames: string[],
+  sessionsThisWeek: number,
+  previousSessions: number
+): string | null {
+  const primarySubject = subjectNames[0];
+
+  if (sessionsThisWeek === 0 && primarySubject) {
+    return `Quiet week — maybe suggest a quick session on ${primarySubject}?`;
+  }
+
+  if (sessionsThisWeek < previousSessions && primarySubject) {
+    return `${childName} is still building knowledge. ${primarySubject} might be a good next nudge.`;
+  }
+
+  return null;
+}
+
+async function hasParentAccess(
+  db: Database,
+  parentProfileId: string,
+  childProfileId: string
+): Promise<boolean> {
+  const link = await db.query.familyLinks.findFirst({
+    where: and(
+      eq(familyLinks.parentProfileId, parentProfileId),
+      eq(familyLinks.childProfileId, childProfileId)
+    ),
+  });
+
+  return !!link;
+}
+
+async function buildChildProgressSummary(
+  db: Database,
+  childProfileId: string,
+  childName: string,
+  sessionsThisWeek: number,
+  sessionsLastWeek: number,
+  totalTimeThisWeekMinutes: number,
+  subjectNames: string[]
+): Promise<DashboardChild['progress']> {
+  const latestSnapshot = await getLatestSnapshot(db, childProfileId);
+  if (!latestSnapshot) {
+    return null;
+  }
+
+  const previousSnapshot = await getLatestSnapshotOnOrBefore(
+    db,
+    childProfileId,
+    isoDate(
+      subtractDays(new Date(`${latestSnapshot.snapshotDate}T00:00:00Z`), 7)
+    )
+  );
+
+  const previousMetrics = previousSnapshot?.metrics ?? null;
+  const currentMetrics = latestSnapshot.metrics;
+
+  return {
+    snapshotDate: latestSnapshot.snapshotDate,
+    topicsMastered: currentMetrics.topicsMastered,
+    vocabularyTotal: currentMetrics.vocabularyTotal,
+    minutesThisWeek: totalTimeThisWeekMinutes,
+    weeklyDeltaTopicsMastered: previousMetrics
+      ? Math.max(
+          0,
+          currentMetrics.topicsMastered - previousMetrics.topicsMastered
+        )
+      : null,
+    weeklyDeltaVocabularyTotal: previousMetrics
+      ? Math.max(
+          0,
+          currentMetrics.vocabularyTotal - previousMetrics.vocabularyTotal
+        )
+      : null,
+    weeklyDeltaTopicsExplored: previousMetrics
+      ? Math.max(
+          0,
+          sumTopicsExplored(currentMetrics) - sumTopicsExplored(previousMetrics)
+        )
+      : null,
+    engagementTrend:
+      sessionsThisWeek === 0
+        ? 'quiet'
+        : sessionsThisWeek > sessionsLastWeek
+        ? 'growing'
+        : 'steady',
+    guidance: buildProgressGuidance(
+      childName,
+      subjectNames,
+      sessionsThisWeek,
+      sessionsLastWeek
+    ),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // DB-aware query functions (Sprint 8 — route wiring)
 // ---------------------------------------------------------------------------
@@ -357,6 +488,7 @@ export async function getChildrenForParent(
       exchangesLastWeek: dashboardInput.exchangesLastWeek,
       trend,
       subjects: progress.subjects.map((s) => ({
+        subjectId: s.subjectId,
         name: s.name,
         retentionStatus: s.retentionStatus,
         rawInput: rawInputMap.get(s.subjectId) ?? null,
@@ -366,6 +498,15 @@ export async function getChildrenForParent(
         guidedMetrics.totalProblemCount
       ),
       retentionTrend,
+      progress: await buildChildProgressSummary(
+        db,
+        childProfileId,
+        profile.displayName,
+        sessionsThisWeek,
+        sessionsLastWeek,
+        dashboardInput.totalTimeThisWeekMinutes,
+        progress.subjects.map((subject) => subject.name)
+      ),
     });
   }
 
@@ -380,14 +521,8 @@ export async function getChildDetail(
   parentProfileId: string,
   childProfileId: string
 ): Promise<DashboardChild | null> {
-  // Verify parent-child relationship
-  const link = await db.query.familyLinks.findFirst({
-    where: and(
-      eq(familyLinks.parentProfileId, parentProfileId),
-      eq(familyLinks.childProfileId, childProfileId)
-    ),
-  });
-  if (!link) return null;
+  if (!(await hasParentAccess(db, parentProfileId, childProfileId)))
+    return null;
 
   const children = await getChildrenForParent(db, parentProfileId);
   return children.find((c) => c.profileId === childProfileId) ?? null;
@@ -402,14 +537,7 @@ export async function getChildSubjectTopics(
   childProfileId: string,
   subjectId: string
 ): Promise<TopicProgress[]> {
-  // Verify parent-child relationship
-  const link = await db.query.familyLinks.findFirst({
-    where: and(
-      eq(familyLinks.parentProfileId, parentProfileId),
-      eq(familyLinks.childProfileId, childProfileId)
-    ),
-  });
-  if (!link) return [];
+  if (!(await hasParentAccess(db, parentProfileId, childProfileId))) return [];
 
   // Get curriculum for subject
   const curriculum = await db.query.curricula.findFirst({
@@ -481,14 +609,7 @@ export async function getChildSessions(
   parentProfileId: string,
   childProfileId: string
 ): Promise<ChildSession[]> {
-  // Verify parent-child relationship
-  const link = await db.query.familyLinks.findFirst({
-    where: and(
-      eq(familyLinks.parentProfileId, parentProfileId),
-      eq(familyLinks.childProfileId, childProfileId)
-    ),
-  });
-  if (!link) return [];
+  if (!(await hasParentAccess(db, parentProfileId, childProfileId))) return [];
 
   const sessions = await db.query.learningSessions.findMany({
     where: eq(learningSessions.profileId, childProfileId),
@@ -528,14 +649,8 @@ export async function getChildSessionTranscript(
   childProfileId: string,
   sessionId: string
 ): Promise<ChildSessionTranscript | null> {
-  // Verify parent-child relationship
-  const link = await db.query.familyLinks.findFirst({
-    where: and(
-      eq(familyLinks.parentProfileId, parentProfileId),
-      eq(familyLinks.childProfileId, childProfileId)
-    ),
-  });
-  if (!link) return null;
+  if (!(await hasParentAccess(db, parentProfileId, childProfileId)))
+    return null;
 
   // Get session scoped to child
   const session = await db.query.learningSessions.findFirst({
@@ -596,4 +711,64 @@ export async function getChildSessionTranscript(
     },
     exchanges,
   };
+}
+
+export async function getChildInventory(
+  db: Database,
+  parentProfileId: string,
+  childProfileId: string
+): Promise<KnowledgeInventory | null> {
+  if (!(await hasParentAccess(db, parentProfileId, childProfileId)))
+    return null;
+  return buildKnowledgeInventory(db, childProfileId);
+}
+
+export async function getChildProgressHistory(
+  db: Database,
+  parentProfileId: string,
+  childProfileId: string,
+  input?: {
+    from?: string;
+    to?: string;
+    granularity?: 'daily' | 'weekly';
+  }
+): Promise<ProgressHistory | null> {
+  if (!(await hasParentAccess(db, parentProfileId, childProfileId)))
+    return null;
+  return buildProgressHistory(db, childProfileId, input);
+}
+
+export async function getChildReports(
+  db: Database,
+  parentProfileId: string,
+  childProfileId: string
+): Promise<MonthlyReportSummary[]> {
+  if (!(await hasParentAccess(db, parentProfileId, childProfileId))) return [];
+  return listMonthlyReportsForParentChild(db, parentProfileId, childProfileId);
+}
+
+export async function getChildReportDetail(
+  db: Database,
+  parentProfileId: string,
+  childProfileId: string,
+  reportId: string
+): Promise<MonthlyReportRecord | null> {
+  if (!(await hasParentAccess(db, parentProfileId, childProfileId)))
+    return null;
+  return getMonthlyReportForParentChild(
+    db,
+    parentProfileId,
+    childProfileId,
+    reportId
+  );
+}
+
+export async function markChildReportViewed(
+  db: Database,
+  parentProfileId: string,
+  childProfileId: string,
+  reportId: string
+): Promise<void> {
+  if (!(await hasParentAccess(db, parentProfileId, childProfileId))) return;
+  await markMonthlyReportViewed(db, parentProfileId, childProfileId, reportId);
 }

@@ -43,6 +43,9 @@ import type {
   HomeworkSessionMetadata,
   SessionMetadata,
   SessionAnalyticsEventInput,
+  LearningStyle,
+  StrengthEntry,
+  StruggleEntry,
 } from '@eduagent/schemas';
 import {
   processExchange,
@@ -65,6 +68,7 @@ import {
   fetchCrossSubjectHighlights,
   buildCrossSubjectContext,
 } from './prior-learning';
+import { buildMemoryBlock, getLearningProfile } from './learner-profile';
 import { retrieveRelevantMemory } from './memory';
 import { getTeachingPreference } from './retention-data';
 import { shouldTriggerEvaluate } from './evaluate';
@@ -820,6 +824,7 @@ async function prepareExchangeContext(
     learningModeRecord,
     crossSubjectHighlights,
     rawInputMemory,
+    learningProfile,
   ] = await Promise.all([
     Promise.resolve(staticContext.subject),
     session.topicId
@@ -881,6 +886,7 @@ async function prepareExchangeContext(
           5
         )
       : Promise.resolve({ context: '', topicIds: [] }),
+    getLearningProfile(db, profileId),
   ]);
 
   const topic = topicRows[0];
@@ -1087,6 +1093,59 @@ async function prepareExchangeContext(
     learningHistoryParts.length > 0
       ? learningHistoryParts.join('\n\n')
       : undefined;
+  // Amendment 2: load ALL well-retained topic titles for this profile so
+  // buildMemoryBlock can filter struggles on any topic the learner has
+  // mastered, not just the current session topic. Uses intervalDays >= 21
+  // as the "strong" threshold per the retention model.
+  let strongTopicTitles: string[] = [];
+  if (learningProfile) {
+    const strongCards = await db
+      .select({ topicId: retentionCards.topicId })
+      .from(retentionCards)
+      .where(
+        and(
+          eq(retentionCards.profileId, profileId),
+          gte(retentionCards.intervalDays, 21)
+        )
+      );
+    const strongTopicIds = strongCards.map((row) => row.topicId);
+    if (strongTopicIds.length > 0) {
+      const strongTopicRows = await db
+        .select({ title: curriculumTopics.title })
+        .from(curriculumTopics)
+        .where(inArray(curriculumTopics.id, strongTopicIds));
+      strongTopicTitles = strongTopicRows.map((row) => row.title);
+    }
+  }
+
+  const learnerMemoryContext = learningProfile
+    ? buildMemoryBlock(
+        {
+          learningStyle:
+            (learningProfile.learningStyle as LearningStyle | null) ?? null,
+          interests: Array.isArray(learningProfile.interests)
+            ? learningProfile.interests
+            : [],
+          strengths: (Array.isArray(learningProfile.strengths)
+            ? learningProfile.strengths
+            : []) as StrengthEntry[],
+          struggles: (Array.isArray(learningProfile.struggles)
+            ? learningProfile.struggles
+            : []) as StruggleEntry[],
+          communicationNotes: Array.isArray(learningProfile.communicationNotes)
+            ? learningProfile.communicationNotes
+            : [],
+          memoryEnabled: learningProfile.memoryEnabled,
+          memoryInjectionEnabled: learningProfile.memoryInjectionEnabled,
+        },
+        subject?.name ?? null,
+        topic?.title ?? null,
+        {
+          status: retentionStatusValue,
+          strongTopics: strongTopicTitles,
+        }
+      ) || undefined
+    : undefined;
 
   // 6. Build ExchangeContext
   // For interleaved sessions: use the topic list, clear single-topic fields
@@ -1104,6 +1163,7 @@ async function prepareExchangeContext(
     priorLearningContext: priorLearning.contextText || undefined,
     crossSubjectContext,
     learningHistoryContext,
+    learnerMemoryContext,
     // CFLF-23: Merge per-message memory with rawInput-based pre-session memory
     embeddingMemoryContext:
       mergeMemoryContexts(memory.context, rawInputMemory.context) || undefined,

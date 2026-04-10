@@ -1,0 +1,117 @@
+import { Pressable, Text, View } from 'react-native';
+import type { SubjectInventory } from '@eduagent/schemas';
+import { ProgressBar } from './ProgressBar';
+
+interface SubjectCardProps {
+  subject: SubjectInventory;
+  onPress?: () => void;
+  testID?: string;
+}
+
+function getTopicHeadline(subject: SubjectInventory): {
+  headline: string;
+  progressValue: number;
+  progressMax: number;
+  footnote: string;
+  hideBar: boolean;
+} {
+  const hasFixedGoal = subject.topics.total != null && subject.topics.total > 0;
+
+  if (!hasFixedGoal) {
+    const exploredCount = Math.max(
+      subject.topics.explored,
+      subject.topics.mastered + subject.topics.inProgress
+    );
+    return {
+      headline: `${exploredCount} topics explored`,
+      progressValue: exploredCount,
+      progressMax: Math.max(1, exploredCount),
+      footnote: `${subject.activeMinutes} active min`,
+      hideBar: true,
+    };
+  }
+
+  if (subject.topics.explored > 0) {
+    return {
+      headline: `${
+        subject.topics.mastered + subject.topics.explored
+      } topics explored`,
+      progressValue: subject.topics.mastered,
+      progressMax: subject.topics.total!,
+      footnote: `${subject.topics.mastered}/${subject.topics.total} planned topics mastered`,
+      hideBar: false,
+    };
+  }
+
+  return {
+    headline: `${subject.topics.mastered}/${subject.topics.total} topics`,
+    progressValue: subject.topics.mastered,
+    progressMax: subject.topics.total!,
+    footnote: `${subject.activeMinutes} active min`,
+    hideBar: false,
+  };
+}
+
+export function SubjectCard({
+  subject,
+  onPress,
+  testID,
+}: SubjectCardProps): React.ReactElement {
+  const topicHeadline = getTopicHeadline(subject);
+  const content = (
+    <View className="bg-surface rounded-card p-4">
+      <View className="flex-row items-start justify-between">
+        <View className="flex-1 me-3">
+          <Text className="text-body font-semibold text-text-primary">
+            {subject.subjectName}
+          </Text>
+          <Text className="text-body-sm text-text-secondary mt-1">
+            {topicHeadline.headline}
+          </Text>
+        </View>
+        {subject.estimatedProficiencyLabel || subject.estimatedProficiency ? (
+          <View className="bg-background rounded-full px-3 py-1">
+            <Text className="text-caption font-semibold text-text-secondary">
+              {subject.estimatedProficiencyLabel ??
+                subject.estimatedProficiency}
+            </Text>
+          </View>
+        ) : null}
+      </View>
+
+      {!topicHeadline.hideBar ? (
+        <View className="mt-3">
+          <ProgressBar
+            value={topicHeadline.progressValue}
+            max={topicHeadline.progressMax}
+            testID={testID ? `${testID}-bar` : undefined}
+          />
+        </View>
+      ) : null}
+
+      <View className="flex-row items-center justify-between mt-3">
+        <Text className="text-caption text-text-secondary">
+          {topicHeadline.footnote}
+        </Text>
+        <Text className="text-caption text-text-secondary">
+          {subject.vocabulary.total > 0
+            ? `${subject.vocabulary.total} words`
+            : `${subject.sessionsCount} sessions`}
+        </Text>
+      </View>
+    </View>
+  );
+
+  if (!onPress) return content;
+
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`Open ${subject.subjectName} progress`}
+      testID={testID}
+    >
+      {content}
+    </Pressable>
+  );
+}

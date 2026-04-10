@@ -24,6 +24,7 @@ import type { NotificationPayload } from './notifications';
 export interface NotificationPrefs {
   reviewReminders: boolean;
   dailyReminders: boolean;
+  weeklyProgressPush: boolean;
   pushEnabled: boolean;
   maxDailyPush: number;
 }
@@ -41,6 +42,7 @@ export interface LearningModeRecord {
 const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
   reviewReminders: false,
   dailyReminders: false,
+  weeklyProgressPush: true,
   pushEnabled: false,
   maxDailyPush: 3,
 };
@@ -68,6 +70,7 @@ export async function getNotificationPrefs(
   return {
     reviewReminders: row.reviewReminders,
     dailyReminders: row.dailyReminders,
+    weeklyProgressPush: row.weeklyProgressPush,
     pushEnabled: row.pushEnabled,
     maxDailyPush: row.maxDailyPush,
   };
@@ -90,6 +93,7 @@ export async function upsertNotificationPrefs(
       .set({
         reviewReminders: input.reviewReminders,
         dailyReminders: input.dailyReminders,
+        weeklyProgressPush: input.weeklyProgressPush ?? true,
         pushEnabled: input.pushEnabled,
         maxDailyPush,
         updatedAt: new Date(),
@@ -100,6 +104,7 @@ export async function upsertNotificationPrefs(
       profileId,
       reviewReminders: input.reviewReminders,
       dailyReminders: input.dailyReminders,
+      weeklyProgressPush: input.weeklyProgressPush ?? true,
       pushEnabled: input.pushEnabled,
       maxDailyPush,
     });
@@ -108,6 +113,7 @@ export async function upsertNotificationPrefs(
   return {
     reviewReminders: input.reviewReminders,
     dailyReminders: input.dailyReminders,
+    weeklyProgressPush: input.weeklyProgressPush ?? true,
     pushEnabled: input.pushEnabled,
     maxDailyPush,
   };

@@ -22,6 +22,7 @@ import {
   bookSuggestions,
   topicSuggestions,
   curriculumBooks,
+  learningProfiles,
 } from './schema/index';
 
 export function createScopedRepository(db: Database, profileId: string) {
@@ -247,6 +248,18 @@ export function createScopedRepository(db: Database, profileId: string) {
       async findFirst(extraWhere?: SQL) {
         return db.query.sessionEmbeddings.findFirst({
           where: scopedWhere(sessionEmbeddings, extraWhere),
+        });
+      },
+    },
+    learningProfiles: {
+      async findMany(extraWhere?: SQL) {
+        return db.query.learningProfiles.findMany({
+          where: scopedWhere(learningProfiles, extraWhere),
+        });
+      },
+      async findFirst(extraWhere?: SQL) {
+        return db.query.learningProfiles.findFirst({
+          where: scopedWhere(learningProfiles, extraWhere),
         });
       },
     },

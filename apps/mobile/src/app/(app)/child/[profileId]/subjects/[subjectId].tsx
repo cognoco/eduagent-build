@@ -6,6 +6,7 @@ import {
   type RetentionStatus,
 } from '../../../../../components/progress';
 import { useChildSubjectTopics } from '../../../../../hooks/use-dashboard';
+import { useChildInventory } from '../../../../../hooks/use-progress';
 
 const COMPLETION_LABELS: Record<string, string> = {
   not_started: 'Not started',
@@ -28,14 +29,25 @@ function TopicSkeleton(): React.ReactNode {
 export default function SubjectTopicsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { profileId, subjectId } = useLocalSearchParams<{
+  const {
+    profileId,
+    subjectId,
+    subjectName: routeSubjectName,
+  } = useLocalSearchParams<{
     profileId: string;
     subjectId: string;
+    subjectName?: string;
   }>();
   const { data: topics, isLoading } = useChildSubjectTopics(
     profileId,
     subjectId
   );
+  const { data: inventory } = useChildInventory(profileId);
+  const subjectName =
+    routeSubjectName ??
+    inventory?.subjects.find((subject) => subject.subjectId === subjectId)
+      ?.subjectName ??
+    'Subject';
 
   if (!profileId || !subjectId) {
     return (
@@ -62,7 +74,7 @@ export default function SubjectTopicsScreen() {
           </Text>
         </Pressable>
         <Text className="text-h2 font-bold text-text-primary">
-          {subjectId ?? 'Subject'}
+          {subjectName}
         </Text>
       </View>
 

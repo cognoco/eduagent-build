@@ -1,9 +1,29 @@
-import { useQuery, type UseQueryResult } from '@tanstack/react-query';
-import type { SubjectProgress, TopicProgress } from '@eduagent/schemas';
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type UseMutationResult,
+  type UseQueryResult,
+} from '@tanstack/react-query';
+import type {
+  KnowledgeInventory,
+  MilestoneRecord,
+  MonthlyReportRecord,
+  MonthlyReportSummary,
+  ProgressHistory,
+  SubjectProgress,
+  TopicProgress,
+} from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
+
+interface ProgressHistoryQuery {
+  from?: string;
+  to?: string;
+  granularity?: 'daily' | 'weekly';
+}
 
 export function useSubjectProgress(
   subjectId: string
@@ -104,5 +124,277 @@ export function useTopicProgress(
       }
     },
     enabled: !!activeProfile && !!subjectId && !!topicId,
+  });
+}
+
+export function useProgressInventory(): UseQueryResult<KnowledgeInventory> {
+  const client = useApiClient();
+  const { activeProfile } = useProfile();
+
+  return useQuery({
+    queryKey: ['progress', 'inventory', activeProfile?.id],
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const res = await client.progress.inventory.$get(
+          {},
+          { init: { signal } }
+        );
+        await assertOk(res);
+        return (await res.json()) as KnowledgeInventory;
+      } finally {
+        cleanup();
+      }
+    },
+    enabled: !!activeProfile,
+  });
+}
+
+export function useProgressHistory(
+  query?: ProgressHistoryQuery
+): UseQueryResult<ProgressHistory> {
+  const client = useApiClient();
+  const { activeProfile } = useProfile();
+
+  return useQuery({
+    queryKey: ['progress', 'history', activeProfile?.id, query],
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const res = await client.progress.history.$get(
+          {
+            query: {
+              ...(query?.from ? { from: query.from } : {}),
+              ...(query?.to ? { to: query.to } : {}),
+              ...(query?.granularity ? { granularity: query.granularity } : {}),
+            },
+          },
+          { init: { signal } }
+        );
+        await assertOk(res);
+        return (await res.json()) as ProgressHistory;
+      } finally {
+        cleanup();
+      }
+    },
+    enabled: !!activeProfile,
+  });
+}
+
+export function useProgressMilestones(
+  limit = 5
+): UseQueryResult<MilestoneRecord[]> {
+  const client = useApiClient();
+  const { activeProfile } = useProfile();
+
+  return useQuery({
+    queryKey: ['progress', 'milestones', activeProfile?.id, limit],
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const res = await client.progress.milestones.$get(
+          { query: { limit: String(limit) } },
+          { init: { signal } }
+        );
+        await assertOk(res);
+        const data = (await res.json()) as { milestones: MilestoneRecord[] };
+        return data.milestones;
+      } finally {
+        cleanup();
+      }
+    },
+    enabled: !!activeProfile,
+  });
+}
+
+export function useRefreshProgressSnapshot(): UseMutationResult<
+  unknown,
+  Error,
+  void
+> {
+  const client = useApiClient();
+  const queryClient = useQueryClient();
+  const { activeProfile } = useProfile();
+
+  return useMutation({
+    mutationFn: async () => {
+      const res = await client.progress.refresh.$post();
+      await assertOk(res);
+      return await res.json();
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ['progress', 'inventory', activeProfile?.id],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['progress', 'history', activeProfile?.id],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['progress', 'milestones', activeProfile?.id],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['dashboard'],
+      });
+    },
+  });
+}
+
+export function useChildInventory(
+  childProfileId: string | undefined
+): UseQueryResult<KnowledgeInventory | null> {
+  const client = useApiClient();
+  const { activeProfile } = useProfile();
+
+  return useQuery({
+    queryKey: ['dashboard', 'child', childProfileId, 'inventory'],
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const res = await client.dashboard.children[
+          ':profileId'
+        ].inventory.$get(
+          { param: { profileId: childProfileId! } },
+          { init: { signal } }
+        );
+        await assertOk(res);
+        const data = (await res.json()) as {
+          inventory: KnowledgeInventory | null;
+        };
+        return data.inventory;
+      } finally {
+        cleanup();
+      }
+    },
+    enabled: !!activeProfile && !!childProfileId,
+  });
+}
+
+export function useChildProgressHistory(
+  childProfileId: string | undefined,
+  query?: ProgressHistoryQuery
+): UseQueryResult<ProgressHistory | null> {
+  const client = useApiClient();
+  const { activeProfile } = useProfile();
+
+  return useQuery({
+    queryKey: ['dashboard', 'child', childProfileId, 'history', query],
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const res = await client.dashboard.children[':profileId'][
+          'progress-history'
+        ].$get(
+          {
+            param: { profileId: childProfileId! },
+            query: {
+              ...(query?.from ? { from: query.from } : {}),
+              ...(query?.to ? { to: query.to } : {}),
+              ...(query?.granularity ? { granularity: query.granularity } : {}),
+            },
+          },
+          { init: { signal } }
+        );
+        await assertOk(res);
+        const data = (await res.json()) as { history: ProgressHistory | null };
+        return data.history;
+      } finally {
+        cleanup();
+      }
+    },
+    enabled: !!activeProfile && !!childProfileId,
+  });
+}
+
+export function useChildReports(
+  childProfileId: string | undefined
+): UseQueryResult<MonthlyReportSummary[]> {
+  const client = useApiClient();
+  const { activeProfile } = useProfile();
+
+  return useQuery({
+    queryKey: ['dashboard', 'child', childProfileId, 'reports'],
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const res = await client.dashboard.children[':profileId'].reports.$get(
+          { param: { profileId: childProfileId! } },
+          { init: { signal } }
+        );
+        await assertOk(res);
+        const data = (await res.json()) as { reports: MonthlyReportSummary[] };
+        return data.reports;
+      } finally {
+        cleanup();
+      }
+    },
+    enabled: !!activeProfile && !!childProfileId,
+  });
+}
+
+export function useChildReportDetail(
+  childProfileId: string | undefined,
+  reportId: string | undefined
+): UseQueryResult<MonthlyReportRecord | null> {
+  const client = useApiClient();
+  const { activeProfile } = useProfile();
+
+  return useQuery({
+    queryKey: ['dashboard', 'child', childProfileId, 'report', reportId],
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const res = await client.dashboard.children[':profileId'].reports[
+          ':reportId'
+        ].$get(
+          {
+            param: { profileId: childProfileId!, reportId: reportId! },
+          },
+          { init: { signal } }
+        );
+        await assertOk(res);
+        const data = (await res.json()) as {
+          report: MonthlyReportRecord | null;
+        };
+        return data.report;
+      } finally {
+        cleanup();
+      }
+    },
+    enabled: !!activeProfile && !!childProfileId && !!reportId,
+  });
+}
+
+export function useMarkChildReportViewed(): UseMutationResult<
+  { viewed: boolean },
+  Error,
+  { childProfileId: string; reportId: string }
+> {
+  const client = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ childProfileId, reportId }) => {
+      const res = await client.dashboard.children[':profileId'].reports[
+        ':reportId'
+      ].view.$post({
+        param: { profileId: childProfileId, reportId },
+      });
+      await assertOk(res);
+      return (await res.json()) as { viewed: boolean };
+    },
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({
+        queryKey: ['dashboard', 'child', variables.childProfileId, 'reports'],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: [
+          'dashboard',
+          'child',
+          variables.childProfileId,
+          'report',
+          variables.reportId,
+        ],
+      });
+    },
   });
 }
