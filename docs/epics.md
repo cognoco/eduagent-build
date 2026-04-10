@@ -6078,3 +6078,122 @@ Phase A all parallelizable. Phase B: 14.10 and 14.9 can be parallel, then 14.11,
 ### Epic 14 FR Coverage
 
 12 FRs (FR218-FR229) mapped across 12 stories in 3 phases.
+
+---
+
+## Post-MVP Epic Candidates: Web Platform Expansion
+
+_Added 2026-04-10 as a future-decision record. Not scheduled. Not part of MVP. See `docs/architecture.md` → "Post-MVP Platform Decision: Web Port Analysis" for the full cost and path-dependency analysis._
+
+**Status:** Deferred. Only activate when there is concrete product demand (parent feedback, sales requirement, or marketing acquisition need).
+
+### Epic WEB-A: Parent Control Center (web) — CANDIDATE
+
+**Goal:** Give paying parents a big-screen view of their child's learning without porting the voice-first kid experience. Mobile remains the only surface for the learning session flow.
+
+**Scope signal:** ~10-15% of mobile codebase. ~15-20 web screens, all parent-facing. Reuses existing API routes.
+
+**Preconditions before activation:**
+
+- Product decision that web is a priority (triggered by parent feedback, sales, or marketing need)
+- Stripe web checkout activation — payment flow exists as dormant code post-Epic 9, deliberately left scaffolded
+- Clerk web account configured in Doppler per environment (dev / staging / prod)
+
+**Story candidates (not yet sized):**
+
+- **WEB-A.1:** Enable Expo web build — `web` npm script, Metro web output, CI job
+- **WEB-A.2:** Clerk auth swap — `@clerk/clerk-expo` → `@clerk/clerk-react`, shared session cookie strategy
+- **WEB-A.3:** Token storage swap — SecureStore → httpOnly cookie or scoped `localStorage` with cross-tab sync
+- **WEB-A.4:** Responsive shell + `(parent)` route group + base layout + navigation
+- **WEB-A.5:** Parent dashboard web screen (reuses `apps/api/src/routes/dashboard.ts`)
+- **WEB-A.6:** Learner profile management web screen (reuses `apps/api/src/routes/learner-profile.ts`)
+- **WEB-A.7:** Progress / snapshot web screen (reuses `apps/api/src/routes/snapshot-progress.ts`)
+- **WEB-A.8:** Monthly report web screen (reuses `apps/api/src/services/monthly-report.ts`)
+- **WEB-A.9:** Billing web screen with Stripe Checkout activation + entitlement sync
+- **WEB-A.10:** Account / settings / GDPR export + delete on web
+- **WEB-A.11:** Sentry web SDK + analytics wiring
+- **WEB-A.12:** E2E smoke suite for web shell (Playwright or similar)
+
+**Explicit exclusions (belong to WEB-B or never):**
+
+- No session/learning flow on web
+- No voice (STT or TTS) on web
+- No homework photo capture on web
+- No push notifications on web
+- No offline mode on web
+
+**Forward-compatibility requirement:**
+
+All WEB-A work MUST follow the "Forward-Compatible Choices" table in `docs/architecture.md` → Post-MVP Platform Decision. In particular: route groups reserve `(learn)`, layouts are responsive from day one, Clerk session uses `family_links` role checks (post-Epic-12) rather than parent-only assumptions, and design stays in the existing teal/lavender token system. Skipping forward-compatibility buys nothing and silently blocks WEB-B.
+
+---
+
+### Epic WEB-B: Text-Mode Learning Flow (web) — CANDIDATE
+
+**Goal:** Extend the web app with a typed (not voice) learning session for teens and adults who want to learn at a desk. Only activate if concrete demand exists; otherwise Option A alone is the final answer.
+
+**Scope signal:** ~10-15% additional on top of WEB-A. ~20-25% total from zero if WEB-A is not yet built.
+
+**Preconditions before activation:**
+
+- WEB-A shipped and validated with real parent usage data
+- Product decision that divergent voice-first mobile + type-first web is acceptable
+- Concrete demand signal (teens requesting web, demo pressure, market research finding)
+- Acceptance of ongoing two-surface UX maintenance burden
+
+**Story candidates (not yet sized):**
+
+- **WEB-B.1:** Text-input session UI — genuinely new, no mobile equivalent because mobile is voice-first
+- **WEB-B.2:** TTS via `window.speechSynthesis` (swap `expo-speech` for web)
+- **WEB-B.3:** Session screens port — `/(learn)/session`, `/(learn)/chat`
+- **WEB-B.4:** Library screens port — `/(learn)/library` with shelf/book/topic views
+- **WEB-B.5:** Homework web flow — `<input type="file" capture>` + server OCR fallback (already exists)
+- **WEB-B.6:** Animation audit — 18 reanimated components (CelebrationAnimation, PenWritingAnimation, BookPageFlipAnimation, AnimatedSplash, etc.)
+- **WEB-B.7:** File handling swap — `expo-file-system` + `expo-image-manipulator` → Canvas / Blob APIs
+- **WEB-B.8:** Kid-role Clerk flow on web (builds on WEB-A.2 `family_links` foundation)
+- **WEB-B.9:** Responsive typography/layout pass for teens on phone browsers
+
+**Explicit exclusions:**
+
+- STT on web (Safari Web Speech API inadequate as of 2026-04; no viable kid-safe fallback)
+- Push notifications on web
+- Offline-first support on web
+
+**Known risk:**
+
+Maintaining two divergent session UIs (voice-first mobile, type-first web) means every new session feature must be designed for both input modes. This is why WEB-B is deferred until demand is concrete and measurable.
+
+---
+
+### WEB-A / WEB-B Dependencies & Sequencing
+
+```
+WEB-A (Parent Control Center)
+  ├─ WEB-A.1  (Expo web build)       ─── no deps
+  ├─ WEB-A.2  (Clerk swap)           ─── depends on A.1
+  ├─ WEB-A.3  (Token storage)        ─── depends on A.2
+  ├─ WEB-A.4  (Shell + routing)      ─── depends on A.1
+  ├─ WEB-A.5-A.8 (dashboard screens) ─── depend on A.2, A.3, A.4 (parallelizable)
+  ├─ WEB-A.9  (Stripe billing)       ─── depends on A.2
+  ├─ WEB-A.10 (Account/GDPR)         ─── depends on A.2
+  ├─ WEB-A.11 (Sentry/analytics)     ─── depends on A.1
+  └─ WEB-A.12 (E2E)                  ─── depends on A.5-A.10
+
+WEB-B (Text-Mode Learning)
+  └─ ALL stories depend on WEB-A shipped
+```
+
+- WEB-A has **no dependency on WEB-B**. Can ship alone and stop there.
+- WEB-B **depends on** WEB-A (foundation, auth, routing, payment infrastructure).
+- Both epics depend on Stripe web checkout activation (dormant in Epic 9).
+- Neither epic affects mobile roadmap — both are parallel tracks, so mobile feature work continues unimpeded.
+
+### Explicit Non-Epics
+
+Web-adjacent ideas explicitly considered and deferred with no epic placeholder:
+
+- **PWA / installable web app:** out of scope, no demand signal
+- **Marketing landing page:** belongs to a separate surface (Next.js or static site), not a port of this app
+- **School / district admin shell:** different product shape, needs its own discovery cycle
+- **Web push notifications:** deferred indefinitely
+- **Concept map visualization on web:** belongs to v1.1 concept map epic, not the web port
