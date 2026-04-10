@@ -56,8 +56,7 @@ const queryClient = new QueryClient({
     onError: (error, query) => {
       // Global fallback: report query failures to Sentry so silent blank
       // screens become observable even when a screen forgets to handle
-      // isError. This does NOT replace per-screen error UI — use QueryGuard
-      // for that — but ensures no failure goes unnoticed.
+      // isError, but ensures no failure goes unnoticed.
       Sentry.captureException(error, {
         tags: { queryKey: JSON.stringify(query.queryKey) },
       });
