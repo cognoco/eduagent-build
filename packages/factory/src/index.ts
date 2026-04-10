@@ -1,4 +1,9 @@
 /**
+ * @deprecated This package has zero consumers as of 2026-04-10.
+ * Wire to test fixtures or remove after Epic 17.
+ */
+
+/**
  * Test Data Factory Package
  *
  * Provides builder functions for creating typed test data.

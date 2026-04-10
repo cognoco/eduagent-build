@@ -6,7 +6,6 @@ const envSchema = z.object({
     .default('development'),
   DATABASE_URL: z.string().min(1),
   CLERK_SECRET_KEY: z.string().min(1).optional(),
-  CLERK_PUBLISHABLE_KEY: z.string().min(1).optional(),
   CLERK_JWKS_URL: z.string().url().optional(),
   CLERK_AUDIENCE: z.string().min(1).optional(),
   GEMINI_API_KEY: z.string().min(1).optional(),
