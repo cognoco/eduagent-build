@@ -30,6 +30,11 @@ import {
   progressMetricsSchema,
 } from '@eduagent/schemas';
 import { getCurrentLanguageProgress } from './language-curriculum';
+// [EP15-I7] Static import of milestone-detection. No circular dependency
+// (milestone-detection does not import snapshot-aggregation), so the prior
+// dynamic `await import()` added per-call module-resolution overhead on a
+// hot path with no justification. Static import resolves once at cold start.
+import { detectMilestones, storeMilestones } from './milestone-detection';
 
 type SubjectRow = typeof subjects.$inferSelect;
 type TopicRow = typeof curriculumTopics.$inferSelect;
@@ -576,39 +581,49 @@ export async function buildKnowledgeInventory(
   });
 }
 
-function snapshotRowToMetrics(row: typeof progressSnapshots.$inferSelect): {
+// [EP15-C4 AR-13] `updatedAt` is exposed so callers (notably
+// `refreshProgressSnapshot`) can debounce redundant recomputes when a
+// session completion event arrives after the snapshot was already
+// refreshed by another concurrent step. See refreshProgressSnapshot below.
+export interface LatestSnapshot {
   snapshotDate: string;
   metrics: ProgressMetrics;
-} {
+  updatedAt: Date;
+}
+
+function snapshotRowToLatestSnapshot(
+  row: typeof progressSnapshots.$inferSelect
+): LatestSnapshot {
   return {
     snapshotDate: row.snapshotDate,
     metrics: parseMetrics(row.metrics),
+    updatedAt: row.updatedAt,
   };
 }
 
 export async function getLatestSnapshot(
   db: Database,
   profileId: string
-): Promise<{ snapshotDate: string; metrics: ProgressMetrics } | null> {
+): Promise<LatestSnapshot | null> {
   const row = await db.query.progressSnapshots.findFirst({
     where: eq(progressSnapshots.profileId, profileId),
     orderBy: desc(progressSnapshots.snapshotDate),
   });
 
-  return row ? snapshotRowToMetrics(row) : null;
+  return row ? snapshotRowToLatestSnapshot(row) : null;
 }
 
 export async function getLatestSnapshotOnOrBefore(
   db: Database,
   profileId: string,
   snapshotDate: string
-): Promise<{ snapshotDate: string; metrics: ProgressMetrics } | null> {
+): Promise<LatestSnapshot | null> {
   const rows = await db.query.progressSnapshots.findMany({
     where: eq(progressSnapshots.profileId, profileId),
     orderBy: desc(progressSnapshots.snapshotDate),
   });
   const match = rows.find((row) => row.snapshotDate <= snapshotDate);
-  return match ? snapshotRowToMetrics(match) : null;
+  return match ? snapshotRowToLatestSnapshot(match) : null;
 }
 
 export async function getSnapshotsInRange(
@@ -622,9 +637,14 @@ export async function getSnapshotsInRange(
     orderBy: progressSnapshots.snapshotDate,
   });
 
+  // Range consumers (history chart) don't need `updatedAt`; strip to the
+  // narrower shape so the public API stays intentional.
   return rows
     .filter((row) => row.snapshotDate >= from && row.snapshotDate <= to)
-    .map(snapshotRowToMetrics);
+    .map((row) => ({
+      snapshotDate: row.snapshotDate,
+      metrics: parseMetrics(row.metrics),
+    }));
 }
 
 function metricsToHistoryPoint(
@@ -758,11 +778,46 @@ async function previousSnapshotForToday(
   return parseMetrics(row.metrics);
 }
 
+export interface RefreshProgressSnapshotOptions {
+  /**
+   * Timestamp of the session completion event that triggered this refresh.
+   * When provided, enables the AR-13 debounce: if the latest snapshot for
+   * today was already updated at-or-after `sessionEndedAt`, another concurrent
+   * session-completed handler already recomputed it and this call returns the
+   * cached result without re-reading history or re-running milestone
+   * detection. Omit for cron-driven calls (daily-snapshot) where a full
+   * refresh is always desired.
+   */
+  sessionEndedAt?: Date;
+}
+
 export async function refreshProgressSnapshot(
   db: Database,
-  profileId: string
+  profileId: string,
+  options: RefreshProgressSnapshotOptions = {}
 ): Promise<RefreshSnapshotResult> {
   const snapshotDate = isoDate(new Date());
+
+  // [EP15-C4 AR-13] Debounce redundant session-completion refreshes.
+  // Two sessions finishing within the same minute would otherwise each
+  // recompute the full progress state, ship a duplicate snapshot upsert,
+  // and re-run milestone detection. When the caller tells us when the
+  // session ended, skip if the on-disk snapshot is already newer than that.
+  if (options.sessionEndedAt) {
+    const latest = await getLatestSnapshot(db, profileId);
+    if (
+      latest &&
+      latest.snapshotDate === snapshotDate &&
+      latest.updatedAt >= options.sessionEndedAt
+    ) {
+      return {
+        snapshotDate: latest.snapshotDate,
+        metrics: latest.metrics,
+        milestones: [],
+      };
+    }
+  }
+
   const previousMetrics = await previousSnapshotForToday(
     db,
     profileId,
@@ -772,9 +827,7 @@ export async function refreshProgressSnapshot(
 
   await upsertProgressSnapshot(db, profileId, snapshotDate, metrics);
 
-  const { detectMilestones, storeMilestones } = await import(
-    './milestone-detection'
-  );
+  // [EP15-I7] Was `await import('./milestone-detection')` — now static.
   const insertedMilestones = await storeMilestones(
     db,
     profileId,

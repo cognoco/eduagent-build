@@ -422,13 +422,25 @@ export const sessionCompleted = inngest.createFunction(
     // Step 2: Write coaching card / session summary
     // Runs before analyze-learner-profile so the next session's home screen
     // opens with a fresh coaching card even if LLM profile analysis is slow.
+    // NOTE [EP15-C3]: This deviates from Epic 15 plan F-1, which mandates
+    // memory (Step 3) → snapshot refresh → coaching cards. Current order
+    // prioritizes user-facing coaching-card latency over plan compliance.
+    // Pending product decision on whether to reconcile plan or code.
     outcomes.push(
       await step.run('write-coaching-card', async () =>
         runIsolated('write-coaching-card', profileId, async () => {
           const db = getStepDatabase();
-          if ((db.query as Record<string, unknown>)?.['progressSnapshots']) {
-            await refreshProgressSnapshot(db, profileId);
-          }
+          // [EP15-I6] Schema guard removed — migration 0020 makes the table
+          // unconditionally present in all environments. Tests must seed the
+          // real schema rather than relying on `db.query` shape checks.
+          //
+          // [EP15-C4 AR-13] Pass sessionEndedAt so refreshProgressSnapshot
+          // can debounce: if two completions for the same profile land in
+          // the same minute, the second one sees the first's snapshot was
+          // already updated after the session ended and returns it cached.
+          await refreshProgressSnapshot(db, profileId, {
+            sessionEndedAt: timestamp ? new Date(timestamp) : new Date(),
+          });
           await createPendingSessionSummary(
             db,
             sessionId,
@@ -445,8 +457,10 @@ export const sessionCompleted = inngest.createFunction(
     );
 
     // Step 3: Analyze learner transcript and update learning profile (Epic 16).
-    // Runs AFTER write-coaching-card per the plan — profile analysis is
-    // background enrichment and should not delay user-facing coaching card.
+    // NOTE [EP15-M3]: runs AFTER write-coaching-card by deliberate deviation
+    // from Epic 15 plan F-1 (not "per the plan" as a prior comment claimed).
+    // Rationale: profile analysis is background enrichment and should not
+    // delay user-facing coaching card. See EP15-C3 for pending reconciliation.
     outcomes.push(
       await step.run('analyze-learner-profile', async () =>
         runIsolated('analyze-learner-profile', profileId, async () => {

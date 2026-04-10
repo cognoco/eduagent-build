@@ -82,12 +82,19 @@ export function generateMonthlyReportData(
   return monthlyReportDataSchema.parse({
     childName,
     month: monthLabel,
+    // [EP15-I2 AR-6] `thisMonth` previously stored per-month *deltas* while
+    // `lastMonth` stored *cumulative totals* under the same schema key —
+    // a split-personality field that made apples-to-apples comparison
+    // impossible without reading the generator source. Both now store
+    // cumulative end-of-month values; the headline stat (below) is where
+    // deltas live, which is semantically correct because "words learned
+    // this month" IS a delta.
     thisMonth: {
       totalSessions: sessionsDelta,
       totalActiveMinutes: activeMinutesDelta,
       topicsMastered: topicsMasteredDelta,
       topicsExplored: topicsExploredDelta,
-      vocabularyLearned: vocabularyDelta,
+      vocabularyTotal: thisMonth.vocabularyTotal,
       streakBest: thisMonth.longestStreak,
     },
     lastMonth: lastMonth
@@ -96,7 +103,7 @@ export function generateMonthlyReportData(
           totalActiveMinutes: lastMonth.totalActiveMinutes,
           topicsMastered: lastMonth.topicsMastered,
           topicsExplored: subjectExploredTotal(lastMonth),
-          vocabularyLearned: lastMonth.vocabularyTotal,
+          vocabularyTotal: lastMonth.vocabularyTotal,
           streakBest: lastMonth.longestStreak,
         }
       : null,
@@ -125,10 +132,12 @@ export function generateMonthlyReportData(
           subject.topicsExplored ?? 0,
           previousSubject?.topicsExplored
         ),
-        vocabularyLearned: safeDelta(
-          subject.vocabularyTotal,
-          previousSubject?.vocabularyTotal
-        ),
+        // [EP15-I2] Cumulative end-of-month total for this subject,
+        // matching the new `vocabularyTotal` contract. The per-month
+        // vocabulary change can still be computed at render time as
+        // `subject.vocabularyTotal - previousSubject?.vocabularyTotal`
+        // if a delta view is needed.
+        vocabularyTotal: subject.vocabularyTotal,
         activeMinutes: activeDeltaForSubject,
         trend:
           activeDeltaForSubject > 0

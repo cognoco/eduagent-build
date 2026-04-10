@@ -19,7 +19,10 @@ import {
   dailySnapshotCron,
   dailySnapshotRefresh,
 } from './functions/daily-snapshot';
-import { weeklyProgressPush } from './functions/weekly-progress-push';
+import {
+  weeklyProgressPushCron,
+  weeklyProgressPushGenerate,
+} from './functions/weekly-progress-push';
 import {
   monthlyReportCron,
   monthlyReportGenerate,
@@ -45,7 +48,8 @@ export {
   freeformFilingRetry,
   dailySnapshotCron,
   dailySnapshotRefresh,
-  weeklyProgressPush,
+  weeklyProgressPushCron,
+  weeklyProgressPushGenerate,
   monthlyReportCron,
   monthlyReportGenerate,
 };
@@ -70,7 +74,9 @@ export const functions = [
   freeformFilingRetry,
   dailySnapshotCron,
   dailySnapshotRefresh,
-  weeklyProgressPush,
+  // [EP15-I1 AR-9] Weekly push split into cron + per-parent handler.
+  weeklyProgressPushCron,
+  weeklyProgressPushGenerate,
   monthlyReportCron,
   monthlyReportGenerate,
 ];

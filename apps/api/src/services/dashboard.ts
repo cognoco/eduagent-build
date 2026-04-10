@@ -36,6 +36,31 @@ import {
   listMonthlyReportsForParentChild,
   markMonthlyReportViewed,
 } from './monthly-report';
+import { ForbiddenError } from '../errors';
+
+/**
+ * [EP15-I5] Central enforcement of parent→child access checks.
+ *
+ * Prior implementation scattered `if (!(await hasParentAccess(...))) return null`
+ * across seven functions, and the routes blindly serialized the null result
+ * as `{ inventory: null }` / `{ reports: [] }` with HTTP 200. That masked
+ * authorization denials as empty states — an attacker iterating child IDs
+ * could not tell a forbidden child apart from a genuinely empty one, and
+ * legitimate users saw "no reports yet" instead of "you lost access to this
+ * child". Both outcomes are wrong.
+ *
+ * `assertParentAccess` throws `ForbiddenError` on failure, and the global
+ * `app.onError` handler in `index.ts` converts it to HTTP 403 once.
+ */
+async function assertParentAccess(
+  db: Database,
+  parentProfileId: string,
+  childProfileId: string
+): Promise<void> {
+  if (!(await hasParentAccess(db, parentProfileId, childProfileId))) {
+    throw new ForbiddenError('You do not have access to this child profile.');
+  }
+}
 
 export interface DashboardInput {
   childProfileId: string;
@@ -397,6 +422,18 @@ export async function getChildrenForParent(
 
   // Batch guided metrics and progress in parallel per child (still parallelized)
   const validLinks = links.filter((l) => profilesById.has(l.childProfileId));
+  // [EP15-I9] `buildChildProgressSummary` makes two sequential snapshot
+  // reads per child. Previously it was called inside the per-child for-loop
+  // below, which serialized N × 2 = 2N DB roundtrips (a parent with 4
+  // children did 8 sequential round trips for progress summaries alone,
+  // ignoring the parallel work above). Hoisted here into Promise.all so
+  // all children's progress summaries fan out in parallel, matching the
+  // batching pattern used for `getOverallProgress` and `countGuidedMetrics`.
+  //
+  // Note: the per-child summary needs `sessionsThisWeek`/`sessionsLastWeek`/
+  // `totalTimeThisWeekMinutes`/`subjectNames`, which are computed inside
+  // the for-loop below. We therefore do the parallel fan-out AFTER we've
+  // precomputed those inputs per child in a first pass.
   const [progressResults, guidedMetricsResults] = await Promise.all([
     Promise.all(
       validLinks.map((l) => getOverallProgress(db, l.childProfileId))
@@ -408,8 +445,23 @@ export async function getChildrenForParent(
     ),
   ]);
 
-  const children: DashboardChild[] = [];
+  // Pre-compute per-child display inputs (first pass) so that the
+  // progress-summary fan-out can run in parallel without needing the
+  // `children.push` loop to complete sequentially.
+  interface PreparedChild {
+    childProfileId: string;
+    displayName: string;
+    sessionsThisWeek: number;
+    sessionsLastWeek: number;
+    totalTimeThisWeekMinutes: number;
+    subjectNames: string[];
+    dashboardInput: DashboardInput;
+    progress: (typeof progressResults)[number];
+    guidedMetrics: (typeof guidedMetricsResults)[number];
+    rawInputMap: Map<string, string | null>;
+  }
 
+  const prepared: PreparedChild[] = [];
   for (let i = 0; i < validLinks.length; i++) {
     const childProfileId = validLinks[i]!.childProfileId;
     const profile = profilesById.get(childProfileId)!;
@@ -472,43 +524,70 @@ export async function getChildrenForParent(
       totalProblemCount: guidedMetrics.totalProblemCount,
     };
 
-    const summary = generateChildSummary(dashboardInput);
-    const trend = calculateTrend(sessionsThisWeek, sessionsLastWeek);
-    const retentionTrend = calculateRetentionTrend(subjectRetentionData);
-
-    children.push({
-      profileId: childProfileId,
+    prepared.push({
+      childProfileId,
       displayName: profile.displayName,
-      summary,
       sessionsThisWeek,
       sessionsLastWeek,
-      totalTimeThisWeek: dashboardInput.totalTimeThisWeekMinutes,
-      totalTimeLastWeek: dashboardInput.totalTimeLastWeekMinutes,
-      exchangesThisWeek: dashboardInput.exchangesThisWeek,
-      exchangesLastWeek: dashboardInput.exchangesLastWeek,
+      totalTimeThisWeekMinutes: dashboardInput.totalTimeThisWeekMinutes,
+      subjectNames: progress.subjects.map((subject) => subject.name),
+      dashboardInput,
+      progress,
+      guidedMetrics,
+      rawInputMap,
+    });
+  }
+
+  // [EP15-I9] Parallel fan-out of progress summaries. Each call is a pair
+  // of snapshot reads; fanning out turns N × 2 sequential roundtrips into
+  // ~2 roundtrips (bounded by the slowest child). Bounded by `validLinks`
+  // (typically ≤ 4 children per parent), so no explicit batching needed.
+  const progressSummaries = await Promise.all(
+    prepared.map((p) =>
+      buildChildProgressSummary(
+        db,
+        p.childProfileId,
+        p.displayName,
+        p.sessionsThisWeek,
+        p.sessionsLastWeek,
+        p.totalTimeThisWeekMinutes,
+        p.subjectNames
+      )
+    )
+  );
+
+  const children: DashboardChild[] = prepared.map((p, i) => {
+    const summary = generateChildSummary(p.dashboardInput);
+    const trend = calculateTrend(p.sessionsThisWeek, p.sessionsLastWeek);
+    const retentionTrend = calculateRetentionTrend(
+      p.dashboardInput.subjectRetentionData
+    );
+
+    return {
+      profileId: p.childProfileId,
+      displayName: p.displayName,
+      summary,
+      sessionsThisWeek: p.sessionsThisWeek,
+      sessionsLastWeek: p.sessionsLastWeek,
+      totalTimeThisWeek: p.dashboardInput.totalTimeThisWeekMinutes,
+      totalTimeLastWeek: p.dashboardInput.totalTimeLastWeekMinutes,
+      exchangesThisWeek: p.dashboardInput.exchangesThisWeek,
+      exchangesLastWeek: p.dashboardInput.exchangesLastWeek,
       trend,
-      subjects: progress.subjects.map((s) => ({
+      subjects: p.progress.subjects.map((s) => ({
         subjectId: s.subjectId,
         name: s.name,
         retentionStatus: s.retentionStatus,
-        rawInput: rawInputMap.get(s.subjectId) ?? null,
+        rawInput: p.rawInputMap.get(s.subjectId) ?? null,
       })),
       guidedVsImmediateRatio: calculateGuidedRatio(
-        guidedMetrics.guidedCount,
-        guidedMetrics.totalProblemCount
+        p.guidedMetrics.guidedCount,
+        p.guidedMetrics.totalProblemCount
       ),
       retentionTrend,
-      progress: await buildChildProgressSummary(
-        db,
-        childProfileId,
-        profile.displayName,
-        sessionsThisWeek,
-        sessionsLastWeek,
-        dashboardInput.totalTimeThisWeekMinutes,
-        progress.subjects.map((subject) => subject.name)
-      ),
-    });
-  }
+      progress: progressSummaries[i]!,
+    };
+  });
 
   return children;
 }
@@ -521,8 +600,10 @@ export async function getChildDetail(
   parentProfileId: string,
   childProfileId: string
 ): Promise<DashboardChild | null> {
-  if (!(await hasParentAccess(db, parentProfileId, childProfileId)))
-    return null;
+  // [EP15-I5] Throws ForbiddenError (→ 403) on access denial instead of
+  // returning null. A null return here now means "parent has access but
+  // the child was not present in the dashboard list" — a genuine not-found.
+  await assertParentAccess(db, parentProfileId, childProfileId);
 
   const children = await getChildrenForParent(db, parentProfileId);
   return children.find((c) => c.profileId === childProfileId) ?? null;
@@ -537,7 +618,8 @@ export async function getChildSubjectTopics(
   childProfileId: string,
   subjectId: string
 ): Promise<TopicProgress[]> {
-  if (!(await hasParentAccess(db, parentProfileId, childProfileId))) return [];
+  // [EP15-I5] See assertParentAccess comment — ForbiddenError → 403.
+  await assertParentAccess(db, parentProfileId, childProfileId);
 
   // Get curriculum for subject
   const curriculum = await db.query.curricula.findFirst({
@@ -609,7 +691,9 @@ export async function getChildSessions(
   parentProfileId: string,
   childProfileId: string
 ): Promise<ChildSession[]> {
-  if (!(await hasParentAccess(db, parentProfileId, childProfileId))) return [];
+  // [EP15-I5] ForbiddenError → 403. Empty array now means "parent has
+  // access and the child has no sessions", not "access denied".
+  await assertParentAccess(db, parentProfileId, childProfileId);
 
   const sessions = await db.query.learningSessions.findMany({
     where: eq(learningSessions.profileId, childProfileId),
@@ -649,8 +733,9 @@ export async function getChildSessionTranscript(
   childProfileId: string,
   sessionId: string
 ): Promise<ChildSessionTranscript | null> {
-  if (!(await hasParentAccess(db, parentProfileId, childProfileId)))
-    return null;
+  // [EP15-I5] ForbiddenError → 403. null from here now means "access
+  // granted but that session doesn't belong to this child" — 404-like.
+  await assertParentAccess(db, parentProfileId, childProfileId);
 
   // Get session scoped to child
   const session = await db.query.learningSessions.findFirst({
@@ -717,9 +802,10 @@ export async function getChildInventory(
   db: Database,
   parentProfileId: string,
   childProfileId: string
-): Promise<KnowledgeInventory | null> {
-  if (!(await hasParentAccess(db, parentProfileId, childProfileId)))
-    return null;
+): Promise<KnowledgeInventory> {
+  // [EP15-I5] Return type tightened from `| null`. Access denial now
+  // throws (→ 403); the only remaining path is a valid inventory.
+  await assertParentAccess(db, parentProfileId, childProfileId);
   return buildKnowledgeInventory(db, childProfileId);
 }
 
@@ -732,9 +818,9 @@ export async function getChildProgressHistory(
     to?: string;
     granularity?: 'daily' | 'weekly';
   }
-): Promise<ProgressHistory | null> {
-  if (!(await hasParentAccess(db, parentProfileId, childProfileId)))
-    return null;
+): Promise<ProgressHistory> {
+  // [EP15-I5] Return type tightened — access denial throws, not returns null.
+  await assertParentAccess(db, parentProfileId, childProfileId);
   return buildProgressHistory(db, childProfileId, input);
 }
 
@@ -743,7 +829,9 @@ export async function getChildReports(
   parentProfileId: string,
   childProfileId: string
 ): Promise<MonthlyReportSummary[]> {
-  if (!(await hasParentAccess(db, parentProfileId, childProfileId))) return [];
+  // [EP15-I5] Access denial throws (→ 403). Empty array now means "no
+  // reports yet for this child" — semantically distinct from forbidden.
+  await assertParentAccess(db, parentProfileId, childProfileId);
   return listMonthlyReportsForParentChild(db, parentProfileId, childProfileId);
 }
 
@@ -753,8 +841,8 @@ export async function getChildReportDetail(
   childProfileId: string,
   reportId: string
 ): Promise<MonthlyReportRecord | null> {
-  if (!(await hasParentAccess(db, parentProfileId, childProfileId)))
-    return null;
+  // [EP15-I5] null now only means "access granted but report not found".
+  await assertParentAccess(db, parentProfileId, childProfileId);
   return getMonthlyReportForParentChild(
     db,
     parentProfileId,
@@ -769,6 +857,8 @@ export async function markChildReportViewed(
   childProfileId: string,
   reportId: string
 ): Promise<void> {
-  if (!(await hasParentAccess(db, parentProfileId, childProfileId))) return;
+  // [EP15-I5] Previously silently returned on access denial, letting an
+  // unauthorized POST pretend to succeed. Now throws → 403.
+  await assertParentAccess(db, parentProfileId, childProfileId);
   await markMonthlyReportViewed(db, parentProfileId, childProfileId, reportId);
 }
