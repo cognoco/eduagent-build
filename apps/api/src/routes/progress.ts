@@ -8,6 +8,7 @@ import {
   getOverallProgress,
   getContinueSuggestion,
 } from '../services/progress';
+import { getProfileOverdueCount } from '../services/retention-data';
 import { notFound } from '../errors';
 
 type ProgressRouteEnv = {
@@ -50,6 +51,15 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
 
     const overview = await getOverallProgress(db, profileId);
     return c.json(overview);
+  })
+
+  // Get total overdue review count across the active profile
+  .get('/progress/review-summary', async (c) => {
+    const db = c.get('db');
+    const profileId = requireProfileId(c.get('profileId'));
+
+    const { overdueCount } = await getProfileOverdueCount(db, profileId);
+    return c.json({ totalOverdue: overdueCount });
   })
 
   // Get "continue where I left off" suggestion

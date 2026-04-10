@@ -5,6 +5,8 @@ import { useThemeColors } from '../../lib/theme';
 interface IntentCardProps {
   title: string;
   subtitle?: string;
+  badge?: number;
+  variant?: 'default' | 'highlight';
   onPress: () => void;
   testID?: string;
 }
@@ -12,6 +14,8 @@ interface IntentCardProps {
 export function IntentCard({
   title,
   subtitle,
+  badge,
+  variant = 'default',
   onPress,
   testID,
 }: IntentCardProps): React.ReactElement {
@@ -19,13 +23,29 @@ export function IntentCard({
   return (
     <Pressable
       onPress={onPress}
-      className="bg-surface-elevated rounded-card border-l-4 border-primary flex-row items-center px-5 py-5 active:opacity-80 min-h-[112px]"
+      className={`rounded-card border-l-4 border-primary flex-row items-center px-5 py-5 active:opacity-80 min-h-[112px] ${
+        variant === 'highlight' ? 'bg-primary-soft' : 'bg-surface-elevated'
+      }`}
       accessibilityRole="button"
       accessibilityLabel={title}
       testID={testID}
     >
       <View className="flex-1 justify-center">
-        <Text className="text-h2 font-bold text-text-primary">{title}</Text>
+        <View className="flex-row items-center">
+          <Text className="text-h2 font-bold text-text-primary flex-shrink">
+            {title}
+          </Text>
+          {badge != null ? (
+            <View
+              className="ml-3 rounded-full bg-primary-soft px-2.5 py-1"
+              testID={testID ? `${testID}-badge` : undefined}
+            >
+              <Text className="text-caption font-semibold text-primary">
+                {badge}
+              </Text>
+            </View>
+          ) : null}
+        </View>
         {subtitle ? (
           <Text className="text-body text-text-secondary mt-2">{subtitle}</Text>
         ) : null}

@@ -1,6 +1,17 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react-native';
 
 const mockPush = jest.fn();
+const mockReadSessionRecoveryMarker = jest.fn();
+const mockClearSessionRecoveryMarker = jest.fn();
+const mockIsRecoveryMarkerFresh = jest.fn();
+const mockUseContinueSuggestion = jest.fn();
+const mockUseReviewSummary = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
@@ -31,6 +42,20 @@ jest.mock('../../hooks/use-subjects', () => ({
   useSubjects: () => ({ data: mockSubjects, isLoading: false }),
 }));
 
+jest.mock('../../hooks/use-progress', () => ({
+  useContinueSuggestion: () => mockUseContinueSuggestion(),
+  useReviewSummary: () => mockUseReviewSummary(),
+}));
+
+jest.mock('../../lib/session-recovery', () => ({
+  readSessionRecoveryMarker: (...args: unknown[]) =>
+    mockReadSessionRecoveryMarker(...args),
+  clearSessionRecoveryMarker: (...args: unknown[]) =>
+    mockClearSessionRecoveryMarker(...args),
+  isRecoveryMarkerFresh: (...args: unknown[]) =>
+    mockIsRecoveryMarkerFresh(...args),
+}));
+
 const { LearnerScreen } = require('./LearnerScreen');
 
 const defaultProps = {
@@ -43,6 +68,10 @@ describe('LearnerScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockSubjects = [];
+    mockReadSessionRecoveryMarker.mockResolvedValue(null);
+    mockIsRecoveryMarkerFresh.mockReturnValue(true);
+    mockUseContinueSuggestion.mockReturnValue({ data: null });
+    mockUseReviewSummary.mockReturnValue({ data: { totalOverdue: 0 } });
   });
 
   it('renders greeting with profile name', () => {
@@ -56,7 +85,7 @@ describe('LearnerScreen', () => {
     it('shows a clear first-step CTA and homework help', () => {
       render(<LearnerScreen {...defaultProps} />);
 
-      expect(screen.getByText('Start your first subject')).toBeTruthy();
+      expect(screen.getByText('Start learning')).toBeTruthy();
       expect(
         screen.getByText("We'll build a path and get you learning fast")
       ).toBeTruthy();
@@ -75,15 +104,104 @@ describe('LearnerScreen', () => {
       mockSubjects = [{ id: 's1', name: 'Math', status: 'active' }];
     });
 
-    it('shows all three intent cards', () => {
+    it('shows all three intent cards with default review copy', () => {
       render(<LearnerScreen {...defaultProps} />);
 
+      expect(screen.getByText('Start learning')).toBeTruthy();
       expect(screen.getByText('Start a fresh session')).toBeTruthy();
-      expect(
-        screen.getByText('Ask a new question or explore a new topic')
-      ).toBeTruthy();
       expect(screen.getByText('Help with assignment?')).toBeTruthy();
       expect(screen.getByText('Repeat & review')).toBeTruthy();
+      expect(screen.getByText('Keep your knowledge fresh')).toBeTruthy();
+    });
+
+    it('uses the continue suggestion as the primary subtitle when available', () => {
+      mockUseContinueSuggestion.mockReturnValue({
+        data: {
+          subjectId: 's1',
+          subjectName: 'Math',
+          topicId: 't1',
+          topicTitle: 'Fractions',
+        },
+      });
+
+      render(<LearnerScreen {...defaultProps} />);
+
+      expect(screen.getByText('Continue with Fractions in Math')).toBeTruthy();
+    });
+
+    it('moves review to the front and shows a badge when many reviews are due', () => {
+      mockUseReviewSummary.mockReturnValue({ data: { totalOverdue: 6 } });
+
+      render(<LearnerScreen {...defaultProps} />);
+
+      const cards = within(screen.getByTestId('learner-intent-stack'))
+        .getAllByRole('button')
+        .map((card) => card.props.testID);
+
+      expect(cards).toEqual([
+        'intent-review',
+        'intent-learn-new',
+        'intent-homework',
+      ]);
+      expect(screen.getByText('6 topics ready for review')).toBeTruthy();
+      expect(screen.getByTestId('intent-review-badge')).toBeTruthy();
+    });
+
+    it('shows a highlighted resume card first when a fresh recovery marker exists', async () => {
+      mockReadSessionRecoveryMarker.mockResolvedValue({
+        sessionId: 'session-1',
+        subjectId: 's1',
+        subjectName: 'Math',
+        topicId: 't1',
+        mode: 'learning',
+        updatedAt: new Date().toISOString(),
+      });
+      mockUseReviewSummary.mockReturnValue({ data: { totalOverdue: 6 } });
+
+      render(<LearnerScreen {...defaultProps} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Continue where you left off')).toBeTruthy();
+      });
+
+      const cards = within(screen.getByTestId('learner-intent-stack'))
+        .getAllByRole('button')
+        .map((card) => card.props.testID);
+
+      expect(cards).toEqual([
+        'intent-resume',
+        'intent-review',
+        'intent-learn-new',
+        'intent-homework',
+      ]);
+
+      fireEvent.press(screen.getByTestId('intent-resume'));
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: '/(app)/session',
+        params: {
+          sessionId: 'session-1',
+          subjectId: 's1',
+          subjectName: 'Math',
+          mode: 'learning',
+          topicId: 't1',
+        },
+      });
+    });
+
+    it('clears stale recovery markers instead of surfacing them', async () => {
+      mockReadSessionRecoveryMarker.mockResolvedValue({
+        sessionId: 'session-1',
+        updatedAt: new Date().toISOString(),
+      });
+      mockIsRecoveryMarkerFresh.mockReturnValue(false);
+
+      render(<LearnerScreen {...defaultProps} />);
+
+      await waitFor(() => {
+        expect(mockClearSessionRecoveryMarker).toHaveBeenCalledWith('p1');
+      });
+
+      expect(screen.queryByText('Continue where you left off')).toBeNull();
     });
   });
 

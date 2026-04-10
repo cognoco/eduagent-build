@@ -297,7 +297,48 @@ describe('LibraryScreen', () => {
     expect(screen.getByTestId('library-tab-topics')).toBeTruthy();
     expect(screen.getByText('Shelves (2)')).toBeTruthy();
     expect(screen.getByText('Books (1)')).toBeTruthy();
-    expect(screen.getByText('Topics (1)')).toBeTruthy();
+    expect(screen.getByText('Topics')).toBeTruthy();
+  });
+
+  it('shows review urgency on the topics tab and matching shelf card', () => {
+    mockUseSubjects.mockReturnValue({
+      data: [{ id: 'sub-1', name: 'Math', status: 'active' }],
+      isLoading: false,
+    });
+    mockUseOverallProgress.mockReturnValue({
+      data: {
+        subjects: [
+          {
+            subjectId: 'sub-1',
+            name: 'Math',
+            topicsTotal: 5,
+            topicsCompleted: 2,
+            topicsVerified: 1,
+            urgencyScore: 0,
+            retentionStatus: 'fading',
+            lastSessionAt: null,
+          },
+        ],
+        totalTopicsCompleted: 2,
+        totalTopicsVerified: 1,
+      },
+      isLoading: false,
+    });
+    mockUseQueries.mockReturnValue([
+      {
+        data: {
+          topics: [],
+          reviewDueCount: 4,
+        },
+        isLoading: false,
+      },
+    ]);
+
+    render(<LibraryScreen />, { wrapper: createWrapper() });
+
+    expect(screen.getByTestId('library-tab-topics-review-badge')).toBeTruthy();
+    expect(screen.getByText('4')).toBeTruthy();
+    expect(screen.getByText('4 to review')).toBeTruthy();
   });
 
   it('shows books tab with all books across subjects', () => {

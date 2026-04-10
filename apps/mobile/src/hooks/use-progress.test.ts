@@ -5,6 +5,7 @@ import {
   useSubjectProgress,
   useOverallProgress,
   useContinueSuggestion,
+  useReviewSummary,
   useTopicProgress,
 } from './use-progress';
 
@@ -205,6 +206,34 @@ describe('useContinueSuggestion', () => {
     });
 
     expect(result.current.data).toBeNull();
+  });
+});
+
+describe('useReviewSummary', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    queryClient.clear();
+  });
+
+  it('fetches review summary from API', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ totalOverdue: 6 }), { status: 200 })
+    );
+
+    const { result } = renderHook(() => useReviewSummary(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    expect(mockFetch).toHaveBeenCalled();
+    expect(result.current.data?.totalOverdue).toBe(6);
   });
 });
 

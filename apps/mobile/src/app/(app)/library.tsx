@@ -181,11 +181,29 @@ export default function LibraryScreen() {
   );
 
   const shelves = useMemo<ShelfItem[]>(() => {
+    const retentionBySubjectId = new Map(
+      (subjectsQuery.data ?? []).map((subject, index) => [
+        subject.id,
+        retentionQueries[index]?.data,
+      ])
+    );
+
     return (subjectsQuery.data ?? []).map((subject) => ({
       subject,
       progress: progressBySubjectId.get(subject.id),
+      reviewDueCount:
+        retentionBySubjectId.get(subject.id)?.reviewDueCount ?? undefined,
     }));
-  }, [subjectsQuery.data, progressBySubjectId]);
+  }, [progressBySubjectId, retentionQueries, subjectsQuery.data]);
+
+  const totalOverdue = useMemo(
+    () =>
+      retentionQueries.reduce(
+        (sum, query) => sum + (query.data?.reviewDueCount ?? 0),
+        0
+      ),
+    [retentionQueries]
+  );
 
   const tabCounts = useMemo(
     () => ({
@@ -283,6 +301,7 @@ export default function LibraryScreen() {
           activeTab={activeTab}
           onTabChange={handleTabChange}
           counts={tabCounts}
+          reviewBadge={totalOverdue > 0 ? totalOverdue : undefined}
         />
         {activeTab === 'shelves' && (
           <ShelvesTab

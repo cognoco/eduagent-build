@@ -25,6 +25,10 @@ interface ProgressHistoryQuery {
   granularity?: 'daily' | 'weekly';
 }
 
+export interface ReviewSummary {
+  totalOverdue: number;
+}
+
 export function useSubjectProgress(
   subjectId: string
 ): UseQueryResult<SubjectProgress> {
@@ -90,6 +94,29 @@ export function useContinueSuggestion() {
         await assertOk(res);
         const data = await res.json();
         return data.suggestion;
+      } finally {
+        cleanup();
+      }
+    },
+    enabled: !!activeProfile,
+  });
+}
+
+export function useReviewSummary(): UseQueryResult<ReviewSummary> {
+  const client = useApiClient();
+  const { activeProfile } = useProfile();
+
+  return useQuery({
+    queryKey: ['progress', 'review-summary', activeProfile?.id],
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const res = await client.progress['review-summary'].$get(
+          {},
+          { init: { signal } }
+        );
+        await assertOk(res);
+        return (await res.json()) as ReviewSummary;
       } finally {
         cleanup();
       }

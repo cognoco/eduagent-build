@@ -1,11 +1,22 @@
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Profile } from '@eduagent/schemas';
 import { ProfileSwitcher } from '../common';
+import {
+  useContinueSuggestion,
+  useReviewSummary,
+} from '../../hooks/use-progress';
 import { useSubjects } from '../../hooks/use-subjects';
 import { getGreeting } from '../../lib/greeting';
+import {
+  clearSessionRecoveryMarker,
+  isRecoveryMarkerFresh,
+  readSessionRecoveryMarker,
+  type SessionRecoveryMarker,
+} from '../../lib/session-recovery';
 import { useThemeColors } from '../../lib/theme';
 import { IntentCard } from './IntentCard';
 
@@ -18,6 +29,8 @@ export interface LearnerScreenProps {
   onBack?: () => void;
 }
 
+const REVIEW_PRIORITY_THRESHOLD = 5;
+
 export function LearnerScreen({
   profiles,
   activeProfile,
@@ -28,16 +41,130 @@ export function LearnerScreen({
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
   const { data: subjects } = useSubjects();
+  const { data: continueSuggestion } = useContinueSuggestion();
+  const { data: reviewSummary } = useReviewSummary();
+  const [recoveryMarker, setRecoveryMarker] =
+    useState<SessionRecoveryMarker | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadRecoveryMarker(): Promise<void> {
+      try {
+        const marker = await readSessionRecoveryMarker(activeProfile?.id);
+        if (cancelled) return;
+
+        if (marker && isRecoveryMarkerFresh(marker)) {
+          setRecoveryMarker(marker);
+          return;
+        }
+
+        setRecoveryMarker(null);
+        if (marker) {
+          void clearSessionRecoveryMarker(activeProfile?.id);
+        }
+      } catch {
+        if (!cancelled) {
+          setRecoveryMarker(null);
+        }
+      }
+    }
+
+    void loadRecoveryMarker();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeProfile?.id]);
+
   const activeSubjects =
     subjects?.filter((subject) => subject.status === 'active') ?? [];
   const hasLibraryContent = activeSubjects.length > 0;
-  const primaryIntentTitle = hasLibraryContent
-    ? 'Start a fresh session'
-    : 'Start your first subject';
+  const reviewDueCount = reviewSummary?.totalOverdue ?? 0;
+  const primaryIntentTitle = 'Start learning';
   const primaryIntentSubtitle = hasLibraryContent
-    ? 'Ask a new question or explore a new topic'
+    ? recoveryMarker
+      ? 'Start a fresh session'
+      : continueSuggestion
+      ? `Continue with ${continueSuggestion.topicTitle} in ${continueSuggestion.subjectName}`
+      : 'Start a fresh session'
     : "We'll build a path and get you learning fast";
   const { title, subtitle } = getGreeting(activeProfile?.displayName ?? '');
+  const reviewSubtitle =
+    reviewDueCount > 0
+      ? `${reviewDueCount} ${
+          reviewDueCount === 1 ? 'topic' : 'topics'
+        } ready for review`
+      : 'Keep your knowledge fresh';
+
+  const intentCards = useMemo(() => {
+    const primaryCard = {
+      title: primaryIntentTitle,
+      subtitle: primaryIntentSubtitle,
+      onPress: () => router.push('/(app)/learn-new' as never),
+      testID: 'intent-learn-new',
+    };
+    const homeworkCard = {
+      title: 'Help with assignment?',
+      subtitle: "Take a picture and we'll look at it together",
+      onPress: () => router.push('/(app)/homework/camera' as never),
+      testID: 'intent-homework',
+    };
+    const reviewCard = hasLibraryContent
+      ? {
+          title: 'Repeat & review',
+          subtitle: reviewSubtitle,
+          badge: reviewDueCount > 0 ? reviewDueCount : undefined,
+          onPress: () => router.push('/(app)/library' as never),
+          testID: 'intent-review',
+        }
+      : null;
+    const resumeCard = recoveryMarker
+      ? {
+          title: 'Continue where you left off',
+          subtitle: recoveryMarker.subjectName,
+          variant: 'highlight' as const,
+          onPress: () =>
+            router.push({
+              pathname: '/(app)/session',
+              params: {
+                sessionId: recoveryMarker.sessionId,
+                ...(recoveryMarker.subjectId && {
+                  subjectId: recoveryMarker.subjectId,
+                }),
+                ...(recoveryMarker.subjectName && {
+                  subjectName: recoveryMarker.subjectName,
+                }),
+                ...(recoveryMarker.mode && { mode: recoveryMarker.mode }),
+                ...(recoveryMarker.topicId && {
+                  topicId: recoveryMarker.topicId,
+                }),
+              },
+            } as never),
+          testID: 'intent-resume',
+        }
+      : null;
+
+    const cards = [];
+    if (resumeCard) cards.push(resumeCard);
+    if (reviewCard && reviewDueCount >= REVIEW_PRIORITY_THRESHOLD) {
+      cards.push(reviewCard);
+    }
+    cards.push(primaryCard, homeworkCard);
+    if (reviewCard && reviewDueCount < REVIEW_PRIORITY_THRESHOLD) {
+      cards.push(reviewCard);
+    }
+
+    return cards;
+  }, [
+    hasLibraryContent,
+    primaryIntentSubtitle,
+    primaryIntentTitle,
+    recoveryMarker,
+    reviewDueCount,
+    reviewSubtitle,
+    router,
+  ]);
 
   return (
     <ScrollView
@@ -80,26 +207,10 @@ export function LearnerScreen({
         />
       </View>
 
-      <View className="gap-4">
-        <IntentCard
-          title={primaryIntentTitle}
-          subtitle={primaryIntentSubtitle}
-          onPress={() => router.push('/(app)/learn-new' as never)}
-          testID="intent-learn-new"
-        />
-        <IntentCard
-          title="Help with assignment?"
-          subtitle="Take a picture and we'll look at it together"
-          onPress={() => router.push('/(app)/homework/camera' as never)}
-          testID="intent-homework"
-        />
-        {hasLibraryContent ? (
-          <IntentCard
-            title="Repeat & review"
-            onPress={() => router.push('/(app)/library' as never)}
-            testID="intent-review"
-          />
-        ) : null}
+      <View className="gap-4" testID="learner-intent-stack">
+        {intentCards.map((card) => (
+          <IntentCard key={card.testID} {...card} />
+        ))}
       </View>
     </ScrollView>
   );

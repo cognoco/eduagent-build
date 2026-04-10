@@ -34,6 +34,34 @@ describe('IntentCard', () => {
     expect(screen.queryByText('Take a picture')).toBeNull();
   });
 
+  it('renders badge when provided', () => {
+    render(
+      <IntentCard
+        title="Repeat & review"
+        badge={6}
+        onPress={jest.fn()}
+        testID="card"
+      />
+    );
+
+    expect(screen.getByTestId('card-badge')).toBeTruthy();
+    expect(screen.getByText('6')).toBeTruthy();
+  });
+
+  it('applies highlight styling when requested', () => {
+    render(
+      <IntentCard
+        title="Continue where you left off"
+        variant="highlight"
+        onPress={jest.fn()}
+        testID="card"
+      />
+    );
+
+    const card = screen.getByTestId('card');
+    expect(card.props.className).toContain('bg-primary-soft');
+  });
+
   it('sets accessibility role and label', () => {
     render(
       <IntentCard title="Pick a subject" onPress={jest.fn()} testID="card" />
