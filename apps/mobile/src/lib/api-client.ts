@@ -60,6 +60,20 @@ export class QuotaExceededError extends Error {
   }
 }
 
+/**
+ * [EP15-I5] Typed error for 403 responses.
+ * Thrown by customFetch so callers can `instanceof ForbiddenError` instead
+ * of parsing status codes from generic Error message strings.
+ */
+export class ForbiddenError extends Error {
+  readonly code = 'FORBIDDEN' as const;
+
+  constructor(message = 'You do not have permission to access this resource') {
+    super(message);
+    this.name = 'ForbiddenError';
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Authenticated Hono RPC client
 // ---------------------------------------------------------------------------
@@ -128,6 +142,17 @@ export function useApiClient(): ApiClient {
             );
           }
         }
+
+        // [EP15-I5] Classify 403 into typed ForbiddenError so screens can
+        // distinguish "access denied" from generic API errors.  Always throw
+        // here to avoid double-consuming the response body with text() below.
+        if (res.status === 403) {
+          const body = await res
+            .json()
+            .catch(() => null as Record<string, unknown> | null);
+          throw new ForbiddenError((body?.message as string) ?? undefined);
+        }
+
         const errBody = await res.text().catch(() => '');
         throw new Error(
           `API error ${res.status}: ${errBody || res.statusText}`

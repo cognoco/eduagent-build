@@ -1,6 +1,7 @@
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ErrorFallback } from '../../../components/common';
 import { ProgressBar } from '../../../components/progress';
 import {
   useProgressInventory,
@@ -93,40 +94,25 @@ export default function ProgressSubjectScreen(): React.ReactElement {
   if (inventoryQuery.isError) {
     return (
       <View
-        className="flex-1 bg-background items-center justify-center px-6"
+        className="flex-1 bg-background"
         style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
-        testID="progress-subject-error"
       >
-        <Text className="text-h3 font-semibold text-text-primary text-center mb-2">
-          We couldn't load this subject
-        </Text>
-        <Text className="text-body text-text-secondary text-center mb-6">
-          Check your connection and try again.
-        </Text>
-        <View className="flex-row gap-3">
-          <Pressable
-            onPress={() => void inventoryQuery.refetch()}
-            className="bg-primary rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
-            accessibilityRole="button"
-            accessibilityLabel="Retry"
-            testID="progress-subject-error-retry"
-          >
-            <Text className="text-body font-semibold text-text-inverse">
-              Try again
-            </Text>
-          </Pressable>
-          <Pressable
-            onPress={() => router.replace('/(app)/progress' as never)}
-            className="bg-surface rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
-            accessibilityRole="button"
-            accessibilityLabel="Back to progress"
-            testID="progress-subject-error-back"
-          >
-            <Text className="text-body font-semibold text-text-primary">
-              Go back
-            </Text>
-          </Pressable>
-        </View>
+        <ErrorFallback
+          variant="centered"
+          title="We couldn't load this subject"
+          message="Check your connection and try again."
+          primaryAction={{
+            label: 'Try again',
+            onPress: () => void inventoryQuery.refetch(),
+            testID: 'progress-subject-error-retry',
+          }}
+          secondaryAction={{
+            label: 'Go back',
+            onPress: () => router.replace('/(app)/progress' as never),
+            testID: 'progress-subject-error-back',
+          }}
+          testID="progress-subject-error"
+        />
       </View>
     );
   }

@@ -422,10 +422,9 @@ export const sessionCompleted = inngest.createFunction(
     // Step 2: Write coaching card / session summary
     // Runs before analyze-learner-profile so the next session's home screen
     // opens with a fresh coaching card even if LLM profile analysis is slow.
-    // NOTE [EP15-C3]: This deviates from Epic 15 plan F-1, which mandates
-    // memory (Step 3) → snapshot refresh → coaching cards. Current order
-    // prioritizes user-facing coaching-card latency over plan compliance.
-    // Pending product decision on whether to reconcile plan or code.
+    // [EP15-C3 RESOLVED]: Plan F-1 mandated memory → snapshot → cards, but
+    // computeProgressMetrics never reads learning_profiles — the pipelines
+    // are independent. Latency-first order confirmed correct; plan AD6 amended.
     outcomes.push(
       await step.run('write-coaching-card', async () =>
         runIsolated('write-coaching-card', profileId, async () => {
@@ -457,10 +456,9 @@ export const sessionCompleted = inngest.createFunction(
     );
 
     // Step 3: Analyze learner transcript and update learning profile (Epic 16).
-    // NOTE [EP15-M3]: runs AFTER write-coaching-card by deliberate deviation
-    // from Epic 15 plan F-1 (not "per the plan" as a prior comment claimed).
-    // Rationale: profile analysis is background enrichment and should not
-    // delay user-facing coaching card. See EP15-C3 for pending reconciliation.
+    // [EP15-M3]: runs AFTER write-coaching-card — profile analysis is background
+    // enrichment and must not delay user-facing coaching card. EP15-C3 confirmed
+    // this ordering is safe: snapshot pipeline never reads learning_profiles.
     outcomes.push(
       await step.run('analyze-learner-profile', async () =>
         runIsolated('analyze-learner-profile', profileId, async () => {

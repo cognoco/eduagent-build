@@ -118,6 +118,11 @@ export function formatApiError(error: unknown): string {
       return msg;
     }
 
+    // [EP15-I5] ForbiddenError — pass through the server's message
+    if (error.name === 'ForbiddenError') {
+      return msg || 'You do not have permission to view this.';
+    }
+
     if (msgLower.includes('timed out while waiting for a reply')) {
       return 'That reply took too long. Tap reconnect to try again.';
     }
@@ -144,10 +149,7 @@ export function formatApiError(error: unknown): string {
         }
         return SERVER_MESSAGE;
       }
-      if (
-        parsedApiBody.apiMessage &&
-        parsedApiBody.apiMessage.length < 200
-      ) {
+      if (parsedApiBody.apiMessage && parsedApiBody.apiMessage.length < 200) {
         return parsedApiBody.apiMessage;
       }
       return "That didn't work. Please check your input and try again.";

@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ErrorFallback } from '../../components/common';
 import {
   GrowthChart,
   MilestoneCard,
@@ -190,41 +191,21 @@ export default function ProgressScreen(): React.ReactElement {
         {isLoading ? (
           <LoadingBlock />
         ) : isError ? (
-          <View
-            className="bg-coaching-card rounded-card p-5"
+          <ErrorFallback
+            title="We couldn't load your progress"
+            message="Check your connection and try again. Your data is safe."
+            primaryAction={{
+              label: 'Try again',
+              onPress: () => void handleRefresh(),
+              testID: 'progress-error-retry',
+            }}
+            secondaryAction={{
+              label: 'Go home',
+              onPress: () => router.push('/(app)/home' as never),
+              testID: 'progress-error-home',
+            }}
             testID="progress-error-state"
-          >
-            <Text className="text-h3 font-semibold text-text-primary">
-              We couldn't load your progress
-            </Text>
-            <Text className="text-body text-text-secondary mt-2">
-              Check your connection and try again. Your data is safe.
-            </Text>
-            <View className="flex-row gap-3 mt-4">
-              <Pressable
-                onPress={() => void handleRefresh()}
-                className="bg-primary rounded-button px-4 py-3 items-center flex-1"
-                accessibilityRole="button"
-                accessibilityLabel="Retry loading progress"
-                testID="progress-error-retry"
-              >
-                <Text className="text-body font-semibold text-text-inverse">
-                  Try again
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={() => router.push('/(app)/home' as never)}
-                className="bg-surface rounded-button px-4 py-3 items-center flex-1"
-                accessibilityRole="button"
-                accessibilityLabel="Go to home"
-                testID="progress-error-home"
-              >
-                <Text className="text-body font-semibold text-text-primary">
-                  Go home
-                </Text>
-              </Pressable>
-            </View>
-          </View>
+          />
         ) : isEmpty ? (
           <View className="bg-coaching-card rounded-card p-5">
             <Text className="text-h3 font-semibold text-text-primary">

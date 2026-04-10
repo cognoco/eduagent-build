@@ -10,6 +10,8 @@ export { CelebrationAnimation } from './CelebrationAnimation';
 export * from './celebrations';
 export { CheckmarkPopAnimation } from './CheckmarkPopAnimation';
 export { ErrorBoundary } from './ErrorBoundary';
+export { ErrorFallback } from './ErrorFallback';
+export { LoadingFallback } from './LoadingFallback';
 export { OfflineBanner } from './OfflineBanner';
 export { PasswordInput } from './PasswordInput';
 export { PenWritingAnimation } from './PenWritingAnimation';
