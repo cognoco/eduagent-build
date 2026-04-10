@@ -5,12 +5,14 @@ import {
   useSubscription,
   useUsage,
   useFamilySubscription,
+  useJoinByokWaitlist,
+} from './use-subscription';
+import {
   useCreateCheckout,
   useCancelSubscription,
   useCreatePortalSession,
   usePurchaseTopUp,
-  useJoinByokWaitlist,
-} from './use-subscription';
+} from './use-subscription-stripe';
 
 const mockFetch = jest.fn();
 
