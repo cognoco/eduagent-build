@@ -40,7 +40,7 @@ export const profileSchema = z.object({
   accountId: z.string().uuid(),
   displayName: z.string(),
   avatarUrl: z.string().url().nullable(),
-  birthYear: birthYearSchema.nullable(),
+  birthYear: birthYearSchema,
   location: locationSchema.nullable(),
   isOwner: z.boolean(),
   hasPremiumLlm: z.boolean().default(false),

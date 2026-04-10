@@ -51,7 +51,7 @@ function mapProfileRow(
     accountId: row.accountId,
     displayName: row.displayName,
     avatarUrl: row.avatarUrl ?? null,
-    birthYear: row.birthYear ?? null,
+    birthYear: row.birthYear,
     location: row.location ?? null,
     isOwner: row.isOwner,
     hasPremiumLlm: row.hasPremiumLlm,
