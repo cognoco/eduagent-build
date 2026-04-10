@@ -72,19 +72,16 @@ const PENDING_CONSENT_STATUSES = new Set([
  *   pending/withdrawn consent screen can switch back to their own profile.
  */
 function canSwitchFromConsentGate(
-  activeProfile: { id: string; birthYear?: number | null } | null,
-  profiles: ReadonlyArray<{ id: string; birthYear?: number | null }>
+  activeProfile: { id: string; birthYear: number } | null,
+  profiles: ReadonlyArray<{ id: string; birthYear: number }>
 ): boolean {
-  if (!activeProfile?.birthYear) return false;
+  if (!activeProfile) return false;
   const currentYear = new Date().getFullYear();
   const age = currentYear - activeProfile.birthYear;
   if (age < 18) return false;
   // Must have at least one OTHER profile that belongs to a minor
   return profiles.some(
-    (p) =>
-      p.id !== activeProfile.id &&
-      p.birthYear != null &&
-      currentYear - p.birthYear < 18
+    (p) => p.id !== activeProfile.id && currentYear - p.birthYear < 18
   );
 }
 

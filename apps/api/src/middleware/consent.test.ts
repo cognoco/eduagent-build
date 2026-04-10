@@ -38,30 +38,35 @@ const CHILD_PENDING_META: ProfileMeta = {
   birthYear: new Date().getFullYear() - 12,
   location: null,
   consentStatus: 'PENDING',
+  hasPremiumLlm: false,
 };
 
 const CHILD_REQUESTED_META: ProfileMeta = {
   birthYear: new Date().getFullYear() - 10,
   location: null,
   consentStatus: 'PARENTAL_CONSENT_REQUESTED',
+  hasPremiumLlm: false,
 };
 
 const WITHDRAWN_CHILD_META: ProfileMeta = {
   birthYear: new Date().getFullYear() - 12,
   location: null,
   consentStatus: 'WITHDRAWN',
+  hasPremiumLlm: false,
 };
 
 const CONSENTED_CHILD_META: ProfileMeta = {
   birthYear: new Date().getFullYear() - 12,
   location: null,
   consentStatus: 'CONSENTED',
+  hasPremiumLlm: false,
 };
 
 const ADULT_META: ProfileMeta = {
   birthYear: new Date().getFullYear() - 25,
   location: null,
   consentStatus: null,
+  hasPremiumLlm: false,
 };
 
 // ---------------------------------------------------------------------------
@@ -115,15 +120,6 @@ describe('consentMiddleware', () => {
       profileMeta: CHILD_PENDING_META,
     });
     const res = await app.request('/v1/billing/status');
-    expect(res.status).toBe(200);
-  });
-
-  it('passes through when birthYear is missing', async () => {
-    const app = createApp({
-      profileId: 'p-1',
-      profileMeta: { birthYear: null, location: null, consentStatus: null },
-    });
-    const res = await app.request('/v1/subjects');
     expect(res.status).toBe(200);
   });
 

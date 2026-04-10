@@ -20,10 +20,12 @@ const mockSelectChain = {
 };
 mockDb.select.mockReturnValue(mockSelectChain);
 
-jest.mock('@eduagent/database', () => {
-  const col = (name: string) => ({ name });
-  return {
-    createDatabase: jest.fn(() => mockDb),
+import { createDatabaseModuleMock } from '../../test-utils/database-module';
+
+const col = (name: string) => ({ name });
+const mockDatabaseModule = createDatabaseModuleMock({
+  db: mockDb,
+  exports: {
     curriculumBooks: {
       id: col('id'),
       subjectId: col('subjectId'),
@@ -31,8 +33,10 @@ jest.mock('@eduagent/database', () => {
       sortOrder: col('sortOrder'),
     },
     profiles: { id: col('id'), birthYear: col('birthYear') },
-  };
+  },
 });
+
+jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
 const mockGenerateBookTopics = jest.fn().mockResolvedValue({
   topics: [
@@ -274,38 +278,7 @@ describe('bookPreGeneration', () => {
     });
   });
 
-  describe('null birthYear fallback', () => {
-    it('defaults to age 12 when profile has no birthYear', async () => {
-      mockDb.query.curriculumBooks.findFirst.mockResolvedValueOnce({
-        id: 'book-001',
-        sortOrder: 1,
-      });
-
-      const nextBooks = [
-        {
-          id: 'book-002',
-          title: 'Ancient Greece',
-          description: 'Gods and heroes',
-          sortOrder: 2,
-        },
-      ];
-      mockSelectChain.limit.mockResolvedValueOnce(nextBooks);
-
-      // Profile exists but birthYear is null
-      mockDb.query.profiles.findFirst.mockResolvedValueOnce({
-        id: 'profile-001',
-        birthYear: null,
-      });
-
-      await executeSteps(createEventData());
-
-      expect(mockGenerateBookTopics).toHaveBeenCalledWith(
-        'Ancient Greece',
-        'Gods and heroes',
-        12 // fallback age
-      );
-    });
-
+  describe('missing profile fallback', () => {
     it('defaults to age 12 when profile is not found', async () => {
       mockDb.query.curriculumBooks.findFirst.mockResolvedValueOnce({
         id: 'book-001',

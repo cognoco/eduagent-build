@@ -18,15 +18,18 @@ jest.mock('../middleware/jwt', () => ({
 // Mock database module — middleware creates a stub db per request
 // ---------------------------------------------------------------------------
 
-jest.mock('@eduagent/database', () => ({
-  createDatabase: jest.fn().mockReturnValue({
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    transaction: jest.fn().mockImplementation(async (cb: (tx: any) => any) => {
-      const tx = { execute: jest.fn().mockResolvedValue(undefined) };
-      return cb(tx);
-    }),
+import {
+  createDatabaseModuleMock,
+  createTransactionalMockDb,
+} from '../test-utils/database-module';
+
+const mockDatabaseModule = createDatabaseModuleMock({
+  db: createTransactionalMockDb({
+    execute: jest.fn().mockResolvedValue(undefined),
   }),
-}));
+});
+
+jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
 // ---------------------------------------------------------------------------
 // Mock account & profile services — pure stubs, no DB interaction
@@ -235,7 +238,7 @@ describe('profile routes', () => {
       expect(body.message).toMatch(/upgrade/i);
     });
 
-    it('returns 400 when no age field is provided', async () => {
+    it('returns 400 when birthYear is missing (Zod rejects undefined)', async () => {
       const res = await app.request(
         '/v1/profiles',
         {
@@ -249,6 +252,29 @@ describe('profile routes', () => {
       );
 
       expect(res.status).toBe(400);
+      // Error body must reference the birthYear field so regressions
+      // that accept missing birthYear are caught.
+      const raw = await res.text();
+      expect(raw).toContain('birthYear');
+    });
+
+    it('returns 400 when birthYear is null (Zod rejects wrong type)', async () => {
+      const res = await app.request(
+        '/v1/profiles',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            displayName: 'Test User',
+            birthYear: null,
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(400);
+      const raw = await res.text();
+      expect(raw).toContain('birthYear');
     });
   });
 

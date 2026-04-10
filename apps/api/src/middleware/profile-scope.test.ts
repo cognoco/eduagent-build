@@ -134,30 +134,4 @@ describe('profileScopeMiddleware', () => {
     expect(body.profileId).toBeNull();
     expect(body.profileMeta).toBeNull();
   });
-
-  it('passes birthYear: null in profileMeta when profile has null birthYear', async () => {
-    const { findOwnerProfile } = jest.requireMock('../services/profile');
-
-    findOwnerProfile.mockResolvedValueOnce({
-      id: 'null-birth-profile',
-      accountId: 'test-account-id',
-      displayName: 'NullBirth',
-      birthYear: null,
-      location: 'US',
-      consentStatus: 'PENDING',
-    });
-
-    const app = createApp();
-    const res = await app.request('/test');
-    const body = await res.json();
-
-    expect(res.status).toBe(200);
-    expect(body.profileId).toBe('null-birth-profile');
-    expect(body.profileMeta).toEqual({
-      birthYear: null,
-      location: 'US',
-      consentStatus: 'PENDING',
-      hasPremiumLlm: false,
-    });
-  });
 });
