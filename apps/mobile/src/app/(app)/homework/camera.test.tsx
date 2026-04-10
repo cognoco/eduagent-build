@@ -1,3 +1,4 @@
+import { Alert } from 'react-native';
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import CameraScreen from './camera';
@@ -38,6 +39,12 @@ jest.mock('expo-camera', () => {
     useCameraPermissions: jest.fn(),
   };
 });
+
+jest.mock('expo-image-picker', () => ({
+  __esModule: true,
+  launchImageLibraryAsync: jest.fn(),
+  getMediaLibraryPermissionsAsync: jest.fn(),
+}));
 
 // Mock @expo/vector-icons
 jest.mock('@expo/vector-icons', () => {
@@ -101,6 +108,10 @@ jest.mock('../../../hooks/use-classify-subject', () => ({
 
 // Import mocks after jest.mock
 const { useCameraPermissions } = require('expo-camera');
+const {
+  launchImageLibraryAsync: mockLaunchImageLibraryAsync,
+  getMediaLibraryPermissionsAsync: mockGetMediaLibraryPermissionsAsync,
+} = require('expo-image-picker');
 const { useHomeworkOcr } = require('../../../hooks/use-homework-ocr');
 const {
   useSubjects,
@@ -116,6 +127,14 @@ const { useClassifySubject } = require('../../../hooks/use-classify-subject');
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockLaunchImageLibraryAsync.mockResolvedValue({
+    canceled: true,
+    assets: null,
+  });
+  mockGetMediaLibraryPermissionsAsync.mockResolvedValue({
+    granted: true,
+    canAskAgain: true,
+  });
   (useRouter as jest.Mock).mockReturnValue(mockRouter);
   (useSubjects as jest.Mock).mockReturnValue({
     data: [
@@ -187,8 +206,72 @@ describe('CameraScreen', () => {
     const { getByTestId, getByText } = render(<CameraScreen />);
     expect(getByTestId('camera-view')).toBeTruthy();
     expect(getByTestId('capture-button')).toBeTruthy();
+    expect(getByTestId('gallery-button')).toBeTruthy();
     expect(getByTestId('flash-toggle')).toBeTruthy();
     expect(getByText(/center your homework/i)).toBeTruthy();
+  });
+
+  it('opens the preview when a gallery image is selected', async () => {
+    mockLaunchImageLibraryAsync.mockResolvedValueOnce({
+      canceled: false,
+      assets: [{ uri: 'file:///gallery/homework.png' }],
+    });
+
+    const { getByTestId } = render(<CameraScreen />);
+
+    fireEvent.press(getByTestId('gallery-button'));
+
+    await waitFor(() => {
+      expect(getByTestId('photo-preview')).toBeTruthy();
+    });
+
+    expect(mockLaunchImageLibraryAsync).toHaveBeenCalledWith({
+      mediaTypes: ['images'],
+      quality: 1,
+      allowsEditing: false,
+    });
+  });
+
+  it('stays on the viewfinder when the gallery picker is cancelled', async () => {
+    mockLaunchImageLibraryAsync.mockResolvedValueOnce({
+      canceled: true,
+      assets: null,
+    });
+
+    const { getByTestId, queryByTestId } = render(<CameraScreen />);
+
+    fireEvent.press(getByTestId('gallery-button'));
+
+    await waitFor(() => {
+      expect(mockLaunchImageLibraryAsync).toHaveBeenCalled();
+    });
+
+    expect(getByTestId('camera-view')).toBeTruthy();
+    expect(queryByTestId('photo-preview')).toBeNull();
+  });
+
+  it('shows an alert when the gallery picker fails', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(jest.fn());
+    const consoleErrorSpy = jest
+      .spyOn(console, 'error')
+      .mockImplementation(jest.fn());
+    mockLaunchImageLibraryAsync.mockRejectedValueOnce(
+      new Error('Picker crashed')
+    );
+
+    const { getByTestId } = render(<CameraScreen />);
+
+    fireEvent.press(getByTestId('gallery-button'));
+
+    await waitFor(() => {
+      expect(alertSpy).toHaveBeenCalledWith(
+        "Couldn't open your photos",
+        'Please try again or use the camera instead.'
+      );
+    });
+
+    alertSpy.mockRestore();
+    consoleErrorSpy.mockRestore();
   });
 
   it('shows close button that calls router.back()', () => {

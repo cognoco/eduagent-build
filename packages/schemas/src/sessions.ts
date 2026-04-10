@@ -88,6 +88,9 @@ export type HomeworkMode = z.infer<typeof homeworkModeSchema>;
 export const homeworkProblemSourceSchema = z.enum(['ocr', 'manual']);
 export type HomeworkProblemSource = z.infer<typeof homeworkProblemSourceSchema>;
 
+export const homeworkCaptureSourceSchema = z.enum(['camera', 'gallery']);
+export type HomeworkCaptureSource = z.infer<typeof homeworkCaptureSourceSchema>;
+
 export const homeworkProblemStatusSchema = z.enum([
   'pending',
   'active',
@@ -111,6 +114,7 @@ export const homeworkSessionMetadataSchema = z
     currentProblemIndex: z.number().int().min(0),
     problems: z.array(homeworkProblemSchema),
     ocrText: z.string().optional(),
+    source: homeworkCaptureSourceSchema.optional(),
   })
   .strip();
 export type HomeworkSessionMetadata = z.infer<

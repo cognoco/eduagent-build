@@ -426,6 +426,50 @@ describe('SessionScreen homework flow', () => {
     );
   }, 15000);
 
+  it('includes the capture source in homework metadata when homework starts from the gallery', async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'homework',
+      subjectId: 'subject-1',
+      subjectName: 'Math',
+      captureSource: 'gallery',
+      ocrText: 'Solve 2x + 5 = 17',
+      homeworkProblems: JSON.stringify([
+        {
+          id: 'problem-1',
+          text: 'Solve 2x + 5 = 17',
+          source: 'ocr',
+        },
+      ]),
+    });
+
+    const screen = render(<SessionScreen />);
+
+    fireEvent.press(screen.getByTestId('manual-send-button'));
+    await flushAsyncWork();
+
+    await waitFor(() => {
+      expect(mockStartSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadata: expect.objectContaining({
+            homework: expect.objectContaining({
+              source: 'gallery',
+              ocrText: 'Solve 2x + 5 = 17',
+            }),
+          }),
+        })
+      );
+      expect(mockHomeworkStatePost).toHaveBeenCalledWith(
+        expect.objectContaining({
+          json: expect.objectContaining({
+            metadata: expect.objectContaining({
+              source: 'gallery',
+            }),
+          }),
+        })
+      );
+    });
+  });
+
   it('hides contextual chips on greeting but shows session tools', () => {
     const screen = render(<SessionScreen />);
 

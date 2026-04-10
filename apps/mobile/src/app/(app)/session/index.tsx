@@ -12,7 +12,11 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { PendingCelebration, HomeworkProblem } from '@eduagent/schemas';
+import type {
+  PendingCelebration,
+  HomeworkCaptureSource,
+  HomeworkProblem,
+} from '@eduagent/schemas';
 import {
   ChatShell,
   animateResponse,
@@ -289,6 +293,7 @@ export default function SessionScreen() {
     problemText,
     homeworkProblems,
     ocrText,
+    captureSource,
     rawInput,
   } = useLocalSearchParams<{
     mode?: string;
@@ -300,6 +305,7 @@ export default function SessionScreen() {
     problemText?: string;
     homeworkProblems?: string;
     ocrText?: string;
+    captureSource?: HomeworkCaptureSource;
     rawInput?: string;
   }>();
   const router = useRouter();
@@ -308,6 +314,15 @@ export default function SessionScreen() {
   const colors = useThemeColors();
 
   const effectiveMode = mode ?? 'freeform';
+  const normalizedOcrText = Array.isArray(ocrText) ? ocrText[0] : ocrText;
+  const normalizedCaptureSource = Array.isArray(captureSource)
+    ? captureSource[0]
+    : captureSource;
+  const homeworkCaptureSource: HomeworkCaptureSource | undefined =
+    normalizedCaptureSource === 'camera' ||
+    normalizedCaptureSource === 'gallery'
+      ? normalizedCaptureSource
+      : undefined;
   const initialHomeworkProblems = useMemo(
     () =>
       effectiveMode === 'homework'
@@ -562,7 +577,8 @@ export default function SessionScreen() {
           metadata: buildHomeworkSessionMetadata(
             problems,
             problemIndex,
-            Array.isArray(ocrText) ? ocrText[0] : ocrText
+            normalizedOcrText,
+            homeworkCaptureSource
           ),
         },
       });
@@ -571,7 +587,7 @@ export default function SessionScreen() {
         throw new Error(`Homework state sync failed: ${res.status}`);
       }
     },
-    [apiClient, effectiveMode, ocrText]
+    [apiClient, effectiveMode, normalizedOcrText, homeworkCaptureSource]
   );
 
   useEffect(() => {
@@ -797,7 +813,8 @@ export default function SessionScreen() {
                     homework: buildHomeworkSessionMetadata(
                       homeworkProblemsState,
                       currentProblemIndex,
-                      Array.isArray(ocrText) ? ocrText[0] : ocrText
+                      normalizedOcrText,
+                      homeworkCaptureSource
                     ),
                   },
                 }
@@ -824,7 +841,8 @@ export default function SessionScreen() {
                   homework: buildHomeworkSessionMetadata(
                     homeworkProblemsState,
                     currentProblemIndex,
-                    Array.isArray(ocrText) ? ocrText[0] : ocrText
+                    normalizedOcrText,
+                    homeworkCaptureSource
                   ),
                 },
               }
@@ -857,7 +875,8 @@ export default function SessionScreen() {
       startSession,
       homeworkProblemsState,
       currentProblemIndex,
-      ocrText,
+      normalizedOcrText,
+      homeworkCaptureSource,
       inputMode,
       syncHomeworkMetadata,
     ]

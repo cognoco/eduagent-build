@@ -67,6 +67,13 @@
           "cameraPermission": "MentoMate needs camera access to photograph your homework."
         }
       ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "MentoMate needs photo library access to import homework from your gallery.",
+          "microphonePermission": false
+        }
+      ],
       "expo-notifications",
       [
         "@sentry/react-native/expo",

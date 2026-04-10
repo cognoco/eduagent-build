@@ -9,6 +9,7 @@ describe('cameraReducer', () => {
   it('starts in permission phase', () => {
     expect(initialCameraState.phase).toBe('permission');
     expect(initialCameraState.imageUri).toBeNull();
+    expect(initialCameraState.source).toBe('camera');
     expect(initialCameraState.ocrText).toBeNull();
     expect(initialCameraState.errorMessage).toBeNull();
     expect(initialCameraState.failCount).toBe(0);
@@ -29,9 +30,26 @@ describe('cameraReducer', () => {
     const state = cameraReducer(viewfinder, {
       type: 'PHOTO_TAKEN',
       uri: 'file:///cache/homework-123.jpg',
+      source: 'camera',
     });
     expect(state.phase).toBe('preview');
     expect(state.imageUri).toBe('file:///cache/homework-123.jpg');
+    expect(state.source).toBe('camera');
+  });
+
+  it('stores gallery as the capture source when selecting from photos', () => {
+    const viewfinder: CameraState = {
+      ...initialCameraState,
+      phase: 'viewfinder',
+    };
+    const state = cameraReducer(viewfinder, {
+      type: 'PHOTO_TAKEN',
+      uri: 'file:///cache/gallery-123.jpg',
+      source: 'gallery',
+    });
+    expect(state.phase).toBe('preview');
+    expect(state.imageUri).toBe('file:///cache/gallery-123.jpg');
+    expect(state.source).toBe('gallery');
   });
 
   it('transitions preview → processing on CONFIRM_PHOTO', () => {
@@ -121,6 +139,7 @@ describe('cameraReducer', () => {
     expect(state.phase).toBe('viewfinder');
     expect(state.failCount).toBe(0);
     expect(state.imageUri).toBeNull();
+    expect(state.source).toBe('camera');
     expect(state.ocrText).toBeNull();
     expect(state.errorMessage).toBeNull();
   });
@@ -134,6 +153,7 @@ describe('cameraReducer', () => {
     const state = cameraReducer(preview, { type: 'RETAKE' });
     expect(state.phase).toBe('viewfinder');
     expect(state.imageUri).toBeNull();
+    expect(state.source).toBe('camera');
   });
 
   it('allows RETAKE from result state', () => {
@@ -146,6 +166,7 @@ describe('cameraReducer', () => {
     const state = cameraReducer(result, { type: 'RETAKE' });
     expect(state.phase).toBe('viewfinder');
     expect(state.imageUri).toBeNull();
+    expect(state.source).toBe('camera');
     expect(state.ocrText).toBeNull();
   });
 
