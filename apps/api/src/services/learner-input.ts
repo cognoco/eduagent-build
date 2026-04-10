@@ -124,7 +124,15 @@ async function parseLearnerInputToAnalysis(
           source,
         })) ?? null,
     };
-  } catch {
+  } catch (err) {
+    // Log before falling back so LLM/network failures are observable.
+    // The outer parseLearnerInput does not see this path because the fallback
+    // resolves successfully — without logging here, failures are invisible.
+    console.warn('[learner-input] LLM parse failed, using fallback', {
+      event: 'learner_input.llm.failed',
+      source,
+      error: err instanceof Error ? err.message : String(err),
+    });
     return fallbackAnalysis(text, source);
   }
 }

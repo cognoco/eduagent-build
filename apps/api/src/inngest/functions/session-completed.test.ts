@@ -2,34 +2,48 @@
 // Session Completed — Tests
 // ---------------------------------------------------------------------------
 
-jest.mock('@eduagent/database', () => {
-  const col = (name: string) => ({ name });
-  return {
-    createDatabase: jest.fn(() => {
-      const chainable = () => ({
-        from: () => ({ where: () => ({ limit: () => Promise.resolve([]) }) }),
-      });
-      const db: Record<string, unknown> = {
-        query: {
-          sessionEvents: { findMany: jest.fn().mockResolvedValue([]) },
-          curriculumTopics: { findFirst: jest.fn().mockResolvedValue(null) },
-          subjects: { findFirst: jest.fn().mockResolvedValue(null) },
-          learningProfiles: {
-            findFirst: jest.fn().mockResolvedValue({
-              memoryConsentStatus: 'pending',
-              memoryCollectionEnabled: false,
-              memoryEnabled: false,
-            }),
-          },
-          streaks: { findFirst: jest.fn().mockResolvedValue(null) },
-        },
-        select: chainable,
-      };
-      db.transaction = jest
-        .fn()
-        .mockImplementation(async (fn: (tx: unknown) => unknown) => fn(db));
-      return db;
-    }),
+import {
+  createDatabaseModuleMock,
+  createTransactionalMockDb,
+} from '../../test-utils/database-module';
+
+const col = (name: string) => ({ name });
+const chainable = () => ({
+  from: () => ({ where: () => ({ limit: () => Promise.resolve([]) }) }),
+});
+const mockSessionCompletedDb = createTransactionalMockDb({
+  query: {
+    sessionEvents: { findMany: jest.fn().mockResolvedValue([]) },
+    curriculumTopics: { findFirst: jest.fn().mockResolvedValue(null) },
+    subjects: { findFirst: jest.fn().mockResolvedValue(null) },
+    learningProfiles: {
+      findFirst: jest.fn().mockResolvedValue({
+        memoryConsentStatus: 'pending',
+        memoryCollectionEnabled: false,
+        memoryEnabled: false,
+      }),
+    },
+    streaks: { findFirst: jest.fn().mockResolvedValue(null) },
+    // analyze-learner-profile reads the session row for rawInput
+    learningSessions: {
+      findFirst: jest.fn().mockResolvedValue({ rawInput: null }),
+    },
+    // Snapshot aggregation reads these directly — supply empty results
+    // so production code can use db.query.progressSnapshots and
+    // db.query.milestones without defensive guards.
+    progressSnapshots: {
+      findFirst: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
+    milestones: {
+      findMany: jest.fn().mockResolvedValue([]),
+    },
+  },
+  select: chainable,
+});
+const mockDatabaseModule = createDatabaseModuleMock({
+  db: mockSessionCompletedDb,
+  exports: {
     sessionEvents: {
       sessionId: col('sessionId'),
       profileId: col('profileId'),
@@ -45,8 +59,10 @@ jest.mock('@eduagent/database', () => {
     learningSessions: { id: col('id'), profileId: col('profileId') },
     subjects: { id: col('id'), profileId: col('profileId') },
     streaks: { profileId: col('profileId') },
-  };
+  },
 });
+
+jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
 const mockStoreSessionEmbedding = jest.fn().mockResolvedValue(undefined);
 const mockExtractSessionContent = jest
@@ -184,6 +200,21 @@ jest.mock('../../services/sentry', () => ({
   captureException: (...args: unknown[]) => mockCaptureException(...args),
 }));
 
+// Learner-profile service — mocked so the analyze-learner-profile step can
+// be driven through its consent gate without hitting the real LLM or DB.
+// Default return: pending consent, so the step short-circuits (matches the
+// prior db-mock-driven behavior). Positive-path tests override this.
+const mockGetLearningProfile = jest.fn();
+const mockAnalyzeSessionTranscript = jest.fn();
+const mockApplyAnalysis = jest.fn();
+
+jest.mock('../../services/learner-profile', () => ({
+  getLearningProfile: (...args: unknown[]) => mockGetLearningProfile(...args),
+  analyzeSessionTranscript: (...args: unknown[]) =>
+    mockAnalyzeSessionTranscript(...args),
+  applyAnalysis: (...args: unknown[]) => mockApplyAnalysis(...args),
+}));
+
 import { sessionCompleted } from './session-completed';
 import { createDatabase } from '@eduagent/database';
 
@@ -240,6 +271,14 @@ describe('sessionCompleted', () => {
     jest.clearAllMocks();
     process.env['DATABASE_URL'] = 'postgresql://test:test@localhost/test';
     process.env['VOYAGE_API_KEY'] = 'pa-test-key-123';
+    // Default: pending consent — analyze-learner-profile step short-circuits.
+    // Positive-path tests override to consent='granted' + collection=true.
+    mockGetLearningProfile.mockResolvedValue({
+      memoryConsentStatus: 'pending',
+      memoryCollectionEnabled: false,
+    });
+    mockAnalyzeSessionTranscript.mockResolvedValue(null);
+    mockApplyAnalysis.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -1042,6 +1081,96 @@ describe('sessionCompleted', () => {
       expect(mockRecordSessionActivity).toHaveBeenCalled();
 
       consoleSpy.mockRestore();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // analyze-learner-profile step — Epic 16 Adaptive Memory
+  //
+  // The step runs AFTER write-coaching-card so profile analysis never
+  // delays the user-facing card. It is gated by BOTH:
+  //   memoryConsentStatus === 'granted' AND memoryCollectionEnabled === true
+  // A regression that inverts either check would silently collect data
+  // against consent, or silently skip collection when consent exists.
+  // These tests pin down all three gate paths.
+  // -------------------------------------------------------------------------
+
+  describe('analyze-learner-profile step', () => {
+    it('skips applyAnalysis when memoryConsentStatus is pending', async () => {
+      mockGetLearningProfile.mockResolvedValue({
+        memoryConsentStatus: 'pending',
+        memoryCollectionEnabled: false,
+      });
+
+      const { result } = (await executeSteps(
+        createEventData({ qualityRating: 4 })
+      )) as any;
+
+      expect(mockAnalyzeSessionTranscript).not.toHaveBeenCalled();
+      expect(mockApplyAnalysis).not.toHaveBeenCalled();
+      // Step still runs and completes ok — the early return is success.
+      const outcome = result.outcomes.find(
+        (o: any) => o.step === 'analyze-learner-profile'
+      );
+      expect(outcome.status).toBe('ok');
+    });
+
+    it('skips applyAnalysis when consent granted but collection disabled', async () => {
+      mockGetLearningProfile.mockResolvedValue({
+        memoryConsentStatus: 'granted',
+        memoryCollectionEnabled: false,
+      });
+
+      await executeSteps(createEventData({ qualityRating: 4 }));
+
+      // Gate check: both conditions must be true. Disabling collection alone
+      // must prevent both transcript analysis AND applyAnalysis.
+      expect(mockAnalyzeSessionTranscript).not.toHaveBeenCalled();
+      expect(mockApplyAnalysis).not.toHaveBeenCalled();
+    });
+
+    it('calls applyAnalysis on the happy path (consent granted + collection enabled)', async () => {
+      mockGetLearningProfile.mockResolvedValue({
+        memoryConsentStatus: 'granted',
+        memoryCollectionEnabled: true,
+      });
+      mockAnalyzeSessionTranscript.mockResolvedValue({
+        explanationEffectiveness: null,
+        interests: ['space'],
+        strengths: null,
+        struggles: null,
+        resolvedTopics: null,
+        communicationNotes: null,
+        engagementLevel: null,
+        confidence: 'high',
+      });
+
+      await executeSteps(createEventData({ qualityRating: 4 }));
+
+      expect(mockAnalyzeSessionTranscript).toHaveBeenCalled();
+      // applyAnalysis must fire with the authenticated profileId and the
+      // analysis returned by analyzeSessionTranscript. The fourth arg is
+      // the subject name (null when subjectId lookup misses).
+      expect(mockApplyAnalysis).toHaveBeenCalledWith(
+        expect.anything(),
+        'profile-001',
+        expect.objectContaining({ interests: ['space'] }),
+        null
+      );
+    });
+
+    it('does not call applyAnalysis when analyzeSessionTranscript returns null', async () => {
+      mockGetLearningProfile.mockResolvedValue({
+        memoryConsentStatus: 'granted',
+        memoryCollectionEnabled: true,
+      });
+      // Transcript analysis short-circuited (e.g., empty transcript)
+      mockAnalyzeSessionTranscript.mockResolvedValue(null);
+
+      await executeSteps(createEventData({ qualityRating: 4 }));
+
+      expect(mockAnalyzeSessionTranscript).toHaveBeenCalled();
+      expect(mockApplyAnalysis).not.toHaveBeenCalled();
     });
   });
 
