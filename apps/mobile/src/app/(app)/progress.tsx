@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import {
+  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -132,8 +133,16 @@ export default function ProgressScreen(): React.ReactElement {
   const handleRefresh = async () => {
     try {
       await refreshSnapshot.mutateAsync();
-    } catch {
-      // The existing query error states already communicate failures.
+    } catch (err) {
+      // [EP15-C5] Bare `catch {}` was banned by the global mutateAsync rule.
+      // Even though the page-level error state handles query failures, a
+      // *manual* refresh action that fails needs direct user feedback or
+      // the user thinks the gesture was ignored.
+      const message =
+        err instanceof Error
+          ? err.message
+          : "We couldn't refresh your progress right now.";
+      Alert.alert('Refresh failed', message);
     }
 
     await Promise.all([
@@ -143,10 +152,13 @@ export default function ProgressScreen(): React.ReactElement {
     ]);
   };
 
-  const isLoading =
-    inventoryQuery.isLoading &&
-    historyQuery.isLoading &&
-    milestonesQuery.isLoading;
+  // [EP15-M2] Gate on primary query only so secondary queries don't cause
+  // partial-load flicker when history lands before inventory (or vice versa).
+  const isLoading = inventoryQuery.isLoading;
+  // [EP15-C5] Primary query failure must surface — otherwise the `?? 0`
+  // defaults below render "You've mastered 0 topics" as if the user had
+  // a clean slate, which is indistinguishable from an offline/500 error.
+  const isError = inventoryQuery.isError;
   const isEmpty =
     !!inventory &&
     inventory.global.totalSessions === 0 &&
@@ -177,6 +189,42 @@ export default function ProgressScreen(): React.ReactElement {
 
         {isLoading ? (
           <LoadingBlock />
+        ) : isError ? (
+          <View
+            className="bg-coaching-card rounded-card p-5"
+            testID="progress-error-state"
+          >
+            <Text className="text-h3 font-semibold text-text-primary">
+              We couldn't load your progress
+            </Text>
+            <Text className="text-body text-text-secondary mt-2">
+              Check your connection and try again. Your data is safe.
+            </Text>
+            <View className="flex-row gap-3 mt-4">
+              <Pressable
+                onPress={() => void handleRefresh()}
+                className="bg-primary rounded-button px-4 py-3 items-center flex-1"
+                accessibilityRole="button"
+                accessibilityLabel="Retry loading progress"
+                testID="progress-error-retry"
+              >
+                <Text className="text-body font-semibold text-text-inverse">
+                  Try again
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => router.push('/(app)/home' as never)}
+                className="bg-surface rounded-button px-4 py-3 items-center flex-1"
+                accessibilityRole="button"
+                accessibilityLabel="Go to home"
+                testID="progress-error-home"
+              >
+                <Text className="text-body font-semibold text-text-primary">
+                  Go home
+                </Text>
+              </Pressable>
+            </View>
+          </View>
         ) : isEmpty ? (
           <View className="bg-coaching-card rounded-card p-5">
             <Text className="text-h3 font-semibold text-text-primary">

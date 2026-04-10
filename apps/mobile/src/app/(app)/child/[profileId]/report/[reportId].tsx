@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Sentry from '@sentry/react-native';
 import {
   useChildReportDetail,
   useMarkChildReportViewed,
@@ -36,7 +37,17 @@ export default function ChildReportDetailScreen(): React.ReactElement {
 
   useEffect(() => {
     if (!profileId || !reportId || !report || report.viewedAt) return;
-    void markViewed.mutateAsync({ childProfileId: profileId, reportId });
+    // [EP15-C7] Mark-viewed is best-effort background tracking — a failure
+    // should not interrupt the user's read, but we capture to Sentry for
+    // observability instead of swallowing silently with `void`.
+    markViewed
+      .mutateAsync({ childProfileId: profileId, reportId })
+      .catch((err: unknown) => {
+        Sentry.captureException(err, {
+          tags: { feature: 'monthly_report', action: 'mark_viewed' },
+          extra: { profileId, reportId },
+        });
+      });
   }, [markViewed, profileId, report, reportId]);
 
   return (
@@ -104,9 +115,12 @@ export default function ChildReportDetailScreen(): React.ReactElement {
                 label="Topics mastered"
                 value={String(report.reportData.thisMonth.topicsMastered)}
               />
+              {/* [EP15-I2] Field renamed from vocabularyLearned to
+                  vocabularyTotal — it's cumulative, not per-month delta.
+                  "Words learned" was misleading; use "Total words". */}
               <MetricCard
-                label="Words learned"
-                value={String(report.reportData.thisMonth.vocabularyLearned)}
+                label="Total words"
+                value={String(report.reportData.thisMonth.vocabularyTotal)}
               />
             </View>
 
@@ -161,7 +175,7 @@ export default function ChildReportDetailScreen(): React.ReactElement {
                     </Text>
                     <Text className="text-body-sm text-text-secondary mt-1">
                       {subject.topicsMastered} topics mastered •{' '}
-                      {subject.vocabularyLearned} words learned •{' '}
+                      {subject.vocabularyTotal} words known •{' '}
                       {subject.activeMinutes} active min
                     </Text>
                   </View>
@@ -170,10 +184,40 @@ export default function ChildReportDetailScreen(): React.ReactElement {
             </View>
           </>
         ) : (
-          <View className="bg-surface rounded-card p-4 mt-4">
-            <Text className="text-body-sm text-text-secondary">
-              This report is no longer available.
+          // [EP15-I4] Dead-end fix: prior "no longer available" branch
+          // had zero interactive elements, leaving users with only the
+          // OS back gesture. Adds an explicit back-to-reports Pressable.
+          <View
+            className="bg-surface rounded-card p-5 mt-4"
+            testID="child-report-gone"
+          >
+            <Text className="text-h3 font-semibold text-text-primary">
+              This report is no longer available
             </Text>
+            <Text className="text-body-sm text-text-secondary mt-2">
+              It may have been archived or removed. All your other reports are
+              still safe.
+            </Text>
+            <Pressable
+              onPress={() => {
+                if (profileId) {
+                  router.replace({
+                    pathname: '/(app)/child/[profileId]/reports',
+                    params: { profileId },
+                  } as never);
+                } else {
+                  router.replace('/(app)/dashboard' as never);
+                }
+              }}
+              className="bg-primary rounded-button px-4 py-3 items-center mt-4 min-h-[48px] justify-center"
+              accessibilityRole="button"
+              accessibilityLabel="Back to reports"
+              testID="child-report-gone-back"
+            >
+              <Text className="text-body font-semibold text-text-inverse">
+                Back to reports
+              </Text>
+            </Pressable>
           </View>
         )}
       </ScrollView>

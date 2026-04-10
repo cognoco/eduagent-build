@@ -36,12 +36,97 @@ export default function ProgressSubjectScreen(): React.ReactElement {
   );
   const legacyProgress = subjectProgressQuery.data;
 
+  // [EP15-C6] Every state must have at least one action. The prior
+  // implementation jumped straight to the render tree when `!subjectId`
+  // or `!subject` with no "go back" pressable — a genuine dead-end.
   if (!subjectId) {
     return (
-      <View className="flex-1 bg-background items-center justify-center px-6">
-        <Text className="text-body text-text-secondary text-center">
-          No subject selected.
+      <View
+        className="flex-1 bg-background items-center justify-center px-6"
+        style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
+        testID="progress-subject-missing"
+      >
+        <Text className="text-h3 font-semibold text-text-primary text-center mb-2">
+          No subject selected
         </Text>
+        <Text className="text-body text-text-secondary text-center mb-6">
+          Pick a subject from your progress page to see details.
+        </Text>
+        <Pressable
+          onPress={() => router.replace('/(app)/progress' as never)}
+          className="bg-primary rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
+          accessibilityRole="button"
+          accessibilityLabel="Back to progress"
+          testID="progress-subject-missing-back"
+        >
+          <Text className="text-body font-semibold text-text-inverse">
+            Back to progress
+          </Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  // [EP15-C6] Loading state. Previously the screen rendered immediately
+  // with `subject?.subjectName ?? 'Subject progress'` and an empty body,
+  // which is indistinguishable from a "this subject is gone" state.
+  if (inventoryQuery.isLoading) {
+    return (
+      <View
+        className="flex-1 bg-background"
+        style={{ paddingTop: insets.top }}
+        testID="progress-subject-loading"
+      >
+        <View className="px-5 pt-4">
+          <View className="bg-border rounded h-6 w-1/2 mb-4" />
+          <View className="bg-coaching-card rounded-card p-5">
+            <View className="bg-border rounded h-5 w-2/3 mb-3" />
+            <View className="bg-border rounded h-4 w-full mb-2" />
+            <View className="bg-border rounded h-4 w-3/4" />
+          </View>
+        </View>
+      </View>
+    );
+  }
+
+  // [EP15-C6] Error state — query failure gets a retry + go back.
+  if (inventoryQuery.isError) {
+    return (
+      <View
+        className="flex-1 bg-background items-center justify-center px-6"
+        style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
+        testID="progress-subject-error"
+      >
+        <Text className="text-h3 font-semibold text-text-primary text-center mb-2">
+          We couldn't load this subject
+        </Text>
+        <Text className="text-body text-text-secondary text-center mb-6">
+          Check your connection and try again.
+        </Text>
+        <View className="flex-row gap-3">
+          <Pressable
+            onPress={() => void inventoryQuery.refetch()}
+            className="bg-primary rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
+            accessibilityRole="button"
+            accessibilityLabel="Retry"
+            testID="progress-subject-error-retry"
+          >
+            <Text className="text-body font-semibold text-text-inverse">
+              Try again
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => router.replace('/(app)/progress' as never)}
+            className="bg-surface rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
+            accessibilityRole="button"
+            accessibilityLabel="Back to progress"
+            testID="progress-subject-error-back"
+          >
+            <Text className="text-body font-semibold text-text-primary">
+              Go back
+            </Text>
+          </Pressable>
+        </View>
       </View>
     );
   }
@@ -205,10 +290,30 @@ export default function ProgressSubjectScreen(): React.ReactElement {
             </View>
           </>
         ) : (
-          <View className="bg-surface rounded-card p-5 mt-4">
-            <Text className="text-body text-text-secondary">
-              This subject is no longer available.
+          // [EP15-C6] Dead-end fix — the prior version showed only text
+          // with zero actionable elements. Users scrolling into a deleted
+          // subject had nothing to press besides the OS back gesture.
+          <View
+            className="bg-surface rounded-card p-5 mt-4"
+            testID="progress-subject-gone"
+          >
+            <Text className="text-h3 font-semibold text-text-primary">
+              This subject is no longer available
             </Text>
+            <Text className="text-body-sm text-text-secondary mt-2">
+              It may have been removed or merged into another subject.
+            </Text>
+            <Pressable
+              onPress={() => router.replace('/(app)/progress' as never)}
+              className="bg-primary rounded-button px-4 py-3 items-center mt-4 min-h-[48px] justify-center"
+              accessibilityRole="button"
+              accessibilityLabel="Back to progress"
+              testID="progress-subject-gone-back"
+            >
+              <Text className="text-body font-semibold text-text-inverse">
+                Back to progress
+              </Text>
+            </Pressable>
           </View>
         )}
       </ScrollView>

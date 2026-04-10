@@ -7,7 +7,12 @@ export default function ChildReportsScreen(): React.ReactElement {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { profileId } = useLocalSearchParams<{ profileId: string }>();
-  const { data: reports, isLoading } = useChildReports(profileId);
+  const {
+    data: reports,
+    isLoading,
+    isError,
+    refetch,
+  } = useChildReports(profileId);
 
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
@@ -42,6 +47,46 @@ export default function ChildReportsScreen(): React.ReactElement {
             <Text className="text-body-sm text-text-secondary">
               Loading reports...
             </Text>
+          </View>
+        ) : isError ? (
+          // [EP15-I3] Prior version destructured only `data, isLoading`.
+          // On API failure users saw the "no reports yet" empty state and
+          // thought their child had no learning activity, when really the
+          // server was down. Error must be visually distinct from empty.
+          <View
+            className="bg-surface rounded-card p-4 mt-4"
+            testID="child-reports-error"
+          >
+            <Text className="text-h3 font-semibold text-text-primary">
+              We couldn't load the reports
+            </Text>
+            <Text className="text-body-sm text-text-secondary mt-2">
+              Check your connection and try again.
+            </Text>
+            <View className="flex-row gap-3 mt-4">
+              <Pressable
+                onPress={() => void refetch()}
+                className="bg-primary rounded-button px-4 py-3 items-center flex-1 min-h-[48px] justify-center"
+                accessibilityRole="button"
+                accessibilityLabel="Retry loading reports"
+                testID="child-reports-error-retry"
+              >
+                <Text className="text-body font-semibold text-text-inverse">
+                  Try again
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => router.back()}
+                className="bg-background rounded-button px-4 py-3 items-center flex-1 min-h-[48px] justify-center"
+                accessibilityRole="button"
+                accessibilityLabel="Go back"
+                testID="child-reports-error-back"
+              >
+                <Text className="text-body font-semibold text-text-primary">
+                  Go back
+                </Text>
+              </Pressable>
+            </View>
           </View>
         ) : reports && reports.length > 0 ? (
           reports.map((report) => (
