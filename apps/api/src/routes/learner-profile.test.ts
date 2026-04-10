@@ -66,11 +66,20 @@ jest.mock('../services/profile', () => ({
     })),
 }));
 
-// Family-access is the IDOR choke point. The route asks hasParentAccess
-// whether the parent may manage the child; we drive that decision here.
+// Family-access is the IDOR choke point. The route calls assertParentAccess
+// which throws ForbiddenError on denial; we drive that decision here.
 const mockHasParentAccess = jest.fn();
 jest.mock('../services/family-access', () => ({
   hasParentAccess: (...args: unknown[]) => mockHasParentAccess(...args),
+  assertParentAccess: async (...args: unknown[]) => {
+    const allowed = await mockHasParentAccess(...args);
+    if (!allowed) {
+      const { ForbiddenError } = jest.requireActual('../errors') as {
+        ForbiddenError: new (msg?: string) => Error;
+      };
+      throw new ForbiddenError('You do not have access to this child profile.');
+    }
+  },
 }));
 
 // Learner-profile service mocks — record calls so assertions can verify

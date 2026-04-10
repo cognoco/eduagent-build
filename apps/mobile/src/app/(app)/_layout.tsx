@@ -1108,6 +1108,13 @@ export default function AppLayout() {
           }}
         />
         <Tabs.Screen
+          name="mentor-memory"
+          options={{
+            href: null,
+            tabBarItemStyle: { display: 'none' },
+          }}
+        />
+        <Tabs.Screen
           name="pick-book"
           options={{
             href: null,

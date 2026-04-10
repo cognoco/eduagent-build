@@ -332,7 +332,7 @@ describe('Integration: Session-Completed Chain (P0-008)', () => {
 
     expect(result.status).toBe('completed');
     expect(result.sessionId).toBe(scenario.sessionId);
-    expect(result.outcomes).toHaveLength(12);
+    expect(result.outcomes).toHaveLength(13);
 
     const retentionCard = await loadRetentionCard(
       scenario.profileId,

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isoDateSchema } from './common.ts';
 
 const pedagogyModeSchema = z.enum(['socratic', 'four_strands']);
 
@@ -101,10 +102,17 @@ export const progressDataPointSchema = z.object({
 });
 export type ProgressDataPoint = z.infer<typeof progressDataPointSchema>;
 
+export const historyQuerySchema = z.object({
+  from: isoDateSchema.optional(),
+  to: isoDateSchema.optional(),
+  granularity: z.enum(['daily', 'weekly']).optional(),
+});
+export type HistoryQuery = z.infer<typeof historyQuerySchema>;
+
 export const progressHistorySchema = z.object({
   profileId: z.string().uuid(),
-  from: z.string(),
-  to: z.string(),
+  from: isoDateSchema,
+  to: isoDateSchema,
   granularity: z.enum(['daily', 'weekly']),
   dataPoints: z.array(progressDataPointSchema),
 });

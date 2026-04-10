@@ -3,11 +3,12 @@
 **Author:** Zuzka + Claude
 **Date:** 2026-04-07
 **Status:** Draft
-**FRs:** FR243–FR252
+**FRs:** FR243–FR255
 **Dependencies:** Story 16.0 (fix existing memory layers — **IMPLEMENTED**), Epic 13 (session lifecycle), Epic 7 (library infrastructure), LLM router (`services/llm/router.ts`)
 **UX Review:** 2026-04-09 — 10 improvements added (FR246.6, FR247.6–7, FR248.6, FR249.7–8, FR250.7–8, FR252). New Story 16.10, Phase D, AD6.
 **Spec Alignment:** 2026-04-09 — FR244.4 output schema updated (added `strengths`, `resolvedTopics`, expanded explanation style enum to 6 values per FR248.2). `engagementLevel` clarified as captured-but-not-stored. FR244.8 metric notes added. Story 16.0 added as dependency. Amendments cross-referenced.
 **Amendments integrated:** 2026-04-09 — Amendment 2 (Epic 15 mastery cross-reference → FR247.4.1) and Amendment 3 (memory layer deduplication → FR245.8) from `docs/superpowers/plans/2026-04-08-epic-16-amendments.md` formalized as spec requirements.
+**Learning Accommodation Modes:** 2026-04-10 — 3 new stories (16.11–16.13), FRs FR253–FR255, Phase E. Capability-first naming (Short-Burst, Audio-First, Predictable), parent-set single-select, independent of memory consent.
 
 > **Note on FR numbering:** This epic's original requirement IDs (234–242) were renumbered to 243–251 to avoid collision with Epic 15 (FR230–FR241). All internal references use the new numbering.
 
@@ -56,6 +57,9 @@ Memory in this spec means something specific: the AI mentor building an understa
 | 16.8 | Parent Memory Visibility | C | PLANNED | FR250 |
 | 16.9 | Memory Warm-Start for New Subjects | C | PLANNED | FR251 |
 | 16.10 | "Tell Your Mentor" — Learner-Initiated Input | D | PLANNED | FR252 |
+| 16.11 | Learning Accommodation Mode — Schema & API | E | PLANNED | FR253 |
+| 16.12 | Learning Accommodation Mode — Prompt Adaptation | E | PLANNED | FR254 |
+| 16.13 | Learning Accommodation Mode — Mobile Settings UI | E | PLANNED | FR255 |
 
 ---
 
@@ -298,6 +302,87 @@ Memory in this spec means something specific: the AI mentor building an understa
   - Struggles (subject-specific — struggling with fractions says nothing about history)
 - **FR251.3:** The mentor references the warm-start naturally: "I know you like examples with animals, so let's explore Spanish vocabulary with animal names!" The meta-instruction in FR245.5 covers this.
 - **FR251.4:** Warm-start quality degrades gracefully. A child with 50 sessions across 3 subjects gets a rich warm-start. A child with 2 sessions in 1 subject gets a minimal warm-start. A brand new child gets no warm-start — the default age + subject context still works.
+
+### FR253: Learning Accommodation Mode — Schema
+
+- **FR253.1:** New field on `learning_profiles` table:
+  ```
+  accommodationMode  TEXT, default 'none'  — 'none' | 'short-burst' | 'audio-first' | 'predictable'
+  ```
+  Only one mode can be active at a time (single-select, not combinable).
+- **FR253.2:** The mode is **parent-set**, not AI-inferred. This is an explicit exception to Design Principle #1 ("memory is built FROM interactions, not configured BY the user"). Accommodation modes are configured preferences, not observations. The parent (or self-managed teen) sets the mode via settings; the system never infers or suggests a mode.
+- **FR253.3:** Accommodation mode works **independently of memory consent** (FR250.7). A parent can set an accommodation mode even if memory collection is declined or not yet consented to. The mode affects prompt construction (FR254) but does not require the observation/collection pipeline.
+- **FR253.4:** If no `learning_profiles` row exists when a parent sets an accommodation mode, one is created with default values and the requested mode. This ensures the mode can be set before the child has any sessions.
+- **FR253.5:** The `accommodationMode` field is included in GDPR data export (FR250.6) and deleted on profile cascade.
+- **FR253.6:** Capability-first naming avoids storing diagnostic labels. The UI and database use `short-burst`, `audio-first`, `predictable` — never clinical terms like "ADHD", "dyslexia", "autism". This satisfies GDPR data minimization (no health data stored) and keeps components persona-unaware per project conventions.
+- **FR253.7:** Zod schema in `@eduagent/schemas`:
+  ```typescript
+  export const accommodationModeSchema = z.enum(['none', 'short-burst', 'audio-first', 'predictable']);
+  export type AccommodationMode = z.infer<typeof accommodationModeSchema>;
+  ```
+
+### FR254: Learning Accommodation Mode — Prompt Adaptation
+
+- **FR254.1:** When `accommodationMode` is not `'none'`, `buildSystemPrompt()` injects a mode-specific accommodation block into the system prompt, alongside (but independent of) the learner memory block (FR245).
+- **FR254.2:** The accommodation block is injected even when `memoryInjectionEnabled = false` (FR250.8). Memory controls govern the inferred profile; the accommodation mode is an explicit parent preference, not an inference.
+- **FR254.3:** Mode-specific prompt preambles (~100–200 tokens each):
+
+  **Short-Burst Mode** (`short-burst`):
+  > - Keep explanations concise — 2-3 sentences max before checking understanding
+  > - Break complex topics into small, concrete steps — one concept per exchange
+  > - Use frequent engagement checkpoints: "Ready for the next part?" or "Want to try one?"
+  > - Celebrate small wins explicitly — "Nice one!" after each correct step, not just at the end
+  > - Avoid long blocks of text. If a concept needs depth, split it across multiple exchanges
+  > - Vary activity types to maintain engagement (explain → try → explain → game → try)
+
+  **Audio-First Mode** (`audio-first`):
+  > - Prefer spoken-style explanations — write as if reading aloud, with natural rhythm
+  > - Avoid relying on visual-only content (tables, diagrams described only in text, complex formatting)
+  > - When teaching vocabulary or new terms, always include phonetic breakdowns or syllable splits
+  > - Use repetition and rhyme as memory aids where natural
+  > - Keep sentence structure simple — active voice, short clauses, minimal nesting
+  > - When the learner makes a spelling or reading error, gently model the correct form without highlighting the mistake
+
+  **Predictable Mode** (`predictable`):
+  > - Start every session with a clear agenda: "Today we'll do X, then Y, then Z"
+  > - Use explicit transitions between topics: "We're done with fractions. Now let's move to geometry."
+  > - Avoid open-ended questions without scaffolding — offer choices or examples alongside "What do you think?"
+  > - Be literal and concrete — avoid sarcasm, idioms, or figurative language unless teaching them explicitly
+  > - Maintain a consistent session structure: recap → new concept → practice → summary
+  > - When something changes (topic shift, difficulty increase), explain why: "This next part is harder because…"
+
+- **FR254.4:** The accommodation block is placed **before** the learner memory block in the system prompt, so the LLM processes accommodation instructions before personalized memory context. This ensures accommodation rules take precedence when they conflict with inferred preferences (e.g., inferred preference for long stories vs. short-burst requirement for brevity).
+- **FR254.5:** The accommodation block includes a meta-instruction: *"The above learning accommodation is a parental preference. Follow it consistently. Do not override it based on inferred learner behavior."*
+- **FR254.6:** Token budget for the accommodation block: ~150 tokens per mode. This is separate from the 500-token learner memory budget (FR245.4). Updated token budget table:
+  | Layer | Source | Budget |
+  |-------|--------|--------|
+  | Prior Learning | `prior-learning.ts` | ~1500 tokens |
+  | Cross-Subject Highlights | `prior-learning.ts` | ~200 tokens |
+  | Book History | `session.ts` | ~1000 tokens |
+  | Embedding Memory | `memory.ts` | ~375 tokens |
+  | **Accommodation Mode** | `learner-profile.ts` | **~150 tokens** |
+  | Learner Profile | `learner-profile.ts` | 500 tokens (FR245.4) |
+
+  Total combined budget is ~3,725 tokens, well within model context limits.
+
+### FR255: Learning Accommodation Mode — Mobile Settings UI
+
+- **FR255.1:** Parent-facing accommodation mode selector on the child profile settings screen. Location: below the existing "Learning Mode" (serious/casual) setting.
+- **FR255.2:** UI is a single-select radio group or segmented control with four options:
+  - **None** (default) — "Standard learning experience"
+  - **Short-Burst** — "Shorter explanations, frequent check-ins, small steps"
+  - **Audio-First** — "Spoken-style explanations, simple sentences, phonetic support"
+  - **Predictable** — "Clear structure, explicit transitions, concrete examples"
+
+  Each option includes a 1-line description so the parent understands the effect without needing clinical context.
+- **FR255.3:** Setting change takes effect on the **next session**. No mid-session switching — if the mode is changed while a session is active, the current session continues with the previous mode.
+- **FR255.4:** The child's "What My Mentor Knows" screen (FR249) shows the active accommodation mode (if not `none`) as a non-deletable badge at the top: "Your learning style: Short-Burst — your parent set this for you." The child cannot change the mode (parent-only control), but can see what it is.
+- **FR255.5:** Self-managed teen accounts (no linked parent) can set their own accommodation mode from the same settings location.
+- **FR255.6:** The accommodation mode selector is available immediately — it does not require memory consent (FR250.7) and is visible even when memory collection is disabled.
+- **FR255.7:** Age-appropriate copy for the mode display on the child's "What My Mentor Knows" screen:
+  - Under 10: "Your mentor uses a special way to teach you!" (no mode name shown)
+  - 10-14: "Learning style: Short-Burst — shorter explanations with lots of check-ins"
+  - 15+: "Accommodation mode: Short-Burst — concise explanations, frequent checkpoints"
 
 ---
 
@@ -882,6 +967,137 @@ So that the mentor doesn't have to guess from conversations alone — I feel lik
 
 ---
 
+### Story 16.11: Learning Accommodation Mode — Schema & API
+
+As a parent,
+I want to select a learning accommodation mode for my child,
+So that the mentor adapts its teaching approach to how my child processes information best.
+
+> **Note:** This story is an explicit exception to Design Principle #1 ("memory is built FROM interactions, not configured BY the user"). Accommodation modes are parent-set preferences, not AI-inferred observations. The system never suggests or infers a mode.
+
+**Acceptance Criteria:**
+
+**Given** a parent views their child's settings
+**When** they select an accommodation mode (Short-Burst, Audio-First, or Predictable)
+**Then** the mode is stored on the child's `learning_profiles` row as `accommodationMode`
+**And** the setting takes effect on the next session
+
+**Given** no `learning_profiles` row exists for the child
+**When** the parent sets an accommodation mode
+**Then** a `learning_profiles` row is created with default values and the selected mode
+
+**Given** the parent has not consented to memory collection (FR250.7)
+**When** they set an accommodation mode
+**Then** the mode is stored and active regardless — it does not require memory consent
+
+**Given** the parent changes the mode from one value to another
+**When** the update is saved
+**Then** only `accommodationMode` and `updatedAt` are modified
+**And** the `version` column is incremented (optimistic concurrency)
+
+**Given** the mode is set to `'none'`
+**When** the system prompt is built
+**Then** no accommodation block is injected — behavior is identical to today
+
+**FRs:** FR253
+
+**Failure Modes:**
+
+| State | Trigger | User sees | Recovery |
+|-------|---------|-----------|----------|
+| Save fails | Network error | Toast: "Couldn't save — try again" | Retry, setting reverts to previous value |
+| Concurrent update | Parent + Inngest analysis race | Version conflict | Retry with fresh read (optimistic lock) |
+| Profile created mid-session | Parent sets mode while child is in session | No immediate effect | Mode applies on next session, not mid-session |
+
+---
+
+### Story 16.12: Learning Accommodation Mode — Prompt Adaptation
+
+As a learner with an active accommodation mode,
+I want the mentor to consistently adapt its teaching to my processing style,
+So that sessions feel natural and not overwhelming, confusing, or unpredictable.
+
+**Acceptance Criteria:**
+
+**Given** a learner has `accommodationMode: 'short-burst'`
+**When** a session starts
+**Then** the system prompt includes the Short-Burst preamble
+**And** the mentor keeps explanations to 2-3 sentences, uses frequent check-ins, and celebrates small wins
+
+**Given** a learner has `accommodationMode: 'audio-first'`
+**When** a session starts
+**Then** the system prompt includes the Audio-First preamble
+**And** the mentor uses spoken-style language, phonetic support, and avoids visual-only content
+
+**Given** a learner has `accommodationMode: 'predictable'`
+**When** a session starts
+**Then** the system prompt includes the Predictable preamble
+**And** the mentor starts with an agenda, uses explicit transitions, and avoids ambiguity
+
+**Given** an accommodation mode is active and memory injection is disabled (FR250.8)
+**When** the system prompt is built
+**Then** the accommodation block is still injected — it is independent of the memory toggle
+
+**Given** an accommodation mode is active and a learner memory block exists
+**When** both are injected
+**Then** the accommodation block appears before the memory block in the prompt
+**And** the meta-instruction ensures accommodation rules take precedence over inferred preferences
+
+**FRs:** FR254
+
+**Failure Modes:**
+
+| State | Trigger | User sees | Recovery |
+|-------|---------|-----------|----------|
+| LLM ignores accommodation | Model doesn't follow preamble | Non-adapted session | Meta-instruction reinforces compliance. Session analysis can flag non-compliance for monitoring. |
+| Mode conflicts with inferred preference | Short-burst active but inferred preference is "thorough" | Accommodation wins | FR254.4: accommodation block has priority position and meta-instruction |
+| Prompt too long | Accommodation + full memory + history | Token budget exceeded | Accommodation block has separate budget (~150 tokens), does not compete with memory block |
+
+---
+
+### Story 16.13: Learning Accommodation Mode — Mobile Settings UI
+
+As a parent,
+I want to see clear descriptions of each accommodation mode and select one easily,
+So that I can make an informed choice without needing to understand clinical terminology.
+
+**Acceptance Criteria:**
+
+**Given** a parent opens their child's profile settings
+**When** they scroll to the learning section
+**Then** they see a "Learning accommodation" selector below the existing Learning Mode (serious/casual) setting
+**And** four options are displayed with 1-line descriptions
+
+**Given** a parent selects "Short-Burst"
+**When** the selection is saved
+**Then** the selector shows the active mode with a checkmark
+**And** a toast confirms "Accommodation updated"
+
+**Given** a child views the "What My Mentor Knows" screen (FR249)
+**When** they have an active accommodation mode (not `none`)
+**Then** a non-deletable badge at the top shows age-appropriate copy about their active mode
+**And** the badge cannot be removed by the child (parent-only control)
+
+**Given** a self-managed teen account (no linked parent)
+**When** they open their settings
+**Then** they can set their own accommodation mode from the same location
+
+**Given** the accommodation mode selector
+**When** memory collection is disabled or consent is pending
+**Then** the selector is still visible and functional — it does not depend on memory consent
+
+**FRs:** FR255
+
+**Failure Modes:**
+
+| State | Trigger | User sees | Recovery |
+|-------|---------|-----------|----------|
+| Settings screen load fails | Network error | Error fallback | Retry + Go Back |
+| Child tries to change mode | Taps the badge on mentor memory screen | Non-interactive badge | "Ask your parent to change this in settings" |
+| Mode set but no sessions yet | Parent enables mode for new child | No immediate visible effect | Confirmation toast: "This will take effect in your child's next session" |
+
+---
+
 ## Execution Order
 
 ### Phase A — Memory Infrastructure (Stories 16.1-16.3)
@@ -925,6 +1141,18 @@ UX refinements: consent-first, granular toggles,             ─── depends o
 
 Phase D makes memory feel collaborative rather than surveillance-like. Story 16.10 adds direct learner/parent input. The UX refinements from the 2026-04-09 review (consent-first, granular toggles, undo suppression, strengths-first layout, earlier struggle notifications, struggle resolution celebration, mentor check-in questions, human-readable export, per-subject interest hints) are folded into the existing stories they extend but grouped here for execution sequencing. Phase D depends on Phase C (the screens must exist before they can be enhanced).
 
+### Phase E — Learning Accommodation Modes (Stories 16.11-16.13)
+
+```
+16.11 (Schema & API — accommodationMode field + endpoints)     ─── depends on 16.1
+16.12 (Prompt adaptation — mode-specific preambles)            ─── depends on 16.11, 16.3
+16.13 (Mobile settings UI — parent selector + child badge)     ─── depends on 16.11, 16.7
+```
+
+Story 16.11 ships first (schema + API). Then 16.12 and 16.13 can run in parallel. Phase E depends on Phase A (the `learning_profiles` table must exist) and touches Phase C screens (the accommodation badge on the "What My Mentor Knows" screen), but is otherwise independent of Phases B–D. This means Phase E can begin as soon as Phase A is complete, in parallel with Phases B–D.
+
+Note: Accommodation modes are **parent-set preferences**, not AI-inferred — they do not depend on the session analysis pipeline (Phase B) or collaborative memory features (Phase D). They only need the schema (16.1), prompt injection point (16.3), and the mentor memory screen (16.7) for the child-facing badge.
+
 ### Summary
 
 ```
@@ -932,6 +1160,7 @@ Phase A: 16.1 → (16.2 || 16.3)           ── core infrastructure, must comp
 Phase B: (16.4 || 16.5 || 16.6)          ── depends on Phase A, internal parallelism
 Phase C: (16.7 → 16.8) || 16.9           ── depends on Phase A, parallel with Phase B
 Phase D: 16.10 + UX refinements           ── depends on Phase C, collaborative memory
+Phase E: 16.11 → (16.12 || 16.13)        ── depends on Phase A + 16.7, parallel with B–D
 ```
 
 ---
@@ -967,6 +1196,10 @@ Phase D: 16.10 + UX refinements           ── depends on Phase C, collaborati
 | **Struggle list feels like a judgment** — children with anxiety see a list of things they're bad at | Medium | Strengths-first layout (FR249.8): struggles are in a collapsible section titled "Things you're improving at" (collapsed by default). Progress indicators show improvement. Struggle resolution celebration (FR247.7) turns resolved struggles into achievements. |
 | **Parent learns about struggles too late** — 5 sessions of struggling before any notification | Medium | Two-tier notification (FR247.6): early signal at `medium` confidence (3 sessions), escalated signal at `high` (5 sessions). Parents are informed earlier without false-positive overload. |
 | **Default opt-in for children's behavioral profiling** — potential GDPR Article 8 non-compliance | High | Consent-first activation (FR250.7): memory collection requires explicit parental consent before first activation. One-time prompt on child dashboard. Consent state tracked in profile. |
+| **Accommodation mode stereotypes learning** — "Short-Burst" is used as a shortcut label instead of understanding the individual child | Medium | Accommodation modes are additive preambles, not replacement personas. The inferred learning profile (Phases A–D) still adapts to the individual. The mode provides a baseline; the profile refines it. Parents can set mode to `none` at any time. |
+| **Accommodation mode implies diagnosis** — parent or child infers the app is diagnosing neurodivergence | Medium | Capability-first naming (FR253.6): no clinical terms stored or displayed. UI descriptions focus on learning style ("shorter explanations", "clear structure"), not conditions. No "ADHD", "dyslexia", or "autism" anywhere in the app. |
+| **LLM ignores accommodation preamble** — model doesn't follow the mode-specific instructions | Medium | Meta-instruction (FR254.5) reinforces compliance. Accommodation block placed first in prompt (FR254.4) for highest attention. Prompt preambles are designed as concrete behavioral rules, not abstract goals. Monitor via session review sampling. |
+| **Mid-session mode change** — parent changes mode while child is in active session | Low | FR255.3: changes take effect on next session only. Current session continues with previous mode. No mid-session prompt mutation. |
 
 ---
 
@@ -1009,3 +1242,8 @@ Phase D: 16.10 + UX refinements           ── depends on Phase C, collaborati
 | Mentor check-in prompt | Conditional "Did that help?" in system prompt | 16.6 (FR248.6) |
 | Human-readable export | Formatted summary + JSON download | 16.8 (FR250.3) |
 | Interest relevance hint | Soft LLM instruction to not force interests | 16.4 (FR246.6) |
+| `accommodationMode` field on `learning_profiles` | Single-select enum: none, short-burst, audio-first, predictable | 16.11 (FR253) |
+| Accommodation mode API endpoints | GET/PUT on learner-profile settings, early row creation | 16.11 (FR253) |
+| Mode-specific prompt preambles | 3 prompt blocks (~150 tokens each) injected before memory block | 16.12 (FR254) |
+| Parent accommodation mode selector | Radio group/segmented control on child profile settings | 16.13 (FR255) |
+| Child accommodation badge | Non-deletable, age-adapted badge on "What My Mentor Knows" screen | 16.13 (FR255) |

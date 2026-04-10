@@ -1,4 +1,4 @@
-import { Hono, type Context } from 'hono';
+import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import type { Database } from '@eduagent/database';
 import {
@@ -12,7 +12,6 @@ import {
 } from '@eduagent/schemas';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
-import { forbidden } from '../errors';
 import {
   buildHumanReadableMemoryExport,
   deleteAllMemory,
@@ -25,7 +24,7 @@ import {
   unsuppressInference,
 } from '../services/learner-profile';
 import { parseLearnerInput } from '../services/learner-input';
-import { hasParentAccess } from '../services/family-access';
+import { assertParentAccess } from '../services/family-access';
 
 type LearnerProfileRouteEnv = {
   Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
@@ -35,19 +34,6 @@ type LearnerProfileRouteEnv = {
     profileId: string | undefined;
   };
 };
-
-async function requireChildAccess(
-  c: Context<LearnerProfileRouteEnv>,
-  childProfileId: string
-): Promise<string | Response> {
-  const db = c.get('db');
-  const parentProfileId = requireProfileId(c.get('profileId'));
-  const allowed = await hasParentAccess(db, parentProfileId, childProfileId);
-  if (!allowed) {
-    return forbidden(c, 'Profile does not belong to this family');
-  }
-  return parentProfileId;
-}
 
 export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
   .get('/learner-profile', async (c) => {
@@ -67,9 +53,9 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
   })
   .get('/learner-profile/:profileId/export-text', async (c) => {
     const db = c.get('db');
+    const parentProfileId = requireProfileId(c.get('profileId'));
     const childProfileId = c.req.param('profileId');
-    const access = await requireChildAccess(c, childProfileId);
-    if (access instanceof Response) return access;
+    await assertParentAccess(db, parentProfileId, childProfileId);
     const profile = await getOrCreateLearningProfile(db, childProfileId);
     return c.json({
       text: buildHumanReadableMemoryExport(profile),
@@ -78,9 +64,9 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
   })
   .get('/learner-profile/:profileId', async (c) => {
     const db = c.get('db');
+    const parentProfileId = requireProfileId(c.get('profileId'));
     const childProfileId = c.req.param('profileId');
-    const access = await requireChildAccess(c, childProfileId);
-    if (access instanceof Response) return access;
+    await assertParentAccess(db, parentProfileId, childProfileId);
     const profile = await getOrCreateLearningProfile(db, childProfileId);
     return c.json({ profile });
   })
@@ -107,9 +93,9 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
     zValidator('json', deleteMemoryItemSchema),
     async (c) => {
       const db = c.get('db');
+      const parentProfileId = requireProfileId(c.get('profileId'));
       const childProfileId = c.req.param('profileId');
-      const access = await requireChildAccess(c, childProfileId);
-      if (access instanceof Response) return access;
+      await assertParentAccess(db, parentProfileId, childProfileId);
       const input = c.req.valid('json');
       await deleteMemoryItem(
         db,
@@ -130,9 +116,9 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
   })
   .delete('/learner-profile/:profileId/all', async (c) => {
     const db = c.get('db');
+    const parentProfileId = requireProfileId(c.get('profileId'));
     const childProfileId = c.req.param('profileId');
-    const access = await requireChildAccess(c, childProfileId);
-    if (access instanceof Response) return access;
+    await assertParentAccess(db, parentProfileId, childProfileId);
     await deleteAllMemory(db, childProfileId);
     return c.json({ success: true });
   })
@@ -152,9 +138,9 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
     zValidator('json', toggleMemoryEnabledSchema),
     async (c) => {
       const db = c.get('db');
+      const parentProfileId = requireProfileId(c.get('profileId'));
       const childProfileId = c.req.param('profileId');
-      const access = await requireChildAccess(c, childProfileId);
-      if (access instanceof Response) return access;
+      await assertParentAccess(db, parentProfileId, childProfileId);
       const { memoryEnabled } = c.req.valid('json');
       await toggleMemoryEnabled(db, childProfileId, memoryEnabled);
       return c.json({ success: true });
@@ -176,9 +162,9 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
     zValidator('json', toggleMemoryCollectionSchema),
     async (c) => {
       const db = c.get('db');
+      const parentProfileId = requireProfileId(c.get('profileId'));
       const childProfileId = c.req.param('profileId');
-      const access = await requireChildAccess(c, childProfileId);
-      if (access instanceof Response) return access;
+      await assertParentAccess(db, parentProfileId, childProfileId);
       const { memoryCollectionEnabled } = c.req.valid('json');
       await toggleMemoryCollection(db, childProfileId, memoryCollectionEnabled);
       return c.json({ success: true });
@@ -200,9 +186,9 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
     zValidator('json', toggleMemoryInjectionSchema),
     async (c) => {
       const db = c.get('db');
+      const parentProfileId = requireProfileId(c.get('profileId'));
       const childProfileId = c.req.param('profileId');
-      const access = await requireChildAccess(c, childProfileId);
-      if (access instanceof Response) return access;
+      await assertParentAccess(db, parentProfileId, childProfileId);
       const { memoryInjectionEnabled } = c.req.valid('json');
       await toggleMemoryInjection(db, childProfileId, memoryInjectionEnabled);
       return c.json({ success: true });
@@ -213,9 +199,9 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
     zValidator('json', grantMemoryConsentSchema),
     async (c) => {
       const db = c.get('db');
+      const parentProfileId = requireProfileId(c.get('profileId'));
       const childProfileId = c.req.param('profileId');
-      const access = await requireChildAccess(c, childProfileId);
-      if (access instanceof Response) return access;
+      await assertParentAccess(db, parentProfileId, childProfileId);
       const { consent } = c.req.valid('json');
       await grantMemoryConsent(db, childProfileId, consent);
       return c.json({ success: true });
@@ -237,9 +223,9 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
     zValidator('json', tellMentorInputSchema),
     async (c) => {
       const db = c.get('db');
+      const parentProfileId = requireProfileId(c.get('profileId'));
       const childProfileId = c.req.param('profileId');
-      const access = await requireChildAccess(c, childProfileId);
-      if (access instanceof Response) return access;
+      await assertParentAccess(db, parentProfileId, childProfileId);
       const { text } = c.req.valid('json');
       const result = await parseLearnerInput(
         db,
@@ -266,9 +252,9 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
     zValidator('json', unsuppressInferenceSchema),
     async (c) => {
       const db = c.get('db');
+      const parentProfileId = requireProfileId(c.get('profileId'));
       const childProfileId = c.req.param('profileId');
-      const access = await requireChildAccess(c, childProfileId);
-      if (access instanceof Response) return access;
+      await assertParentAccess(db, parentProfileId, childProfileId);
       const { value } = c.req.valid('json');
       await unsuppressInference(db, childProfileId, value);
       return c.json({ success: true });

@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
-import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
 import type { Database } from '@eduagent/database';
+import { historyQuerySchema } from '@eduagent/schemas';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
 import {
@@ -25,12 +25,6 @@ type DashboardRouteEnv = {
     profileId: string | undefined;
   };
 };
-
-const historyQuerySchema = z.object({
-  from: z.string().optional(),
-  to: z.string().optional(),
-  granularity: z.enum(['daily', 'weekly']).optional(),
-});
 
 export const dashboardRoutes = new Hono<DashboardRouteEnv>()
   // Get parent dashboard data

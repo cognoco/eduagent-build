@@ -519,6 +519,7 @@ export function ChatShell({
               onSubmitEditing={handleSend}
               maxLength={5000}
               returnKeyType="send"
+              autoCapitalize="sentences"
               blurOnSubmit={false}
               editable={!isStreaming}
               testID="chat-input"

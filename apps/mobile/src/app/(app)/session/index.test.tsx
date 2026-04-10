@@ -655,7 +655,7 @@ describe('SessionScreen homework flow', () => {
 
   it('shows "+ New subject" escape hatch when classification fails [BUG-234]', async () => {
     (useLocalSearchParams as jest.Mock).mockReturnValue({
-      mode: 'freeform',
+      mode: 'learning',
     });
     mockClassifySubject.mockRejectedValue(new Error('Network error'));
 

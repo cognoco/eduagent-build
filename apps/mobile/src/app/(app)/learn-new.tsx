@@ -101,7 +101,21 @@ export default function LearnNewScreen(): React.ReactElement {
             onPress={() =>
               router.push({
                 pathname: '/(app)/session',
-                params: { sessionId: recoveryMarker.sessionId },
+                params: {
+                  sessionId: recoveryMarker.sessionId,
+                  ...(recoveryMarker.subjectId && {
+                    subjectId: recoveryMarker.subjectId,
+                  }),
+                  ...(recoveryMarker.subjectName && {
+                    subjectName: recoveryMarker.subjectName,
+                  }),
+                  ...(recoveryMarker.mode && {
+                    mode: recoveryMarker.mode,
+                  }),
+                  ...(recoveryMarker.topicId && {
+                    topicId: recoveryMarker.topicId,
+                  }),
+                },
               } as never)
             }
             testID="intent-resume"

@@ -7,6 +7,7 @@
 
 import { and, eq } from 'drizzle-orm';
 import { familyLinks, type Database } from '@eduagent/database';
+import { ForbiddenError } from '../errors';
 
 /**
  * Returns true if the authenticated parent profile has a family link to the
@@ -25,4 +26,20 @@ export async function hasParentAccess(
     ),
   });
   return Boolean(link);
+}
+
+/**
+ * Throws `ForbiddenError` when `parentProfileId` has no family link to
+ * `childProfileId`. Preferred over the return-type pattern because a missing
+ * check is a compile-time error (unused variable) or runtime crash, not a
+ * silent access bypass.
+ */
+export async function assertParentAccess(
+  db: Database,
+  parentProfileId: string,
+  childProfileId: string
+): Promise<void> {
+  if (!(await hasParentAccess(db, parentProfileId, childProfileId))) {
+    throw new ForbiddenError('You do not have access to this child profile.');
+  }
 }

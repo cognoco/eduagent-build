@@ -1,5 +1,9 @@
-import { eq } from 'drizzle-orm';
-import { monthlyReports, profiles } from '@eduagent/database';
+import { and, eq, gte, inArray, lte } from 'drizzle-orm';
+import {
+  monthlyReports,
+  profiles,
+  progressSnapshots,
+} from '@eduagent/database';
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
 import {
@@ -45,23 +49,27 @@ export const monthlyReportCron = inngest.createFunction(
         },
       });
 
-      const eligible: Array<{ parentId: string; childId: string }> = [];
-      for (const link of links) {
-        const snapshots = await getSnapshotsInRange(
-          db,
-          link.childProfileId,
-          isoDate(lastMonthStart),
-          isoDate(lastMonthEnd)
-        );
-        if (snapshots.length > 0) {
-          eligible.push({
-            parentId: link.parentProfileId,
-            childId: link.childProfileId,
-          });
-        }
-      }
+      const childIds = links.map((l) => l.childProfileId);
+      if (childIds.length === 0) return [];
 
-      return eligible;
+      const rows = await db
+        .selectDistinct({ childProfileId: progressSnapshots.profileId })
+        .from(progressSnapshots)
+        .where(
+          and(
+            inArray(progressSnapshots.profileId, childIds),
+            gte(progressSnapshots.snapshotDate, isoDate(lastMonthStart)),
+            lte(progressSnapshots.snapshotDate, isoDate(lastMonthEnd))
+          )
+        );
+      const activeChildIds = new Set(rows.map((r) => r.childProfileId));
+
+      return links
+        .filter((l) => activeChildIds.has(l.childProfileId))
+        .map((l) => ({
+          parentId: l.parentProfileId,
+          childId: l.childProfileId,
+        }));
     });
 
     if (pairs.length === 0) {

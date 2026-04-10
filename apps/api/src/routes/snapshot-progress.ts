@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
-import { ERROR_CODES } from '@eduagent/schemas';
+import { ERROR_CODES, historyQuerySchema } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
@@ -25,12 +25,6 @@ type SnapshotProgressRouteEnv = {
     profileId: string | undefined;
   };
 };
-
-const historyQuerySchema = z.object({
-  from: z.string().optional(),
-  to: z.string().optional(),
-  granularity: z.enum(['daily', 'weekly']).optional(),
-});
 
 const milestonesQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).optional(),
