@@ -193,10 +193,14 @@ export default function ProgressScreen(): React.ReactElement {
         ) : isError ? (
           <ErrorFallback
             title="We couldn't load your progress"
-            message="Check your connection and try again. Your data is safe."
+            message={
+              inventoryQuery.error?.message?.includes('API error')
+                ? 'Something went wrong on our end. Pull down or tap below to retry.'
+                : 'Check your connection and try again. Your data is safe.'
+            }
             primaryAction={{
               label: 'Try again',
-              onPress: () => void handleRefresh(),
+              onPress: () => void inventoryQuery.refetch(),
               testID: 'progress-error-retry',
             }}
             secondaryAction={{
