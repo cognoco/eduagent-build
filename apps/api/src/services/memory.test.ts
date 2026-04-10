@@ -1,4 +1,5 @@
 import { retrieveRelevantMemory } from './memory';
+import { createDatabaseModuleMock } from '../test-utils/database-module';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -10,9 +11,13 @@ jest.mock('./embeddings', () => ({
 }));
 
 const mockFindSimilarTopics = jest.fn();
-jest.mock('@eduagent/database', () => ({
-  findSimilarTopics: (...args: unknown[]) => mockFindSimilarTopics(...args),
-}));
+const mockDatabaseModule = createDatabaseModuleMock({
+  exports: {
+    findSimilarTopics: (...args: unknown[]) => mockFindSimilarTopics(...args),
+  },
+});
+
+jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
 const mockDb = {} as Parameters<typeof retrieveRelevantMemory>[0];
 

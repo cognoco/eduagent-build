@@ -481,15 +481,19 @@ describe('countGuidedMetrics', () => {
 // ---------------------------------------------------------------------------
 
 describe('getChildDetail', () => {
-  it('returns null when no parent-child link exists', async () => {
+  // [EP15-I5] Break test — previously returned null (and the route
+  // serialized that as 200 `{ child: null }`, masking IDOR as a benign
+  // not-found). Now throws ForbiddenError so app.onError converts to 403.
+  it('throws ForbiddenError when no parent-child link exists', async () => {
     const { getChildDetail } = await importDbFunctions();
+    const { ForbiddenError } = await import('../errors');
     const db = createMockDb();
 
     mockFamilyLinksFindFirst.mockResolvedValue(null);
 
-    const result = await getChildDetail(db as never, PARENT_ID, CHILD_ID);
-
-    expect(result).toBeNull();
+    await expect(
+      getChildDetail(db as never, PARENT_ID, CHILD_ID)
+    ).rejects.toBeInstanceOf(ForbiddenError);
     expect(mockFamilyLinksFindFirst).toHaveBeenCalled();
   });
 
@@ -534,20 +538,19 @@ describe('getChildDetail', () => {
 // ---------------------------------------------------------------------------
 
 describe('getChildSubjectTopics', () => {
-  it('returns empty when no parent-child link exists', async () => {
+  // [EP15-I5] Break test — `[]` on access denial masked forbidden as
+  // "child has no topics yet". Routes returned 200 with empty array,
+  // giving no feedback that the user had lost access (or never had it).
+  it('throws ForbiddenError when no parent-child link exists', async () => {
     const { getChildSubjectTopics } = await importDbFunctions();
+    const { ForbiddenError } = await import('../errors');
     const db = createMockDb();
 
     mockFamilyLinksFindFirst.mockResolvedValue(null);
 
-    const result = await getChildSubjectTopics(
-      db as never,
-      PARENT_ID,
-      CHILD_ID,
-      SUBJECT_ID
-    );
-
-    expect(result).toEqual([]);
+    await expect(
+      getChildSubjectTopics(db as never, PARENT_ID, CHILD_ID, SUBJECT_ID)
+    ).rejects.toBeInstanceOf(ForbiddenError);
   });
 
   it('returns empty when no curriculum exists for the subject', async () => {
@@ -622,15 +625,19 @@ const SESSION_ID_1 = '00000000-0000-0000-0000-000000000010';
 const SESSION_ID_2 = '00000000-0000-0000-0000-000000000011';
 
 describe('getChildSessions', () => {
-  it('returns empty array when no parent-child link exists', async () => {
+  // [EP15-I5] Break test — sessions list is more sensitive than topic
+  // progress because it contains transcript previews. Masking forbidden
+  // as empty here is a particularly bad IDOR posture.
+  it('throws ForbiddenError when no parent-child link exists', async () => {
     const { getChildSessions } = await importDbFunctions();
+    const { ForbiddenError } = await import('../errors');
     const db = createMockDb();
 
     mockFamilyLinksFindFirst.mockResolvedValue(null);
 
-    const result = await getChildSessions(db as never, PARENT_ID, CHILD_ID);
-
-    expect(result).toEqual([]);
+    await expect(
+      getChildSessions(db as never, PARENT_ID, CHILD_ID)
+    ).rejects.toBeInstanceOf(ForbiddenError);
     expect(mockFamilyLinksFindFirst).toHaveBeenCalled();
     expect(mockSessionsFindMany).not.toHaveBeenCalled();
   });
@@ -711,20 +718,20 @@ describe('getChildSessions', () => {
 // ---------------------------------------------------------------------------
 
 describe('getChildSessionTranscript', () => {
-  it('returns null when no parent-child link exists', async () => {
+  // [EP15-I5] Break test — transcripts contain full conversation history.
+  // Access denial must be a 403, not a 200 with null body. Note the
+  // "returns null when session does not belong to child" test further down
+  // is still correct — that null means "access granted but 404", not "forbidden".
+  it('throws ForbiddenError when no parent-child link exists', async () => {
     const { getChildSessionTranscript } = await importDbFunctions();
+    const { ForbiddenError } = await import('../errors');
     const db = createMockDb();
 
     mockFamilyLinksFindFirst.mockResolvedValue(null);
 
-    const result = await getChildSessionTranscript(
-      db as never,
-      PARENT_ID,
-      CHILD_ID,
-      SESSION_ID_1
-    );
-
-    expect(result).toBeNull();
+    await expect(
+      getChildSessionTranscript(db as never, PARENT_ID, CHILD_ID, SESSION_ID_1)
+    ).rejects.toBeInstanceOf(ForbiddenError);
     expect(mockSessionsFindFirst).not.toHaveBeenCalled();
   });
 

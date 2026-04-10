@@ -2,9 +2,13 @@
 // Database Middleware Tests
 // ---------------------------------------------------------------------------
 
-jest.mock('@eduagent/database', () => ({
-  createDatabase: jest.fn().mockReturnValue({ mock: true }),
-}));
+import { createDatabaseModuleMock } from '../test-utils/database-module';
+
+const mockDatabaseModule = createDatabaseModuleMock({
+  db: { mock: true },
+});
+
+jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
 import { Hono } from 'hono';
 import { databaseMiddleware } from './database';

@@ -1,11 +1,14 @@
-jest.mock('@eduagent/database', () => {
-  const actual = jest.requireActual('@eduagent/database');
-  return {
-    ...actual,
+import { createDatabaseModuleMock } from '../test-utils/database-module';
+
+const mockDatabaseModule = createDatabaseModuleMock({
+  includeActual: true,
+  exports: {
     createScopedRepository: jest.fn(),
     generateUUIDv7: jest.fn().mockReturnValue('mock-uuid-v7'),
-  };
+  },
 });
+
+jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
 import {
   createScopedRepository,

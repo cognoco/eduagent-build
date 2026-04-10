@@ -14,16 +14,15 @@ jest.mock('../middleware/jwt', () => ({
   }),
 }));
 
-jest.mock('@eduagent/database', () => {
-  const mockDb = {
-    transaction: jest
-      .fn()
-      .mockImplementation(async (fn: (tx: unknown) => unknown) => fn(mockDb)),
-  };
-  return {
-    createDatabase: jest.fn().mockReturnValue(mockDb),
-  };
-});
+import {
+  createDatabaseModuleMock,
+  createTransactionalMockDb,
+} from '../test-utils/database-module';
+
+const mockDb = createTransactionalMockDb();
+const mockDatabaseModule = createDatabaseModuleMock({ db: mockDb });
+
+jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
 jest.mock('../services/account', () => ({
   findOrCreateAccount: jest.fn().mockResolvedValue({

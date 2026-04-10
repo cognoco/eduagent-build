@@ -5,13 +5,19 @@
 const mockFindFirst = jest.fn();
 const mockTopicFindFirst = jest.fn();
 
-jest.mock('@eduagent/database', () => ({
-  createScopedRepository: jest.fn(() => ({
-    sessions: { findFirst: mockFindFirst },
-  })),
-  learningSessions: { id: 'id' },
-  curriculumTopics: { id: 'id' },
-}));
+import { createDatabaseModuleMock } from '../test-utils/database-module';
+
+const mockDatabaseModule = createDatabaseModuleMock({
+  exports: {
+    createScopedRepository: jest.fn(() => ({
+      sessions: { findFirst: mockFindFirst },
+    })),
+    learningSessions: { id: 'id' },
+    curriculumTopics: { id: 'id' },
+  },
+});
+
+jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
 const mockRouteAndCall = jest.fn();
 

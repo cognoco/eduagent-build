@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import { STABILITY_THRESHOLD } from './retention';
+import { createDatabaseModuleMock } from '../test-utils/database-module';
 
 // Mock database
 const mockFindMany = jest.fn();
@@ -10,15 +11,19 @@ const mockFindFirst = jest.fn();
 const mockInsert = jest.fn();
 const mockReturning = jest.fn();
 
-jest.mock('@eduagent/database', () => ({
-  createScopedRepository: jest.fn(() => ({
-    retentionCards: { findMany: mockFindMany },
-  })),
-  retentionCards: { topicId: 'topicId', profileId: 'profileId' },
-  curriculumTopics: { id: 'id', curriculumId: 'curriculumId' },
-  curricula: { id: 'id', subjectId: 'subjectId' },
-  learningSessions: {},
-}));
+const mockDatabaseModule = createDatabaseModuleMock({
+  exports: {
+    createScopedRepository: jest.fn(() => ({
+      retentionCards: { findMany: mockFindMany },
+    })),
+    retentionCards: { topicId: 'topicId', profileId: 'profileId' },
+    curriculumTopics: { id: 'id', curriculumId: 'curriculumId' },
+    curricula: { id: 'id', subjectId: 'subjectId' },
+    learningSessions: {},
+  },
+});
+
+jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
 import {
   selectInterleavedTopics,

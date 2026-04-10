@@ -2,9 +2,11 @@
 // Subject Auto-Archive — Tests
 // ---------------------------------------------------------------------------
 
-jest.mock('@eduagent/database', () => ({
-  createDatabase: jest.fn(() => ({})),
-}));
+import { createDatabaseModuleMock } from '../../test-utils/database-module';
+
+const mockDatabaseModule = createDatabaseModuleMock();
+
+jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
 const mockArchiveInactiveSubjects = jest.fn().mockResolvedValue([]);
 

@@ -18,15 +18,18 @@ jest.mock('../middleware/jwt', () => ({
 // Mock database module — middleware creates a stub db per request
 // ---------------------------------------------------------------------------
 
-jest.mock('@eduagent/database', () => ({
-  createDatabase: jest.fn().mockReturnValue({
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    transaction: jest.fn().mockImplementation(async (cb: (tx: any) => any) => {
-      const tx = { execute: jest.fn().mockResolvedValue(undefined) };
-      return cb(tx);
-    }),
+import {
+  createDatabaseModuleMock,
+  createTransactionalMockDb,
+} from '../test-utils/database-module';
+
+const mockDatabaseModule = createDatabaseModuleMock({
+  db: createTransactionalMockDb({
+    execute: jest.fn().mockResolvedValue(undefined),
   }),
-}));
+});
+
+jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
 // ---------------------------------------------------------------------------
 // Mock account service — resolves Clerk user → local Account

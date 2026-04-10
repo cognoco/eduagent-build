@@ -34,9 +34,11 @@ jest.mock('../inngest/client', () => ({
 }));
 
 // Minimal database stub — middleware creates it per request.
-jest.mock('@eduagent/database', () => ({
-  createDatabase: jest.fn().mockReturnValue({}),
-}));
+import { createDatabaseModuleMock } from '../test-utils/database-module';
+
+const mockDatabaseModule = createDatabaseModuleMock();
+
+jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
 jest.mock('../services/account', () => ({
   findOrCreateAccount: jest.fn().mockResolvedValue({
@@ -178,7 +180,7 @@ describe('learner-profile routes', () => {
       expect(res.status).toBe(403);
       expect(mockGetOrCreateLearningProfile).not.toHaveBeenCalled();
       expect(mockHasParentAccess).toHaveBeenCalledWith(
-        expect.anything(),
+        undefined,
         PARENT_PROFILE_ID,
         OTHER_FAMILY_CHILD_ID
       );
@@ -259,7 +261,7 @@ describe('learner-profile routes', () => {
 
       expect(res.status).toBe(200);
       expect(mockGetOrCreateLearningProfile).toHaveBeenCalledWith(
-        expect.anything(),
+        undefined,
         OWN_CHILD_PROFILE_ID
       );
       const body = (await res.json()) as { profile: { id: string } };
@@ -279,7 +281,7 @@ describe('learner-profile routes', () => {
 
       expect(res.status).toBe(200);
       expect(mockGrantMemoryConsent).toHaveBeenCalledWith(
-        expect.anything(),
+        undefined,
         OWN_CHILD_PROFILE_ID,
         'granted'
       );
@@ -313,7 +315,7 @@ describe('learner-profile routes', () => {
 
       expect(res.status).toBe(200);
       expect(mockDeleteAllMemory).toHaveBeenCalledWith(
-        expect.anything(),
+        undefined,
         PARENT_PROFILE_ID
       );
       // Family-link check is not required for self-scoped routes.
@@ -333,7 +335,7 @@ describe('learner-profile routes', () => {
 
       expect(res.status).toBe(200);
       expect(mockToggleMemoryEnabled).toHaveBeenCalledWith(
-        expect.anything(),
+        undefined,
         PARENT_PROFILE_ID,
         false
       );
@@ -356,7 +358,7 @@ describe('learner-profile routes', () => {
 
       expect(res.status).toBe(200);
       expect(mockDeleteMemoryItem).toHaveBeenCalledWith(
-        expect.anything(),
+        undefined,
         PARENT_PROFILE_ID,
         'interests',
         'dinosaurs',
