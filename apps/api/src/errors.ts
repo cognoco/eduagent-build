@@ -15,6 +15,27 @@ export class NotFoundError extends Error {
   }
 }
 
+/**
+ * Typed domain error for authorization failures.
+ * Thrown by services when a caller lacks permission to read or mutate a
+ * resource — notably parent → child access checks in the dashboard service.
+ *
+ * [EP15-I5] Introduced to replace the anti-pattern where services returned
+ * `null`/`[]` on `hasParentAccess === false`, which masked IDOR denials as
+ * empty-state responses (HTTP 200 with empty body) instead of 403s. Empty
+ * state is semantically indistinguishable from "no children" — a real
+ * security issue if automation probes endpoints by iterating IDs.
+ *
+ * The central `app.onError` handler converts this to a 403 response so
+ * individual route handlers don't need per-endpoint try/catch blocks.
+ */
+export class ForbiddenError extends Error {
+  constructor(message = 'Insufficient permissions') {
+    super(message);
+    this.name = 'ForbiddenError';
+  }
+}
+
 export function apiError(
   c: Context,
   status: 400 | 401 | 403 | 404 | 409 | 410 | 422 | 429 | 500 | 501 | 502 | 503,

@@ -9,7 +9,10 @@ export const subjectProgressMetricsSchema = z.object({
   topicsAttempted: z.number().int(),
   topicsMastered: z.number().int(),
   topicsTotal: z.number().int(),
-  topicsExplored: z.number().int(),
+  // [EP15-C8] default(0) keeps pre-existing JSONB snapshots parseable after
+  // the topicsExplored field was added (FR241.5). Without it, reads of old
+  // snapshot rows throw and the `?? 0` fallbacks elsewhere are never reached.
+  topicsExplored: z.number().int().default(0),
   vocabularyTotal: z.number().int(),
   vocabularyMastered: z.number().int(),
   sessionsCount: z.number().int(),
@@ -88,7 +91,8 @@ export const progressDataPointSchema = z.object({
   date: z.string(),
   topicsMastered: z.number().int(),
   topicsAttempted: z.number().int(),
-  topicsExplored: z.number().int(),
+  // [EP15-C8] default(0) — same forward-compat rationale as subjectProgressMetricsSchema
+  topicsExplored: z.number().int().default(0),
   vocabularyTotal: z.number().int(),
   vocabularyMastered: z.number().int(),
   totalSessions: z.number().int(),
@@ -137,7 +141,12 @@ export const monthMetricsSchema = z.object({
   totalActiveMinutes: z.number().int(),
   topicsMastered: z.number().int(),
   topicsExplored: z.number().int(),
-  vocabularyLearned: z.number().int(),
+  // [EP15-I2 AR-6] Renamed from `vocabularyLearned`. The previous name
+  // implied per-month delta but `lastMonth` stored a cumulative total
+  // (split-personality field). `vocabularyTotal` unambiguously holds the
+  // cumulative vocabulary count at month end — deltas are computed at
+  // display time from `thisMonth.vocabularyTotal - lastMonth.vocabularyTotal`.
+  vocabularyTotal: z.number().int(),
   streakBest: z.number().int(),
 });
 export type MonthMetrics = z.infer<typeof monthMetricsSchema>;
@@ -147,7 +156,9 @@ export const subjectMonthlyDetailSchema = z.object({
   topicsMastered: z.number().int(),
   topicsAttempted: z.number().int(),
   topicsExplored: z.number().int(),
-  vocabularyLearned: z.number().int(),
+  // [EP15-I2 AR-6] Cumulative vocabulary count for this subject at month end.
+  // See monthMetricsSchema comment above for the rename rationale.
+  vocabularyTotal: z.number().int(),
   activeMinutes: z.number().int(),
   trend: z.enum(['growing', 'stable', 'declining']),
 });

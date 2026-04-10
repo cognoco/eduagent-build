@@ -7,6 +7,7 @@ import { ERROR_CODES } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 
 import { captureException } from './services/sentry';
+import { ForbiddenError, NotFoundError } from './errors';
 
 import { envValidationMiddleware } from './middleware/env-validation';
 import { authMiddleware } from './middleware/auth';
@@ -223,6 +224,19 @@ app.onError((err, c) => {
   // middleware/routes (e.g. requireProfileId → 401). Forward its response as-is.
   if (err instanceof HTTPException) {
     return err.getResponse();
+  }
+
+  // [EP15-I5] Typed-error classification at the boundary (per global
+  // CLAUDE.md "Typed Error Hierarchy" rule). Services throw
+  // ForbiddenError/NotFoundError; this handler converts them to HTTP
+  // status codes once, so individual route handlers don't need per-endpoint
+  // try/catch. Important: we do NOT captureException for these — they are
+  // expected domain outcomes, not server faults.
+  if (err instanceof ForbiddenError) {
+    return c.json({ code: ERROR_CODES.FORBIDDEN, message: err.message }, 403);
+  }
+  if (err instanceof NotFoundError) {
+    return c.json({ code: ERROR_CODES.NOT_FOUND, message: err.message }, 404);
   }
 
   // Report to Sentry with user/request context (primary observability channel)
