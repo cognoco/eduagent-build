@@ -23,7 +23,7 @@ import { PenWritingAnimation } from '../common';
 
 export interface ChatMessage {
   id: string;
-  role: 'ai' | 'user';
+  role: 'assistant' | 'user';
   content: string;
   streaming?: boolean;
   kind?: 'reconnect_prompt' | 'session_expired';
@@ -73,7 +73,7 @@ export function animateResponse(
   const streamId = `ai-${Date.now()}`;
   setMessages((prev) => [
     ...prev,
-    { id: streamId, role: 'ai', content: '', streaming: true },
+    { id: streamId, role: 'assistant', content: '', streaming: true },
   ]);
   setIsStreaming(true);
 
@@ -207,7 +207,7 @@ export function ChatShell({
     // Find the last AI message that is NOT streaming
     const lastAiMessage = [...messages]
       .reverse()
-      .find((m) => m.role === 'ai' && !m.streaming);
+      .find((m) => m.role === 'assistant' && !m.streaming);
 
     if (!lastAiMessage) return;
     if (lastAiMessage.id === lastSpokenIdRef.current) return;
@@ -328,7 +328,7 @@ export function ChatShell({
 
   const lastMessageIsAi = useMemo(() => {
     const last = messages[messages.length - 1];
-    return last?.role === 'ai' && !last.streaming;
+    return last?.role === 'assistant' && !last.streaming;
   }, [messages]);
 
   useEffect(() => {

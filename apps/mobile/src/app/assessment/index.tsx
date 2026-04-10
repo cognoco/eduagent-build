@@ -25,7 +25,7 @@ export default function AssessmentScreen() {
   const submitAnswer = useSubmitAnswer(assessmentId ?? '');
 
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { id: 'opening', role: 'ai', content: OPENING_MESSAGE },
+    { id: 'opening', role: 'assistant', content: OPENING_MESSAGE },
   ]);
   const [isStreaming, setIsStreaming] = useState(false);
 
@@ -57,7 +57,7 @@ export default function AssessmentScreen() {
               ...prev,
               {
                 id: `assessment-done-${Date.now()}`,
-                role: 'ai',
+                role: 'assistant',
                 content: `You've got a solid grasp of most of this \u2014 ${Math.round(
                   evaluation.masteryScore * 100
                 )}% mastery! The areas to revisit will show up in your Library.`,

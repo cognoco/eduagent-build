@@ -18,7 +18,7 @@ import { useThemeColors } from '../../lib/theme';
 export type VerificationBadge = 'evaluate' | 'teach_back';
 
 interface MessageBubbleProps {
-  role: 'ai' | 'user';
+  role: 'assistant' | 'user';
   content: string;
   streaming?: boolean;
   escalationRung?: number;
@@ -273,7 +273,7 @@ export function MessageBubble({
   verificationBadge,
   actions,
 }: MessageBubbleProps): React.ReactElement {
-  const isAI = role === 'ai';
+  const isAI = role === 'assistant';
   const colors = useThemeColors();
   const displayContent = isAI ? formatMathContent(content) : content;
   const escalation =

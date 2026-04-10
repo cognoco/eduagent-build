@@ -35,7 +35,7 @@ export default function InterviewScreen() {
     : OPENING_MESSAGE;
 
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { id: 'opening', role: 'ai', content: openingMessage },
+    { id: 'opening', role: 'assistant', content: openingMessage },
   ]);
   const isStreaming = isStreamingSSE;
   const [interviewComplete, setInterviewComplete] = useState(false);
@@ -51,7 +51,9 @@ export default function InterviewScreen() {
 
   useEffect(() => {
     seededDraftRef.current = false;
-    setMessages([{ id: 'opening', role: 'ai', content: openingMessage }]);
+    setMessages([
+      { id: 'opening', role: 'assistant', content: openingMessage },
+    ]);
     setInterviewComplete(false);
     setRestartRequired(false);
     setStreamError(null);
@@ -78,7 +80,7 @@ export default function InterviewScreen() {
       state.exchangeHistory?.map(
         (exchange, index): ChatMessage => ({
           id: `draft-${index}`,
-          role: exchange.role === 'assistant' ? 'ai' : 'user',
+          role: exchange.role === 'assistant' ? 'assistant' : 'user',
           content: exchange.content
             .replace(/\[INTERVIEW_COMPLETE\]/g, '')
             .trimEnd(),
@@ -89,7 +91,7 @@ export default function InterviewScreen() {
       setMessages(
         mappedHistory.length > 0
           ? mappedHistory
-          : [{ id: 'opening', role: 'ai', content: openingMessage }]
+          : [{ id: 'opening', role: 'assistant', content: openingMessage }]
       );
       setInterviewComplete(true);
       seededDraftRef.current = true;
@@ -100,7 +102,7 @@ export default function InterviewScreen() {
       setMessages([
         {
           id: 'expired',
-          role: 'ai',
+          role: 'assistant',
           content: state.resumeSummary?.trim()
             ? `This interview expired after 7 days away. ${state.resumeSummary}`
             : 'This interview expired after 7 days away. Restart to begin again.',
@@ -119,7 +121,7 @@ export default function InterviewScreen() {
         ...mappedHistory,
         {
           id: 'resume',
-          role: 'ai',
+          role: 'assistant',
           content: `Continue your interview? ${resumePrompt}`,
         },
       ]);
@@ -131,7 +133,9 @@ export default function InterviewScreen() {
   const handleRestartInterview = useCallback(() => {
     try {
       abortStream();
-      setMessages([{ id: 'opening', role: 'ai', content: openingMessage }]);
+      setMessages([
+        { id: 'opening', role: 'assistant', content: openingMessage },
+      ]);
       setInterviewComplete(false);
       setRestartRequired(false);
       setStreamError(null);
@@ -151,7 +155,7 @@ export default function InterviewScreen() {
       setMessages((prev) => [
         ...prev,
         { id: `user-${Date.now()}`, role: 'user', content: text },
-        { id: streamMsgId, role: 'ai', content: '', streaming: true },
+        { id: streamMsgId, role: 'assistant', content: '', streaming: true },
       ]);
 
       try {

@@ -338,7 +338,7 @@ export default function SessionScreen() {
   const { isApiReachable, isChecked: apiChecked } = useApiReachability();
 
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { id: 'opening', role: 'ai', content: openingContent },
+    { id: 'opening', role: 'assistant', content: openingContent },
   ]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [exchangeCount, setExchangeCount] = useState(0);
@@ -435,7 +435,9 @@ export default function SessionScreen() {
   useFocusEffect(
     useCallback(() => {
       animationCleanupRef.current?.();
-      setMessages([{ id: 'opening', role: 'ai', content: openingContent }]);
+      setMessages([
+        { id: 'opening', role: 'assistant', content: openingContent },
+      ]);
       setIsStreaming(false);
       setExchangeCount(0);
       setEscalationRung(1);
@@ -584,7 +586,10 @@ export default function SessionScreen() {
         id: `${entry.isSystemPrompt ? 'system' : entry.role}-${index}-${
           entry.timestamp
         }`,
-        role: entry.role === 'assistant' ? ('ai' as const) : ('user' as const),
+        role:
+          entry.role === 'assistant'
+            ? ('assistant' as const)
+            : ('user' as const),
         content: entry.content,
         eventId: entry.eventId,
         isSystemPrompt: entry.isSystemPrompt,
@@ -594,7 +599,7 @@ export default function SessionScreen() {
     setMessages(
       transcriptMessages.length > 0
         ? transcriptMessages
-        : [{ id: 'opening', role: 'ai', content: openingContent }]
+        : [{ id: 'opening', role: 'assistant', content: openingContent }]
     );
     setExchangeCount(transcript.data.session.exchangeCount);
     setEscalationRung(
@@ -613,7 +618,7 @@ export default function SessionScreen() {
     setMessages([
       {
         id: 'session-expired',
-        role: 'ai',
+        role: 'assistant',
         content: 'Session expired. Start a new one to keep going.',
         isSystemPrompt: true,
         kind: 'session_expired',
@@ -718,7 +723,7 @@ export default function SessionScreen() {
             ...prev,
             {
               id: 'silence-prompt',
-              role: 'ai',
+              role: 'assistant',
               content: prompt,
               isSystemPrompt: true,
             },
@@ -988,7 +993,7 @@ export default function SessionScreen() {
         const previousAiAt = lastAiAtRef.current;
         setMessages((prev) => [
           ...prev,
-          { id: streamId!, role: 'ai', content: '', streaming: true },
+          { id: streamId!, role: 'assistant', content: '', streaming: true },
         ]);
         setIsStreaming(true);
 
@@ -1119,7 +1124,7 @@ export default function SessionScreen() {
           ...prev,
           {
             id: createLocalMessageId('ai'),
-            role: 'ai',
+            role: 'assistant',
             content: errorMessage,
             isSystemPrompt: reconnectable,
             kind: reconnectable ? 'reconnect_prompt' : undefined,
@@ -1191,7 +1196,7 @@ export default function SessionScreen() {
         ...prev,
         {
           id: createLocalMessageId('ai'),
-          role: 'ai',
+          role: 'assistant',
           content: `Got it, we're working on ${candidate.subjectName}.`,
           isSystemPrompt: true,
         },
@@ -1228,7 +1233,7 @@ export default function SessionScreen() {
       ...prev,
       {
         id: createLocalMessageId('ai'),
-        role: 'ai',
+        role: 'assistant',
         content: `Adding ${suggestedName} and getting started...`,
         isSystemPrompt: true,
       },
@@ -1299,7 +1304,7 @@ export default function SessionScreen() {
               ...prev,
               {
                 id: createLocalMessageId('ai'),
-                role: 'ai',
+                role: 'assistant',
                 content: `Got it, this sounds like ${candidate.subjectName}.`,
                 isSystemPrompt: true,
               },
@@ -1914,8 +1919,8 @@ export default function SessionScreen() {
     () =>
       [...messages]
         .reverse()
-        .find((message) => message.role === 'ai' && !message.streaming)?.id ??
-      null,
+        .find((message) => message.role === 'assistant' && !message.streaming)
+        ?.id ?? null,
     [messages]
   );
 
@@ -2214,7 +2219,11 @@ export default function SessionScreen() {
   );
 
   const renderMessageActions = (message: ChatMessage): React.ReactNode => {
-    if (message.role !== 'ai' || message.streaming || message.isSystemPrompt) {
+    if (
+      message.role !== 'assistant' ||
+      message.streaming ||
+      message.isSystemPrompt
+    ) {
       if (message.kind === 'reconnect_prompt') {
         return (
           <Pressable
