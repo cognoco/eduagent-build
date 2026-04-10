@@ -1117,8 +1117,7 @@ export default function AppLayout() {
         <Tabs.Screen
           name="pick-book"
           options={{
-            href: null,
-            tabBarItemStyle: { display: 'none' },
+            tabBarButton: () => null,
           }}
         />
         <Tabs.Screen
