@@ -6,6 +6,10 @@ export type AgeBracket = 'child' | 'adolescent' | 'adult';
  * Uses `currentYear - birthYear`, which can overestimate by up to 11 months.
  * Callers that need conservative safety gating (consent, minimum-age checks)
  * should use `<=` thresholds to compensate.
+ *
+ * @see personaFromBirthYear in apps/mobile/src/lib/profile.ts — mobile-only
+ *   UI theme variant with different labels ('teen' | 'learner' | 'parent').
+ *   Same thresholds, different purpose. Do not unify.
  */
 export function computeAgeBracket(
   birthYear: number,

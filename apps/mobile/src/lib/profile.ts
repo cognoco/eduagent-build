@@ -33,9 +33,15 @@ const storage = {
 export type { Profile };
 
 /**
- * Derive a persona string from the profile's birthYear.
- * age < 13 → 'teen', age < 18 → 'learner', else 'parent'.
+ * Derive a visual persona for UI theming from the profile's birthYear.
+ * Under 13 → 'teen' (child-friendly theme), 13–17 → 'learner', 18+ → 'parent'.
  * Falls back to 'learner' when birthYear is null/undefined.
+ *
+ * The label names are theme keys, not age descriptions — a child under 13
+ * gets the 'teen' theme because the learner/parent themes assume more maturity.
+ *
+ * @see computeAgeBracket in @eduagent/schemas — shared consent-gating variant
+ *   with labels ('child' | 'adolescent' | 'adult'). Same thresholds, different purpose.
  */
 export function personaFromBirthYear(
   birthYear: number | null | undefined
