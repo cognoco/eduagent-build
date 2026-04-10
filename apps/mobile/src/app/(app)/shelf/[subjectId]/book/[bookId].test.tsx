@@ -584,8 +584,8 @@ describe('BookScreen', () => {
     );
   });
 
-  it('long-pressing a session row shows context alert', () => {
-    const alertSpy = jest.spyOn(Alert, 'alert');
+  it('long-pressing a session row no longer shows unavailable actions', () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(jest.fn());
     mockUseBookSessions.mockReturnValue({
       data: makeSessions(1),
       isLoading: false,
@@ -594,15 +594,7 @@ describe('BookScreen', () => {
     const { getByTestId } = render(<BookScreen />);
     fireEvent(getByTestId('session-sess-1'), 'longPress');
 
-    expect(alertSpy).toHaveBeenCalledWith(
-      'Session Topic 1',
-      undefined,
-      expect.arrayContaining([
-        expect.objectContaining({ text: 'Move to different book' }),
-        expect.objectContaining({ text: 'Delete', style: 'destructive' }),
-        expect.objectContaining({ text: 'Cancel', style: 'cancel' }),
-      ])
-    );
+    expect(alertSpy).not.toHaveBeenCalled();
   });
 
   it('shows "Past sessions" heading when sessions exist', () => {

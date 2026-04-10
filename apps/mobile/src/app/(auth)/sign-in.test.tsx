@@ -6,12 +6,18 @@ import {
   act,
 } from '@testing-library/react-native';
 import { useSignIn, useSSO } from '@clerk/clerk-expo';
+import * as Linking from 'expo-linking';
 
 const mockReplace = jest.fn();
 const mockPush = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ replace: mockReplace, push: mockPush }),
+}));
+
+jest.mock('expo-linking', () => ({
+  createURL: jest.fn(() => 'mentomate://sso-callback'),
+  openURL: jest.fn(),
 }));
 
 jest.mock('react-native-safe-area-context', () => ({
@@ -21,6 +27,10 @@ jest.mock('react-native-safe-area-context', () => ({
 const signInModule = require('./sign-in');
 const SignInScreen = signInModule.default;
 const { clearTransitionState } = require('../../lib/auth-transition');
+const {
+  markSessionExpired,
+  clearSessionExpiredNotice,
+} = require('../../lib/auth-expiry');
 
 describe('SignInScreen', () => {
   const mockCreate = jest.fn();
@@ -34,6 +44,7 @@ describe('SignInScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     clearTransitionState();
+    clearSessionExpiredNotice();
     delete process.env.EXPO_PUBLIC_CLERK_OPENAI_SSO_KEY;
     (useSignIn as jest.Mock).mockReturnValue({
       isLoaded: true,
@@ -492,7 +503,53 @@ describe('SignInScreen', () => {
     await waitFor(() => {
       expect(
         screen.getByText(
-          'This account needs an additional verification method that this build does not support yet. Please use a different sign-in method.'
+          'This account needs a security key or passkey to finish signing in, and this build does not support that yet. Try Google or Apple if you use them on this account, or contact support for help.'
+        )
+      ).toBeTruthy();
+    });
+
+    expect(screen.getByTestId('sign-in-unsupported-factor-help')).toBeTruthy();
+  });
+
+  it('opens support email when unsupported MFA help is used', async () => {
+    (Linking.openURL as jest.Mock).mockResolvedValue(true);
+    mockCreate.mockResolvedValue({
+      status: 'needs_second_factor',
+      createdSessionId: null,
+      supportedSecondFactors: [{ strategy: 'webauthn' }],
+    });
+
+    render(<SignInScreen />);
+
+    fireEvent.changeText(
+      screen.getByTestId('sign-in-email'),
+      'test@example.com'
+    );
+    fireEvent.changeText(screen.getByTestId('sign-in-password'), 'password123');
+    fireEvent.press(screen.getByTestId('sign-in-button'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('sign-in-contact-support')).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByTestId('sign-in-contact-support'));
+
+    await waitFor(() => {
+      expect(Linking.openURL).toHaveBeenCalledWith(
+        expect.stringContaining('mailto:support@mentomate.app')
+      );
+    });
+  });
+
+  it('shows a session-expired banner after forced sign-out', async () => {
+    markSessionExpired();
+
+    render(<SignInScreen />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          'Your session expired. Sign in again to continue learning.'
         )
       ).toBeTruthy();
     });

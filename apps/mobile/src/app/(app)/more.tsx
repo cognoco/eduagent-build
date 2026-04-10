@@ -1,4 +1,13 @@
-import { View, Text, Pressable, ScrollView, Switch, Alert } from 'react-native';
+import {
+  View,
+  Text,
+  Pressable,
+  ScrollView,
+  Switch,
+  Alert,
+  Linking,
+  Share,
+} from 'react-native';
 import { useCallback } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -188,12 +197,28 @@ export default function MoreScreen() {
 
   const handleExport = useCallback(async () => {
     try {
-      await exportData.mutateAsync();
-      Alert.alert('Export complete', 'Your data export is ready.');
+      const data = await exportData.mutateAsync();
+      await Share.share({
+        title: 'MentoMate account data export',
+        message: JSON.stringify(data, null, 2),
+      });
     } catch {
       Alert.alert('Export failed', 'Please try again later.');
     }
   }, [exportData]);
+
+  const handleHelp = useCallback(async () => {
+    try {
+      await Linking.openURL(
+        'mailto:support@mentomate.app?subject=MentoMate%20Support'
+      );
+    } catch {
+      Alert.alert(
+        'Contact support',
+        'Email support@mentomate.app for help with your account.'
+      );
+    }
+  }, []);
 
   const handleAddChild = useCallback(() => {
     const tier = subscription?.tier;
@@ -396,7 +421,7 @@ export default function MoreScreen() {
           }
           onPress={() => router.push('/(app)/subscription')}
         />
-        <SettingsRow label="Help & Support" />
+        <SettingsRow label="Help & Support" onPress={() => void handleHelp()} />
         <SettingsRow
           label="Privacy Policy"
           onPress={() => router.push('/privacy')}

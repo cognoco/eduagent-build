@@ -2,6 +2,8 @@ import { render, screen } from '@testing-library/react-native';
 import { useAuth } from '@clerk/clerk-expo';
 
 const mockUseProfile = jest.fn();
+const mockUseConsentStatus = jest.fn();
+const mockInvalidateQueries = jest.fn();
 const mockTabs = Object.assign(
   ({ children }: { children?: React.ReactNode }) => {
     const { View } = require('react-native');
@@ -32,10 +34,29 @@ jest.mock('@expo/vector-icons', () => ({
 jest.mock('@clerk/clerk-expo', () => ({
   useAuth: jest.fn(),
   useClerk: () => ({ signOut: jest.fn() }),
+  useUser: () => ({
+    user: {
+      primaryEmailAddress: { emailAddress: 'child@example.com' },
+    },
+  }),
 }));
 
 jest.mock('../../lib/profile', () => ({
   useProfile: () => mockUseProfile(),
+}));
+
+jest.mock('@tanstack/react-query', () => ({
+  useQueryClient: () => ({
+    invalidateQueries: mockInvalidateQueries,
+  }),
+}));
+
+jest.mock('../../hooks/use-consent', () => ({
+  useConsentStatus: () => mockUseConsentStatus(),
+  useRequestConsent: () => ({
+    mutate: jest.fn(),
+    isPending: false,
+  }),
 }));
 
 jest.mock('../../lib/theme', () => ({
@@ -80,13 +101,26 @@ describe('AppLayout', () => {
     });
     mockUseProfile.mockReturnValue({
       profiles: [
-        { id: 'p1', isOwner: true, consentStatus: null },
-        { id: 'c1', isOwner: false, consentStatus: null },
+        { id: 'p1', isOwner: true, consentStatus: null, birthYear: 1990 },
+        { id: 'c1', isOwner: false, consentStatus: null, birthYear: 2014 },
       ],
-      activeProfile: { id: 'p1', isOwner: true, consentStatus: null },
+      activeProfile: {
+        id: 'p1',
+        isOwner: true,
+        consentStatus: null,
+        birthYear: 1990,
+      },
       isLoading: false,
       profileWasRemoved: false,
       acknowledgeProfileRemoval: jest.fn(),
+      switchProfile: jest.fn(),
+    });
+    mockUseConsentStatus.mockReturnValue({
+      data: {
+        consentStatus: null,
+        parentEmail: null,
+        consentType: null,
+      },
     });
   });
 
@@ -141,6 +175,7 @@ describe('AppLayout', () => {
       isLoading: true,
       profileWasRemoved: false,
       acknowledgeProfileRemoval: jest.fn(),
+      switchProfile: jest.fn(),
     });
 
     render(<AppLayout />);
@@ -148,5 +183,42 @@ describe('AppLayout', () => {
     expect(screen.getByTestId('profile-loading')).toBeTruthy();
     expect(screen.queryByTestId('tabs')).toBeNull();
     expect(screen.queryByTestId('redirect')).toBeNull();
+  });
+
+  it('tells waiting learners that consent is checked automatically', () => {
+    mockUseProfile.mockReturnValue({
+      profiles: [
+        {
+          id: 'c1',
+          isOwner: false,
+          consentStatus: 'PARENTAL_CONSENT_REQUESTED',
+          birthYear: 2014,
+        },
+      ],
+      activeProfile: {
+        id: 'c1',
+        isOwner: false,
+        consentStatus: 'PARENTAL_CONSENT_REQUESTED',
+        birthYear: 2014,
+      },
+      isLoading: false,
+      profileWasRemoved: false,
+      acknowledgeProfileRemoval: jest.fn(),
+      switchProfile: jest.fn(),
+    });
+    mockUseConsentStatus.mockReturnValue({
+      data: {
+        consentStatus: 'PARENTAL_CONSENT_REQUESTED',
+        parentEmail: 'parent@example.com',
+        consentType: 'GDPR',
+      },
+    });
+
+    render(<AppLayout />);
+
+    expect(screen.getByTestId('consent-pending-gate')).toBeTruthy();
+    expect(
+      screen.getByText("We'll keep checking automatically while you wait.")
+    ).toBeTruthy();
   });
 });

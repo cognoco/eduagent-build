@@ -437,6 +437,7 @@ function ConsentWithdrawnGate(): React.ReactElement {
 }
 
 function ConsentPendingGate(): React.ReactElement {
+  const AUTO_REFRESH_MS = 15_000;
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -465,14 +466,31 @@ function ConsentPendingGate(): React.ReactElement {
   const emailWasSent =
     activeProfile?.consentStatus === 'PARENTAL_CONSENT_REQUESTED';
 
+  const refreshConsentGate = React.useCallback(async () => {
+    await queryClient.invalidateQueries({
+      predicate: (query) => {
+        const key = String(query.queryKey[0]);
+        return key === 'profiles' || key === 'consent-status';
+      },
+    });
+  }, [queryClient]);
+
   const onCheckAgain = async () => {
     setChecking(true);
     try {
-      await queryClient.invalidateQueries({ queryKey: ['profiles'] });
+      await refreshConsentGate();
     } finally {
       setChecking(false);
     }
   };
+
+  React.useEffect(() => {
+    if (!emailWasSent) return;
+    const interval = setInterval(() => {
+      void refreshConsentGate();
+    }, AUTO_REFRESH_MS);
+    return () => clearInterval(interval);
+  }, [emailWasSent, refreshConsentGate]);
 
   const onResend = () => {
     if (!activeProfile || !consentData?.parentEmail || !consentData.consentType)
@@ -664,6 +682,10 @@ function ConsentPendingGate(): React.ReactElement {
           </Text>
         )}
       </Pressable>
+
+      <Text className="text-body-sm text-text-muted text-center mb-3">
+        We&apos;ll keep checking automatically while you wait.
+      </Text>
 
       {parentEmail && consentData?.consentType && !changingEmail && (
         <Pressable
@@ -1117,7 +1139,8 @@ export default function AppLayout() {
         <Tabs.Screen
           name="pick-book"
           options={{
-            tabBarButton: () => null,
+            href: null,
+            tabBarItemStyle: { display: 'none' },
           }}
         />
         <Tabs.Screen

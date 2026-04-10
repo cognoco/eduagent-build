@@ -272,31 +272,6 @@ export default function BookScreen() {
     [router]
   );
 
-  // --- Long-press context menu on session ---
-  const handleSessionLongPress = useCallback((session: BookSession) => {
-    Alert.alert(session.topicTitle, undefined, [
-      {
-        text: 'Move to different book',
-        onPress: () => {
-          Alert.alert('Coming soon', 'This feature is not available yet.');
-        },
-      },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: () => {
-          // Deletion would require a separate API endpoint.
-          // For now, show a not-yet-available message.
-          Alert.alert(
-            'Not available yet',
-            'Session deletion will be available in a future update.'
-          );
-        },
-      },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
-  }, []);
-
   // --- Start learning: navigate to session with first suggestion or first uncovered topic ---
   const handleStartLearning = useCallback(() => {
     // Try first suggestion card (which may be a pre-generated topic)
@@ -642,7 +617,6 @@ export default function BookScreen() {
                           s.topicId != null && noteTopicIds.has(s.topicId)
                         }
                         onPress={() => handleSessionPress(s)}
-                        onLongPress={() => handleSessionLongPress(s)}
                         testID={`session-${s.id}`}
                       />
                     ))}
@@ -655,7 +629,6 @@ export default function BookScreen() {
                     relativeDate={formatRelativeDate(s.createdAt)}
                     hasNote={s.topicId != null && noteTopicIds.has(s.topicId)}
                     onPress={() => handleSessionPress(s)}
-                    onLongPress={() => handleSessionLongPress(s)}
                     testID={`session-${s.id}`}
                   />
                 ))}

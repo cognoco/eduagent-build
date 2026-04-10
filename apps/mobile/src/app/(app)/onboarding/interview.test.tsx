@@ -102,11 +102,11 @@ describe('InterviewScreen', () => {
       );
     });
 
-    // Tapping the CTA navigates to analogy-preference
+    // Tapping the CTA navigates straight to curriculum review
     fireEvent.press(screen.getByTestId('view-curriculum-button'));
     expect(mockReplace).toHaveBeenCalledWith(
       expect.objectContaining({
-        pathname: '/(app)/onboarding/analogy-preference',
+        pathname: '/(app)/onboarding/curriculum-review',
       })
     );
   });

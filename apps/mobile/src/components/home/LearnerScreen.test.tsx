@@ -53,10 +53,13 @@ describe('LearnerScreen', () => {
   });
 
   describe('empty library', () => {
-    it('shows "Learn something new!" and "Help with assignment?"', () => {
+    it('shows a clear first-step CTA and homework help', () => {
       render(<LearnerScreen {...defaultProps} />);
 
-      expect(screen.getByText('Learn something new!')).toBeTruthy();
+      expect(screen.getByText('Start your first subject')).toBeTruthy();
+      expect(
+        screen.getByText("We'll build a path and get you learning fast")
+      ).toBeTruthy();
       expect(screen.getByText('Help with assignment?')).toBeTruthy();
     });
 
@@ -75,7 +78,10 @@ describe('LearnerScreen', () => {
     it('shows all three intent cards', () => {
       render(<LearnerScreen {...defaultProps} />);
 
-      expect(screen.getByText('Learn something new!')).toBeTruthy();
+      expect(screen.getByText('Start a fresh session')).toBeTruthy();
+      expect(
+        screen.getByText('Ask a new question or explore a new topic')
+      ).toBeTruthy();
       expect(screen.getByText('Help with assignment?')).toBeTruthy();
       expect(screen.getByText('Repeat & review')).toBeTruthy();
     });
@@ -92,7 +98,7 @@ describe('LearnerScreen', () => {
   });
 
   describe('navigation', () => {
-    it('navigates to learn-new on "Learn something new!"', () => {
+    it('navigates to learn-new on the primary learning CTA', () => {
       render(<LearnerScreen {...defaultProps} />);
 
       fireEvent.press(screen.getByTestId('intent-learn-new'));

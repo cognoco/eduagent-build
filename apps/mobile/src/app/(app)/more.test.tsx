@@ -1,8 +1,15 @@
-import { render, screen, fireEvent } from '@testing-library/react-native';
+import {
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+} from '@testing-library/react-native';
+import { Alert, Linking, Share } from 'react-native';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const mockPush = jest.fn();
+const mockExportMutateAsync = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
@@ -28,7 +35,7 @@ jest.mock('../../lib/profile', () => ({
 }));
 
 jest.mock('../../hooks/use-account', () => ({
-  useExportData: () => ({ mutateAsync: jest.fn() }),
+  useExportData: () => ({ mutateAsync: mockExportMutateAsync }),
 }));
 
 jest.mock('../../hooks/use-subscription', () => ({
@@ -97,6 +104,15 @@ const MoreScreen = require('./more').default;
 describe('MoreScreen — Learning Mode', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockExportMutateAsync.mockResolvedValue({
+      account: {
+        email: 'alex@example.com',
+        createdAt: '2026-04-10T10:00:00.000Z',
+      },
+      profiles: [],
+      consentStates: [],
+      exportedAt: '2026-04-10T10:00:00.000Z',
+    });
     mockLearningMode = 'serious';
     mockLearningModeLoading = false;
     mockLearningModePending = false;
@@ -238,5 +254,72 @@ describe('MoreScreen — Account Security', () => {
     render(<MoreScreen />, { wrapper: createWrapper() });
 
     expect(screen.getByText('Account Security')).toBeTruthy();
+  });
+});
+
+describe('MoreScreen — Account Actions', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockExportMutateAsync.mockResolvedValue({
+      account: {
+        email: 'alex@example.com',
+        createdAt: '2026-04-10T10:00:00.000Z',
+      },
+      profiles: [],
+      consentStates: [],
+      exportedAt: '2026-04-10T10:00:00.000Z',
+    });
+  });
+
+  it('shares the account export when Export my data is pressed', async () => {
+    const shareSpy = jest.spyOn(Share, 'share').mockResolvedValue({
+      action: 'sharedAction',
+    } as never);
+
+    render(<MoreScreen />, { wrapper: createWrapper() });
+
+    fireEvent.press(screen.getByText('Export my data'));
+
+    await waitFor(() => {
+      expect(mockExportMutateAsync).toHaveBeenCalledTimes(1);
+      expect(shareSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'MentoMate account data export',
+          message: expect.stringContaining('"email": "alex@example.com"'),
+        })
+      );
+    });
+  });
+
+  it('opens a support email when Help & Support is pressed', async () => {
+    const openUrlSpy = jest
+      .spyOn(Linking, 'openURL')
+      .mockResolvedValue(true as never);
+
+    render(<MoreScreen />, { wrapper: createWrapper() });
+
+    fireEvent.press(screen.getByText('Help & Support'));
+
+    await waitFor(() => {
+      expect(openUrlSpy).toHaveBeenCalledWith(
+        'mailto:support@mentomate.app?subject=MentoMate%20Support'
+      );
+    });
+  });
+
+  it('shows a fallback alert when opening support email fails', async () => {
+    jest.spyOn(Linking, 'openURL').mockRejectedValue(new Error('unsupported'));
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(jest.fn());
+
+    render(<MoreScreen />, { wrapper: createWrapper() });
+
+    fireEvent.press(screen.getByText('Help & Support'));
+
+    await waitFor(() => {
+      expect(alertSpy).toHaveBeenCalledWith(
+        'Contact support',
+        'Email support@mentomate.app for help with your account.'
+      );
+    });
   });
 });

@@ -32,6 +32,7 @@ import {
   getTransitionElapsed,
   SESSION_TRANSITION_MS,
 } from '../../lib/auth-transition';
+import { consumeSessionExpiredNotice } from '../../lib/auth-expiry';
 
 // Use physical screen height (not window) so the content container always
 // overflows the ScrollView after adjustResize shrinks it for the keyboard.
@@ -116,6 +117,54 @@ function isTotpFactor(factor: unknown): factor is TotpFactor {
   );
 }
 
+function getFactorStrategies(factors: unknown[] | null | undefined): string[] {
+  const strategies = new Set<string>();
+  for (const factor of factors ?? []) {
+    if (
+      typeof factor === 'object' &&
+      factor !== null &&
+      'strategy' in factor &&
+      typeof factor.strategy === 'string'
+    ) {
+      strategies.add(factor.strategy);
+    }
+  }
+  return Array.from(strategies);
+}
+
+function describeVerificationStrategy(strategy: string): string {
+  switch (strategy) {
+    case 'webauthn':
+      return 'a security key or passkey';
+    case 'totp':
+      return 'an authenticator app';
+    case 'phone_code':
+      return 'a phone verification code';
+    case 'email_code':
+      return 'an email verification code';
+    default:
+      return strategy.replace(/_/g, ' ');
+  }
+}
+
+function formatUnsupportedVerificationMessage(strategies: string[]): string {
+  if (strategies.length === 0) {
+    return 'This account needs an additional verification method that this build does not support yet.';
+  }
+
+  if (strategies.length === 1) {
+    return `This account needs ${describeVerificationStrategy(
+      strategies[0]!
+    )} to finish signing in, and this build does not support that yet.`;
+  }
+
+  const described = strategies.map(describeVerificationStrategy);
+  const last = described.pop();
+  return `This account needs ${described.join(
+    ', '
+  )}, or ${last} to finish signing in, and this build does not support those methods yet.`;
+}
+
 export default function SignInScreen() {
   const { signIn, setActive, isLoaded } = useSignIn();
   const router = useRouter();
@@ -132,6 +181,10 @@ export default function SignInScreen() {
     useState<VerificationState | null>(null);
   const [pendingVerification, setPendingVerification] =
     useState<VerificationState | null>(null);
+  const [
+    unsupportedVerificationStrategies,
+    setUnsupportedVerificationStrategies,
+  ] = useState<string[]>([]);
   const [code, setCode] = useState('');
   const [resending, setResending] = useState(false);
   const [pendingSessionActivationId, setPendingSessionActivationId] = useState<
@@ -197,6 +250,7 @@ export default function SignInScreen() {
     (clearError = false) => {
       setVerificationOffer(null);
       setPendingVerification(null);
+      setUnsupportedVerificationStrategies([]);
       setCode('');
       setPendingSessionActivationId(null);
       setActivationFailureContext(null);
@@ -206,6 +260,13 @@ export default function SignInScreen() {
     },
     [setError]
   );
+
+  useEffect(() => {
+    if (consumeSessionExpiredNotice()) {
+      clearVerificationFlow();
+      setError('Your session expired. Sign in again to continue learning.');
+    }
+  }, [clearVerificationFlow]);
 
   const getVerificationStep = useCallback(
     (attempt: SignInAttemptLike) => {
@@ -342,8 +403,16 @@ export default function SignInScreen() {
         attempt.status === 'needs_first_factor' ||
         attempt.status === 'needs_second_factor'
       ) {
+        const unsupportedStrategies = getFactorStrategies(
+          attempt.status === 'needs_first_factor'
+            ? attempt.supportedFirstFactors
+            : attempt.supportedSecondFactors
+        );
+        setUnsupportedVerificationStrategies(unsupportedStrategies);
         setError(
-          'This account needs an additional verification method that this build does not support yet. Please use a different sign-in method.'
+          `${formatUnsupportedVerificationMessage(
+            unsupportedStrategies
+          )} Try Google or Apple if you use them on this account, or contact support for help.`
         );
         return;
       }
@@ -352,6 +421,29 @@ export default function SignInScreen() {
     },
     [clearVerificationFlow, getVerificationStep, startVerificationFlow]
   );
+
+  const onContactSupport = useCallback(async () => {
+    const describedMethods =
+      unsupportedVerificationStrategies.length > 0
+        ? unsupportedVerificationStrategies
+            .map(describeVerificationStrategy)
+            .join(', ')
+        : 'an unsupported verification method';
+
+    try {
+      await Linking.openURL(
+        `mailto:support@mentomate.app?subject=${encodeURIComponent(
+          'Unsupported sign-in verification'
+        )}&body=${encodeURIComponent(
+          `Hi, I need help signing in on mobile because my account requires ${describedMethods}.`
+        )}`
+      );
+    } catch {
+      setError(
+        `We couldn't open your email app. Please contact support@mentomate.app and mention ${describedMethods}.`
+      );
+    }
+  }, [unsupportedVerificationStrategies]);
 
   const onSSOPress = useCallback(
     async (strategy: SupportedSSOStrategy) => {
@@ -880,6 +972,31 @@ export default function SignInScreen() {
             accessibilityRole="alert"
           >
             <Text className="text-danger text-body-sm">{error}</Text>
+          </View>
+        )}
+
+        {unsupportedVerificationStrategies.length > 0 && (
+          <View
+            className="bg-surface rounded-card px-4 py-4 mb-4"
+            testID="sign-in-unsupported-factor-help"
+          >
+            <Text className="text-body-sm text-text-secondary">
+              If this account also uses Google or Apple sign-in, try that above.
+              Otherwise, contact support and mention{' '}
+              {unsupportedVerificationStrategies
+                .map(describeVerificationStrategy)
+                .join(', ')}
+              .
+            </Text>
+            <View className="mt-4">
+              <Button
+                variant="secondary"
+                size="small"
+                label="Contact support"
+                onPress={() => void onContactSupport()}
+                testID="sign-in-contact-support"
+              />
+            </View>
           </View>
         )}
 

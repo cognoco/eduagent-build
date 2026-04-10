@@ -29,6 +29,7 @@ import {
   personaFromBirthYear,
 } from '../lib/profile';
 import { setOnAuthExpired, clearOnAuthExpired } from '../lib/api-client';
+import { markSessionExpired } from '../lib/auth-expiry';
 import { ErrorBoundary, OfflineBanner } from '../components/common';
 import { useNetworkStatus } from '../hooks/use-network-status';
 import { Sentry } from '../lib/sentry';
@@ -139,14 +140,14 @@ function ThemedApp() {
         );
       // BM-03: clear cached query data before sign-out to prevent the next
       // user from seeing stale data from the previous session.
+      markSessionExpired();
       queryClient.clear();
-      // Show visible feedback so the user knows WHY they're being signed out,
-      // instead of silently redirecting back to auth screens.
-      Alert.alert(
-        'Session expired',
-        'Your session has expired. Please sign in again.',
-        [{ text: 'OK', onPress: () => void signOut() }]
-      );
+      void signOut().catch(() => {
+        Alert.alert(
+          'Could not sign you out',
+          'Please close and reopen the app, then sign in again.'
+        );
+      });
     });
     return () => clearOnAuthExpired();
   }, [signOut]);

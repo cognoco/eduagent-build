@@ -31,6 +31,12 @@ export function LearnerScreen({
   const activeSubjects =
     subjects?.filter((subject) => subject.status === 'active') ?? [];
   const hasLibraryContent = activeSubjects.length > 0;
+  const primaryIntentTitle = hasLibraryContent
+    ? 'Start a fresh session'
+    : 'Start your first subject';
+  const primaryIntentSubtitle = hasLibraryContent
+    ? 'Ask a new question or explore a new topic'
+    : "We'll build a path and get you learning fast";
   const { title, subtitle } = getGreeting(activeProfile?.displayName ?? '');
 
   return (
@@ -76,7 +82,8 @@ export function LearnerScreen({
 
       <View className="gap-4">
         <IntentCard
-          title="Learn something new!"
+          title={primaryIntentTitle}
+          subtitle={primaryIntentSubtitle}
           onPress={() => router.push('/(app)/learn-new' as never)}
           testID="intent-learn-new"
         />

@@ -34,6 +34,16 @@ export default function InterviewScreen() {
     ? `Hi! I'm your learning mate. Let's talk about ${bookTitle}! What do you already know about it, and what are you most curious to learn?`
     : OPENING_MESSAGE;
 
+  const goToCurriculum = useCallback(() => {
+    router.replace({
+      pathname: '/(app)/onboarding/curriculum-review',
+      params: {
+        subjectId,
+        ...(bookId ? { bookId } : {}),
+      },
+    } as never);
+  }, [bookId, router, subjectId]);
+
   const [messages, setMessages] = useState<ChatMessage[]>([
     { id: 'opening', role: 'assistant', content: openingMessage },
   ]);
@@ -223,18 +233,7 @@ export default function InterviewScreen() {
           exchangeCount={exchangeCount}
           isComplete={interviewComplete}
           isExpressive
-          onPress={
-            interviewComplete
-              ? () =>
-                  router.replace({
-                    pathname: '/(app)/onboarding/analogy-preference',
-                    params: {
-                      subjectId,
-                      ...(bookId ? { bookId } : {}),
-                    },
-                  } as never)
-              : undefined
-          }
+          onPress={interviewComplete ? goToCurriculum : undefined}
         />
       }
       footer={
@@ -244,19 +243,11 @@ export default function InterviewScreen() {
               Ready to start learning!
             </Text>
             <Text className="text-body-sm text-text-secondary mb-3">
-              I've built a personalized curriculum just for you. Let's set up
-              how you like to learn, then jump right in.
+              I've built your first learning path. Review it, make any quick
+              changes you want, and start learning.
             </Text>
             <Pressable
-              onPress={() =>
-                router.replace({
-                  pathname: '/(app)/onboarding/analogy-preference',
-                  params: {
-                    subjectId,
-                    ...(bookId ? { bookId } : {}),
-                  },
-                } as never)
-              }
+              onPress={goToCurriculum}
               className="bg-primary rounded-button py-3 items-center"
               testID="view-curriculum-button"
               accessibilityLabel="Start learning"
