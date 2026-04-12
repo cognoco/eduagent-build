@@ -113,10 +113,10 @@ describe('ConsentScreen', () => {
     render(<ConsentScreen />, { wrapper: Wrapper });
 
     expect(screen.getByTestId('consent-child-view')).toBeTruthy();
-    expect(screen.getByText('One more step!')).toBeTruthy();
+    expect(screen.getByText('Almost there!')).toBeTruthy();
     expect(
       screen.getByText(
-        "We need a grown-up to say it's OK. Hand your phone to your parent or guardian."
+        "We need your parent or guardian to say it's OK. Enter their email and we'll send them a quick link."
       )
     ).toBeTruthy();
     expect(screen.getByTestId('consent-handoff-button')).toBeTruthy();
@@ -249,7 +249,7 @@ describe('ConsentScreen', () => {
       expect(screen.getByTestId('consent-success')).toBeTruthy();
     });
 
-    expect(screen.getByText('Consent link sent!')).toBeTruthy();
+    expect(screen.getByText('Link sent!')).toBeTruthy();
     expect(screen.getByText(/parent@example\.com/)).toBeTruthy();
   });
 

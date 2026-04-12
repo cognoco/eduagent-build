@@ -6,6 +6,8 @@ export interface ConsentHandOffCopy {
   childTitle: string;
   childMessage: string;
   handOffButton: string;
+  childSubmitButton: string;
+  parentIsHereButton: string;
   parentTitle: string;
   parentEmailLabel: string;
   parentEmailPlaceholder: string;
@@ -17,20 +19,22 @@ export interface ConsentHandOffCopy {
 }
 
 const learnerConsentHandOff: ConsentHandOffCopy = {
-  childTitle: 'One more step!',
+  childTitle: 'Almost there!',
   childMessage:
-    "We need a grown-up to say it's OK. Hand your phone to your parent or guardian.",
+    "We need your parent or guardian to say it's OK. Enter their email and we'll send them a quick link.",
   handOffButton: "I'm the parent / guardian",
+  childSubmitButton: 'Send link to my parent',
+  parentIsHereButton: 'My parent is here with me',
   parentTitle: 'Parental Consent Required',
   parentEmailLabel: 'Your email address',
   parentEmailPlaceholder: 'you@example.com',
   spamWarning:
     "We'll send a one-time consent link. Check your spam folder if you don't see it within a few minutes.",
   parentSubmitButton: 'Send consent link',
-  successMessage: 'Consent link sent!',
+  successMessage: 'Link sent!',
   successSpamHint:
     'Check your inbox (and spam folder). The link expires in 7 days.',
-  handBackButton: 'Hand back to your child',
+  handBackButton: 'Got it',
 };
 
 const defaultConsentHandOff: ConsentHandOffCopy = {
@@ -38,6 +42,8 @@ const defaultConsentHandOff: ConsentHandOffCopy = {
   childMessage:
     'A parent or guardian needs to approve this account. Please hand this device to them.',
   handOffButton: "I'm the parent / guardian",
+  childSubmitButton: 'Send consent link',
+  parentIsHereButton: 'My parent is here with me',
   parentTitle: 'Parental Consent Required',
   parentEmailLabel: 'Your email address',
   parentEmailPlaceholder: 'you@example.com',
