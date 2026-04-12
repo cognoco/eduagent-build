@@ -112,6 +112,38 @@ describe('TopicDetailScreen', () => {
     expect(screen.getByText('Topic not found')).toBeTruthy();
   });
 
+  it('shows retry and go-back buttons when retention query errors [3B.6]', () => {
+    const mockRefetchProgress = jest.fn().mockResolvedValue(undefined);
+    const mockRefetchRetention = jest.fn().mockResolvedValue(undefined);
+
+    mockUseTopicProgress.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: false,
+      refetch: mockRefetchProgress,
+    });
+    mockUseTopicRetention.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      refetch: mockRefetchRetention,
+    });
+
+    render(<TopicDetailScreen />, { wrapper: createWrapper() });
+
+    // Full-screen error state must render with both actions so user is never stuck
+    expect(screen.getByTestId('topic-detail-retry')).toBeTruthy();
+    expect(screen.getByTestId('topic-detail-go-back')).toBeTruthy();
+    expect(screen.getByText("We couldn't load this topic")).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('topic-detail-retry'));
+    expect(mockRefetchProgress).toHaveBeenCalled();
+    expect(mockRefetchRetention).toHaveBeenCalled();
+
+    fireEvent.press(screen.getByTestId('topic-detail-go-back'));
+    expect(mockBack).toHaveBeenCalled();
+  });
+
   it('renders topic progress and retention details', () => {
     mockUseTopicProgress.mockReturnValue({
       data: {
