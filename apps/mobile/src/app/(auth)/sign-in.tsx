@@ -63,6 +63,10 @@ type VerificationState =
   | {
       stage: VerificationStage;
       strategy: 'totp';
+    }
+  | {
+      stage: VerificationStage;
+      strategy: 'backup_code';
     };
 
 type EmailCodeFactor = {
@@ -79,6 +83,10 @@ type PhoneCodeFactor = {
 
 type TotpFactor = {
   strategy: 'totp';
+};
+
+type BackupCodeFactor = {
+  strategy: 'backup_code';
 };
 
 type SignInAttemptLike = {
@@ -117,6 +125,15 @@ function isTotpFactor(factor: unknown): factor is TotpFactor {
   );
 }
 
+function isBackupCodeFactor(factor: unknown): factor is BackupCodeFactor {
+  return (
+    typeof factor === 'object' &&
+    factor !== null &&
+    'strategy' in factor &&
+    factor.strategy === 'backup_code'
+  );
+}
+
 function getFactorStrategies(factors: unknown[] | null | undefined): string[] {
   const strategies = new Set<string>();
   for (const factor of factors ?? []) {
@@ -130,6 +147,17 @@ function getFactorStrategies(factors: unknown[] | null | undefined): string[] {
     }
   }
   return Array.from(strategies);
+}
+
+function hasSSOProviders(factors: unknown[] | null | undefined): boolean {
+  return (factors ?? []).some(
+    (f) =>
+      typeof f === 'object' &&
+      f !== null &&
+      'strategy' in f &&
+      typeof (f as Record<string, unknown>).strategy === 'string' &&
+      ((f as Record<string, unknown>).strategy as string).startsWith('oauth_')
+  );
 }
 
 function describeVerificationStrategy(strategy: string): string {
@@ -149,20 +177,20 @@ function describeVerificationStrategy(strategy: string): string {
 
 function formatUnsupportedVerificationMessage(strategies: string[]): string {
   if (strategies.length === 0) {
-    return 'This account needs an additional verification method that this build does not support yet.';
+    return 'This account needs an additional verification method that is not available on mobile yet.';
   }
 
   if (strategies.length === 1) {
-    return `This account needs ${describeVerificationStrategy(
+    return `This account requires ${describeVerificationStrategy(
       strategies[0]!
-    )} to finish signing in, and this build does not support that yet.`;
+    )} which isn't available on mobile yet.`;
   }
 
   const described = strategies.map(describeVerificationStrategy);
   const last = described.pop();
-  return `This account needs ${described.join(
+  return `This account requires ${described.join(
     ', '
-  )}, or ${last} to finish signing in, and this build does not support those methods yet.`;
+  )} or ${last} which isn't available on mobile yet.`;
 }
 
 export default function SignInScreen() {
@@ -185,6 +213,8 @@ export default function SignInScreen() {
     unsupportedVerificationStrategies,
     setUnsupportedVerificationStrategies,
   ] = useState<string[]>([]);
+  const [unsupportedHasSSOProviders, setUnsupportedHasSSOProviders] =
+    useState(false);
   const [code, setCode] = useState('');
   const [resending, setResending] = useState(false);
   const [pendingSessionActivationId, setPendingSessionActivationId] = useState<
@@ -251,6 +281,7 @@ export default function SignInScreen() {
       setVerificationOffer(null);
       setPendingVerification(null);
       setUnsupportedVerificationStrategies([]);
+      setUnsupportedHasSSOProviders(false);
       setCode('');
       setPendingSessionActivationId(null);
       setActivationFailureContext(null);
@@ -318,6 +349,15 @@ export default function SignInScreen() {
             phoneNumberId: phoneFactor.phoneNumberId,
           } as const;
         }
+
+        const backupCodeFactor =
+          attempt.supportedSecondFactors?.find(isBackupCodeFactor) ?? null;
+        if (backupCodeFactor) {
+          return {
+            stage: 'second_factor',
+            strategy: 'backup_code',
+          } as const;
+        }
       }
 
       return null;
@@ -331,9 +371,9 @@ export default function SignInScreen() {
         throw new Error('Authentication not loaded.');
       }
 
-      // TOTP doesn't need a prepare step — the authenticator app generates
-      // codes locally. Go straight to the code entry screen.
-      if (step.strategy !== 'totp') {
+      // TOTP and backup_code don't need a prepare step — codes are generated
+      // locally or pre-saved. Go straight to the code entry screen.
+      if (step.strategy !== 'totp' && step.strategy !== 'backup_code') {
         if (step.stage === 'first_factor' && step.strategy === 'email_code') {
           await signIn.prepareFirstFactor({
             strategy: 'email_code',
@@ -408,12 +448,10 @@ export default function SignInScreen() {
             ? attempt.supportedFirstFactors
             : attempt.supportedSecondFactors
         );
+        const ssoAvailable = hasSSOProviders(attempt.supportedFirstFactors);
         setUnsupportedVerificationStrategies(unsupportedStrategies);
-        setError(
-          `${formatUnsupportedVerificationMessage(
-            unsupportedStrategies
-          )} Try Google or Apple if you use them on this account, or contact support for help.`
-        );
+        setUnsupportedHasSSOProviders(ssoAvailable);
+        setError(formatUnsupportedVerificationMessage(unsupportedStrategies));
         return;
       }
 
@@ -759,6 +797,7 @@ export default function SignInScreen() {
 
   const onResendCode = useCallback(async () => {
     if (!isLoaded || !signIn || !pendingVerification || resending) return;
+    if (pendingVerification.strategy === 'backup_code') return;
 
     setError('');
     setResending(true);
@@ -835,11 +874,15 @@ export default function SignInScreen() {
           <Text className="text-h2 font-bold text-text-primary mb-1">
             {pendingVerification.strategy === 'totp'
               ? 'Enter authenticator code'
+              : pendingVerification.strategy === 'backup_code'
+              ? 'Enter a backup code'
               : 'Enter verification code'}
           </Text>
           <Text className="text-body-sm text-text-secondary mb-6">
             {pendingVerification.strategy === 'totp' ? (
               'Open your authenticator app and enter the 6-digit code.'
+            ) : pendingVerification.strategy === 'backup_code' ? (
+              'Enter one of the backup codes you saved when you set up two-factor authentication.'
             ) : (
               <>
                 We sent a verification code to{' '}
@@ -869,9 +912,18 @@ export default function SignInScreen() {
             </Text>
             <TextInput
               className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-6"
-              placeholder="Enter 6-digit code"
+              placeholder={
+                pendingVerification.strategy === 'backup_code'
+                  ? 'Enter backup code'
+                  : 'Enter 6-digit code'
+              }
               placeholderTextColor={colors.muted}
-              keyboardType="number-pad"
+              keyboardType={
+                pendingVerification.strategy === 'backup_code'
+                  ? 'default'
+                  : 'number-pad'
+              }
+              autoCapitalize="none"
               value={code}
               onChangeText={setCode}
               editable={!loading}
@@ -903,18 +955,19 @@ export default function SignInScreen() {
             </View>
           ) : null}
 
-          {pendingVerification.strategy !== 'totp' && (
-            <View className="flex-row justify-center mt-4">
-              <Button
-                variant="tertiary"
-                size="small"
-                label="Resend code"
-                onPress={onResendCode}
-                loading={resending}
-                testID="sign-in-resend-code"
-              />
-            </View>
-          )}
+          {pendingVerification.strategy !== 'totp' &&
+            pendingVerification.strategy !== 'backup_code' && (
+              <View className="flex-row justify-center mt-4">
+                <Button
+                  variant="tertiary"
+                  size="small"
+                  label="Resend code"
+                  onPress={onResendCode}
+                  loading={resending}
+                  testID="sign-in-resend-code"
+                />
+              </View>
+            )}
 
           <View className="flex-row justify-center mt-2">
             <Button
@@ -958,10 +1011,16 @@ export default function SignInScreen() {
             on tall screens so the logo and form stay visually connected. */}
         <View className="flex-1" style={{ minHeight: 16, maxHeight: 32 }} />
         <Text className="text-h2 font-bold text-text-primary mb-1 text-center">
-          {isReturningUser ? 'Welcome back' : 'Welcome to MentoMate'}
+          {isReturningUser === null
+            ? 'Welcome'
+            : isReturningUser
+            ? 'Welcome back'
+            : 'Welcome to MentoMate'}
         </Text>
         <Text className="text-body-sm text-text-secondary mb-6 text-center">
-          {isReturningUser
+          {isReturningUser === null
+            ? 'Sign in to get started'
+            : isReturningUser
             ? 'Sign in to continue learning'
             : 'Sign in to start learning'}
         </Text>
@@ -981,12 +1040,11 @@ export default function SignInScreen() {
             testID="sign-in-unsupported-factor-help"
           >
             <Text className="text-body-sm text-text-secondary">
-              If this account also uses Google or Apple sign-in, try that above.
-              Otherwise, contact support and mention{' '}
-              {unsupportedVerificationStrategies
-                .map(describeVerificationStrategy)
-                .join(', ')}
-              .
+              {unsupportedHasSSOProviders
+                ? "If this account also uses Google or Apple sign-in, try that above. If that doesn't work, contact support."
+                : `Contact support and we'll help you sign in. Mention: ${unsupportedVerificationStrategies
+                    .map(describeVerificationStrategy)
+                    .join(', ')}.`}
             </Text>
             <View className="mt-4">
               <Button
