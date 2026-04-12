@@ -23,14 +23,29 @@ function formatTimestamp(iso: string): string {
 export default function SessionTranscriptScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { profileId, sessionId } = useLocalSearchParams<{
-    profileId: string;
-    sessionId: string;
-  }>();
-  const { data: transcript, isLoading } = useChildSessionTranscript(
-    profileId,
-    sessionId
-  );
+  const { profileId: rawProfileId, sessionId: rawSessionId } =
+    useLocalSearchParams<{
+      profileId: string;
+      sessionId: string;
+    }>();
+  // Expo Router can deliver string[] for repeated params — extract scalar
+  const profileId = Array.isArray(rawProfileId)
+    ? rawProfileId[0]
+    : rawProfileId;
+  const sessionId = Array.isArray(rawSessionId)
+    ? rawSessionId[0]
+    : rawSessionId;
+  const {
+    data: transcript,
+    isLoading,
+    error: transcriptError,
+  } = useChildSessionTranscript(profileId, sessionId);
+
+  const isSessionNotFound =
+    transcriptError !== null &&
+    typeof transcriptError === 'object' &&
+    'status' in transcriptError &&
+    (transcriptError as { status?: unknown }).status === 404;
 
   const sessionDate = transcript?.session.startedAt
     ? new Date(transcript.session.startedAt).toLocaleDateString(undefined, {
@@ -88,6 +103,27 @@ export default function SessionTranscriptScreen() {
             </View>
             <MessageSkeleton />
           </>
+        ) : isSessionNotFound ? (
+          <View className="py-8 items-center" testID="session-not-found">
+            <Text className="text-h3 font-semibold text-text-primary text-center mb-2">
+              This session has ended
+            </Text>
+            <Text className="text-body text-text-secondary text-center mb-6">
+              This session is no longer available. You can review other sessions
+              from the home screen.
+            </Text>
+            <Pressable
+              onPress={() => router.back()}
+              className="bg-primary rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
+              accessibilityRole="button"
+              accessibilityLabel="Go back"
+              testID="session-not-found-back"
+            >
+              <Text className="text-body font-semibold text-text-inverse">
+                Go Back
+              </Text>
+            </Pressable>
+          </View>
         ) : transcript && transcript.exchanges.length > 0 ? (
           transcript.exchanges.map((exchange, i) => {
             const isUser = exchange.role === 'user';
@@ -151,15 +187,24 @@ export default function SessionTranscriptScreen() {
             );
           })
         ) : (
-          <View className="py-8 items-center">
+          <View className="py-8 items-center" testID="empty-transcript">
             <Text className="text-h3 font-semibold text-text-primary text-center mb-2">
-              {transcript === null ? 'Session not found' : 'No messages yet'}
+              No transcript available
             </Text>
-            <Text className="text-body text-text-secondary text-center">
-              {transcript === null
-                ? 'This session may have expired or been removed.'
-                : 'This session did not capture any transcript messages.'}
+            <Text className="text-body text-text-secondary text-center mb-6">
+              No transcript is available for this session.
             </Text>
+            <Pressable
+              onPress={() => router.back()}
+              className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center"
+              accessibilityRole="button"
+              accessibilityLabel="Go back"
+              testID="empty-transcript-back"
+            >
+              <Text className="text-body font-semibold text-text-inverse">
+                Go back
+              </Text>
+            </Pressable>
           </View>
         )}
       </ScrollView>

@@ -333,6 +333,15 @@ function CreateProfileGate(): React.ReactElement {
   const router = useRouter();
   const { signOut } = useClerk();
 
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+    } catch (err: unknown) {
+      console.error('signOut failed:', err);
+      Alert.alert('Sign Out Failed', 'Please try again or restart the app.');
+    }
+  };
+
   return (
     <View
       className="flex-1 bg-background items-center justify-center px-6"
@@ -358,7 +367,7 @@ function CreateProfileGate(): React.ReactElement {
         </Text>
       </Pressable>
       <Pressable
-        onPress={() => signOut()}
+        onPress={() => void handleSignOut()}
         className="mt-6 py-2"
         testID="create-profile-gate-signout"
         accessibilityRole="button"
@@ -380,6 +389,15 @@ function CreateProfileGate(): React.ReactElement {
 function ConsentWithdrawnGate(): React.ReactElement {
   const insets = useSafeAreaInsets();
   const { signOut } = useClerk();
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+    } catch (err: unknown) {
+      console.error('signOut failed:', err);
+      Alert.alert('Sign Out Failed', 'Please try again or restart the app.');
+    }
+  };
   const { profiles, activeProfile, switchProfile } = useProfile();
   const { persona } = useTheme();
   const copy = getConsentWithdrawnCopy(persona);
@@ -424,7 +442,7 @@ function ConsentWithdrawnGate(): React.ReactElement {
       )}
 
       <Pressable
-        onPress={() => signOut()}
+        onPress={() => void handleSignOut()}
         className="py-3.5 px-8 items-center w-full"
         testID="withdrawn-sign-out"
         accessibilityRole="button"
@@ -443,6 +461,15 @@ function ConsentPendingGate(): React.ReactElement {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { signOut } = useClerk();
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+    } catch (err: unknown) {
+      console.error('signOut failed:', err);
+      Alert.alert('Sign Out Failed', 'Please try again or restart the app.');
+    }
+  };
   const { profiles, activeProfile, switchProfile } = useProfile();
   const { data: consentData } = useConsentStatus();
   const resendMutation = useRequestConsent();
@@ -628,7 +655,7 @@ function ConsentPendingGate(): React.ReactElement {
         )}
 
         <Pressable
-          onPress={() => signOut()}
+          onPress={() => void handleSignOut()}
           className="py-3.5 px-8 items-center w-full"
           testID="consent-sign-out"
           accessibilityRole="button"
@@ -885,7 +912,7 @@ function ConsentPendingGate(): React.ReactElement {
       )}
 
       <Pressable
-        onPress={() => signOut()}
+        onPress={() => void handleSignOut()}
         className="py-3.5 px-8 items-center w-full"
         testID="consent-sign-out"
         accessibilityRole="button"
