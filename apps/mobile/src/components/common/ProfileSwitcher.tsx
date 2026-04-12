@@ -53,6 +53,9 @@ export function ProfileSwitcher({
           setIsOpen(false);
         }
         // Switch failed — keep dropdown open so user can retry.
+      } catch (err: unknown) {
+        console.error('Profile switch failed:', err);
+        // Dropdown stays open for retry
       } finally {
         setSwitching(false);
       }

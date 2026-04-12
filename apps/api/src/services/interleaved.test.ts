@@ -56,6 +56,11 @@ function createMockDb(overrides: Record<string, unknown> = {}): any {
     query: {
       curricula: {
         findFirst: mockFindFirst,
+        findMany: jest
+          .fn()
+          .mockResolvedValue([
+            { id: 'curriculum-001', subjectId: 'subject-001' },
+          ]),
       },
       curriculumTopics: {
         findFirst: jest.fn().mockResolvedValue({
@@ -117,6 +122,9 @@ describe('selectInterleavedTopics', () => {
       id: 'curriculum-001',
       subjectId: 'subject-001',
     });
+    db.query.curricula.findMany = jest
+      .fn()
+      .mockResolvedValue([{ id: 'curriculum-001', subjectId: 'subject-001' }]);
 
     const topics = await selectInterleavedTopics(db, PROFILE_ID, {
       topicCount: 3,
@@ -169,6 +177,9 @@ describe('selectInterleavedTopics', () => {
       id: 'curriculum-001',
       subjectId: 'subject-001',
     });
+    db.query.curricula.findMany = jest
+      .fn()
+      .mockResolvedValue([{ id: 'curriculum-001', subjectId: 'subject-001' }]);
 
     const topics = await selectInterleavedTopics(db, PROFILE_ID, {
       topicCount: 3,
@@ -257,6 +268,9 @@ describe('selectInterleavedTopics', () => {
       id: 'curriculum-001',
       subjectId: 'subject-001',
     });
+    db.query.curricula.findMany = jest
+      .fn()
+      .mockResolvedValue([{ id: 'curriculum-001', subjectId: 'subject-001' }]);
 
     const topics = await selectInterleavedTopics(db, PROFILE_ID, {
       topicCount: 2,
@@ -314,6 +328,9 @@ describe('startInterleavedSession', () => {
       id: 'curriculum-001',
       subjectId: 'subject-001',
     });
+    db.query.curricula.findMany = jest
+      .fn()
+      .mockResolvedValue([{ id: 'curriculum-001', subjectId: 'subject-001' }]);
 
     const result = await startInterleavedSession(db, PROFILE_ID);
 

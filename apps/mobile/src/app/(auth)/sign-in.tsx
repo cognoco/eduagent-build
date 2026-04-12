@@ -483,6 +483,60 @@ export default function SignInScreen() {
     }
   }, [unsupportedVerificationStrategies]);
 
+  const activateSession = useCallback(
+    async (
+      sessionId: string | null,
+      context: 'oauth' | 'password' | 'verification'
+    ): Promise<boolean> => {
+      if (!sessionId) {
+        setError('No session was created. Please try again.');
+        return false;
+      }
+      if (!setActive) {
+        setError('Authentication not loaded. Please try again.');
+        return false;
+      }
+
+      try {
+        if (__DEV__)
+          console.log(
+            `[AUTH-DEBUG] activateSession → calling setActive(${sessionId}) context=${context}`
+          );
+        await setActive({ session: sessionId });
+        if (__DEV__)
+          console.log('[AUTH-DEBUG] activateSession → setActive resolved OK');
+      } catch (e) {
+        if (__DEV__)
+          console.warn('[AUTH-DEBUG] activateSession → setActive THREW', e);
+        setPendingSessionActivationId(sessionId);
+        setActivationFailureContext(context);
+        setError('Could not activate your session. Please try again.');
+        return false;
+      }
+
+      // Show "Signing you in…" spinner immediately — before clearing form
+      // state, so the user never sees a flash of the empty sign-in form.
+      // The module-level timestamp lets this survive component remounts
+      // if the redirect briefly bounces back.
+      markSessionActivated();
+      setIsTransitioning(true);
+
+      setPendingSessionActivationId(null);
+      setActivationFailureContext(null);
+      setPendingVerification(null);
+      setVerificationOffer(null);
+      setCode('');
+      void SecureStore.setItemAsync(HAS_SIGNED_IN_KEY, 'true');
+      // Don't navigate explicitly — the auth layout guard redirects to
+      // /(app)/home once Clerk's useAuth() state propagates with
+      // isSignedIn: true.  Calling router.replace() here races with Clerk's
+      // React state update: the app layout renders before isSignedIn
+      // flips, sees !isSignedIn, and bounces back to sign-in.
+      return true;
+    },
+    [setActive]
+  );
+
   const onSSOPress = useCallback(
     async (strategy: SupportedSSOStrategy) => {
       if (!isLoaded) return;
@@ -570,66 +624,13 @@ export default function SignInScreen() {
       }
     },
     [
+      activateSession,
       clearVerificationFlow,
       handleIncompleteSignIn,
       isLoaded,
       setActive,
       startSSOFlow,
     ]
-  );
-
-  const activateSession = useCallback(
-    async (
-      sessionId: string | null,
-      context: 'oauth' | 'password' | 'verification'
-    ): Promise<boolean> => {
-      if (!sessionId) {
-        setError('No session was created. Please try again.');
-        return false;
-      }
-      if (!setActive) {
-        setError('Authentication not loaded. Please try again.');
-        return false;
-      }
-
-      try {
-        if (__DEV__)
-          console.log(
-            `[AUTH-DEBUG] activateSession → calling setActive(${sessionId}) context=${context}`
-          );
-        await setActive({ session: sessionId });
-        if (__DEV__)
-          console.log('[AUTH-DEBUG] activateSession → setActive resolved OK');
-      } catch (e) {
-        if (__DEV__)
-          console.warn('[AUTH-DEBUG] activateSession → setActive THREW', e);
-        setPendingSessionActivationId(sessionId);
-        setActivationFailureContext(context);
-        setError('Could not activate your session. Please try again.');
-        return false;
-      }
-
-      // Show "Signing you in…" spinner immediately — before clearing form
-      // state, so the user never sees a flash of the empty sign-in form.
-      // The module-level timestamp lets this survive component remounts
-      // if the redirect briefly bounces back.
-      markSessionActivated();
-      setIsTransitioning(true);
-
-      setPendingSessionActivationId(null);
-      setActivationFailureContext(null);
-      setPendingVerification(null);
-      setVerificationOffer(null);
-      setCode('');
-      void SecureStore.setItemAsync(HAS_SIGNED_IN_KEY, 'true');
-      // Don't navigate explicitly — the auth layout guard redirects to
-      // /(app)/home once Clerk's useAuth() state propagates with
-      // isSignedIn: true.  Calling router.replace() here races with Clerk's
-      // React state update: the app layout renders before isSignedIn
-      // flips, sees !isSignedIn, and bounces back to sign-in.
-      return true;
-    },
-    [setActive]
   );
 
   const retrySessionActivation = useCallback(async () => {
@@ -1081,16 +1082,18 @@ export default function SignInScreen() {
           />
         </View>
 
-        <View className="mb-6">
-          <Button
-            variant="secondary"
-            label="Continue with Apple"
-            onPress={() => onSSOPress('oauth_apple')}
-            disabled={oauthLoading !== null}
-            loading={oauthLoading === 'oauth_apple'}
-            testID="apple-sso-button"
-          />
-        </View>
+        {Platform.OS !== 'web' && (
+          <View className="mb-6">
+            <Button
+              variant="secondary"
+              label="Continue with Apple"
+              onPress={() => onSSOPress('oauth_apple')}
+              disabled={oauthLoading !== null}
+              loading={oauthLoading === 'oauth_apple'}
+              testID="apple-sso-button"
+            />
+          </View>
+        )}
 
         {openAIStrategy ? (
           <View className="mb-6">

@@ -103,7 +103,7 @@ export function LearnerScreen({
     const primaryCard = {
       title: primaryIntentTitle,
       subtitle: primaryIntentSubtitle,
-      onPress: () => router.push('/(app)/learn-new' as never),
+      onPress: () => router.push('/learn-new' as never),
       testID: 'intent-learn-new',
     };
     const homeworkCard = {

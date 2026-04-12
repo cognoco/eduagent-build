@@ -227,7 +227,7 @@ describe('LearnerScreen', () => {
       render(<LearnerScreen {...defaultProps} />);
 
       fireEvent.press(screen.getByTestId('intent-learn-new'));
-      expect(mockPush).toHaveBeenCalledWith('/(app)/learn-new');
+      expect(mockPush).toHaveBeenCalledWith('/learn-new');
     });
 
     it('navigates to homework camera on "Help with assignment?"', () => {

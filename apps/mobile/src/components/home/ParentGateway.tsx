@@ -77,7 +77,7 @@ export function ParentGateway({
         />
         <IntentCard
           title="Learn something"
-          onPress={() => router.push('/(app)/learn' as never)}
+          onPress={() => router.push('/learn-new' as never)}
           testID="gateway-learn"
         />
       </View>

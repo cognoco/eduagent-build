@@ -30,14 +30,20 @@ export default function SubjectTopicsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const {
-    profileId,
-    subjectId,
+    profileId: rawProfileId,
+    subjectId: rawSubjectId,
     subjectName: routeSubjectName,
   } = useLocalSearchParams<{
     profileId: string;
     subjectId: string;
     subjectName?: string;
   }>();
+  const profileId = Array.isArray(rawProfileId)
+    ? rawProfileId[0]
+    : rawProfileId;
+  const subjectId = Array.isArray(rawSubjectId)
+    ? rawSubjectId[0]
+    : rawSubjectId;
   const { data: topics, isLoading } = useChildSubjectTopics(
     profileId,
     subjectId
@@ -97,13 +103,13 @@ export default function SubjectTopicsScreen() {
                 router.push({
                   pathname: '/(app)/child/[profileId]/topic/[topicId]',
                   params: {
-                    profileId: profileId!,
+                    profileId: profileId ?? '',
                     topicId: topic.topicId,
                     title: topic.title,
                     completionStatus: topic.completionStatus,
                     masteryScore: String(topic.masteryScore ?? ''),
                     retentionStatus: topic.retentionStatus ?? '',
-                    subjectId: subjectId!,
+                    subjectId: subjectId ?? '',
                   },
                 } as never)
               }

@@ -5,7 +5,7 @@
 // Pure business logic — no Hono imports.
 // ---------------------------------------------------------------------------
 
-import { eq, and, gt, asc, sql } from 'drizzle-orm';
+import { eq, and, gt, asc, sql, inArray } from 'drizzle-orm';
 import {
   learningSessions,
   streaks,
@@ -226,9 +226,24 @@ export async function precomputeCoachingCard(
   }
 
   // --- Priority 4: challenge (fallback) ---
-  // If there are any retention cards, pick the first topic; otherwise use a placeholder
-  const fallbackTopicId =
-    allCards.length > 0 ? allCards[0]!.topicId : profileId;
+  // [BUG-55] When no retention cards exist, find a topic from the curriculum
+  // instead of using profileId as topicId (which is semantically wrong).
+  const fallbackTopicId: string | null =
+    allCards.length > 0 ? allCards[0]!.topicId : null;
+  // No retention cards = new learner, return curriculum_complete start prompt
+  if (!fallbackTopicId) {
+    return {
+      id,
+      profileId,
+      type: 'curriculum_complete' as const,
+      title: 'Ready to start learning?',
+      body: 'Create your first subject to begin!',
+      priority: 3,
+      expiresAt,
+      createdAt,
+    };
+  }
+
   return {
     id,
     profileId,
@@ -283,34 +298,64 @@ async function findContinueBookCard(
     )
     .orderBy(asc(curriculumBooks.sortOrder));
 
-  for (const book of booksWithSubjects) {
-    // Get the curriculum for this subject
-    const curriculum = await db.query.curricula?.findFirst?.({
-      where: eq(curricula.subjectId, book.subjectId),
-    });
-    if (!curriculum) continue;
+  if (booksWithSubjects.length === 0) return null;
 
-    const topics = await db
-      .select()
-      .from(curriculumTopics)
-      .where(
-        and(
-          eq(curriculumTopics.curriculumId, curriculum.id),
-          eq(curriculumTopics.bookId, book.bookId),
-          eq(curriculumTopics.skipped, false)
-        )
+  // [BUG-63] Batch: get all curricula for these subjects
+  const subjectIds = [...new Set(booksWithSubjects.map((b) => b.subjectId))];
+  const allCurricula = await db.query.curricula.findMany({
+    where: inArray(curricula.subjectId, subjectIds),
+  });
+  const curriculumBySubject = new Map<string, (typeof allCurricula)[0]>();
+  for (const c of allCurricula) {
+    if (!curriculumBySubject.has(c.subjectId)) {
+      curriculumBySubject.set(c.subjectId, c);
+    }
+  }
+  const bookIds = booksWithSubjects.map((b) => b.bookId);
+  const curriculumIds = [...curriculumBySubject.values()].map((c) => c.id);
+  const allTopics =
+    curriculumIds.length > 0
+      ? await db
+          .select()
+          .from(curriculumTopics)
+          .where(
+            and(
+              inArray(curriculumTopics.curriculumId, curriculumIds),
+              inArray(curriculumTopics.bookId, bookIds),
+              eq(curriculumTopics.skipped, false)
+            )
+          )
+          .orderBy(asc(curriculumTopics.sortOrder))
+      : [];
+  if (allTopics.length === 0) return null;
+  const topicIds = allTopics.map((t) => t.id);
+  const sessionsForTopics = await db
+    .select({ topicId: learningSessions.topicId })
+    .from(learningSessions)
+    .where(
+      and(
+        inArray(learningSessions.topicId, topicIds),
+        eq(learningSessions.profileId, profileId)
       )
-      .orderBy(asc(curriculumTopics.sortOrder));
+    );
+  const topicsWithSessions = new Set(
+    sessionsForTopics.map((s) => s.topicId).filter(Boolean)
+  );
+  const topicsByBook = new Map<string, typeof allTopics>();
+  for (const topic of allTopics) {
+    if (!topic.bookId) continue;
+    const list = topicsByBook.get(topic.bookId) ?? [];
+    list.push(topic);
+    topicsByBook.set(topic.bookId, list);
+  }
 
-    // Find first topic without a completed session
+  for (const book of booksWithSubjects) {
+    const curriculum = curriculumBySubject.get(book.subjectId);
+    if (!curriculum) continue;
+    const topics = topicsByBook.get(book.bookId) ?? [];
     for (const topic of topics) {
-      const hasSession = await db.query.learningSessions?.findFirst?.({
-        where: and(
-          eq(learningSessions.topicId, topic.id),
-          eq(learningSessions.profileId, profileId)
-        ),
-      });
-      if (!hasSession) {
+      if (topic.curriculumId !== curriculum.id) continue;
+      if (!topicsWithSessions.has(topic.id)) {
         const basePriority = 4;
         const priority = boostedSubjectIds.has(book.subjectId)
           ? Math.min(basePriority + 3, 10)

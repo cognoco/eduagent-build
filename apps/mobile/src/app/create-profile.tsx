@@ -84,7 +84,10 @@ export default function CreateProfileScreen() {
   );
 
   const canSubmit =
-    displayName.trim().length >= 1 && birthDate !== null && !loading;
+    displayName.trim().length >= 1 &&
+    displayName.trim().length <= 50 &&
+    birthDate !== null &&
+    !loading;
 
   const onSubmit = useCallback(async () => {
     if (!canSubmit || !birthDate) return;

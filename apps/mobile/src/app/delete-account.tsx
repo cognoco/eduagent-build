@@ -71,6 +71,8 @@ export default function DeleteAccountScreen() {
             onPress={() => router.back()}
             className="min-h-[44px] min-w-[44px] items-center justify-center"
             testID="delete-account-close"
+            accessibilityRole="button"
+            accessibilityLabel="Close"
           >
             <Text className="text-body text-primary font-semibold">Close</Text>
           </Pressable>
@@ -110,6 +112,17 @@ export default function DeleteAccountScreen() {
                   I changed my mind — keep my account
                 </Text>
               )}
+            </Pressable>
+            <Pressable
+              onPress={() => router.back()}
+              className="bg-surface rounded-button py-3.5 items-center"
+              testID="delete-account-dismiss"
+              accessibilityRole="button"
+              accessibilityLabel="Close without cancelling"
+            >
+              <Text className="text-body font-semibold text-text-primary">
+                Close
+              </Text>
             </Pressable>
           </View>
         ) : (

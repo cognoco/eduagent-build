@@ -145,7 +145,10 @@ export default function ForgotPasswordScreen() {
         >
           {/* Top spacer: see sign-in.tsx BUG-24 comment */}
           <View className="flex-1" style={{ minHeight: 40 }} />
-          <Text className="text-h2 font-bold text-text-primary mb-1">
+          <Text
+            className="text-h2 font-bold text-text-primary mb-1"
+            accessibilityRole="header"
+          >
             Reset password
           </Text>
           <Text className="text-body-sm text-text-secondary mb-6">
@@ -270,7 +273,10 @@ export default function ForgotPasswordScreen() {
       >
         {/* Top spacer: see sign-in.tsx BUG-24 comment */}
         <View className="flex-1" style={{ minHeight: 40 }} />
-        <Text className="text-h2 font-bold text-text-primary mb-1">
+        <Text
+          className="text-h2 font-bold text-text-primary mb-1"
+          accessibilityRole="header"
+        >
           Forgot password?
         </Text>
         <Text className="text-body-sm text-text-secondary mb-6">

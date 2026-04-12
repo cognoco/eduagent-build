@@ -643,22 +643,52 @@ export default function BookScreen() {
           </View>
         )}
 
-        {/* Empty state — no sessions yet */}
-        {sessions.length === 0 && !needsGeneration && topics.length > 0 && (
-          <View className="px-5 py-8 items-center" testID="book-empty-sessions">
-            <Ionicons
-              name="book-outline"
-              size={40}
-              color={themeColors.textSecondary}
-            />
-            <Text className="text-body text-text-secondary text-center mt-3 mb-1">
-              No sessions yet
-            </Text>
-            <Text className="text-body-sm text-text-secondary text-center mb-4">
-              Pick a topic above to start learning
-            </Text>
-          </View>
-        )}
+        {/* [BUG-28] All topics completed — distinct from "no sessions" */}
+        {completedTopicCount > 0 &&
+          completedTopicCount >= topics.length &&
+          topics.length > 0 &&
+          !needsGeneration && (
+            <View
+              className="px-5 py-6 items-center"
+              testID="book-all-completed"
+            >
+              <Ionicons
+                name="checkmark-circle"
+                size={40}
+                color={themeColors.primary}
+              />
+              <Text className="text-body text-text-primary text-center mt-3 mb-1 font-semibold">
+                You finished this book!
+              </Text>
+              <Text className="text-body-sm text-text-secondary text-center">
+                All {topics.length} topics covered. Review any topic to
+                strengthen your understanding.
+              </Text>
+            </View>
+          )}
+
+        {/* Empty state — no sessions yet (only when no topics completed) */}
+        {sessions.length === 0 &&
+          !needsGeneration &&
+          topics.length > 0 &&
+          completedTopicCount === 0 && (
+            <View
+              className="px-5 py-8 items-center"
+              testID="book-empty-sessions"
+            >
+              <Ionicons
+                name="book-outline"
+                size={40}
+                color={themeColors.textSecondary}
+              />
+              <Text className="text-body text-text-secondary text-center mt-3 mb-1">
+                No sessions yet
+              </Text>
+              <Text className="text-body-sm text-text-secondary text-center mb-4">
+                Pick a topic above to start learning
+              </Text>
+            </View>
+          )}
 
         {/* Empty topics state */}
         {topics.length === 0 && !needsGeneration && (
@@ -689,16 +719,26 @@ export default function BookScreen() {
             onPress={handleStartLearning}
             className="bg-primary rounded-button px-5 py-4 flex-row items-center justify-center min-h-[48px]"
             testID="book-start-learning"
-            accessibilityLabel="Start learning"
+            accessibilityLabel={
+              completedTopicCount >= topics.length && topics.length > 0
+                ? 'Review a topic'
+                : 'Start learning'
+            }
           >
             <Ionicons
-              name="add-circle-outline"
+              name={
+                completedTopicCount >= topics.length && topics.length > 0
+                  ? 'refresh-outline'
+                  : 'add-circle-outline'
+              }
               size={20}
               color={themeColors.textInverse}
               style={{ marginRight: 8 }}
             />
             <Text className="text-body font-semibold text-text-inverse">
-              Start learning
+              {completedTopicCount >= topics.length && topics.length > 0
+                ? 'Review a topic'
+                : 'Start learning'}
             </Text>
           </Pressable>
         </View>
