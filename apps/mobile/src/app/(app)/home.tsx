@@ -1,4 +1,6 @@
-import { View, ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator, Text, Pressable } from 'react-native';
+import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ParentGateway, LearnerScreen } from '../../components/home';
 import { useCelebration } from '../../hooks/use-celebration';
 import {
@@ -6,6 +8,7 @@ import {
   usePendingCelebrations,
 } from '../../hooks/use-celebrations';
 import { useCelebrationLevel } from '../../hooks/use-settings';
+import { useSubscription } from '../../hooks/use-subscription';
 import { useProfile } from '../../lib/profile';
 
 /** True when the active user is the account owner AND has at least one child profile. */
@@ -21,8 +24,47 @@ function hasLinkedChildren(
   );
 }
 
+/**
+ * Shown when an owner is on a family/pro plan but has not yet added a child
+ * profile. Gives them a clear CTA to add their first child instead of
+ * dropping them into the solo-learner flow.
+ */
+function AddFirstChildScreen(): React.ReactElement {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+
+  return (
+    <View
+      className="flex-1 bg-background items-center justify-center px-6"
+      style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
+      testID="add-first-child-screen"
+    >
+      <Text className="text-h2 font-bold text-text-primary text-center mb-3">
+        Add your first child
+      </Text>
+      <Text className="text-body text-text-secondary text-center mb-8">
+        Create a child profile to start tracking their progress and learning
+        sessions.
+      </Text>
+      <Pressable
+        onPress={() => router.push('/create-profile' as never)}
+        className="bg-primary rounded-button px-8 py-3.5 items-center w-full"
+        style={{ minHeight: 48 }}
+        accessibilityRole="button"
+        accessibilityLabel="Add a child profile"
+        testID="add-first-child-cta"
+      >
+        <Text className="text-body font-semibold text-text-inverse">
+          Add Child Profile
+        </Text>
+      </Pressable>
+    </View>
+  );
+}
+
 export default function HomeScreen(): React.ReactElement {
   const { profiles, activeProfile, switchProfile, isLoading } = useProfile();
+  const { data: subscription } = useSubscription();
   const { data: celebrationLevel = 'all' } = useCelebrationLevel();
   const { data: pendingCelebrations } = usePendingCelebrations();
   const markCelebrationsSeen = useMarkCelebrationsSeen();
@@ -50,6 +92,12 @@ export default function HomeScreen(): React.ReactElement {
 
   const showParentGateway = hasLinkedChildren(activeProfile, profiles);
 
+  // Owner with no linked child profiles yet: show Add Child CTA regardless of
+  // tier — any owner without children should not land on the learner flow.
+  // Guard on subscription != null so we don't flash the CTA while loading.
+  const isParentWithNoChildren =
+    isOwner && !showParentGateway && subscription != null;
+
   return (
     <View className="flex-1">
       {showParentGateway ? (
@@ -58,6 +106,8 @@ export default function HomeScreen(): React.ReactElement {
           activeProfile={activeProfile}
           switchProfile={switchProfile}
         />
+      ) : isParentWithNoChildren ? (
+        <AddFirstChildScreen />
       ) : (
         <LearnerScreen
           profiles={profiles}

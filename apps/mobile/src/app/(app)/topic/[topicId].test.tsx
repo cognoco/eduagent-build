@@ -1,6 +1,5 @@
 import { render, screen, fireEvent } from '@testing-library/react-native';
 import React from 'react';
-import { ActivityIndicator } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const mockBack = jest.fn();
@@ -108,8 +107,9 @@ describe('TopicDetailScreen', () => {
 
     render(<TopicDetailScreen />, { wrapper: createWrapper() });
 
-    // Component renders a spinner when route params are missing
-    expect(screen.UNSAFE_getByType(ActivityIndicator)).toBeTruthy();
+    // Component renders an error state when route params are missing
+    expect(screen.getByTestId('topic-detail-missing-params-back')).toBeTruthy();
+    expect(screen.getByText('Topic not found')).toBeTruthy();
   });
 
   it('renders topic progress and retention details', () => {

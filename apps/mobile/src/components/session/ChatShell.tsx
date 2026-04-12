@@ -396,17 +396,28 @@ export function ChatShell({
           scrollRef.current?.scrollToEnd({ animated: true })
         }
       >
-        {messages.map((msg) => (
-          <MessageBubble
-            key={msg.id}
-            role={msg.role}
-            content={msg.content}
-            streaming={msg.streaming}
-            escalationRung={msg.escalationRung}
-            verificationBadge={msg.verificationBadge}
-            actions={renderMessageActions?.(msg)}
-          />
-        ))}
+        {messages.length === 0 ? (
+          <View
+            className="flex-1 items-center justify-center py-16"
+            testID="chat-empty-state"
+          >
+            <Text className="text-body text-text-secondary text-center">
+              Your conversation will appear here.
+            </Text>
+          </View>
+        ) : (
+          messages.map((msg) => (
+            <MessageBubble
+              key={msg.id}
+              role={msg.role}
+              content={msg.content}
+              streaming={msg.streaming}
+              escalationRung={msg.escalationRung}
+              verificationBadge={msg.verificationBadge}
+              actions={renderMessageActions?.(msg)}
+            />
+          ))
+        )}
         {showIdleAnim && (
           <View className="items-center py-4" testID="idle-pen-animation">
             <PenWritingAnimation size={48} color={colors.muted} />

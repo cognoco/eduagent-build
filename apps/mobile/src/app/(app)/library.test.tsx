@@ -429,4 +429,65 @@ describe('LibraryScreen', () => {
       params: { subjectId: 'sub-1', bookId: 'book-1' },
     });
   });
+
+  // -----------------------------------------------------------------------
+  // BUG-82: error state when allBooksQuery fails [BUG-82]
+  // -----------------------------------------------------------------------
+  it('shows error state with retry and back buttons when allBooksQuery fails', () => {
+    const mockRefetch = jest.fn();
+    mockUseSubjects.mockReturnValue({
+      data: [{ id: 'sub-1', name: 'Math', status: 'active' }],
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+    mockUseOverallProgress.mockReturnValue({
+      data: { subjects: [] },
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+    mockUseAllBooks.mockReturnValue({
+      books: [],
+      isLoading: false,
+      isError: true,
+      refetch: mockRefetch,
+    });
+
+    render(<LibraryScreen />, { wrapper: createWrapper() });
+
+    expect(screen.getByTestId('library-error')).toBeTruthy();
+    expect(
+      screen.getByText('Unable to load your library. Please try again.')
+    ).toBeTruthy();
+    expect(screen.getByTestId('library-retry-button')).toBeTruthy();
+    expect(screen.getByTestId('library-home-button')).toBeTruthy();
+  });
+
+  it('retry button on books error calls allBooksQuery.refetch', () => {
+    const mockRefetch = jest.fn();
+    mockUseSubjects.mockReturnValue({
+      data: [],
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+    mockUseOverallProgress.mockReturnValue({
+      data: { subjects: [] },
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+    mockUseAllBooks.mockReturnValue({
+      books: [],
+      isLoading: false,
+      isError: true,
+      refetch: mockRefetch,
+    });
+
+    render(<LibraryScreen />, { wrapper: createWrapper() });
+
+    fireEvent.press(screen.getByTestId('library-retry-button'));
+    expect(mockRefetch).toHaveBeenCalledTimes(1);
+  });
 });

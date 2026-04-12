@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { RetentionSignal, type RetentionStatus } from './RetentionSignal';
 
@@ -57,16 +57,26 @@ export function RemediationCard({
     if (!cooldownEndsAt) return 0;
     return Math.max(0, new Date(cooldownEndsAt).getTime() - Date.now());
   });
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!cooldownEndsAt) return;
     const update = () => {
       const ms = Math.max(0, new Date(cooldownEndsAt).getTime() - Date.now());
       setRemainingMs(ms);
+      if (ms <= 0) {
+        timerRef.current = null;
+        return;
+      }
+      // Tick every 1s when ≤60s remain so the button re-enables on time;
+      // tick every 60s otherwise to avoid unnecessary re-renders.
+      const nextTick = ms <= 60_000 ? 1_000 : 60_000;
+      timerRef.current = setTimeout(update, nextTick);
     };
     update();
-    const id = setInterval(update, 60_000);
-    return () => clearInterval(id);
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
   }, [cooldownEndsAt]);
 
   const cooldownActive = remainingMs > 0;

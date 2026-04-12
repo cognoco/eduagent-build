@@ -832,6 +832,49 @@ describe('BookScreen', () => {
   });
 
   // -----------------------------------------------------------------------
+  // BUG-81: initial generation failure shows user-visible Alert [BUG-81]
+  // -----------------------------------------------------------------------
+  it('shows Alert when initial book topic generation fails', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(jest.fn());
+
+    // Book needs generation (topicsGenerated: false)
+    mockUseBookWithTopics.mockReturnValue({
+      data: {
+        book: {
+          id: 'book-1',
+          title: 'Algebra',
+          emoji: '📐',
+          topicsGenerated: false,
+          description: null,
+        },
+        topics: [],
+        completedTopicCount: 0,
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: mockBookRefetch,
+    });
+
+    // Simulate mutate calling its onError callback
+    mockGenerateMutate.mockImplementation(
+      (_input: unknown, callbacks: { onError: (e: Error) => void }) => {
+        callbacks.onError(new Error('LLM service unavailable'));
+      }
+    );
+
+    render(<BookScreen />);
+
+    await waitFor(() => {
+      expect(alertSpy).toHaveBeenCalledWith(
+        "Couldn't build this book",
+        expect.any(String),
+        expect.any(Array)
+      );
+    });
+  });
+
+  // -----------------------------------------------------------------------
   // Loading back button
   // -----------------------------------------------------------------------
   it('loading state has a back button that navigates away', () => {

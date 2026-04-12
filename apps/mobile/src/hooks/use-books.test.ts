@@ -388,4 +388,47 @@ describe('useGenerateBookTopics', () => {
       expect.objectContaining({ queryKey: ['curriculum', 'subject-1'] })
     );
   });
+
+  // BUG-123: stale closure — onSuccess must read the latest ref values [BUG-123]
+  it('onSuccess invalidates using the latest subjectId and bookId when they change after mount', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify(mockBookWithTopics), { status: 200 })
+    );
+
+    const wrapper = createWrapper();
+    const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries');
+
+    // Mount with initial IDs
+    let subjectId = 'subject-1';
+    let bookId = 'book-1';
+
+    const { result, rerender } = renderHook(
+      () => useGenerateBookTopics(subjectId, bookId),
+      { wrapper }
+    );
+
+    // Simulate route param change before mutation completes
+    subjectId = 'subject-2';
+    bookId = 'book-2';
+    rerender({});
+
+    await act(async () => {
+      await result.current.mutateAsync(undefined);
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    // Should invalidate using the LATEST IDs (subject-2, book-2), not stale ones
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ queryKey: ['books', 'subject-2'] })
+    );
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ queryKey: ['book', 'subject-2', 'book-2'] })
+    );
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ queryKey: ['curriculum', 'subject-2'] })
+    );
+  });
 });

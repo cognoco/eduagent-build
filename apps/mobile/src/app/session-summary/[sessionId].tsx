@@ -128,6 +128,37 @@ export default function SessionSummaryScreen() {
     );
   }
 
+  const isSessionExpired =
+    transcript.isError &&
+    typeof transcript.error === 'object' &&
+    transcript.error !== null &&
+    'status' in transcript.error &&
+    (transcript.error as { status?: unknown }).status === 404;
+
+  if (isSessionExpired) {
+    return (
+      <View className="flex-1 bg-background items-center justify-center px-6">
+        <Text className="text-h3 font-semibold text-text-primary text-center mb-3">
+          This session has expired
+        </Text>
+        <Text className="text-body text-text-secondary text-center mb-6">
+          This session is no longer available. Head home to start a new one.
+        </Text>
+        <Pressable
+          onPress={() => router.replace('/(app)/home')}
+          className="bg-primary rounded-button py-3 px-8 items-center"
+          testID="expired-session-go-home"
+          accessibilityLabel="Go home"
+          accessibilityRole="button"
+        >
+          <Text className="text-text-inverse text-body font-semibold">
+            Go Home
+          </Text>
+        </Pressable>
+      </View>
+    );
+  }
+
   if (
     !exchangeCount &&
     !wallClockSeconds &&

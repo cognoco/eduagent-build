@@ -138,13 +138,21 @@ export default function BookScreen() {
 
     generateMutation.mutate(undefined, {
       onSuccess: () => {
+        clearTimeout(slowTimer);
+        clearTimeout(timeoutTimer);
         setGenPhase('idle');
         alreadyPending.current = false;
         void bookQuery.refetch();
       },
-      onError: () => {
+      onError: (error) => {
+        clearTimeout(slowTimer);
+        clearTimeout(timeoutTimer);
         setGenPhase('timed_out');
         alreadyPending.current = false;
+        // BUG-81: Show user-visible error feedback on initial generation failure
+        Alert.alert("Couldn't build this book", formatApiError(error), [
+          { text: 'OK' },
+        ]);
       },
     });
 

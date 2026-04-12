@@ -217,6 +217,7 @@ export default function LibraryScreen() {
   const handleRetry = (): void => {
     void subjectsQuery.refetch();
     void progressQuery.refetch();
+    allBooksQuery.refetch();
     retentionQueries.forEach((query) => void query.refetch());
   };
 
@@ -263,22 +264,35 @@ export default function LibraryScreen() {
       );
     }
 
-    if (subjectsQuery.isError || progressQuery.isError) {
+    if (
+      subjectsQuery.isError ||
+      progressQuery.isError ||
+      allBooksQuery.isError
+    ) {
       return (
         <View
           className="flex-1 items-center justify-center px-5 py-12"
-          testID="book-error"
+          testID="library-error"
         >
           <Text className="text-body text-text-secondary text-center mb-4">
             Unable to load your library. Please try again.
           </Text>
           <Pressable
             onPress={handleRetry}
-            className="bg-primary rounded-button px-6 py-3 items-center"
-            testID="book-retry-button"
+            className="bg-primary rounded-button px-6 py-3 items-center min-h-[48px] justify-center mb-3"
+            testID="library-retry-button"
           >
             <Text className="text-text-inverse text-body font-semibold">
               Retry
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => router.replace('/(app)')}
+            className="bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
+            testID="library-home-button"
+          >
+            <Text className="text-text-primary text-body font-semibold">
+              Go Home
             </Text>
           </Pressable>
         </View>

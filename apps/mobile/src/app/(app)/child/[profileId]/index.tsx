@@ -200,10 +200,28 @@ export default function ChildDetailScreen() {
 
   if (!profileId) {
     return (
-      <View className="flex-1 bg-background items-center justify-center px-6">
-        <Text className="text-text-secondary text-body text-center">
+      <View
+        className="flex-1 bg-background items-center justify-center px-6"
+        style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
+        testID="child-profile-no-id"
+      >
+        <Text className="text-h3 font-semibold text-text-primary text-center mb-2">
+          Profile not found
+        </Text>
+        <Text className="text-body text-text-secondary text-center mb-6">
           Unable to load child details.
         </Text>
+        <Pressable
+          onPress={() => router.replace('/(app)/home' as never)}
+          className="bg-primary rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
+          accessibilityRole="button"
+          accessibilityLabel="Go home"
+          testID="child-profile-no-id-go-home"
+        >
+          <Text className="text-body font-semibold text-text-inverse">
+            Go Home
+          </Text>
+        </Pressable>
       </View>
     );
   }

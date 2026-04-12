@@ -70,6 +70,18 @@ export function useBookWithTopics(
   });
 }
 
+/**
+ * Internal mutation variables type — wraps the API input with the routing
+ * params so onSuccess can use the exact IDs that were submitted, avoiding a
+ * stale closure when the component re-renders with new params while the
+ * mutation is in flight. [3F.7]
+ */
+interface GenerateBookTopicsVars {
+  subjectId: string;
+  bookId: string;
+  input: BookTopicGenerateInput | undefined;
+}
+
 export function useGenerateBookTopics(
   subjectId: string | undefined,
   bookId: string | undefined
@@ -81,36 +93,86 @@ export function useGenerateBookTopics(
   const client = useApiClient();
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: async (
-      input?: BookTopicGenerateInput
-    ): Promise<BookWithTopics> => {
-      if (!subjectId || !bookId) {
-        throw new Error(
-          'Cannot generate topics: subjectId and bookId are required'
-        );
-      }
+  // Internal mutation that carries subjectId + bookId in its variables so that
+  // onSuccess always invalidates the queries for the book that was actually
+  // generated, not whatever IDs happen to be in scope when the callback fires.
+  const internalMutation = useMutation<
+    BookWithTopics,
+    Error,
+    GenerateBookTopicsVars
+  >({
+    mutationFn: async ({
+      subjectId: sid,
+      bookId: bid,
+      input,
+    }: GenerateBookTopicsVars): Promise<BookWithTopics> => {
       const res = await client.subjects[':subjectId'].books[':bookId'][
         'generate-topics'
       ].$post({
-        param: { subjectId, bookId },
+        param: { subjectId: sid, bookId: bid },
         json: input ?? {},
       });
       await assertOk(res);
       return (await res.json()) as BookWithTopics;
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
+      // Use variables.subjectId / variables.bookId — the IDs from the actual
+      // request — not the closed-over hook params which may have changed if
+      // the user navigated between subjects while generation was in flight.
+      const { subjectId: sid, bookId: bid } = variables;
       // Scope invalidation to the affected subject to avoid re-fetching every
       // book/curriculum query across all subjects (over-invalidation).
       void queryClient.invalidateQueries({
-        queryKey: ['books', subjectId],
+        queryKey: ['books', sid],
       });
       void queryClient.invalidateQueries({
-        queryKey: ['book', subjectId, bookId],
+        queryKey: ['book', sid, bid],
       });
       void queryClient.invalidateQueries({
-        queryKey: ['curriculum', subjectId],
+        queryKey: ['curriculum', sid],
       });
     },
   });
+
+  // Expose a public-facing mutation result with the original
+  // BookTopicGenerateInput | undefined variable type so callers do not need
+  // to know about the internal routing-param wrapping.
+  // Full cast is required because GenerateBookTopicsVars (internal) has no
+  // overlap with BookTopicGenerateInput | undefined (public API). [3F.7]
+  const publicMutation = internalMutation as unknown as UseMutationResult<
+    BookWithTopics,
+    Error,
+    BookTopicGenerateInput | undefined
+  >;
+  return {
+    ...publicMutation,
+    mutate: (
+      input: BookTopicGenerateInput | undefined,
+      options?: Parameters<typeof publicMutation.mutate>[1]
+    ) => {
+      if (!subjectId || !bookId) return;
+      internalMutation.mutate(
+        { subjectId, bookId, input },
+        options as Parameters<typeof internalMutation.mutate>[1]
+      );
+    },
+    mutateAsync: async (
+      input: BookTopicGenerateInput | undefined,
+      options?: Parameters<typeof publicMutation.mutateAsync>[1]
+    ) => {
+      if (!subjectId || !bookId) {
+        throw new Error(
+          'Cannot generate topics: subjectId and bookId are required'
+        );
+      }
+      return internalMutation.mutateAsync(
+        { subjectId, bookId, input },
+        options as Parameters<typeof internalMutation.mutateAsync>[1]
+      );
+    },
+  } as UseMutationResult<
+    BookWithTopics,
+    Error,
+    BookTopicGenerateInput | undefined
+  >;
 }
