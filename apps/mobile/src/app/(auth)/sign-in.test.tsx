@@ -615,6 +615,35 @@ describe('SignInScreen', () => {
     expect(screen.queryByTestId('sign-in-unsupported-factor-help')).toBeNull();
   });
 
+  it('shows SSO suggestion in help block when account has SSO providers linked', async () => {
+    mockCreate.mockResolvedValue({
+      status: 'needs_second_factor',
+      createdSessionId: null,
+      supportedSecondFactors: [{ strategy: 'webauthn' }],
+      supportedFirstFactors: [
+        { strategy: 'oauth_google' },
+        { strategy: 'password' },
+      ],
+    });
+
+    render(<SignInScreen />);
+
+    fireEvent.changeText(
+      screen.getByTestId('sign-in-email'),
+      'test@example.com'
+    );
+    fireEvent.changeText(screen.getByTestId('sign-in-password'), 'password123');
+    fireEvent.press(screen.getByTestId('sign-in-button'));
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId('sign-in-unsupported-factor-help')
+      ).toBeTruthy();
+    });
+
+    expect(screen.getByText(/Google or Apple/)).toBeTruthy();
+  });
+
   it('opens support email when unsupported MFA help is used', async () => {
     (Linking.openURL as jest.Mock).mockResolvedValue(true);
     mockCreate.mockResolvedValue({
