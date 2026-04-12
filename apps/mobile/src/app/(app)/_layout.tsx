@@ -13,7 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth, useClerk, useUser } from '@clerk/clerk-expo';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from '../../lib/secure-storage';
 import { useProfile } from '../../lib/profile';
 import { useTheme, useThemeColors, useTokenVars } from '../../lib/theme';
 import { useConsentStatus, useRequestConsent } from '../../hooks/use-consent';
@@ -333,6 +333,7 @@ function CreateProfileGate(): React.ReactElement {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { signOut } = useClerk();
+  const isPushingRef = React.useRef(false);
 
   const handleSignOut = async () => {
     try {
@@ -343,6 +344,16 @@ function CreateProfileGate(): React.ReactElement {
       Alert.alert('Sign Out Failed', 'Please try again or restart the app.');
     }
   };
+
+  const handleGetStarted = React.useCallback(() => {
+    if (isPushingRef.current) return;
+    isPushingRef.current = true;
+    router.push('/create-profile');
+    // Reset after navigation settles to allow re-entry if user backs out
+    setTimeout(() => {
+      isPushingRef.current = false;
+    }, 1000);
+  }, [router]);
 
   return (
     <View
@@ -357,7 +368,7 @@ function CreateProfileGate(): React.ReactElement {
         Let's set up your profile so your mentor can get to know you.
       </Text>
       <Pressable
-        onPress={() => router.push('/create-profile')}
+        onPress={handleGetStarted}
         className="bg-primary rounded-button py-3.5 px-8 items-center w-full"
         style={{ minHeight: 48 }}
         testID="create-profile-cta"

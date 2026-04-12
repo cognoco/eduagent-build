@@ -73,6 +73,12 @@ export default function ConsentScreen() {
         return;
       }
       setIsTransitioning(true);
+      // Safety net: force-reset if animation stalls (BUG-286)
+      const safetyTimer = setTimeout(() => {
+        isTransitioningRef.current = false;
+        setIsTransitioning(false);
+        fadeAnim.setValue(1);
+      }, 1000);
       Animated.timing(fadeAnim, {
         toValue: 0,
         duration: 300,
@@ -84,6 +90,7 @@ export default function ConsentScreen() {
           duration: 300,
           useNativeDriver: true,
         }).start(() => {
+          clearTimeout(safetyTimer);
           isTransitioningRef.current = false;
           setIsTransitioning(false);
         });
@@ -259,6 +266,15 @@ export default function ConsentScreen() {
                   testID="consent-handoff-button"
                 />
               </View>
+              <View className="flex-row justify-center mt-2">
+                <Button
+                  variant="tertiary"
+                  size="small"
+                  label="Go back"
+                  onPress={() => router.back()}
+                  testID="consent-cancel"
+                />
+              </View>
             </View>
           )}
 
@@ -328,6 +344,15 @@ export default function ConsentScreen() {
                 loading={isPending}
                 testID="consent-submit"
               />
+              <View className="flex-row justify-center mt-4">
+                <Button
+                  variant="tertiary"
+                  size="small"
+                  label="Back to child"
+                  onPress={() => transitionToPhase('child')}
+                  testID="consent-back-to-child"
+                />
+              </View>
             </View>
           )}
 

@@ -138,14 +138,12 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       const db = c.get('db');
       const account = c.get('account');
 
+      // BUG-77: Return 404 (not 500) when Stripe is unconfigured — these
+      // endpoints are dormant for mobile. 404 communicates "feature not
+      // available" rather than misleading "server error".
       const stripeKey = c.env.STRIPE_SECRET_KEY;
       if (!stripeKey) {
-        return apiError(
-          c,
-          500,
-          ERROR_CODES.INTERNAL_ERROR,
-          'Stripe is not configured'
-        );
+        return notFound(c, 'Stripe web billing is not currently enabled');
       }
 
       const priceId = resolvePriceId(c.env, tier, interval);
@@ -217,14 +215,10 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       return notFound(c, 'No active subscription to cancel');
     }
 
+    // BUG-77: 404 when Stripe unconfigured (dormant for mobile)
     const stripeKey = c.env.STRIPE_SECRET_KEY;
     if (!stripeKey) {
-      return apiError(
-        c,
-        500,
-        ERROR_CODES.INTERNAL_ERROR,
-        'Stripe is not configured'
-      );
+      return notFound(c, 'Stripe web billing is not currently enabled');
     }
 
     const stripe = createStripeClient(stripeKey);
@@ -279,14 +273,10 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
         );
       }
 
+      // BUG-77: 404 when Stripe unconfigured (dormant for mobile)
       const stripeKey = c.env.STRIPE_SECRET_KEY;
       if (!stripeKey) {
-        return apiError(
-          c,
-          500,
-          ERROR_CODES.INTERNAL_ERROR,
-          'Stripe is not configured'
-        );
+        return notFound(c, 'Stripe web billing is not currently enabled');
       }
 
       const stripe = createStripeClient(stripeKey);
@@ -397,14 +387,10 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       return notFound(c, 'No billing account found');
     }
 
+    // BUG-77: 404 when Stripe unconfigured (dormant for mobile)
     const stripeKey = c.env.STRIPE_SECRET_KEY;
     if (!stripeKey) {
-      return apiError(
-        c,
-        500,
-        ERROR_CODES.INTERNAL_ERROR,
-        'Stripe is not configured'
-      );
+      return notFound(c, 'Stripe web billing is not currently enabled');
     }
 
     const stripe = createStripeClient(stripeKey);

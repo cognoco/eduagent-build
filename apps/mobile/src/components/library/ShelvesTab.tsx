@@ -300,6 +300,7 @@ export function ShelvesTab({
           data={filtered}
           keyExtractor={(item) => item.subject.id}
           renderItem={renderShelfCard}
+          scrollEnabled={false}
           testID="shelves-list"
         />
       )}

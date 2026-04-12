@@ -29,6 +29,8 @@ export interface LearnerScreenProps {
     profileId: string
   ) => Promise<{ success: boolean; error?: string }>;
   onBack?: () => void;
+  /** Injectable clock for deterministic testing of time-based greeting. */
+  now?: Date;
 }
 
 const REVIEW_PRIORITY_THRESHOLD = 5;
@@ -38,6 +40,7 @@ export function LearnerScreen({
   activeProfile,
   switchProfile,
   onBack,
+  now,
 }: LearnerScreenProps): React.ReactElement {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -85,7 +88,10 @@ export function LearnerScreen({
     subjects?.filter((subject) => subject.status === 'active') ?? [];
   const hasLibraryContent = activeSubjects.length > 0;
   const reviewDueCount = reviewSummary?.totalOverdue ?? 0;
-  const { title, subtitle } = getGreeting(activeProfile?.displayName ?? '');
+  const { title, subtitle } = getGreeting(
+    activeProfile?.displayName ?? '',
+    now
+  );
   const reviewSubtitle =
     reviewDueCount > 0
       ? `${reviewDueCount} ${
@@ -209,17 +215,16 @@ export function LearnerScreen({
   }
 
   return (
-    <ScrollView
-      className="flex-1 bg-background"
-      contentContainerStyle={{
-        paddingTop: insets.top + 16,
-        paddingHorizontal: 20,
-        paddingBottom: insets.bottom + 24,
-      }}
-      keyboardShouldPersistTaps="handled"
-      testID="learner-screen"
-    >
-      <View className="flex-row items-center justify-between mb-6">
+    <View className="flex-1 bg-background" testID="learner-screen">
+      {/* Header outside ScrollView so ProfileSwitcher dropdown isn't clipped */}
+      <View
+        className="flex-row items-center justify-between px-5"
+        style={{
+          paddingTop: insets.top + 16,
+          zIndex: 10,
+          elevation: 10,
+        }}
+      >
         <View className="flex-row items-center flex-1 me-3">
           {onBack ? (
             <Pressable
@@ -250,28 +255,38 @@ export function LearnerScreen({
         />
       </View>
 
-      {recentlyExpiredSession && (
-        <Pressable
-          onPress={() => setRecentlyExpiredSession(false)}
-          className="bg-surface rounded-card p-4 mb-2"
-          accessibilityRole="button"
-          accessibilityLabel="Dismiss session expired notice"
-          testID="recently-expired-banner"
-        >
-          <Text className="text-body-sm text-text-secondary">
-            Your previous session has expired and can no longer be resumed.
-          </Text>
-          <Text className="text-caption text-text-muted mt-1">
-            Tap to dismiss
-          </Text>
-        </Pressable>
-      )}
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{
+          paddingTop: 16,
+          paddingHorizontal: 20,
+          paddingBottom: insets.bottom + 24,
+        }}
+        keyboardShouldPersistTaps="handled"
+      >
+        {recentlyExpiredSession && (
+          <Pressable
+            onPress={() => setRecentlyExpiredSession(false)}
+            className="bg-surface rounded-card p-4 mb-2"
+            accessibilityRole="button"
+            accessibilityLabel="Dismiss session expired notice"
+            testID="recently-expired-banner"
+          >
+            <Text className="text-body-sm text-text-secondary">
+              Your previous session has expired and can no longer be resumed.
+            </Text>
+            <Text className="text-caption text-text-muted mt-1">
+              Tap to dismiss
+            </Text>
+          </Pressable>
+        )}
 
-      <View className="gap-4" testID="learner-intent-stack">
-        {intentCards.map((card) => (
-          <IntentCard key={card.testID} {...card} />
-        ))}
-      </View>
-    </ScrollView>
+        <View className="gap-4" testID="learner-intent-stack">
+          {intentCards.map((card) => (
+            <IntentCard key={card.testID} {...card} />
+          ))}
+        </View>
+      </ScrollView>
+    </View>
   );
 }

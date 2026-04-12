@@ -69,7 +69,8 @@ export function useChildDetail(
         cleanup();
       }
     },
-    enabled: !!activeProfile && !!childProfileId,
+    enabled:
+      !!activeProfile && activeProfile.isOwner === true && !!childProfileId,
   });
 }
 
@@ -98,7 +99,11 @@ export function useChildSubjectTopics(
         cleanup();
       }
     },
-    enabled: !!activeProfile && !!childProfileId && !!subjectId,
+    enabled:
+      !!activeProfile &&
+      activeProfile.isOwner === true &&
+      !!childProfileId &&
+      !!subjectId,
   });
 }
 
@@ -122,7 +127,8 @@ export function useChildSessions(childProfileId: string | undefined) {
         cleanup();
       }
     },
-    enabled: !!activeProfile && !!childProfileId,
+    enabled:
+      !!activeProfile && activeProfile.isOwner === true && !!childProfileId,
   });
 }
 
@@ -158,6 +164,10 @@ export function useChildSessionTranscript(
         cleanup();
       }
     },
-    enabled: !!activeProfile && !!childProfileId && !!sessionId,
+    enabled:
+      !!activeProfile &&
+      activeProfile.isOwner === true &&
+      !!childProfileId &&
+      !!sessionId,
   });
 }

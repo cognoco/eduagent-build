@@ -30,12 +30,19 @@ export default function ProfilesScreen() {
       // Query still loading — don't block with a false 'Upgrade required'
       return;
     }
+
+    // BUG-287: Always allow creating the first child profile (the owner profile
+    // is always profile #1, so profiles.length === 1 means no children yet).
+    // New users should never be blocked from adding their first child.
+    const hasNoChildren = profiles.length <= 1;
+
     const tier = subscription.tier;
     // Whitelist: only family/pro may add profiles. Blocks free and plus.
-    if (tier !== 'family' && tier !== 'pro') {
+    // Exception: first child profile is always allowed regardless of tier.
+    if (!hasNoChildren && tier !== 'family' && tier !== 'pro') {
       Alert.alert(
         'Upgrade required',
-        'Adding profiles requires a Family or Pro subscription.',
+        'Adding more profiles requires a Family or Pro subscription.',
         [
           {
             text: 'View plans',
@@ -67,7 +74,7 @@ export default function ProfilesScreen() {
     }
 
     router.push('/create-profile');
-  }, [subscription, familyData, router]);
+  }, [subscription, familyData, router, profiles.length]);
 
   const handleSwitch = async (profileId: string) => {
     if (isSwitching) return;
@@ -99,10 +106,16 @@ export default function ProfilesScreen() {
       <View className="flex-row items-center justify-between px-5 pt-4 pb-2">
         <Text className="text-h1 font-bold text-text-primary">Profiles</Text>
         <Pressable
-          onPress={() =>
-            router.canGoBack() ? router.back() : router.replace('/(app)')
-          }
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace('/(app)/home' as never);
+            }
+          }}
           className="min-h-[44px] min-w-[44px] items-center justify-center"
+          accessibilityRole="button"
+          accessibilityLabel="Done"
           testID="profiles-close"
         >
           <Text className="text-body text-primary font-semibold">Done</Text>
@@ -122,7 +135,7 @@ export default function ProfilesScreen() {
             Create your first profile to get started
           </Text>
           <Pressable
-            onPress={handleAddProfile}
+            onPress={() => router.push('/create-profile')}
             className="bg-primary rounded-button px-6 py-3"
             testID="profiles-create-first"
           >

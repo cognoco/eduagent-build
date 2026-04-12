@@ -80,6 +80,7 @@ export function ProfileSwitcher({
       <Pressable
         onPress={() => setIsOpen((prev) => !prev)}
         className="flex-row items-center bg-surface-elevated rounded-full px-3 py-1.5"
+        style={Platform.OS === 'web' ? { cursor: 'pointer' } : undefined}
         accessibilityRole="button"
         accessibilityLabel={`Switch profile. Current: ${
           activeProfile?.displayName ?? 'Unknown'
@@ -122,7 +123,9 @@ export function ProfileSwitcher({
             className="bg-surface-elevated rounded-card shadow-lg"
             style={{
               position: 'absolute',
-              top: '100%',
+              // BUG-408: Use fixed offset instead of percentage — Android doesn't
+              // resolve `top: '100%'` correctly in non-sized absolute parents.
+              top: 40,
               right: 0,
               minWidth: 200,
               marginTop: 4,

@@ -1,7 +1,8 @@
 import { View, Text, Pressable, ScrollView, Alert } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useProfile } from '../../../../lib/profile';
 import {
   GrowthChart,
   RetentionSignal,
@@ -115,6 +116,7 @@ function getGracePeriodDaysRemaining(respondedAt: string | null): number {
 export default function ChildDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { profiles } = useProfile();
   const { profileId: rawProfileId } = useLocalSearchParams<{
     profileId: string;
   }>();
@@ -122,6 +124,12 @@ export default function ChildDetailScreen() {
   // the generic says `string`. Make the type honest so hooks receive the real
   // runtime type and their `enabled` guards prevent API calls with undefined.
   const profileId = rawProfileId as string | undefined;
+
+  // BUG-382: Client-side IDOR guard — only allow access to profiles owned by this account
+  const isOwnedProfile = useMemo(
+    () => profiles.some((p) => p.id === profileId),
+    [profiles, profileId]
+  );
   const {
     data: child,
     isLoading,
@@ -249,6 +257,29 @@ export default function ChildDetailScreen() {
         >
           <Text className="text-body font-semibold text-text-inverse">
             Back to dashboard
+          </Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  // BUG-382: Block access to profiles not owned by this account
+  if (profileId && profiles.length > 0 && !isOwnedProfile) {
+    return (
+      <View
+        className="flex-1 bg-background items-center justify-center px-5"
+        style={{ paddingTop: insets.top }}
+      >
+        <Text className="text-body text-text-secondary text-center mb-4">
+          You don&apos;t have access to this profile.
+        </Text>
+        <Pressable
+          onPress={() => router.back()}
+          className="bg-primary rounded-button px-6 py-3"
+          accessibilityRole="button"
+        >
+          <Text className="text-text-inverse text-body font-semibold">
+            Go back
           </Text>
         </Pressable>
       </View>
@@ -528,16 +559,31 @@ export default function ChildDetailScreen() {
               childName={child?.displayName}
               isPending={grantMemoryConsent.isPending}
               onGrant={() =>
-                void grantMemoryConsent.mutateAsync({
-                  childProfileId: profileId,
-                  consent: 'granted',
-                })
+                void (async () => {
+                  try {
+                    await grantMemoryConsent.mutateAsync({
+                      childProfileId: profileId,
+                      consent: 'granted',
+                    });
+                  } catch {
+                    Alert.alert('Could not enable memory', 'Please try again.');
+                  }
+                })()
               }
               onDecline={() =>
-                void grantMemoryConsent.mutateAsync({
-                  childProfileId: profileId,
-                  consent: 'declined',
-                })
+                void (async () => {
+                  try {
+                    await grantMemoryConsent.mutateAsync({
+                      childProfileId: profileId,
+                      consent: 'declined',
+                    });
+                  } catch {
+                    Alert.alert(
+                      'Could not save preference',
+                      'Please try again.'
+                    );
+                  }
+                })()
               }
             />
           </View>

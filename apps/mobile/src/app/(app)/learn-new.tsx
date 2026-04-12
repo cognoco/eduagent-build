@@ -17,13 +17,17 @@ export default function LearnNewScreen(): React.ReactElement {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
-  const { activeProfile } = useProfile();
+  const { activeProfile, isLoading: isProfileLoading } = useProfile();
   const [recoveryMarker, setRecoveryMarker] =
     useState<SessionRecoveryMarker | null>(null);
   const [expiredRecoveryMarker, setExpiredRecoveryMarker] =
     useState<SessionRecoveryMarker | null>(null);
 
   useEffect(() => {
+    // BUG-310: Don't read until profile is confirmed — avoids reading the
+    // wrong (unscoped) recovery key while activeProfile is still null.
+    if (isProfileLoading) return;
+
     let cancelled = false;
 
     async function loadRecoveryMarker(): Promise<void> {
@@ -56,7 +60,7 @@ export default function LearnNewScreen(): React.ReactElement {
     return () => {
       cancelled = true;
     };
-  }, [activeProfile?.id]);
+  }, [activeProfile?.id, isProfileLoading]);
 
   return (
     <ScrollView

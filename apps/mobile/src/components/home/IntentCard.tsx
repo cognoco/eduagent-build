@@ -1,4 +1,4 @@
-import { Pressable, Text, View } from 'react-native';
+import { Platform, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeColors } from '../../lib/theme';
 
@@ -26,6 +26,7 @@ export function IntentCard({
       className={`rounded-card border-l-4 border-primary flex-row items-center px-5 py-5 active:opacity-80 min-h-[112px] ${
         variant === 'highlight' ? 'bg-primary-soft' : 'bg-surface-elevated'
       }`}
+      style={Platform.OS === 'web' ? { cursor: 'pointer' } : undefined}
       accessibilityRole="button"
       accessibilityLabel={badge != null ? `${title}, ${badge} items` : title}
       accessibilityHint="Opens this activity"

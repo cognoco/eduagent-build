@@ -177,7 +177,7 @@ describe('PickBookScreen', () => {
     expect(getByTestId('pick-book-back-button')).toBeTruthy();
   });
 
-  it('shows empty state with free text input when suggestions are empty', () => {
+  it('auto-opens custom input when suggestions are empty', () => {
     mockUseBookSuggestions.mockReturnValueOnce({
       data: [],
       isLoading: false,
@@ -186,12 +186,9 @@ describe('PickBookScreen', () => {
       refetch: mockRefetch,
     });
 
-    const { getByTestId, getByText } = render(<PickBookScreen />);
-    expect(getByTestId('pick-book-empty')).toBeTruthy();
-    expect(
-      getByText('No suggestions yet. Type what you want to learn below.')
-    ).toBeTruthy();
-    // "Something else..." custom input should still be accessible
-    expect(getByText('Something else...')).toBeTruthy();
+    const { getByTestId } = render(<PickBookScreen />);
+    // BUG-318: When suggestions load empty, custom input auto-opens
+    // so the user doesn't have to find "Something else..."
+    expect(getByTestId('pick-book-custom-input')).toBeTruthy();
   });
 });

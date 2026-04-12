@@ -1,4 +1,4 @@
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from './secure-storage';
 
 /**
  * One-time migration: reads a value from `oldKey`, writes it to `newKey`,

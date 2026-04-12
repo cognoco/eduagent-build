@@ -34,17 +34,23 @@ export interface ParentGatewayProps {
   switchProfile: (
     profileId: string
   ) => Promise<{ success: boolean; error?: string }>;
+  /** Injectable clock for deterministic testing of time-based greeting. */
+  now?: Date;
 }
 
 export function ParentGateway({
   profiles,
   activeProfile,
   switchProfile,
+  now,
 }: ParentGatewayProps): React.ReactElement {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { data: dashboard, isError, refetch } = useDashboard();
-  const { title, subtitle } = getGreeting(activeProfile?.displayName ?? '');
+  const { title, subtitle } = getGreeting(
+    activeProfile?.displayName ?? '',
+    now
+  );
 
   return (
     <ScrollView

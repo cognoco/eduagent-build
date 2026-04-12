@@ -12,7 +12,7 @@ import {
 import { useSignIn, useSSO } from '@clerk/clerk-expo';
 import { useRouter } from 'expo-router';
 import * as Linking from 'expo-linking';
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from '../../lib/secure-storage';
 import { useWebBrowserWarmup } from '../../hooks/use-web-browser-warmup';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '../../lib/theme';
@@ -1184,6 +1184,19 @@ export default function SignInScreen() {
           loading={loading}
           testID="sign-in-button"
         />
+        {/* BUG-414: Explain why button is disabled when fields are empty */}
+        {!canSubmit && !loading && (
+          <Text
+            className="text-body-sm text-text-secondary text-center mt-2"
+            testID="sign-in-validation-hint"
+          >
+            {emailAddress.trim() === ''
+              ? 'Enter your email to continue'
+              : password === ''
+              ? 'Enter your password to continue'
+              : ''}
+          </Text>
+        )}
 
         {verificationOffer && (
           <View

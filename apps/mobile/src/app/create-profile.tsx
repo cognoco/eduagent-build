@@ -109,6 +109,15 @@ export default function CreateProfileScreen() {
 
       const res = await client.profiles.$post({ json: body });
       const result = (await res.json()) as { profile: Profile };
+
+      // BUG-264: Optimistically add the new profile to the query cache BEFORE
+      // invalidating. Without this, invalidateQueries triggers a refetch with
+      // stale data (empty array for first-time users), causing activeProfile to
+      // be null briefly, which remounts CreateProfileGate and flashes the
+      // welcome screen again.
+      queryClient.setQueryData<Profile[]>(['profiles'], (old) =>
+        old ? [...old, result.profile] : [result.profile]
+      );
       await queryClient.invalidateQueries({ queryKey: ['profiles'] });
 
       // BUG-239: When a parent adds a child, the API grants consent inline

@@ -975,6 +975,14 @@ export default function SessionScreen() {
           setHomeworkProblemsState(updatedProblems);
         }
 
+        // BUG-331: Update retry payload BEFORE ensureSession so that if
+        // ensureSession fails and the user reconnects, we replay the correct
+        // (current) message — not the payload from the previous send.
+        lastRetryPayloadRef.current = {
+          text,
+          options,
+        };
+
         const sid = await ensureSession(sessionSubjectId);
         if (!sid) {
           const hasSubject = !!(
@@ -992,11 +1000,6 @@ export default function SessionScreen() {
           );
           return;
         }
-
-        lastRetryPayloadRef.current = {
-          text,
-          options,
-        };
 
         await writeSessionRecoveryMarker(
           {
@@ -1551,29 +1554,29 @@ export default function SessionScreen() {
   const fetchFastCelebrations = useCallback(async (): Promise<
     PendingCelebration[]
   > => {
-    const celebrationsClient = (apiClient as Record<string, any>)[
-      'celebrations'
-    ];
-    const startedAt = Date.now();
+    try {
+      const startedAt = Date.now();
 
-    while (Date.now() - startedAt < 3000) {
-      const res = await celebrationsClient.pending.$get();
-      if (res.ok) {
-        const data = (await res.json()) as {
-          pendingCelebrations: PendingCelebration[];
-        };
-        if (data.pendingCelebrations.length > 0) {
-          await celebrationsClient.seen.$post({
-            json: { viewer: 'child' },
-          });
-          return data.pendingCelebrations;
+      while (Date.now() - startedAt < 3000) {
+        const res = await apiClient.celebrations.pending.$get();
+        if (res.ok) {
+          const data = await res.json();
+          if (data.pendingCelebrations.length > 0) {
+            await apiClient.celebrations.seen.$post({
+              json: { viewer: 'child' },
+            });
+            return data.pendingCelebrations;
+          }
         }
+
+        await new Promise((resolve) => setTimeout(resolve, 500));
       }
 
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      return [];
+    } catch (error) {
+      console.error('[Session] Failed to fetch celebrations:', error);
+      return [];
     }
-
-    return [];
   }, [apiClient]);
 
   const handleNextProblem = useCallback(async () => {
@@ -1943,7 +1946,10 @@ export default function SessionScreen() {
     [activeProfile?.id, activeSessionId, closeSession, effectiveMode, router]
   );
 
-  const showEndSession = exchangeCount > 0;
+  // BUG-358: Show End Session immediately for resumed sessions — the session
+  // already exists, so the button should be available even before the transcript
+  // loads and sets exchangeCount > 0.
+  const showEndSession = exchangeCount > 0 || !!routeSessionId;
 
   const userMessageCount = useMemo(
     () => messages.filter((m) => m.role === 'user').length,
@@ -2410,6 +2416,13 @@ export default function SessionScreen() {
           !!pendingSubjectResolution ||
           sessionExpired
         }
+        disabledReason={
+          isOffline
+            ? "You're offline — input will return when you reconnect"
+            : sessionExpired
+            ? 'This session has ended'
+            : undefined
+        }
         verificationType={
           transcript.data?.session.verificationType ?? undefined
         }
@@ -2586,7 +2599,10 @@ export default function SessionScreen() {
                 />
               </View>
             )}
-            {exchangeCount === 0 && (
+            {/* BUG-356: Use userMessageCount instead of exchangeCount — the server
+                counts system messages (quick chips, auto-sent text) in exchangeCount,
+                which hides the mode toggle before the user has deliberately typed. */}
+            {userMessageCount === 0 && (
               <SessionInputModeToggle
                 mode={inputMode}
                 onModeChange={setInputMode}

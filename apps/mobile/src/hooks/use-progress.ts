@@ -292,7 +292,8 @@ export function useChildInventory(
         cleanup();
       }
     },
-    enabled: !!activeProfile && !!childProfileId,
+    enabled:
+      !!activeProfile && activeProfile.isOwner === true && !!childProfileId,
   });
 }
 
@@ -328,7 +329,8 @@ export function useChildProgressHistory(
         cleanup();
       }
     },
-    enabled: !!activeProfile && !!childProfileId,
+    enabled:
+      !!activeProfile && activeProfile.isOwner === true && !!childProfileId,
   });
 }
 
@@ -354,7 +356,8 @@ export function useChildReports(
         cleanup();
       }
     },
-    enabled: !!activeProfile && !!childProfileId,
+    enabled:
+      !!activeProfile && activeProfile.isOwner === true && !!childProfileId,
   });
 }
 
@@ -387,7 +390,11 @@ export function useChildReportDetail(
         cleanup();
       }
     },
-    enabled: !!activeProfile && !!childProfileId && !!reportId,
+    enabled:
+      !!activeProfile &&
+      activeProfile.isOwner === true &&
+      !!childProfileId &&
+      !!reportId,
   });
 }
 

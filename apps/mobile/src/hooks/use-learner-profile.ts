@@ -90,7 +90,8 @@ export function useChildLearnerProfile(
         cleanup();
       }
     },
-    enabled: !!activeProfile && !!childProfileId,
+    enabled:
+      !!activeProfile && activeProfile.isOwner === true && !!childProfileId,
   });
 }
 

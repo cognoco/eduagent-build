@@ -1,7 +1,14 @@
 import '../../global.css';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Alert, Pressable, Text, View, useColorScheme } from 'react-native';
-import * as SecureStore from 'expo-secure-store';
+import {
+  Alert,
+  Platform,
+  Pressable,
+  Text,
+  View,
+  useColorScheme,
+} from 'react-native';
+import * as SecureStore from '../lib/secure-storage';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
@@ -14,7 +21,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ClerkProvider, useClerk } from '@clerk/clerk-expo';
-import { tokenCache } from '@clerk/clerk-expo/token-cache';
+import { tokenCache as nativeTokenCache } from '@clerk/clerk-expo/token-cache';
 import {
   QueryCache,
   QueryClient,
@@ -35,6 +42,15 @@ import { useNetworkStatus } from '../hooks/use-network-status';
 import { Sentry } from '../lib/sentry';
 import { configureRevenueCat } from '../lib/revenuecat';
 import { AnimatedSplash } from '../components/AnimatedSplash';
+
+// BUG-417: Clerk's default tokenCache uses expo-secure-store directly,
+// which crashes on web. Use our secure-storage wrapper instead.
+const webTokenCache = {
+  getToken: (key: string) => SecureStore.getItemAsync(key),
+  saveToken: (key: string, value: string) =>
+    SecureStore.setItemAsync(key, value),
+};
+const tokenCache = Platform.OS === 'web' ? webTokenCache : nativeTokenCache;
 
 // Initialize RevenueCat at module level — runs before any component renders.
 // No-ops gracefully when API keys are not set (dev/web).

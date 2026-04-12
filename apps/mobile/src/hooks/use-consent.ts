@@ -11,6 +11,7 @@ import type {
   ConsentStatus,
 } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
+import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
 
@@ -114,6 +115,7 @@ export function useChildConsentStatus(
   childProfileId: string | undefined
 ): UseQueryResult<ChildConsentData> {
   const client = useApiClient();
+  const { activeProfile } = useProfile();
 
   return useQuery({
     queryKey: ['consent', 'child', childProfileId],
@@ -133,7 +135,7 @@ export function useChildConsentStatus(
         cleanup();
       }
     },
-    enabled: !!childProfileId,
+    enabled: !!childProfileId && activeProfile?.isOwner === true,
   });
 }
 

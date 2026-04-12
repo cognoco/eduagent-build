@@ -1,6 +1,7 @@
 import {
   View,
   Text,
+  Platform,
   Pressable,
   ScrollView,
   Switch,
@@ -9,7 +10,7 @@ import {
   Share,
 } from 'react-native';
 import { useState, useCallback } from 'react';
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from '../../lib/secure-storage';
 import { clearTransitionState } from '../../lib/auth-transition';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -46,7 +47,10 @@ function SettingsRow({
       onPress={onPress}
       disabled={!onPress}
       className="flex-row items-center justify-between bg-surface rounded-card px-4 py-3.5 mb-2"
-      style={({ pressed }) => (pressed ? { opacity: 0.6 } : undefined)}
+      style={({ pressed }) => ({
+        ...(pressed ? { opacity: 0.6 } : {}),
+        ...(Platform.OS === 'web' && onPress ? { cursor: 'pointer' } : {}),
+      })}
       accessibilityLabel={label}
       accessibilityRole="button"
     >
@@ -504,6 +508,7 @@ export default function MoreScreen() {
             'bg-surface rounded-card px-4 py-3.5 mt-6 items-center' +
             (isSigningOut ? ' opacity-50' : '')
           }
+          style={Platform.OS === 'web' ? { cursor: 'pointer' } : undefined}
           testID="sign-out-button"
           accessibilityLabel="Sign out"
           accessibilityRole="button"

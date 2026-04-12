@@ -19,6 +19,12 @@ jest.mock('../lib/api-client', () => ({
   },
 }));
 
+jest.mock('../lib/profile', () => ({
+  useProfile: () => ({
+    activeProfile: { id: 'test-profile-id', isOwner: true },
+  }),
+}));
+
 let queryClient: QueryClient;
 
 function createWrapper() {

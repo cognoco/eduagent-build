@@ -38,6 +38,8 @@ export default function ShelfScreen() {
   const filing = useFiling();
 
   const handlePickBookSuggestion = async (suggestion: BookSuggestion) => {
+    // BUG-323: Guard against concurrent filing calls from alert retry
+    if (filing.isPending) return;
     try {
       const result = await filing.mutateAsync({
         rawInput: suggestion.title,

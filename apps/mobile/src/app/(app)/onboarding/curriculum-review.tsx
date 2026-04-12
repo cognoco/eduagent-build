@@ -191,7 +191,7 @@ export default function CurriculumScreen() {
           testID="challenge-button"
         >
           <Text className="text-body-sm text-primary font-semibold">
-            Change my topics
+            Suggest changes
           </Text>
         </Pressable>
       </View>

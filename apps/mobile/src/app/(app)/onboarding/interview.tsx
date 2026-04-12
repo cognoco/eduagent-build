@@ -23,12 +23,16 @@ export default function InterviewScreen() {
     bookTitle?: string;
   }>();
   const router = useRouter();
-  const interviewState = useInterviewState(subjectId ?? '');
+
+  // BUG-316: Guard against empty/missing subjectId — hooks receive empty string
+  // which triggers a 404 API call. Show error state instead.
+  const safeSubjectId = subjectId && subjectId.trim() ? subjectId : undefined;
+  const interviewState = useInterviewState(safeSubjectId ?? '');
   const {
     stream: streamInterview,
     abort: abortStream,
     isStreaming: isStreamingSSE,
-  } = useStreamInterviewMessage(subjectId ?? '', bookId);
+  } = useStreamInterviewMessage(safeSubjectId ?? '', bookId);
 
   const openingMessage = bookTitle
     ? `Hi! I'm your learning mate. Let's talk about ${bookTitle}! What do you already know about it, and what are you most curious to learn?`
@@ -52,6 +56,8 @@ export default function InterviewScreen() {
   const [restartRequired, setRestartRequired] = useState(false);
   const [streamError, setStreamError] = useState<string | null>(null);
   const seededDraftRef = useRef(false);
+  // BUG-317: Store last sent text so Try Again can resend the orphaned message
+  const lastSentTextRef = useRef<string | null>(null);
 
   // Count user messages for the Living Book page counter
   const exchangeCount = useMemo(
@@ -156,9 +162,13 @@ export default function InterviewScreen() {
   }, [abortStream, openingMessage]);
 
   const handleSend = useCallback(
-    async (text: string) => {
-      if (isStreaming || !subjectId || restartRequired || streamError) return;
+    async (text: string, { isRetry = false } = {}) => {
+      if (isStreaming || !subjectId || restartRequired) return;
+      // BUG-317: Skip streamError guard when called from retry — the caller
+      // already cleared the error and removed orphaned messages.
+      if (!isRetry && streamError) return;
 
+      lastSentTextRef.current = text;
       const streamMsgId = `ai-${Date.now()}`;
       setStreamError(null);
 
@@ -217,6 +227,28 @@ export default function InterviewScreen() {
     [isStreaming, restartRequired, streamError, subjectId, streamInterview]
   );
 
+  // BUG-316: Show error screen when subjectId is missing — hooks already
+  // disable themselves with empty string, but the user sees a dead screen.
+  if (!subjectId) {
+    return (
+      <View className="flex-1 bg-background items-center justify-center px-5">
+        <Text className="text-body text-text-secondary text-center mb-4">
+          Missing subject information. Please go back and try again.
+        </Text>
+        <Pressable
+          onPress={() => router.back()}
+          className="bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
+          testID="interview-missing-subject-back"
+          accessibilityRole="button"
+        >
+          <Text className="text-text-primary text-body font-semibold">
+            Go back
+          </Text>
+        </Pressable>
+      </View>
+    );
+  }
+
   return (
     <ChatShell
       title={
@@ -270,7 +302,29 @@ export default function InterviewScreen() {
               {streamError}
             </Text>
             <Pressable
-              onPress={() => setStreamError(null)}
+              onPress={() => {
+                // BUG-317: Resend the orphaned message instead of just clearing
+                // the error. Remove the error AI message and the user message
+                // that triggered it, then replay.
+                const lastText = lastSentTextRef.current;
+                setMessages((prev) => {
+                  const len = prev.length;
+                  // Remove trailing [user, error-assistant] pair
+                  if (
+                    len >= 2 &&
+                    prev[len - 1]?.role === 'assistant' &&
+                    prev[len - 2]?.role === 'user'
+                  ) {
+                    return prev.slice(0, -2);
+                  }
+                  // Fallback: just remove the error message
+                  return prev.slice(0, -1);
+                });
+                setStreamError(null);
+                if (lastText) {
+                  void handleSend(lastText, { isRetry: true });
+                }
+              }}
               className="bg-primary rounded-button py-3 items-center"
               testID="interview-try-again-button"
               accessibilityLabel="Try the interview again"

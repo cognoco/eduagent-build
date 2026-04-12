@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { View, ActivityIndicator, Text, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -80,12 +81,48 @@ export default function HomeScreen(): React.ReactElement {
     },
   });
 
+  // BUG-306: Add timeout so the loading spinner doesn't hang forever
+  const [loadingTimedOut, setLoadingTimedOut] = useState(false);
+  useEffect(() => {
+    if (!isLoading) {
+      setLoadingTimedOut(false);
+      return;
+    }
+    const timer = setTimeout(() => setLoadingTimedOut(true), 10_000);
+    return () => clearTimeout(timer);
+  }, [isLoading]);
+
   // Neutral placeholder while profiles load — prevents flash of wrong content
   // (e.g. parent briefly seeing LearnerScreen before ParentGateway renders).
-  if (isLoading) {
+  if (isLoading && !loadingTimedOut) {
     return (
       <View className="flex-1 bg-background items-center justify-center">
         <ActivityIndicator size="large" />
+      </View>
+    );
+  }
+
+  if (loadingTimedOut) {
+    return (
+      <View
+        className="flex-1 bg-background items-center justify-center px-6"
+        testID="home-loading-timeout"
+      >
+        <Text className="text-body text-text-secondary text-center mb-4">
+          Taking longer than expected. Please check your connection and try
+          again.
+        </Text>
+        <Pressable
+          onPress={() => setLoadingTimedOut(false)}
+          className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center"
+          accessibilityRole="button"
+          accessibilityLabel="Retry loading"
+          testID="home-loading-retry"
+        >
+          <Text className="text-text-inverse text-body font-semibold">
+            Retry
+          </Text>
+        </Pressable>
       </View>
     );
   }

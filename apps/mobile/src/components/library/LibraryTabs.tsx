@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Platform, Pressable, Text, View } from 'react-native';
 import type { LibraryTab } from '../../lib/library-filters';
 
 interface LibraryTabsProps {
@@ -34,6 +34,7 @@ export function LibraryTabs({
             className={`rounded-full px-4 py-2 ${
               isActive ? 'bg-primary' : 'bg-surface-elevated'
             }`}
+            style={Platform.OS === 'web' ? { cursor: 'pointer' } : undefined}
             testID={`library-tab-${key}`}
             accessibilityRole="tab"
             accessibilityState={{ selected: isActive }}

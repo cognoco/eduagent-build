@@ -19,6 +19,7 @@ import {
   getStruggleProgress,
 } from '../../../../components/mentor-memory-sections';
 import { TellMentorInput } from '../../../../components/tell-mentor-input';
+import { useProfile } from '../../../../lib/profile';
 import { useChildDetail } from '../../../../hooks/use-dashboard';
 import {
   useChildLearnerProfile,
@@ -37,6 +38,7 @@ export default function ChildMentorMemoryScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const client = useApiClient();
+  const { profiles } = useProfile();
   const { profileId } = useLocalSearchParams<{ profileId: string }>();
   const childProfileId = profileId as string | undefined;
   const { data: child } = useChildDetail(childProfileId);
@@ -145,6 +147,33 @@ export default function ChildMentorMemoryScreen() {
     })();
   }, [child?.displayName, childProfileId, client]);
 
+  // BUG-382: Client-side IDOR guard — only allow access to profiles owned by this account
+  if (
+    childProfileId &&
+    profiles.length > 0 &&
+    !profiles.some((p) => p.id === childProfileId)
+  ) {
+    return (
+      <View
+        className="flex-1 bg-background items-center justify-center px-5"
+        style={{ paddingTop: insets.top }}
+      >
+        <Text className="text-body text-text-secondary text-center mb-4">
+          You don&apos;t have access to this profile.
+        </Text>
+        <Pressable
+          onPress={() => router.back()}
+          className="bg-primary rounded-button px-6 py-3"
+          accessibilityRole="button"
+        >
+          <Text className="text-text-inverse text-body font-semibold">
+            Go back
+          </Text>
+        </Pressable>
+      </View>
+    );
+  }
+
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
       <View className="px-5 pt-4 pb-2 flex-row items-center">
@@ -178,16 +207,31 @@ export default function ChildMentorMemoryScreen() {
               childName={child?.displayName}
               isPending={grantConsent.isPending}
               onGrant={() =>
-                void grantConsent.mutateAsync({
-                  childProfileId,
-                  consent: 'granted',
-                })
+                void (async () => {
+                  try {
+                    await grantConsent.mutateAsync({
+                      childProfileId,
+                      consent: 'granted',
+                    });
+                  } catch {
+                    Alert.alert('Could not enable memory', 'Please try again.');
+                  }
+                })()
               }
               onDecline={() =>
-                void grantConsent.mutateAsync({
-                  childProfileId,
-                  consent: 'declined',
-                })
+                void (async () => {
+                  try {
+                    await grantConsent.mutateAsync({
+                      childProfileId,
+                      consent: 'declined',
+                    });
+                  } catch {
+                    Alert.alert(
+                      'Could not save preference',
+                      'Please try again.'
+                    );
+                  }
+                })()
               }
             />
           </View>

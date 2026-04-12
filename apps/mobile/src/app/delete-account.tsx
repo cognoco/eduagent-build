@@ -118,6 +118,8 @@ export default function DeleteAccountScreen() {
               disabled={isLoading}
               className="bg-primary rounded-button py-3.5 items-center mb-3"
               testID="delete-account-keep"
+              accessibilityRole="button"
+              accessibilityLabel="I changed my mind — keep my account"
             >
               {cancelDeletion.isPending ? (
                 <ActivityIndicator color={colors.textInverse} />
@@ -155,6 +157,8 @@ export default function DeleteAccountScreen() {
               disabled={isLoading}
               className="bg-danger rounded-button py-3.5 items-center mb-3"
               testID="delete-account-confirm"
+              accessibilityRole="button"
+              accessibilityLabel="I understand, delete my account"
             >
               {deleteAccount.isPending ? (
                 <ActivityIndicator
@@ -172,6 +176,8 @@ export default function DeleteAccountScreen() {
               onPress={() => router.back()}
               className="bg-surface rounded-button py-3.5 items-center"
               testID="delete-account-cancel"
+              accessibilityRole="button"
+              accessibilityLabel="Cancel"
             >
               <Text className="text-body font-semibold text-text-primary">
                 Cancel

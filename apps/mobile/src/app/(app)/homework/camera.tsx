@@ -152,9 +152,17 @@ export default function CameraScreen(): React.ReactNode {
   }, [state.phase, combinedProblemText, subjectId]);
 
   const handleCapture = useCallback(async () => {
-    const photo = await cameraRef.current?.takePictureAsync();
-    if (photo?.uri) {
-      dispatch({ type: 'PHOTO_TAKEN', uri: photo.uri, source: 'camera' });
+    try {
+      const photo = await cameraRef.current?.takePictureAsync();
+      if (photo?.uri) {
+        dispatch({ type: 'PHOTO_TAKEN', uri: photo.uri, source: 'camera' });
+      }
+    } catch (error) {
+      console.error('[HomeworkCamera] Failed to capture photo:', error);
+      Alert.alert(
+        'Could not take photo',
+        'Please try again. If the problem continues, try importing from your gallery instead.'
+      );
     }
   }, []);
 
@@ -429,7 +437,7 @@ export default function CameraScreen(): React.ReactNode {
     if (router.canGoBack()) {
       router.back();
     } else {
-      router.replace('/(app)');
+      router.replace('/(app)/home' as never);
     }
   }, [router]);
 
@@ -619,7 +627,7 @@ export default function CameraScreen(): React.ReactNode {
             </View>
           )}
         </View>
-        <View className="flex-row gap-4 px-6 pb-4">
+        <View className="flex-row gap-4 px-6 pb-2">
           <Pressable
             testID="retake-button"
             onPress={handleRetake}
@@ -641,6 +649,15 @@ export default function CameraScreen(): React.ReactNode {
             <Text className="text-body font-bold text-white">Use this</Text>
           </Pressable>
         </View>
+        <Pressable
+          testID="preview-cancel"
+          onPress={handleClose}
+          className="py-3 px-6 min-h-[44px] items-center justify-center self-center mb-2"
+          accessibilityLabel="Cancel and go back"
+          accessibilityRole="button"
+        >
+          <Text className="text-body text-text-secondary">Cancel</Text>
+        </Pressable>
       </View>
     );
   }
@@ -663,6 +680,20 @@ export default function CameraScreen(): React.ReactNode {
             Reading your {subjectName ? `${subjectName} homework` : 'homework'}
             ...
           </Text>
+          <Pressable
+            onPress={() => {
+              ocr.cancel();
+              dispatch({ type: 'RETAKE' });
+            }}
+            className="mt-6 py-3 px-6 min-h-[44px] items-center justify-center self-center"
+            accessibilityLabel="Cancel OCR and retake"
+            accessibilityRole="button"
+            testID="camera-cancel-ocr"
+          >
+            <Text className="text-body font-semibold text-text-secondary">
+              Cancel
+            </Text>
+          </Pressable>
         </View>
       </View>
     );
@@ -681,9 +712,9 @@ export default function CameraScreen(): React.ReactNode {
       >
         <Pressable
           testID="camera-back-button"
-          onPress={handleClose}
+          onPress={handleRetake}
           className="self-start flex-row items-center min-h-[48px] mt-2 px-2"
-          accessibilityLabel="Go back"
+          accessibilityLabel="Retake photo"
           accessibilityRole="button"
         >
           <Ionicons name="chevron-back" size={22} color={colors.textPrimary} />

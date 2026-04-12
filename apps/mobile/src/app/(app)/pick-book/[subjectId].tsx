@@ -46,7 +46,26 @@ export default function PickBookScreen(): React.ReactElement {
   const suggestions = suggestionsQuery.data ?? [];
   const subject = subjects?.find((s) => s.id === subjectId);
 
+  // BUG-318: Auto-open custom input when suggestions load empty — the user
+  // shouldn't have to find and tap "Something else..." when there's nothing to pick.
+  useEffect(() => {
+    if (
+      !suggestionsQuery.isLoading &&
+      !suggestionsQuery.isError &&
+      suggestions.length === 0
+    ) {
+      setShowCustomInput(true);
+    }
+  }, [
+    suggestionsQuery.isLoading,
+    suggestionsQuery.isError,
+    suggestions.length,
+  ]);
+
   const handlePickSuggestion = async (suggestion: BookSuggestion) => {
+    // BUG-323: Guard against concurrent filing calls — alert retry
+    // can fire while a previous mutateAsync is still in-flight.
+    if (filing.isPending) return;
     try {
       const result = await filing.mutateAsync({
         rawInput: suggestion.title,
@@ -77,7 +96,8 @@ export default function PickBookScreen(): React.ReactElement {
 
   const handleCustomSubmit = async () => {
     const trimmed = customText.trim();
-    if (!trimmed) return;
+    // BUG-323: Guard against concurrent filing calls
+    if (!trimmed || filing.isPending) return;
     try {
       // M-10: Include subject name as context so the filing LLM places
       // the custom topic within the correct shelf/subject.
@@ -314,7 +334,14 @@ export default function PickBookScreen(): React.ReactElement {
           </Text>
           {showSkip && (
             <Pressable
-              onPress={() => router.back()}
+              onPress={() =>
+                // BUG-319: Navigate to shelf instead of router.back() which
+                // would return to create-subject. The subject already exists.
+                router.replace({
+                  pathname: '/(app)/shelf/[subjectId]',
+                  params: { subjectId },
+                } as never)
+              }
               className="mt-6 bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
               testID="pick-book-filing-skip"
               accessibilityLabel="Skip and start learning anyway"

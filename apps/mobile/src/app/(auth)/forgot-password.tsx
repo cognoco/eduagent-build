@@ -273,8 +273,9 @@ export default function ForgotPasswordScreen() {
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
       >
-        {/* Top spacer: see sign-in.tsx BUG-24 comment */}
-        <View className="flex-1" style={{ minHeight: 40 }} />
+        {/* BUG-19: Reduced top spacer — forgot-password has fewer fields than
+            sign-in, so flex-1 pushed content excessively to the bottom. */}
+        <View style={{ minHeight: 40, flex: 0.3 }} />
         <Text
           className="text-h2 font-bold text-text-primary mb-1"
           accessibilityRole="header"
@@ -331,6 +332,10 @@ export default function ForgotPasswordScreen() {
             testID="back-to-sign-in"
           />
         </View>
+
+        {/* BUG-19: Bottom spacer to balance the top flex-1 spacer.
+            Without this, content is pushed down with excessive empty space below. */}
+        <View className="flex-1" style={{ minHeight: 40 }} />
       </ScrollView>
     </KeyboardAvoidingView>
   );

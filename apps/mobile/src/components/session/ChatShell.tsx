@@ -40,6 +40,8 @@ interface ChatShellProps {
   onSend: (text: string) => void;
   isStreaming: boolean;
   inputDisabled?: boolean;
+  /** Explains why input is disabled — shown inline where the input area normally appears. */
+  disabledReason?: string;
   rightAction?: React.ReactNode;
   footer?: React.ReactNode;
   inputAccessory?: React.ReactNode;
@@ -109,6 +111,7 @@ export function ChatShell({
   onSend,
   isStreaming,
   inputDisabled = false,
+  disabledReason,
   rightAction,
   footer,
   inputAccessory,
@@ -455,8 +458,19 @@ export function ChatShell({
           actionable even when the text input itself is disabled (BUG-234). */}
       {inputAccessory}
 
-      {/* Input */}
-      {!inputDisabled && (
+      {/* Input — when disabled, show inline reason instead of hiding entirely */}
+      {inputDisabled && disabledReason ? (
+        <View
+          className="px-4 py-4 bg-surface border-t border-surface-elevated"
+          style={{ paddingBottom: Math.max(insets.bottom, 8) }}
+          testID="input-disabled-banner"
+          accessibilityRole="alert"
+        >
+          <Text className="text-body-sm text-text-secondary text-center">
+            {disabledReason}
+          </Text>
+        </View>
+      ) : !inputDisabled ? (
         <View>
           <View className="px-4 py-2 bg-surface border-t border-surface-elevated">
             <View
@@ -569,7 +583,7 @@ export function ChatShell({
             </Pressable>
           </View>
         </View>
-      )}
+      ) : null}
       {belowInput}
     </KeyboardAvoidingView>
   );

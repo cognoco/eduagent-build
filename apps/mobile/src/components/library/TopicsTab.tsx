@@ -317,6 +317,7 @@ export function TopicsTab({
           data={filtered}
           keyExtractor={(item) => item.topicId}
           renderItem={renderTopicRow}
+          scrollEnabled={false}
           testID="topics-list"
         />
       )}

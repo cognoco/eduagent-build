@@ -1,5 +1,13 @@
 import { useMemo, useState } from 'react';
-import { Alert, Modal, Pressable, ScrollView, Text, View } from 'react-native';
+import {
+  Alert,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from 'react-native';
 import { useQueries } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -358,7 +366,10 @@ export default function LibraryScreen() {
 
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
-      <View className="px-5 pt-4 pb-3 flex-row items-center justify-between">
+      <View
+        className="px-5 pt-4 pb-3 flex-row items-center justify-between"
+        style={{ zIndex: 2, elevation: 2 }}
+      >
         <View className="flex-row items-center flex-1 me-3">
           <View className="flex-1">
             <Text className="text-h1 font-bold text-text-primary">Library</Text>
@@ -372,6 +383,7 @@ export default function LibraryScreen() {
           <Pressable
             onPress={() => setShowManageSubjects(true)}
             className="rounded-full bg-surface-elevated px-4 py-2"
+            style={Platform.OS === 'web' ? { cursor: 'pointer' } : undefined}
             accessibilityRole="button"
             accessibilityLabel="Manage subjects"
             testID="manage-subjects-button"
@@ -389,7 +401,10 @@ export default function LibraryScreen() {
         !progressQuery.isLoading &&
         !progressQuery.isError &&
         !allBooksQuery.isError && (
-          <View className="px-5">
+          <View
+            className="px-5"
+            style={{ zIndex: 2, position: 'relative', elevation: 2 }}
+          >
             <LibraryTabs
               activeTab={activeTab}
               onTabChange={handleTabChange}
@@ -401,6 +416,7 @@ export default function LibraryScreen() {
 
       <ScrollView
         className="flex-1 px-5"
+        style={{ zIndex: 0 }}
         contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
         keyboardShouldPersistTaps="handled"
       >

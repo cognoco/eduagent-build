@@ -10,7 +10,7 @@ import {
   Platform,
 } from 'react-native';
 import { useState, useCallback, useEffect, useRef } from 'react';
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from '../../lib/secure-storage';
 import { migrateSecureStoreKey } from '../../lib/migrate-secure-store-key';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';

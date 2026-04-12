@@ -41,7 +41,9 @@ export async function getItemAsync(
     return getWebStorage().getItem(key);
   }
 
-  return ExpoSecureStore.getItemAsync(key, options);
+  return options
+    ? ExpoSecureStore.getItemAsync(key, options)
+    : ExpoSecureStore.getItemAsync(key);
 }
 
 export async function setItemAsync(
@@ -54,7 +56,11 @@ export async function setItemAsync(
     return;
   }
 
-  await ExpoSecureStore.setItemAsync(key, value, options);
+  if (options) {
+    await ExpoSecureStore.setItemAsync(key, value, options);
+  } else {
+    await ExpoSecureStore.setItemAsync(key, value);
+  }
 }
 
 export async function deleteItemAsync(
@@ -66,5 +72,9 @@ export async function deleteItemAsync(
     return;
   }
 
-  await ExpoSecureStore.deleteItemAsync(key, options);
+  if (options) {
+    await ExpoSecureStore.deleteItemAsync(key, options);
+  } else {
+    await ExpoSecureStore.deleteItemAsync(key);
+  }
 }
