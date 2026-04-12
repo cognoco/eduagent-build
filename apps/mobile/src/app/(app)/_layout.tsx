@@ -795,6 +795,8 @@ function ConsentPendingGate(): React.ReactElement {
           {isSameAsChild && (
             <Text
               className="text-danger text-body-sm mb-1"
+              accessibilityRole="alert"
+              accessibilityLiveRegion="assertive"
               testID="consent-change-same-email-warning"
             >
               {copy.sameEmailWarning}

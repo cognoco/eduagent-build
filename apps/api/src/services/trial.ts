@@ -196,10 +196,9 @@ function extractDate(date: Date, tz: string): number {
 /**
  * Returns a trial warning message based on days remaining.
  *
- * - 3 days: "3 days left of your trial"
- * - 1 day: "1 day left of your trial"
- * - 0 days: "Last day of your trial"
- * - Otherwise: null (no warning needed)
+ * Milestones: 7 days, 3 days, 2 days, 1 day, last day (0).
+ * Returns null for all other values (no warning needed).
+ * [BUG-59] Added 7-day and 2-day milestones.
  */
 export function getTrialWarningMessage(daysRemaining: number): string | null {
   if (daysRemaining === 0) {

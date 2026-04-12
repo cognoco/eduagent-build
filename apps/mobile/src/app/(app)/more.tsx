@@ -8,7 +8,8 @@ import {
   Linking,
   Share,
 } from 'react-native';
-import { useCallback } from 'react';
+import { useState, useCallback } from 'react';
+import * as SecureStore from 'expo-secure-store';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth, useUser } from '@clerk/clerk-expo';
@@ -28,6 +29,7 @@ import {
   useUpdateCelebrationLevel,
 } from '../../hooks/use-settings';
 import { useSubscription } from '../../hooks/use-subscription';
+import { formatApiError } from '../../lib/format-api-error';
 
 function SettingsRow({
   label,
@@ -145,7 +147,7 @@ export default function MoreScreen() {
   const { user } = useUser();
   const { activeProfile, profiles } = useProfile();
   const exportData = useExportData();
-
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const { data: subscription } = useSubscription();
   const { data: familyData } = useFamilySubscription(
     subscription?.tier === 'family' || subscription?.tier === 'pro'
@@ -202,8 +204,8 @@ export default function MoreScreen() {
         title: 'MentoMate account data export',
         message: JSON.stringify(data, null, 2),
       });
-    } catch {
-      Alert.alert('Export failed', 'Please try again later.');
+    } catch (err: unknown) {
+      Alert.alert('Export failed', formatApiError(err));
     }
   }, [exportData]);
 
@@ -440,16 +442,24 @@ export default function MoreScreen() {
 
         <Pressable
           onPress={async () => {
+            if (isSigningOut) return;
+            setIsSigningOut(true);
             try {
+              void SecureStore.deleteItemAsync('hasSignedInBefore');
               await signOut();
             } catch {
               Alert.alert(
                 'Could not sign out',
                 'Please try again in a moment.'
               );
+              setIsSigningOut(false);
             }
           }}
-          className="bg-surface rounded-card px-4 py-3.5 mt-6 items-center"
+          disabled={isSigningOut}
+          className={
+            'bg-surface rounded-card px-4 py-3.5 mt-6 items-center' +
+            (isSigningOut ? ' opacity-50' : '')
+          }
           testID="sign-out-button"
           accessibilityLabel="Sign out"
           accessibilityRole="button"

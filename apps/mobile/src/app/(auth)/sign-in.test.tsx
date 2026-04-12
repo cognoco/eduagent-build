@@ -484,11 +484,12 @@ describe('SignInScreen', () => {
     expect(mockPrepareSecondFactor).not.toHaveBeenCalled();
   });
 
-  it('shows unsupported message for unknown MFA methods', async () => {
+  it('shows unsupported message for unknown MFA methods (no SSO available)', async () => {
     mockCreate.mockResolvedValue({
       status: 'needs_second_factor',
       createdSessionId: null,
       supportedSecondFactors: [{ strategy: 'webauthn' }],
+      supportedFirstFactors: [], // no SSO providers
     });
 
     render(<SignInScreen />);
@@ -503,12 +504,115 @@ describe('SignInScreen', () => {
     await waitFor(() => {
       expect(
         screen.getByText(
-          'This account needs a security key or passkey to finish signing in, and this build does not support that yet. Try Google or Apple if you use them on this account, or contact support for help.'
+          "This account requires a security key or passkey which isn't available on mobile yet."
         )
       ).toBeTruthy();
     });
 
     expect(screen.getByTestId('sign-in-unsupported-factor-help')).toBeTruthy();
+    // No SSO providers: help text should NOT mention "Google or Apple"
+    expect(screen.queryByText(/Google or Apple/)).toBeNull();
+  });
+
+  it('shows backup_code entry form when backup_code is only supported second factor', async () => {
+    mockCreate.mockResolvedValue({
+      status: 'needs_second_factor',
+      createdSessionId: null,
+      supportedSecondFactors: [{ strategy: 'backup_code' }],
+    });
+
+    render(<SignInScreen />);
+    fireEvent.changeText(
+      screen.getByTestId('sign-in-email'),
+      'test@example.com'
+    );
+    fireEvent.changeText(screen.getByTestId('sign-in-password'), 'password123');
+    fireEvent.press(screen.getByTestId('sign-in-button'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Enter a backup code')).toBeTruthy();
+    });
+    expect(screen.getByTestId('sign-in-verify-code')).toBeTruthy();
+  });
+
+  it('successfully verifies with backup_code strategy', async () => {
+    mockCreate.mockResolvedValue({
+      status: 'needs_second_factor',
+      createdSessionId: null,
+      supportedSecondFactors: [{ strategy: 'backup_code' }],
+    });
+    mockAttemptSecondFactor.mockResolvedValue({
+      status: 'complete',
+      createdSessionId: 'sess_backup_ok',
+    });
+    mockSetActive.mockResolvedValue(undefined);
+
+    render(<SignInScreen />);
+
+    fireEvent.changeText(
+      screen.getByTestId('sign-in-email'),
+      'test@example.com'
+    );
+    fireEvent.changeText(screen.getByTestId('sign-in-password'), 'password123');
+    fireEvent.press(screen.getByTestId('sign-in-button'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Enter a backup code')).toBeTruthy();
+    });
+
+    expect(
+      screen.getByText(
+        'Enter one of the backup codes you saved when you set up two-factor authentication.'
+      )
+    ).toBeTruthy();
+
+    // No "Resend code" button for backup_code
+    expect(screen.queryByTestId('sign-in-resend-code')).toBeNull();
+
+    fireEvent.changeText(
+      screen.getByTestId('sign-in-verify-code'),
+      'ABCD-1234'
+    );
+    fireEvent.press(screen.getByTestId('sign-in-verify-button'));
+
+    await waitFor(() => {
+      expect(mockAttemptSecondFactor).toHaveBeenCalledWith({
+        strategy: 'backup_code',
+        code: 'ABCD-1234',
+      });
+    });
+
+    await waitFor(() => {
+      expect(mockSetActive).toHaveBeenCalledWith({ session: 'sess_backup_ok' });
+    });
+
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('uses backup_code when available before falling back to unsupported message', async () => {
+    mockCreate.mockResolvedValue({
+      status: 'needs_second_factor',
+      createdSessionId: null,
+      supportedSecondFactors: [
+        { strategy: 'webauthn' },
+        { strategy: 'backup_code' },
+      ],
+    });
+
+    render(<SignInScreen />);
+
+    fireEvent.changeText(
+      screen.getByTestId('sign-in-email'),
+      'test@example.com'
+    );
+    fireEvent.changeText(screen.getByTestId('sign-in-password'), 'password123');
+    fireEvent.press(screen.getByTestId('sign-in-button'));
+
+    // backup_code is supported — should go to code entry, not unsupported message
+    await waitFor(() => {
+      expect(screen.getByText('Enter a backup code')).toBeTruthy();
+    });
+    expect(screen.queryByTestId('sign-in-unsupported-factor-help')).toBeNull();
   });
 
   it('opens support email when unsupported MFA help is used', async () => {

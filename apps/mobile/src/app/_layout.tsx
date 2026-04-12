@@ -1,6 +1,6 @@
 import '../../global.css';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Alert, View, useColorScheme } from 'react-native';
+import { Alert, Pressable, Text, View, useColorScheme } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -142,6 +142,7 @@ function ThemedApp() {
       // user from seeing stale data from the previous session.
       markSessionExpired();
       queryClient.clear();
+      void SecureStore.deleteItemAsync('hasSignedInBefore');
       void signOut().catch(() => {
         Alert.alert(
           'Could not sign you out',
@@ -290,9 +291,11 @@ function ThemedContent({ colorScheme }: { colorScheme: ColorScheme }) {
 function ClerkGate({
   children,
   onReady,
+  timedOut,
 }: {
   children: React.ReactNode;
   onReady: () => void;
+  timedOut: boolean;
 }) {
   const { isLoaded } = useAuth();
 
@@ -300,7 +303,62 @@ function ClerkGate({
     if (isLoaded) onReady();
   }, [isLoaded, onReady]);
 
-  if (!isLoaded) return null;
+  if (!isLoaded) {
+    if (timedOut) {
+      return (
+        <View
+          style={{
+            flex: 1,
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 24,
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 18,
+              fontWeight: '600',
+              marginBottom: 8,
+              textAlign: 'center',
+            }}
+          >
+            Taking longer than expected
+          </Text>
+          <Text
+            style={{
+              fontSize: 14,
+              color: '#888',
+              textAlign: 'center',
+              marginBottom: 24,
+            }}
+          >
+            Please check your internet connection and try again.
+          </Text>
+          <Pressable
+            onPress={() =>
+              Alert.alert(
+                'Please restart',
+                'Close the app completely and reopen it.'
+              )
+            }
+            style={{
+              backgroundColor: '#0d9488',
+              borderRadius: 12,
+              paddingVertical: 14,
+              paddingHorizontal: 32,
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Try again"
+          >
+            <Text style={{ color: '#fff', fontWeight: '600', fontSize: 16 }}>
+              Try again
+            </Text>
+          </Pressable>
+        </View>
+      );
+    }
+    return null;
+  }
 
   return children as React.ReactElement;
 }
@@ -343,6 +401,7 @@ export default function RootLayout() {
   // JS bundles where Clerk init can take > 3 seconds.
   const [animDone, setAnimDone] = useState(false);
   const [clerkReady, setClerkReady] = useState(false);
+  const [clerkTimedOut, setClerkTimedOut] = useState(false);
   const showSplash = !animDone || !clerkReady;
 
   const onAnimComplete = useCallback(() => {
@@ -385,6 +444,7 @@ export default function RootLayout() {
       console.warn(
         '[Splash] Clerk DISMISSED by failsafe timeout (12s) — Clerk not loaded'
       );
+      setClerkTimedOut(true);
       setClerkReady(true);
     }, 12000);
     return () => clearTimeout(timeout);
@@ -406,7 +466,7 @@ export default function RootLayout() {
           publishableKey={clerkPublishableKey}
           tokenCache={tokenCache}
         >
-          <ClerkGate onReady={onClerkReady}>
+          <ClerkGate onReady={onClerkReady} timedOut={clerkTimedOut}>
             <QueryClientProvider client={queryClient}>
               <ProfileProvider>
                 <ErrorBoundary>
