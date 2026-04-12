@@ -393,7 +393,6 @@ function ChildPaywall(): React.ReactElement {
 
   const topicsLearned = xpSummary?.topicsCompleted ?? 0;
   const totalXp = xpSummary?.totalXp ?? 0;
-  const hasStats = topicsLearned > 0 || totalXp > 0;
 
   return (
     <View
@@ -417,11 +416,11 @@ function ChildPaywall(): React.ReactElement {
           Nice work so far!
         </Text>
         <Text className="text-body text-text-secondary mb-2 text-center">
-          {hasStats
+          {topicsLearned > 0 || totalXp > 0
             ? `You learned ${topicsLearned} topic${
                 topicsLearned !== 1 ? 's' : ''
-              } and earned ${totalXp} XP \u2014 keep going!`
-            : "You've been making great progress \u2014 keep going!"}
+              } and earned ${totalXp} XP \u2014 great work!`
+            : "You've been exploring and learning \u2014 great start!"}
         </Text>
         <Text className="text-body text-text-secondary mb-8 text-center">
           You've used all your free questions. Ask your parent to upgrade so you
@@ -463,14 +462,24 @@ function ChildPaywall(): React.ReactElement {
           </Text>
         )}
 
-        <Text className="text-body-sm text-text-secondary text-center mb-6">
-          While you wait, you can still browse your Library and see your
-          progress.
-        </Text>
+        {isNotified ? (
+          <Text
+            className="text-body-sm text-text-secondary text-center mb-4"
+            testID="notified-explore-text"
+          >
+            Your parent has been notified! While you wait, you can still
+            explore:
+          </Text>
+        ) : (
+          <Text className="text-body-sm text-text-secondary text-center mb-4">
+            While you wait, you can still browse your Library and see your
+            progress.
+          </Text>
+        )}
 
         <Pressable
           onPress={() => router.push('/(app)/library')}
-          className="bg-surface rounded-button py-3.5 px-8 items-center w-full"
+          className="bg-surface rounded-button py-3.5 px-8 items-center w-full mb-2"
           testID="browse-library-button"
           accessibilityRole="button"
           accessibilityLabel="Browse Library"
@@ -478,6 +487,28 @@ function ChildPaywall(): React.ReactElement {
           <Text className="text-body font-semibold text-primary">
             Browse Library
           </Text>
+        </Pressable>
+
+        <Pressable
+          onPress={() => router.push('/(app)/progress')}
+          className="bg-surface rounded-button py-3.5 px-8 items-center w-full mb-2"
+          testID="see-progress-button"
+          accessibilityRole="button"
+          accessibilityLabel="See your progress"
+        >
+          <Text className="text-body font-semibold text-primary">
+            See your progress
+          </Text>
+        </Pressable>
+
+        <Pressable
+          onPress={() => router.push('/(app)/home')}
+          className="bg-surface rounded-button py-3.5 px-8 items-center w-full"
+          testID="go-home-button"
+          accessibilityRole="button"
+          accessibilityLabel="Go Home"
+        >
+          <Text className="text-body font-semibold text-primary">Go Home</Text>
         </Pressable>
       </View>
     </View>
