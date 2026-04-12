@@ -122,11 +122,15 @@ describe('ConsentScreen', () => {
     expect(screen.getByTestId('consent-handoff-button')).toBeTruthy();
   });
 
-  it('does not show email input or submit button in child view', () => {
+  it('shows email input, submit button, and parent escape hatch in child view', () => {
     render(<ConsentScreen />, { wrapper: Wrapper });
 
-    expect(screen.queryByTestId('consent-email')).toBeNull();
-    expect(screen.queryByTestId('consent-submit')).toBeNull();
+    // Child can now enter parent email directly — no phone handoff required.
+    expect(screen.getByTestId('consent-email')).toBeTruthy();
+    expect(screen.getByTestId('consent-submit')).toBeTruthy();
+    // Optional escape hatch for when parent is physically present
+    expect(screen.getByTestId('consent-handoff-button')).toBeTruthy();
+    expect(screen.getByText('My parent is here with me')).toBeTruthy();
   });
 
   // ── Phase 2: Parent view ─────────────────────────────────────────
@@ -275,8 +279,9 @@ describe('ConsentScreen', () => {
       expect(screen.getByTestId('consent-success')).toBeTruthy();
     });
 
+    // Success body now tells the child their parent will be notified.
     expect(
-      screen.getByText(/check your inbox.*the link expires in 7 days/i)
+      screen.getByText(/we'll let you know as soon as they approve/i)
     ).toBeTruthy();
     expect(screen.getByTestId('consent-resend-email')).toBeTruthy();
   });

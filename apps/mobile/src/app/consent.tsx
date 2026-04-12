@@ -110,7 +110,7 @@ export default function ConsentScreen() {
     !isSameAsChild &&
     !isPending &&
     !isTransitioning &&
-    phase === 'parent' &&
+    (phase === 'child' || phase === 'parent') &&
     !isOffline;
 
   const onSubmit = useCallback(async () => {
@@ -184,15 +184,73 @@ export default function ConsentScreen() {
               <Text className="text-h1 font-bold text-text-primary mb-4">
                 {copy.childTitle}
               </Text>
-              <Text className="text-body text-text-secondary mb-8">
+              <Text className="text-body text-text-secondary mb-6">
                 {copy.childMessage}
               </Text>
+
+              {error !== '' && (
+                <View
+                  className="bg-danger/10 rounded-card px-4 py-3 mb-4"
+                  accessibilityRole="alert"
+                >
+                  <Text
+                    className="text-danger text-body-sm"
+                    testID="consent-error"
+                  >
+                    {error}
+                  </Text>
+                </View>
+              )}
+
+              <View onLayout={onFieldLayout('email')}>
+                <Text className="text-body-sm font-semibold text-text-secondary mb-1">
+                  {copy.parentEmailLabel}
+                </Text>
+                <TextInput
+                  className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-2"
+                  placeholder={copy.parentEmailPlaceholder}
+                  placeholderTextColor={colors.muted}
+                  value={parentEmail}
+                  onChangeText={setParentEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoComplete="email"
+                  editable={!isPending}
+                  testID="consent-email"
+                  onFocus={onFieldFocus('email')}
+                />
+                {isSameAsChild && (
+                  <Text
+                    className="text-danger text-body-sm mb-1"
+                    testID="consent-same-email-warning"
+                    accessibilityRole="alert"
+                  >
+                    This is your own email. Please enter a parent or
+                    guardian&apos;s email address.
+                  </Text>
+                )}
+                <Text className="text-body-sm text-text-secondary mb-6">
+                  {copy.spamWarning}
+                </Text>
+              </View>
+
               <Button
                 variant="primary"
-                label={copy.handOffButton}
-                onPress={() => transitionToPhase('parent')}
-                testID="consent-handoff-button"
+                label={copy.childSubmitButton}
+                onPress={onSubmit}
+                disabled={!canSubmit}
+                loading={isPending}
+                testID="consent-submit"
               />
+              <View className="flex-row justify-center mt-4">
+                <Button
+                  variant="tertiary"
+                  size="small"
+                  label={copy.parentIsHereButton}
+                  onPress={() => transitionToPhase('parent')}
+                  testID="consent-handoff-button"
+                />
+              </View>
             </View>
           )}
 
@@ -273,8 +331,10 @@ export default function ConsentScreen() {
               <Text className="text-body text-text-primary mb-2">
                 {deliveryState === 'sent' ? (
                   <>
-                    We sent a consent link to{' '}
-                    <Text className="font-semibold">{parentEmail}</Text>.
+                    Your parent will get an email at{' '}
+                    <Text className="font-semibold">{parentEmail}</Text>
+                    {'. '}
+                    We&apos;ll let you know as soon as they approve.
                   </>
                 ) : (
                   <>
@@ -285,9 +345,9 @@ export default function ConsentScreen() {
                 )}
               </Text>
               <Text className="text-body text-text-secondary mb-8">
-                {deliveryState === 'sent'
-                  ? copy.successSpamHint
-                  : 'You can resend the request now or go back and enter a different email address.'}
+                {deliveryState !== 'sent'
+                  ? 'You can resend the request now or go back and enter a different email address.'
+                  : ''}
               </Text>
               <Button
                 variant="primary"
