@@ -3,6 +3,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useChildSessionTranscript } from '../../../../../hooks/use-dashboard';
+import { Button } from '../../../../../components/common/Button';
 
 function MessageSkeleton(): React.ReactNode {
   return (
@@ -38,6 +39,8 @@ export default function SessionTranscriptScreen() {
   const {
     data: transcript,
     isLoading,
+    isError,
+    refetch,
     error: transcriptError,
   } = useChildSessionTranscript(profileId, sessionId);
 
@@ -103,6 +106,25 @@ export default function SessionTranscriptScreen() {
             </View>
             <MessageSkeleton />
           </>
+        ) : isError && !isSessionNotFound ? (
+          <View
+            style={{
+              flex: 1,
+              justifyContent: 'center',
+              alignItems: 'center',
+              padding: 24,
+            }}
+          >
+            <Text className="text-text-primary text-body mb-4">
+              Could not load session
+            </Text>
+            <Button
+              variant="primary"
+              label="Try again"
+              onPress={() => refetch()}
+              testID="retry-session"
+            />
+          </View>
         ) : isSessionNotFound ? (
           <View className="py-8 items-center" testID="session-not-found">
             <Text className="text-h3 font-semibold text-text-primary text-center mb-2">

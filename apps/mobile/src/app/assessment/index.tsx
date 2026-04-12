@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
-import { useLocalSearchParams } from 'expo-router';
+import { View, Text } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
   ChatShell,
   animateResponse,
@@ -10,11 +11,13 @@ import {
   useSubmitAnswer,
 } from '../../hooks/use-assessments';
 import { formatApiError } from '../../lib/format-api-error';
+import { Button } from '../../components/common/Button';
 
 const OPENING_MESSAGE =
   "Let's see what you've picked up so far. I'll ask a few questions \u2014 just do your best, and I'll help fill in any gaps.";
 
 export default function AssessmentScreen() {
+  const router = useRouter();
   const { subjectId, topicId } = useLocalSearchParams<{
     subjectId?: string;
     topicId?: string;
@@ -78,6 +81,29 @@ export default function AssessmentScreen() {
       submitAnswer,
     ]
   );
+
+  if (!subjectId || !topicId) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          padding: 24,
+        }}
+      >
+        <Text className="text-text-primary text-body mb-4">
+          This assessment can't be started — missing required information.
+        </Text>
+        <Button
+          variant="primary"
+          label="Go back"
+          onPress={() => router.back()}
+          testID="assessment-go-back"
+        />
+      </View>
+    );
+  }
 
   return (
     <ChatShell

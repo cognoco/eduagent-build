@@ -199,7 +199,10 @@ describe('MoreScreen — Learning Mode', () => {
 
     fireEvent.press(screen.getByTestId('learning-mode-casual'));
 
-    expect(mockLearningModeMutate).toHaveBeenCalledWith('casual');
+    expect(mockLearningModeMutate).toHaveBeenCalledWith(
+      'casual',
+      expect.objectContaining({ onError: expect.any(Function) })
+    );
   });
 
   it('calls updateLearningMode when switching to serious', () => {
@@ -209,7 +212,10 @@ describe('MoreScreen — Learning Mode', () => {
 
     fireEvent.press(screen.getByTestId('learning-mode-serious'));
 
-    expect(mockLearningModeMutate).toHaveBeenCalledWith('serious');
+    expect(mockLearningModeMutate).toHaveBeenCalledWith(
+      'serious',
+      expect.objectContaining({ onError: expect.any(Function) })
+    );
   });
 
   it('does not call updateLearningMode when pressing already active mode', () => {
@@ -245,7 +251,10 @@ describe('MoreScreen — Learning Mode', () => {
 
     fireEvent.press(screen.getByTestId('celebration-level-big-only'));
 
-    expect(mockCelebrationLevelMutate).toHaveBeenCalledWith('big_only');
+    expect(mockCelebrationLevelMutate).toHaveBeenCalledWith(
+      'big_only',
+      expect.objectContaining({ onError: expect.any(Function) })
+    );
   });
 });
 

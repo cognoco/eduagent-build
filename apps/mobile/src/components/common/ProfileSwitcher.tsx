@@ -1,4 +1,4 @@
-import { useState, useCallback, type ReactNode } from 'react';
+import { useState, useCallback, useRef, type ReactNode } from 'react';
 import { View, Text, Pressable, Platform } from 'react-native';
 import type { Profile } from '@eduagent/schemas';
 import { isGuardianProfile } from '../../lib/profile';
@@ -15,7 +15,7 @@ function roleLabel(
 
 interface ProfileSwitcherProps {
   profiles: Profile[];
-  activeProfileId: string;
+  activeProfileId?: string;
   onSwitch: (profileId: string) => Promise<{ success: boolean }> | void;
 }
 
@@ -26,6 +26,7 @@ export function ProfileSwitcher({
 }: ProfileSwitcherProps): ReactNode {
   const [isOpen, setIsOpen] = useState(false);
   const [switching, setSwitching] = useState(false);
+  const switchingRef = useRef(false);
 
   const activeProfile = profiles.find((p) => p.id === activeProfileId);
   const initials = activeProfile
@@ -43,7 +44,8 @@ export function ProfileSwitcher({
         setIsOpen(false);
         return;
       }
-      if (switching) return;
+      if (switchingRef.current) return;
+      switchingRef.current = true;
       setSwitching(true);
       try {
         const result = await onSwitch(profileId);
@@ -57,10 +59,11 @@ export function ProfileSwitcher({
         console.error('Profile switch failed:', err);
         // Dropdown stays open for retry
       } finally {
+        switchingRef.current = false;
         setSwitching(false);
       }
     },
-    [activeProfileId, onSwitch, switching]
+    [activeProfileId, onSwitch]
   );
 
   if (profiles.length <= 1) return null;

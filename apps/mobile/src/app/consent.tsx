@@ -101,10 +101,16 @@ export default function ConsentScreen() {
 
   const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(parentEmail);
   const childEmail = user?.primaryEmailAddress?.emailAddress;
+  const stripSubAddressing = (email: string): string => {
+    const [local, domain] = email.split('@');
+    if (!local || !domain) return email;
+    return `${local.split('+')[0]}@${domain}`;
+  };
   const isSameAsChild =
     isValidEmail &&
     !!childEmail &&
-    parentEmail.trim().toLowerCase() === childEmail.toLowerCase();
+    stripSubAddressing(parentEmail.trim().toLowerCase()) ===
+      stripSubAddressing(childEmail.toLowerCase());
   const canSubmit =
     isValidEmail &&
     !isSameAsChild &&

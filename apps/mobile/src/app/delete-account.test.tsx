@@ -5,6 +5,7 @@ import {
   waitFor,
 } from '@testing-library/react-native';
 import React from 'react';
+import { Alert } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const mockBack = jest.fn();
@@ -43,9 +44,17 @@ function Wrapper({ children }: { children: React.ReactNode }) {
 
 const DeleteAccountScreen = require('./delete-account').default;
 
+// Mock Alert.alert to auto-press the destructive "Delete" button
+const alertSpy = jest.spyOn(Alert, 'alert');
+
 describe('DeleteAccountScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // By default, auto-press the destructive button in the confirmation alert
+    alertSpy.mockImplementation((_title, _message, buttons) => {
+      const deleteBtn = buttons?.find((b) => b.style === 'destructive');
+      deleteBtn?.onPress?.();
+    });
   });
 
   afterEach(() => {

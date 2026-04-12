@@ -1,14 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Profile } from '@eduagent/schemas';
 import { ProfileSwitcher } from '../common';
-import {
-  useContinueSuggestion,
-  useReviewSummary,
-} from '../../hooks/use-progress';
+import { useReviewSummary } from '../../hooks/use-progress';
 import { useSubjects } from '../../hooks/use-subjects';
 import { getGreeting } from '../../lib/greeting';
 import {
@@ -39,8 +42,7 @@ export function LearnerScreen({
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
-  const { data: subjects } = useSubjects();
-  const { data: continueSuggestion } = useContinueSuggestion();
+  const { data: subjects, isLoading, isError, refetch } = useSubjects();
   const { data: reviewSummary } = useReviewSummary();
   const [recoveryMarker, setRecoveryMarker] =
     useState<SessionRecoveryMarker | null>(null);
@@ -83,14 +85,6 @@ export function LearnerScreen({
     subjects?.filter((subject) => subject.status === 'active') ?? [];
   const hasLibraryContent = activeSubjects.length > 0;
   const reviewDueCount = reviewSummary?.totalOverdue ?? 0;
-  const primaryIntentTitle = 'Start learning';
-  const primaryIntentSubtitle = hasLibraryContent
-    ? recoveryMarker
-      ? 'Start a fresh session'
-      : continueSuggestion
-      ? `Continue with ${continueSuggestion.topicTitle} in ${continueSuggestion.subjectName}`
-      : 'Start a fresh session'
-    : "We'll build a path and get you learning fast";
   const { title, subtitle } = getGreeting(activeProfile?.displayName ?? '');
   const reviewSubtitle =
     reviewDueCount > 0
@@ -101,8 +95,7 @@ export function LearnerScreen({
 
   const intentCards = useMemo(() => {
     const primaryCard = {
-      title: primaryIntentTitle,
-      subtitle: primaryIntentSubtitle,
+      title: 'Start learning',
       onPress: () => router.push('/learn-new' as never),
       testID: 'intent-learn-new',
     };
@@ -124,7 +117,7 @@ export function LearnerScreen({
     const resumeCard = recoveryMarker
       ? {
           title: 'Continue where you left off',
-          subtitle: recoveryMarker.subjectName,
+          subtitle: recoveryMarker.subjectName ?? 'Your last session',
           variant: 'highlight' as const,
           onPress: () =>
             router.push({
@@ -160,13 +153,60 @@ export function LearnerScreen({
     return cards;
   }, [
     hasLibraryContent,
-    primaryIntentSubtitle,
-    primaryIntentTitle,
     recoveryMarker,
     reviewDueCount,
     reviewSubtitle,
     router,
   ]);
+
+  if (isLoading) {
+    return (
+      <ScrollView
+        className="flex-1 bg-background"
+        contentContainerStyle={{
+          paddingTop: insets.top + 16,
+          paddingHorizontal: 20,
+          paddingBottom: insets.bottom + 24,
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}
+      >
+        <ActivityIndicator size="large" />
+      </ScrollView>
+    );
+  }
+
+  if (isError && !subjects) {
+    return (
+      <ScrollView
+        className="flex-1 bg-background"
+        contentContainerStyle={{
+          paddingTop: insets.top + 16,
+          paddingHorizontal: 20,
+          paddingBottom: insets.bottom + 24,
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}
+        testID="learner-error-state"
+      >
+        <Text className="text-body text-text-secondary text-center mb-4">
+          We couldn't load your library right now
+        </Text>
+        <Pressable
+          onPress={() => void refetch()}
+          className="min-h-[44px] px-6 items-center justify-center bg-surface rounded-card"
+          accessibilityRole="button"
+          accessibilityLabel="Retry loading library"
+        >
+          <Text className="text-body font-semibold text-text-primary">
+            Retry
+          </Text>
+        </Pressable>
+      </ScrollView>
+    );
+  }
 
   return (
     <ScrollView
@@ -176,6 +216,7 @@ export function LearnerScreen({
         paddingHorizontal: 20,
         paddingBottom: insets.bottom + 24,
       }}
+      keyboardShouldPersistTaps="handled"
       testID="learner-screen"
     >
       <View className="flex-row items-center justify-between mb-6">
@@ -183,7 +224,7 @@ export function LearnerScreen({
           {onBack ? (
             <Pressable
               onPress={onBack}
-              className="mr-3 min-h-[32px] min-w-[32px] items-center justify-center"
+              className="mr-3 min-h-[44px] min-w-[44px] items-center justify-center"
               accessibilityRole="button"
               accessibilityLabel="Go back"
               testID="learner-back"
@@ -204,7 +245,7 @@ export function LearnerScreen({
         </View>
         <ProfileSwitcher
           profiles={profiles}
-          activeProfileId={activeProfile?.id ?? ''}
+          activeProfileId={activeProfile?.id}
           onSwitch={switchProfile}
         />
       </View>

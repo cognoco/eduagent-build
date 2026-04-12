@@ -134,15 +134,6 @@ export default function CreateProfileScreen() {
         result.profile.consentStatus === 'PENDING' ||
         result.profile.consentStatus === 'PARENTAL_CONSENT_REQUESTED';
 
-      if (needsConsentFlow) {
-        router.replace({
-          pathname: '/consent',
-          params: { profileId: result.profile.id },
-        });
-      } else {
-        router.back();
-      }
-
       const switchResult = await switchProfile(result.profile.id);
       if (switchResult?.success === false) {
         Alert.alert(
@@ -150,6 +141,15 @@ export default function CreateProfileScreen() {
           switchResult.error ??
             'We created the profile, but could not switch to it automatically. You can switch from the Profiles screen.'
         );
+      }
+
+      if (needsConsentFlow) {
+        router.replace({
+          pathname: '/consent',
+          params: { profileId: result.profile.id },
+        });
+      } else {
+        router.back();
       }
     } catch (err: unknown) {
       setError(formatApiError(err));

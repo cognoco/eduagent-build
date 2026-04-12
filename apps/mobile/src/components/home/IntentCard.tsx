@@ -27,7 +27,8 @@ export function IntentCard({
         variant === 'highlight' ? 'bg-primary-soft' : 'bg-surface-elevated'
       }`}
       accessibilityRole="button"
-      accessibilityLabel={title}
+      accessibilityLabel={badge != null ? `${title}, ${badge} items` : title}
+      accessibilityHint="Opens this activity"
       testID={testID}
     >
       <View className="flex-1 justify-center">
@@ -38,7 +39,7 @@ export function IntentCard({
           {badge != null ? (
             <View
               className="ml-3 rounded-full bg-primary-soft px-2.5 py-1"
-              testID={testID ? `${testID}-badge` : undefined}
+              testID={`${testID ?? 'intent-card'}-badge`}
             >
               <Text className="text-caption font-semibold text-primary">
                 {badge}

@@ -174,8 +174,13 @@ export default function CreateSubjectScreen() {
 
         setShowClarifyInput(false);
         setResolveState({ phase: 'suggestion', result });
-      } catch {
-        await doCreate(trimmedInput, trimmedInput);
+      } catch (err) {
+        // Don't fall through to create on network error
+        setError(
+          'Could not check if this subject exists. Please check your connection and try again.'
+        );
+        setResolveState({ phase: 'idle' });
+        return;
       }
     },
     [doCreate, resolveSubject]
@@ -313,7 +318,9 @@ export default function CreateSubjectScreen() {
             variant="tertiary"
             size="small"
             label="Cancel"
-            onPress={() => router.back()}
+            onPress={() =>
+              router.canGoBack() ? router.back() : router.replace('/(app)')
+            }
             testID="create-subject-cancel"
           />
         </View>
@@ -518,7 +525,7 @@ export default function CreateSubjectScreen() {
           resolveState.phase === 'suggestion' && (
             <View
               className="bg-primary-soft rounded-card px-4 py-4 mb-4"
-              testID="subject-suggestion-card"
+              testID="subject-single-suggestion-card"
             >
               <View className="flex-row items-start mb-3">
                 <Ionicons

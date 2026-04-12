@@ -25,6 +25,7 @@ import {
 } from '../../lib/consent-copy';
 import { evaluateSentryForProfile } from '../../lib/sentry';
 import { formatApiError } from '../../lib/format-api-error';
+import { clearTransitionState } from '../../lib/auth-transition';
 
 const iconMap: Record<
   string,
@@ -335,6 +336,7 @@ function CreateProfileGate(): React.ReactElement {
 
   const handleSignOut = async () => {
     try {
+      clearTransitionState();
       await signOut();
     } catch (err: unknown) {
       console.error('signOut failed:', err);
@@ -392,6 +394,7 @@ function ConsentWithdrawnGate(): React.ReactElement {
 
   const handleSignOut = async () => {
     try {
+      clearTransitionState();
       await signOut();
     } catch (err: unknown) {
       console.error('signOut failed:', err);
@@ -428,7 +431,11 @@ function ConsentWithdrawnGate(): React.ReactElement {
         <Pressable
           onPress={() => {
             const other = profiles.find((p) => p.id !== activeProfile?.id);
-            if (other) void switchProfile(other.id);
+            if (other) {
+              void switchProfile(other.id).catch(() => {
+                Alert.alert('Could not switch profile', 'Please try again.');
+              });
+            }
           }}
           className="bg-surface rounded-button py-3.5 px-8 items-center mb-3 w-full"
           testID="withdrawn-switch-profile"
@@ -464,6 +471,7 @@ function ConsentPendingGate(): React.ReactElement {
 
   const handleSignOut = async () => {
     try {
+      clearTransitionState();
       await signOut();
     } catch (err: unknown) {
       console.error('signOut failed:', err);
@@ -641,7 +649,11 @@ function ConsentPendingGate(): React.ReactElement {
           <Pressable
             onPress={() => {
               const other = profiles.find((p) => p.id !== activeProfile?.id);
-              if (other) void switchProfile(other.id);
+              if (other) {
+                void switchProfile(other.id).catch(() => {
+                  Alert.alert('Could not switch profile', 'Please try again.');
+                });
+              }
             }}
             className="py-3.5 px-8 items-center mb-3 w-full"
             testID="consent-switch-profile"
@@ -900,7 +912,11 @@ function ConsentPendingGate(): React.ReactElement {
         <Pressable
           onPress={() => {
             const other = profiles.find((p) => p.id !== activeProfile?.id);
-            if (other) void switchProfile(other.id);
+            if (other) {
+              void switchProfile(other.id).catch(() => {
+                Alert.alert('Could not switch profile', 'Please try again.');
+              });
+            }
           }}
           className="py-3.5 px-8 items-center mb-3 w-full"
           testID="consent-switch-profile"
@@ -977,7 +993,12 @@ export default function AppLayout() {
     console.log(
       `[AUTH-DEBUG] (app) layout | isLoaded=${isLoaded} | isSignedIn=${isSignedIn}`
     );
-  if (!isLoaded) return null;
+  if (!isLoaded)
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
   if (!isSignedIn) {
     if (__DEV__)
       console.warn(

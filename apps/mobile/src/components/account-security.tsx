@@ -26,7 +26,7 @@ export function AccountSecurity(): React.JSX.Element | null {
 
   const isOwner = activeProfile?.isOwner ?? false;
   const userRecord = user as unknown as Record<string, unknown> | null;
-  const passwordEnabled = userRecord?.passwordEnabled as boolean;
+  const passwordEnabled = userRecord?.passwordEnabled === true;
   const externalAccounts = (userRecord?.externalAccounts ?? []) as Array<{
     provider: string;
   }>;

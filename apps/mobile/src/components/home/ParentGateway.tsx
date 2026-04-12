@@ -1,4 +1,4 @@
-import { ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { DashboardData, Profile } from '@eduagent/schemas';
@@ -25,7 +25,7 @@ function getChildHighlight(dashboard: DashboardData | undefined): string {
     return `${child.displayName} practiced ${minutes} min this week`;
   }
 
-  return 'No activity today';
+  return 'No activity this week';
 }
 
 export interface ParentGatewayProps {
@@ -43,7 +43,7 @@ export function ParentGateway({
 }: ParentGatewayProps): React.ReactElement {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { data: dashboard } = useDashboard();
+  const { data: dashboard, isError, refetch } = useDashboard();
   const { title, subtitle } = getGreeting(activeProfile?.displayName ?? '');
 
   return (
@@ -63,10 +63,25 @@ export function ParentGateway({
         </View>
         <ProfileSwitcher
           profiles={profiles}
-          activeProfileId={activeProfile?.id ?? ''}
+          activeProfileId={activeProfile?.id}
           onSwitch={switchProfile}
         />
       </View>
+
+      {isError && (
+        <Pressable
+          onPress={() => void refetch()}
+          className="bg-danger/10 rounded-card p-4 mb-4"
+          accessibilityRole="button"
+          accessibilityLabel="Retry loading dashboard"
+          testID="parent-dashboard-error"
+        >
+          <Text className="text-body-sm text-danger font-semibold mb-1">
+            We couldn't load the dashboard
+          </Text>
+          <Text className="text-caption text-text-secondary">Tap to retry</Text>
+        </Pressable>
+      )}
 
       <View className="gap-4">
         <IntentCard

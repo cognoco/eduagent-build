@@ -311,12 +311,6 @@ export default function LibraryScreen() {
 
     return (
       <>
-        <LibraryTabs
-          activeTab={activeTab}
-          onTabChange={handleTabChange}
-          counts={tabCounts}
-          reviewBadge={totalOverdue > 0 ? totalOverdue : undefined}
-        />
         {activeTab === 'shelves' && (
           <ShelvesTab
             shelves={shelves}
@@ -378,6 +372,8 @@ export default function LibraryScreen() {
           <Pressable
             onPress={() => setShowManageSubjects(true)}
             className="rounded-full bg-surface-elevated px-4 py-2"
+            accessibilityRole="button"
+            accessibilityLabel="Manage subjects"
             testID="manage-subjects-button"
           >
             <Text className="text-body-sm font-semibold text-primary">
@@ -387,9 +383,26 @@ export default function LibraryScreen() {
         )}
       </View>
 
+      {/* Tabs fixed above scroll area to avoid gesture conflicts with nested FlatLists */}
+      {!subjectsQuery.isLoading &&
+        !subjectsQuery.isError &&
+        !progressQuery.isLoading &&
+        !progressQuery.isError &&
+        !allBooksQuery.isError && (
+          <View className="px-5">
+            <LibraryTabs
+              activeTab={activeTab}
+              onTabChange={handleTabChange}
+              counts={tabCounts}
+              reviewBadge={totalOverdue > 0 ? totalOverdue : undefined}
+            />
+          </View>
+        )}
+
       <ScrollView
         className="flex-1 px-5"
         contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
+        keyboardShouldPersistTaps="handled"
       >
         {!!progressQuery.data?.subjects.length &&
           progressQuery.data.subjects.every(

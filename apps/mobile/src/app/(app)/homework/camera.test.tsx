@@ -121,6 +121,7 @@ const {
 const mockRouter = {
   replace: jest.fn(),
   back: jest.fn(),
+  canGoBack: jest.fn(() => true),
 };
 
 const { useClassifySubject } = require('../../../hooks/use-classify-subject');

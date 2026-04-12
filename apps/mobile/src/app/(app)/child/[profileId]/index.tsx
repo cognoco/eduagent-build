@@ -390,6 +390,7 @@ export default function ChildDetailScreen() {
             {child.subjects.map((subject) => (
               <Pressable
                 key={subject.subjectId ?? subject.name}
+                disabled={!subject.subjectId}
                 onPress={() => {
                   if (!profileId || !subject.subjectId) return;
                   router.push({
@@ -401,7 +402,9 @@ export default function ChildDetailScreen() {
                     },
                   } as never);
                 }}
-                className="bg-surface rounded-card p-4 mt-3 flex-row items-center justify-between"
+                className={`bg-surface rounded-card p-4 mt-3 flex-row items-center justify-between${
+                  !subject.subjectId ? ' opacity-50' : ''
+                }`}
                 accessibilityLabel={`View ${subject.name} details`}
                 accessibilityRole="button"
                 testID={`subject-card-${subject.name}`}
@@ -550,6 +553,7 @@ export default function ChildDetailScreen() {
           className="bg-surface rounded-card p-4 mt-1"
           accessibilityRole="button"
           accessibilityLabel="View what the mentor knows"
+          testID="mentor-memory-link"
         >
           <Text className="text-body font-medium text-text-primary">
             What the mentor knows

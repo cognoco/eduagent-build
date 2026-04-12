@@ -26,9 +26,12 @@ export default function ProfilesScreen() {
   const [isSwitching, setIsSwitching] = useState(false);
 
   const handleAddProfile = useCallback(() => {
-    const tier = subscription?.tier;
-    // Whitelist: only family/pro may add profiles. Blocks free, plus, and
-    // undefined (query still loading or failed) — never fall through.
+    if (!subscription) {
+      // Query still loading — don't block with a false 'Upgrade required'
+      return;
+    }
+    const tier = subscription.tier;
+    // Whitelist: only family/pro may add profiles. Blocks free and plus.
     if (tier !== 'family' && tier !== 'pro') {
       Alert.alert(
         'Upgrade required',
@@ -96,7 +99,9 @@ export default function ProfilesScreen() {
       <View className="flex-row items-center justify-between px-5 pt-4 pb-2">
         <Text className="text-h1 font-bold text-text-primary">Profiles</Text>
         <Pressable
-          onPress={() => router.back()}
+          onPress={() =>
+            router.canGoBack() ? router.back() : router.replace('/(app)')
+          }
           className="min-h-[44px] min-w-[44px] items-center justify-center"
           testID="profiles-close"
         >

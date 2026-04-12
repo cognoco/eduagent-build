@@ -351,7 +351,7 @@ export default function BookScreen() {
         } as never);
       }
     },
-    [router, subjectId, topics]
+    [router, subjectId]
   );
 
   // --- Screen states ---

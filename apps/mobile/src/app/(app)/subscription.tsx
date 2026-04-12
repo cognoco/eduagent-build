@@ -385,8 +385,8 @@ function ChildPaywall(): React.ReactElement {
       }
     } catch {
       Alert.alert(
-        'Ask your parent',
-        'Ask your parent to open the app and subscribe.'
+        'Could not send notification',
+        'Please check your connection and try again.'
       );
     }
   }, [notifyParent, profileId]);
@@ -770,8 +770,11 @@ export default function SubscriptionScreen() {
   const hasLoadError = subError || usageError;
   const trialOrExpired =
     !hasLoadError &&
-    (subscription?.status === 'expired' || (!subscription && !subLoading));
-  if (isChild && trialOrExpired) {
+    (subscription?.status === 'expired' ||
+      subscription?.status === 'cancelled' ||
+      (!subscription && !subLoading));
+  const quotaExhausted = !hasLoadError && usage?.warningLevel === 'exceeded';
+  if (isChild && (trialOrExpired || quotaExhausted)) {
     return <ChildPaywall />;
   }
 

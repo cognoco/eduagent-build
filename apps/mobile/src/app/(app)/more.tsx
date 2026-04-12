@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useState, useCallback } from 'react';
 import * as SecureStore from 'expo-secure-store';
+import { clearTransitionState } from '../../lib/auth-transition';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth, useUser } from '@clerk/clerk-expo';
@@ -43,7 +44,9 @@ function SettingsRow({
   return (
     <Pressable
       onPress={onPress}
+      disabled={!onPress}
       className="flex-row items-center justify-between bg-surface rounded-card px-4 py-3.5 mb-2"
+      style={({ pressed }) => (pressed ? { opacity: 0.6 } : undefined)}
       accessibilityLabel={label}
       accessibilityRole="button"
     >
@@ -166,24 +169,44 @@ export default function MoreScreen() {
 
   const handleTogglePush = useCallback(
     (value: boolean) => {
-      updateNotifications.mutate({
-        reviewReminders: notifPrefs?.reviewReminders ?? false,
-        dailyReminders: notifPrefs?.dailyReminders ?? false,
-        weeklyProgressPush: notifPrefs?.weeklyProgressPush ?? true,
-        pushEnabled: value,
-      });
+      updateNotifications.mutate(
+        {
+          reviewReminders: notifPrefs?.reviewReminders ?? false,
+          dailyReminders: notifPrefs?.dailyReminders ?? false,
+          weeklyProgressPush: notifPrefs?.weeklyProgressPush ?? true,
+          pushEnabled: value,
+        },
+        {
+          onError: () => {
+            Alert.alert(
+              'Could not update notification settings',
+              'Please try again.'
+            );
+          },
+        }
+      );
     },
     [updateNotifications, notifPrefs]
   );
 
   const handleToggleDigest = useCallback(
     (value: boolean) => {
-      updateNotifications.mutate({
-        reviewReminders: notifPrefs?.reviewReminders ?? false,
-        dailyReminders: notifPrefs?.dailyReminders ?? false,
-        weeklyProgressPush: value,
-        pushEnabled: notifPrefs?.pushEnabled ?? false,
-      });
+      updateNotifications.mutate(
+        {
+          reviewReminders: notifPrefs?.reviewReminders ?? false,
+          dailyReminders: notifPrefs?.dailyReminders ?? false,
+          weeklyProgressPush: value,
+          pushEnabled: notifPrefs?.pushEnabled ?? false,
+        },
+        {
+          onError: () => {
+            Alert.alert(
+              'Could not update notification settings',
+              'Please try again.'
+            );
+          },
+        }
+      );
     },
     [updateNotifications, notifPrefs]
   );
@@ -191,7 +214,11 @@ export default function MoreScreen() {
   const handleSelectMode = useCallback(
     (mode: LearningMode) => {
       if (mode !== learningMode) {
-        updateLearningMode.mutate(mode);
+        updateLearningMode.mutate(mode, {
+          onError: () => {
+            Alert.alert('Could not save setting', 'Please try again.');
+          },
+        });
       }
     },
     [learningMode, updateLearningMode]
@@ -223,9 +250,12 @@ export default function MoreScreen() {
   }, []);
 
   const handleAddChild = useCallback(() => {
-    const tier = subscription?.tier;
-    // Whitelist: only family/pro may add children. Blocks free, plus, and
-    // undefined (query still loading or failed) — never fall through.
+    if (!subscription) {
+      // Query still loading — don't block with a false 'Upgrade required'
+      return;
+    }
+    const tier = subscription.tier;
+    // Whitelist: only family/pro may add children. Blocks free and plus.
     if (tier !== 'family' && tier !== 'pro') {
       Alert.alert(
         'Upgrade required',
@@ -282,6 +312,7 @@ export default function MoreScreen() {
       <ScrollView
         className="flex-1 px-5"
         contentContainerStyle={{ paddingBottom: 24 }}
+        keyboardShouldPersistTaps="handled"
       >
         <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2 mt-4">
           Notifications
@@ -324,7 +355,11 @@ export default function MoreScreen() {
           disabled={celebrationLoading || updateCelebrationLevel.isPending}
           onPress={() => {
             if (celebrationLevel !== 'all') {
-              updateCelebrationLevel.mutate('all');
+              updateCelebrationLevel.mutate('all', {
+                onError: () => {
+                  Alert.alert('Could not save setting', 'Please try again.');
+                },
+              });
             }
           }}
           testID="celebration-level-all"
@@ -336,7 +371,11 @@ export default function MoreScreen() {
           disabled={celebrationLoading || updateCelebrationLevel.isPending}
           onPress={() => {
             if (celebrationLevel !== 'big_only') {
-              updateCelebrationLevel.mutate('big_only');
+              updateCelebrationLevel.mutate('big_only', {
+                onError: () => {
+                  Alert.alert('Could not save setting', 'Please try again.');
+                },
+              });
             }
           }}
           testID="celebration-level-big-only"
@@ -348,7 +387,11 @@ export default function MoreScreen() {
           disabled={celebrationLoading || updateCelebrationLevel.isPending}
           onPress={() => {
             if (celebrationLevel !== 'off') {
-              updateCelebrationLevel.mutate('off');
+              updateCelebrationLevel.mutate('off', {
+                onError: () => {
+                  Alert.alert('Could not save setting', 'Please try again.');
+                },
+              });
             }
           }}
           testID="celebration-level-off"
@@ -445,6 +488,7 @@ export default function MoreScreen() {
             if (isSigningOut) return;
             setIsSigningOut(true);
             try {
+              clearTransitionState();
               void SecureStore.deleteItemAsync('hasSignedInBefore');
               await signOut();
             } catch {

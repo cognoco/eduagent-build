@@ -426,7 +426,11 @@ export default function CameraScreen(): React.ReactNode {
   );
 
   const handleClose = useCallback(() => {
-    router.back();
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/(app)');
+    }
   }, [router]);
 
   const toggleFlash = useCallback(() => {

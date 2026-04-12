@@ -13,6 +13,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '../../lib/theme';
 import { extractClerkError } from '../../lib/clerk-error';
+import { markSessionActivated } from '../../lib/auth-transition';
 import { PasswordInput } from '../../components/common';
 import { Button } from '../../components/common/Button';
 import { useKeyboardScroll } from '../../hooks/use-keyboard-scroll';
@@ -83,6 +84,7 @@ export default function ForgotPasswordScreen() {
       if (result.status === 'complete') {
         try {
           await setActive({ session: result.createdSessionId });
+          markSessionActivated();
         } catch {
           setError(
             'Could not activate your session. Please try signing in again.'

@@ -70,8 +70,8 @@ export default function PrivacyPolicyScreen() {
 
         <Section title="2. Data We Collect">
           <Paragraph>
-            Account data: email address, display name, persona type (learner or
-            parent), and profile information you provide during registration.
+            Account data: email address, display name, and profile information
+            you provide during registration.
           </Paragraph>
           <Paragraph>
             Learning data: subjects, interview responses, curriculum progress,
@@ -140,7 +140,7 @@ export default function PrivacyPolicyScreen() {
         <Section title="7. Data Retention">
           <Paragraph>
             We retain your data for as long as your account is active. When you
-            delete your account, your data enters a 30-day grace period (during
+            delete your account, your data enters a 7-day grace period (during
             which you can cancel deletion), after which it is permanently
             removed.
           </Paragraph>

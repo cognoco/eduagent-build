@@ -12,6 +12,7 @@
  *
  * Used by `useStreamMessage` to pipe real-time LLM tokens into the chat UI.
  */
+import { QuotaExceededError, type QuotaExceededDetails } from './api-client';
 
 export interface StreamChunkEvent {
   type: 'chunk';
@@ -189,6 +190,8 @@ export function streamSSEViaXHR(
   // will enrich the error with the full response body and then resolve.
   xhr.onreadystatechange = () => {
     if (xhr.readyState === 2 && xhr.status >= 400) {
+      // Placeholder — onloadend will overwrite with a richer error once the
+      // full response body is available (needed for QuotaExceededError on 402).
       streamError = new Error(
         `API error ${xhr.status}: ${xhr.statusText || 'request failed'}`
       ) as Error & { status?: number };
@@ -228,6 +231,30 @@ export function streamSSEViaXHR(
     // If headers-received handler already flagged an error, enrich it with the
     // full response body (now available) and extract any structured error code.
     if (streamError && xhr.status >= 400) {
+      // Promote 402 to QuotaExceededError so downstream code gets quota details
+      // and can show the upgrade CTA — a plain Error silently drops them.
+      if (xhr.status === 402) {
+        try {
+          const parsed = JSON.parse(xhr.responseText || '{}') as {
+            code?: string;
+            message?: string;
+            details?: QuotaExceededDetails;
+          };
+          if (parsed.code === 'QUOTA_EXCEEDED' && parsed.details) {
+            streamError = new QuotaExceededError(
+              parsed.message ?? 'Quota exceeded',
+              parsed.details
+            );
+            done = true;
+            const r = resolve;
+            resolve = null;
+            r?.();
+            return;
+          }
+        } catch {
+          // Fall through to generic error enrichment below.
+        }
+      }
       const apiError = streamError as Error & {
         status?: number;
         code?: string;
@@ -261,6 +288,30 @@ export function streamSSEViaXHR(
       return;
     }
     if (xhr.status >= 400) {
+      // Promote 402 to QuotaExceededError so downstream code gets quota details
+      // and can show the upgrade CTA — a plain Error silently drops them.
+      if (xhr.status === 402) {
+        try {
+          const parsed = JSON.parse(xhr.responseText || '{}') as {
+            code?: string;
+            message?: string;
+            details?: QuotaExceededDetails;
+          };
+          if (parsed.code === 'QUOTA_EXCEEDED' && parsed.details) {
+            streamError = new QuotaExceededError(
+              parsed.message ?? 'Quota exceeded',
+              parsed.details
+            );
+            done = true;
+            const r = resolve;
+            resolve = null;
+            r?.();
+            return;
+          }
+        } catch {
+          // Fall through to generic error path below.
+        }
+      }
       const apiError = new Error(
         `API error ${xhr.status}: ${xhr.responseText || xhr.statusText}`
       ) as Error & { status?: number; code?: string };

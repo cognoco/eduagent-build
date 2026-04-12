@@ -7,6 +7,7 @@ import {
 } from '../../../../../components/progress';
 import { useChildSubjectTopics } from '../../../../../hooks/use-dashboard';
 import { useChildInventory } from '../../../../../hooks/use-progress';
+import { Button } from '../../../../../components/common/Button';
 
 const COMPLETION_LABELS: Record<string, string> = {
   not_started: 'Not started',
@@ -44,10 +45,12 @@ export default function SubjectTopicsScreen() {
   const subjectId = Array.isArray(rawSubjectId)
     ? rawSubjectId[0]
     : rawSubjectId;
-  const { data: topics, isLoading } = useChildSubjectTopics(
-    profileId,
-    subjectId
-  );
+  const {
+    data: topics,
+    isLoading,
+    isError,
+    refetch,
+  } = useChildSubjectTopics(profileId, subjectId);
   const { data: inventory } = useChildInventory(profileId);
   const subjectName =
     routeSubjectName ??
@@ -61,6 +64,29 @@ export default function SubjectTopicsScreen() {
         <Text className="text-text-secondary text-body text-center">
           Unable to load subject details.
         </Text>
+      </View>
+    );
+  }
+
+  if (isError) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          padding: 24,
+        }}
+      >
+        <Text className="text-text-primary text-body mb-4">
+          Could not load topics
+        </Text>
+        <Button
+          variant="primary"
+          label="Try again"
+          onPress={() => refetch()}
+          testID="retry-topics"
+        />
       </View>
     );
   }
@@ -107,7 +133,7 @@ export default function SubjectTopicsScreen() {
                     topicId: topic.topicId,
                     title: topic.title,
                     completionStatus: topic.completionStatus,
-                    masteryScore: String(topic.masteryScore ?? ''),
+                    masteryScore: String(topic.masteryScore ?? 0),
                     retentionStatus: topic.retentionStatus ?? '',
                     subjectId: subjectId ?? '',
                   },

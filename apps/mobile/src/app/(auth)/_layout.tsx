@@ -4,9 +4,10 @@ import { useAuth } from '@clerk/clerk-expo';
 import { useTokenVars } from '../../lib/theme';
 
 export default function AuthRoutesLayout() {
-  const { isSignedIn } = useAuth();
+  const { isLoaded, isSignedIn } = useAuth();
   const tokenVars = useTokenVars();
 
+  if (!isLoaded) return null;
   if (__DEV__)
     console.log(`[AUTH-DEBUG] (auth) layout | isSignedIn=${isSignedIn}`);
   if (isSignedIn) {

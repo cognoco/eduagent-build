@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -217,6 +217,14 @@ export default function SignInScreen() {
     useState(false);
   const [code, setCode] = useState('');
   const [resending, setResending] = useState(false);
+  // Guard against stale closures calling activateSession after unmount
+  // (e.g. during sign-out → remount transitions)
+  const isMountedRef = useRef(true);
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
   const [pendingSessionActivationId, setPendingSessionActivationId] = useState<
     string | null
   >(null);
@@ -488,6 +496,7 @@ export default function SignInScreen() {
       sessionId: string | null,
       context: 'oauth' | 'password' | 'verification'
     ): Promise<boolean> => {
+      if (!isMountedRef.current) return false;
       if (!sessionId) {
         setError('No session was created. Please try again.');
         return false;
@@ -634,6 +643,7 @@ export default function SignInScreen() {
   );
 
   const retrySessionActivation = useCallback(async () => {
+    if (!isMountedRef.current) return;
     if (!pendingSessionActivationId || !activationFailureContext) {
       return;
     }

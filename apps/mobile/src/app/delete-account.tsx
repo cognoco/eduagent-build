@@ -5,6 +5,7 @@ import {
   Pressable,
   ActivityIndicator,
   ScrollView,
+  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -22,14 +23,27 @@ export default function DeleteAccountScreen() {
   const [gracePeriodEnds, setGracePeriodEnds] = useState<string | null>(null);
   const [error, setError] = useState('');
 
-  const onDelete = useCallback(async () => {
-    setError('');
-    try {
-      const result = await deleteAccount.mutateAsync();
-      setGracePeriodEnds(result.gracePeriodEnds);
-    } catch (err: unknown) {
-      setError(formatApiError(err));
-    }
+  const onDelete = useCallback(() => {
+    Alert.alert(
+      'Delete account?',
+      'This action is irreversible. All your data will be permanently deleted.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setError('');
+            try {
+              const result = await deleteAccount.mutateAsync();
+              setGracePeriodEnds(result.gracePeriodEnds);
+            } catch (err: unknown) {
+              setError(formatApiError(err));
+            }
+          },
+        },
+      ]
+    );
   }, [deleteAccount]);
 
   const onCancel = useCallback(async () => {
