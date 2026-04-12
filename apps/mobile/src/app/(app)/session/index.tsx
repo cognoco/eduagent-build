@@ -204,7 +204,24 @@ const QUICK_CHIP_CONFIG: Record<
 };
 
 const RECONNECT_PROMPT =
-  'Lost connection to your session. Tap reconnect to try again.';
+  'Lost connection to your session. Use the Reconnect button below to try again.';
+
+const TIMEOUT_PROMPT = 'Your session timed out. Please try again.';
+
+function isTimeoutError(error: unknown): boolean {
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'isTimeout' in error &&
+    (error as { isTimeout?: unknown }).isTimeout === true
+  ) {
+    return true;
+  }
+  if (error instanceof Error) {
+    return error.message.toLowerCase().includes('timed out while waiting');
+  }
+  return false;
+}
 
 function errorHasStatus(error: unknown, status: number): boolean {
   return (
@@ -1112,14 +1129,12 @@ export default function SessionScreen() {
       } catch (err: unknown) {
         const reconnectable = isReconnectableSessionError(err);
         const formattedError = formatApiError(err);
-        const errorMessage =
-          reconnectable &&
-          (formattedError.toLowerCase().includes('reconnect') ||
-            formattedError.toLowerCase().includes('timed out'))
-            ? formattedError
-            : reconnectable
-            ? RECONNECT_PROMPT
-            : formattedError;
+        // [3B.1] Classify: timeout -> specific message, network -> reconnect, fatal -> server msg
+        const errorMessage = reconnectable
+          ? isTimeoutError(err)
+            ? TIMEOUT_PROMPT
+            : RECONNECT_PROMPT
+          : formattedError;
 
         setIsStreaming(false);
         if (streamId) {

@@ -192,7 +192,7 @@ export default function ConsentScreen() {
                 <View
                   className="bg-danger/10 rounded-card px-4 py-3 mb-4"
                   accessibilityRole="alert"
-                    accessibilityLiveRegion="assertive"
+                  accessibilityLiveRegion="assertive"
                 >
                   <Text
                     className="text-danger text-body-sm"
@@ -270,7 +270,7 @@ export default function ConsentScreen() {
                 <View
                   className="bg-danger/10 rounded-card px-4 py-3 mb-4"
                   accessibilityRole="alert"
-                    accessibilityLiveRegion="assertive"
+                  accessibilityLiveRegion="assertive"
                 >
                   <Text
                     className="text-danger text-body-sm"
@@ -366,7 +366,11 @@ export default function ConsentScreen() {
                 testID="consent-done"
               />
               {resendError ? (
-                <Text className="text-sm text-danger text-center mt-4 mb-1" accessibilityRole="alert" accessibilityLiveRegion="assertive">
+                <Text
+                  className="text-sm text-danger text-center mt-4 mb-1"
+                  accessibilityRole="alert"
+                  accessibilityLiveRegion="assertive"
+                >
                   {resendError}
                 </Text>
               ) : null}

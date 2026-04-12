@@ -12,7 +12,6 @@ import {
 import { useSubjects } from '../../hooks/use-subjects';
 import { getGreeting } from '../../lib/greeting';
 import {
-  clearSessionRecoveryMarker,
   isRecoveryMarkerFresh,
   readSessionRecoveryMarker,
   type SessionRecoveryMarker,
@@ -45,6 +44,7 @@ export function LearnerScreen({
   const { data: reviewSummary } = useReviewSummary();
   const [recoveryMarker, setRecoveryMarker] =
     useState<SessionRecoveryMarker | null>(null);
+  const [recentlyExpiredSession, setRecentlyExpiredSession] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -61,7 +61,9 @@ export function LearnerScreen({
 
         setRecoveryMarker(null);
         if (marker) {
-          void clearSessionRecoveryMarker(activeProfile?.id);
+          // [3C.4] Do NOT clear the marker here — SessionScreen is responsible
+          // for clearing it only after the server acknowledges the close.
+          setRecentlyExpiredSession(true);
         }
       } catch {
         if (!cancelled) {
@@ -206,6 +208,23 @@ export function LearnerScreen({
           onSwitch={switchProfile}
         />
       </View>
+
+      {recentlyExpiredSession && (
+        <Pressable
+          onPress={() => setRecentlyExpiredSession(false)}
+          className="bg-surface rounded-card p-4 mb-2"
+          accessibilityRole="button"
+          accessibilityLabel="Dismiss session expired notice"
+          testID="recently-expired-banner"
+        >
+          <Text className="text-body-sm text-text-secondary">
+            Your previous session has expired and can no longer be resumed.
+          </Text>
+          <Text className="text-caption text-text-muted mt-1">
+            Tap to dismiss
+          </Text>
+        </Pressable>
+      )}
 
       <View className="gap-4" testID="learner-intent-stack">
         {intentCards.map((card) => (

@@ -17,6 +17,18 @@ jest.mock('expo-router', () => ({
   }),
 }));
 
+let mockChildEmail: string | undefined = undefined;
+
+jest.mock('@clerk/clerk-expo', () => ({
+  useUser: () => ({
+    user: {
+      primaryEmailAddress: mockChildEmail
+        ? { emailAddress: mockChildEmail }
+        : undefined,
+    },
+  }),
+}));
+
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
@@ -100,6 +112,7 @@ describe('ConsentScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers();
+    mockChildEmail = undefined;
   });
 
   afterEach(() => {
@@ -131,6 +144,138 @@ describe('ConsentScreen', () => {
     // Optional escape hatch for when parent is physically present
     expect(screen.getByTestId('consent-handoff-button')).toBeTruthy();
     expect(screen.getByText('My parent is here with me')).toBeTruthy();
+  });
+
+  // ── Child view email validation ──────────────────────────────────
+
+  it('disables submit button in child view when email is empty', () => {
+    render(<ConsentScreen />, { wrapper: Wrapper });
+
+    const button = screen.getByTestId('consent-submit');
+    expect(
+      button.props.accessibilityState?.disabled ?? button.props.disabled
+    ).toBeTruthy();
+  });
+
+  it('disables submit button in child view for invalid email', () => {
+    render(<ConsentScreen />, { wrapper: Wrapper });
+
+    fireEvent.changeText(screen.getByTestId('consent-email'), 'not-an-email');
+
+    const button = screen.getByTestId('consent-submit');
+    expect(
+      button.props.accessibilityState?.disabled ?? button.props.disabled
+    ).toBeTruthy();
+  });
+
+  it('enables submit button in child view for valid email', () => {
+    render(<ConsentScreen />, { wrapper: Wrapper });
+
+    fireEvent.changeText(
+      screen.getByTestId('consent-email'),
+      'parent@example.com'
+    );
+
+    const button = screen.getByTestId('consent-submit');
+    expect(
+      button.props.accessibilityState?.disabled ?? button.props.disabled
+    ).toBeFalsy();
+  });
+
+  it('shows same-email warning in child phase and disables submit', () => {
+    mockChildEmail = 'child@example.com';
+    render(<ConsentScreen />, { wrapper: Wrapper });
+
+    fireEvent.changeText(
+      screen.getByTestId('consent-email'),
+      'child@example.com'
+    );
+
+    expect(screen.getByTestId('consent-same-email-warning')).toBeTruthy();
+    const button = screen.getByTestId('consent-submit');
+    expect(
+      button.props.accessibilityState?.disabled ?? button.props.disabled
+    ).toBeTruthy();
+  });
+
+  it('child submits directly without handoff — calls API and shows success', async () => {
+    mockMutateAsync.mockResolvedValue({
+      message: 'Consent request sent',
+      consentType: 'GDPR',
+      emailStatus: 'sent',
+    });
+
+    render(<ConsentScreen />, { wrapper: Wrapper });
+
+    fireEvent.changeText(
+      screen.getByTestId('consent-email'),
+      'parent@example.com'
+    );
+    fireEvent.press(screen.getByTestId('consent-submit'));
+
+    await waitFor(() => {
+      expect(mockMutateAsync).toHaveBeenCalledWith({
+        childProfileId: '550e8400-e29b-41d4-a716-446655440000',
+        parentEmail: 'parent@example.com',
+        consentType: 'GDPR',
+      });
+    });
+
+    flushFadeAnimation();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('consent-success')).toBeTruthy();
+    });
+  });
+
+  it('success phase shows "Link sent!" and parent email after child direct submit', async () => {
+    mockMutateAsync.mockResolvedValue({
+      message: 'Consent request sent',
+      consentType: 'GDPR',
+      emailStatus: 'sent',
+    });
+
+    render(<ConsentScreen />, { wrapper: Wrapper });
+
+    fireEvent.changeText(
+      screen.getByTestId('consent-email'),
+      'mum@example.com'
+    );
+    fireEvent.press(screen.getByTestId('consent-submit'));
+
+    flushFadeAnimation();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('consent-success')).toBeTruthy();
+    });
+
+    expect(screen.getByText('Link sent!')).toBeTruthy();
+    expect(screen.getByText(/mum@example\.com/)).toBeTruthy();
+  });
+
+  it('"Got it" button calls router.back() after child direct submit', async () => {
+    mockMutateAsync.mockResolvedValue({
+      message: 'Consent request sent',
+      consentType: 'GDPR',
+      emailStatus: 'sent',
+    });
+
+    render(<ConsentScreen />, { wrapper: Wrapper });
+
+    fireEvent.changeText(
+      screen.getByTestId('consent-email'),
+      'parent@example.com'
+    );
+    fireEvent.press(screen.getByTestId('consent-submit'));
+
+    flushFadeAnimation();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('consent-done')).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByTestId('consent-done'));
+    expect(mockBack).toHaveBeenCalled();
   });
 
   // ── Phase 2: Parent view ─────────────────────────────────────────

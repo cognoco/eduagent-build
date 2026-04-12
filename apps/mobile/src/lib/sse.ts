@@ -300,9 +300,11 @@ export function streamSSEViaXHR(
   // 30s timeout — prevents indefinite hangs if server stalls mid-stream
   xhr.timeout = 30_000;
   xhr.ontimeout = () => {
-    streamError = new Error(
+    const timeoutError = new Error(
       'The connection timed out while waiting for a reply'
-    );
+    ) as Error & { isTimeout: boolean };
+    timeoutError.isTimeout = true;
+    streamError = timeoutError;
     done = true;
     const r = resolve;
     resolve = null;

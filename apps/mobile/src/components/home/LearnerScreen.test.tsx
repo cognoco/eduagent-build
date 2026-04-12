@@ -188,7 +188,7 @@ describe('LearnerScreen', () => {
       });
     });
 
-    it('clears stale recovery markers instead of surfacing them', async () => {
+    it('shows expired session notice for stale markers instead of clearing them [3C.4]', async () => {
       mockReadSessionRecoveryMarker.mockResolvedValue({
         sessionId: 'session-1',
         updatedAt: new Date().toISOString(),
@@ -197,10 +197,17 @@ describe('LearnerScreen', () => {
 
       render(<LearnerScreen {...defaultProps} />);
 
+      // [3C.4] The marker should NOT be cleared optimistically — SessionScreen
+      // is responsible for clearing after server acknowledges close.
       await waitFor(() => {
-        expect(mockClearSessionRecoveryMarker).toHaveBeenCalledWith('p1');
+        expect(
+          screen.getByText(
+            'Your previous session has expired and can no longer be resumed.'
+          )
+        ).toBeTruthy();
       });
 
+      expect(mockClearSessionRecoveryMarker).not.toHaveBeenCalled();
       expect(screen.queryByText('Continue where you left off')).toBeNull();
     });
   });

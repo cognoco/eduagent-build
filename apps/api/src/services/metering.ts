@@ -80,6 +80,9 @@ export function calculateRemainingDaily(state: MeteringState): number | null {
  */
 export function checkQuota(state: MeteringState): MeteringResult {
   const remaining = calculateRemainingQuestions(state);
+  // [1C.1] warningLevel reflects monthly plan consumption, not top-up credits.
+  // When monthly quota is exhausted but top-ups remain, warningLevel = 'exceeded'
+  // (the user is drawing from top-ups, which the UI should highlight).
   const warningLevel = getWarningLevel(state.usedThisMonth, state.monthlyLimit);
   const dailyRemaining = calculateRemainingDaily(state);
   const dailyWarningLevel =
