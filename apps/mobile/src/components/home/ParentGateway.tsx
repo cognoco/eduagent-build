@@ -53,16 +53,16 @@ export function ParentGateway({
   );
 
   return (
-    <ScrollView
-      className="flex-1 bg-background"
-      contentContainerStyle={{
-        paddingTop: insets.top + 16,
-        paddingHorizontal: 20,
-        paddingBottom: insets.bottom + 24,
-      }}
-      testID="parent-gateway"
-    >
-      <View className="flex-row items-center justify-between mb-6">
+    <View className="flex-1 bg-background" testID="parent-gateway">
+      {/* Keep the switcher outside the ScrollView so the web dropdown isn't clipped. */}
+      <View
+        className="flex-row items-center justify-between px-5"
+        style={{
+          paddingTop: insets.top + 16,
+          zIndex: 10,
+          elevation: 10,
+        }}
+      >
         <View className="flex-1 me-3">
           <Text className="text-h2 font-bold text-text-primary">{title}</Text>
           <Text className="text-body text-text-secondary mt-1">{subtitle}</Text>
@@ -74,34 +74,45 @@ export function ParentGateway({
         />
       </View>
 
-      {isError && (
-        <Pressable
-          onPress={() => void refetch()}
-          className="bg-danger/10 rounded-card p-4 mb-4"
-          accessibilityRole="button"
-          accessibilityLabel="Retry loading dashboard"
-          testID="parent-dashboard-error"
-        >
-          <Text className="text-body-sm text-danger font-semibold mb-1">
-            We couldn't load the dashboard
-          </Text>
-          <Text className="text-caption text-text-secondary">Tap to retry</Text>
-        </Pressable>
-      )}
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{
+          paddingTop: 16,
+          paddingHorizontal: 20,
+          paddingBottom: insets.bottom + 24,
+        }}
+      >
+        {isError && (
+          <Pressable
+            onPress={() => void refetch()}
+            className="bg-danger/10 rounded-card p-4 mb-4"
+            accessibilityRole="button"
+            accessibilityLabel="Retry loading dashboard"
+            testID="parent-dashboard-error"
+          >
+            <Text className="text-body-sm text-danger font-semibold mb-1">
+              We couldn't load the dashboard
+            </Text>
+            <Text className="text-caption text-text-secondary">
+              Tap to retry
+            </Text>
+          </Pressable>
+        )}
 
-      <View className="gap-4">
-        <IntentCard
-          title="Check child's progress"
-          subtitle={getChildHighlight(dashboard)}
-          onPress={() => router.push('/(app)/dashboard' as never)}
-          testID="gateway-check-progress"
-        />
-        <IntentCard
-          title="Learn something"
-          onPress={() => router.push('/learn-new' as never)}
-          testID="gateway-learn"
-        />
-      </View>
-    </ScrollView>
+        <View className="gap-4">
+          <IntentCard
+            title="Check child's progress"
+            subtitle={getChildHighlight(dashboard)}
+            onPress={() => router.push('/(app)/dashboard' as never)}
+            testID="gateway-check-progress"
+          />
+          <IntentCard
+            title="Learn something"
+            onPress={() => router.push('/learn-new' as never)}
+            testID="gateway-learn"
+          />
+        </View>
+      </ScrollView>
+    </View>
   );
 }

@@ -10,9 +10,14 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const mockBack = jest.fn();
 const mockReplace = jest.fn();
+const mockCanGoBack = jest.fn();
 
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ back: mockBack, replace: mockReplace }),
+  useRouter: () => ({
+    back: mockBack,
+    replace: mockReplace,
+    canGoBack: mockCanGoBack,
+  }),
 }));
 
 jest.mock('react-native-safe-area-context', () => ({
@@ -73,6 +78,7 @@ describe('CreateProfileScreen', () => {
     mockFetch.mockReset();
     jest.clearAllMocks();
     datePickerOnChange = null;
+    mockCanGoBack.mockReturnValue(true);
   });
 
   afterEach(() => {
@@ -255,5 +261,15 @@ describe('CreateProfileScreen', () => {
     fireEvent.press(screen.getByTestId('create-profile-cancel'));
 
     expect(mockBack).toHaveBeenCalled();
+  });
+
+  it('replaces home on cancel when there is no back history', () => {
+    mockCanGoBack.mockReturnValue(false);
+
+    render(<CreateProfileScreen />, { wrapper: Wrapper });
+
+    fireEvent.press(screen.getByTestId('create-profile-cancel'));
+
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
   });
 });

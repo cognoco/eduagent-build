@@ -13,10 +13,16 @@ jest.mock('react-native-safe-area-context', () => ({
 const mockPush = jest.fn();
 const mockBack = jest.fn();
 const mockReplace = jest.fn();
+const mockCanGoBack = jest.fn();
 
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockSearchParams(),
-  useRouter: () => ({ push: mockPush, back: mockBack, replace: mockReplace }),
+  useRouter: () => ({
+    push: mockPush,
+    back: mockBack,
+    replace: mockReplace,
+    canGoBack: mockCanGoBack,
+  }),
 }));
 
 // Default search params — overridden per test via mockSearchParams
@@ -147,6 +153,7 @@ describe('ShelfScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockSearchParams = () => ({ subjectId: 'sub-1' });
+    mockCanGoBack.mockReturnValue(true);
 
     mockUseBooks.mockImplementation(() => ({
       data: [
@@ -329,6 +336,14 @@ describe('ShelfScreen', () => {
     const { getByTestId } = render(<ShelfScreen />);
     fireEvent.press(getByTestId('shelf-back'));
     expect(mockBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('back button replaces library when there is no back history', () => {
+    mockCanGoBack.mockReturnValue(false);
+
+    const { getByTestId } = render(<ShelfScreen />);
+    fireEvent.press(getByTestId('shelf-back'));
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
   });
 
   it('pressing a book card navigates to the book screen', () => {

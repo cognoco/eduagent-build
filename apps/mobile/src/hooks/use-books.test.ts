@@ -186,6 +186,22 @@ describe('useBooks', () => {
 
     expect(result.current.error?.message).toContain('Network request failed');
   });
+
+  it('unwraps legacy wrapped cache entries from the books query key', async () => {
+    const wrapper = createWrapper();
+    queryClient.setQueryData(['books', 'subject-1', 'test-profile-id'], {
+      books: mockBooks,
+      subjectId: 'subject-1',
+    });
+
+    const { result } = renderHook(() => useBooks('subject-1'), {
+      wrapper,
+    });
+
+    await waitFor(() => {
+      expect(result.current.data).toEqual(mockBooks);
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------

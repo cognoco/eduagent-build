@@ -2,6 +2,7 @@ import { View, Text, ScrollView, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { goBackOrReplace } from '../lib/navigation';
 import { useThemeColors } from '../lib/theme';
 
 function Section({
@@ -33,12 +34,15 @@ export default function PrivacyPolicyScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const colors = useThemeColors();
+  const handleBack = () => {
+    goBackOrReplace(router, '/(app)/more');
+  };
 
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
       <View className="flex-row items-center px-5 pt-4 pb-2">
         <Pressable
-          onPress={() => router.back()}
+          onPress={handleBack}
           accessibilityLabel="Go back"
           accessibilityRole="button"
           className="mr-3 w-10 h-10 items-center justify-center rounded-full bg-surface"

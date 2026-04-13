@@ -20,6 +20,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useApiClient } from '../lib/api-client';
 import { useProfile, type Profile } from '../lib/profile';
 import { useThemeColors } from '../lib/theme';
+import { goBackOrReplace } from '../lib/navigation';
 import { Button } from '../components/common/Button';
 import { useKeyboardScroll } from '../hooks/use-keyboard-scroll';
 import { formatApiError } from '../lib/format-api-error';
@@ -68,6 +69,10 @@ export default function CreateProfileScreen() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { scrollRef, onFieldLayout, onFieldFocus } = useKeyboardScroll();
+
+  const handleClose = useCallback(() => {
+    goBackOrReplace(router, '/(app)/home');
+  }, [router]);
 
   const birthYear = birthDate ? birthDate.getFullYear() : null;
 
@@ -125,7 +130,7 @@ export default function CreateProfileScreen() {
       // request screen, and do NOT switch to the child profile — keep the
       // parent on their own profile.
       if (isParentAddingChild) {
-        router.back();
+        handleClose();
         // Show confirmation — parent stays on their own profile
         Alert.alert(
           'Profile created',
@@ -158,7 +163,7 @@ export default function CreateProfileScreen() {
           params: { profileId: result.profile.id },
         });
       } else {
-        router.back();
+        handleClose();
       }
     } catch (err: unknown) {
       setError(formatApiError(err));
@@ -175,6 +180,7 @@ export default function CreateProfileScreen() {
     queryClient,
     switchProfile,
     router,
+    handleClose,
   ]);
 
   return (
@@ -204,7 +210,7 @@ export default function CreateProfileScreen() {
             variant="tertiary"
             size="small"
             label="Cancel"
-            onPress={() => router.back()}
+            onPress={handleClose}
             testID="create-profile-cancel"
           />
         </View>

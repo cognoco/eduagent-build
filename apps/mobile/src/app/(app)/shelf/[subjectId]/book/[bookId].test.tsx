@@ -12,10 +12,17 @@ jest.mock('react-native-safe-area-context', () => ({
 
 const mockPush = jest.fn();
 const mockBack = jest.fn();
+const mockReplace = jest.fn();
+const mockCanGoBack = jest.fn();
 
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockSearchParams(),
-  useRouter: () => ({ push: mockPush, back: mockBack }),
+  useRouter: () => ({
+    push: mockPush,
+    back: mockBack,
+    replace: mockReplace,
+    canGoBack: mockCanGoBack,
+  }),
 }));
 
 // Default search params — overridden per test via mockSearchParams
@@ -156,6 +163,7 @@ function makeSessions(count: number, withChapters = false) {
 describe('BookScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockCanGoBack.mockReturnValue(true);
     // Reset to defaults
     mockSearchParams = () => ({
       subjectId: 'sub-1',
@@ -650,6 +658,17 @@ describe('BookScreen', () => {
     const { getByTestId } = render(<BookScreen />);
     fireEvent.press(getByTestId('book-back'));
     expect(mockBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('back button replaces shelf when there is no back history', () => {
+    mockCanGoBack.mockReturnValue(false);
+
+    const { getByTestId } = render(<BookScreen />);
+    fireEvent.press(getByTestId('book-back'));
+    expect(mockReplace).toHaveBeenCalledWith({
+      pathname: '/(app)/shelf/[subjectId]',
+      params: { subjectId: 'sub-1' },
+    });
   });
 
   // -----------------------------------------------------------------------

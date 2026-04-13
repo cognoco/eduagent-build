@@ -7,10 +7,17 @@ import {
 
 const mockPush = jest.fn();
 const mockBack = jest.fn();
+const mockReplace = jest.fn();
+const mockCanGoBack = jest.fn();
 const mockReadSessionRecoveryMarker = jest.fn();
 
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ push: mockPush, back: mockBack }),
+  useRouter: () => ({
+    push: mockPush,
+    back: mockBack,
+    replace: mockReplace,
+    canGoBack: mockCanGoBack,
+  }),
 }));
 
 jest.mock('react-native-safe-area-context', () => ({
@@ -39,6 +46,7 @@ describe('LearnNewScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockReadSessionRecoveryMarker.mockResolvedValue(null);
+    mockCanGoBack.mockReturnValue(true);
   });
 
   it('renders title and two always-visible cards', () => {
@@ -114,5 +122,14 @@ describe('LearnNewScreen', () => {
 
     fireEvent.press(screen.getByTestId('learn-new-back'));
     expect(mockBack).toHaveBeenCalled();
+  });
+
+  it('back button replaces home when there is no back history', () => {
+    mockCanGoBack.mockReturnValue(false);
+
+    render(<LearnNewScreen />);
+
+    fireEvent.press(screen.getByTestId('learn-new-back'));
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
   });
 });

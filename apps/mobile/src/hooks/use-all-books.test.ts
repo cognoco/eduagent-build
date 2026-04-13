@@ -261,4 +261,31 @@ describe('useAllBooks', () => {
 
     expect(typeof result.current.refetch).toBe('function');
   });
+
+  it('stores per-subject books in the shared books cache as an array', async () => {
+    mockFetch.mockResolvedValueOnce(
+      makeSubjectsResponse([{ id: 's1', name: 'Math' }])
+    );
+    mockFetch.mockResolvedValueOnce(
+      makeBooksResponse([
+        { id: 'b1', title: 'Algebra', subjectId: 's1', topicsGenerated: true },
+      ])
+    );
+
+    renderHook(() => useAllBooks(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(
+        queryClient.getQueryData(['books', 's1', 'test-profile-id'])
+      ).toEqual([
+        expect.objectContaining({
+          id: 'b1',
+          subjectId: 's1',
+          title: 'Algebra',
+        }),
+      ]);
+    });
+  });
 });

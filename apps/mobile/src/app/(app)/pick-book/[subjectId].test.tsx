@@ -11,6 +11,7 @@ jest.mock('react-native-safe-area-context', () => ({
 const mockPush = jest.fn();
 const mockBack = jest.fn();
 const mockReplace = jest.fn();
+const mockCanGoBack = jest.fn();
 
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => ({ subjectId: 'sub-1' }),
@@ -18,6 +19,7 @@ jest.mock('expo-router', () => ({
     push: mockPush,
     back: mockBack,
     replace: mockReplace,
+    canGoBack: mockCanGoBack,
   }),
 }));
 
@@ -66,6 +68,7 @@ jest.mock('../../../hooks/use-filing', () => ({
 describe('PickBookScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockCanGoBack.mockReturnValue(true);
   });
 
   it('renders suggestion cards', () => {
@@ -190,5 +193,17 @@ describe('PickBookScreen', () => {
     // BUG-318: When suggestions load empty, custom input auto-opens
     // so the user doesn't have to find "Something else..."
     expect(getByTestId('pick-book-custom-input')).toBeTruthy();
+  });
+
+  it('back button replaces shelf when there is no back history', () => {
+    mockCanGoBack.mockReturnValue(false);
+
+    const { getByTestId } = render(<PickBookScreen />);
+    fireEvent.press(getByTestId('pick-book-back'));
+
+    expect(mockReplace).toHaveBeenCalledWith({
+      pathname: '/(app)/shelf/[subjectId]',
+      params: { subjectId: 'sub-1' },
+    });
   });
 });

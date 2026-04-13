@@ -23,6 +23,7 @@ import {
 } from '../lib/consent-copy';
 import { useNetworkStatus } from '../hooks/use-network-status';
 import { formatApiError } from '../lib/format-api-error';
+import { goBackOrReplace } from '../lib/navigation';
 
 // Captured at module load — safe because these screens are portrait-locked.
 // On web, cap at a mobile-like height to avoid massive whitespace.
@@ -57,6 +58,10 @@ export default function ConsentScreen() {
   const [isTransitioning, setIsTransitioning] = useState(false);
   const isTransitioningRef = useRef(false);
   const { scrollRef, onFieldLayout, onFieldFocus } = useKeyboardScroll();
+
+  const handleClose = useCallback(() => {
+    goBackOrReplace(router, '/(app)/home');
+  }, [router]);
 
   // BUG-26: Fade animation for phase transitions (child → parent → success)
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -271,7 +276,7 @@ export default function ConsentScreen() {
                   variant="tertiary"
                   size="small"
                   label="Go back"
-                  onPress={() => router.back()}
+                  onPress={handleClose}
                   testID="consent-cancel"
                 />
               </View>
@@ -391,7 +396,7 @@ export default function ConsentScreen() {
                 }
                 onPress={() =>
                   deliveryState === 'sent'
-                    ? router.back()
+                    ? handleClose()
                     : transitionToPhase('parent')
                 }
                 testID="consent-done"

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -18,6 +18,7 @@ import { useSubjects } from '../../../hooks/use-subjects';
 import { SuggestionCard } from '../../../components/library/SuggestionCard';
 import { useThemeColors } from '../../../lib/theme';
 import { formatApiError } from '../../../lib/format-api-error';
+import { goBackOrReplace } from '../../../lib/navigation';
 
 export default function PickBookScreen(): React.ReactElement {
   const router = useRouter();
@@ -32,6 +33,18 @@ export default function PickBookScreen(): React.ReactElement {
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [customText, setCustomText] = useState('');
   const [showSkip, setShowSkip] = useState(false);
+
+  const handleBack = useCallback(() => {
+    if (subjectId) {
+      goBackOrReplace(router, {
+        pathname: '/(app)/shelf/[subjectId]',
+        params: { subjectId },
+      } as never);
+      return;
+    }
+
+    goBackOrReplace(router, '/(app)/library');
+  }, [router, subjectId]);
 
   // M-9: Filing overlay timeout — show skip button after 15 seconds
   useEffect(() => {
@@ -88,7 +101,7 @@ export default function PickBookScreen(): React.ReactElement {
             text: 'Try again',
             onPress: () => void handlePickSuggestion(suggestion),
           },
-          { text: 'Go back', onPress: () => router.back() },
+          { text: 'Go back', onPress: handleBack },
         ]
       );
     }
@@ -115,7 +128,7 @@ export default function PickBookScreen(): React.ReactElement {
     } catch (err) {
       Alert.alert('Something went wrong', formatApiError(err), [
         { text: 'Try again', onPress: () => void handleCustomSubmit() },
-        { text: 'Go back', onPress: () => router.back() },
+        { text: 'Go back', onPress: handleBack },
       ]);
     }
   };
@@ -132,7 +145,7 @@ export default function PickBookScreen(): React.ReactElement {
           Missing subject. Please go back and try again.
         </Text>
         <Pressable
-          onPress={() => router.back()}
+          onPress={handleBack}
           className="bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
           testID="pick-book-missing-param-back"
         >
@@ -157,7 +170,7 @@ export default function PickBookScreen(): React.ReactElement {
           Loading suggestions...
         </Text>
         <Pressable
-          onPress={() => router.back()}
+          onPress={handleBack}
           className="mt-6 px-5 py-3"
           accessibilityLabel="Go back"
           testID="pick-book-loading-back"
@@ -194,7 +207,7 @@ export default function PickBookScreen(): React.ReactElement {
           </Text>
         </Pressable>
         <Pressable
-          onPress={() => router.back()}
+          onPress={handleBack}
           className="bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
           testID="pick-book-back-button"
         >
@@ -224,7 +237,7 @@ export default function PickBookScreen(): React.ReactElement {
         {/* Header */}
         <View className="flex-row items-center mb-2">
           <Pressable
-            onPress={() => router.back()}
+            onPress={handleBack}
             className="p-2 -ms-2 me-2"
             accessibilityLabel="Back"
             testID="pick-book-back"

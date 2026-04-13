@@ -27,6 +27,7 @@ import { useTopicSuggestions } from '../../../../../hooks/use-topic-suggestions'
 import { useBookNotes } from '../../../../../hooks/use-notes';
 import { useSubjects } from '../../../../../hooks/use-subjects';
 import { formatApiError } from '../../../../../lib/format-api-error';
+import { goBackOrReplace } from '../../../../../lib/navigation';
 import { useThemeColors } from '../../../../../lib/theme';
 
 // ---------------------------------------------------------------------------
@@ -111,6 +112,18 @@ export default function BookScreen() {
   const generateMutation = useGenerateBookTopics(subjectId, bookId);
   const subjectsQuery = useSubjects();
   const subjectName = subjectsQuery.data?.find((s) => s.id === subjectId)?.name;
+
+  const handleBack = useCallback(() => {
+    if (subjectId) {
+      goBackOrReplace(router, {
+        pathname: '/(app)/shelf/[subjectId]',
+        params: { subjectId },
+      } as never);
+      return;
+    }
+
+    goBackOrReplace(router, '/(app)/library');
+  }, [router, subjectId]);
 
   // --- Generation auto-trigger ---
   const [genPhase, setGenPhase] = useState<GenerationPhase>('idle');
@@ -368,7 +381,7 @@ export default function BookScreen() {
           Missing book details. Please go back and try again.
         </Text>
         <Pressable
-          onPress={() => router.back()}
+          onPress={handleBack}
           className="bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
           testID="book-missing-param-back"
         >
@@ -393,7 +406,7 @@ export default function BookScreen() {
           Loading book...
         </Text>
         <Pressable
-          onPress={() => router.back()}
+          onPress={handleBack}
           className="mt-6 px-5 py-3"
           accessibilityLabel="Go back"
           testID="book-loading-back"
@@ -430,7 +443,7 @@ export default function BookScreen() {
           </Text>
         </Pressable>
         <Pressable
-          onPress={() => router.back()}
+          onPress={handleBack}
           className="bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
           testID="book-back-button"
         >
@@ -485,7 +498,7 @@ export default function BookScreen() {
               </Text>
             </Pressable>
             <Pressable
-              onPress={() => router.back()}
+              onPress={handleBack}
               className="px-5 py-3"
               testID="book-gen-back"
               accessibilityLabel="Go back"
@@ -499,7 +512,7 @@ export default function BookScreen() {
 
         {genPhase !== 'timed_out' && (
           <Pressable
-            onPress={() => router.back()}
+            onPress={handleBack}
             className="mt-6 px-5 py-3"
             accessibilityLabel="Go back"
             testID="book-gen-back-idle"
@@ -527,7 +540,7 @@ export default function BookScreen() {
         {/* Header */}
         <View className="px-5 pt-4 pb-3 flex-row items-center">
           <Pressable
-            onPress={() => router.back()}
+            onPress={handleBack}
             className="p-2 -ms-2 me-2"
             accessibilityLabel="Back"
             testID="book-back"
@@ -697,7 +710,7 @@ export default function BookScreen() {
               No topics in this book yet.
             </Text>
             <Pressable
-              onPress={() => router.back()}
+              onPress={handleBack}
               className="bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
               testID="book-empty-back"
             >

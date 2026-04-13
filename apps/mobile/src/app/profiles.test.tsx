@@ -8,9 +8,16 @@ import type { Profile } from '../lib/profile';
 
 const mockBack = jest.fn();
 const mockPush = jest.fn();
+const mockReplace = jest.fn();
+const mockCanGoBack = jest.fn();
 
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ back: mockBack, push: mockPush }),
+  useRouter: () => ({
+    back: mockBack,
+    push: mockPush,
+    replace: mockReplace,
+    canGoBack: mockCanGoBack,
+  }),
 }));
 
 jest.mock('react-native-safe-area-context', () => ({
@@ -75,6 +82,7 @@ const ProfilesScreen = require('./profiles').default;
 describe('ProfilesScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockCanGoBack.mockReturnValue(true);
   });
 
   it('shows empty state when no profiles', () => {
@@ -163,5 +171,27 @@ describe('ProfilesScreen', () => {
     render(<ProfilesScreen />);
 
     expect(screen.getByTestId('profiles-loading')).toBeTruthy();
+  });
+
+  it('replaces home after switching when there is no back history', async () => {
+    mockCanGoBack.mockReturnValue(false);
+    useProfile.mockReturnValue({
+      profiles: [ownerProfile, childProfile],
+      activeProfile: ownerProfile,
+      switchProfile: mockSwitchProfile,
+      isLoading: false,
+    });
+
+    render(<ProfilesScreen />);
+
+    fireEvent.press(screen.getByTestId('profile-row-child-id'));
+
+    await waitFor(() => {
+      expect(mockSwitchProfile).toHaveBeenCalledWith('child-id');
+    });
+
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
+    });
   });
 });

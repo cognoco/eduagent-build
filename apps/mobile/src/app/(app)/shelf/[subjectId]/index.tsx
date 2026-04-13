@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -18,6 +18,7 @@ import { useBooks } from '../../../../hooks/use-books';
 import { useFiling } from '../../../../hooks/use-filing';
 import { useSubjects } from '../../../../hooks/use-subjects';
 import { formatApiError } from '../../../../lib/format-api-error';
+import { goBackOrReplace } from '../../../../lib/navigation';
 import { useThemeColors } from '../../../../lib/theme';
 
 export default function ShelfScreen() {
@@ -36,6 +37,10 @@ export default function ShelfScreen() {
   const { data: rawBookSuggestions } = useBookSuggestions(subjectId);
   const bookSuggestions = rawBookSuggestions ?? [];
   const filing = useFiling();
+
+  const handleBack = useCallback(() => {
+    goBackOrReplace(router, '/(app)/library');
+  }, [router]);
 
   const handlePickBookSuggestion = async (suggestion: BookSuggestion) => {
     // BUG-323: Guard against concurrent filing calls from alert retry
@@ -61,7 +66,7 @@ export default function ShelfScreen() {
           text: 'Try again',
           onPress: () => void handlePickBookSuggestion(suggestion),
         },
-        { text: 'Go back', onPress: () => router.back() },
+        { text: 'Go back', onPress: handleBack },
       ]);
     }
   };
@@ -89,7 +94,7 @@ export default function ShelfScreen() {
           Missing subject. Please go back and try again.
         </Text>
         <Pressable
-          onPress={() => router.back()}
+          onPress={handleBack}
           className="bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
           testID="shelf-missing-param-back"
         >
@@ -147,7 +152,7 @@ export default function ShelfScreen() {
           Loading this shelf...
         </Text>
         <Pressable
-          onPress={() => router.back()}
+          onPress={handleBack}
           className="mt-6 px-5 py-3"
           accessibilityLabel="Go back"
           testID="shelf-loading-back"
@@ -183,7 +188,7 @@ export default function ShelfScreen() {
           </Text>
         </Pressable>
         <Pressable
-          onPress={() => router.back()}
+          onPress={handleBack}
           className="bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
           testID="shelf-back-button"
         >
@@ -204,7 +209,7 @@ export default function ShelfScreen() {
       {/* Header */}
       <View className="px-5 pt-4 pb-3 flex-row items-center justify-between">
         <Pressable
-          onPress={() => router.back()}
+          onPress={handleBack}
           className="p-2 -ms-2 me-2"
           accessibilityLabel="Back"
           testID="shelf-back"
@@ -315,7 +320,7 @@ export default function ShelfScreen() {
               Your curriculum is still being built. Check back soon.
             </Text>
             <Pressable
-              onPress={() => router.back()}
+              onPress={handleBack}
               className="bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
               testID="shelf-empty-back"
             >

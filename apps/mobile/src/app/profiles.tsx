@@ -10,6 +10,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useProfile, isGuardianProfile } from '../lib/profile';
+import { goBackOrReplace } from '../lib/navigation';
 import {
   useSubscription,
   useFamilySubscription,
@@ -24,6 +25,10 @@ export default function ProfilesScreen() {
     subscription?.tier === 'family' || subscription?.tier === 'pro'
   );
   const [isSwitching, setIsSwitching] = useState(false);
+
+  const handleClose = useCallback(() => {
+    goBackOrReplace(router, '/(app)/home');
+  }, [router]);
 
   const handleAddProfile = useCallback(() => {
     if (!subscription) {
@@ -91,7 +96,7 @@ export default function ProfilesScreen() {
 
       // Close modal AFTER a successful switch to avoid dismissing the screen
       // when the profile change did not actually complete.
-      router.back();
+      handleClose();
     } finally {
       setIsSwitching(false);
     }
@@ -106,13 +111,7 @@ export default function ProfilesScreen() {
       <View className="flex-row items-center justify-between px-5 pt-4 pb-2">
         <Text className="text-h1 font-bold text-text-primary">Profiles</Text>
         <Pressable
-          onPress={() => {
-            if (router.canGoBack()) {
-              router.back();
-            } else {
-              router.replace('/(app)/home' as never);
-            }
-          }}
+          onPress={handleClose}
           className="min-h-[44px] min-w-[44px] items-center justify-center"
           accessibilityRole="button"
           accessibilityLabel="Done"

@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IntentCard } from '../../components/home/IntentCard';
+import { goBackOrReplace } from '../../lib/navigation';
 import { useProfile } from '../../lib/profile';
 import {
   clearSessionRecoveryMarker,
@@ -22,6 +23,10 @@ export default function LearnNewScreen(): React.ReactElement {
     useState<SessionRecoveryMarker | null>(null);
   const [expiredRecoveryMarker, setExpiredRecoveryMarker] =
     useState<SessionRecoveryMarker | null>(null);
+
+  const handleBack = () => {
+    goBackOrReplace(router, '/(app)/home');
+  };
 
   useEffect(() => {
     // BUG-310: Don't read until profile is confirmed — avoids reading the
@@ -74,7 +79,7 @@ export default function LearnNewScreen(): React.ReactElement {
     >
       <View className="flex-row items-center mb-6">
         <Pressable
-          onPress={() => router.back()}
+          onPress={handleBack}
           className="mr-3 min-h-[32px] min-w-[32px] items-center justify-center"
           accessibilityRole="button"
           accessibilityLabel="Go back"

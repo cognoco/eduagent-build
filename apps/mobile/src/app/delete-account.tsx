@@ -11,6 +11,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useDeleteAccount, useCancelDeletion } from '../hooks/use-account';
 import { useThemeColors } from '../lib/theme';
+import { goBackOrReplace } from '../lib/navigation';
 import { formatApiError } from '../lib/format-api-error';
 
 export default function DeleteAccountScreen() {
@@ -22,6 +23,10 @@ export default function DeleteAccountScreen() {
 
   const [gracePeriodEnds, setGracePeriodEnds] = useState<string | null>(null);
   const [error, setError] = useState('');
+
+  const handleClose = useCallback(() => {
+    goBackOrReplace(router, '/(app)/more');
+  }, [router]);
 
   const onDelete = useCallback(() => {
     Alert.alert(
@@ -50,11 +55,11 @@ export default function DeleteAccountScreen() {
     setError('');
     try {
       await cancelDeletion.mutateAsync();
-      router.back();
+      handleClose();
     } catch (err: unknown) {
       setError(formatApiError(err));
     }
-  }, [cancelDeletion, router]);
+  }, [cancelDeletion, handleClose]);
 
   const isLoading = deleteAccount.isPending || cancelDeletion.isPending;
 
@@ -82,7 +87,7 @@ export default function DeleteAccountScreen() {
             Delete account
           </Text>
           <Pressable
-            onPress={() => router.back()}
+            onPress={handleClose}
             className="min-h-[44px] min-w-[44px] items-center justify-center"
             testID="delete-account-close"
             accessibilityRole="button"
@@ -130,7 +135,7 @@ export default function DeleteAccountScreen() {
               )}
             </Pressable>
             <Pressable
-              onPress={() => router.back()}
+              onPress={handleClose}
               className="bg-surface rounded-button py-3.5 items-center"
               testID="delete-account-dismiss"
               accessibilityRole="button"
@@ -173,7 +178,7 @@ export default function DeleteAccountScreen() {
             </Pressable>
 
             <Pressable
-              onPress={() => router.back()}
+              onPress={handleClose}
               className="bg-surface rounded-button py-3.5 items-center"
               testID="delete-account-cancel"
               accessibilityRole="button"

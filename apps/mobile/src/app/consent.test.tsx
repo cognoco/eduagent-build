@@ -9,9 +9,15 @@ import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const mockBack = jest.fn();
+const mockReplace = jest.fn();
+const mockCanGoBack = jest.fn();
 
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ back: mockBack }),
+  useRouter: () => ({
+    back: mockBack,
+    replace: mockReplace,
+    canGoBack: mockCanGoBack,
+  }),
   useLocalSearchParams: () => ({
     profileId: '550e8400-e29b-41d4-a716-446655440000',
   }),
@@ -113,6 +119,7 @@ describe('ConsentScreen', () => {
     jest.clearAllMocks();
     jest.useFakeTimers();
     mockChildEmail = undefined;
+    mockCanGoBack.mockReturnValue(true);
   });
 
   afterEach(() => {
@@ -455,6 +462,32 @@ describe('ConsentScreen', () => {
 
     fireEvent.press(screen.getByTestId('consent-done'));
     expect(mockBack).toHaveBeenCalled();
+  });
+
+  it('replaces home when closing with no back history', async () => {
+    mockCanGoBack.mockReturnValue(false);
+    mockMutateAsync.mockResolvedValue({
+      message: 'Consent request sent',
+      consentType: 'GDPR',
+      emailStatus: 'sent',
+    });
+
+    render(<ConsentScreen />, { wrapper: Wrapper });
+
+    fireEvent.changeText(
+      screen.getByTestId('consent-email'),
+      'parent@example.com'
+    );
+    fireEvent.press(screen.getByTestId('consent-submit'));
+
+    flushFadeAnimation();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('consent-done')).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByTestId('consent-done'));
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
   });
 
   // ── Error handling ───────────────────────────────────────────────

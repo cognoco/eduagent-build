@@ -38,6 +38,15 @@ export function useBooks(
         cleanup();
       }
     },
+    select: (data) => {
+      const normalized = data as
+        | CurriculumBook[]
+        | { books?: CurriculumBook[] };
+      if (Array.isArray(normalized)) {
+        return normalized;
+      }
+      return Array.isArray(normalized.books) ? normalized.books : [];
+    },
     enabled: !!activeProfile && !!subjectId,
   });
 }
