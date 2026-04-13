@@ -40,6 +40,26 @@ function formatDateForDisplay(date: Date): string {
   });
 }
 
+function parseWebBirthDate(value: string): Date | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+  if (!match) return null;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+
+  const parsed = new Date(year, month - 1, day);
+  const isValid =
+    parsed.getFullYear() === year &&
+    parsed.getMonth() === month - 1 &&
+    parsed.getDate() === day;
+
+  if (!isValid) return null;
+  if (parsed < MIN_DATE || parsed > MAX_DATE) return null;
+
+  return parsed;
+}
+
 const MAX_DATE = new Date();
 const MIN_DATE = new Date(
   MAX_DATE.getFullYear() - 100,
@@ -65,6 +85,7 @@ export default function CreateProfileScreen() {
 
   const [displayName, setDisplayName] = useState('');
   const [birthDate, setBirthDate] = useState<Date | null>(null);
+  const [birthDateText, setBirthDateText] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -86,6 +107,15 @@ export default function CreateProfileScreen() {
       }
     },
     []
+  );
+
+  const onWebBirthDateChange = useCallback(
+    (value: string) => {
+      setBirthDateText(value);
+      setBirthDate(parseWebBirthDate(value));
+      if (error) setError('');
+    },
+    [error]
   );
 
   const canSubmit =
@@ -256,22 +286,44 @@ export default function CreateProfileScreen() {
           We use your age to personalise how your mentor talks to you and to
           comply with privacy laws.
         </Text>
-        <Pressable
-          onPress={() => setShowDatePicker(true)}
-          className="bg-surface rounded-input px-4 py-3 mb-2"
-          disabled={loading}
-          accessibilityLabel="Select birth date"
-          testID="create-profile-birthdate"
-        >
-          <Text
-            className={birthDate ? 'text-text-primary text-body' : 'text-body'}
-            style={birthDate ? undefined : { color: colors.muted }}
+        {Platform.OS === 'web' ? (
+          <View className="mb-2" onLayout={onFieldLayout('birthdate')}>
+            <TextInput
+              className="bg-surface text-text-primary text-body rounded-input px-4 py-3"
+              placeholder="YYYY-MM-DD"
+              placeholderTextColor={colors.muted}
+              value={birthDateText}
+              onChangeText={onWebBirthDateChange}
+              editable={!loading}
+              autoComplete="birthdate-full"
+              testID="create-profile-birthdate-input"
+              accessibilityLabel="Birth date"
+              onFocus={onFieldFocus('birthdate')}
+            />
+            <Text className="text-caption text-text-secondary mt-2">
+              Enter your birth date as YYYY-MM-DD.
+            </Text>
+          </View>
+        ) : (
+          <Pressable
+            onPress={() => setShowDatePicker(true)}
+            className="bg-surface rounded-input px-4 py-3 mb-2"
+            disabled={loading}
+            accessibilityLabel="Select birth date"
+            testID="create-profile-birthdate"
           >
-            {birthDate
-              ? formatDateForDisplay(birthDate)
-              : 'Select date of birth'}
-          </Text>
-        </Pressable>
+            <Text
+              className={
+                birthDate ? 'text-text-primary text-body' : 'text-body'
+              }
+              style={birthDate ? undefined : { color: colors.muted }}
+            >
+              {birthDate
+                ? formatDateForDisplay(birthDate)
+                : 'Select date of birth'}
+            </Text>
+          </Pressable>
+        )}
 
         {Platform.OS === 'ios' && showDatePicker && (
           <Modal transparent animationType="slide" testID="date-picker-modal">
@@ -313,20 +365,6 @@ export default function CreateProfileScreen() {
             onChange={onDateChange}
             testID="date-picker"
           />
-        )}
-
-        {Platform.OS === 'web' && showDatePicker && (
-          <View className="mb-2">
-            <DateTimePicker
-              value={birthDate ?? new Date(2010, 0, 1)}
-              mode="date"
-              display="default"
-              maximumDate={MAX_DATE}
-              minimumDate={MIN_DATE}
-              onChange={onDateChange}
-              testID="date-picker"
-            />
-          </View>
         )}
 
         {/* Spacer before submit — persona is auto-detected from birth date */}

@@ -129,6 +129,37 @@ describe('CreateProfileScreen', () => {
     expect(screen.getByTestId('date-picker')).toBeTruthy();
   });
 
+  it('renders a web birthdate input fallback', () => {
+    const RN = require('react-native');
+    const originalOs = Object.getOwnPropertyDescriptor(RN.Platform, 'OS');
+
+    Object.defineProperty(RN.Platform, 'OS', {
+      configurable: true,
+      get: () => 'web',
+    });
+
+    try {
+      render(<CreateProfileScreen />, { wrapper: Wrapper });
+
+      expect(screen.getByTestId('create-profile-birthdate-input')).toBeTruthy();
+
+      fireEvent.changeText(screen.getByTestId('create-profile-name'), 'Sam');
+      fireEvent.changeText(
+        screen.getByTestId('create-profile-birthdate-input'),
+        '2010-06-15'
+      );
+
+      const button = screen.getByTestId('create-profile-submit');
+      expect(
+        button.props.accessibilityState?.disabled ?? button.props.disabled
+      ).toBeFalsy();
+    } finally {
+      if (originalOs) {
+        Object.defineProperty(RN.Platform, 'OS', originalOs);
+      }
+    }
+  });
+
   it('calls POST and navigates back on successful submit (adult, no consent needed)', async () => {
     const newProfile = {
       id: 'new-id',

@@ -55,7 +55,7 @@ describe('envValidationMiddleware', () => {
 
   it('calls validateEnv with c.env in non-test environment', async () => {
     process.env['NODE_ENV'] = 'development';
-    const env = { ENVIRONMENT: 'development', DATABASE_URL: 'postgresql://x' };
+    const env = { ENVIRONMENT: 'staging', DATABASE_URL: 'postgresql://x' };
     const c = createMockContext(env);
     const next = jest.fn().mockResolvedValue(undefined);
     mockValidateEnv.mockReturnValue(env as any);
@@ -92,7 +92,7 @@ describe('envValidationMiddleware', () => {
 
   it('only validates once (skips on subsequent requests)', async () => {
     process.env['NODE_ENV'] = 'development';
-    const env = { ENVIRONMENT: 'development', DATABASE_URL: 'postgresql://x' };
+    const env = { ENVIRONMENT: 'staging', DATABASE_URL: 'postgresql://x' };
     const c = createMockContext(env);
     const next = jest.fn().mockResolvedValue(undefined);
     mockValidateEnv.mockReturnValue(env as any);

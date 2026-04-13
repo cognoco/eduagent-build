@@ -22,8 +22,13 @@ let validated = false;
 export const envValidationMiddleware = createMiddleware<EnvValidationEnv>(
   async (c, next): Promise<Response | void> => {
     if (!validated) {
-      // Skip in test environments — tests mock env bindings selectively
-      if (process.env['NODE_ENV'] !== 'test') {
+      // Skip in tests and local development — tests mock bindings selectively,
+      // and Wrangler local bindings can differ slightly from deployed envs.
+      // Optional chain on c.env: app.request() tests run without bindings.
+      if (
+        process.env['NODE_ENV'] !== 'test' &&
+        c.env?.ENVIRONMENT !== 'development'
+      ) {
         try {
           validateEnv(c.env as Record<string, string | undefined>);
         } catch (err) {

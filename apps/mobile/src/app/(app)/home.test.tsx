@@ -75,27 +75,27 @@ describe('HomeScreen intent router', () => {
     mockSubscriptionTier = undefined;
   });
 
-  it('renders Add First Child screen for owner with no children (free tier)', () => {
+  it('renders LearnerScreen for owner with no children on free tier', () => {
     mockProfiles = [{ id: 'p1', displayName: 'Alex', isOwner: true }];
     mockActiveProfile = mockProfiles[0] ?? null;
     mockSubscriptionTier = 'free';
 
     render(<HomeScreen />);
 
-    expect(screen.getByTestId('add-first-child-screen')).toBeTruthy();
+    expect(screen.getByTestId('learner-screen')).toBeTruthy();
     expect(screen.queryByTestId('parent-gateway')).toBeNull();
-    expect(screen.queryByTestId('learner-screen')).toBeNull();
+    expect(screen.queryByTestId('add-first-child-screen')).toBeNull();
   });
 
-  it('renders Add First Child screen for owner with no children (plus tier)', () => {
+  it('renders LearnerScreen for owner with no children on plus tier', () => {
     mockProfiles = [{ id: 'p1', displayName: 'Alex', isOwner: true }];
     mockActiveProfile = mockProfiles[0] ?? null;
     mockSubscriptionTier = 'plus';
 
     render(<HomeScreen />);
 
-    expect(screen.getByTestId('add-first-child-screen')).toBeTruthy();
-    expect(screen.queryByTestId('learner-screen')).toBeNull();
+    expect(screen.getByTestId('learner-screen')).toBeTruthy();
+    expect(screen.queryByTestId('add-first-child-screen')).toBeNull();
   });
 
   it('renders Add First Child screen for family-tier owner with no children', () => {
