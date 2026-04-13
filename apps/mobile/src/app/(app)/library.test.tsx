@@ -185,6 +185,7 @@ describe('LibraryScreen', () => {
               easeFactor: 2.5,
               repetitions: 2,
               lastReviewedAt: null,
+              nextReviewAt: new Date(Date.now() + 7 * 86_400_000).toISOString(),
               xpStatus: 'verified',
               failureCount: 0,
             },

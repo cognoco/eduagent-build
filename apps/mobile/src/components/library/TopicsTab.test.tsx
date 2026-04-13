@@ -164,10 +164,10 @@ describe('TopicsTab', () => {
     render(<TopicsTab {...defaultProps} onTopicPress={onTopicPress} />);
 
     fireEvent.press(screen.getByTestId('topic-row-topic-1'));
-    expect(onTopicPress).toHaveBeenCalledWith('topic-1', 'sub-1');
+    expect(onTopicPress).toHaveBeenCalledWith('topic-1', 'sub-1', 'strong');
 
     fireEvent.press(screen.getByTestId('topic-row-topic-2'));
-    expect(onTopicPress).toHaveBeenCalledWith('topic-2', 'sub-2');
+    expect(onTopicPress).toHaveBeenCalledWith('topic-2', 'sub-2', 'forgotten');
   });
 
   it('shows empty state when no topics exist', () => {

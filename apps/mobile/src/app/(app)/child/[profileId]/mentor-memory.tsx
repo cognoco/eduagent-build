@@ -53,6 +53,30 @@ export default function ChildMentorMemoryScreen() {
   const unsuppress = useUnsuppressInference();
   const [draft, setDraft] = useState('');
 
+  // S-2: Wrap mutateAsync calls so delete/unsuppress failures show user feedback.
+  // Previously all 6 onRemove handlers used `void mutateAsync(...)` with no catch.
+  const safeDelete = useCallback(
+    async (args: Parameters<typeof deleteItem.mutateAsync>[0]) => {
+      try {
+        await deleteItem.mutateAsync(args);
+      } catch {
+        Alert.alert('Could not delete item', 'Please try again.');
+      }
+    },
+    [deleteItem]
+  );
+
+  const safeUnsuppress = useCallback(
+    async (args: Parameters<typeof unsuppress.mutateAsync>[0]) => {
+      try {
+        await unsuppress.mutateAsync(args);
+      } catch {
+        Alert.alert('Could not restore item', 'Please try again.');
+      }
+    },
+    [unsuppress]
+  );
+
   const learningStyleRows = useMemo(
     () => getLearningStyleRows(profile?.learningStyle ?? null),
     [profile?.learningStyle]
@@ -292,7 +316,7 @@ export default function ChildMentorMemoryScreen() {
                 label={row.label}
                 source={row.source}
                 onRemove={() =>
-                  void deleteItem.mutateAsync({
+                  void safeDelete({
                     childProfileId,
                     category: 'learningStyle',
                     value: row.key,
@@ -313,7 +337,7 @@ export default function ChildMentorMemoryScreen() {
                 key={interest}
                 label={interest}
                 onRemove={() =>
-                  void deleteItem.mutateAsync({
+                  void safeDelete({
                     childProfileId,
                     category: 'interests',
                     value: interest,
@@ -335,7 +359,7 @@ export default function ChildMentorMemoryScreen() {
                 label={`${entry.subject}: ${entry.topics.join(', ')}`}
                 source={entry.source}
                 onRemove={() =>
-                  void deleteItem.mutateAsync({
+                  void safeDelete({
                     childProfileId,
                     category: 'strengths',
                     value: entry.subject,
@@ -366,7 +390,7 @@ export default function ChildMentorMemoryScreen() {
                   progressLabel={progress.progressLabel}
                   progressValue={progress.progressValue}
                   onRemove={() =>
-                    void deleteItem.mutateAsync({
+                    void safeDelete({
                       childProfileId,
                       category: 'struggles',
                       value: entry.topic,
@@ -389,7 +413,7 @@ export default function ChildMentorMemoryScreen() {
                 key={note}
                 label={note}
                 onRemove={() =>
-                  void deleteItem.mutateAsync({
+                  void safeDelete({
                     childProfileId,
                     category: 'communicationNotes',
                     value: note,
@@ -413,9 +437,7 @@ export default function ChildMentorMemoryScreen() {
                 key={value}
                 label={value}
                 actionLabel="Bring back"
-                onRemove={() =>
-                  void unsuppress.mutateAsync({ childProfileId, value })
-                }
+                onRemove={() => void safeUnsuppress({ childProfileId, value })}
               />
             ))}
           </CollapsibleMemorySection>

@@ -147,6 +147,14 @@ export function ChatShell({
       : initialVoiceEnabled ?? verificationType === 'teach_back'
   );
 
+  // BUG-349: Sync voice state when inputMode prop changes after mount
+  // (useState only reads initial value once, so prop changes were ignored).
+  useEffect(() => {
+    if (inputMode) {
+      setIsVoiceEnabled(inputMode === 'voice');
+    }
+  }, [inputMode]);
+
   // STT hook
   const {
     isListening,
@@ -235,9 +243,11 @@ export function ChatShell({
   const setVoiceEnabled = useCallback(
     (enabled: boolean) => {
       setIsVoiceEnabled(enabled);
+      // BUG-344: Stop TTS immediately when switching to text mode
+      if (!enabled) stopSpeaking();
       onInputModeChange?.(enabled ? 'voice' : 'text');
     },
-    [onInputModeChange]
+    [onInputModeChange, stopSpeaking]
   );
 
   const handleSend = useCallback(() => {
@@ -245,10 +255,11 @@ export function ChatShell({
     const text = input.trim();
     setInput('');
     onDraftChange?.('');
-    // Stop TTS when user sends a message
-    if (isVoiceEnabled) stopSpeaking();
+    // Stop TTS when user sends a message — unconditional so it works even
+    // if user switched to text mode while TTS was still playing (BUG-344)
+    stopSpeaking();
     onSend(text);
-  }, [input, isStreaming, onDraftChange, onSend, isVoiceEnabled, stopSpeaking]);
+  }, [input, isStreaming, onDraftChange, onSend, stopSpeaking]);
 
   // Voice record button toggle
   const handleVoicePress = useCallback(async () => {

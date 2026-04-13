@@ -23,18 +23,11 @@ jest.mock('@clerk/clerk-expo', () => ({
 jest.mock('../lib/api-client', () => ({
   useApiClient: () => {
     const { hc } = require('hono/client');
+    // Pass raw Response through — matches production hc() behavior.
+    // Each hook uses assertOk() to throw on non-OK responses.
     return hc('http://localhost', {
-      fetch: async (...args: unknown[]) => {
-        const res = await mockFetch(...(args as Parameters<typeof fetch>));
-        if (!res.ok) {
-          const text = await res
-            .clone()
-            .text()
-            .catch(() => res.statusText);
-          throw new Error(`API error ${res.status}: ${text}`);
-        }
-        return res;
-      },
+      fetch: async (...args: unknown[]) =>
+        mockFetch(...(args as Parameters<typeof fetch>)),
     });
   },
 }));

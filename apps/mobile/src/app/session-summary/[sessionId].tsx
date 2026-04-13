@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -58,6 +58,11 @@ export default function SessionSummaryScreen() {
   const [summaryText, setSummaryText] = useState('');
   const [aiFeedback, setAiFeedback] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
+
+  // R-3: Ref-based locks — isPending resets before Alert callbacks fire,
+  // allowing double-submission if user taps rapidly.
+  const submitInFlight = useRef(false);
+  const skipInFlight = useRef(false);
 
   const submitSummary = useSubmitSummary(sessionId ?? '');
   const skipSummary = useSkipSummary(sessionId ?? '');
@@ -176,7 +181,13 @@ export default function SessionSummaryScreen() {
   }
 
   const handleSubmit = async (): Promise<void> => {
-    if (summaryText.trim().length < 10 || submitSummary.isPending) return;
+    if (
+      summaryText.trim().length < 10 ||
+      submitSummary.isPending ||
+      submitInFlight.current
+    )
+      return;
+    submitInFlight.current = true;
 
     try {
       const result = await submitSummary.mutateAsync({
@@ -199,13 +210,16 @@ export default function SessionSummaryScreen() {
       });
     } catch {
       // Error state handled by mutation
+    } finally {
+      submitInFlight.current = false;
     }
   };
 
   const handleContinue = async (): Promise<void> => {
     // Story 10.8 Phase 0: summary_skipped event (only when not yet submitted)
     if (!submitted) {
-      if (skipSummary.isPending) return;
+      if (skipSummary.isPending || skipInFlight.current) return;
+      skipInFlight.current = true;
 
       let skipResult:
         | Awaited<ReturnType<typeof skipSummary.mutateAsync>>
@@ -213,8 +227,12 @@ export default function SessionSummaryScreen() {
       try {
         skipResult = await skipSummary.mutateAsync();
       } catch {
+        skipInFlight.current = false;
+        // S-3: Surface skip failures — bare catch { return } was silent.
+        Alert.alert('Could not skip', 'Please try again.');
         return;
       }
+      skipInFlight.current = false;
 
       Sentry.addBreadcrumb({
         category: 'summary',

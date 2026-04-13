@@ -199,9 +199,30 @@ export default function SubjectTopicsScreen() {
                 )}
             </Pressable>
           ))
+        ) : !topics ? (
+          // BUG-106: Data is undefined without isError — possible silent failure.
+          // Offer retry instead of misleading "No topics yet".
+          <View className="py-8 items-center" testID="topics-load-unknown">
+            <Text className="text-body text-text-secondary mb-3">
+              Topics could not be loaded. Tap to try again.
+            </Text>
+            <Pressable
+              onPress={() => refetch()}
+              className="bg-primary rounded-button px-5 py-2.5 items-center"
+              accessibilityRole="button"
+              accessibilityLabel="Retry loading topics"
+              testID="topics-retry-fallback"
+            >
+              <Text className="text-body font-semibold text-text-inverse">
+                Retry
+              </Text>
+            </Pressable>
+          </View>
         ) : (
-          <View className="py-8 items-center">
-            <Text className="text-body text-text-secondary">No topics yet</Text>
+          <View className="py-8 items-center" testID="topics-empty">
+            <Text className="text-body text-text-secondary">
+              No topics yet — start a learning session to explore this subject.
+            </Text>
           </View>
         )}
       </ScrollView>

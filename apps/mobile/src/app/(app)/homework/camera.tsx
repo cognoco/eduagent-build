@@ -65,9 +65,17 @@ export default function CameraScreen(): React.ReactNode {
   const classifyTriggeredRef = useRef(false);
   const [manualSubjectName, setManualSubjectName] = useState('');
 
-  // Reset state when screen regains focus (prevents stale state loop)
+  // BUG-366: Track phase via ref so useFocusEffect can check it without
+  // adding it as a dependency (which would cause spurious re-runs).
+  const phaseRef = useRef(state.phase);
+  phaseRef.current = state.phase;
+
+  // Reset state when screen regains focus (prevents stale state loop).
+  // BUG-366: Skip reset when user is in result phase — preserves OCR work
+  // when returning from create-subject navigation.
   useFocusEffect(
     useCallback(() => {
+      if (phaseRef.current === 'result') return;
       dispatch({ type: 'RESET', hasPermission: permission?.granted ?? false });
       setOcrText('');
       setDraftProblems([]);
@@ -809,12 +817,27 @@ export default function CameraScreen(): React.ReactNode {
 
         {/* Subject auto-detection loading indicator */}
         {needsSubjectPick && classifyMutation.isPending && (
-          <Text
-            className="text-body-sm text-text-secondary mt-3"
-            testID="classify-loading"
-          >
-            Figuring out the subject...
-          </Text>
+          <View>
+            <Text
+              className="text-body-sm text-text-secondary mt-3"
+              testID="classify-loading"
+            >
+              Figuring out the subject...
+            </Text>
+            {/* BUG-388: Always show Retake during classification so user
+                isn't stuck if detection hangs or takes too long */}
+            <Pressable
+              testID="classify-pending-retake"
+              onPress={handleRetake}
+              className="bg-surface rounded-button py-3 mt-4 min-h-[48px] items-center justify-center"
+              accessibilityLabel="Retake photo"
+              accessibilityRole="button"
+            >
+              <Text className="text-body font-semibold text-text-primary">
+                Retake
+              </Text>
+            </Pressable>
+          </View>
         )}
 
         {/* Auto-detected subject confirmation */}

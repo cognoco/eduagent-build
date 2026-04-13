@@ -128,6 +128,9 @@ export default function LibraryScreen() {
   const [pendingSubjectId, setPendingSubjectId] = useState<string | null>(null);
 
   const subjectsQuery = useSubjects({ includeInactive: true });
+  // S-5: Centralized Array.isArray guard — same class as BUG-418.
+  // TanStack Query's select can be bypassed when enabled=false.
+  const subjects = Array.isArray(subjectsQuery.data) ? subjectsQuery.data : [];
   const progressQuery = useOverallProgress();
   const updateSubject = useUpdateSubject();
   const allBooksQuery = useAllBooks();
@@ -138,7 +141,7 @@ export default function LibraryScreen() {
   );
 
   const retentionQueries = useQueries({
-    queries: (subjectsQuery.data ?? []).map((subject) => ({
+    queries: subjects.map((subject) => ({
       queryKey: ['retention', 'subject', subject.id, activeProfile?.id],
       queryFn: async ({ signal: querySignal }: { signal?: AbortSignal }) => {
         const { signal, cleanup } = combinedSignal(querySignal);
@@ -191,13 +194,13 @@ export default function LibraryScreen() {
 
   const shelves = useMemo<ShelfItem[]>(() => {
     const retentionBySubjectId = new Map(
-      (subjectsQuery.data ?? []).map((subject, index) => [
+      subjects.map((subject, index) => [
         subject.id,
         retentionQueries[index]?.data,
       ])
     );
 
-    return (subjectsQuery.data ?? []).map((subject) => ({
+    return subjects.map((subject) => ({
       subject,
       progress: progressBySubjectId.get(subject.id),
       reviewDueCount:
@@ -254,10 +257,20 @@ export default function LibraryScreen() {
     }
   };
 
-  const openTopic = (topicId: string, subjectId: string): void => {
+  // BUG-342: Derive session mode from retention — forgotten/weak topics
+  // open in relearn mode so the AI uses spaced-repetition pedagogy.
+  const openTopic = (
+    topicId: string,
+    subjectId: string,
+    retention?: RetentionStatus
+  ): void => {
+    const mode =
+      retention === 'weak' || retention === 'forgotten'
+        ? 'relearn'
+        : 'learning';
     router.push({
       pathname: '/(app)/session',
-      params: { mode: 'learning', subjectId, topicId },
+      params: { mode, subjectId, topicId },
     } as never);
   };
 
@@ -309,7 +322,7 @@ export default function LibraryScreen() {
     }
 
     // Top-level library view — three tabs
-    const subjectList = (subjectsQuery.data ?? []).map((s) => ({
+    const subjectList = subjects.map((s) => ({
       id: s.id,
       name: s.name,
     }));
@@ -357,7 +370,9 @@ export default function LibraryScreen() {
             noteTopicIds={noteIdSet}
             state={topicsTabState}
             onStateChange={setTopicsTabState}
-            onTopicPress={(topicId, subjectId) => openTopic(topicId, subjectId)}
+            onTopicPress={(topicId, subjectId, retention) =>
+              openTopic(topicId, subjectId, retention)
+            }
             onAddSubject={() => router.push('/create-subject')}
           />
         )}
@@ -487,7 +502,7 @@ export default function LibraryScreen() {
             </Text>
 
             <ScrollView style={{ maxHeight: 360 }}>
-              {(subjectsQuery.data ?? []).map((subject) => {
+              {subjects.map((subject) => {
                 const isPending = pendingSubjectId === subject.id;
                 return (
                   <View

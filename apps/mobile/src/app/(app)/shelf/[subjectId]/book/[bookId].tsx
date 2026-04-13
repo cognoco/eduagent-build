@@ -340,6 +340,8 @@ export default function BookScreen() {
     if (
       autoStart === 'true' &&
       !autoStartTriggered.current &&
+      !needsGeneration &&
+      !generateMutation.isPending &&
       topics.length > 0
     ) {
       autoStartTriggered.current = true;

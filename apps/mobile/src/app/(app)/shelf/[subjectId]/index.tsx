@@ -45,9 +45,14 @@ export default function ShelfScreen() {
     goBackOrReplace(router, '/(app)/library');
   }, [router]);
 
+  // R-1: Ref-based lock — backported from pick-book BUG-361 fix.
+  // isPending resets before Alert callbacks fire, allowing double-submission.
+  const filingInFlight = useRef(false);
+
   const handlePickBookSuggestion = async (suggestion: BookSuggestion) => {
-    // BUG-323: Guard against concurrent filing calls from alert retry
-    if (filing.isPending) return;
+    // BUG-323 + R-1: Double guard — isPending (React state) + ref lock
+    if (filing.isPending || filingInFlight.current) return;
+    filingInFlight.current = true;
     try {
       const result = await filing.mutateAsync({
         rawInput: suggestion.title,
@@ -64,6 +69,7 @@ export default function ShelfScreen() {
         },
       } as never);
     } catch (err) {
+      filingInFlight.current = false;
       Alert.alert('Error', formatApiError(err), [
         {
           text: 'Try again',

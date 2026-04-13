@@ -346,6 +346,20 @@ export default function CreateSubjectScreen() {
               {error}
               {subjectLimitGuidance}
             </Text>
+            {/* BUG-116: Actionable navigation to manage existing subjects */}
+            {isSubjectLimitError && (
+              <Pressable
+                onPress={() => router.replace('/(app)/library' as never)}
+                className="mt-2 bg-surface rounded-button py-2.5 px-4 items-center"
+                accessibilityRole="button"
+                accessibilityLabel="Manage your subjects"
+                testID="manage-subjects-button"
+              >
+                <Text className="text-body-sm font-semibold text-primary">
+                  Manage your subjects
+                </Text>
+              </Pressable>
+            )}
           </View>
         )}
 
