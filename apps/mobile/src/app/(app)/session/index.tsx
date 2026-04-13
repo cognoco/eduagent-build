@@ -412,14 +412,16 @@ export default function SessionScreen() {
   useEffect(() => {
     if (!activeProfile?.id) return;
     let cancelled = false;
-    void SecureStore.getItemAsync(getInputModeKey(activeProfile.id)).then(
-      (stored) => {
+    void SecureStore.getItemAsync(getInputModeKey(activeProfile.id))
+      .then((stored) => {
         if (cancelled) return;
         if (stored === 'voice' || stored === 'text') {
           setInputMode(stored);
         }
-      }
-    );
+      })
+      .catch(() => {
+        // Non-critical preference — silent fallback to 'text' default.
+      });
     return () => {
       cancelled = true;
     };
@@ -495,6 +497,10 @@ export default function SessionScreen() {
     hydrate,
     reset: resetMilestones,
   } = useMilestoneTracker();
+  // BUG-350: Ref mirrors trackerState so silence timer always reads the
+  // current value, not a stale closure capture from when setTimeout was created.
+  const trackerStateRef = useRef(trackerState);
+  trackerStateRef.current = trackerState;
   const { CelebrationOverlay, trigger } = useCelebration({
     celebrationLevel,
     audience: 'child',
@@ -516,7 +522,8 @@ export default function SessionScreen() {
       setClassifyError(null);
       setClassifiedSubject(null);
       setPendingSubjectResolution(null);
-      setInputMode('text');
+      // BUG-357: Don't reset inputMode to 'text' — preserve the user's
+      // stored preference (restored from SecureStore on mount).
       setDraftText('');
       setResumedBanner(false);
       setResponseHistory([]);
@@ -814,7 +821,7 @@ export default function SessionScreen() {
             subjectName: effectiveSubjectName || undefined,
             topicId: topicId ?? undefined,
             mode: effectiveMode,
-            milestoneTracker: trackerState,
+            milestoneTracker: trackerStateRef.current,
             updatedAt: new Date().toISOString(),
           },
           activeProfile?.id
@@ -829,7 +836,6 @@ export default function SessionScreen() {
       effectiveSubjectName,
       recordSystemPrompt,
       responseHistory,
-      trackerState,
       topicId,
     ]
   );
@@ -1809,14 +1815,19 @@ export default function SessionScreen() {
                 } as never);
               }
             } catch (err: unknown) {
-              setIsClosing(false);
+              // R-2: Do NOT reset isClosing here — keep End Session button
+              // disabled while the Alert is visible. Reset inside the callback.
               Alert.alert(
                 'Could not end this session cleanly',
                 `${formatApiError(
                   err
                 )} You can keep trying, or go home now and come back later.`,
                 [
-                  { text: 'Keep trying', style: 'cancel' },
+                  {
+                    text: 'Keep trying',
+                    style: 'cancel',
+                    onPress: () => setIsClosing(false),
+                  },
                   {
                     text: 'Go Home',
                     onPress: () => {
@@ -2572,7 +2583,6 @@ export default function SessionScreen() {
         belowInput={sessionToolAccessory}
         onDraftChange={setDraftText}
         renderMessageActions={renderMessageActions}
-        initialVoiceEnabled={inputMode === 'voice'}
         speechRecognitionLanguage={languageVoiceLocale}
         textToSpeechLanguage={languageVoiceLocale}
         footer={
