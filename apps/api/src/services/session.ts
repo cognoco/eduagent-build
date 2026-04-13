@@ -1235,7 +1235,7 @@ async function prepareExchangeContext(
     llmTier: options?.llmTier,
     // CFLF: Original learner input so the LLM stays anchored to intent
     rawInput: session.rawInput,
-    inputMode: session.inputMode as 'text' | 'voice' | undefined,
+    inputMode: session.inputMode,
   };
 
   return { session, context, effectiveRung, hintCount, lastAiResponseAt };

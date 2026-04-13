@@ -15,6 +15,7 @@ import {
   type AgeBracket,
   type LearningMode,
   type HomeworkMode,
+  type InputMode,
 } from '@eduagent/schemas';
 import { buildFourStrandsPrompt } from './language-prompts';
 import type { LLMTier } from './subscription';
@@ -82,7 +83,7 @@ export interface ExchangeContext {
   /** Original free-text input the learner typed when starting this session (CFLF) */
   rawInput?: string | null;
   /** Input mode for this session — controls voice-optimized brevity in the system prompt */
-  inputMode?: 'text' | 'voice';
+  inputMode?: InputMode;
 }
 
 /** Result of processing a single exchange */
@@ -463,7 +464,8 @@ export function buildSystemPrompt(context: ExchangeContext): string {
     );
   }
 
-  // Voice-mode brevity constraint — shorter responses for spoken output (FR256)
+  // Voice-mode brevity constraint — MUST be last section so it overrides
+  // any earlier instructions that encourage longer explanations (FR256).
   if (context.inputMode === 'voice') {
     sections.push(
       'VOICE MODE: The learner is using voice. Keep every response under 50 words. ' +
