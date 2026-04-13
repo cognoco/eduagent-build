@@ -87,8 +87,9 @@ export async function classifySubject(
           };
         }
       }
-    } catch {
-      // LLM failed — fall through to default empty result
+    } catch (err) {
+      // S-6: Log so LLM failures are visible in production — previously silent.
+      console.error('[classify] LLM failed for zero-subject path:', err);
     }
 
     return {
@@ -190,8 +191,9 @@ export async function classifySubject(
           ? parsed.suggestedSubjectName
           : null,
     };
-  } catch {
-    // Failure handling: never block the user
+  } catch (err) {
+    // S-6: Log so LLM failures are visible in production — previously silent.
+    console.error('[classify] LLM failed for multi-subject path:', err);
     return {
       candidates: [],
       needsConfirmation: true,
