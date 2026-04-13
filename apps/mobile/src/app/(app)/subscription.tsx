@@ -739,13 +739,22 @@ export default function SubscriptionScreen() {
       if (!mountedRef.current) break;
       await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
       if (!mountedRef.current) break;
-      await queryClient.invalidateQueries({ queryKey: ['usage'] });
-      // Brief wait for the query to refetch
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      // Use fetchQuery with staleTime: 0 to force a fresh network fetch and
+      // await the response directly — eliminates the 500ms sleep race where
+      // getQueryData could read a stale entry before invalidation propagated.
+      let freshUsage: { topUpCreditsRemaining: number } | undefined;
+      try {
+        freshUsage = await queryClient.fetchQuery<{
+          topUpCreditsRemaining: number;
+        }>({
+          queryKey: ['usage', activeProfile?.id],
+          staleTime: 0,
+        });
+      } catch {
+        // Network error during poll — continue to next attempt
+        continue;
+      }
       if (!mountedRef.current) break;
-      const freshUsage = queryClient.getQueryData<{
-        topUpCreditsRemaining: number;
-      }>(['usage', activeProfile?.id]);
       if (freshUsage && freshUsage.topUpCreditsRemaining > baseCredits) {
         confirmed = true;
         break;

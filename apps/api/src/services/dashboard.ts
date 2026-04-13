@@ -349,10 +349,10 @@ async function buildChildProgressSummary(
       : null,
     engagementTrend:
       sessionsThisWeek === 0
-        ? 'quiet'
+        ? 'declining'
         : sessionsThisWeek > sessionsLastWeek
-        ? 'growing'
-        : 'steady',
+        ? 'increasing'
+        : 'stable',
     guidance: buildProgressGuidance(
       childName,
       subjectNames,

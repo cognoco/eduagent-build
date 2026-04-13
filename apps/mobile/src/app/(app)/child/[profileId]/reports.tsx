@@ -4,6 +4,19 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useChildReports } from '../../../../hooks/use-progress';
 import { goBackOrReplace } from '../../../../lib/navigation';
 
+function getNextReportDate(): string {
+  const now = new Date();
+  // Monthly report cron runs 10:00 UTC on the 1st of each month
+  const nextRun = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 10, 0, 0)
+  );
+  return nextRun.toLocaleDateString(undefined, {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
 export default function ChildReportsScreen(): React.ReactElement {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -139,10 +152,17 @@ export default function ChildReportsScreen(): React.ReactElement {
             </Pressable>
           ))
         ) : (
-          <View className="bg-surface rounded-card p-4 mt-4">
-            <Text className="text-body-sm text-text-secondary">
-              No monthly reports yet. They will appear here once a month after
-              there is enough learning activity to summarize.
+          <View
+            className="bg-surface rounded-card p-5 mt-4 items-center"
+            testID="child-reports-empty"
+          >
+            <Text className="text-4xl mb-3">📊</Text>
+            <Text className="text-h3 font-semibold text-text-primary text-center">
+              First report coming soon
+            </Text>
+            <Text className="text-body-sm text-text-secondary text-center mt-2">
+              Reports are generated on the 1st of each month. The first one will
+              appear around {getNextReportDate()}.
             </Text>
           </View>
         )}

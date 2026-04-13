@@ -4,7 +4,7 @@
 
 - Mobile: 38+ screens (85 test suites),
 - Monorepo: `apps/api`, `apps/mobile`, shared packages in `packages/`
-- Core docs: `docs/project_context.md`, `docs/architecture.md`, relevant spec/plan under `docs/plans/` or `docs/superpowers/specs/`
+- Core docs: `docs/project_context.md`, `docs/architecture.md`, relevant spec/plan under `docs/plans/` or `docs/specs/`
 
 ## Read This Before Editing
 

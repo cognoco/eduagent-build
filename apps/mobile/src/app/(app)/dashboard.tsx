@@ -67,7 +67,7 @@ function renderChildCards(
       weeklyDeltaTopicsMastered: number | null;
       weeklyDeltaVocabularyTotal: number | null;
       weeklyDeltaTopicsExplored: number | null;
-      engagementTrend: 'growing' | 'steady' | 'quiet';
+      engagementTrend: 'increasing' | 'stable' | 'declining';
       guidance: string | null;
     } | null;
   }[],

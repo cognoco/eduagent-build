@@ -115,7 +115,7 @@ Required: `DATABASE_URL` (Neon connection string). See `.env.example` for all va
 
 - [`docs/architecture.md`](docs/architecture.md) — Full architecture decisions and technical design
 - [`docs/prd.md`](docs/prd.md) — Product requirements (117 FRs across 7 epics)
-- [`docs/epics.md`](docs/epics.md) — Epic breakdown with stories
+- [`docs/specs/epics.md`](docs/specs/epics.md) — Epic breakdown with stories
 - [`docs/ux-design-specification.md`](docs/ux-design-specification.md) — UX patterns, theming, component specs
 - [`docs/project_context.md`](docs/project_context.md) — AI agent rules and implementation patterns
 

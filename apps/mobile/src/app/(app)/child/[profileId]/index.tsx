@@ -318,6 +318,7 @@ export default function ChildDetailScreen() {
         contentContainerStyle={{ paddingBottom: 24 }}
         testID="child-detail-scroll"
       >
+        {/* Progress snapshot card — only shown once a snapshot exists */}
         {child?.progress ? (
           <View className="bg-coaching-card rounded-card p-4 mt-4">
             <Text className="text-h3 font-semibold text-text-primary">
@@ -351,26 +352,34 @@ export default function ChildDetailScreen() {
                 {child.progress.guidance}
               </Text>
             ) : null}
-            <Pressable
-              onPress={() => {
-                if (!profileId) return;
-                router.push({
-                  pathname: '/(app)/child/[profileId]/reports',
-                  params: { profileId },
-                } as never);
-              }}
-              className="bg-background rounded-button px-4 py-3 mt-4 items-center"
-              accessibilityRole="button"
-              accessibilityLabel="Open monthly reports"
-              testID="child-reports-link"
-            >
-              <Text className="text-body font-semibold text-text-primary">
-                Monthly reports
-                {reports && reports.length > 0 ? ` (${reports.length})` : ''}
-              </Text>
-            </Pressable>
           </View>
         ) : null}
+
+        {/* Reports card — always visible */}
+        <View className="bg-surface rounded-card p-4 mt-4">
+          <Pressable
+            onPress={() => {
+              if (!profileId) return;
+              router.push({
+                pathname: '/(app)/child/[profileId]/reports',
+                params: { profileId },
+              } as never);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Open monthly reports"
+            testID="child-reports-link"
+          >
+            <Text className="text-body font-semibold text-text-primary">
+              Monthly reports
+              {reports && reports.length > 0 ? ` (${reports.length})` : ''}
+            </Text>
+            <Text className="text-body-sm text-text-secondary mt-1">
+              {reports && reports.length > 0
+                ? 'A monthly summary of learning activity.'
+                : 'Your first report will appear after the first month of activity.'}
+            </Text>
+          </Pressable>
+        </View>
 
         {history ? (
           <View className="mt-4">

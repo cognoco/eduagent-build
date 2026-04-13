@@ -100,60 +100,78 @@ export const curricula = pgTable(
   ]
 );
 
-export const curriculumBooks = pgTable('curriculum_books', {
-  id: uuid('id')
-    .primaryKey()
-    .$defaultFn(() => generateUUIDv7()),
-  subjectId: uuid('subject_id')
-    .notNull()
-    .references(() => subjects.id, { onDelete: 'cascade' }),
-  title: text('title').notNull(),
-  description: text('description'),
-  emoji: text('emoji'),
-  sortOrder: integer('sort_order').notNull(),
-  topicsGenerated: boolean('topics_generated').notNull().default(false),
-  createdAt: timestamp('created_at', { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+export const curriculumBooks = pgTable(
+  'curriculum_books',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .$defaultFn(() => generateUUIDv7()),
+    subjectId: uuid('subject_id')
+      .notNull()
+      .references(() => subjects.id, { onDelete: 'cascade' }),
+    title: text('title').notNull(),
+    description: text('description'),
+    emoji: text('emoji'),
+    sortOrder: integer('sort_order').notNull(),
+    topicsGenerated: boolean('topics_generated').notNull().default(false),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('curriculum_books_subject_sort_order_uq').on(
+      table.subjectId,
+      table.sortOrder
+    ),
+  ]
+);
 
-export const curriculumTopics = pgTable('curriculum_topics', {
-  id: uuid('id')
-    .primaryKey()
-    .$defaultFn(() => generateUUIDv7()),
-  curriculumId: uuid('curriculum_id')
-    .notNull()
-    .references(() => curricula.id, { onDelete: 'cascade' }),
-  title: text('title').notNull(),
-  description: text('description').notNull(),
-  sortOrder: integer('sort_order').notNull(),
-  relevance: topicRelevanceEnum('relevance').notNull().default('core'),
-  source: curriculumTopicSourceEnum('source').notNull().default('generated'),
-  estimatedMinutes: integer('estimated_minutes').notNull(),
-  bookId: uuid('book_id')
-    .notNull()
-    .references(() => curriculumBooks.id, { onDelete: 'cascade' }),
-  chapter: text('chapter'),
-  skipped: boolean('skipped').notNull().default(false),
-  cefrLevel: text('cefr_level'),
-  cefrSublevel: text('cefr_sublevel'),
-  targetWordCount: integer('target_word_count'),
-  targetChunkCount: integer('target_chunk_count'),
-  filedFrom: filedFromEnum('filed_from').notNull().default('pre_generated'),
-  sessionId: uuid('session_id'),
-  // FK to learning_sessions(id) is defined in migration SQL only.
-  // DO NOT add a JS .references(() => learningSessions.id) here —
-  // sessions.ts already imports from subjects.ts, creating a circular dep.
-  createdAt: timestamp('created_at', { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+export const curriculumTopics = pgTable(
+  'curriculum_topics',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .$defaultFn(() => generateUUIDv7()),
+    curriculumId: uuid('curriculum_id')
+      .notNull()
+      .references(() => curricula.id, { onDelete: 'cascade' }),
+    title: text('title').notNull(),
+    description: text('description').notNull(),
+    sortOrder: integer('sort_order').notNull(),
+    relevance: topicRelevanceEnum('relevance').notNull().default('core'),
+    source: curriculumTopicSourceEnum('source').notNull().default('generated'),
+    estimatedMinutes: integer('estimated_minutes').notNull(),
+    bookId: uuid('book_id')
+      .notNull()
+      .references(() => curriculumBooks.id, { onDelete: 'cascade' }),
+    chapter: text('chapter'),
+    skipped: boolean('skipped').notNull().default(false),
+    cefrLevel: text('cefr_level'),
+    cefrSublevel: text('cefr_sublevel'),
+    targetWordCount: integer('target_word_count'),
+    targetChunkCount: integer('target_chunk_count'),
+    filedFrom: filedFromEnum('filed_from').notNull().default('pre_generated'),
+    sessionId: uuid('session_id'),
+    // FK to learning_sessions(id) is defined in migration SQL only.
+    // DO NOT add a JS .references(() => learningSessions.id) here —
+    // sessions.ts already imports from subjects.ts, creating a circular dep.
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('curriculum_topics_book_sort_order_uq').on(
+      table.bookId,
+      table.sortOrder
+    ),
+  ]
+);
 
 export const topicConnections = pgTable('topic_connections', {
   id: uuid('id')

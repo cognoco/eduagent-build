@@ -216,7 +216,7 @@ Phase 2 (cleanup):
 
 ## Stories
 
-See `docs/epics.md` Epic 12 stories section for full story details (Stories 12.1-12.7).
+See `docs/specs/epics.md` Epic 12 stories section for full story details (Stories 12.1-12.7).
 
 ---
 

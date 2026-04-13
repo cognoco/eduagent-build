@@ -243,6 +243,17 @@ jest.mock('../../../lib/session-recovery', () => ({
   writeSessionRecoveryMarker: jest.fn().mockResolvedValue(undefined),
 }));
 
+const secureStore: Record<string, string> = {};
+jest.mock('../../../lib/secure-storage', () => ({
+  getItemAsync: jest.fn((key: string) =>
+    Promise.resolve(secureStore[key] ?? null)
+  ),
+  setItemAsync: jest.fn((key: string, value: string) => {
+    secureStore[key] = value;
+    return Promise.resolve();
+  }),
+}));
+
 const { readSessionRecoveryMarker: mockReadSessionRecoveryMarker } =
   require('../../../lib/session-recovery') as {
     readSessionRecoveryMarker: jest.Mock;
@@ -298,6 +309,8 @@ describe('SessionScreen homework flow', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers();
+    // Clear SecureStore mock data
+    Object.keys(secureStore).forEach((key) => delete secureStore[key]);
     let aiEventCount = 0;
     (useRouter as jest.Mock).mockReturnValue({
       replace: mockReplace,
@@ -862,5 +875,105 @@ describe('SessionScreen homework flow', () => {
         );
       });
     }, 15000);
+  });
+});
+
+describe('voice mode persistence', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.useFakeTimers();
+    Object.keys(secureStore).forEach((key) => delete secureStore[key]);
+    (useRouter as jest.Mock).mockReturnValue({ replace: mockReplace });
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'homework',
+      subjectId: 'subject-1',
+      subjectName: 'Math',
+      homeworkProblems: JSON.stringify([
+        { id: 'problem-1', text: 'Solve 2x + 5 = 17', source: 'ocr' },
+      ]),
+    });
+    mockStartSession.mockResolvedValue({ session: { id: 'session-1' } });
+    mockHomeworkStatePost.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        metadata: { problemCount: 1, currentProblemIndex: 0, problems: [] },
+      }),
+    });
+    mockStream.mockImplementation(
+      async (
+        _msg: string,
+        _onChunk: unknown,
+        onDone: (r: { exchangeCount: number; escalationRung: number }) => void
+      ) => {
+        onDone({ exchangeCount: 1, escalationRung: 1 });
+      }
+    );
+    mockRecordSystemPrompt.mockResolvedValue({ ok: true });
+    mockCelebrationsPendingGet.mockResolvedValue({
+      ok: true,
+      json: async () => ({ pendingCelebrations: [] }),
+    });
+    mockFilingMutateAsync.mockResolvedValue({
+      shelfId: 'shelf-1',
+      bookId: 'book-1',
+    });
+    mockSetSessionInputMode.mockResolvedValue({
+      session: { id: 'session-1', inputMode: 'voice' },
+    });
+    mockFlagSessionContent.mockResolvedValue({
+      message: 'Content flagged for review. Thank you!',
+    });
+    mockClassifySubject.mockResolvedValue({
+      candidates: [],
+      needsConfirmation: false,
+    });
+    mockDirectStartSession.mockResolvedValue({
+      ok: true,
+      json: async () => ({ session: { id: 'session-1' } }),
+    });
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('defaults to voice when SecureStore has voice preference', async () => {
+    secureStore['voice-input-mode-profile-1'] = 'voice';
+    const { getByTestId } = render(<SessionScreen />);
+    await waitFor(() => {
+      expect(getByTestId('mock-input-mode').props.children).toBe('voice');
+    });
+  });
+
+  it('defaults to text when SecureStore has no preference', async () => {
+    const { getByTestId } = render(<SessionScreen />);
+    await waitFor(() => {
+      expect(getByTestId('mock-input-mode').props.children).toBe('text');
+    });
+  });
+
+  it('persists voice preference when mode changes to voice', async () => {
+    const { getByTestId } = render(<SessionScreen />);
+    await act(async () => {
+      fireEvent.press(getByTestId('mock-set-voice-mode'));
+    });
+    await waitFor(() => {
+      expect(secureStore['voice-input-mode-profile-1']).toBe('voice');
+    });
+  });
+
+  it('persists text preference when mode changes to text', async () => {
+    secureStore['voice-input-mode-profile-1'] = 'voice';
+    const { getByTestId } = render(<SessionScreen />);
+    // Wait for initial voice mode to load
+    await waitFor(() => {
+      expect(getByTestId('mock-input-mode').props.children).toBe('voice');
+    });
+    await act(async () => {
+      fireEvent.press(getByTestId('mock-set-text-mode'));
+    });
+    await waitFor(() => {
+      expect(secureStore['voice-input-mode-profile-1']).toBe('text');
+    });
   });
 });

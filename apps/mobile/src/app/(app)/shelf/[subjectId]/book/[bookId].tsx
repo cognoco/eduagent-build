@@ -26,7 +26,9 @@ import {
 import { useTopicSuggestions } from '../../../../../hooks/use-topic-suggestions';
 import { useBookNotes } from '../../../../../hooks/use-notes';
 import { useSubjects } from '../../../../../hooks/use-subjects';
+import { InlineNoteCard } from '../../../../../components/library/InlineNoteCard';
 import { formatApiError } from '../../../../../lib/format-api-error';
+import { formatRelativeDate } from '../../../../../lib/format-relative-date';
 import { goBackOrReplace } from '../../../../../lib/navigation';
 import { useThemeColors } from '../../../../../lib/theme';
 
@@ -34,24 +36,9 @@ import { useThemeColors } from '../../../../../lib/theme';
 // Helpers
 // ---------------------------------------------------------------------------
 
-function formatRelativeDate(isoDate: string): string {
-  const now = Date.now();
-  const then = new Date(isoDate).getTime();
-  const diffMs = now - then;
-  if (diffMs < 0) return 'just now';
-
-  const seconds = Math.floor(diffMs / 1000);
-  if (seconds < 60) return 'just now';
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d`;
-  const months = Math.floor(days / 30);
-  if (months < 12) return `${months}mo`;
-  const years = Math.floor(months / 12);
-  return `${years}y`;
+function formatMonthYear(isoDate: string): string {
+  const d = new Date(isoDate);
+  return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 }
 
 interface GroupedChapter {
@@ -223,6 +210,15 @@ export default function BookScreen() {
   const notes = notesQuery.data?.notes ?? [];
   const noteTopicIds = useMemo(
     () => new Set(notes.map((n) => n.topicId)),
+    [notes]
+  );
+  const topicTitleMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const t of topics) map.set(t.id, t.title);
+    return map;
+  }, [topics]);
+  const sortedNotes = useMemo(
+    () => [...notes].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
     [notes]
   );
   // --- Sessions data ---
@@ -653,6 +649,38 @@ export default function BookScreen() {
                     testID={`session-${s.id}`}
                   />
                 ))}
+          </View>
+        )}
+
+        {/* Inline notes */}
+        {sortedNotes.length > 0 && (
+          <View className="mb-4" testID="book-notes-section">
+            <Text className="text-body-sm font-semibold text-text-secondary mb-1 px-5 uppercase tracking-wide">
+              My notes
+            </Text>
+            {(() => {
+              let lastMonth = '';
+              return sortedNotes.map((note) => {
+                const month = formatMonthYear(note.updatedAt);
+                const showSeparator = month !== lastMonth;
+                lastMonth = month;
+                return (
+                  <View key={note.topicId}>
+                    {showSeparator && (
+                      <Text className="text-caption text-text-tertiary px-5 mt-2 mb-1">
+                        {month}
+                      </Text>
+                    )}
+                    <InlineNoteCard
+                      topicTitle={topicTitleMap.get(note.topicId) ?? 'Topic'}
+                      content={note.content}
+                      updatedAt={note.updatedAt}
+                      testID={`note-${note.topicId}`}
+                    />
+                  </View>
+                );
+              });
+            })()}
           </View>
         )}
 

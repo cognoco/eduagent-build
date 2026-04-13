@@ -70,6 +70,7 @@ import {
   readSessionRecoveryMarker,
   writeSessionRecoveryMarker,
 } from '../../../lib/session-recovery';
+import * as SecureStore from '../../../lib/secure-storage';
 import {
   buildHomeworkSessionMetadata,
   parseHomeworkProblems,
@@ -92,6 +93,9 @@ function computePaceMultiplier(
       : ratios[middle]!;
   return Math.min(3, Math.max(0.5, Number(median.toFixed(2))));
 }
+
+/** SecureStore key for persisting voice/text input mode preference per profile. */
+const getInputModeKey = (profileId: string) => `voice-input-mode-${profileId}`;
 
 function serializeMilestones(milestones: string[]): string {
   return encodeURIComponent(JSON.stringify(milestones));
@@ -403,6 +407,24 @@ export default function SessionScreen() {
   const [pendingSubjectResolution, setPendingSubjectResolution] =
     useState<PendingSubjectResolution | null>(null);
   const [inputMode, setInputMode] = useState<'text' | 'voice'>('text');
+
+  // Restore the user's last-used input mode from SecureStore on mount.
+  useEffect(() => {
+    if (!activeProfile?.id) return;
+    let cancelled = false;
+    void SecureStore.getItemAsync(getInputModeKey(activeProfile.id)).then(
+      (stored) => {
+        if (cancelled) return;
+        if (stored === 'voice' || stored === 'text') {
+          setInputMode(stored);
+        }
+      }
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [activeProfile?.id]);
+
   const [homeworkProblemsState, setHomeworkProblemsState] = useState<
     HomeworkProblem[]
   >(initialHomeworkProblems);
@@ -920,6 +942,15 @@ export default function SessionScreen() {
     (nextInputMode: 'text' | 'voice') => {
       const previousInputMode = inputMode;
       setInputMode(nextInputMode);
+
+      // Persist preference so next session restores it.
+      if (activeProfile?.id) {
+        void SecureStore.setItemAsync(
+          getInputModeKey(activeProfile.id),
+          nextInputMode
+        );
+      }
+
       if (!activeSessionId) {
         return;
       }
@@ -930,7 +961,13 @@ export default function SessionScreen() {
           showConfirmation("Couldn't save that mode just now.");
         });
     },
-    [activeSessionId, inputMode, setSessionInputMode, showConfirmation]
+    [
+      activeProfile?.id,
+      activeSessionId,
+      inputMode,
+      setSessionInputMode,
+      showConfirmation,
+    ]
   );
 
   const openSubjectResolution = useCallback(
@@ -2707,7 +2744,7 @@ export default function SessionScreen() {
             {userMessageCount === 0 && (
               <SessionInputModeToggle
                 mode={inputMode}
-                onModeChange={setInputMode}
+                onModeChange={handleInputModeChange}
               />
             )}
             {modeConfig.showQuestionCount && (

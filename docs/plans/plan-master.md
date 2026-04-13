@@ -99,7 +99,7 @@ This is the only remaining Epic 12 story:
 
 ## Adaptive Home Screen
 
-*Verified against code 2026-04-04. Implemented on `diverse` branch per design spec `docs/superpowers/specs/2026-04-04-adaptive-home-screen-design.md`.*
+*Verified against code 2026-04-04. Implemented on `diverse` branch per design spec `docs/specs/2026-04-04-adaptive-home-screen-design.md`.*
 
 | Component | Status | Evidence |
 |-----------|--------|----------|
@@ -153,11 +153,11 @@ Only Story 12.3 (theme decoupling) has hotspot files:
 
 | Epic/Feature | Spec file |
 |------|-----------|
-| 7 (library v3) | `docs/superpowers/specs/2026-04-04-epic-7-library-design.md` |
-| 7.8-7.9 (library UX) | `docs/superpowers/specs/2026-04-06-library-ux-refactor-design.md` |
+| 7 (library v3) | `docs/specs/2026-04-04-epic-7-library-design.md` |
+| 7.8-7.9 (library UX) | `docs/specs/2026-04-06-library-ux-refactor-design.md` |
 | 12 (persona removal) | `docs/plans/epic-12-persona-to-roles.md` |
-| 15 (visible progress) | `docs/superpowers/specs/2026-04-07-epic-15-visible-progress-design.md` |
-| Conversation-first | `docs/superpowers/specs/2026-04-08-conversation-first-learning-flow-design.md` |
-| Home screen | `docs/superpowers/specs/2026-04-04-adaptive-home-screen-design.md` |
+| 15 (visible progress) | `docs/specs/2026-04-07-epic-15-visible-progress-design.md` |
+| Conversation-first | `docs/specs/2026-04-08-conversation-first-learning-flow-design.md` |
+| Home screen | `docs/specs/2026-04-04-adaptive-home-screen-design.md` |
 
-**`docs/epics.md` is the master document.** Spec files add detail but are not authoritative when they conflict with `epics.md`.
+**`docs/specs/epics.md` is the master document.** Spec files add detail but are not authoritative when they conflict with `epics.md`.

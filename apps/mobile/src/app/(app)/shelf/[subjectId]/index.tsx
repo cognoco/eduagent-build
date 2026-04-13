@@ -133,20 +133,33 @@ export default function ShelfScreen() {
     void subjectsQuery.refetch();
   };
 
+  // Status is now server-computed and returned in the book object itself.
+  // Fall back to topicsGenerated heuristic only if status is absent (old cache).
   const getBookStatus = (bookId: string): BookProgressStatus => {
     const book = books.find((b) => b.id === bookId);
     if (!book) return 'NOT_STARTED';
+    if (book.status) return book.status;
     if (!book.topicsGenerated) return 'NOT_STARTED';
     return 'IN_PROGRESS';
   };
 
   const suggestedBookId = (() => {
+    const reviewDue = books.find((b) => getBookStatus(b.id) === 'REVIEW_DUE');
+    if (reviewDue) return reviewDue.id;
     const inProgress = books.find((b) => getBookStatus(b.id) === 'IN_PROGRESS');
     if (inProgress) return inProgress.id;
     const notStarted = books.find((b) => getBookStatus(b.id) === 'NOT_STARTED');
     if (notStarted) return notStarted.id;
     return null;
   })();
+
+  // Aggregate progress from all books on this shelf
+  const totalTopics = books.reduce((sum, b) => sum + (b.topicCount ?? 0), 0);
+  const completedTopics = books.reduce(
+    (sum, b) => sum + (b.completedTopicCount ?? 0),
+    0
+  );
+  const showProgress = totalTopics > 0;
 
   if (isLoading) {
     return (
@@ -235,6 +248,27 @@ export default function ShelfScreen() {
           <Text className="text-body-sm text-text-secondary mt-1">
             {books.length} {books.length === 1 ? 'book' : 'books'}
           </Text>
+          {showProgress && (
+            <View className="mt-2">
+              <Text
+                className="text-caption text-text-secondary mb-1"
+                testID="shelf-progress-label"
+              >
+                {completedTopics}/{totalTopics} topics
+              </Text>
+              <View className="h-1.5 bg-surface-elevated rounded-full overflow-hidden">
+                <View
+                  className="h-full bg-primary rounded-full"
+                  style={{
+                    width: `${Math.round(
+                      (completedTopics / totalTopics) * 100
+                    )}%`,
+                  }}
+                  testID="shelf-progress-bar"
+                />
+              </View>
+            </View>
+          )}
         </View>
 
         <Pressable

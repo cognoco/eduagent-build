@@ -129,7 +129,7 @@ export const dashboardChildProgressSchema = z.object({
   weeklyDeltaTopicsMastered: z.number().int().nullable(),
   weeklyDeltaVocabularyTotal: z.number().int().nullable(),
   weeklyDeltaTopicsExplored: z.number().int().nullable(),
-  engagementTrend: z.enum(['growing', 'steady', 'quiet']),
+  engagementTrend: z.enum(['increasing', 'stable', 'declining']),
   guidance: z.string().nullable(),
 });
 export type DashboardChildProgress = z.infer<
