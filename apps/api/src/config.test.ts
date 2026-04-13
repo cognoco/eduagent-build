@@ -36,7 +36,6 @@ describe('validateProductionKeys', () => {
     expect(missing).toContain('GEMINI_API_KEY');
     expect(missing).toContain('VOYAGE_API_KEY');
     expect(missing).toContain('RESEND_API_KEY');
-    expect(missing).toContain('REVENUECAT_WEBHOOK_SECRET');
     // API_ORIGIN is provided by BASE_ENV (non-optional in schema)
     expect(missing).not.toContain('API_ORIGIN');
     // Stripe secrets are optional — dormant until web client added
@@ -44,7 +43,9 @@ describe('validateProductionKeys', () => {
     expect(missing).not.toContain('STRIPE_WEBHOOK_SECRET');
     // OPENAI_API_KEY is optional — alternative to GEMINI_API_KEY
     expect(missing).not.toContain('OPENAI_API_KEY');
-    expect(missing).toHaveLength(7);
+    // RevenueCat webhook secret is route-scoped, not a global production blocker
+    expect(missing).not.toContain('REVENUECAT_WEBHOOK_SECRET');
+    expect(missing).toHaveLength(6);
   });
 
   it('returns empty array for production with all required secrets present', () => {
@@ -57,7 +58,6 @@ describe('validateProductionKeys', () => {
       GEMINI_API_KEY: 'gemini-key',
       VOYAGE_API_KEY: 'voyage-key',
       RESEND_API_KEY: 're_xxx',
-      REVENUECAT_WEBHOOK_SECRET: 'rc_webhook_secret',
       API_ORIGIN: 'https://api.mentomate.com',
       // Stripe secrets omitted — optional (dormant until web client)
     });
@@ -74,7 +74,6 @@ describe('validateProductionKeys', () => {
       GEMINI_API_KEY: 'gemini-key',
       VOYAGE_API_KEY: 'voyage-key',
       RESEND_API_KEY: 're_xxx',
-      REVENUECAT_WEBHOOK_SECRET: 'rc_webhook_secret',
     });
 
     expect(missing).toContain('CLERK_AUDIENCE');
@@ -87,17 +86,13 @@ describe('validateProductionKeys', () => {
       CLERK_SECRET_KEY: 'sk_live_xxx',
       CLERK_JWKS_URL: 'https://clerk.example.com/.well-known/jwks.json',
       CLERK_AUDIENCE: 'eduagent-api',
-      // Missing: VOYAGE_API_KEY, RESEND_API_KEY, REVENUECAT_WEBHOOK_SECRET
+      // Missing: VOYAGE_API_KEY, RESEND_API_KEY
       // API_ORIGIN is provided by BASE_ENV (non-optional in schema)
       GEMINI_API_KEY: 'gemini-key',
       // Stripe keys are optional — not in production required list
     });
 
-    expect(missing).toEqual([
-      'VOYAGE_API_KEY',
-      'RESEND_API_KEY',
-      'REVENUECAT_WEBHOOK_SECRET',
-    ]);
+    expect(missing).toEqual(['VOYAGE_API_KEY', 'RESEND_API_KEY']);
   });
 });
 
@@ -110,7 +105,6 @@ describe('validateEnv', () => {
     const env = validateEnv({
       ENVIRONMENT: 'development',
       DATABASE_URL: 'postgresql://localhost/test',
-      API_ORIGIN: 'https://api.dev.mentomate.com',
     });
 
     expect(env.ENVIRONMENT).toBe('development');
@@ -121,9 +115,18 @@ describe('validateEnv', () => {
     expect(() =>
       validateEnv({
         ENVIRONMENT: 'development',
-        API_ORIGIN: 'https://api.dev.mentomate.com',
       })
     ).toThrow('Invalid environment');
+  });
+
+  it('parses valid staging env without API_ORIGIN', () => {
+    const env = validateEnv({
+      ENVIRONMENT: 'staging',
+      DATABASE_URL: 'postgresql://staging/db',
+    });
+
+    expect(env.ENVIRONMENT).toBe('staging');
+    expect(env.API_ORIGIN).toBeUndefined();
   });
 
   it('throws when production env is missing required keys', () => {
@@ -147,7 +150,6 @@ describe('validateEnv', () => {
       OPENAI_API_KEY: 'openai-key',
       VOYAGE_API_KEY: 'voyage-key',
       RESEND_API_KEY: 're_xxx',
-      REVENUECAT_WEBHOOK_SECRET: 'rc_webhook_secret',
       API_ORIGIN: 'https://api.mentomate.com',
       // Stripe secrets omitted — optional (dormant until web client)
     });
