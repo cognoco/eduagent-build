@@ -218,7 +218,10 @@ export default function BookScreen() {
     return map;
   }, [topics]);
   const sortedNotes = useMemo(
-    () => [...notes].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
+    () =>
+      [...notes].sort((a, b) =>
+        (b.updatedAt ?? '').localeCompare(a.updatedAt ?? '')
+      ),
     [notes]
   );
   // --- Sessions data ---
