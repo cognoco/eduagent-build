@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useChildSessionTranscript } from '../../../../../hooks/use-dashboard';
 import { Button } from '../../../../../components/common/Button';
+import { goBackOrReplace } from '../../../../../lib/navigation';
 
 function MessageSkeleton(): React.ReactNode {
   return (
@@ -62,7 +63,7 @@ export default function SessionTranscriptScreen() {
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
       <View className="px-5 pt-4 pb-2 flex-row items-center">
         <Pressable
-          onPress={() => router.back()}
+          onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
           className="me-3 py-2 pe-2"
           accessibilityLabel="Go back"
           accessibilityRole="button"
@@ -135,7 +136,7 @@ export default function SessionTranscriptScreen() {
               from the home screen.
             </Text>
             <Pressable
-              onPress={() => router.back()}
+              onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
               className="bg-primary rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
               accessibilityRole="button"
               accessibilityLabel="Go back"
@@ -217,7 +218,7 @@ export default function SessionTranscriptScreen() {
               No transcript is available for this session.
             </Text>
             <Pressable
-              onPress={() => router.back()}
+              onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
               className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center"
               accessibilityRole="button"
               accessibilityLabel="Go back"

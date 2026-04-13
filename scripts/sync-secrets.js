@@ -51,7 +51,7 @@ const ENV_MAP = {
 // Keys that exist in Doppler but are NOT consumed by Cloudflare Workers.
 // These are CI/CD tokens, Doppler metadata, or mobile-only config.
 const EXCLUDE_PREFIXES = ['DOPPLER_', 'EXPO_', 'CLOUDFLARE_', 'SENTRY_AUTH_'];
-const EXCLUDE_EXACT = ['EXPO_TOKEN'];
+const EXCLUDE_EXACT = ['EXPO_TOKEN', 'API_ORIGIN'];
 
 const DOPPLER_CLI =
   process.platform === 'win32' ? 'C:\\Tools\\doppler\\doppler.exe' : 'doppler';

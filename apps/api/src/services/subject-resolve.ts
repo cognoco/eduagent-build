@@ -112,16 +112,15 @@ export async function resolveSubjectName(
     // Fall through to fallback
   }
 
-  // Fallback: if LLM response is unparseable, treat as direct match
-  const fallbackLanguage = detectLanguageHint(rawInput);
+  // BUG-31: Fallback to no_match instead of direct_match — the user should
+  // see the "couldn't match" UI with explicit options rather than silently
+  // creating a freeform subject from raw input.
   return {
-    status: 'direct_match',
-    resolvedName: rawInput,
-    suggestions: [{ name: rawInput, description: '' }],
-    displayMessage: '',
-    isLanguageLearning: fallbackLanguage != null,
-    detectedLanguageCode: fallbackLanguage?.code ?? null,
-    detectedLanguageName: fallbackLanguage?.names[0] ?? null,
+    status: 'no_match',
+    resolvedName: null,
+    suggestions: [],
+    displayMessage:
+      "I couldn't understand that as a subject. Try a name like 'Physics' or describe what you'd like to learn.",
   };
 }
 
@@ -139,7 +138,9 @@ function parseStatus(value: unknown): SubjectResolveResult['status'] {
   ) {
     return value as SubjectResolveResult['status'];
   }
-  return 'direct_match';
+  // BUG-31: Unrecognized status → no_match, not direct_match. This prevents
+  // silently creating a subject when the LLM returns an unexpected value.
+  return 'no_match';
 }
 
 function parseSuggestions(

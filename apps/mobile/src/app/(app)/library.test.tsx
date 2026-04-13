@@ -67,7 +67,11 @@ jest.mock('../../lib/api-client', () => ({
 }));
 
 jest.mock('../../lib/profile', () => ({
-  useProfile: () => ({ activeProfile: { id: 'profile-1' } }),
+  useProfile: () => ({
+    activeProfile: { id: 'profile-1', isOwner: true },
+    profiles: [{ id: 'profile-1', isOwner: true }],
+  }),
+  isGuardianProfile: () => false,
 }));
 
 const { useQueries: mockUseQueries } = require('@tanstack/react-query') as {

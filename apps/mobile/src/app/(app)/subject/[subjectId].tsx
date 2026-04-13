@@ -1,5 +1,6 @@
 import { View, Text, Pressable, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { goBackOrReplace } from '../../../lib/navigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AnalogyDomainPicker } from '../../../components/common';
 import {
@@ -38,7 +39,7 @@ export default function SubjectSettingsScreen() {
       {/* Header */}
       <View className="px-5 pt-4 pb-3 flex-row items-center">
         <Pressable
-          onPress={() => router.back()}
+          onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
           className="me-3 p-2 min-h-[44px] min-w-[44px] items-center justify-center"
           testID="subject-settings-back"
           accessibilityLabel="Go back"

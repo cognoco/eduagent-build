@@ -1,28 +1,29 @@
 # Master Implementation Plan — Remaining Epics
 
 **Author:** Zuzka + Claude
-**Date:** 2026-03-30 (original), 2026-04-04 (rewritten from code verification)
+**Date:** 2026-03-30 (original), 2026-04-04 (rewritten from code verification), 2026-04-13 (status update)
 **Context:** App has zero users. All work delivered by LLM agents. Order optimized for least friction, minimal code duplication, and safe incremental delivery.
 
 ---
 
 ## Status Summary
 
-*Verified against codebase: 2026-04-04. Every status below was confirmed by reading source files, not from prior documentation.*
+*Last verified against codebase: 2026-04-13.*
 
 | Epic / Phase | Status | Details |
 |------|--------|-------|
 | 0-5 | **COMPLETE** | Foundation, onboarding, learning, retention, progress, billing |
-| 6 | **COMPLETE** | Language learning — Four Strands, vocabulary CRUD, CEFR milestones, SM-2 spaced repetition. Full stack: schema, routes, services, mobile UI, tests. On `diverse` branch (PR #109). |
-| 7 | **COMPLETE** (core) | Self-building library — curriculum books, generation, library UI (merged main via PR #108). Stories 7.5 (visual map) and 7.6 (knowledge tracking) deferred to v1.1. |
-| 8 | **COMPLETE** | Full voice mode — Stories 8.1-8.5 shipped and merged to main (PRs #104, #105). Story 8.6 (VAD) remains optional stretch. |
+| 6 | **COMPLETE** | Language learning — Four Strands, vocabulary CRUD, CEFR milestones, SM-2 spaced repetition. Merged to main. |
+| 7 | **COMPLETE** (core) | Self-building library — curriculum books, generation, library UI, shelf/book screens, search/sort/filter. Stories 7.5 (visual map) and 7.6 (knowledge tracking) deferred to v1.1. |
+| 8 | **COMPLETE** | Full voice mode — Stories 8.1-8.5 shipped. Story 8.6 (VAD) remains optional stretch. |
 | 9 | **COMPLETE** | Native IAP (RevenueCat) |
-| 10 | **COMPLETE** | Pre-launch UX polish — all Story 10.1-10.23 slices shipped. 10.10 consent animation now implemented (300ms fade transitions). |
+| 10 | **COMPLETE** | Pre-launch UX polish — all Story 10.1-10.23 slices shipped. |
 | 11 | **COMPLETE** | Brand identity — navy dark bg, teal/lavender tokens, light mode. |
-| 12 | **PARTIAL** | Remove persona enum — 12.1, 12.5, 12.7 complete; 12.6 ~40%; 12.2, 12.3, 12.4 not started. |
+| 12 | **NEAR COMPLETE** | Remove persona enum — 12.1, 12.2, 12.4, 12.5, 12.6, 12.7 done. Only 12.3 (theme decoupling) remains. |
 | 13 | **COMPLETE** | Session lifecycle — all 7 stories. Wall-clock, crash recovery, celebrations, adaptive silence. |
 | 14 | **COMPLETE** | Human agency — ALL stories (A+B+C). |
-| — | **COMPLETE** | Adaptive home screen — intent router, ParentGateway, LearnerScreen, /learn, /learn-new routes. On `diverse` branch (PR #109). |
+| 15 | **COMPLETE** | Visible progress — progress snapshots, milestones, journey screen, parent dashboard. Merged via PR #117. |
+| — | **COMPLETE** | Adaptive home screen — intent router, ParentGateway, LearnerScreen, /learn, /learn-new routes. |
 
 ### Completed Phases (historical record)
 
@@ -41,25 +42,27 @@
 
 ## Epic 12 — Detailed Story Status
 
-*Each row verified by reading source files on 2026-04-04.*
+*Verified against codebase: 2026-04-13.*
 
 | Story | Status | Evidence |
 |-------|--------|----------|
-| **12.1** (age voice) | ✅ DONE | `exchanges.ts` uses `getAgeVoice(ageBracket)` via `resolveAgeBracket(context.birthYear)`. Zero `personaType` refs in exchanges. `create-profile.tsx` still submits `personaType` (legacy, persona picker UI commented out). |
-| **12.7** (home cards) | ✅ DONE | `precomputeHomeCards()` in `home-cards.ts`, `HomeActionCard` component, `GET /v1/home-cards` + `POST /v1/home-cards/interactions` routes, ranking heuristics, SecureStore dismissal tracking. Fully persona-agnostic. |
-| **12.5** (routing cleanup) | ✅ DONE | `(learner)/_layout.tsx:683-684` redirects based on `isOwner` + linked children, NOT `personaType`. `(parent)/_layout.tsx:121-124` uses `hasLinkedChildren` with `isOwner` check. `home.tsx` routes to `ParentGateway` or `LearnerScreen` via family structure. Zero persona-based redirects remain. |
-| **12.6** (big migration) | ⏳ ~40% | **Done:** Consent service uses `checkConsentRequired(birthYear)` ✅. Consent middleware uses `meta.birthYear` ✅. Sentry age-gating uses `birthYear` ✅. Inngest payloads use `profileId` not persona ✅. RevenueCat syncs `userId` only ✅. DB schema has `birthYear` integer column ✅. Routing uses `isOwner` not persona ✅. **Not done:** Factory (`buildProfile()` still has `personaType: 'LEARNER'`). Test-seed (5 `personaType` refs). Schemas (`personaTypeSchema` still exported, `personaType` in create/response schemas). `create-profile.tsx` still submits `personaType`. Consent-web deep links still use `mentomate://parent/dashboard`. |
-| **12.3** (theme decoupling) | ❌ NOT STARTED | `_layout.tsx:118` derives persona from `activeProfile.personaType.toLowerCase()`. `design-tokens.ts` organizes tokens by `Record<Persona, Record<ColorScheme, ThemeTokens>>`. Theme values still sourced from DB `personaType` column. |
-| **12.2** (route merge) | ❌ NOT STARTED | Routes still in separate `(learner)/` and `(parent)/` groups. No `(app)/` group exists. |
-| **12.4** (DB migration) | ❌ NOT STARTED | Schema still has `personaType` enum + column. `birthYear` integer column now exists (added during 12.6 compat work), but `personaType` and `birthDate` have not been removed. |
+| **12.1** (age voice) | ✅ DONE | `exchanges.ts` uses `getAgeVoice(ageBracket)` via `resolveAgeBracket(context.birthYear)`. Zero `personaType` refs in exchanges. |
+| **12.2** (route merge) | ✅ DONE | `(learner)` and `(parent)` route groups removed. Unified `(app)` group in place. |
+| **12.4** (DB migration) | ✅ DONE | `personaType` enum/column and `birthDate` removed from `packages/database/src/schema/profiles.ts`. Uses `birthYear` only. |
+| **12.5** (routing cleanup) | ✅ DONE | Routing uses `isOwner` + `hasLinkedChildren`, not personaType. |
+| **12.6** (big migration) | ✅ DONE | Factory, schemas, DB, consent, routing all migrated. `personaType` removed from `@eduagent/schemas`. Only residual: `birthDate` as local UI variable in `create-profile.tsx` (date picker intermediate). |
+| **12.7** (home cards) | ✅ DONE | `precomputeHomeCards()`, `HomeActionCard`, ranking heuristics, SecureStore dismissal. Persona-agnostic. |
+| **12.3** (theme decoupling) | ❌ NOT DONE | `_layout.tsx` still derives persona from `birthYear` via `personaFromBirthYear()`. `design-tokens.ts` still ships 3 persona token matrices. `AccentPicker` component still exists (commented out import). |
 
-### 12.6 Remaining Work (ordered)
+### 12.3 Remaining Work
 
-1. **Factory + test-seed** (FR206.8) — DO FIRST. `buildProfile()` in `packages/factory/src/profiles.ts` still defaults `personaType: 'LEARNER'`. `test-seed.ts` has 5 `personaType` refs (hardcoded `'PARENT'` in parent scenarios). Broken factory = broken tests.
-2. **Schemas** — Remove `personaTypeSchema`, `PersonaType` type, and `personaType` field from profile schemas in `packages/schemas/src/profiles.ts`.
-3. **create-profile.tsx** — Stop submitting `personaType` in profile creation request (persona picker UI already commented out).
-4. **Consent-web deep links** (FR206.6) — Update `mentomate://parent/dashboard` → post-merge route in server-rendered HTML.
-5. **Full grep audit** — Zero `personaType` and zero `birthDate` hits in source code.
+This is the only remaining Epic 12 story:
+
+1. **`_layout.tsx`** — Stop deriving persona from `personaFromBirthYear()`. Use fixed teal+lavender scheme.
+2. **`design-tokens.ts`** — Remove persona-keyed token structure. Single token set per color scheme.
+3. **`theme.ts`** — Remove `persona` from `ThemeContextValue`. Simplify hooks.
+4. **`AccentPicker`** — Delete component file and commented-out import.
+5. **Grep audit** — Zero `persona` hits in theme/design-token code.
 
 ---
 
@@ -112,86 +115,49 @@
 
 ## What Remains — Prioritized
 
-### Immediate (merge existing work)
-
-| # | Action | Effort | Blocked by |
-|---|--------|--------|------------|
-| 1 | **Merge PR #109** (`diverse` → main) — language learning, adaptive home screen, code review fixes | Review + merge | Nothing |
-
 ### Short-term (launch readiness)
 
 | # | Action | Effort | Blocked by |
 |---|--------|--------|------------|
-| 2 | **Pre-launch config** — Clerk staging key swap, Resend API key, RevenueCat store connections | Config, not code | Store account access |
-| 3 | **Store blockers** — Apple enrollment (~pending since 2026-03-13), Google Play appeal | Administrative | External |
+| 1 | **Pre-launch config** — Clerk staging key swap, Resend API key, RevenueCat store connections | Config, not code | Store account access |
+| 2 | **Store blockers** — Apple enrollment (~pending since 2026-03-13), Google Play appeal | Administrative | External |
 
-### Medium-term (v1.1 features)
+### Post-launch cleanup
 
 | # | Action | Effort | Blocked by |
 |---|--------|--------|------------|
-| 4 | **Epic 12 remainder** — 12.6 factory/test-seed/schemas/create-profile, 12.3 theme, 12.2 route merge, 12.4 DB migration | Large (~30 files) | 12.6 factory first |
+| 3 | **Story 12.3** — Theme decoupling (remove persona token matrices, simplify _layout theme derivation) | Medium (~5 files) | Nothing |
+| 4 | **Code review fixes** — Phases 2-4 of `Plan-code-review-fixes` (~125 items: N+1 queries, Inngest crons, UX dead-ends, test gaps) | Large | Phase 1 done |
+
+### Deferred (v1.1)
+
+| # | Action | Effort | Blocked by |
+|---|--------|--------|------------|
 | 5 | **Epic 7 deferred** — 7.5 visual topic map, 7.6 knowledge tracking | Medium | Nothing |
+| 6 | **Epic 6** — Language learning mobile UI (backend complete, no mobile screens) | Medium | Nothing |
 
 ---
 
-## Key Constraints (active)
+## Hotspot Files (remaining work)
 
-1. **Story 12.6 FR206.8 (factory) before any other 12.x test updates** — broken factory breaks tests.
-2. **No parallel agents on the same hotspot file** — sequential execution for session screen, Inngest chain, and home screen work.
+Only Story 12.3 (theme decoupling) has hotspot files:
 
-### Resolved Constraints
-
-- ~~Story 13.2 before Story 12.1~~ — Both done.
-- ~~Story 12.7 before 14.1~~ — Both done and wired together.
-- ~~Story 13.7 before Epic 7 Story 7.5~~ — 13.7 done. Epic 7 unblocked.
-- ~~Epic 8 before Epic 6~~ — Epic 8 merged (PRs #104, #105). Epic 6 complete.
-- ~~Epic 8 must merge before Epic 6~~ — Both complete.
-
----
-
-## Hotspot Files
-
-These files are touched by remaining work. Agents must read current state before modifying.
-
-| File | Remaining touches |
-|------|-------------------|
-| `packages/database/src/schema/profiles.ts` | 12.4 (drop `personaType` enum + column, drop `birthDate`) |
-| `packages/schemas/src/profiles.ts` | 12.6 (remove `personaTypeSchema`, `personaType` from create/response schemas) |
-| `packages/factory/src/profiles.ts` | 12.6 FR206.8 (remove `personaType: 'LEARNER'` default) |
-| `apps/api/src/services/test-seed.ts` | 12.6 FR206.8 (5 remaining `personaType` refs) |
-| `apps/mobile/src/app/_layout.tsx` | 12.3 (stop deriving persona from `activeProfile.personaType` at line 118) |
-| `apps/mobile/src/lib/design-tokens.ts` | 12.3 (remove persona-keyed token structure) |
-| `apps/mobile/src/app/(learner)/_layout.tsx` | 12.2 (route merge into unified group) |
-| `apps/mobile/src/app/(parent)/_layout.tsx` | 12.2 (route merge into unified group) |
-| `apps/mobile/src/app/create-profile.tsx` | 12.6 (stop submitting personaType) |
-| `apps/api/src/routes/consent-web.ts` | 12.6 (update `mentomate://parent/dashboard` deep link) |
-
-### Phase Details (reference)
-
-**Phase 8 — Architecture Refactor (Epic 12 remainder):**
-
-```
-12.6 (factory/test-seed/schemas) ──┐
-                                    ├─→ 12.3 (theme decoupling) ──┐
-                                    │                               ├─→ 12.2 (route merge) ──→ 12.4 (DB migration)
-                                    └───────────────────────────────┘
-```
-
-Story 12.6 is the heaviest remaining item — covers factory, test-seed, schemas, create-profile, and deep links. Must complete before 12.3/12.2/12.4.
-
-**Deferred Features:** Epic 7 Stories 7.5 (visual map) + 7.6 (knowledge tracking).
+| File | Change |
+|------|--------|
+| `apps/mobile/src/app/_layout.tsx` | Stop deriving persona from `personaFromBirthYear()`. Use fixed scheme. |
+| `apps/mobile/src/lib/design-tokens.ts` | Remove persona-keyed token structure. Single token set. |
+| `apps/mobile/src/lib/theme.ts` | Remove `persona` from `ThemeContextValue`. |
+| `apps/mobile/src/components/common/AccentPicker.tsx` | Delete. |
 
 ## Spec Documents
 
-| Epic | Plan file | Master stories |
-|------|-----------|---------------|
-| 6 | (no separate plan — impl on `diverse` branch) | `docs/epics.md` Epic 6 stories |
-| 7 | `docs/plans/epic-7-revised-guide-dont-gate.md`, `docs/superpowers/specs/2026-04-04-epic-7-library-design.md` | `docs/epics.md` Epic 7 stories |
-| 8 | (no separate plan — spec in `docs/epics.md`) | `docs/epics.md` Epic 8 stories |
-| 11 | (no separate plan — spec in `docs/epics.md`) | `docs/epics.md` Epic 11 section |
-| 12 | `docs/plans/epic-12-persona-to-roles.md` | `docs/epics.md` Epic 12 stories |
-| 13 | `docs/plans/epic-13-session-lifecycle-overhaul.md` | `docs/epics.md` Epic 13 stories |
-| 14 | `docs/plans/epic-14-human-agency-feedback.md` | `docs/epics.md` Epic 14 stories |
-| Home | `docs/superpowers/specs/2026-04-04-adaptive-home-screen-design.md` | N/A (standalone feature) |
+| Epic/Feature | Spec file |
+|------|-----------|
+| 7 (library v3) | `docs/superpowers/specs/2026-04-04-epic-7-library-design.md` |
+| 7.8-7.9 (library UX) | `docs/superpowers/specs/2026-04-06-library-ux-refactor-design.md` |
+| 12 (persona removal) | `docs/plans/epic-12-persona-to-roles.md` |
+| 15 (visible progress) | `docs/superpowers/specs/2026-04-07-epic-15-visible-progress-design.md` |
+| Conversation-first | `docs/superpowers/specs/2026-04-08-conversation-first-learning-flow-design.md` |
+| Home screen | `docs/superpowers/specs/2026-04-04-adaptive-home-screen-design.md` |
 
-**`docs/epics.md` is the master document.** Plan files add detail but are not authoritative when they conflict with `epics.md`.
+**`docs/epics.md` is the master document.** Spec files add detail but are not authoritative when they conflict with `epics.md`.

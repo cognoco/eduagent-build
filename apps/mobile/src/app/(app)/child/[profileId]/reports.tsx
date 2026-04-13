@@ -2,6 +2,7 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useChildReports } from '../../../../hooks/use-progress';
+import { goBackOrReplace } from '../../../../lib/navigation';
 
 export default function ChildReportsScreen(): React.ReactElement {
   const router = useRouter();
@@ -28,7 +29,7 @@ export default function ChildReportsScreen(): React.ReactElement {
       >
         <View className="flex-row items-center mt-4">
           <Pressable
-            onPress={() => router.back()}
+            onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
             className="me-3 py-2 pe-2"
             accessibilityRole="button"
             accessibilityLabel="Go back"
@@ -82,7 +83,7 @@ export default function ChildReportsScreen(): React.ReactElement {
                 </Text>
               </Pressable>
               <Pressable
-                onPress={() => router.back()}
+                onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
                 className="bg-background rounded-button px-4 py-3 items-center flex-1 min-h-[48px] justify-center"
                 accessibilityRole="button"
                 accessibilityLabel="Go back"

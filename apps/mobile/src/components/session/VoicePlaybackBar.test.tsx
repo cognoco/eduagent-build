@@ -199,13 +199,7 @@ describe('VoicePlaybackBar', () => {
     expect(replay.props.accessibilityState?.disabled).toBe(false);
   });
 
-  it('shows the screen-reader playback note when auto-play is paused', () => {
-    render(<VoicePlaybackBar {...defaultProps} screenReaderEnabled={true} />);
-
-    expect(
-      screen.getByText(
-        'Auto-play is paused while your screen reader is active.'
-      )
-    ).toBeTruthy();
-  });
+  // BUG-348: screenReaderEnabled prop and banner removed — the entire
+  // VoicePlaybackBar is hidden at the ChatShell level when a screen reader
+  // is active, so the component never renders with screenReaderEnabled.
 });

@@ -1,12 +1,23 @@
-# Code Review Discovery — Epics 1-5
+# Code Review Discovery — Epics 1-13 + UX Dead-End Audit
 
 **Date:** 2026-04-05
-**Reviewer:** 5 parallel code-reviewer agents against FR requirements, ARCH rules, and UX specs
-**Scope:** Full implementation audit of Epics 1-5 (FR13-FR117)
+**Reviewer:** 5+ parallel code-reviewer agents against FR requirements, ARCH rules, and UX specs
+**Scope:** Full implementation audit of Epics 1-13 (FR13-FR229) + UX dead-end audit
 
 ---
 
-## Summary by Epic
+## Staleness Warning (2026-04-13)
+
+This document is a **findings snapshot**, not a live tracker. Many findings have been fixed since the audit:
+
+- **Phase 1 of `Plan-code-review-fixes` is 100% complete** (18 items): Epic 12 persona cascade (DB migration, schema, factory), security fixes (persistCurriculum ownership, profile-cap enforcement, OCR scoping, webhook HMAC), billing/metering correctness (quota check, state machine, top-up credits). These are NOT annotated inline below — cross-reference `Plan-code-review-fixes` for status.
+- **Epic 12 CRITICAL findings (12.DB, 12.schemas, 12.factory, 12.route-merge)** are resolved. `personaType` enum/column removed from DB. `personaTypeSchema` removed from schemas package. Route groups merged to `(app)`. Only **Story 12.3 (theme decoupling)** remains open.
+- **Many UX dead-end findings** have been fixed in commits on `main` (see `git log --grep="UX"` or `git log --grep="dead-end"`). Specific fixes: UX-01 (reconnect), UX-02 (session close), UX-05/06/07 (auth setActive recovery), UX-08 (child deleted), UX-15 (topic not found), UX-19 (offerings fallback), and others.
+- **For current fix status**, use `Plan-code-review-fixes` as the authoritative tracker, not this file.
+
+---
+
+## Epics 1-5 Summary (original audit — see staleness warning above)
 
 | Epic | Health | Highs | Meds | Lows | Key Concern |
 |------|--------|-------|------|------|-------------|

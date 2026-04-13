@@ -777,11 +777,13 @@ describe('SessionScreen homework flow', () => {
       fireEvent.press(endButton);
 
       // Alert.alert was called with "Ready to wrap up?" — invoke the "I'm Done" callback
+      // BUG-352 added a 4th options arg { cancelable, onDismiss }
       await waitFor(() => {
         expect(alertSpy).toHaveBeenCalledWith(
           'Ready to wrap up?',
           expect.any(String),
-          expect.any(Array)
+          expect.any(Array),
+          expect.objectContaining({ cancelable: true })
         );
       });
 

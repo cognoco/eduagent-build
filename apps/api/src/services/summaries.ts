@@ -133,11 +133,12 @@ function parseSummaryEvaluation(response: string): SummaryEvaluation {
     // Fall through to default
   }
 
-  // Graceful fallback — treat the raw response as feedback, accept by default
+  // Fallback — LLM response was unparseable. Do NOT accept — the summary was
+  // not actually evaluated. The learner sees a message and can re-submit.
   return {
-    feedback: response,
+    feedback: "We couldn't evaluate your summary right now. Please try again.",
     hasUnderstandingGaps: false,
-    isAccepted: true,
+    isAccepted: false,
   };
 }
 

@@ -39,46 +39,51 @@ This document records the confirmed web bugs found while testing the current mob
 
 **Severity:** High
 **Affected flows:** `ACCOUNT-01`, `ACCOUNT-02`, `ACCOUNT-11`, `ACCOUNT-12`, `ACCOUNT-13`, `ACCOUNT-14`, `ACCOUNT-19`, `ACCOUNT-20`, `ACCOUNT-21`, `HOME-06`, `LEARN-09`, `LEARN-10`
-**Status:** Partially fixed in current branch
+**Status:** Fixed in current branch (full sweep complete)
 
 **Symptom:** On direct-load or refreshed web routes, pressing `Cancel`, `Done`, or a top-left back button can do nothing at all. The URL stays the same because `router.back()` has nowhere to go.
 
 **Root cause:** Several screens relied on bare `router.back()` for dismissal. On web, direct URL entry, refresh, or prior `router.replace()` can leave the history stack empty, which makes `router.back()` a silent no-op.
 
-**Fix applied:** Added a shared `goBackOrReplace(router, fallbackHref)` helper and used it on the web-broken screens confirmed in this pass:
+**Fix applied:** Added a shared `goBackOrReplace(router, fallbackHref)` helper and applied it to all screens with bare `router.back()` calls.
 
-- `/create-profile`
-- `/profiles`
-- `/delete-account`
-- `/consent`
-- `/(app)/learn-new`
-- `/(app)/shelf/[subjectId]`
-- `/(app)/shelf/[subjectId]/book/[bookId]`
-- `/(app)/pick-book/[subjectId]`
-- `/terms`
-- `/privacy`
+**Phase 1** (initial pass — 10 screens):
 
-**Files:**
+- `/create-profile`, `/profiles`, `/delete-account`, `/consent`
+- `/(app)/learn-new`, `/(app)/shelf/[subjectId]`, `/(app)/shelf/[subjectId]/book/[bookId]`, `/(app)/pick-book/[subjectId]`
+- `/terms`, `/privacy`
 
-- `apps/mobile/src/lib/navigation.ts`
-- `apps/mobile/src/app/create-profile.tsx`
-- `apps/mobile/src/app/profiles.tsx`
-- `apps/mobile/src/app/delete-account.tsx`
-- `apps/mobile/src/app/consent.tsx`
-- `apps/mobile/src/app/(app)/learn-new.tsx`
-- `apps/mobile/src/app/(app)/shelf/[subjectId]/index.tsx`
-- `apps/mobile/src/app/(app)/shelf/[subjectId]/book/[bookId].tsx`
-- `apps/mobile/src/app/(app)/pick-book/[subjectId].tsx`
-- `apps/mobile/src/app/terms.tsx`
-- `apps/mobile/src/app/privacy.tsx`
+**Phase 2** (full sweep — 23 additional screens):
 
-**Verification:** Confirmed in web after direct loads that:
+Learner flow screens (fallback → `/(app)/home`):
+- `/create-subject`, `/assessment`, `/(app)/learn`, `/(app)/dashboard`
+- `/(app)/homework/camera`, `/(app)/progress/[subjectId]`, `/(app)/subject/[subjectId]`
+- `/(app)/topic/[topicId]` (4 call sites), `/(app)/topic/relearn` (2 call sites)
+- `/(app)/onboarding/curriculum-review`, `/(app)/onboarding/interview`
+- `/(app)/onboarding/analogy-preference`, `/(app)/onboarding/language-setup`
+- `ChatShell` component (shared session UI)
 
-- `/create-profile` `Cancel` falls back to `/(app)/home`
-- `/(app)/learn-new` back falls back to `/(app)/home`
-- `/terms` back falls back to `/(app)/more`
+Settings screens (fallback → `/(app)/more`):
+- `/(app)/mentor-memory` (2 call sites), `/(app)/subscription` (2 call sites)
 
-**Follow-up:** This root cause likely still exists on other screens that use bare `router.back()` and have not yet been swept.
+Auth screen (fallback → `/sign-in`):
+- `/(auth)/forgot-password`
+
+Parent child screens (fallback → `/(app)/home`):
+- `/(app)/child/[profileId]` (2 call sites)
+- `/(app)/child/[profileId]/mentor-memory` (2 call sites)
+- `/(app)/child/[profileId]/reports` (2 call sites)
+- `/(app)/child/[profileId]/report/[reportId]`
+- `/(app)/child/[profileId]/subjects/[subjectId]`
+- `/(app)/child/[profileId]/session/[sessionId]` (3 call sites)
+- `/(app)/child/[profileId]/topic/[topicId]`
+
+**Verification:**
+
+- `screen-navigation.test.ts`: 40/40 passed (all screens still have exit navigation)
+- All related test suites: 146 tests passed across 11 suites
+- Mobile typecheck: clean (no errors)
+- Zero bare `router.back()` calls remain in non-test source files
 
 ## WEB-03: "Open shelf" is not a dead click; the destination screen crashes immediately
 
@@ -235,7 +240,8 @@ That matters because it points away from a single global failure in Expo Router,
 
 ## Recommended Next Sweep
 
-- Continue replacing fragile bare `router.back()` usage on standalone/detail routes that should always have a safe fallback on web.
+- ~~Continue replacing fragile bare `router.back()` usage on standalone/detail routes that should always have a safe fallback on web.~~ **DONE** — full sweep completed, zero bare `router.back()` calls remain in production source.
 - Keep validating suspected "dead click" reports in the browser before clustering them under one root cause.
 - Keep using the local API for systematic web-flow coverage until the remote dev deployment is updated to match the repo code.
 - Add more inventory-linked web regression checks around Library, subject shelf, and account/legal screens.
+- When adding new screens, use `goBackOrReplace(router, fallbackHref)` instead of bare `router.back()` to maintain web safety.

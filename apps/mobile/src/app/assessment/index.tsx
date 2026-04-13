@@ -11,6 +11,7 @@ import {
   useSubmitAnswer,
 } from '../../hooks/use-assessments';
 import { formatApiError } from '../../lib/format-api-error';
+import { goBackOrReplace } from '../../lib/navigation';
 import { Button } from '../../components/common/Button';
 
 const OPENING_MESSAGE =
@@ -98,7 +99,7 @@ export default function AssessmentScreen() {
         <Button
           variant="primary"
           label="Go back"
-          onPress={() => router.back()}
+          onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
           testID="assessment-go-back"
         />
       </View>

@@ -253,36 +253,51 @@ function isReconnectableSessionError(error: unknown): boolean {
   // Known fatal API errors — never reconnectable
   if (
     errorHasCode(error, 'EXCHANGE_LIMIT_EXCEEDED') ||
-    errorHasCode(error, 'SUBJECT_INACTIVE') ||
-    errorHasStatus(error, 404)
+    errorHasCode(error, 'SUBJECT_INACTIVE')
   ) {
     return false;
+  }
+
+  // BUG-355: Classify by HTTP status code FIRST — structured data is always
+  // more reliable than string matching. 4xx = client error (never
+  // reconnectable), 5xx = server error (reconnectable).
+  const status =
+    typeof error === 'object' &&
+    error !== null &&
+    'status' in error &&
+    typeof (error as { status?: unknown }).status === 'number'
+      ? ((error as { status: number }).status as number)
+      : undefined;
+  if (status !== undefined) {
+    if (status >= 400 && status < 500) return false;
+    if (status >= 500) return true;
   }
 
   if (!(error instanceof Error)) {
     return false;
   }
 
-  // Structured type checks first — fetch throws TypeError for network failures
+  // Structured type checks — fetch throws TypeError for network failures
   // (DNS, offline, refused) and DOMException with name 'AbortError' for
   // aborted requests. These are stable across JS engines (Hermes, JSC, V8).
   if (error.name === 'TypeError' || error.name === 'AbortError') {
     return true;
   }
 
-  // Fallback: message matching for network errors that don't use standard
-  // error types (e.g. React Native polyfills, SSE wrappers). Must run BEFORE
-  // formatApiError transforms the message into user-facing copy.
+  // BUG-355: Last-resort message matching for RN polyfills and SSE wrappers
+  // that don't use standard error types. Must run BEFORE formatApiError
+  // transforms the message. Use specific phrases — bare 'network' or 'abort'
+  // can false-match on unrelated API error messages.
   const message = error.message.toLowerCase();
   return (
-    message.includes('network') ||
+    message.includes('network request failed') ||
+    message.includes('network error') ||
     message.includes('offline') ||
     message.includes('timed out') ||
     message.includes('server unreachable') ||
     message.includes('connection failed') ||
     message.includes('connection timed out') ||
-    message.includes('sse connection failed') ||
-    message.includes('abort')
+    message.includes('sse connection failed')
   );
 }
 
@@ -883,7 +898,10 @@ export default function SessionScreen() {
     },
     [
       activeSessionId,
-      activeProfile?.id,
+      // BUG-339: Removed activeProfile?.id — it is not read inside
+      // ensureSession. Including it caused the callback (and every downstream
+      // dependency like continueWithMessage) to be recreated on every profile
+      // refetch, risking dropped in-flight state.
       effectiveSubjectId,
       topicId,
       effectiveMode,
@@ -894,7 +912,6 @@ export default function SessionScreen() {
       currentProblemIndex,
       normalizedOcrText,
       homeworkCaptureSource,
-      inputMode,
       syncHomeworkMetadata,
     ]
   );
@@ -1306,7 +1323,7 @@ export default function SessionScreen() {
   ]);
 
   const handleSend = useCallback(
-    async (text: string) => {
+    async (text: string, opts?: { isAutoSent?: boolean }) => {
       if (isStreaming || pendingClassification) return;
       if (pendingSubjectResolution) {
         showConfirmation("Pick the subject first, then I'll keep going.");
@@ -1315,7 +1332,12 @@ export default function SessionScreen() {
 
       setMessages((prev) => [
         ...prev,
-        { id: createLocalMessageId('user'), role: 'user', content: text },
+        {
+          id: createLocalMessageId('user'),
+          role: 'user',
+          content: text,
+          isAutoSent: opts?.isAutoSent,
+        },
       ]);
       setResumedBanner(false);
 
@@ -1347,7 +1369,27 @@ export default function SessionScreen() {
               },
             ]);
           } else if (effectiveMode === 'freeform') {
-            // Freeform: auto-pick the best candidate without prompting
+            // BUG-31: When multiple candidates exist, don't silently pick —
+            // ask the user which subject they meant. Single-candidate or
+            // zero-candidate cases still auto-pick for a frictionless start.
+            if (result.candidates.length > 1) {
+              const freeformCandidates = result.candidates.map((c) => ({
+                subjectId: c.subjectId,
+                subjectName: c.subjectName,
+              }));
+              const promptMessage = `This sounds like it could be ${freeformCandidates
+                .slice(0, 3)
+                .map((c) => c.subjectName)
+                .join(' or ')}. Which one are we working on?`;
+              openSubjectResolution(
+                text,
+                promptMessage,
+                freeformCandidates,
+                result.suggestedSubjectName
+              );
+              return;
+            }
+            // Single candidate or fallback to first enrolled subject
             const best =
               result.candidates[0] ??
               (availableSubjects[0]
@@ -1444,7 +1486,21 @@ export default function SessionScreen() {
           }
         } catch {
           if (effectiveMode === 'freeform') {
-            // Freeform: on classification failure, auto-pick first enrolled subject
+            // BUG-31: When classification fails and there are multiple enrolled
+            // subjects, show a picker instead of silently picking the first one.
+            if (availableSubjects.length > 1) {
+              const fallbackCandidates = availableSubjects.map((s) => ({
+                subjectId: s.id,
+                subjectName: s.name,
+              }));
+              openSubjectResolution(
+                text,
+                "I couldn't figure out the subject. Which one fits?",
+                fallbackCandidates
+              );
+              return;
+            }
+            // Single enrolled subject — auto-pick with "wrong subject?" chip
             const fallback = availableSubjects[0];
             if (fallback) {
               setClassifiedSubject({
@@ -1534,7 +1590,9 @@ export default function SessionScreen() {
     const queuedProblemText = queuedProblemTextRef.current;
     queuedProblemTextRef.current = null;
     const timer = setTimeout(() => {
-      void handleSend(queuedProblemText);
+      // BUG-373: Mark queued multi-problem sends as auto-sent so the
+      // voice/text toggle stays visible until the user deliberately types.
+      void handleSend(queuedProblemText, { isAutoSent: true });
     }, 0);
 
     return () => clearTimeout(timer);
@@ -1544,7 +1602,8 @@ export default function SessionScreen() {
     if (problemText && !routeSessionId && !hasAutoSentRef.current) {
       hasAutoSentRef.current = true;
       const timer = setTimeout(() => {
-        void handleSend(problemText);
+        // BUG-373: Mark homework auto-send as auto-sent
+        void handleSend(problemText, { isAutoSent: true });
       }, 500);
       return () => clearTimeout(timer);
     }
@@ -1658,67 +1717,86 @@ export default function SessionScreen() {
   const handleEndSession = useCallback(async () => {
     if (!activeSessionId || isClosing) return;
 
-    Alert.alert('Ready to wrap up?', 'Keep going or finish this session now.', [
-      { text: 'Keep Going', style: 'cancel' },
-      {
-        text: "I'm Done",
-        onPress: async () => {
-          setIsClosing(true);
-          try {
-            const result = await closeSession.mutateAsync({
-              reason: 'user_ended',
-              summaryStatus: 'pending',
-              milestonesReached,
-            });
-            const fastCelebrations = await fetchFastCelebrations();
-            await clearSessionRecoveryMarker(activeProfile?.id);
+    // BUG-352: Set isClosing immediately — before Alert.alert renders — so a
+    // second tap in the same render frame cannot pass the guard and produce a
+    // duplicate confirmation dialog.
+    setIsClosing(true);
 
-            // Store close result for deferred navigation
-            closedSessionRef.current = {
-              wallClockSeconds: result.wallClockSeconds,
-              fastCelebrations,
-            };
-
-            // Freeform/homework: show filing prompt before navigating
-            if (effectiveMode === 'freeform' || effectiveMode === 'homework') {
-              setShowFilingPrompt(true);
-            } else {
-              router.replace({
-                pathname: `/session-summary/${activeSessionId}`,
-                params: {
-                  subjectName: effectiveSubjectName ?? '',
-                  exchangeCount: String(exchangeCount),
-                  escalationRung: String(escalationRung),
-                  subjectId: effectiveSubjectId ?? '',
-                  topicId: topicId ?? '',
-                  wallClockSeconds: String(result.wallClockSeconds),
-                  milestones: serializeMilestones(milestonesReached),
-                  fastCelebrations: serializeCelebrations(fastCelebrations),
-                  sessionType: 'learning',
-                },
-              } as never);
-            }
-          } catch (err: unknown) {
-            setIsClosing(false);
-            Alert.alert(
-              'Could not end this session cleanly',
-              `${formatApiError(
-                err
-              )} You can keep trying, or go home now and come back later.`,
-              [
-                { text: 'Keep trying', style: 'cancel' },
-                {
-                  text: 'Go Home',
-                  onPress: () => {
-                    router.replace('/(app)/home' as never);
-                  },
-                },
-              ]
-            );
-          }
+    Alert.alert(
+      'Ready to wrap up?',
+      'Keep going or finish this session now.',
+      [
+        {
+          text: 'Keep Going',
+          style: 'cancel',
+          onPress: () => setIsClosing(false),
         },
-      },
-    ]);
+        {
+          text: "I'm Done",
+          onPress: async () => {
+            try {
+              const result = await closeSession.mutateAsync({
+                reason: 'user_ended',
+                summaryStatus: 'pending',
+                milestonesReached,
+              });
+              const fastCelebrations = await fetchFastCelebrations();
+              await clearSessionRecoveryMarker(activeProfile?.id);
+
+              // Store close result for deferred navigation
+              closedSessionRef.current = {
+                wallClockSeconds: result.wallClockSeconds,
+                fastCelebrations,
+              };
+
+              // Freeform/homework: show filing prompt before navigating
+              if (
+                effectiveMode === 'freeform' ||
+                effectiveMode === 'homework'
+              ) {
+                setShowFilingPrompt(true);
+              } else {
+                router.replace({
+                  pathname: `/session-summary/${activeSessionId}`,
+                  params: {
+                    subjectName: effectiveSubjectName ?? '',
+                    exchangeCount: String(exchangeCount),
+                    escalationRung: String(escalationRung),
+                    subjectId: effectiveSubjectId ?? '',
+                    topicId: topicId ?? '',
+                    wallClockSeconds: String(result.wallClockSeconds),
+                    milestones: serializeMilestones(milestonesReached),
+                    fastCelebrations: serializeCelebrations(fastCelebrations),
+                    sessionType: 'learning',
+                  },
+                } as never);
+              }
+            } catch (err: unknown) {
+              setIsClosing(false);
+              Alert.alert(
+                'Could not end this session cleanly',
+                `${formatApiError(
+                  err
+                )} You can keep trying, or go home now and come back later.`,
+                [
+                  { text: 'Keep trying', style: 'cancel' },
+                  {
+                    text: 'Go Home',
+                    onPress: () => {
+                      router.replace('/(app)/home' as never);
+                    },
+                  },
+                ]
+              );
+            }
+          },
+        },
+      ],
+      // BUG-352: Reset isClosing when the dialog is dismissed without choosing
+      // (e.g. Android back button). Without this the "I'm Done" button stays
+      // permanently disabled after a dismiss.
+      { cancelable: true, onDismiss: () => setIsClosing(false) }
+    );
   }, [
     activeSessionId,
     isClosing,
@@ -1951,8 +2029,10 @@ export default function SessionScreen() {
   // loads and sets exchangeCount > 0.
   const showEndSession = exchangeCount > 0 || !!routeSessionId;
 
+  // BUG-373: Exclude auto-sent messages (homework OCR, queued multi-problem)
+  // so the voice/text toggle stays visible until the user deliberately types.
   const userMessageCount = useMemo(
-    () => messages.filter((m) => m.role === 'user').length,
+    () => messages.filter((m) => m.role === 'user' && !m.isAutoSent).length,
     [messages]
   );
   const latestAiMessageId = useMemo(
@@ -2189,7 +2269,7 @@ export default function SessionScreen() {
                 {activeHomeworkProblem?.text.slice(0, 70) ?? ''}
               </Text>
             </View>
-            {currentProblemIndex < homeworkProblemsState.length - 1 && (
+            {currentProblemIndex < homeworkProblemsState.length - 1 ? (
               <Pressable
                 onPress={handleNextProblem}
                 className="rounded-full bg-primary/10 px-3 py-2"
@@ -2201,53 +2281,75 @@ export default function SessionScreen() {
                   Next problem
                 </Text>
               </Pressable>
+            ) : (
+              <Pressable
+                onPress={handleEndSession}
+                className="rounded-full bg-success/15 px-3 py-2"
+                testID="finish-homework-chip"
+                accessibilityRole="button"
+                accessibilityLabel="Finish homework session"
+              >
+                <Text className="text-body-sm font-semibold text-success">
+                  Finish homework
+                </Text>
+              </Pressable>
             )}
           </View>
         )}
-        <View className="flex-row px-4 py-3 gap-2">
-          <Pressable
-            onPress={() => setHomeworkMode('help_me')}
-            className={`flex-1 rounded-button py-2 items-center ${
-              homeworkMode === 'help_me' ? 'bg-primary' : 'bg-surface-elevated'
-            }`}
-            testID="homework-mode-help-me"
-            accessibilityRole="button"
-            accessibilityLabel="Help me solve it"
-            accessibilityState={{ selected: homeworkMode === 'help_me' }}
-          >
-            <Text
-              className={`text-body-sm font-semibold ${
+        {homeworkProblemsState.length > 0 ? (
+          <View className="flex-row px-4 py-3 gap-2">
+            <Pressable
+              onPress={() => setHomeworkMode('help_me')}
+              className={`flex-1 rounded-button py-2 items-center ${
                 homeworkMode === 'help_me'
-                  ? 'text-text-inverse'
-                  : 'text-text-primary'
+                  ? 'bg-primary'
+                  : 'bg-surface-elevated'
               }`}
+              testID="homework-mode-help-me"
+              accessibilityRole="button"
+              accessibilityLabel="Help me solve it"
+              accessibilityState={{ selected: homeworkMode === 'help_me' }}
             >
-              Help me solve it
-            </Text>
-          </Pressable>
-          <Pressable
-            onPress={() => setHomeworkMode('check_answer')}
-            className={`flex-1 rounded-button py-2 items-center ${
-              homeworkMode === 'check_answer'
-                ? 'bg-primary'
-                : 'bg-surface-elevated'
-            }`}
-            testID="homework-mode-check-answer"
-            accessibilityRole="button"
-            accessibilityLabel="Check my answer"
-            accessibilityState={{ selected: homeworkMode === 'check_answer' }}
-          >
-            <Text
-              className={`text-body-sm font-semibold ${
+              <Text
+                className={`text-body-sm font-semibold ${
+                  homeworkMode === 'help_me'
+                    ? 'text-text-inverse'
+                    : 'text-text-primary'
+                }`}
+              >
+                Help me solve it
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setHomeworkMode('check_answer')}
+              className={`flex-1 rounded-button py-2 items-center ${
                 homeworkMode === 'check_answer'
-                  ? 'text-text-inverse'
-                  : 'text-text-primary'
+                  ? 'bg-primary'
+                  : 'bg-surface-elevated'
               }`}
+              testID="homework-mode-check-answer"
+              accessibilityRole="button"
+              accessibilityLabel="Check my answer"
+              accessibilityState={{ selected: homeworkMode === 'check_answer' }}
             >
-              Check my answer
+              <Text
+                className={`text-body-sm font-semibold ${
+                  homeworkMode === 'check_answer'
+                    ? 'text-text-inverse'
+                    : 'text-text-primary'
+                }`}
+              >
+                Check my answer
+              </Text>
+            </Pressable>
+          </View>
+        ) : (
+          <View className="px-4 py-3" testID="homework-no-problems">
+            <Text className="text-body-sm text-text-secondary text-center">
+              No problems loaded. Type your question directly in the chat.
             </Text>
-          </Pressable>
-        </View>
+          </View>
+        )}
       </View>
     ) : undefined;
 

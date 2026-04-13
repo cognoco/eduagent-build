@@ -1,8 +1,8 @@
 # Epic 12: Remove Persona Enum — Age + Role + Intent-as-Cards (POST-LAUNCH)
 
 **Author:** Zuzka + Claude
-**Date:** 2026-03-30 (revised)
-**Status:** Spec complete (v2 — intent-as-cards redesign), development deferred to post-launch
+**Date:** 2026-03-30 (revised), 2026-04-13 (status update)
+**Status:** Near complete — only Story 12.3 (theme decoupling) remains. See `plan-master.md` for current story-level status.
 **Supersedes:** v1 (dynamic tab bar model, 2026-03-29)
 
 ---

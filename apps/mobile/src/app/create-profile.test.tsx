@@ -6,6 +6,7 @@ import {
   act,
 } from '@testing-library/react-native';
 import React from 'react';
+import { Alert } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const mockBack = jest.fn();
@@ -51,14 +52,10 @@ jest.mock('../lib/api-client', () => ({
 
 const mockSwitchProfile = jest.fn().mockResolvedValue(undefined);
 
+// BUG-301: Made per-test overridable so isParentAddingChild can be tested.
+const mockUseProfile = jest.fn();
 jest.mock('../lib/profile', () => ({
-  useProfile: () => ({
-    switchProfile: mockSwitchProfile,
-    // Simulate non-owner (child self-registering or first-time user).
-    // isParentAddingChild will be false when activeProfile is null.
-    activeProfile: null,
-    profiles: [],
-  }),
+  useProfile: () => mockUseProfile(),
 }));
 
 const queryClient = new QueryClient({
@@ -79,6 +76,13 @@ describe('CreateProfileScreen', () => {
     jest.clearAllMocks();
     datePickerOnChange = null;
     mockCanGoBack.mockReturnValue(true);
+    // Default: non-parent flow (first-time user / child self-registering)
+    mockUseProfile.mockReturnValue({
+      switchProfile: mockSwitchProfile,
+      activeProfile: null,
+      profiles: [],
+    });
+    jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
   });
 
   afterEach(() => {
@@ -302,5 +306,129 @@ describe('CreateProfileScreen', () => {
     fireEvent.press(screen.getByTestId('create-profile-cancel'));
 
     expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
+  });
+
+  // ---------------------------------------------------------------------------
+  // BUG-301: isParentAddingChild code path tests
+  // ---------------------------------------------------------------------------
+
+  describe('parent adding child', () => {
+    const parentProfile = {
+      id: 'parent-id',
+      accountId: 'a1',
+      displayName: 'Mum',
+      avatarUrl: null,
+      birthYear: 1985,
+      location: null,
+      isOwner: true,
+      hasPremiumLlm: false,
+      consentStatus: null,
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+    };
+
+    const childProfile = {
+      id: 'child-new',
+      accountId: 'a1',
+      displayName: 'Lily',
+      avatarUrl: null,
+      birthYear: 2014,
+      location: null,
+      isOwner: false,
+      hasPremiumLlm: false,
+      consentStatus: 'CONSENTED',
+      createdAt: '2026-02-16T00:00:00Z',
+      updatedAt: '2026-02-16T00:00:00Z',
+    };
+
+    beforeEach(() => {
+      mockUseProfile.mockReturnValue({
+        switchProfile: mockSwitchProfile,
+        activeProfile: parentProfile,
+        profiles: [parentProfile],
+      });
+    });
+
+    it('shows confirmation alert and does NOT switch profile when parent adds child', async () => {
+      mockFetch.mockResolvedValueOnce(
+        new Response(JSON.stringify({ profile: childProfile }), { status: 200 })
+      );
+
+      render(<CreateProfileScreen />, { wrapper: Wrapper });
+
+      fireEvent.changeText(screen.getByTestId('create-profile-name'), 'Lily');
+      fireEvent.press(screen.getByTestId('create-profile-birthdate'));
+      await act(() => {
+        datePickerOnChange?.({ type: 'set' }, new Date(2014, 5, 15));
+      });
+
+      fireEvent.press(screen.getByTestId('create-profile-submit'));
+
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalled();
+      });
+
+      await waitFor(() => {
+        expect(Alert.alert).toHaveBeenCalledWith(
+          'Profile created',
+          "Lily's profile is ready. You can switch to it from the Profiles screen."
+        );
+      });
+
+      // Parent stays on their own profile — switchProfile must NOT be called
+      expect(mockSwitchProfile).not.toHaveBeenCalled();
+      // Navigation back (handleClose) should fire
+      expect(mockBack).toHaveBeenCalled();
+    });
+
+    it('navigates home when parent adds child and no back history', async () => {
+      mockCanGoBack.mockReturnValue(false);
+      mockFetch.mockResolvedValueOnce(
+        new Response(JSON.stringify({ profile: childProfile }), { status: 200 })
+      );
+
+      render(<CreateProfileScreen />, { wrapper: Wrapper });
+
+      fireEvent.changeText(screen.getByTestId('create-profile-name'), 'Lily');
+      fireEvent.press(screen.getByTestId('create-profile-birthdate'));
+      await act(() => {
+        datePickerOnChange?.({ type: 'set' }, new Date(2014, 5, 15));
+      });
+
+      fireEvent.press(screen.getByTestId('create-profile-submit'));
+
+      await waitFor(() => {
+        expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
+      });
+      expect(mockSwitchProfile).not.toHaveBeenCalled();
+    });
+
+    it('shows error banner on API failure — no alert or navigation', async () => {
+      mockFetch.mockResolvedValueOnce(
+        new Response('Server error', {
+          status: 500,
+          statusText: 'Internal Server Error',
+        })
+      );
+
+      render(<CreateProfileScreen />, { wrapper: Wrapper });
+
+      fireEvent.changeText(screen.getByTestId('create-profile-name'), 'Lily');
+      fireEvent.press(screen.getByTestId('create-profile-birthdate'));
+      await act(() => {
+        datePickerOnChange?.({ type: 'set' }, new Date(2014, 5, 15));
+      });
+
+      fireEvent.press(screen.getByTestId('create-profile-submit'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('create-profile-error')).toBeTruthy();
+      });
+
+      // No confirmation alert or navigation on failure
+      expect(Alert.alert).not.toHaveBeenCalled();
+      expect(mockBack).not.toHaveBeenCalled();
+      expect(mockSwitchProfile).not.toHaveBeenCalled();
+    });
   });
 });

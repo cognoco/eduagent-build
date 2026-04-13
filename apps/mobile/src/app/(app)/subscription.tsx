@@ -23,6 +23,7 @@ import type {
 import { PURCHASES_ERROR_CODE, PACKAGE_TYPE } from 'react-native-purchases';
 import { useQueryClient } from '@tanstack/react-query';
 import { useThemeColors } from '../../lib/theme';
+import { goBackOrReplace } from '../../lib/navigation';
 import { useProfile } from '../../lib/profile';
 import { UsageMeter } from '../../components/common';
 import {
@@ -249,6 +250,9 @@ function PackageOption({
 
 const NOTIFY_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 hours
 
+// BUG-399: Account-scoped key — BYOK waitlist is per-account email, not per-profile.
+const BYOK_JOINED_KEY = 'byok-waitlist-joined';
+
 // Key renamed from colon to dash delimiter — colons caused SecureStore
 // crashes on some Android devices. See migrate-secure-store-key.ts.
 function getNotifyStorageKey(profileId: string): string {
@@ -402,7 +406,7 @@ function ChildPaywall(): React.ReactElement {
     >
       <View className="px-5 pt-4 pb-2 flex-row items-center">
         <Pressable
-          onPress={() => router.back()}
+          onPress={() => goBackOrReplace(router, '/(app)/more' as const)}
           className="me-3 min-w-[44px] min-h-[44px] justify-center items-center"
           accessibilityLabel="Go back"
           accessibilityRole="button"
@@ -547,6 +551,21 @@ export default function SubscriptionScreen() {
   );
   const byokWaitlist = useJoinByokWaitlist();
 
+  // BUG-399: Persistent "already joined" flag for BYOK waitlist
+  const [byokJoined, setByokJoined] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const stored = await SecureStore.getItemAsync(BYOK_JOINED_KEY);
+      if (!cancelled && stored === 'true') {
+        setByokJoined(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Top-up IAP state
   const [topUpPurchasing, setTopUpPurchasing] = useState(false);
   const [topUpPolling, setTopUpPolling] = useState(false);
@@ -640,10 +659,29 @@ export default function SubscriptionScreen() {
   // ---------------------------------------------------------------------------
 
   const handleManageBilling = useCallback(async () => {
+    const url =
+      Platform.OS === 'ios'
+        ? 'https://apps.apple.com/account/subscriptions'
+        : 'https://play.google.com/store/account/subscriptions';
     try {
       await openSubscriptionManagement();
     } catch {
-      Alert.alert('Error', 'Could not open subscription management.');
+      // BUG-400: Provide retry + fallback URL so the user isn't stuck.
+      Alert.alert(
+        'Could not open subscription management',
+        `You can manage your subscription directly at:\n${url}`,
+        [
+          {
+            text: 'Try again',
+            onPress: () => {
+              void openSubscriptionManagement().catch(() => {
+                // Second attempt also failed — user already has the URL from the alert.
+              });
+            },
+          },
+          { text: 'OK', style: 'cancel' },
+        ]
+      );
     }
   }, []);
 
@@ -756,6 +794,8 @@ export default function SubscriptionScreen() {
   const handleByokSubmit = useCallback(async () => {
     try {
       await byokWaitlist.mutateAsync();
+      setByokJoined(true);
+      void SecureStore.setItemAsync(BYOK_JOINED_KEY, 'true');
       Alert.alert('Waitlist', 'You have been added to the BYOK waitlist.');
     } catch {
       Alert.alert('Error', 'Could not join waitlist. Try again.');
@@ -799,7 +839,7 @@ export default function SubscriptionScreen() {
     >
       <View className="px-5 pt-4 pb-2 flex-row items-center">
         <Pressable
-          onPress={() => router.back()}
+          onPress={() => goBackOrReplace(router, '/(app)/more' as const)}
           className="me-3 min-w-[44px] min-h-[44px] justify-center items-center"
           accessibilityLabel="Go back"
           accessibilityRole="button"
@@ -1210,9 +1250,15 @@ export default function SubscriptionScreen() {
               </Text>
               <Pressable
                 onPress={handleByokSubmit}
-                disabled={byokWaitlist.isPending}
-                className="bg-primary rounded-button px-4 py-2.5 items-center justify-center"
-                accessibilityLabel="Join BYOK waitlist"
+                disabled={byokWaitlist.isPending || byokJoined}
+                className={`rounded-button px-4 py-2.5 items-center justify-center ${
+                  byokJoined ? 'bg-surface-elevated' : 'bg-primary'
+                }`}
+                accessibilityLabel={
+                  byokJoined
+                    ? 'Already joined BYOK waitlist'
+                    : 'Join BYOK waitlist'
+                }
                 accessibilityRole="button"
                 testID="join-byok-waitlist-button"
               >
@@ -1222,6 +1268,10 @@ export default function SubscriptionScreen() {
                     color={colors.textInverse}
                     testID="join-byok-waitlist-loading"
                   />
+                ) : byokJoined ? (
+                  <Text className="text-text-secondary text-body font-semibold">
+                    Already joined
+                  </Text>
                 ) : (
                   <Text className="text-text-inverse text-body font-semibold">
                     Join Waitlist

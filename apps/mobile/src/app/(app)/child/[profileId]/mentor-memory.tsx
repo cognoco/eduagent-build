@@ -32,6 +32,7 @@ import {
   useUnsuppressInference,
 } from '../../../../hooks/use-learner-profile';
 import { assertOk } from '../../../../lib/assert-ok';
+import { goBackOrReplace } from '../../../../lib/navigation';
 import { useApiClient } from '../../../../lib/api-client';
 
 export default function ChildMentorMemoryScreen() {
@@ -162,7 +163,7 @@ export default function ChildMentorMemoryScreen() {
           You don&apos;t have access to this profile.
         </Text>
         <Pressable
-          onPress={() => router.back()}
+          onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
           className="bg-primary rounded-button px-6 py-3"
           accessibilityRole="button"
         >
@@ -178,7 +179,7 @@ export default function ChildMentorMemoryScreen() {
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
       <View className="px-5 pt-4 pb-2 flex-row items-center">
         <Pressable
-          onPress={() => router.back()}
+          onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
           className="me-3 py-2 pe-2"
           accessibilityRole="button"
           accessibilityLabel="Go back"

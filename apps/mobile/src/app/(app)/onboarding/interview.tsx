@@ -11,6 +11,7 @@ import {
   useStreamInterviewMessage,
 } from '../../../hooks/use-interview';
 import { formatApiError } from '../../../lib/format-api-error';
+import { goBackOrReplace } from '../../../lib/navigation';
 
 const OPENING_MESSAGE =
   "Hi! I'm your learning mate. I'd like to get to know you a bit before we start. What made you interested in learning this subject?";
@@ -236,7 +237,7 @@ export default function InterviewScreen() {
           Missing subject information. Please go back and try again.
         </Text>
         <Pressable
-          onPress={() => router.back()}
+          onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
           className="bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
           testID="interview-missing-subject-back"
           accessibilityRole="button"

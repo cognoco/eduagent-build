@@ -22,6 +22,8 @@ import { useCreateSubject, useSubjects } from '../../../hooks/use-subjects';
 import { useClassifySubject } from '../../../hooks/use-classify-subject';
 import { CelebrationAnimation } from '../../../components/common';
 import { formatApiError } from '../../../lib/format-api-error';
+import { goBackOrReplace } from '../../../lib/navigation';
+import { Sentry } from '../../../lib/sentry';
 import {
   createHomeworkProblem,
   getHomeworkProblemText,
@@ -136,8 +138,15 @@ export default function CameraScreen(): React.ReactNode {
               subjectId: created.subject.id,
               subjectName: created.subject.name,
             });
-          } catch {
-            // Subject creation failed — fall back to manual picker
+          } catch (autoCreateErr) {
+            // BUG-363: Silent recovery ban — capture so we can track how often
+            // auto-create fails and triage root causes.
+            Sentry.captureException(autoCreateErr, {
+              tags: {
+                component: 'HomeworkCamera',
+                action: 'auto-create-subject',
+              },
+            });
             setShowSubjectPicker(true);
           }
         } else {
@@ -405,8 +414,17 @@ export default function CameraScreen(): React.ReactNode {
         // Multiple candidates or low confidence — show picker
         setShowSubjectPicker(true);
       }
-    } catch {
-      // Classification failed — show picker
+    } catch (classifyErr) {
+      // BUG-367: Tell the user why the subject picker appeared instead of
+      // silently showing it after classification fails.
+      Sentry.captureException(classifyErr, {
+        tags: { component: 'HomeworkCamera', action: 'manual-classify' },
+      });
+      Alert.alert(
+        'Could not identify the subject',
+        'Please pick the subject this homework belongs to.',
+        [{ text: 'OK' }]
+      );
       setShowSubjectPicker(true);
     }
   }, [
@@ -434,11 +452,7 @@ export default function CameraScreen(): React.ReactNode {
   );
 
   const handleClose = useCallback(() => {
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.replace('/(app)/home' as never);
-    }
+    goBackOrReplace(router, '/(app)/home' as const);
   }, [router]);
 
   const toggleFlash = useCallback(() => {

@@ -6,7 +6,11 @@ const mockBack = jest.fn();
 const mockPush = jest.fn();
 
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ back: mockBack, push: mockPush }),
+  useRouter: () => ({
+    back: mockBack,
+    push: mockPush,
+    canGoBack: jest.fn(() => true),
+  }),
   useLocalSearchParams: jest.fn(),
 }));
 
@@ -486,5 +490,105 @@ describe('TopicDetailScreen', () => {
       pathname: '/(app)/topic/relearn',
       params: { subjectId: 'sub-1', topicId: 'topic-1' },
     });
+  });
+
+  // -------------------------------------------------------------------------
+  // BUG-364: Gap-fill tests — error Go Home, failureCount relearn, empty parking lot
+  // -------------------------------------------------------------------------
+
+  it('navigates home on "Go Home" button in error state', () => {
+    const mockReplace = jest.fn();
+    const routerModule = require('expo-router') as {
+      useRouter: () => Record<string, jest.Mock>;
+    };
+    // Temporarily override the mock to capture replace
+    jest.spyOn(routerModule, 'useRouter').mockReturnValue({
+      back: mockBack,
+      push: mockPush,
+      canGoBack: jest.fn(() => true),
+      replace: mockReplace,
+    });
+
+    mockUseTopicProgress.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      refetch: jest.fn(),
+    });
+    mockUseTopicRetention.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+
+    render(<TopicDetailScreen />, { wrapper: createWrapper() });
+
+    expect(screen.getByTestId('topic-detail-go-home')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('topic-detail-go-home'));
+    expect(mockReplace).toHaveBeenCalledWith('/(app)');
+  });
+
+  it('shows Relearn button when failureCount >= 3 (even without needs_deepening)', () => {
+    mockUseTopicProgress.mockReturnValue({
+      data: {
+        topicId: 'topic-1',
+        title: 'Trigonometry',
+        description: '',
+        completionStatus: 'completed',
+        retentionStatus: 'weak',
+        struggleStatus: 'normal',
+        masteryScore: 0.4,
+        summaryExcerpt: null,
+        xpStatus: null,
+      },
+      isLoading: false,
+    });
+    mockUseTopicRetention.mockReturnValue({
+      data: {
+        topicId: 'topic-1',
+        easeFactor: 2.0,
+        intervalDays: 3,
+        repetitions: 2,
+        nextReviewAt: new Date(
+          Date.now() + 2 * 24 * 60 * 60 * 1000
+        ).toISOString(),
+        xpStatus: null,
+        failureCount: 4,
+      },
+      isLoading: false,
+    });
+
+    render(<TopicDetailScreen />, { wrapper: createWrapper() });
+
+    expect(screen.getByTestId('relearn-button')).toBeTruthy();
+    // With failureCount >= 3, the retest button shows "Review and Re-test" variant
+    expect(screen.getByText('Review and Re-test')).toBeTruthy();
+  });
+
+  it('shows empty parking lot message when no items exist', () => {
+    mockUseTopicProgress.mockReturnValue({
+      data: {
+        topicId: 'topic-1',
+        title: 'Chemistry',
+        description: '',
+        completionStatus: 'completed',
+        retentionStatus: 'strong',
+        struggleStatus: 'normal',
+        masteryScore: null,
+        summaryExcerpt: null,
+        xpStatus: null,
+      },
+      isLoading: false,
+    });
+    mockUseTopicRetention.mockReturnValue({ data: null, isLoading: false });
+    mockUseTopicParkingLot.mockReturnValue({ data: [], isLoading: false });
+
+    render(<TopicDetailScreen />, { wrapper: createWrapper() });
+
+    expect(screen.getByText('Parking Lot')).toBeTruthy();
+    expect(
+      screen.getByText('No parked questions for this topic yet.')
+    ).toBeTruthy();
   });
 });

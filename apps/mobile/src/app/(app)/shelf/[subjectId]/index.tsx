@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -31,7 +31,10 @@ export default function ShelfScreen() {
   const booksQuery = useBooks(subjectId);
   const subjectsQuery = useSubjects();
 
-  const books = booksQuery.data ?? [];
+  // BUG-418: Use Array.isArray instead of ?? — TanStack Query's `select` is
+  // bypassed when `enabled` is false, so `data` can be a wrapped object rather
+  // than an array. The ?? operator only catches null/undefined, not objects.
+  const books = Array.isArray(booksQuery.data) ? booksQuery.data : [];
   const subject = subjectsQuery.data?.find((s) => s.id === subjectId);
 
   const { data: rawBookSuggestions } = useBookSuggestions(subjectId);
@@ -72,8 +75,13 @@ export default function ShelfScreen() {
   };
 
   // Single-book auto-skip: navigate directly to the book screen
+  // BUG-354: One-shot guard — without this, every React Query refetch
+  // re-triggers the replace and bounces the user back after navigating away.
+  const autoSkippedRef = useRef(false);
   useEffect(() => {
+    if (autoSkippedRef.current) return;
     if (booksQuery.data && booksQuery.data.length === 1 && subjectId) {
+      autoSkippedRef.current = true;
       const onlyBook = booksQuery.data[0]!;
       router.replace({
         pathname: '/(app)/shelf/[subjectId]/book/[bookId]',

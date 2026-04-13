@@ -1,5 +1,6 @@
 import { View, Text, Pressable, ScrollView } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { goBackOrReplace } from '../../../lib/navigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AnalogyDomainPicker } from '../../../components/common';
 import { useUpdateAnalogyDomain } from '../../../hooks/use-settings';
@@ -53,7 +54,7 @@ export default function AnalogyPreferenceScreen() {
       {/* Header */}
       <View className="px-5 pt-4 pb-3">
         <Pressable
-          onPress={() => router.back()}
+          onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
           className="mb-3 min-w-[44px] min-h-[44px] justify-center self-start"
           accessibilityLabel="Go back"
           accessibilityRole="button"

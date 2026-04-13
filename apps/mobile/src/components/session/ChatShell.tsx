@@ -19,6 +19,7 @@ import { VoicePlaybackBar } from './VoicePlaybackBar';
 import { useSpeechRecognition } from '../../hooks/use-speech-recognition';
 import { useTextToSpeech } from '../../hooks/use-text-to-speech';
 import { useThemeColors } from '../../lib/theme';
+import { goBackOrReplace } from '../../lib/navigation';
 import { PenWritingAnimation } from '../common';
 
 export interface ChatMessage {
@@ -31,6 +32,10 @@ export interface ChatMessage {
   verificationBadge?: VerificationBadge;
   eventId?: string;
   isSystemPrompt?: boolean;
+  /** BUG-373: True for programmatically auto-sent messages (homework OCR, queued
+   *  multi-problem). Used to exclude from userMessageCount so the voice/text
+   *  toggle stays visible until the user deliberately sends a message. */
+  isAutoSent?: boolean;
 }
 
 interface ChatShellProps {
@@ -220,6 +225,13 @@ export function ChatShell({
     speak(lastAiMessage.content);
   }, [messages, isVoiceEnabled, screenReaderEnabled, speak]);
 
+  // BUG-348: Stop TTS immediately when screen reader activates mid-session
+  useEffect(() => {
+    if (screenReaderEnabled && ttsPlaying) {
+      stopSpeaking();
+    }
+  }, [screenReaderEnabled, ttsPlaying, stopSpeaking]);
+
   const setVoiceEnabled = useCallback(
     (enabled: boolean) => {
       setIsVoiceEnabled(enabled);
@@ -256,8 +268,14 @@ export function ChatShell({
     }
   }, [isStreaming, isListening, stopListening, startListening, stopSpeaking]);
 
+  // BUG-359: Gate to prevent late STT updates from re-populating the
+  // transcript after the user taps Discard. Set on discard, cleared on
+  // re-record or new recording.
+  const discardedRef = useRef(false);
+
   // Sync transcript from STT hook to pending transcript when recording stops
   useEffect(() => {
+    if (discardedRef.current) return;
     if (!isListening && transcript.trim()) {
       setPendingTranscript(transcript);
     }
@@ -271,6 +289,7 @@ export function ChatShell({
     setPendingTranscript('');
     onDraftChange?.('');
     clearTranscript();
+    discardedRef.current = false;
   }, [
     pendingTranscript,
     isStreaming,
@@ -281,11 +300,13 @@ export function ChatShell({
   ]);
 
   const handleVoiceDiscard = useCallback(() => {
+    discardedRef.current = true;
     setPendingTranscript('');
     clearTranscript();
   }, [clearTranscript]);
 
   const handleVoiceReRecord = useCallback(async () => {
+    discardedRef.current = false;
     setPendingTranscript('');
     clearTranscript();
     stopSpeaking();
@@ -368,7 +389,7 @@ export function ChatShell({
         style={{ paddingTop: insets.top + 8 }}
       >
         <Pressable
-          onPress={() => router.back()}
+          onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
           className="me-3 p-2 min-h-[44px] min-w-[44px] items-center justify-center"
           accessibilityLabel="Go back"
           accessibilityRole="button"
@@ -429,8 +450,10 @@ export function ChatShell({
         {footer}
       </ScrollView>
 
-      {/* VoicePlaybackBar — shown when voice is ON and input is active */}
-      {isVoiceEnabled && !inputDisabled && (
+      {/* BUG-348: Hide VoicePlaybackBar entirely when screen reader is active.
+          TTS controls compete with VoiceOver/TalkBack for the audio channel,
+          and the Replay button bypasses the auto-TTS suppression. */}
+      {isVoiceEnabled && !inputDisabled && !screenReaderEnabled && (
         <VoicePlaybackBar
           isSpeaking={ttsPlaying}
           isPaused={ttsPaused}
@@ -440,7 +463,6 @@ export function ChatShell({
           onResume={resumeSpeaking}
           onReplay={replay}
           onRateChange={setRate}
-          screenReaderEnabled={screenReaderEnabled}
         />
       )}
 

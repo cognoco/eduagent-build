@@ -12,7 +12,11 @@ const mockResolveSubjectMutateAsync = jest.fn();
 let mockSearchParams: Record<string, string> = {};
 
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ back: mockBack, replace: mockReplace }),
+  useRouter: () => ({
+    back: mockBack,
+    replace: mockReplace,
+    canGoBack: jest.fn(() => true),
+  }),
   useLocalSearchParams: () => mockSearchParams,
 }));
 

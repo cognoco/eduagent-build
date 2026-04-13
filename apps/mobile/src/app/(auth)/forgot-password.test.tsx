@@ -10,7 +10,11 @@ const mockReplace = jest.fn();
 const mockBack = jest.fn();
 
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ replace: mockReplace, back: mockBack }),
+  useRouter: () => ({
+    replace: mockReplace,
+    back: mockBack,
+    canGoBack: jest.fn(() => true),
+  }),
 }));
 
 jest.mock('react-native-safe-area-context', () => ({

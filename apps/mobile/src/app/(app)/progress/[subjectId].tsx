@@ -1,5 +1,6 @@
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { goBackOrReplace } from '../../../lib/navigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ErrorFallback } from '../../../components/common';
 import { ProgressBar } from '../../../components/progress';
@@ -129,7 +130,7 @@ export default function ProgressSubjectScreen(): React.ReactElement {
       >
         <View className="flex-row items-center mt-4">
           <Pressable
-            onPress={() => router.back()}
+            onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
             className="me-3 py-2 pe-2"
             accessibilityRole="button"
             accessibilityLabel="Go back"
@@ -232,7 +233,30 @@ export default function ProgressSubjectScreen(): React.ReactElement {
               </View>
             ) : null}
 
-            {legacyProgress ? (
+            {subjectProgressQuery.isError ? (
+              <View
+                className="bg-surface rounded-card p-4 mt-4"
+                testID="progress-subject-retention-error"
+              >
+                <Text className="text-h3 font-semibold text-text-primary">
+                  Current retention
+                </Text>
+                <Text className="text-body-sm text-text-secondary mt-1 mb-3">
+                  We couldn't load retention data right now.
+                </Text>
+                <Pressable
+                  onPress={() => void subjectProgressQuery.refetch()}
+                  className="bg-surface-elevated rounded-button px-4 py-2.5 self-start min-h-[44px] items-center justify-center"
+                  accessibilityRole="button"
+                  accessibilityLabel="Retry loading retention"
+                  testID="progress-subject-retention-retry"
+                >
+                  <Text className="text-body-sm font-semibold text-text-primary">
+                    Retry
+                  </Text>
+                </Pressable>
+              </View>
+            ) : legacyProgress ? (
               <View className="bg-surface rounded-card p-4 mt-4">
                 <Text className="text-h3 font-semibold text-text-primary">
                   Current retention

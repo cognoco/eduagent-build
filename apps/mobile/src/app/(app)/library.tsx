@@ -44,7 +44,7 @@ import { useSubjects, useUpdateSubject } from '../../hooks/use-subjects';
 import { useOverallProgress } from '../../hooks/use-progress';
 import { useNoteTopicIds } from '../../hooks/use-notes';
 import { useApiClient } from '../../lib/api-client';
-import { useProfile } from '../../lib/profile';
+import { isGuardianProfile, useProfile } from '../../lib/profile';
 import { combinedSignal } from '../../lib/query-timeout';
 import { assertOk } from '../../lib/assert-ok';
 import { formatApiError } from '../../lib/format-api-error';
@@ -111,7 +111,8 @@ export default function LibraryScreen() {
   const insets = useSafeAreaInsets();
   const themeColors = useThemeColors();
   const apiClient = useApiClient();
-  const { activeProfile } = useProfile();
+  const { activeProfile, profiles } = useProfile();
+  const isGuardian = isGuardianProfile(activeProfile, profiles);
 
   const [activeTab, setActiveTab] = useState<LibraryTab>('shelves');
   const [shelvesTabState, setShelvesTabState] = useState<ShelvesTabState>(
@@ -374,7 +375,11 @@ export default function LibraryScreen() {
           <View className="flex-1">
             <Text className="text-h1 font-bold text-text-primary">Library</Text>
             <Text className="text-body-sm text-text-secondary mt-1">
-              {`${subjectsQuery.data?.length ?? 0} subjects`}
+              {isGuardian
+                ? `Your personal library \u00B7 ${
+                    subjectsQuery.data?.length ?? 0
+                  } subjects`
+                : `${subjectsQuery.data?.length ?? 0} subjects`}
             </Text>
           </View>
         </View>

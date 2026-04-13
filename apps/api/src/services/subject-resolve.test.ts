@@ -114,7 +114,7 @@ describe('resolveSubjectName', () => {
     expect(result.suggestions).toHaveLength(0);
   });
 
-  it('falls back to direct_match when LLM returns unparseable response', async () => {
+  it('falls back to no_match when LLM returns unparseable response [BUG-31]', async () => {
     mockRouteAndCall.mockResolvedValueOnce({
       response: 'Sorry, I cannot help with that.',
       provider: 'gemini',
@@ -124,12 +124,13 @@ describe('resolveSubjectName', () => {
 
     const result = await resolveSubjectName('History');
 
-    expect(result.status).toBe('direct_match');
-    expect(result.resolvedName).toBe('History');
-    expect(result.suggestions).toHaveLength(1);
+    // BUG-31: must not silently create a subject from raw input on LLM failure
+    expect(result.status).toBe('no_match');
+    expect(result.resolvedName).toBeNull();
+    expect(result.suggestions).toHaveLength(0);
   });
 
-  it('falls back to direct_match when LLM returns unknown status', async () => {
+  it('falls back to no_match when LLM returns unknown status [BUG-31]', async () => {
     llmResponse({
       status: 'something_unknown',
       resolvedName: 'Whatever',
@@ -139,7 +140,8 @@ describe('resolveSubjectName', () => {
 
     const result = await resolveSubjectName('History');
 
-    expect(result.status).toBe('direct_match');
+    // BUG-31: unrecognized status must not be treated as a valid subject match
+    expect(result.status).toBe('no_match');
   });
 
   it('calls routeAndCall with rung 1', async () => {

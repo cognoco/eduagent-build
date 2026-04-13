@@ -19,6 +19,7 @@ import {
   getStruggleProgress,
 } from '../../components/mentor-memory-sections';
 import { TellMentorInput } from '../../components/tell-mentor-input';
+import { goBackOrReplace } from '../../lib/navigation';
 import {
   useDeleteAllMemory,
   useDeleteMemoryItem,
@@ -125,7 +126,7 @@ export default function MentorMemoryScreen() {
         </Pressable>
         <Pressable
           testID="mentor-memory-go-back"
-          onPress={() => router.back()}
+          onPress={() => goBackOrReplace(router, '/(app)/more' as const)}
           className="mt-3 px-6 py-3"
           accessibilityRole="button"
         >
@@ -139,7 +140,7 @@ export default function MentorMemoryScreen() {
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
       <View className="px-5 pt-4 pb-2 flex-row items-center">
         <Pressable
-          onPress={() => router.back()}
+          onPress={() => goBackOrReplace(router, '/(app)/more' as const)}
           className="me-3 py-2 pe-2"
           accessibilityRole="button"
           accessibilityLabel="Go back"

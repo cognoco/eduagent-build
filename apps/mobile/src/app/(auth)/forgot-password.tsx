@@ -12,6 +12,7 @@ import { useSignIn } from '@clerk/clerk-expo';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '../../lib/theme';
+import { goBackOrReplace } from '../../lib/navigation';
 import { extractClerkError } from '../../lib/clerk-error';
 import { markSessionActivated } from '../../lib/auth-transition';
 import { PasswordInput } from '../../components/common';
@@ -328,7 +329,7 @@ export default function ForgotPasswordScreen() {
             variant="tertiary"
             size="small"
             label="Back to sign in"
-            onPress={() => router.back()}
+            onPress={() => goBackOrReplace(router, '/sign-in' as const)}
             testID="back-to-sign-in"
           />
         </View>

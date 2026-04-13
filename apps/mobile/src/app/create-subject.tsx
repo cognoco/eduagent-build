@@ -19,6 +19,7 @@ import { useThemeColors } from '../lib/theme';
 import { Button } from '../components/common/Button';
 import { useKeyboardScroll } from '../hooks/use-keyboard-scroll';
 import { formatApiError } from '../lib/format-api-error';
+import { goBackOrReplace } from '../lib/navigation';
 import type { SubjectResolveResult } from '@eduagent/schemas';
 
 // Captured at module load — safe because these screens are portrait-locked.
@@ -328,13 +329,7 @@ export default function CreateSubjectScreen() {
             variant="tertiary"
             size="small"
             label="Cancel"
-            onPress={() => {
-              if (router.canGoBack()) {
-                router.back();
-              } else {
-                router.replace('/(app)/home' as never);
-              }
-            }}
+            onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
             testID="create-subject-cancel"
           />
         </View>

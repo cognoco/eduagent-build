@@ -19,7 +19,6 @@ export interface VoicePlaybackBarProps {
   onResume: () => void;
   onReplay: () => void;
   onRateChange: (rate: number) => void;
-  screenReaderEnabled?: boolean;
 }
 
 function nextRate(current: number): number {
@@ -37,7 +36,6 @@ export function VoicePlaybackBar({
   onResume,
   onReplay,
   onRateChange,
-  screenReaderEnabled = false,
 }: VoicePlaybackBarProps) {
   const colors = useThemeColors();
 
@@ -46,11 +44,6 @@ export function VoicePlaybackBar({
       className="px-4 py-2 bg-surface border-t border-surface-elevated"
       testID="voice-playback-bar"
     >
-      {screenReaderEnabled ? (
-        <Text className="text-caption text-text-secondary mb-2">
-          Auto-play is paused while your screen reader is active.
-        </Text>
-      ) : null}
       <View className="flex-row items-center gap-2">
         {/* Replay */}
         <Pressable

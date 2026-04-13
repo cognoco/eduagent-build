@@ -8,6 +8,7 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({
     back: mockBack,
     replace: mockReplace,
+    canGoBack: jest.fn().mockReturnValue(true),
   }),
   useLocalSearchParams: () => ({
     languageCode: 'es',
