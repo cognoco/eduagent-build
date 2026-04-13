@@ -887,6 +887,7 @@ describe('SubscriptionScreen', () => {
 
   describe('top-up flow', () => {
     const topUpPkg = makeMockPackage({
+      packageType: 'CUSTOM',
       productOverrides: { identifier: 'mentomate_topup_500' },
     });
 

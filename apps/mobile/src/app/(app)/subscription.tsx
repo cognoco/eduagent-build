@@ -570,6 +570,10 @@ export default function SubscriptionScreen() {
   const [topUpPurchasing, setTopUpPurchasing] = useState(false);
   const [topUpPolling, setTopUpPolling] = useState(false);
 
+  // BUG-403: ScrollView ref so the Upgrade button can scroll to offerings
+  const scrollViewRef = useRef<ScrollView>(null);
+  const offeringsYRef = useRef(0);
+
   // Track mount state so the top-up polling loop can bail out if the user
   // navigates away mid-poll (prevents setState-on-unmounted warnings and
   // unnecessary query invalidations).
@@ -587,8 +591,11 @@ export default function SubscriptionScreen() {
     isError: offeringsError,
     refetch: refetchOfferings,
   } = useOfferings();
-  const { data: customerInfo, isLoading: customerInfoLoading } =
-    useCustomerInfo();
+  const {
+    data: customerInfo,
+    isLoading: customerInfoLoading,
+    isError: customerInfoError,
+  } = useCustomerInfo();
   const purchase = usePurchase();
   const restore = useRestorePurchases();
 
@@ -693,8 +700,8 @@ export default function SubscriptionScreen() {
     // Find the top-up package from offerings
     // RevenueCat consumables can be in a separate offering or as a non-subscription package
     const topUpOffering = offerings?.all?.['top_up'] ?? offerings?.current;
-    const topUpPkg = topUpOffering?.availablePackages.find((p) =>
-      p.product.identifier.includes('topup')
+    const topUpPkg = topUpOffering?.availablePackages.find(
+      (p) => p.packageType === PACKAGE_TYPE.CUSTOM
     );
 
     if (!topUpPkg) {
@@ -901,6 +908,7 @@ export default function SubscriptionScreen() {
         </View>
       ) : (
         <ScrollView
+          ref={scrollViewRef}
           className="flex-1 px-5"
           contentContainerStyle={{ flexGrow: 1, paddingBottom: 32 }}
         >
@@ -946,7 +954,11 @@ export default function SubscriptionScreen() {
               <Pressable
                 onPress={() => {
                   if (availablePackages.length > 0) {
-                    // RevenueCat packages available — scroll handled by layout
+                    // BUG-403: Scroll to the offerings section
+                    scrollViewRef.current?.scrollTo({
+                      y: offeringsYRef.current,
+                      animated: true,
+                    });
                   } else {
                     void refetchOfferings();
                   }
@@ -990,6 +1002,15 @@ export default function SubscriptionScreen() {
                   limit={usage.monthlyLimit}
                   warningLevel={usage.warningLevel}
                 />
+                {/* BUG-395: Show daily usage for free-tier users who have a daily cap */}
+                {usage.dailyLimit != null && (
+                  <View className="mt-2" testID="daily-usage">
+                    <Text className="text-caption text-text-secondary">
+                      Today: {usage.usedToday} / {usage.dailyLimit} daily
+                      questions
+                    </Text>
+                  </View>
+                )}
                 {usage.topUpCreditsRemaining > 0 && (
                   <Text className="text-caption text-text-secondary mt-2">
                     + {usage.topUpCreditsRemaining} top-up credits remaining
@@ -999,6 +1020,24 @@ export default function SubscriptionScreen() {
                   Resets {new Date(usage.cycleResetAt).toLocaleDateString()}
                 </Text>
               </View>
+              {/* BUG-395: Show daily quota for free-tier users */}
+              {usage.dailyLimit != null && (
+                <View
+                  className="bg-surface rounded-card px-4 py-3.5 mt-2"
+                  testID="daily-usage-card"
+                >
+                  <UsageMeter
+                    used={usage.usedToday}
+                    limit={usage.dailyLimit}
+                    warningLevel={
+                      usage.usedToday >= usage.dailyLimit ? 'exceeded' : 'none'
+                    }
+                  />
+                  <Text className="text-caption text-text-secondary mt-1">
+                    Daily limit — resets at midnight
+                  </Text>
+                </View>
+              )}
             </View>
           )}
 
@@ -1031,7 +1070,12 @@ export default function SubscriptionScreen() {
 
           {/* RevenueCat Offerings — available packages */}
           {availablePackages.length > 0 && (
-            <View testID="offerings-section">
+            <View
+              testID="offerings-section"
+              onLayout={(e) => {
+                offeringsYRef.current = e.nativeEvent.layout.y;
+              }}
+            >
               <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2 mt-6">
                 Plans
               </Text>
@@ -1057,7 +1101,12 @@ export default function SubscriptionScreen() {
 
           {/* No offerings fallback — show static tier comparison when RevenueCat is unavailable */}
           {availablePackages.length === 0 && !offeringsLoading && (
-            <View testID="no-offerings">
+            <View
+              testID="no-offerings"
+              onLayout={(e) => {
+                offeringsYRef.current = e.nativeEvent.layout.y;
+              }}
+            >
               <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2 mt-6">
                 Plans
               </Text>
@@ -1223,7 +1272,8 @@ export default function SubscriptionScreen() {
           )}
 
           {/* Manage billing — deep links to platform subscription management */}
-          {hasActiveSubscription && (
+          {/* BUG-394: Fall back to API-side tier when RevenueCat fails */}
+          {(hasActiveSubscription || (customerInfoError && isPaidTier)) && (
             <View className="mt-6" testID="manage-section">
               <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2">
                 Manage

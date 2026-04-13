@@ -92,25 +92,16 @@ export function useFamilySubscription(
         const familyClient = client.subscription.family as {
           $get: (input: { init: { signal: AbortSignal } }) => Promise<Response>;
         };
-        try {
-          const res = await familyClient.$get({
-            init: { signal },
-          });
-          if (res.status === 404) {
-            return null;
-          }
-          await assertOk(res);
-          const data = await res.json();
-          return data.family as FamilySubscription;
-        } catch (error) {
-          if (
-            error instanceof Error &&
-            error.message.startsWith('API error 404')
-          ) {
-            return null;
-          }
-          throw error;
+        const res = await familyClient.$get({
+          init: { signal },
+        });
+        // 404 = no family subscription exists — not an error
+        if (res.status === 404) {
+          return null;
         }
+        await assertOk(res);
+        const data = await res.json();
+        return data.family as FamilySubscription;
       } finally {
         cleanup();
       }
