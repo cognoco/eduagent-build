@@ -81,6 +81,8 @@ export interface ExchangeContext {
   llmTier?: LLMTier;
   /** Original free-text input the learner typed when starting this session (CFLF) */
   rawInput?: string | null;
+  /** Input mode for this session — controls voice-optimized brevity in the system prompt */
+  inputMode?: 'text' | 'voice';
 }
 
 /** Result of processing a single exchange */
@@ -458,6 +460,16 @@ export function buildSystemPrompt(context: ExchangeContext): string {
         '- Use "Not yet" framing — the learner hasn\'t got it *yet*, and that is perfectly fine.\n' +
         '- Acknowledge effort and partial correctness before guiding further.\n' +
         '- When a learner repeats a question they asked before, answer it fresh. Do not reference that they "already asked this."'
+    );
+  }
+
+  // Voice-mode brevity constraint — shorter responses for spoken output (FR256)
+  if (context.inputMode === 'voice') {
+    sections.push(
+      'VOICE MODE: The learner is using voice. Keep every response under 50 words. ' +
+        'Use natural spoken language — no bullet lists, no markdown, no headers. ' +
+        'One idea at a time. Ask one question max per turn. ' +
+        'Write as you would speak aloud.'
     );
   }
 

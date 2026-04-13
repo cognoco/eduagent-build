@@ -418,6 +418,23 @@ describe('buildSystemPrompt', () => {
       expect(prompt).toContain('<script>');
     });
   });
+
+  it('includes voice-mode brevity constraint when inputMode is voice', () => {
+    const prompt = buildSystemPrompt({ ...baseContext, inputMode: 'voice' });
+    expect(prompt).toContain('VOICE MODE');
+    expect(prompt).toContain('50 words');
+    expect(prompt).toContain('spoken language');
+  });
+
+  it('does not include voice-mode constraint when inputMode is text', () => {
+    const prompt = buildSystemPrompt({ ...baseContext, inputMode: 'text' });
+    expect(prompt).not.toContain('VOICE MODE');
+  });
+
+  it('does not include voice-mode constraint when inputMode is undefined', () => {
+    const prompt = buildSystemPrompt(baseContext);
+    expect(prompt).not.toContain('VOICE MODE');
+  });
 });
 
 // ---------------------------------------------------------------------------
