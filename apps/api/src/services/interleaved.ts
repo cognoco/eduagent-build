@@ -3,7 +3,7 @@
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import {
   curriculumTopics,
   curricula,
@@ -97,32 +97,29 @@ export async function selectInterleavedTopics(
     selected = [...selected, ...sorted.slice(0, needed)];
   }
 
-  // Resolve topic titles and subject IDs
+  // [BUG-68] Batch topic + curriculum lookups
   const topicIds = selected.map((c) => c.topicId);
-  const topicRows = await Promise.all(
-    topicIds.map((id) =>
-      db.query.curriculumTopics.findFirst({
-        where: eq(curriculumTopics.id, id),
-      })
-    )
-  );
-
-  // Build subject lookup from curricula
-  const curriculumIds = new Set(
-    topicRows.filter(Boolean).map((t) => t!.curriculumId)
-  );
-  const curriculumRows = await Promise.all(
-    [...curriculumIds].map((cid) =>
-      db.query.curricula.findFirst({ where: eq(curricula.id, cid) })
-    )
-  );
+  const topicRows =
+    topicIds.length > 0
+      ? await db.query.curriculumTopics.findMany({
+          where: inArray(curriculumTopics.id, topicIds),
+        })
+      : [];
+  const topicMap = new Map(topicRows.map((t) => [t.id, t]));
+  const curriculumIds = [...new Set(topicRows.map((t) => t.curriculumId))];
+  const curriculumRows =
+    curriculumIds.length > 0
+      ? await db.query.curricula.findMany({
+          where: inArray(curricula.id, curriculumIds),
+        })
+      : [];
   const curriculumToSubject = new Map<string, string>();
   for (const c of curriculumRows) {
-    if (c) curriculumToSubject.set(c.id, c.subjectId);
+    curriculumToSubject.set(c.id, c.subjectId);
   }
 
-  return selected.map((card, i) => {
-    const topic = topicRows[i];
+  return selected.map((card) => {
+    const topic = topicMap.get(card.topicId);
     return {
       topicId: card.topicId,
       subjectId: topic ? curriculumToSubject.get(topic.curriculumId) ?? '' : '',

@@ -344,6 +344,7 @@ import {
   recordSystemPrompt,
   recordSessionEvent,
   setSessionInputMode,
+  SessionExchangeLimitError,
 } from '../services/session';
 import {
   shouldPromptCasualSwitch,
@@ -498,6 +499,27 @@ describe('session routes', () => {
       );
 
       expect(res.status).toBe(401);
+    });
+
+    // BUG-91: session limit must return EXCHANGE_LIMIT_EXCEEDED code, not generic 429
+    it('returns 429 with EXCHANGE_LIMIT_EXCEEDED code when session limit is hit [BUG-91]', async () => {
+      (processMessage as jest.Mock).mockRejectedValueOnce(
+        new SessionExchangeLimitError(50)
+      );
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/messages`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'one more question' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(429);
+      const body = await res.json();
+      expect(body.code).toBe('EXCHANGE_LIMIT_EXCEEDED');
     });
   });
 

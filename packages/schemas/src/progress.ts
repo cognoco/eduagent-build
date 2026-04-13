@@ -97,7 +97,7 @@ export const subjectProgressSchema = z.object({
   topicsCompleted: z.number().int(),
   topicsVerified: z.number().int(),
   urgencyScore: z.number(),
-  retentionStatus: z.enum(['strong', 'fading', 'weak']),
+  retentionStatus: z.enum(['strong', 'fading', 'weak', 'forgotten']),
   lastSessionAt: z.string().datetime().nullable(),
 });
 export type SubjectProgress = z.infer<typeof subjectProgressSchema>;
@@ -151,7 +151,7 @@ export const dashboardChildSchema = z.object({
     z.object({
       subjectId: z.string().uuid().optional(),
       name: z.string(),
-      retentionStatus: z.enum(['strong', 'fading', 'weak']),
+      retentionStatus: z.enum(['strong', 'fading', 'weak', 'forgotten']),
       rawInput: z.string().nullable().optional(),
     })
   ),

@@ -81,16 +81,34 @@ export default function TopicDetailScreen() {
     useTopicParkingLot(subjectId ?? '', topicId ?? '');
 
   const isLoading = progressLoading || retentionLoading || parkingLotLoading;
+  // Data-critical queries only — parking lot is secondary and should not suppress errors
+  const isCriticalLoading = progressLoading || retentionLoading;
 
   if (!subjectId || !topicId) {
     return (
-      <View className="flex-1 bg-background items-center justify-center">
-        <ActivityIndicator size="large" color={colors.muted} />
+      <View className="flex-1 bg-background items-center justify-center px-8">
+        <Text className="text-h3 font-semibold text-text-primary text-center mb-2">
+          Topic not found
+        </Text>
+        <Text className="text-body text-text-secondary text-center mb-6">
+          This topic could not be opened. Please go back and try again.
+        </Text>
+        <Pressable
+          onPress={() => router.back()}
+          className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center"
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+          testID="topic-detail-missing-params-back"
+        >
+          <Text className="text-body font-semibold text-text-inverse">
+            Go back
+          </Text>
+        </Pressable>
       </View>
     );
   }
 
-  if ((progressError || retentionError) && !isLoading) {
+  if ((progressError || retentionError) && !isCriticalLoading) {
     return (
       <View className="flex-1 bg-background items-center justify-center px-8">
         <Text className="text-h3 font-semibold text-text-primary text-center mb-2">
@@ -115,7 +133,7 @@ export default function TopicDetailScreen() {
         </Pressable>
         <Pressable
           onPress={() => router.back()}
-          className="bg-surface rounded-button px-6 py-3 min-h-[48px] items-center justify-center"
+          className="bg-surface rounded-button px-6 py-3 min-h-[48px] items-center justify-center mb-3"
           accessibilityRole="button"
           accessibilityLabel="Go back"
           testID="topic-detail-go-back"
@@ -123,6 +141,15 @@ export default function TopicDetailScreen() {
           <Text className="text-body font-semibold text-text-primary">
             Go back
           </Text>
+        </Pressable>
+        <Pressable
+          onPress={() => router.replace('/(app)')}
+          className="py-2 items-center justify-center"
+          accessibilityRole="button"
+          accessibilityLabel="Go home"
+          testID="topic-detail-go-home"
+        >
+          <Text className="text-body-sm text-primary">Go Home</Text>
         </Pressable>
       </View>
     );

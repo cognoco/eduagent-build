@@ -20,6 +20,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useApiClient } from '../lib/api-client';
 import { useProfile, type Profile } from '../lib/profile';
 import { useThemeColors } from '../lib/theme';
+import { goBackOrReplace } from '../lib/navigation';
 import { Button } from '../components/common/Button';
 import { useKeyboardScroll } from '../hooks/use-keyboard-scroll';
 import { formatApiError } from '../lib/format-api-error';
@@ -69,6 +70,10 @@ export default function CreateProfileScreen() {
   const [loading, setLoading] = useState(false);
   const { scrollRef, onFieldLayout, onFieldFocus } = useKeyboardScroll();
 
+  const handleClose = useCallback(() => {
+    goBackOrReplace(router, '/(app)/home');
+  }, [router]);
+
   const birthYear = birthDate ? birthDate.getFullYear() : null;
 
   const onDateChange = useCallback(
@@ -84,7 +89,10 @@ export default function CreateProfileScreen() {
   );
 
   const canSubmit =
-    displayName.trim().length >= 1 && birthDate !== null && !loading;
+    displayName.trim().length >= 1 &&
+    displayName.trim().length <= 50 &&
+    birthDate !== null &&
+    !loading;
 
   const onSubmit = useCallback(async () => {
     if (!canSubmit || !birthDate) return;
@@ -106,6 +114,15 @@ export default function CreateProfileScreen() {
 
       const res = await client.profiles.$post({ json: body });
       const result = (await res.json()) as { profile: Profile };
+
+      // BUG-264: Optimistically add the new profile to the query cache BEFORE
+      // invalidating. Without this, invalidateQueries triggers a refetch with
+      // stale data (empty array for first-time users), causing activeProfile to
+      // be null briefly, which remounts CreateProfileGate and flashes the
+      // welcome screen again.
+      queryClient.setQueryData<Profile[]>(['profiles'], (old) =>
+        old ? [...old, result.profile] : [result.profile]
+      );
       await queryClient.invalidateQueries({ queryKey: ['profiles'] });
 
       // BUG-239: When a parent adds a child, the API grants consent inline
@@ -113,7 +130,7 @@ export default function CreateProfileScreen() {
       // request screen, and do NOT switch to the child profile — keep the
       // parent on their own profile.
       if (isParentAddingChild) {
-        router.back();
+        handleClose();
         // Show confirmation — parent stays on their own profile
         Alert.alert(
           'Profile created',
@@ -131,15 +148,6 @@ export default function CreateProfileScreen() {
         result.profile.consentStatus === 'PENDING' ||
         result.profile.consentStatus === 'PARENTAL_CONSENT_REQUESTED';
 
-      if (needsConsentFlow) {
-        router.replace({
-          pathname: '/consent',
-          params: { profileId: result.profile.id },
-        });
-      } else {
-        router.back();
-      }
-
       const switchResult = await switchProfile(result.profile.id);
       if (switchResult?.success === false) {
         Alert.alert(
@@ -147,6 +155,15 @@ export default function CreateProfileScreen() {
           switchResult.error ??
             'We created the profile, but could not switch to it automatically. You can switch from the Profiles screen.'
         );
+      }
+
+      if (needsConsentFlow) {
+        router.replace({
+          pathname: '/consent',
+          params: { profileId: result.profile.id },
+        });
+      } else {
+        handleClose();
       }
     } catch (err: unknown) {
       setError(formatApiError(err));
@@ -163,6 +180,7 @@ export default function CreateProfileScreen() {
     queryClient,
     switchProfile,
     router,
+    handleClose,
   ]);
 
   return (
@@ -192,7 +210,7 @@ export default function CreateProfileScreen() {
             variant="tertiary"
             size="small"
             label="Cancel"
-            onPress={() => router.back()}
+            onPress={handleClose}
             testID="create-profile-cancel"
           />
         </View>

@@ -1,4 +1,4 @@
-import { useState, useCallback, type ReactNode } from 'react';
+import { useState, useCallback, useRef, type ReactNode } from 'react';
 import { View, Text, Pressable, Platform } from 'react-native';
 import type { Profile } from '@eduagent/schemas';
 import { isGuardianProfile } from '../../lib/profile';
@@ -15,7 +15,7 @@ function roleLabel(
 
 interface ProfileSwitcherProps {
   profiles: Profile[];
-  activeProfileId: string;
+  activeProfileId?: string;
   onSwitch: (profileId: string) => Promise<{ success: boolean }> | void;
 }
 
@@ -26,6 +26,7 @@ export function ProfileSwitcher({
 }: ProfileSwitcherProps): ReactNode {
   const [isOpen, setIsOpen] = useState(false);
   const [switching, setSwitching] = useState(false);
+  const switchingRef = useRef(false);
 
   const activeProfile = profiles.find((p) => p.id === activeProfileId);
   const initials = activeProfile
@@ -43,7 +44,8 @@ export function ProfileSwitcher({
         setIsOpen(false);
         return;
       }
-      if (switching) return;
+      if (switchingRef.current) return;
+      switchingRef.current = true;
       setSwitching(true);
       try {
         const result = await onSwitch(profileId);
@@ -53,11 +55,15 @@ export function ProfileSwitcher({
           setIsOpen(false);
         }
         // Switch failed — keep dropdown open so user can retry.
+      } catch (err: unknown) {
+        console.error('Profile switch failed:', err);
+        // Dropdown stays open for retry
       } finally {
+        switchingRef.current = false;
         setSwitching(false);
       }
     },
-    [activeProfileId, onSwitch, switching]
+    [activeProfileId, onSwitch]
   );
 
   if (profiles.length <= 1) return null;
@@ -74,6 +80,7 @@ export function ProfileSwitcher({
       <Pressable
         onPress={() => setIsOpen((prev) => !prev)}
         className="flex-row items-center bg-surface-elevated rounded-full px-3 py-1.5"
+        style={Platform.OS === 'web' ? { cursor: 'pointer' } : undefined}
         accessibilityRole="button"
         accessibilityLabel={`Switch profile. Current: ${
           activeProfile?.displayName ?? 'Unknown'
@@ -116,7 +123,9 @@ export function ProfileSwitcher({
             className="bg-surface-elevated rounded-card shadow-lg"
             style={{
               position: 'absolute',
-              top: '100%',
+              // BUG-408: Use fixed offset instead of percentage — Android doesn't
+              // resolve `top: '100%'` correctly in non-sized absolute parents.
+              top: 40,
               right: 0,
               minWidth: 200,
               marginTop: 4,

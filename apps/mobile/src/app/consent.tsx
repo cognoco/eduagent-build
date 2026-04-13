@@ -23,6 +23,7 @@ import {
 } from '../lib/consent-copy';
 import { useNetworkStatus } from '../hooks/use-network-status';
 import { formatApiError } from '../lib/format-api-error';
+import { goBackOrReplace } from '../lib/navigation';
 
 // Captured at module load — safe because these screens are portrait-locked.
 // On web, cap at a mobile-like height to avoid massive whitespace.
@@ -58,6 +59,10 @@ export default function ConsentScreen() {
   const isTransitioningRef = useRef(false);
   const { scrollRef, onFieldLayout, onFieldFocus } = useKeyboardScroll();
 
+  const handleClose = useCallback(() => {
+    goBackOrReplace(router, '/(app)/home');
+  }, [router]);
+
   // BUG-26: Fade animation for phase transitions (child → parent → success)
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
@@ -73,6 +78,12 @@ export default function ConsentScreen() {
         return;
       }
       setIsTransitioning(true);
+      // Safety net: force-reset if animation stalls (BUG-286)
+      const safetyTimer = setTimeout(() => {
+        isTransitioningRef.current = false;
+        setIsTransitioning(false);
+        fadeAnim.setValue(1);
+      }, 1000);
       Animated.timing(fadeAnim, {
         toValue: 0,
         duration: 300,
@@ -84,6 +95,7 @@ export default function ConsentScreen() {
           duration: 300,
           useNativeDriver: true,
         }).start(() => {
+          clearTimeout(safetyTimer);
           isTransitioningRef.current = false;
           setIsTransitioning(false);
         });
@@ -101,16 +113,22 @@ export default function ConsentScreen() {
 
   const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(parentEmail);
   const childEmail = user?.primaryEmailAddress?.emailAddress;
+  const stripSubAddressing = (email: string): string => {
+    const [local, domain] = email.split('@');
+    if (!local || !domain) return email;
+    return `${local.split('+')[0]}@${domain}`;
+  };
   const isSameAsChild =
     isValidEmail &&
     !!childEmail &&
-    parentEmail.trim().toLowerCase() === childEmail.toLowerCase();
+    stripSubAddressing(parentEmail.trim().toLowerCase()) ===
+      stripSubAddressing(childEmail.toLowerCase());
   const canSubmit =
     isValidEmail &&
     !isSameAsChild &&
     !isPending &&
     !isTransitioning &&
-    phase === 'parent' &&
+    (phase === 'child' || phase === 'parent') &&
     !isOffline;
 
   const onSubmit = useCallback(async () => {
@@ -184,32 +202,15 @@ export default function ConsentScreen() {
               <Text className="text-h1 font-bold text-text-primary mb-4">
                 {copy.childTitle}
               </Text>
-              <Text className="text-body text-text-secondary mb-8">
-                {copy.childMessage}
-              </Text>
-              <Button
-                variant="primary"
-                label={copy.handOffButton}
-                onPress={() => transitionToPhase('parent')}
-                testID="consent-handoff-button"
-              />
-            </View>
-          )}
-
-          {phase === 'parent' && (
-            <View testID="consent-parent-view">
-              <Text className="text-h1 font-bold text-text-primary mb-4">
-                {copy.parentTitle}
-              </Text>
-
               <Text className="text-body text-text-secondary mb-6">
-                {regulationText}
+                {copy.childMessage}
               </Text>
 
               {error !== '' && (
                 <View
                   className="bg-danger/10 rounded-card px-4 py-3 mb-4"
                   accessibilityRole="alert"
+                  accessibilityLiveRegion="assertive"
                 >
                   <Text
                     className="text-danger text-body-sm"
@@ -242,6 +243,94 @@ export default function ConsentScreen() {
                     className="text-danger text-body-sm mb-1"
                     testID="consent-same-email-warning"
                     accessibilityRole="alert"
+                    accessibilityLiveRegion="assertive"
+                  >
+                    This is your own email. Please enter a parent or
+                    guardian&apos;s email address.
+                  </Text>
+                )}
+                <Text className="text-body-sm text-text-secondary mb-6">
+                  {copy.spamWarning}
+                </Text>
+              </View>
+
+              <Button
+                variant="primary"
+                label={copy.childSubmitButton}
+                onPress={onSubmit}
+                disabled={!canSubmit}
+                loading={isPending}
+                testID="consent-submit"
+              />
+              <View className="flex-row justify-center mt-4">
+                <Button
+                  variant="tertiary"
+                  size="small"
+                  label={copy.parentIsHereButton}
+                  onPress={() => transitionToPhase('parent')}
+                  testID="consent-handoff-button"
+                />
+              </View>
+              <View className="flex-row justify-center mt-2">
+                <Button
+                  variant="tertiary"
+                  size="small"
+                  label="Go back"
+                  onPress={handleClose}
+                  testID="consent-cancel"
+                />
+              </View>
+            </View>
+          )}
+
+          {phase === 'parent' && (
+            <View testID="consent-parent-view">
+              <Text className="text-h1 font-bold text-text-primary mb-4">
+                {copy.parentTitle}
+              </Text>
+
+              <Text className="text-body text-text-secondary mb-6">
+                {regulationText}
+              </Text>
+
+              {error !== '' && (
+                <View
+                  className="bg-danger/10 rounded-card px-4 py-3 mb-4"
+                  accessibilityRole="alert"
+                  accessibilityLiveRegion="assertive"
+                >
+                  <Text
+                    className="text-danger text-body-sm"
+                    testID="consent-error"
+                  >
+                    {error}
+                  </Text>
+                </View>
+              )}
+
+              <View onLayout={onFieldLayout('email')}>
+                <Text className="text-body-sm font-semibold text-text-secondary mb-1">
+                  {copy.parentEmailLabel}
+                </Text>
+                <TextInput
+                  className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-2"
+                  placeholder={copy.parentEmailPlaceholder}
+                  placeholderTextColor={colors.muted}
+                  value={parentEmail}
+                  onChangeText={setParentEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoComplete="email"
+                  editable={!isPending}
+                  testID="consent-email"
+                  onFocus={onFieldFocus('email')}
+                />
+                {isSameAsChild && (
+                  <Text
+                    className="text-danger text-body-sm mb-1"
+                    testID="consent-same-email-warning"
+                    accessibilityRole="alert"
+                    accessibilityLiveRegion="assertive"
                   >
                     This is your own email. Please enter a parent or
                     guardian&apos;s email address.
@@ -260,6 +349,15 @@ export default function ConsentScreen() {
                 loading={isPending}
                 testID="consent-submit"
               />
+              <View className="flex-row justify-center mt-4">
+                <Button
+                  variant="tertiary"
+                  size="small"
+                  label="Back to child"
+                  onPress={() => transitionToPhase('child')}
+                  testID="consent-back-to-child"
+                />
+              </View>
             </View>
           )}
 
@@ -273,8 +371,10 @@ export default function ConsentScreen() {
               <Text className="text-body text-text-primary mb-2">
                 {deliveryState === 'sent' ? (
                   <>
-                    We sent a consent link to{' '}
-                    <Text className="font-semibold">{parentEmail}</Text>.
+                    Your parent will get an email at{' '}
+                    <Text className="font-semibold">{parentEmail}</Text>
+                    {'. '}
+                    We&apos;ll let you know as soon as they approve.
                   </>
                 ) : (
                   <>
@@ -285,9 +385,9 @@ export default function ConsentScreen() {
                 )}
               </Text>
               <Text className="text-body text-text-secondary mb-8">
-                {deliveryState === 'sent'
-                  ? copy.successSpamHint
-                  : 'You can resend the request now or go back and enter a different email address.'}
+                {deliveryState !== 'sent'
+                  ? 'You can resend the request now or go back and enter a different email address.'
+                  : ''}
               </Text>
               <Button
                 variant="primary"
@@ -296,13 +396,17 @@ export default function ConsentScreen() {
                 }
                 onPress={() =>
                   deliveryState === 'sent'
-                    ? router.back()
+                    ? handleClose()
                     : transitionToPhase('parent')
                 }
                 testID="consent-done"
               />
               {resendError ? (
-                <Text className="text-sm text-red-400 text-center mt-4 mb-1">
+                <Text
+                  className="text-sm text-danger text-center mt-4 mb-1"
+                  accessibilityRole="alert"
+                  accessibilityLiveRegion="assertive"
+                >
                   {resendError}
                 </Text>
               ) : null}

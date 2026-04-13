@@ -27,6 +27,7 @@ import { useTopicSuggestions } from '../../../../../hooks/use-topic-suggestions'
 import { useBookNotes } from '../../../../../hooks/use-notes';
 import { useSubjects } from '../../../../../hooks/use-subjects';
 import { formatApiError } from '../../../../../lib/format-api-error';
+import { goBackOrReplace } from '../../../../../lib/navigation';
 import { useThemeColors } from '../../../../../lib/theme';
 
 // ---------------------------------------------------------------------------
@@ -112,6 +113,18 @@ export default function BookScreen() {
   const subjectsQuery = useSubjects();
   const subjectName = subjectsQuery.data?.find((s) => s.id === subjectId)?.name;
 
+  const handleBack = useCallback(() => {
+    if (subjectId) {
+      goBackOrReplace(router, {
+        pathname: '/(app)/shelf/[subjectId]',
+        params: { subjectId },
+      } as never);
+      return;
+    }
+
+    goBackOrReplace(router, '/(app)/library');
+  }, [router, subjectId]);
+
   // --- Generation auto-trigger ---
   const [genPhase, setGenPhase] = useState<GenerationPhase>('idle');
   const alreadyPending = useRef(false);
@@ -138,13 +151,21 @@ export default function BookScreen() {
 
     generateMutation.mutate(undefined, {
       onSuccess: () => {
+        clearTimeout(slowTimer);
+        clearTimeout(timeoutTimer);
         setGenPhase('idle');
         alreadyPending.current = false;
         void bookQuery.refetch();
       },
-      onError: () => {
+      onError: (error) => {
+        clearTimeout(slowTimer);
+        clearTimeout(timeoutTimer);
         setGenPhase('timed_out');
         alreadyPending.current = false;
+        // BUG-81: Show user-visible error feedback on initial generation failure
+        Alert.alert("Couldn't build this book", formatApiError(error), [
+          { text: 'OK' },
+        ]);
       },
     });
 
@@ -272,31 +293,6 @@ export default function BookScreen() {
     [router]
   );
 
-  // --- Long-press context menu on session ---
-  const handleSessionLongPress = useCallback((session: BookSession) => {
-    Alert.alert(session.topicTitle, undefined, [
-      {
-        text: 'Move to different book',
-        onPress: () => {
-          Alert.alert('Coming soon', 'This feature is not available yet.');
-        },
-      },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: () => {
-          // Deletion would require a separate API endpoint.
-          // For now, show a not-yet-available message.
-          Alert.alert(
-            'Not available yet',
-            'Session deletion will be available in a future update.'
-          );
-        },
-      },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
-  }, []);
-
   // --- Start learning: navigate to session with first suggestion or first uncovered topic ---
   const handleStartLearning = useCallback(() => {
     // Try first suggestion card (which may be a pre-generated topic)
@@ -368,7 +364,7 @@ export default function BookScreen() {
         } as never);
       }
     },
-    [router, subjectId, topics]
+    [router, subjectId]
   );
 
   // --- Screen states ---
@@ -385,7 +381,7 @@ export default function BookScreen() {
           Missing book details. Please go back and try again.
         </Text>
         <Pressable
-          onPress={() => router.back()}
+          onPress={handleBack}
           className="bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
           testID="book-missing-param-back"
         >
@@ -410,7 +406,7 @@ export default function BookScreen() {
           Loading book...
         </Text>
         <Pressable
-          onPress={() => router.back()}
+          onPress={handleBack}
           className="mt-6 px-5 py-3"
           accessibilityLabel="Go back"
           testID="book-loading-back"
@@ -447,7 +443,7 @@ export default function BookScreen() {
           </Text>
         </Pressable>
         <Pressable
-          onPress={() => router.back()}
+          onPress={handleBack}
           className="bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
           testID="book-back-button"
         >
@@ -502,7 +498,7 @@ export default function BookScreen() {
               </Text>
             </Pressable>
             <Pressable
-              onPress={() => router.back()}
+              onPress={handleBack}
               className="px-5 py-3"
               testID="book-gen-back"
               accessibilityLabel="Go back"
@@ -516,7 +512,7 @@ export default function BookScreen() {
 
         {genPhase !== 'timed_out' && (
           <Pressable
-            onPress={() => router.back()}
+            onPress={handleBack}
             className="mt-6 px-5 py-3"
             accessibilityLabel="Go back"
             testID="book-gen-back-idle"
@@ -544,7 +540,7 @@ export default function BookScreen() {
         {/* Header */}
         <View className="px-5 pt-4 pb-3 flex-row items-center">
           <Pressable
-            onPress={() => router.back()}
+            onPress={handleBack}
             className="p-2 -ms-2 me-2"
             accessibilityLabel="Back"
             testID="book-back"
@@ -642,7 +638,6 @@ export default function BookScreen() {
                           s.topicId != null && noteTopicIds.has(s.topicId)
                         }
                         onPress={() => handleSessionPress(s)}
-                        onLongPress={() => handleSessionLongPress(s)}
                         testID={`session-${s.id}`}
                       />
                     ))}
@@ -655,29 +650,58 @@ export default function BookScreen() {
                     relativeDate={formatRelativeDate(s.createdAt)}
                     hasNote={s.topicId != null && noteTopicIds.has(s.topicId)}
                     onPress={() => handleSessionPress(s)}
-                    onLongPress={() => handleSessionLongPress(s)}
                     testID={`session-${s.id}`}
                   />
                 ))}
           </View>
         )}
 
-        {/* Empty state — no sessions yet */}
-        {sessions.length === 0 && !needsGeneration && topics.length > 0 && (
-          <View className="px-5 py-8 items-center" testID="book-empty-sessions">
-            <Ionicons
-              name="book-outline"
-              size={40}
-              color={themeColors.textSecondary}
-            />
-            <Text className="text-body text-text-secondary text-center mt-3 mb-1">
-              No sessions yet
-            </Text>
-            <Text className="text-body-sm text-text-secondary text-center mb-4">
-              Pick a topic above to start learning
-            </Text>
-          </View>
-        )}
+        {/* [BUG-28] All topics completed — distinct from "no sessions" */}
+        {completedTopicCount > 0 &&
+          completedTopicCount >= topics.length &&
+          topics.length > 0 &&
+          !needsGeneration && (
+            <View
+              className="px-5 py-6 items-center"
+              testID="book-all-completed"
+            >
+              <Ionicons
+                name="checkmark-circle"
+                size={40}
+                color={themeColors.primary}
+              />
+              <Text className="text-body text-text-primary text-center mt-3 mb-1 font-semibold">
+                You finished this book!
+              </Text>
+              <Text className="text-body-sm text-text-secondary text-center">
+                All {topics.length} topics covered. Review any topic to
+                strengthen your understanding.
+              </Text>
+            </View>
+          )}
+
+        {/* Empty state — no sessions yet (only when no topics completed) */}
+        {sessions.length === 0 &&
+          !needsGeneration &&
+          topics.length > 0 &&
+          completedTopicCount === 0 && (
+            <View
+              className="px-5 py-8 items-center"
+              testID="book-empty-sessions"
+            >
+              <Ionicons
+                name="book-outline"
+                size={40}
+                color={themeColors.textSecondary}
+              />
+              <Text className="text-body text-text-secondary text-center mt-3 mb-1">
+                No sessions yet
+              </Text>
+              <Text className="text-body-sm text-text-secondary text-center mb-4">
+                Pick a topic above to start learning
+              </Text>
+            </View>
+          )}
 
         {/* Empty topics state */}
         {topics.length === 0 && !needsGeneration && (
@@ -686,7 +710,7 @@ export default function BookScreen() {
               No topics in this book yet.
             </Text>
             <Pressable
-              onPress={() => router.back()}
+              onPress={handleBack}
               className="bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
               testID="book-empty-back"
             >
@@ -708,16 +732,26 @@ export default function BookScreen() {
             onPress={handleStartLearning}
             className="bg-primary rounded-button px-5 py-4 flex-row items-center justify-center min-h-[48px]"
             testID="book-start-learning"
-            accessibilityLabel="Start learning"
+            accessibilityLabel={
+              completedTopicCount >= topics.length && topics.length > 0
+                ? 'Review a topic'
+                : 'Start learning'
+            }
           >
             <Ionicons
-              name="add-circle-outline"
+              name={
+                completedTopicCount >= topics.length && topics.length > 0
+                  ? 'refresh-outline'
+                  : 'add-circle-outline'
+              }
               size={20}
               color={themeColors.textInverse}
               style={{ marginRight: 8 }}
             />
             <Text className="text-body font-semibold text-text-inverse">
-              Start learning
+              {completedTopicCount >= topics.length && topics.length > 0
+                ? 'Review a topic'
+                : 'Start learning'}
             </Text>
           </Pressable>
         </View>

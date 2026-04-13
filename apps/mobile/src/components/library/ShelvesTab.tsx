@@ -211,6 +211,10 @@ export function ShelvesTab({
       progress && progress.topicsTotal > 0
         ? `${progress.topicsCompleted}/${progress.topicsTotal} topics`
         : 'Shelf ready to explore';
+    const reviewLabel =
+      item.reviewDueCount && item.reviewDueCount > 0
+        ? `${item.reviewDueCount} to review`
+        : null;
 
     return (
       <Pressable
@@ -231,6 +235,14 @@ export function ShelvesTab({
             <Text className="text-body-sm text-text-secondary">
               {progressLabel}
             </Text>
+            {reviewLabel ? (
+              <Text
+                className="text-caption text-primary mt-1"
+                testID={`subject-review-due-${subject.id}`}
+              >
+                {reviewLabel}
+              </Text>
+            ) : null}
             {progress?.lastSessionAt && (
               <Text className="text-caption text-text-secondary mt-2">
                 Last session: {formatLastPracticed(progress.lastSessionAt)}
@@ -288,6 +300,7 @@ export function ShelvesTab({
           data={filtered}
           keyExtractor={(item) => item.subject.id}
           renderItem={renderShelfCard}
+          scrollEnabled={false}
           testID="shelves-list"
         />
       )}

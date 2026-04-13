@@ -1,8 +1,8 @@
 import { View, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeColors } from '../../lib/theme';
-
-export type RetentionStatus = 'strong' | 'fading' | 'weak' | 'forgotten';
+import type { RetentionStatus } from '@eduagent/schemas';
+export type { RetentionStatus };
 
 interface RetentionSignalProps {
   status: RetentionStatus;

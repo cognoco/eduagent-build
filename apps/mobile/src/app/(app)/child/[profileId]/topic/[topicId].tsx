@@ -42,13 +42,13 @@ export default function TopicDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const {
-    topicId,
-    profileId,
+    topicId: rawTopicId,
+    profileId: rawProfileId,
     title,
     completionStatus,
     masteryScore,
     retentionStatus,
-    subjectId,
+    subjectId: rawSubjectId,
   } = useLocalSearchParams<{
     topicId: string;
     profileId: string;
@@ -58,6 +58,13 @@ export default function TopicDetailScreen() {
     retentionStatus: string;
     subjectId: string;
   }>();
+  const topicId = Array.isArray(rawTopicId) ? rawTopicId[0] : rawTopicId;
+  const profileId = Array.isArray(rawProfileId)
+    ? rawProfileId[0]
+    : rawProfileId;
+  const subjectId = Array.isArray(rawSubjectId)
+    ? rawSubjectId[0]
+    : rawSubjectId;
 
   const mastery =
     masteryScore !== undefined && masteryScore !== ''
@@ -172,7 +179,7 @@ export default function TopicDetailScreen() {
                 router.push({
                   pathname: '/(app)/child/[profileId]/session/[sessionId]',
                   params: {
-                    profileId: profileId!,
+                    profileId: profileId ?? '',
                     sessionId: session.sessionId,
                   },
                 } as never)

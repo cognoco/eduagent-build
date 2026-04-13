@@ -389,8 +389,32 @@ describe('getTopicProgress', () => {
 
     expect(result!.retentionStatus).toBe('forgotten');
   });
-});
 
+  it('marks struggle status as blocked when active deepening AND failureCount >= 3 [BUG-58]', async () => {
+    const topic = mockTopicRow();
+    setupScopedRepo({
+      subjectFindFirst: mockSubjectRow(),
+      retentionCardFindFirst: mockRetentionCard({ failureCount: 3 }),
+      assessmentsFindMany: [],
+      sessionsFindMany: [],
+      needsDeepeningFindMany: [{ topicId, status: 'active' }],
+      xpLedgerFindMany: [],
+    });
+    const db = {
+      query: {
+        curricula: { findFirst: jest.fn().mockResolvedValue(undefined) },
+        curriculumTopics: {
+          findFirst: jest.fn().mockResolvedValue(topic),
+          findMany: jest.fn().mockResolvedValue([]),
+        },
+      },
+    } as unknown as Database;
+
+    const result = await getTopicProgress(db, profileId, subjectId, topicId);
+
+    expect(result!.struggleStatus).toBe('blocked');
+  });
+});
 // ---------------------------------------------------------------------------
 // getOverallProgress
 // ---------------------------------------------------------------------------

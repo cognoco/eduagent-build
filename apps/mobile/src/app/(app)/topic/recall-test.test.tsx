@@ -72,7 +72,7 @@ jest.mock('../../../components/session/ChatShell', () => {
       setIsStreaming(false);
       setMessages((prev) => [
         ...prev,
-        { id: `ai-${prev.length}`, role: 'ai', content },
+        { id: `ai-${prev.length}`, role: 'assistant', content },
       ]);
       onComplete?.();
       return () => undefined;

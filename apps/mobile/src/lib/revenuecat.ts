@@ -35,10 +35,19 @@ export function configureRevenueCat(): void {
   const apiKey = getRevenueCatApiKey();
 
   if (!apiKey) {
+    // BUG-78: Always log when API key is missing, not just in dev.
+    // On web this is expected (no native IAP), but on iOS/Android a missing
+    // key means purchases are silently broken.
+    if (Platform.OS === 'web') {
+      return; // expected — web has no native IAP
+    }
+    const message = `[RevenueCat] API key not configured for ${Platform.OS}; purchases are disabled in this build`;
     if (__DEV__) {
-      console.warn(
-        `[RevenueCat] API key not configured for ${Platform.OS}; purchases are disabled in this build`
-      );
+      console.warn(message);
+    } else {
+      // Production: use console.error so crash reporters / log aggregators
+      // surface the misconfiguration rather than silently disabling purchases.
+      console.error(message);
     }
     return;
   }

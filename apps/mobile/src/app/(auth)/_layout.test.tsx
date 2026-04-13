@@ -78,18 +78,19 @@ describe('AuthRoutesLayout', () => {
     expect(screen.queryByTestId('stack')).toBeNull();
   });
 
-  it('stays on auth screen when isLoaded is false (Clerk still initializing)', () => {
+  it('renders nothing when isLoaded is false (Clerk still initializing)', () => {
     (useAuth as jest.Mock).mockReturnValue({
       isLoaded: false,
       isSignedIn: undefined,
     });
 
-    render(<AuthLayout />);
+    const { toJSON } = render(<AuthLayout />);
 
-    // Should render auth routes, not redirect — Clerk hasn't determined
-    // auth state yet.  Redirecting here would flash the sign-in screen
-    // for already-signed-in users.
-    expect(screen.getByTestId('stack')).toBeTruthy();
+    // Should render nothing — Clerk hasn't determined auth state yet.
+    // Rendering the Stack would flash sign-in for already-signed-in users.
+    // Rendering a Redirect would send users to the wrong place.
+    expect(toJSON()).toBeNull();
+    expect(screen.queryByTestId('stack')).toBeNull();
     expect(screen.queryByTestId('redirect')).toBeNull();
   });
 });

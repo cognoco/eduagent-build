@@ -82,7 +82,7 @@ export const tokens: Record<Persona, Record<ColorScheme, ThemeTokens>> = {
         surface: '#22224a',
         surfaceElevated: '#2a2a54',
         textPrimary: '#f5f5f5',
-        textSecondary: '#a3a3a3',
+        textSecondary: '#94a3b8',
         textInverse: '#ffffff',
         primary: '#2dd4bf',
         primarySoft: 'rgba(45, 212, 191, 0.16)',

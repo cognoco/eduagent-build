@@ -5,7 +5,7 @@ import {
   topUpRequestSchema,
   byokWaitlistSchema,
   familyAddProfileSchema,
-  familyRemoveProfileSchema,
+  // familyRemoveProfileSchema, // disabled until invite/claim flow exists (CR-21)
   ERROR_CODES,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
@@ -22,8 +22,8 @@ import {
   getTopUpPriceCents,
   listFamilyMembers,
   addProfileToSubscription,
-  removeProfileFromSubscription,
-  ProfileRemovalNotImplementedError,
+  // removeProfileFromSubscription, // disabled until invite/claim flow exists (CR-21)
+  // ProfileRemovalNotImplementedError, // disabled until invite/claim flow exists (CR-21)
   getFamilyPoolStatus,
 } from '../services/billing';
 import {
@@ -138,14 +138,12 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       const db = c.get('db');
       const account = c.get('account');
 
+      // BUG-77: Return 404 (not 500) when Stripe is unconfigured — these
+      // endpoints are dormant for mobile. 404 communicates "feature not
+      // available" rather than misleading "server error".
       const stripeKey = c.env.STRIPE_SECRET_KEY;
       if (!stripeKey) {
-        return apiError(
-          c,
-          500,
-          ERROR_CODES.INTERNAL_ERROR,
-          'Stripe is not configured'
-        );
+        return notFound(c, 'Stripe web billing is not currently enabled');
       }
 
       const priceId = resolvePriceId(c.env, tier, interval);
@@ -217,14 +215,10 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       return notFound(c, 'No active subscription to cancel');
     }
 
+    // BUG-77: 404 when Stripe unconfigured (dormant for mobile)
     const stripeKey = c.env.STRIPE_SECRET_KEY;
     if (!stripeKey) {
-      return apiError(
-        c,
-        500,
-        ERROR_CODES.INTERNAL_ERROR,
-        'Stripe is not configured'
-      );
+      return notFound(c, 'Stripe web billing is not currently enabled');
     }
 
     const stripe = createStripeClient(stripeKey);
@@ -279,14 +273,10 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
         );
       }
 
+      // BUG-77: 404 when Stripe unconfigured (dormant for mobile)
       const stripeKey = c.env.STRIPE_SECRET_KEY;
       if (!stripeKey) {
-        return apiError(
-          c,
-          500,
-          ERROR_CODES.INTERNAL_ERROR,
-          'Stripe is not configured'
-        );
+        return notFound(c, 'Stripe web billing is not currently enabled');
       }
 
       const stripe = createStripeClient(stripeKey);
@@ -397,14 +387,10 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       return notFound(c, 'No billing account found');
     }
 
+    // BUG-77: 404 when Stripe unconfigured (dormant for mobile)
     const stripeKey = c.env.STRIPE_SECRET_KEY;
     if (!stripeKey) {
-      return apiError(
-        c,
-        500,
-        ERROR_CODES.INTERNAL_ERROR,
-        'Stripe is not configured'
-      );
+      return notFound(c, 'Stripe web billing is not currently enabled');
     }
 
     const stripe = createStripeClient(stripeKey);
@@ -532,56 +518,58 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     }
   )
 
-  // Remove a profile from the family subscription
-  .post(
-    '/subscription/family/remove',
-    zValidator('json', familyRemoveProfileSchema),
-    async (c) => {
-      const { profileId, newAccountId } = c.req.valid('json');
-      const db = c.get('db');
-      const account = c.get('account');
-
-      const subscription = await getSubscriptionByAccountId(db, account.id);
-      if (!subscription) {
-        return notFound(c, 'No subscription found');
-      }
-
-      let result: { removedProfileId: string } | null;
-      try {
-        result = await removeProfileFromSubscription(
-          db,
-          subscription.id,
-          profileId,
-          newAccountId
-        );
-      } catch (err) {
-        if (err instanceof ProfileRemovalNotImplementedError) {
-          return apiError(
-            c,
-            422,
-            ERROR_CODES.NOT_IMPLEMENTED,
-            'Profile removal is not yet implemented. An invite/claim flow is required.'
-          );
-        }
-        throw err;
-      }
-
-      if (!result) {
-        return apiError(
-          c,
-          403,
-          ERROR_CODES.FORBIDDEN,
-          'Cannot remove profile. Profile not found, not in this family, or is the subscription owner.'
-        );
-      }
-
-      return c.json({
-        message:
-          'Profile removed from family subscription and downgraded to Free tier',
-        removedProfileId: result.removedProfileId,
-      });
-    }
-  )
+  // ---------------------------------------------------------------------------
+  // Family profile removal — disabled until invite/claim flow exists (CR-21)
+  // ---------------------------------------------------------------------------
+  // .post(
+  //   '/subscription/family/remove',
+  //   zValidator('json', familyRemoveProfileSchema),
+  //   async (c) => {
+  //     const { profileId, newAccountId } = c.req.valid('json');
+  //     const db = c.get('db');
+  //     const account = c.get('account');
+  //
+  //     const subscription = await getSubscriptionByAccountId(db, account.id);
+  //     if (!subscription) {
+  //       return notFound(c, 'No subscription found');
+  //     }
+  //
+  //     let result: { removedProfileId: string } | null;
+  //     try {
+  //       result = await removeProfileFromSubscription(
+  //         db,
+  //         subscription.id,
+  //         profileId,
+  //         newAccountId
+  //       );
+  //     } catch (err) {
+  //       if (err instanceof ProfileRemovalNotImplementedError) {
+  //         return apiError(
+  //           c,
+  //           422,
+  //           ERROR_CODES.NOT_IMPLEMENTED,
+  //           'Profile removal is not yet implemented. An invite/claim flow is required.'
+  //         );
+  //       }
+  //       throw err;
+  //     }
+  //
+  //     if (!result) {
+  //       return apiError(
+  //         c,
+  //         403,
+  //         ERROR_CODES.FORBIDDEN,
+  //         'Cannot remove profile. Profile not found, not in this family, or is the subscription owner.'
+  //       );
+  //     }
+  //
+  //     return c.json({
+  //       message:
+  //         'Profile removed from family subscription and downgraded to Free tier',
+  //       removedProfileId: result.removedProfileId,
+  //     });
+  //   }
+  // )
 
   // Join BYOK waitlist
   .post('/byok-waitlist', zValidator('json', byokWaitlistSchema), async (c) => {

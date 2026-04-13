@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IntentCard } from '../../components/home/IntentCard';
+import { goBackOrReplace } from '../../lib/navigation';
 import { useProfile } from '../../lib/profile';
 import {
   clearSessionRecoveryMarker,
@@ -17,13 +18,21 @@ export default function LearnNewScreen(): React.ReactElement {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
-  const { activeProfile } = useProfile();
+  const { activeProfile, isLoading: isProfileLoading } = useProfile();
   const [recoveryMarker, setRecoveryMarker] =
     useState<SessionRecoveryMarker | null>(null);
   const [expiredRecoveryMarker, setExpiredRecoveryMarker] =
     useState<SessionRecoveryMarker | null>(null);
 
+  const handleBack = () => {
+    goBackOrReplace(router, '/(app)/home');
+  };
+
   useEffect(() => {
+    // BUG-310: Don't read until profile is confirmed — avoids reading the
+    // wrong (unscoped) recovery key while activeProfile is still null.
+    if (isProfileLoading) return;
+
     let cancelled = false;
 
     async function loadRecoveryMarker(): Promise<void> {
@@ -56,7 +65,7 @@ export default function LearnNewScreen(): React.ReactElement {
     return () => {
       cancelled = true;
     };
-  }, [activeProfile?.id]);
+  }, [activeProfile?.id, isProfileLoading]);
 
   return (
     <ScrollView
@@ -70,7 +79,7 @@ export default function LearnNewScreen(): React.ReactElement {
     >
       <View className="flex-row items-center mb-6">
         <Pressable
-          onPress={() => router.back()}
+          onPress={handleBack}
           className="mr-3 min-h-[32px] min-w-[32px] items-center justify-center"
           accessibilityRole="button"
           accessibilityLabel="Go back"

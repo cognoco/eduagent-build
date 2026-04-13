@@ -1,3 +1,5 @@
+import type { HomeworkCaptureSource } from '@eduagent/schemas';
+
 export type CameraPhase =
   | 'permission'
   | 'viewfinder'
@@ -9,6 +11,7 @@ export type CameraPhase =
 export type CameraState = {
   phase: CameraPhase;
   imageUri: string | null;
+  source: HomeworkCaptureSource;
   ocrText: string | null;
   errorMessage: string | null;
   failCount: number;
@@ -16,7 +19,7 @@ export type CameraState = {
 
 export type CameraAction =
   | { type: 'PERMISSION_GRANTED' }
-  | { type: 'PHOTO_TAKEN'; uri: string }
+  | { type: 'PHOTO_TAKEN'; uri: string; source: HomeworkCaptureSource }
   | { type: 'CONFIRM_PHOTO' }
   | { type: 'RETAKE' }
   | { type: 'OCR_SUCCESS'; text: string }
@@ -27,6 +30,7 @@ export type CameraAction =
 export const initialCameraState: CameraState = {
   phase: 'permission',
   imageUri: null,
+  source: 'camera',
   ocrText: null,
   errorMessage: null,
   failCount: 0,
@@ -41,7 +45,12 @@ export function cameraReducer(
       return { ...state, phase: 'viewfinder' };
 
     case 'PHOTO_TAKEN':
-      return { ...state, phase: 'preview', imageUri: action.uri };
+      return {
+        ...state,
+        phase: 'preview',
+        imageUri: action.uri,
+        source: action.source,
+      };
 
     case 'CONFIRM_PHOTO':
       return { ...state, phase: 'processing' };

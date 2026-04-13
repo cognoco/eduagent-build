@@ -3,7 +3,6 @@ import {
   filterCelebrationsByLevel,
   filterPendingCelebrations,
   queueCelebration,
-  PARENT_VISIBLE_REASONS,
 } from './celebrations';
 
 const profileId = 'test-profile-id';
@@ -120,7 +119,7 @@ describe('filterPendingCelebrations', () => {
 
     expect(result).toEqual([
       expect.objectContaining({
-        reason: PARENT_VISIBLE_REASONS[0],
+        reason: 'topic_mastered',
       }),
     ]);
   });

@@ -4,14 +4,13 @@ import {
   Text,
   Pressable,
   ScrollView,
-  TextInput,
   Alert,
   ActivityIndicator,
   Linking,
   Platform,
 } from 'react-native';
 import { useState, useCallback, useEffect, useRef } from 'react';
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from '../../lib/secure-storage';
 import { migrateSecureStoreKey } from '../../lib/migrate-secure-store-key';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -386,15 +385,14 @@ function ChildPaywall(): React.ReactElement {
       }
     } catch {
       Alert.alert(
-        'Ask your parent',
-        'Ask your parent to open the app and subscribe.'
+        'Could not send notification',
+        'Please check your connection and try again.'
       );
     }
   }, [notifyParent, profileId]);
 
   const topicsLearned = xpSummary?.topicsCompleted ?? 0;
   const totalXp = xpSummary?.totalXp ?? 0;
-  const hasStats = topicsLearned > 0 || totalXp > 0;
 
   return (
     <View
@@ -418,11 +416,11 @@ function ChildPaywall(): React.ReactElement {
           Nice work so far!
         </Text>
         <Text className="text-body text-text-secondary mb-2 text-center">
-          {hasStats
+          {topicsLearned > 0 || totalXp > 0
             ? `You learned ${topicsLearned} topic${
                 topicsLearned !== 1 ? 's' : ''
-              } and earned ${totalXp} XP \u2014 keep going!`
-            : "You've been making great progress \u2014 keep going!"}
+              } and earned ${totalXp} XP \u2014 great work!`
+            : "You've been exploring and learning \u2014 great start!"}
         </Text>
         <Text className="text-body text-text-secondary mb-8 text-center">
           You've used all your free questions. Ask your parent to upgrade so you
@@ -464,14 +462,24 @@ function ChildPaywall(): React.ReactElement {
           </Text>
         )}
 
-        <Text className="text-body-sm text-text-secondary text-center mb-6">
-          While you wait, you can still browse your Library and see your
-          progress.
-        </Text>
+        {isNotified ? (
+          <Text
+            className="text-body-sm text-text-secondary text-center mb-4"
+            testID="notified-explore-text"
+          >
+            Your parent has been notified! While you wait, you can still
+            explore:
+          </Text>
+        ) : (
+          <Text className="text-body-sm text-text-secondary text-center mb-4">
+            While you wait, you can still browse your Library and see your
+            progress.
+          </Text>
+        )}
 
         <Pressable
           onPress={() => router.push('/(app)/library')}
-          className="bg-surface rounded-button py-3.5 px-8 items-center w-full"
+          className="bg-surface rounded-button py-3.5 px-8 items-center w-full mb-2"
           testID="browse-library-button"
           accessibilityRole="button"
           accessibilityLabel="Browse Library"
@@ -479,6 +487,28 @@ function ChildPaywall(): React.ReactElement {
           <Text className="text-body font-semibold text-primary">
             Browse Library
           </Text>
+        </Pressable>
+
+        <Pressable
+          onPress={() => router.push('/(app)/progress')}
+          className="bg-surface rounded-button py-3.5 px-8 items-center w-full mb-2"
+          testID="see-progress-button"
+          accessibilityRole="button"
+          accessibilityLabel="See your progress"
+        >
+          <Text className="text-body font-semibold text-primary">
+            See your progress
+          </Text>
+        </Pressable>
+
+        <Pressable
+          onPress={() => router.push('/(app)/home')}
+          className="bg-surface rounded-button py-3.5 px-8 items-center w-full"
+          testID="go-home-button"
+          accessibilityRole="button"
+          accessibilityLabel="Go Home"
+        >
+          <Text className="text-body font-semibold text-primary">Go Home</Text>
         </Pressable>
       </View>
     </View>
@@ -493,7 +523,6 @@ export default function SubscriptionScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const colors = useThemeColors();
-  const [byokEmail, setByokEmail] = useState('');
   const { activeProfile } = useProfile();
 
   const queryClient = useQueryClient();
@@ -725,16 +754,13 @@ export default function SubscriptionScreen() {
   // ---------------------------------------------------------------------------
 
   const handleByokSubmit = useCallback(async () => {
-    const email = byokEmail.trim();
-    if (!email) return;
     try {
-      await byokWaitlist.mutateAsync({ email });
+      await byokWaitlist.mutateAsync();
       Alert.alert('Waitlist', 'You have been added to the BYOK waitlist.');
-      setByokEmail('');
     } catch {
       Alert.alert('Error', 'Could not join waitlist. Try again.');
     }
-  }, [byokEmail, byokWaitlist]);
+  }, [byokWaitlist]);
 
   // ---------------------------------------------------------------------------
   // Child profile gate — child sees the child-friendly paywall
@@ -744,8 +770,11 @@ export default function SubscriptionScreen() {
   const hasLoadError = subError || usageError;
   const trialOrExpired =
     !hasLoadError &&
-    (subscription?.status === 'expired' || (!subscription && !subLoading));
-  if (isChild && trialOrExpired) {
+    (subscription?.status === 'expired' ||
+      subscription?.status === 'cancelled' ||
+      (!subscription && !subLoading));
+  const quotaExhausted = !hasLoadError && usage?.warningLevel === 'exceeded';
+  if (isChild && (trialOrExpired || quotaExhausted)) {
     return <ChildPaywall />;
   }
 
@@ -1176,42 +1205,29 @@ export default function SubscriptionScreen() {
             <View className="bg-surface rounded-card px-4 py-3.5">
               <Text className="text-body-sm text-text-secondary mb-3">
                 Use your own API key to unlock unlimited questions. Join the
-                waitlist to be notified when available.
+                waitlist to be notified when available. We'll use your account
+                email.
               </Text>
-              <View className="flex-row">
-                <TextInput
-                  value={byokEmail}
-                  onChangeText={setByokEmail}
-                  placeholder="your@email.com"
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  className="flex-1 bg-background rounded-button px-3 py-2.5 text-body text-text-primary me-2"
-                  placeholderTextColor={colors.muted}
-                  accessibilityLabel="Email for BYOK waitlist"
-                  testID="byok-waitlist-email-input"
-                />
-                <Pressable
-                  onPress={handleByokSubmit}
-                  disabled={byokWaitlist.isPending || !byokEmail.trim()}
-                  className="bg-primary rounded-button px-4 py-2.5 justify-center"
-                  accessibilityLabel="Join BYOK waitlist"
-                  accessibilityRole="button"
-                  testID="join-byok-waitlist-button"
-                >
-                  {byokWaitlist.isPending ? (
-                    <ActivityIndicator
-                      size="small"
-                      color={colors.textInverse}
-                      testID="join-byok-waitlist-loading"
-                    />
-                  ) : (
-                    <Text className="text-text-inverse text-body font-semibold">
-                      Join
-                    </Text>
-                  )}
-                </Pressable>
-              </View>
+              <Pressable
+                onPress={handleByokSubmit}
+                disabled={byokWaitlist.isPending}
+                className="bg-primary rounded-button px-4 py-2.5 items-center justify-center"
+                accessibilityLabel="Join BYOK waitlist"
+                accessibilityRole="button"
+                testID="join-byok-waitlist-button"
+              >
+                {byokWaitlist.isPending ? (
+                  <ActivityIndicator
+                    size="small"
+                    color={colors.textInverse}
+                    testID="join-byok-waitlist-loading"
+                  />
+                ) : (
+                  <Text className="text-text-inverse text-body font-semibold">
+                    Join Waitlist
+                  </Text>
+                )}
+              </Pressable>
             </View>
           </View>
         </ScrollView>

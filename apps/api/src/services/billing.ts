@@ -180,11 +180,15 @@ export async function updateSubscriptionFromWebhook(
     return null;
   }
 
-  // Idempotency check: skip if incoming event is older
+  // Idempotency check: skip if incoming event is older (NaN-safe) [1C.6]
   if (existing.lastStripeEventTimestamp) {
     const existingTs = existing.lastStripeEventTimestamp.getTime();
     const incomingTs = new Date(updates.lastStripeEventTimestamp).getTime();
-    if (incomingTs <= existingTs) {
+    if (
+      !Number.isNaN(existingTs) &&
+      !Number.isNaN(incomingTs) &&
+      incomingTs <= existingTs
+    ) {
       return mapSubscriptionRow(existing);
     }
   }

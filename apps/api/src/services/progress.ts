@@ -25,24 +25,28 @@ import type { SubjectProgress, TopicProgress } from '@eduagent/schemas';
 
 function computeRetentionStatus(
   nextReviewAt: Date | null
-): 'strong' | 'fading' | 'weak' {
-  if (!nextReviewAt) return 'weak';
+): 'strong' | 'fading' | 'weak' | 'forgotten' {
+  if (!nextReviewAt) return 'forgotten';
   const now = new Date();
   const daysUntilReview =
     (nextReviewAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
   if (daysUntilReview > 3) return 'strong';
   if (daysUntilReview > 0) return 'fading';
-  return 'weak';
+  if (daysUntilReview > -7) return 'weak';
+  return 'forgotten';
 }
 
 function computeAggregateRetentionStatus(
-  statuses: Array<'strong' | 'fading' | 'weak'>
-): 'strong' | 'fading' | 'weak' {
+  statuses: Array<'strong' | 'fading' | 'weak' | 'forgotten'>
+): 'strong' | 'fading' | 'weak' | 'forgotten' {
   if (statuses.length === 0) return 'strong';
+  const forgottenCount = statuses.filter((s) => s === 'forgotten').length;
   const weakCount = statuses.filter((s) => s === 'weak').length;
   const fadingCount = statuses.filter((s) => s === 'fading').length;
-  if (weakCount > statuses.length * 0.3) return 'weak';
-  if (fadingCount + weakCount > statuses.length * 0.3) return 'fading';
+  if (forgottenCount > statuses.length * 0.3) return 'forgotten';
+  if (weakCount + forgottenCount > statuses.length * 0.3) return 'weak';
+  if (fadingCount + weakCount + forgottenCount > statuses.length * 0.3)
+    return 'fading';
   return 'strong';
 }
 

@@ -47,6 +47,9 @@ export default function CreateSubjectScreen() {
   const [name, setName] = useState('');
   const [originalInput, setOriginalInput] = useState('');
   const [error, setError] = useState('');
+  // BUG-324: Track subject-limit error from the raw error object — not the
+  // formatted display string which may strip keywords the regex depends on.
+  const [isSubjectLimitError, setIsSubjectLimitError] = useState(false);
   const [resolveState, setResolveState] = useState<ResolveState>({
     phase: 'idle',
   });
@@ -140,6 +143,10 @@ export default function CreateSubjectScreen() {
           },
         } as never);
       } catch (err: unknown) {
+        const rawMsg = err instanceof Error ? err.message : '';
+        setIsSubjectLimitError(
+          /subject limit|max subjects|too many subjects/i.test(rawMsg)
+        );
         setError(formatApiError(err));
         setResolveState({ phase: 'idle' });
       }
@@ -153,7 +160,7 @@ export default function CreateSubjectScreen() {
       if (!trimmedInput) return;
 
       setResolveRounds((prev) => prev + 1);
-      setOriginalInput(trimmedInput);
+      setOriginalInput((prev) => prev || trimmedInput);
       setResolveState({ phase: 'resolving' });
       setError('');
 
@@ -175,13 +182,22 @@ export default function CreateSubjectScreen() {
         setShowClarifyInput(false);
         setResolveState({ phase: 'suggestion', result });
       } catch {
-        await doCreate(trimmedInput, trimmedInput);
+        // Don't fall through to create on network error
+        setError(
+          'Could not check if this subject exists. Please check your connection and try again.'
+        );
+        setResolveState({ phase: 'idle' });
+        return;
       }
     },
     [doCreate, resolveSubject]
   );
 
   const onSubmit = useCallback(async () => {
+    if (!name.trim()) {
+      setError('Please enter a subject name');
+      return;
+    }
     if (!canSubmit) return;
     setError('');
     await resolveInput(name.trim());
@@ -281,10 +297,9 @@ export default function CreateSubjectScreen() {
   const isNoMatch = showSuggestion && resolveState.result.status === 'no_match';
   const allowUseMyWords = isNoMatch || resolveRounds >= 2;
   const exactWords = (clarificationInput || originalInput || name).trim();
-  const subjectLimitGuidance =
-    /subject limit|max subjects|too many subjects/i.test(error)
-      ? ' Delete an old subject first to make room.'
-      : '';
+  const subjectLimitGuidance = isSubjectLimitError
+    ? ' Delete an old subject first to make room.'
+    : '';
 
   return (
     <KeyboardAvoidingView
@@ -313,7 +328,13 @@ export default function CreateSubjectScreen() {
             variant="tertiary"
             size="small"
             label="Cancel"
-            onPress={() => router.back()}
+            onPress={() => {
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace('/(app)/home' as never);
+              }
+            }}
             testID="create-subject-cancel"
           />
         </View>
@@ -518,7 +539,7 @@ export default function CreateSubjectScreen() {
           resolveState.phase === 'suggestion' && (
             <View
               className="bg-primary-soft rounded-card px-4 py-4 mb-4"
-              testID="subject-suggestion-card"
+              testID="subject-single-suggestion-card"
             >
               <View className="flex-row items-start mb-3">
                 <Ionicons
@@ -563,14 +584,25 @@ export default function CreateSubjectScreen() {
 
         {/* Only show Start Learning when not showing suggestions */}
         {!showSuggestion && (
-          <Button
-            variant="primary"
-            label="Start Learning"
-            onPress={onSubmit}
-            disabled={!canSubmit}
-            loading={isBusy}
-            testID="create-subject-submit"
-          />
+          <>
+            <Button
+              variant="primary"
+              label="Start Learning"
+              onPress={onSubmit}
+              disabled={!canSubmit}
+              loading={isBusy}
+              testID="create-subject-submit"
+            />
+            {/* BUG-414: Explain why button is disabled */}
+            {!canSubmit && !isBusy && (
+              <Text
+                className="text-body-sm text-text-secondary text-center mt-2"
+                testID="create-subject-validation-hint"
+              >
+                Enter a subject name to get started
+              </Text>
+            )}
+          </>
         )}
       </ScrollView>
     </KeyboardAvoidingView>

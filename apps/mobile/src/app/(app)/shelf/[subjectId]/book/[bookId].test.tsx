@@ -12,10 +12,17 @@ jest.mock('react-native-safe-area-context', () => ({
 
 const mockPush = jest.fn();
 const mockBack = jest.fn();
+const mockReplace = jest.fn();
+const mockCanGoBack = jest.fn();
 
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockSearchParams(),
-  useRouter: () => ({ push: mockPush, back: mockBack }),
+  useRouter: () => ({
+    push: mockPush,
+    back: mockBack,
+    replace: mockReplace,
+    canGoBack: mockCanGoBack,
+  }),
 }));
 
 // Default search params — overridden per test via mockSearchParams
@@ -156,6 +163,7 @@ function makeSessions(count: number, withChapters = false) {
 describe('BookScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockCanGoBack.mockReturnValue(true);
     // Reset to defaults
     mockSearchParams = () => ({
       subjectId: 'sub-1',
@@ -584,8 +592,8 @@ describe('BookScreen', () => {
     );
   });
 
-  it('long-pressing a session row shows context alert', () => {
-    const alertSpy = jest.spyOn(Alert, 'alert');
+  it('long-pressing a session row no longer shows unavailable actions', () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(jest.fn());
     mockUseBookSessions.mockReturnValue({
       data: makeSessions(1),
       isLoading: false,
@@ -594,15 +602,7 @@ describe('BookScreen', () => {
     const { getByTestId } = render(<BookScreen />);
     fireEvent(getByTestId('session-sess-1'), 'longPress');
 
-    expect(alertSpy).toHaveBeenCalledWith(
-      'Session Topic 1',
-      undefined,
-      expect.arrayContaining([
-        expect.objectContaining({ text: 'Move to different book' }),
-        expect.objectContaining({ text: 'Delete', style: 'destructive' }),
-        expect.objectContaining({ text: 'Cancel', style: 'cancel' }),
-      ])
-    );
+    expect(alertSpy).not.toHaveBeenCalled();
   });
 
   it('shows "Past sessions" heading when sessions exist', () => {
@@ -658,6 +658,17 @@ describe('BookScreen', () => {
     const { getByTestId } = render(<BookScreen />);
     fireEvent.press(getByTestId('book-back'));
     expect(mockBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('back button replaces shelf when there is no back history', () => {
+    mockCanGoBack.mockReturnValue(false);
+
+    const { getByTestId } = render(<BookScreen />);
+    fireEvent.press(getByTestId('book-back'));
+    expect(mockReplace).toHaveBeenCalledWith({
+      pathname: '/(app)/shelf/[subjectId]',
+      params: { subjectId: 'sub-1' },
+    });
   });
 
   // -----------------------------------------------------------------------
@@ -837,6 +848,49 @@ describe('BookScreen', () => {
     render(<BookScreen />);
     // Push should not be called automatically (no interaction)
     expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  // -----------------------------------------------------------------------
+  // BUG-81: initial generation failure shows user-visible Alert [BUG-81]
+  // -----------------------------------------------------------------------
+  it('shows Alert when initial book topic generation fails', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(jest.fn());
+
+    // Book needs generation (topicsGenerated: false)
+    mockUseBookWithTopics.mockReturnValue({
+      data: {
+        book: {
+          id: 'book-1',
+          title: 'Algebra',
+          emoji: '📐',
+          topicsGenerated: false,
+          description: null,
+        },
+        topics: [],
+        completedTopicCount: 0,
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: mockBookRefetch,
+    });
+
+    // Simulate mutate calling its onError callback
+    mockGenerateMutate.mockImplementation(
+      (_input: unknown, callbacks: { onError: (e: Error) => void }) => {
+        callbacks.onError(new Error('LLM service unavailable'));
+      }
+    );
+
+    render(<BookScreen />);
+
+    await waitFor(() => {
+      expect(alertSpy).toHaveBeenCalledWith(
+        "Couldn't build this book",
+        expect.any(String),
+        expect.any(Array)
+      );
+    });
   });
 
   // -----------------------------------------------------------------------

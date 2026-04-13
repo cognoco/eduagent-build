@@ -23,7 +23,7 @@ import { PenWritingAnimation } from '../common';
 
 export interface ChatMessage {
   id: string;
-  role: 'ai' | 'user';
+  role: 'assistant' | 'user';
   content: string;
   streaming?: boolean;
   kind?: 'reconnect_prompt' | 'session_expired';
@@ -40,6 +40,8 @@ interface ChatShellProps {
   onSend: (text: string) => void;
   isStreaming: boolean;
   inputDisabled?: boolean;
+  /** Explains why input is disabled — shown inline where the input area normally appears. */
+  disabledReason?: string;
   rightAction?: React.ReactNode;
   footer?: React.ReactNode;
   inputAccessory?: React.ReactNode;
@@ -73,7 +75,7 @@ export function animateResponse(
   const streamId = `ai-${Date.now()}`;
   setMessages((prev) => [
     ...prev,
-    { id: streamId, role: 'ai', content: '', streaming: true },
+    { id: streamId, role: 'assistant', content: '', streaming: true },
   ]);
   setIsStreaming(true);
 
@@ -109,6 +111,7 @@ export function ChatShell({
   onSend,
   isStreaming,
   inputDisabled = false,
+  disabledReason,
   rightAction,
   footer,
   inputAccessory,
@@ -207,7 +210,7 @@ export function ChatShell({
     // Find the last AI message that is NOT streaming
     const lastAiMessage = [...messages]
       .reverse()
-      .find((m) => m.role === 'ai' && !m.streaming);
+      .find((m) => m.role === 'assistant' && !m.streaming);
 
     if (!lastAiMessage) return;
     if (lastAiMessage.id === lastSpokenIdRef.current) return;
@@ -328,7 +331,7 @@ export function ChatShell({
 
   const lastMessageIsAi = useMemo(() => {
     const last = messages[messages.length - 1];
-    return last?.role === 'ai' && !last.streaming;
+    return last?.role === 'assistant' && !last.streaming;
   }, [messages]);
 
   useEffect(() => {
@@ -396,17 +399,28 @@ export function ChatShell({
           scrollRef.current?.scrollToEnd({ animated: true })
         }
       >
-        {messages.map((msg) => (
-          <MessageBubble
-            key={msg.id}
-            role={msg.role}
-            content={msg.content}
-            streaming={msg.streaming}
-            escalationRung={msg.escalationRung}
-            verificationBadge={msg.verificationBadge}
-            actions={renderMessageActions?.(msg)}
-          />
-        ))}
+        {messages.length === 0 ? (
+          <View
+            className="flex-1 items-center justify-center py-16"
+            testID="chat-empty-state"
+          >
+            <Text className="text-body text-text-secondary text-center">
+              Your conversation will appear here.
+            </Text>
+          </View>
+        ) : (
+          messages.map((msg) => (
+            <MessageBubble
+              key={msg.id}
+              role={msg.role}
+              content={msg.content}
+              streaming={msg.streaming}
+              escalationRung={msg.escalationRung}
+              verificationBadge={msg.verificationBadge}
+              actions={renderMessageActions?.(msg)}
+            />
+          ))
+        )}
         {showIdleAnim && (
           <View className="items-center py-4" testID="idle-pen-animation">
             <PenWritingAnimation size={48} color={colors.muted} />
@@ -444,8 +458,19 @@ export function ChatShell({
           actionable even when the text input itself is disabled (BUG-234). */}
       {inputAccessory}
 
-      {/* Input */}
-      {!inputDisabled && (
+      {/* Input — when disabled, show inline reason instead of hiding entirely */}
+      {inputDisabled && disabledReason ? (
+        <View
+          className="px-4 py-4 bg-surface border-t border-surface-elevated"
+          style={{ paddingBottom: Math.max(insets.bottom, 8) }}
+          testID="input-disabled-banner"
+          accessibilityRole="alert"
+        >
+          <Text className="text-body-sm text-text-secondary text-center">
+            {disabledReason}
+          </Text>
+        </View>
+      ) : !inputDisabled ? (
         <View>
           <View className="px-4 py-2 bg-surface border-t border-surface-elevated">
             <View
@@ -558,7 +583,7 @@ export function ChatShell({
             </Pressable>
           </View>
         </View>
-      )}
+      ) : null}
       {belowInput}
     </KeyboardAvoidingView>
   );

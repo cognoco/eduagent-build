@@ -83,7 +83,7 @@ jest.mock('../common', () => ({
 // ---------------------------------------------------------------------------
 
 const DEFAULT_MESSAGES: ChatMessage[] = [
-  { id: 'ai-1', role: 'ai', content: 'Hello student!' },
+  { id: 'ai-1', role: 'assistant', content: 'Hello student!' },
 ];
 
 function renderChatShell(
@@ -369,7 +369,7 @@ describe('ChatShell', () => {
   describe('TTS auto-speak', () => {
     it('speaks completed AI messages when voice is enabled', () => {
       const completedMessages: ChatMessage[] = [
-        { id: 'ai-1', role: 'ai', content: 'Explain photosynthesis' },
+        { id: 'ai-1', role: 'assistant', content: 'Explain photosynthesis' },
       ];
 
       renderChatShell({
@@ -382,7 +382,12 @@ describe('ChatShell', () => {
 
     it('does NOT speak streaming AI messages', () => {
       const streamingMessages: ChatMessage[] = [
-        { id: 'ai-1', role: 'ai', content: 'Explain photo', streaming: true },
+        {
+          id: 'ai-1',
+          role: 'assistant',
+          content: 'Explain photo',
+          streaming: true,
+        },
       ];
 
       renderChatShell({
@@ -396,7 +401,7 @@ describe('ChatShell', () => {
     it('does NOT speak when voice toggle is off', () => {
       renderChatShell({
         verificationType: 'teach_back',
-        messages: [{ id: 'ai-1', role: 'ai', content: 'Hello' }],
+        messages: [{ id: 'ai-1', role: 'assistant', content: 'Hello' }],
       });
 
       // First render speaks. Clear the mock.
@@ -416,7 +421,7 @@ describe('ChatShell', () => {
     it('does NOT speak when voice defaults OFF (standard session)', () => {
       renderChatShell({
         verificationType: undefined,
-        messages: [{ id: 'ai-1', role: 'ai', content: 'Hello' }],
+        messages: [{ id: 'ai-1', role: 'assistant', content: 'Hello' }],
       });
 
       expect(mockSpeak).not.toHaveBeenCalled();
@@ -515,7 +520,9 @@ describe('ChatShell', () => {
 
       const { rerender, props } = renderChatShell({
         verificationType: 'teach_back',
-        messages: [{ id: 'ai-1', role: 'ai', content: 'Please explain.' }],
+        messages: [
+          { id: 'ai-1', role: 'assistant', content: 'Please explain.' },
+        ],
       });
 
       // The first message may speak before the async screen reader check resolves.
@@ -531,8 +538,8 @@ describe('ChatShell', () => {
         <ChatShell
           {...props}
           messages={[
-            { id: 'ai-1', role: 'ai', content: 'Please explain.' },
-            { id: 'ai-2', role: 'ai', content: 'Second message' },
+            { id: 'ai-1', role: 'assistant', content: 'Please explain.' },
+            { id: 'ai-2', role: 'assistant', content: 'Second message' },
           ]}
         />
       );
@@ -543,7 +550,9 @@ describe('ChatShell', () => {
     it('suppresses TTS when screen reader becomes active mid-session', async () => {
       renderChatShell({
         verificationType: 'teach_back',
-        messages: [{ id: 'ai-1', role: 'ai', content: 'Hello learner!' }],
+        messages: [
+          { id: 'ai-1', role: 'assistant', content: 'Hello learner!' },
+        ],
       });
 
       // Allow the isScreenReaderEnabled promise to resolve
@@ -592,7 +601,7 @@ describe('ChatShell', () => {
     it('transitions from auto to manual TTS when screen reader detected', async () => {
       renderChatShell({
         verificationType: 'teach_back',
-        messages: [{ id: 'ai-1', role: 'ai', content: 'First message' }],
+        messages: [{ id: 'ai-1', role: 'assistant', content: 'First message' }],
       });
 
       // Allow the isScreenReaderEnabled promise to resolve

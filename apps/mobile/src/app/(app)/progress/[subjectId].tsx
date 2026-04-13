@@ -100,7 +100,11 @@ export default function ProgressSubjectScreen(): React.ReactElement {
         <ErrorFallback
           variant="centered"
           title="We couldn't load this subject"
-          message="Check your connection and try again."
+          message={
+            inventoryQuery.error?.message?.includes('API error')
+              ? 'Something went wrong on our end. Tap below to retry.'
+              : 'Check your connection and try again.'
+          }
           primaryAction={{
             label: 'Try again',
             onPress: () => void inventoryQuery.refetch(),

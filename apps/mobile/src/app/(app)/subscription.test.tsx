@@ -125,8 +125,11 @@ jest.mock('../../hooks/use-settings', () => ({
   }),
 }));
 
+let mockXpSummary: { topicsCompleted?: number; totalXp?: number } | undefined =
+  undefined;
+
 jest.mock('../../hooks/use-streaks', () => ({
-  useXpSummary: () => ({ data: undefined }),
+  useXpSummary: () => ({ data: mockXpSummary }),
 }));
 
 // Mock react-native-purchases for enum/constant access
@@ -314,6 +317,7 @@ describe('SubscriptionScreen', () => {
       displayName: 'Alex',
       isOwner: true,
     };
+    mockXpSummary = undefined;
     jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
     jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
   });
@@ -758,7 +762,7 @@ describe('SubscriptionScreen', () => {
     expect(screen.getByText(/Parent \(owner\), Alex, Mia/)).toBeTruthy();
   });
 
-  it('joins the BYOK waitlist and clears the email field on success', async () => {
+  it('joins the BYOK waitlist using account email on success', async () => {
     mockMutateAsyncByokWaitlist.mockResolvedValue({
       message: 'Added to BYOK waitlist',
       email: 'user@example.com',
@@ -766,24 +770,16 @@ describe('SubscriptionScreen', () => {
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
-    fireEvent.changeText(
-      screen.getByTestId('byok-waitlist-email-input'),
-      'user@example.com'
-    );
     fireEvent.press(screen.getByTestId('join-byok-waitlist-button'));
 
     await waitFor(() => {
-      expect(mockMutateAsyncByokWaitlist).toHaveBeenCalledWith({
-        email: 'user@example.com',
-      });
+      // No email argument — the API uses the authenticated account email (CR-17)
+      expect(mockMutateAsyncByokWaitlist).toHaveBeenCalledWith();
     });
 
     expect(Alert.alert).toHaveBeenCalledWith(
       'Waitlist',
       'You have been added to the BYOK waitlist.'
-    );
-    expect(screen.getByTestId('byok-waitlist-email-input').props.value).toBe(
-      ''
     );
   });
 
@@ -792,10 +788,6 @@ describe('SubscriptionScreen', () => {
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
-    fireEvent.changeText(
-      screen.getByTestId('byok-waitlist-email-input'),
-      'user@example.com'
-    );
     fireEvent.press(screen.getByTestId('join-byok-waitlist-button'));
 
     await waitFor(() => {
@@ -806,5 +798,83 @@ describe('SubscriptionScreen', () => {
       'Error',
       'Could not join waitlist. Try again.'
     );
+  });
+
+  describe('ChildPaywall', () => {
+    beforeEach(() => {
+      mockActiveProfile = {
+        id: 'child-1',
+        displayName: 'Alex',
+        isOwner: false,
+      };
+      mockSubscription = undefined;
+      mockSubLoading = false;
+      mockSubError = false;
+    });
+
+    it('renders "See your progress" and "Go Home" buttons', () => {
+      render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+      expect(screen.getByTestId('child-paywall')).toBeTruthy();
+      expect(screen.getByTestId('see-progress-button')).toBeTruthy();
+      expect(screen.getByTestId('go-home-button')).toBeTruthy();
+    });
+
+    it('"Go Home" button navigates to /(app)/home', () => {
+      render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+      fireEvent.press(screen.getByTestId('go-home-button'));
+      expect(mockPush).toHaveBeenCalledWith('/(app)/home');
+    });
+
+    it('"See your progress" button navigates to /(app)/progress', () => {
+      render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+      fireEvent.press(screen.getByTestId('see-progress-button'));
+      expect(mockPush).toHaveBeenCalledWith('/(app)/progress');
+    });
+
+    it('"Browse Library" button navigates to /(app)/library', () => {
+      render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+      fireEvent.press(screen.getByTestId('browse-library-button'));
+      expect(mockPush).toHaveBeenCalledWith('/(app)/library');
+    });
+
+    it('shows "great start" text when child has no XP data', () => {
+      mockXpSummary = undefined;
+
+      render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+      expect(
+        screen.getByText(
+          "You've been exploring and learning \u2014 great start!"
+        )
+      ).toBeTruthy();
+    });
+
+    it('shows XP stats with "great work" when child has topics and XP', () => {
+      mockXpSummary = { topicsCompleted: 5, totalXp: 250 };
+
+      render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+      expect(
+        screen.getByText(
+          'You learned 5 topics and earned 250 XP \u2014 great work!'
+        )
+      ).toBeTruthy();
+    });
+
+    it('shows singular "topic" when topicsCompleted is 1', () => {
+      mockXpSummary = { topicsCompleted: 1, totalXp: 50 };
+
+      render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+      expect(
+        screen.getByText(
+          'You learned 1 topic and earned 50 XP \u2014 great work!'
+        )
+      ).toBeTruthy();
+    });
   });
 });

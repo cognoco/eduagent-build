@@ -9,11 +9,29 @@ import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const mockBack = jest.fn();
+const mockReplace = jest.fn();
+const mockCanGoBack = jest.fn();
 
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ back: mockBack }),
+  useRouter: () => ({
+    back: mockBack,
+    replace: mockReplace,
+    canGoBack: mockCanGoBack,
+  }),
   useLocalSearchParams: () => ({
     profileId: '550e8400-e29b-41d4-a716-446655440000',
+  }),
+}));
+
+let mockChildEmail: string | undefined = undefined;
+
+jest.mock('@clerk/clerk-expo', () => ({
+  useUser: () => ({
+    user: {
+      primaryEmailAddress: mockChildEmail
+        ? { emailAddress: mockChildEmail }
+        : undefined,
+    },
   }),
 }));
 
@@ -100,6 +118,8 @@ describe('ConsentScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers();
+    mockChildEmail = undefined;
+    mockCanGoBack.mockReturnValue(true);
   });
 
   afterEach(() => {
@@ -113,20 +133,156 @@ describe('ConsentScreen', () => {
     render(<ConsentScreen />, { wrapper: Wrapper });
 
     expect(screen.getByTestId('consent-child-view')).toBeTruthy();
-    expect(screen.getByText('One more step!')).toBeTruthy();
+    expect(screen.getByText('Almost there!')).toBeTruthy();
     expect(
       screen.getByText(
-        "We need a grown-up to say it's OK. Hand your phone to your parent or guardian."
+        "We need your parent or guardian to say it's OK. Enter their email and we'll send them a quick link."
       )
     ).toBeTruthy();
     expect(screen.getByTestId('consent-handoff-button')).toBeTruthy();
   });
 
-  it('does not show email input or submit button in child view', () => {
+  it('shows email input, submit button, and parent escape hatch in child view', () => {
     render(<ConsentScreen />, { wrapper: Wrapper });
 
-    expect(screen.queryByTestId('consent-email')).toBeNull();
-    expect(screen.queryByTestId('consent-submit')).toBeNull();
+    // Child can now enter parent email directly — no phone handoff required.
+    expect(screen.getByTestId('consent-email')).toBeTruthy();
+    expect(screen.getByTestId('consent-submit')).toBeTruthy();
+    // Optional escape hatch for when parent is physically present
+    expect(screen.getByTestId('consent-handoff-button')).toBeTruthy();
+    expect(screen.getByText('My parent is here with me')).toBeTruthy();
+  });
+
+  // ── Child view email validation ──────────────────────────────────
+
+  it('disables submit button in child view when email is empty', () => {
+    render(<ConsentScreen />, { wrapper: Wrapper });
+
+    const button = screen.getByTestId('consent-submit');
+    expect(
+      button.props.accessibilityState?.disabled ?? button.props.disabled
+    ).toBeTruthy();
+  });
+
+  it('disables submit button in child view for invalid email', () => {
+    render(<ConsentScreen />, { wrapper: Wrapper });
+
+    fireEvent.changeText(screen.getByTestId('consent-email'), 'not-an-email');
+
+    const button = screen.getByTestId('consent-submit');
+    expect(
+      button.props.accessibilityState?.disabled ?? button.props.disabled
+    ).toBeTruthy();
+  });
+
+  it('enables submit button in child view for valid email', () => {
+    render(<ConsentScreen />, { wrapper: Wrapper });
+
+    fireEvent.changeText(
+      screen.getByTestId('consent-email'),
+      'parent@example.com'
+    );
+
+    const button = screen.getByTestId('consent-submit');
+    expect(
+      button.props.accessibilityState?.disabled ?? button.props.disabled
+    ).toBeFalsy();
+  });
+
+  it('shows same-email warning in child phase and disables submit', () => {
+    mockChildEmail = 'child@example.com';
+    render(<ConsentScreen />, { wrapper: Wrapper });
+
+    fireEvent.changeText(
+      screen.getByTestId('consent-email'),
+      'child@example.com'
+    );
+
+    expect(screen.getByTestId('consent-same-email-warning')).toBeTruthy();
+    const button = screen.getByTestId('consent-submit');
+    expect(
+      button.props.accessibilityState?.disabled ?? button.props.disabled
+    ).toBeTruthy();
+  });
+
+  it('child submits directly without handoff — calls API and shows success', async () => {
+    mockMutateAsync.mockResolvedValue({
+      message: 'Consent request sent',
+      consentType: 'GDPR',
+      emailStatus: 'sent',
+    });
+
+    render(<ConsentScreen />, { wrapper: Wrapper });
+
+    fireEvent.changeText(
+      screen.getByTestId('consent-email'),
+      'parent@example.com'
+    );
+    fireEvent.press(screen.getByTestId('consent-submit'));
+
+    await waitFor(() => {
+      expect(mockMutateAsync).toHaveBeenCalledWith({
+        childProfileId: '550e8400-e29b-41d4-a716-446655440000',
+        parentEmail: 'parent@example.com',
+        consentType: 'GDPR',
+      });
+    });
+
+    flushFadeAnimation();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('consent-success')).toBeTruthy();
+    });
+  });
+
+  it('success phase shows "Link sent!" and parent email after child direct submit', async () => {
+    mockMutateAsync.mockResolvedValue({
+      message: 'Consent request sent',
+      consentType: 'GDPR',
+      emailStatus: 'sent',
+    });
+
+    render(<ConsentScreen />, { wrapper: Wrapper });
+
+    fireEvent.changeText(
+      screen.getByTestId('consent-email'),
+      'mum@example.com'
+    );
+    fireEvent.press(screen.getByTestId('consent-submit'));
+
+    flushFadeAnimation();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('consent-success')).toBeTruthy();
+    });
+
+    expect(screen.getByText('Link sent!')).toBeTruthy();
+    expect(screen.getByText(/mum@example\.com/)).toBeTruthy();
+  });
+
+  it('"Got it" button calls router.back() after child direct submit', async () => {
+    mockMutateAsync.mockResolvedValue({
+      message: 'Consent request sent',
+      consentType: 'GDPR',
+      emailStatus: 'sent',
+    });
+
+    render(<ConsentScreen />, { wrapper: Wrapper });
+
+    fireEvent.changeText(
+      screen.getByTestId('consent-email'),
+      'parent@example.com'
+    );
+    fireEvent.press(screen.getByTestId('consent-submit'));
+
+    flushFadeAnimation();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('consent-done')).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByTestId('consent-done'));
+    expect(mockBack).toHaveBeenCalled();
   });
 
   // ── Phase 2: Parent view ─────────────────────────────────────────
@@ -249,7 +405,7 @@ describe('ConsentScreen', () => {
       expect(screen.getByTestId('consent-success')).toBeTruthy();
     });
 
-    expect(screen.getByText('Consent link sent!')).toBeTruthy();
+    expect(screen.getByText('Link sent!')).toBeTruthy();
     expect(screen.getByText(/parent@example\.com/)).toBeTruthy();
   });
 
@@ -275,8 +431,9 @@ describe('ConsentScreen', () => {
       expect(screen.getByTestId('consent-success')).toBeTruthy();
     });
 
+    // Success body now tells the child their parent will be notified.
     expect(
-      screen.getByText(/check your inbox.*the link expires in 7 days/i)
+      screen.getByText(/we'll let you know as soon as they approve/i)
     ).toBeTruthy();
     expect(screen.getByTestId('consent-resend-email')).toBeTruthy();
   });
@@ -305,6 +462,32 @@ describe('ConsentScreen', () => {
 
     fireEvent.press(screen.getByTestId('consent-done'));
     expect(mockBack).toHaveBeenCalled();
+  });
+
+  it('replaces home when closing with no back history', async () => {
+    mockCanGoBack.mockReturnValue(false);
+    mockMutateAsync.mockResolvedValue({
+      message: 'Consent request sent',
+      consentType: 'GDPR',
+      emailStatus: 'sent',
+    });
+
+    render(<ConsentScreen />, { wrapper: Wrapper });
+
+    fireEvent.changeText(
+      screen.getByTestId('consent-email'),
+      'parent@example.com'
+    );
+    fireEvent.press(screen.getByTestId('consent-submit'));
+
+    flushFadeAnimation();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('consent-done')).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByTestId('consent-done'));
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
   });
 
   // ── Error handling ───────────────────────────────────────────────

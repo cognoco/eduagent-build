@@ -15,7 +15,7 @@ import { formatApiError } from '../../../lib/format-api-error';
 
 const OPENING_MESSAGE: ChatMessage = {
   id: 'ai-opening',
-  role: 'ai',
+  role: 'assistant',
   content:
     "What comes to mind about this topic? Just share what you remember \u2014 there's no wrong answer.",
 };

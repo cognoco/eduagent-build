@@ -1,4 +1,5 @@
 import type {
+  HomeworkCaptureSource,
   HomeworkMode,
   HomeworkProblem,
   HomeworkSessionMetadata,
@@ -145,12 +146,14 @@ export function withProblemMode(
 export function buildHomeworkSessionMetadata(
   problems: HomeworkProblem[],
   currentProblemIndex: number,
-  ocrText?: string
+  ocrText?: string,
+  source?: HomeworkCaptureSource
 ): HomeworkSessionMetadata {
   return {
     problemCount: problems.length,
     currentProblemIndex,
     problems: withProblemStatus(problems, currentProblemIndex),
     ...(ocrText?.trim() ? { ocrText: ocrText.trim() } : {}),
+    ...(source ? { source } : {}),
   };
 }

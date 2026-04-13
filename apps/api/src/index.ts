@@ -48,7 +48,6 @@ import { settingsRoutes } from './routes/settings';
 import { vocabularyRoutes } from './routes/vocabulary';
 import { languageProgressRoutes } from './routes/language-progress';
 import { coachingCardRoutes } from './routes/coaching-card';
-import { dailyPlanRoutes } from './routes/daily-plan';
 import { celebrationRoutes } from './routes/celebrations';
 import { dashboardRoutes } from './routes/dashboard';
 import { billingRoutes } from './routes/billing';
@@ -64,7 +63,6 @@ type Bindings = {
   ENVIRONMENT: string;
   DATABASE_URL: string;
   CLERK_SECRET_KEY?: string;
-  CLERK_PUBLISHABLE_KEY?: string;
   CLERK_JWKS_URL?: string;
   CLERK_AUDIENCE?: string;
   GEMINI_API_KEY?: string;
@@ -86,7 +84,6 @@ type Bindings = {
   SENTRY_DSN?: string;
   TEST_SEED_SECRET?: string;
   REVENUECAT_WEBHOOK_SECRET?: string;
-  COACHING_KV?: KVNamespace;
 };
 
 type Variables = {
@@ -197,7 +194,6 @@ const routes = api
   .route('/', vocabularyRoutes)
   .route('/', languageProgressRoutes)
   .route('/', coachingCardRoutes)
-  .route('/', dailyPlanRoutes)
   .route('/', celebrationRoutes)
   .route('/', dashboardRoutes)
   .route('/', billingRoutes)

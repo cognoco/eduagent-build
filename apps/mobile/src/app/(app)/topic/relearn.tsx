@@ -157,9 +157,23 @@ export default function RelearnScreen() {
   if (!topicId || !subjectId) {
     return (
       <View className="flex-1 bg-background items-center justify-center px-6">
-        <Text className="text-text-secondary text-body text-center">
+        <Text className="text-h3 font-semibold text-text-primary text-center mb-2">
+          Unable to open relearn
+        </Text>
+        <Text className="text-text-secondary text-body text-center mb-6">
           Missing required parameters. Please go back and try again.
         </Text>
+        <Pressable
+          onPress={() => router.back()}
+          className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center"
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+          testID="relearn-missing-params-back"
+        >
+          <Text className="text-body font-semibold text-text-inverse">
+            Go back
+          </Text>
+        </Pressable>
       </View>
     );
   }

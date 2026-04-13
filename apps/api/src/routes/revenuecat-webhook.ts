@@ -573,7 +573,13 @@ export const revenuecatWebhookRoute = new Hono<{
     );
   }
 
-  if (!(await constantTimeCompare(token, webhookSecret, webhookSecret))) {
+  if (
+    !(await constantTimeCompare(
+      token,
+      webhookSecret,
+      'eduagent-revenuecat-hmac-comparison-v1'
+    ))
+  ) {
     return apiError(
       c,
       401,
@@ -607,9 +613,7 @@ export const revenuecatWebhookRoute = new Hono<{
       `[revenuecat-webhook] Unresolvable app_user_id: ${event.app_user_id}, event: ${event.type}/${event.id}`
     );
     captureException(
-      new Error(
-        `Unresolvable RevenueCat app_user_id: ${event.app_user_id}`
-      ),
+      new Error(`Unresolvable RevenueCat app_user_id: ${event.app_user_id}`),
       {
         extra: {
           eventType: event.type,

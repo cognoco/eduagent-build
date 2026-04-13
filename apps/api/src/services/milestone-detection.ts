@@ -1,4 +1,3 @@
-import { and, desc, eq, isNull } from 'drizzle-orm';
 import { milestones, type Database } from '@eduagent/database';
 import type {
   MilestoneRecord,
@@ -213,33 +212,4 @@ export async function storeMilestones(
   }
 
   return inserted;
-}
-
-export async function getUncelebratedMilestone(
-  db: Database,
-  profileId: string
-): Promise<MilestoneRecord | null> {
-  const row = await db.query.milestones.findFirst({
-    where: and(
-      eq(milestones.profileId, profileId),
-      isNull(milestones.celebratedAt)
-    ),
-    orderBy: desc(milestones.createdAt),
-  });
-
-  if (!row) {
-    return null;
-  }
-
-  return mapMilestoneRow(row);
-}
-
-export async function markMilestoneCelebrated(
-  db: Database,
-  milestoneId: string
-): Promise<void> {
-  await db
-    .update(milestones)
-    .set({ celebratedAt: new Date() })
-    .where(eq(milestones.id, milestoneId));
 }

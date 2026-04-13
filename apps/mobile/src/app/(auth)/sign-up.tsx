@@ -189,13 +189,7 @@ export default function SignUpScreen() {
         setOauthLoading(null);
       }
     },
-    [
-      activateCreatedSession,
-      clearActivationFailure,
-      isLoaded,
-      setActive,
-      startSSOFlow,
-    ]
+    [activateCreatedSession, clearActivationFailure, isLoaded, startSSOFlow]
   );
 
   const onSignUpPress = useCallback(async () => {
@@ -265,7 +259,7 @@ export default function SignUpScreen() {
     } finally {
       setLoading(false);
     }
-  }, [activateCreatedSession, isLoaded, canSubmitCode, signUp, router, code]);
+  }, [activateCreatedSession, isLoaded, canSubmitCode, signUp, code]);
 
   const onResendCode = useCallback(async () => {
     if (!isLoaded || resending) return;

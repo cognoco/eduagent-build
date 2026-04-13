@@ -73,7 +73,7 @@ export interface DashboardInput {
   exchangesLastWeek: number;
   subjectRetentionData: Array<{
     name: string;
-    status: 'strong' | 'fading' | 'weak';
+    status: 'strong' | 'fading' | 'weak' | 'forgotten';
   }>;
   guidedCount: number;
   totalProblemCount: number;
@@ -134,14 +134,17 @@ export function generateChildSummary(input: DashboardInput): string {
  * Compares strong count vs weak+fading count across all subjects.
  */
 export function calculateRetentionTrend(
-  subjectRetentionData: Array<{ status: 'strong' | 'fading' | 'weak' }>
+  subjectRetentionData: Array<{
+    status: 'strong' | 'fading' | 'weak' | 'forgotten';
+  }>
 ): 'improving' | 'declining' | 'stable' {
   if (subjectRetentionData.length === 0) return 'stable';
   const strongCount = subjectRetentionData.filter(
     (s) => s.status === 'strong'
   ).length;
   const weakCount = subjectRetentionData.filter(
-    (s) => s.status === 'weak' || s.status === 'fading'
+    (s) =>
+      s.status === 'weak' || s.status === 'fading' || s.status === 'forgotten'
   ).length;
   if (strongCount > weakCount) return 'improving';
   if (strongCount < weakCount) return 'declining';

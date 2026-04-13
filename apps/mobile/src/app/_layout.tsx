@@ -1,7 +1,14 @@
 import '../../global.css';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Alert, View, useColorScheme } from 'react-native';
-import * as SecureStore from 'expo-secure-store';
+import {
+  Alert,
+  Platform,
+  Pressable,
+  Text,
+  View,
+  useColorScheme,
+} from 'react-native';
+import * as SecureStore from '../lib/secure-storage';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
@@ -14,7 +21,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ClerkProvider, useClerk } from '@clerk/clerk-expo';
-import { tokenCache } from '@clerk/clerk-expo/token-cache';
+import { tokenCache as nativeTokenCache } from '@clerk/clerk-expo/token-cache';
 import {
   QueryCache,
   QueryClient,
@@ -29,11 +36,21 @@ import {
   personaFromBirthYear,
 } from '../lib/profile';
 import { setOnAuthExpired, clearOnAuthExpired } from '../lib/api-client';
+import { markSessionExpired } from '../lib/auth-expiry';
 import { ErrorBoundary, OfflineBanner } from '../components/common';
 import { useNetworkStatus } from '../hooks/use-network-status';
 import { Sentry } from '../lib/sentry';
 import { configureRevenueCat } from '../lib/revenuecat';
 import { AnimatedSplash } from '../components/AnimatedSplash';
+
+// BUG-417: Clerk's default tokenCache uses expo-secure-store directly,
+// which crashes on web. Use our secure-storage wrapper instead.
+const webTokenCache = {
+  getToken: (key: string) => SecureStore.getItemAsync(key),
+  saveToken: (key: string, value: string) =>
+    SecureStore.setItemAsync(key, value),
+};
+const tokenCache = Platform.OS === 'web' ? webTokenCache : nativeTokenCache;
 
 // Initialize RevenueCat at module level — runs before any component renders.
 // No-ops gracefully when API keys are not set (dev/web).
@@ -56,8 +73,7 @@ const queryClient = new QueryClient({
     onError: (error, query) => {
       // Global fallback: report query failures to Sentry so silent blank
       // screens become observable even when a screen forgets to handle
-      // isError. This does NOT replace per-screen error UI — use QueryGuard
-      // for that — but ensures no failure goes unnoticed.
+      // isError, but ensures no failure goes unnoticed.
       Sentry.captureException(error, {
         tags: { queryKey: JSON.stringify(query.queryKey) },
       });
@@ -140,14 +156,15 @@ function ThemedApp() {
         );
       // BM-03: clear cached query data before sign-out to prevent the next
       // user from seeing stale data from the previous session.
+      markSessionExpired();
       queryClient.clear();
-      // Show visible feedback so the user knows WHY they're being signed out,
-      // instead of silently redirecting back to auth screens.
-      Alert.alert(
-        'Session expired',
-        'Your session has expired. Please sign in again.',
-        [{ text: 'OK', onPress: () => void signOut() }]
-      );
+      void SecureStore.deleteItemAsync('hasSignedInBefore');
+      void signOut().catch(() => {
+        Alert.alert(
+          'Could not sign you out',
+          'Please close and reopen the app, then sign in again.'
+        );
+      });
     });
     return () => clearOnAuthExpired();
   }, [signOut]);
@@ -290,9 +307,11 @@ function ThemedContent({ colorScheme }: { colorScheme: ColorScheme }) {
 function ClerkGate({
   children,
   onReady,
+  timedOut,
 }: {
   children: React.ReactNode;
   onReady: () => void;
+  timedOut: boolean;
 }) {
   const { isLoaded } = useAuth();
 
@@ -300,7 +319,62 @@ function ClerkGate({
     if (isLoaded) onReady();
   }, [isLoaded, onReady]);
 
-  if (!isLoaded) return null;
+  if (!isLoaded) {
+    if (timedOut) {
+      return (
+        <View
+          style={{
+            flex: 1,
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 24,
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 18,
+              fontWeight: '600',
+              marginBottom: 8,
+              textAlign: 'center',
+            }}
+          >
+            Taking longer than expected
+          </Text>
+          <Text
+            style={{
+              fontSize: 14,
+              color: '#888',
+              textAlign: 'center',
+              marginBottom: 24,
+            }}
+          >
+            Please check your internet connection and try again.
+          </Text>
+          <Pressable
+            onPress={() =>
+              Alert.alert(
+                'Please restart',
+                'Close the app completely and reopen it.'
+              )
+            }
+            style={{
+              backgroundColor: '#0d9488',
+              borderRadius: 12,
+              paddingVertical: 14,
+              paddingHorizontal: 32,
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Try again"
+          >
+            <Text style={{ color: '#fff', fontWeight: '600', fontSize: 16 }}>
+              Try again
+            </Text>
+          </Pressable>
+        </View>
+      );
+    }
+    return null;
+  }
 
   return children as React.ReactElement;
 }
@@ -343,6 +417,7 @@ export default function RootLayout() {
   // JS bundles where Clerk init can take > 3 seconds.
   const [animDone, setAnimDone] = useState(false);
   const [clerkReady, setClerkReady] = useState(false);
+  const [clerkTimedOut, setClerkTimedOut] = useState(false);
   const showSplash = !animDone || !clerkReady;
 
   const onAnimComplete = useCallback(() => {
@@ -385,6 +460,7 @@ export default function RootLayout() {
       console.warn(
         '[Splash] Clerk DISMISSED by failsafe timeout (12s) — Clerk not loaded'
       );
+      setClerkTimedOut(true);
       setClerkReady(true);
     }, 12000);
     return () => clearTimeout(timeout);
@@ -406,7 +482,7 @@ export default function RootLayout() {
           publishableKey={clerkPublishableKey}
           tokenCache={tokenCache}
         >
-          <ClerkGate onReady={onClerkReady}>
+          <ClerkGate onReady={onClerkReady} timedOut={clerkTimedOut}>
             <QueryClientProvider client={queryClient}>
               <ProfileProvider>
                 <ErrorBoundary>

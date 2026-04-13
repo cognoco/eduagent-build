@@ -11,9 +11,10 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import type { HomeworkProblem } from '@eduagent/schemas';
+import type { HomeworkCaptureSource, HomeworkProblem } from '@eduagent/schemas';
 import { useThemeColors } from '../../../lib/theme';
 import { cameraReducer, initialCameraState } from './camera-reducer';
 import { useHomeworkOcr } from '../../../hooks/use-homework-ocr';
@@ -97,6 +98,7 @@ export default function CameraScreen(): React.ReactNode {
   }, [ocr.status, ocr.text, ocr.error]);
 
   const combinedProblemText = getHomeworkProblemText(draftProblems);
+  const homeworkCaptureSource = state.imageUri ? state.source : undefined;
 
   // Auto-classify subject when OCR text is available and no subjectId
   useEffect(() => {
@@ -150,9 +152,72 @@ export default function CameraScreen(): React.ReactNode {
   }, [state.phase, combinedProblemText, subjectId]);
 
   const handleCapture = useCallback(async () => {
-    const photo = await cameraRef.current?.takePictureAsync();
-    if (photo?.uri) {
-      dispatch({ type: 'PHOTO_TAKEN', uri: photo.uri });
+    try {
+      const photo = await cameraRef.current?.takePictureAsync();
+      if (photo?.uri) {
+        dispatch({ type: 'PHOTO_TAKEN', uri: photo.uri, source: 'camera' });
+      }
+    } catch (error) {
+      console.error('[HomeworkCamera] Failed to capture photo:', error);
+      Alert.alert(
+        'Could not take photo',
+        'Please try again. If the problem continues, try importing from your gallery instead.'
+      );
+    }
+  }, []);
+
+  const handlePickFromGallery = useCallback(async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        quality: 1,
+        allowsEditing: false,
+      });
+
+      if (result.canceled) {
+        return;
+      }
+
+      const selectedImage = result.assets?.[0];
+      if (!selectedImage?.uri) {
+        Alert.alert(
+          "Couldn't open your photos",
+          'Please try again or use the camera instead.'
+        );
+        return;
+      }
+
+      dispatch({
+        type: 'PHOTO_TAKEN',
+        uri: selectedImage.uri,
+        source: 'gallery',
+      });
+    } catch (error) {
+      console.error('[HomeworkCamera] Failed to open image library:', error);
+
+      const permission =
+        await ImagePicker.getMediaLibraryPermissionsAsync().catch(() => null);
+      if (permission && !permission.granted && !permission.canAskAgain) {
+        Alert.alert(
+          'Photo access needed',
+          'Please enable photo library access in Settings to import homework from your gallery.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Open Settings',
+              onPress: () => {
+                void Linking.openSettings();
+              },
+            },
+          ]
+        );
+        return;
+      }
+
+      Alert.alert(
+        "Couldn't open your photos",
+        'Please try again or use the camera instead.'
+      );
     }
   }, []);
 
@@ -178,7 +243,8 @@ export default function CameraScreen(): React.ReactNode {
       problemText: string,
       problems?: HomeworkProblem[],
       imageUri?: string,
-      sourceOcrText?: string
+      sourceOcrText?: string,
+      captureSource?: HomeworkCaptureSource
     ) => {
       router.replace({
         pathname: '/(app)/session',
@@ -192,6 +258,7 @@ export default function CameraScreen(): React.ReactNode {
             : {}),
           ...(sourceOcrText ? { ocrText: sourceOcrText } : {}),
           ...(imageUri ? { imageUri } : {}),
+          ...(captureSource ? { captureSource } : {}),
         },
       } as never);
     },
@@ -222,7 +289,8 @@ export default function CameraScreen(): React.ReactNode {
       combinedProblemText,
       draftProblems,
       state.imageUri ?? undefined,
-      ocrText
+      ocrText,
+      homeworkCaptureSource
     );
   }, [
     navigateToSession,
@@ -233,6 +301,7 @@ export default function CameraScreen(): React.ReactNode {
     draftProblems,
     state.imageUri,
     ocrText,
+    homeworkCaptureSource,
   ]);
 
   const handlePickSubject = useCallback(
@@ -243,7 +312,8 @@ export default function CameraScreen(): React.ReactNode {
         combinedProblemText,
         draftProblems,
         state.imageUri ?? undefined,
-        ocrText
+        ocrText,
+        homeworkCaptureSource
       );
     },
     [
@@ -252,6 +322,7 @@ export default function CameraScreen(): React.ReactNode {
       draftProblems,
       state.imageUri,
       ocrText,
+      homeworkCaptureSource,
     ]
   );
 
@@ -269,7 +340,8 @@ export default function CameraScreen(): React.ReactNode {
         combinedProblemText,
         draftProblems,
         state.imageUri ?? undefined,
-        ocrText
+        ocrText,
+        homeworkCaptureSource
       );
       return;
     }
@@ -285,7 +357,8 @@ export default function CameraScreen(): React.ReactNode {
         combinedProblemText,
         draftProblems,
         state.imageUri ?? undefined,
-        ocrText
+        ocrText,
+        homeworkCaptureSource
       );
     } catch (err: unknown) {
       Alert.alert('Could not create subject', formatApiError(err));
@@ -297,13 +370,22 @@ export default function CameraScreen(): React.ReactNode {
     manualSubjectName,
     navigateToSession,
     ocrText,
+    homeworkCaptureSource,
     state.imageUri,
     subjects,
   ]);
 
   const handleManualContinue = useCallback(async () => {
     if (subjectId) {
-      navigateToSession(subjectId, subjectName ?? '', manualText);
+      navigateToSession(
+        subjectId,
+        subjectName ?? '',
+        manualText,
+        undefined,
+        undefined,
+        undefined,
+        homeworkCaptureSource
+      );
       return;
     }
     // No subjectId — auto-classify the manually typed text
@@ -313,7 +395,11 @@ export default function CameraScreen(): React.ReactNode {
         navigateToSession(
           result.candidates[0]!.subjectId,
           result.candidates[0]!.subjectName,
-          manualText
+          manualText,
+          undefined,
+          undefined,
+          undefined,
+          homeworkCaptureSource
         );
       } else {
         // Multiple candidates or low confidence — show picker
@@ -323,17 +409,36 @@ export default function CameraScreen(): React.ReactNode {
       // Classification failed — show picker
       setShowSubjectPicker(true);
     }
-  }, [navigateToSession, subjectId, subjectName, manualText, classifyMutation]);
+  }, [
+    navigateToSession,
+    subjectId,
+    subjectName,
+    manualText,
+    classifyMutation,
+    homeworkCaptureSource,
+  ]);
 
   const handleManualPickSubject = useCallback(
     (sid: string, sName: string) => {
-      navigateToSession(sid, sName, manualText);
+      navigateToSession(
+        sid,
+        sName,
+        manualText,
+        undefined,
+        undefined,
+        undefined,
+        homeworkCaptureSource
+      );
     },
-    [navigateToSession, manualText]
+    [navigateToSession, manualText, homeworkCaptureSource]
   );
 
   const handleClose = useCallback(() => {
-    router.back();
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/(app)/home' as never);
+    }
   }, [router]);
 
   const toggleFlash = useCallback(() => {
@@ -454,21 +559,19 @@ export default function CameraScreen(): React.ReactNode {
             </View>
           </View>
 
-          {/* Bottom controls: flash toggle + capture button */}
+          {/* Bottom controls: gallery + capture + flash */}
           <View
             className="flex-row items-center justify-center px-8 pb-4"
             style={{ paddingBottom: insets.bottom + 16 }}
           >
             <Pressable
-              testID="flash-toggle"
-              onPress={toggleFlash}
+              testID="gallery-button"
+              onPress={() => void handlePickFromGallery()}
               className="absolute left-8 w-12 h-12 items-center justify-center rounded-full bg-black/40"
-              accessibilityLabel={`Flash ${flash === 'off' ? 'off' : 'on'}`}
+              accessibilityLabel="Choose homework from your photos"
               accessibilityRole="button"
             >
-              <Text className="text-white text-body">
-                {flash === 'off' ? '⚡' : '⚡✓'}
-              </Text>
+              <Ionicons name="images-outline" size={22} color="white" />
             </Pressable>
 
             <Pressable
@@ -479,6 +582,20 @@ export default function CameraScreen(): React.ReactNode {
               accessibilityRole="button"
             >
               <View className="w-14 h-14 rounded-full border-2 border-white/80" />
+            </Pressable>
+
+            <Pressable
+              testID="flash-toggle"
+              onPress={toggleFlash}
+              className="absolute right-8 w-12 h-12 items-center justify-center rounded-full bg-black/40"
+              accessibilityLabel={`Flash ${flash === 'off' ? 'off' : 'on'}`}
+              accessibilityRole="button"
+            >
+              <Ionicons
+                name={flash === 'off' ? 'flash-off-outline' : 'flash-outline'}
+                size={22}
+                color="white"
+              />
             </Pressable>
           </View>
         </CameraView>
@@ -500,7 +617,7 @@ export default function CameraScreen(): React.ReactNode {
               className="w-full aspect-[4/3] rounded-card"
               resizeMode="contain"
               testID="photo-preview"
-              accessibilityLabel="Captured homework photo"
+              accessibilityLabel="Homework image preview"
             />
           ) : (
             <View className="w-full aspect-[4/3] bg-surface rounded-card items-center justify-center">
@@ -510,7 +627,7 @@ export default function CameraScreen(): React.ReactNode {
             </View>
           )}
         </View>
-        <View className="flex-row gap-4 px-6 pb-4">
+        <View className="flex-row gap-4 px-6 pb-2">
           <Pressable
             testID="retake-button"
             onPress={handleRetake}
@@ -532,6 +649,15 @@ export default function CameraScreen(): React.ReactNode {
             <Text className="text-body font-bold text-white">Use this</Text>
           </Pressable>
         </View>
+        <Pressable
+          testID="preview-cancel"
+          onPress={handleClose}
+          className="py-3 px-6 min-h-[44px] items-center justify-center self-center mb-2"
+          accessibilityLabel="Cancel and go back"
+          accessibilityRole="button"
+        >
+          <Text className="text-body text-text-secondary">Cancel</Text>
+        </Pressable>
       </View>
     );
   }
@@ -554,6 +680,20 @@ export default function CameraScreen(): React.ReactNode {
             Reading your {subjectName ? `${subjectName} homework` : 'homework'}
             ...
           </Text>
+          <Pressable
+            onPress={() => {
+              ocr.cancel();
+              dispatch({ type: 'RETAKE' });
+            }}
+            className="mt-6 py-3 px-6 min-h-[44px] items-center justify-center self-center"
+            accessibilityLabel="Cancel OCR and retake"
+            accessibilityRole="button"
+            testID="camera-cancel-ocr"
+          >
+            <Text className="text-body font-semibold text-text-secondary">
+              Cancel
+            </Text>
+          </Pressable>
         </View>
       </View>
     );
@@ -572,9 +712,9 @@ export default function CameraScreen(): React.ReactNode {
       >
         <Pressable
           testID="camera-back-button"
-          onPress={handleClose}
+          onPress={handleRetake}
           className="self-start flex-row items-center min-h-[48px] mt-2 px-2"
-          accessibilityLabel="Go back"
+          accessibilityLabel="Retake photo"
           accessibilityRole="button"
         >
           <Ionicons name="chevron-back" size={22} color={colors.textPrimary} />

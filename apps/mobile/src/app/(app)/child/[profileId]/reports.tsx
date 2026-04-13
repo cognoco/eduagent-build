@@ -6,7 +6,13 @@ import { useChildReports } from '../../../../hooks/use-progress';
 export default function ChildReportsScreen(): React.ReactElement {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { profileId } = useLocalSearchParams<{ profileId: string }>();
+  const { profileId: rawProfileId } = useLocalSearchParams<{
+    profileId: string;
+  }>();
+  // Expo Router can deliver string[] for repeated params — extract scalar
+  const profileId = Array.isArray(rawProfileId)
+    ? rawProfileId[0]
+    : rawProfileId;
   const {
     data: reports,
     isLoading,

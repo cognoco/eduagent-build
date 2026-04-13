@@ -5,12 +5,19 @@ import {
   waitFor,
 } from '@testing-library/react-native';
 import React from 'react';
+import { Alert } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const mockBack = jest.fn();
+const mockReplace = jest.fn();
+const mockCanGoBack = jest.fn();
 
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ back: mockBack }),
+  useRouter: () => ({
+    back: mockBack,
+    replace: mockReplace,
+    canGoBack: mockCanGoBack,
+  }),
 }));
 
 jest.mock('react-native-safe-area-context', () => ({
@@ -43,9 +50,18 @@ function Wrapper({ children }: { children: React.ReactNode }) {
 
 const DeleteAccountScreen = require('./delete-account').default;
 
+// Mock Alert.alert to auto-press the destructive "Delete" button
+const alertSpy = jest.spyOn(Alert, 'alert');
+
 describe('DeleteAccountScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockCanGoBack.mockReturnValue(true);
+    // By default, auto-press the destructive button in the confirmation alert
+    alertSpy.mockImplementation((_title, _message, buttons) => {
+      const deleteBtn = buttons?.find((b) => b.style === 'destructive');
+      deleteBtn?.onPress?.();
+    });
   });
 
   afterEach(() => {
@@ -135,5 +151,14 @@ describe('DeleteAccountScreen', () => {
 
     fireEvent.press(screen.getByTestId('delete-account-close'));
     expect(mockBack).toHaveBeenCalled();
+  });
+
+  it('replaces more when cancelling without back history', () => {
+    mockCanGoBack.mockReturnValue(false);
+
+    render(<DeleteAccountScreen />, { wrapper: Wrapper });
+
+    fireEvent.press(screen.getByTestId('delete-account-cancel'));
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/more');
   });
 });

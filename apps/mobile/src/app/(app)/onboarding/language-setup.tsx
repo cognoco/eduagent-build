@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { CefrLevel } from '@eduagent/schemas';
 import { useConfigureLanguageSubject } from '../../../hooks/use-subjects';
 import { formatApiError } from '../../../lib/format-api-error';
+import { useThemeColors } from '../../../lib/theme';
 
 const NATIVE_LANGUAGE_OPTIONS = [
   { code: 'en', label: 'English' },
@@ -56,6 +57,7 @@ export default function LanguageSetup() {
     languageName?: string;
   }>();
   const configureLanguageSubject = useConfigureLanguageSubject();
+  const colors = useThemeColors(); // [BUG-118]
   const [nativeLanguage, setNativeLanguage] = useState<string>('en');
   const [startingLevel, setStartingLevel] = useState<CefrLevel>('A1');
   const [error, setError] = useState('');
@@ -199,7 +201,7 @@ export default function LanguageSetup() {
           testID="language-setup-continue"
         >
           {configureLanguageSubject.isPending ? (
-            <ActivityIndicator color="white" />
+            <ActivityIndicator color={colors.textInverse} />
           ) : (
             <Text className="text-text-inverse text-body font-semibold">
               Continue

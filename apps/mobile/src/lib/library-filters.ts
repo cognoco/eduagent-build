@@ -19,6 +19,7 @@ export type LibraryTab = 'shelves' | 'books' | 'topics';
 export interface ShelfItem {
   subject: Subject;
   progress: SubjectProgress | undefined;
+  reviewDueCount?: number;
 }
 
 export type ShelvesSortKey =

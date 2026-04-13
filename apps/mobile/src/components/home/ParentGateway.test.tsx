@@ -23,9 +23,15 @@ let mockDashboardData:
       }>;
     }
   | undefined;
+let mockDashboardIsError = false;
+const mockRefetch = jest.fn();
 
 jest.mock('../../hooks/use-dashboard', () => ({
-  useDashboard: () => ({ data: mockDashboardData }),
+  useDashboard: () => ({
+    data: mockDashboardData,
+    isError: mockDashboardIsError,
+    refetch: mockRefetch,
+  }),
 }));
 
 jest.mock('../../lib/greeting', () => ({
@@ -49,6 +55,7 @@ const defaultProps = {
 describe('ParentGateway', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockDashboardIsError = false;
     mockDashboardData = {
       children: [
         { displayName: 'Emma', totalTimeThisWeek: 720, profileId: 'c1' },
@@ -85,7 +92,7 @@ describe('ParentGateway', () => {
 
     render(<ParentGateway {...defaultProps} />);
 
-    expect(screen.getByText('No activity today')).toBeTruthy();
+    expect(screen.getByText('No activity this week')).toBeTruthy();
   });
 
   it('shows fallback highlight when dashboard not loaded', () => {
@@ -116,10 +123,30 @@ describe('ParentGateway', () => {
     expect(mockPush).toHaveBeenCalledWith('/(app)/dashboard');
   });
 
-  it('navigates to learn route on "Learn something"', () => {
+  it('navigates to learn-new on "Learn something"', () => {
     render(<ParentGateway {...defaultProps} />);
 
     fireEvent.press(screen.getByTestId('gateway-learn'));
-    expect(mockPush).toHaveBeenCalledWith('/(app)/learn');
+    expect(mockPush).toHaveBeenCalledWith('/learn-new');
+  });
+
+  it('shows error banner and calls refetch on press when dashboard fails', () => {
+    mockDashboardIsError = true;
+    mockDashboardData = undefined;
+
+    render(<ParentGateway {...defaultProps} />);
+
+    expect(screen.getByTestId('parent-dashboard-error')).toBeTruthy();
+    expect(screen.getByText("We couldn't load the dashboard")).toBeTruthy();
+    expect(screen.getByText('Tap to retry')).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('parent-dashboard-error'));
+    expect(mockRefetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not show error banner when dashboard loads successfully', () => {
+    render(<ParentGateway {...defaultProps} />);
+
+    expect(screen.queryByTestId('parent-dashboard-error')).toBeNull();
   });
 });

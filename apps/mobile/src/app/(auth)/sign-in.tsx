@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,7 @@ import {
 import { useSignIn, useSSO } from '@clerk/clerk-expo';
 import { useRouter } from 'expo-router';
 import * as Linking from 'expo-linking';
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from '../../lib/secure-storage';
 import { useWebBrowserWarmup } from '../../hooks/use-web-browser-warmup';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '../../lib/theme';
@@ -32,6 +32,7 @@ import {
   getTransitionElapsed,
   SESSION_TRANSITION_MS,
 } from '../../lib/auth-transition';
+import { consumeSessionExpiredNotice } from '../../lib/auth-expiry';
 
 // Use physical screen height (not window) so the content container always
 // overflows the ScrollView after adjustResize shrinks it for the keyboard.
@@ -62,6 +63,10 @@ type VerificationState =
   | {
       stage: VerificationStage;
       strategy: 'totp';
+    }
+  | {
+      stage: VerificationStage;
+      strategy: 'backup_code';
     };
 
 type EmailCodeFactor = {
@@ -78,6 +83,10 @@ type PhoneCodeFactor = {
 
 type TotpFactor = {
   strategy: 'totp';
+};
+
+type BackupCodeFactor = {
+  strategy: 'backup_code';
 };
 
 type SignInAttemptLike = {
@@ -116,6 +125,74 @@ function isTotpFactor(factor: unknown): factor is TotpFactor {
   );
 }
 
+function isBackupCodeFactor(factor: unknown): factor is BackupCodeFactor {
+  return (
+    typeof factor === 'object' &&
+    factor !== null &&
+    'strategy' in factor &&
+    factor.strategy === 'backup_code'
+  );
+}
+
+function getFactorStrategies(factors: unknown[] | null | undefined): string[] {
+  const strategies = new Set<string>();
+  for (const factor of factors ?? []) {
+    if (
+      typeof factor === 'object' &&
+      factor !== null &&
+      'strategy' in factor &&
+      typeof factor.strategy === 'string'
+    ) {
+      strategies.add(factor.strategy);
+    }
+  }
+  return Array.from(strategies);
+}
+
+function hasSSOProviders(factors: unknown[] | null | undefined): boolean {
+  return (factors ?? []).some(
+    (f) =>
+      typeof f === 'object' &&
+      f !== null &&
+      'strategy' in f &&
+      typeof (f as Record<string, unknown>).strategy === 'string' &&
+      ((f as Record<string, unknown>).strategy as string).startsWith('oauth_')
+  );
+}
+
+function describeVerificationStrategy(strategy: string): string {
+  switch (strategy) {
+    case 'webauthn':
+      return 'a security key or passkey';
+    case 'totp':
+      return 'an authenticator app';
+    case 'phone_code':
+      return 'a phone verification code';
+    case 'email_code':
+      return 'an email verification code';
+    default:
+      return strategy.replace(/_/g, ' ');
+  }
+}
+
+function formatUnsupportedVerificationMessage(strategies: string[]): string {
+  if (strategies.length === 0) {
+    return 'This account needs an additional verification method that is not available on mobile yet.';
+  }
+
+  if (strategies.length === 1) {
+    return `This account requires ${describeVerificationStrategy(
+      strategies[0]!
+    )} which isn't available on mobile yet.`;
+  }
+
+  const described = strategies.map(describeVerificationStrategy);
+  const last = described.pop();
+  return `This account requires ${described.join(
+    ', '
+  )} or ${last} which isn't available on mobile yet.`;
+}
+
 export default function SignInScreen() {
   const { signIn, setActive, isLoaded } = useSignIn();
   const router = useRouter();
@@ -132,8 +209,22 @@ export default function SignInScreen() {
     useState<VerificationState | null>(null);
   const [pendingVerification, setPendingVerification] =
     useState<VerificationState | null>(null);
+  const [
+    unsupportedVerificationStrategies,
+    setUnsupportedVerificationStrategies,
+  ] = useState<string[]>([]);
+  const [unsupportedHasSSOProviders, setUnsupportedHasSSOProviders] =
+    useState(false);
   const [code, setCode] = useState('');
   const [resending, setResending] = useState(false);
+  // Guard against stale closures calling activateSession after unmount
+  // (e.g. during sign-out → remount transitions)
+  const isMountedRef = useRef(true);
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
   const [pendingSessionActivationId, setPendingSessionActivationId] = useState<
     string | null
   >(null);
@@ -197,6 +288,8 @@ export default function SignInScreen() {
     (clearError = false) => {
       setVerificationOffer(null);
       setPendingVerification(null);
+      setUnsupportedVerificationStrategies([]);
+      setUnsupportedHasSSOProviders(false);
       setCode('');
       setPendingSessionActivationId(null);
       setActivationFailureContext(null);
@@ -206,6 +299,13 @@ export default function SignInScreen() {
     },
     [setError]
   );
+
+  useEffect(() => {
+    if (consumeSessionExpiredNotice()) {
+      clearVerificationFlow();
+      setError('Your session expired. Sign in again to continue learning.');
+    }
+  }, [clearVerificationFlow]);
 
   const getVerificationStep = useCallback(
     (attempt: SignInAttemptLike) => {
@@ -257,6 +357,15 @@ export default function SignInScreen() {
             phoneNumberId: phoneFactor.phoneNumberId,
           } as const;
         }
+
+        const backupCodeFactor =
+          attempt.supportedSecondFactors?.find(isBackupCodeFactor) ?? null;
+        if (backupCodeFactor) {
+          return {
+            stage: 'second_factor',
+            strategy: 'backup_code',
+          } as const;
+        }
       }
 
       return null;
@@ -270,9 +379,9 @@ export default function SignInScreen() {
         throw new Error('Authentication not loaded.');
       }
 
-      // TOTP doesn't need a prepare step — the authenticator app generates
-      // codes locally. Go straight to the code entry screen.
-      if (step.strategy !== 'totp') {
+      // TOTP and backup_code don't need a prepare step — codes are generated
+      // locally or pre-saved. Go straight to the code entry screen.
+      if (step.strategy !== 'totp' && step.strategy !== 'backup_code') {
         if (step.stage === 'first_factor' && step.strategy === 'email_code') {
           await signIn.prepareFirstFactor({
             strategy: 'email_code',
@@ -342,15 +451,99 @@ export default function SignInScreen() {
         attempt.status === 'needs_first_factor' ||
         attempt.status === 'needs_second_factor'
       ) {
-        setError(
-          'This account needs an additional verification method that this build does not support yet. Please use a different sign-in method.'
+        const unsupportedStrategies = getFactorStrategies(
+          attempt.status === 'needs_first_factor'
+            ? attempt.supportedFirstFactors
+            : attempt.supportedSecondFactors
         );
+        const ssoAvailable = hasSSOProviders(attempt.supportedFirstFactors);
+        setUnsupportedVerificationStrategies(unsupportedStrategies);
+        setUnsupportedHasSSOProviders(ssoAvailable);
+        setError(formatUnsupportedVerificationMessage(unsupportedStrategies));
         return;
       }
 
       setError('Sign-in could not be completed. Please try again.');
     },
     [clearVerificationFlow, getVerificationStep, startVerificationFlow]
+  );
+
+  const onContactSupport = useCallback(async () => {
+    const describedMethods =
+      unsupportedVerificationStrategies.length > 0
+        ? unsupportedVerificationStrategies
+            .map(describeVerificationStrategy)
+            .join(', ')
+        : 'an unsupported verification method';
+
+    try {
+      await Linking.openURL(
+        `mailto:support@mentomate.app?subject=${encodeURIComponent(
+          'Unsupported sign-in verification'
+        )}&body=${encodeURIComponent(
+          `Hi, I need help signing in on mobile because my account requires ${describedMethods}.`
+        )}`
+      );
+    } catch {
+      setError(
+        `We couldn't open your email app. Please contact support@mentomate.app and mention ${describedMethods}.`
+      );
+    }
+  }, [unsupportedVerificationStrategies]);
+
+  const activateSession = useCallback(
+    async (
+      sessionId: string | null,
+      context: 'oauth' | 'password' | 'verification'
+    ): Promise<boolean> => {
+      if (!isMountedRef.current) return false;
+      if (!sessionId) {
+        setError('No session was created. Please try again.');
+        return false;
+      }
+      if (!setActive) {
+        setError('Authentication not loaded. Please try again.');
+        return false;
+      }
+
+      try {
+        if (__DEV__)
+          console.log(
+            `[AUTH-DEBUG] activateSession → calling setActive(${sessionId}) context=${context}`
+          );
+        await setActive({ session: sessionId });
+        if (__DEV__)
+          console.log('[AUTH-DEBUG] activateSession → setActive resolved OK');
+      } catch (e) {
+        if (__DEV__)
+          console.warn('[AUTH-DEBUG] activateSession → setActive THREW', e);
+        setPendingSessionActivationId(sessionId);
+        setActivationFailureContext(context);
+        setError('Could not activate your session. Please try again.');
+        return false;
+      }
+
+      // Show "Signing you in…" spinner immediately — before clearing form
+      // state, so the user never sees a flash of the empty sign-in form.
+      // The module-level timestamp lets this survive component remounts
+      // if the redirect briefly bounces back.
+      markSessionActivated();
+      setIsTransitioning(true);
+
+      setPendingSessionActivationId(null);
+      setActivationFailureContext(null);
+      setPendingVerification(null);
+      setVerificationOffer(null);
+      setCode('');
+      void SecureStore.setItemAsync(HAS_SIGNED_IN_KEY, 'true');
+      // Don't navigate explicitly — the auth layout guard redirects to
+      // /(app)/home once Clerk's useAuth() state propagates with
+      // isSignedIn: true.  Calling router.replace() here races with Clerk's
+      // React state update: the app layout renders before isSignedIn
+      // flips, sees !isSignedIn, and bounces back to sign-in.
+      return true;
+    },
+    [setActive]
   );
 
   const onSSOPress = useCallback(
@@ -440,6 +633,7 @@ export default function SignInScreen() {
       }
     },
     [
+      activateSession,
       clearVerificationFlow,
       handleIncompleteSignIn,
       isLoaded,
@@ -448,61 +642,8 @@ export default function SignInScreen() {
     ]
   );
 
-  const activateSession = useCallback(
-    async (
-      sessionId: string | null,
-      context: 'oauth' | 'password' | 'verification'
-    ): Promise<boolean> => {
-      if (!sessionId) {
-        setError('No session was created. Please try again.');
-        return false;
-      }
-      if (!setActive) {
-        setError('Authentication not loaded. Please try again.');
-        return false;
-      }
-
-      try {
-        if (__DEV__)
-          console.log(
-            `[AUTH-DEBUG] activateSession → calling setActive(${sessionId}) context=${context}`
-          );
-        await setActive({ session: sessionId });
-        if (__DEV__)
-          console.log('[AUTH-DEBUG] activateSession → setActive resolved OK');
-      } catch (e) {
-        if (__DEV__)
-          console.warn('[AUTH-DEBUG] activateSession → setActive THREW', e);
-        setPendingSessionActivationId(sessionId);
-        setActivationFailureContext(context);
-        setError('Could not activate your session. Please try again.');
-        return false;
-      }
-
-      // Show "Signing you in…" spinner immediately — before clearing form
-      // state, so the user never sees a flash of the empty sign-in form.
-      // The module-level timestamp lets this survive component remounts
-      // if the redirect briefly bounces back.
-      markSessionActivated();
-      setIsTransitioning(true);
-
-      setPendingSessionActivationId(null);
-      setActivationFailureContext(null);
-      setPendingVerification(null);
-      setVerificationOffer(null);
-      setCode('');
-      void SecureStore.setItemAsync(HAS_SIGNED_IN_KEY, 'true');
-      // Don't navigate explicitly — the auth layout guard redirects to
-      // /(app)/home once Clerk's useAuth() state propagates with
-      // isSignedIn: true.  Calling router.replace() here races with Clerk's
-      // React state update: the app layout renders before isSignedIn
-      // flips, sees !isSignedIn, and bounces back to sign-in.
-      return true;
-    },
-    [setActive]
-  );
-
   const retrySessionActivation = useCallback(async () => {
+    if (!isMountedRef.current) return;
     if (!pendingSessionActivationId || !activationFailureContext) {
       return;
     }
@@ -667,6 +808,7 @@ export default function SignInScreen() {
 
   const onResendCode = useCallback(async () => {
     if (!isLoaded || !signIn || !pendingVerification || resending) return;
+    if (pendingVerification.strategy === 'backup_code') return;
 
     setError('');
     setResending(true);
@@ -743,11 +885,15 @@ export default function SignInScreen() {
           <Text className="text-h2 font-bold text-text-primary mb-1">
             {pendingVerification.strategy === 'totp'
               ? 'Enter authenticator code'
+              : pendingVerification.strategy === 'backup_code'
+              ? 'Enter a backup code'
               : 'Enter verification code'}
           </Text>
           <Text className="text-body-sm text-text-secondary mb-6">
             {pendingVerification.strategy === 'totp' ? (
               'Open your authenticator app and enter the 6-digit code.'
+            ) : pendingVerification.strategy === 'backup_code' ? (
+              'Enter one of the backup codes you saved when you set up two-factor authentication.'
             ) : (
               <>
                 We sent a verification code to{' '}
@@ -777,9 +923,18 @@ export default function SignInScreen() {
             </Text>
             <TextInput
               className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-6"
-              placeholder="Enter 6-digit code"
+              placeholder={
+                pendingVerification.strategy === 'backup_code'
+                  ? 'Enter backup code'
+                  : 'Enter 6-digit code'
+              }
               placeholderTextColor={colors.muted}
-              keyboardType="number-pad"
+              keyboardType={
+                pendingVerification.strategy === 'backup_code'
+                  ? 'default'
+                  : 'number-pad'
+              }
+              autoCapitalize="none"
               value={code}
               onChangeText={setCode}
               editable={!loading}
@@ -811,18 +966,19 @@ export default function SignInScreen() {
             </View>
           ) : null}
 
-          {pendingVerification.strategy !== 'totp' && (
-            <View className="flex-row justify-center mt-4">
-              <Button
-                variant="tertiary"
-                size="small"
-                label="Resend code"
-                onPress={onResendCode}
-                loading={resending}
-                testID="sign-in-resend-code"
-              />
-            </View>
-          )}
+          {pendingVerification.strategy !== 'totp' &&
+            pendingVerification.strategy !== 'backup_code' && (
+              <View className="flex-row justify-center mt-4">
+                <Button
+                  variant="tertiary"
+                  size="small"
+                  label="Resend code"
+                  onPress={onResendCode}
+                  loading={resending}
+                  testID="sign-in-resend-code"
+                />
+              </View>
+            )}
 
           <View className="flex-row justify-center mt-2">
             <Button
@@ -866,10 +1022,16 @@ export default function SignInScreen() {
             on tall screens so the logo and form stay visually connected. */}
         <View className="flex-1" style={{ minHeight: 16, maxHeight: 32 }} />
         <Text className="text-h2 font-bold text-text-primary mb-1 text-center">
-          {isReturningUser ? 'Welcome back' : 'Welcome to MentoMate'}
+          {isReturningUser === null
+            ? 'Welcome'
+            : isReturningUser
+            ? 'Welcome back'
+            : 'Welcome to MentoMate'}
         </Text>
         <Text className="text-body-sm text-text-secondary mb-6 text-center">
-          {isReturningUser
+          {isReturningUser === null
+            ? 'Sign in to get started'
+            : isReturningUser
             ? 'Sign in to continue learning'
             : 'Sign in to start learning'}
         </Text>
@@ -880,6 +1042,30 @@ export default function SignInScreen() {
             accessibilityRole="alert"
           >
             <Text className="text-danger text-body-sm">{error}</Text>
+          </View>
+        )}
+
+        {unsupportedVerificationStrategies.length > 0 && (
+          <View
+            className="bg-surface rounded-card px-4 py-4 mb-4"
+            testID="sign-in-unsupported-factor-help"
+          >
+            <Text className="text-body-sm text-text-secondary">
+              {unsupportedHasSSOProviders
+                ? "If this account also uses Google or Apple sign-in, try that above. If that doesn't work, contact support."
+                : `Contact support and we'll help you sign in. Mention: ${unsupportedVerificationStrategies
+                    .map(describeVerificationStrategy)
+                    .join(', ')}.`}
+            </Text>
+            <View className="mt-4">
+              <Button
+                variant="secondary"
+                size="small"
+                label="Contact support"
+                onPress={() => void onContactSupport()}
+                testID="sign-in-contact-support"
+              />
+            </View>
           </View>
         )}
 
@@ -906,16 +1092,18 @@ export default function SignInScreen() {
           />
         </View>
 
-        <View className="mb-6">
-          <Button
-            variant="secondary"
-            label="Continue with Apple"
-            onPress={() => onSSOPress('oauth_apple')}
-            disabled={oauthLoading !== null}
-            loading={oauthLoading === 'oauth_apple'}
-            testID="apple-sso-button"
-          />
-        </View>
+        {Platform.OS !== 'web' && (
+          <View className="mb-6">
+            <Button
+              variant="secondary"
+              label="Continue with Apple"
+              onPress={() => onSSOPress('oauth_apple')}
+              disabled={oauthLoading !== null}
+              loading={oauthLoading === 'oauth_apple'}
+              testID="apple-sso-button"
+            />
+          </View>
+        )}
 
         {openAIStrategy ? (
           <View className="mb-6">
@@ -996,6 +1184,19 @@ export default function SignInScreen() {
           loading={loading}
           testID="sign-in-button"
         />
+        {/* BUG-414: Explain why button is disabled when fields are empty */}
+        {!canSubmit && !loading && (
+          <Text
+            className="text-body-sm text-text-secondary text-center mt-2"
+            testID="sign-in-validation-hint"
+          >
+            {emailAddress.trim() === ''
+              ? 'Enter your email to continue'
+              : password === ''
+              ? 'Enter your password to continue'
+              : ''}
+          </Text>
+        )}
 
         {verificationOffer && (
           <View

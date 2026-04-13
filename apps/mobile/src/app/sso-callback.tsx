@@ -1,11 +1,5 @@
 import { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  Pressable,
-  ActivityIndicator,
-  Platform,
-} from 'react-native';
+import { View, Text, Pressable, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 
@@ -26,7 +20,6 @@ export default function SSOCallbackScreen() {
   const [showFallback, setShowFallback] = useState(false);
 
   useEffect(() => {
-    if (Platform.OS === 'web') return;
     void WebBrowser.maybeCompleteAuthSession();
   }, []);
 
@@ -37,7 +30,7 @@ export default function SSOCallbackScreen() {
 
   return (
     <View className="flex-1 bg-background items-center justify-center">
-      <ActivityIndicator size="large" />
+      <ActivityIndicator size="large" accessibilityLabel="Finishing sign-in" />
       <Text className="text-body text-text-secondary mt-4">
         Finishing sign-in...
       </Text>

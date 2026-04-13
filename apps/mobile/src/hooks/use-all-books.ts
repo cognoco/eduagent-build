@@ -11,9 +11,9 @@ import { assertOk } from '../lib/assert-ok';
 /**
  * Aggregates books across all subjects into a flat `EnrichedBook[]`.
  *
- * Uses `useQueries` to fetch books per subject (reuses the
- * `['books', subjectId]` query key so TanStack Query deduplicates with
- * existing `useBooks` calls).
+ * Uses `useQueries` to fetch books per subject and reuses the same
+ * `CurriculumBook[]` cache shape as `useBooks` so TanStack Query can safely
+ * deduplicate per-subject requests.
  *
  * **Progress baseline:** `topicCount` and `completedCount` are 0 at the list
  * level. Per-book detail (accurate counts + status) requires a `BookWithTopics`
@@ -46,7 +46,7 @@ export function useAllBooks(): {
           );
           await assertOk(res);
           const data = (await res.json()) as { books: CurriculumBook[] };
-          return { books: data.books, subjectId: subject.id };
+          return data.books;
         } finally {
           cleanup();
         }
@@ -64,8 +64,8 @@ export function useAllBooks(): {
   const books = useMemo<EnrichedBook[]>(() => {
     return subjects.flatMap((subject, index) => {
       const queryData = bookQueries[index]?.data;
-      if (!queryData) return [];
-      return queryData.books.map((book) => ({
+      if (!Array.isArray(queryData)) return [];
+      return queryData.map((book) => ({
         book,
         subjectId: subject.id,
         subjectName: subject.name,

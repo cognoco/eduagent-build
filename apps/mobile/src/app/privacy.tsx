@@ -2,6 +2,7 @@ import { View, Text, ScrollView, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { goBackOrReplace } from '../lib/navigation';
 import { useThemeColors } from '../lib/theme';
 
 function Section({
@@ -33,12 +34,15 @@ export default function PrivacyPolicyScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const colors = useThemeColors();
+  const handleBack = () => {
+    goBackOrReplace(router, '/(app)/more');
+  };
 
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
       <View className="flex-row items-center px-5 pt-4 pb-2">
         <Pressable
-          onPress={() => router.back()}
+          onPress={handleBack}
           accessibilityLabel="Go back"
           accessibilityRole="button"
           className="mr-3 w-10 h-10 items-center justify-center rounded-full bg-surface"
@@ -70,8 +74,8 @@ export default function PrivacyPolicyScreen() {
 
         <Section title="2. Data We Collect">
           <Paragraph>
-            Account data: email address, display name, persona type (learner or
-            parent), and profile information you provide during registration.
+            Account data: email address, display name, and profile information
+            you provide during registration.
           </Paragraph>
           <Paragraph>
             Learning data: subjects, interview responses, curriculum progress,
@@ -140,7 +144,7 @@ export default function PrivacyPolicyScreen() {
         <Section title="7. Data Retention">
           <Paragraph>
             We retain your data for as long as your account is active. When you
-            delete your account, your data enters a 30-day grace period (during
+            delete your account, your data enters a 7-day grace period (during
             which you can cancel deletion), after which it is permanently
             removed.
           </Paragraph>

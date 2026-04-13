@@ -1,4 +1,4 @@
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from './secure-storage';
 import type { MilestoneTrackerState } from '../hooks/use-milestone-tracker';
 
 const RECOVERY_KEY = 'session-recovery-marker';

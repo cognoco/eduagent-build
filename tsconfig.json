@@ -7,9 +7,6 @@
       "path": "./packages/database"
     },
     {
-      "path": "./packages/factory"
-    },
-    {
       "path": "./packages/schemas"
     },
     {

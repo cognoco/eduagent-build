@@ -5,11 +5,13 @@ import {
   Pressable,
   ActivityIndicator,
   ScrollView,
+  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useDeleteAccount, useCancelDeletion } from '../hooks/use-account';
 import { useThemeColors } from '../lib/theme';
+import { goBackOrReplace } from '../lib/navigation';
 import { formatApiError } from '../lib/format-api-error';
 
 export default function DeleteAccountScreen() {
@@ -22,25 +24,42 @@ export default function DeleteAccountScreen() {
   const [gracePeriodEnds, setGracePeriodEnds] = useState<string | null>(null);
   const [error, setError] = useState('');
 
-  const onDelete = useCallback(async () => {
-    setError('');
-    try {
-      const result = await deleteAccount.mutateAsync();
-      setGracePeriodEnds(result.gracePeriodEnds);
-    } catch (err: unknown) {
-      setError(formatApiError(err));
-    }
+  const handleClose = useCallback(() => {
+    goBackOrReplace(router, '/(app)/more');
+  }, [router]);
+
+  const onDelete = useCallback(() => {
+    Alert.alert(
+      'Delete account?',
+      'This action is irreversible. All your data will be permanently deleted.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setError('');
+            try {
+              const result = await deleteAccount.mutateAsync();
+              setGracePeriodEnds(result.gracePeriodEnds);
+            } catch (err: unknown) {
+              setError(formatApiError(err));
+            }
+          },
+        },
+      ]
+    );
   }, [deleteAccount]);
 
   const onCancel = useCallback(async () => {
     setError('');
     try {
       await cancelDeletion.mutateAsync();
-      router.back();
+      handleClose();
     } catch (err: unknown) {
       setError(formatApiError(err));
     }
-  }, [cancelDeletion, router]);
+  }, [cancelDeletion, handleClose]);
 
   const isLoading = deleteAccount.isPending || cancelDeletion.isPending;
 
@@ -68,9 +87,11 @@ export default function DeleteAccountScreen() {
             Delete account
           </Text>
           <Pressable
-            onPress={() => router.back()}
+            onPress={handleClose}
             className="min-h-[44px] min-w-[44px] items-center justify-center"
             testID="delete-account-close"
+            accessibilityRole="button"
+            accessibilityLabel="Close"
           >
             <Text className="text-body text-primary font-semibold">Close</Text>
           </Pressable>
@@ -102,6 +123,8 @@ export default function DeleteAccountScreen() {
               disabled={isLoading}
               className="bg-primary rounded-button py-3.5 items-center mb-3"
               testID="delete-account-keep"
+              accessibilityRole="button"
+              accessibilityLabel="I changed my mind — keep my account"
             >
               {cancelDeletion.isPending ? (
                 <ActivityIndicator color={colors.textInverse} />
@@ -110,6 +133,17 @@ export default function DeleteAccountScreen() {
                   I changed my mind — keep my account
                 </Text>
               )}
+            </Pressable>
+            <Pressable
+              onPress={handleClose}
+              className="bg-surface rounded-button py-3.5 items-center"
+              testID="delete-account-dismiss"
+              accessibilityRole="button"
+              accessibilityLabel="Close without cancelling"
+            >
+              <Text className="text-body font-semibold text-text-primary">
+                Close
+              </Text>
             </Pressable>
           </View>
         ) : (
@@ -128,6 +162,8 @@ export default function DeleteAccountScreen() {
               disabled={isLoading}
               className="bg-danger rounded-button py-3.5 items-center mb-3"
               testID="delete-account-confirm"
+              accessibilityRole="button"
+              accessibilityLabel="I understand, delete my account"
             >
               {deleteAccount.isPending ? (
                 <ActivityIndicator
@@ -142,9 +178,11 @@ export default function DeleteAccountScreen() {
             </Pressable>
 
             <Pressable
-              onPress={() => router.back()}
+              onPress={handleClose}
               className="bg-surface rounded-button py-3.5 items-center"
               testID="delete-account-cancel"
+              accessibilityRole="button"
+              accessibilityLabel="Cancel"
             >
               <Text className="text-body font-semibold text-text-primary">
                 Cancel

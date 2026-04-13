@@ -164,6 +164,17 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
     let subscriptionId: string;
     let subscriptionStatus: SubscriptionStatus;
 
+    // Don't trust KV when it reports daily exhaustion — the daily cron
+    // resets used_today in DB but cannot invalidate KV entries (no KV binding).
+    // Fall through to DB so the first post-reset request gets fresh data.
+    if (
+      cached &&
+      cached.dailyLimit !== null &&
+      cached.usedToday >= cached.dailyLimit
+    ) {
+      cached = null;
+    }
+
     if (cached) {
       // KV hit — use cached values (CR3: subscriptionId now in cache)
       subscriptionId = cached.subscriptionId;

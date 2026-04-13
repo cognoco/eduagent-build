@@ -6,12 +6,18 @@ import {
   act,
 } from '@testing-library/react-native';
 import { useSignIn, useSSO } from '@clerk/clerk-expo';
+import * as Linking from 'expo-linking';
 
 const mockReplace = jest.fn();
 const mockPush = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ replace: mockReplace, push: mockPush }),
+}));
+
+jest.mock('expo-linking', () => ({
+  createURL: jest.fn(() => 'mentomate://sso-callback'),
+  openURL: jest.fn(),
 }));
 
 jest.mock('react-native-safe-area-context', () => ({
@@ -21,6 +27,10 @@ jest.mock('react-native-safe-area-context', () => ({
 const signInModule = require('./sign-in');
 const SignInScreen = signInModule.default;
 const { clearTransitionState } = require('../../lib/auth-transition');
+const {
+  markSessionExpired,
+  clearSessionExpiredNotice,
+} = require('../../lib/auth-expiry');
 
 describe('SignInScreen', () => {
   const mockCreate = jest.fn();
@@ -34,6 +44,7 @@ describe('SignInScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     clearTransitionState();
+    clearSessionExpiredNotice();
     delete process.env.EXPO_PUBLIC_CLERK_OPENAI_SSO_KEY;
     (useSignIn as jest.Mock).mockReturnValue({
       isLoaded: true,
@@ -473,7 +484,168 @@ describe('SignInScreen', () => {
     expect(mockPrepareSecondFactor).not.toHaveBeenCalled();
   });
 
-  it('shows unsupported message for unknown MFA methods', async () => {
+  it('shows unsupported message for unknown MFA methods (no SSO available)', async () => {
+    mockCreate.mockResolvedValue({
+      status: 'needs_second_factor',
+      createdSessionId: null,
+      supportedSecondFactors: [{ strategy: 'webauthn' }],
+      supportedFirstFactors: [], // no SSO providers
+    });
+
+    render(<SignInScreen />);
+
+    fireEvent.changeText(
+      screen.getByTestId('sign-in-email'),
+      'test@example.com'
+    );
+    fireEvent.changeText(screen.getByTestId('sign-in-password'), 'password123');
+    fireEvent.press(screen.getByTestId('sign-in-button'));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          "This account requires a security key or passkey which isn't available on mobile yet."
+        )
+      ).toBeTruthy();
+    });
+
+    expect(screen.getByTestId('sign-in-unsupported-factor-help')).toBeTruthy();
+    // No SSO providers: help text should NOT mention "Google or Apple"
+    expect(screen.queryByText(/Google or Apple/)).toBeNull();
+  });
+
+  it('shows backup_code entry form when backup_code is only supported second factor', async () => {
+    mockCreate.mockResolvedValue({
+      status: 'needs_second_factor',
+      createdSessionId: null,
+      supportedSecondFactors: [{ strategy: 'backup_code' }],
+    });
+
+    render(<SignInScreen />);
+    fireEvent.changeText(
+      screen.getByTestId('sign-in-email'),
+      'test@example.com'
+    );
+    fireEvent.changeText(screen.getByTestId('sign-in-password'), 'password123');
+    fireEvent.press(screen.getByTestId('sign-in-button'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Enter a backup code')).toBeTruthy();
+    });
+    expect(screen.getByTestId('sign-in-verify-code')).toBeTruthy();
+  });
+
+  it('successfully verifies with backup_code strategy', async () => {
+    mockCreate.mockResolvedValue({
+      status: 'needs_second_factor',
+      createdSessionId: null,
+      supportedSecondFactors: [{ strategy: 'backup_code' }],
+    });
+    mockAttemptSecondFactor.mockResolvedValue({
+      status: 'complete',
+      createdSessionId: 'sess_backup_ok',
+    });
+    mockSetActive.mockResolvedValue(undefined);
+
+    render(<SignInScreen />);
+
+    fireEvent.changeText(
+      screen.getByTestId('sign-in-email'),
+      'test@example.com'
+    );
+    fireEvent.changeText(screen.getByTestId('sign-in-password'), 'password123');
+    fireEvent.press(screen.getByTestId('sign-in-button'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Enter a backup code')).toBeTruthy();
+    });
+
+    expect(
+      screen.getByText(
+        'Enter one of the backup codes you saved when you set up two-factor authentication.'
+      )
+    ).toBeTruthy();
+
+    // No "Resend code" button for backup_code
+    expect(screen.queryByTestId('sign-in-resend-code')).toBeNull();
+
+    fireEvent.changeText(
+      screen.getByTestId('sign-in-verify-code'),
+      'ABCD-1234'
+    );
+    fireEvent.press(screen.getByTestId('sign-in-verify-button'));
+
+    await waitFor(() => {
+      expect(mockAttemptSecondFactor).toHaveBeenCalledWith({
+        strategy: 'backup_code',
+        code: 'ABCD-1234',
+      });
+    });
+
+    await waitFor(() => {
+      expect(mockSetActive).toHaveBeenCalledWith({ session: 'sess_backup_ok' });
+    });
+
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('uses backup_code when available before falling back to unsupported message', async () => {
+    mockCreate.mockResolvedValue({
+      status: 'needs_second_factor',
+      createdSessionId: null,
+      supportedSecondFactors: [
+        { strategy: 'webauthn' },
+        { strategy: 'backup_code' },
+      ],
+    });
+
+    render(<SignInScreen />);
+
+    fireEvent.changeText(
+      screen.getByTestId('sign-in-email'),
+      'test@example.com'
+    );
+    fireEvent.changeText(screen.getByTestId('sign-in-password'), 'password123');
+    fireEvent.press(screen.getByTestId('sign-in-button'));
+
+    // backup_code is supported — should go to code entry, not unsupported message
+    await waitFor(() => {
+      expect(screen.getByText('Enter a backup code')).toBeTruthy();
+    });
+    expect(screen.queryByTestId('sign-in-unsupported-factor-help')).toBeNull();
+  });
+
+  it('shows SSO suggestion in help block when account has SSO providers linked', async () => {
+    mockCreate.mockResolvedValue({
+      status: 'needs_second_factor',
+      createdSessionId: null,
+      supportedSecondFactors: [{ strategy: 'webauthn' }],
+      supportedFirstFactors: [
+        { strategy: 'oauth_google' },
+        { strategy: 'password' },
+      ],
+    });
+
+    render(<SignInScreen />);
+
+    fireEvent.changeText(
+      screen.getByTestId('sign-in-email'),
+      'test@example.com'
+    );
+    fireEvent.changeText(screen.getByTestId('sign-in-password'), 'password123');
+    fireEvent.press(screen.getByTestId('sign-in-button'));
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId('sign-in-unsupported-factor-help')
+      ).toBeTruthy();
+    });
+
+    expect(screen.getByText(/Google or Apple/)).toBeTruthy();
+  });
+
+  it('opens support email when unsupported MFA help is used', async () => {
+    (Linking.openURL as jest.Mock).mockResolvedValue(true);
     mockCreate.mockResolvedValue({
       status: 'needs_second_factor',
       createdSessionId: null,
@@ -490,9 +662,27 @@ describe('SignInScreen', () => {
     fireEvent.press(screen.getByTestId('sign-in-button'));
 
     await waitFor(() => {
+      expect(screen.getByTestId('sign-in-contact-support')).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByTestId('sign-in-contact-support'));
+
+    await waitFor(() => {
+      expect(Linking.openURL).toHaveBeenCalledWith(
+        expect.stringContaining('mailto:support@mentomate.app')
+      );
+    });
+  });
+
+  it('shows a session-expired banner after forced sign-out', async () => {
+    markSessionExpired();
+
+    render(<SignInScreen />);
+
+    await waitFor(() => {
       expect(
         screen.getByText(
-          'This account needs an additional verification method that this build does not support yet. Please use a different sign-in method.'
+          'Your session expired. Sign in again to continue learning.'
         )
       ).toBeTruthy();
     });

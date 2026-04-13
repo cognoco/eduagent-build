@@ -14,6 +14,7 @@ const EXIT_PATTERNS = [
   /router\.back\(\)/, // router.back()
   /router\.push\(/, // router.push(...)
   /router\.replace\(/, // router.replace(...)
+  /goBackOrReplace\(/, // goBackOrReplace helper (wraps router.back/replace)
   /ChatShell/, // ChatShell component has built-in back button
   /name="close"/, // Ionicons close button
   /name="chevron-back"/, // Ionicons chevron-back button

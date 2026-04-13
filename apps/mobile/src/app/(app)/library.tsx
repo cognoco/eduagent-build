@@ -1,5 +1,13 @@
 import { useMemo, useState } from 'react';
-import { Alert, Modal, Pressable, ScrollView, Text, View } from 'react-native';
+import {
+  Alert,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from 'react-native';
 import { useQueries } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -181,11 +189,29 @@ export default function LibraryScreen() {
   );
 
   const shelves = useMemo<ShelfItem[]>(() => {
+    const retentionBySubjectId = new Map(
+      (subjectsQuery.data ?? []).map((subject, index) => [
+        subject.id,
+        retentionQueries[index]?.data,
+      ])
+    );
+
     return (subjectsQuery.data ?? []).map((subject) => ({
       subject,
       progress: progressBySubjectId.get(subject.id),
+      reviewDueCount:
+        retentionBySubjectId.get(subject.id)?.reviewDueCount ?? undefined,
     }));
-  }, [subjectsQuery.data, progressBySubjectId]);
+  }, [progressBySubjectId, retentionQueries, subjectsQuery.data]);
+
+  const totalOverdue = useMemo(
+    () =>
+      retentionQueries.reduce(
+        (sum, query) => sum + (query.data?.reviewDueCount ?? 0),
+        0
+      ),
+    [retentionQueries]
+  );
 
   const tabCounts = useMemo(
     () => ({
@@ -199,6 +225,7 @@ export default function LibraryScreen() {
   const handleRetry = (): void => {
     void subjectsQuery.refetch();
     void progressQuery.refetch();
+    allBooksQuery.refetch();
     retentionQueries.forEach((query) => void query.refetch());
   };
 
@@ -245,22 +272,35 @@ export default function LibraryScreen() {
       );
     }
 
-    if (subjectsQuery.isError || progressQuery.isError) {
+    if (
+      subjectsQuery.isError ||
+      progressQuery.isError ||
+      allBooksQuery.isError
+    ) {
       return (
         <View
           className="flex-1 items-center justify-center px-5 py-12"
-          testID="book-error"
+          testID="library-error"
         >
           <Text className="text-body text-text-secondary text-center mb-4">
             Unable to load your library. Please try again.
           </Text>
           <Pressable
             onPress={handleRetry}
-            className="bg-primary rounded-button px-6 py-3 items-center"
-            testID="book-retry-button"
+            className="bg-primary rounded-button px-6 py-3 items-center min-h-[48px] justify-center mb-3"
+            testID="library-retry-button"
           >
             <Text className="text-text-inverse text-body font-semibold">
               Retry
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => router.replace('/(app)')}
+            className="bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
+            testID="library-home-button"
+          >
+            <Text className="text-text-primary text-body font-semibold">
+              Go Home
             </Text>
           </Pressable>
         </View>
@@ -279,11 +319,6 @@ export default function LibraryScreen() {
 
     return (
       <>
-        <LibraryTabs
-          activeTab={activeTab}
-          onTabChange={handleTabChange}
-          counts={tabCounts}
-        />
         {activeTab === 'shelves' && (
           <ShelvesTab
             shelves={shelves}
@@ -331,7 +366,10 @@ export default function LibraryScreen() {
 
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
-      <View className="px-5 pt-4 pb-3 flex-row items-center justify-between">
+      <View
+        className="px-5 pt-4 pb-3 flex-row items-center justify-between"
+        style={{ zIndex: 2, elevation: 2 }}
+      >
         <View className="flex-row items-center flex-1 me-3">
           <View className="flex-1">
             <Text className="text-h1 font-bold text-text-primary">Library</Text>
@@ -345,6 +383,9 @@ export default function LibraryScreen() {
           <Pressable
             onPress={() => setShowManageSubjects(true)}
             className="rounded-full bg-surface-elevated px-4 py-2"
+            style={Platform.OS === 'web' ? { cursor: 'pointer' } : undefined}
+            accessibilityRole="button"
+            accessibilityLabel="Manage subjects"
             testID="manage-subjects-button"
           >
             <Text className="text-body-sm font-semibold text-primary">
@@ -354,9 +395,30 @@ export default function LibraryScreen() {
         )}
       </View>
 
+      {/* Tabs fixed above scroll area to avoid gesture conflicts with nested FlatLists */}
+      {!subjectsQuery.isLoading &&
+        !subjectsQuery.isError &&
+        !progressQuery.isLoading &&
+        !progressQuery.isError &&
+        !allBooksQuery.isError && (
+          <View
+            className="px-5"
+            style={{ zIndex: 2, position: 'relative', elevation: 2 }}
+          >
+            <LibraryTabs
+              activeTab={activeTab}
+              onTabChange={handleTabChange}
+              counts={tabCounts}
+              reviewBadge={totalOverdue > 0 ? totalOverdue : undefined}
+            />
+          </View>
+        )}
+
       <ScrollView
         className="flex-1 px-5"
+        style={{ zIndex: 0 }}
         contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
+        keyboardShouldPersistTaps="handled"
       >
         {!!progressQuery.data?.subjects.length &&
           progressQuery.data.subjects.every(

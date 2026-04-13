@@ -1,4 +1,12 @@
-import { Alert, Pressable, ScrollView, Switch, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  ScrollView,
+  Switch,
+  Text,
+  View,
+} from 'react-native';
 import { useCallback, useMemo, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -24,7 +32,7 @@ export default function MentorMemoryScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { activeProfile } = useProfile();
-  const { data: profile, isLoading } = useLearnerProfile();
+  const { data: profile, isLoading, isError, refetch } = useLearnerProfile();
   const deleteItem = useDeleteMemoryItem();
   const deleteAll = useDeleteAllMemory();
   const tellMentor = useTellMentor();
@@ -85,6 +93,47 @@ export default function MentorMemoryScreen() {
   );
 
   const consentStatus = profile?.memoryConsentStatus ?? 'pending';
+
+  if (isLoading) {
+    return (
+      <View
+        className="flex-1 bg-background items-center justify-center"
+        style={{ paddingTop: insets.top }}
+      >
+        <ActivityIndicator />
+      </View>
+    );
+  }
+
+  if (isError) {
+    return (
+      <View
+        testID="mentor-memory-error"
+        className="flex-1 bg-background items-center justify-center"
+        style={{ paddingTop: insets.top }}
+      >
+        <Text className="text-body text-text-primary text-center px-6">
+          We couldn't load your mentor memory right now
+        </Text>
+        <Pressable
+          testID="mentor-memory-retry"
+          onPress={() => void refetch()}
+          className="mt-4 px-6 py-3 bg-primary rounded-card"
+          accessibilityRole="button"
+        >
+          <Text className="text-body font-semibold text-white">Retry</Text>
+        </Pressable>
+        <Pressable
+          testID="mentor-memory-go-back"
+          onPress={() => router.back()}
+          className="mt-3 px-6 py-3"
+          accessibilityRole="button"
+        >
+          <Text className="text-body text-primary">Go Back</Text>
+        </Pressable>
+      </View>
+    );
+  }
 
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
@@ -154,13 +203,17 @@ export default function MentorMemoryScreen() {
                 key={row.key}
                 label={row.label}
                 source={row.source}
-                onRemove={() =>
-                  void deleteItem.mutateAsync({
-                    category: 'learningStyle',
-                    value: row.key,
-                    suppress: true,
-                  })
-                }
+                onRemove={async () => {
+                  try {
+                    await deleteItem.mutateAsync({
+                      category: 'learningStyle',
+                      value: row.key,
+                      suppress: true,
+                    });
+                  } catch {
+                    Alert.alert('Could not delete item', 'Please try again.');
+                  }
+                }}
               />
             ))
           ) : (
@@ -174,13 +227,17 @@ export default function MentorMemoryScreen() {
               <MemoryRow
                 key={interest}
                 label={interest}
-                onRemove={() =>
-                  void deleteItem.mutateAsync({
-                    category: 'interests',
-                    value: interest,
-                    suppress: true,
-                  })
-                }
+                onRemove={async () => {
+                  try {
+                    await deleteItem.mutateAsync({
+                      category: 'interests',
+                      value: interest,
+                      suppress: true,
+                    });
+                  } catch {
+                    Alert.alert('Could not delete item', 'Please try again.');
+                  }
+                }}
               />
             ))
           ) : (
@@ -195,13 +252,17 @@ export default function MentorMemoryScreen() {
                 key={entry.subject}
                 label={`${entry.subject}: ${entry.topics.join(', ')}`}
                 source={entry.source}
-                onRemove={() =>
-                  void deleteItem.mutateAsync({
-                    category: 'strengths',
-                    value: entry.subject,
-                    suppress: true,
-                  })
-                }
+                onRemove={async () => {
+                  try {
+                    await deleteItem.mutateAsync({
+                      category: 'strengths',
+                      value: entry.subject,
+                      suppress: true,
+                    });
+                  } catch {
+                    Alert.alert('Could not delete item', 'Please try again.');
+                  }
+                }}
               />
             ))
           ) : (
@@ -225,14 +286,18 @@ export default function MentorMemoryScreen() {
                   source={entry.source}
                   progressLabel={progress.progressLabel}
                   progressValue={progress.progressValue}
-                  onRemove={() =>
-                    void deleteItem.mutateAsync({
-                      category: 'struggles',
-                      value: entry.topic,
-                      subject: entry.subject ?? undefined,
-                      suppress: true,
-                    })
-                  }
+                  onRemove={async () => {
+                    try {
+                      await deleteItem.mutateAsync({
+                        category: 'struggles',
+                        value: entry.topic,
+                        subject: entry.subject ?? undefined,
+                        suppress: true,
+                      });
+                    } catch {
+                      Alert.alert('Could not delete item', 'Please try again.');
+                    }
+                  }}
                 />
               );
             })
@@ -247,13 +312,17 @@ export default function MentorMemoryScreen() {
               <MemoryRow
                 key={note}
                 label={note}
-                onRemove={() =>
-                  void deleteItem.mutateAsync({
-                    category: 'communicationNotes',
-                    value: note,
-                    suppress: true,
-                  })
-                }
+                onRemove={async () => {
+                  try {
+                    await deleteItem.mutateAsync({
+                      category: 'communicationNotes',
+                      value: note,
+                      suppress: true,
+                    });
+                  } catch {
+                    Alert.alert('Could not delete item', 'Please try again.');
+                  }
+                }}
               />
             ))
           ) : (
@@ -271,7 +340,13 @@ export default function MentorMemoryScreen() {
                 key={value}
                 label={value}
                 actionLabel="Bring back"
-                onRemove={() => void unsuppress.mutateAsync({ value })}
+                onRemove={async () => {
+                  try {
+                    await unsuppress.mutateAsync({ value });
+                  } catch {
+                    Alert.alert('Could not restore item', 'Please try again.');
+                  }
+                }}
               />
             ))}
           </CollapsibleMemorySection>

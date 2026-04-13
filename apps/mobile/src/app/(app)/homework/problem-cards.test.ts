@@ -68,12 +68,18 @@ describe('problem card helpers', () => {
 
   it('builds homework metadata for the API', () => {
     const problems = splitHomeworkProblems('1. Add 2 + 2\n2. Add 3 + 3');
-    const metadata = buildHomeworkSessionMetadata(problems, 0, 'raw OCR text');
+    const metadata = buildHomeworkSessionMetadata(
+      problems,
+      0,
+      'raw OCR text',
+      'gallery'
+    );
 
     expect(metadata.problemCount).toBe(2);
     expect(metadata.currentProblemIndex).toBe(0);
     expect(metadata.problems[0]?.status).toBe('active');
     expect(metadata.problems[1]?.status).toBe('pending');
     expect(metadata.ocrText).toBe('raw OCR text');
+    expect(metadata.source).toBe('gallery');
   });
 });

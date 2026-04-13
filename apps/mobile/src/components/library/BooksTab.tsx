@@ -282,6 +282,7 @@ export function BooksTab({
           data={filtered}
           keyExtractor={(item) => item.book.id}
           renderItem={renderBookCard}
+          scrollEnabled={false}
           testID="books-list"
         />
       )}

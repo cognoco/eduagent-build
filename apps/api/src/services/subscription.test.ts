@@ -1,10 +1,4 @@
-import {
-  getTierConfig,
-  isValidTransition,
-  shouldDowngradeOnExpiry,
-  getTrialDaysRemaining,
-  type SubscriptionState,
-} from './subscription';
+import { getTierConfig, isValidTransition } from './subscription';
 
 // ---------------------------------------------------------------------------
 // getTierConfig
@@ -99,96 +93,5 @@ describe('isValidTransition', () => {
 
   it('rejects trial -> cancelled (must go through active first)', () => {
     expect(isValidTransition('trial', 'cancelled')).toBe(false);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// getTrialDaysRemaining
-// ---------------------------------------------------------------------------
-
-describe('getTrialDaysRemaining', () => {
-  it('returns positive days when trial is still active', () => {
-    const futureDate = new Date();
-    futureDate.setDate(futureDate.getDate() + 5);
-
-    const days = getTrialDaysRemaining(futureDate.toISOString());
-
-    expect(days).toBe(5);
-  });
-
-  it('returns 0 when trial has expired', () => {
-    const pastDate = new Date();
-    pastDate.setDate(pastDate.getDate() - 3);
-
-    const days = getTrialDaysRemaining(pastDate.toISOString());
-
-    expect(days).toBe(0);
-  });
-
-  it('returns 0 when trial end date is in the past', () => {
-    const days = getTrialDaysRemaining('2020-01-01T00:00:00Z');
-
-    expect(days).toBe(0);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// shouldDowngradeOnExpiry
-// ---------------------------------------------------------------------------
-
-describe('shouldDowngradeOnExpiry', () => {
-  it('returns true for expired status', () => {
-    const state: SubscriptionState = {
-      tier: 'plus',
-      status: 'expired',
-      trialEndsAt: null,
-      currentPeriodEnd: null,
-    };
-
-    expect(shouldDowngradeOnExpiry(state)).toBe(true);
-  });
-
-  it('returns true for cancelled status', () => {
-    const state: SubscriptionState = {
-      tier: 'family',
-      status: 'cancelled',
-      trialEndsAt: null,
-      currentPeriodEnd: null,
-    };
-
-    expect(shouldDowngradeOnExpiry(state)).toBe(true);
-  });
-
-  it('returns false for active status', () => {
-    const state: SubscriptionState = {
-      tier: 'pro',
-      status: 'active',
-      trialEndsAt: null,
-      currentPeriodEnd: null,
-    };
-
-    expect(shouldDowngradeOnExpiry(state)).toBe(false);
-  });
-
-  it('returns false for trial status', () => {
-    const state: SubscriptionState = {
-      tier: 'free',
-      status: 'trial',
-      trialEndsAt: null,
-      currentPeriodEnd: null,
-    };
-
-    expect(shouldDowngradeOnExpiry(state)).toBe(false);
-  });
-
-  it('returns false for past_due status', () => {
-    const state: SubscriptionState = {
-      tier: 'plus',
-      status: 'past_due',
-      trialEndsAt: null,
-      currentPeriodEnd: null,
-    };
-
-    expect(shouldDowngradeOnExpiry(state)).toBe(false);
   });
 });

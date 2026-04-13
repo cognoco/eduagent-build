@@ -24,6 +24,7 @@ export interface UseHomeworkOcrResult {
   failCount: number;
   process: (uri: string) => Promise<void>;
   retry: () => Promise<void>;
+  cancel: () => void;
 }
 
 async function copyToCache(tempUri: string): Promise<string> {
@@ -40,9 +41,20 @@ async function resizeImage(uri: string): Promise<string> {
   return result.uri;
 }
 
+const OCR_DEVICE_TIMEOUT_MS = 20_000;
+const OCR_SERVER_TIMEOUT_MS = 15_000;
+
 async function recognizeText(imageUri: string): Promise<string | null> {
   const resizedUri = await resizeImage(imageUri);
-  const result = await TextRecognition.recognize(resizedUri);
+  const result = await Promise.race([
+    TextRecognition.recognize(resizedUri),
+    new Promise<never>((_, reject) =>
+      setTimeout(
+        () => reject(new Error('On-device text recognition timed out')),
+        OCR_DEVICE_TIMEOUT_MS
+      )
+    ),
+  ]);
   const text = result.text?.trim();
   return text || null;
 }
@@ -68,11 +80,19 @@ async function recognizeTextServerSide(
     headers['X-Profile-Id'] = profileId;
   }
 
-  const response = await fetch(`${getApiUrl()}/v1/ocr`, {
-    method: 'POST',
-    headers,
-    body: formData,
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), OCR_SERVER_TIMEOUT_MS);
+  let response: Response;
+  try {
+    response = await fetch(`${getApiUrl()}/v1/ocr`, {
+      method: 'POST',
+      headers,
+      body: formData,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   if (!response || !response.ok) {
     throw new Error(`Server OCR failed (${response?.status ?? 'unknown'})`);
@@ -91,6 +111,14 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
   const [error, setError] = useState<string | null>(null);
   const [failCount, setFailCount] = useState(0);
   const currentUriRef = useRef<string | null>(null);
+  const cancelRef = useRef<AbortController | null>(null);
+
+  const cancel = useCallback(() => {
+    cancelRef.current?.abort();
+    cancelRef.current = null;
+    setStatus('idle');
+    setError(null);
+  }, []);
 
   const tryServerFallback = useCallback(
     async (uri: string): Promise<boolean> => {
@@ -117,12 +145,18 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
 
   const runOcr = useCallback(
     async (uri: string, isRetry: boolean) => {
+      cancelRef.current?.abort();
+      const controller = new AbortController();
+      cancelRef.current = controller;
+
       setStatus('processing');
       setError(null);
       if (!isRetry) {
         setText(null);
         setFailCount(0);
       }
+
+      if (controller.signal.aborted) return;
 
       if (!isTextRecognitionAvailable()) {
         console.error(
@@ -192,5 +226,5 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
     await runOcr(currentUriRef.current, true);
   }, [runOcr]);
 
-  return { text, status, error, failCount, process, retry };
+  return { text, status, error, failCount, process, retry, cancel };
 }

@@ -11,6 +11,8 @@ jest.mock('@react-native-community/netinfo', () => ({
     mockListener = listener;
     return mockUnsubscribe;
   },
+  // BUG-101: Proactive initial check calls fetch() on mount
+  fetch: jest.fn(() => Promise.resolve({ isInternetReachable: true })),
 }));
 
 describe('useNetworkStatus', () => {

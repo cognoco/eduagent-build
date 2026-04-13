@@ -12,7 +12,11 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { PendingCelebration, HomeworkProblem } from '@eduagent/schemas';
+import type {
+  PendingCelebration,
+  HomeworkCaptureSource,
+  HomeworkProblem,
+} from '@eduagent/schemas';
 import {
   ChatShell,
   animateResponse,
@@ -200,7 +204,24 @@ const QUICK_CHIP_CONFIG: Record<
 };
 
 const RECONNECT_PROMPT =
-  'Lost connection to your session. Tap reconnect to try again.';
+  'Lost connection to your session. Use the Reconnect button below to try again.';
+
+const TIMEOUT_PROMPT = 'Your session timed out. Please try again.';
+
+function isTimeoutError(error: unknown): boolean {
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'isTimeout' in error &&
+    (error as { isTimeout?: unknown }).isTimeout === true
+  ) {
+    return true;
+  }
+  if (error instanceof Error) {
+    return error.message.toLowerCase().includes('timed out while waiting');
+  }
+  return false;
+}
 
 function errorHasStatus(error: unknown, status: number): boolean {
   return (
@@ -289,6 +310,7 @@ export default function SessionScreen() {
     problemText,
     homeworkProblems,
     ocrText,
+    captureSource,
     rawInput,
   } = useLocalSearchParams<{
     mode?: string;
@@ -300,6 +322,7 @@ export default function SessionScreen() {
     problemText?: string;
     homeworkProblems?: string;
     ocrText?: string;
+    captureSource?: HomeworkCaptureSource;
     rawInput?: string;
   }>();
   const router = useRouter();
@@ -308,6 +331,15 @@ export default function SessionScreen() {
   const colors = useThemeColors();
 
   const effectiveMode = mode ?? 'freeform';
+  const normalizedOcrText = Array.isArray(ocrText) ? ocrText[0] : ocrText;
+  const normalizedCaptureSource = Array.isArray(captureSource)
+    ? captureSource[0]
+    : captureSource;
+  const homeworkCaptureSource: HomeworkCaptureSource | undefined =
+    normalizedCaptureSource === 'camera' ||
+    normalizedCaptureSource === 'gallery'
+      ? normalizedCaptureSource
+      : undefined;
   const initialHomeworkProblems = useMemo(
     () =>
       effectiveMode === 'homework'
@@ -338,7 +370,7 @@ export default function SessionScreen() {
   const { isApiReachable, isChecked: apiChecked } = useApiReachability();
 
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { id: 'opening', role: 'ai', content: openingContent },
+    { id: 'opening', role: 'assistant', content: openingContent },
   ]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [exchangeCount, setExchangeCount] = useState(0);
@@ -435,7 +467,9 @@ export default function SessionScreen() {
   useFocusEffect(
     useCallback(() => {
       animationCleanupRef.current?.();
-      setMessages([{ id: 'opening', role: 'ai', content: openingContent }]);
+      setMessages([
+        { id: 'opening', role: 'assistant', content: openingContent },
+      ]);
       setIsStreaming(false);
       setExchangeCount(0);
       setEscalationRung(1);
@@ -560,7 +594,8 @@ export default function SessionScreen() {
           metadata: buildHomeworkSessionMetadata(
             problems,
             problemIndex,
-            Array.isArray(ocrText) ? ocrText[0] : ocrText
+            normalizedOcrText,
+            homeworkCaptureSource
           ),
         },
       });
@@ -569,7 +604,7 @@ export default function SessionScreen() {
         throw new Error(`Homework state sync failed: ${res.status}`);
       }
     },
-    [apiClient, effectiveMode, ocrText]
+    [apiClient, effectiveMode, normalizedOcrText, homeworkCaptureSource]
   );
 
   useEffect(() => {
@@ -584,7 +619,10 @@ export default function SessionScreen() {
         id: `${entry.isSystemPrompt ? 'system' : entry.role}-${index}-${
           entry.timestamp
         }`,
-        role: entry.role === 'assistant' ? ('ai' as const) : ('user' as const),
+        role:
+          entry.role === 'assistant'
+            ? ('assistant' as const)
+            : ('user' as const),
         content: entry.content,
         eventId: entry.eventId,
         isSystemPrompt: entry.isSystemPrompt,
@@ -594,7 +632,7 @@ export default function SessionScreen() {
     setMessages(
       transcriptMessages.length > 0
         ? transcriptMessages
-        : [{ id: 'opening', role: 'ai', content: openingContent }]
+        : [{ id: 'opening', role: 'assistant', content: openingContent }]
     );
     setExchangeCount(transcript.data.session.exchangeCount);
     setEscalationRung(
@@ -613,7 +651,7 @@ export default function SessionScreen() {
     setMessages([
       {
         id: 'session-expired',
-        role: 'ai',
+        role: 'assistant',
         content: 'Session expired. Start a new one to keep going.',
         isSystemPrompt: true,
         kind: 'session_expired',
@@ -718,7 +756,7 @@ export default function SessionScreen() {
             ...prev,
             {
               id: 'silence-prompt',
-              role: 'ai',
+              role: 'assistant',
               content: prompt,
               isSystemPrompt: true,
             },
@@ -792,7 +830,8 @@ export default function SessionScreen() {
                     homework: buildHomeworkSessionMetadata(
                       homeworkProblemsState,
                       currentProblemIndex,
-                      Array.isArray(ocrText) ? ocrText[0] : ocrText
+                      normalizedOcrText,
+                      homeworkCaptureSource
                     ),
                   },
                 }
@@ -819,7 +858,8 @@ export default function SessionScreen() {
                   homework: buildHomeworkSessionMetadata(
                     homeworkProblemsState,
                     currentProblemIndex,
-                    Array.isArray(ocrText) ? ocrText[0] : ocrText
+                    normalizedOcrText,
+                    homeworkCaptureSource
                   ),
                 },
               }
@@ -852,7 +892,8 @@ export default function SessionScreen() {
       startSession,
       homeworkProblemsState,
       currentProblemIndex,
-      ocrText,
+      normalizedOcrText,
+      homeworkCaptureSource,
       inputMode,
       syncHomeworkMetadata,
     ]
@@ -934,6 +975,14 @@ export default function SessionScreen() {
           setHomeworkProblemsState(updatedProblems);
         }
 
+        // BUG-331: Update retry payload BEFORE ensureSession so that if
+        // ensureSession fails and the user reconnects, we replay the correct
+        // (current) message — not the payload from the previous send.
+        lastRetryPayloadRef.current = {
+          text,
+          options,
+        };
+
         const sid = await ensureSession(sessionSubjectId);
         if (!sid) {
           const hasSubject = !!(
@@ -951,11 +1000,6 @@ export default function SessionScreen() {
           );
           return;
         }
-
-        lastRetryPayloadRef.current = {
-          text,
-          options,
-        };
 
         await writeSessionRecoveryMarker(
           {
@@ -988,7 +1032,7 @@ export default function SessionScreen() {
         const previousAiAt = lastAiAtRef.current;
         setMessages((prev) => [
           ...prev,
-          { id: streamId!, role: 'ai', content: '', streaming: true },
+          { id: streamId!, role: 'assistant', content: '', streaming: true },
         ]);
         setIsStreaming(true);
 
@@ -1088,14 +1132,12 @@ export default function SessionScreen() {
       } catch (err: unknown) {
         const reconnectable = isReconnectableSessionError(err);
         const formattedError = formatApiError(err);
-        const errorMessage =
-          reconnectable &&
-          (formattedError.toLowerCase().includes('reconnect') ||
-            formattedError.toLowerCase().includes('timed out'))
-            ? formattedError
-            : reconnectable
-            ? RECONNECT_PROMPT
-            : formattedError;
+        // [3B.1] Classify: timeout -> specific message, network -> reconnect, fatal -> server msg
+        const errorMessage = reconnectable
+          ? isTimeoutError(err)
+            ? TIMEOUT_PROMPT
+            : RECONNECT_PROMPT
+          : formattedError;
 
         setIsStreaming(false);
         if (streamId) {
@@ -1119,7 +1161,7 @@ export default function SessionScreen() {
           ...prev,
           {
             id: createLocalMessageId('ai'),
-            role: 'ai',
+            role: 'assistant',
             content: errorMessage,
             isSystemPrompt: reconnectable,
             kind: reconnectable ? 'reconnect_prompt' : undefined,
@@ -1191,7 +1233,7 @@ export default function SessionScreen() {
         ...prev,
         {
           id: createLocalMessageId('ai'),
-          role: 'ai',
+          role: 'assistant',
           content: `Got it, we're working on ${candidate.subjectName}.`,
           isSystemPrompt: true,
         },
@@ -1228,7 +1270,7 @@ export default function SessionScreen() {
       ...prev,
       {
         id: createLocalMessageId('ai'),
-        role: 'ai',
+        role: 'assistant',
         content: `Adding ${suggestedName} and getting started...`,
         isSystemPrompt: true,
       },
@@ -1299,7 +1341,7 @@ export default function SessionScreen() {
               ...prev,
               {
                 id: createLocalMessageId('ai'),
-                role: 'ai',
+                role: 'assistant',
                 content: `Got it, this sounds like ${candidate.subjectName}.`,
                 isSystemPrompt: true,
               },
@@ -1512,29 +1554,29 @@ export default function SessionScreen() {
   const fetchFastCelebrations = useCallback(async (): Promise<
     PendingCelebration[]
   > => {
-    const celebrationsClient = (apiClient as Record<string, any>)[
-      'celebrations'
-    ];
-    const startedAt = Date.now();
+    try {
+      const startedAt = Date.now();
 
-    while (Date.now() - startedAt < 3000) {
-      const res = await celebrationsClient.pending.$get();
-      if (res.ok) {
-        const data = (await res.json()) as {
-          pendingCelebrations: PendingCelebration[];
-        };
-        if (data.pendingCelebrations.length > 0) {
-          await celebrationsClient.seen.$post({
-            json: { viewer: 'child' },
-          });
-          return data.pendingCelebrations;
+      while (Date.now() - startedAt < 3000) {
+        const res = await apiClient.celebrations.pending.$get();
+        if (res.ok) {
+          const data = await res.json();
+          if (data.pendingCelebrations.length > 0) {
+            await apiClient.celebrations.seen.$post({
+              json: { viewer: 'child' },
+            });
+            return data.pendingCelebrations;
+          }
         }
+
+        await new Promise((resolve) => setTimeout(resolve, 500));
       }
 
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      return [];
+    } catch (error) {
+      console.error('[Session] Failed to fetch celebrations:', error);
+      return [];
     }
-
-    return [];
   }, [apiClient]);
 
   const handleNextProblem = useCallback(async () => {
@@ -1904,7 +1946,10 @@ export default function SessionScreen() {
     [activeProfile?.id, activeSessionId, closeSession, effectiveMode, router]
   );
 
-  const showEndSession = exchangeCount > 0;
+  // BUG-358: Show End Session immediately for resumed sessions — the session
+  // already exists, so the button should be available even before the transcript
+  // loads and sets exchangeCount > 0.
+  const showEndSession = exchangeCount > 0 || !!routeSessionId;
 
   const userMessageCount = useMemo(
     () => messages.filter((m) => m.role === 'user').length,
@@ -1914,8 +1959,8 @@ export default function SessionScreen() {
     () =>
       [...messages]
         .reverse()
-        .find((message) => message.role === 'ai' && !message.streaming)?.id ??
-      null,
+        .find((message) => message.role === 'assistant' && !message.streaming)
+        ?.id ?? null,
     [messages]
   );
 
@@ -2214,7 +2259,11 @@ export default function SessionScreen() {
   );
 
   const renderMessageActions = (message: ChatMessage): React.ReactNode => {
-    if (message.role !== 'ai' || message.streaming || message.isSystemPrompt) {
+    if (
+      message.role !== 'assistant' ||
+      message.streaming ||
+      message.isSystemPrompt
+    ) {
       if (message.kind === 'reconnect_prompt') {
         return (
           <Pressable
@@ -2366,6 +2415,13 @@ export default function SessionScreen() {
           pendingClassification ||
           !!pendingSubjectResolution ||
           sessionExpired
+        }
+        disabledReason={
+          isOffline
+            ? "You're offline — input will return when you reconnect"
+            : sessionExpired
+            ? 'This session has ended'
+            : undefined
         }
         verificationType={
           transcript.data?.session.verificationType ?? undefined
@@ -2543,7 +2599,10 @@ export default function SessionScreen() {
                 />
               </View>
             )}
-            {exchangeCount === 0 && (
+            {/* BUG-356: Use userMessageCount instead of exchangeCount — the server
+                counts system messages (quick chips, auto-sent text) in exchangeCount,
+                which hides the mode toggle before the user has deliberately typed. */}
+            {userMessageCount === 0 && (
               <SessionInputModeToggle
                 mode={inputMode}
                 onModeChange={setInputMode}

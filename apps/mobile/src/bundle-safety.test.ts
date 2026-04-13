@@ -19,7 +19,6 @@ const TEST_ONLY_PATTERNS = [
   /@testing-library\//,
   /\bfrom\s+['"]jest\b/,
   /\bimport\b.*\bfrom\s+['"]@eduagent\/test-utils['"]/,
-  /\bimport\b.*\bfrom\s+['"]@eduagent\/factory['"]/,
   /\brequire\(['"]react-test-renderer['"]\)/,
 ];
 

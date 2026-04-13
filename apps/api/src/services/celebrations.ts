@@ -13,7 +13,7 @@ import {
 
 const CELEBRATION_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
 
-export const PARENT_VISIBLE_REASONS: CelebrationReason[] = [
+const PARENT_VISIBLE_REASONS: CelebrationReason[] = [
   'topic_mastered',
   'curriculum_complete',
   'evaluate_success',

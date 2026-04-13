@@ -38,9 +38,7 @@ export const topUpRequestSchema = z.object({
 });
 export type TopUpRequest = z.infer<typeof topUpRequestSchema>;
 
-export const byokWaitlistSchema = z.object({
-  email: z.string().email(),
-});
+export const byokWaitlistSchema = z.object({});
 export type ByokWaitlistInput = z.infer<typeof byokWaitlistSchema>;
 
 export const usageSchema = z.object({

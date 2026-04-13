@@ -667,6 +667,59 @@ describe('metering middleware', () => {
       );
     });
 
+    it('bypasses stale KV when daily quota appears exhausted — falls through to DB', async () => {
+      // Simulates the bug: daily cron reset used_today in DB but KV still
+      // shows usedToday=10 (24h TTL). Middleware must not trust stale KV
+      // for daily exhaustion — it should fall through to DB.
+      mockReadSubscriptionStatus.mockResolvedValue({
+        subscriptionId: 'sub-free',
+        tier: 'free',
+        status: 'active',
+        monthlyLimit: 100,
+        usedThisMonth: 10,
+        dailyLimit: 10,
+        usedToday: 10, // stale — DB was already reset to 0
+      });
+
+      // DB returns the post-reset state
+      mockEnsureFreeSubscription.mockResolvedValue(
+        mockSubscription({ id: 'sub-free', tier: 'free' })
+      );
+      mockGetQuotaPool.mockResolvedValue(
+        mockQuota({
+          subscriptionId: 'sub-free',
+          monthlyLimit: 100,
+          usedThisMonth: 10,
+          dailyLimit: 10,
+          usedToday: 0, // DB was reset by cron
+        })
+      );
+      mockDecrementQuota.mockResolvedValue({
+        success: true,
+        source: 'monthly',
+        remainingMonthly: 89,
+        remainingTopUp: 0,
+        remainingDaily: 9,
+      });
+
+      const res = await app.request(
+        '/v1/sessions/session-1/messages',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'hello' }),
+        },
+        { ...TEST_ENV, SUBSCRIPTION_KV: {} as KVNamespace }
+      );
+
+      // Must NOT return 402 — DB says quota is available
+      expect(res.status).toBe(200);
+      // Stale KV was bypassed, DB was queried
+      expect(mockEnsureFreeSubscription).toHaveBeenCalled();
+      expect(mockGetQuotaPool).toHaveBeenCalled();
+      expect(res.headers.get('X-Daily-Remaining')).toBe('9');
+    });
+
     it('falls back to DB for quota data when KV write fails after post-decrement update [4C.7]', async () => {
       // KV read succeeds (cache hit), but KV write fails on post-decrement update
       mockReadSubscriptionStatus.mockResolvedValue({

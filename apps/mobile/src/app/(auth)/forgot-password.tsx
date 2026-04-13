@@ -13,6 +13,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '../../lib/theme';
 import { extractClerkError } from '../../lib/clerk-error';
+import { markSessionActivated } from '../../lib/auth-transition';
 import { PasswordInput } from '../../components/common';
 import { Button } from '../../components/common/Button';
 import { useKeyboardScroll } from '../../hooks/use-keyboard-scroll';
@@ -83,6 +84,7 @@ export default function ForgotPasswordScreen() {
       if (result.status === 'complete') {
         try {
           await setActive({ session: result.createdSessionId });
+          markSessionActivated();
         } catch {
           setError(
             'Could not activate your session. Please try signing in again.'
@@ -145,7 +147,10 @@ export default function ForgotPasswordScreen() {
         >
           {/* Top spacer: see sign-in.tsx BUG-24 comment */}
           <View className="flex-1" style={{ minHeight: 40 }} />
-          <Text className="text-h2 font-bold text-text-primary mb-1">
+          <Text
+            className="text-h2 font-bold text-text-primary mb-1"
+            accessibilityRole="header"
+          >
             Reset password
           </Text>
           <Text className="text-body-sm text-text-secondary mb-6">
@@ -268,9 +273,13 @@ export default function ForgotPasswordScreen() {
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
       >
-        {/* Top spacer: see sign-in.tsx BUG-24 comment */}
-        <View className="flex-1" style={{ minHeight: 40 }} />
-        <Text className="text-h2 font-bold text-text-primary mb-1">
+        {/* BUG-19: Reduced top spacer — forgot-password has fewer fields than
+            sign-in, so flex-1 pushed content excessively to the bottom. */}
+        <View style={{ minHeight: 40, flex: 0.3 }} />
+        <Text
+          className="text-h2 font-bold text-text-primary mb-1"
+          accessibilityRole="header"
+        >
           Forgot password?
         </Text>
         <Text className="text-body-sm text-text-secondary mb-6">
@@ -323,6 +332,10 @@ export default function ForgotPasswordScreen() {
             testID="back-to-sign-in"
           />
         </View>
+
+        {/* BUG-19: Bottom spacer to balance the top flex-1 spacer.
+            Without this, content is pushed down with excessive empty space below. */}
+        <View className="flex-1" style={{ minHeight: 40 }} />
       </ScrollView>
     </KeyboardAvoidingView>
   );

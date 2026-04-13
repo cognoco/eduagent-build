@@ -10,6 +10,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useProfile, isGuardianProfile } from '../lib/profile';
+import { goBackOrReplace } from '../lib/navigation';
 import {
   useSubscription,
   useFamilySubscription,
@@ -25,14 +26,28 @@ export default function ProfilesScreen() {
   );
   const [isSwitching, setIsSwitching] = useState(false);
 
+  const handleClose = useCallback(() => {
+    goBackOrReplace(router, '/(app)/home');
+  }, [router]);
+
   const handleAddProfile = useCallback(() => {
-    const tier = subscription?.tier;
-    // Whitelist: only family/pro may add profiles. Blocks free, plus, and
-    // undefined (query still loading or failed) — never fall through.
-    if (tier !== 'family' && tier !== 'pro') {
+    if (!subscription) {
+      // Query still loading — don't block with a false 'Upgrade required'
+      return;
+    }
+
+    // BUG-287: Always allow creating the first child profile (the owner profile
+    // is always profile #1, so profiles.length === 1 means no children yet).
+    // New users should never be blocked from adding their first child.
+    const hasNoChildren = profiles.length <= 1;
+
+    const tier = subscription.tier;
+    // Whitelist: only family/pro may add profiles. Blocks free and plus.
+    // Exception: first child profile is always allowed regardless of tier.
+    if (!hasNoChildren && tier !== 'family' && tier !== 'pro') {
       Alert.alert(
         'Upgrade required',
-        'Adding profiles requires a Family or Pro subscription.',
+        'Adding more profiles requires a Family or Pro subscription.',
         [
           {
             text: 'View plans',
@@ -64,7 +79,7 @@ export default function ProfilesScreen() {
     }
 
     router.push('/create-profile');
-  }, [subscription, familyData, router]);
+  }, [subscription, familyData, router, profiles.length]);
 
   const handleSwitch = async (profileId: string) => {
     if (isSwitching) return;
@@ -81,7 +96,7 @@ export default function ProfilesScreen() {
 
       // Close modal AFTER a successful switch to avoid dismissing the screen
       // when the profile change did not actually complete.
-      router.back();
+      handleClose();
     } finally {
       setIsSwitching(false);
     }
@@ -96,8 +111,10 @@ export default function ProfilesScreen() {
       <View className="flex-row items-center justify-between px-5 pt-4 pb-2">
         <Text className="text-h1 font-bold text-text-primary">Profiles</Text>
         <Pressable
-          onPress={() => router.back()}
+          onPress={handleClose}
           className="min-h-[44px] min-w-[44px] items-center justify-center"
+          accessibilityRole="button"
+          accessibilityLabel="Done"
           testID="profiles-close"
         >
           <Text className="text-body text-primary font-semibold">Done</Text>
@@ -117,7 +134,7 @@ export default function ProfilesScreen() {
             Create your first profile to get started
           </Text>
           <Pressable
-            onPress={handleAddProfile}
+            onPress={() => router.push('/create-profile')}
             className="bg-primary rounded-button px-6 py-3"
             testID="profiles-create-first"
           >

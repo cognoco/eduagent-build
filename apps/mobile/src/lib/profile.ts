@@ -7,35 +7,24 @@ import {
   useMemo,
 } from 'react';
 import { createElement, type ReactNode } from 'react';
-import { Platform } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from './secure-storage';
 import type { Profile } from '@eduagent/schemas';
 import { useProfiles } from '../hooks/use-profiles';
 import { useApiClient } from './api-client';
 
-// expo-secure-store is native-only; fall back to localStorage on web
-const isWeb = Platform.OS === 'web';
-const storage = {
-  getItem: async (key: string): Promise<string | null> => {
-    if (isWeb) return localStorage.getItem(key);
-    return SecureStore.getItemAsync(key);
-  },
-  setItem: async (key: string, value: string): Promise<void> => {
-    if (isWeb) {
-      localStorage.setItem(key, value);
-      return;
-    }
-    await SecureStore.setItemAsync(key, value);
-  },
-};
-
 export type { Profile };
 
 /**
- * Derive a persona string from the profile's birthYear.
- * age < 13 → 'teen', age < 18 → 'learner', else 'parent'.
+ * Derive a visual persona for UI theming from the profile's birthYear.
+ * Under 13 → 'teen' (child-friendly theme), 13–17 → 'learner', 18+ → 'parent'.
  * Falls back to 'learner' when birthYear is null/undefined.
+ *
+ * The label names are theme keys, not age descriptions — a child under 13
+ * gets the 'teen' theme because the learner/parent themes assume more maturity.
+ *
+ * @see computeAgeBracket in @eduagent/schemas — shared consent-gating variant
+ *   with labels ('child' | 'adolescent' | 'adult'). Same thresholds, different purpose.
  */
 export function personaFromBirthYear(
   birthYear: number | null | undefined
@@ -99,7 +88,11 @@ export function ProfileProvider({
 }: {
   children: ReactNode;
 }): ReactNode {
-  const { data: profiles = [], isLoading: isProfilesLoading } = useProfiles();
+  const {
+    data: profiles = [],
+    isLoading: isProfilesLoading,
+    isFetching: isProfilesFetching,
+  } = useProfiles();
   const client = useApiClient();
   const queryClient = useQueryClient();
 
@@ -110,7 +103,7 @@ export function ProfileProvider({
   // On mount: restore saved profile ID from SecureStore
   useEffect(() => {
     const restore = async () => {
-      const savedId = await storage.getItem(ACTIVE_PROFILE_KEY);
+      const savedId = await SecureStore.getItemAsync(ACTIVE_PROFILE_KEY);
       if (savedId) {
         setActiveProfileId(savedId);
       }
@@ -132,7 +125,7 @@ export function ProfileProvider({
       }
       const owner = profiles.find((p) => p.isOwner) ?? profiles[0]!;
       setActiveProfileId(owner.id);
-      void storage.setItem(ACTIVE_PROFILE_KEY, owner.id);
+      void SecureStore.setItemAsync(ACTIVE_PROFILE_KEY, owner.id);
     }
   }, [profiles, activeProfileId, isRestoringId]);
 
@@ -156,7 +149,7 @@ export function ProfileProvider({
           error: 'Network error while switching profile',
         };
       }
-      await storage.setItem(ACTIVE_PROFILE_KEY, profileId);
+      await SecureStore.setItemAsync(ACTIVE_PROFILE_KEY, profileId);
       // State update LAST — triggers re-renders that change themeKey and
       // remount the navigation tree.  Callers should close modals before
       // awaiting this function to avoid navigation state corruption.
@@ -201,7 +194,16 @@ export function ProfileProvider({
     setProfileWasRemoved(false);
   }, []);
 
-  const isLoading = isProfilesLoading || isRestoringId;
+  // BUG-264: Treat the profile provider as loading when activeProfileId was
+  // explicitly set but the matching profile is not yet in the cached list AND
+  // a background refetch is in-flight.  This prevents CreateProfileGate from
+  // flashing during the brief race window after profile creation, where
+  // switchProfile already set activeProfileId but the invalidated profiles
+  // query hasn't returned the new profile yet.
+  const isLoading =
+    isProfilesLoading ||
+    isRestoringId ||
+    (activeProfileId !== null && activeProfile === null && isProfilesFetching);
 
   const value = useMemo<ProfileContextValue>(
     () => ({

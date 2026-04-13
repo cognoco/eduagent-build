@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import * as StoreReview from 'expo-store-review';
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from '../lib/secure-storage';
 import { computeAgeBracket } from '@eduagent/schemas';
 import { useProfile } from '../lib/profile';
 import { migrateSecureStoreKey } from '../lib/migrate-secure-store-key';

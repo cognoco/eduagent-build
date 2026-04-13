@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { View, Text, Pressable } from 'react-native';
+import { View, Text, Pressable, Alert } from 'react-native';
 import { useUser, useAuth } from '@clerk/clerk-expo';
 import { useRouter } from 'expo-router';
 import { PasswordInput } from './common';
@@ -49,7 +49,12 @@ export function ChangePassword(): React.JSX.Element {
   }, [user, currentPassword, newPassword, confirmPassword]);
 
   const handleForgotPassword = useCallback(async () => {
-    await signOut();
+    try {
+      await signOut();
+    } catch {
+      Alert.alert('Could not sign out', 'Please try again.');
+      return;
+    }
     router.replace('/(auth)/sign-in' as never);
   }, [signOut, router]);
 

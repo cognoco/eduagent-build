@@ -58,6 +58,7 @@ const mathShelf: ShelfItem = {
     retentionStatus: 'fading',
     lastSessionAt: '2026-04-03T12:00:00Z',
   },
+  reviewDueCount: 3,
 };
 
 const historyShelf: ShelfItem = {
@@ -136,6 +137,13 @@ describe('ShelvesTab', () => {
     render(<ShelvesTab {...defaultProps} />);
     // Mocked RetentionSignal renders status text
     expect(screen.getByText('fading')).toBeTruthy();
+  });
+
+  it('shows per-subject review indicator when reviews are due', () => {
+    render(<ShelvesTab {...defaultProps} />);
+
+    expect(screen.getByTestId('subject-review-due-sub-1')).toBeTruthy();
+    expect(screen.getByText('3 to review')).toBeTruthy();
   });
 
   it('shows search bar that propagates search via onStateChange', () => {

@@ -97,6 +97,18 @@ interface TimedEvent {
 type CachedProfileRow = typeof profiles.$inferSelect | null;
 type CachedSubject = Awaited<ReturnType<typeof getSubject>>;
 
+// BUG-70: Extended cache to include session-scoped supplementary lookups
+// that are static within a session but were re-queried on every exchange.
+interface SessionSupplementaryData {
+  priorTopics: Awaited<ReturnType<typeof fetchPriorTopics>>;
+  teachingPref: Awaited<ReturnType<typeof getTeachingPreference>>;
+  learningMode: Awaited<ReturnType<typeof getLearningMode>>;
+  learningProfile: Awaited<ReturnType<typeof getLearningProfile>>;
+  crossSubjectHighlights: Awaited<
+    ReturnType<typeof fetchCrossSubjectHighlights>
+  >;
+}
+
 interface SessionStaticContextCacheEntry {
   profileId: string;
   sessionId: string;
@@ -108,6 +120,8 @@ interface SessionStaticContextCacheEntry {
   homeworkLibraryContextLoaded: boolean;
   homeworkLibraryContext?: string;
   bookLearningHistoryContexts: Map<string, string | undefined>;
+  // Supplementary data: lazily populated on first exchange, reused for duration
+  supplementary?: SessionSupplementaryData;
 }
 
 const SESSION_STATIC_CONTEXT_TTL_MS = 5 * 60 * 1000;
@@ -811,6 +825,11 @@ async function prepareExchangeContext(
   // by the learner's original intent so the very first exchange has rich context.
   const isFreeformWithRawInput = !session.topicId && !!session.rawInput;
 
+  // BUG-70: Use cached supplementary data for lookups that are static within
+  // a session (priorTopics, teachingPref, learningMode, learningProfile,
+  // crossSubjectHighlights). Saves ~5 DB queries per exchange after the first.
+  const cachedSupp = staticContext.supplementary;
+
   const [
     subject,
     topicRows,
@@ -854,10 +873,14 @@ async function prepareExchangeContext(
       ),
       orderBy: asc(sessionEvents.createdAt),
     }),
-    fetchPriorTopics(db, profileId, session.subjectId),
+    cachedSupp
+      ? Promise.resolve(cachedSupp.priorTopics)
+      : fetchPriorTopics(db, profileId, session.subjectId),
     retrieveRelevantMemory(db, profileId, userMessage, options?.voyageApiKey),
     // FR58: Load teaching method preference for adaptive teaching
-    getTeachingPreference(db, profileId, session.subjectId),
+    cachedSupp
+      ? Promise.resolve(cachedSupp.teachingPref)
+      : getTeachingPreference(db, profileId, session.subjectId),
     // FR92: Load session metadata for interleaved topic list
     isInterleaved
       ? db
@@ -872,9 +895,13 @@ async function prepareExchangeContext(
           .limit(1)
       : Promise.resolve([]),
     // Learning mode: affects LLM tutoring style (casual vs serious)
-    getLearningMode(db, profileId),
+    cachedSupp
+      ? Promise.resolve(cachedSupp.learningMode)
+      : getLearningMode(db, profileId),
     // Story 16.0: Cross-subject learning highlights for broader context
-    fetchCrossSubjectHighlights(db, profileId, session.subjectId),
+    cachedSupp
+      ? Promise.resolve(cachedSupp.crossSubjectHighlights)
+      : fetchCrossSubjectHighlights(db, profileId, session.subjectId),
     // CFLF-23: Pre-session similarity scan — uses rawInput for freeform sessions
     // Graceful degradation: if Voyage API is down, returns empty (never breaks session)
     isFreeformWithRawInput
@@ -886,8 +913,23 @@ async function prepareExchangeContext(
           5
         )
       : Promise.resolve({ context: '', topicIds: [] }),
-    getLearningProfile(db, profileId),
+    cachedSupp
+      ? Promise.resolve(cachedSupp.learningProfile)
+      : getLearningProfile(db, profileId),
   ]);
+
+  // BUG-70: Populate supplementary cache on first exchange
+  if (!cachedSupp) {
+    const cacheKey = getSessionStaticContextCacheKey(profileId, sessionId);
+    staticContext.supplementary = {
+      priorTopics,
+      teachingPref,
+      learningMode: learningModeRecord,
+      learningProfile,
+      crossSubjectHighlights,
+    };
+    touchSessionStaticContextCacheEntry(cacheKey, staticContext);
+  }
 
   const topic = topicRows[0];
   const [profile] = profileRows;

@@ -19,6 +19,7 @@ export * from './assessments.ts';
 
 // Progress, Motivation & Dashboard (Epic 4)
 export * from './progress.ts';
+export * from './retention-status.ts';
 export * from './snapshots.ts';
 
 // Subscription & Billing (Epic 5)

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -18,6 +18,7 @@ import { useSubjects } from '../../../hooks/use-subjects';
 import { SuggestionCard } from '../../../components/library/SuggestionCard';
 import { useThemeColors } from '../../../lib/theme';
 import { formatApiError } from '../../../lib/format-api-error';
+import { goBackOrReplace } from '../../../lib/navigation';
 
 export default function PickBookScreen(): React.ReactElement {
   const router = useRouter();
@@ -33,6 +34,18 @@ export default function PickBookScreen(): React.ReactElement {
   const [customText, setCustomText] = useState('');
   const [showSkip, setShowSkip] = useState(false);
 
+  const handleBack = useCallback(() => {
+    if (subjectId) {
+      goBackOrReplace(router, {
+        pathname: '/(app)/shelf/[subjectId]',
+        params: { subjectId },
+      } as never);
+      return;
+    }
+
+    goBackOrReplace(router, '/(app)/library');
+  }, [router, subjectId]);
+
   // M-9: Filing overlay timeout — show skip button after 15 seconds
   useEffect(() => {
     if (filing.isPending) {
@@ -46,7 +59,26 @@ export default function PickBookScreen(): React.ReactElement {
   const suggestions = suggestionsQuery.data ?? [];
   const subject = subjects?.find((s) => s.id === subjectId);
 
+  // BUG-318: Auto-open custom input when suggestions load empty — the user
+  // shouldn't have to find and tap "Something else..." when there's nothing to pick.
+  useEffect(() => {
+    if (
+      !suggestionsQuery.isLoading &&
+      !suggestionsQuery.isError &&
+      suggestions.length === 0
+    ) {
+      setShowCustomInput(true);
+    }
+  }, [
+    suggestionsQuery.isLoading,
+    suggestionsQuery.isError,
+    suggestions.length,
+  ]);
+
   const handlePickSuggestion = async (suggestion: BookSuggestion) => {
+    // BUG-323: Guard against concurrent filing calls — alert retry
+    // can fire while a previous mutateAsync is still in-flight.
+    if (filing.isPending) return;
     try {
       const result = await filing.mutateAsync({
         rawInput: suggestion.title,
@@ -69,7 +101,7 @@ export default function PickBookScreen(): React.ReactElement {
             text: 'Try again',
             onPress: () => void handlePickSuggestion(suggestion),
           },
-          { text: 'Go back', onPress: () => router.back() },
+          { text: 'Go back', onPress: handleBack },
         ]
       );
     }
@@ -77,7 +109,8 @@ export default function PickBookScreen(): React.ReactElement {
 
   const handleCustomSubmit = async () => {
     const trimmed = customText.trim();
-    if (!trimmed) return;
+    // BUG-323: Guard against concurrent filing calls
+    if (!trimmed || filing.isPending) return;
     try {
       // M-10: Include subject name as context so the filing LLM places
       // the custom topic within the correct shelf/subject.
@@ -95,7 +128,7 @@ export default function PickBookScreen(): React.ReactElement {
     } catch (err) {
       Alert.alert('Something went wrong', formatApiError(err), [
         { text: 'Try again', onPress: () => void handleCustomSubmit() },
-        { text: 'Go back', onPress: () => router.back() },
+        { text: 'Go back', onPress: handleBack },
       ]);
     }
   };
@@ -112,7 +145,7 @@ export default function PickBookScreen(): React.ReactElement {
           Missing subject. Please go back and try again.
         </Text>
         <Pressable
-          onPress={() => router.back()}
+          onPress={handleBack}
           className="bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
           testID="pick-book-missing-param-back"
         >
@@ -137,7 +170,7 @@ export default function PickBookScreen(): React.ReactElement {
           Loading suggestions...
         </Text>
         <Pressable
-          onPress={() => router.back()}
+          onPress={handleBack}
           className="mt-6 px-5 py-3"
           accessibilityLabel="Go back"
           testID="pick-book-loading-back"
@@ -174,7 +207,7 @@ export default function PickBookScreen(): React.ReactElement {
           </Text>
         </Pressable>
         <Pressable
-          onPress={() => router.back()}
+          onPress={handleBack}
           className="bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
           testID="pick-book-back-button"
         >
@@ -204,7 +237,7 @@ export default function PickBookScreen(): React.ReactElement {
         {/* Header */}
         <View className="flex-row items-center mb-2">
           <Pressable
-            onPress={() => router.back()}
+            onPress={handleBack}
             className="p-2 -ms-2 me-2"
             accessibilityLabel="Back"
             testID="pick-book-back"
@@ -314,7 +347,14 @@ export default function PickBookScreen(): React.ReactElement {
           </Text>
           {showSkip && (
             <Pressable
-              onPress={() => router.back()}
+              onPress={() =>
+                // BUG-319: Navigate to shelf instead of router.back() which
+                // would return to create-subject. The subject already exists.
+                router.replace({
+                  pathname: '/(app)/shelf/[subjectId]',
+                  params: { subjectId },
+                } as never)
+              }
               className="mt-6 bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
               testID="pick-book-filing-skip"
               accessibilityLabel="Skip and start learning anyway"

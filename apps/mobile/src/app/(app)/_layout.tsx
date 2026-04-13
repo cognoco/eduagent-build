@@ -13,7 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth, useClerk, useUser } from '@clerk/clerk-expo';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from '../../lib/secure-storage';
 import { useProfile } from '../../lib/profile';
 import { useTheme, useThemeColors, useTokenVars } from '../../lib/theme';
 import { useConsentStatus, useRequestConsent } from '../../hooks/use-consent';
@@ -25,6 +25,7 @@ import {
 } from '../../lib/consent-copy';
 import { evaluateSentryForProfile } from '../../lib/sentry';
 import { formatApiError } from '../../lib/format-api-error';
+import { clearTransitionState } from '../../lib/auth-transition';
 
 const iconMap: Record<
   string,
@@ -332,6 +333,27 @@ function CreateProfileGate(): React.ReactElement {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { signOut } = useClerk();
+  const isPushingRef = React.useRef(false);
+
+  const handleSignOut = async () => {
+    try {
+      clearTransitionState();
+      await signOut();
+    } catch (err: unknown) {
+      console.error('signOut failed:', err);
+      Alert.alert('Sign Out Failed', 'Please try again or restart the app.');
+    }
+  };
+
+  const handleGetStarted = React.useCallback(() => {
+    if (isPushingRef.current) return;
+    isPushingRef.current = true;
+    router.push('/create-profile');
+    // Reset after navigation settles to allow re-entry if user backs out
+    setTimeout(() => {
+      isPushingRef.current = false;
+    }, 1000);
+  }, [router]);
 
   return (
     <View
@@ -346,7 +368,7 @@ function CreateProfileGate(): React.ReactElement {
         Let's set up your profile so your mentor can get to know you.
       </Text>
       <Pressable
-        onPress={() => router.push('/create-profile')}
+        onPress={handleGetStarted}
         className="bg-primary rounded-button py-3.5 px-8 items-center w-full"
         style={{ minHeight: 48 }}
         testID="create-profile-cta"
@@ -358,7 +380,7 @@ function CreateProfileGate(): React.ReactElement {
         </Text>
       </Pressable>
       <Pressable
-        onPress={() => signOut()}
+        onPress={() => void handleSignOut()}
         className="mt-6 py-2"
         testID="create-profile-gate-signout"
         accessibilityRole="button"
@@ -380,6 +402,16 @@ function CreateProfileGate(): React.ReactElement {
 function ConsentWithdrawnGate(): React.ReactElement {
   const insets = useSafeAreaInsets();
   const { signOut } = useClerk();
+
+  const handleSignOut = async () => {
+    try {
+      clearTransitionState();
+      await signOut();
+    } catch (err: unknown) {
+      console.error('signOut failed:', err);
+      Alert.alert('Sign Out Failed', 'Please try again or restart the app.');
+    }
+  };
   const { profiles, activeProfile, switchProfile } = useProfile();
   const { persona } = useTheme();
   const copy = getConsentWithdrawnCopy(persona);
@@ -410,7 +442,11 @@ function ConsentWithdrawnGate(): React.ReactElement {
         <Pressable
           onPress={() => {
             const other = profiles.find((p) => p.id !== activeProfile?.id);
-            if (other) void switchProfile(other.id);
+            if (other) {
+              void switchProfile(other.id).catch(() => {
+                Alert.alert('Could not switch profile', 'Please try again.');
+              });
+            }
           }}
           className="bg-surface rounded-button py-3.5 px-8 items-center mb-3 w-full"
           testID="withdrawn-switch-profile"
@@ -424,7 +460,7 @@ function ConsentWithdrawnGate(): React.ReactElement {
       )}
 
       <Pressable
-        onPress={() => signOut()}
+        onPress={() => void handleSignOut()}
         className="py-3.5 px-8 items-center w-full"
         testID="withdrawn-sign-out"
         accessibilityRole="button"
@@ -437,11 +473,22 @@ function ConsentWithdrawnGate(): React.ReactElement {
 }
 
 function ConsentPendingGate(): React.ReactElement {
+  const AUTO_REFRESH_MS = 15_000;
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const queryClient = useQueryClient();
   const { signOut } = useClerk();
+
+  const handleSignOut = async () => {
+    try {
+      clearTransitionState();
+      await signOut();
+    } catch (err: unknown) {
+      console.error('signOut failed:', err);
+      Alert.alert('Sign Out Failed', 'Please try again or restart the app.');
+    }
+  };
   const { profiles, activeProfile, switchProfile } = useProfile();
   const { data: consentData } = useConsentStatus();
   const resendMutation = useRequestConsent();
@@ -465,14 +512,31 @@ function ConsentPendingGate(): React.ReactElement {
   const emailWasSent =
     activeProfile?.consentStatus === 'PARENTAL_CONSENT_REQUESTED';
 
+  const refreshConsentGate = React.useCallback(async () => {
+    await queryClient.invalidateQueries({
+      predicate: (query) => {
+        const key = String(query.queryKey[0]);
+        return key === 'profiles' || key === 'consent-status';
+      },
+    });
+  }, [queryClient]);
+
   const onCheckAgain = async () => {
     setChecking(true);
     try {
-      await queryClient.invalidateQueries({ queryKey: ['profiles'] });
+      await refreshConsentGate();
     } finally {
       setChecking(false);
     }
   };
+
+  React.useEffect(() => {
+    if (!emailWasSent) return;
+    const interval = setInterval(() => {
+      void refreshConsentGate();
+    }, AUTO_REFRESH_MS);
+    return () => clearInterval(interval);
+  }, [emailWasSent, refreshConsentGate]);
 
   const onResend = () => {
     if (!activeProfile || !consentData?.parentEmail || !consentData.consentType)
@@ -596,7 +660,11 @@ function ConsentPendingGate(): React.ReactElement {
           <Pressable
             onPress={() => {
               const other = profiles.find((p) => p.id !== activeProfile?.id);
-              if (other) void switchProfile(other.id);
+              if (other) {
+                void switchProfile(other.id).catch(() => {
+                  Alert.alert('Could not switch profile', 'Please try again.');
+                });
+              }
             }}
             className="py-3.5 px-8 items-center mb-3 w-full"
             testID="consent-switch-profile"
@@ -610,7 +678,7 @@ function ConsentPendingGate(): React.ReactElement {
         )}
 
         <Pressable
-          onPress={() => signOut()}
+          onPress={() => void handleSignOut()}
           className="py-3.5 px-8 items-center w-full"
           testID="consent-sign-out"
           accessibilityRole="button"
@@ -664,6 +732,10 @@ function ConsentPendingGate(): React.ReactElement {
           </Text>
         )}
       </Pressable>
+
+      <Text className="text-body-sm text-text-muted text-center mb-3">
+        We&apos;ll keep checking automatically while you wait.
+      </Text>
 
       {parentEmail && consentData?.consentType && !changingEmail && (
         <Pressable
@@ -746,6 +818,8 @@ function ConsentPendingGate(): React.ReactElement {
           {isSameAsChild && (
             <Text
               className="text-danger text-body-sm mb-1"
+              accessibilityRole="alert"
+              accessibilityLiveRegion="assertive"
               testID="consent-change-same-email-warning"
             >
               {copy.sameEmailWarning}
@@ -849,7 +923,11 @@ function ConsentPendingGate(): React.ReactElement {
         <Pressable
           onPress={() => {
             const other = profiles.find((p) => p.id !== activeProfile?.id);
-            if (other) void switchProfile(other.id);
+            if (other) {
+              void switchProfile(other.id).catch(() => {
+                Alert.alert('Could not switch profile', 'Please try again.');
+              });
+            }
           }}
           className="py-3.5 px-8 items-center mb-3 w-full"
           testID="consent-switch-profile"
@@ -863,7 +941,7 @@ function ConsentPendingGate(): React.ReactElement {
       )}
 
       <Pressable
-        onPress={() => signOut()}
+        onPress={() => void handleSignOut()}
         className="py-3.5 px-8 items-center w-full"
         testID="consent-sign-out"
         accessibilityRole="button"
@@ -926,7 +1004,12 @@ export default function AppLayout() {
     console.log(
       `[AUTH-DEBUG] (app) layout | isLoaded=${isLoaded} | isSignedIn=${isSignedIn}`
     );
-  if (!isLoaded) return null;
+  if (!isLoaded)
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
   if (!isSignedIn) {
     if (__DEV__)
       console.warn(
@@ -1112,7 +1195,6 @@ export default function AppLayout() {
           options={{
             href: null,
             tabBarItemStyle: { display: 'none' },
-            tabBarButton: () => null,
           }}
         />
         <Tabs.Screen
@@ -1120,7 +1202,6 @@ export default function AppLayout() {
           options={{
             href: null,
             tabBarItemStyle: { display: 'none' },
-            tabBarButton: () => null,
           }}
         />
         <Tabs.Screen

@@ -224,8 +224,8 @@ describe('precomputeCoachingCard', () => {
     }
   });
 
-  it('returns challenge card as fallback', async () => {
-    // No retention cards at all
+  it('returns curriculum_complete when no retention cards exist', async () => {
+    // [BUG-55] No retention cards = no valid topicId, returns curriculum_complete
     setupScopedRepo({ retentionCardsFindMany: [] });
     const db = createMockDb();
 
@@ -234,12 +234,8 @@ describe('precomputeCoachingCard', () => {
 
     const card = await precomputeCoachingCard(db, profileId);
 
-    expect(card.type).toBe('challenge');
+    expect(card.type).toBe('curriculum_complete');
     expect(card.priority).toBe(3);
-    if (card.type === 'challenge') {
-      expect(['easy', 'medium', 'hard']).toContain(card.difficulty);
-      expect(card.xpReward).toBeGreaterThanOrEqual(0);
-    }
   });
 
   it('returns curriculum_complete card when all retention cards are verified (>= 3 cards)', async () => {
@@ -708,7 +704,8 @@ describe('getCoachingCardForProfile', () => {
 
     expect(result.coldStart).toBe(false);
     expect(result.card).not.toBeNull();
-    expect(result.card!.type).toBe('challenge'); // fallback since no retention cards
+    // [BUG-55] No retention cards = no valid topicId, so returns curriculum_complete
+    expect(result.card!.type).toBe('curriculum_complete');
     expect(result.fallback).toBeNull();
     // Verify cache was written (insert called for the write)
     expect(db.insert).toHaveBeenCalled();

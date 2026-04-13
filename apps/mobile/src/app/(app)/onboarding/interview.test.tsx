@@ -102,17 +102,33 @@ describe('InterviewScreen', () => {
       );
     });
 
-    // Tapping the CTA navigates to analogy-preference
+    // Tapping the CTA navigates straight to curriculum review
     fireEvent.press(screen.getByTestId('view-curriculum-button'));
     expect(mockReplace).toHaveBeenCalledWith(
       expect.objectContaining({
-        pathname: '/(app)/onboarding/analogy-preference',
+        pathname: '/(app)/onboarding/curriculum-review',
       })
     );
   });
 
-  it('disables input after a stream error and lets the learner clear it', async () => {
-    mockStream.mockRejectedValueOnce(new Error('Network request failed'));
+  it('disables input after a stream error and lets the learner retry', async () => {
+    // BUG-317: Try Again now resends the failed message instead of just clearing
+    // the error. Mock the first call to fail and the retry to succeed.
+    mockStream
+      .mockRejectedValueOnce(new Error('Network request failed'))
+      .mockImplementationOnce(
+        async (
+          _msg: string,
+          _onChunk: (accumulated: string) => void,
+          onDone: (result: {
+            isComplete: boolean;
+            exchangeCount: number;
+          }) => void
+        ) => {
+          // Retry succeeds — call onDone to finalize the streaming message
+          onDone({ isComplete: false, exchangeCount: 2 });
+        }
+      );
 
     render(<InterviewScreen />);
 
@@ -133,10 +149,15 @@ describe('InterviewScreen', () => {
     fireEvent.press(screen.getByTestId('interview-try-again-button'));
 
     await waitFor(() => {
+      // Error panel should disappear after retry
       expect(screen.queryByTestId('interview-stream-error')).toBeNull();
+      // Input should be re-enabled since retry succeeded (no streamError)
       expect(screen.getByTestId('chat-shell-input-disabled')).toHaveTextContent(
         'false'
       );
     });
+
+    // Verify the retry actually called stream again
+    expect(mockStream).toHaveBeenCalledTimes(2);
   });
 });

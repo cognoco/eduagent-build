@@ -47,6 +47,10 @@ jest.mock('../services/progress', () => ({
   getContinueSuggestion: jest.fn(),
 }));
 
+jest.mock('../services/retention-data', () => ({
+  getProfileOverdueCount: jest.fn(),
+}));
+
 import { app } from '../index';
 import {
   getSubjectProgress,
@@ -54,6 +58,7 @@ import {
   getOverallProgress,
   getContinueSuggestion,
 } from '../services/progress';
+import { getProfileOverdueCount } from '../services/retention-data';
 
 const TEST_ENV = {
   CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',
@@ -242,6 +247,40 @@ describe('progress routes', () => {
 
     it('returns 401 without auth header', async () => {
       const res = await app.request('/v1/progress/overview', {}, TEST_ENV);
+
+      expect(res.status).toBe(401);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // GET /v1/progress/review-summary
+  // -------------------------------------------------------------------------
+
+  describe('GET /v1/progress/review-summary', () => {
+    it('returns 200 with total overdue review count', async () => {
+      (getProfileOverdueCount as jest.Mock).mockResolvedValue({
+        overdueCount: 7,
+        topTopicIds: ['topic-1', 'topic-2', 'topic-3'],
+      });
+
+      const res = await app.request(
+        '/v1/progress/review-summary',
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.totalOverdue).toBe(7);
+    });
+
+    it('returns 401 without auth header', async () => {
+      const res = await app.request(
+        '/v1/progress/review-summary',
+        {},
+        TEST_ENV
+      );
 
       expect(res.status).toBe(401);
     });
