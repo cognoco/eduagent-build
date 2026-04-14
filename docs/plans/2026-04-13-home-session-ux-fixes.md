@@ -170,11 +170,10 @@ Expected: 0 errors.
 ## PART 2 — Wire `useContinueSuggestion` into Learner Home Card
 
 
-> **AMENDMENT (2026-04-14):** Implementation deviated from original spec.
-> The subtitle on "Start learning" was **removed** (project convention: that card is title-only, no subtitle).
-> Instead: (1) `hasLibraryContent` is now gated on `continueSuggestion != null` so "Repeat & review"
-> only shows when actual curriculum exists; (2) a "Resume last session" IntentCard was added to
-> `learn-new.tsx` using `continueSuggestion`. Commit: `3551ba39`.
+> **AMENDMENT (2026-04-14):** Plan spec stated the hook returns `{ topicName, subjectName }` but the
+> actual API shape is `{ topicTitle, subjectName }` (`topicTitle`, not `topicName`). Implementation
+> correctly uses `topicTitle`. The subtitle **is** wired: `"Continue with {topicTitle} in {subjectName}"`.
+> Commits: `593f08e4` (hook wiring), `529e1e43` (strengthened test assertion).
 
 **Problem:** The "Start learning" `IntentCard` on `LearnerScreen` has no subtitle. The `useContinueSuggestion` hook (in `apps/mobile/src/hooks/use-progress.ts`) calls `GET /progress/continue` and returns `{ suggestion: { topicName, subjectName } | null }`. The hook exists and is tested but is never used in the home screen.
 
@@ -747,7 +746,7 @@ Expected: 0 errors.
 
 ### Steps
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 In `ParentGateway.test.tsx`, add:
 
@@ -763,7 +762,7 @@ it('gateway-learn card routes to /learn, not /learn-new', () => {
 });
 ```
 
-- [ ] **Step 2: Run to confirm it fails**
+- [x] **Step 2: Run to confirm it fails**
 
 ```bash
 cd apps/mobile && pnpm exec jest --findRelatedTests src/components/home/ParentGateway.tsx --no-coverage 2>&1 | tail -20
@@ -771,7 +770,7 @@ cd apps/mobile && pnpm exec jest --findRelatedTests src/components/home/ParentGa
 
 Expected: FAIL — `mockPush` called with `/learn-new`, not `/learn`.
 
-- [ ] **Step 3: Update `ParentGateway.tsx`**
+- [x] **Step 3: Update `ParentGateway.tsx`**
 
 In `apps/mobile/src/components/home/ParentGateway.tsx`, find:
 
@@ -793,7 +792,7 @@ Change to:
 />
 ```
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 ```bash
 cd apps/mobile && pnpm exec jest --findRelatedTests src/components/home/ParentGateway.tsx --no-coverage 2>&1 | tail -20
@@ -801,7 +800,7 @@ cd apps/mobile && pnpm exec jest --findRelatedTests src/components/home/ParentGa
 
 Expected: PASS.
 
-- [ ] **Step 5: Typecheck**
+- [x] **Step 5: Typecheck**
 
 ```bash
 cd apps/mobile && pnpm exec tsc --noEmit 2>&1 | tail -20
@@ -844,11 +843,11 @@ pnpm exec nx run api:typecheck 2>&1 | tail -20
 
 | # | Finding | File(s) | Status | Verified By |
 |---|---------|---------|--------|-------------|
-| 1 | Blank-page paralysis on subject creation | `create-subject.tsx` | ✅ Done (`7fc73544`) | `test: create-subject.test.tsx:"renders starter chips and fills the input on tap"` |
-| 2 | Library error on book fetch failure; "Repeat & review" shown too early; missing resume card | `LearnerScreen.tsx`, `library.tsx`, `learn-new.tsx` | ✅ Done (`3551ba39`) — see AMENDMENT above | `test: LearnerScreen.test.tsx, library.test.tsx, learn-new.test.tsx` |
-| 3a | Quota exceeded shown as plain text bubble | `session/index.tsx`, `QuotaExceededCard.tsx` | ✅ Done (`3551ba39`) | `test: session/index.test.tsx:"shows QuotaExceededCard and disables input when stream returns 402"` |
-| 3b | Chat input stays enabled after quota exceeded | `session/index.tsx` | ✅ Done (`3551ba39`) | Same test as 3a |
-| 4 | Parents routed to wrong `/learn-new` entry point | `ParentGateway.tsx` | ✅ Done | `test: ParentGateway.test.tsx:"gateway-learn card routes to /learn, not /learn-new"` |
+| 1 | Blank-page paralysis on subject creation | `create-subject.tsx` | ✅ Done (`7fc73544`, `c28ea0fa`) | `test: create-subject.test.tsx:"renders starter chips and fills the input on tap"` + `"tapping a chip immediately triggers resolveInput"` |
+| 2 | "Start learning" card has no subtitle | `LearnerScreen.tsx` | ✅ Done (`593f08e4`, `529e1e43`) | `test: LearnerScreen.test.tsx:"shows continue suggestion as Start learning subtitle when available"` |
+| 3a | Quota exceeded shown as plain text bubble | `session/index.tsx`, `QuotaExceededCard.tsx` | ✅ Done (`3551ba39`, `c9e2062f`) | `test: session/index.test.tsx:"shows QuotaExceededCard and disables input when stream returns 402"` |
+| 3b | Chat input stays enabled after quota exceeded | `session/index.tsx` | ✅ Done (`3551ba39`) | Same test as 3a — `input-disabled-banner` assertion |
+| 4 | Parents routed to wrong `/learn-new` entry point | `ParentGateway.tsx` | ✅ Done (`29960023`) | `test: ParentGateway.test.tsx:"gateway-learn card routes to /learn, not /learn-new"` |
 
 ---
 
