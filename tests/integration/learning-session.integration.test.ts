@@ -43,6 +43,28 @@ const mockInngestCreateFunction = jest.fn().mockImplementation((config) => {
   return fn;
 });
 
+const mockRouteAndCall = jest.fn().mockResolvedValue({
+  response: JSON.stringify({
+    feedback: 'Great summary!',
+    hasUnderstandingGaps: false,
+    gapAreas: [],
+    isAccepted: true,
+  }),
+  model: 'mock',
+  rung: 1,
+});
+
+jest.mock('../../apps/api/src/services/llm', () => {
+  const actual = jest.requireActual(
+    '../../apps/api/src/services/llm'
+  ) as Record<string, unknown>;
+
+  return {
+    ...actual,
+    routeAndCall: (...args: unknown[]) => mockRouteAndCall(...args),
+  };
+});
+
 jest.mock('../../apps/api/src/middleware/jwt', () => jwt);
 jest.mock('../../apps/api/src/inngest/client', () => ({
   inngest: {
