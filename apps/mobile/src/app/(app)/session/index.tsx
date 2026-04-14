@@ -5,9 +5,6 @@ import {
   Text,
   Pressable,
   Alert,
-  Modal,
-  ScrollView,
-  TextInput,
   ActivityIndicator,
 } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
@@ -84,6 +81,7 @@ import { useSubjectClassification } from './use-subject-classification';
 import { useSessionActions } from './use-session-actions';
 import { SessionMessageActions } from './SessionMessageActions';
 import { SessionToolAccessory, SessionAccessory } from './SessionAccessories';
+import { ParkingLotModal, TopicSwitcherModal } from './SessionModals';
 
 function MilestoneDots({ count }: { count: number }) {
   if (count <= 0) return null;
@@ -1043,200 +1041,26 @@ export default function SessionScreen() {
           </>
         }
       />
-      <Modal
+      <ParkingLotModal
         visible={showParkingLot}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowParkingLot(false)}
-      >
-        <View className="flex-1 bg-black/40 justify-end">
-          <View
-            className="bg-background rounded-t-3xl px-5 pt-5"
-            style={{ paddingBottom: Math.max(insets.bottom, 24) }}
-          >
-            <View className="items-center mb-4">
-              <View className="w-10 h-1 rounded-full bg-text-secondary/30" />
-            </View>
-            <Text className="text-h3 font-semibold text-text-primary mb-2">
-              Parking lot
-            </Text>
-            <Text className="text-body-sm text-text-secondary mb-4">
-              Save side questions for later so you can stay focused on this
-              session.
-            </Text>
-
-            <TextInput
-              value={parkingLotDraft}
-              onChangeText={setParkingLotDraft}
-              placeholder="What do you want to come back to later?"
-              className="bg-surface rounded-input px-4 py-3 text-body text-text-primary"
-              multiline
-              testID="parking-lot-input"
-            />
-
-            <Pressable
-              onPress={() => void handleSaveParkingLot()}
-              disabled={!parkingLotDraft.trim() || addParkingLotItem.isPending}
-              className={
-                parkingLotDraft.trim()
-                  ? 'bg-primary rounded-button py-3 mt-4 items-center'
-                  : 'bg-surface-elevated rounded-button py-3 mt-4 items-center'
-              }
-              testID="parking-lot-save"
-            >
-              {addParkingLotItem.isPending ? (
-                <ActivityIndicator color="white" />
-              ) : (
-                <Text
-                  className={
-                    parkingLotDraft.trim()
-                      ? 'text-body font-semibold text-text-inverse'
-                      : 'text-body font-semibold text-text-secondary'
-                  }
-                >
-                  Save question
-                </Text>
-              )}
-            </Pressable>
-
-            <ScrollView className="mt-4" style={{ maxHeight: 220 }}>
-              {(parkingLot.data ?? []).map((item) => (
-                <View
-                  key={item.id}
-                  className="bg-surface rounded-card px-4 py-3 mb-2"
-                  testID={`parking-lot-item-${item.id}`}
-                >
-                  <Text className="text-body text-text-primary">
-                    {item.question}
-                  </Text>
-                  <Text className="text-caption text-text-secondary mt-1">
-                    Saved for later
-                  </Text>
-                </View>
-              ))}
-              {parkingLot.isLoading ? (
-                <View className="py-4 items-center">
-                  <ActivityIndicator />
-                </View>
-              ) : parkingLot.data?.length ? null : (
-                <Text className="text-body-sm text-text-secondary mt-3">
-                  Nothing parked yet.
-                </Text>
-              )}
-            </ScrollView>
-
-            <Pressable
-              onPress={() => setShowParkingLot(false)}
-              className="items-center py-3 mt-3"
-            >
-              <Text className="text-body font-semibold text-text-secondary">
-                Close
-              </Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
-      <Modal
+        onClose={() => setShowParkingLot(false)}
+        parkingLotDraft={parkingLotDraft}
+        setParkingLotDraft={setParkingLotDraft}
+        handleSaveParkingLot={handleSaveParkingLot}
+        parkingLot={parkingLot}
+        addParkingLotItem={addParkingLotItem}
+        insetsBottom={insets.bottom}
+      />
+      <TopicSwitcherModal
         visible={showTopicSwitcher}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowTopicSwitcher(false)}
-      >
-        <View className="flex-1 bg-black/40 justify-end">
-          <View
-            className="bg-background rounded-t-3xl px-5 pt-5"
-            style={{ paddingBottom: Math.max(insets.bottom, 24) }}
-          >
-            <View className="items-center mb-4">
-              <View className="w-10 h-1 rounded-full bg-text-secondary/30" />
-            </View>
-            <Text className="text-h3 font-semibold text-text-primary mb-2">
-              Switch topic
-            </Text>
-            <Text className="text-body-sm text-text-secondary mb-4">
-              Start a new learning thread in another topic without losing this
-              conversation.
-            </Text>
-
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ gap: 8 }}
-              className="mb-4"
-            >
-              {availableSubjects.map((subject) => (
-                <Pressable
-                  key={subject.id}
-                  onPress={() => setTopicSwitcherSubjectId(subject.id)}
-                  className={
-                    switcherSubjectId === subject.id
-                      ? 'rounded-full bg-primary px-4 py-2'
-                      : 'rounded-full bg-surface-elevated px-4 py-2'
-                  }
-                  testID={`switch-subject-${subject.id}`}
-                >
-                  <Text
-                    className={
-                      switcherSubjectId === subject.id
-                        ? 'text-body-sm font-semibold text-text-inverse'
-                        : 'text-body-sm font-semibold text-text-secondary'
-                    }
-                  >
-                    {subject.name}
-                  </Text>
-                </Pressable>
-              ))}
-            </ScrollView>
-
-            <ScrollView style={{ maxHeight: 280 }}>
-              {switcherCurriculum.isLoading ? (
-                <View className="py-6 items-center">
-                  <ActivityIndicator />
-                </View>
-              ) : (
-                (switcherCurriculum.data?.topics ?? [])
-                  .filter((topic) => !topic.skipped)
-                  .map((topic) => {
-                    const subjectForTopic = availableSubjects.find(
-                      (subject) => subject.id === switcherSubjectId
-                    );
-                    if (!subjectForTopic) return null;
-                    return (
-                      <Pressable
-                        key={topic.id}
-                        onPress={() =>
-                          handleTopicSwitch(
-                            topic.id,
-                            subjectForTopic.id,
-                            subjectForTopic.name
-                          )
-                        }
-                        className="bg-surface rounded-card px-4 py-3 mb-2"
-                        testID={`switch-topic-${topic.id}`}
-                      >
-                        <Text className="text-body font-semibold text-text-primary">
-                          {topic.title}
-                        </Text>
-                        <Text className="text-body-sm text-text-secondary mt-1">
-                          {topic.description}
-                        </Text>
-                      </Pressable>
-                    );
-                  })
-              )}
-            </ScrollView>
-
-            <Pressable
-              onPress={() => setShowTopicSwitcher(false)}
-              className="items-center py-3 mt-3"
-            >
-              <Text className="text-body font-semibold text-text-secondary">
-                Close
-              </Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
+        onClose={() => setShowTopicSwitcher(false)}
+        availableSubjects={availableSubjects}
+        switcherSubjectId={switcherSubjectId}
+        setTopicSwitcherSubjectId={setTopicSwitcherSubjectId}
+        switcherCurriculum={switcherCurriculum}
+        handleTopicSwitch={handleTopicSwitch}
+        insetsBottom={insets.bottom}
+      />
       {confirmationToast ? (
         <View
           pointerEvents="none"
