@@ -93,4 +93,42 @@ describe('VocabularyBrowserScreen', () => {
     render(<VocabularyBrowserScreen />);
     expect(screen.getByTestId('vocab-browser-error')).toBeTruthy();
   });
+
+  it('shows new learner empty state when no vocab and < 4 sessions', () => {
+    (useProgressInventory as jest.Mock).mockReturnValue({
+      data: {
+        ...mockInventory,
+        global: {
+          ...mockInventory.global,
+          vocabularyTotal: 0,
+          totalSessions: 2,
+        },
+        subjects: [],
+      },
+      isLoading: false,
+      isError: false,
+    });
+    render(<VocabularyBrowserScreen />);
+    expect(screen.getByTestId('vocab-browser-new-learner')).toBeTruthy();
+    expect(screen.getByText('Your vocabulary will grow here')).toBeTruthy();
+  });
+
+  it('shows standard empty state when no vocab and >= 4 sessions', () => {
+    (useProgressInventory as jest.Mock).mockReturnValue({
+      data: {
+        ...mockInventory,
+        global: {
+          ...mockInventory.global,
+          vocabularyTotal: 0,
+          totalSessions: 10,
+        },
+        subjects: [],
+      },
+      isLoading: false,
+      isError: false,
+    });
+    render(<VocabularyBrowserScreen />);
+    expect(screen.getByTestId('vocab-browser-empty')).toBeTruthy();
+    expect(screen.queryByTestId('vocab-browser-new-learner')).toBeNull();
+  });
 });
