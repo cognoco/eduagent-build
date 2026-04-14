@@ -102,8 +102,9 @@ export function useRatingPrompt(): {
         await SecureStore.setItemAsync(lastPromptKey, new Date().toISOString());
       }
     } catch (error) {
-      // SecureStore may be unavailable in some environments — skip rating prompt
-      if (__DEV__) console.warn('Rating prompt check failed:', error);
+      // SecureStore may be unavailable in some environments — skip rating prompt.
+      // Log for prod observability [SC-4]
+      console.error('[RatingPrompt] check failed:', error);
     }
   }, [activeProfile]);
 

@@ -208,8 +208,9 @@ export default function SessionSummaryScreen() {
         },
         level: 'info',
       });
-    } catch {
-      // Error state handled by mutation
+    } catch (err) {
+      // Error state surfaced by submitSummary.isError inline in JSX [SC-1]
+      console.error('[SessionSummary] handleSubmit failed:', err);
     } finally {
       submitInFlight.current = false;
     }

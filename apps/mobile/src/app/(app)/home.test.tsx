@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react-native';
+import { render, screen, act } from '@testing-library/react-native';
 
 let mockProfiles: Array<{
   id: string;
@@ -12,6 +12,9 @@ let mockActiveProfile: {
 } | null = null;
 let mockIsLoading = false;
 let mockSubscriptionTier: string | undefined = undefined;
+
+let mockMarkCelebrationsSeen = { mutateAsync: jest.fn() };
+let mockOnAllComplete: (() => void) | null = null;
 
 jest.mock('../../lib/profile', () => ({
   useProfile: () => ({
@@ -31,11 +34,14 @@ jest.mock('../../hooks/use-subscription', () => ({
 
 jest.mock('../../hooks/use-celebrations', () => ({
   usePendingCelebrations: () => ({ data: [] }),
-  useMarkCelebrationsSeen: () => ({ mutateAsync: jest.fn() }),
+  useMarkCelebrationsSeen: () => mockMarkCelebrationsSeen,
 }));
 
 jest.mock('../../hooks/use-celebration', () => ({
-  useCelebration: () => ({ CelebrationOverlay: null }),
+  useCelebration: ({ onAllComplete }: { onAllComplete: () => void }) => {
+    mockOnAllComplete = onAllComplete;
+    return { CelebrationOverlay: null };
+  },
 }));
 
 jest.mock('../../hooks/use-settings', () => ({
@@ -73,6 +79,8 @@ describe('HomeScreen intent router', () => {
     jest.clearAllMocks();
     mockIsLoading = false;
     mockSubscriptionTier = undefined;
+    mockMarkCelebrationsSeen = { mutateAsync: jest.fn() };
+    mockOnAllComplete = null;
   });
 
   it('renders LearnerScreen for owner with no children on free tier', () => {
@@ -172,5 +180,43 @@ describe('HomeScreen intent router', () => {
     // Falls back to learner while subscription loads — avoids false Add Child flash
     expect(screen.getByTestId('learner-screen')).toBeTruthy();
     expect(screen.queryByTestId('add-first-child-screen')).toBeNull();
+  });
+});
+
+describe('HomeScreen SF-1: markCelebrationsSeen error handling', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockIsLoading = false;
+    mockSubscriptionTier = 'free';
+    mockProfiles = [{ id: 'p1', displayName: 'Alex', isOwner: true }];
+    mockActiveProfile = mockProfiles[0] ?? null;
+    mockOnAllComplete = null;
+  });
+
+  it('logs error when markCelebrationsSeen.mutateAsync rejects — no unhandled rejection [SF-1]', async () => {
+    const consoleSpy = jest
+      .spyOn(console, 'error')
+      // eslint-disable-next-line @typescript-eslint/no-empty-function
+      .mockImplementation(() => {});
+    // In jsdom, unhandledrejection is not fully supported; we verify via console.error
+    mockMarkCelebrationsSeen = {
+      mutateAsync: jest.fn().mockRejectedValue(new Error('network failure')),
+    };
+
+    render(<HomeScreen />);
+
+    // Trigger the onAllComplete callback to simulate celebration completion
+    expect(mockOnAllComplete).not.toBeNull();
+    await act(async () => {
+      mockOnAllComplete?.();
+    });
+
+    // The error must be logged — not silently swallowed
+    expect(consoleSpy).toHaveBeenCalledWith(
+      '[Celebrations] Failed to mark seen:',
+      expect.any(Error)
+    );
+
+    consoleSpy.mockRestore();
   });
 });

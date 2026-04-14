@@ -159,12 +159,17 @@ export default function ChildDetailScreen() {
   const restoreConsent = useRestoreConsent(profileId);
   const grantMemoryConsent = useGrantMemoryConsent();
   const { CelebrationOverlay } = useCelebration({
+    // Celebrations are best-effort — empty on error is acceptable [SQ-4]
     queue: pendingCelebrations.data ?? [],
     celebrationLevel: 'all',
     audience: 'adult',
     onAllComplete: () => {
       if (!profileId) return;
-      void markCelebrationsSeen.mutateAsync({ viewer: 'parent', profileId });
+      markCelebrationsSeen
+        .mutateAsync({ viewer: 'parent', profileId })
+        .catch((err) => {
+          console.error('[Celebrations] Failed to mark seen:', err);
+        });
     },
   });
 

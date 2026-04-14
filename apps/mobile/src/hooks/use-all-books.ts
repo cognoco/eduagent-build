@@ -32,6 +32,8 @@ export function useAllBooks(): {
   const { activeProfile } = useProfile();
   const queryClient = useQueryClient();
   const subjectsQuery = useSubjects({ includeInactive: true });
+  // SQ-1: subjects empty-on-error is acceptable here because isError propagates
+  // to the hook's return value, letting consumers (library.tsx) show a retry UI.
   const subjects = subjectsQuery.data ?? [];
 
   const bookQueries = useQueries({

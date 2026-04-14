@@ -125,10 +125,10 @@ async function parseLearnerInputToAnalysis(
         })) ?? null,
     };
   } catch (err) {
-    // Log before falling back so LLM/network failures are observable.
-    // The outer parseLearnerInput does not see this path because the fallback
-    // resolves successfully — without logging here, failures are invisible.
-    console.warn('[learner-input] LLM parse failed, using fallback', {
+    // SC-7: Log at error level for prod observability. The outer parseLearnerInput
+    // does not see this path because the fallback resolves successfully — without
+    // logging here, LLM/network failures are invisible in production.
+    console.error('[learner-input] LLM parse failed, using fallback', {
       event: 'learner_input.llm.failed',
       source,
       error: err instanceof Error ? err.message : String(err),

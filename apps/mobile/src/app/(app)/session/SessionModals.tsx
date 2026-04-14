@@ -94,6 +94,7 @@ export function ParkingLotModal({
           </Pressable>
 
           <ScrollView className="mt-4" style={{ maxHeight: 220 }}>
+            {/* Parking lot is best-effort — empty on error is acceptable [SQ-5] */}
             {(parkingLot.data ?? []).map((item) => (
               <View
                 key={item.id}

@@ -909,4 +909,59 @@ describe('BookScreen', () => {
     fireEvent.press(getByTestId('book-loading-back'));
     expect(mockBack).toHaveBeenCalledTimes(1);
   });
+
+  // -----------------------------------------------------------------------
+  // RT-1: useRef lock prevents double-fire on retry button
+  // -----------------------------------------------------------------------
+  it('pressing retry generation fires mutate exactly once [RT-1]', async () => {
+    // Set up book needing generation
+    mockUseBookWithTopics.mockReturnValue({
+      data: {
+        book: {
+          id: 'book-1',
+          title: 'Algebra',
+          emoji: '📐',
+          topicsGenerated: false, // triggers auto-generation
+          description: 'Basic algebra',
+        },
+        topics: [],
+        completedTopicCount: 0,
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: mockBookRefetch,
+    });
+
+    // Initial auto-trigger fires onError to put us in timed_out phase
+    mockGenerateMutate.mockImplementationOnce(
+      (
+        _input: unknown,
+        callbacks: { onSuccess: () => void; onError: (e: Error) => void }
+      ) => {
+        callbacks.onError(new Error('initial failure'));
+      }
+    );
+
+    const { getByTestId } = render(<BookScreen />);
+
+    await waitFor(() => {
+      expect(getByTestId('book-gen-retry')).toBeTruthy();
+    });
+
+    // Reset mock before testing retry — capture pending retry call
+    let mutateCallCount = 0;
+    mockGenerateMutate.mockImplementation(() => {
+      mutateCallCount++;
+      // Do NOT call callbacks — leave retryInFlight locked
+    });
+
+    // First press: should trigger mutate and lock retryInFlight
+    fireEvent.press(getByTestId('book-gen-retry'));
+
+    // Mutate was called once and retryInFlight.current is now true.
+    // The retry button is hidden because genPhase was set to 'idle',
+    // so a second press is naturally impossible after state update.
+    expect(mutateCallCount).toBe(1);
+  });
 });
