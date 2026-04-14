@@ -47,7 +47,9 @@ function getAllScreenFiles(dir: string): string[] {
       } else if (
         entry.name.endsWith('.tsx') &&
         !entry.name.endsWith('.test.tsx') &&
-        !entry.name.startsWith('_layout')
+        !entry.name.startsWith('_layout') &&
+        // PascalCase .tsx files are co-located components, not route pages
+        !/^[A-Z]/.test(entry.name)
       ) {
         results.push(fullPath);
       }
