@@ -14,6 +14,9 @@ module.exports = {
     '^(\\.{1,2}/.*)\\.[jt]s$': '$1',
   },
   moduleFileExtensions: ['ts', 'js'],
-  testMatch: ['<rootDir>/apps/api/src/**/*.test.ts'],
+  testMatch: [
+    '<rootDir>/apps/api/src/**/*.test.ts',
+    '<rootDir>/apps/api/src/**/*.integration.test.ts',
+  ],
   coverageDirectory: '<rootDir>/coverage/apps/api',
 };
