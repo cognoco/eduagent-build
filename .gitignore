@@ -138,6 +138,16 @@ hs_err_pid*.log
 # ADB uiautomator dump artifacts
 *uidump*.xml
 *ui_dump*.xml
+apps/mobile/window_dump*.xml
+
+# Dev server / proxy / emulator log files (written by running processes)
+bundle-proxy.current.log
+bundle-proxy.current.err.log
+emulator.log
+emulator.err.log
+metro.current.log
+metro.current.err.log
+tdz_check.js
 
 # Maestro debug flows (local-only, not part of test suite)
 apps/mobile/e2e/flows/_debug/
