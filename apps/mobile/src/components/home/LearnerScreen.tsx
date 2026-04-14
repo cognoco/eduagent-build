@@ -52,7 +52,7 @@ export function LearnerScreen({
   const { data: reviewSummary } = useReviewSummary();
   const { data: continueSuggestion } = useContinueSuggestion();
   const continueSubtitle = continueSuggestion
-    ? `Continue with ${continueSuggestion.topicName} in ${continueSuggestion.subjectName}`
+    ? `Continue with ${continueSuggestion.topicTitle} in ${continueSuggestion.subjectName}`
     : undefined;
   const [recoveryMarker, setRecoveryMarker] =
     useState<SessionRecoveryMarker | null>(null);

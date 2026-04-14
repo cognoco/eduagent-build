@@ -747,6 +747,52 @@ describe('sessionCompleted', () => {
       );
     });
 
+    it('prefers LLM-assigned cefrLevel over milestone fallback [LANG-01]', async () => {
+      setupSubjectMock(fourStrandsSubject);
+      // LLM returns cefrLevel: 'A2' on the item; milestone level is 'B1'
+      mockExtractVocabularyFromTranscript.mockResolvedValueOnce([
+        { term: 'hola', translation: 'hello', type: 'word', cefrLevel: 'A2' },
+      ]);
+      mockGetCurrentLanguageProgress.mockResolvedValue({
+        currentLevel: 'B1',
+        currentMilestone: { milestoneId: 'milestone-1' },
+      });
+
+      await executeSteps(createEventData({ qualityRating: 4 }));
+
+      expect(mockUpsertExtractedVocabulary).toHaveBeenCalledWith(
+        expect.anything(),
+        'profile-001',
+        'subject-001',
+        expect.arrayContaining([
+          expect.objectContaining({ term: 'hola', cefrLevel: 'A2' }),
+        ])
+      );
+    });
+
+    it('falls back to milestone cefrLevel when LLM returns null [LANG-01]', async () => {
+      setupSubjectMock(fourStrandsSubject);
+      // LLM returns cefrLevel: null; milestone level is 'B1'
+      mockExtractVocabularyFromTranscript.mockResolvedValueOnce([
+        { term: 'hola', translation: 'hello', type: 'word', cefrLevel: null },
+      ]);
+      mockGetCurrentLanguageProgress.mockResolvedValue({
+        currentLevel: 'B1',
+        currentMilestone: { milestoneId: 'milestone-1' },
+      });
+
+      await executeSteps(createEventData({ qualityRating: 4 }));
+
+      expect(mockUpsertExtractedVocabulary).toHaveBeenCalledWith(
+        expect.anything(),
+        'profile-001',
+        'subject-001',
+        expect.arrayContaining([
+          expect.objectContaining({ term: 'hola', cefrLevel: 'B1' }),
+        ])
+      );
+    });
+
     it('fetches language progress before and after vocabulary upsert', async () => {
       setupSubjectMock(fourStrandsSubject);
       mockExtractVocabularyFromTranscript.mockResolvedValueOnce([

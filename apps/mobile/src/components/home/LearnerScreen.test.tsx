@@ -322,7 +322,7 @@ describe('LearnerScreen', () => {
   describe('continue suggestion subtitle [HOME-02]', () => {
     it('shows continue suggestion as Start learning subtitle when available', async () => {
       mockUseContinueSuggestion.mockReturnValue({
-        data: { topicName: 'Fractions', subjectName: 'Math' },
+        data: { topicTitle: 'Fractions', subjectName: 'Math' },
       });
 
       render(<LearnerScreen {...defaultProps} />);
