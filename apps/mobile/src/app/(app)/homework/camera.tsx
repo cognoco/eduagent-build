@@ -914,20 +914,17 @@ export default function CameraScreen(): React.ReactNode {
                   <Text className="text-body text-text-primary">{s.name}</Text>
                 </Pressable>
               ))}
-            {(classifyMutation.data?.candidates?.length ?? 0) === 0 &&
-              (subjects?.length ?? 0) === 0 && (
-                <Pressable
-                  onPress={() => router.push('/create-subject')}
-                  className="bg-surface rounded-button py-3 px-4 mb-2 min-h-[48px] justify-center"
-                  accessibilityLabel="Create a new subject"
-                  accessibilityRole="button"
-                  testID="camera-create-subject"
-                >
-                  <Text className="text-body font-semibold text-primary">
-                    Create New Subject
-                  </Text>
-                </Pressable>
-              )}
+            <Pressable
+              onPress={() => router.push('/create-subject')}
+              className="bg-surface rounded-button py-3 px-4 mb-2 min-h-[48px] justify-center"
+              accessibilityLabel="Create a new subject"
+              accessibilityRole="button"
+              testID="camera-create-subject"
+            >
+              <Text className="text-body font-semibold text-primary">
+                Create New Subject
+              </Text>
+            </Pressable>
 
             {/* Manual subject entry — lets user type a subject name */}
             <Text className="text-body-sm text-text-secondary mt-4 mb-2">
@@ -1044,7 +1041,7 @@ export default function CameraScreen(): React.ReactNode {
 
   // ---- Error phase ----
   if (state.phase === 'error') {
-    const showManualFallback = ocr.failCount >= 2;
+    const showManualFallback = ocr.failCount >= 1;
 
     return (
       <View

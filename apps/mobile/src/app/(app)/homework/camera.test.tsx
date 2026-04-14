@@ -312,9 +312,9 @@ describe('CameraScreen', () => {
     expect(getByText(/center your homework/i)).toBeTruthy();
   });
 
-  // ---- Error phase (single failure) ----
+  // ---- Error phase (1st failure — manual fallback immediately) ----
 
-  it('shows retry and retake buttons on first OCR failure', async () => {
+  it('shows manual fallback on first OCR failure', async () => {
     (useHomeworkOcr as jest.Mock).mockReturnValue({
       text: null,
       status: 'error',
@@ -324,22 +324,21 @@ describe('CameraScreen', () => {
       retry: mockRetry,
     });
 
-    const { getByTestId } = render(<CameraScreen />);
+    const { getByTestId, getByText } = render(<CameraScreen />);
 
     await waitFor(() => {
-      expect(getByTestId('retry-button')).toBeTruthy();
-      expect(getByTestId('retake-button')).toBeTruthy();
+      expect(getByText(/type it out/i)).toBeTruthy();
+      expect(getByTestId('manual-input')).toBeTruthy();
+      expect(getByText(/having trouble reading/i)).toBeTruthy();
     });
   });
 
-  // ---- Error phase (>= 2 failures — manual fallback) ----
-
-  it('shows type-instead fallback after 2 OCR failures', async () => {
+  it('shows type-instead fallback after 1 OCR failure', async () => {
     (useHomeworkOcr as jest.Mock).mockReturnValue({
       text: null,
       status: 'error',
       error: 'Failed to read',
-      failCount: 2,
+      failCount: 1,
       process: mockProcess,
       retry: mockRetry,
     });
@@ -358,7 +357,7 @@ describe('CameraScreen', () => {
       text: null,
       status: 'error',
       error: 'Failed to read',
-      failCount: 2,
+      failCount: 1,
       process: mockProcess,
       retry: mockRetry,
     });
