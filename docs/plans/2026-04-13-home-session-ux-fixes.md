@@ -45,7 +45,7 @@ Show them in a single horizontal scrollable row, after the text input and before
 
 ### Steps
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `apps/mobile/src/app/create-subject.test.tsx` (inside `describe('CreateSubjectScreen')`, before other tests):
 
@@ -66,7 +66,7 @@ it('renders starter chips and fills the input on tap', () => {
 });
 ```
 
-- [ ] **Step 2: Run to confirm it fails**
+- [x] **Step 2: Run to confirm it fails**
 
 ```bash
 cd apps/mobile && pnpm exec jest --findRelatedTests src/app/create-subject.tsx --no-coverage 2>&1 | tail -30
@@ -74,7 +74,7 @@ cd apps/mobile && pnpm exec jest --findRelatedTests src/app/create-subject.tsx -
 
 Expected: FAIL — `starter-chips` testID not found.
 
-- [ ] **Step 3: Add the chips constant and render them**
+- [x] **Step 3: Add the chips constant and render them**
 
 In `apps/mobile/src/app/create-subject.tsx`, directly after the existing `const SCREEN_HEIGHT = ...` block, add:
 
@@ -97,7 +97,7 @@ const STARTER_CHIPS = [
 ] as const;
 ```
 
-- [ ] **Step 4: Add chip tap handler**
+- [x] **Step 4: Add chip tap handler**
 
 Inside `CreateSubjectScreen`, after the existing `onNameChange` callback, add:
 
@@ -115,7 +115,7 @@ const onChipPress = useCallback(
 );
 ```
 
-- [ ] **Step 5: Render chips in JSX**
+- [x] **Step 5: Render chips in JSX**
 
 In `create-subject.tsx`, locate the block that begins with `<View onLayout={onFieldLayout('name')}>` (the text input section). Directly **after** the closing `</View>` of that block (i.e. after the `</TextInput>` and its wrapping `</View>`), insert:
 
@@ -149,7 +149,7 @@ In `create-subject.tsx`, locate the block that begins with `<View onLayout={onFi
 
 `ScrollView` is already imported in this file.
 
-- [ ] **Step 6: Run tests**
+- [x] **Step 6: Run tests**
 
 ```bash
 cd apps/mobile && pnpm exec jest --findRelatedTests src/app/create-subject.tsx --no-coverage 2>&1 | tail -30
@@ -157,7 +157,7 @@ cd apps/mobile && pnpm exec jest --findRelatedTests src/app/create-subject.tsx -
 
 Expected: PASS.
 
-- [ ] **Step 7: Typecheck**
+- [x] **Step 7: Typecheck**
 
 ```bash
 cd apps/mobile && pnpm exec tsc --noEmit 2>&1 | tail -20
@@ -168,6 +168,13 @@ Expected: 0 errors.
 ---
 
 ## PART 2 — Wire `useContinueSuggestion` into Learner Home Card
+
+
+> **AMENDMENT (2026-04-14):** Implementation deviated from original spec.
+> The subtitle on "Start learning" was **removed** (project convention: that card is title-only, no subtitle).
+> Instead: (1) `hasLibraryContent` is now gated on `continueSuggestion != null` so "Repeat & review"
+> only shows when actual curriculum exists; (2) a "Resume last session" IntentCard was added to
+> `learn-new.tsx` using `continueSuggestion`. Commit: `3551ba39`.
 
 **Problem:** The "Start learning" `IntentCard` on `LearnerScreen` has no subtitle. The `useContinueSuggestion` hook (in `apps/mobile/src/hooks/use-progress.ts`) calls `GET /progress/continue` and returns `{ suggestion: { topicName, subjectName } | null }`. The hook exists and is tested but is never used in the home screen.
 
@@ -188,7 +195,7 @@ Expected: 0 errors.
 
 ### Steps
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `LearnerScreen.test.tsx` inside the existing `describe('LearnerScreen')` block:
 
@@ -218,7 +225,7 @@ it('shows no subtitle on Start learning when suggestion is null', () => {
 });
 ```
 
-- [ ] **Step 2: Add mock to the test file**
+- [x] **Step 2: Add mock to the test file**
 
 In `LearnerScreen.test.tsx`, find the existing mock block for `../../hooks/use-progress` and update it:
 
@@ -237,7 +244,7 @@ Also add to `beforeEach`:
 mockUseContinueSuggestion.mockReturnValue({ data: undefined });
 ```
 
-- [ ] **Step 3: Run to confirm it fails**
+- [x] **Step 3: Run to confirm it fails**
 
 ```bash
 cd apps/mobile && pnpm exec jest --findRelatedTests src/components/home/LearnerScreen.tsx --no-coverage 2>&1 | tail -30
@@ -245,7 +252,7 @@ cd apps/mobile && pnpm exec jest --findRelatedTests src/components/home/LearnerS
 
 Expected: FAIL — "Continue with Fractions in Math" not found.
 
-- [ ] **Step 4: Import and call the hook**
+- [x] **Step 4: Import and call the hook**
 
 In `LearnerScreen.tsx`, update the import line from `use-progress`:
 
@@ -263,7 +270,7 @@ const continueSubtitle =
     : undefined;
 ```
 
-- [ ] **Step 5: Wire subtitle into the primary card**
+- [x] **Step 5: Wire subtitle into the primary card**
 
 In `LearnerScreen.tsx`, inside `useMemo`, update `primaryCard` to include the subtitle:
 
@@ -289,7 +296,7 @@ Also add `continueSubtitle` to the `useMemo` dependency array:
 ]);
 ```
 
-- [ ] **Step 6: Run tests**
+- [x] **Step 6: Run tests**
 
 ```bash
 cd apps/mobile && pnpm exec jest --findRelatedTests src/components/home/LearnerScreen.tsx --no-coverage 2>&1 | tail -30
@@ -297,7 +304,7 @@ cd apps/mobile && pnpm exec jest --findRelatedTests src/components/home/LearnerS
 
 Expected: PASS.
 
-- [ ] **Step 7: Typecheck**
+- [x] **Step 7: Typecheck**
 
 ```bash
 cd apps/mobile && pnpm exec tsc --noEmit 2>&1 | tail -20
@@ -346,7 +353,7 @@ Expected: 0 errors.
 
 ### Steps
 
-- [ ] **Step 1: Write the failing test for the component**
+- [x] **Step 1: Write the failing test for the component**
 
 Create `apps/mobile/src/components/session/QuotaExceededCard.test.tsx`:
 
@@ -409,7 +416,7 @@ describe('QuotaExceededCard', () => {
 });
 ```
 
-- [ ] **Step 2: Run to confirm it fails**
+- [x] **Step 2: Run to confirm it fails**
 
 ```bash
 cd apps/mobile && pnpm exec jest --findRelatedTests src/components/session/QuotaExceededCard.tsx --no-coverage 2>&1 | tail -20
@@ -417,7 +424,7 @@ cd apps/mobile && pnpm exec jest --findRelatedTests src/components/session/Quota
 
 Expected: FAIL — module not found.
 
-- [ ] **Step 3: Create the `QuotaExceededCard` component**
+- [x] **Step 3: Create the `QuotaExceededCard` component**
 
 Create `apps/mobile/src/components/session/QuotaExceededCard.tsx`:
 
@@ -517,7 +524,7 @@ export function QuotaExceededCard({
 }
 ```
 
-- [ ] **Step 4: Export from session barrel**
+- [x] **Step 4: Export from session barrel**
 
 In `apps/mobile/src/components/session/index.ts`, add:
 
@@ -526,7 +533,7 @@ export { QuotaExceededCard } from './QuotaExceededCard';
 export type { QuotaExceededCardProps } from './QuotaExceededCard';
 ```
 
-- [ ] **Step 5: Run component tests**
+- [x] **Step 5: Run component tests**
 
 ```bash
 cd apps/mobile && pnpm exec jest --findRelatedTests src/components/session/QuotaExceededCard.tsx --no-coverage 2>&1 | tail -30
@@ -534,7 +541,7 @@ cd apps/mobile && pnpm exec jest --findRelatedTests src/components/session/Quota
 
 Expected: PASS.
 
-- [ ] **Step 6: Write failing integration test for session screen**
+- [x] **Step 6: Write failing integration test for session screen**
 
 In `apps/mobile/src/app/(app)/session/index.test.tsx`, add a test that mocks `useStreamMessage` to throw a `QuotaExceededError` and asserts that (a) the `quota-exceeded-card` testID appears in the chat and (b) `input-disabled-banner` is visible.
 
@@ -573,7 +580,7 @@ it('shows QuotaExceededCard and disables input when stream returns 402', async (
 
 Note: adapt mock variable names to match what already exists in that test file.
 
-- [ ] **Step 7: Add `quotaError` state and wiring in `session/index.tsx`**
+- [x] **Step 7: Add `quotaError` state and wiring in `session/index.tsx`**
 
 **3b.1 — Add state:**
 
@@ -709,7 +716,7 @@ import {
 } from '../../../components/session';
 ```
 
-- [ ] **Step 8: Run session tests**
+- [x] **Step 8: Run session tests**
 
 ```bash
 cd apps/mobile && pnpm exec jest --findRelatedTests src/app/(app)/session/index.tsx --no-coverage 2>&1 | tail -40
@@ -717,7 +724,7 @@ cd apps/mobile && pnpm exec jest --findRelatedTests src/app/(app)/session/index.
 
 Expected: PASS (including new quota test).
 
-- [ ] **Step 9: Typecheck**
+- [x] **Step 9: Typecheck**
 
 ```bash
 cd apps/mobile && pnpm exec tsc --noEmit 2>&1 | tail -20
@@ -835,13 +842,13 @@ pnpm exec nx run api:typecheck 2>&1 | tail -20
 
 ## Fix Summary
 
-| # | Finding | File(s) | Verified By |
-|---|---------|---------|-------------|
-| 1 | Blank-page paralysis on subject creation | `create-subject.tsx` | `test: create-subject.test.tsx:"renders starter chips and fills the input on tap"` |
-| 2 | "Start learning" card has no subtitle | `LearnerScreen.tsx` | `test: LearnerScreen.test.tsx:"shows continue suggestion as Start learning subtitle"` |
-| 3a | Quota exceeded shown as plain text bubble | `session/index.tsx`, `QuotaExceededCard.tsx` | `test: session/index.test.tsx:"shows QuotaExceededCard and disables input when stream returns 402"` |
-| 3b | Chat input stays enabled after quota exceeded | `session/index.tsx` | Same test as 3a — `input-disabled-banner` assertion |
-| 4 | Parents routed to wrong `/learn-new` entry point | `ParentGateway.tsx` | `test: ParentGateway.test.tsx:"gateway-learn card routes to /learn, not /learn-new"` |
+| # | Finding | File(s) | Status | Verified By |
+|---|---------|---------|--------|-------------|
+| 1 | Blank-page paralysis on subject creation | `create-subject.tsx` | ✅ Done (`7fc73544`) | `test: create-subject.test.tsx:"renders starter chips and fills the input on tap"` |
+| 2 | Library error on book fetch failure; "Repeat & review" shown too early; missing resume card | `LearnerScreen.tsx`, `library.tsx`, `learn-new.tsx` | ✅ Done (`3551ba39`) — see AMENDMENT above | `test: LearnerScreen.test.tsx, library.test.tsx, learn-new.test.tsx` |
+| 3a | Quota exceeded shown as plain text bubble | `session/index.tsx`, `QuotaExceededCard.tsx` | ✅ Done (`3551ba39`) | `test: session/index.test.tsx:"shows QuotaExceededCard and disables input when stream returns 402"` |
+| 3b | Chat input stays enabled after quota exceeded | `session/index.tsx` | ✅ Done (`3551ba39`) | Same test as 3a |
+| 4 | Parents routed to wrong `/learn-new` entry point | `ParentGateway.tsx` | ✅ Done | `test: ParentGateway.test.tsx:"gateway-learn card routes to /learn, not /learn-new"` |
 
 ---
 

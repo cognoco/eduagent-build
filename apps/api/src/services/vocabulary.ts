@@ -169,12 +169,17 @@ export async function updateVocabulary(
 export async function deleteVocabulary(
   db: Database,
   profileId: string,
+  subjectId: string,
   vocabularyId: string
 ): Promise<boolean> {
   const rows = await db
     .delete(vocabulary)
     .where(
-      and(eq(vocabulary.id, vocabularyId), eq(vocabulary.profileId, profileId))
+      and(
+        eq(vocabulary.id, vocabularyId),
+        eq(vocabulary.profileId, profileId),
+        eq(vocabulary.subjectId, subjectId)
+      )
     )
     .returning({ id: vocabulary.id });
 

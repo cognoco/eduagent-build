@@ -99,9 +99,14 @@ export const vocabularyRoutes = new Hono<VocabularyRouteEnv>()
   .delete('/subjects/:subjectId/vocabulary/:vocabularyId', async (c) => {
     const db = c.get('db');
     const profileId = requireProfileId(c.get('profileId'));
-    const { vocabularyId } = c.req.param();
+    const { subjectId, vocabularyId } = c.req.param();
 
-    const deleted = await deleteVocabulary(db, profileId, vocabularyId);
+    const deleted = await deleteVocabulary(
+      db,
+      profileId,
+      subjectId,
+      vocabularyId
+    );
     if (!deleted) {
       return notFound(c, 'Vocabulary item not found');
     }
