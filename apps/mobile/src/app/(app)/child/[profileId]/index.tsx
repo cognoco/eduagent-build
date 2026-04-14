@@ -159,6 +159,7 @@ export default function ChildDetailScreen() {
   const restoreConsent = useRestoreConsent(profileId);
   const grantMemoryConsent = useGrantMemoryConsent();
   const { CelebrationOverlay } = useCelebration({
+    // Celebrations are best-effort — empty on error is acceptable [SQ-4]
     queue: pendingCelebrations.data ?? [],
     celebrationLevel: 'all',
     audience: 'adult',

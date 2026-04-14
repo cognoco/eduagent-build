@@ -620,8 +620,29 @@ export default function BookScreen() {
           </View>
         )}
 
+        {/* Session list error state [SQ-3] */}
+        {sessionsQuery.isError && (
+          <View
+            className="mx-5 mb-4 rounded-card bg-surface-elevated p-4"
+            testID="sessions-error"
+          >
+            <Text className="text-body-sm text-danger mb-2">
+              Could not load session history.
+            </Text>
+            <Pressable
+              onPress={() => void sessionsQuery.refetch()}
+              className="self-start"
+              testID="sessions-retry-button"
+            >
+              <Text className="text-body-sm text-primary font-semibold">
+                Retry
+              </Text>
+            </Pressable>
+          </View>
+        )}
+
         {/* Session list */}
-        {sessions.length > 0 && (
+        {!sessionsQuery.isError && sessions.length > 0 && (
           <View className="mb-4">
             <Text className="text-body-sm font-semibold text-text-secondary mb-1 px-5 uppercase tracking-wide">
               Past sessions
@@ -715,6 +736,7 @@ export default function BookScreen() {
 
         {/* Empty state — no sessions yet (only when no topics completed) */}
         {sessions.length === 0 &&
+          !sessionsQuery.isError &&
           !needsGeneration &&
           topics.length > 0 &&
           completedTopicCount === 0 && (
