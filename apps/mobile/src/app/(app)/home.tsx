@@ -75,9 +75,13 @@ export default function HomeScreen(): React.ReactElement {
     celebrationLevel,
     audience: isOwner ? 'adult' : 'child',
     onAllComplete: () => {
-      void markCelebrationsSeen.mutateAsync({
-        viewer: isOwner ? 'parent' : 'child',
-      });
+      markCelebrationsSeen
+        .mutateAsync({
+          viewer: isOwner ? 'parent' : 'child',
+        })
+        .catch((err) => {
+          console.error('[Celebrations] Failed to mark seen:', err);
+        });
     },
   });
 

@@ -164,7 +164,11 @@ export default function ChildDetailScreen() {
     audience: 'adult',
     onAllComplete: () => {
       if (!profileId) return;
-      void markCelebrationsSeen.mutateAsync({ viewer: 'parent', profileId });
+      markCelebrationsSeen
+        .mutateAsync({ viewer: 'parent', profileId })
+        .catch((err) => {
+          console.error('[Celebrations] Failed to mark seen:', err);
+        });
     },
   });
 
