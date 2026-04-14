@@ -10,17 +10,21 @@
 
 **Adversarial review #2:** 2026-04-09. Found 13 issues (4 HIGH, 7 MEDIUM, 2 LOW) across cross-task coherence, GDPR compliance, data correctness, and test quality. All resolved — see [Review Changelog](#review-changelog).
 
+**Amendments merged:** 2026-04-13. All 5 amendments from `docs/plans/2026-04-08-epic-16-amendments.md` are integrated into this plan. Amendment 1 (Story 16.0 prerequisite — IMPLEMENTED) and Amendment 2 (Epic 15 mastery cross-reference) were already in place. Amendment 3 (memory layer deduplication note) was already in Task 7 Step 2. Amendment 4 (embedding step independence comment) added to Task 6 Step 2. Amendment 5 errata (resolveStruggle ordering, sessionAnalysisOutputSchema import, `ne` import in prior-learning.ts) are noted at their respective tasks.
+
 **Goal:** Build a learner memory system that analyzes session transcripts post-session, accumulates a learning profile (interests, struggles, explanation preferences), and injects that profile into future system prompts — making the AI mentor feel like it truly knows each child. The system is **collaborative**: learners and parents can directly contribute to and control the profile, not just observe it.
 
 **Architecture:** New `learning_profiles` table with JSONB fields stores per-profile learning data. A new Inngest step in the `session-completed` chain sends the transcript to a budget LLM for structured analysis. `buildSystemPrompt()` gains a "learner memory" block capped at 500 tokens. Mobile screens expose the profile to children and parents with granular controls, direct input, consent management, and GDPR compliance.
 
 **Tech Stack:** Drizzle ORM (PostgreSQL), Inngest (background processing), LLM router (`services/llm/router.ts`), Hono (API routes), React Native + NativeWind (mobile screens), Zod (validation), `@eduagent/schemas` (shared types), `@eduagent/database` (schema + repository)
 
-**Spec:** `docs/superpowers/specs/2026-04-07-epic-16-adaptive-memory-design.md`
+**Spec:** `docs/specs/2026-04-07-epic-16-adaptive-memory-design.md`
 
 **Prerequisites:**
-- **Story 16.0** (`docs/superpowers/plans/2026-04-08-story-16.0-fix-existing-memory-layers.md`) — **IMPLEMENTED**. Fixes existing memory layers (embedding key passthrough, prompt instructions, cross-subject context). Must be complete before Phase A.
-- **Amendments** (`docs/superpowers/plans/2026-04-08-epic-16-amendments.md`) — 5 amendments to this plan: Story 16.0 dependency, Epic 15 mastery cross-reference in `buildMemoryBlock`, memory layer deduplication, step independence, errata. Apply during implementation.
+- **Story 16.0** — **IMPLEMENTED** (plan file deleted). Fixed existing memory layers (embedding key passthrough, prompt instructions, cross-subject context).
+  - Dependency graph: Story 16.0 (Fixes A/B/C) → Phase A (Tasks 1–8) → Phase B (Tasks 9–12) → Phase C (Tasks 13–16).
+  - **Amendment 5c errata:** `fetchCrossSubjectHighlights` in `apps/api/src/services/prior-learning.ts` uses `ne()` from `drizzle-orm`. Verify `ne` is included in the drizzle-orm imports in that file before Story 16.0 is considered fully integrated.
+- **Amendments** (`docs/plans/2026-04-08-epic-16-amendments.md`) — 5 amendments to this plan: Story 16.0 dependency, Epic 15 mastery cross-reference in `buildMemoryBlock`, memory layer deduplication, step independence, errata. **All integrated into this plan as of 2026-04-13.**
 
 ---
 
@@ -1496,6 +1500,8 @@ import { sessionAnalysisOutputSchema } from '@eduagent/schemas';
 ```
 
 - [ ] **Step 2: Add the `analyze-learner-profile` step to session-completed.ts**
+
+> **Amendment 4 (step independence):** This step is independent of `generate-embeddings`. Both read from `session_events` directly — they do not consume each other's output. If embedding generation fails (Voyage API down), this analysis step still runs with full transcript access.
 
 Add import at the top of `session-completed.ts`:
 
@@ -3583,7 +3589,7 @@ const learnerMemoryContext = learningProfileRow
   : '';
 ```
 
-See `docs/superpowers/plans/2026-04-08-epic-16-amendments.md` Amendment 2 for full code.
+See `docs/plans/2026-04-08-epic-16-amendments.md` Amendment 2 for full code.
 
 - [ ] **Step 4: Run tests to verify they pass**
 

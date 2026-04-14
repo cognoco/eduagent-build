@@ -8,6 +8,13 @@
 
 **Tech Stack:** Expo / EAS (app.json), React Native / TanStack Query (subscription screen)
 
+### Execution Status (2026-04-13)
+
+| Task | Status | Notes |
+|------|--------|-------|
+| OTA-01: Restore `fingerprint` policy | **BLOCKED** | `@expo/fingerprint` v0.15.4 still has 48 `type: "dir"` pnpm entries that can't be ignored. Requires upgrade > 0.15.4. `appVersion` policy stays. |
+| BILLING-07: Fix top-up polling race | **DONE** | Commit `4e31fe36` on `bugfix2`. Also fixed `bookProgressStatusSchema` TDZ ordering in `packages/schemas/src/subjects.ts`. |
+
 ---
 
 ## Background & Context
@@ -335,5 +342,5 @@ The `fetchQuery` staleTime: 0 pattern is standard TanStack Query idiom for imper
 
 | Item | Fix | Verified By |
 |------|-----|-------------|
-| OTA-01 | `"policy": "fingerprint"` in `app.json` | manual: `expo-updates fingerprint:generate` shows no pnpm entries; EAS build passes |
-| BILLING-07 | `fetchQuery` with `staleTime: 0` replaces invalidate+sleep | `tsc --noEmit` passes; jest subscription tests pass |
+| OTA-01 | **BLOCKED** — `appVersion` policy kept | manual: `fingerprint:generate` still shows 48 `type: "dir"` pnpm entries; `@expo/fingerprint` v0.15.4 unchanged |
+| BILLING-07 | `fetchQuery` with `staleTime: 0` replaces invalidate+sleep | `tsc --noEmit` 0 errors; `tsc --build` 0 errors; jest subscription 41/41 passed |
