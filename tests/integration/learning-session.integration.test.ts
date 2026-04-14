@@ -23,6 +23,7 @@ import {
   subscriptions,
   quotaPools,
 } from '@eduagent/database';
+import type { SessionType } from '@eduagent/schemas';
 
 import { jwtMock, configureValidJWT } from './mocks';
 import {
@@ -40,6 +41,28 @@ const mockInngestCreateFunction = jest.fn().mockImplementation((config) => {
     { id, name: id, triggers: [], steps: {} },
   ];
   return fn;
+});
+
+const mockRouteAndCall = jest.fn().mockResolvedValue({
+  response: JSON.stringify({
+    feedback: 'Great summary!',
+    hasUnderstandingGaps: false,
+    gapAreas: [],
+    isAccepted: true,
+  }),
+  model: 'mock',
+  rung: 1,
+});
+
+jest.mock('../../apps/api/src/services/llm', () => {
+  const actual = jest.requireActual(
+    '../../apps/api/src/services/llm'
+  ) as Record<string, unknown>;
+
+  return {
+    ...actual,
+    routeAndCall: (...args: unknown[]) => mockRouteAndCall(...args),
+  };
 });
 
 jest.mock('../../apps/api/src/middleware/jwt', () => jwt);
@@ -189,7 +212,7 @@ async function startSession(
     id: string;
     subjectId: string;
     topicId: string | null;
-    sessionType: 'learning' | 'homework' | 'interleaved';
+    sessionType: SessionType;
     status: string;
   };
 }

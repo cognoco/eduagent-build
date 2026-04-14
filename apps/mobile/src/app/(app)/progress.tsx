@@ -256,6 +256,21 @@ export default function ProgressScreen(): React.ReactElement {
                       {inventory.global.currentStreak}-day streak
                     </Text>
                   </View>
+                  {inventory.global.vocabularyTotal > 0 ? (
+                    <Pressable
+                      onPress={() =>
+                        router.push('/(app)/progress/vocabulary' as never)
+                      }
+                      className="bg-background rounded-full px-3 py-1.5"
+                      accessibilityRole="button"
+                      accessibilityLabel={`View ${inventory.global.vocabularyTotal} vocabulary words`}
+                      testID="progress-vocab-stat"
+                    >
+                      <Text className="text-caption font-semibold text-primary">
+                        {inventory.global.vocabularyTotal} words →
+                      </Text>
+                    </Pressable>
+                  ) : null}
                 </View>
               ) : null}
             </View>
@@ -287,9 +302,25 @@ export default function ProgressScreen(): React.ReactElement {
               />
             </View>
 
-            <Text className="text-h3 font-semibold text-text-primary mt-6 mb-2">
-              Recent milestones
-            </Text>
+            <View className="flex-row items-center justify-between mt-6 mb-2">
+              <Text className="text-h3 font-semibold text-text-primary">
+                Recent milestones
+              </Text>
+              {milestonesQuery.data && milestonesQuery.data.length >= 5 ? (
+                <Pressable
+                  onPress={() =>
+                    router.push('/(app)/progress/milestones' as never)
+                  }
+                  accessibilityRole="button"
+                  accessibilityLabel="See all milestones"
+                  testID="progress-milestones-see-all"
+                >
+                  <Text className="text-body-sm text-primary font-medium">
+                    See all →
+                  </Text>
+                </Pressable>
+              ) : null}
+            </View>
             {milestonesQuery.data && milestonesQuery.data.length > 0 ? (
               milestonesQuery.data.map((milestone) => (
                 <View key={milestone.id} className="mt-3">

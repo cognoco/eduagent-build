@@ -1,5 +1,6 @@
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { goBackOrReplace } from '../../../lib/navigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ErrorFallback } from '../../../components/common';
 import { ProgressBar } from '../../../components/progress';
@@ -7,6 +8,7 @@ import {
   useProgressInventory,
   useSubjectProgress,
 } from '../../../hooks/use-progress';
+import { useLanguageProgress } from '../../../hooks/use-language-progress';
 
 function StatCard({
   label,
@@ -31,11 +33,15 @@ export default function ProgressSubjectScreen(): React.ReactElement {
   const { subjectId } = useLocalSearchParams<{ subjectId: string }>();
   const inventoryQuery = useProgressInventory();
   const subjectProgressQuery = useSubjectProgress(subjectId ?? '');
+  const languageProgressQuery = useLanguageProgress(subjectId ?? '');
+  const languageProgress = languageProgressQuery.data;
 
   const subject = inventoryQuery.data?.subjects.find(
     (entry) => entry.subjectId === subjectId
   );
   const legacyProgress = subjectProgressQuery.data;
+  const isLanguageSubject =
+    subject?.pedagogyMode === 'four_strands' || !!languageProgress;
 
   // [EP15-C6] Every state must have at least one action. The prior
   // implementation jumped straight to the render tree when `!subjectId`
@@ -129,7 +135,7 @@ export default function ProgressSubjectScreen(): React.ReactElement {
       >
         <View className="flex-row items-center mt-4">
           <Pressable
-            onPress={() => router.back()}
+            onPress={() => goBackOrReplace(router, '/(app)/progress' as const)}
             className="me-3 py-2 pe-2"
             accessibilityRole="button"
             accessibilityLabel="Go back"
@@ -229,10 +235,126 @@ export default function ProgressSubjectScreen(): React.ReactElement {
                     )
                   )}
                 </View>
+                <Pressable
+                  onPress={() =>
+                    router.push({
+                      pathname: '/(app)/vocabulary/[subjectId]',
+                      params: { subjectId: subject.subjectId },
+                    } as never)
+                  }
+                  className="mt-3 py-2 self-start"
+                  accessibilityRole="button"
+                  accessibilityLabel="View all vocabulary"
+                  testID="vocab-view-all"
+                >
+                  <Text className="text-body-sm font-semibold text-primary">
+                    View all vocabulary →
+                  </Text>
+                </Pressable>
               </View>
             ) : null}
 
-            {legacyProgress ? (
+            {isLanguageSubject && (
+              <View
+                className="bg-coaching-card rounded-card p-5 mt-4"
+                testID="cefr-milestone-card"
+              >
+                <Text className="text-h3 font-semibold text-text-primary">
+                  Language milestone
+                </Text>
+
+                {languageProgressQuery.isLoading ? (
+                  <View className="mt-3">
+                    <View className="bg-border rounded h-4 w-2/3 mb-2" />
+                    <View className="bg-border rounded h-3 w-full" />
+                  </View>
+                ) : languageProgressQuery.isError ? (
+                  <View className="mt-3">
+                    <Text className="text-body-sm text-text-secondary mb-2">
+                      Could not load milestone data.
+                    </Text>
+                    <Pressable
+                      onPress={() => void languageProgressQuery.refetch()}
+                      className="bg-surface-elevated rounded-button px-4 py-2.5 self-start min-h-[44px] items-center justify-center"
+                      accessibilityRole="button"
+                      accessibilityLabel="Retry loading milestone"
+                      testID="cefr-milestone-retry"
+                    >
+                      <Text className="text-body-sm font-semibold text-text-primary">
+                        Retry
+                      </Text>
+                    </Pressable>
+                  </View>
+                ) : languageProgress?.currentMilestone ? (
+                  <>
+                    <Text className="text-body-sm text-text-secondary mt-1">
+                      {languageProgress.currentLevel} ·{' '}
+                      {languageProgress.currentMilestone.milestoneTitle}
+                    </Text>
+                    <View className="mt-3">
+                      <View className="flex-row justify-between mb-1">
+                        <Text className="text-caption text-text-muted">
+                          {languageProgress.currentMilestone.wordsMastered}/
+                          {languageProgress.currentMilestone.wordsTarget} words
+                        </Text>
+                        <Text className="text-caption text-text-muted">
+                          {languageProgress.currentMilestone.chunksMastered}/
+                          {languageProgress.currentMilestone.chunksTarget}{' '}
+                          phrases
+                        </Text>
+                      </View>
+                      <View className="bg-border rounded-full h-2 overflow-hidden">
+                        <View
+                          className="bg-primary h-full rounded-full"
+                          style={{
+                            width: `${Math.round(
+                              languageProgress.currentMilestone
+                                .milestoneProgress * 100
+                            )}%`,
+                          }}
+                        />
+                      </View>
+                    </View>
+                    {languageProgress.nextMilestone && (
+                      <Text className="text-caption text-text-muted mt-2">
+                        Up next: {languageProgress.nextMilestone.level} —{' '}
+                        {languageProgress.nextMilestone.milestoneTitle}
+                      </Text>
+                    )}
+                  </>
+                ) : (
+                  <Text className="text-body-sm text-text-secondary mt-2">
+                    Complete a session to start tracking your milestone
+                    progress.
+                  </Text>
+                )}
+              </View>
+            )}
+
+            {subjectProgressQuery.isError ? (
+              <View
+                className="bg-surface rounded-card p-4 mt-4"
+                testID="progress-subject-retention-error"
+              >
+                <Text className="text-h3 font-semibold text-text-primary">
+                  Current retention
+                </Text>
+                <Text className="text-body-sm text-text-secondary mt-1 mb-3">
+                  We couldn't load retention data right now.
+                </Text>
+                <Pressable
+                  onPress={() => void subjectProgressQuery.refetch()}
+                  className="bg-surface-elevated rounded-button px-4 py-2.5 self-start min-h-[44px] items-center justify-center"
+                  accessibilityRole="button"
+                  accessibilityLabel="Retry loading retention"
+                  testID="progress-subject-retention-retry"
+                >
+                  <Text className="text-body-sm font-semibold text-text-primary">
+                    Retry
+                  </Text>
+                </Pressable>
+              </View>
+            ) : legacyProgress ? (
               <View className="bg-surface rounded-card p-4 mt-4">
                 <Text className="text-h3 font-semibold text-text-primary">
                   Current retention

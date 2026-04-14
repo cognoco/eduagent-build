@@ -11,6 +11,7 @@ const mockReadSessionRecoveryMarker = jest.fn();
 const mockClearSessionRecoveryMarker = jest.fn();
 const mockIsRecoveryMarkerFresh = jest.fn();
 const mockUseReviewSummary = jest.fn();
+const mockUseContinueSuggestion = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
@@ -43,6 +44,7 @@ jest.mock('../../hooks/use-subjects', () => ({
 
 jest.mock('../../hooks/use-progress', () => ({
   useReviewSummary: () => mockUseReviewSummary(),
+  useContinueSuggestion: () => mockUseContinueSuggestion(),
 }));
 
 jest.mock('../../lib/session-recovery', () => ({
@@ -69,6 +71,7 @@ describe('LearnerScreen', () => {
     mockReadSessionRecoveryMarker.mockResolvedValue(null);
     mockIsRecoveryMarkerFresh.mockReturnValue(true);
     mockUseReviewSummary.mockReturnValue({ data: { totalOverdue: 0 } });
+    mockUseContinueSuggestion.mockReturnValue({ data: undefined });
   });
 
   it('renders greeting with profile name', () => {
@@ -96,6 +99,14 @@ describe('LearnerScreen', () => {
   describe('library with active subjects', () => {
     beforeEach(() => {
       mockSubjects = [{ id: 's1', name: 'Math', status: 'active' }];
+      mockUseContinueSuggestion.mockReturnValue({
+        data: {
+          subjectId: 's1',
+          subjectName: 'Math',
+          topicId: 't1',
+          topicTitle: 'Topic 1',
+        },
+      });
     });
 
     it('shows all three intent cards with default review copy', () => {
@@ -217,6 +228,14 @@ describe('LearnerScreen', () => {
 
     it('navigates to library on "Repeat & review"', () => {
       mockSubjects = [{ id: 's1', name: 'Math', status: 'active' }];
+      mockUseContinueSuggestion.mockReturnValue({
+        data: {
+          subjectId: 's1',
+          subjectName: 'Math',
+          topicId: 't1',
+          topicTitle: 'Topic 1',
+        },
+      });
 
       render(<LearnerScreen {...defaultProps} />);
 
@@ -236,7 +255,14 @@ describe('LearnerScreen', () => {
     });
 
     it('does not render a subtitle on the primary card when library has content', () => {
-      mockSubjects = [{ id: 's1', name: 'Math', status: 'active' }];
+      mockUseContinueSuggestion.mockReturnValue({
+        data: {
+          subjectId: 's1',
+          subjectName: 'Math',
+          topicId: 't1',
+          topicTitle: 'Fractions',
+        },
+      });
 
       render(<LearnerScreen {...defaultProps} />);
 
@@ -247,6 +273,14 @@ describe('LearnerScreen', () => {
   describe('review priority threshold boundary [BUG-251]', () => {
     beforeEach(() => {
       mockSubjects = [{ id: 's1', name: 'Math', status: 'active' }];
+      mockUseContinueSuggestion.mockReturnValue({
+        data: {
+          subjectId: 's1',
+          subjectName: 'Math',
+          topicId: 't1',
+          topicTitle: 'Topic 1',
+        },
+      });
     });
 
     it('promotes review card above primary when reviewDueCount is exactly 5 (threshold)', () => {
@@ -313,6 +347,46 @@ describe('LearnerScreen', () => {
       render(<LearnerScreen {...defaultProps} />);
 
       expect(screen.queryByTestId('learner-back')).toBeNull();
+    });
+  });
+
+  describe('continueSuggestion gates "Repeat & review" [HOME-02]', () => {
+    it('shows "Repeat & review" when continueSuggestion is available', () => {
+      mockUseContinueSuggestion.mockReturnValue({
+        data: {
+          subjectId: 's1',
+          subjectName: 'Math',
+          topicId: 't1',
+          topicTitle: 'Fractions',
+        },
+      });
+
+      render(<LearnerScreen {...defaultProps} />);
+
+      expect(screen.getByText('Repeat & review')).toBeTruthy();
+    });
+
+    it('hides "Repeat & review" when continueSuggestion is null', () => {
+      mockUseContinueSuggestion.mockReturnValue({ data: null });
+
+      render(<LearnerScreen {...defaultProps} />);
+
+      expect(screen.queryByText('Repeat & review')).toBeNull();
+    });
+
+    it('does not show continue suggestion as subtitle on Start learning card', () => {
+      mockUseContinueSuggestion.mockReturnValue({
+        data: {
+          subjectId: 's1',
+          subjectName: 'Math',
+          topicId: 't1',
+          topicTitle: 'Fractions',
+        },
+      });
+
+      render(<LearnerScreen {...defaultProps} />);
+
+      expect(screen.queryByText(/Continue with/)).toBeNull();
     });
   });
 });

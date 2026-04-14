@@ -227,15 +227,23 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       { cancel_at_period_end: true }
     );
 
-    // Stripe SDK v20 (basil): current_period_end moved to SubscriptionItem
-    const periodEnd = updated.items.data[0]?.current_period_end;
-    if (!periodEnd) {
+    // BUG-51 (re-apply 1C.8): Read subscription-level current_period_end first,
+    // with item-level as fallback. The subscription-level field is reliably
+    // present on cancel responses even in Stripe SDK v20.
+    const raw = updated as unknown as Record<string, unknown>;
+    const subscriptionLevelEnd =
+      typeof raw.current_period_end === 'number'
+        ? raw.current_period_end
+        : undefined;
+    const itemLevelEnd = updated.items.data[0]?.current_period_end;
+    const periodEndTs = subscriptionLevelEnd ?? itemLevelEnd;
+    if (!periodEndTs) {
       console.error(
-        `[billing] Subscription ${subscription.stripeSubscriptionId} returned empty items.data — cannot determine period end. Falling back to current timestamp.`
+        `[billing] Subscription ${subscription.stripeSubscriptionId} returned no current_period_end at subscription or item level. Falling back to current timestamp.`
       );
     }
-    const currentPeriodEnd = periodEnd
-      ? new Date(periodEnd * 1000).toISOString()
+    const currentPeriodEnd = periodEndTs
+      ? new Date(periodEndTs * 1000).toISOString()
       : new Date().toISOString();
 
     // Mark local DB row so cancelAtPeriodEnd is reflected immediately

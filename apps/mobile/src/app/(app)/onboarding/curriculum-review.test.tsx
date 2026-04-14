@@ -35,6 +35,7 @@ jest.mock('expo-router', () => ({
     back: mockBack,
     push: mockPush,
     replace: mockReplace,
+    canGoBack: jest.fn().mockReturnValue(true),
   }),
   useLocalSearchParams: () => ({
     subjectId: 'subject-1',

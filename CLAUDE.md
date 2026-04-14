@@ -2,9 +2,10 @@
 
 ## Snapshot
 
-- Mobile: 38+ screens (85 test suites),
+- Mobile: 38+ screens (117 test suites), 1,228 mobile tests
+- API: All 33 route groups, 2,136 API tests, 19 integration test suites, 16 Inngest functions
 - Monorepo: `apps/api`, `apps/mobile`, shared packages in `packages/`
-- Core docs: `docs/project_context.md`, `docs/architecture.md`, relevant spec/plan under `docs/plans/` or `docs/superpowers/specs/`
+- Core docs: `docs/project_context.md`, `docs/architecture.md`, relevant spec/plan under `docs/plans/` or `docs/specs/`
 
 ## Read This Before Editing
 
@@ -50,6 +51,7 @@ Do not call work complete if related tests, lint, typecheck, or required migrati
 - Package imports go through the package barrel (`@eduagent/schemas`, `@eduagent/database`, etc.).
 - SecureStore keys must use Expo-safe characters only: letters, numbers, `.`, `-`, `_`.
 - In API code, use the typed config object instead of raw `process.env` reads.
+- lint-staged uses `node --stack-size=65536` to work around Windows stack overflow in eslint AST traversal (see `project_nx_expo_plugin_bug.md`).
 
 ## Handy Commands
 

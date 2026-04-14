@@ -9,6 +9,7 @@ import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
 import {
   createVocabulary,
+  deleteVocabulary,
   listVocabulary,
   reviewVocabulary,
 } from '../services/vocabulary';
@@ -94,4 +95,20 @@ export const vocabularyRoutes = new Hono<VocabularyRouteEnv>()
         );
       }
     }
-  );
+  )
+  .delete('/subjects/:subjectId/vocabulary/:vocabularyId', async (c) => {
+    const db = c.get('db');
+    const profileId = requireProfileId(c.get('profileId'));
+    const { subjectId, vocabularyId } = c.req.param();
+
+    const deleted = await deleteVocabulary(
+      db,
+      profileId,
+      subjectId,
+      vocabularyId
+    );
+    if (!deleted) {
+      return notFound(c, 'Vocabulary item not found');
+    }
+    return c.json({ success: true });
+  });

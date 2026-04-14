@@ -3,6 +3,7 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Sentry from '@sentry/react-native';
+import { goBackOrReplace } from '../../../../../lib/navigation';
 import {
   useChildReportDetail,
   useMarkChildReportViewed,
@@ -58,7 +59,7 @@ export default function ChildReportDetailScreen(): React.ReactElement {
       >
         <View className="flex-row items-center mt-4">
           <Pressable
-            onPress={() => router.back()}
+            onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
             className="me-3 py-2 pe-2"
             accessibilityRole="button"
             accessibilityLabel="Go back"

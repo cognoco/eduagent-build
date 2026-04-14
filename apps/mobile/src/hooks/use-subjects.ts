@@ -5,7 +5,12 @@ import {
   type UseQueryResult,
   type UseMutationResult,
 } from '@tanstack/react-query';
-import type { CefrLevel, Subject, SubjectStatus } from '@eduagent/schemas';
+import type {
+  CefrLevel,
+  PedagogyMode,
+  Subject,
+  SubjectStatus,
+} from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
@@ -88,7 +93,13 @@ export function useCreateSubject(): UseMutationResult<
 export function useUpdateSubject(): UseMutationResult<
   { subject: Subject },
   Error,
-  { subjectId: string; name?: string; status?: SubjectStatus }
+  {
+    subjectId: string;
+    name?: string;
+    status?: SubjectStatus;
+    pedagogyMode?: PedagogyMode;
+    languageCode?: string | null;
+  }
 > {
   const client = useApiClient();
   const queryClient = useQueryClient();
@@ -101,6 +112,8 @@ export function useUpdateSubject(): UseMutationResult<
       subjectId: string;
       name?: string;
       status?: SubjectStatus;
+      pedagogyMode?: PedagogyMode;
+      languageCode?: string | null;
     }) => {
       const res = await client.subjects[':id'].$patch({
         param: { id: subjectId },

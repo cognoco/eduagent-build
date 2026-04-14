@@ -108,7 +108,7 @@
     "runtimeVersion": {
       "policy": "appVersion"
     },
-    "privacyPolicyUrl": "https://mentomate.com/privacy-policy",
+    "privacyPolicyUrl": "https://mentomate.app/privacy",
     "updates": {
       "url": "https://u.expo.dev/cbb7c7e1-cf56-45f2-9df8-f043bb8bb361",
       "enabled": true,

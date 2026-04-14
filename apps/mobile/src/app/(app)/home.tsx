@@ -128,12 +128,20 @@ export default function HomeScreen(): React.ReactElement {
   }
 
   const showParentGateway = hasLinkedChildren(activeProfile, profiles);
+  // Guard against subscription still loading (undefined) — treat as
+  // indeterminate so family/pro owners don't flash LearnerScreen. [CR-fix-6]
+  const supportsMultipleProfiles =
+    subscription != null &&
+    (subscription.tier === 'family' || subscription.tier === 'pro');
 
-  // Owner with no linked child profiles yet: show Add Child CTA regardless of
-  // tier — any owner without children should not land on the learner flow.
-  // Guard on subscription != null so we don't flash the CTA while loading.
+  // Only multi-profile plans should see the add-child CTA. Free/Plus owners are
+  // solo learners, so routing them away from LearnerScreen hides core flows.
+  // Also indeterminate while subscription is loading (subscription == null).
   const isParentWithNoChildren =
-    isOwner && !showParentGateway && subscription != null;
+    subscription != null &&
+    isOwner &&
+    !showParentGateway &&
+    supportsMultipleProfiles;
 
   return (
     <View className="flex-1">

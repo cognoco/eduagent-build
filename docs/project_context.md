@@ -84,7 +84,7 @@ Groups separated by blank lines. **Named exports only.** No default exports exce
   - RIGHT: Use NativeWind semantic classes (`bg-surface`, `text-primary`, `border-accent`) that resolve via CSS variables. The root `_layout.tsx` sets variables per persona — components never need to know which persona is active.
 - **TanStack Query for all server state.** React Context for auth + active profile only. Local state for UI interactions.
 - **No Zustand at MVP.** Add only when shared client state crosses navigation boundaries and doesn't come from the server.
-- **Expo Router route groups:** `(auth)/`, `(learner)/`, `(parent)/`. Root `_layout.tsx` sets persona CSS variables.
+- **Expo Router route groups:** `(auth)/`, `(app)/`. Root `_layout.tsx` sets theme CSS variables. (Epic 12 merged the old `(learner)/` and `(parent)/` groups into a unified `(app)/` group.)
 - **Expo Image** (built into SDK 54) for all images. No additional library.
 - **SecureStore keys must use Expo-safe characters only.** Keys may contain only alphanumeric characters, `.`, `-`, and `_`. Never use `:` in persisted keys; prefer patterns like `${prefix}-${profileId}`.
 - **`expo-web-browser` warm-up is best-effort on Android.** Guard `warmUpAsync()` / `coolDownAsync()` with `Platform.OS === 'android'`, catch failures, and only cool down after a successful warm-up. Some devices do not expose the Custom Tabs service.
@@ -147,7 +147,7 @@ Groups separated by blank lines. **Named exports only.** No default exports exce
 
 - **Co-located tests.** `sessions.ts` → `sessions.test.ts` in same directory. No `__tests__/` directories.
 - **Integration/E2E tests** in top-level `tests/` directory (exception to co-location).
-- **`packages/factory/` for test data.** Imports types from `@eduagent/schemas` — TypeScript catches schema drift at build time.
+- **Test data factories** import types from `@eduagent/schemas` — TypeScript catches schema drift at build time.
 - **`packages/test-utils/` for shared mocks** (Clerk, Neon, Inngest).
 - **Inngest lifecycle chain needs integration test** (`inngest/test` mode) — unit tests of individual steps give false confidence.
 
@@ -163,7 +163,7 @@ Groups separated by blank lines. **Named exports only.** No default exports exce
   ```
 - **Dependency direction (strictly enforced — applies to ALL dependency graphs):**
   ```
-  apps/mobile  →  @eduagent/schemas, @eduagent/retention
+  apps/mobile  →  @eduagent/schemas
   apps/api     →  @eduagent/schemas, @eduagent/database, @eduagent/retention
   @eduagent/database  →  @eduagent/schemas
   @eduagent/retention →  (no workspace deps)

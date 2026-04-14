@@ -12,6 +12,7 @@ import type { CefrLevel } from '@eduagent/schemas';
 import { useConfigureLanguageSubject } from '../../../hooks/use-subjects';
 import { formatApiError } from '../../../lib/format-api-error';
 import { useThemeColors } from '../../../lib/theme';
+import { goBackOrReplace } from '../../../lib/navigation';
 
 const NATIVE_LANGUAGE_OPTIONS = [
   { code: 'en', label: 'English' },
@@ -20,6 +21,14 @@ const NATIVE_LANGUAGE_OPTIONS = [
   { code: 'de', label: 'German' },
   { code: 'it', label: 'Italian' },
   { code: 'pt', label: 'Portuguese' },
+  { code: 'nl', label: 'Dutch' },
+  { code: 'nb', label: 'Norwegian' },
+  { code: 'sv', label: 'Swedish' },
+  { code: 'da', label: 'Danish' },
+  { code: 'ro', label: 'Romanian' },
+  { code: 'id', label: 'Indonesian' },
+  { code: 'ms', label: 'Malay' },
+  { code: 'sw', label: 'Swahili' },
 ];
 
 const LEVEL_OPTIONS: Array<{
@@ -103,7 +112,7 @@ export default function LanguageSetup() {
         showsVerticalScrollIndicator={false}
       >
         <Pressable
-          onPress={() => router.back()}
+          onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
           className="mb-3 min-w-[44px] min-h-[44px] justify-center self-start"
           accessibilityLabel="Go back"
           accessibilityRole="button"

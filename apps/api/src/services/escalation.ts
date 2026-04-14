@@ -1,4 +1,5 @@
 import type { EscalationRung } from './llm';
+import type { SessionType } from '@eduagent/schemas';
 
 // ---------------------------------------------------------------------------
 // Socratic Escalation Ladder — Stories 2.2, 2.6
@@ -220,7 +221,7 @@ export function evaluateEscalation(
  */
 export function getEscalationPromptGuidance(
   rung: EscalationRung,
-  sessionType: 'learning' | 'homework' | 'interleaved'
+  sessionType: SessionType
 ): string {
   switch (rung) {
     case 1:

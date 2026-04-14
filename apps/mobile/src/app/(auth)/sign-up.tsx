@@ -480,18 +480,20 @@ export default function SignUpScreen() {
           </>
         ) : null}
 
-        <View className="mb-3">
-          <Button
-            variant="secondary"
-            label="Continue with Google"
-            onPress={() => onSSOPress('oauth_google')}
-            disabled={oauthLoading !== null}
-            loading={oauthLoading === 'oauth_google'}
-            testID="sign-up-google-sso"
-          />
-        </View>
+        {Platform.OS !== 'ios' && (
+          <View className="mb-6">
+            <Button
+              variant="secondary"
+              label="Continue with Google"
+              onPress={() => onSSOPress('oauth_google')}
+              disabled={oauthLoading !== null}
+              loading={oauthLoading === 'oauth_google'}
+              testID="sign-up-google-sso"
+            />
+          </View>
+        )}
 
-        {Platform.OS !== 'web' && (
+        {Platform.OS === 'ios' && (
           <View className="mb-6">
             <Button
               variant="secondary"

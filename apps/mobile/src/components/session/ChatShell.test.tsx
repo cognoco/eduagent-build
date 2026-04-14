@@ -8,7 +8,7 @@ import { ChatShell, type ChatMessage } from './ChatShell';
 
 const mockBack = jest.fn();
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ back: mockBack }),
+  useRouter: () => ({ back: mockBack, canGoBack: jest.fn(() => true) }),
 }));
 
 jest.mock('react-native-safe-area-context', () => ({

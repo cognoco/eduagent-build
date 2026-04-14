@@ -3,8 +3,10 @@
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
+import type { SessionType } from '@eduagent/schemas';
+
 export interface SessionTimerConfig {
-  sessionType: 'learning' | 'homework' | 'interleaved';
+  sessionType: SessionType;
   expectedResponseMinutes?: number | null;
   medianResponseSeconds?: number | null;
   responseHistory?: Array<{

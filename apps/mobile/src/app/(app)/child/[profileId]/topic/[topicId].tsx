@@ -12,6 +12,7 @@ import {
   type RetentionStatus,
 } from '../../../../../components/progress';
 import { useChildSessions } from '../../../../../hooks/use-dashboard';
+import { goBackOrReplace } from '../../../../../lib/navigation';
 
 const COMPLETION_LABELS: Record<string, string> = {
   not_started: 'Not started',
@@ -84,7 +85,7 @@ export default function TopicDetailScreen() {
     >
       <View className="px-5 pt-4 pb-2 flex-row items-center">
         <Pressable
-          onPress={() => router.back()}
+          onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
           className="me-3 py-2 pe-2"
           accessibilityLabel="Go back"
           accessibilityRole="button"

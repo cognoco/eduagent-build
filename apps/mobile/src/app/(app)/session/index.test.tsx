@@ -1,6 +1,13 @@
+import type { InputMode } from '@eduagent/schemas';
 import React from 'react';
 import { Alert } from 'react-native';
-import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
+import {
+  render,
+  fireEvent,
+  waitFor,
+  act,
+  screen,
+} from '@testing-library/react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import SessionScreen from './index';
 
@@ -41,13 +48,15 @@ jest.mock('../../../components/session', () => ({
     renderMessageActions,
     rightAction,
     footer,
+    inputDisabled,
+    disabledReason,
   }: {
     subtitle?: string;
     messages?: Array<{ id: string; content: string }>;
     inputAccessory?: React.ReactNode;
     belowInput?: React.ReactNode;
-    inputMode?: 'text' | 'voice';
-    onInputModeChange?: (mode: 'text' | 'voice') => void;
+    inputMode?: InputMode;
+    onInputModeChange?: (mode: InputMode) => void;
     onSend: (text: string) => void;
     renderMessageActions?: (message: {
       id: string;
@@ -59,12 +68,19 @@ jest.mock('../../../components/session', () => ({
     }) => React.ReactNode;
     rightAction?: React.ReactNode;
     footer?: React.ReactNode;
+    inputDisabled?: boolean;
+    disabledReason?: string;
   }) => {
     const { View, Text, Pressable } = require('react-native');
     return (
       <View>
         <Text testID="session-subtitle">{subtitle}</Text>
         <Text testID="mock-input-mode">{inputMode ?? 'text'}</Text>
+        {inputDisabled && disabledReason ? (
+          <View testID="input-disabled-banner">
+            <Text>{disabledReason}</Text>
+          </View>
+        ) : null}
         {(messages ?? []).map((message) => (
           <View key={message.id} testID={`mock-message-${message.id}`}>
             <Text>{message.content}</Text>
@@ -109,6 +125,23 @@ jest.mock('../../../components/session', () => ({
   QuestionCounter: () => null,
   LibraryPrompt: () => null,
   SessionInputModeToggle: () => null,
+  QuotaExceededCard: ({
+    details,
+    isOwner,
+  }: {
+    details: { reason: string };
+    isOwner: boolean;
+  }) => {
+    const { View, Text } = require('react-native');
+    return (
+      <View testID="quota-exceeded-card">
+        <Text>{isOwner ? 'Upgrade plan' : 'Ask your parent'}</Text>
+        <Text>
+          {details.reason === 'daily' ? "today's limit" : "this month's limit"}
+        </Text>
+      </View>
+    );
+  },
 }));
 
 jest.mock('../../../hooks/use-sessions', () => ({
@@ -243,38 +276,72 @@ jest.mock('../../../lib/session-recovery', () => ({
   writeSessionRecoveryMarker: jest.fn().mockResolvedValue(undefined),
 }));
 
+const secureStore: Record<string, string> = {};
+jest.mock('../../../lib/secure-storage', () => ({
+  getItemAsync: jest.fn((key: string) =>
+    Promise.resolve(secureStore[key] ?? null)
+  ),
+  setItemAsync: jest.fn((key: string, value: string) => {
+    secureStore[key] = value;
+    return Promise.resolve();
+  }),
+}));
+
 const { readSessionRecoveryMarker: mockReadSessionRecoveryMarker } =
   require('../../../lib/session-recovery') as {
     readSessionRecoveryMarker: jest.Mock;
   };
 
 const mockCelebrationsPendingGet = jest.fn();
-jest.mock('../../../lib/api-client', () => ({
-  useApiClient: () => ({
-    sessions: {
-      ':sessionId': {
-        'homework-state': {
-          $post: mockHomeworkStatePost,
+
+jest.mock('../../../lib/api-client', () => {
+  class QuotaExceededError extends Error {
+    readonly code = 'QUOTA_EXCEEDED' as const;
+    readonly details: unknown;
+    constructor(message: string, details: unknown) {
+      super(message);
+      this.name = 'QuotaExceededError';
+      this.details = details;
+    }
+  }
+
+  class ForbiddenError extends Error {
+    readonly code = 'FORBIDDEN' as const;
+    constructor(message = 'Forbidden') {
+      super(message);
+      this.name = 'ForbiddenError';
+    }
+  }
+
+  return {
+    QuotaExceededError,
+    ForbiddenError,
+    useApiClient: () => ({
+      sessions: {
+        ':sessionId': {
+          'homework-state': {
+            $post: mockHomeworkStatePost,
+          },
         },
       },
-    },
-    subjects: {
-      ':subjectId': {
-        sessions: {
-          $post: mockDirectStartSession,
+      subjects: {
+        ':subjectId': {
+          sessions: {
+            $post: mockDirectStartSession,
+          },
         },
       },
-    },
-    celebrations: {
-      pending: {
-        $get: mockCelebrationsPendingGet,
+      celebrations: {
+        pending: {
+          $get: mockCelebrationsPendingGet,
+        },
+        seen: {
+          $post: jest.fn().mockResolvedValue({ ok: true }),
+        },
       },
-      seen: {
-        $post: jest.fn().mockResolvedValue({ ok: true }),
-      },
-    },
-  }),
-}));
+    }),
+  };
+});
 
 jest.mock('../../../lib/format-api-error', () => ({
   formatApiError: (error: unknown) =>
@@ -283,7 +350,7 @@ jest.mock('../../../lib/format-api-error', () => ({
 
 jest.mock('../../../lib/profile', () => ({
   useProfile: () => ({
-    activeProfile: { id: 'profile-1' },
+    activeProfile: { id: 'profile-1', isOwner: true },
   }),
 }));
 
@@ -298,6 +365,8 @@ describe('SessionScreen homework flow', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers();
+    // Clear SecureStore mock data
+    Object.keys(secureStore).forEach((key) => delete secureStore[key]);
     let aiEventCount = 0;
     (useRouter as jest.Mock).mockReturnValue({
       replace: mockReplace,
@@ -777,11 +846,13 @@ describe('SessionScreen homework flow', () => {
       fireEvent.press(endButton);
 
       // Alert.alert was called with "Ready to wrap up?" — invoke the "I'm Done" callback
+      // BUG-352 added a 4th options arg { cancelable, onDismiss }
       await waitFor(() => {
         expect(alertSpy).toHaveBeenCalledWith(
           'Ready to wrap up?',
           expect.any(String),
-          expect.any(Array)
+          expect.any(Array),
+          expect.objectContaining({ cancelable: true })
         );
       });
 
@@ -860,5 +931,140 @@ describe('SessionScreen homework flow', () => {
         );
       });
     }, 15000);
+  });
+});
+
+describe('voice mode persistence', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.useFakeTimers();
+    Object.keys(secureStore).forEach((key) => delete secureStore[key]);
+    (useRouter as jest.Mock).mockReturnValue({ replace: mockReplace });
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'homework',
+      subjectId: 'subject-1',
+      subjectName: 'Math',
+      homeworkProblems: JSON.stringify([
+        { id: 'problem-1', text: 'Solve 2x + 5 = 17', source: 'ocr' },
+      ]),
+    });
+    mockStartSession.mockResolvedValue({ session: { id: 'session-1' } });
+    mockHomeworkStatePost.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        metadata: { problemCount: 1, currentProblemIndex: 0, problems: [] },
+      }),
+    });
+    mockStream.mockImplementation(
+      async (
+        _msg: string,
+        _onChunk: unknown,
+        onDone: (r: { exchangeCount: number; escalationRung: number }) => void
+      ) => {
+        onDone({ exchangeCount: 1, escalationRung: 1 });
+      }
+    );
+    mockRecordSystemPrompt.mockResolvedValue({ ok: true });
+    mockCelebrationsPendingGet.mockResolvedValue({
+      ok: true,
+      json: async () => ({ pendingCelebrations: [] }),
+    });
+    mockFilingMutateAsync.mockResolvedValue({
+      shelfId: 'shelf-1',
+      bookId: 'book-1',
+    });
+    mockSetSessionInputMode.mockResolvedValue({
+      session: { id: 'session-1', inputMode: 'voice' },
+    });
+    mockFlagSessionContent.mockResolvedValue({
+      message: 'Content flagged for review. Thank you!',
+    });
+    mockClassifySubject.mockResolvedValue({
+      candidates: [],
+      needsConfirmation: false,
+    });
+    mockDirectStartSession.mockResolvedValue({
+      ok: true,
+      json: async () => ({ session: { id: 'session-1' } }),
+    });
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('defaults to voice when SecureStore has voice preference', async () => {
+    secureStore['voice-input-mode-profile-1'] = 'voice';
+    const { getByTestId } = render(<SessionScreen />);
+    await waitFor(() => {
+      expect(getByTestId('mock-input-mode').props.children).toBe('voice');
+    });
+  });
+
+  it('defaults to text when SecureStore has no preference', async () => {
+    const { getByTestId } = render(<SessionScreen />);
+    await waitFor(() => {
+      expect(getByTestId('mock-input-mode').props.children).toBe('text');
+    });
+  });
+
+  it('persists voice preference when mode changes to voice', async () => {
+    const { getByTestId } = render(<SessionScreen />);
+    await act(async () => {
+      fireEvent.press(getByTestId('mock-set-voice-mode'));
+    });
+    await waitFor(() => {
+      expect(secureStore['voice-input-mode-profile-1']).toBe('voice');
+    });
+  });
+
+  it('persists text preference when mode changes to text', async () => {
+    secureStore['voice-input-mode-profile-1'] = 'voice';
+    const { getByTestId } = render(<SessionScreen />);
+    // Wait for initial voice mode to load
+    await waitFor(() => {
+      expect(getByTestId('mock-input-mode').props.children).toBe('voice');
+    });
+    await act(async () => {
+      fireEvent.press(getByTestId('mock-set-text-mode'));
+    });
+    await waitFor(() => {
+      expect(secureStore['voice-input-mode-profile-1']).toBe('text');
+    });
+  });
+
+  it('shows QuotaExceededCard and disables input when stream returns 402', async () => {
+    const { QuotaExceededError } = require('../../../lib/api-client');
+    const details = {
+      tier: 'free' as const,
+      reason: 'monthly' as const,
+      monthlyLimit: 100,
+      usedThisMonth: 100,
+      dailyLimit: null,
+      usedToday: 0,
+      topUpCreditsRemaining: 0,
+      upgradeOptions: [],
+    };
+    mockStream.mockRejectedValueOnce(
+      new QuotaExceededError('Quota exceeded', details)
+    );
+
+    const { unmount } = render(<SessionScreen />);
+
+    // Flush startup async work
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // Trigger a message send using the mock send button
+    fireEvent.press(screen.getByTestId('manual-send-button'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('quota-exceeded-card')).toBeTruthy();
+      expect(screen.getByTestId('input-disabled-banner')).toBeTruthy();
+    });
+
+    unmount();
   });
 });

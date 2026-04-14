@@ -5,12 +5,11 @@ import {
   ScrollView,
   Alert,
   RefreshControl,
-  InteractionManager,
   ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { goBackOrReplace } from '../../lib/navigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useTheme } from '../../lib/theme';
 import { ParentDashboardSummary } from '../../components/coaching';
 import type { RetentionStatus } from '../../components/progress';
 import { useDashboard } from '../../hooks/use-dashboard';
@@ -68,7 +67,7 @@ function renderChildCards(
       weeklyDeltaTopicsMastered: number | null;
       weeklyDeltaVocabularyTotal: number | null;
       weeklyDeltaTopicsExplored: number | null;
-      engagementTrend: 'growing' | 'steady' | 'quiet';
+      engagementTrend: 'increasing' | 'stable' | 'declining';
       guidance: string | null;
     } | null;
   }[],
@@ -99,7 +98,6 @@ function renderChildCards(
 
 export default function DashboardScreen() {
   const router = useRouter();
-  const { setPersona } = useTheme();
   const insets = useSafeAreaInsets();
   const {
     data: dashboard,
@@ -130,7 +128,7 @@ export default function DashboardScreen() {
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
       <View className="px-5 pt-4 pb-2">
         <Pressable
-          onPress={() => router.back()}
+          onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
           className="mb-2 self-start"
           hitSlop={12}
           testID="dashboard-back"
@@ -242,21 +240,6 @@ export default function DashboardScreen() {
               here.
             </Text>
           </View>
-        )}
-
-        {__DEV__ && (
-          <Pressable
-            onPress={() => {
-              router.replace('/(app)/home' as never);
-              InteractionManager.runAfterInteractions(() => setPersona('teen'));
-            }}
-            className="mt-6 items-center py-3 min-h-[44px] justify-center"
-            testID="switch-to-teen"
-          >
-            <Text className="text-body-sm text-text-secondary underline">
-              Switch to Teen view (demo)
-            </Text>
-          </Pressable>
         )}
       </ScrollView>
     </View>

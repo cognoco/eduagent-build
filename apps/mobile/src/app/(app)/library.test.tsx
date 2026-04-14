@@ -67,7 +67,11 @@ jest.mock('../../lib/api-client', () => ({
 }));
 
 jest.mock('../../lib/profile', () => ({
-  useProfile: () => ({ activeProfile: { id: 'profile-1' } }),
+  useProfile: () => ({
+    activeProfile: { id: 'profile-1', isOwner: true },
+    profiles: [{ id: 'profile-1', isOwner: true }],
+  }),
+  isGuardianProfile: () => false,
 }));
 
 const { useQueries: mockUseQueries } = require('@tanstack/react-query') as {
@@ -181,6 +185,7 @@ describe('LibraryScreen', () => {
               easeFactor: 2.5,
               repetitions: 2,
               lastReviewedAt: null,
+              nextReviewAt: new Date(Date.now() + 7 * 86_400_000).toISOString(),
               xpStatus: 'verified',
               failureCount: 0,
             },
@@ -431,10 +436,12 @@ describe('LibraryScreen', () => {
   });
 
   // -----------------------------------------------------------------------
-  // BUG-82: error state when allBooksQuery fails [BUG-82]
+  // BUG-82: allBooksQuery failure is non-fatal — library still renders [BUG-82]
+  // Previously allBooksQuery.isError triggered a full-page error state.
+  // Now book-fetch errors are non-fatal: subjects/progress errors block the
+  // view, but a book-fetch failure only degrades the Books tab gracefully.
   // -----------------------------------------------------------------------
-  it('shows error state with retry and back buttons when allBooksQuery fails', () => {
-    const mockRefetch = jest.fn();
+  it('does not show full-page error when only allBooksQuery fails', () => {
     mockUseSubjects.mockReturnValue({
       data: [{ id: 'sub-1', name: 'Math', status: 'active' }],
       isLoading: false,
@@ -451,43 +458,13 @@ describe('LibraryScreen', () => {
       books: [],
       isLoading: false,
       isError: true,
-      refetch: mockRefetch,
+      refetch: jest.fn(),
     });
 
     render(<LibraryScreen />, { wrapper: createWrapper() });
 
-    expect(screen.getByTestId('library-error')).toBeTruthy();
-    expect(
-      screen.getByText('Unable to load your library. Please try again.')
-    ).toBeTruthy();
-    expect(screen.getByTestId('library-retry-button')).toBeTruthy();
-    expect(screen.getByTestId('library-home-button')).toBeTruthy();
-  });
-
-  it('retry button on books error calls allBooksQuery.refetch', () => {
-    const mockRefetch = jest.fn();
-    mockUseSubjects.mockReturnValue({
-      data: [],
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
-    });
-    mockUseOverallProgress.mockReturnValue({
-      data: { subjects: [] },
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
-    });
-    mockUseAllBooks.mockReturnValue({
-      books: [],
-      isLoading: false,
-      isError: true,
-      refetch: mockRefetch,
-    });
-
-    render(<LibraryScreen />, { wrapper: createWrapper() });
-
-    fireEvent.press(screen.getByTestId('library-retry-button'));
-    expect(mockRefetch).toHaveBeenCalledTimes(1);
+    // Library renders normally — tabs and header are visible
+    expect(screen.queryByTestId('library-error')).toBeNull();
+    expect(screen.getByTestId('library-tab-shelves')).toBeTruthy();
   });
 });

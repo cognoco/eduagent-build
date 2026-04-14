@@ -11,8 +11,7 @@ import {
 import { useQueries } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { Subject } from '@eduagent/schemas';
-import type { RetentionStatus } from '../../components/progress';
+import type { Subject, RetentionStatus } from '@eduagent/schemas';
 import {
   BookPageFlipAnimation,
   BrandCelebration,
@@ -44,7 +43,7 @@ import { useSubjects, useUpdateSubject } from '../../hooks/use-subjects';
 import { useOverallProgress } from '../../hooks/use-progress';
 import { useNoteTopicIds } from '../../hooks/use-notes';
 import { useApiClient } from '../../lib/api-client';
-import { useProfile } from '../../lib/profile';
+import { isGuardianProfile, useProfile } from '../../lib/profile';
 import { combinedSignal } from '../../lib/query-timeout';
 import { assertOk } from '../../lib/assert-ok';
 import { formatApiError } from '../../lib/format-api-error';
@@ -111,7 +110,8 @@ export default function LibraryScreen() {
   const insets = useSafeAreaInsets();
   const themeColors = useThemeColors();
   const apiClient = useApiClient();
-  const { activeProfile } = useProfile();
+  const { activeProfile, profiles } = useProfile();
+  const isGuardian = isGuardianProfile(activeProfile, profiles);
 
   const [activeTab, setActiveTab] = useState<LibraryTab>('shelves');
   const [shelvesTabState, setShelvesTabState] = useState<ShelvesTabState>(
@@ -127,6 +127,9 @@ export default function LibraryScreen() {
   const [pendingSubjectId, setPendingSubjectId] = useState<string | null>(null);
 
   const subjectsQuery = useSubjects({ includeInactive: true });
+  // S-5: Centralized Array.isArray guard — same class as BUG-418.
+  // TanStack Query's select can be bypassed when enabled=false.
+  const subjects = Array.isArray(subjectsQuery.data) ? subjectsQuery.data : [];
   const progressQuery = useOverallProgress();
   const updateSubject = useUpdateSubject();
   const allBooksQuery = useAllBooks();
@@ -137,7 +140,7 @@ export default function LibraryScreen() {
   );
 
   const retentionQueries = useQueries({
-    queries: (subjectsQuery.data ?? []).map((subject) => ({
+    queries: subjects.map((subject) => ({
       queryKey: ['retention', 'subject', subject.id, activeProfile?.id],
       queryFn: async ({ signal: querySignal }: { signal?: AbortSignal }) => {
         const { signal, cleanup } = combinedSignal(querySignal);
@@ -190,13 +193,13 @@ export default function LibraryScreen() {
 
   const shelves = useMemo<ShelfItem[]>(() => {
     const retentionBySubjectId = new Map(
-      (subjectsQuery.data ?? []).map((subject, index) => [
+      subjects.map((subject, index) => [
         subject.id,
         retentionQueries[index]?.data,
       ])
     );
 
-    return (subjectsQuery.data ?? []).map((subject) => ({
+    return subjects.map((subject) => ({
       subject,
       progress: progressBySubjectId.get(subject.id),
       reviewDueCount:
@@ -253,10 +256,20 @@ export default function LibraryScreen() {
     }
   };
 
-  const openTopic = (topicId: string, subjectId: string): void => {
+  // BUG-342: Derive session mode from retention — forgotten/weak topics
+  // open in relearn mode so the AI uses spaced-repetition pedagogy.
+  const openTopic = (
+    topicId: string,
+    subjectId: string,
+    retention?: RetentionStatus
+  ): void => {
+    const mode =
+      retention === 'weak' || retention === 'forgotten'
+        ? 'relearn'
+        : 'learning';
     router.push({
       pathname: '/(app)/session',
-      params: { mode: 'learning', subjectId, topicId },
+      params: { mode, subjectId, topicId },
     } as never);
   };
 
@@ -272,11 +285,7 @@ export default function LibraryScreen() {
       );
     }
 
-    if (
-      subjectsQuery.isError ||
-      progressQuery.isError ||
-      allBooksQuery.isError
-    ) {
+    if (subjectsQuery.isError || progressQuery.isError) {
       return (
         <View
           className="flex-1 items-center justify-center px-5 py-12"
@@ -308,7 +317,7 @@ export default function LibraryScreen() {
     }
 
     // Top-level library view — three tabs
-    const subjectList = (subjectsQuery.data ?? []).map((s) => ({
+    const subjectList = subjects.map((s) => ({
       id: s.id,
       name: s.name,
     }));
@@ -356,7 +365,9 @@ export default function LibraryScreen() {
             noteTopicIds={noteIdSet}
             state={topicsTabState}
             onStateChange={setTopicsTabState}
-            onTopicPress={(topicId, subjectId) => openTopic(topicId, subjectId)}
+            onTopicPress={(topicId, subjectId, retention) =>
+              openTopic(topicId, subjectId, retention)
+            }
             onAddSubject={() => router.push('/create-subject')}
           />
         )}
@@ -374,7 +385,11 @@ export default function LibraryScreen() {
           <View className="flex-1">
             <Text className="text-h1 font-bold text-text-primary">Library</Text>
             <Text className="text-body-sm text-text-secondary mt-1">
-              {`${subjectsQuery.data?.length ?? 0} subjects`}
+              {isGuardian
+                ? `Your personal library \u00B7 ${
+                    subjectsQuery.data?.length ?? 0
+                  } subjects`
+                : `${subjectsQuery.data?.length ?? 0} subjects`}
             </Text>
           </View>
         </View>
@@ -399,8 +414,7 @@ export default function LibraryScreen() {
       {!subjectsQuery.isLoading &&
         !subjectsQuery.isError &&
         !progressQuery.isLoading &&
-        !progressQuery.isError &&
-        !allBooksQuery.isError && (
+        !progressQuery.isError && (
           <View
             className="px-5"
             style={{ zIndex: 2, position: 'relative', elevation: 2 }}
@@ -482,7 +496,7 @@ export default function LibraryScreen() {
             </Text>
 
             <ScrollView style={{ maxHeight: 360 }}>
-              {(subjectsQuery.data ?? []).map((subject) => {
+              {subjects.map((subject) => {
                 const isPending = pendingSubjectId === subject.id;
                 return (
                   <View

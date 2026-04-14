@@ -1,0 +1,2 @@
+please select 10 bugs from Notion and address them. No shortcuts, all must be production ready, please. Be sure that the bug is fixed before you mark it complete.   
+  Please put the status to be in progress while you work on them so that other agents do not pick the same bugs. 

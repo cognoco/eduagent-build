@@ -15,6 +15,7 @@ import { useTopicProgress } from '../../../hooks/use-progress';
 import { useTopicRetention } from '../../../hooks/use-retention';
 import { useTopicParkingLot } from '../../../hooks/use-sessions';
 import { useThemeColors } from '../../../lib/theme';
+import { goBackOrReplace } from '../../../lib/navigation';
 
 function deriveRetentionStatus(
   card:
@@ -94,7 +95,7 @@ export default function TopicDetailScreen() {
           This topic could not be opened. Please go back and try again.
         </Text>
         <Pressable
-          onPress={() => router.back()}
+          onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
           className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center"
           accessibilityRole="button"
           accessibilityLabel="Go back"
@@ -132,7 +133,7 @@ export default function TopicDetailScreen() {
           </Text>
         </Pressable>
         <Pressable
-          onPress={() => router.back()}
+          onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
           className="bg-surface rounded-button px-6 py-3 min-h-[48px] items-center justify-center mb-3"
           accessibilityRole="button"
           accessibilityLabel="Go back"
@@ -171,7 +172,7 @@ export default function TopicDetailScreen() {
       {/* Header */}
       <View className="px-5 pt-4 pb-3 flex-row items-center">
         <Pressable
-          onPress={() => router.back()}
+          onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
           className="me-3 p-2 min-h-[44px] min-w-[44px] items-center justify-center"
           testID="topic-detail-back"
           accessibilityLabel="Go back"
@@ -207,7 +208,7 @@ export default function TopicDetailScreen() {
             This topic may have been removed from your curriculum.
           </Text>
           <Pressable
-            onPress={() => router.back()}
+            onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
             className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center mt-6"
             testID="topic-detail-empty-back"
             accessibilityRole="button"

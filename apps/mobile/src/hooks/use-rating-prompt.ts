@@ -61,43 +61,49 @@ export function useRatingPrompt(): {
 
     if (computeAgeBracket(activeProfile.birthYear) === 'adult') return;
 
-    const profileId = activeProfile.id;
+    try {
+      const profileId = activeProfile.id;
 
-    // Increment successful recall count
-    const countKey = RECALL_COUNT_KEY(profileId);
-    const stored = await SecureStore.getItemAsync(countKey);
-    const parsed = stored ? parseInt(stored, 10) : 0;
-    const currentCount = Number.isNaN(parsed) ? 0 : parsed;
-    const newCount = currentCount + 1;
-    await SecureStore.setItemAsync(countKey, String(newCount));
+      // Increment successful recall count
+      const countKey = RECALL_COUNT_KEY(profileId);
+      const stored = await SecureStore.getItemAsync(countKey);
+      const parsed = stored ? parseInt(stored, 10) : 0;
+      const currentCount = Number.isNaN(parsed) ? 0 : parsed;
+      const newCount = currentCount + 1;
+      await SecureStore.setItemAsync(countKey, String(newCount));
 
-    // Check minimum recalls
-    if (newCount < MIN_SUCCESSFUL_RECALLS) return;
+      // Check minimum recalls
+      if (newCount < MIN_SUCCESSFUL_RECALLS) return;
 
-    // Check minimum days since profile creation
-    if (activeProfile.createdAt) {
-      const daysSinceCreation = Math.floor(
-        (Date.now() - new Date(activeProfile.createdAt).getTime()) /
-          (24 * 60 * 60 * 1000)
-      );
-      if (daysSinceCreation < MIN_DAYS_SINCE_CREATION) return;
-    }
+      // Check minimum days since profile creation
+      if (activeProfile.createdAt) {
+        const daysSinceCreation = Math.floor(
+          (Date.now() - new Date(activeProfile.createdAt).getTime()) /
+            (24 * 60 * 60 * 1000)
+        );
+        if (daysSinceCreation < MIN_DAYS_SINCE_CREATION) return;
+      }
 
-    // Check cooldown between prompts
-    const lastPromptKey = LAST_PROMPT_KEY(profileId);
-    const lastPromptStr = await SecureStore.getItemAsync(lastPromptKey);
-    if (lastPromptStr) {
-      const daysSincePrompt = Math.floor(
-        (Date.now() - new Date(lastPromptStr).getTime()) / (24 * 60 * 60 * 1000)
-      );
-      if (daysSincePrompt < MIN_DAYS_BETWEEN_PROMPTS) return;
-    }
+      // Check cooldown between prompts
+      const lastPromptKey = LAST_PROMPT_KEY(profileId);
+      const lastPromptStr = await SecureStore.getItemAsync(lastPromptKey);
+      if (lastPromptStr) {
+        const daysSincePrompt = Math.floor(
+          (Date.now() - new Date(lastPromptStr).getTime()) /
+            (24 * 60 * 60 * 1000)
+        );
+        if (daysSincePrompt < MIN_DAYS_BETWEEN_PROMPTS) return;
+      }
 
-    // All conditions met — request review
-    const isAvailable = await StoreReview.isAvailableAsync();
-    if (isAvailable) {
-      await StoreReview.requestReview();
-      await SecureStore.setItemAsync(lastPromptKey, new Date().toISOString());
+      // All conditions met — request review
+      const isAvailable = await StoreReview.isAvailableAsync();
+      if (isAvailable) {
+        await StoreReview.requestReview();
+        await SecureStore.setItemAsync(lastPromptKey, new Date().toISOString());
+      }
+    } catch (error) {
+      // SecureStore may be unavailable in some environments — skip rating prompt
+      if (__DEV__) console.warn('Rating prompt check failed:', error);
     }
   }, [activeProfile]);
 

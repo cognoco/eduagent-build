@@ -109,6 +109,7 @@ routes = [
 [env.staging.vars]
 ENVIRONMENT = "staging"
 APP_URL = "https://www.mentomate.com"
+API_ORIGIN = "https://mentomate-api-stg.zwizzly.workers.dev"
 LOG_LEVEL = "warn"
 EMAIL_FROM = "staging-noreply@mentomate.com"
 
@@ -138,6 +139,7 @@ routes = [
 [env.production.vars]
 ENVIRONMENT = "production"
 APP_URL = "https://www.mentomate.com"
+API_ORIGIN = "https://api.mentomate.com"
 LOG_LEVEL = "info"
 EMAIL_FROM = "noreply@mentomate.com"
 

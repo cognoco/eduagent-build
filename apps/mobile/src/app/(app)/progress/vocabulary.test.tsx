@@ -1,0 +1,96 @@
+import { render, screen } from '@testing-library/react-native';
+import { useProgressInventory } from '../../../hooks/use-progress';
+import VocabularyBrowserScreen from './vocabulary';
+
+jest.mock('../../../hooks/use-progress');
+jest.mock('expo-router', () => ({
+  useRouter: () => ({ back: jest.fn(), push: jest.fn(), replace: jest.fn() }),
+}));
+jest.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0 }),
+}));
+
+const mockInventory = {
+  profileId: 'p1',
+  snapshotDate: '2026-04-13',
+  global: {
+    topicsAttempted: 5,
+    topicsMastered: 3,
+    vocabularyTotal: 12,
+    vocabularyMastered: 8,
+    totalSessions: 10,
+    totalActiveMinutes: 120,
+    currentStreak: 3,
+    longestStreak: 5,
+  },
+  subjects: [
+    {
+      subjectId: 's1',
+      subjectName: 'Spanish',
+      pedagogyMode: 'language',
+      topics: {
+        total: 10,
+        explored: 5,
+        mastered: 3,
+        inProgress: 2,
+        notStarted: 5,
+      },
+      vocabulary: {
+        total: 12,
+        mastered: 8,
+        learning: 3,
+        new: 1,
+        byCefrLevel: { A1: 6, A2: 4, B1: 2 },
+      },
+      estimatedProficiency: 'A2',
+      estimatedProficiencyLabel: 'Elementary',
+      lastSessionAt: null,
+      activeMinutes: 60,
+      sessionsCount: 5,
+    },
+  ],
+};
+
+describe('VocabularyBrowserScreen', () => {
+  beforeEach(() => {
+    (useProgressInventory as jest.Mock).mockReturnValue({
+      data: mockInventory,
+      isLoading: false,
+      isError: false,
+    });
+  });
+
+  it('renders subject section and CEFR breakdown', () => {
+    render(<VocabularyBrowserScreen />);
+    expect(screen.getByText('Spanish')).toBeTruthy();
+    expect(screen.getByText('A1')).toBeTruthy();
+    expect(screen.getByText('6 words')).toBeTruthy();
+    expect(screen.getByTestId('vocab-browser-back')).toBeTruthy();
+  });
+
+  it('shows empty state when no vocabulary', () => {
+    (useProgressInventory as jest.Mock).mockReturnValue({
+      data: {
+        ...mockInventory,
+        global: { ...mockInventory.global, vocabularyTotal: 0 },
+        subjects: [],
+      },
+      isLoading: false,
+      isError: false,
+    });
+    render(<VocabularyBrowserScreen />);
+    expect(screen.getByTestId('vocab-browser-empty')).toBeTruthy();
+  });
+
+  it('shows error state with retry and back buttons', () => {
+    (useProgressInventory as jest.Mock).mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      error: new Error('Network error'),
+      refetch: jest.fn(),
+    });
+    render(<VocabularyBrowserScreen />);
+    expect(screen.getByTestId('vocab-browser-error')).toBeTruthy();
+  });
+});

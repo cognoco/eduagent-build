@@ -23,18 +23,11 @@ jest.mock('@clerk/clerk-expo', () => ({
 jest.mock('../lib/api-client', () => ({
   useApiClient: () => {
     const { hc } = require('hono/client');
+    // Pass raw Response through — matches production hc() behavior.
+    // Each hook uses assertOk() to throw on non-OK responses.
     return hc('http://localhost', {
-      fetch: async (...args: unknown[]) => {
-        const res = await mockFetch(...(args as Parameters<typeof fetch>));
-        if (!res.ok) {
-          const text = await res
-            .clone()
-            .text()
-            .catch(() => res.statusText);
-          throw new Error(`API error ${res.status}: ${text}`);
-        }
-        return res;
-      },
+      fetch: async (...args: unknown[]) =>
+        mockFetch(...(args as Parameters<typeof fetch>)),
     });
   },
 }));
@@ -280,8 +273,23 @@ describe('useFamilySubscription', () => {
     expect(result.current.data?.maxProfiles).toBe(4);
   });
 
-  it('returns null when the family endpoint responds 404', async () => {
+  it('returns null when the family endpoint responds 404 (non-throwing mock)', async () => {
     mockFetch.mockResolvedValueOnce(new Response('Not found', { status: 404 }));
+
+    const { result } = renderHook(() => useFamilySubscription(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    expect(result.current.data).toBeNull();
+  });
+
+  it('returns null when the family endpoint throws API error 404 (production api-client path)', async () => {
+    // Simulate the production api-client throwing instead of returning a Response
+    mockFetch.mockRejectedValueOnce(new Error('API error 404: Not Found'));
 
     const { result } = renderHook(() => useFamilySubscription(), {
       wrapper: createWrapper(),

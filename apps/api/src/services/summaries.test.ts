@@ -124,9 +124,11 @@ describe('evaluateSummary', () => {
       'Arrays are ordered collections.'
     );
 
-    // Fallback: raw response becomes feedback, accepted by default
-    expect(result.feedback).toContain('Your summary looks good overall');
-    expect(result.isAccepted).toBe(true);
+    // Fallback: LLM returned non-JSON — show safe error message, do not accept.
+    // The raw LLM text is never passed through as feedback (it could be an error
+    // message, safety refusal, or rate-limit JSON).
+    expect(result.feedback).toContain("couldn't provide AI feedback");
+    expect(result.isAccepted).toBe(false);
     expect(result.hasUnderstandingGaps).toBe(false);
   });
 

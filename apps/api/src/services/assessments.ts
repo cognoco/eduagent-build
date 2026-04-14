@@ -200,14 +200,13 @@ function parseQuickCheckResult(response: string): QuickCheckResult {
     // Fall through to default
   }
 
-  // Graceful fallback — return generic questions
+  // Graceful fallback — return generic topic-agnostic questions.
+  // S-4: Do NOT embed response.slice() — the raw LLM output could be an error
+  // message, safety refusal, or rate-limit JSON that would leak into the UI.
   return {
     questions: [
-      `Can you explain the key idea behind ${response.slice(
-        0,
-        30
-      )}... in your own words?`,
-      `Why is this concept important? What problem does it solve?`,
+      'Can you explain this concept in your own words?',
+      'Why is this concept important? What problem does it solve?',
     ],
     checkType: 'concept_boundary',
   };

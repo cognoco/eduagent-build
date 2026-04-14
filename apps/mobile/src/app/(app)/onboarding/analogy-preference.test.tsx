@@ -98,10 +98,10 @@ describe('AnalogyPreferenceScreen', () => {
   });
 
   it('saves domain and navigates when continue is pressed with selection', async () => {
-    // Make mutate call onSettled immediately
+    // Make mutate call onSuccess immediately
     mockMutate.mockImplementation(
-      (_domain: string, options: { onSettled?: () => void }) => {
-        options.onSettled?.();
+      (_domain: string, options: { onSuccess?: () => void }) => {
+        options.onSuccess?.();
       }
     );
 
@@ -115,7 +115,7 @@ describe('AnalogyPreferenceScreen', () => {
     await waitFor(() => {
       expect(mockMutate).toHaveBeenCalledWith(
         'cooking',
-        expect.objectContaining({ onSettled: expect.any(Function) })
+        expect.objectContaining({ onSuccess: expect.any(Function) })
       );
     });
 

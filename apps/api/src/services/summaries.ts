@@ -133,11 +133,14 @@ function parseSummaryEvaluation(response: string): SummaryEvaluation {
     // Fall through to default
   }
 
-  // Graceful fallback — treat the raw response as feedback, accept by default
+  // Fallback — LLM response was unparseable. Do NOT accept — the summary was
+  // not actually evaluated. isAccepted=false is consistent with the feedback:
+  // the submission was saved but evaluation is unavailable (no contradictory checkmark).
   return {
-    feedback: response,
+    feedback:
+      "Your summary was saved. We couldn't provide AI feedback right now — you can try submitting again.",
     hasUnderstandingGaps: false,
-    isAccepted: true,
+    isAccepted: false,
   };
 }
 
@@ -174,10 +177,7 @@ export async function createPendingSessionSummary(
     return row!;
   }
 
-  const nextStatus = mergeSummaryStatus(
-    existing.status as SummaryStatus,
-    status
-  );
+  const nextStatus = mergeSummaryStatus(existing.status, status);
   const nextTopicId = existing.topicId ?? topicId ?? null;
   const now = new Date();
 

@@ -77,7 +77,7 @@ Motivated learners aged 11+ who really want to learn—not casual browsers:
 - **Pricing:** €18.99/mo (Plus) | €28.99/mo (Family, up to 4 users) | €48.99/mo (Pro, up to 6 users)
 - **Family/Pro:** Shared question pools across all users
 - **Trial:** 14 days Plus access + 14 days soft landing (reverse trial)
-- **Free Tier:** 50 questions/month with first-week boost (10/day for days 1-7)
+- **Free Tier:** 100 questions/month with first-week boost (10/day for days 1-7)
 - **Top-ups:** Plus €10/500, Family/Pro €5/500 (12-month expiry)
 
 ---
@@ -132,7 +132,7 @@ A user can learn ANY subject through AI-powered tutoring with personalized curri
 
 | Feature Category | Included Features |
 |------------------|-------------------|
-| **Authentication** | Email + password, Google OAuth, Apple Sign-in, OpenAI OAuth (exploring), multi-profile (family), GDPR parental consent (11-15, EU) |
+| **Authentication** | Email + password, Google OAuth, Apple Sign-in, OpenAI OAuth (exploring — not yet implemented), multi-profile (family), GDPR parental consent (11-15, EU) |
 | **Onboarding** | Subject selection (any topic), conversational interview, dynamic curriculum generation, homework help quick entry |
 | **Learning Experience** | Real-time AI chat, prior knowledge context, adaptive explanations, mandatory user summaries, homework integrity mode |
 | **Assessments** | In-lesson quizzes, topic completion tests, re-testing from summaries |
@@ -140,7 +140,7 @@ A user can learn ANY subject through AI-powered tutoring with personalized curri
 | **Gamification** | Honest streak (recall-based), retention XP (verified after delayed recall), decay bars |
 | **Language Learning** | Four Strands methodology (explicit instruction + input + output + fluency), vocabulary tracking, CEFR progress |
 | **Subscription** | Free tier + 14-day Plus trial + reverse trial, tiered pricing (Free/Plus/Family/Pro), shared question pools, top-up credits, payment gateway integration, BYOK waitlist |
-| **Platforms** | iOS, Android, Web (cross-platform) |
+| **Platforms** | iOS, Android (mobile only for v1.0); Web deferred — see note below |
 
 **Subject Coverage:** ANY subject via dynamic curriculum generation (no pre-curated content bottleneck)
 
@@ -155,7 +155,7 @@ A user can learn ANY subject through AI-powered tutoring with personalized curri
 | Cohorts, buddy matching, study groups | Needs user volume | v1.5 |
 | Human coaching add-on | New business model | v2.0 |
 | Portfolio projects | Complexity, needs curriculum stability | v2.0 |
-| Multi-language UI (beyond EN/DE) | English + German MVP | v2.0 |
+| Multi-language UI (beyond English) | English only for v1.0 | v2.0 |
 | Offline mode | Significant caching complexity | v2.0 |
 | Age 6-10 mode | Different UX, stricter COPPA requirements | v2.0 |
 | B2B/Team licensing | Focus on B2C first | v2.0 |
@@ -285,7 +285,7 @@ A user can learn ANY subject through AI-powered tutoring with personalized curri
 4. **Trust Validation**
    - Sees child's own written summaries in their voice
    - Reviews AI's teaching notes and feedback
-   - Confirms Socratic guidance for homework (not answer-giving)
+   - Confirms direct explanation approach for homework (AI explains method + similar examples, never gives final answer)
 
 **Success Indicators:**
 - Parent reviews progress at least weekly
@@ -296,7 +296,7 @@ A user can learn ANY subject through AI-powered tutoring with personalized curri
 
 **Actor:** Student with specific homework problem
 
-**Goal:** Get help solving problem through guided thinking (not getting answers)
+**Goal:** Understand how to solve the problem through direct explanation and worked examples (not getting final answers)
 
 **Journey Flow:**
 
@@ -307,30 +307,31 @@ A user can learn ANY subject through AI-powered tutoring with personalized curri
 
 2. **Problem Input**
    - Types homework problem description
-   - OR photographs problem (v1.1)
+   - OR photographs problem (Implemented — FR32)
 
-3. **Socratic Guidance**
+3. **Direct Explanation Mode (FR228)**
    - AI detects "help with problem" vs "teach concept"
    - AI switches to homework integrity mode
-   - Asks: "What do you think the first step is?"
-   - Student explains thinking
-   - AI guides: "Good! Now what happens next?"
-   - Student works through problem with prompting
-   - AI NEVER gives final answer
+   - Student chooses their mode:
+     - **"Check my answer"** — brief verification of the student's submitted answer, with feedback on what's right or wrong
+     - **"Help me solve it"** — AI explains the approach and shows a similar worked example
+   - AI explains the method and reasoning for the example problem
+   - AI NEVER provides the final answer to the actual homework problem
 
-4. **Solution Discovery**
-   - Student arrives at solution through own reasoning
-   - AI confirms correctness
-   - Session marked as "🎯 Guided problem-solving" in Library
+4. **Answer Verification**
+   - Student applies the explained approach to their problem
+   - Student submits their own answer for verification
+   - AI confirms correctness or points to the specific error
+   - Session marked as "Guided problem-solving" in Library
 
 5. **Parent Visibility**
    - Parent can review session
-   - Sees student did thinking, AI only guided
+   - Sees AI explained approach + student found solution
    - Trust reinforced: "App helps, doesn't cheat"
 
 **Success Indicators:**
-- Student solves problem independently
-- Parent sees guided process, not answer-giving
+- Student understands the approach and solves problem independently
+- Parent sees explanation-based guidance, not answer-giving
 - Student returns for future homework help
 - Retention maintained for underlying concepts
 
@@ -511,11 +512,11 @@ A user can learn ANY subject through AI-powered tutoring with personalized curri
 
 ### Internationalization
 
-**MVP:** English + German UI
-**Post-MVP:** Spanish, French, Polish UI translations
+**MVP:** English only UI
+**Post-MVP:** German, Spanish, French, Polish UI translations
 
 **Learning Languages:** ANY language can be taught (via LLM capability)
-**UI Languages:** English + German in v1.0
+**UI Language:** English only in v1.0
 
 #<<< MISSING: Translation workflows, locale-specific compliance requirements >>>
 
@@ -577,7 +578,7 @@ A user can learn ANY subject through AI-powered tutoring with personalized curri
 **Implementation:**
 - For multi-step problems: AI checks understanding at each step
 - For explanations: AI asks clarifying questions during learner's explanation
-- For homework help: Socratic guidance operates at step level, not problem level
+- For homework help: direct explanation and verification operates at step level, not problem level (FR228)
 
 ### Adaptive Difficulty (80% Success Target)
 
@@ -688,16 +689,20 @@ A user can learn ANY subject through AI-powered tutoring with personalized curri
 
 **Trigger:** System detects "help with this problem" vs "teach me concept"
 
-**Workflow:**
+**Workflow (FR228 — direct explanation, not Socratic):**
 1. AI switches to homework integrity mode automatically
-2. Guides through solution: "What do you think the first step is?"
-3. Student explains thinking, AI prompts next step
-4. AI never provides final answers directly
-5. Session marked as "Guided problem-solving" in Library
+2. Student chooses their approach:
+   - **"Check my answer"** — brief verification with targeted feedback on what is right or wrong
+   - **"Help me solve it"** — AI explains the approach and shows a similar worked example
+3. AI explains the reasoning/method using a similar (not identical) example problem
+4. Student applies the explanation to their own problem and submits an answer
+5. AI verifies the student's answer without providing the final answer first
+6. AI NEVER provides the final answer to the actual homework problem
+7. Session marked as "Guided problem-solving" in Library
 
 **Parent Visibility:**
 - All homework sessions flagged in Library
-- Parent can see: AI guidance provided / Student found solution / No answers given
+- Parent can see: AI explanation provided / Student found solution / No answers given
 - Full conversation history available for review
 
 ### Summary Quality & Skip Consequences
@@ -837,17 +842,17 @@ A user can learn ANY subject through AI-powered tutoring with personalized curri
 
 ### Application Type
 
-**Primary Classification:** Web Application + Mobile Application (cross-platform)
+**Primary Classification:** Mobile Application (iOS + Android) — v1.0. Web deferred (see note).
 
 **Platform Requirements:**
 - iOS (native application)
 - Android (native application)
-- Web (browser-based application)
+- Web (browser-based application) — **deferred, mobile only for v1.0**
 
 **Rationale:**
 - Mobile-first learning (users prefer apps over desktop)
 - Cross-platform reduces development overhead
-- Web access for desktop users and SEO
+- Web access for desktop users and SEO (planned for post-v1.0)
 
 ### Technical Category Requirements
 
@@ -860,8 +865,8 @@ A user can learn ANY subject through AI-powered tutoring with personalized curri
 **Session Recovery:**
 - Session state auto-saved after each AI exchange (not just at session end)
 - On reconnection: Show "Welcome back! Continue where you left off?" with last message displayed
-- If disconnected >30 minutes: Session marked as "paused", can resume from Library
-- If disconnected >24 hours: Session auto-closes, partial progress saved as "incomplete topic"
+- If disconnected >30 minutes: Session marked as "paused", can resume from Library *(Revised: sessions use adaptive silence handling with wall-clock display. No hard inactivity caps.)*
+- If disconnected >24 hours: Session auto-closes, partial progress saved as "incomplete topic" *(Revised: adaptive silence handling — no hard 24-hour auto-close cap)*
 
 **AI/LLM Integration:**
 - System must integrate with AI language model APIs for conversational teaching
@@ -958,7 +963,7 @@ A user can learn ANY subject through AI-powered tutoring with personalized curri
 
 ### User Management
 
-- FR1: Users can register using email/password, Google OAuth, Apple Sign-in, or OpenAI OAuth
+- FR1: Users can register using email/password, Google OAuth, or Apple Sign-in. OpenAI OAuth (Exploring — not yet implemented)
 - FR2: Users can verify email addresses to activate accounts
 - FR3: Users can reset passwords via email link
 - FR4: Users can create multiple learner profiles under single subscription (family accounts)
@@ -1034,13 +1039,13 @@ See also FR134-FR137 (Analogy Domain Preferences) for subject-level learning sty
 - FR29: Users can flag content that seems incorrect
 - FR30: Users can choose between "Learn something new" and "Get help with homework" modes
 - FR31: (Revised by FR228, Epic 14) Homework help uses direct explanation and verification — AI explains approaches, shows similar worked examples, and verifies student answers. Two modes per problem: "Check my answer" (brief verification) and "Help me solve it" (explain + similar example). AI never provides the final answer to the actual homework problem. Learning sessions retain Socratic guidance.
-- FR32: Users can photograph homework problems for AI analysis (v1.1)
+- FR32: Users can photograph homework problems for AI analysis (Implemented)
 - FR33: Users can see sessions marked as "guided problem-solving" in Library
 
 **Session Timeout Handling:**
-- After **5 minutes** inactivity: First soft prompt "Still there?"
-- After **10 minutes** inactivity: Second prompt "Your session will pause soon"
-- After **15 minutes** inactivity: Session auto-pauses, state saved
+- After **5 minutes** inactivity: First soft prompt "Still there?" *(Revised: adaptive silence handling replaces fixed timeout thresholds — see Session Recovery notes)*
+- After **10 minutes** inactivity: Second prompt "Your session will pause soon" *(Revised: adaptive silence handling)*
+- After **15 minutes** inactivity: Session auto-pauses, state saved *(Revised: adaptive silence handling)*
 - On return: "Welcome back! Continue where you left off?"
 - No penalty for timeout; session simply pauses
 
@@ -1391,7 +1396,7 @@ Realistic time expectations based on Foreign Service Institute research (for Eng
 
 - FR128: EVALUATE verification type — 8th verification type where AI presents deliberately flawed reasoning about a concept and student must identify the error. Targets Bloom's Taxonomy Level 5-6 (Evaluate/Create). Only triggers on topics with strong retention (easeFactor >= 2.5, repetitions > 0).
 - FR129: Strong-retention gating — EVALUATE challenges are never presented for new, weak, or fading topics. The verification selector checks retention card state before offering EVALUATE as an option.
-- FR130: Persona-appropriate framing — Teen (11-15): playful/competitive tone ("I think this explanation is right — can you prove me wrong?"). Learner (16+): academic/collaborative ("Here's a common explanation — what's the flaw in this reasoning?"). Uses existing `buildSystemPrompt()` persona voice system.
+- FR130: Age-appropriate framing — Child (&lt;13): playful/accessible tone ("I think this explanation is right — can you prove me wrong?"). Adolescent (13-17): engaging/competitive tone. Adult (18+): academic/collaborative ("Here's a common explanation — what's the flaw in this reasoning?"). Age bracket derived from birthYear at session time, not stored as a persona type. Uses existing `buildSystemPrompt()` persona voice system.
 - FR131: Difficulty calibration — EVALUATE difficulty tied to existing escalation rung system (1-4). Rung 1-2: obvious logical errors, clear factual mistakes. Rung 3-4: subtle misconceptions, plausible-but-wrong reasoning. `evaluateDifficultyRung` (integer 1-4, nullable, default null) stored on retention card alongside SM-2 state. Advances on consecutive success, demotes on failure.
 - FR132: Modified SM-2 scoring floor — EVALUATE failure maps to quality 2-3 (not 0-1). Rationale: missing a subtle flaw in presented reasoning ≠ not knowing the concept. Standard verification failure = quality 0-3. Without this floor, tricky EVALUATE challenges would tank retention scores unfairly. The SM-2 library (`packages/retention/`) math is unchanged — only the quality INPUT is different.
 - FR133: Three-strike escalation for EVALUATE — First failure: reveal the flaw with explanation (teach the analytical skill, not the concept). Second failure: lower difficulty rung, retry with more obvious flaw. Third consecutive failure: mark topic for standard review (not EVALUATE) — don't re-teach from scratch, the student knows the concept, just needs practice identifying flaws.
@@ -1414,12 +1419,13 @@ Realistic time expectations based on Foreign Service Institute research (for Eng
 | 3 | Subtle misconception | Conflating correlation with causation |
 | 4 | Plausible-but-wrong reasoning | Applying a rule correctly to the wrong domain |
 
-**Persona Framing:**
+**Age Framing (derived from birthYear, not a stored persona type):**
 
-| Persona | Opening Frame | Tone |
+| Age Bracket | Opening Frame | Tone |
 |---|---|---|
-| Teen (11-15) | "I think this explanation is right — can you prove me wrong?" | Playful/competitive |
-| Learner (16+) | "Here's a common explanation — what's the flaw in this reasoning?" | Academic/collaborative |
+| Child (&lt;13) | "I think this explanation is right — can you prove me wrong?" | Playful/accessible |
+| Adolescent (13-17) | "I think this is right — think you can spot what's wrong?" | Engaging/competitive |
+| Adult (18+) | "Here's a common explanation — what's the flaw in this reasoning?" | Academic/collaborative |
 
 **LLM Prompt Requirements:**
 The EVALUATE prompt template needs access to: (a) the topic's key concepts, (b) common misconceptions for that topic, (c) the student's current mastery level, (d) the current EVALUATE difficulty rung. The prompt must generate a plausible-but-wrong explanation calibrated to difficulty — too obviously wrong is useless, too subtle is frustrating.
@@ -1469,16 +1475,16 @@ The EVALUATE prompt template needs access to: (a) the topic's key concepts, (b) 
 
 | Tier | Monthly | Annual | Users | Questions/Month | Top-Up Price |
 |------|---------|--------|-------|-----------------|--------------|
-| **Free** | €0 | - | 1 | 50* | N/A |
-| **Plus** | €18.99 | €169 (26% off) | 1 | 500 | €10/500 |
-| **Family** | €28.99 | €259 (26% off) | Up to 4 | 1,500 shared | €5/500 |
-| **Pro** | €48.99 | €439 (25% off) | Up to 6 | 3,000 shared | €5/500 |
+| **Free** | €0 | - | 1 | 100* | N/A |
+| **Plus** | €18.99 | €168 (26% off) | 1 | 700 | €10/500 |
+| **Family** | €28.99 | €252 (26% off) | Up to 4 | 1,500 shared | €5/500 |
+| **Pro** | €48.99 | €432 (26% off) | Up to 6 | 3,000 shared | €5/500 |
 
 *\*Free tier includes first-week boost: 10 questions/day for days 1-7*
 
 **Free Tier:**
 - Unlimited onboarding (interview + curriculum generation)
-- 50 questions/month with first-week boost (10/day for days 1-7)
+- 100 questions/month with first-week boost (10/day for days 1-7)
 - Full feature access (no feature gating, only usage limits)
 - Progress tracking and Library (progress saved forever)
 - Top-ups not available (must upgrade)
@@ -1486,7 +1492,7 @@ The EVALUATE prompt template needs access to: (a) the topic's key concepts, (b) 
 - Est. LLM cost: ~€0.25/month per free user
 
 **Plus Tier:**
-- 500 questions/month for individual learner
+- 700 questions/month for individual learner (no daily limit)
 - Full feature access
 - Top-up credits: €10/500 questions
 - Target: Individual serious learners
@@ -1545,12 +1551,12 @@ The EVALUATE prompt template needs access to: (a) the topic's key concepts, (b) 
 |--------|--------------|-------------|---------|
 | Days 1-14 | Full Plus access | Up to 500/month | Experience full value |
 | Days 15-28 | Extended trial | 15 questions/day | Soft landing (friction without cliff) |
-| Day 29+ | Free tier | ~5/day (50/month) | Standard free limits |
+| Day 29+ | Free tier | ~3/day (100/month) | Standard free limits |
 
 **Soft Landing Messaging:**
 - Day 15: "Your trial ended, but we're giving you 15 questions/day for 2 more weeks"
 - Day 21: "1 week left of extended access — upgrade to keep learning without limits"
-- Day 28: "Tomorrow you'll move to Free (50 questions/month). Upgrade now?"
+- Day 28: "Tomorrow you'll move to Free (100 questions/month). Upgrade now?"
 
 **Trial Mechanics:**
 - Credit card required for trial (2.7x higher conversion)
@@ -1576,7 +1582,7 @@ The EVALUATE prompt template needs access to: (a) the topic's key concepts, (b) 
 
 | From | To | Trigger & Message |
 |------|-----|-------------------|
-| Free | Plus | User hits 50/month cap: "Upgrade for 10x more questions" |
+| Free | Plus | User hits 100/month cap: "Upgrade for 7x more questions" |
 | Plus | Family | User wants to add family member: "Add up to 3 more people, 3x the questions" |
 | Plus | Family | User buys 3+ top-ups: "You've spent €30 on top-ups. Family tier saves you money" |
 | Family | Pro | Need 5-6 users: "Need more seats? Pro includes up to 6 users" |
@@ -1684,10 +1690,10 @@ BYOK allows power users who already have AI subscriptions (Claude Pro, ChatGPT P
 
 | Model Tier | Cost/Question | Use Case |
 |------------|---------------|----------|
-| Gemini 1.5 Flash | €0.0007 | Simple Q&A, drills |
+| Gemini 2.5 Flash | €0.0007 | Simple Q&A, drills |
 | GPT-4o-mini | €0.0013 | Standard teaching |
 | GPT-4o | €0.022 | Complex reasoning |
-| Claude 3.5 Sonnet | €0.030 | Nuanced explanations |
+| Claude 3.5 Sonnet | €0.030 | Nuanced explanations (registered as provider; not actively routed for standard sessions) |
 
 **Cost Optimization Strategy:**
 - Multi-model routing based on query complexity
@@ -1712,7 +1718,7 @@ BYOK allows power users who already have AI subscriptions (Claude Pro, ChatGPT P
 
 | Requirement | MVP | Post-MVP |
 |-------------|-----|----------|
-| UI Languages | English + German | Spanish, French, Polish |
+| UI Languages | English only | German, Spanish, French, Polish |
 | Learning Languages | ANY (via LLM) | ANY (via LLM) |
 | Time Zones | UTC + user local | UTC + user local |
 | Currency | EUR | EUR, USD, GBP (based on region) |

@@ -12,7 +12,11 @@ const mockPush = jest.fn();
 const mockMutate = jest.fn();
 
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ back: mockBack, push: mockPush }),
+  useRouter: () => ({
+    back: mockBack,
+    push: mockPush,
+    canGoBack: jest.fn(() => true),
+  }),
   useLocalSearchParams: () => ({
     topicId: 'topic-1',
     subjectId: 'sub-1',

@@ -119,7 +119,9 @@ function usePostApprovalLanding(
     if (!profileId) return;
     setShouldShow(false);
     const key = `postApprovalSeen_${profileId}`;
-    void SecureStore.setItemAsync(key, 'true');
+    void SecureStore.setItemAsync(key, 'true').catch(() => {
+      /* non-fatal */
+    });
   }, [profileId]);
 
   return [checked && shouldShow, dismiss];
@@ -402,6 +404,8 @@ function CreateProfileGate(): React.ReactElement {
 function ConsentWithdrawnGate(): React.ReactElement {
   const insets = useSafeAreaInsets();
   const { signOut } = useClerk();
+  const queryClient = useQueryClient();
+  const [refreshing, setRefreshing] = React.useState(false);
 
   const handleSignOut = async () => {
     try {
@@ -412,6 +416,18 @@ function ConsentWithdrawnGate(): React.ReactElement {
       Alert.alert('Sign Out Failed', 'Please try again or restart the app.');
     }
   };
+
+  // BUG-114: Allow child to re-check consent status (e.g. parent cancelled deletion)
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await queryClient.invalidateQueries({ queryKey: ['consent-status'] });
+      await queryClient.invalidateQueries({ queryKey: ['profiles'] });
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   const { profiles, activeProfile, switchProfile } = useProfile();
   const { persona } = useTheme();
   const copy = getConsentWithdrawnCopy(persona);
@@ -437,6 +453,24 @@ function ConsentWithdrawnGate(): React.ReactElement {
       <Text className="text-body-sm text-text-muted mb-8 text-center">
         {copy.help}
       </Text>
+
+      {/* BUG-114: Refresh button so child can re-check if consent was restored */}
+      <Pressable
+        onPress={() => void handleRefresh()}
+        disabled={refreshing}
+        className="bg-primary rounded-button py-3.5 px-8 items-center mb-3 w-full"
+        testID="withdrawn-refresh-status"
+        accessibilityRole="button"
+        accessibilityLabel="Refresh status"
+      >
+        {refreshing ? (
+          <ActivityIndicator size="small" color="white" />
+        ) : (
+          <Text className="text-body font-semibold text-text-inverse">
+            Refresh status
+          </Text>
+        )}
+      </Pressable>
 
       {canSwitchFromConsentGate(activeProfile, profiles) && (
         <Pressable
@@ -1184,6 +1218,14 @@ export default function AppLayout() {
         />
         <Tabs.Screen
           name="shelf"
+          options={{
+            href: null,
+            tabBarItemStyle: { display: 'none' },
+            tabBarStyle: { display: 'none' },
+          }}
+        />
+        <Tabs.Screen
+          name="shelf/[subjectId]"
           options={{
             href: null,
             tabBarItemStyle: { display: 'none' },

@@ -2,6 +2,20 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useChildReports } from '../../../../hooks/use-progress';
+import { goBackOrReplace } from '../../../../lib/navigation';
+
+function getNextReportDate(): string {
+  const now = new Date();
+  // Monthly report cron runs 10:00 UTC on the 1st of each month
+  const nextRun = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 10, 0, 0)
+  );
+  return nextRun.toLocaleDateString(undefined, {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
 
 export default function ChildReportsScreen(): React.ReactElement {
   const router = useRouter();
@@ -28,7 +42,14 @@ export default function ChildReportsScreen(): React.ReactElement {
       >
         <View className="flex-row items-center mt-4">
           <Pressable
-            onPress={() => router.back()}
+            onPress={() =>
+              goBackOrReplace(
+                router,
+                profileId
+                  ? (`/(app)/child/${profileId}` as const)
+                  : ('/(app)/dashboard' as const)
+              )
+            }
             className="me-3 py-2 pe-2"
             accessibilityRole="button"
             accessibilityLabel="Go back"
@@ -82,7 +103,14 @@ export default function ChildReportsScreen(): React.ReactElement {
                 </Text>
               </Pressable>
               <Pressable
-                onPress={() => router.back()}
+                onPress={() =>
+                  goBackOrReplace(
+                    router,
+                    profileId
+                      ? (`/(app)/child/${profileId}` as const)
+                      : ('/(app)/dashboard' as const)
+                  )
+                }
                 className="bg-background rounded-button px-4 py-3 items-center flex-1 min-h-[48px] justify-center"
                 accessibilityRole="button"
                 accessibilityLabel="Go back"
@@ -138,10 +166,17 @@ export default function ChildReportsScreen(): React.ReactElement {
             </Pressable>
           ))
         ) : (
-          <View className="bg-surface rounded-card p-4 mt-4">
-            <Text className="text-body-sm text-text-secondary">
-              No monthly reports yet. They will appear here once a month after
-              there is enough learning activity to summarize.
+          <View
+            className="bg-surface rounded-card p-5 mt-4 items-center"
+            testID="child-reports-empty"
+          >
+            <Text className="text-4xl mb-3">📊</Text>
+            <Text className="text-h3 font-semibold text-text-primary text-center">
+              First report coming soon
+            </Text>
+            <Text className="text-body-sm text-text-secondary text-center mt-2">
+              Reports are generated on the 1st of each month. The first one will
+              appear around {getNextReportDate()}.
             </Text>
           </View>
         )}

@@ -477,7 +477,41 @@ export async function getBooks(
     orderBy: [asc(curriculumBooks.sortOrder), asc(curriculumBooks.createdAt)],
   });
 
-  return rows.map(mapBookRow);
+  if (rows.length === 0) return [];
+
+  // Batch: fetch all non-skipped topic IDs for all books in one query
+  const allTopicRows = await db
+    .select({ id: curriculumTopics.id, bookId: curriculumTopics.bookId })
+    .from(curriculumTopics)
+    .where(
+      and(
+        inArray(
+          curriculumTopics.bookId,
+          rows.map((b) => b.id)
+        ),
+        eq(curriculumTopics.skipped, false)
+      )
+    );
+
+  const topicsByBook = new Map<string, string[]>();
+  for (const t of allTopicRows) {
+    const existing = topicsByBook.get(t.bookId) ?? [];
+    existing.push(t.id);
+    topicsByBook.set(t.bookId, existing);
+  }
+
+  const statusResults = await Promise.all(
+    rows.map((book) =>
+      computeBookStatus(db, profileId, topicsByBook.get(book.id) ?? [])
+    )
+  );
+
+  return rows.map((book, i) => ({
+    ...mapBookRow(book),
+    status: statusResults[i]!.status,
+    topicCount: (topicsByBook.get(book.id) ?? []).length,
+    completedTopicCount: statusResults[i]!.completedTopicCount,
+  }));
 }
 
 export async function getBookWithTopics(

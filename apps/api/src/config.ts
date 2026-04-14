@@ -12,7 +12,10 @@ const envSchema = z.object({
   OPENAI_API_KEY: z.string().min(1).optional(),
   ANTHROPIC_API_KEY: z.string().min(1).optional(),
   APP_URL: z.string().url().default('https://www.mentomate.com'),
-  API_ORIGIN: z.string().url(), // Required — consent/settings routes throw 500 without it
+  // Optional outside production: only consent/settings email-link flows need it.
+  // Keeping it optional here prevents unrelated routes from failing globally
+  // in staging/dev deployments that are missing this binding.
+  API_ORIGIN: z.string().url().optional(),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
 
   // Stripe — optional. Dormant until web client added; mobile uses RevenueCat IAP.
@@ -58,8 +61,8 @@ const PRODUCTION_REQUIRED_KEYS: readonly (keyof Env)[] = [
   'GEMINI_API_KEY',
   'VOYAGE_API_KEY',
   'RESEND_API_KEY',
-  'REVENUECAT_WEBHOOK_SECRET',
   'API_ORIGIN',
+  'REVENUECAT_WEBHOOK_SECRET',
 ] as const;
 
 /**

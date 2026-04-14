@@ -12,7 +12,11 @@ const mockResolveSubjectMutateAsync = jest.fn();
 let mockSearchParams: Record<string, string> = {};
 
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ back: mockBack, replace: mockReplace }),
+  useRouter: () => ({
+    back: mockBack,
+    replace: mockReplace,
+    canGoBack: jest.fn(() => true),
+  }),
   useLocalSearchParams: () => mockSearchParams,
 }));
 
@@ -23,6 +27,9 @@ jest.mock('react-native-safe-area-context', () => ({
 jest.mock('../hooks/use-subjects', () => ({
   useCreateSubject: () => ({
     mutateAsync: mockCreateSubjectMutateAsync,
+  }),
+  useUpdateSubject: () => ({
+    mutateAsync: jest.fn().mockResolvedValue({ subject: {} }),
   }),
 }));
 
@@ -53,6 +60,43 @@ describe('CreateSubjectScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockSearchParams = {};
+  });
+
+  it('renders starter chips and fills the input on tap', () => {
+    render(<CreateSubjectScreen />);
+
+    // Chips container is visible
+    expect(screen.getByTestId('starter-chips')).toBeTruthy();
+
+    // "Math" chip is present and tappable
+    const mathChip = screen.getByTestId('starter-chip-Math');
+    expect(mathChip).toBeTruthy();
+
+    // Tapping fills the name input
+    fireEvent.press(mathChip);
+    expect(screen.getByTestId('create-subject-name').props.value).toBe('Math');
+  });
+
+  it('tapping a chip immediately triggers resolveInput', async () => {
+    mockResolveSubjectMutateAsync.mockResolvedValueOnce({
+      status: 'direct_match',
+      resolvedName: 'Math',
+      suggestions: [],
+      displayMessage: 'Math it is.',
+    });
+    mockCreateSubjectMutateAsync.mockResolvedValueOnce({
+      subject: { id: 'subject-math', name: 'Math' },
+    });
+
+    render(<CreateSubjectScreen />);
+
+    fireEvent.press(screen.getByTestId('starter-chip-Math'));
+
+    await waitFor(() => {
+      expect(mockResolveSubjectMutateAsync).toHaveBeenCalledWith({
+        rawInput: 'Math',
+      });
+    });
   });
 
   it('reveals the clarify input when Something else is pressed', async () => {
@@ -367,6 +411,78 @@ describe('CreateSubjectScreen', () => {
         params: { subjectId: 'subject-history' },
       });
     });
+  });
+
+  // ----------------------------------------------------------------
+  // BUG-3: Cancel and subject-limit buttons must route back to chat
+  // when the screen was opened from a session (returnTo=chat).
+  // ----------------------------------------------------------------
+  it('[BUG-3] Cancel button calls router.back() when returnTo=chat', () => {
+    mockSearchParams = { returnTo: 'chat' };
+
+    render(<CreateSubjectScreen />);
+
+    fireEvent.press(screen.getByTestId('create-subject-cancel'));
+
+    expect(mockBack).toHaveBeenCalled();
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('[BUG-3] subject-limit "Manage" button calls router.back() when returnTo=chat', async () => {
+    mockSearchParams = { returnTo: 'chat' };
+
+    mockResolveSubjectMutateAsync.mockResolvedValueOnce({
+      status: 'direct_match',
+      resolvedName: 'Math',
+      suggestions: [],
+      displayMessage: 'Math works.',
+    });
+    mockCreateSubjectMutateAsync.mockRejectedValueOnce(
+      new Error('You have reached the subject limit for your plan')
+    );
+
+    render(<CreateSubjectScreen />);
+
+    fireEvent.changeText(screen.getByTestId('create-subject-name'), 'Math');
+    fireEvent.press(screen.getByTestId('create-subject-submit'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('manage-subjects-button')).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByTestId('manage-subjects-button'));
+
+    expect(mockBack).toHaveBeenCalled();
+    expect(mockReplace).not.toHaveBeenCalledWith(
+      expect.stringContaining('library')
+    );
+  });
+
+  it('[BUG-3] subject-limit "Manage" button routes to library when no returnTo', async () => {
+    mockSearchParams = {};
+
+    mockResolveSubjectMutateAsync.mockResolvedValueOnce({
+      status: 'direct_match',
+      resolvedName: 'Math',
+      suggestions: [],
+      displayMessage: 'Math works.',
+    });
+    mockCreateSubjectMutateAsync.mockRejectedValueOnce(
+      new Error('You have reached the subject limit for your plan')
+    );
+
+    render(<CreateSubjectScreen />);
+
+    fireEvent.changeText(screen.getByTestId('create-subject-name'), 'Math');
+    fireEvent.press(screen.getByTestId('create-subject-submit'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('manage-subjects-button')).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByTestId('manage-subjects-button'));
+
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
   });
 
   it('[BUG-236] returns to chat session when returnTo=chat after subject creation', async () => {

@@ -71,9 +71,10 @@ export function useAllBooks(): {
         subjectName: subject.name,
         topicCount: 0,
         completedCount: 0,
-        status: (book.topicsGenerated
-          ? 'IN_PROGRESS'
-          : 'NOT_STARTED') as BookProgressStatus,
+        status: (book.status ??
+          (book.topicsGenerated
+            ? 'IN_PROGRESS'
+            : 'NOT_STARTED')) as BookProgressStatus,
       }));
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- dataKey is a stable proxy for bookQueries data changes

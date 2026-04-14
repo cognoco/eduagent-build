@@ -93,11 +93,13 @@ jest.mock('../services/vocabulary', () => ({
       consecutiveSuccesses: 1,
     },
   }),
+  deleteVocabulary: jest.fn().mockResolvedValue(true),
 }));
 
 import { app } from '../index';
 import {
   createVocabulary,
+  deleteVocabulary,
   listVocabulary,
   reviewVocabulary,
 } from '../services/vocabulary';
@@ -301,6 +303,74 @@ describe('vocabulary routes', () => {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ quality: 4 }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(401);
+    });
+  });
+
+  describe('DELETE /v1/subjects/:subjectId/vocabulary/:vocabularyId', () => {
+    it('returns 200 with success when item belongs to profile', async () => {
+      (deleteVocabulary as jest.Mock).mockResolvedValueOnce(true);
+
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/vocabulary/${VOCABULARY_ID}`,
+        {
+          method: 'DELETE',
+          headers: AUTH_HEADERS,
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.success).toBe(true);
+      expect(deleteVocabulary).toHaveBeenCalled();
+    });
+
+    it('returns 404 when vocabulary item does not exist', async () => {
+      (deleteVocabulary as jest.Mock).mockResolvedValueOnce(false);
+
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/vocabulary/${VOCABULARY_ID}`,
+        {
+          method: 'DELETE',
+          headers: AUTH_HEADERS,
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(404);
+    });
+
+    it('passes profileId and subjectId to service for IDOR protection', async () => {
+      (deleteVocabulary as jest.Mock).mockResolvedValueOnce(true);
+
+      await app.request(
+        `/v1/subjects/${SUBJECT_ID}/vocabulary/${VOCABULARY_ID}`,
+        {
+          method: 'DELETE',
+          headers: AUTH_HEADERS,
+        },
+        TEST_ENV
+      );
+
+      const [, profileId, subjectId, vocabularyId] = (
+        deleteVocabulary as jest.Mock
+      ).mock.calls[0];
+      expect(profileId).toBe('test-profile-id');
+      expect(subjectId).toBe(SUBJECT_ID);
+      expect(vocabularyId).toBe(VOCABULARY_ID);
+    });
+
+    it('returns 401 without auth header', async () => {
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/vocabulary/${VOCABULARY_ID}`,
+        {
+          method: 'DELETE',
         },
         TEST_ENV
       );

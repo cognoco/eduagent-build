@@ -15,6 +15,9 @@ import {
   type AgeBracket,
   type LearningMode,
   type HomeworkMode,
+  type InputMode,
+  type SessionType,
+  type VerificationType,
 } from '@eduagent/schemas';
 import { buildFourStrandsPrompt } from './language-prompts';
 import type { LLMTier } from './subscription';
@@ -31,7 +34,7 @@ export interface ExchangeContext {
   subjectName: string;
   topicTitle?: string;
   topicDescription?: string;
-  sessionType: 'learning' | 'homework' | 'interleaved';
+  sessionType: SessionType;
   escalationRung: EscalationRung;
   exchangeHistory: Array<{
     role: 'system' | 'user' | 'assistant';
@@ -54,7 +57,7 @@ export interface ExchangeContext {
     description?: string;
   }>;
   /** Verification type: standard (default), evaluate (Devil's Advocate), teach_back (Feynman) */
-  verificationType?: 'standard' | 'evaluate' | 'teach_back';
+  verificationType?: VerificationType;
   /** Preferred analogy domain for explanations (FR134-137) */
   analogyDomain?: string;
   /** Pedagogy mode for the subject */
@@ -81,6 +84,8 @@ export interface ExchangeContext {
   llmTier?: LLMTier;
   /** Original free-text input the learner typed when starting this session (CFLF) */
   rawInput?: string | null;
+  /** Input mode for this session — controls voice-optimized brevity in the system prompt */
+  inputMode?: InputMode;
 }
 
 /** Result of processing a single exchange */
@@ -389,7 +394,7 @@ export function buildSystemPrompt(context: ExchangeContext): string {
   // EVALUATE verification type — Devil's Advocate (FR128-133)
   if (context.verificationType === 'evaluate') {
     const rung = context.evaluateDifficultyRung ?? 1;
-    const rungDescription = getEvaluateRungDescription(rung as 1 | 2 | 3 | 4);
+    const rungDescription = getEvaluateRungDescription(rung);
     sections.push(
       "Session type: THINK DEEPER (Devil's Advocate)\n" +
         'Present a plausibly flawed explanation of the topic.\n' +
@@ -458,6 +463,17 @@ export function buildSystemPrompt(context: ExchangeContext): string {
         '- Use "Not yet" framing — the learner hasn\'t got it *yet*, and that is perfectly fine.\n' +
         '- Acknowledge effort and partial correctness before guiding further.\n' +
         '- When a learner repeats a question they asked before, answer it fresh. Do not reference that they "already asked this."'
+    );
+  }
+
+  // Voice-mode brevity constraint — MUST be last section so it overrides
+  // any earlier instructions that encourage longer explanations (FR256).
+  if (context.inputMode === 'voice') {
+    sections.push(
+      'VOICE MODE: The learner is using voice. Keep every response under 50 words. ' +
+        'Use natural spoken language — no bullet lists, no markdown, no headers. ' +
+        'One idea at a time. Ask one question max per turn. ' +
+        'Write as you would speak aloud.'
     );
   }
 
@@ -627,7 +643,7 @@ function getAgeVoice(ageBracket: AgeBracket): string {
 }
 
 function getSessionTypeGuidance(
-  sessionType: 'learning' | 'homework' | 'interleaved',
+  sessionType: SessionType,
   homeworkMode?: HomeworkMode,
   ageBracket: AgeBracket = 'adult'
 ): string {

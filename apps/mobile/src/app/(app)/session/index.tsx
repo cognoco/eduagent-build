@@ -13,9 +13,10 @@ import {
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type {
-  PendingCelebration,
   HomeworkCaptureSource,
   HomeworkProblem,
+  InputMode,
+  PendingCelebration,
 } from '@eduagent/schemas';
 import {
   ChatShell,
@@ -26,6 +27,7 @@ import {
   QuestionCounter,
   LibraryPrompt,
   SessionInputModeToggle,
+  QuotaExceededCard,
   type ChatMessage,
 } from '../../../components/session';
 import {
@@ -58,7 +60,11 @@ import {
   useMilestoneTracker,
 } from '../../../hooks/use-milestone-tracker';
 import { Ionicons } from '@expo/vector-icons';
-import { useApiClient } from '../../../lib/api-client';
+import {
+  useApiClient,
+  QuotaExceededError,
+  type QuotaExceededDetails,
+} from '../../../lib/api-client';
 import { formatApiError } from '../../../lib/format-api-error';
 import { useThemeColors } from '../../../lib/theme';
 import { NoteInput } from '../../../components/library/NoteInput';
@@ -70,6 +76,7 @@ import {
   readSessionRecoveryMarker,
   writeSessionRecoveryMarker,
 } from '../../../lib/session-recovery';
+import * as SecureStore from '../../../lib/secure-storage';
 import {
   buildHomeworkSessionMetadata,
   parseHomeworkProblems,
@@ -92,6 +99,9 @@ function computePaceMultiplier(
       : ratios[middle]!;
   return Math.min(3, Math.max(0.5, Number(median.toFixed(2))));
 }
+
+/** SecureStore key for persisting voice/text input mode preference per profile. */
+const getInputModeKey = (profileId: string) => `voice-input-mode-${profileId}`;
 
 function serializeMilestones(milestones: string[]): string {
   return encodeURIComponent(JSON.stringify(milestones));
@@ -253,36 +263,51 @@ function isReconnectableSessionError(error: unknown): boolean {
   // Known fatal API errors — never reconnectable
   if (
     errorHasCode(error, 'EXCHANGE_LIMIT_EXCEEDED') ||
-    errorHasCode(error, 'SUBJECT_INACTIVE') ||
-    errorHasStatus(error, 404)
+    errorHasCode(error, 'SUBJECT_INACTIVE')
   ) {
     return false;
+  }
+
+  // BUG-355: Classify by HTTP status code FIRST — structured data is always
+  // more reliable than string matching. 4xx = client error (never
+  // reconnectable), 5xx = server error (reconnectable).
+  const status =
+    typeof error === 'object' &&
+    error !== null &&
+    'status' in error &&
+    typeof (error as { status?: unknown }).status === 'number'
+      ? ((error as { status: number }).status as number)
+      : undefined;
+  if (status !== undefined) {
+    if (status >= 400 && status < 500) return false;
+    if (status >= 500) return true;
   }
 
   if (!(error instanceof Error)) {
     return false;
   }
 
-  // Structured type checks first — fetch throws TypeError for network failures
+  // Structured type checks — fetch throws TypeError for network failures
   // (DNS, offline, refused) and DOMException with name 'AbortError' for
   // aborted requests. These are stable across JS engines (Hermes, JSC, V8).
   if (error.name === 'TypeError' || error.name === 'AbortError') {
     return true;
   }
 
-  // Fallback: message matching for network errors that don't use standard
-  // error types (e.g. React Native polyfills, SSE wrappers). Must run BEFORE
-  // formatApiError transforms the message into user-facing copy.
+  // BUG-355: Last-resort message matching for RN polyfills and SSE wrappers
+  // that don't use standard error types. Must run BEFORE formatApiError
+  // transforms the message. Use specific phrases — bare 'network' or 'abort'
+  // can false-match on unrelated API error messages.
   const message = error.message.toLowerCase();
   return (
-    message.includes('network') ||
+    message.includes('network request failed') ||
+    message.includes('network error') ||
     message.includes('offline') ||
     message.includes('timed out') ||
     message.includes('server unreachable') ||
     message.includes('connection failed') ||
     message.includes('connection timed out') ||
-    message.includes('sse connection failed') ||
-    message.includes('abort')
+    message.includes('sse connection failed')
   );
 }
 
@@ -387,7 +412,33 @@ export default function SessionScreen() {
   } | null>(null);
   const [pendingSubjectResolution, setPendingSubjectResolution] =
     useState<PendingSubjectResolution | null>(null);
-  const [inputMode, setInputMode] = useState<'text' | 'voice'>('text');
+  const [inputMode, setInputMode] = useState<InputMode>('text');
+  // CR-9: Guard so profile refetches don't overwrite the user's in-session choice.
+  const hasRestoredInputModeRef = useRef(false);
+
+  // Restore the user's last-used input mode from SecureStore on mount.
+  useEffect(() => {
+    if (!activeProfile?.id) return;
+    // CR-9: Only restore once — ignore subsequent profile refetches.
+    if (hasRestoredInputModeRef.current) return;
+    let cancelled = false;
+    void SecureStore.getItemAsync(getInputModeKey(activeProfile.id))
+      .then((stored) => {
+        if (cancelled) return;
+        if (stored === 'voice' || stored === 'text') {
+          setInputMode(stored);
+        }
+        hasRestoredInputModeRef.current = true;
+      })
+      .catch(() => {
+        // Non-critical preference — silent fallback to 'text' default.
+        hasRestoredInputModeRef.current = true;
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeProfile?.id]);
+
   const [homeworkProblemsState, setHomeworkProblemsState] = useState<
     HomeworkProblem[]
   >(initialHomeworkProblems);
@@ -420,6 +471,9 @@ export default function SessionScreen() {
   const [showNoteInput, setShowNoteInput] = useState(false);
   const [showFilingPrompt, setShowFilingPrompt] = useState(false);
   const [filingDismissed, setFilingDismissed] = useState(false);
+  const [quotaError, setQuotaError] = useState<QuotaExceededDetails | null>(
+    null
+  );
 
   const sessionNoteSavedRef = useRef(false);
   const closedSessionRef = useRef<{
@@ -458,6 +512,10 @@ export default function SessionScreen() {
     hydrate,
     reset: resetMilestones,
   } = useMilestoneTracker();
+  // BUG-350: Ref mirrors trackerState so silence timer always reads the
+  // current value, not a stale closure capture from when setTimeout was created.
+  const trackerStateRef = useRef(trackerState);
+  trackerStateRef.current = trackerState;
   const { CelebrationOverlay, trigger } = useCelebration({
     celebrationLevel,
     audience: 'child',
@@ -479,7 +537,8 @@ export default function SessionScreen() {
       setClassifyError(null);
       setClassifiedSubject(null);
       setPendingSubjectResolution(null);
-      setInputMode('text');
+      // BUG-357: Don't reset inputMode to 'text' — preserve the user's
+      // stored preference (restored from SecureStore on mount).
       setDraftText('');
       setResumedBanner(false);
       setResponseHistory([]);
@@ -495,6 +554,7 @@ export default function SessionScreen() {
       setShowNoteInput(false);
       setShowFilingPrompt(false);
       setFilingDismissed(false);
+      setQuotaError(null);
       closedSessionRef.current = null;
       sessionNoteSavedRef.current = false;
       hasHydratedRecoveryRef.current = false;
@@ -666,22 +726,26 @@ export default function SessionScreen() {
     let cancelled = false;
 
     void (async () => {
-      const marker = await readSessionRecoveryMarker(activeProfile?.id);
-      if (cancelled || hasHydratedRecoveryRef.current) return;
+      try {
+        const marker = await readSessionRecoveryMarker(activeProfile?.id);
+        if (cancelled || hasHydratedRecoveryRef.current) return;
 
-      if (marker?.sessionId === routeSessionId && marker.milestoneTracker) {
-        hydrate(normalizeMilestoneTrackerState(marker.milestoneTracker));
-        hasHydratedRecoveryRef.current = true;
-        return;
-      }
+        if (marker?.sessionId === routeSessionId && marker.milestoneTracker) {
+          hydrate(normalizeMilestoneTrackerState(marker.milestoneTracker));
+          hasHydratedRecoveryRef.current = true;
+          return;
+        }
 
-      const transcriptMilestones =
-        transcript.data?.session.milestonesReached ?? [];
-      if (transcriptMilestones.length > 0) {
-        hydrate(
-          createMilestoneTrackerStateFromMilestones(transcriptMilestones)
-        );
-        hasHydratedRecoveryRef.current = true;
+        const transcriptMilestones =
+          transcript.data?.session.milestonesReached ?? [];
+        if (transcriptMilestones.length > 0) {
+          hydrate(
+            createMilestoneTrackerStateFromMilestones(transcriptMilestones)
+          );
+          hasHydratedRecoveryRef.current = true;
+        }
+      } catch {
+        /* SecureStore unavailable — skip recovery hydration */
       }
     })();
 
@@ -713,7 +777,7 @@ export default function SessionScreen() {
             updatedAt: new Date().toISOString(),
           },
           activeProfile?.id
-        );
+        ).catch(() => undefined);
       }
     });
 
@@ -777,11 +841,11 @@ export default function SessionScreen() {
             subjectName: effectiveSubjectName || undefined,
             topicId: topicId ?? undefined,
             mode: effectiveMode,
-            milestoneTracker: trackerState,
+            milestoneTracker: trackerStateRef.current,
             updatedAt: new Date().toISOString(),
           },
           activeProfile?.id
-        );
+        ).catch(() => undefined);
       }, thresholdMinutes * 60 * 1000);
     },
     [
@@ -792,7 +856,6 @@ export default function SessionScreen() {
       effectiveSubjectName,
       recordSystemPrompt,
       responseHistory,
-      trackerState,
       topicId,
     ]
   );
@@ -883,7 +946,10 @@ export default function SessionScreen() {
     },
     [
       activeSessionId,
-      activeProfile?.id,
+      // BUG-339: Removed activeProfile?.id — it is not read inside
+      // ensureSession. Including it caused the callback (and every downstream
+      // dependency like continueWithMessage) to be recreated on every profile
+      // refetch, risking dropped in-flight state.
       effectiveSubjectId,
       topicId,
       effectiveMode,
@@ -894,15 +960,23 @@ export default function SessionScreen() {
       currentProblemIndex,
       normalizedOcrText,
       homeworkCaptureSource,
-      inputMode,
       syncHomeworkMetadata,
     ]
   );
 
   const handleInputModeChange = useCallback(
-    (nextInputMode: 'text' | 'voice') => {
+    (nextInputMode: InputMode) => {
       const previousInputMode = inputMode;
       setInputMode(nextInputMode);
+
+      // Persist preference so next session restores it.
+      if (activeProfile?.id) {
+        void SecureStore.setItemAsync(
+          getInputModeKey(activeProfile.id),
+          nextInputMode
+        ).catch(() => undefined);
+      }
+
       if (!activeSessionId) {
         return;
       }
@@ -913,7 +987,13 @@ export default function SessionScreen() {
           showConfirmation("Couldn't save that mode just now.");
         });
     },
-    [activeSessionId, inputMode, setSessionInputMode, showConfirmation]
+    [
+      activeProfile?.id,
+      activeSessionId,
+      inputMode,
+      setSessionInputMode,
+      showConfirmation,
+    ]
   );
 
   const openSubjectResolution = useCallback(
@@ -1010,7 +1090,9 @@ export default function SessionScreen() {
               sessionSubjectName ?? effectiveSubjectName ?? undefined,
             topicId: topicId ?? undefined,
             mode: effectiveMode,
-            milestoneTracker: trackerState,
+            // CR-2: Read from ref so this callback doesn't re-create on every
+            // milestone tracker tick (stale closure fix).
+            milestoneTracker: trackerStateRef.current,
             updatedAt: new Date().toISOString(),
           },
           activeProfile?.id
@@ -1130,6 +1212,40 @@ export default function SessionScreen() {
             : undefined
         );
       } catch (err: unknown) {
+        // Detect quota before reconnect classification — QuotaExceededError is
+        // never reconnectable and needs a structured card, not a text bubble.
+        if (err instanceof QuotaExceededError) {
+          setIsStreaming(false);
+          setQuotaError(err.details);
+          if (streamId) {
+            setMessages((prev) =>
+              prev.map((message) =>
+                message.id === streamId
+                  ? {
+                      ...message,
+                      content: '',
+                      streaming: false,
+                      kind: 'quota_exceeded' as const,
+                      isSystemPrompt: true,
+                    }
+                  : message
+              )
+            );
+          } else {
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: createLocalMessageId('ai'),
+                role: 'assistant',
+                content: '',
+                isSystemPrompt: true,
+                kind: 'quota_exceeded' as const,
+              },
+            ]);
+          }
+          return;
+        }
+
         const reconnectable = isReconnectableSessionError(err);
         const formattedError = formatApiError(err);
         // [3B.1] Classify: timeout -> specific message, network -> reconnect, fatal -> server msg
@@ -1188,15 +1304,22 @@ export default function SessionScreen() {
       syncHomeworkMetadata,
       topicId,
       trackExchange,
-      trackerState,
+      // CR-2: trackerState removed — reads trackerStateRef.current inside body.
+      // CR-3: Removed duplicate createLocalMessageId entry.
       trigger,
-      createLocalMessageId,
     ]
   );
 
   const handleReconnect = useCallback(
     async (messageId: string) => {
-      if (!lastRetryPayloadRef.current || isStreaming || sessionExpired) {
+      // CR-5: Also guard on quotaError — reconnecting into a quota wall just
+      // replays the send that will fail again immediately.
+      if (
+        !lastRetryPayloadRef.current ||
+        isStreaming ||
+        sessionExpired ||
+        quotaError
+      ) {
         return;
       }
 
@@ -1217,7 +1340,7 @@ export default function SessionScreen() {
       });
       await continueWithMessage(retryPayload.text, retryPayload.options);
     },
-    [continueWithMessage, isStreaming, sessionExpired]
+    [continueWithMessage, isStreaming, sessionExpired, quotaError]
   );
 
   const handleResolveSubject = useCallback(
@@ -1249,6 +1372,59 @@ export default function SessionScreen() {
       isStreaming,
       pendingClassification,
       pendingSubjectResolution,
+    ]
+  );
+
+  // Create a new subject from a resolve API suggestion
+  const handleCreateResolveSuggestion = useCallback(
+    async (suggestion: {
+      name: string;
+      description: string;
+      focus?: string;
+    }) => {
+      if (isStreaming || pendingClassification || !pendingSubjectResolution)
+        return;
+
+      const originalText = pendingSubjectResolution.originalText;
+      setPendingSubjectResolution(null);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: createLocalMessageId('ai'),
+          role: 'assistant',
+          content: `Adding ${suggestion.name} and getting started...`,
+          isSystemPrompt: true,
+        },
+      ]);
+
+      try {
+        const result = await createSubject.mutateAsync({
+          name: suggestion.name,
+          rawInput: suggestion.focus ?? originalText,
+        });
+        setClassifiedSubject({
+          subjectId: result.subject.id,
+          subjectName: result.subject.name,
+        });
+        setShowWrongSubjectChip(false);
+        await continueWithMessage(originalText, {
+          sessionSubjectId: result.subject.id,
+          sessionSubjectName: result.subject.name,
+        });
+      } catch {
+        showConfirmation(
+          `Could not create ${suggestion.name}. Please try again or pick an existing subject.`
+        );
+      }
+    },
+    [
+      continueWithMessage,
+      createLocalMessageId,
+      createSubject,
+      isStreaming,
+      pendingClassification,
+      pendingSubjectResolution,
+      showConfirmation,
     ]
   );
 
@@ -1306,8 +1482,10 @@ export default function SessionScreen() {
   ]);
 
   const handleSend = useCallback(
-    async (text: string) => {
-      if (isStreaming || pendingClassification) return;
+    async (text: string, opts?: { isAutoSent?: boolean }) => {
+      // CR-1: Guard on quotaError so programmatic callers (quick chips, homework
+      // auto-send, queued problems) can't bypass the UI-disabled input guard.
+      if (isStreaming || pendingClassification || quotaError) return;
       if (pendingSubjectResolution) {
         showConfirmation("Pick the subject first, then I'll keep going.");
         return;
@@ -1315,7 +1493,12 @@ export default function SessionScreen() {
 
       setMessages((prev) => [
         ...prev,
-        { id: createLocalMessageId('user'), role: 'user', content: text },
+        {
+          id: createLocalMessageId('user'),
+          role: 'user',
+          content: text,
+          isAutoSent: opts?.isAutoSent,
+        },
       ]);
       setResumedBanner(false);
 
@@ -1347,7 +1530,27 @@ export default function SessionScreen() {
               },
             ]);
           } else if (effectiveMode === 'freeform') {
-            // Freeform: auto-pick the best candidate without prompting
+            // BUG-31: When multiple candidates exist, don't silently pick —
+            // ask the user which subject they meant. Single-candidate or
+            // zero-candidate cases still auto-pick for a frictionless start.
+            if (result.candidates.length > 1) {
+              const freeformCandidates = result.candidates.map((c) => ({
+                subjectId: c.subjectId,
+                subjectName: c.subjectName,
+              }));
+              const promptMessage = `This sounds like it could be ${freeformCandidates
+                .slice(0, 3)
+                .map((c) => c.subjectName)
+                .join(' or ')}. Which one are we working on?`;
+              openSubjectResolution(
+                text,
+                promptMessage,
+                freeformCandidates,
+                result.suggestedSubjectName
+              );
+              return;
+            }
+            // Single candidate or fallback to first enrolled subject
             const best =
               result.candidates[0] ??
               (availableSubjects[0]
@@ -1444,7 +1647,21 @@ export default function SessionScreen() {
           }
         } catch {
           if (effectiveMode === 'freeform') {
-            // Freeform: on classification failure, auto-pick first enrolled subject
+            // BUG-31: When classification fails and there are multiple enrolled
+            // subjects, show a picker instead of silently picking the first one.
+            if (availableSubjects.length > 1) {
+              const fallbackCandidates = availableSubjects.map((s) => ({
+                subjectId: s.id,
+                subjectName: s.name,
+              }));
+              openSubjectResolution(
+                text,
+                "I couldn't figure out the subject. Which one fits?",
+                fallbackCandidates
+              );
+              return;
+            }
+            // Single enrolled subject — auto-pick with "wrong subject?" chip
             const fallback = availableSubjects[0];
             if (fallback) {
               setClassifiedSubject({
@@ -1511,6 +1728,8 @@ export default function SessionScreen() {
     [
       isStreaming,
       pendingClassification,
+      // CR-1: quotaError added so the callback re-creates when quota state changes.
+      quotaError,
       pendingSubjectResolution,
       createLocalMessageId,
       subjectId,
@@ -1534,7 +1753,9 @@ export default function SessionScreen() {
     const queuedProblemText = queuedProblemTextRef.current;
     queuedProblemTextRef.current = null;
     const timer = setTimeout(() => {
-      void handleSend(queuedProblemText);
+      // BUG-373: Mark queued multi-problem sends as auto-sent so the
+      // voice/text toggle stays visible until the user deliberately types.
+      void handleSend(queuedProblemText, { isAutoSent: true });
     }, 0);
 
     return () => clearTimeout(timer);
@@ -1544,7 +1765,8 @@ export default function SessionScreen() {
     if (problemText && !routeSessionId && !hasAutoSentRef.current) {
       hasAutoSentRef.current = true;
       const timer = setTimeout(() => {
-        void handleSend(problemText);
+        // BUG-373: Mark homework auto-send as auto-sent
+        void handleSend(problemText, { isAutoSent: true });
       }, 500);
       return () => clearTimeout(timer);
     }
@@ -1658,67 +1880,91 @@ export default function SessionScreen() {
   const handleEndSession = useCallback(async () => {
     if (!activeSessionId || isClosing) return;
 
-    Alert.alert('Ready to wrap up?', 'Keep going or finish this session now.', [
-      { text: 'Keep Going', style: 'cancel' },
-      {
-        text: "I'm Done",
-        onPress: async () => {
-          setIsClosing(true);
-          try {
-            const result = await closeSession.mutateAsync({
-              reason: 'user_ended',
-              summaryStatus: 'pending',
-              milestonesReached,
-            });
-            const fastCelebrations = await fetchFastCelebrations();
-            await clearSessionRecoveryMarker(activeProfile?.id);
+    // BUG-352: Set isClosing immediately — before Alert.alert renders — so a
+    // second tap in the same render frame cannot pass the guard and produce a
+    // duplicate confirmation dialog.
+    setIsClosing(true);
 
-            // Store close result for deferred navigation
-            closedSessionRef.current = {
-              wallClockSeconds: result.wallClockSeconds,
-              fastCelebrations,
-            };
-
-            // Freeform/homework: show filing prompt before navigating
-            if (effectiveMode === 'freeform' || effectiveMode === 'homework') {
-              setShowFilingPrompt(true);
-            } else {
-              router.replace({
-                pathname: `/session-summary/${activeSessionId}`,
-                params: {
-                  subjectName: effectiveSubjectName ?? '',
-                  exchangeCount: String(exchangeCount),
-                  escalationRung: String(escalationRung),
-                  subjectId: effectiveSubjectId ?? '',
-                  topicId: topicId ?? '',
-                  wallClockSeconds: String(result.wallClockSeconds),
-                  milestones: serializeMilestones(milestonesReached),
-                  fastCelebrations: serializeCelebrations(fastCelebrations),
-                  sessionType: 'learning',
-                },
-              } as never);
-            }
-          } catch (err: unknown) {
-            setIsClosing(false);
-            Alert.alert(
-              'Could not end this session cleanly',
-              `${formatApiError(
-                err
-              )} You can keep trying, or go home now and come back later.`,
-              [
-                { text: 'Keep trying', style: 'cancel' },
-                {
-                  text: 'Go Home',
-                  onPress: () => {
-                    router.replace('/(app)/home' as never);
-                  },
-                },
-              ]
-            );
-          }
+    Alert.alert(
+      'Ready to wrap up?',
+      'Keep going or finish this session now.',
+      [
+        {
+          text: 'Keep Going',
+          style: 'cancel',
+          onPress: () => setIsClosing(false),
         },
-      },
-    ]);
+        {
+          text: "I'm Done",
+          onPress: async () => {
+            try {
+              const result = await closeSession.mutateAsync({
+                reason: 'user_ended',
+                summaryStatus: 'pending',
+                milestonesReached,
+              });
+              const fastCelebrations = await fetchFastCelebrations();
+              await clearSessionRecoveryMarker(activeProfile?.id);
+
+              // Store close result for deferred navigation
+              closedSessionRef.current = {
+                wallClockSeconds: result.wallClockSeconds,
+                fastCelebrations,
+              };
+
+              // Freeform/homework: show filing prompt before navigating
+              if (
+                effectiveMode === 'freeform' ||
+                effectiveMode === 'homework'
+              ) {
+                setShowFilingPrompt(true);
+              } else {
+                router.replace({
+                  pathname: `/session-summary/${activeSessionId}`,
+                  params: {
+                    subjectName: effectiveSubjectName ?? '',
+                    exchangeCount: String(exchangeCount),
+                    escalationRung: String(escalationRung),
+                    subjectId: effectiveSubjectId ?? '',
+                    topicId: topicId ?? '',
+                    wallClockSeconds: String(result.wallClockSeconds),
+                    milestones: serializeMilestones(milestonesReached),
+                    fastCelebrations: serializeCelebrations(fastCelebrations),
+                    sessionType: 'learning',
+                  },
+                } as never);
+              }
+            } catch (err: unknown) {
+              // R-2: Do NOT reset isClosing here — keep End Session button
+              // disabled while the Alert is visible. Reset inside the callback.
+              Alert.alert(
+                'Could not end this session cleanly',
+                `${formatApiError(
+                  err
+                )} You can keep trying, or go home now and come back later.`,
+                [
+                  {
+                    text: 'Keep trying',
+                    style: 'cancel',
+                    onPress: () => setIsClosing(false),
+                  },
+                  {
+                    text: 'Go Home',
+                    onPress: () => {
+                      router.replace('/(app)/home' as never);
+                    },
+                  },
+                ]
+              );
+            }
+          },
+        },
+      ],
+      // BUG-352: Reset isClosing when the dialog is dismissed without choosing
+      // (e.g. Android back button). Without this the "I'm Done" button stays
+      // permanently disabled after a dismiss.
+      { cancelable: true, onDismiss: () => setIsClosing(false) }
+    );
   }, [
     activeSessionId,
     isClosing,
@@ -1951,8 +2197,10 @@ export default function SessionScreen() {
   // loads and sets exchangeCount > 0.
   const showEndSession = exchangeCount > 0 || !!routeSessionId;
 
+  // BUG-373: Exclude auto-sent messages (homework OCR, queued multi-problem)
+  // so the voice/text toggle stays visible until the user deliberately types.
   const userMessageCount = useMemo(
-    () => messages.filter((m) => m.role === 'user').length,
+    () => messages.filter((m) => m.role === 'user' && !m.isAutoSent).length,
     [messages]
   );
   const latestAiMessageId = useMemo(
@@ -2121,6 +2369,30 @@ export default function SessionScreen() {
               </Text>
             </Pressable>
           )}
+          {/* Render rich suggestions from the resolve API */}
+          {pendingSubjectResolution.resolveSuggestions?.map((suggestion) => (
+            <Pressable
+              key={suggestion.name}
+              onPress={() => void handleCreateResolveSuggestion(suggestion)}
+              disabled={
+                isStreaming || pendingClassification || createSubject.isPending
+              }
+              className="rounded-full bg-primary/20 px-4 py-2"
+              accessibilityRole="button"
+              accessibilityLabel={`Add ${suggestion.name} as a new subject`}
+              accessibilityState={{
+                disabled:
+                  isStreaming ||
+                  pendingClassification ||
+                  createSubject.isPending,
+              }}
+              testID={`subject-resolution-resolve-${suggestion.name}`}
+            >
+              <Text className="text-body-sm font-semibold text-primary">
+                {createSubject.isPending ? 'Adding...' : `+ ${suggestion.name}`}
+              </Text>
+            </Pressable>
+          ))}
           {/* BUG-236: Generic new-subject escape hatch — returns to chat after creation */}
           <Pressable
             onPress={() =>
@@ -2189,7 +2461,7 @@ export default function SessionScreen() {
                 {activeHomeworkProblem?.text.slice(0, 70) ?? ''}
               </Text>
             </View>
-            {currentProblemIndex < homeworkProblemsState.length - 1 && (
+            {currentProblemIndex < homeworkProblemsState.length - 1 ? (
               <Pressable
                 onPress={handleNextProblem}
                 className="rounded-full bg-primary/10 px-3 py-2"
@@ -2201,53 +2473,75 @@ export default function SessionScreen() {
                   Next problem
                 </Text>
               </Pressable>
+            ) : (
+              <Pressable
+                onPress={handleEndSession}
+                className="rounded-full bg-success/15 px-3 py-2"
+                testID="finish-homework-chip"
+                accessibilityRole="button"
+                accessibilityLabel="Finish homework session"
+              >
+                <Text className="text-body-sm font-semibold text-success">
+                  Finish homework
+                </Text>
+              </Pressable>
             )}
           </View>
         )}
-        <View className="flex-row px-4 py-3 gap-2">
-          <Pressable
-            onPress={() => setHomeworkMode('help_me')}
-            className={`flex-1 rounded-button py-2 items-center ${
-              homeworkMode === 'help_me' ? 'bg-primary' : 'bg-surface-elevated'
-            }`}
-            testID="homework-mode-help-me"
-            accessibilityRole="button"
-            accessibilityLabel="Help me solve it"
-            accessibilityState={{ selected: homeworkMode === 'help_me' }}
-          >
-            <Text
-              className={`text-body-sm font-semibold ${
+        {homeworkProblemsState.length > 0 ? (
+          <View className="flex-row px-4 py-3 gap-2">
+            <Pressable
+              onPress={() => setHomeworkMode('help_me')}
+              className={`flex-1 rounded-button py-2 items-center ${
                 homeworkMode === 'help_me'
-                  ? 'text-text-inverse'
-                  : 'text-text-primary'
+                  ? 'bg-primary'
+                  : 'bg-surface-elevated'
               }`}
+              testID="homework-mode-help-me"
+              accessibilityRole="button"
+              accessibilityLabel="Help me solve it"
+              accessibilityState={{ selected: homeworkMode === 'help_me' }}
             >
-              Help me solve it
-            </Text>
-          </Pressable>
-          <Pressable
-            onPress={() => setHomeworkMode('check_answer')}
-            className={`flex-1 rounded-button py-2 items-center ${
-              homeworkMode === 'check_answer'
-                ? 'bg-primary'
-                : 'bg-surface-elevated'
-            }`}
-            testID="homework-mode-check-answer"
-            accessibilityRole="button"
-            accessibilityLabel="Check my answer"
-            accessibilityState={{ selected: homeworkMode === 'check_answer' }}
-          >
-            <Text
-              className={`text-body-sm font-semibold ${
+              <Text
+                className={`text-body-sm font-semibold ${
+                  homeworkMode === 'help_me'
+                    ? 'text-text-inverse'
+                    : 'text-text-primary'
+                }`}
+              >
+                Help me solve it
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setHomeworkMode('check_answer')}
+              className={`flex-1 rounded-button py-2 items-center ${
                 homeworkMode === 'check_answer'
-                  ? 'text-text-inverse'
-                  : 'text-text-primary'
+                  ? 'bg-primary'
+                  : 'bg-surface-elevated'
               }`}
+              testID="homework-mode-check-answer"
+              accessibilityRole="button"
+              accessibilityLabel="Check my answer"
+              accessibilityState={{ selected: homeworkMode === 'check_answer' }}
             >
-              Check my answer
+              <Text
+                className={`text-body-sm font-semibold ${
+                  homeworkMode === 'check_answer'
+                    ? 'text-text-inverse'
+                    : 'text-text-primary'
+                }`}
+              >
+                Check my answer
+              </Text>
+            </Pressable>
+          </View>
+        ) : (
+          <View className="px-4 py-3" testID="homework-no-problems">
+            <Text className="text-body-sm text-text-secondary text-center">
+              No problems loaded. Type your question directly in the chat.
             </Text>
-          </Pressable>
-        </View>
+          </View>
+        )}
       </View>
     ) : undefined;
 
@@ -2276,6 +2570,14 @@ export default function SessionScreen() {
               Reconnect
             </Text>
           </Pressable>
+        );
+      }
+      if (message.kind === 'quota_exceeded' && quotaError) {
+        return (
+          <QuotaExceededCard
+            details={quotaError}
+            isOwner={activeProfile?.isOwner === true}
+          />
         );
       }
       return null;
@@ -2414,13 +2716,18 @@ export default function SessionScreen() {
           isOffline ||
           pendingClassification ||
           !!pendingSubjectResolution ||
-          sessionExpired
+          sessionExpired ||
+          !!quotaError ||
+          // CR-6: Disable input while session close is in flight.
+          isClosing
         }
         disabledReason={
           isOffline
             ? "You're offline — input will return when you reconnect"
             : sessionExpired
             ? 'This session has ended'
+            : quotaError
+            ? 'Your session limit has been reached'
             : undefined
         }
         verificationType={
@@ -2433,7 +2740,6 @@ export default function SessionScreen() {
         belowInput={sessionToolAccessory}
         onDraftChange={setDraftText}
         renderMessageActions={renderMessageActions}
-        initialVoiceEnabled={inputMode === 'voice'}
         speechRecognitionLanguage={languageVoiceLocale}
         textToSpeechLanguage={languageVoiceLocale}
         footer={
@@ -2605,7 +2911,7 @@ export default function SessionScreen() {
             {userMessageCount === 0 && (
               <SessionInputModeToggle
                 mode={inputMode}
-                onModeChange={setInputMode}
+                onModeChange={handleInputModeChange}
               />
             )}
             {modeConfig.showQuestionCount && (

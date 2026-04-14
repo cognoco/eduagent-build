@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -33,6 +33,11 @@ export default function PickBookScreen(): React.ReactElement {
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [customText, setCustomText] = useState('');
   const [showSkip, setShowSkip] = useState(false);
+
+  // BUG-361: Synchronous mutex — filing.isPending has React batching delay,
+  // so an alert "Try again" callback and a "Go" button tap in the same frame
+  // can both pass the isPending guard. The ref is checked and set atomically.
+  const filingInFlight = useRef(false);
 
   const handleBack = useCallback(() => {
     if (subjectId) {
@@ -76,15 +81,18 @@ export default function PickBookScreen(): React.ReactElement {
   ]);
 
   const handlePickSuggestion = async (suggestion: BookSuggestion) => {
-    // BUG-323: Guard against concurrent filing calls — alert retry
-    // can fire while a previous mutateAsync is still in-flight.
-    if (filing.isPending) return;
+    // BUG-323 + BUG-361: Double guard — isPending (React state) + ref lock
+    // (synchronous). The ref closes the window between mutation error and
+    // the next render where both Alert retry and the Go button can fire.
+    if (filing.isPending || filingInFlight.current) return;
+    filingInFlight.current = true;
     try {
       const result = await filing.mutateAsync({
         rawInput: suggestion.title,
         selectedSuggestion: suggestion.title,
         pickedSuggestionId: suggestion.id,
       });
+      filingInFlight.current = false;
       router.push({
         pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
         params: {
@@ -93,6 +101,7 @@ export default function PickBookScreen(): React.ReactElement {
         },
       } as never);
     } catch {
+      filingInFlight.current = false;
       Alert.alert(
         'Something went wrong',
         "Couldn't set up that book. Try again?",
@@ -109,8 +118,9 @@ export default function PickBookScreen(): React.ReactElement {
 
   const handleCustomSubmit = async () => {
     const trimmed = customText.trim();
-    // BUG-323: Guard against concurrent filing calls
-    if (!trimmed || filing.isPending) return;
+    // BUG-323 + BUG-361: Double guard — isPending + ref lock
+    if (!trimmed || filing.isPending || filingInFlight.current) return;
+    filingInFlight.current = true;
     try {
       // M-10: Include subject name as context so the filing LLM places
       // the custom topic within the correct shelf/subject.
@@ -118,6 +128,7 @@ export default function PickBookScreen(): React.ReactElement {
         rawInput: trimmed,
         selectedSuggestion: subject?.name ?? null,
       });
+      filingInFlight.current = false;
       router.push({
         pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
         params: {
@@ -126,6 +137,7 @@ export default function PickBookScreen(): React.ReactElement {
         },
       } as never);
     } catch (err) {
+      filingInFlight.current = false;
       Alert.alert('Something went wrong', formatApiError(err), [
         { text: 'Try again', onPress: () => void handleCustomSubmit() },
         { text: 'Go back', onPress: handleBack },
@@ -301,7 +313,9 @@ export default function PickBookScreen(): React.ReactElement {
                 onPress={() => void handleCustomSubmit()}
                 disabled={!customText.trim() || filing.isPending}
                 className="flex-1 bg-primary rounded-button py-3 items-center min-h-[48px] justify-center"
-                style={{ opacity: customText.trim() ? 1 : 0.5 }}
+                style={{
+                  opacity: customText.trim() && !filing.isPending ? 1 : 0.5,
+                }}
                 testID="pick-book-custom-submit"
               >
                 <Text className="text-text-inverse text-body font-semibold">

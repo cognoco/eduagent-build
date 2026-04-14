@@ -12,6 +12,8 @@ import {
   readSessionRecoveryMarker,
   type SessionRecoveryMarker,
 } from '../../lib/session-recovery';
+import { useContinueSuggestion } from '../../hooks/use-progress';
+import { useSubjects } from '../../hooks/use-subjects';
 import { useThemeColors } from '../../lib/theme';
 
 export default function LearnNewScreen(): React.ReactElement {
@@ -23,6 +25,8 @@ export default function LearnNewScreen(): React.ReactElement {
     useState<SessionRecoveryMarker | null>(null);
   const [expiredRecoveryMarker, setExpiredRecoveryMarker] =
     useState<SessionRecoveryMarker | null>(null);
+  const { data: continueSuggestion } = useContinueSuggestion();
+  const { data: subjects } = useSubjects();
 
   const handleBack = () => {
     goBackOrReplace(router, '/(app)/home');
@@ -46,7 +50,9 @@ export default function LearnNewScreen(): React.ReactElement {
             setRecoveryMarker(null);
             setExpiredRecoveryMarker(marker);
             // Clear from storage — show the notice once, not forever
-            void clearSessionRecoveryMarker(activeProfile?.id);
+            void clearSessionRecoveryMarker(activeProfile?.id).catch(
+              () => undefined
+            );
           } else {
             setRecoveryMarker(null);
             setExpiredRecoveryMarker(null);
@@ -103,6 +109,43 @@ export default function LearnNewScreen(): React.ReactElement {
           onPress={() => router.push('/(app)/session?mode=freeform' as never)}
           testID="intent-freeform"
         />
+        {!recoveryMarker && continueSuggestion ? (
+          <IntentCard
+            title="Resume last session"
+            subtitle={continueSuggestion.subjectName}
+            onPress={() =>
+              router.push({
+                pathname: '/(app)/session',
+                params: {
+                  subjectId: continueSuggestion.subjectId,
+                  subjectName: continueSuggestion.subjectName,
+                  topicId: continueSuggestion.topicId,
+                  mode: 'learning',
+                },
+              } as never)
+            }
+            testID="intent-resume-last"
+          />
+        ) : null}
+        {!recoveryMarker &&
+        !continueSuggestion &&
+        subjects &&
+        subjects.length > 0 ? (
+          <IntentCard
+            title={`Continue with ${subjects[0]!.name}`}
+            onPress={() =>
+              router.push({
+                pathname: '/(app)/session',
+                params: {
+                  subjectId: subjects[0]!.id,
+                  subjectName: subjects[0]!.name,
+                  mode: 'learning',
+                },
+              } as never)
+            }
+            testID="intent-continue-subject"
+          />
+        ) : null}
         {recoveryMarker ? (
           <IntentCard
             title="Continue where you left off"

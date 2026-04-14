@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useStartRelearn } from '../../../hooks/use-retention';
 // Persona-conditional copy — documented exception, same pattern as (app)/home.tsx
 import { useTheme } from '../../../lib/theme';
+import { goBackOrReplace } from '../../../lib/navigation';
 import { formatApiError } from '../../../lib/format-api-error';
 
 const TEACHING_METHODS = [
@@ -164,7 +165,7 @@ export default function RelearnScreen() {
           Missing required parameters. Please go back and try again.
         </Text>
         <Pressable
-          onPress={() => router.back()}
+          onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
           className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center"
           accessibilityRole="button"
           accessibilityLabel="Go back"
@@ -183,7 +184,7 @@ export default function RelearnScreen() {
       {/* Header */}
       <View className="px-5 pt-4 pb-3 flex-row items-center">
         <Pressable
-          onPress={() => router.back()}
+          onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
           className="me-3 p-2 min-h-[44px] min-w-[44px] items-center justify-center"
           testID="relearn-back"
           accessibilityLabel="Go back"

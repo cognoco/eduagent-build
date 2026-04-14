@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -31,7 +31,10 @@ export default function ShelfScreen() {
   const booksQuery = useBooks(subjectId);
   const subjectsQuery = useSubjects();
 
-  const books = booksQuery.data ?? [];
+  // BUG-418: Use Array.isArray instead of ?? — TanStack Query's `select` is
+  // bypassed when `enabled` is false, so `data` can be a wrapped object rather
+  // than an array. The ?? operator only catches null/undefined, not objects.
+  const books = Array.isArray(booksQuery.data) ? booksQuery.data : [];
   const subject = subjectsQuery.data?.find((s) => s.id === subjectId);
 
   const { data: rawBookSuggestions } = useBookSuggestions(subjectId);
@@ -42,15 +45,23 @@ export default function ShelfScreen() {
     goBackOrReplace(router, '/(app)/library');
   }, [router]);
 
+  // R-1: Ref-based lock — backported from pick-book BUG-361 fix.
+  // isPending resets before Alert callbacks fire, allowing double-submission.
+  const filingInFlight = useRef(false);
+
   const handlePickBookSuggestion = async (suggestion: BookSuggestion) => {
-    // BUG-323: Guard against concurrent filing calls from alert retry
-    if (filing.isPending) return;
+    // BUG-323 + R-1: Double guard — isPending (React state) + ref lock
+    if (filing.isPending || filingInFlight.current) return;
+    filingInFlight.current = true;
     try {
       const result = await filing.mutateAsync({
         rawInput: suggestion.title,
         selectedSuggestion: suggestion.title,
         pickedSuggestionId: suggestion.id,
       });
+      // Reset the in-flight lock before navigating so a back-navigation
+      // doesn't leave filingInFlight permanently true. [CR-fix-3]
+      filingInFlight.current = false;
       // M-12: Pass autoStart so the book screen begins a session immediately
       router.push({
         pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
@@ -61,6 +72,7 @@ export default function ShelfScreen() {
         },
       } as never);
     } catch (err) {
+      filingInFlight.current = false;
       Alert.alert('Error', formatApiError(err), [
         {
           text: 'Try again',
@@ -72,8 +84,13 @@ export default function ShelfScreen() {
   };
 
   // Single-book auto-skip: navigate directly to the book screen
+  // BUG-354: One-shot guard — without this, every React Query refetch
+  // re-triggers the replace and bounces the user back after navigating away.
+  const autoSkippedRef = useRef(false);
   useEffect(() => {
+    if (autoSkippedRef.current) return;
     if (booksQuery.data && booksQuery.data.length === 1 && subjectId) {
+      autoSkippedRef.current = true;
       const onlyBook = booksQuery.data[0]!;
       router.replace({
         pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
@@ -125,20 +142,33 @@ export default function ShelfScreen() {
     void subjectsQuery.refetch();
   };
 
+  // Status is now server-computed and returned in the book object itself.
+  // Fall back to topicsGenerated heuristic only if status is absent (old cache).
   const getBookStatus = (bookId: string): BookProgressStatus => {
     const book = books.find((b) => b.id === bookId);
     if (!book) return 'NOT_STARTED';
+    if (book.status) return book.status;
     if (!book.topicsGenerated) return 'NOT_STARTED';
     return 'IN_PROGRESS';
   };
 
   const suggestedBookId = (() => {
+    const reviewDue = books.find((b) => getBookStatus(b.id) === 'REVIEW_DUE');
+    if (reviewDue) return reviewDue.id;
     const inProgress = books.find((b) => getBookStatus(b.id) === 'IN_PROGRESS');
     if (inProgress) return inProgress.id;
     const notStarted = books.find((b) => getBookStatus(b.id) === 'NOT_STARTED');
     if (notStarted) return notStarted.id;
     return null;
   })();
+
+  // Aggregate progress from all books on this shelf
+  const totalTopics = books.reduce((sum, b) => sum + (b.topicCount ?? 0), 0);
+  const completedTopics = books.reduce(
+    (sum, b) => sum + (b.completedTopicCount ?? 0),
+    0
+  );
+  const showProgress = totalTopics > 0;
 
   if (isLoading) {
     return (
@@ -227,6 +257,27 @@ export default function ShelfScreen() {
           <Text className="text-body-sm text-text-secondary mt-1">
             {books.length} {books.length === 1 ? 'book' : 'books'}
           </Text>
+          {showProgress && (
+            <View className="mt-2">
+              <Text
+                className="text-caption text-text-secondary mb-1"
+                testID="shelf-progress-label"
+              >
+                {completedTopics}/{totalTopics} topics
+              </Text>
+              <View className="h-1.5 bg-surface-elevated rounded-full overflow-hidden">
+                <View
+                  className="h-full bg-primary rounded-full"
+                  style={{
+                    width: `${Math.round(
+                      (completedTopics / totalTopics) * 100
+                    )}%`,
+                  }}
+                  testID="shelf-progress-bar"
+                />
+              </View>
+            </View>
+          )}
         </View>
 
         <Pressable

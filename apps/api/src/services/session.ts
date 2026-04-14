@@ -46,6 +46,9 @@ import type {
   LearningStyle,
   StrengthEntry,
   StruggleEntry,
+  InputMode,
+  SessionType,
+  VerificationType,
 } from '@eduagent/schemas';
 import {
   processExchange,
@@ -520,7 +523,7 @@ function mapSessionRow(
       ? (row.metadata as SessionMetadata)
       : undefined;
   const inputMode =
-    (row.inputMode as 'text' | 'voice') ?? metadata?.inputMode ?? 'text';
+    (row.inputMode as InputMode) ?? metadata?.inputMode ?? 'text';
 
   return {
     id: row.id,
@@ -528,8 +531,7 @@ function mapSessionRow(
     topicId: row.topicId ?? null,
     sessionType: row.sessionType,
     inputMode,
-    verificationType:
-      (row.verificationType as 'standard' | 'evaluate' | 'teach_back') ?? null,
+    verificationType: (row.verificationType as VerificationType) ?? null,
     status: row.status,
     escalationRung: row.escalationRung,
     exchangeCount: row.exchangeCount,
@@ -956,9 +958,12 @@ async function prepareExchangeContext(
       : [];
 
   // Determine verification type: explicit from session, or auto-select from retention card
-  let verificationType: 'standard' | 'evaluate' | 'teach_back' | undefined;
+  let verificationType: VerificationType | undefined;
   if (session.verificationType && session.verificationType !== 'standard') {
-    verificationType = session.verificationType as 'evaluate' | 'teach_back';
+    verificationType = session.verificationType as Exclude<
+      VerificationType,
+      'standard'
+    >;
   } else if (
     retentionCard &&
     !isInterleaved &&
@@ -1053,7 +1058,7 @@ async function prepareExchangeContext(
       repetitions: retentionCard.repetitions,
       failureCount: retentionCard.failureCount,
       consecutiveSuccesses: retentionCard.consecutiveSuccesses,
-      xpStatus: retentionCard.xpStatus as 'pending' | 'verified' | 'decayed',
+      xpStatus: retentionCard.xpStatus,
       nextReviewAt: retentionCard.nextReviewAt?.toISOString() ?? null,
       lastReviewedAt: retentionCard.lastReviewedAt?.toISOString() ?? null,
     };
@@ -1095,7 +1100,7 @@ async function prepareExchangeContext(
   const currentRung =
     session.exchangeCount === 0 && retentionStatusValue
       ? getRetentionAwareStartingRung(retentionStatusValue)
-      : (session.escalationRung as EscalationRung);
+      : session.escalationRung;
 
   const escalationDecision = evaluateEscalation(
     {
@@ -1197,7 +1202,7 @@ async function prepareExchangeContext(
     subjectName: subject?.name ?? 'Unknown',
     topicTitle: interleavedTopics ? undefined : topic?.title,
     topicDescription: interleavedTopics ? undefined : topic?.description,
-    sessionType: session.sessionType as 'learning' | 'homework' | 'interleaved',
+    sessionType: session.sessionType,
     escalationRung: effectiveRung,
     exchangeHistory,
     birthYear: profile?.birthYear ?? null,
@@ -1235,6 +1240,7 @@ async function prepareExchangeContext(
     llmTier: options?.llmTier,
     // CFLF: Original learner input so the LLM stays anchored to intent
     rawInput: session.rawInput,
+    inputMode: session.inputMode,
   };
 
   return { session, context, effectiveRung, hintCount, lastAiResponseAt };
@@ -1794,9 +1800,9 @@ export async function getSessionTranscript(
     sessionId: string;
     subjectId: string;
     topicId: string | null;
-    sessionType: 'learning' | 'homework' | 'interleaved';
-    inputMode: 'text' | 'voice';
-    verificationType?: 'standard' | 'evaluate' | 'teach_back' | null;
+    sessionType: SessionType;
+    inputMode: InputMode;
+    verificationType?: VerificationType | null;
     startedAt: string;
     exchangeCount: number;
     milestonesReached: string[];

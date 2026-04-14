@@ -103,9 +103,13 @@ export function ProfileProvider({
   // On mount: restore saved profile ID from SecureStore
   useEffect(() => {
     const restore = async () => {
-      const savedId = await SecureStore.getItemAsync(ACTIVE_PROFILE_KEY);
-      if (savedId) {
-        setActiveProfileId(savedId);
+      try {
+        const savedId = await SecureStore.getItemAsync(ACTIVE_PROFILE_KEY);
+        if (savedId) {
+          setActiveProfileId(savedId);
+        }
+      } catch {
+        /* SecureStore unavailable */
       }
       setIsRestoringId(false);
     };
@@ -125,7 +129,7 @@ export function ProfileProvider({
       }
       const owner = profiles.find((p) => p.isOwner) ?? profiles[0]!;
       setActiveProfileId(owner.id);
-      void SecureStore.setItemAsync(ACTIVE_PROFILE_KEY, owner.id);
+      void SecureStore.setItemAsync(ACTIVE_PROFILE_KEY, owner.id).catch(() => { /* non-fatal — in-memory activeProfileId is already set above */ });
     }
   }, [profiles, activeProfileId, isRestoringId]);
 
@@ -149,7 +153,11 @@ export function ProfileProvider({
           error: 'Network error while switching profile',
         };
       }
-      await SecureStore.setItemAsync(ACTIVE_PROFILE_KEY, profileId);
+      try {
+        await SecureStore.setItemAsync(ACTIVE_PROFILE_KEY, profileId);
+      } catch {
+        /* SecureStore write failed — profile switch proceeds in-memory */
+      }
       // State update LAST — triggers re-renders that change themeKey and
       // remount the navigation tree.  Callers should close modals before
       // awaiting this function to avoid navigation state corruption.

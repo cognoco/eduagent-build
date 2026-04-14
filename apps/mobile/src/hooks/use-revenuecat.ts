@@ -7,6 +7,7 @@
 
 import { useEffect, useRef } from 'react';
 import { Platform } from 'react-native';
+import * as Sentry from '@sentry/react-native';
 import Purchases from 'react-native-purchases';
 import type {
   CustomerInfo,
@@ -53,30 +54,62 @@ function isRevenueCatAvailable(): boolean {
 export function useRevenueCatIdentity(): void {
   const { isSignedIn, userId } = useAuth();
   const previousUserIdRef = useRef<string | null>(null);
+  const retryCountRef = useRef(0);
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const MAX_RETRIES = 2;
 
   useEffect(() => {
     if (!isRevenueCatAvailable()) return;
 
+    retryCountRef.current = 0;
+    let cancelled = false;
+
     const syncIdentity = async (): Promise<void> => {
+      if (cancelled) return;
       try {
         if (isSignedIn && userId) {
-          // Only logIn if the user changed
           if (previousUserIdRef.current !== userId) {
             await Purchases.logIn(userId);
+            if (cancelled) return;
             previousUserIdRef.current = userId;
+            retryCountRef.current = 0;
           }
         } else if (previousUserIdRef.current !== null) {
-          // User signed out — reset RevenueCat to anonymous
           await Purchases.logOut();
+          if (cancelled) return;
           previousUserIdRef.current = null;
+          retryCountRef.current = 0;
         }
-      } catch {
-        // Silently fail — RevenueCat identity sync is non-critical.
-        // The SDK falls back to anonymous user if logIn/logOut fails.
+      } catch (error) {
+        if (cancelled) return;
+        // BUG-393: Log failure instead of silently swallowing.
+        // RevenueCat falls back to anonymous, but we need visibility.
+        Sentry.addBreadcrumb({
+          category: 'revenuecat',
+          message: `Identity sync failed: ${
+            error instanceof Error ? error.message : 'unknown'
+          }`,
+          level: 'warning',
+          data: { userId, attempt: retryCountRef.current + 1 },
+        });
+
+        // Retry on transient failures (network issues, SDK init race)
+        if (retryCountRef.current < MAX_RETRIES) {
+          retryCountRef.current += 1;
+          retryTimerRef.current = setTimeout(() => void syncIdentity(), 3000);
+        }
       }
     };
 
     void syncIdentity();
+
+    return () => {
+      cancelled = true;
+      if (retryTimerRef.current) {
+        clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = null;
+      }
+    };
   }, [isSignedIn, userId]);
 }
 

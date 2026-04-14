@@ -12,6 +12,7 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '../../../lib/theme';
+import { goBackOrReplace } from '../../../lib/navigation';
 import {
   useCurriculum,
   useSkipTopic,
@@ -176,7 +177,7 @@ export default function CurriculumScreen() {
       {/* Header */}
       <View className="px-5 pt-4 pb-3 flex-row items-center justify-between">
         <Pressable
-          onPress={() => router.back()}
+          onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
           className="me-3 p-2 min-h-[44px] min-w-[44px] items-center justify-center"
           testID="curriculum-back"
         >

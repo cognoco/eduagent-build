@@ -1,3 +1,4 @@
+import type { InputMode } from '@eduagent/schemas';
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   AccessibilityInfo,
@@ -19,6 +20,7 @@ import { VoicePlaybackBar } from './VoicePlaybackBar';
 import { useSpeechRecognition } from '../../hooks/use-speech-recognition';
 import { useTextToSpeech } from '../../hooks/use-text-to-speech';
 import { useThemeColors } from '../../lib/theme';
+import { goBackOrReplace } from '../../lib/navigation';
 import { PenWritingAnimation } from '../common';
 
 export interface ChatMessage {
@@ -26,11 +28,15 @@ export interface ChatMessage {
   role: 'assistant' | 'user';
   content: string;
   streaming?: boolean;
-  kind?: 'reconnect_prompt' | 'session_expired';
+  kind?: 'reconnect_prompt' | 'session_expired' | 'quota_exceeded';
   escalationRung?: number;
   verificationBadge?: VerificationBadge;
   eventId?: string;
   isSystemPrompt?: boolean;
+  /** BUG-373: True for programmatically auto-sent messages (homework OCR, queued
+   *  multi-problem). Used to exclude from userMessageCount so the voice/text
+   *  toggle stays visible until the user deliberately sends a message. */
+  isAutoSent?: boolean;
 }
 
 interface ChatShellProps {
@@ -52,8 +58,8 @@ interface ChatShellProps {
   verificationType?: string;
   /** Explicit voice mode override from session-start input mode toggle (FR144). Takes precedence over verificationType. */
   initialVoiceEnabled?: boolean;
-  inputMode?: 'text' | 'voice';
-  onInputModeChange?: (mode: 'text' | 'voice') => void;
+  inputMode?: InputMode;
+  onInputModeChange?: (mode: InputMode) => void;
   speechRecognitionLanguage?: string;
   textToSpeechLanguage?: string;
   /** Compact controls rendered below the text input (e.g. Switch topic / Park it). */
@@ -142,6 +148,19 @@ export function ChatShell({
       : initialVoiceEnabled ?? verificationType === 'teach_back'
   );
 
+  // BUG-349: Sync voice state when inputMode prop changes after mount
+  // (useState only reads initial value once, so prop changes were ignored).
+  // Guard against the prev value to avoid an extra render on every mode toggle.
+  useEffect(() => {
+    if (inputMode) {
+      const shouldBeVoice = inputMode === 'voice';
+      if (isVoiceEnabled !== shouldBeVoice) {
+        setIsVoiceEnabled(shouldBeVoice);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inputMode]);
+
   // STT hook
   const {
     isListening,
@@ -169,13 +188,6 @@ export function ChatShell({
 
   // Track last spoken message id to avoid re-speaking
   const lastSpokenIdRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (inputMode == null) {
-      return;
-    }
-    setIsVoiceEnabled(inputMode === 'voice');
-  }, [inputMode]);
 
   useEffect(() => {
     scrollRef.current?.scrollToEnd({ animated: true });
@@ -220,12 +232,21 @@ export function ChatShell({
     speak(lastAiMessage.content);
   }, [messages, isVoiceEnabled, screenReaderEnabled, speak]);
 
+  // BUG-348: Stop TTS immediately when screen reader activates mid-session
+  useEffect(() => {
+    if (screenReaderEnabled && ttsPlaying) {
+      stopSpeaking();
+    }
+  }, [screenReaderEnabled, ttsPlaying, stopSpeaking]);
+
   const setVoiceEnabled = useCallback(
     (enabled: boolean) => {
       setIsVoiceEnabled(enabled);
+      // BUG-344: Stop TTS immediately when switching to text mode
+      if (!enabled) stopSpeaking();
       onInputModeChange?.(enabled ? 'voice' : 'text');
     },
-    [onInputModeChange]
+    [onInputModeChange, stopSpeaking]
   );
 
   const handleSend = useCallback(() => {
@@ -233,10 +254,11 @@ export function ChatShell({
     const text = input.trim();
     setInput('');
     onDraftChange?.('');
-    // Stop TTS when user sends a message
-    if (isVoiceEnabled) stopSpeaking();
+    // Stop TTS when user sends a message — unconditional so it works even
+    // if user switched to text mode while TTS was still playing (BUG-344)
+    stopSpeaking();
     onSend(text);
-  }, [input, isStreaming, onDraftChange, onSend, isVoiceEnabled, stopSpeaking]);
+  }, [input, isStreaming, onDraftChange, onSend, stopSpeaking]);
 
   // Voice record button toggle
   const handleVoicePress = useCallback(async () => {
@@ -256,8 +278,14 @@ export function ChatShell({
     }
   }, [isStreaming, isListening, stopListening, startListening, stopSpeaking]);
 
+  // BUG-359: Gate to prevent late STT updates from re-populating the
+  // transcript after the user taps Discard. Set on discard, cleared on
+  // re-record or new recording.
+  const discardedRef = useRef(false);
+
   // Sync transcript from STT hook to pending transcript when recording stops
   useEffect(() => {
+    if (discardedRef.current) return;
     if (!isListening && transcript.trim()) {
       setPendingTranscript(transcript);
     }
@@ -271,6 +299,7 @@ export function ChatShell({
     setPendingTranscript('');
     onDraftChange?.('');
     clearTranscript();
+    discardedRef.current = false;
   }, [
     pendingTranscript,
     isStreaming,
@@ -281,11 +310,13 @@ export function ChatShell({
   ]);
 
   const handleVoiceDiscard = useCallback(() => {
+    discardedRef.current = true;
     setPendingTranscript('');
     clearTranscript();
   }, [clearTranscript]);
 
   const handleVoiceReRecord = useCallback(async () => {
+    discardedRef.current = false;
     setPendingTranscript('');
     clearTranscript();
     stopSpeaking();
@@ -293,7 +324,7 @@ export function ChatShell({
   }, [clearTranscript, startListening, stopSpeaking]);
 
   const handleSelectInputMode = useCallback(
-    async (mode: 'text' | 'voice') => {
+    async (mode: InputMode) => {
       if (mode === 'text') {
         if (!isVoiceEnabled) {
           return;
@@ -368,7 +399,7 @@ export function ChatShell({
         style={{ paddingTop: insets.top + 8 }}
       >
         <Pressable
-          onPress={() => router.back()}
+          onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
           className="me-3 p-2 min-h-[44px] min-w-[44px] items-center justify-center"
           accessibilityLabel="Go back"
           accessibilityRole="button"
@@ -429,8 +460,10 @@ export function ChatShell({
         {footer}
       </ScrollView>
 
-      {/* VoicePlaybackBar — shown when voice is ON and input is active */}
-      {isVoiceEnabled && !inputDisabled && (
+      {/* BUG-348: Hide VoicePlaybackBar entirely when screen reader is active.
+          TTS controls compete with VoiceOver/TalkBack for the audio channel,
+          and the Replay button bypasses the auto-TTS suppression. */}
+      {isVoiceEnabled && !inputDisabled && !screenReaderEnabled && (
         <VoicePlaybackBar
           isSpeaking={ttsPlaying}
           isPaused={ttsPaused}
@@ -440,7 +473,6 @@ export function ChatShell({
           onResume={resumeSpeaking}
           onReplay={replay}
           onRateChange={setRate}
-          screenReaderEnabled={screenReaderEnabled}
         />
       )}
 

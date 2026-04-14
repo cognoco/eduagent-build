@@ -11,7 +11,10 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Profile } from '@eduagent/schemas';
 import { ProfileSwitcher } from '../common';
-import { useReviewSummary } from '../../hooks/use-progress';
+import {
+  useReviewSummary,
+  useContinueSuggestion,
+} from '../../hooks/use-progress';
 import { useSubjects } from '../../hooks/use-subjects';
 import { getGreeting } from '../../lib/greeting';
 import {
@@ -47,6 +50,7 @@ export function LearnerScreen({
   const colors = useThemeColors();
   const { data: subjects, isLoading, isError, refetch } = useSubjects();
   const { data: reviewSummary } = useReviewSummary();
+  const { data: continueSuggestion } = useContinueSuggestion();
   const [recoveryMarker, setRecoveryMarker] =
     useState<SessionRecoveryMarker | null>(null);
   const [recentlyExpiredSession, setRecentlyExpiredSession] = useState(false);
@@ -84,9 +88,9 @@ export function LearnerScreen({
     };
   }, [activeProfile?.id]);
 
-  const activeSubjects =
-    subjects?.filter((subject) => subject.status === 'active') ?? [];
-  const hasLibraryContent = activeSubjects.length > 0;
+  // Only show "Repeat & review" when the user has actual curriculum to revisit.
+  // continueSuggestion is null when no curricula exist (fresh subject, no topics yet).
+  const hasLibraryContent = continueSuggestion != null;
   const reviewDueCount = reviewSummary?.totalOverdue ?? 0;
   const { title, subtitle } = getGreeting(
     activeProfile?.displayName ?? '',

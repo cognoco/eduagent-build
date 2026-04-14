@@ -8,6 +8,7 @@ import {
 import { useChildSubjectTopics } from '../../../../../hooks/use-dashboard';
 import { useChildInventory } from '../../../../../hooks/use-progress';
 import { Button } from '../../../../../components/common/Button';
+import { goBackOrReplace } from '../../../../../lib/navigation';
 
 const COMPLETION_LABELS: Record<string, string> = {
   not_started: 'Not started',
@@ -60,10 +61,28 @@ export default function SubjectTopicsScreen() {
 
   if (!profileId || !subjectId) {
     return (
-      <View className="flex-1 bg-background items-center justify-center px-6">
-        <Text className="text-text-secondary text-body text-center">
-          Unable to load subject details.
+      <View
+        className="flex-1 bg-background items-center justify-center px-6"
+        style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
+        testID="child-subject-missing-params"
+      >
+        <Text className="text-h3 font-semibold text-text-primary text-center mb-2">
+          Subject not found
         </Text>
+        <Text className="text-text-secondary text-body text-center mb-6">
+          Unable to load subject details. Please go back and try again.
+        </Text>
+        <Pressable
+          onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
+          className="bg-primary rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+          testID="child-subject-missing-params-back"
+        >
+          <Text className="text-body font-semibold text-text-inverse">
+            Go back
+          </Text>
+        </Pressable>
       </View>
     );
   }
@@ -71,15 +90,15 @@ export default function SubjectTopicsScreen() {
   if (isError) {
     return (
       <View
-        style={{
-          flex: 1,
-          justifyContent: 'center',
-          alignItems: 'center',
-          padding: 24,
-        }}
+        className="flex-1 bg-background items-center justify-center px-6"
+        style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
+        testID="child-subject-error"
       >
-        <Text className="text-text-primary text-body mb-4">
+        <Text className="text-h3 font-semibold text-text-primary text-center mb-2">
           Could not load topics
+        </Text>
+        <Text className="text-body text-text-secondary text-center mb-6">
+          Something went wrong. Tap below to try again.
         </Text>
         <Button
           variant="primary"
@@ -87,6 +106,15 @@ export default function SubjectTopicsScreen() {
           onPress={() => refetch()}
           testID="retry-topics"
         />
+        <Pressable
+          onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
+          className="mt-3 py-3 px-6 min-h-[44px] items-center justify-center"
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+          testID="child-subject-error-back"
+        >
+          <Text className="text-body text-primary font-semibold">Go back</Text>
+        </Pressable>
       </View>
     );
   }
@@ -95,7 +123,7 @@ export default function SubjectTopicsScreen() {
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
       <View className="px-5 pt-4 pb-2 flex-row items-center">
         <Pressable
-          onPress={() => router.back()}
+          onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
           className="me-3 py-2 pe-2"
           accessibilityLabel="Go back"
           accessibilityRole="button"
@@ -171,9 +199,30 @@ export default function SubjectTopicsScreen() {
                 )}
             </Pressable>
           ))
+        ) : !topics ? (
+          // BUG-106: Data is undefined without isError — possible silent failure.
+          // Offer retry instead of misleading "No topics yet".
+          <View className="py-8 items-center" testID="topics-load-unknown">
+            <Text className="text-body text-text-secondary mb-3">
+              Topics could not be loaded. Tap to try again.
+            </Text>
+            <Pressable
+              onPress={() => refetch()}
+              className="bg-primary rounded-button px-5 py-2.5 items-center"
+              accessibilityRole="button"
+              accessibilityLabel="Retry loading topics"
+              testID="topics-retry-fallback"
+            >
+              <Text className="text-body font-semibold text-text-inverse">
+                Retry
+              </Text>
+            </Pressable>
+          </View>
         ) : (
-          <View className="py-8 items-center">
-            <Text className="text-body text-text-secondary">No topics yet</Text>
+          <View className="py-8 items-center" testID="topics-empty">
+            <Text className="text-body text-text-secondary">
+              No topics yet — start a learning session to explore this subject.
+            </Text>
           </View>
         )}
       </ScrollView>

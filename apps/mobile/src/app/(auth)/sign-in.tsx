@@ -535,7 +535,9 @@ export default function SignInScreen() {
       setPendingVerification(null);
       setVerificationOffer(null);
       setCode('');
-      void SecureStore.setItemAsync(HAS_SIGNED_IN_KEY, 'true');
+      void SecureStore.setItemAsync(HAS_SIGNED_IN_KEY, 'true').catch(() => {
+        /* non-fatal */
+      });
       // Don't navigate explicitly — the auth layout guard redirects to
       // /(app)/home once Clerk's useAuth() state propagates with
       // isSignedIn: true.  Calling router.replace() here races with Clerk's
@@ -588,7 +590,9 @@ export default function SignInScreen() {
           if (!activated) {
             return;
           }
-          void SecureStore.setItemAsync(HAS_SIGNED_IN_KEY, 'true');
+          void SecureStore.setItemAsync(HAS_SIGNED_IN_KEY, 'true').catch(() => {
+            /* non-fatal */
+          });
           // Auth layout guard handles navigation once isSignedIn propagates.
           return;
         }
@@ -1081,18 +1085,20 @@ export default function SignInScreen() {
           </View>
         ) : null}
 
-        <View className="mb-3">
-          <Button
-            variant="secondary"
-            label="Continue with Google"
-            onPress={() => onSSOPress('oauth_google')}
-            disabled={oauthLoading !== null}
-            loading={oauthLoading === 'oauth_google'}
-            testID="google-sso-button"
-          />
-        </View>
+        {Platform.OS !== 'ios' && (
+          <View className="mb-6">
+            <Button
+              variant="secondary"
+              label="Continue with Google"
+              onPress={() => onSSOPress('oauth_google')}
+              disabled={oauthLoading !== null}
+              loading={oauthLoading === 'oauth_google'}
+              testID="google-sso-button"
+            />
+          </View>
+        )}
 
-        {Platform.OS !== 'web' && (
+        {Platform.OS === 'ios' && (
           <View className="mb-6">
             <Button
               variant="secondary"

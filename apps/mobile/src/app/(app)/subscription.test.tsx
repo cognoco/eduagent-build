@@ -16,7 +16,11 @@ const mockBack = jest.fn();
 const mockPush = jest.fn();
 
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ back: mockBack, push: mockPush }),
+  useRouter: () => ({
+    back: mockBack,
+    push: mockPush,
+    canGoBack: jest.fn(() => true),
+  }),
 }));
 
 jest.mock('react-native-safe-area-context', () => ({
@@ -108,10 +112,9 @@ jest.mock('../../hooks/use-subscription', () => ({
   useFamilySubscription: () => ({
     data: mockFamilySubscription,
   }),
-  usePurchaseTopUp: () => ({
-    mutateAsync: jest.fn(),
-    isPending: false,
-  }),
+  // BUG-401: usePurchaseTopUp mock removed — it was dead code:
+  // (a) usePurchaseTopUp lives in use-subscription-stripe, not use-subscription
+  // (b) subscription.tsx never imports usePurchaseTopUp (uses usePurchase from RevenueCat)
   useJoinByokWaitlist: () => ({
     mutateAsync: mockMutateAsyncByokWaitlist,
     isPending: mockByokWaitlistIsPending,
@@ -875,6 +878,127 @@ describe('SubscriptionScreen', () => {
           'You learned 1 topic and earned 50 XP \u2014 great work!'
         )
       ).toBeTruthy();
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // BUG-401: Top-up flow tests
+  // ---------------------------------------------------------------------------
+
+  describe('top-up flow', () => {
+    const topUpPkg = makeMockPackage({
+      packageType: 'CUSTOM',
+      productOverrides: { identifier: 'mentomate_topup_500' },
+    });
+
+    function setupPaidTierWithTopUp() {
+      mockSubscription = { tier: 'plus', status: 'active' };
+      mockOfferings = makeMockOfferings([makeMockPackage(), topUpPkg]);
+    }
+
+    it('does not render top-up section for free tier users', () => {
+      mockSubscription = { tier: 'free', status: 'active' };
+      mockOfferings = makeMockOfferings([makeMockPackage()]);
+
+      render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+      expect(screen.queryByTestId('top-up-section')).toBeNull();
+    });
+
+    it('renders top-up section with "Buy 500 credits" for paid tier', () => {
+      setupPaidTierWithTopUp();
+
+      render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+      expect(screen.getByTestId('top-up-section')).toBeTruthy();
+      expect(screen.getByText('Buy 500 credits')).toBeTruthy();
+    });
+
+    it('shows error alert when no topup package is in offerings', async () => {
+      mockSubscription = { tier: 'plus', status: 'active' };
+      // Offerings with only a standard monthly package — no 'topup' identifier
+      mockOfferings = makeMockOfferings([makeMockPackage()]);
+
+      render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+      fireEvent.press(screen.getByTestId('top-up-button'));
+
+      await waitFor(() => {
+        expect(Alert.alert).toHaveBeenCalledWith(
+          'Error',
+          'Top-up package not available.'
+        );
+      });
+    });
+
+    it('silently dismisses when user cancels top-up purchase', async () => {
+      setupPaidTierWithTopUp();
+      const cancelError = {
+        code: '1',
+        message: 'User cancelled',
+        readableErrorCode: 'PURCHASE_CANCELLED_ERROR',
+        userInfo: { readableErrorCode: 'PURCHASE_CANCELLED_ERROR' },
+        underlyingErrorMessage: '',
+        userCancelled: true,
+      };
+      mockMutateAsyncPurchase.mockRejectedValue(cancelError);
+
+      render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+      fireEvent.press(screen.getByTestId('top-up-button'));
+
+      await waitFor(() => {
+        expect(mockMutateAsyncPurchase).toHaveBeenCalled();
+      });
+      expect(Alert.alert).not.toHaveBeenCalled();
+    });
+
+    it('shows network error alert on top-up network failure', async () => {
+      setupPaidTierWithTopUp();
+      const networkError = {
+        code: '10',
+        message: 'Network error',
+        readableErrorCode: 'NETWORK_ERROR',
+        userInfo: { readableErrorCode: 'NETWORK_ERROR' },
+        underlyingErrorMessage: '',
+        userCancelled: false,
+      };
+      mockMutateAsyncPurchase.mockRejectedValue(networkError);
+
+      render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+      fireEvent.press(screen.getByTestId('top-up-button'));
+
+      await waitFor(() => {
+        expect(Alert.alert).toHaveBeenCalledWith(
+          'Network error',
+          'Please check your internet connection and try again.'
+        );
+      });
+    });
+
+    it('shows generic "Purchase failed" alert on unknown top-up error', async () => {
+      setupPaidTierWithTopUp();
+      const genericError = {
+        code: '0',
+        message: 'Something went wrong',
+        readableErrorCode: 'UNKNOWN_ERROR',
+        userInfo: { readableErrorCode: 'UNKNOWN_ERROR' },
+        underlyingErrorMessage: '',
+        userCancelled: false,
+      };
+      mockMutateAsyncPurchase.mockRejectedValue(genericError);
+
+      render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+      fireEvent.press(screen.getByTestId('top-up-button'));
+
+      await waitFor(() => {
+        expect(Alert.alert).toHaveBeenCalledWith(
+          'Purchase failed',
+          'Something unexpected happened with your purchase. Please try again.'
+        );
+      });
     });
   });
 });

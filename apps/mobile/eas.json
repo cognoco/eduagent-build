@@ -36,8 +36,8 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://api-stg.mentomate.com",
-        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsubWVudG9tYXRlLmNvbSQ",
+        "EXPO_PUBLIC_API_URL": "https://mentomate-api-stg.zwizzly.workers.dev",
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_d2hvbGUtaWd1YW5hLTkuY2xlcmsuYWNjb3VudHMuZGV2JA",
         "EXPO_PUBLIC_SENTRY_DSN": "https://e9c5130b65e3f88c3ac6d738da1dc28e@o4509320773763072.ingest.de.sentry.io/4511082906452048",
         "SENTRY_DISABLE_AUTO_UPLOAD": "true"
       }

@@ -1,3 +1,4 @@
+import type { SessionType, InputMode } from '@eduagent/schemas';
 import { createDatabaseModuleMock } from '../test-utils/database-module';
 
 const mockDatabaseModule = createDatabaseModuleMock({
@@ -114,7 +115,7 @@ function mockSessionRow(
     id: string;
     subjectId: string;
     topicId: string | null;
-    sessionType: 'learning' | 'homework' | 'interleaved';
+    sessionType: SessionType;
     status: 'active' | 'paused' | 'completed' | 'auto_closed';
     escalationRung: number;
     exchangeCount: number;
@@ -123,7 +124,7 @@ function mockSessionRow(
     endedAt: Date | null;
     durationSeconds: number | null;
     wallClockSeconds: number | null;
-    inputMode: 'text' | 'voice';
+    inputMode: InputMode;
     metadata: Record<string, unknown>;
   }>
 ) {

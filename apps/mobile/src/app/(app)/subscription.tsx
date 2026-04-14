@@ -23,7 +23,10 @@ import type {
 import { PURCHASES_ERROR_CODE, PACKAGE_TYPE } from 'react-native-purchases';
 import { useQueryClient } from '@tanstack/react-query';
 import { useThemeColors } from '../../lib/theme';
+import { goBackOrReplace } from '../../lib/navigation';
 import { useProfile } from '../../lib/profile';
+import { useApiClient } from '../../lib/api-client';
+import { assertOk } from '../../lib/assert-ok';
 import { UsageMeter } from '../../components/common';
 import {
   useSubscription,
@@ -249,6 +252,9 @@ function PackageOption({
 
 const NOTIFY_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 hours
 
+// BUG-399: Account-scoped key — BYOK waitlist is per-account email, not per-profile.
+const BYOK_JOINED_KEY = 'byok-waitlist-joined';
+
 // Key renamed from colon to dash delimiter — colons caused SecureStore
 // crashes on some Android devices. See migrate-secure-store-key.ts.
 function getNotifyStorageKey(profileId: string): string {
@@ -303,24 +309,28 @@ function ChildPaywall(): React.ReactElement {
     if (!profileId) return;
     let cancelled = false;
     (async () => {
-      // Step 1: migrate legacy key → new key (no-ops if already migrated)
-      await migrateSecureStoreKey(
-        getLegacyNotifyStorageKey(profileId),
-        getNotifyStorageKey(profileId)
-      );
-      if (cancelled) return;
-      // Step 2: restore persisted notified timestamp
-      const value = await SecureStore.getItemAsync(
-        getNotifyStorageKey(profileId)
-      );
-      if (cancelled) return;
-      if (!value) return;
-      const ts = Number(value);
-      if (Number.isNaN(ts)) return;
-      const remaining = computeCooldownMsRemaining(ts);
-      if (remaining > 0) {
-        setNotifiedAt(ts);
-        setCooldownMsRemaining(remaining);
+      try {
+        // Step 1: migrate legacy key → new key (no-ops if already migrated)
+        await migrateSecureStoreKey(
+          getLegacyNotifyStorageKey(profileId),
+          getNotifyStorageKey(profileId)
+        );
+        if (cancelled) return;
+        // Step 2: restore persisted notified timestamp
+        const value = await SecureStore.getItemAsync(
+          getNotifyStorageKey(profileId)
+        );
+        if (cancelled) return;
+        if (!value) return;
+        const ts = Number(value);
+        if (Number.isNaN(ts)) return;
+        const remaining = computeCooldownMsRemaining(ts);
+        if (remaining > 0) {
+          setNotifiedAt(ts);
+          setCooldownMsRemaining(remaining);
+        }
+      } catch {
+        /* SecureStore unavailable */
       }
     })();
     return () => {
@@ -365,7 +375,7 @@ function ChildPaywall(): React.ReactElement {
           void SecureStore.setItemAsync(
             getNotifyStorageKey(profileId),
             String(now)
-          );
+          ).catch(() => undefined);
         }
       } else if (result.sent) {
         const now = Date.now();
@@ -374,7 +384,7 @@ function ChildPaywall(): React.ReactElement {
           void SecureStore.setItemAsync(
             getNotifyStorageKey(profileId),
             String(now)
-          );
+          ).catch(() => undefined);
         }
         Alert.alert('Sent!', 'We let your parent know!');
       } else {
@@ -402,7 +412,7 @@ function ChildPaywall(): React.ReactElement {
     >
       <View className="px-5 pt-4 pb-2 flex-row items-center">
         <Pressable
-          onPress={() => router.back()}
+          onPress={() => goBackOrReplace(router, '/(app)/more' as const)}
           className="me-3 min-w-[44px] min-h-[44px] justify-center items-center"
           accessibilityLabel="Go back"
           accessibilityRole="button"
@@ -524,6 +534,7 @@ export default function SubscriptionScreen() {
   const router = useRouter();
   const colors = useThemeColors();
   const { activeProfile } = useProfile();
+  const client = useApiClient();
 
   const queryClient = useQueryClient();
 
@@ -547,9 +558,32 @@ export default function SubscriptionScreen() {
   );
   const byokWaitlist = useJoinByokWaitlist();
 
+  // BUG-399: Persistent "already joined" flag for BYOK waitlist
+  const [byokJoined, setByokJoined] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const stored = await SecureStore.getItemAsync(BYOK_JOINED_KEY);
+        if (!cancelled && stored === 'true') {
+          setByokJoined(true);
+        }
+      } catch {
+        // SecureStore may throw on web or restricted environments
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Top-up IAP state
   const [topUpPurchasing, setTopUpPurchasing] = useState(false);
   const [topUpPolling, setTopUpPolling] = useState(false);
+
+  // BUG-403: ScrollView ref so the Upgrade button can scroll to offerings
+  const scrollViewRef = useRef<ScrollView>(null);
+  const offeringsYRef = useRef(0);
 
   // Track mount state so the top-up polling loop can bail out if the user
   // navigates away mid-poll (prevents setState-on-unmounted warnings and
@@ -568,8 +602,11 @@ export default function SubscriptionScreen() {
     isError: offeringsError,
     refetch: refetchOfferings,
   } = useOfferings();
-  const { data: customerInfo, isLoading: customerInfoLoading } =
-    useCustomerInfo();
+  const {
+    data: customerInfo,
+    isLoading: customerInfoLoading,
+    isError: customerInfoError,
+  } = useCustomerInfo();
   const purchase = usePurchase();
   const restore = useRestorePurchases();
 
@@ -640,10 +677,29 @@ export default function SubscriptionScreen() {
   // ---------------------------------------------------------------------------
 
   const handleManageBilling = useCallback(async () => {
+    const url =
+      Platform.OS === 'ios'
+        ? 'https://apps.apple.com/account/subscriptions'
+        : 'https://play.google.com/store/account/subscriptions';
     try {
       await openSubscriptionManagement();
     } catch {
-      Alert.alert('Error', 'Could not open subscription management.');
+      // BUG-400: Provide retry + fallback URL so the user isn't stuck.
+      Alert.alert(
+        'Could not open subscription management',
+        `You can manage your subscription directly at:\n${url}`,
+        [
+          {
+            text: 'Try again',
+            onPress: () => {
+              void openSubscriptionManagement().catch(() => {
+                // Second attempt also failed — user already has the URL from the alert.
+              });
+            },
+          },
+          { text: 'OK', style: 'cancel' },
+        ]
+      );
     }
   }, []);
 
@@ -655,8 +711,10 @@ export default function SubscriptionScreen() {
     // Find the top-up package from offerings
     // RevenueCat consumables can be in a separate offering or as a non-subscription package
     const topUpOffering = offerings?.all?.['top_up'] ?? offerings?.current;
-    const topUpPkg = topUpOffering?.availablePackages.find((p) =>
-      p.product.identifier.includes('topup')
+    const topUpPkg = topUpOffering?.availablePackages.find(
+      (p) =>
+        p.packageType === PACKAGE_TYPE.CUSTOM &&
+        p.product.identifier.includes('topup')
     );
 
     if (!topUpPkg) {
@@ -701,13 +759,28 @@ export default function SubscriptionScreen() {
       if (!mountedRef.current) break;
       await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
       if (!mountedRef.current) break;
-      await queryClient.invalidateQueries({ queryKey: ['usage'] });
-      // Brief wait for the query to refetch
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      // Use fetchQuery with staleTime: 0 to force a fresh network fetch and
+      // await the response directly — eliminates the 500ms sleep race where
+      // getQueryData could read a stale entry before invalidation propagated.
+      let freshUsage: { topUpCreditsRemaining: number } | undefined;
+      try {
+        freshUsage = await queryClient.fetchQuery<{
+          topUpCreditsRemaining: number;
+        }>({
+          queryKey: ['usage', activeProfile?.id],
+          staleTime: 0,
+          queryFn: async () => {
+            const res = await client.usage.$get({}, { init: {} });
+            await assertOk(res);
+            const data = await res.json();
+            return data.usage;
+          },
+        });
+      } catch {
+        // Network error during poll — continue to next attempt
+        continue;
+      }
       if (!mountedRef.current) break;
-      const freshUsage = queryClient.getQueryData<{
-        topUpCreditsRemaining: number;
-      }>(['usage', activeProfile?.id]);
       if (freshUsage && freshUsage.topUpCreditsRemaining > baseCredits) {
         confirmed = true;
         break;
@@ -756,6 +829,10 @@ export default function SubscriptionScreen() {
   const handleByokSubmit = useCallback(async () => {
     try {
       await byokWaitlist.mutateAsync();
+      setByokJoined(true);
+      void SecureStore.setItemAsync(BYOK_JOINED_KEY, 'true').catch(
+        () => undefined
+      );
       Alert.alert('Waitlist', 'You have been added to the BYOK waitlist.');
     } catch {
       Alert.alert('Error', 'Could not join waitlist. Try again.');
@@ -799,7 +876,7 @@ export default function SubscriptionScreen() {
     >
       <View className="px-5 pt-4 pb-2 flex-row items-center">
         <Pressable
-          onPress={() => router.back()}
+          onPress={() => goBackOrReplace(router, '/(app)/more' as const)}
           className="me-3 min-w-[44px] min-h-[44px] justify-center items-center"
           accessibilityLabel="Go back"
           accessibilityRole="button"
@@ -852,6 +929,7 @@ export default function SubscriptionScreen() {
         </View>
       ) : (
         <ScrollView
+          ref={scrollViewRef}
           className="flex-1 px-5"
           contentContainerStyle={{ flexGrow: 1, paddingBottom: 32 }}
         >
@@ -897,7 +975,11 @@ export default function SubscriptionScreen() {
               <Pressable
                 onPress={() => {
                   if (availablePackages.length > 0) {
-                    // RevenueCat packages available — scroll handled by layout
+                    // BUG-403: Scroll to the offerings section
+                    scrollViewRef.current?.scrollTo({
+                      y: offeringsYRef.current,
+                      animated: true,
+                    });
                   } else {
                     void refetchOfferings();
                   }
@@ -941,6 +1023,15 @@ export default function SubscriptionScreen() {
                   limit={usage.monthlyLimit}
                   warningLevel={usage.warningLevel}
                 />
+                {/* BUG-395: Show daily usage for free-tier users who have a daily cap */}
+                {usage.dailyLimit != null && (
+                  <View className="mt-2" testID="daily-usage">
+                    <Text className="text-caption text-text-secondary">
+                      Today: {usage.usedToday} / {usage.dailyLimit} daily
+                      questions
+                    </Text>
+                  </View>
+                )}
                 {usage.topUpCreditsRemaining > 0 && (
                   <Text className="text-caption text-text-secondary mt-2">
                     + {usage.topUpCreditsRemaining} top-up credits remaining
@@ -950,6 +1041,24 @@ export default function SubscriptionScreen() {
                   Resets {new Date(usage.cycleResetAt).toLocaleDateString()}
                 </Text>
               </View>
+              {/* BUG-395: Show daily quota for free-tier users */}
+              {usage.dailyLimit != null && (
+                <View
+                  className="bg-surface rounded-card px-4 py-3.5 mt-2"
+                  testID="daily-usage-card"
+                >
+                  <UsageMeter
+                    used={usage.usedToday}
+                    limit={usage.dailyLimit}
+                    warningLevel={
+                      usage.usedToday >= usage.dailyLimit ? 'exceeded' : 'none'
+                    }
+                  />
+                  <Text className="text-caption text-text-secondary mt-1">
+                    Daily limit — resets at midnight
+                  </Text>
+                </View>
+              )}
             </View>
           )}
 
@@ -982,7 +1091,12 @@ export default function SubscriptionScreen() {
 
           {/* RevenueCat Offerings — available packages */}
           {availablePackages.length > 0 && (
-            <View testID="offerings-section">
+            <View
+              testID="offerings-section"
+              onLayout={(e) => {
+                offeringsYRef.current = e.nativeEvent.layout.y;
+              }}
+            >
               <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2 mt-6">
                 Plans
               </Text>
@@ -1008,7 +1122,12 @@ export default function SubscriptionScreen() {
 
           {/* No offerings fallback — show static tier comparison when RevenueCat is unavailable */}
           {availablePackages.length === 0 && !offeringsLoading && (
-            <View testID="no-offerings">
+            <View
+              testID="no-offerings"
+              onLayout={(e) => {
+                offeringsYRef.current = e.nativeEvent.layout.y;
+              }}
+            >
               <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2 mt-6">
                 Plans
               </Text>
@@ -1174,7 +1293,8 @@ export default function SubscriptionScreen() {
           )}
 
           {/* Manage billing — deep links to platform subscription management */}
-          {hasActiveSubscription && (
+          {/* BUG-394: Fall back to API-side tier when RevenueCat fails */}
+          {(hasActiveSubscription || (customerInfoError && isPaidTier)) && (
             <View className="mt-6" testID="manage-section">
               <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2">
                 Manage
@@ -1210,9 +1330,15 @@ export default function SubscriptionScreen() {
               </Text>
               <Pressable
                 onPress={handleByokSubmit}
-                disabled={byokWaitlist.isPending}
-                className="bg-primary rounded-button px-4 py-2.5 items-center justify-center"
-                accessibilityLabel="Join BYOK waitlist"
+                disabled={byokWaitlist.isPending || byokJoined}
+                className={`rounded-button px-4 py-2.5 items-center justify-center ${
+                  byokJoined ? 'bg-surface-elevated' : 'bg-primary'
+                }`}
+                accessibilityLabel={
+                  byokJoined
+                    ? 'Already joined BYOK waitlist'
+                    : 'Join BYOK waitlist'
+                }
                 accessibilityRole="button"
                 testID="join-byok-waitlist-button"
               >
@@ -1222,6 +1348,10 @@ export default function SubscriptionScreen() {
                     color={colors.textInverse}
                     testID="join-byok-waitlist-loading"
                   />
+                ) : byokJoined ? (
+                  <Text className="text-text-secondary text-body font-semibold">
+                    Already joined
+                  </Text>
                 ) : (
                   <Text className="text-text-inverse text-body font-semibold">
                     Join Waitlist

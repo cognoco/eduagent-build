@@ -22,6 +22,8 @@ import { useCreateSubject, useSubjects } from '../../../hooks/use-subjects';
 import { useClassifySubject } from '../../../hooks/use-classify-subject';
 import { CelebrationAnimation } from '../../../components/common';
 import { formatApiError } from '../../../lib/format-api-error';
+import { goBackOrReplace } from '../../../lib/navigation';
+import { Sentry } from '../../../lib/sentry';
 import {
   createHomeworkProblem,
   getHomeworkProblemText,
@@ -63,9 +65,17 @@ export default function CameraScreen(): React.ReactNode {
   const classifyTriggeredRef = useRef(false);
   const [manualSubjectName, setManualSubjectName] = useState('');
 
-  // Reset state when screen regains focus (prevents stale state loop)
+  // BUG-366: Track phase via ref so useFocusEffect can check it without
+  // adding it as a dependency (which would cause spurious re-runs).
+  const phaseRef = useRef(state.phase);
+  phaseRef.current = state.phase;
+
+  // Reset state when screen regains focus (prevents stale state loop).
+  // BUG-366: Skip reset when user is in result phase — preserves OCR work
+  // when returning from create-subject navigation.
   useFocusEffect(
     useCallback(() => {
+      if (phaseRef.current === 'result') return;
       dispatch({ type: 'RESET', hasPermission: permission?.granted ?? false });
       setOcrText('');
       setDraftProblems([]);
@@ -136,8 +146,15 @@ export default function CameraScreen(): React.ReactNode {
               subjectId: created.subject.id,
               subjectName: created.subject.name,
             });
-          } catch {
-            // Subject creation failed — fall back to manual picker
+          } catch (autoCreateErr) {
+            // BUG-363: Silent recovery ban — capture so we can track how often
+            // auto-create fails and triage root causes.
+            Sentry.captureException(autoCreateErr, {
+              tags: {
+                component: 'HomeworkCamera',
+                action: 'auto-create-subject',
+              },
+            });
             setShowSubjectPicker(true);
           }
         } else {
@@ -405,8 +422,17 @@ export default function CameraScreen(): React.ReactNode {
         // Multiple candidates or low confidence — show picker
         setShowSubjectPicker(true);
       }
-    } catch {
-      // Classification failed — show picker
+    } catch (classifyErr) {
+      // BUG-367: Tell the user why the subject picker appeared instead of
+      // silently showing it after classification fails.
+      Sentry.captureException(classifyErr, {
+        tags: { component: 'HomeworkCamera', action: 'manual-classify' },
+      });
+      Alert.alert(
+        'Could not identify the subject',
+        'Please pick the subject this homework belongs to.',
+        [{ text: 'OK' }]
+      );
       setShowSubjectPicker(true);
     }
   }, [
@@ -434,11 +460,7 @@ export default function CameraScreen(): React.ReactNode {
   );
 
   const handleClose = useCallback(() => {
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.replace('/(app)/home' as never);
-    }
+    goBackOrReplace(router, '/(app)/home' as const);
   }, [router]);
 
   const toggleFlash = useCallback(() => {
@@ -795,12 +817,27 @@ export default function CameraScreen(): React.ReactNode {
 
         {/* Subject auto-detection loading indicator */}
         {needsSubjectPick && classifyMutation.isPending && (
-          <Text
-            className="text-body-sm text-text-secondary mt-3"
-            testID="classify-loading"
-          >
-            Figuring out the subject...
-          </Text>
+          <View>
+            <Text
+              className="text-body-sm text-text-secondary mt-3"
+              testID="classify-loading"
+            >
+              Figuring out the subject...
+            </Text>
+            {/* BUG-388: Always show Retake during classification so user
+                isn't stuck if detection hangs or takes too long */}
+            <Pressable
+              testID="classify-pending-retake"
+              onPress={handleRetake}
+              className="bg-surface rounded-button py-3 mt-4 min-h-[48px] items-center justify-center"
+              accessibilityLabel="Retake photo"
+              accessibilityRole="button"
+            >
+              <Text className="text-body font-semibold text-text-primary">
+                Retake
+              </Text>
+            </Pressable>
+          </View>
         )}
 
         {/* Auto-detected subject confirmation */}
@@ -877,20 +914,17 @@ export default function CameraScreen(): React.ReactNode {
                   <Text className="text-body text-text-primary">{s.name}</Text>
                 </Pressable>
               ))}
-            {(classifyMutation.data?.candidates?.length ?? 0) === 0 &&
-              (subjects?.length ?? 0) === 0 && (
-                <Pressable
-                  onPress={() => router.push('/create-subject')}
-                  className="bg-surface rounded-button py-3 px-4 mb-2 min-h-[48px] justify-center"
-                  accessibilityLabel="Create a new subject"
-                  accessibilityRole="button"
-                  testID="camera-create-subject"
-                >
-                  <Text className="text-body font-semibold text-primary">
-                    Create New Subject
-                  </Text>
-                </Pressable>
-              )}
+            <Pressable
+              onPress={() => router.push('/create-subject')}
+              className="bg-surface rounded-button py-3 px-4 mb-2 min-h-[48px] justify-center"
+              accessibilityLabel="Create a new subject"
+              accessibilityRole="button"
+              testID="camera-create-subject"
+            >
+              <Text className="text-body font-semibold text-primary">
+                Create New Subject
+              </Text>
+            </Pressable>
 
             {/* Manual subject entry — lets user type a subject name */}
             <Text className="text-body-sm text-text-secondary mt-4 mb-2">
@@ -1007,7 +1041,7 @@ export default function CameraScreen(): React.ReactNode {
 
   // ---- Error phase ----
   if (state.phase === 'error') {
-    const showManualFallback = ocr.failCount >= 2;
+    const showManualFallback = ocr.failCount >= 1;
 
     return (
       <View

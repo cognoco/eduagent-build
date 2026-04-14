@@ -11,6 +11,7 @@ import {
   useStreamInterviewMessage,
 } from '../../../hooks/use-interview';
 import { formatApiError } from '../../../lib/format-api-error';
+import { goBackOrReplace } from '../../../lib/navigation';
 
 const OPENING_MESSAGE =
   "Hi! I'm your learning mate. I'd like to get to know you a bit before we start. What made you interested in learning this subject?";
@@ -59,9 +60,10 @@ export default function InterviewScreen() {
   // BUG-317: Store last sent text so Try Again can resend the orphaned message
   const lastSentTextRef = useRef<string | null>(null);
 
-  // Count user messages for the Living Book page counter
+  // R-4: Exclude isAutoSent messages — consistent with session screen (BUG-373).
+  // Currently no auto-sends in interview, but this prevents latent bugs.
   const exchangeCount = useMemo(
-    () => messages.filter((m) => m.role === 'user').length,
+    () => messages.filter((m) => m.role === 'user' && !m.isAutoSent).length,
     [messages]
   );
 
@@ -236,7 +238,7 @@ export default function InterviewScreen() {
           Missing subject information. Please go back and try again.
         </Text>
         <Pressable
-          onPress={() => router.back()}
+          onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
           className="bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
           testID="interview-missing-subject-back"
           accessibilityRole="button"

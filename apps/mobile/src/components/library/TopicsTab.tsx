@@ -51,7 +51,11 @@ interface TopicsTabProps {
   noteTopicIds: Set<string>;
   state: TopicsTabState;
   onStateChange: (state: TopicsTabState) => void;
-  onTopicPress: (topicId: string, subjectId: string) => void;
+  onTopicPress: (
+    topicId: string,
+    subjectId: string,
+    retention: RetentionStatus
+  ) => void;
   onAddSubject: () => void;
 }
 
@@ -237,7 +241,9 @@ export function TopicsTab({
 
     return (
       <Pressable
-        onPress={() => onTopicPress(item.topicId, item.subjectId)}
+        onPress={() =>
+          onTopicPress(item.topicId, item.subjectId, item.retention)
+        }
         className="bg-surface rounded-card px-4 py-3 mb-3"
         accessibilityRole="button"
         accessibilityLabel={`${item.name}. ${item.subjectName}.`}

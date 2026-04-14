@@ -9,7 +9,7 @@ jest.mock('expo-router', () => ({
     subjectId: 'subject-1',
     subjectName: 'Mathematics',
   }),
-  useRouter: () => ({ back: mockBack }),
+  useRouter: () => ({ back: mockBack, canGoBack: jest.fn(() => true) }),
 }));
 
 jest.mock('react-native-safe-area-context', () => {

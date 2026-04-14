@@ -4,7 +4,7 @@ import { Alert } from 'react-native';
 const mockBack = jest.fn();
 
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ back: mockBack }),
+  useRouter: () => ({ back: mockBack, canGoBack: jest.fn(() => true) }),
   useLocalSearchParams: () => ({
     profileId: 'child-profile-001',
     sessionId: 'session-001',

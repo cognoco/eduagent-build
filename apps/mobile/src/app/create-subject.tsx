@@ -19,6 +19,7 @@ import { useThemeColors } from '../lib/theme';
 import { Button } from '../components/common/Button';
 import { useKeyboardScroll } from '../hooks/use-keyboard-scroll';
 import { formatApiError } from '../lib/format-api-error';
+import { goBackOrReplace } from '../lib/navigation';
 import type { SubjectResolveResult } from '@eduagent/schemas';
 
 // Captured at module load — safe because these screens are portrait-locked.
@@ -27,6 +28,23 @@ const SCREEN_HEIGHT =
   Platform.OS === 'web'
     ? Math.min(Dimensions.get('screen').height, 812)
     : Dimensions.get('screen').height;
+
+const STARTER_CHIPS = [
+  'Math',
+  'Science',
+  'English',
+  'History',
+  'Geography',
+  'Art',
+  'Music',
+  'Programming',
+  'Biology',
+  'Physics',
+  'Chemistry',
+  'Spanish',
+  'French',
+  'Economics',
+] as const;
 
 type ResolveState =
   | { phase: 'idle' }
@@ -292,6 +310,30 @@ export default function CreateSubjectScreen() {
     [resolveState.phase, error]
   );
 
+  const handleCancel = useCallback(() => {
+    goBackOrReplace(router, '/(app)/home' as const);
+  }, [router]);
+
+  const handleSubjectLimitPress = useCallback(() => {
+    if (returnTo === 'chat') {
+      router.back();
+    } else {
+      router.replace('/(app)/library' as never);
+    }
+  }, [returnTo, router]);
+
+  const onChipPress = useCallback(
+    async (chip: string) => {
+      setName(chip);
+      setError('');
+      setOriginalInput(''); // clear stale original input
+      setResolveState({ phase: 'idle' });
+      setResolveRounds(0);
+      await resolveInput(chip);
+    },
+    [resolveInput]
+  );
+
   const isAmbiguous =
     showSuggestion && resolveState.result.status === 'ambiguous';
   const isNoMatch = showSuggestion && resolveState.result.status === 'no_match';
@@ -328,13 +370,7 @@ export default function CreateSubjectScreen() {
             variant="tertiary"
             size="small"
             label="Cancel"
-            onPress={() => {
-              if (router.canGoBack()) {
-                router.back();
-              } else {
-                router.replace('/(app)/home' as never);
-              }
-            }}
+            onPress={handleCancel}
             testID="create-subject-cancel"
           />
         </View>
@@ -351,6 +387,22 @@ export default function CreateSubjectScreen() {
               {error}
               {subjectLimitGuidance}
             </Text>
+            {/* BUG-116: Actionable navigation to manage existing subjects */}
+            {isSubjectLimitError && (
+              <Pressable
+                onPress={handleSubjectLimitPress}
+                className="mt-2 bg-surface rounded-button py-2.5 px-4 items-center"
+                accessibilityRole="button"
+                accessibilityLabel={
+                  returnTo === 'chat' ? 'Go back' : 'Manage your subjects'
+                }
+                testID="manage-subjects-button"
+              >
+                <Text className="text-body-sm font-semibold text-primary">
+                  Manage your subjects
+                </Text>
+              </Pressable>
+            )}
           </View>
         )}
 
@@ -376,6 +428,32 @@ export default function CreateSubjectScreen() {
             onFocus={onFieldFocus('name')}
           />
         </View>
+
+        {/* Starter chips — shown while idle, hidden during resolve/suggestion to avoid confusion */}
+        {resolveState.phase === 'idle' && !isBusy && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 8, paddingBottom: 16 }}
+            testID="starter-chips"
+            accessibilityLabel="Suggested subjects"
+          >
+            {STARTER_CHIPS.map((chip) => (
+              <Pressable
+                key={chip}
+                onPress={() => void onChipPress(chip)}
+                className="rounded-full bg-surface-elevated px-4 py-2 min-h-[36px] items-center justify-center"
+                accessibilityRole="button"
+                accessibilityLabel={`Choose ${chip}`}
+                testID={`starter-chip-${chip}`}
+              >
+                <Text className="text-body-sm font-medium text-text-secondary">
+                  {chip}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        )}
 
         {/* Resolve loading indicator */}
         {resolveState.phase === 'resolving' && (

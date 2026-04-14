@@ -19,6 +19,11 @@ import {
   sessionEvents,
   sessionSummaries,
 } from '@eduagent/database';
+import type {
+  SessionType,
+  InputMode,
+  VerificationType,
+} from '@eduagent/schemas';
 
 import {
   backfillSessionTopicId,
@@ -161,12 +166,12 @@ async function seedSession(input: {
   profileId: string;
   subjectId: string;
   topicId?: string | null;
-  sessionType?: 'learning' | 'homework' | 'interleaved';
+  sessionType?: SessionType;
   status?: 'active' | 'paused' | 'completed' | 'auto_closed';
   exchangeCount?: number;
   escalationRung?: number;
-  inputMode?: 'text' | 'voice';
-  verificationType?: 'standard' | 'evaluate' | 'teach_back' | null;
+  inputMode?: InputMode;
+  verificationType?: VerificationType | null;
   startedAt?: Date;
   lastActivityAt?: Date;
   endedAt?: Date | null;
