@@ -46,9 +46,9 @@ import { AnimatedSplash } from '../components/AnimatedSplash';
 // BUG-417: Clerk's default tokenCache uses expo-secure-store directly,
 // which crashes on web. Use our secure-storage wrapper instead.
 const webTokenCache = {
-  getToken: (key: string) => SecureStore.getItemAsync(key),
+  getToken: (key: string) => SecureStore.getItemAsync(key).catch(() => null),
   saveToken: (key: string, value: string) =>
-    SecureStore.setItemAsync(key, value),
+    SecureStore.setItemAsync(key, value).catch(() => undefined),
 };
 const tokenCache = Platform.OS === 'web' ? webTokenCache : nativeTokenCache;
 
@@ -158,7 +158,9 @@ function ThemedApp() {
       // user from seeing stale data from the previous session.
       markSessionExpired();
       queryClient.clear();
-      void SecureStore.deleteItemAsync('hasSignedInBefore').catch(() => {});
+      void SecureStore.deleteItemAsync('hasSignedInBefore').catch(
+        () => undefined
+      );
       void signOut().catch(() => {
         Alert.alert(
           'Could not sign you out',

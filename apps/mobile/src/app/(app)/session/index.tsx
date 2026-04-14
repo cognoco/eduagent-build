@@ -1360,7 +1360,7 @@ export default function SessionScreen() {
     ]
   );
 
-  // BUG-XXX: Create a new subject from a resolve API suggestion
+  // Create a new subject from a resolve API suggestion
   const handleCreateResolveSuggestion = useCallback(
     async (suggestion: {
       name: string;
@@ -2350,7 +2350,7 @@ export default function SessionScreen() {
               </Text>
             </Pressable>
           )}
-          {/* BUG-XXX: Render rich suggestions from the resolve API */}
+          {/* Render rich suggestions from the resolve API */}
           {pendingSubjectResolution.resolveSuggestions?.map((suggestion) => (
             <Pressable
               key={suggestion.name}

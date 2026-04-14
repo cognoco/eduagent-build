@@ -373,7 +373,7 @@ function ChildPaywall(): React.ReactElement {
           void SecureStore.setItemAsync(
             getNotifyStorageKey(profileId),
             String(now)
-          ).catch(() => {});
+          ).catch(() => undefined);
         }
       } else if (result.sent) {
         const now = Date.now();
@@ -382,7 +382,7 @@ function ChildPaywall(): React.ReactElement {
           void SecureStore.setItemAsync(
             getNotifyStorageKey(profileId),
             String(now)
-          ).catch(() => {});
+          ).catch(() => undefined);
         }
         Alert.alert('Sent!', 'We let your parent know!');
       } else {
@@ -560,9 +560,13 @@ export default function SubscriptionScreen() {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const stored = await SecureStore.getItemAsync(BYOK_JOINED_KEY);
-      if (!cancelled && stored === 'true') {
-        setByokJoined(true);
+      try {
+        const stored = await SecureStore.getItemAsync(BYOK_JOINED_KEY);
+        if (!cancelled && stored === 'true') {
+          setByokJoined(true);
+        }
+      } catch {
+        // SecureStore may throw on web or restricted environments
       }
     })();
     return () => {
@@ -815,7 +819,9 @@ export default function SubscriptionScreen() {
     try {
       await byokWaitlist.mutateAsync();
       setByokJoined(true);
-      void SecureStore.setItemAsync(BYOK_JOINED_KEY, 'true').catch(() => {});
+      void SecureStore.setItemAsync(BYOK_JOINED_KEY, 'true').catch(
+        () => undefined
+      );
       Alert.alert('Waitlist', 'You have been added to the BYOK waitlist.');
     } catch {
       Alert.alert('Error', 'Could not join waitlist. Try again.');
