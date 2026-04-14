@@ -129,7 +129,7 @@ export function ProfileProvider({
       }
       const owner = profiles.find((p) => p.isOwner) ?? profiles[0]!;
       setActiveProfileId(owner.id);
-      void SecureStore.setItemAsync(ACTIVE_PROFILE_KEY, owner.id).catch(() => {});
+      void SecureStore.setItemAsync(ACTIVE_PROFILE_KEY, owner.id).catch(() => { /* non-fatal — in-memory activeProfileId is already set above */ });
     }
   }, [profiles, activeProfileId, isRestoringId]);
 
