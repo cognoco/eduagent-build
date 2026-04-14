@@ -226,7 +226,7 @@ describe('LearnerScreen', () => {
       expect(mockPush).toHaveBeenCalledWith('/(app)/homework/camera');
     });
 
-    it('navigates to library on "Repeat & review"', () => {
+    it('navigates to relearn screen when overdue review topic exists', () => {
       mockSubjects = [{ id: 's1', name: 'Math', status: 'active' }];
       mockUseContinueSuggestion.mockReturnValue({
         data: {
@@ -235,6 +235,40 @@ describe('LearnerScreen', () => {
           topicId: 't1',
           topicTitle: 'Topic 1',
         },
+      });
+      mockUseReviewSummary.mockReturnValue({
+        data: {
+          totalOverdue: 3,
+          nextReviewTopic: {
+            topicId: 't2',
+            subjectId: 's1',
+            subjectName: 'Math',
+            topicTitle: 'Fractions',
+          },
+        },
+      });
+
+      render(<LearnerScreen {...defaultProps} />);
+
+      fireEvent.press(screen.getByTestId('intent-review'));
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: '/(app)/topic/relearn',
+        params: { topicId: 't2', subjectId: 's1' },
+      });
+    });
+
+    it('falls back to library when no overdue review topic', () => {
+      mockSubjects = [{ id: 's1', name: 'Math', status: 'active' }];
+      mockUseContinueSuggestion.mockReturnValue({
+        data: {
+          subjectId: 's1',
+          subjectName: 'Math',
+          topicId: 't1',
+          topicTitle: 'Topic 1',
+        },
+      });
+      mockUseReviewSummary.mockReturnValue({
+        data: { totalOverdue: 0, nextReviewTopic: null },
       });
 
       render(<LearnerScreen {...defaultProps} />);

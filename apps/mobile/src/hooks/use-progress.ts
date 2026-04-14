@@ -25,8 +25,16 @@ interface ProgressHistoryQuery {
   granularity?: 'daily' | 'weekly';
 }
 
+export interface NextReviewTopic {
+  topicId: string;
+  subjectId: string;
+  subjectName: string;
+  topicTitle: string;
+}
+
 export interface ReviewSummary {
   totalOverdue: number;
+  nextReviewTopic: NextReviewTopic | null;
 }
 
 export function useSubjectProgress(

@@ -115,12 +115,27 @@ export function LearnerScreen({
       onPress: () => router.push('/(app)/homework/camera' as never),
       testID: 'intent-homework',
     };
+    const nextReviewTopic = reviewSummary?.nextReviewTopic ?? null;
     const reviewCard = hasLibraryContent
       ? {
           title: 'Repeat & review',
           subtitle: reviewSubtitle,
           badge: reviewDueCount > 0 ? reviewDueCount : undefined,
-          onPress: () => router.push('/(app)/library' as never),
+          onPress: () => {
+            if (nextReviewTopic) {
+              // Go directly to the relearn screen for the most overdue topic
+              router.push({
+                pathname: '/(app)/topic/relearn',
+                params: {
+                  topicId: nextReviewTopic.topicId,
+                  subjectId: nextReviewTopic.subjectId,
+                },
+              } as never);
+            } else {
+              // No specific overdue topic — browse the library
+              router.push('/(app)/library' as never);
+            }
+          },
           testID: 'intent-review',
         }
       : null;
