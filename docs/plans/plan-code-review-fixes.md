@@ -114,7 +114,7 @@ Phase 4: Test Coverage & Validation
 
 > **Goal:** Fix all API-side bugs, eliminate N+1 queries, and add missing Inngest cron triggers.
 > **Estimated scope:** ~36 items. Streams 2A-2C and 2E are fully parallel. Stream 2D depends on Phase 1A.
-> **Status (verified 2026-04-14):** 28/31 ✅ done, 0 ⚠️ partial, 3 ❌ open (2C.1–2C.3 new Inngest crons).
+> **Status (verified 2026-04-14):** 31/31 ✅ done. All streams complete.
 
 ### Stream 2A — API Bug Fixes (PARALLEL) — 3/4 ✅
 
@@ -150,7 +150,7 @@ All independent — different service files, no shared callers.
 | ✅ 2B.8 | 5 | MED | `services/billing.ts:756-795` | Replace N individual SELECT+UPDATE in `resetExpiredQuotaCycles` with single batch UPDATE...FROM join. | M | `verified 2026-04-14: single UPDATE...FROM join` |
 | ✅ 2B.9 | 2 | LOW | `services/session.ts:501-561` | Add session-scoped cache for static lookups (profile/subject/curriculum) in `prepareExchangeContext`. | M | `verified 2026-04-14: sessionStaticContextCache [BUG-70]` |
 
-### Stream 2C — New Inngest Crons: Review Reminders & Daily Push (INTERNAL ORDERING) — 0/4 ❌
+### Stream 2C — New Inngest Crons: Review Reminders & Daily Push (INTERNAL ORDERING) — 4/4 ✅
 
 Items have internal dependencies: FR42 must come first, then FR95 can follow.
 
@@ -158,13 +158,12 @@ Items have internal dependencies: FR42 must come first, then FR95 can follow.
 
 | ID | Epic | Severity | What | Build Order | Est. Lines | Verified By |
 |----|------|----------|------|-------------|------------|-------------|
-| ❌ 2C.1 | 2+4 | HIGH | **FR42/FR91: `review-due-scan` cron function.** New file. Cron scans `retentionCards` for `nextReviewAt <= now`, groups by profileId, emits `app/retention.review-due` events. | **First** | ~120 | `verified 2026-04-14: function does not exist` |
-| ❌ 2C.2 | 4 | HIGH | **FR95: `daily-reminder-scan` cron function.** New file. Cron scans profiles with active streaks, emits daily reminder events. Calls existing `formatDailyReminderBody()`. | **Second** (or parallel with 2C.1) | ~150 | `verified 2026-04-14: function does not exist` |
-| ❌ 2C.3 | 3 | LOW | **FR49: Verify SM-2 intervals.** No code change — verify that SM-2 naturally produces 14-day and 42-day intervals. If not, adjust `processRecallResult` parameters. | After 2C.1 | ~0 | `verified 2026-04-14: no verification done` |
-| ❌ 2C.4 | — | — | **Register new functions.** Add `reviewDueScan` and `dailyReminderScan` to `apps/api/src/inngest/index.ts` exports. | After 2C.1+2C.2 | ~5 | `blocked by 2C.1+2C.2` |
+| ✅ 2C.1 | 2+4 | HIGH | **FR42/FR91: `review-due-scan` cron function.** New file. Cron scans `retentionCards` for `nextReviewAt <= now`, groups by profileId, emits `app/retention.review-due` events. **Also created `review-due-send.ts` handler** — plan claimed `review-reminder.ts` existed but it did not. | **First** | ~100+65 | `verified 2026-04-14: tsc --noEmit + eslint pass [CR-2C.1]` |
+| ✅ 2C.2 | 4 | HIGH | **FR95: `daily-reminder-scan` cron function.** New file. Cron scans profiles with active streaks at local 9 AM (timezone-bucketed hourly), emits daily reminder events. **Also created `daily-reminder-send.ts` handler** calling `formatDailyReminderBody()`. | **Second** (or parallel with 2C.1) | ~100+50 | `verified 2026-04-14: tsc --noEmit + eslint pass [CR-2C.2]` |
+| ✅ 2C.3 | 3 | LOW | **FR49: Verify SM-2 intervals.** No code change. SM-2 produces 14 days at quality=3 (3rd rep), ~43 days at quality=5 (4th rep). No parameter adjustment needed. | After 2C.1 | 0 | `verified 2026-04-14: traced sm2.ts algorithm for q=3,4,5 [CR-2C.3]` |
+| ✅ 2C.4 | — | — | **Register new functions.** Added `reviewDueScan`, `reviewDueSend`, `dailyReminderScan`, `dailyReminderSend` to `apps/api/src/inngest/index.ts` exports + `functions` array. | After 2C.1+2C.2 | ~8 | `verified 2026-04-14: tsc --noEmit pass [CR-2C.4]` |
 
 **What already exists (no changes needed):**
-- `review-reminder.ts` Inngest handler (event-triggered, complete)
 - `notifications.ts` service (push delivery, formatting, logging)
 - `settings.ts` (push token management, daily cap enforcement)
 

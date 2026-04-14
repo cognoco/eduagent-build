@@ -13,6 +13,10 @@ import { recallNudge } from './functions/recall-nudge';
 import { recallNudgeSend } from './functions/recall-nudge-send';
 import { postSessionSuggestions } from './functions/post-session-suggestions';
 import { freeformFilingRetry } from './functions/freeform-filing';
+import { reviewDueScan } from './functions/review-due-scan';
+import { reviewDueSend } from './functions/review-due-send';
+import { dailyReminderScan } from './functions/daily-reminder-scan';
+import { dailyReminderSend } from './functions/daily-reminder-send';
 import {
   dailySnapshotCron,
   dailySnapshotRefresh,
@@ -48,6 +52,10 @@ export {
   monthlyReportCron,
   monthlyReportGenerate,
   freeformFilingRetry,
+  reviewDueScan,
+  reviewDueSend,
+  dailyReminderScan,
+  dailyReminderSend,
 };
 
 // All Inngest functions to register with the serve handler
@@ -73,4 +81,8 @@ export const functions = [
   monthlyReportCron,
   monthlyReportGenerate,
   freeformFilingRetry,
+  reviewDueScan,
+  reviewDueSend,
+  dailyReminderScan,
+  dailyReminderSend,
 ];
