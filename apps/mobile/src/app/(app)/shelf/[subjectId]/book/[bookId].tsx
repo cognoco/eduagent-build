@@ -165,8 +165,13 @@ export default function BookScreen() {
   }, [needsGeneration]);
 
   const retryTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  // RT-1: ref lock prevents double-fire from rapid taps on the retry button
+  const retryInFlight = useRef(false);
 
   const handleRetryGeneration = () => {
+    if (retryInFlight.current) return;
+    retryInFlight.current = true;
+
     // Clear any leftover retry timers before starting new ones
     for (const t of retryTimersRef.current) clearTimeout(t);
     retryTimersRef.current = [];
@@ -185,6 +190,7 @@ export default function BookScreen() {
       onSuccess: () => {
         setGenPhase('idle');
         alreadyPending.current = false;
+        retryInFlight.current = false;
         for (const t of retryTimersRef.current) clearTimeout(t);
         retryTimersRef.current = [];
         void bookQuery.refetch();
@@ -192,6 +198,7 @@ export default function BookScreen() {
       onError: (error) => {
         setGenPhase('timed_out');
         alreadyPending.current = false;
+        retryInFlight.current = false;
         for (const t of retryTimersRef.current) clearTimeout(t);
         retryTimersRef.current = [];
         Alert.alert('Generation failed', formatApiError(error));
