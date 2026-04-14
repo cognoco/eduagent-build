@@ -258,6 +258,26 @@ export function buildSystemPrompt(context: ExchangeContext): string {
     );
   }
 
+  // First-exchange teaching opener — tell the LLM to start teaching, not ask
+  if (
+    context.exchangeCount === 0 &&
+    context.sessionType === 'learning' &&
+    !isLanguageMode
+  ) {
+    if (context.topicTitle) {
+      sections.push(
+        'The learner chose this topic. Begin teaching it immediately. ' +
+          'Do not ask what they want to learn — they already told you by choosing the topic. ' +
+          'If prior session history exists for this topic, pick up where the previous session left off.'
+      );
+    } else if (context.rawInput) {
+      sections.push(
+        'The learner expressed interest in the above topic. ' +
+          'Anchor your teaching to their stated intent and begin immediately.'
+      );
+    }
+  }
+
   // Session type
   if (isLanguageMode) {
     sections.push(

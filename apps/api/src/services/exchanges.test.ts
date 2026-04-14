@@ -69,6 +69,65 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('Sharp and collegial');
   });
 
+  describe('first-exchange teaching opener', () => {
+    it('injects "begin teaching immediately" when exchangeCount=0 and topicTitle present', () => {
+      const prompt = buildSystemPrompt({
+        ...baseContext,
+        exchangeCount: 0,
+        topicTitle: 'Quadratic Equations',
+        sessionType: 'learning',
+      });
+      expect(prompt).toContain('Begin teaching it immediately');
+      expect(prompt).toContain('Do not ask what they want to learn');
+    });
+
+    it('injects rawInput anchor when exchangeCount=0 and only rawInput present', () => {
+      const prompt = buildSystemPrompt({
+        ...baseContext,
+        exchangeCount: 0,
+        topicTitle: undefined,
+        rawInput: 'How do volcanoes work?',
+        sessionType: 'learning',
+      });
+      expect(prompt).toContain(
+        'Anchor your teaching to their stated intent and begin immediately'
+      );
+    });
+
+    it('does NOT inject opener when exchangeCount > 0', () => {
+      const prompt = buildSystemPrompt({
+        ...baseContext,
+        exchangeCount: 3,
+        topicTitle: 'Quadratic Equations',
+        sessionType: 'learning',
+      });
+      expect(prompt).not.toContain('Begin teaching it immediately');
+    });
+
+    it('does NOT inject opener for non-learning sessions', () => {
+      const prompt = buildSystemPrompt({
+        ...baseContext,
+        exchangeCount: 0,
+        topicTitle: 'Quadratic Equations',
+        sessionType: 'homework',
+        homeworkMode: 'help_me',
+      });
+      expect(prompt).not.toContain('Begin teaching it immediately');
+    });
+
+    it('does NOT inject opener for freeform (no topic, no rawInput)', () => {
+      const prompt = buildSystemPrompt({
+        ...baseContext,
+        exchangeCount: 0,
+        topicTitle: undefined,
+        rawInput: undefined,
+        sessionType: 'learning',
+      });
+      expect(prompt).not.toContain('Begin teaching it immediately');
+      expect(prompt).not.toContain('Anchor your teaching');
+    });
+  });
+
   it('LEARNING session type uses explain-verify-next cycle', () => {
     const prompt = buildSystemPrompt({
       ...baseContext,
