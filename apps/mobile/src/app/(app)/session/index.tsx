@@ -1,12 +1,5 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import {
-  AppState,
-  View,
-  Text,
-  Pressable,
-  Alert,
-  ActivityIndicator,
-} from 'react-native';
+import { AppState, View, Text, Pressable, Alert } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type {
@@ -20,9 +13,6 @@ import {
   getModeConfig,
   getOpeningMessage,
   SessionTimer,
-  QuestionCounter,
-  LibraryPrompt,
-  SessionInputModeToggle,
   type ChatMessage,
 } from '../../../components/session';
 import {
@@ -53,14 +43,11 @@ import {
   normalizeMilestoneTrackerState,
   useMilestoneTracker,
 } from '../../../hooks/use-milestone-tracker';
-import { Ionicons } from '@expo/vector-icons';
 import {
   useApiClient,
   type QuotaExceededDetails,
 } from '../../../lib/api-client';
-import { formatApiError } from '../../../lib/format-api-error';
 import { useThemeColors } from '../../../lib/theme';
-import { NoteInput } from '../../../components/library/NoteInput';
 import { useUpsertNote } from '../../../hooks/use-notes';
 import { getVoiceLocaleForLanguage } from '../../../lib/language-locales';
 import { useProfile } from '../../../lib/profile';
@@ -82,6 +69,7 @@ import { useSessionActions } from './use-session-actions';
 import { SessionMessageActions } from './SessionMessageActions';
 import { SessionToolAccessory, SessionAccessory } from './SessionAccessories';
 import { ParkingLotModal, TopicSwitcherModal } from './SessionModals';
+import { SessionFooter } from './SessionFooter';
 
 function MilestoneDots({ count }: { count: number }) {
   if (count <= 0) return null;
@@ -863,182 +851,30 @@ export default function SessionScreen() {
         speechRecognitionLanguage={languageVoiceLocale}
         textToSpeechLanguage={languageVoiceLocale}
         footer={
-          <>
-            {showFilingPrompt && !filingDismissed && (
-              <View
-                className="px-4 py-6 bg-surface-elevated rounded-t-2xl"
-                testID="filing-prompt"
-              >
-                <Text className="text-lg font-semibold text-text-primary mb-2">
-                  Add to your library?
-                </Text>
-                <Text className="text-body-sm text-text-secondary mb-4">
-                  We can organize what you learned into your library.
-                </Text>
-                <View className="flex-row gap-3">
-                  <Pressable
-                    onPress={async () => {
-                      try {
-                        const result = await filing.mutateAsync({
-                          sessionId: activeSessionId ?? undefined,
-                          sessionMode: effectiveMode as 'freeform' | 'homework',
-                        });
-                        setShowFilingPrompt(false);
-                        router.replace({
-                          pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
-                          params: {
-                            subjectId: result.shelfId,
-                            bookId: result.bookId,
-                          },
-                        } as never);
-                      } catch {
-                        Alert.alert(
-                          "Couldn't add to library",
-                          'Your session is still saved.',
-                          [
-                            {
-                              text: 'OK',
-                              onPress: () => {
-                                setFilingDismissed(true);
-                                navigateToSessionSummary();
-                              },
-                            },
-                          ]
-                        );
-                      }
-                    }}
-                    disabled={filing.isPending}
-                    className="flex-1 bg-primary rounded-xl py-3 items-center min-h-[44px] justify-center"
-                    testID="filing-prompt-accept"
-                    accessibilityRole="button"
-                    accessibilityLabel={
-                      filing.isPending
-                        ? 'Adding to library'
-                        : 'Yes, add to library'
-                    }
-                  >
-                    {filing.isPending ? (
-                      <ActivityIndicator color="white" />
-                    ) : (
-                      <Text className="text-text-inverse font-semibold">
-                        Yes, add it
-                      </Text>
-                    )}
-                  </Pressable>
-                  <Pressable
-                    onPress={() => {
-                      setFilingDismissed(true);
-                      navigateToSessionSummary();
-                    }}
-                    disabled={filing.isPending}
-                    className="px-4 py-3 min-h-[44px] justify-center"
-                    testID="filing-prompt-dismiss"
-                    accessibilityRole="button"
-                    accessibilityLabel="No thanks, skip"
-                  >
-                    <Text className="text-text-secondary">No thanks</Text>
-                  </Pressable>
-                </View>
-              </View>
-            )}
-            {sessionExpired && (
-              <View className="bg-surface rounded-card p-4 mt-2 mb-4">
-                <Text className="text-body font-semibold text-text-primary mb-2">
-                  Session expired
-                </Text>
-                <Text className="text-body-sm text-text-secondary mb-3">
-                  This session is no longer available. Start a new one from home
-                  or your library.
-                </Text>
-                <Pressable
-                  onPress={() => router.replace('/(app)/home' as never)}
-                  className="bg-primary rounded-button py-3 items-center"
-                  testID="session-expired-go-home"
-                  accessibilityRole="button"
-                  accessibilityLabel="Go home"
-                >
-                  <Text className="text-text-inverse text-body font-semibold">
-                    Go Home
-                  </Text>
-                </Pressable>
-              </View>
-            )}
-            {notePromptOffered &&
-              !showNoteInput &&
-              !sessionNoteSavedRef.current && (
-                <Pressable
-                  className="bg-primary/10 rounded-lg px-4 py-3 mx-4 mb-2 flex-row items-center"
-                  onPress={() => setShowNoteInput(true)}
-                  testID="session-note-prompt"
-                  accessibilityRole="button"
-                  accessibilityLabel="Write a note"
-                >
-                  <Ionicons
-                    name="document-text-outline"
-                    size={18}
-                    color={colors.primary}
-                  />
-                  <Text className="text-body text-primary font-semibold ml-2">
-                    Write a note
-                  </Text>
-                </Pressable>
-              )}
-            {showNoteInput && (
-              <View className="px-4 mb-2">
-                <NoteInput
-                  onSave={(content) => {
-                    if (!topicId) {
-                      Alert.alert(
-                        'Cannot save note',
-                        'No topic selected for this session.'
-                      );
-                      return;
-                    }
-                    const separator = !sessionNoteSavedRef.current
-                      ? `--- ${new Date().toLocaleDateString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                        })} ---\n`
-                      : '';
-                    upsertNote.mutate(
-                      {
-                        topicId,
-                        content: `${separator}${content}`,
-                        append: true,
-                      },
-                      {
-                        onSuccess: () => {
-                          sessionNoteSavedRef.current = true;
-                          setShowNoteInput(false);
-                        },
-                        onError: (err) => {
-                          Alert.alert(
-                            "Couldn't save your note",
-                            formatApiError(err)
-                          );
-                        },
-                      }
-                    );
-                  }}
-                  onCancel={() => setShowNoteInput(false)}
-                  saving={upsertNote.isPending}
-                />
-              </View>
-            )}
-            {/* BUG-356: Use userMessageCount instead of exchangeCount — the server
-                counts system messages (quick chips, auto-sent text) in exchangeCount,
-                which hides the mode toggle before the user has deliberately typed. */}
-            {userMessageCount === 0 && (
-              <SessionInputModeToggle
-                mode={inputMode}
-                onModeChange={handleInputModeChange}
-              />
-            )}
-            {modeConfig.showQuestionCount && (
-              <QuestionCounter count={userMessageCount} />
-            )}
-            {showBookLink && <LibraryPrompt />}
-          </>
+          <SessionFooter
+            showFilingPrompt={showFilingPrompt}
+            filingDismissed={filingDismissed}
+            filing={filing}
+            activeSessionId={activeSessionId}
+            effectiveMode={effectiveMode}
+            setShowFilingPrompt={setShowFilingPrompt}
+            setFilingDismissed={setFilingDismissed}
+            navigateToSessionSummary={navigateToSessionSummary}
+            router={router}
+            sessionExpired={sessionExpired}
+            notePromptOffered={notePromptOffered}
+            showNoteInput={showNoteInput}
+            setShowNoteInput={setShowNoteInput}
+            sessionNoteSavedRef={sessionNoteSavedRef}
+            topicId={topicId ?? undefined}
+            upsertNote={upsertNote}
+            colors={colors}
+            userMessageCount={userMessageCount}
+            inputMode={inputMode}
+            handleInputModeChange={handleInputModeChange}
+            showQuestionCount={modeConfig.showQuestionCount}
+            showBookLink={showBookLink}
+          />
         }
       />
       <ParkingLotModal
