@@ -35,7 +35,7 @@ export function QuotaExceededCard({
           <Text className="text-body-sm text-text-secondary mb-3">
             {isDailyLimit
               ? `You've reached today's limit. Used ${details.usedToday} of ${
-                  details.dailyLimit ?? details.monthlyLimit
+                  details.dailyLimit ?? 0
                 } — resets at midnight.`
               : `Used ${details.usedThisMonth} of ${details.monthlyLimit} this month.`}{' '}
             Upgrade for more learning time.

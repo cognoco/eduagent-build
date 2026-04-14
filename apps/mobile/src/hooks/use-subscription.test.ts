@@ -273,8 +273,23 @@ describe('useFamilySubscription', () => {
     expect(result.current.data?.maxProfiles).toBe(4);
   });
 
-  it('returns null when the family endpoint responds 404', async () => {
+  it('returns null when the family endpoint responds 404 (non-throwing mock)', async () => {
     mockFetch.mockResolvedValueOnce(new Response('Not found', { status: 404 }));
+
+    const { result } = renderHook(() => useFamilySubscription(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    expect(result.current.data).toBeNull();
+  });
+
+  it('returns null when the family endpoint throws API error 404 (production api-client path)', async () => {
+    // Simulate the production api-client throwing instead of returning a Response
+    mockFetch.mockRejectedValueOnce(new Error('API error 404: Not Found'));
 
     const { result } = renderHook(() => useFamilySubscription(), {
       wrapper: createWrapper(),

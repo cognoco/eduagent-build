@@ -62,6 +62,7 @@ const PRODUCTION_REQUIRED_KEYS: readonly (keyof Env)[] = [
   'VOYAGE_API_KEY',
   'RESEND_API_KEY',
   'API_ORIGIN',
+  'REVENUECAT_WEBHOOK_SECRET',
 ] as const;
 
 /**

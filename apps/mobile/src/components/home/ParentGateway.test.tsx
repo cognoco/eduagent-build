@@ -128,15 +128,6 @@ describe('ParentGateway', () => {
 
     fireEvent.press(screen.getByTestId('gateway-learn'));
     expect(mockPush).toHaveBeenCalledWith('/learn');
-  });
-
-  it('gateway-learn card routes to /learn, not /learn-new', () => {
-    render(<ParentGateway {...defaultProps} />);
-
-    const learnCard = screen.getByTestId('gateway-learn');
-    fireEvent.press(learnCard);
-
-    expect(mockPush).toHaveBeenCalledWith('/learn');
     expect(mockPush).not.toHaveBeenCalledWith('/learn-new');
   });
 

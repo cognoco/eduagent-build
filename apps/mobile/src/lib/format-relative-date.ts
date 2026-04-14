@@ -1,6 +1,7 @@
 export function formatRelativeDate(isoDate: string): string {
   const now = Date.now();
   const then = new Date(isoDate).getTime();
+  if (isNaN(then)) return '';
   const diffMs = now - then;
   if (diffMs < 0) return 'just now';
 

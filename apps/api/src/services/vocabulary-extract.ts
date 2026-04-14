@@ -1,3 +1,4 @@
+import { cefrLevelSchema } from '@eduagent/schemas';
 import { getLanguageByCode } from '../data/languages';
 import { routeAndCall, type ChatMessage } from './llm';
 
@@ -83,7 +84,9 @@ export async function extractVocabularyFromTranscript(
         term: item.term.trim(),
         translation: item.translation.trim(),
         type: item.type,
-        cefrLevel: typeof item.cefrLevel === 'string' ? item.cefrLevel : null,
+        cefrLevel: cefrLevelSchema.safeParse(item.cefrLevel).success
+          ? (item.cefrLevel as string)
+          : null,
       }));
   } catch (err) {
     console.warn('[extractVocabularyFromTranscript] extraction failed:', err);

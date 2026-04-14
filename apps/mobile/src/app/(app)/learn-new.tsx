@@ -132,13 +132,13 @@ export default function LearnNewScreen(): React.ReactElement {
         subjects &&
         subjects.length > 0 ? (
           <IntentCard
-            title={`Continue with ${subjects[0]?.name}`}
+            title={`Continue with ${subjects[0]!.name}`}
             onPress={() =>
               router.push({
                 pathname: '/(app)/session',
                 params: {
-                  subjectId: subjects[0]?.id,
-                  subjectName: subjects[0]?.name,
+                  subjectId: subjects[0]!.id,
+                  subjectName: subjects[0]!.name,
                   mode: 'learning',
                 },
               } as never)

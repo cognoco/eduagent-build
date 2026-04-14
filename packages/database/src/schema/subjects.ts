@@ -167,6 +167,7 @@ export const curriculumTopics = pgTable(
   },
   (table) => [
     uniqueIndex('curriculum_topics_book_sort_order_uq').on(
+      table.curriculumId,
       table.bookId,
       table.sortOrder
     ),

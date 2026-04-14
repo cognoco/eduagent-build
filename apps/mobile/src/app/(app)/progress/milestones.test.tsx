@@ -41,6 +41,7 @@ describe('MilestonesListScreen', () => {
       data: mockMilestones,
       isLoading: false,
       isError: false,
+      refetch: jest.fn(),
     });
   });
 

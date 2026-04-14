@@ -413,10 +413,14 @@ export default function SessionScreen() {
   const [pendingSubjectResolution, setPendingSubjectResolution] =
     useState<PendingSubjectResolution | null>(null);
   const [inputMode, setInputMode] = useState<InputMode>('text');
+  // CR-9: Guard so profile refetches don't overwrite the user's in-session choice.
+  const hasRestoredInputModeRef = useRef(false);
 
   // Restore the user's last-used input mode from SecureStore on mount.
   useEffect(() => {
     if (!activeProfile?.id) return;
+    // CR-9: Only restore once — ignore subsequent profile refetches.
+    if (hasRestoredInputModeRef.current) return;
     let cancelled = false;
     void SecureStore.getItemAsync(getInputModeKey(activeProfile.id))
       .then((stored) => {
@@ -424,9 +428,11 @@ export default function SessionScreen() {
         if (stored === 'voice' || stored === 'text') {
           setInputMode(stored);
         }
+        hasRestoredInputModeRef.current = true;
       })
       .catch(() => {
         // Non-critical preference — silent fallback to 'text' default.
+        hasRestoredInputModeRef.current = true;
       });
     return () => {
       cancelled = true;
@@ -1084,7 +1090,9 @@ export default function SessionScreen() {
               sessionSubjectName ?? effectiveSubjectName ?? undefined,
             topicId: topicId ?? undefined,
             mode: effectiveMode,
-            milestoneTracker: trackerState,
+            // CR-2: Read from ref so this callback doesn't re-create on every
+            // milestone tracker tick (stale closure fix).
+            milestoneTracker: trackerStateRef.current,
             updatedAt: new Date().toISOString(),
           },
           activeProfile?.id
@@ -1296,15 +1304,22 @@ export default function SessionScreen() {
       syncHomeworkMetadata,
       topicId,
       trackExchange,
-      trackerState,
+      // CR-2: trackerState removed — reads trackerStateRef.current inside body.
+      // CR-3: Removed duplicate createLocalMessageId entry.
       trigger,
-      createLocalMessageId,
     ]
   );
 
   const handleReconnect = useCallback(
     async (messageId: string) => {
-      if (!lastRetryPayloadRef.current || isStreaming || sessionExpired) {
+      // CR-5: Also guard on quotaError — reconnecting into a quota wall just
+      // replays the send that will fail again immediately.
+      if (
+        !lastRetryPayloadRef.current ||
+        isStreaming ||
+        sessionExpired ||
+        quotaError
+      ) {
         return;
       }
 
@@ -1325,7 +1340,7 @@ export default function SessionScreen() {
       });
       await continueWithMessage(retryPayload.text, retryPayload.options);
     },
-    [continueWithMessage, isStreaming, sessionExpired]
+    [continueWithMessage, isStreaming, sessionExpired, quotaError]
   );
 
   const handleResolveSubject = useCallback(
@@ -1468,7 +1483,9 @@ export default function SessionScreen() {
 
   const handleSend = useCallback(
     async (text: string, opts?: { isAutoSent?: boolean }) => {
-      if (isStreaming || pendingClassification) return;
+      // CR-1: Guard on quotaError so programmatic callers (quick chips, homework
+      // auto-send, queued problems) can't bypass the UI-disabled input guard.
+      if (isStreaming || pendingClassification || quotaError) return;
       if (pendingSubjectResolution) {
         showConfirmation("Pick the subject first, then I'll keep going.");
         return;
@@ -1711,6 +1728,8 @@ export default function SessionScreen() {
     [
       isStreaming,
       pendingClassification,
+      // CR-1: quotaError added so the callback re-creates when quota state changes.
+      quotaError,
       pendingSubjectResolution,
       createLocalMessageId,
       subjectId,
@@ -2698,7 +2717,9 @@ export default function SessionScreen() {
           pendingClassification ||
           !!pendingSubjectResolution ||
           sessionExpired ||
-          !!quotaError
+          !!quotaError ||
+          // CR-6: Disable input while session close is in flight.
+          isClosing
         }
         disabledReason={
           isOffline

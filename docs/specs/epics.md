@@ -9,7 +9,7 @@ inputDocuments:
 
 ## Overview
 
-This document is the **canonical spec** for all epics and stories. It describes *what* each feature is and its acceptance criteria. It is NOT an implementation tracker — for current build status, see `docs/plans/plan-master.md`.
+This document is the **canonical spec** for all epics and stories. It describes *what* each feature is and its acceptance criteria. It is NOT an implementation tracker — for current build status, see the latest dated plan in `docs/plans/`.
 
 Detailed design specs for later epics live in `docs/specs/`.
 

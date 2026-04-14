@@ -25,6 +25,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useThemeColors } from '../../lib/theme';
 import { goBackOrReplace } from '../../lib/navigation';
 import { useProfile } from '../../lib/profile';
+import { useApiClient } from '../../lib/api-client';
+import { assertOk } from '../../lib/assert-ok';
 import { UsageMeter } from '../../components/common';
 import {
   useSubscription,
@@ -532,6 +534,7 @@ export default function SubscriptionScreen() {
   const router = useRouter();
   const colors = useThemeColors();
   const { activeProfile } = useProfile();
+  const client = useApiClient();
 
   const queryClient = useQueryClient();
 
@@ -709,7 +712,9 @@ export default function SubscriptionScreen() {
     // RevenueCat consumables can be in a separate offering or as a non-subscription package
     const topUpOffering = offerings?.all?.['top_up'] ?? offerings?.current;
     const topUpPkg = topUpOffering?.availablePackages.find(
-      (p) => p.packageType === PACKAGE_TYPE.CUSTOM
+      (p) =>
+        p.packageType === PACKAGE_TYPE.CUSTOM &&
+        p.product.identifier.includes('topup')
     );
 
     if (!topUpPkg) {
@@ -764,6 +769,12 @@ export default function SubscriptionScreen() {
         }>({
           queryKey: ['usage', activeProfile?.id],
           staleTime: 0,
+          queryFn: async () => {
+            const res = await client.usage.$get({}, { init: {} });
+            await assertOk(res);
+            const data = await res.json();
+            return data.usage;
+          },
         });
       } catch {
         // Network error during poll — continue to next attempt

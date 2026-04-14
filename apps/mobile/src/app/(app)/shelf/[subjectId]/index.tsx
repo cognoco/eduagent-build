@@ -59,6 +59,9 @@ export default function ShelfScreen() {
         selectedSuggestion: suggestion.title,
         pickedSuggestionId: suggestion.id,
       });
+      // Reset the in-flight lock before navigating so a back-navigation
+      // doesn't leave filingInFlight permanently true. [CR-fix-3]
+      filingInFlight.current = false;
       // M-12: Pass autoStart so the book screen begins a session immediately
       router.push({
         pathname: '/(app)/shelf/[subjectId]/book/[bookId]',

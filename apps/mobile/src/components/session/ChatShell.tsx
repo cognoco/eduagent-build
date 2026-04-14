@@ -150,10 +150,15 @@ export function ChatShell({
 
   // BUG-349: Sync voice state when inputMode prop changes after mount
   // (useState only reads initial value once, so prop changes were ignored).
+  // Guard against the prev value to avoid an extra render on every mode toggle.
   useEffect(() => {
     if (inputMode) {
-      setIsVoiceEnabled(inputMode === 'voice');
+      const shouldBeVoice = inputMode === 'voice';
+      if (isVoiceEnabled !== shouldBeVoice) {
+        setIsVoiceEnabled(shouldBeVoice);
+      }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inputMode]);
 
   // STT hook
@@ -183,13 +188,6 @@ export function ChatShell({
 
   // Track last spoken message id to avoid re-speaking
   const lastSpokenIdRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (inputMode == null) {
-      return;
-    }
-    setIsVoiceEnabled(inputMode === 'voice');
-  }, [inputMode]);
 
   useEffect(() => {
     scrollRef.current?.scrollToEnd({ animated: true });

@@ -134,9 +134,11 @@ function parseSummaryEvaluation(response: string): SummaryEvaluation {
   }
 
   // Fallback — LLM response was unparseable. Do NOT accept — the summary was
-  // not actually evaluated. The learner sees a message and can re-submit.
+  // not actually evaluated. isAccepted=false is consistent with the feedback:
+  // the submission was saved but evaluation is unavailable (no contradictory checkmark).
   return {
-    feedback: "We couldn't evaluate your summary right now. Please try again.",
+    feedback:
+      "Your summary was saved. We couldn't provide AI feedback right now — you can try submitting again.",
     hasUnderstandingGaps: false,
     isAccepted: false,
   };

@@ -311,12 +311,8 @@ export default function CreateSubjectScreen() {
   );
 
   const handleCancel = useCallback(() => {
-    if (returnTo === 'chat') {
-      router.back();
-    } else {
-      goBackOrReplace(router, '/(app)/home' as const);
-    }
-  }, [returnTo, router]);
+    goBackOrReplace(router, '/(app)/home' as const);
+  }, [router]);
 
   const handleSubjectLimitPress = useCallback(() => {
     if (returnTo === 'chat') {

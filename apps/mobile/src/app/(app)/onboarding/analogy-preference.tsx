@@ -1,4 +1,4 @@
-import { View, Text, Pressable, ScrollView } from 'react-native';
+import { Alert, View, Text, Pressable, ScrollView } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,8 +21,17 @@ export default function AnalogyPreferenceScreen() {
   const handleContinue = (): void => {
     if (selectedDomain) {
       updateAnalogyDomain(selectedDomain, {
-        onSettled: () => {
+        onSuccess: () => {
           navigateToCurriculum();
+        },
+        onError: (err) => {
+          Alert.alert(
+            'Could not save preference',
+            err instanceof Error
+              ? err.message
+              : 'Something went wrong. Please try again.',
+            [{ text: 'OK' }]
+          );
         },
       });
     } else {

@@ -62,21 +62,26 @@ export function useRevenueCatIdentity(): void {
     if (!isRevenueCatAvailable()) return;
 
     retryCountRef.current = 0;
+    let cancelled = false;
 
     const syncIdentity = async (): Promise<void> => {
+      if (cancelled) return;
       try {
         if (isSignedIn && userId) {
           if (previousUserIdRef.current !== userId) {
             await Purchases.logIn(userId);
+            if (cancelled) return;
             previousUserIdRef.current = userId;
             retryCountRef.current = 0;
           }
         } else if (previousUserIdRef.current !== null) {
           await Purchases.logOut();
+          if (cancelled) return;
           previousUserIdRef.current = null;
           retryCountRef.current = 0;
         }
       } catch (error) {
+        if (cancelled) return;
         // BUG-393: Log failure instead of silently swallowing.
         // RevenueCat falls back to anonymous, but we need visibility.
         Sentry.addBreadcrumb({
@@ -99,6 +104,7 @@ export function useRevenueCatIdentity(): void {
     void syncIdentity();
 
     return () => {
+      cancelled = true;
       if (retryTimerRef.current) {
         clearTimeout(retryTimerRef.current);
         retryTimerRef.current = null;

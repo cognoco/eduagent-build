@@ -135,7 +135,7 @@ export default function ProgressSubjectScreen(): React.ReactElement {
       >
         <View className="flex-row items-center mt-4">
           <Pressable
-            onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
+            onPress={() => goBackOrReplace(router, '/(app)/progress' as const)}
             className="me-3 py-2 pe-2"
             accessibilityRole="button"
             accessibilityLabel="Go back"

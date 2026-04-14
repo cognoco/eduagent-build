@@ -42,7 +42,14 @@ export default function ChildReportsScreen(): React.ReactElement {
       >
         <View className="flex-row items-center mt-4">
           <Pressable
-            onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
+            onPress={() =>
+              goBackOrReplace(
+                router,
+                profileId
+                  ? (`/(app)/child/${profileId}` as const)
+                  : ('/(app)/dashboard' as const)
+              )
+            }
             className="me-3 py-2 pe-2"
             accessibilityRole="button"
             accessibilityLabel="Go back"
@@ -96,7 +103,14 @@ export default function ChildReportsScreen(): React.ReactElement {
                 </Text>
               </Pressable>
               <Pressable
-                onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
+                onPress={() =>
+                  goBackOrReplace(
+                    router,
+                    profileId
+                      ? (`/(app)/child/${profileId}` as const)
+                      : ('/(app)/dashboard' as const)
+                  )
+                }
                 className="bg-background rounded-button px-4 py-3 items-center flex-1 min-h-[48px] justify-center"
                 accessibilityRole="button"
                 accessibilityLabel="Go back"
