@@ -20,7 +20,6 @@ import type {
 } from '@eduagent/schemas';
 import {
   ChatShell,
-  animateResponse,
   getModeConfig,
   getOpeningMessage,
   SessionTimer,
@@ -54,7 +53,6 @@ import { useCelebration } from '../../../hooks/use-celebration';
 import { useSubjects, useCreateSubject } from '../../../hooks/use-subjects';
 import { useCurriculum } from '../../../hooks/use-curriculum';
 import {
-  celebrationForReason,
   createMilestoneTrackerStateFromMilestones,
   normalizeMilestoneTrackerState,
   useMilestoneTracker,
@@ -62,7 +60,6 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import {
   useApiClient,
-  QuotaExceededError,
   type QuotaExceededDetails,
 } from '../../../lib/api-client';
 import { formatApiError } from '../../../lib/format-api-error';
@@ -78,27 +75,22 @@ import {
 } from '../../../lib/session-recovery';
 import * as SecureStore from '../../../lib/secure-storage';
 import {
-  buildHomeworkSessionMetadata,
   parseHomeworkProblems,
   withProblemMode,
 } from '../homework/problem-cards';
 import {
-  computePaceMultiplier,
   getInputModeKey,
   serializeMilestones,
   serializeCelebrations,
-  isReconnectableSessionError,
-  isTimeoutError,
   errorHasStatus,
   getContextualQuickChips,
-  RECONNECT_PROMPT,
-  TIMEOUT_PROMPT,
   CONFIRMATION_BY_CHIP,
   QUICK_CHIP_CONFIG,
   type QuickChipId,
   type MessageFeedbackState,
   type PendingSubjectResolution,
 } from './session-types';
+import { useSessionStreaming } from './use-session-streaming';
 
 function MilestoneDots({ count }: { count: number }) {
   if (count <= 0) return null;
@@ -424,37 +416,6 @@ export default function SessionScreen() {
     return `${prefix}-${Date.now()}-${localMessageIdRef.current}`;
   }, []);
 
-  const syncHomeworkMetadata = useCallback(
-    async (
-      targetSessionId: string,
-      problems: HomeworkProblem[],
-      problemIndex: number
-    ) => {
-      if (effectiveMode !== 'homework' || problems.length === 0) {
-        return;
-      }
-
-      const res = await apiClient.sessions[':sessionId'][
-        'homework-state'
-      ].$post({
-        param: { sessionId: targetSessionId },
-        json: {
-          metadata: buildHomeworkSessionMetadata(
-            problems,
-            problemIndex,
-            normalizedOcrText,
-            homeworkCaptureSource
-          ),
-        },
-      });
-
-      if (!res.ok) {
-        throw new Error(`Homework state sync failed: ${res.status}`);
-      }
-    },
-    [apiClient, effectiveMode, normalizedOcrText, homeworkCaptureSource]
-  );
-
   useEffect(() => {
     if (!routeSessionId || !transcript.data) return;
 
@@ -580,178 +541,6 @@ export default function SessionScreen() {
     topicId,
   ]);
 
-  const scheduleSilencePrompt = useCallback(
-    (sessionIdToUse: string, expectedResponseMinutes: number) => {
-      if (silenceTimerRef.current) {
-        clearTimeout(silenceTimerRef.current);
-      }
-
-      const thresholdMinutes = Math.min(
-        20,
-        Math.max(
-          2,
-          expectedResponseMinutes * computePaceMultiplier(responseHistory)
-        )
-      );
-
-      silenceTimerRef.current = setTimeout(async () => {
-        if (draftText.trim()) return;
-
-        const prompt =
-          "Still working on it? Take your time - I'm here when you're ready.";
-
-        setMessages((prev) => {
-          if (prev.some((message) => message.id === 'silence-prompt')) {
-            return prev;
-          }
-          return [
-            ...prev,
-            {
-              id: 'silence-prompt',
-              role: 'assistant',
-              content: prompt,
-              isSystemPrompt: true,
-            },
-          ];
-        });
-
-        try {
-          await recordSystemPrompt.mutateAsync({ content: prompt });
-        } catch {
-          // Best effort only.
-        }
-
-        await writeSessionRecoveryMarker(
-          {
-            sessionId: sessionIdToUse,
-            profileId: activeProfile?.id ?? undefined,
-            subjectId: effectiveSubjectId || undefined,
-            subjectName: effectiveSubjectName || undefined,
-            topicId: topicId ?? undefined,
-            mode: effectiveMode,
-            milestoneTracker: trackerStateRef.current,
-            updatedAt: new Date().toISOString(),
-          },
-          activeProfile?.id
-        ).catch(() => undefined);
-      }, thresholdMinutes * 60 * 1000);
-    },
-    [
-      activeProfile?.id,
-      draftText,
-      effectiveMode,
-      effectiveSubjectId,
-      effectiveSubjectName,
-      recordSystemPrompt,
-      responseHistory,
-      topicId,
-    ]
-  );
-
-  const ensureSession = useCallback(
-    async (overrideSubjectId?: string): Promise<string | null> => {
-      if (activeSessionId) return activeSessionId;
-
-      const sid = overrideSubjectId ?? effectiveSubjectId;
-      if (!sid) return null;
-
-      const sessionType =
-        effectiveMode === 'homework'
-          ? ('homework' as const)
-          : ('learning' as const);
-
-      // Errors propagate to continueWithMessage's catch block, which handles
-      // them with proper user-facing UI (error messages, reconnect prompts).
-      let newId: string;
-      if (overrideSubjectId) {
-        // Use API client directly — useStartSession's URL param may be
-        // stale when called in the same render cycle as setClassifiedSubject.
-        const res = await apiClient.subjects[':subjectId'].sessions.$post({
-          param: { subjectId: overrideSubjectId },
-          json: {
-            subjectId: overrideSubjectId,
-            topicId: topicId ?? undefined,
-            sessionType,
-            inputMode,
-            ...(rawInput ? { rawInput } : {}),
-            ...(effectiveMode === 'homework' && homeworkProblemsState.length > 0
-              ? {
-                  metadata: {
-                    inputMode,
-                    homework: buildHomeworkSessionMetadata(
-                      homeworkProblemsState,
-                      currentProblemIndex,
-                      normalizedOcrText,
-                      homeworkCaptureSource
-                    ),
-                  },
-                }
-              : {}),
-          },
-        });
-        if (!res.ok) {
-          const body = await res.text().catch(() => '');
-          throw new Error(`API error ${res.status}: ${body || res.statusText}`);
-        }
-        const data = (await res.json()) as { session: { id: string } };
-        newId = data.session.id;
-      } else {
-        const result = await startSession.mutateAsync({
-          subjectId: sid,
-          topicId: topicId ?? undefined,
-          sessionType,
-          inputMode,
-          ...(rawInput ? { rawInput } : {}),
-          ...(effectiveMode === 'homework' && homeworkProblemsState.length > 0
-            ? {
-                metadata: {
-                  inputMode,
-                  homework: buildHomeworkSessionMetadata(
-                    homeworkProblemsState,
-                    currentProblemIndex,
-                    normalizedOcrText,
-                    homeworkCaptureSource
-                  ),
-                },
-              }
-            : {}),
-        });
-        newId = result.session.id;
-      }
-      setActiveSessionId(newId);
-      if (effectiveMode === 'homework' && homeworkProblemsState.length > 0) {
-        try {
-          await syncHomeworkMetadata(
-            newId,
-            homeworkProblemsState,
-            currentProblemIndex
-          );
-        } catch {
-          // Keep the session alive even if homework metadata sync fails.
-        }
-      }
-      return newId;
-    },
-    [
-      activeSessionId,
-      // BUG-339: Removed activeProfile?.id — it is not read inside
-      // ensureSession. Including it caused the callback (and every downstream
-      // dependency like continueWithMessage) to be recreated on every profile
-      // refetch, risking dropped in-flight state.
-      effectiveSubjectId,
-      topicId,
-      effectiveMode,
-      inputMode,
-      apiClient,
-      startSession,
-      homeworkProblemsState,
-      currentProblemIndex,
-      normalizedOcrText,
-      homeworkCaptureSource,
-      syncHomeworkMetadata,
-    ]
-  );
-
   const handleInputModeChange = useCallback(
     (nextInputMode: InputMode) => {
       const previousInputMode = inputMode;
@@ -816,320 +605,59 @@ export default function SessionScreen() {
     []
   );
 
-  const continueWithMessage = useCallback(
-    async (
-      text: string,
-      options?: {
-        sessionSubjectId?: string;
-        sessionSubjectName?: string;
-      }
-    ) => {
-      let streamId: string | null = null;
-      try {
-        const sessionSubjectId = options?.sessionSubjectId;
-        const sessionSubjectName = options?.sessionSubjectName;
-        const currentHomeworkProblemId =
-          effectiveMode === 'homework' ? activeHomeworkProblem?.id : undefined;
-        const updatedProblems =
-          effectiveMode === 'homework' && currentHomeworkProblemId
-            ? withProblemMode(
-                homeworkProblemsState,
-                currentHomeworkProblemId,
-                homeworkMode
-              )
-            : homeworkProblemsState;
-
-        if (updatedProblems !== homeworkProblemsState) {
-          setHomeworkProblemsState(updatedProblems);
-        }
-
-        // BUG-331: Update retry payload BEFORE ensureSession so that if
-        // ensureSession fails and the user reconnects, we replay the correct
-        // (current) message — not the payload from the previous send.
-        lastRetryPayloadRef.current = {
-          text,
-          options,
-        };
-
-        const sid = await ensureSession(sessionSubjectId);
-        if (!sid) {
-          const hasSubject = !!(
-            subjectId ||
-            classifiedSubject ||
-            sessionSubjectId
-          );
-          const errorMessage = hasSubject
-            ? "Couldn't start your session. Check your connection and try again."
-            : 'Please select a subject first so I can help you learn.';
-          animationCleanupRef.current = animateResponse(
-            errorMessage,
-            setMessages,
-            setIsStreaming
-          );
-          return;
-        }
-
-        await writeSessionRecoveryMarker(
-          {
-            sessionId: sid,
-            profileId: activeProfile?.id ?? undefined,
-            subjectId: (sessionSubjectId ?? effectiveSubjectId) || undefined,
-            subjectName:
-              sessionSubjectName ?? effectiveSubjectName ?? undefined,
-            topicId: topicId ?? undefined,
-            mode: effectiveMode,
-            // CR-2: Read from ref so this callback doesn't re-create on every
-            // milestone tracker tick (stale closure fix).
-            milestoneTracker: trackerStateRef.current,
-            updatedAt: new Date().toISOString(),
-          },
-          activeProfile?.id
-        );
-
-        if (effectiveMode === 'homework' && updatedProblems.length > 0) {
-          try {
-            await syncHomeworkMetadata(
-              sid,
-              updatedProblems,
-              currentProblemIndex
-            );
-          } catch {
-            // Don't block the tutoring exchange on metadata sync.
-          }
-        }
-
-        streamId = createLocalMessageId('ai');
-        const previousAiAt = lastAiAtRef.current;
-        setMessages((prev) => [
-          ...prev,
-          { id: streamId!, role: 'assistant', content: '', streaming: true },
-        ]);
-        setIsStreaming(true);
-
-        await streamMessage(
-          text,
-          (accumulated) => {
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.id === streamId ? { ...m, content: accumulated } : m
-              )
-            );
-          },
-          async (result) => {
-            const { triggered, trackerState: nextTrackerState } = trackExchange(
-              {
-                userMessage: text,
-                escalationRung: result.escalationRung,
-              }
-            );
-            triggered.forEach((reason) => {
-              trigger({
-                celebration: celebrationForReason(reason),
-                reason,
-                detail: null,
-              });
-            });
-
-            setMessages((prev) =>
-              prev.map((m) => {
-                if (m.id !== streamId) return m;
-                // Strip notePrompt JSON annotation from visible message text
-                let content = m.content;
-                if (result.notePrompt) {
-                  content = content
-                    .replace(
-                      /\n?\{"notePrompt":\s*true(?:,\s*"postSession":\s*true)?\}\s*$/,
-                      ''
-                    )
-                    .trimEnd();
-                }
-                return {
-                  ...m,
-                  content,
-                  streaming: false,
-                  eventId: result.aiEventId,
-                  escalationRung: result.escalationRung,
-                };
-              })
-            );
-            setIsStreaming(false);
-            setExchangeCount(result.exchangeCount);
-            setEscalationRung(result.escalationRung);
-
-            // Handle note prompt triggers
-            if (result.notePrompt && !notePromptOffered) {
-              setNotePromptOffered(true);
-            }
-            if (result.notePromptPostSession) {
-              setShowNoteInput(true);
-            }
-
-            if (previousAiAt) {
-              setResponseHistory((prev) => [
-                ...prev,
-                {
-                  actualSeconds: Math.round((Date.now() - previousAiAt) / 1000),
-                  expectedMinutes: lastExpectedMinutesRef.current,
-                },
-              ]);
-            }
-            const expectedResponseMinutes =
-              result.expectedResponseMinutes ?? 10;
-            lastExpectedMinutesRef.current = expectedResponseMinutes;
-            lastAiAtRef.current = Date.now();
-            scheduleSilencePrompt(sid, expectedResponseMinutes);
-            await writeSessionRecoveryMarker(
-              {
-                sessionId: sid,
-                profileId: activeProfile?.id ?? undefined,
-                subjectId:
-                  (sessionSubjectId ?? effectiveSubjectId) || undefined,
-                subjectName:
-                  sessionSubjectName ?? effectiveSubjectName ?? undefined,
-                topicId: topicId ?? undefined,
-                mode: effectiveMode,
-                milestoneTracker: nextTrackerState,
-                updatedAt: new Date().toISOString(),
-              },
-              activeProfile?.id
-            );
-          },
-          sid,
-          effectiveMode === 'homework' && homeworkMode
-            ? { homeworkMode }
-            : undefined
-        );
-      } catch (err: unknown) {
-        // Detect quota before reconnect classification — QuotaExceededError is
-        // never reconnectable and needs a structured card, not a text bubble.
-        if (err instanceof QuotaExceededError) {
-          setIsStreaming(false);
-          setQuotaError(err.details);
-          if (streamId) {
-            setMessages((prev) =>
-              prev.map((message) =>
-                message.id === streamId
-                  ? {
-                      ...message,
-                      content: '',
-                      streaming: false,
-                      kind: 'quota_exceeded' as const,
-                      isSystemPrompt: true,
-                    }
-                  : message
-              )
-            );
-          } else {
-            setMessages((prev) => [
-              ...prev,
-              {
-                id: createLocalMessageId('ai'),
-                role: 'assistant',
-                content: '',
-                isSystemPrompt: true,
-                kind: 'quota_exceeded' as const,
-              },
-            ]);
-          }
-          return;
-        }
-
-        const reconnectable = isReconnectableSessionError(err);
-        const formattedError = formatApiError(err);
-        // [3B.1] Classify: timeout -> specific message, network -> reconnect, fatal -> server msg
-        const errorMessage = reconnectable
-          ? isTimeoutError(err)
-            ? TIMEOUT_PROMPT
-            : RECONNECT_PROMPT
-          : formattedError;
-
-        setIsStreaming(false);
-        if (streamId) {
-          setMessages((prev) =>
-            prev.map((message) =>
-              message.id === streamId
-                ? {
-                    ...message,
-                    content: errorMessage,
-                    streaming: false,
-                    kind: reconnectable ? 'reconnect_prompt' : undefined,
-                    isSystemPrompt: reconnectable,
-                  }
-                : message
-            )
-          );
-          return;
-        }
-
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: createLocalMessageId('ai'),
-            role: 'assistant',
-            content: errorMessage,
-            isSystemPrompt: reconnectable,
-            kind: reconnectable ? 'reconnect_prompt' : undefined,
-          },
-        ]);
-      }
-    },
-    [
-      activeHomeworkProblem,
-      activeProfile?.id,
-      classifiedSubject,
-      createLocalMessageId,
-      currentProblemIndex,
-      effectiveMode,
-      effectiveSubjectId,
-      effectiveSubjectName,
-      ensureSession,
-      homeworkMode,
-      homeworkProblemsState,
-      notePromptOffered,
-      scheduleSilencePrompt,
-      streamMessage,
-      subjectId,
-      syncHomeworkMetadata,
-      topicId,
-      trackExchange,
-      // CR-2: trackerState removed — reads trackerStateRef.current inside body.
-      // CR-3: Removed duplicate createLocalMessageId entry.
-      trigger,
-    ]
-  );
-
-  const handleReconnect = useCallback(
-    async (messageId: string) => {
-      // CR-5: Also guard on quotaError — reconnecting into a quota wall just
-      // replays the send that will fail again immediately.
-      if (
-        !lastRetryPayloadRef.current ||
-        isStreaming ||
-        sessionExpired ||
-        quotaError
-      ) {
-        return;
-      }
-
-      const retryPayload = lastRetryPayloadRef.current;
-      // Remove both the error message AND the user's preceding message to
-      // prevent the AI from seeing a duplicate exchange (the replay via
-      // continueWithMessage re-adds the user message to the transcript).
-      setMessages((prev) => {
-        const errorIndex = prev.findIndex((m) => m.id === messageId);
-        if (errorIndex < 0) return prev;
-        // The user message that triggered the failed stream is immediately
-        // before the error AI message.
-        const userIndex =
-          errorIndex > 0 && prev[errorIndex - 1]?.role === 'user'
-            ? errorIndex - 1
-            : -1;
-        return prev.filter((_, i) => i !== errorIndex && i !== userIndex);
-      });
-      await continueWithMessage(retryPayload.text, retryPayload.options);
-    },
-    [continueWithMessage, isStreaming, sessionExpired, quotaError]
-  );
+  const {
+    syncHomeworkMetadata,
+    continueWithMessage,
+    handleReconnect,
+    fetchFastCelebrations,
+  } = useSessionStreaming({
+    activeSessionId,
+    setActiveSessionId,
+    effectiveSubjectId,
+    effectiveSubjectName,
+    effectiveMode,
+    topicId: topicId ?? undefined,
+    inputMode,
+    rawInput: rawInput ?? undefined,
+    normalizedOcrText,
+    homeworkCaptureSource,
+    messages,
+    setMessages,
+    setIsStreaming,
+    setExchangeCount,
+    setEscalationRung,
+    setQuotaError,
+    setNotePromptOffered,
+    setShowNoteInput,
+    setResponseHistory,
+    setHomeworkProblemsState,
+    homeworkProblemsState,
+    currentProblemIndex,
+    activeHomeworkProblem,
+    homeworkMode,
+    subjectId: subjectId ?? undefined,
+    classifiedSubject,
+    isStreaming,
+    sessionExpired,
+    quotaError,
+    draftText,
+    notePromptOffered,
+    animationCleanupRef,
+    silenceTimerRef,
+    lastAiAtRef,
+    lastExpectedMinutesRef,
+    lastRetryPayloadRef,
+    trackerStateRef,
+    activeProfileId: activeProfile?.id,
+    apiClient,
+    startSession,
+    streamMessage,
+    recordSystemPrompt,
+    trackExchange,
+    trigger,
+    createLocalMessageId,
+    responseHistory,
+  });
 
   const handleResolveSubject = useCallback(
     async (candidate: { subjectId: string; subjectName: string }) => {
@@ -1560,34 +1088,6 @@ export default function SessionScreen() {
     }
     return undefined;
   }, [problemText, handleSend, routeSessionId]);
-
-  const fetchFastCelebrations = useCallback(async (): Promise<
-    PendingCelebration[]
-  > => {
-    try {
-      const startedAt = Date.now();
-
-      while (Date.now() - startedAt < 3000) {
-        const res = await apiClient.celebrations.pending.$get();
-        if (res.ok) {
-          const data = await res.json();
-          if (data.pendingCelebrations.length > 0) {
-            await apiClient.celebrations.seen.$post({
-              json: { viewer: 'child' },
-            });
-            return data.pendingCelebrations;
-          }
-        }
-
-        await new Promise((resolve) => setTimeout(resolve, 500));
-      }
-
-      return [];
-    } catch (error) {
-      console.error('[Session] Failed to fetch celebrations:', error);
-      return [];
-    }
-  }, [apiClient]);
 
   const handleNextProblem = useCallback(async () => {
     if (
