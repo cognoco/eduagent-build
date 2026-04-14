@@ -30,6 +30,21 @@ import {
   type MessageFeedbackState,
 } from './session-types';
 
+/** Conditions for silent auto-filing of freeform sessions at close */
+export function shouldAutoFile(params: {
+  effectiveMode: string;
+  effectiveSubjectId: string | null | undefined;
+  exchangeCount: number;
+  topicId: string | undefined;
+}): boolean {
+  return (
+    params.effectiveMode === 'freeform' &&
+    !!params.effectiveSubjectId &&
+    params.exchangeCount >= 5 &&
+    !params.topicId
+  );
+}
+
 export interface UseSessionActionsOptions {
   // State
   activeSessionId: string | null;
@@ -94,6 +109,13 @@ export interface UseSessionActionsOptions {
   ) => Promise<void>;
   fetchFastCelebrations: () => Promise<PendingCelebration[]>;
   showConfirmation: (message: string) => void;
+  /** Filing mutation for auto-filing freeform sessions */
+  filing?: {
+    mutateAsync: (input: {
+      sessionId: string;
+      sessionMode: 'freeform';
+    }) => Promise<{ shelfId: string; bookId: string }>;
+  };
 
   router: Router;
 }
@@ -141,6 +163,7 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
     syncHomeworkMetadata,
     fetchFastCelebrations,
     showConfirmation,
+    filing,
     router,
   } = opts;
 
@@ -257,6 +280,39 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
     closedSessionRef,
   ]);
 
+  const navigateToSummary = useCallback(
+    (
+      sessionId: string,
+      wallClockSeconds: number,
+      fastCelebrations: PendingCelebration[]
+    ) => {
+      router.replace({
+        pathname: `/session-summary/${sessionId}`,
+        params: {
+          subjectName: effectiveSubjectName ?? '',
+          exchangeCount: String(exchangeCount),
+          escalationRung: String(escalationRung),
+          subjectId: effectiveSubjectId ?? '',
+          topicId: topicId ?? '',
+          wallClockSeconds: String(wallClockSeconds),
+          milestones: serializeMilestones(milestonesReached),
+          fastCelebrations: serializeCelebrations(fastCelebrations),
+          sessionType: effectiveMode,
+        },
+      } as never);
+    },
+    [
+      router,
+      effectiveSubjectName,
+      exchangeCount,
+      escalationRung,
+      effectiveSubjectId,
+      topicId,
+      milestonesReached,
+      effectiveMode,
+    ]
+  );
+
   const handleEndSession = useCallback(async () => {
     if (!activeSessionId || isClosing) return;
 
@@ -292,27 +348,47 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
                 fastCelebrations,
               };
 
-              // Freeform/homework: show filing prompt before navigating
+              // Freeform: auto-file silently if conditions met, else show prompt
+              // Homework: always show filing prompt
               if (
                 effectiveMode === 'freeform' ||
                 effectiveMode === 'homework'
               ) {
-                setShowFilingPrompt(true);
+                if (
+                  shouldAutoFile({
+                    effectiveMode,
+                    effectiveSubjectId,
+                    exchangeCount,
+                    topicId,
+                  }) &&
+                  filing
+                ) {
+                  // Auto-file silently — no modal, no decision for the kid
+                  try {
+                    await filing.mutateAsync({
+                      sessionId: activeSessionId,
+                      sessionMode: 'freeform',
+                    });
+                    showConfirmation(
+                      `Saved to your ${effectiveSubjectName ?? 'library'} shelf`
+                    );
+                  } catch {
+                    showConfirmation?.("Couldn't save — we'll try next time");
+                  }
+                  navigateToSummary(
+                    activeSessionId,
+                    result.wallClockSeconds,
+                    fastCelebrations
+                  );
+                } else {
+                  setShowFilingPrompt(true);
+                }
               } else {
-                router.replace({
-                  pathname: `/session-summary/${activeSessionId}`,
-                  params: {
-                    subjectName: effectiveSubjectName ?? '',
-                    exchangeCount: String(exchangeCount),
-                    escalationRung: String(escalationRung),
-                    subjectId: effectiveSubjectId ?? '',
-                    topicId: topicId ?? '',
-                    wallClockSeconds: String(result.wallClockSeconds),
-                    milestones: serializeMilestones(milestonesReached),
-                    fastCelebrations: serializeCelebrations(fastCelebrations),
-                    sessionType: 'learning',
-                  },
-                } as never);
+                navigateToSummary(
+                  activeSessionId,
+                  result.wallClockSeconds,
+                  fastCelebrations
+                );
               }
             } catch (err: unknown) {
               // R-2: Do NOT reset isClosing here — keep End Session button
@@ -349,16 +425,17 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
     activeSessionId,
     isClosing,
     closeSession,
-    router,
-    effectiveSubjectName,
-    effectiveSubjectId,
-    topicId,
-    exchangeCount,
-    escalationRung,
     fetchFastCelebrations,
     activeProfileId,
     milestonesReached,
     effectiveMode,
+    effectiveSubjectId,
+    effectiveSubjectName,
+    exchangeCount,
+    topicId,
+    filing,
+    showConfirmation,
+    navigateToSummary,
     setIsClosing,
     setShowFilingPrompt,
     closedSessionRef,
@@ -597,6 +674,7 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
     handleInputModeChange,
     handleNextProblem,
     navigateToSessionSummary,
+    navigateToSummary,
     handleEndSession,
     handleQuickChip,
     handleMessageFeedback,

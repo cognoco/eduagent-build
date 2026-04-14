@@ -684,6 +684,7 @@ export default function SessionScreen() {
     syncHomeworkMetadata,
     fetchFastCelebrations,
     showConfirmation,
+    filing,
     router,
   });
 
