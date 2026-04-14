@@ -11,6 +11,7 @@ const mockReplace = jest.fn();
 const mockCanGoBack = jest.fn();
 const mockReadSessionRecoveryMarker = jest.fn();
 const mockUseContinueSuggestion = jest.fn();
+const mockUseSubjects = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({
@@ -40,6 +41,10 @@ jest.mock('../../hooks/use-progress', () => ({
   useContinueSuggestion: () => mockUseContinueSuggestion(),
 }));
 
+jest.mock('../../hooks/use-subjects', () => ({
+  useSubjects: () => mockUseSubjects(),
+}));
+
 jest.mock('../../lib/session-recovery', () => ({
   readSessionRecoveryMarker: (...args: unknown[]) =>
     mockReadSessionRecoveryMarker(...args),
@@ -55,6 +60,7 @@ describe('LearnNewScreen', () => {
     mockReadSessionRecoveryMarker.mockResolvedValue(null);
     mockCanGoBack.mockReturnValue(true);
     mockUseContinueSuggestion.mockReturnValue({ data: null });
+    mockUseSubjects.mockReturnValue({ data: undefined });
   });
 
   it('renders title and two always-visible cards', () => {
@@ -139,6 +145,61 @@ describe('LearnNewScreen', () => {
 
     fireEvent.press(screen.getByTestId('learn-new-back'));
     expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
+  });
+
+  describe('continue-with-subject card', () => {
+    it('shows shortcut to most recent subject when no continueSuggestion', () => {
+      mockUseSubjects.mockReturnValue({
+        data: [{ id: 'sub-1', name: 'Geography of Africa', status: 'active' }],
+      });
+
+      render(<LearnNewScreen />);
+
+      expect(
+        screen.getByText('Continue with Geography of Africa')
+      ).toBeTruthy();
+      expect(screen.getByTestId('intent-continue-subject')).toBeTruthy();
+    });
+
+    it('navigates to session with subject on press', () => {
+      mockUseSubjects.mockReturnValue({
+        data: [{ id: 'sub-1', name: 'Geography of Africa', status: 'active' }],
+      });
+
+      render(<LearnNewScreen />);
+
+      fireEvent.press(screen.getByTestId('intent-continue-subject'));
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: '/(app)/session',
+        params: {
+          subjectId: 'sub-1',
+          subjectName: 'Geography of Africa',
+          mode: 'learning',
+        },
+      });
+    });
+
+    it('hides when continueSuggestion exists (resume-last takes priority)', () => {
+      mockUseContinueSuggestion.mockReturnValue({
+        data: { subjectId: 's1', subjectName: 'Math', topicId: 't1' },
+      });
+      mockUseSubjects.mockReturnValue({
+        data: [{ id: 'sub-1', name: 'Geography of Africa', status: 'active' }],
+      });
+
+      render(<LearnNewScreen />);
+
+      expect(screen.queryByTestId('intent-continue-subject')).toBeNull();
+      expect(screen.getByTestId('intent-resume-last')).toBeTruthy();
+    });
+
+    it('hides when subjects list is empty', () => {
+      mockUseSubjects.mockReturnValue({ data: [] });
+
+      render(<LearnNewScreen />);
+
+      expect(screen.queryByTestId('intent-continue-subject')).toBeNull();
+    });
   });
 
   describe('resume-last-session card [BUG-continue]', () => {
