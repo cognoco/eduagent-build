@@ -1,3 +1,4 @@
+import type { InputMode } from '@eduagent/schemas';
 import React from 'react';
 import { Alert } from 'react-native';
 import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
@@ -46,8 +47,8 @@ jest.mock('../../../components/session', () => ({
     messages?: Array<{ id: string; content: string }>;
     inputAccessory?: React.ReactNode;
     belowInput?: React.ReactNode;
-    inputMode?: 'text' | 'voice';
-    onInputModeChange?: (mode: 'text' | 'voice') => void;
+    inputMode?: InputMode;
+    onInputModeChange?: (mode: InputMode) => void;
     onSend: (text: string) => void;
     renderMessageActions?: (message: {
       id: string;

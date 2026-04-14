@@ -307,24 +307,28 @@ function ChildPaywall(): React.ReactElement {
     if (!profileId) return;
     let cancelled = false;
     (async () => {
-      // Step 1: migrate legacy key → new key (no-ops if already migrated)
-      await migrateSecureStoreKey(
-        getLegacyNotifyStorageKey(profileId),
-        getNotifyStorageKey(profileId)
-      );
-      if (cancelled) return;
-      // Step 2: restore persisted notified timestamp
-      const value = await SecureStore.getItemAsync(
-        getNotifyStorageKey(profileId)
-      );
-      if (cancelled) return;
-      if (!value) return;
-      const ts = Number(value);
-      if (Number.isNaN(ts)) return;
-      const remaining = computeCooldownMsRemaining(ts);
-      if (remaining > 0) {
-        setNotifiedAt(ts);
-        setCooldownMsRemaining(remaining);
+      try {
+        // Step 1: migrate legacy key → new key (no-ops if already migrated)
+        await migrateSecureStoreKey(
+          getLegacyNotifyStorageKey(profileId),
+          getNotifyStorageKey(profileId)
+        );
+        if (cancelled) return;
+        // Step 2: restore persisted notified timestamp
+        const value = await SecureStore.getItemAsync(
+          getNotifyStorageKey(profileId)
+        );
+        if (cancelled) return;
+        if (!value) return;
+        const ts = Number(value);
+        if (Number.isNaN(ts)) return;
+        const remaining = computeCooldownMsRemaining(ts);
+        if (remaining > 0) {
+          setNotifiedAt(ts);
+          setCooldownMsRemaining(remaining);
+        }
+      } catch {
+        /* SecureStore unavailable */
       }
     })();
     return () => {
@@ -369,7 +373,7 @@ function ChildPaywall(): React.ReactElement {
           void SecureStore.setItemAsync(
             getNotifyStorageKey(profileId),
             String(now)
-          );
+          ).catch(() => {});
         }
       } else if (result.sent) {
         const now = Date.now();
@@ -378,7 +382,7 @@ function ChildPaywall(): React.ReactElement {
           void SecureStore.setItemAsync(
             getNotifyStorageKey(profileId),
             String(now)
-          );
+          ).catch(() => {});
         }
         Alert.alert('Sent!', 'We let your parent know!');
       } else {
@@ -811,7 +815,7 @@ export default function SubscriptionScreen() {
     try {
       await byokWaitlist.mutateAsync();
       setByokJoined(true);
-      void SecureStore.setItemAsync(BYOK_JOINED_KEY, 'true');
+      void SecureStore.setItemAsync(BYOK_JOINED_KEY, 'true').catch(() => {});
       Alert.alert('Waitlist', 'You have been added to the BYOK waitlist.');
     } catch {
       Alert.alert('Error', 'Could not join waitlist. Try again.');

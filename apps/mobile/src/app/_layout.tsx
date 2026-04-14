@@ -158,7 +158,7 @@ function ThemedApp() {
       // user from seeing stale data from the previous session.
       markSessionExpired();
       queryClient.clear();
-      void SecureStore.deleteItemAsync('hasSignedInBefore');
+      void SecureStore.deleteItemAsync('hasSignedInBefore').catch(() => {});
       void signOut().catch(() => {
         Alert.alert(
           'Could not sign you out',

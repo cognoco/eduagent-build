@@ -13,9 +13,10 @@ import {
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type {
-  PendingCelebration,
   HomeworkCaptureSource,
   HomeworkProblem,
+  InputMode,
+  PendingCelebration,
 } from '@eduagent/schemas';
 import {
   ChatShell,
@@ -406,7 +407,7 @@ export default function SessionScreen() {
   } | null>(null);
   const [pendingSubjectResolution, setPendingSubjectResolution] =
     useState<PendingSubjectResolution | null>(null);
-  const [inputMode, setInputMode] = useState<'text' | 'voice'>('text');
+  const [inputMode, setInputMode] = useState<InputMode>('text');
 
   // Restore the user's last-used input mode from SecureStore on mount.
   useEffect(() => {
@@ -710,22 +711,26 @@ export default function SessionScreen() {
     let cancelled = false;
 
     void (async () => {
-      const marker = await readSessionRecoveryMarker(activeProfile?.id);
-      if (cancelled || hasHydratedRecoveryRef.current) return;
+      try {
+        const marker = await readSessionRecoveryMarker(activeProfile?.id);
+        if (cancelled || hasHydratedRecoveryRef.current) return;
 
-      if (marker?.sessionId === routeSessionId && marker.milestoneTracker) {
-        hydrate(normalizeMilestoneTrackerState(marker.milestoneTracker));
-        hasHydratedRecoveryRef.current = true;
-        return;
-      }
+        if (marker?.sessionId === routeSessionId && marker.milestoneTracker) {
+          hydrate(normalizeMilestoneTrackerState(marker.milestoneTracker));
+          hasHydratedRecoveryRef.current = true;
+          return;
+        }
 
-      const transcriptMilestones =
-        transcript.data?.session.milestonesReached ?? [];
-      if (transcriptMilestones.length > 0) {
-        hydrate(
-          createMilestoneTrackerStateFromMilestones(transcriptMilestones)
-        );
-        hasHydratedRecoveryRef.current = true;
+        const transcriptMilestones =
+          transcript.data?.session.milestonesReached ?? [];
+        if (transcriptMilestones.length > 0) {
+          hydrate(
+            createMilestoneTrackerStateFromMilestones(transcriptMilestones)
+          );
+          hasHydratedRecoveryRef.current = true;
+        }
+      } catch {
+        /* SecureStore unavailable — skip recovery hydration */
       }
     })();
 
@@ -757,7 +762,7 @@ export default function SessionScreen() {
             updatedAt: new Date().toISOString(),
           },
           activeProfile?.id
-        );
+        ).catch(() => {});
       }
     });
 
@@ -825,7 +830,7 @@ export default function SessionScreen() {
             updatedAt: new Date().toISOString(),
           },
           activeProfile?.id
-        );
+        ).catch(() => {});
       }, thresholdMinutes * 60 * 1000);
     },
     [
@@ -945,7 +950,7 @@ export default function SessionScreen() {
   );
 
   const handleInputModeChange = useCallback(
-    (nextInputMode: 'text' | 'voice') => {
+    (nextInputMode: InputMode) => {
       const previousInputMode = inputMode;
       setInputMode(nextInputMode);
 
@@ -954,7 +959,7 @@ export default function SessionScreen() {
         void SecureStore.setItemAsync(
           getInputModeKey(activeProfile.id),
           nextInputMode
-        );
+        ).catch(() => {});
       }
 
       if (!activeSessionId) {
@@ -1309,6 +1314,54 @@ export default function SessionScreen() {
       isStreaming,
       pendingClassification,
       pendingSubjectResolution,
+    ]
+  );
+
+  // BUG-XXX: Create a new subject from a resolve API suggestion
+  const handleCreateResolveSuggestion = useCallback(
+    async (suggestion: { name: string; description: string; focus?: string }) => {
+      if (isStreaming || pendingClassification || !pendingSubjectResolution) return;
+
+      const originalText = pendingSubjectResolution.originalText;
+      setPendingSubjectResolution(null);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: createLocalMessageId('ai'),
+          role: 'assistant',
+          content: `Adding ${suggestion.name} and getting started...`,
+          isSystemPrompt: true,
+        },
+      ]);
+
+      try {
+        const result = await createSubject.mutateAsync({
+          name: suggestion.name,
+          rawInput: suggestion.focus ?? originalText,
+        });
+        setClassifiedSubject({
+          subjectId: result.subject.id,
+          subjectName: result.subject.name,
+        });
+        setShowWrongSubjectChip(false);
+        await continueWithMessage(originalText, {
+          sessionSubjectId: result.subject.id,
+          sessionSubjectName: result.subject.name,
+        });
+      } catch {
+        showConfirmation(
+          `Could not create ${suggestion.name}. Please try again or pick an existing subject.`
+        );
+      }
+    },
+    [
+      continueWithMessage,
+      createLocalMessageId,
+      createSubject,
+      isStreaming,
+      pendingClassification,
+      pendingSubjectResolution,
+      showConfirmation,
     ]
   );
 
@@ -2249,6 +2302,28 @@ export default function SessionScreen() {
               </Text>
             </Pressable>
           )}
+          {/* BUG-XXX: Render rich suggestions from the resolve API */}
+          {pendingSubjectResolution.resolveSuggestions?.map((suggestion) => (
+            <Pressable
+              key={suggestion.name}
+              onPress={() => void handleCreateResolveSuggestion(suggestion)}
+              disabled={
+                isStreaming || pendingClassification || createSubject.isPending
+              }
+              className="rounded-full bg-primary/20 px-4 py-2"
+              accessibilityRole="button"
+              accessibilityLabel={`Add ${suggestion.name} as a new subject`}
+              accessibilityState={{
+                disabled:
+                  isStreaming || pendingClassification || createSubject.isPending,
+              }}
+              testID={`subject-resolution-resolve-${suggestion.name}`}
+            >
+              <Text className="text-body-sm font-semibold text-primary">
+                {createSubject.isPending ? 'Adding...' : `+ ${suggestion.name}`}
+              </Text>
+            </Pressable>
+          ))}
           {/* BUG-236: Generic new-subject escape hatch — returns to chat after creation */}
           <Pressable
             onPress={() =>

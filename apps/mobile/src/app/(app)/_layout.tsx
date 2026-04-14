@@ -119,7 +119,7 @@ function usePostApprovalLanding(
     if (!profileId) return;
     setShouldShow(false);
     const key = `postApprovalSeen_${profileId}`;
-    void SecureStore.setItemAsync(key, 'true');
+    void SecureStore.setItemAsync(key, 'true').catch(() => {});
   }, [profileId]);
 
   return [checked && shouldShow, dismiss];

@@ -493,7 +493,7 @@ export default function MoreScreen() {
             setIsSigningOut(true);
             try {
               clearTransitionState();
-              void SecureStore.deleteItemAsync('hasSignedInBefore');
+              void SecureStore.deleteItemAsync('hasSignedInBefore').catch(() => {});
               await signOut();
             } catch {
               Alert.alert(

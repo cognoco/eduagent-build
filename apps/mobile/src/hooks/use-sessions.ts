@@ -11,6 +11,7 @@ import type {
   CelebrationReason,
   ContentFlagInput,
   HomeworkSessionMetadata,
+  InputMode,
   LearningSession,
   ParkingLotItem,
   SessionMessageInput,
@@ -18,7 +19,9 @@ import type {
   SessionAnalyticsEventInput,
   SessionSummary,
   SessionTranscript,
+  SessionType,
   RecallBridgeResult,
+  VerificationType,
 } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
@@ -82,9 +85,9 @@ export function useStartSession(subjectId: string): UseMutationResult<
   {
     subjectId: string;
     topicId?: string;
-    sessionType?: 'learning' | 'homework' | 'interleaved';
-    verificationType?: 'standard' | 'evaluate' | 'teach_back';
-    inputMode?: 'text' | 'voice';
+    sessionType?: SessionType;
+    verificationType?: VerificationType;
+    inputMode?: InputMode;
     metadata?: SessionMetadata;
     rawInput?: string;
   }
@@ -96,9 +99,9 @@ export function useStartSession(subjectId: string): UseMutationResult<
     mutationFn: async (input: {
       subjectId: string;
       topicId?: string;
-      sessionType?: 'learning' | 'homework' | 'interleaved';
-      verificationType?: 'standard' | 'evaluate' | 'teach_back';
-      inputMode?: 'text' | 'voice';
+      sessionType?: SessionType;
+      verificationType?: VerificationType;
+      inputMode?: InputMode;
       metadata?: SessionMetadata;
       rawInput?: string;
     }): Promise<SessionStartResult> => {
@@ -120,13 +123,13 @@ export function useSetSessionInputMode(
 ): UseMutationResult<
   SessionStartResult,
   Error,
-  { inputMode: 'text' | 'voice' }
+  { inputMode: InputMode }
 > {
   const client = useApiClient();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: { inputMode: 'text' | 'voice' }) => {
+    mutationFn: async (input: { inputMode: InputMode }) => {
       // Hono RPC cannot index hyphenated path segments as JS identifiers.
       // Narrow cast to preserve type intent — update if the API route changes.
       // Route ref: apps/api/src/routes/sessions.ts POST /sessions/:sessionId/input-mode
@@ -135,7 +138,7 @@ export function useSetSessionInputMode(
           'input-mode': {
             $post: (args: {
               param: { sessionId: string };
-              json: { inputMode: 'text' | 'voice' };
+              json: { inputMode: InputMode };
             }) => Promise<Response>;
           };
         }

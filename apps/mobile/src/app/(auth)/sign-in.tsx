@@ -535,7 +535,7 @@ export default function SignInScreen() {
       setPendingVerification(null);
       setVerificationOffer(null);
       setCode('');
-      void SecureStore.setItemAsync(HAS_SIGNED_IN_KEY, 'true');
+      void SecureStore.setItemAsync(HAS_SIGNED_IN_KEY, 'true').catch(() => {});
       // Don't navigate explicitly — the auth layout guard redirects to
       // /(app)/home once Clerk's useAuth() state propagates with
       // isSignedIn: true.  Calling router.replace() here races with Clerk's
@@ -588,7 +588,7 @@ export default function SignInScreen() {
           if (!activated) {
             return;
           }
-          void SecureStore.setItemAsync(HAS_SIGNED_IN_KEY, 'true');
+          void SecureStore.setItemAsync(HAS_SIGNED_IN_KEY, 'true').catch(() => {});
           // Auth layout guard handles navigation once isSignedIn propagates.
           return;
         }

@@ -1,3 +1,4 @@
+import type { InputMode } from '@eduagent/schemas';
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   AccessibilityInfo,
@@ -57,8 +58,8 @@ interface ChatShellProps {
   verificationType?: string;
   /** Explicit voice mode override from session-start input mode toggle (FR144). Takes precedence over verificationType. */
   initialVoiceEnabled?: boolean;
-  inputMode?: 'text' | 'voice';
-  onInputModeChange?: (mode: 'text' | 'voice') => void;
+  inputMode?: InputMode;
+  onInputModeChange?: (mode: InputMode) => void;
   speechRecognitionLanguage?: string;
   textToSpeechLanguage?: string;
   /** Compact controls rendered below the text input (e.g. Switch topic / Park it). */
@@ -325,7 +326,7 @@ export function ChatShell({
   }, [clearTranscript, startListening, stopSpeaking]);
 
   const handleSelectInputMode = useCallback(
-    async (mode: 'text' | 'voice') => {
+    async (mode: InputMode) => {
       if (mode === 'text') {
         if (!isVoiceEnabled) {
           return;
