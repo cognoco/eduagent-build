@@ -69,6 +69,11 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('Sharp and collegial');
   });
 
+  it('accepts exchangeCount in the context', () => {
+    const prompt = buildSystemPrompt({ ...baseContext, exchangeCount: 0 });
+    expect(prompt).toBeDefined();
+  });
+
   it('includes learning session guidance', () => {
     const prompt = buildSystemPrompt(baseContext);
     expect(prompt).toContain('LEARNING');

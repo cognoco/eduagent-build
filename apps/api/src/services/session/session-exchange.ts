@@ -527,7 +527,10 @@ export async function prepareExchangeContext(
         {
           status: retentionStatusValue,
           strongTopics: strongTopicTitles,
-        }
+        },
+        Array.isArray(learningProfile.recentlyResolvedTopics)
+          ? (learningProfile.recentlyResolvedTopics as string[])
+          : []
       ) || undefined
     : undefined;
 
@@ -578,6 +581,8 @@ export async function prepareExchangeContext(
     // CFLF: Original learner input so the LLM stays anchored to intent
     rawInput: session.rawInput,
     inputMode: session.inputMode,
+    // Teach-first: expose exchange count so buildSystemPrompt can gate first-exchange behaviour
+    exchangeCount: session.exchangeCount,
   };
 
   return { session, context, effectiveRung, hintCount, lastAiResponseAt };

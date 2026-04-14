@@ -86,6 +86,8 @@ export interface ExchangeContext {
   rawInput?: string | null;
   /** Input mode for this session — controls voice-optimized brevity in the system prompt */
   inputMode?: InputMode;
+  /** Number of completed exchanges in this session — 0 means the LLM's first turn */
+  exchangeCount?: number;
 }
 
 /** Result of processing a single exchange */
