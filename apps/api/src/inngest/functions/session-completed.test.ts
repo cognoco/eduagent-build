@@ -645,7 +645,8 @@ describe('sessionCompleted', () => {
 
       expect(mockExtractVocabularyFromTranscript).toHaveBeenCalledWith(
         expect.any(Array), // transcript
-        'es' // languageCode
+        'es', // languageCode
+        null // cefrLevel (no language progress in this test)
       );
     });
 

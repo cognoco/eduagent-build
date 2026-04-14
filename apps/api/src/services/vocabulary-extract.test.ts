@@ -51,11 +51,13 @@ describe('extractVocabularyFromTranscript', () => {
       term: 'hola',
       translation: 'hello',
       type: 'word',
+      cefrLevel: null,
     });
     expect(result[1]).toEqual({
       term: 'buenos días',
       translation: 'good morning',
       type: 'chunk',
+      cefrLevel: null,
     });
   });
 
@@ -133,7 +135,12 @@ describe('extractVocabularyFromTranscript', () => {
     );
 
     expect(result).toHaveLength(1);
-    expect(result[0].term).toBe('hola');
+    expect(result[0]).toEqual({
+      term: 'hola',
+      translation: 'hello',
+      type: 'word',
+      cefrLevel: null,
+    });
   });
 
   it('filters out items with empty term', async () => {
@@ -151,7 +158,12 @@ describe('extractVocabularyFromTranscript', () => {
     );
 
     expect(result).toHaveLength(1);
-    expect(result[0].term).toBe('hola');
+    expect(result[0]).toEqual({
+      term: 'hola',
+      translation: 'hello',
+      type: 'word',
+      cefrLevel: null,
+    });
   });
 
   it('filters out items with empty translation', async () => {
@@ -168,7 +180,12 @@ describe('extractVocabularyFromTranscript', () => {
     );
 
     expect(result).toHaveLength(1);
-    expect(result[0].term).toBe('adiós');
+    expect(result[0]).toEqual({
+      term: 'adiós',
+      translation: 'goodbye',
+      type: 'word',
+      cefrLevel: null,
+    });
   });
 
   it('filters out items with missing fields', async () => {
@@ -186,7 +203,12 @@ describe('extractVocabularyFromTranscript', () => {
     );
 
     expect(result).toHaveLength(1);
-    expect(result[0].term).toBe('adiós');
+    expect(result[0]).toEqual({
+      term: 'adiós',
+      translation: 'goodbye',
+      type: 'word',
+      cefrLevel: null,
+    });
   });
 
   it('limits output to 8 items maximum', async () => {
@@ -215,8 +237,12 @@ describe('extractVocabularyFromTranscript', () => {
       'es'
     );
 
-    expect(result[0].term).toBe('hola');
-    expect(result[0].translation).toBe('hello');
+    expect(result[0]).toEqual({
+      term: 'hola',
+      translation: 'hello',
+      type: 'word',
+      cefrLevel: null,
+    });
   });
 
   it('calls routeAndCall with target language info', async () => {
@@ -254,5 +280,86 @@ describe('extractVocabularyFromTranscript', () => {
     );
 
     expect(result).toEqual([]);
+  });
+
+  it('returns cefrLevel from LLM response when cefrLevel argument is provided', async () => {
+    llmResponse({
+      items: [
+        { term: 'hola', translation: 'hello', type: 'word', cefrLevel: 'A2' },
+      ],
+    });
+
+    const result = await extractVocabularyFromTranscript(
+      sampleTranscript,
+      'es',
+      'A2'
+    );
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toEqual({
+      term: 'hola',
+      translation: 'hello',
+      type: 'word',
+      cefrLevel: 'A2',
+    });
+  });
+
+  it('maps invalid (non-string) cefrLevel from LLM to null', async () => {
+    llmResponse({
+      items: [
+        {
+          term: 'hola',
+          translation: 'hello',
+          type: 'word',
+          cefrLevel: 42,
+        },
+      ],
+    });
+
+    const result = await extractVocabularyFromTranscript(
+      sampleTranscript,
+      'es',
+      'A2'
+    );
+
+    expect(result).toHaveLength(1);
+    expect(result[0].cefrLevel).toBeNull();
+  });
+
+  it('works without cefrLevel argument (backward compatible)', async () => {
+    llmResponse({
+      items: [{ term: 'hola', translation: 'hello', type: 'word' }],
+    });
+
+    const result = await extractVocabularyFromTranscript(
+      sampleTranscript,
+      'es'
+    );
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toEqual({
+      term: 'hola',
+      translation: 'hello',
+      type: 'word',
+      cefrLevel: null,
+    });
+  });
+
+  it('includes CEFR target level in user message when cefrLevel is provided', async () => {
+    llmResponse({ items: [] });
+
+    await extractVocabularyFromTranscript(sampleTranscript, 'es', 'B1');
+
+    const [messages] = mockRouteAndCall.mock.calls[0];
+    expect(messages[1].content).toMatch(/CEFR target level: B1/);
+  });
+
+  it('does not include CEFR target level in user message when cefrLevel is not provided', async () => {
+    llmResponse({ items: [] });
+
+    await extractVocabularyFromTranscript(sampleTranscript, 'es');
+
+    const [messages] = mockRouteAndCall.mock.calls[0];
+    expect(messages[1].content).not.toMatch(/CEFR target level/);
   });
 });
