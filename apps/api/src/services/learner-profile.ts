@@ -79,6 +79,22 @@ export interface MemoryRetentionContext {
   strongTopics?: string[];
 }
 
+export type StruggleNotificationType =
+  | 'struggle_noticed'
+  | 'struggle_flagged'
+  | 'struggle_resolved';
+
+export interface StruggleNotification {
+  type: StruggleNotificationType;
+  topic: string;
+  subject: string | null;
+}
+
+export interface ApplyAnalysisResult {
+  fieldsUpdated: string[];
+  notifications: StruggleNotification[];
+}
+
 function nowIso(): string {
   return new Date().toISOString();
 }
@@ -378,6 +394,60 @@ export function resolveStruggle(
   return result;
 }
 
+export function detectStruggleNotifications(
+  beforeStruggles: StruggleEntry[],
+  afterStruggles: StruggleEntry[],
+  resolvedTopics: Array<{ topic: string; subject: string | null }> | null
+): StruggleNotification[] {
+  const notifications: StruggleNotification[] = [];
+
+  for (const after of afterStruggles) {
+    const before = beforeStruggles.find(
+      (b) =>
+        sameNormalized(b.topic, after.topic) &&
+        sameNormalized(b.subject, after.subject)
+    );
+
+    if (
+      after.confidence === 'medium' &&
+      (!before || before.confidence === 'low')
+    ) {
+      notifications.push({
+        type: 'struggle_noticed',
+        topic: after.topic,
+        subject: after.subject,
+      });
+    }
+
+    if (after.confidence === 'high' && before?.confidence !== 'high') {
+      notifications.push({
+        type: 'struggle_flagged',
+        topic: after.topic,
+        subject: after.subject,
+      });
+    }
+  }
+
+  if (resolvedTopics) {
+    for (const resolved of resolvedTopics) {
+      const wasInBefore = beforeStruggles.some(
+        (b) =>
+          sameNormalized(b.topic, resolved.topic) &&
+          sameNormalized(b.subject, resolved.subject)
+      );
+      if (wasInBefore) {
+        notifications.push({
+          type: 'struggle_resolved',
+          topic: resolved.topic,
+          subject: resolved.subject,
+        });
+      }
+    }
+  }
+
+  return notifications;
+}
+
 export function shouldUpdateLearningStyle(
   existingConfidence: ConfidenceLevel | undefined,
   newConfidence: ConfidenceLevel,
@@ -459,6 +529,7 @@ function buildAnalysisUpdates(
 ): {
   updates: Record<string, unknown>;
   fieldsUpdated: string[];
+  notifications: StruggleNotification[];
 } {
   const suppressed = asStringArray(profile.suppressedInferences);
   const updates: Record<string, unknown> = {};
@@ -489,7 +560,8 @@ function buildAnalysisUpdates(
     fieldsUpdated.push('strengths');
   }
 
-  let mergedStruggles = asStruggleArray(profile.struggles);
+  const beforeStruggles = asStruggleArray(profile.struggles);
+  let mergedStruggles = beforeStruggles;
   if (analysis.struggles?.length) {
     mergedStruggles = archiveStaleStruggles(
       mergeStruggles(
@@ -551,9 +623,18 @@ function buildAnalysisUpdates(
     fieldsUpdated.push('learningStyle');
   }
 
+  const afterStruggles =
+    (updates.struggles as StruggleEntry[] | undefined) ?? mergedStruggles;
+  const notifications = detectStruggleNotifications(
+    beforeStruggles,
+    afterStruggles,
+    analysis.resolvedTopics ?? null
+  );
+
   return {
     updates,
     fieldsUpdated,
+    notifications,
   };
 }
 
@@ -639,7 +720,8 @@ export function buildMemoryBlock(
   profile: MemoryBlockProfile | null,
   currentSubject: string | null,
   currentTopic: string | null,
-  retentionContext?: MemoryRetentionContext | null
+  retentionContext?: MemoryRetentionContext | null,
+  recentlyResolved?: string[]
 ): string {
   const injectionEnabled =
     profile?.memoryInjectionEnabled ?? profile?.memoryEnabled ?? true;
@@ -674,6 +756,13 @@ export function buildMemoryBlock(
       .join(', ');
     sections.push(
       `- They've been working hard on: ${struggleTopics}. Be patient and try a different angle before escalating.`
+    );
+  }
+
+  if (recentlyResolved && recentlyResolved.length > 0) {
+    const resolvedList = recentlyResolved.join(', ');
+    sections.push(
+      `- They recently overcame difficulties with: ${resolvedList}. Celebrate their growth!`
     );
   }
 
@@ -815,17 +904,17 @@ export async function applyAnalysis(
   analysis: SessionAnalysisOutput,
   subjectName: string | null,
   source: MemorySource = 'inferred'
-): Promise<string[]> {
+): Promise<ApplyAnalysisResult> {
   if (analysis.confidence === 'low') {
     console.info('[learner-profile] Low-confidence analysis skipped', {
       event: 'learner_profile.analysis.low_confidence',
       profileId,
     });
-    return [];
+    return { fieldsUpdated: [], notifications: [] };
   }
 
   const profile = await getOrCreateLearningProfile(db, profileId);
-  const { updates, fieldsUpdated } = buildAnalysisUpdates(
+  const { updates, fieldsUpdated, notifications } = buildAnalysisUpdates(
     profile,
     analysis,
     source,
@@ -833,7 +922,7 @@ export async function applyAnalysis(
   );
 
   if (Object.keys(updates).length === 0) {
-    return [];
+    return { fieldsUpdated: [], notifications: [] };
   }
 
   const updated = await updateWithRetry(
@@ -844,10 +933,21 @@ export async function applyAnalysis(
   );
   if (!updated) {
     const fresh = await getLearningProfile(db, profileId);
-    if (!fresh) return [];
+    if (!fresh) return { fieldsUpdated: [], notifications: [] };
 
     const retry = buildAnalysisUpdates(fresh, analysis, source, subjectName);
     await updateWithRetry(db, profileId, fresh.version, retry.updates);
+  }
+
+  if (notifications.length > 0) {
+    console.info('[learner-profile] Struggle notifications emitted', {
+      event: 'learner_profile.struggle.notifications',
+      profileId,
+      notifications: notifications.map((n) => ({
+        type: n.type,
+        topic: n.topic,
+      })),
+    });
   }
 
   console.info('[learner-profile] Analysis applied', {
@@ -856,7 +956,7 @@ export async function applyAnalysis(
     fieldsUpdated,
   });
 
-  return fieldsUpdated;
+  return { fieldsUpdated, notifications };
 }
 
 export async function deleteMemoryItem(

@@ -145,17 +145,11 @@ export async function parseLearnerInput(
 ): Promise<ParseLearnerInputResult> {
   try {
     const analysis = await parseLearnerInputToAnalysis(text, source);
-    const fieldsUpdated = await applyAnalysis(
-      db,
-      profileId,
-      analysis,
-      null,
-      source
-    );
+    const result = await applyAnalysis(db, profileId, analysis, null, source);
     return {
       success: true,
       message: 'Got it!',
-      fieldsUpdated,
+      fieldsUpdated: result.fieldsUpdated,
     };
   } catch (err) {
     console.error('[learner-input] parseLearnerInput failed', {
