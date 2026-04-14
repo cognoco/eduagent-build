@@ -16,6 +16,8 @@ import {
   type LearningMode,
   type HomeworkMode,
   type InputMode,
+  type SessionType,
+  type VerificationType,
 } from '@eduagent/schemas';
 import { buildFourStrandsPrompt } from './language-prompts';
 import type { LLMTier } from './subscription';
@@ -32,7 +34,7 @@ export interface ExchangeContext {
   subjectName: string;
   topicTitle?: string;
   topicDescription?: string;
-  sessionType: 'learning' | 'homework' | 'interleaved';
+  sessionType: SessionType;
   escalationRung: EscalationRung;
   exchangeHistory: Array<{
     role: 'system' | 'user' | 'assistant';
@@ -55,7 +57,7 @@ export interface ExchangeContext {
     description?: string;
   }>;
   /** Verification type: standard (default), evaluate (Devil's Advocate), teach_back (Feynman) */
-  verificationType?: 'standard' | 'evaluate' | 'teach_back';
+  verificationType?: VerificationType;
   /** Preferred analogy domain for explanations (FR134-137) */
   analogyDomain?: string;
   /** Pedagogy mode for the subject */
@@ -392,7 +394,7 @@ export function buildSystemPrompt(context: ExchangeContext): string {
   // EVALUATE verification type — Devil's Advocate (FR128-133)
   if (context.verificationType === 'evaluate') {
     const rung = context.evaluateDifficultyRung ?? 1;
-    const rungDescription = getEvaluateRungDescription(rung as 1 | 2 | 3 | 4);
+    const rungDescription = getEvaluateRungDescription(rung);
     sections.push(
       "Session type: THINK DEEPER (Devil's Advocate)\n" +
         'Present a plausibly flawed explanation of the topic.\n' +
@@ -641,7 +643,7 @@ function getAgeVoice(ageBracket: AgeBracket): string {
 }
 
 function getSessionTypeGuidance(
-  sessionType: 'learning' | 'homework' | 'interleaved',
+  sessionType: SessionType,
   homeworkMode?: HomeworkMode,
   ageBracket: AgeBracket = 'adult'
 ): string {

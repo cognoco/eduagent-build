@@ -175,10 +175,7 @@ export async function createPendingSessionSummary(
     return row!;
   }
 
-  const nextStatus = mergeSummaryStatus(
-    existing.status as SummaryStatus,
-    status
-  );
+  const nextStatus = mergeSummaryStatus(existing.status, status);
   const nextTopicId = existing.topicId ?? topicId ?? null;
   const now = new Date();
 

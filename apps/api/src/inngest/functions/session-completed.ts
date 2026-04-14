@@ -39,7 +39,7 @@ import {
   subjects,
 } from '@eduagent/database';
 import { and, asc, eq } from 'drizzle-orm';
-import { verificationTypeSchema } from '@eduagent/schemas';
+import { cefrLevelSchema, verificationTypeSchema } from '@eduagent/schemas';
 import {
   analyzeSessionTranscript,
   applyAnalysis,
@@ -331,9 +331,12 @@ export const sessionCompleted = inngest.createFunction(
                 content: entry.content,
               }));
 
+            const cefrLevel = previousLanguageProgress?.currentLevel ?? null;
+
             const extractedVocabulary = await extractVocabularyFromTranscript(
               transcript,
-              subject.languageCode
+              subject.languageCode,
+              cefrLevel
             );
 
             if (extractedVocabulary.length === 0) {
@@ -349,13 +352,20 @@ export const sessionCompleted = inngest.createFunction(
               db,
               profileId,
               subjectId,
-              extractedVocabulary.map((item) => ({
-                ...item,
-                milestoneId:
-                  previousLanguageProgress?.currentMilestone?.milestoneId ??
-                  undefined,
-                quality,
-              }))
+              extractedVocabulary.map((item) => {
+                // Prefer LLM-assigned level; fall back to milestone's current level.
+                // Validate both through cefrLevelSchema to ensure type safety.
+                const rawLevel = item.cefrLevel ?? cefrLevel ?? undefined;
+                const parsedLevel = cefrLevelSchema.safeParse(rawLevel);
+                return {
+                  ...item,
+                  cefrLevel: parsedLevel.success ? parsedLevel.data : undefined,
+                  milestoneId:
+                    previousLanguageProgress?.currentMilestone?.milestoneId ??
+                    undefined,
+                  quality,
+                };
+              })
             );
 
             nextLanguageProgress = await getCurrentLanguageProgress(

@@ -23,6 +23,7 @@ import {
   subscriptions,
   quotaPools,
 } from '@eduagent/database';
+import type { SessionType } from '@eduagent/schemas';
 
 import { jwtMock, configureValidJWT } from './mocks';
 import {
@@ -189,7 +190,7 @@ async function startSession(
     id: string;
     subjectId: string;
     topicId: string | null;
-    sessionType: 'learning' | 'homework' | 'interleaved';
+    sessionType: SessionType;
     status: string;
   };
 }
