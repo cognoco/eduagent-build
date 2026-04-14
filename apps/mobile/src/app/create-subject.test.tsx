@@ -59,6 +59,21 @@ describe('CreateSubjectScreen', () => {
     mockSearchParams = {};
   });
 
+  it('renders starter chips and fills the input on tap', () => {
+    render(<CreateSubjectScreen />);
+
+    // Chips container is visible
+    expect(screen.getByTestId('starter-chips')).toBeTruthy();
+
+    // "Math" chip is present and tappable
+    const mathChip = screen.getByTestId('starter-chip-Math');
+    expect(mathChip).toBeTruthy();
+
+    // Tapping fills the name input
+    fireEvent.press(mathChip);
+    expect(screen.getByTestId('create-subject-name').props.value).toBe('Math');
+  });
+
   it('reveals the clarify input when Something else is pressed', async () => {
     mockResolveSubjectMutateAsync.mockResolvedValueOnce({
       status: 'ambiguous',

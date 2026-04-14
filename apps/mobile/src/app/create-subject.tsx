@@ -29,6 +29,23 @@ const SCREEN_HEIGHT =
     ? Math.min(Dimensions.get('screen').height, 812)
     : Dimensions.get('screen').height;
 
+const STARTER_CHIPS = [
+  'Math',
+  'Science',
+  'English',
+  'History',
+  'Geography',
+  'Art',
+  'Music',
+  'Programming',
+  'Biology',
+  'Physics',
+  'Chemistry',
+  'Spanish',
+  'French',
+  'Economics',
+] as const;
+
 type ResolveState =
   | { phase: 'idle' }
   | { phase: 'resolving' }
@@ -293,6 +310,17 @@ export default function CreateSubjectScreen() {
     [resolveState.phase, error]
   );
 
+  const onChipPress = useCallback(
+    async (chip: string) => {
+      setName(chip);
+      setError('');
+      setResolveState({ phase: 'idle' });
+      setResolveRounds(0);
+      await resolveInput(chip);
+    },
+    [resolveInput]
+  );
+
   const isAmbiguous =
     showSuggestion && resolveState.result.status === 'ambiguous';
   const isNoMatch = showSuggestion && resolveState.result.status === 'no_match';
@@ -385,6 +413,32 @@ export default function CreateSubjectScreen() {
             onFocus={onFieldFocus('name')}
           />
         </View>
+
+        {/* Starter chips — shown while idle, hidden during resolve/suggestion to avoid confusion */}
+        {resolveState.phase === 'idle' && !isBusy && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 8, paddingBottom: 16 }}
+            testID="starter-chips"
+            accessibilityLabel="Suggested subjects"
+          >
+            {STARTER_CHIPS.map((chip) => (
+              <Pressable
+                key={chip}
+                onPress={() => void onChipPress(chip)}
+                className="rounded-full bg-surface-elevated px-4 py-2 min-h-[36px] items-center justify-center"
+                accessibilityRole="button"
+                accessibilityLabel={`Choose ${chip}`}
+                testID={`starter-chip-${chip}`}
+              >
+                <Text className="text-body-sm font-medium text-text-secondary">
+                  {chip}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        )}
 
         {/* Resolve loading indicator */}
         {resolveState.phase === 'resolving' && (
