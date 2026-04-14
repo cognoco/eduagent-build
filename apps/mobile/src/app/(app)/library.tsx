@@ -11,8 +11,7 @@ import {
 import { useQueries } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { Subject } from '@eduagent/schemas';
-import type { RetentionStatus } from '../../components/progress';
+import type { Subject, RetentionStatus } from '@eduagent/schemas';
 import {
   BookPageFlipAnimation,
   BrandCelebration,

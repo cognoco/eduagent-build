@@ -11,7 +11,10 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Profile } from '@eduagent/schemas';
 import { ProfileSwitcher } from '../common';
-import { useReviewSummary } from '../../hooks/use-progress';
+import {
+  useReviewSummary,
+  useContinueSuggestion,
+} from '../../hooks/use-progress';
 import { useSubjects } from '../../hooks/use-subjects';
 import { getGreeting } from '../../lib/greeting';
 import {
@@ -47,6 +50,10 @@ export function LearnerScreen({
   const colors = useThemeColors();
   const { data: subjects, isLoading, isError, refetch } = useSubjects();
   const { data: reviewSummary } = useReviewSummary();
+  const { data: continueSuggestion } = useContinueSuggestion();
+  const continueSubtitle = continueSuggestion
+    ? `Continue with ${continueSuggestion.topicName} in ${continueSuggestion.subjectName}`
+    : undefined;
   const [recoveryMarker, setRecoveryMarker] =
     useState<SessionRecoveryMarker | null>(null);
   const [recentlyExpiredSession, setRecentlyExpiredSession] = useState(false);
@@ -102,6 +109,7 @@ export function LearnerScreen({
   const intentCards = useMemo(() => {
     const primaryCard = {
       title: 'Start learning',
+      subtitle: continueSubtitle,
       onPress: () => router.push('/learn-new' as never),
       testID: 'intent-learn-new',
     };
@@ -158,6 +166,7 @@ export function LearnerScreen({
 
     return cards;
   }, [
+    continueSubtitle,
     hasLibraryContent,
     recoveryMarker,
     reviewDueCount,

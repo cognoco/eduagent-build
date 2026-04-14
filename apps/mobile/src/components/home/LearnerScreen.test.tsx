@@ -11,6 +11,7 @@ const mockReadSessionRecoveryMarker = jest.fn();
 const mockClearSessionRecoveryMarker = jest.fn();
 const mockIsRecoveryMarkerFresh = jest.fn();
 const mockUseReviewSummary = jest.fn();
+const mockUseContinueSuggestion = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
@@ -43,6 +44,7 @@ jest.mock('../../hooks/use-subjects', () => ({
 
 jest.mock('../../hooks/use-progress', () => ({
   useReviewSummary: () => mockUseReviewSummary(),
+  useContinueSuggestion: () => mockUseContinueSuggestion(),
 }));
 
 jest.mock('../../lib/session-recovery', () => ({
@@ -69,6 +71,7 @@ describe('LearnerScreen', () => {
     mockReadSessionRecoveryMarker.mockResolvedValue(null);
     mockIsRecoveryMarkerFresh.mockReturnValue(true);
     mockUseReviewSummary.mockReturnValue({ data: { totalOverdue: 0 } });
+    mockUseContinueSuggestion.mockReturnValue({ data: undefined });
   });
 
   it('renders greeting with profile name', () => {
@@ -313,6 +316,31 @@ describe('LearnerScreen', () => {
       render(<LearnerScreen {...defaultProps} />);
 
       expect(screen.queryByTestId('learner-back')).toBeNull();
+    });
+  });
+
+  describe('continue suggestion subtitle [HOME-02]', () => {
+    it('shows continue suggestion as Start learning subtitle when available', async () => {
+      mockUseContinueSuggestion.mockReturnValue({
+        data: { topicName: 'Fractions', subjectName: 'Math' },
+      });
+
+      render(<LearnerScreen {...defaultProps} />);
+
+      await waitFor(() => {
+        expect(
+          screen.getByText('Continue with Fractions in Math')
+        ).toBeTruthy();
+      });
+    });
+
+    it('shows no subtitle on Start learning when suggestion is null', () => {
+      mockUseContinueSuggestion.mockReturnValue({ data: null });
+
+      render(<LearnerScreen {...defaultProps} />);
+
+      // The card renders without subtitle — no crash
+      expect(screen.getByTestId('intent-learn-new')).toBeTruthy();
     });
   });
 });
