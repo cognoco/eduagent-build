@@ -5,6 +5,7 @@ import {
   waitFor,
 } from '@testing-library/react-native';
 import { useSignUp, useSSO } from '@clerk/clerk-expo';
+import { Platform } from 'react-native';
 
 const mockReplace = jest.fn();
 const mockPush = jest.fn();
@@ -28,6 +29,14 @@ describe('SignUpScreen', () => {
   const mockAttemptVerification = jest.fn();
   const mockSetActive = jest.fn();
 
+  afterEach(() => {
+    Object.defineProperty(Platform, 'OS', {
+      value: 'ios',
+      configurable: true,
+      writable: true,
+    });
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
     delete process.env.EXPO_PUBLIC_CLERK_OPENAI_SSO_KEY;
@@ -48,7 +57,8 @@ describe('SignUpScreen', () => {
   it('renders sign-up form with SSO buttons', () => {
     render(<SignUpScreen />);
 
-    expect(screen.getByTestId('sign-up-google-sso')).toBeTruthy();
+    // On iOS (default test platform), Google SSO is hidden; Apple SSO is shown instead
+    expect(screen.queryByTestId('sign-up-google-sso')).toBeNull();
     expect(screen.queryByTestId('sign-up-openai-sso')).toBeNull();
     expect(screen.getByTestId('sign-up-email')).toBeTruthy();
     expect(screen.getByTestId('sign-up-password')).toBeTruthy();
@@ -66,6 +76,11 @@ describe('SignUpScreen', () => {
   });
 
   it('handles Google SSO sign-up', async () => {
+    Object.defineProperty(Platform, 'OS', {
+      value: 'android',
+      configurable: true,
+      writable: true,
+    });
     mockStartSSOFlow.mockResolvedValue({ createdSessionId: 'sess_google' });
     mockSetActive.mockResolvedValue(undefined);
 

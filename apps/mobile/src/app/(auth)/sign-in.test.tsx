@@ -6,6 +6,7 @@ import {
   act,
 } from '@testing-library/react-native';
 import { useSignIn, useSSO } from '@clerk/clerk-expo';
+import { Platform } from 'react-native';
 import * as Linking from 'expo-linking';
 
 const mockReplace = jest.fn();
@@ -41,6 +42,14 @@ describe('SignInScreen', () => {
   const mockSetActive = jest.fn();
   const mockStartSSOFlow = jest.fn();
 
+  afterEach(() => {
+    Object.defineProperty(Platform, 'OS', {
+      value: 'ios',
+      configurable: true,
+      writable: true,
+    });
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
     clearTransitionState();
@@ -71,15 +80,33 @@ describe('SignInScreen', () => {
     expect(screen.getByTestId('sign-in-button')).toBeTruthy();
   });
 
-  it('renders OAuth buttons', async () => {
+  it('renders Apple SSO button on iOS (Google hidden)', async () => {
+    render(<SignInScreen />);
+    await act(async () => undefined);
+
+    expect(screen.queryByTestId('google-sso-button')).toBeNull();
+    expect(screen.getByTestId('apple-sso-button')).toBeTruthy();
+    expect(screen.queryByTestId('openai-sso-button')).toBeNull();
+    expect(screen.getByText('Continue with Apple')).toBeTruthy();
+  });
+
+  it('renders Google SSO button on Android (Apple hidden)', async () => {
+    Object.defineProperty(Platform, 'OS', {
+      value: 'android',
+      configurable: true,
+      writable: true,
+    });
     render(<SignInScreen />);
     await act(async () => undefined);
 
     expect(screen.getByTestId('google-sso-button')).toBeTruthy();
-    expect(screen.getByTestId('apple-sso-button')).toBeTruthy();
-    expect(screen.queryByTestId('openai-sso-button')).toBeNull();
+    expect(screen.queryByTestId('apple-sso-button')).toBeNull();
     expect(screen.getByText('Continue with Google')).toBeTruthy();
-    expect(screen.getByText('Continue with Apple')).toBeTruthy();
+    Object.defineProperty(Platform, 'OS', {
+      value: 'ios',
+      configurable: true,
+      writable: true,
+    });
   });
 
   it('renders OpenAI SSO when configured', async () => {
@@ -693,6 +720,11 @@ describe('SignInScreen', () => {
   // ---------------------------------------------------------------------------
 
   it('calls startSSOFlow for Google and activates session on success', async () => {
+    Object.defineProperty(Platform, 'OS', {
+      value: 'android',
+      configurable: true,
+      writable: true,
+    });
     mockStartSSOFlow.mockResolvedValue({
       createdSessionId: 'sess_google_123',
     });
@@ -740,6 +772,11 @@ describe('SignInScreen', () => {
   });
 
   it('displays error on OAuth failure', async () => {
+    Object.defineProperty(Platform, 'OS', {
+      value: 'android',
+      configurable: true,
+      writable: true,
+    });
     mockStartSSOFlow.mockRejectedValue({
       errors: [{ longMessage: 'OAuth provider error' }],
     });
@@ -753,6 +790,11 @@ describe('SignInScreen', () => {
   });
 
   it('shows error when SSO returns no session', async () => {
+    Object.defineProperty(Platform, 'OS', {
+      value: 'android',
+      configurable: true,
+      writable: true,
+    });
     mockStartSSOFlow.mockResolvedValue({
       createdSessionId: null,
     });
@@ -954,6 +996,11 @@ describe('SignInScreen', () => {
     });
 
     it('Google SSO: no navigation after setActive()', async () => {
+      Object.defineProperty(Platform, 'OS', {
+        value: 'android',
+        configurable: true,
+        writable: true,
+      });
       mockStartSSOFlow.mockResolvedValue({
         createdSessionId: 'sess_nav_google',
       });

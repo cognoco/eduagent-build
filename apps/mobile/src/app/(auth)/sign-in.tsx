@@ -1081,18 +1081,20 @@ export default function SignInScreen() {
           </View>
         ) : null}
 
-        <View className="mb-3">
-          <Button
-            variant="secondary"
-            label="Continue with Google"
-            onPress={() => onSSOPress('oauth_google')}
-            disabled={oauthLoading !== null}
-            loading={oauthLoading === 'oauth_google'}
-            testID="google-sso-button"
-          />
-        </View>
+        {Platform.OS !== 'ios' && (
+          <View className="mb-6">
+            <Button
+              variant="secondary"
+              label="Continue with Google"
+              onPress={() => onSSOPress('oauth_google')}
+              disabled={oauthLoading !== null}
+              loading={oauthLoading === 'oauth_google'}
+              testID="google-sso-button"
+            />
+          </View>
+        )}
 
-        {Platform.OS !== 'web' && (
+        {Platform.OS === 'ios' && (
           <View className="mb-6">
             <Button
               variant="secondary"
