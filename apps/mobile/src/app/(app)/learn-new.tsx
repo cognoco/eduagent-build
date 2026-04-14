@@ -12,7 +12,10 @@ import {
   readSessionRecoveryMarker,
   type SessionRecoveryMarker,
 } from '../../lib/session-recovery';
-import { useContinueSuggestion } from '../../hooks/use-progress';
+import {
+  useContinueSuggestion,
+  useReviewSummary,
+} from '../../hooks/use-progress';
 import { useSubjects } from '../../hooks/use-subjects';
 import { useThemeColors } from '../../lib/theme';
 
@@ -26,7 +29,16 @@ export default function LearnNewScreen(): React.ReactElement {
   const [expiredRecoveryMarker, setExpiredRecoveryMarker] =
     useState<SessionRecoveryMarker | null>(null);
   const { data: continueSuggestion } = useContinueSuggestion();
+  const { data: reviewSummary } = useReviewSummary();
   const { data: subjects } = useSubjects();
+
+  const reviewDueCount = reviewSummary?.totalOverdue ?? 0;
+  const reviewSubtitle =
+    reviewDueCount > 0
+      ? `${reviewDueCount} ${
+          reviewDueCount === 1 ? 'topic' : 'topics'
+        } ready for review`
+      : 'Keep your knowledge fresh';
 
   const handleBack = () => {
     goBackOrReplace(router, '/(app)/home');
@@ -109,22 +121,26 @@ export default function LearnNewScreen(): React.ReactElement {
           onPress={() => router.push('/(app)/session?mode=freeform' as never)}
           testID="intent-freeform"
         />
-        {!recoveryMarker && continueSuggestion ? (
+        {continueSuggestion ? (
           <IntentCard
-            title="Resume last session"
-            subtitle={continueSuggestion.subjectName}
-            onPress={() =>
-              router.push({
-                pathname: '/(app)/session',
-                params: {
-                  subjectId: continueSuggestion.subjectId,
-                  subjectName: continueSuggestion.subjectName,
-                  topicId: continueSuggestion.topicId,
-                  mode: 'learning',
-                },
-              } as never)
-            }
-            testID="intent-resume-last"
+            title="Repeat & review"
+            subtitle={reviewSubtitle}
+            badge={reviewDueCount > 0 ? reviewDueCount : undefined}
+            onPress={() => {
+              const nextReviewTopic = reviewSummary?.nextReviewTopic ?? null;
+              if (nextReviewTopic) {
+                router.push({
+                  pathname: '/(app)/topic/relearn',
+                  params: {
+                    topicId: nextReviewTopic.topicId,
+                    subjectId: nextReviewTopic.subjectId,
+                  },
+                } as never);
+              } else {
+                router.push('/(app)/library' as never);
+              }
+            }}
+            testID="intent-review"
           />
         ) : null}
         {!recoveryMarker &&

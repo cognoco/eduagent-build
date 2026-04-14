@@ -631,6 +631,14 @@ function buildAnalysisUpdates(
     analysis.resolvedTopics ?? null
   );
 
+  // Persist resolved topic names so the next session's buildMemoryBlock can
+  // celebrate them.  Overwrites each analysis run — only the most recent
+  // session's resolutions are surfaced.
+  const resolvedTopicNames = notifications
+    .filter((n) => n.type === 'struggle_resolved')
+    .map((n) => n.topic);
+  updates.recentlyResolvedTopics = resolvedTopicNames;
+
   return {
     updates,
     fieldsUpdated,

@@ -11,10 +11,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Profile } from '@eduagent/schemas';
 import { ProfileSwitcher } from '../common';
-import {
-  useReviewSummary,
-  useContinueSuggestion,
-} from '../../hooks/use-progress';
+import { useContinueSuggestion } from '../../hooks/use-progress';
 import { useSubjects } from '../../hooks/use-subjects';
 import { getGreeting } from '../../lib/greeting';
 import {
@@ -36,8 +33,6 @@ export interface LearnerScreenProps {
   now?: Date;
 }
 
-const REVIEW_PRIORITY_THRESHOLD = 5;
-
 export function LearnerScreen({
   profiles,
   activeProfile,
@@ -49,7 +44,6 @@ export function LearnerScreen({
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
   const { data: subjects, isLoading, isError, refetch } = useSubjects();
-  const { data: reviewSummary } = useReviewSummary();
   const { data: continueSuggestion } = useContinueSuggestion();
   const [recoveryMarker, setRecoveryMarker] =
     useState<SessionRecoveryMarker | null>(null);
@@ -88,20 +82,10 @@ export function LearnerScreen({
     };
   }, [activeProfile?.id]);
 
-  // Only show "Repeat & review" when the user has actual curriculum to revisit.
-  // continueSuggestion is null when no curricula exist (fresh subject, no topics yet).
-  const hasLibraryContent = continueSuggestion != null;
-  const reviewDueCount = reviewSummary?.totalOverdue ?? 0;
   const { title, subtitle } = getGreeting(
     activeProfile?.displayName ?? '',
     now
   );
-  const reviewSubtitle =
-    reviewDueCount > 0
-      ? `${reviewDueCount} ${
-          reviewDueCount === 1 ? 'topic' : 'topics'
-        } ready for review`
-      : 'Keep your knowledge fresh';
 
   const intentCards = useMemo(() => {
     const primaryCard = {
@@ -115,30 +99,6 @@ export function LearnerScreen({
       onPress: () => router.push('/(app)/homework/camera' as never),
       testID: 'intent-homework',
     };
-    const nextReviewTopic = reviewSummary?.nextReviewTopic ?? null;
-    const reviewCard = hasLibraryContent
-      ? {
-          title: 'Repeat & review',
-          subtitle: reviewSubtitle,
-          badge: reviewDueCount > 0 ? reviewDueCount : undefined,
-          onPress: () => {
-            if (nextReviewTopic) {
-              // Go directly to the relearn screen for the most overdue topic
-              router.push({
-                pathname: '/(app)/topic/relearn',
-                params: {
-                  topicId: nextReviewTopic.topicId,
-                  subjectId: nextReviewTopic.subjectId,
-                },
-              } as never);
-            } else {
-              // No specific overdue topic — browse the library
-              router.push('/(app)/library' as never);
-            }
-          },
-          testID: 'intent-review',
-        }
-      : null;
     const resumeCard = recoveryMarker
       ? {
           title: 'Continue where you left off',
@@ -164,25 +124,32 @@ export function LearnerScreen({
           testID: 'intent-resume',
         }
       : null;
+    const continueCard =
+      !recoveryMarker && continueSuggestion
+        ? {
+            title: 'Continue where you left off',
+            subtitle: continueSuggestion.subjectName,
+            onPress: () =>
+              router.push({
+                pathname: '/(app)/session',
+                params: {
+                  subjectId: continueSuggestion.subjectId,
+                  subjectName: continueSuggestion.subjectName,
+                  topicId: continueSuggestion.topicId,
+                  mode: 'learning',
+                },
+              } as never),
+            testID: 'intent-resume-last',
+          }
+        : null;
 
     const cards = [];
     if (resumeCard) cards.push(resumeCard);
-    if (reviewCard && reviewDueCount >= REVIEW_PRIORITY_THRESHOLD) {
-      cards.push(reviewCard);
-    }
+    if (continueCard) cards.push(continueCard);
     cards.push(primaryCard, homeworkCard);
-    if (reviewCard && reviewDueCount < REVIEW_PRIORITY_THRESHOLD) {
-      cards.push(reviewCard);
-    }
 
     return cards;
-  }, [
-    hasLibraryContent,
-    recoveryMarker,
-    reviewDueCount,
-    reviewSubtitle,
-    router,
-  ]);
+  }, [continueSuggestion, recoveryMarker, router]);
 
   if (isLoading) {
     return (

@@ -78,6 +78,7 @@ export const learningProfileSchema = z.object({
   consentPromptDismissedAt: z.string().datetime().nullable().optional(),
   memoryCollectionEnabled: z.boolean().default(false),
   memoryInjectionEnabled: z.boolean().default(true),
+  recentlyResolvedTopics: z.array(z.string()).default([]),
   version: z.number().int(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
