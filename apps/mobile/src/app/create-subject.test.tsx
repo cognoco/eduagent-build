@@ -74,6 +74,28 @@ describe('CreateSubjectScreen', () => {
     expect(screen.getByTestId('create-subject-name').props.value).toBe('Math');
   });
 
+  it('tapping a chip immediately triggers resolveInput', async () => {
+    mockResolveSubjectMutateAsync.mockResolvedValueOnce({
+      status: 'direct_match',
+      resolvedName: 'Math',
+      suggestions: [],
+      displayMessage: 'Math it is.',
+    });
+    mockCreateSubjectMutateAsync.mockResolvedValueOnce({
+      subject: { id: 'subject-math', name: 'Math' },
+    });
+
+    render(<CreateSubjectScreen />);
+
+    fireEvent.press(screen.getByTestId('starter-chip-Math'));
+
+    await waitFor(() => {
+      expect(mockResolveSubjectMutateAsync).toHaveBeenCalledWith({
+        rawInput: 'Math',
+      });
+    });
+  });
+
   it('reveals the clarify input when Something else is pressed', async () => {
     mockResolveSubjectMutateAsync.mockResolvedValueOnce({
       status: 'ambiguous',

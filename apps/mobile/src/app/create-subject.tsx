@@ -314,6 +314,7 @@ export default function CreateSubjectScreen() {
     async (chip: string) => {
       setName(chip);
       setError('');
+      setOriginalInput(''); // clear stale original input
       setResolveState({ phase: 'idle' });
       setResolveRounds(0);
       await resolveInput(chip);
