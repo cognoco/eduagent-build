@@ -24,8 +24,8 @@
   ▎ - AI adapts difficulty based on your responses
   ▎ - Spaced repetition schedules reviews at optimal intervals
   ▎ - Camera-based homework capture with OCR
-  ▎ - Multiple learning modes: Eager Learner and Casual Explorer
-  ▎ - Personalize your experience with themes, accent colors, and analogy preferences
+  ▎ - Multiple learning modes tailored to your goals
+  ▎ - Personalize your experience with analogy preferences and dark/light themes
 
   Category: Education
 

@@ -70,10 +70,10 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 - **Coaching model** (Recall → Build → Apply → Close): Requires session state machine with rung tracking and LLM context injection
 - **Socratic Escalation Ladder**: 5 rungs driving model routing — fastest model at rung 1-2, reasoning models at rung 3+
 - **Coaching card two-path loading**: Cached path (<1s, context-hash freshness) vs fresh path (1-2s skeleton) — requires background precomputation pipeline
-- **Three-persona theming**: Teen dark, learner calm, parent light — CSS variable layer, components stay persona-unaware
+- **Three-persona theming**: Teen dark, learner calm, parent light — theme derived from `birthYear` via `personaFromBirthYear()`, CSS variable layer, components stay persona-unaware. `personaType` DB column removed in Epic 12.
 - **Confidence scoring**: Per-problem behavioral metrics feeding parent dashboard — time-to-answer, hints needed, escalation rung, difficulty
 - **Cold start framing**: Sessions 1-5 use coaching-voiced three-button menu, invisible transition to adaptive entry at session 6+
-- **Phase 1 MVP components**: CoachingCard (planned: BaseCoachingCard + 4 variants per UX-7), Camera Capture, ChatShell + MessageBubble (planned: MessageThread + HomeworkChatWrapper per UX-7), SessionCloseSummary, RetentionSignal, ErrorBoundary (planned: ErrorRecovery per UX-7)
+- **Phase 1 MVP components**: `BaseCoachingCard`, Camera Capture, `ChatShell` + `MessageBubble`, `SessionCloseSummary`, `RetentionSignal`, `ErrorBoundary`, `ErrorFallback`
 
 ### Scale & Complexity Assessment
 
@@ -127,8 +127,8 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 
 | Concern | Architectural Pattern | Scope |
 |---------|----------------------|-------|
-| **Persona-aware theming** | CSS variable layer via NativeWind. 6 JSON token files (3 personas × 2 color modes). **Swap at app root layout**, not Clerk hook — persona is an application concept, not Clerk's. Flow: Clerk authenticates → app fetches active profile → profile includes persona type → root layout sets CSS variables before any child renders. Profile switching within family account swaps variable set without re-authentication. Components stay completely persona-unaware. **Current implementation vs target:** The token system is implemented in `lib/design-tokens.ts` (single TypeScript file) + `lib/theme.ts` (context + hooks). This deviates from the target `theme/tokens/*.json` + `theme/provider.tsx` structure. Migration is planned for v1.1 (dark mode support), when JSON files are needed for: design tool integration (Figma token plugins), automated contrast ratio validation (a11y linting), and 6 distinct value sets (3 personas × 2 color schemes). Current `design-tokens.ts` has identical light/dark values per persona (MVP ships fixed themes: teen=dark, learner=light, parent=light). | All UI |
-| **AI cost management** | Split into two layers: (1) **Metering middleware** calling a **PostgreSQL function** `decrement_quota(profile_id, family_id)` — atomic FIFO logic (monthly pool first, then top-up credits), returns remaining balance or rejection. Middleware interprets result: forward to LLM or return quota-exceeded with soft paywall data. Concurrent family usage handled by PostgreSQL row-level locking (`UPDATE ... SET remaining = remaining - 1 WHERE remaining > 0`) — no application-level locking. (2) **LLM orchestration module** in `services/llm/router.ts` — `routeAndCall(messages: ChatMessage[], rung: EscalationRung, options?) → Promise<RouteResult>`. Handles model selection by escalation rung, provider failover, streaming normalization (`routeAndStream` for SSE). Soft ceiling €0.05/session: **monitoring threshold, not a cutoff.** Never interrupt a learning session for cost reasons. Log when sessions exceed €0.05. If >20% of sessions consistently exceed ceiling, tune routing rules (e.g., lower the escalation rung threshold for reasoning models). Surface as a dashboard metric for cost monitoring. The metering middleware tracks per-session cost accumulation but does not enforce a hard stop — the quota system (monthly pool + top-ups) is the actual spending control. | Backend |
+| **Persona-aware theming** | CSS variable layer via NativeWind. Theme is derived from `birthYear` via `personaFromBirthYear()` in `lib/profile.ts` (mobile-only). Produces one of three theme keys: `teen` / `learner` / `parent`. Tokens are in `lib/design-tokens.ts` (TypeScript, not JSON files) + `lib/theme.ts` (context + hooks). Components stay completely persona-unaware. The `personaType` database column was removed in Epic 12. Profile switching within family account swaps the theme key without re-authentication. **Note:** The original target of `theme/tokens/*.json` + `theme/provider.tsx` (6 JSON files, 3 personas × 2 color modes) is deferred to v1.1 when design-tool integration and automated contrast validation become necessary. | All UI |
+| **AI cost management** | Split into two layers: (1) **Metering middleware** calling `decrementQuota()` in `services/billing.ts` — conditional UPDATE via Drizzle ORM (`usedThisMonth < monthlyLimit`), returns remaining balance or rejection. Middleware interprets result: forward to LLM or return quota-exceeded with soft paywall data. Concurrent family usage handled by PostgreSQL row-level locking (`UPDATE ... SET remaining = remaining - 1 WHERE remaining > 0`) — no application-level locking. (2) **LLM orchestration module** in `services/llm/router.ts` — `routeAndCall(messages: ChatMessage[], rung: EscalationRung, options?) → Promise<RouteResult>`. Handles model selection by escalation rung, provider failover, streaming normalization (`routeAndStream` for SSE). Soft ceiling €0.05/session: **monitoring threshold, not a cutoff.** Never interrupt a learning session for cost reasons. Log when sessions exceed €0.05. If >20% of sessions consistently exceed ceiling, tune routing rules (e.g., lower the escalation rung threshold for reasoning models). Surface as a dashboard metric for cost monitoring. The metering middleware tracks per-session cost accumulation but does not enforce a hard stop — the quota system (monthly pool + top-ups) is the actual spending control. | Backend |
 | **Prompt caching** | Provider-level first (Anthropic prompt caching for system prompts — stable per subject/persona combination). **Parallel Example templates** cached in database: keyed by `subject + type + difficulty + system_prompt_hash`. System prompt change → hash change → old cache entries naturally bypassed. No explicit invalidation or TTL needed — stale entries are orphaned and can be garbage-collected periodically. No general-purpose prompt cache layer at MVP. | Backend |
 | **Multi-profile data isolation** | **Repository pattern** with automatic scope injection: `createScopedRepository(profileId)` — every query gets `WHERE profile_id = $1` automatically. **Neon RLS** as defense-in-depth, not primary enforcement. Profile ID set via session context, not passed per-request. | Data layer |
 | **Session state management** | **Every exchange, hybrid model.** After each AI response completes, in one transaction: (1) **Append session event** (immutable log): `{ exchange_id, timestamp, user_message, ai_response, model_used, escalation_rung, hints_given, time_to_answer, confidence_signals }`. (2) **Upsert session summary row** (mutable current state): `{ session_id, current_rung, total_exchanges, topics_touched, last_exchange_at }`. Event log gives replay/audit/analytics. Summary row gives fast reads for "where are we." Both in same database transaction — not a separate save step. Cost negligible vs. LLM call; no data loss window. | Backend |
@@ -137,8 +137,8 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 | **Retention & spaced repetition** | SM-2 as **library/module** (~50 lines pure math). Takes `{ previous_interval, previous_ease_factor, quality_score }` → returns `{ next_interval, next_ease_factor, next_review_date }`. Writes to `topic_schedules` table. Consumers are all readers: coaching card ("which topics due/overdue"), notification scheduler ("when is next review"), parent dashboard ("how many topics fading"). Library is the writer, everything else is a reader. Clean interface enables future service extraction. Called through event-driven lifecycle. **EVALUATE scoring (Epic 3 extension):** EVALUATE results feed into SM-2 as a new input source, but the math is unchanged. Modified scoring floor: EVALUATE failure = quality 2-3 (not 0-1) — missing a subtle flaw does not equal not knowing the concept. Prevents score tanking on topics the student actually knows. `evaluateDifficultyRung` (integer 1-4) stored alongside SM-2 state on the retention card; persists across sessions, default null (= never evaluated). | Backend |
 | **Data privacy & compliance** | **Consent state machine**: `PENDING → PARENTAL_CONSENT_REQUESTED → CONSENTED → WITHDRAWN`, enforced at repository layer (no data access without CONSENTED). **Deletion orchestrator**: knows every table and external system, anonymizes immediately, full deletion within 30 days, idempotent/retryable steps. | Full stack |
 | **Error boundaries & graceful degradation** | Per-dependency circuit breakers with specific thresholds: **LLM providers** — trip after 3 consecutive 5xx/timeouts within 30-second window, half-open after 60s (one probe request). Tight window intentional — 30s wait is already bad UX in tutoring. **OCR** — no circuit breaker; single-request 5s timeout, immediate text input fallback (failures are per-image, not systemic). **Stripe** — no circuit breaker; webhook delays are normal. Check subscription from local DB (webhook-synced), never call Stripe during learning session. 3-day grace period per PRD. **Neon** — if DB is down, almost nothing works. Cache coaching card + Library on client after each successful load, show with "limited mode" banner. Don't build elaborate fallbacks — invest in Neon reliability instead. | Full stack |
-| **Observability** | Structured logging with **correlation IDs** (request → LLM call → background job chain). Every LLM call logged: model, tokens in/out, latency, context hash, routing decision, cost. SM-2 decisions logged: card, interval, ease factor, grade. OpenTelemetry recommended. | Backend |
-| **i18n** | MVP: English + German UI. Backend: English only. Learning languages: any (via LLM). Framework: react-i18next. RTL deferred. | Frontend |
+| **Observability** | Structured JSON logging via `services/logger.ts`, compatible with Workers Logpush and `wrangler tail`. No Axiom SDK integration. Every LLM call logged: model, tokens in/out, latency, context hash, routing decision, cost. SM-2 decisions logged: card, interval, ease factor, grade. | Backend |
+| **i18n** | English-only UI for v1.0 — no i18n framework implemented. Multi-language UI deferred. Backend: English only. Learning languages: any (via LLM). RTL deferred. | Frontend |
 
 ## Starter Template Evaluation
 
@@ -169,7 +169,7 @@ Monorepo with two apps: Expo mobile client + Hono API backend. **Starting from f
 | GitHub Actions CI/CD (`ci.yml`, `mobile-ci.yml`, `deploy.yml`) | Lint, test, build, typecheck, deploy matrix with Nx Cloud caching |
 | `apps/mobile/` Expo shell | `app.json`, `eas.json`, `metro.config.js`, Jest config — keep and strip app code |
 | `packages/schemas/` | Zod schema pattern — becomes single source of shared types + validation |
-| `packages/test-utils/`, `packages/factory/` | Testing infrastructure — evaluate and keep what applies |
+| `packages/test-utils/` | Testing infrastructure — evaluate and keep what applies |
 | Husky + lint-staged + commitlint | Commit quality enforcement |
 | ESLint 9 flat config + Prettier | Code quality |
 | Jest preset + testing strategy | Testing infrastructure |
@@ -261,7 +261,7 @@ eduagent/
 │   ├── retention/           # SM-2 library — pure math, no deps (new)
 │   ├── database/            # Drizzle schema + Neon connection + scoped repository (rebuilt)
 │   ├── test-utils/          # Testing utilities (kept, adapted)
-│   └── factory/             # Test factories (kept, adapted)
+│   └── (no factory/ package — test factories are co-located with tests)
 ├── .github/workflows/       # CI/CD (kept, deployment targets updated)
 ├── nx.json
 ├── tsconfig.base.json
@@ -328,9 +328,9 @@ Research noted pnpm symlink issues with Expo in some Nx setups. If encountered d
 
 **ORM:** Drizzle. Type-safe schema definitions in `packages/database/`. Drizzle relational queries for 90% of operations (standard CRUD, JOINs). Raw SQL via Drizzle's `sql` template tag for parent dashboard aggregations — `GROUP BY`, window functions, time-series grouping across multiple children's topics with retention scoring. Complex queries wrapped in named query functions in `packages/database/` for type safety and reusability.
 
-**Caching — Workers KV (native, zero network hop):**
-- **Coaching cards**: Precomputed, written infrequently (on `session.completed` via Inngest), read on every app open. Perfect KV workload.
-- **Subscription status**: Updated on Stripe webhook, read on every LLM call by metering middleware. Same write-rare/read-often pattern.
+**Caching:**
+- **Coaching cards**: Cached in the `coaching_card_cache` database table (KV stand-in per ARCH-11). Recomputed in the `session-completed` Inngest function and written to this table. The coaching card route reads from DB via `getCoachingCardForProfile`. Written infrequently (on `session.completed` via Inngest), read on every app open.
+- **Subscription status**: Updated on RevenueCat webhook (primary) and Stripe webhook (dormant). Cached in Workers KV, read on every LLM call by metering middleware. Same write-rare/read-often pattern.
 - **Session summary**: No cache needed — read once per session resumption, single DB query is fine.
 - No Redis/Upstash. Already on Workers — KV is native.
 
@@ -360,7 +360,7 @@ Research noted pnpm symlink issues with Expo in some Nx setups. If encountered d
 
 **Authorization model:** Custom RBAC on profile metadata, not Clerk Organizations. Clerk orgs are designed for B2B multi-tenancy (team invites, role management UI) — wrong abstraction for family accounts. Store profile type (parent, teen, learner), family linkage, and consent state in Neon. Clerk provides authenticated user identity; application middleware maps to profile and enforces access rules.
 
-**Rate limiting:** Cloudflare Workers built-in rate limiting (100 req/min per user per PRD). Configuration in `wrangler.toml`, not code. For the quota system (questions/month), `decrement_quota` PostgreSQL function is the enforcement point.
+**Rate limiting:** Cloudflare Workers built-in rate limiting (100 req/min per user per PRD). Configuration in `wrangler.toml`, not code. For the quota system (questions/month), `decrementQuota()` in `services/billing.ts` is the enforcement point (conditional UPDATE via Drizzle ORM).
 
 **API security:** Input validation via Zod on every route. Parameterized queries via Drizzle. Content Security Policy headers. CORS restricted to mobile app origins.
 
@@ -389,14 +389,27 @@ One mobile client, one error handling path. RFC 7807 overengineered for this. Bo
 **Route structure:**
 
 ```
-/v1/sessions/*          # Learning sessions, exchanges, session events
-/v1/profiles/*          # Profile management, persona, preferences
-/v1/curriculum/*        # Curriculum generation, topics, learning paths
-/v1/assessments/*       # Quizzes, recall tests, mastery scores
-/v1/billing/*           # Billing, quota, top-ups
-/v1/subjects/*          # Subject management
-/v1/progress/*          # Progress tracking, coaching card, Library
-/v1/homework/*          # Homework photo processing (includes OCR endpoint)
+/v1/sessions/*              # Learning sessions, exchanges, session events
+/v1/profiles/*              # Profile management, persona, preferences
+/v1/curriculum/*            # Curriculum generation, topics, learning paths
+/v1/assessments/*           # Quizzes, recall tests, mastery scores
+/v1/billing/*               # Billing, quota, top-ups
+/v1/subjects/*              # Subject management
+/v1/progress/*              # Progress tracking, coaching card, Library
+/v1/homework/*              # Homework photo processing (includes OCR endpoint)
+/v1/books/*                 # Book/LivingBook management
+/v1/book-suggestions/*      # Book suggestion generation
+/v1/celebrations/*          # Celebration events
+/v1/coaching-card           # Coaching card read
+/v1/consent-web/*           # Web-specific GDPR consent flows
+/v1/filing/*                # Filing (document management)
+/v1/language-progress/*     # Language learning progress
+/v1/learner-profile/*       # Learner profile details
+/v1/notes/*                 # Session notes
+/v1/revenuecat-webhook      # RevenueCat IAP webhook handler
+/v1/snapshot-progress/*     # Progress snapshot data
+/v1/topic-suggestions/*     # Topic suggestion generation
+/v1/vocabulary/*            # Vocabulary management
 /v1/dashboard/*         # Parent dashboard
 /v1/settings/*          # User settings
 /v1/account/*           # Account management
@@ -405,7 +418,7 @@ One mobile client, one error handling path. RFC 7807 overengineered for this. Bo
 /v1/retention/*         # Retention data
 /v1/interview/*         # Onboarding interview
 /v1/parking-lot/*       # Parking lot topics
-/v1/stripe-webhook      # Stripe webhook handler
+/v1/stripe-webhook      # Stripe webhook handler (dormant — future web billing)
 /v1/inngest             # Inngest webhook — NOT behind Clerk auth.
                         # Verify Inngest signing key, skip JWT middleware.
 ```
@@ -414,7 +427,7 @@ One mobile client, one error handling path. RFC 7807 overengineered for this. Bo
 
 **State management:**
 - **TanStack Query** for all server state (sessions, topics, coaching cards, dashboard data). Handles caching, background refetch, optimistic updates.
-- **React Context** for auth state (Clerk session) and active profile (persona type, profile ID)
+- **React Context** for auth state (Clerk session) and active profile (profile ID, birthYear for theme derivation)
 - **Local component state** for UI interactions (form inputs, modal visibility, scroll position)
 - No Zustand at MVP. Add when shared client state crosses navigation boundaries and doesn't come from the server.
 
@@ -427,23 +440,30 @@ src/app/
 │   ├── sign-in.tsx
 │   ├── sign-up.tsx
 │   └── forgot-password.tsx
-├── (learner)/                 # Learner persona routes
-│   ├── _layout.tsx            # Learner tab bar + coaching voice
-│   ├── home.tsx
-│   ├── more.tsx
+├── (app)/                     # All authenticated screens — single group
+│   ├── _layout.tsx            # Tab bar + auth guard
+│   ├── home.tsx               # Coaching card entry (view differs by age via personaFromBirthYear)
+│   ├── library.tsx            # Library — all subjects
+│   ├── dashboard.tsx          # Parent dashboard
 │   ├── subscription.tsx
-│   ├── library/                # Library (coaching cards)
+│   ├── learn.tsx
+│   ├── learn-new.tsx
+│   ├── mentor-memory.tsx
+│   ├── progress/
+│   ├── pick-book/
+│   ├── session/               # Active learning session
 │   ├── onboarding/            # Subject creation → interview → curriculum
-│   ├── session/               # Active learning/homework session
-│   └── topic/[topicId].tsx
-├── (parent)/                  # Parent persona routes
-│   ├── _layout.tsx            # Parent nav + dashboard
-│   ├── dashboard.tsx
-│   ├── library.tsx
-│   └── more.tsx
-├── assessment/                # Standalone assessment flow
+│   │   ├── _layout.tsx
+│   │   └── interview.tsx
+│   ├── homework/
+│   ├── shelf/[subjectId]/
+│   ├── subject/[subjectId]/
+│   ├── child/[profileId]/
+│   ├── topic/
+│   ├── settings/
+│   ├── account/
+│   └── consent/
 ├── session-summary/[sessionId].tsx
-├── consent.tsx                # Consent collection (outside auth group)
 ├── create-profile.tsx
 ├── create-subject.tsx
 ├── delete-account.tsx
@@ -451,6 +471,8 @@ src/app/
 ├── sso-callback.tsx
 └── _layout.tsx                # Root layout — sets CSS variables from active profile
 ```
+
+The `(app)/` group contains all authenticated screens. View differences between parents and learners are handled at the component level (e.g., `ParentGateway` / `LearnerScreen` in `home.tsx`) using age derived from `birthYear`, not at the route group level.
 
 **Styling:** NativeWind v4.2.1 + Tailwind CSS 3.4.19. CSS variable theming — root layout sets variables, all components are persona-unaware.
 
@@ -491,9 +513,8 @@ src/app/
 
 **Observability:**
 - **Mobile**: Sentry (`@sentry/react-native`) for crash reporting + performance monitoring
-- **API**: `@sentry/cloudflare` (verify during project init it captures what's needed on Workers). If too limited, Sentry for mobile only.
-- **Backend debugging**: Axiom as primary. Structured logging with correlation IDs, LLM call logging, SM-2 decision logging routed to Axiom.
-- **OpenTelemetry**: Recommended for trace propagation (request → LLM → Inngest job chain)
+- **API**: `@sentry/cloudflare` for unhandled error capture on Workers.
+- **Backend logging**: Structured JSON logging via `services/logger.ts`, compatible with Workers Logpush and `wrangler tail`. No Axiom SDK integration. Includes correlation ID injection, LLM call logging, and SM-2 decision logging.
 
 ### Decision Impact Analysis
 
@@ -608,19 +629,24 @@ Not a separate `__tests__/` directory. Exception: integration/E2E tests in a top
 ```
 components/
 ├── coaching/
-│   └── CoachingCard.tsx         # (BaseCoachingCard hierarchy planned — UX-7)
+│   └── BaseCoachingCard.tsx     # Base coaching card component
 ├── session/
-│   ├── ChatShell.tsx            # Reusable chat UI shell (replaces planned MessageThread)
-│   └── MessageBubble.tsx        # Individual message rendering
+│   ├── ChatShell.tsx            # Reusable chat UI shell
+│   ├── MessageBubble.tsx        # Individual message rendering
+│   ├── LivingBook.tsx
+│   ├── SessionTimer.tsx
+│   ├── VoicePlaybackBar.tsx
+│   ├── VoiceRecordButton.tsx
+│   └── VoiceToggle.tsx
 ├── progress/
 │   └── RetentionSignal.tsx
 └── common/
-    ├── ErrorBoundary.tsx        # React error boundary (replaces planned ErrorRecovery)
-    ├── DashboardCard.tsx
+    ├── ErrorBoundary.tsx        # React error boundary
+    ├── ErrorFallback.tsx        # Reusable error state component
+    ├── OfflineBanner.tsx        # Proactive offline indicator
+    ├── ProfileSwitcher.tsx
     └── UsageMeter.tsx
 ```
-
-> **Note:** Current implementations (`CoachingCard`, `ChatShell`) are simplified versions of the planned UX-7 component hierarchy (`BaseCoachingCard` with 4 variants, `MessageThread` + wrappers). The UX specification component names represent the target architecture.
 
 **Hono handler pattern:** Handler stays inline for route definition and Hono RPC type inference. Business logic extracted into service functions in `apps/api/src/services/` — testable, readable, handler is thin glue.
 
@@ -655,7 +681,6 @@ apps/api     →  @eduagent/retention
 @eduagent/database  →  (no workspace deps)   (uses drizzle-zod, not @eduagent/schemas directly)
 @eduagent/retention →  (no workspace deps)   (pure math, zero deps)
 @eduagent/schemas   →  (no workspace deps)   (leaf package)
-@eduagent/factory   →  @eduagent/schemas     (test builders use schema types)
 ```
 
 `packages/` never imports from `apps/`. `packages/schemas` never imports from `packages/database`. An agent importing a Drizzle type into a shared schema creates a circular dependency — the schema package must remain a leaf.
@@ -721,7 +746,7 @@ GET /v1/progress/:subjectId/topics → [{ topicId, title, retentionStatus, ... }
 ['billing', profileId, 'quota']
 ```
 
-**Logging:** Structured JSON to Axiom. Always include correlation ID.
+**Logging:** Structured JSON (Workers Logpush / `wrangler tail`). Always include correlation ID.
 
 ```typescript
 logger.info({ correlationId, event: "llm.call.complete", model, tokensIn, tokensOut, latencyMs, cost });
@@ -783,7 +808,7 @@ Both client and server import the same Zod schemas — single source of truth pr
 2. Use the scoped repository (`createScopedRepository(profileId)`), never write raw `WHERE profile_id =` clauses
 3. Include `correlationId` in every log statement
 4. Use Inngest for any async work that should survive a request lifecycle
-5. Keep components persona-unaware — no conditional rendering based on persona type. Exception: `(learner)/home.tsx` reads persona for adaptive entry card routing (page-level routing logic that doesn't fit in layout)
+5. Keep components persona-unaware — no conditional rendering based on persona type. Exception: `(app)/home.tsx` reads age (from `birthYear` via `personaFromBirthYear`) for adaptive entry card routing (page-level routing logic that doesn't fit in layout)
 6. Write co-located tests for every new route handler and component
 7. Use Drizzle relational queries for CRUD, `sql` template tag for complex aggregations
 8. Return typed `ApiError` envelope for all error responses, never ad-hoc JSON
@@ -815,37 +840,38 @@ eduagent/
 │   ├── mobile/                       # Expo (React Native)
 │   │   ├── src/
 │   │   │   ├── app/                  # Expo Router file-based routes
-│   │   │   │   ├── _layout.tsx       # Root layout — persona CSS vars, Clerk provider, error boundary
+│   │   │   │   ├── _layout.tsx       # Root layout — theme CSS vars, Clerk provider, error boundary
 │   │   │   │   ├── (auth)/
 │   │   │   │   │   ├── _layout.tsx
 │   │   │   │   │   ├── sign-in.tsx
 │   │   │   │   │   ├── sign-up.tsx
 │   │   │   │   │   └── forgot-password.tsx
-│   │   │   │   ├── (learner)/
-│   │   │   │   │   ├── _layout.tsx       # Learner tab bar + coaching voice
-│   │   │   │   │   ├── home.tsx          # Coaching card entry point (daily use)
-│   │   │   │   │   ├── more.tsx          # Settings/account nav
-│   │   │   │   │   ├── subscription.tsx  # Subscription management
+│   │   │   │   ├── (app)/                    # All authenticated screens — single group
+│   │   │   │   │   ├── _layout.tsx           # Tab bar + auth guard
+│   │   │   │   │   ├── home.tsx              # Entry point — view differs by birthYear age
+│   │   │   │   │   ├── library.tsx           # Library — all subjects
+│   │   │   │   │   ├── dashboard.tsx         # Aggregated child progress (parent view)
+│   │   │   │   │   ├── subscription.tsx      # Subscription management
+│   │   │   │   │   ├── learn.tsx
+│   │   │   │   │   ├── learn-new.tsx
+│   │   │   │   │   ├── mentor-memory.tsx
 │   │   │   │   │   ├── onboarding/
 │   │   │   │   │   │   ├── _layout.tsx
-│   │   │   │   │   │   ├── interview.tsx     # Conversational goal/background assessment
-│   │   │   │   │   │   └── curriculum-review.tsx  # AI-generated path review + customization
+│   │   │   │   │   │   └── interview.tsx     # Conversational goal/background assessment
 │   │   │   │   │   ├── session/
-│   │   │   │   │   │   └── index.tsx     # Active learning session
-│   │   │   │   │   ├── library/
-│   │   │   │   │   │   └── index.tsx     # Library — all subjects
-│   │   │   │   │   └── topic/
-│   │   │   │   │       └── [topicId].tsx # Topic detail + practice
-│   │   │   │   ├── (parent)/
-│   │   │   │   │   ├── _layout.tsx       # Parent nav + dashboard
-│   │   │   │   │   ├── dashboard.tsx     # Aggregated child progress
-│   │   │   │   │   ├── library.tsx        # Parent view of Library
-│   │   │   │   │   └── more.tsx          # Parent settings/account
-│   │   │   │   ├── assessment/
-│   │   │   │   │   └── index.tsx
+│   │   │   │   │   │   └── index.tsx         # Active learning session
+│   │   │   │   │   ├── shelf/[subjectId]/    # Subject shelf view
+│   │   │   │   │   ├── subject/[subjectId]/  # Subject management
+│   │   │   │   │   ├── child/[profileId]/    # Child profile view (parent)
+│   │   │   │   │   ├── topic/                # Topic detail + practice
+│   │   │   │   │   ├── homework/
+│   │   │   │   │   ├── progress/
+│   │   │   │   │   ├── pick-book/
+│   │   │   │   │   ├── settings/
+│   │   │   │   │   ├── account/
+│   │   │   │   │   └── consent/
 │   │   │   │   ├── session-summary/
 │   │   │   │   │   └── [sessionId].tsx   # Post-session summary view
-│   │   │   │   ├── consent.tsx           # GDPR parental consent flow
 │   │   │   │   ├── create-profile.tsx
 │   │   │   │   ├── create-subject.tsx
 │   │   │   │   ├── delete-account.tsx
@@ -853,26 +879,43 @@ eduagent/
 │   │   │   │   └── sso-callback.tsx
 │   │   │   ├── components/
 │   │   │   │   ├── coaching/
-│   │   │   │   │   └── CoachingCard.tsx      # (BaseCoachingCard hierarchy planned — UX-7)
+│   │   │   │   │   └── BaseCoachingCard.tsx  # Base coaching card component
 │   │   │   │   ├── session/
 │   │   │   │   │   ├── ChatShell.tsx         # Reusable chat UI shell
-│   │   │   │   │   └── MessageBubble.tsx     # Individual message rendering
+│   │   │   │   │   ├── MessageBubble.tsx     # Individual message rendering
+│   │   │   │   │   ├── LivingBook.tsx
+│   │   │   │   │   ├── LibraryPrompt.tsx
+│   │   │   │   │   ├── QuestionCounter.tsx
+│   │   │   │   │   ├── SessionInputModeToggle.tsx
+│   │   │   │   │   ├── SessionTimer.tsx
+│   │   │   │   │   ├── VoicePlaybackBar.tsx
+│   │   │   │   │   ├── VoiceRecordButton.tsx
+│   │   │   │   │   └── VoiceToggle.tsx
 │   │   │   │   ├── progress/
 │   │   │   │   │   └── RetentionSignal.tsx
 │   │   │   │   └── common/
 │   │   │   │       ├── ErrorBoundary.tsx
-│   │   │   │       ├── DashboardCard.tsx
+│   │   │   │       ├── ErrorFallback.tsx
+│   │   │   │       ├── OfflineBanner.tsx
+│   │   │   │       ├── ProfileSwitcher.tsx
 │   │   │   │       └── UsageMeter.tsx
-│   │   │   ├── hooks/                    # TanStack Query hooks (kebab-case convention)
+│   │   │   ├── hooks/                    # TanStack Query hooks + utilities (~39 hooks, kebab-case)
 │   │   │   │   ├── use-sessions.ts       # Session CRUD + useStreamMessage (SSE)
-│   │   │   │   ├── use-coaching-card.ts
+│   │   │   │   ├── use-books.ts
+│   │   │   │   ├── use-celebration.tsx
 │   │   │   │   ├── use-curriculum.ts
+│   │   │   │   ├── use-filing.ts
+│   │   │   │   ├── use-homework-ocr.ts
 │   │   │   │   ├── use-interview.ts
 │   │   │   │   ├── use-subjects.ts
 │   │   │   │   ├── use-progress.ts
 │   │   │   │   ├── use-retention.ts
+│   │   │   │   ├── use-revenuecat.ts
+│   │   │   │   ├── use-speech-recognition.ts
 │   │   │   │   ├── use-streaks.ts
 │   │   │   │   ├── use-subscription.ts
+│   │   │   │   ├── use-text-to-speech.ts
+│   │   │   │   ├── use-vocabulary.ts
 │   │   │   │   ├── use-settings.ts
 │   │   │   │   ├── use-profiles.ts
 │   │   │   │   ├── use-dashboard.ts
@@ -902,26 +945,39 @@ eduagent/
 │       ├── src/
 │       │   ├── index.ts             # Hono app entry, route mounting, global error handler
 │       │   ├── routes/
-│       │   │   ├── health.ts        # /v1/health — health check
-│       │   │   ├── auth.ts          # /v1/auth — authentication
-│       │   │   ├── sessions.ts      # /v1/sessions/* — learning sessions, exchanges
-│       │   │   ├── profiles.ts      # /v1/profiles/* — profile management, persona
-│       │   │   ├── curriculum.ts    # /v1/curriculum/* — curriculum gen, topics, paths
-│       │   │   ├── subjects.ts      # /v1/subjects/* — subject management
-│       │   │   ├── assessments.ts   # /v1/assessments/* — quizzes, recall, mastery
-│       │   │   ├── billing.ts       # /v1/billing/* — billing, quota, top-ups
-│       │   │   ├── progress.ts      # /v1/progress/* — progress tracking, coaching card, Library
-│       │   │   ├── homework.ts      # /v1/homework/* — homework processing (includes OCR endpoint)
-│       │   │   ├── dashboard.ts     # /v1/dashboard/* — parent dashboard
-│       │   │   ├── settings.ts      # /v1/settings/* — user settings
-│       │   │   ├── account.ts       # /v1/account/* — account management
-│       │   │   ├── consent.ts       # /v1/consent/* — GDPR consent flows
-│       │   │   ├── interview.ts     # /v1/interview/* — onboarding interview
-│       │   │   ├── streaks.ts       # /v1/streaks/* — streak tracking
-│       │   │   ├── retention.ts     # /v1/retention/* — retention data
-│       │   │   ├── parking-lot.ts   # /v1/parking-lot/* — parking lot topics
-│       │   │   ├── stripe-webhook.ts # Stripe webhook handler
-│       │   │   └── inngest.ts       # /v1/inngest — Inngest webhook (signing key auth)
+│       │   │   ├── health.ts              # /v1/health — health check
+│       │   │   ├── auth.ts                # /v1/auth — authentication
+│       │   │   ├── sessions.ts            # /v1/sessions/* — learning sessions, exchanges
+│       │   │   ├── profiles.ts            # /v1/profiles/* — profile management
+│       │   │   ├── curriculum.ts          # /v1/curriculum/* — curriculum gen, topics, paths
+│       │   │   ├── subjects.ts            # /v1/subjects/* — subject management
+│       │   │   ├── assessments.ts         # /v1/assessments/* — quizzes, recall, mastery
+│       │   │   ├── billing.ts             # /v1/billing/* — billing, quota, top-ups
+│       │   │   ├── progress.ts            # /v1/progress/* — progress tracking, coaching card, Library
+│       │   │   ├── homework.ts            # /v1/homework/* — homework processing (includes OCR endpoint)
+│       │   │   ├── dashboard.ts           # /v1/dashboard/* — parent dashboard
+│       │   │   ├── settings.ts            # /v1/settings/* — user settings
+│       │   │   ├── account.ts             # /v1/account/* — account management
+│       │   │   ├── consent.ts             # /v1/consent/* — GDPR consent flows
+│       │   │   ├── interview.ts           # /v1/interview/* — onboarding interview
+│       │   │   ├── streaks.ts             # /v1/streaks/* — streak tracking
+│       │   │   ├── retention.ts           # /v1/retention/* — retention data
+│       │   │   ├── parking-lot.ts         # /v1/parking-lot/* — parking lot topics
+│       │   │   ├── books.ts               # /v1/books/* — LivingBook management
+│       │   │   ├── book-suggestions.ts    # /v1/book-suggestions/*
+│       │   │   ├── celebrations.ts        # /v1/celebrations/*
+│       │   │   ├── coaching-card.ts       # /v1/coaching-card
+│       │   │   ├── consent-web.ts         # /v1/consent-web/* — web GDPR consent
+│       │   │   ├── filing.ts              # /v1/filing/*
+│       │   │   ├── language-progress.ts   # /v1/language-progress/*
+│       │   │   ├── learner-profile.ts     # /v1/learner-profile/*
+│       │   │   ├── notes.ts               # /v1/notes/*
+│       │   │   ├── snapshot-progress.ts   # /v1/snapshot-progress/*
+│       │   │   ├── topic-suggestions.ts   # /v1/topic-suggestions/*
+│       │   │   ├── vocabulary.ts          # /v1/vocabulary/*
+│       │   │   ├── stripe-webhook.ts      # Stripe webhook handler (dormant — future web billing)
+│       │   │   ├── revenuecat-webhook.ts  # RevenueCat webhook handler (primary — mobile IAP)
+│       │   │   └── inngest.ts             # /v1/inngest — Inngest webhook (signing key auth)
 │       │   ├── middleware/
 │       │   │   ├── auth.ts          # Clerk JWT verification via JWKS (cached in KV)
 │       │   │   ├── jwt.ts           # JWT token handling
@@ -939,14 +995,30 @@ eduagent/
 │       │   │   ├── retention-data.ts # Retention data queries + updateRetentionFromSession
 │       │   │   ├── embeddings.ts    # Embedding generation — provider call + pgvector write
 │       │   │   ├── notifications.ts # Expo Push — batch sends, token cleanup, receipt checking
-│       │   │   ├── metering.ts      # Quota enforcement (calls decrement_quota)
+│       │   │   ├── metering.ts      # Quota enforcement (calls decrementQuota)
 │       │   │   ├── session.ts       # Session management
 │       │   │   ├── session-lifecycle.ts # Session lifecycle management
 │       │   │   ├── adaptive-teaching.ts # Adaptive teaching logic
 │       │   │   ├── subscription.ts  # Subscription management
-│       │   │   ├── billing.ts       # Billing logic + quota pool/trial queries for Inngest
+│       │   │   ├── billing.ts       # Billing logic + quota pool/trial queries for Inngest (decrementQuota lives here)
 │       │   │   ├── trial.ts         # Trial management
 │       │   │   ├── xp.ts            # XP/engagement tracking
+│       │   │   ├── celebrations.ts  # Celebration event detection
+│       │   │   ├── coaching-cards.ts # Coaching card computation + cache management
+│       │   │   ├── evaluate-data.ts # EVALUATE verification data handling
+│       │   │   ├── home-surface-cache.ts # Home surface data caching
+│       │   │   ├── learner-input.ts # Learner input processing
+│       │   │   ├── milestone-detection.ts # Learning milestone detection
+│       │   │   ├── monthly-report.ts # Monthly progress report generation
+│       │   │   ├── notes.ts         # Session notes management
+│       │   │   ├── post-session-suggestions.ts # Post-session study suggestions
+│       │   │   ├── recall-bridge.ts # Bridge between recall and retention systems
+│       │   │   ├── snapshot-aggregation.ts # Progress snapshot aggregation
+│       │   │   ├── subject-classify.ts # Subject classification (LLM-assisted)
+│       │   │   ├── subject-resolve.ts # Subject resolution + LLM fallback
+│       │   │   ├── subject-urgency.ts # Subject urgency calculations
+│       │   │   ├── suggestions.ts   # Topic/book suggestion generation
+│       │   │   ├── verification-completion.ts # Verification flow completion handling
 │       │   │   ├── progress.ts      # Progress tracking, coaching card, Library
 │       │   │   ├── dashboard.ts     # Parent dashboard data
 │       │   │   ├── profile.ts       # Profile management logic
@@ -971,20 +1043,31 @@ eduagent/
 │       │   │       ├── types.ts     # ChatMessage, EscalationRung, RouteResult, StreamResult
 │       │   │       ├── index.ts     # Barrel: export { routeAndCall, routeAndStream, registerProvider }
 │       │   │       └── providers/
-│       │   │           ├── gemini.ts # Gemini Flash (rung 1-2) + Gemini Pro (rung 3+)
-│       │   │           └── mock.ts  # Test provider
+│       │   │           ├── gemini.ts     # Gemini 2.5 Flash (rung 1-2) + Gemini 2.5 Pro (rung 3+)
+│       │   │           ├── openai.ts     # GPT-4o-mini (rung 1-2) + GPT-4o (rung 3+)
+│       │   │           ├── anthropic.ts  # Claude — registered based on config keys
+│       │   │           └── mock.ts       # Test provider
 │       │   ├── inngest/
 │       │   │   ├── client.ts             # Inngest client init
 │       │   │   ├── helpers.ts            # getStepDatabase() helper for step DB access
 │       │   │   ├── index.ts              # Barrel for all Inngest functions
 │       │   │   └── functions/
-│       │   │       ├── session-completed.ts   # session.completed → SM-2 → coaching → dashboard → embeddings
-│       │   │       ├── consent-reminders.ts   # Consent reminder schedule (7/14/25/30 days)
-│       │   │       ├── account-deletion.ts    # Deletion orchestrator (7-day grace period)
-│       │   │       ├── review-reminder.ts     # Scheduled retention review notifications
-│       │   │       ├── payment-retry.ts       # Payment failure retry logic
-│       │   │       ├── quota-reset.ts         # Monthly quota cycle reset
-│       │   │       └── trial-expiry.ts        # Trial expiration handling
+│       │   │       ├── session-completed.ts        # session.completed → SM-2 → coaching → dashboard → embeddings
+│       │   │       ├── consent-reminders.ts        # Consent reminder schedule (7/14/25/30 days)
+│       │   │       ├── account-deletion.ts         # Deletion orchestrator (7-day grace period)
+│       │   │       ├── quota-reset.ts              # Monthly quota cycle reset
+│       │   │       ├── trial-expiry.ts             # Trial expiration handling
+│       │   │       ├── book-pre-generation.ts      # Pre-generate LivingBook content
+│       │   │       ├── consent-revocation.ts       # Consent revocation processing
+│       │   │       ├── daily-snapshot.ts           # Daily progress snapshot
+│       │   │       ├── monthly-report-cron.ts      # Monthly progress report cron
+│       │   │       ├── post-session-suggestions.ts # Post-session study suggestions
+│       │   │       ├── recall-nudge.ts             # Recall nudge scheduling
+│       │   │       ├── recall-nudge-send.ts        # Recall nudge delivery
+│       │   │       ├── session-stale-cleanup.ts    # Clean up stale sessions
+│       │   │       ├── subject-auto-archive.ts     # Auto-archive inactive subjects
+│       │   │       ├── topup-expiry-reminder.ts    # Top-up credit expiry reminders
+│       │   │       └── weekly-progress-push.ts     # Weekly progress push notification
 │       │   ├── config.ts            # Typed env config (Zod validated at startup)
 │       │   └── errors.ts            # AppError class, typed error codes
 │       ├── wrangler.toml            # Workers config + KV namespace bindings + rate limiting rules
@@ -1014,20 +1097,23 @@ eduagent/
 │   ├── database/                    # Drizzle schema + Neon connection + scoped repository
 │   │   ├── src/
 │   │   │   ├── schema/
-│   │   │   │   ├── profiles.ts     # profiles, family_links, consent_states
-│   │   │   │   ├── sessions.ts     # learning_sessions, session_events, session_summaries
-│   │   │   │   ├── subjects.ts     # curricula, topics, learning_paths, topic_prerequisites (v1.1)
-│   │   │   │   ├── assessments.ts  # assessments, recall_tests, mastery_scores
-│   │   │   │   ├── billing.ts      # subscriptions, quota_pools, top_up_credits
-│   │   │   │   ├── progress.ts     # progress tracking, coaching states
-│   │   │   │   ├── embeddings.ts   # pgvector embeddings
-│   │   │   │   └── index.ts        # Re-exports all schemas
+│   │   │   │   ├── profiles.ts         # profiles, family_links, consent_states
+│   │   │   │   ├── sessions.ts         # learning_sessions, session_events, session_summaries
+│   │   │   │   ├── subjects.ts         # curricula, topics, learning_paths, topic_prerequisites (v1.1)
+│   │   │   │   ├── assessments.ts      # assessments, recall_tests, mastery_scores
+│   │   │   │   ├── billing.ts          # subscriptions, quota_pools, top_up_credits
+│   │   │   │   ├── progress.ts         # progress tracking, coaching states
+│   │   │   │   ├── embeddings.ts       # pgvector embeddings
+│   │   │   │   ├── language.ts         # language learning schema
+│   │   │   │   ├── learning-profiles.ts # learner profile details
+│   │   │   │   ├── notes.ts            # session notes
+│   │   │   │   ├── snapshots.ts        # progress snapshots
+│   │   │   │   └── index.ts            # Re-exports all schemas
 │   │   │   ├── repository.ts       # createScopedRepository(profileId)
 │   │   │   ├── client.ts       # Neon serverless connection factory
 │   │   │   ├── queries/            # Named query functions for complex/non-standard queries
-│   │   │   │   ├── dashboard.ts    # Parent dashboard: GROUP BY, window functions
-│   │   │   │   ├── retention.ts    # Retention analytics, decay calculations
 │   │   │   │   └── embeddings.ts   # pgvector similarity search (cosine distance, LIMIT N)
+│   │   │   │                       # (dashboard and retention logic is in service layer)
 │   │   │   └── index.ts
 │   │   ├── tsconfig.json
 │   │   ├── project.json
@@ -1040,23 +1126,15 @@ eduagent/
 │   │   ├── tsconfig.json
 │   │   ├── project.json
 │   │   └── package.json
-│   ├── test-utils/                  # Shared testing utilities
-│   │   ├── src/
-│   │   │   ├── setup.ts            # Jest environment setup
-│   │   │   ├── mocks.ts            # Common mocks (Clerk, Neon, Inngest)
-│   │   │   └── index.ts
-│   │   ├── tsconfig.json
-│   │   ├── project.json
-│   │   └── package.json
-│   └── factory/                     # Test data factories (types from @eduagent/schemas)
+│   └── test-utils/                  # Shared testing utilities
 │       ├── src/
-│       │   ├── profiles.ts
-│       │   ├── sessions.ts
-│       │   ├── subjects.ts
+│       │   ├── setup.ts            # Jest environment setup
+│       │   ├── mocks.ts            # Common mocks (Clerk, Neon, Inngest)
 │       │   └── index.ts
 │       ├── tsconfig.json
 │       ├── project.json
 │       └── package.json
+│                                    # Note: no factory/ package — test factories are co-located with tests
 ├── nx.json                          # Nx workspace config, plugins, Nx Cloud
 ├── tsconfig.base.json               # Shared TS config, path aliases
 ├── pnpm-workspace.yaml
@@ -1078,7 +1156,7 @@ eduagent/
 The original `lib/` was accumulating too many unrelated concerns. Replaced with purpose-specific directories:
 
 - **`services/`** — Business logic extracted from route handlers, including the `services/llm/` orchestration sub-module. Cross-service calls go through exported function interfaces (e.g., `exchanges.ts` calls `getTopicSchedules()` from `retention.ts`), never internal imports. When the dependency graph between services gets tangled, that's a refactoring signal.
-- **`services/llm/`** — LLM orchestration module, nested inside `services/`. `routeAndCall()` in `router.ts`, exported via `index.ts` barrel. Services import as `from './llm'`. Currently only Gemini provider (Flash for rung 1-2, Pro for rung 3+) and mock provider. Does NOT include embedding generation — embedding is a different call pattern (single vector output, not streaming conversation).
+- **`services/llm/`** — LLM orchestration module, nested inside `services/`. `routeAndCall()` in `router.ts`, exported via `index.ts` barrel. Services import as `from './llm'`. Three providers are fully implemented: Gemini (2.5 Flash/Pro), OpenAI (GPT-4o-mini/GPT-4o), and Anthropic (Claude). The LLM middleware registers all three based on config keys. Also includes a mock provider for testing. Does NOT include embedding generation — embedding is a different call pattern (single vector output, not streaming conversation).
 
 **EVALUATE verification prompt (Epic 3 extension):**
 
@@ -1149,15 +1227,15 @@ Voice-first session mode, orthogonal to session type (learning/homework/interlea
 
 **Onboarding as route-level split, not conditional rendering:**
 
-`(learner)/onboarding/` is a separate route group with `interview.tsx` and `curriculum-review.tsx`. The alternative — conditional rendering inside `home.tsx` based on onboarding state — overloads one component with two responsibilities and makes testing harder. Onboarding is a distinct flow with different UI needs (conversational interview, curriculum display with skip/accept). After onboarding completes, `router.replace('/(learner)/home')` navigates to daily coaching. The `(learner)/_layout.tsx` wraps both, so coaching voice and tab bar are shared.
+`(app)/onboarding/` is a separate sub-directory with `interview.tsx`. The alternative — conditional rendering inside `home.tsx` based on onboarding state — overloads one component with two responsibilities and makes testing harder. Onboarding is a distinct flow with different UI needs (conversational interview, curriculum display with skip/accept). After onboarding completes, `router.replace('/(app)/home')` navigates to daily coaching. The `(app)/_layout.tsx` wraps both, so the tab bar is shared.
 
 **`routes/homework.ts` — homework processing route (includes OCR):**
 
 ML Kit handles OCR on-device (primary path). The server-side OCR endpoint exists within `routes/homework.ts` for the fallback case: when ML Kit fails or returns low-confidence results on math-heavy content. Mobile sends the image to the server, server runs it through the OCR provider interface (Mathpix vs CF Workers AI, provider TBD, interface defined now). The route accepts a base64-encoded image, returns structured text.
 
-**Coaching card KV invalidation:**
+**Coaching card cache invalidation:**
 
-Write-through on recompute: when `app/coaching.precompute` Inngest function completes, it writes the new card directly to Workers KV (key: `coaching:{profileId}`). No explicit invalidation -- overwrite replaces stale data. KV TTL set to 24h as safety net (if Inngest fails to recompute, stale card expires rather than persisting indefinitely). On KV miss, API queries Neon and backfills KV.
+Write-through on recompute: when the `session-completed` Inngest function completes, it recomputes the coaching card and writes it to the `coaching_card_cache` database table (KV stand-in per ARCH-11, key: `profileId`). On cache miss, the coaching card route calls `getCoachingCardForProfile` which computes and persists a fresh card. No Workers KV involved for coaching cards.
 
 **SSE streaming and Workers CPU limits:**
 
@@ -1166,7 +1244,7 @@ Workers have a 30-second CPU time limit (wall-clock can exceed this since I/O wa
 **Rate limiting — two layers, different purposes:**
 
 1. **Cloudflare rate limiting** (configured in `wrangler.toml`): 100 req/min per user per PRD. Stops abuse before it hits application code. Applies to all routes.
-2. **Quota metering** (`services/metering.ts`): Per-profile question limits based on subscription tier. Applies to LLM-consuming routes only. Calls `decrement_quota` PostgreSQL function.
+2. **Quota metering** (`services/metering.ts`): Per-profile question limits based on subscription tier. Applies to LLM-consuming routes only. Calls `decrementQuota()` in `services/billing.ts`.
 
 Different concerns: rate limiting protects infrastructure, quota metering enforces billing.
 
@@ -1176,17 +1254,17 @@ Different concerns: rate limiting protects infrastructure, quota metering enforc
 
 **Observability files — established from day one:**
 
-- **`logger.ts`** — Axiom structured logging factory. Creates loggers with automatic correlation ID injection. Every service file imports from here. Convention established at project init, not retrofitted after 20 service files exist.
-- **`sentry.ts`** — `@sentry/cloudflare` initialization. Captures unhandled errors, sets user context from Clerk session, tags with profile ID and persona type.
+- **`logger.ts`** — Structured JSON logging factory (Workers Logpush / `wrangler tail` compatible). Creates loggers with automatic correlation ID injection. Every service file imports from here. Convention established at project init, not retrofitted after 20 service files exist.
+- **`sentry.ts`** — `@sentry/cloudflare` initialization. Captures unhandled errors, sets user context from Clerk session, tags with `userId`, `profileId`, `requestPath`, plus optional `extra`.
 
 **i18n — two distinct concerns:**
 
-1. **UI translations**: `apps/mobile/assets/locales/{en,de}/*.json` via react-i18next. Namespace files per feature area (common, coaching, assessment, settings). Standard string lookup, nothing novel.
-2. **LLM language preference**: NOT i18n infrastructure. The learner's preferred language is a field on their profile (`preferredLanguage`), injected into the system prompt during prompt assembly in `services/exchanges.ts`. The LLM responds in the learner's language naturally. This is a prompt construction concern, not a translation file concern. UI language and LLM language can differ (e.g., German UI, learning Spanish content).
+1. **UI translations**: English only for v1.0 — no i18n framework implemented. Multi-language UI (react-i18next + locale files) is deferred. The original architecture planned `apps/mobile/assets/locales/{en,de}/*.json` via react-i18next, but this was not built for the MVP market pivot to English-only.
+2. **LLM language preference**: NOT i18n infrastructure. The learner's preferred language is a field on their profile (`preferredLanguage`), injected into the system prompt during prompt assembly in `services/exchanges.ts`. The LLM responds in the learner's language naturally. This is a prompt construction concern, not a translation file concern.
 
-**Test factory schema sync:**
+**Test data co-location:**
 
-`packages/factory/` imports types from `packages/schemas/` (same Zod-inferred types the API uses). If a schema changes and a factory doesn't update, TypeScript compilation fails — the type mismatch is caught at build time, not at test runtime. No runtime sync mechanism needed; the type system enforces it. CI runs `nx affected --target=typecheck` on every PR.
+There is no `packages/factory/` package — test factories are co-located with the tests that use them. Test helpers import types from `packages/schemas/` and `packages/test-utils/`. TypeScript compilation catches schema/test mismatches at build time. CI runs `nx affected --target=typecheck` on every PR.
 
 ### Architectural Boundaries
 
@@ -1198,7 +1276,7 @@ Different concerns: rate limiting protects infrastructure, quota metering enforc
 | `/v1/profiles/*` | Profile CRUD, persona, family links | Clerk (user metadata sync) | Clerk JWT |
 | `/v1/curriculum/*` | Curriculum generation, topic management | LLM providers (via orchestrator) | Clerk JWT |
 | `/v1/assessments/*` | Quiz generation, recall scoring, mastery | LLM providers (via orchestrator) | Clerk JWT |
-| `/v1/billing/*` | Subscription state, quota reads | Stripe (webhook-synced) | Clerk JWT |
+| `/v1/billing/*` | Subscription state, quota reads | RevenueCat (webhook-synced, primary) / Stripe (dormant) | Clerk JWT |
 | `/v1/progress/*` | Progress tracking, coaching card, Library | Workers KV (cache reads) | Clerk JWT |
 | `/v1/homework/*` | Homework processing, OCR text extraction | OCR provider (server-side fallback) | Clerk JWT |
 | `/v1/dashboard/*` | Parent dashboard data | — | Clerk JWT |
@@ -1217,22 +1295,21 @@ Different concerns: rate limiting protects infrastructure, quota metering enforc
 
 ```
 Root Layout (_layout.tsx)
-├── Sets: Clerk Provider, TanStack QueryClient, persona CSS variables, Sentry
+├── Sets: Clerk Provider, TanStack QueryClient, theme CSS variables, Sentry
 ├── Owns: Global error boundary, font loading, splash screen
 │
-├── (auth)/ — Auth-gated, no persona context yet
+├── (auth)/ — Auth-gated, no profile context yet
 │   └── Communicates: Clerk SDK directly, no API calls except registration
 │
-├── (learner)/ — Requires authenticated profile with learner/teen persona
-│   ├── home.tsx → reads: coaching card (TanStack Query → /v1/progress)
-│   ├── onboarding/ → interview + curriculum review (first-run only, then router.replace to home)
-│   ├── session/[id].tsx → reads/writes: session state (SSE stream + POST exchanges)
-│   ├── homework/camera.tsx → uses: ML Kit OCR (on-device), falls back to /v1/homework/ocr
-│   └── library/ → reads: Library (full fetch, TanStack Query → /v1/progress)
-│
-└── (parent)/ — Requires authenticated profile with parent persona
-    ├── dashboard.tsx → reads: aggregated child data (/v1/profiles/*/progress)
-    └── profiles/[profileId].tsx → reads: child's session history, coaching state
+└── (app)/ — All authenticated screens
+    ├── home.tsx → reads: coaching card (TanStack Query → /v1/coaching-card)
+    │             view differs by birthYear age (ParentGateway vs LearnerScreen)
+    ├── (app)/onboarding/ → interview + curriculum review (first-run only, then router.replace to home)
+    ├── session/index.tsx → reads/writes: session state (SSE stream + POST exchanges)
+    ├── homework/ → uses: ML Kit OCR (on-device), falls back to /v1/homework/ocr
+    ├── library.tsx → reads: Library (full fetch, TanStack Query → /v1/progress)
+    ├── dashboard.tsx → reads: aggregated child data (/v1/profiles/*/progress) [parent view]
+    └── child/[profileId]/ → reads: child's session history, coaching state [parent view]
 ```
 
 **Service Boundaries (API):**
@@ -1259,7 +1336,7 @@ Service Function (business logic)
 |-----------|-------|--------|----------|
 | Neon (PostgreSQL) | All services via scoped repository | All services via scoped repository | `packages/database` — single access point |
 | pgvector (in Neon) | `queries/embeddings.ts` — vector similarity search for memory retrieval | `services/embeddings.ts` via Inngest (on session.completed) | Same Neon connection, separate query module |
-| Workers KV | `middleware/auth.ts` (JWKS), `services/progress.ts` (coaching card), `services/metering.ts` (subscription) | Inngest events (coaching precompute), Stripe webhook handler (subscription sync) | KV namespace bindings in wrangler.toml |
+| Workers KV | `middleware/auth.ts` (JWKS), `services/metering.ts` (subscription) | RevenueCat webhook handler (subscription sync), Inngest events | KV namespace bindings in wrangler.toml |
 | Client storage | TanStack Query cache (automatic) | TanStack Query cache (automatic), `lib/storage.ts` (offline resilience) | AsyncStorage for persistence across app restarts |
 
 ### Requirements to Structure Mapping
@@ -1269,11 +1346,11 @@ Service Function (business logic)
 | Epic | Routes | Services | Components | Schemas | Database |
 |------|--------|----------|------------|---------|----------|
 | **Epic 0: Registration** | `profiles.ts`, `account.ts`, `consent.ts` | `profile.ts`, `account.ts`, `consent.ts`, `deletion.ts`, `export.ts` | `(auth)/*` | `profiles.ts`, `account.ts`, `consent.ts` | `schema/profiles.ts` |
-| **Epic 1: Onboarding** | `curriculum.ts`, `interview.ts`, `subjects.ts` | `curriculum.ts`, `interview.ts`, `subject.ts` | `(learner)/onboarding/*` | `subjects.ts` | `schema/subjects.ts` |
-| **Epic 2: Learning** | `sessions.ts`, `homework.ts` | `exchanges.ts`, `embeddings.ts`, `session-lifecycle.ts`, `adaptive-teaching.ts`, `escalation.ts` | `session/*`, `homework/*`, `coaching/*` | `sessions.ts` | `schema/sessions.ts` |
+| **Epic 1: Onboarding** | `curriculum.ts`, `interview.ts`, `subjects.ts` | `curriculum.ts`, `interview.ts`, `subject.ts` | `(app)/onboarding/*` | `subjects.ts` | `schema/subjects.ts` |
+| **Epic 2: Learning** | `sessions.ts`, `homework.ts` | `exchanges.ts`, `embeddings.ts`, `session-lifecycle.ts`, `adaptive-teaching.ts`, `escalation.ts` | `(app)/session/*`, `(app)/homework/*`, `coaching/*` | `sessions.ts` | `schema/sessions.ts` |
 | **Epic 3: Assessment** | `assessments.ts`, `retention.ts` | `assessments.ts`, `retention.ts`, `retention-data.ts` | `assessment/*` | `assessments.ts` | `schema/assessments.ts` |
-| **Epic 4: Progress** | `progress.ts`, `streaks.ts`, `dashboard.ts`, `parking-lot.ts` | `progress.ts`, `dashboard.ts`, `notifications.ts`, `streaks.ts`, `xp.ts`, `summaries.ts`, `parking-lot.ts` | `progress/*`, `book/*` | `progress.ts` | `schema/progress.ts` |
-| **Epic 5: Subscription** | `billing.ts`, `stripe-webhook.ts` | `billing.ts`, `subscription.ts`, `trial.ts`, `metering.ts` | `(auth)/upgrade.tsx` (inline) | `billing.ts` | `schema/billing.ts` |
+| **Epic 4: Progress** | `progress.ts`, `streaks.ts`, `dashboard.ts`, `parking-lot.ts` | `progress.ts`, `dashboard.ts`, `notifications.ts`, `streaks.ts`, `xp.ts`, `summaries.ts`, `parking-lot.ts` | `(app)/library.tsx`, `(app)/dashboard.tsx` | `progress.ts` | `schema/progress.ts` |
+| **Epic 5: Subscription** | `billing.ts`, `revenuecat-webhook.ts`, `stripe-webhook.ts` (dormant) | `billing.ts`, `subscription.ts`, `trial.ts`, `metering.ts` | `(app)/subscription.tsx` | `billing.ts` | `schema/billing.ts` |
 | **Epic 6: Language (v1.1)** | New route file | New service file | New component directory | New schema file | New schema file |
 | **Epic 7: Concept Map (v1.1)** | `curriculum.ts` (extend), `concept-map.ts` | `concept-map.ts` (new), `coaching-cards.ts` (extend) | `concept-map/` (new), `book/` (extend) | `subjects.ts` (extend `topic_prerequisites`), `curriculumAdaptations` (add JSONB column) | `@eduagent/schemas` (prerequisiteContext Zod schema) |
 | **Epic 8: Full Voice Mode (v1.1)** | `sessions.ts` (extend for voice mode flag) | `exchanges.ts` (extend for voice context) | `session/` (extend: voice controls, waveform), `hooks/use-voice.ts` (new) | `sessions.ts` (extend: voice mode schemas) | `schema/sessions.ts` (voice mode flag on sessions) |
@@ -1284,15 +1361,15 @@ Service Function (business logic)
 |---------|----------|
 | Authentication | `middleware/auth.ts`, `middleware/jwt.ts`, `@clerk/clerk-expo` in root layout |
 | Profile scoping | `middleware/profile-scope.ts` → `packages/database/repository.ts` |
-| Quota/metering | `services/metering.ts` → `packages/database/` (`decrement_quota` function) |
-| LLM orchestration | `services/llm/router.ts`, `services/llm/providers/gemini.ts`, `services/llm/types.ts` |
+| Quota/metering | `services/metering.ts` → `services/billing.ts` (`decrementQuota()` via Drizzle ORM) |
+| LLM orchestration | `services/llm/router.ts`, `services/llm/providers/{gemini,openai,anthropic}.ts`, `services/llm/types.ts` |
 | Embedding pipeline | `services/embeddings.ts` (provider call) → `queries/embeddings.ts` (vector search) |
 | Background jobs | `inngest/functions/*.ts` (Inngest functions) → call `services/` for logic |
 | Push notifications | `services/notifications.ts` (centralized) ← called by Inngest event handlers |
-| Persona theming | `theme/tokens/*.json`, `theme/provider.tsx`, root `_layout.tsx` |
-| Error handling | `errors.ts` (API), `common/ErrorBoundary.tsx` (mobile) |
-| Observability | `logger.ts` (Axiom), `sentry.ts`, `middleware/request-logger.ts` (correlation ID) |
-| i18n (UI) | `assets/locales/{en,de}/*.json` via react-i18next |
+| Persona theming | `lib/design-tokens.ts` (TypeScript tokens), `lib/theme.ts` (context + hooks), root `_layout.tsx` |
+| Error handling | `errors.ts` (API), `common/ErrorBoundary.tsx`, `common/ErrorFallback.tsx` (mobile) |
+| Observability | `services/logger.ts` (structured JSON, Workers Logpush compatible), `sentry.ts`, `middleware/request-logger.ts` (correlation ID) |
+| i18n (UI) | English only for v1.0 — no i18n framework. Deferred to future release. |
 | i18n (LLM) | Profile `preferredLanguage` field → system prompt in `services/exchanges.ts` |
 | Spaced repetition | `packages/retention/` (math), `services/retention.ts` (orchestration) |
 
@@ -1320,15 +1397,15 @@ Mobile App                          API (Hono on Workers)
 | Service | Integration Point | Protocol | Auth |
 |---------|------------------|----------|------|
 | Clerk | `middleware/auth.ts`, `middleware/jwt.ts` + `@clerk/clerk-expo` | JWKS verification, REST API | JWT + API key |
-| Stripe | `routes/stripe-webhook.ts`, `routes/billing.ts` | Webhook events, REST | Webhook signing secret |
-| LLM providers (currently Gemini only; Claude, GPT-4 planned) | `services/llm/router.ts` | REST + SSE | API keys per provider |
+| RevenueCat | `routes/revenuecat-webhook.ts`, `hooks/use-revenuecat.ts` | Webhook events + mobile SDK (iOS StoreKit 2, Android Play Billing) | Webhook signing secret + SDK key |
+| Stripe | `routes/stripe-webhook.ts`, `routes/billing.ts` | Webhook events, REST | Webhook signing secret (dormant — future web billing) |
+| LLM providers (Gemini, OpenAI, Anthropic — all implemented) | `services/llm/router.ts` + `services/llm/providers/` | REST + SSE | API keys per provider |
 | Voyage AI (voyage-3.5) | `services/embeddings.ts` | REST (`https://api.voyageai.com/v1/embeddings`) | API key |
 | Inngest | `routes/inngest.ts` + `inngest/functions/*.ts` | Webhook | Inngest signing key |
 | Neon | `packages/database/client.ts` | PostgreSQL wire protocol (serverless driver) | Connection string |
 | Expo Push | `services/notifications.ts` | REST API | Expo push token |
 | ML Kit | Mobile on-device (no server integration) | Native SDK | — |
 | OCR fallback provider | `routes/homework.ts` (OCR sub-route) | REST API | API key |
-| Axiom | `logger.ts` | HTTPS ingest | API token |
 | Sentry | `sentry.ts` + `@sentry/react-native` | SDK | DSN |
 
 **Data Flow — Learning Session:**
@@ -1347,7 +1424,7 @@ Mobile App                          API (Hono on Workers)
 
 4. API processes exchange
    ├─ middleware/auth.ts → Clerk JWT verification
-   ├─ services/metering.ts → decrement_quota() → quota check
+   ├─ services/metering.ts → decrementQuota() (services/billing.ts) → quota check
    ├─ middleware/profile-scope.ts → scoped repository
    └─ services/exchanges.ts:
        ├─ Loads session context (summary row + recent events + pgvector memory via queries/embeddings.ts)
@@ -1433,8 +1510,8 @@ No contradictory decisions found. The Workers → Railway/Fly fallback path is c
 - Project tree directly maps to all architectural decisions (services/, services/llm/, inngest/ correspond to documented patterns)
 - Package boundaries (`schemas` → leaf, `database` → imports schemas, `retention` → zero deps) support the dependency direction rule
 - Route structure mirrors API boundary table 1:1
-- Mobile route groups align with persona boundaries (auth, learner, parent)
-- Onboarding route split (`(learner)/onboarding/`) consistent between project tree and Epic 1 mapping
+- Mobile route groups: `(auth)/` for unauthenticated flows, `(app)/` for all authenticated screens. View differences by birthYear handled at component level, not route level.
+- Onboarding route split (`(app)/onboarding/`) consistent between project tree and Epic 1 mapping
 
 ### Requirements Coverage Validation
 
@@ -1443,11 +1520,11 @@ No contradictory decisions found. The Workers → Railway/Fly fallback path is c
 | Epic | Architectural Support | Coverage |
 |------|----------------------|----------|
 | Epic 0: Registration & Account Setup | Clerk auth, consent state machine, profile scoping, deletion orchestrator | Full |
-| Epic 1: Onboarding & Interview | LLM orchestration for curriculum gen, `(learner)/onboarding/` route split (interview + curriculum review), curricula schema | Full |
+| Epic 1: Onboarding & Interview | LLM orchestration for curriculum gen, `(app)/onboarding/` route split (interview + curriculum review), curricula schema | Full |
 | Epic 2: Learning Experience | SSE streaming, session state hybrid model, exchange processing, LLM routing by escalation rung, OCR pipeline (ML Kit + server fallback), homework integrity via prompt design | Full |
 | Epic 3: Assessment & Retention | SM-2 library, Inngest lifecycle chain, mastery scoring in schema, delayed recall scheduling, "Needs Deepening" topic flagging, analogy domain injection in system prompt, TEACH_BACK verification (Feynman stage) with on-device STT/TTS | Full |
 | Epic 4: Progress & Motivation | Library (full fetch), coaching card (KV cache), decay visualization, honest streak, notifications service | Full |
-| Epic 5: Subscription | Stripe webhook-synced, `decrement_quota` PostgreSQL function, KV-cached subscription status, family pool with row-level locking | Full |
+| Epic 5: Subscription | RevenueCat webhook-synced (mobile IAP primary), `decrementQuota()` via Drizzle ORM, KV-cached subscription status, family pool with row-level locking | Full |
 | Epic 6: Language Learning (v1.1) | Deferred. Route/service/schema/component extension points documented. No blocking architectural debt. | Deferred by design |
 | Epic 7: Concept Map (v1.1) | `topic_prerequisites` join table, DAG cycle detection service, graph-aware coaching card precomputation, `prerequisiteContext` JSONB on adaptations | Planned (v1.1) |
 | Epic 8: Full Voice Mode (v1.1) | On-device STT/TTS pipeline (`expo-speech-recognition` + `expo-speech`), voice session controls (pause/resume/replay/speed), session-level input mode for all session types, screen-reader-aware manual playback fallback, VAD left as stretch. Dependency: Epic 8 before Epic 6 SPEAK/LISTEN | Implemented (8.6 stretch deferred) |
@@ -1461,7 +1538,7 @@ All 121 MVP functional requirements have architectural support. The architecture
 | NFR | Target | Architectural Support | Status |
 |-----|--------|----------------------|--------|
 | API response (p95) | <200ms excl. LLM | Workers edge deployment, KV caching, scoped repository | Covered |
-| LLM first token | <2s | SSE streaming, model routing (Gemini Flash for simple, Claude/GPT-4 for complex) | Covered |
+| LLM first token | <2s | SSE streaming, model routing (Gemini 2.5 Flash / GPT-4o-mini for simple, Gemini Pro / GPT-4o / Claude for complex) | Covered |
 | Camera → OCR → first AI | <3s | ML Kit on-device (no network), server fallback behind interface | Covered |
 | App cold start | <3s | Coaching card precompute (KV), Expo bundle optimization | Covered |
 | Uptime | 99.5% | Multi-provider LLM fallback, circuit breakers, Inngest durable jobs | Covered |
@@ -1469,7 +1546,7 @@ All 121 MVP functional requirements have architectural support. The architecture
 | Rate limiting | 100 req/min | Cloudflare Workers rate limiting (wrangler.toml) + quota metering middleware | Covered |
 | GDPR | Full | Consent state machine, deletion orchestrator, data export, profile isolation | Covered |
 | COPPA-adjacent | Ages 11-15 | Parental consent workflow, profile-scoped data access | Covered |
-| i18n | EN+DE MVP | react-i18next + locale files + LLM `preferredLanguage` in system prompt | Covered |
+| i18n | EN only (v1.0) | English-only UI (no i18n framework). LLM `preferredLanguage` in system prompt for learning language. Multi-language UI deferred. | Covered |
 | Accessibility | WCAG 2.1 AA | Phased per UX spec (MVP free, v1.1 moderate, v2.0 operational). NativeWind supports accessibility props. | Phased |
 | Offline behavior | Read-only cached data | See "Offline Boundary" below | Defined |
 
@@ -1760,7 +1837,7 @@ Small decisions at build time that cost ~nothing but preserve Option B optionali
 
 | Area | Narrow (A only) | Forward-compatible |
 |---|---|---|
-| Route structure | `/dashboard` at root | `/(parent)/dashboard` — reserve `(learn)` group for later |
+| Route structure | `/dashboard` at root | `/(parent)/dashboard` (web route group) — reserve `(learn)` group for later |
 | Clerk role handling | Assume parent only | Use existing `family_links` role check (post-Epic-12) — works for kid accounts too |
 | Layout | Fixed desktop sidebar | Responsive from day one |
 | Token storage | Parent-scoped cookie | Session cookie that works for any role |

@@ -1,6 +1,6 @@
 # Spec vs Code Audit — 2026-04-13
 
-Systematic audit of all 23 design specs in `docs/superpowers/specs/` against the current codebase. Each capability area documents what is implemented, what gaps remain, and a balanced case for/against closing each gap.
+Systematic audit of all 23 design specs in `docs/specs/` against the current codebase. Each capability area documents what is implemented, what gaps remain, and a balanced case for/against closing each gap.
 
 **Method:** 7 parallel code-review agents read each spec, verified key files/routes/screens against the codebase, and reported findings.
 
