@@ -11,6 +11,10 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ErrorFallback } from '../../components/common';
 import {
+  isNewLearner,
+  sessionsUntilFullProgress,
+} from '../../lib/progressive-disclosure';
+import {
   GrowthChart,
   MilestoneCard,
   SubjectCard,
@@ -165,6 +169,9 @@ export default function ProgressScreen(): React.ReactElement {
     inventory.global.totalSessions === 0 &&
     inventory.subjects.length === 0;
 
+  const newLearner = !isEmpty && isNewLearner(inventory?.global.totalSessions);
+  const remaining = sessionsUntilFullProgress(inventory?.global.totalSessions);
+
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
       <ScrollView
@@ -224,6 +231,31 @@ export default function ProgressScreen(): React.ReactElement {
               accessibilityRole="button"
               accessibilityLabel="Start learning"
               testID="progress-start-learning"
+            >
+              <Text className="text-body font-semibold text-text-inverse">
+                Start learning
+              </Text>
+            </Pressable>
+          </View>
+        ) : newLearner ? (
+          <View
+            className="bg-coaching-card rounded-card p-5"
+            testID="progress-new-learner-teaser"
+          >
+            <Text className="text-h3 font-semibold text-text-primary">
+              Your journey is just beginning
+            </Text>
+            <Text className="text-body text-text-secondary mt-2">
+              Complete {remaining} more{' '}
+              {remaining === 1 ? 'session' : 'sessions'} to see your full
+              learning journey!
+            </Text>
+            <Pressable
+              onPress={() => router.push('/(app)/home' as never)}
+              className="bg-primary rounded-button px-4 py-3 mt-4 items-center"
+              accessibilityRole="button"
+              accessibilityLabel="Start learning"
+              testID="progress-new-learner-start"
             >
               <Text className="text-body font-semibold text-text-inverse">
                 Start learning

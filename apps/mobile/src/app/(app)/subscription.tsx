@@ -26,13 +26,14 @@ import { useThemeColors } from '../../lib/theme';
 import { goBackOrReplace } from '../../lib/navigation';
 import { useProfile } from '../../lib/profile';
 import { useApiClient } from '../../lib/api-client';
-import { assertOk } from '../../lib/assert-ok';
+
 import { UsageMeter } from '../../components/common';
 import {
   useSubscription,
   useUsage,
   useFamilySubscription,
   useJoinByokWaitlist,
+  fetchUsageData,
   type SubscriptionTier,
 } from '../../hooks/use-subscription';
 import {
@@ -769,12 +770,7 @@ export default function SubscriptionScreen() {
         }>({
           queryKey: ['usage', activeProfile?.id],
           staleTime: 0,
-          queryFn: async () => {
-            const res = await client.usage.$get({}, { init: {} });
-            await assertOk(res);
-            const data = await res.json();
-            return data.usage;
-          },
+          queryFn: () => fetchUsageData(client),
         });
       } catch {
         // Network error during poll — continue to next attempt

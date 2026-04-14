@@ -80,14 +80,15 @@ export async function extractVocabularyFromTranscript(
           (item.type === 'word' || item.type === 'chunk')
       )
       .slice(0, 8)
-      .map((item) => ({
-        term: item.term.trim(),
-        translation: item.translation.trim(),
-        type: item.type,
-        cefrLevel: cefrLevelSchema.safeParse(item.cefrLevel).success
-          ? (item.cefrLevel as string)
-          : null,
-      }));
+      .map((item) => {
+        const cefrParsed = cefrLevelSchema.safeParse(item.cefrLevel);
+        return {
+          term: item.term.trim(),
+          translation: item.translation.trim(),
+          type: item.type,
+          cefrLevel: cefrParsed.success ? cefrParsed.data : null,
+        };
+      });
   } catch (err) {
     console.warn('[extractVocabularyFromTranscript] extraction failed:', err);
     return [];

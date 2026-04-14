@@ -157,6 +157,7 @@ export const dashboardChildSchema = z.object({
   ),
   guidedVsImmediateRatio: z.number().min(0).max(1),
   retentionTrend: z.enum(['improving', 'declining', 'stable']),
+  totalSessions: z.number().int(),
   progress: dashboardChildProgressSchema.nullable().optional(),
 });
 export type DashboardChild = z.infer<typeof dashboardChildSchema>;

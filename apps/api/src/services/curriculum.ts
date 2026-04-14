@@ -287,6 +287,117 @@ async function computeBookStatus(
   };
 }
 
+/**
+ * Batched variant of computeBookStatus — runs 2 queries total instead of N.
+ * Used by getBooks to avoid N parallel DB round-trips for subjects with many books.
+ */
+async function computeBookStatusesBatch(
+  db: Database,
+  profileId: string,
+  topicsByBook: Map<string, string[]>
+): Promise<Map<string, BookProgress>> {
+  const results = new Map<string, BookProgress>();
+
+  // Build flat topic list + reverse mapping (topicId → bookId)
+  const allTopicIds: string[] = [];
+  const topicToBook = new Map<string, string>();
+  for (const [bookId, topicIds] of topicsByBook) {
+    if (topicIds.length === 0) {
+      results.set(bookId, { status: 'NOT_STARTED', completedTopicCount: 0 });
+      continue;
+    }
+    for (const tid of topicIds) {
+      allTopicIds.push(tid);
+      topicToBook.set(tid, bookId);
+    }
+  }
+
+  if (allTopicIds.length === 0) return results;
+
+  // Single query: all learning sessions across every book
+  const sessionRows = await db
+    .select({
+      topicId: learningSessions.topicId,
+      status: learningSessions.status,
+    })
+    .from(learningSessions)
+    .where(
+      and(
+        eq(learningSessions.profileId, profileId),
+        inArray(learningSessions.topicId, allTopicIds)
+      )
+    );
+
+  // Group completed topic IDs by book
+  const completedByBook = new Map<string, Set<string>>();
+  for (const row of sessionRows) {
+    if (
+      row.topicId &&
+      (row.status === 'completed' || row.status === 'auto_closed')
+    ) {
+      const bookId = topicToBook.get(row.topicId as string);
+      if (!bookId) continue;
+      const set = completedByBook.get(bookId) ?? new Set<string>();
+      set.add(row.topicId as string);
+      completedByBook.set(bookId, set);
+    }
+  }
+
+  // Classify books: NOT_STARTED, IN_PROGRESS, or fully-completed (needs retention check)
+  const fullyCompletedTopicIds: string[] = [];
+  const fullyCompletedBooks = new Set<string>();
+  for (const [bookId, topicIds] of topicsByBook) {
+    if (results.has(bookId)) continue; // already set (empty topics)
+    const completed = completedByBook.get(bookId);
+    if (!completed || completed.size === 0) {
+      results.set(bookId, { status: 'NOT_STARTED', completedTopicCount: 0 });
+    } else if (completed.size < topicIds.length) {
+      results.set(bookId, {
+        status: 'IN_PROGRESS',
+        completedTopicCount: completed.size,
+      });
+    } else {
+      fullyCompletedBooks.add(bookId);
+      for (const tid of topicIds) fullyCompletedTopicIds.push(tid);
+    }
+  }
+
+  if (fullyCompletedBooks.size === 0) return results;
+
+  // Single query: retention cards for fully-completed books only
+  const now = Date.now();
+  const reviewRows = await db
+    .select({
+      topicId: retentionCards.topicId,
+      nextReviewAt: retentionCards.nextReviewAt,
+    })
+    .from(retentionCards)
+    .where(
+      and(
+        eq(retentionCards.profileId, profileId),
+        inArray(retentionCards.topicId, fullyCompletedTopicIds)
+      )
+    );
+
+  const reviewDueByBook = new Set<string>();
+  for (const row of reviewRows) {
+    if (row.topicId && row.nextReviewAt && row.nextReviewAt.getTime() <= now) {
+      const bookId = topicToBook.get(row.topicId as string);
+      if (bookId) reviewDueByBook.add(bookId);
+    }
+  }
+
+  for (const bookId of fullyCompletedBooks) {
+    const topicIds = topicsByBook.get(bookId) ?? [];
+    results.set(bookId, {
+      status: reviewDueByBook.has(bookId) ? 'REVIEW_DUE' : 'COMPLETED',
+      completedTopicCount: topicIds.length,
+    });
+  }
+
+  return results;
+}
+
 // ---------------------------------------------------------------------------
 // Persistence types
 // ---------------------------------------------------------------------------
@@ -500,18 +611,20 @@ export async function getBooks(
     topicsByBook.set(t.bookId, existing);
   }
 
-  const statusResults = await Promise.all(
-    rows.map((book) =>
-      computeBookStatus(db, profileId, topicsByBook.get(book.id) ?? [])
-    )
-  );
+  const statusMap = await computeBookStatusesBatch(db, profileId, topicsByBook);
 
-  return rows.map((book, i) => ({
-    ...mapBookRow(book),
-    status: statusResults[i]!.status,
-    topicCount: (topicsByBook.get(book.id) ?? []).length,
-    completedTopicCount: statusResults[i]!.completedTopicCount,
-  }));
+  return rows.map((book) => {
+    const progress = statusMap.get(book.id) ?? {
+      status: 'NOT_STARTED' as const,
+      completedTopicCount: 0,
+    };
+    return {
+      ...mapBookRow(book),
+      status: progress.status,
+      topicCount: (topicsByBook.get(book.id) ?? []).length,
+      completedTopicCount: progress.completedTopicCount,
+    };
+  });
 }
 
 export async function getBookWithTopics(

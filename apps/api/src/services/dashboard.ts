@@ -307,10 +307,10 @@ async function buildChildProgressSummary(
   sessionsLastWeek: number,
   totalTimeThisWeekMinutes: number,
   subjectNames: string[]
-): Promise<DashboardChild['progress']> {
+): Promise<{ progress: DashboardChild['progress']; totalSessions: number }> {
   const latestSnapshot = await getLatestSnapshot(db, childProfileId);
   if (!latestSnapshot) {
-    return null;
+    return { progress: null, totalSessions: 0 };
   }
 
   const previousSnapshot = await getLatestSnapshotOnOrBefore(
@@ -325,40 +325,44 @@ async function buildChildProgressSummary(
   const currentMetrics = latestSnapshot.metrics;
 
   return {
-    snapshotDate: latestSnapshot.snapshotDate,
-    topicsMastered: currentMetrics.topicsMastered,
-    vocabularyTotal: currentMetrics.vocabularyTotal,
-    minutesThisWeek: totalTimeThisWeekMinutes,
-    weeklyDeltaTopicsMastered: previousMetrics
-      ? Math.max(
-          0,
-          currentMetrics.topicsMastered - previousMetrics.topicsMastered
-        )
-      : null,
-    weeklyDeltaVocabularyTotal: previousMetrics
-      ? Math.max(
-          0,
-          currentMetrics.vocabularyTotal - previousMetrics.vocabularyTotal
-        )
-      : null,
-    weeklyDeltaTopicsExplored: previousMetrics
-      ? Math.max(
-          0,
-          sumTopicsExplored(currentMetrics) - sumTopicsExplored(previousMetrics)
-        )
-      : null,
-    engagementTrend:
-      sessionsThisWeek === 0
-        ? 'declining'
-        : sessionsThisWeek > sessionsLastWeek
-        ? 'increasing'
-        : 'stable',
-    guidance: buildProgressGuidance(
-      childName,
-      subjectNames,
-      sessionsThisWeek,
-      sessionsLastWeek
-    ),
+    progress: {
+      snapshotDate: latestSnapshot.snapshotDate,
+      topicsMastered: currentMetrics.topicsMastered,
+      vocabularyTotal: currentMetrics.vocabularyTotal,
+      minutesThisWeek: totalTimeThisWeekMinutes,
+      weeklyDeltaTopicsMastered: previousMetrics
+        ? Math.max(
+            0,
+            currentMetrics.topicsMastered - previousMetrics.topicsMastered
+          )
+        : null,
+      weeklyDeltaVocabularyTotal: previousMetrics
+        ? Math.max(
+            0,
+            currentMetrics.vocabularyTotal - previousMetrics.vocabularyTotal
+          )
+        : null,
+      weeklyDeltaTopicsExplored: previousMetrics
+        ? Math.max(
+            0,
+            sumTopicsExplored(currentMetrics) -
+              sumTopicsExplored(previousMetrics)
+          )
+        : null,
+      engagementTrend:
+        sessionsThisWeek === 0
+          ? 'declining'
+          : sessionsThisWeek > sessionsLastWeek
+          ? 'increasing'
+          : 'stable',
+      guidance: buildProgressGuidance(
+        childName,
+        subjectNames,
+        sessionsThisWeek,
+        sessionsLastWeek
+      ),
+    },
+    totalSessions: currentMetrics.totalSessions,
   };
 }
 
@@ -560,6 +564,7 @@ export async function getChildrenForParent(
   );
 
   const children: DashboardChild[] = prepared.map((p, i) => {
+    const { progress, totalSessions } = progressSummaries[i]!;
     const summary = generateChildSummary(p.dashboardInput);
     const trend = calculateTrend(p.sessionsThisWeek, p.sessionsLastWeek);
     const retentionTrend = calculateRetentionTrend(
@@ -588,7 +593,8 @@ export async function getChildrenForParent(
         p.guidedMetrics.totalProblemCount
       ),
       retentionTrend,
-      progress: progressSummaries[i]!,
+      totalSessions,
+      progress,
     };
   });
 

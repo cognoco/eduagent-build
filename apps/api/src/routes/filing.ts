@@ -74,6 +74,22 @@ export const filingRoutes = new Hono<FilingRouteEnv>().post(
       );
     } catch (err) {
       console.error('[filing] fileToLibrary failed:', err);
+      // Fire async retry for freeform/homework sessions
+      if (sessionTranscript && body.sessionId) {
+        await inngest
+          .send({
+            name: 'app/filing.retry',
+            data: {
+              profileId,
+              sessionId: body.sessionId,
+              sessionTranscript,
+              sessionMode: body.sessionMode ?? 'freeform',
+            },
+          })
+          .catch((retryErr) => {
+            console.error('[filing] Failed to send retry event:', retryErr);
+          });
+      }
       return c.json(
         { code: 'FILING_FAILED', message: "Couldn't organize this topic." },
         500
@@ -97,6 +113,22 @@ export const filingRoutes = new Hono<FilingRouteEnv>().post(
       });
     } catch (err) {
       console.error('[filing] resolveFilingResult failed:', err);
+      // Fire async retry for freeform/homework sessions
+      if (sessionTranscript && body.sessionId) {
+        await inngest
+          .send({
+            name: 'app/filing.retry',
+            data: {
+              profileId,
+              sessionId: body.sessionId,
+              sessionTranscript,
+              sessionMode: body.sessionMode ?? 'freeform',
+            },
+          })
+          .catch((retryErr) => {
+            console.error('[filing] Failed to send retry event:', retryErr);
+          });
+      }
       return c.json(
         {
           code: 'FILING_RESOLUTION_FAILED',

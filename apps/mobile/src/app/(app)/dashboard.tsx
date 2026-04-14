@@ -60,6 +60,7 @@ function renderChildCards(
     totalTimeLastWeek: number;
     trend: string;
     retentionTrend?: string;
+    totalSessions?: number;
     subjects: { name: string; retentionStatus: string }[];
     progress?: {
       topicsMastered: number;
@@ -86,6 +87,7 @@ function renderChildCards(
       retentionTrend={
         child.retentionTrend as 'improving' | 'declining' | 'stable' | undefined
       }
+      totalSessions={child.totalSessions}
       progress={child.progress}
       subjects={child.subjects.map((s) => ({
         name: s.name,
