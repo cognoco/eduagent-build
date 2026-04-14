@@ -69,6 +69,14 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('Sharp and collegial');
   });
 
+  it('uses teach-first role identity (not Socratic)', () => {
+    const prompt = buildSystemPrompt(baseContext);
+    // New identity should be present
+    expect(prompt).toContain('teaches clearly and checks understanding');
+    // Old Socratic identity should be gone
+    expect(prompt).not.toContain('asks the right question at the right time');
+  });
+
   it('accepts exchangeCount in the context', () => {
     const prompt = buildSystemPrompt({ ...baseContext, exchangeCount: 0 });
     expect(prompt).toBeDefined();
