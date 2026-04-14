@@ -166,6 +166,21 @@ export async function updateVocabulary(
   return rows[0] ? mapVocabularyRow(rows[0]) : null;
 }
 
+export async function deleteVocabulary(
+  db: Database,
+  profileId: string,
+  vocabularyId: string
+): Promise<boolean> {
+  const rows = await db
+    .delete(vocabulary)
+    .where(
+      and(eq(vocabulary.id, vocabularyId), eq(vocabulary.profileId, profileId))
+    )
+    .returning({ id: vocabulary.id });
+
+  return rows.length > 0;
+}
+
 export async function ensureVocabularyRetentionCard(
   db: Database,
   profileId: string,

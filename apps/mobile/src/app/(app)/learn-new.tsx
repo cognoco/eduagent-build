@@ -46,7 +46,7 @@ export default function LearnNewScreen(): React.ReactElement {
             setRecoveryMarker(null);
             setExpiredRecoveryMarker(marker);
             // Clear from storage — show the notice once, not forever
-            void clearSessionRecoveryMarker(activeProfile?.id);
+            void clearSessionRecoveryMarker(activeProfile?.id).catch(() => {});
           } else {
             setRecoveryMarker(null);
             setExpiredRecoveryMarker(null);
