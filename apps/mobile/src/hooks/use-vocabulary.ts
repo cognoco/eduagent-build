@@ -80,3 +80,23 @@ export function useReviewVocabulary(subjectId: string) {
     },
   });
 }
+
+export function useDeleteVocabulary(subjectId: string) {
+  const client = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (vocabularyId: string) => {
+      const res = await client.subjects[':subjectId'].vocabulary[
+        ':vocabularyId'
+      ].$delete({
+        param: { subjectId, vocabularyId },
+      });
+      await assertOk(res);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['vocabulary'] });
+      void queryClient.invalidateQueries({ queryKey: ['language-progress'] });
+    },
+  });
+}

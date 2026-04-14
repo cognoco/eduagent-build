@@ -21,6 +21,14 @@ const NATIVE_LANGUAGE_OPTIONS = [
   { code: 'de', label: 'German' },
   { code: 'it', label: 'Italian' },
   { code: 'pt', label: 'Portuguese' },
+  { code: 'nl', label: 'Dutch' },
+  { code: 'nb', label: 'Norwegian' },
+  { code: 'sv', label: 'Swedish' },
+  { code: 'da', label: 'Danish' },
+  { code: 'ro', label: 'Romanian' },
+  { code: 'id', label: 'Indonesian' },
+  { code: 'ms', label: 'Malay' },
+  { code: 'sw', label: 'Swahili' },
 ];
 
 const LEVEL_OPTIONS: Array<{

@@ -310,6 +310,22 @@ export default function CreateSubjectScreen() {
     [resolveState.phase, error]
   );
 
+  const handleCancel = useCallback(() => {
+    if (returnTo === 'chat') {
+      router.back();
+    } else {
+      goBackOrReplace(router, '/(app)/home' as const);
+    }
+  }, [returnTo, router]);
+
+  const handleSubjectLimitPress = useCallback(() => {
+    if (returnTo === 'chat') {
+      router.back();
+    } else {
+      router.replace('/(app)/library' as never);
+    }
+  }, [returnTo, router]);
+
   const onChipPress = useCallback(
     async (chip: string) => {
       setName(chip);
@@ -358,7 +374,7 @@ export default function CreateSubjectScreen() {
             variant="tertiary"
             size="small"
             label="Cancel"
-            onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
+            onPress={handleCancel}
             testID="create-subject-cancel"
           />
         </View>
@@ -378,10 +394,12 @@ export default function CreateSubjectScreen() {
             {/* BUG-116: Actionable navigation to manage existing subjects */}
             {isSubjectLimitError && (
               <Pressable
-                onPress={() => router.replace('/(app)/library' as never)}
+                onPress={handleSubjectLimitPress}
                 className="mt-2 bg-surface rounded-button py-2.5 px-4 items-center"
                 accessibilityRole="button"
-                accessibilityLabel="Manage your subjects"
+                accessibilityLabel={
+                  returnTo === 'chat' ? 'Go back' : 'Manage your subjects'
+                }
                 testID="manage-subjects-button"
               >
                 <Text className="text-body-sm font-semibold text-primary">
