@@ -118,6 +118,17 @@ jest.mock('../../../../../hooks/use-subjects', () => ({
   }),
 }));
 
+// --- useCurriculum ---
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockUseCurriculum = jest.fn((): any => ({
+  data: null,
+  isLoading: false,
+}));
+
+jest.mock('../../../../../hooks/use-curriculum', () => ({
+  useCurriculum: () => mockUseCurriculum(),
+}));
+
 // --- useThemeColors ---
 jest.mock('../../../../../lib/theme', () => ({
   useThemeColors: () => ({
@@ -213,6 +224,10 @@ describe('BookScreen', () => {
     }));
     mockUseBookNotes.mockImplementation(() => ({
       data: { notes: [] },
+      isLoading: false,
+    }));
+    mockUseCurriculum.mockImplementation(() => ({
+      data: null,
       isLoading: false,
     }));
   });
@@ -458,7 +473,11 @@ describe('BookScreen', () => {
     const { getByTestId, getByText } = render(<BookScreen />);
     expect(getByTestId('book-empty-sessions')).toBeTruthy();
     expect(getByText('No sessions yet')).toBeTruthy();
-    expect(getByText('Pick a topic above to start learning')).toBeTruthy();
+    expect(
+      getByText(
+        'Pick a topic above to dive in, or let me build a personalised learning path for you.'
+      )
+    ).toBeTruthy();
   });
 
   // -----------------------------------------------------------------------
@@ -908,6 +927,90 @@ describe('BookScreen', () => {
     const { getByTestId } = render(<BookScreen />);
     fireEvent.press(getByTestId('book-loading-back'));
     expect(mockBack).toHaveBeenCalledTimes(1);
+  });
+
+  // -----------------------------------------------------------------------
+  // Build learning path button
+  // -----------------------------------------------------------------------
+  it('shows build learning path button in empty state when no curriculum exists', () => {
+    // No curriculum (default mock returns null)
+    const { getByTestId } = render(<BookScreen />);
+    expect(getByTestId('book-build-learning-path')).toBeTruthy();
+  });
+
+  it('hides build learning path button in empty state when curriculum already exists', () => {
+    mockUseCurriculum.mockReturnValue({
+      data: {
+        id: 'cur-1',
+        subjectId: 'sub-1',
+        version: 1,
+        generatedAt: new Date().toISOString(),
+        topics: [
+          {
+            id: 'ctopic-1',
+            title: 'Topic A',
+            description: '',
+            sortOrder: 1,
+            relevance: 'core',
+            estimatedMinutes: 10,
+            bookId: 'book-1',
+            skipped: false,
+          },
+        ],
+      },
+      isLoading: false,
+    });
+
+    const { queryByTestId } = render(<BookScreen />);
+    expect(queryByTestId('book-build-learning-path')).toBeNull();
+  });
+
+  it('shows floating bar link when no curriculum exists', () => {
+    const { getByTestId } = render(<BookScreen />);
+    expect(getByTestId('book-build-path-link')).toBeTruthy();
+  });
+
+  it('hides floating bar link when curriculum exists', () => {
+    mockUseCurriculum.mockReturnValue({
+      data: {
+        id: 'cur-1',
+        subjectId: 'sub-1',
+        version: 1,
+        generatedAt: new Date().toISOString(),
+        topics: [
+          {
+            id: 'ctopic-1',
+            title: 'Topic A',
+            description: '',
+            sortOrder: 1,
+            relevance: 'core',
+            estimatedMinutes: 10,
+            bookId: 'book-1',
+            skipped: false,
+          },
+        ],
+      },
+      isLoading: false,
+    });
+
+    const { queryByTestId } = render(<BookScreen />);
+    expect(queryByTestId('book-build-path-link')).toBeNull();
+  });
+
+  it('pressing build learning path navigates to onboarding interview', () => {
+    const { getByTestId } = render(<BookScreen />);
+    fireEvent.press(getByTestId('book-build-learning-path'));
+
+    expect(mockPush).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pathname: '/(app)/onboarding/interview',
+        params: expect.objectContaining({
+          subjectId: 'sub-1',
+          bookId: 'book-1',
+          bookTitle: 'Algebra',
+        }),
+      })
+    );
   });
 
   // -----------------------------------------------------------------------

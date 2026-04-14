@@ -25,6 +25,7 @@ import {
 } from '../../../../../hooks/use-book-sessions';
 import { useTopicSuggestions } from '../../../../../hooks/use-topic-suggestions';
 import { useBookNotes } from '../../../../../hooks/use-notes';
+import { useCurriculum } from '../../../../../hooks/use-curriculum';
 import { useSubjects } from '../../../../../hooks/use-subjects';
 import { InlineNoteCard } from '../../../../../components/library/InlineNoteCard';
 import { formatApiError } from '../../../../../lib/format-api-error';
@@ -97,6 +98,8 @@ export default function BookScreen() {
   const suggestionsQuery = useTopicSuggestions(subjectId, bookId);
   const notesQuery = useBookNotes(subjectId, bookId);
   const generateMutation = useGenerateBookTopics(subjectId, bookId);
+  const curriculumQuery = useCurriculum(subjectId);
+  const hasCurriculum = (curriculumQuery.data?.topics?.length ?? 0) > 0;
   const subjectsQuery = useSubjects();
   const subjectName = subjectsQuery.data?.find((s) => s.id === subjectId)?.name;
 
@@ -340,6 +343,17 @@ export default function BookScreen() {
       } as never);
     }
   }, [suggestionCards, topics, completedTopicIds, router, subjectId]);
+
+  const handleBuildLearningPath = useCallback(() => {
+    router.push({
+      pathname: '/(app)/onboarding/interview',
+      params: {
+        subjectId,
+        bookId,
+        bookTitle: book?.title ?? '',
+      },
+    } as never);
+  }, [router, subjectId, bookId, book?.title]);
 
   // --- Auto-start session when navigated with autoStart=true (M-12) ---
   const autoStartTriggered = useRef(false);
@@ -760,8 +774,21 @@ export default function BookScreen() {
                 No sessions yet
               </Text>
               <Text className="text-body-sm text-text-secondary text-center mb-4">
-                Pick a topic above to start learning
+                Pick a topic above to dive in, or let me build a personalised
+                learning path for you.
               </Text>
+              {!hasCurriculum && (
+                <Pressable
+                  onPress={handleBuildLearningPath}
+                  className="bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
+                  testID="book-build-learning-path"
+                  accessibilityLabel="Build my learning path"
+                >
+                  <Text className="text-text-primary text-body font-semibold">
+                    Build my learning path
+                  </Text>
+                </Pressable>
+              )}
             </View>
           )}
 
@@ -816,6 +843,18 @@ export default function BookScreen() {
                 : 'Start learning'}
             </Text>
           </Pressable>
+          {!hasCurriculum && !isReadOnly && (
+            <Pressable
+              onPress={handleBuildLearningPath}
+              className="mt-2 py-2 items-center"
+              testID="book-build-path-link"
+              accessibilityLabel="Build a learning path"
+            >
+              <Text className="text-body-sm text-text-secondary underline">
+                Build a learning path
+              </Text>
+            </Pressable>
+          )}
         </View>
       )}
     </View>
