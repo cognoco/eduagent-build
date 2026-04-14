@@ -39,6 +39,7 @@ With:
 ```
 You are MentoMate, a personalised learning mate.
 A mate teaches clearly and checks understanding. Explain concepts using concrete examples, then ask a focused question to verify the learner understood. Draw out what the learner already knows before adding new material — but never withhold an explanation in the name of "discovery". If they get it, move to the next concept. If they don't, teach it differently — don't interrogate.
+Adapt your language complexity, examples, and tone to the learner's age (provided via the age-voice section below). A 9-year-old needs short sentences and everyday analogies. A 16-year-old needs precision and real-world context. An adult needs efficiency and respect for existing knowledge.
 ```
 
 #### Session Type LEARNING (line ~703-710)
@@ -170,7 +171,7 @@ Below the primary "Start learning" button, add a text link:
 Build a learning path
 ```
 
-Same navigation target. Shown only when `sessions.length < 3` — after a few sessions the learner has found their footing. Hidden in `isReadOnly` mode.
+Same navigation target. Shown when no curriculum exists for this book yet (check via `useCurriculum(subjectId)` — if curriculum is null or empty, show the link). Once a curriculum is built, the link disappears because the learner already has a structured path. Hidden in `isReadOnly` mode.
 
 #### No New Screens
 
@@ -178,47 +179,44 @@ The interview screen (`onboarding/interview.tsx`) and curriculum review screen (
 
 ---
 
-### Change 5: Mid-Session Filing for Freeform Chat
+### Change 5: Auto-Filing for Freeform Chat on Session End
 
 **Scope:** Freeform sessions where subject classification has already run.
 
 **Files:**
-- `apps/mobile/src/app/(app)/session/index.tsx` (trigger logic + inline card)
-- `apps/mobile/src/app/(app)/session/SessionFooter.tsx` or new inline component
+- `apps/mobile/src/app/(app)/session/index.tsx` (session close handler)
+- Existing `useFiling()` hook + `POST /filing` endpoint
 
-#### Trigger Conditions (all must be true)
+#### Trigger Conditions (all must be true, checked at session close)
 
 1. Session mode is `freeform`
 2. Subject has been classified (`subjectId` is set via CFLF)
-3. At least 5 user exchanges have occurred
+3. At least 5 user exchanges occurred during the session
 4. Topic has NOT already been filed (no `topicId` on the session)
-5. Card has not been previously dismissed in this session
 
-#### UI
+#### Behaviour
 
-A non-blocking inline card, rendered in the chat stream (not a modal):
+When the learner ends a freeform session (taps "I'm Done" or navigates away) and all conditions are met, **auto-file silently** — no card, no question, no decision for the kid. Call `useFiling()` → `POST /filing` to create a `curriculumBook` + topic entry from the classified subject and conversation context. Then show a post-session toast:
 
 ```
-You're getting into this! Want to save this as a topic in your library?
-
-[Save to library]   [Not now]
+Saved "Volcanoes" to your Science shelf   [Undo]
 ```
 
-#### "Save to library" Action
+The toast has an undo action that calls `DELETE /filing/:id` (or equivalent) to remove the auto-filed entry if the learner didn't want it saved.
 
-Calls the existing `useFiling()` hook → `POST /filing`. This creates a `curriculumBook` + topic entry from the session's classified subject and conversation context. The session's `topicId` is updated so:
-- SM-2 retention tracking activates
+#### What This Enables
+
+- SM-2 retention tracking activates for the topic
 - The session appears in the book's session list
 - Future "Continue where you left off" cards reference it
-
-#### "Not now" Action
-
-Dismiss the card. Do not show again for this session. The end-of-session filing prompt at "I'm Done" still works as a fallback.
+- Casual exploration silently converts into structured learning
 
 #### Edge Cases
 
-- If the learner was already auto-filed via subject classification's auto-pick path, the card never appears (topicId already set)
-- If the filing API fails, show a toast error and leave the card visible for retry
+- If the learner was already auto-filed via CFLF's auto-pick path, skip (topicId already set)
+- If the filing API fails, show an error toast — no retry card, the session data is already persisted and can be filed later
+- If the learner taps undo, delete the filed entry and the session remains unfiled (same as today's behaviour for dismissed filing prompts)
+- The existing end-of-session filing prompt is removed for sessions that meet the auto-file conditions (no double-prompt)
 
 ---
 
@@ -237,12 +235,13 @@ Dismiss the card. Do not show again for this session. The end-of-session filing 
 | Interview route missing bookId | Param not passed | Interview opens without book context | Guard in interview.tsx already handles missing bookId gracefully (line 38-40, falls back to generic opening) |
 | Curriculum already exists for book | User taps "Build learning path" twice | Existing curriculum loads on curriculum-review screen | curriculum-review.tsx already handles this — shows existing curriculum |
 | First-session detection wrong | Streaks API returns stale data | Slightly warmer/cooler greeting | Low impact — cosmetic only |
-| Mid-session filing fails | Network error on POST /filing | Toast: "Couldn't save — try again" | Card stays visible for retry; end-of-session filing is fallback |
-| Filing card shown after kid closed subject classification banner | Race between CFLF dismiss and exchange count | Card appears without classified subject | Trigger condition checks subjectId is set — won't fire without it |
+| Auto-filing fails at session end | Network error on POST /filing | Error toast: "Couldn't save — we'll try next time" | Session data persisted; can be filed manually from library later |
+| Learner didn't want auto-file | Auto-filed a casual chat they don't care about | Toast with undo | Undo calls DELETE on the filed entry; session remains unfiled |
+| Auto-file races with manual "I'm Done" filing | Both paths try to file | Double-filed entry | Guard: skip auto-file if topicId is already set at session close |
 
 ## Testing Strategy
 
 - **Change 1-2:** Manual testing with different session entry paths (curriculum topic, book topic, freeform, rawInput). Verify LLM teaches immediately instead of asking what to learn. No unit tests for prompt text — test the behaviour in integration.
 - **Change 3:** Unit test `getOpeningMessage()` with `sessionExperience=0` returns updated text.
-- **Change 4:** Unit test for button visibility conditions (`sessions.length === 0`, `sessions.length < 3`). Manual test navigation to interview screen with bookId params.
-- **Change 5:** Unit test filing card trigger conditions. Integration test that `POST /filing` updates session topicId. Manual test dismiss + end-of-session fallback.
+- **Change 4:** Unit test for button visibility conditions (`sessions.length === 0`, no curriculum exists). Manual test navigation to interview screen with bookId params.
+- **Change 5:** Unit test auto-file trigger conditions (freeform, classified, 5+ exchanges, no topicId). Integration test that `POST /filing` creates entry and updates session topicId. Manual test undo toast removes filed entry. Verify no double-file when "I'm Done" filing already ran.
