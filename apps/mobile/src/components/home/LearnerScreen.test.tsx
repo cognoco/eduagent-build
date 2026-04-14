@@ -339,8 +339,8 @@ describe('LearnerScreen', () => {
 
       render(<LearnerScreen {...defaultProps} />);
 
-      // The card renders without subtitle — no crash
       expect(screen.getByTestId('intent-learn-new')).toBeTruthy();
+      expect(screen.queryByText(/Continue with/)).toBeNull();
     });
   });
 });
