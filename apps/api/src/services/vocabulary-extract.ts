@@ -89,7 +89,11 @@ export async function extractVocabularyFromTranscript(
           : null,
       }));
   } catch (err) {
-    console.warn('[extractVocabularyFromTranscript] extraction failed:', err);
+    // SC-6: Log at error level for prod observability. Returning [] is intentional —
+    // the caller (session-completed Inngest fn) treats empty-on-error same as
+    // genuine-empty (skips vocabulary update), which is acceptable for this
+    // best-effort extraction step.
+    console.error('[extractVocabularyFromTranscript] extraction failed:', err);
     return [];
   }
 }
