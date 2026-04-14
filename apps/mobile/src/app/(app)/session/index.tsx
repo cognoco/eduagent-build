@@ -60,7 +60,11 @@ import {
   useMilestoneTracker,
 } from '../../../hooks/use-milestone-tracker';
 import { Ionicons } from '@expo/vector-icons';
-import { useApiClient, QuotaExceededError } from '../../../lib/api-client';
+import {
+  useApiClient,
+  QuotaExceededError,
+  type QuotaExceededDetails,
+} from '../../../lib/api-client';
 import { formatApiError } from '../../../lib/format-api-error';
 import { useThemeColors } from '../../../lib/theme';
 import { NoteInput } from '../../../components/library/NoteInput';
@@ -461,9 +465,9 @@ export default function SessionScreen() {
   const [showNoteInput, setShowNoteInput] = useState(false);
   const [showFilingPrompt, setShowFilingPrompt] = useState(false);
   const [filingDismissed, setFilingDismissed] = useState(false);
-  const [quotaError, setQuotaError] = useState<
-    import('../../../lib/api-client').QuotaExceededDetails | null
-  >(null);
+  const [quotaError, setQuotaError] = useState<QuotaExceededDetails | null>(
+    null
+  );
 
   const sessionNoteSavedRef = useRef(false);
   const closedSessionRef = useRef<{

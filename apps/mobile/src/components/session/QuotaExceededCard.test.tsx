@@ -52,5 +52,6 @@ describe('QuotaExceededCard', () => {
     render(<QuotaExceededCard details={dailyDetails} isOwner={true} />);
 
     expect(screen.getByText(/today's limit/i)).toBeTruthy();
+    expect(screen.getByText(/used 10 of 10/i)).toBeTruthy();
   });
 });

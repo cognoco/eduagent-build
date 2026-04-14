@@ -13,6 +13,7 @@ import {
   type SessionRecoveryMarker,
 } from '../../lib/session-recovery';
 import { useContinueSuggestion } from '../../hooks/use-progress';
+import { useSubjects } from '../../hooks/use-subjects';
 import { useThemeColors } from '../../lib/theme';
 
 export default function LearnNewScreen(): React.ReactElement {
@@ -25,6 +26,7 @@ export default function LearnNewScreen(): React.ReactElement {
   const [expiredRecoveryMarker, setExpiredRecoveryMarker] =
     useState<SessionRecoveryMarker | null>(null);
   const { data: continueSuggestion } = useContinueSuggestion();
+  const { data: subjects } = useSubjects();
 
   const handleBack = () => {
     goBackOrReplace(router, '/(app)/home');
@@ -123,6 +125,25 @@ export default function LearnNewScreen(): React.ReactElement {
               } as never)
             }
             testID="intent-resume-last"
+          />
+        ) : null}
+        {!recoveryMarker &&
+        !continueSuggestion &&
+        subjects &&
+        subjects.length > 0 ? (
+          <IntentCard
+            title={`Continue with ${subjects[0]?.name}`}
+            onPress={() =>
+              router.push({
+                pathname: '/(app)/session',
+                params: {
+                  subjectId: subjects[0]?.id,
+                  subjectName: subjects[0]?.name,
+                  mode: 'learning',
+                },
+              } as never)
+            }
+            testID="intent-continue-subject"
           />
         ) : null}
         {recoveryMarker ? (
