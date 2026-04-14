@@ -69,6 +69,21 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('Sharp and collegial');
   });
 
+  it('LEARNING session type uses explain-verify-next cycle', () => {
+    const prompt = buildSystemPrompt({
+      ...baseContext,
+      sessionType: 'learning',
+    });
+    expect(prompt).toContain(
+      'Teach the concept clearly using a concrete example'
+    );
+    expect(prompt).toContain('explain → verify → next concept');
+    // Old guidance should be gone
+    expect(prompt).not.toContain(
+      'Default to asking a question before explaining'
+    );
+  });
+
   it('uses teach-first role identity (not Socratic)', () => {
     const prompt = buildSystemPrompt(baseContext);
     // New identity should be present

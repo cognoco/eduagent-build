@@ -707,11 +707,11 @@ function getSessionTypeGuidance(
   }
   return (
     'Session type: LEARNING\n' +
-    'Help the learner understand concepts deeply.\n' +
-    'You may explain concepts, use examples, and teach new material — but guide first.\n' +
-    'Default to asking a question before explaining. If the learner already has partial understanding, draw it out rather than overwriting it.\n' +
-    'Only provide a direct explanation when the learner has clearly exhausted their own reasoning or explicitly asks "just tell me."\n' +
-    'Balance explanation with questions to verify understanding.'
+    'Teach the concept clearly using a concrete example, then ask one question to verify understanding.\n' +
+    "If the learner's response shows they already know it, acknowledge and move to the next concept.\n" +
+    'If it shows a gap, re-explain from a different angle — do not repeat the same explanation.\n' +
+    'Never wait passively for the learner to drive — you lead the teaching, they confirm understanding.\n' +
+    'The cycle is: explain → verify → next concept.'
   );
 }
 
