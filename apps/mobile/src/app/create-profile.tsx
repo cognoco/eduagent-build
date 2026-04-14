@@ -32,6 +32,13 @@ const SCREEN_HEIGHT =
     ? Math.min(Dimensions.get('screen').height, 812)
     : Dimensions.get('screen').height;
 
+const MAX_DATE = new Date();
+const MIN_DATE = new Date(
+  MAX_DATE.getFullYear() - 100,
+  MAX_DATE.getMonth(),
+  MAX_DATE.getDate()
+);
+
 function formatDateForDisplay(date: Date): string {
   return date.toLocaleDateString(undefined, {
     year: 'numeric',
@@ -59,13 +66,6 @@ function parseWebBirthDate(value: string): Date | null {
 
   return parsed;
 }
-
-const MAX_DATE = new Date();
-const MIN_DATE = new Date(
-  MAX_DATE.getFullYear() - 100,
-  MAX_DATE.getMonth(),
-  MAX_DATE.getDate()
-);
 
 export default function CreateProfileScreen() {
   const insets = useSafeAreaInsets();

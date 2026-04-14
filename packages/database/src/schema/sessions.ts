@@ -84,35 +84,6 @@ export const onboardingDrafts = pgTable('onboarding_drafts', {
     .defaultNow(),
 });
 
-export const sessionEvents = pgTable(
-  'session_events',
-  {
-    id: uuid('id')
-      .primaryKey()
-      .$defaultFn(() => generateUUIDv7()),
-    sessionId: uuid('session_id')
-      .notNull()
-      .references(() => learningSessions.id, { onDelete: 'cascade' }),
-    profileId: uuid('profile_id')
-      .notNull()
-      .references(() => profiles.id, { onDelete: 'cascade' }),
-    subjectId: uuid('subject_id')
-      .notNull()
-      .references(() => subjects.id, { onDelete: 'cascade' }),
-    topicId: uuid('topic_id').references(() => curriculumTopics.id, {
-      onDelete: 'cascade',
-    }),
-    eventType: sessionEventTypeEnum('event_type').notNull(),
-    content: text('content').notNull(),
-    metadata: jsonb('metadata').default({}),
-    structuredAssessment: jsonb('structured_assessment'),
-    createdAt: timestamp('created_at', { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-  },
-  (table) => [index('session_events_session_id_idx').on(table.sessionId)]
-);
-
 export const learningSessions = pgTable(
   'learning_sessions',
   {
@@ -153,6 +124,35 @@ export const learningSessions = pgTable(
       .defaultNow(),
   },
   (table) => [index('learning_sessions_profile_id_idx').on(table.profileId)]
+);
+
+export const sessionEvents = pgTable(
+  'session_events',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .$defaultFn(() => generateUUIDv7()),
+    sessionId: uuid('session_id')
+      .notNull()
+      .references(() => learningSessions.id, { onDelete: 'cascade' }),
+    profileId: uuid('profile_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    subjectId: uuid('subject_id')
+      .notNull()
+      .references(() => subjects.id, { onDelete: 'cascade' }),
+    topicId: uuid('topic_id').references(() => curriculumTopics.id, {
+      onDelete: 'cascade',
+    }),
+    eventType: sessionEventTypeEnum('event_type').notNull(),
+    content: text('content').notNull(),
+    metadata: jsonb('metadata').default({}),
+    structuredAssessment: jsonb('structured_assessment'),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index('session_events_session_id_idx').on(table.sessionId)]
 );
 
 export const sessionSummaries = pgTable('session_summaries', {
