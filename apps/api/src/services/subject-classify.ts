@@ -39,6 +39,24 @@ Rules:
 - When the topic is cross-disciplinary, prefer matching to an enrolled subject with even moderate relevance (confidence >= 0.4) over returning no matches
 `;
 
+// BS-10: Sanitize user input before LLM interpolation — strip control
+// characters and limit length to reduce prompt-injection surface area.
+function sanitizeLlmInput(text: string, maxLength = 500): string {
+  return text
+    .split('')
+    .filter((ch) => {
+      const code = ch.charCodeAt(0);
+      // Allow tab (9), LF (10), CR (13); strip other C0 controls + DEL
+      if (code <= 0x08) return false;
+      if (code === 0x0b || code === 0x0c) return false;
+      if (code >= 0x0e && code <= 0x1f) return false;
+      if (code === 0x7f) return false;
+      return true;
+    })
+    .join('')
+    .slice(0, maxLength);
+}
+
 export async function classifySubject(
   db: Database,
   profileId: string,
@@ -49,18 +67,7 @@ export async function classifySubject(
 
   if (subjects.length === 0) {
     // Still ask the LLM to suggest a subject name from the problem text
-    const sanitized = text
-      .split('')
-      .filter((ch) => {
-        const code = ch.charCodeAt(0);
-        if (code <= 0x08) return false;
-        if (code === 0x0b || code === 0x0c) return false;
-        if (code >= 0x0e && code <= 0x1f) return false;
-        if (code === 0x7f) return false;
-        return true;
-      })
-      .join('')
-      .slice(0, 500);
+    const sanitized = sanitizeLlmInput(text);
 
     try {
       const suggestResult = await routeAndCall(
@@ -116,21 +123,7 @@ export async function classifySubject(
 
   const subjectList = subjects.map((s) => `- ${s.name}`).join('\n');
 
-  // BS-10: sanitize user input before LLM interpolation — strip control
-  // characters and limit length to reduce prompt-injection surface area
-  const sanitizedText = text
-    .split('')
-    .filter((ch) => {
-      const code = ch.charCodeAt(0);
-      // Allow tab (9), LF (10), CR (13); strip other C0 controls + DEL
-      if (code <= 0x08) return false;
-      if (code === 0x0b || code === 0x0c) return false;
-      if (code >= 0x0e && code <= 0x1f) return false;
-      if (code === 0x7f) return false;
-      return true;
-    })
-    .join('')
-    .slice(0, 500);
+  const sanitizedText = sanitizeLlmInput(text);
 
   const messages: ChatMessage[] = [
     { role: 'system', content: CLASSIFY_SYSTEM_PROMPT },

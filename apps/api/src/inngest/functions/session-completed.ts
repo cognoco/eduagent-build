@@ -94,7 +94,6 @@ export const sessionCompleted = inngest.createFunction(
       subjectId,
       summaryStatus,
       timestamp,
-      interleavedTopicIds,
       verificationType,
       sessionType,
     } = event.data;
@@ -172,10 +171,11 @@ export const sessionCompleted = inngest.createFunction(
 
     // FR92: Determine which topics need retention updates
     // Interleaved sessions update all practiced topics; others update the single topicId
-    const retentionTopicIds: string[] = (
-      interleavedTopicIds as string[] | undefined
-    )?.length
-      ? (interleavedTopicIds as string[])
+    const rawInterleaved = event.data.interleavedTopicIds;
+    const retentionTopicIds: string[] = Array.isArray(rawInterleaved)
+      ? (rawInterleaved as unknown[]).filter(
+          (id): id is string => typeof id === 'string'
+        )
       : topicId
       ? [topicId]
       : [];
