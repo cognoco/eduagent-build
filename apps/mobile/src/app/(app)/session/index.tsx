@@ -27,6 +27,7 @@ import {
   QuestionCounter,
   LibraryPrompt,
   SessionInputModeToggle,
+  QuotaExceededCard,
   type ChatMessage,
 } from '../../../components/session';
 import {
@@ -59,7 +60,7 @@ import {
   useMilestoneTracker,
 } from '../../../hooks/use-milestone-tracker';
 import { Ionicons } from '@expo/vector-icons';
-import { useApiClient } from '../../../lib/api-client';
+import { useApiClient, QuotaExceededError } from '../../../lib/api-client';
 import { formatApiError } from '../../../lib/format-api-error';
 import { useThemeColors } from '../../../lib/theme';
 import { NoteInput } from '../../../components/library/NoteInput';
@@ -460,6 +461,9 @@ export default function SessionScreen() {
   const [showNoteInput, setShowNoteInput] = useState(false);
   const [showFilingPrompt, setShowFilingPrompt] = useState(false);
   const [filingDismissed, setFilingDismissed] = useState(false);
+  const [quotaError, setQuotaError] = useState<
+    import('../../../lib/api-client').QuotaExceededDetails | null
+  >(null);
 
   const sessionNoteSavedRef = useRef(false);
   const closedSessionRef = useRef<{
@@ -540,6 +544,7 @@ export default function SessionScreen() {
       setShowNoteInput(false);
       setShowFilingPrompt(false);
       setFilingDismissed(false);
+      setQuotaError(null);
       closedSessionRef.current = null;
       sessionNoteSavedRef.current = false;
       hasHydratedRecoveryRef.current = false;
@@ -762,7 +767,7 @@ export default function SessionScreen() {
             updatedAt: new Date().toISOString(),
           },
           activeProfile?.id
-        ).catch(() => {});
+        ).catch(() => undefined);
       }
     });
 
@@ -830,7 +835,7 @@ export default function SessionScreen() {
             updatedAt: new Date().toISOString(),
           },
           activeProfile?.id
-        ).catch(() => {});
+        ).catch(() => undefined);
       }, thresholdMinutes * 60 * 1000);
     },
     [
@@ -959,7 +964,7 @@ export default function SessionScreen() {
         void SecureStore.setItemAsync(
           getInputModeKey(activeProfile.id),
           nextInputMode
-        ).catch(() => {});
+        ).catch(() => undefined);
       }
 
       if (!activeSessionId) {
@@ -1195,6 +1200,40 @@ export default function SessionScreen() {
             : undefined
         );
       } catch (err: unknown) {
+        // Detect quota before reconnect classification — QuotaExceededError is
+        // never reconnectable and needs a structured card, not a text bubble.
+        if (err instanceof QuotaExceededError) {
+          setIsStreaming(false);
+          setQuotaError(err.details);
+          if (streamId) {
+            setMessages((prev) =>
+              prev.map((message) =>
+                message.id === streamId
+                  ? {
+                      ...message,
+                      content: '',
+                      streaming: false,
+                      kind: 'quota_exceeded' as const,
+                      isSystemPrompt: true,
+                    }
+                  : message
+              )
+            );
+          } else {
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: createLocalMessageId('ai'),
+                role: 'assistant',
+                content: '',
+                isSystemPrompt: true,
+                kind: 'quota_exceeded' as const,
+              },
+            ]);
+          }
+          return;
+        }
+
         const reconnectable = isReconnectableSessionError(err);
         const formattedError = formatApiError(err);
         // [3B.1] Classify: timeout -> specific message, network -> reconnect, fatal -> server msg
@@ -1319,8 +1358,13 @@ export default function SessionScreen() {
 
   // BUG-XXX: Create a new subject from a resolve API suggestion
   const handleCreateResolveSuggestion = useCallback(
-    async (suggestion: { name: string; description: string; focus?: string }) => {
-      if (isStreaming || pendingClassification || !pendingSubjectResolution) return;
+    async (suggestion: {
+      name: string;
+      description: string;
+      focus?: string;
+    }) => {
+      if (isStreaming || pendingClassification || !pendingSubjectResolution)
+        return;
 
       const originalText = pendingSubjectResolution.originalText;
       setPendingSubjectResolution(null);
@@ -2315,7 +2359,9 @@ export default function SessionScreen() {
               accessibilityLabel={`Add ${suggestion.name} as a new subject`}
               accessibilityState={{
                 disabled:
-                  isStreaming || pendingClassification || createSubject.isPending,
+                  isStreaming ||
+                  pendingClassification ||
+                  createSubject.isPending,
               }}
               testID={`subject-resolution-resolve-${suggestion.name}`}
             >
@@ -2503,6 +2549,14 @@ export default function SessionScreen() {
           </Pressable>
         );
       }
+      if (message.kind === 'quota_exceeded' && quotaError) {
+        return (
+          <QuotaExceededCard
+            details={quotaError}
+            isOwner={activeProfile?.isOwner === true}
+          />
+        );
+      }
       return null;
     }
 
@@ -2639,13 +2693,16 @@ export default function SessionScreen() {
           isOffline ||
           pendingClassification ||
           !!pendingSubjectResolution ||
-          sessionExpired
+          sessionExpired ||
+          !!quotaError
         }
         disabledReason={
           isOffline
             ? "You're offline — input will return when you reconnect"
             : sessionExpired
             ? 'This session has ended'
+            : quotaError
+            ? 'Your session limit has been reached'
             : undefined
         }
         verificationType={

@@ -1,7 +1,13 @@
 import type { InputMode } from '@eduagent/schemas';
 import React from 'react';
 import { Alert } from 'react-native';
-import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
+import {
+  render,
+  fireEvent,
+  waitFor,
+  act,
+  screen,
+} from '@testing-library/react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import SessionScreen from './index';
 
@@ -42,6 +48,8 @@ jest.mock('../../../components/session', () => ({
     renderMessageActions,
     rightAction,
     footer,
+    inputDisabled,
+    disabledReason,
   }: {
     subtitle?: string;
     messages?: Array<{ id: string; content: string }>;
@@ -60,12 +68,19 @@ jest.mock('../../../components/session', () => ({
     }) => React.ReactNode;
     rightAction?: React.ReactNode;
     footer?: React.ReactNode;
+    inputDisabled?: boolean;
+    disabledReason?: string;
   }) => {
     const { View, Text, Pressable } = require('react-native');
     return (
       <View>
         <Text testID="session-subtitle">{subtitle}</Text>
         <Text testID="mock-input-mode">{inputMode ?? 'text'}</Text>
+        {inputDisabled && disabledReason ? (
+          <View testID="input-disabled-banner">
+            <Text>{disabledReason}</Text>
+          </View>
+        ) : null}
         {(messages ?? []).map((message) => (
           <View key={message.id} testID={`mock-message-${message.id}`}>
             <Text>{message.content}</Text>
@@ -110,6 +125,23 @@ jest.mock('../../../components/session', () => ({
   QuestionCounter: () => null,
   LibraryPrompt: () => null,
   SessionInputModeToggle: () => null,
+  QuotaExceededCard: ({
+    details,
+    isOwner,
+  }: {
+    details: { reason: string };
+    isOwner: boolean;
+  }) => {
+    const { View, Text } = require('react-native');
+    return (
+      <View testID="quota-exceeded-card">
+        <Text>{isOwner ? 'Upgrade plan' : 'Ask your parent'}</Text>
+        <Text>
+          {details.reason === 'daily' ? "today's limit" : "this month's limit"}
+        </Text>
+      </View>
+    );
+  },
 }));
 
 jest.mock('../../../hooks/use-sessions', () => ({
@@ -261,32 +293,55 @@ const { readSessionRecoveryMarker: mockReadSessionRecoveryMarker } =
   };
 
 const mockCelebrationsPendingGet = jest.fn();
-jest.mock('../../../lib/api-client', () => ({
-  useApiClient: () => ({
-    sessions: {
-      ':sessionId': {
-        'homework-state': {
-          $post: mockHomeworkStatePost,
+
+jest.mock('../../../lib/api-client', () => {
+  class QuotaExceededError extends Error {
+    readonly code = 'QUOTA_EXCEEDED' as const;
+    readonly details: unknown;
+    constructor(message: string, details: unknown) {
+      super(message);
+      this.name = 'QuotaExceededError';
+      this.details = details;
+    }
+  }
+
+  class ForbiddenError extends Error {
+    readonly code = 'FORBIDDEN' as const;
+    constructor(message = 'Forbidden') {
+      super(message);
+      this.name = 'ForbiddenError';
+    }
+  }
+
+  return {
+    QuotaExceededError,
+    ForbiddenError,
+    useApiClient: () => ({
+      sessions: {
+        ':sessionId': {
+          'homework-state': {
+            $post: mockHomeworkStatePost,
+          },
         },
       },
-    },
-    subjects: {
-      ':subjectId': {
-        sessions: {
-          $post: mockDirectStartSession,
+      subjects: {
+        ':subjectId': {
+          sessions: {
+            $post: mockDirectStartSession,
+          },
         },
       },
-    },
-    celebrations: {
-      pending: {
-        $get: mockCelebrationsPendingGet,
+      celebrations: {
+        pending: {
+          $get: mockCelebrationsPendingGet,
+        },
+        seen: {
+          $post: jest.fn().mockResolvedValue({ ok: true }),
+        },
       },
-      seen: {
-        $post: jest.fn().mockResolvedValue({ ok: true }),
-      },
-    },
-  }),
-}));
+    }),
+  };
+});
 
 jest.mock('../../../lib/format-api-error', () => ({
   formatApiError: (error: unknown) =>
@@ -295,7 +350,7 @@ jest.mock('../../../lib/format-api-error', () => ({
 
 jest.mock('../../../lib/profile', () => ({
   useProfile: () => ({
-    activeProfile: { id: 'profile-1' },
+    activeProfile: { id: 'profile-1', isOwner: true },
   }),
 }));
 
@@ -976,5 +1031,40 @@ describe('voice mode persistence', () => {
     await waitFor(() => {
       expect(secureStore['voice-input-mode-profile-1']).toBe('text');
     });
+  });
+
+  it('shows QuotaExceededCard and disables input when stream returns 402', async () => {
+    const { QuotaExceededError } = require('../../../lib/api-client');
+    const details = {
+      tier: 'free' as const,
+      reason: 'monthly' as const,
+      monthlyLimit: 100,
+      usedThisMonth: 100,
+      dailyLimit: null,
+      usedToday: 0,
+      topUpCreditsRemaining: 0,
+      upgradeOptions: [],
+    };
+    mockStream.mockRejectedValueOnce(
+      new QuotaExceededError('Quota exceeded', details)
+    );
+
+    const { unmount } = render(<SessionScreen />);
+
+    // Flush startup async work
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // Trigger a message send using the mock send button
+    fireEvent.press(screen.getByTestId('manual-send-button'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('quota-exceeded-card')).toBeTruthy();
+      expect(screen.getByTestId('input-disabled-banner')).toBeTruthy();
+    });
+
+    unmount();
   });
 });

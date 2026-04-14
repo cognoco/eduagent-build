@@ -28,7 +28,7 @@ export interface ChatMessage {
   role: 'assistant' | 'user';
   content: string;
   streaming?: boolean;
-  kind?: 'reconnect_prompt' | 'session_expired';
+  kind?: 'reconnect_prompt' | 'session_expired' | 'quota_exceeded';
   escalationRung?: number;
   verificationBadge?: VerificationBadge;
   eventId?: string;

@@ -285,11 +285,7 @@ export default function LibraryScreen() {
       );
     }
 
-    if (
-      subjectsQuery.isError ||
-      progressQuery.isError ||
-      allBooksQuery.isError
-    ) {
+    if (subjectsQuery.isError || progressQuery.isError) {
       return (
         <View
           className="flex-1 items-center justify-center px-5 py-12"
@@ -418,8 +414,7 @@ export default function LibraryScreen() {
       {!subjectsQuery.isLoading &&
         !subjectsQuery.isError &&
         !progressQuery.isLoading &&
-        !progressQuery.isError &&
-        !allBooksQuery.isError && (
+        !progressQuery.isError && (
           <View
             className="px-5"
             style={{ zIndex: 2, position: 'relative', elevation: 2 }}

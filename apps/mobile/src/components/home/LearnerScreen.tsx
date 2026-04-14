@@ -51,9 +51,6 @@ export function LearnerScreen({
   const { data: subjects, isLoading, isError, refetch } = useSubjects();
   const { data: reviewSummary } = useReviewSummary();
   const { data: continueSuggestion } = useContinueSuggestion();
-  const continueSubtitle = continueSuggestion
-    ? `Continue with ${continueSuggestion.topicTitle} in ${continueSuggestion.subjectName}`
-    : undefined;
   const [recoveryMarker, setRecoveryMarker] =
     useState<SessionRecoveryMarker | null>(null);
   const [recentlyExpiredSession, setRecentlyExpiredSession] = useState(false);
@@ -91,9 +88,9 @@ export function LearnerScreen({
     };
   }, [activeProfile?.id]);
 
-  const activeSubjects =
-    subjects?.filter((subject) => subject.status === 'active') ?? [];
-  const hasLibraryContent = activeSubjects.length > 0;
+  // Only show "Repeat & review" when the user has actual curriculum to revisit.
+  // continueSuggestion is null when no curricula exist (fresh subject, no topics yet).
+  const hasLibraryContent = continueSuggestion != null;
   const reviewDueCount = reviewSummary?.totalOverdue ?? 0;
   const { title, subtitle } = getGreeting(
     activeProfile?.displayName ?? '',
@@ -109,7 +106,6 @@ export function LearnerScreen({
   const intentCards = useMemo(() => {
     const primaryCard = {
       title: 'Start learning',
-      subtitle: continueSubtitle,
       onPress: () => router.push('/learn-new' as never),
       testID: 'intent-learn-new',
     };
@@ -166,7 +162,6 @@ export function LearnerScreen({
 
     return cards;
   }, [
-    continueSubtitle,
     hasLibraryContent,
     recoveryMarker,
     reviewDueCount,
