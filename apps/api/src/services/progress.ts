@@ -459,6 +459,11 @@ export async function getContinueSuggestion(
   topicTitle: string;
   lastSessionId: string | null;
 } | null> {
+  // Sessions older than this are not resumed — a fresh teach-first session
+  // is created instead. Aligns with the 30-min recovery marker on mobile;
+  // the continue suggestion is the broader fallback.
+  const CONTINUE_SESSION_MAX_AGE_MS = 4 * 60 * 60 * 1000; // 4 hours
+
   const repo = createScopedRepository(db, profileId);
   const activeSubjects = (await repo.subjects.findMany()).filter(
     (subject) => subject.status === 'active'
@@ -466,6 +471,34 @@ export async function getContinueSuggestion(
   if (activeSubjects.length === 0) return null;
 
   const subjectIds = activeSubjects.map((subject) => subject.id);
+
+  // Fetch all sessions upfront for subject ordering + session lookup (avoids N+1)
+  const allSessions = await repo.sessions.findMany(
+    inArray(learningSessions.subjectId, subjectIds)
+  );
+
+  // Sort subjects by most recent session activity (not insertion order)
+  const lastActivityBySubject = new Map<string, number>();
+  for (const session of allSessions) {
+    const ts = session.lastActivityAt.getTime();
+    const current = lastActivityBySubject.get(session.subjectId) ?? 0;
+    if (ts > current) lastActivityBySubject.set(session.subjectId, ts);
+  }
+  activeSubjects.sort((a, b) => {
+    const aTime = lastActivityBySubject.get(a.id) ?? 0;
+    const bTime = lastActivityBySubject.get(b.id) ?? 0;
+    return bTime - aTime;
+  });
+
+  // Pre-group resumable (active/paused) sessions by subject
+  const resumableBySubject = new Map<string, typeof allSessions>();
+  for (const session of allSessions) {
+    if (session.status === 'active' || session.status === 'paused') {
+      const list = resumableBySubject.get(session.subjectId) ?? [];
+      list.push(session);
+      resumableBySubject.set(session.subjectId, list);
+    }
+  }
   const curriculumRows = await db
     .select({
       id: curricula.id,
@@ -529,24 +562,25 @@ export async function getContinueSuggestion(
     );
 
     if (nextTopic) {
-      // Look up the most recent active/paused session for this subject so the
-      // mobile client can resume the conversation instead of starting fresh.
-      const recentSessions = await repo.sessions.findMany(
-        and(
-          eq(learningSessions.subjectId, subject.id),
-          inArray(learningSessions.status, ['active', 'paused'])
-        )
-      );
-      const lastSession = recentSessions.sort(
+      // Use pre-fetched resumable sessions instead of per-subject query
+      const resumable = (resumableBySubject.get(subject.id) ?? []).sort(
         (a, b) => b.lastActivityAt.getTime() - a.lastActivityAt.getTime()
-      )[0];
+      );
+      const lastSession = resumable[0];
+      // Only resume sessions that are fresh enough — stale ones would show
+      // pre-teach-first greetings. Omitting lastSessionId causes the mobile
+      // client to create a new session with current teach-first behavior.
+      const isFresh =
+        lastSession &&
+        Date.now() - lastSession.lastActivityAt.getTime() <
+          CONTINUE_SESSION_MAX_AGE_MS;
 
       return {
         subjectId: subject.id,
         subjectName: subject.name,
         topicId: nextTopic.id,
         topicTitle: nextTopic.title,
-        lastSessionId: lastSession?.id ?? null,
+        lastSessionId: isFresh ? lastSession.id : null,
       };
     }
   }
