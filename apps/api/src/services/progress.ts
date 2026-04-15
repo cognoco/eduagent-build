@@ -449,6 +449,26 @@ export async function getOverallProgress(
   };
 }
 
+export async function getActiveSessionForTopic(
+  db: Database,
+  profileId: string,
+  topicId: string
+): Promise<{ sessionId: string } | null> {
+  const repo = createScopedRepository(db, profileId);
+  const sessions = await repo.sessions.findMany(
+    and(
+      eq(learningSessions.topicId, topicId),
+      inArray(learningSessions.status, ['active', 'paused'])
+    )
+  );
+  if (sessions.length === 0) return null;
+  // Use spread to avoid mutating the repo array (consistent with getContinueSuggestion pattern)
+  const sorted = [...sessions].sort(
+    (a, b) => b.lastActivityAt.getTime() - a.lastActivityAt.getTime()
+  );
+  return { sessionId: sorted[0]!.id };
+}
+
 export async function getContinueSuggestion(
   db: Database,
   profileId: string

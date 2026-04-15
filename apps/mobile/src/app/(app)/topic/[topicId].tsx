@@ -11,7 +11,10 @@ import {
   RetentionSignal,
   type RetentionStatus,
 } from '../../../components/progress';
-import { useTopicProgress } from '../../../hooks/use-progress';
+import {
+  useTopicProgress,
+  useActiveSessionForTopic,
+} from '../../../hooks/use-progress';
 import {
   useTopicRetention,
   useEvaluateEligibility,
@@ -169,6 +172,8 @@ export default function TopicDetailScreen() {
   const { data: evaluateEligibility } = useEvaluateEligibility(topicId ?? '');
   // FR68: "Your Words" topic note
   const { data: noteData } = useGetTopicNote(subjectId, topicId);
+  // F-4: Resume active/paused session instead of creating a new one
+  const { data: activeSession } = useActiveSessionForTopic(topicId);
 
   const isLoading = progressLoading || retentionLoading || parkingLotLoading;
   // Data-critical queries only — parking lot is secondary and should not suppress errors
@@ -533,6 +538,9 @@ export default function TopicDetailScreen() {
                       mode: 'freeform',
                       subjectId,
                       topicId,
+                      ...(activeSession?.sessionId && {
+                        sessionId: activeSession.sessionId,
+                      }),
                     },
                   })
                 }
@@ -597,6 +605,9 @@ export default function TopicDetailScreen() {
                       mode: 'freeform',
                       subjectId,
                       topicId,
+                      ...(activeSession?.sessionId && {
+                        sessionId: activeSession.sessionId,
+                      }),
                     },
                   })
                 }

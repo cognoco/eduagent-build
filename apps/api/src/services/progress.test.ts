@@ -16,6 +16,7 @@ import {
   getTopicProgress,
   getOverallProgress,
   getContinueSuggestion,
+  getActiveSessionForTopic,
 } from './progress';
 
 const NOW = new Date('2026-02-15T10:00:00.000Z');
@@ -660,5 +661,47 @@ describe('getContinueSuggestion', () => {
     expect(result!.subjectId).toBe(sciSubjectId);
     expect(result!.subjectName).toBe('Science');
     expect(result!.lastSessionId).toBe('recent-sci-session');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getActiveSessionForTopic [F-4]
+// ---------------------------------------------------------------------------
+
+describe('getActiveSessionForTopic', () => {
+  it('returns the most recent active/paused session for a topic', async () => {
+    const olderSession = {
+      ...mockSessionRow({ topicId }),
+      id: 'older-session',
+      status: 'active' as const,
+      lastActivityAt: new Date('2026-02-14T10:00:00.000Z'),
+    };
+    const newerSession = {
+      ...mockSessionRow({ topicId }),
+      id: 'newer-session',
+      status: 'paused' as const,
+      lastActivityAt: new Date('2026-02-15T09:00:00.000Z'),
+    };
+
+    setupScopedRepo({
+      sessionsFindMany: [olderSession, newerSession],
+    });
+    const db = createMockDb();
+
+    const result = await getActiveSessionForTopic(db, profileId, topicId);
+
+    expect(result).not.toBeNull();
+    expect(result!.sessionId).toBe('newer-session');
+  });
+
+  it('returns null when no active/paused sessions exist', async () => {
+    setupScopedRepo({
+      sessionsFindMany: [],
+    });
+    const db = createMockDb();
+
+    const result = await getActiveSessionForTopic(db, profileId, topicId);
+
+    expect(result).toBeNull();
   });
 });
