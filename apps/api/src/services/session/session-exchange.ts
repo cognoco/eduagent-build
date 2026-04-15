@@ -41,7 +41,11 @@ import {
   fetchCrossSubjectHighlights,
   buildCrossSubjectContext,
 } from '../prior-learning';
-import { buildMemoryBlock, getLearningProfile } from '../learner-profile';
+import {
+  buildMemoryBlock,
+  getLearningProfile,
+  buildAccommodationBlock,
+} from '../learner-profile';
 import { retrieveRelevantMemory } from '../memory';
 import { getTeachingPreference } from '../retention-data';
 import { shouldTriggerEvaluate } from '../evaluate';
@@ -537,6 +541,13 @@ export async function prepareExchangeContext(
       ) || undefined
     : undefined;
 
+  // FR254: Build accommodation block — independent of memory injection toggle
+  const accommodationContext = learningProfile
+    ? buildAccommodationBlock(
+        learningProfile.accommodationMode as string | null
+      ) || undefined
+    : undefined;
+
   // 6. Build ExchangeContext
   // For interleaved sessions: use the topic list, clear single-topic fields
   const context: ExchangeContext = {
@@ -553,6 +564,7 @@ export async function prepareExchangeContext(
     priorLearningContext: priorLearning.contextText || undefined,
     crossSubjectContext,
     learningHistoryContext,
+    accommodationContext,
     learnerMemoryContext,
     // CFLF-23: Merge per-message memory with rawInput-based pre-session memory
     embeddingMemoryContext:

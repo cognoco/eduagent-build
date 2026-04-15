@@ -46,6 +46,8 @@ export interface ExchangeContext {
   crossSubjectContext?: string;
   learningHistoryContext?: string;
   embeddingMemoryContext?: string;
+  /** Accommodation mode preamble — injected before learner memory (FR254) */
+  accommodationContext?: string;
   learnerMemoryContext?: string;
   workedExampleLevel?: 'full' | 'fading' | 'problem_first';
   /** Teaching method preference for adaptive teaching (FR58) */
@@ -325,6 +327,11 @@ export function buildSystemPrompt(context: ExchangeContext): string {
   // Embedding memory context (pgvector semantic retrieval)
   if (context.embeddingMemoryContext) {
     sections.push(context.embeddingMemoryContext);
+  }
+
+  // FR254.4: Accommodation block injected BEFORE learner memory for priority
+  if (context.accommodationContext) {
+    sections.push(context.accommodationContext);
   }
 
   if (context.learnerMemoryContext) {
