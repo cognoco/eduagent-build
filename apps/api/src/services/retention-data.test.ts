@@ -942,6 +942,32 @@ describe('startRelearn', () => {
     // Only 1 insert call: learningSessions (no needsDeepening insert)
     expect(db.insert).toHaveBeenCalledTimes(1);
   });
+
+  it('includes prior teaching preference when method is same', async () => {
+    setupScopedRepo({ needsDeepeningFindMany: [] });
+    const db = createMockDb();
+    (db.query.teachingPreferences.findFirst as jest.Mock).mockResolvedValue({
+      id: 'pref-1',
+      profileId,
+      subjectId,
+      method: 'visual_diagrams',
+      analogyDomain: null,
+      nativeLanguage: null,
+    });
+    (db.insert as jest.Mock).mockReturnValue({
+      values: jest.fn().mockReturnValue({
+        returning: jest.fn().mockResolvedValue([{ id: 'session-new' }]),
+      }),
+    });
+
+    const result = await startRelearn(db, profileId, {
+      topicId,
+      method: 'same',
+    });
+
+    expect(result.method).toBe('same');
+    expect(result.preferredMethod).toBe('visual_diagrams');
+  });
 });
 
 // ---------------------------------------------------------------------------

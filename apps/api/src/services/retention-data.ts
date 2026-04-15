@@ -637,6 +637,15 @@ export async function startRelearn(
     resetPerformed,
   };
 
+  // Look up the prior teaching preference when the learner wants
+  // the same method — inject it so the session prompt can use it.
+  if (input.method === 'same' && subjectId) {
+    const pref = await getTeachingPreference(db, profileId, subjectId);
+    if (pref) {
+      response.preferredMethod = pref.method;
+    }
+  }
+
   if (input.method === 'different' && input.preferredMethod) {
     response.preferredMethod = input.preferredMethod;
   }
