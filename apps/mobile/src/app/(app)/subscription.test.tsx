@@ -51,6 +51,8 @@ const mockMutateAsyncPurchase = jest.fn();
 const mockMutateAsyncRestore = jest.fn();
 let mockOfferings: ReturnType<typeof makeMockOfferings> | null = null;
 let mockOfferingsLoading = false;
+let mockOfferingsError = false;
+const mockRefetchOfferings = jest.fn();
 let mockCustomerInfo: ReturnType<typeof makeMockCustomerInfo> | null = null;
 let mockCustomerInfoLoading = false;
 let mockPurchaseIsPending = false;
@@ -60,6 +62,8 @@ jest.mock('../../hooks/use-revenuecat', () => ({
   useOfferings: () => ({
     data: mockOfferings,
     isLoading: mockOfferingsLoading,
+    isError: mockOfferingsError,
+    refetch: mockRefetchOfferings,
   }),
   useCustomerInfo: () => ({
     data: mockCustomerInfo,
@@ -311,6 +315,8 @@ describe('SubscriptionScreen', () => {
     jest.clearAllMocks();
     mockOfferings = null;
     mockOfferingsLoading = false;
+    mockOfferingsError = false;
+    mockRefetchOfferings.mockClear();
     mockCustomerInfo = null;
     mockCustomerInfoLoading = false;
     mockPurchaseIsPending = false;
@@ -955,19 +961,38 @@ describe('SubscriptionScreen', () => {
       expect(screen.getByText('Buy 500 credits')).toBeTruthy();
     });
 
-    it('shows error alert when no topup package is in offerings', async () => {
+    it('shows graceful error when no topup package is in offerings', async () => {
       mockSubscription = { tier: 'plus', status: 'active' };
-      // Offerings with only a standard monthly package — no 'topup' identifier
       mockOfferings = makeMockOfferings([makeMockPackage()]);
 
       render(<SubscriptionScreen />, { wrapper: createWrapper() });
-
       fireEvent.press(screen.getByTestId('top-up-button'));
 
       await waitFor(() => {
         expect(Alert.alert).toHaveBeenCalledWith(
-          'Error',
-          'Top-up package not available.'
+          'Not available',
+          "Top-up credits aren't available right now. Try again later or contact support.",
+          expect.arrayContaining([
+            expect.objectContaining({ text: 'Retry' }),
+            expect.objectContaining({ text: 'OK' }),
+          ])
+        );
+      });
+    });
+
+    it('shows connection error with retry when offerings failed to load', async () => {
+      mockSubscription = { tier: 'plus', status: 'active' };
+      mockOfferings = null;
+      mockOfferingsError = true;
+
+      render(<SubscriptionScreen />, { wrapper: createWrapper() });
+      fireEvent.press(screen.getByTestId('top-up-button'));
+
+      await waitFor(() => {
+        expect(Alert.alert).toHaveBeenCalledWith(
+          'Connection error',
+          "Couldn't load purchase options. Check your connection and try again.",
+          expect.arrayContaining([expect.objectContaining({ text: 'Retry' })])
         );
       });
     });

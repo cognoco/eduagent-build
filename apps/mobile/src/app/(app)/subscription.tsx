@@ -771,9 +771,30 @@ export default function SubscriptionScreen() {
   // ---------------------------------------------------------------------------
 
   const handleTopUp = useCallback(async () => {
+    // If offerings are still loading, do nothing (button should be disabled)
+    if (offeringsLoading) return;
+
+    // If offerings failed to load, give a retry path
+    if (offeringsError || !offerings) {
+      Alert.alert(
+        'Connection error',
+        "Couldn't load purchase options. Check your connection and try again.",
+        [
+          {
+            text: 'Retry',
+            onPress: () => {
+              void refetchOfferings();
+            },
+          },
+          { text: 'OK', style: 'cancel' },
+        ]
+      );
+      return;
+    }
+
     // Find the top-up package from offerings
     // RevenueCat consumables can be in a separate offering or as a non-subscription package
-    const topUpOffering = offerings?.all?.['top_up'] ?? offerings?.current;
+    const topUpOffering = offerings.all?.['top_up'] ?? offerings.current;
     const topUpPkg = topUpOffering?.availablePackages.find(
       (p) =>
         p.packageType === PACKAGE_TYPE.CUSTOM &&
@@ -781,7 +802,19 @@ export default function SubscriptionScreen() {
     );
 
     if (!topUpPkg) {
-      Alert.alert('Error', 'Top-up package not available.');
+      Alert.alert(
+        'Not available',
+        "Top-up credits aren't available right now. Try again later or contact support.",
+        [
+          {
+            text: 'Retry',
+            onPress: () => {
+              void refetchOfferings();
+            },
+          },
+          { text: 'OK', style: 'cancel' },
+        ]
+      );
       return;
     }
 
@@ -867,7 +900,16 @@ export default function SubscriptionScreen() {
         [{ text: 'OK' }]
       );
     }
-  }, [offerings, usage, queryClient, activeProfile?.id, refetchUsage]);
+  }, [
+    offerings,
+    offeringsLoading,
+    offeringsError,
+    refetchOfferings,
+    usage,
+    queryClient,
+    activeProfile?.id,
+    refetchUsage,
+  ]);
 
   const handleContactSupport = useCallback(async () => {
     try {
