@@ -114,7 +114,7 @@ Phase 4: Test Coverage & Validation
 
 > **Goal:** Fix all API-side bugs, eliminate N+1 queries, and add missing Inngest cron triggers.
 > **Estimated scope:** ~36 items. Streams 2A-2C and 2E are fully parallel. Stream 2D depends on Phase 1A.
-> **Status (verified 2026-04-14):** 31/31 ✅ done. All streams complete.
+> **Status (verified 2026-04-15):** 31/31 ✅ done. All streams complete. 2B.1 batch UPDATE added 2026-04-15.
 
 ### Stream 2A — API Bug Fixes (PARALLEL) — 3/4 ✅
 
@@ -140,7 +140,7 @@ All independent — different service files, no shared callers.
 
 | ID | Epic | Severity | File | Fix | Size | Verified By |
 |----|------|----------|------|-----|------|-------------|
-| ✅ 2B.1 | 1 | MED | `services/curriculum.ts:1065-1077` | Batch UPDATE with CASE expression instead of per-topic loop in `adaptCurriculumFromPerformance`. | S | `verified: single CASE UPDATE [CR-2B.1]` |
+| ✅ 2B.1 | 1 | MED | `services/curriculum.ts:1252-1275` | Batch UPDATE with CASE expression instead of per-topic loop in `adaptCurriculumFromPerformance`. | S | `verified 2026-04-15: single CASE UPDATE + curriculumId guard [CR-2B.1]` |
 | ✅ 2B.2 | 2 | MED | `services/coaching-cards.ts:306-333` | Replace nested loop in `findContinueBookCard()` with single JOIN query (books -> topics -> sessions). | M | `verified 2026-04-14: batched inArray queries [BUG-63]` |
 | 2B.3 | 2 | ~~LOW~~ | `services/session.ts:772` | ❌ **INVALID — LIMIT already exists.** Query at line 772 already has `.limit(60)`. The `.slice(0, 60)` at line 974 is redundant but harmless. No optimization needed. | — | `review: session.ts:772 verified .limit(60) in SQL` |
 | ✅ 2B.4 | 3 | LOW | `services/retention-data.ts:529-552` | Move `subjectId` filter from JS to SQL WHERE in `getSubjectNeedsDeepening`. | S | `verified 2026-04-14: SQL WHERE on subjectId + status` |
@@ -222,7 +222,7 @@ Low-priority consistency fixes. All independent.
 
 > **Goal:** Fix all user-facing dead-end states and complete persona removal on the mobile side.
 > **Estimated scope:** ~53 items (includes 2 reclassified from 2A + 6 LOW UX added 2026-04-14). All streams are parallel except 3D (depends on 1A + 2D).
-> **Status (verified 2026-04-14):** 49/53 ✅ done, 1 ⚠️ partial, 4 ❌ open (3E.1–3E.4 are new feature screens).
+> **Status (verified 2026-04-15):** 53/54 ✅ done, 0 ⚠️ partial, 1 ❌ open (3E.3 requires new API endpoint).
 >
 > **Reclassified from Phase 2A** (mobile files, not API):
 > - ~~2A.8~~ → **3F.12** | HIGH | `apps/mobile/global.css:27` | Fix muted color fallback: change `#525252` to `#94a3b8` to match `tokens.teen.dark`.
@@ -245,7 +245,7 @@ These are the 10 states where users get permanently stuck with no escape.
 | 3A.9 | Parent | `child/.../session/[sessionId].tsx:83-91` | Add empty-state message when `transcript.exchanges.length === 0` instead of blank ScrollView. | No |
 | 3A.10 | Parent | `(parent)/_layout.tsx:150` | Replace redirect to learner home with "Add a child" CTA within parent dashboard context. | No |
 
-### Stream 3B — High UX Dead-Ends (PARALLEL) ✅ ALL VERIFIED
+### Stream 3B — High UX Dead-Ends (PARALLEL) — 11/11 ✅
 
 | ID | Flow | File | Fix | Needs API? |
 |----|------|------|-----|------------|
@@ -259,7 +259,7 @@ These are the 10 states where users get permanently stuck with no escape.
 | 3B.8 | Topic | `topic/relearn.tsx:100-145` | Show error message when `startRelearn` mutation fails. Currently sets `isSubmitting(false)` silently. | No |
 | 3B.9 | Subscription | `subscription.tsx:928-972` | Add retry button + "Contact support" link when RevenueCat offerings fail. Static cards need purchase CTA. | No |
 | 3B.10 | Parent | `subscription.tsx:316-332` | Fix cooldown timer: update every 1s near expiry (not 60s). Ensure button enables immediately at 0. | No |
-| 3B.11 | Parent | `dashboard.tsx:140-173` | Add navigation to Library/More tabs in timeout error state (not just "Retry"). | No |
+| ✅ 3B.11 | Home | `home.tsx:109-132` | Add navigation to Library/More tabs in timeout error state (not just "Retry"). **DONE: "Go to Library" + "More options" buttons added. 4 tests.** | No |
 
 ### Stream 3C — Medium UX Dead-Ends (PARALLEL) — 17/17 ✅
 
@@ -291,16 +291,16 @@ These are the 10 states where users get permanently stuck with no escape.
 | ✅ 3D.2 | HIGH | `apps/mobile/src/app/profiles.tsx:74` | Derive role label from `birthYear` / `isOwner` instead of `personaType`. |
 | ✅ 3D.3 | HIGH | `apps/mobile/src/app/_layout.tsx:86-129` | Remove `schemeForPersona()`. Derive theme from `activeProfile.birthYear` age bracket. |
 
-### Stream 3E — Missing Mobile Screens & Features (PARALLEL) — 0/4 ❌
+### Stream 3E — Missing Mobile Screens & Features (PARALLEL) — 3/4 ✅
 
 | ID | Epic | Severity | Description |
 |----|------|----------|-------------|
-| ❌ 3E.1 | 3 | MED | **TEACH_BACK screen.** Create `teach-back.tsx` with voice I/O UI. Backend processes TEACH_BACK results but no learner-facing screen exists. Wire `useSpeechRecognition` + `useTextToSpeech`. |
-| ❌ 3E.2 | 3 | LOW | **EVALUATE screen.** Create `evaluate-challenge.tsx` (Devil's Advocate). API has eligibility checking + difficulty rung management but no mobile screen. |
-| ❌ 3E.3 | 4 | MED | **"Your Words" summaries (FR68).** Display learner-authored words in topic progress, not just AI-generated `summaryExcerpt`. |
-| ❌ 3E.4 | 4 | MED | **Knowledge decay visualization (FR90).** Add time-based decay bar to `RetentionSignal`, not just categorical strong/fading/weak/forgotten. |
+| ✅ 3E.1 | 3 | MED | **TEACH_BACK screen.** No separate screen needed — session/ChatShell already handles `verificationType: 'teach_back'` with full voice I/O (VoiceRecordButton, VoiceTranscriptPreview, VoiceToggle, VoicePlaybackBar). **Added "Teach it back" entry point button on topic/[topicId].tsx** (gated by easeFactor >= 2.3 + repetitions > 0). 2 tests added. |
+| ✅ 3E.2 | 3 | LOW | **EVALUATE screen.** No separate screen needed — session screen handles `verificationType: 'evaluate'` with evaluate badges in MessageBubble. **Added `useEvaluateEligibility` hook** calling `GET /topics/:topicId/evaluate-eligibility` + "Challenge yourself" button on topic detail (shows rung X/4). 4 tests added. |
+| ❌ 3E.3 | 4 | MED | **"Your Words" summaries (FR68).** Requires new API endpoint (`GET /subjects/:subjectId/topics/:topicId/note`) — `topic_notes` table exists but no single-topic GET route. Cannot be implemented mobile-only. |
+| ✅ 3E.4 | 4 | MED | **Knowledge decay visualization (FR90).** Added `DecayBar` component to topic/[topicId].tsx. Visual progress bar shows elapsed fraction of SM-2 interval, color-coded (strong → fading → due). Uses `lastReviewedAt`, `intervalDays`, `nextReviewAt` from retention card. 3 tests added. |
 
-### Stream 3F — Accessibility, Voice & Polish (PARALLEL) — 12/13 ✅
+### Stream 3F — Accessibility, Voice & Polish (PARALLEL) — 13/13 ✅
 
 | ID | Epic | Severity | File | Fix |
 |----|------|----------|------|-----|
@@ -311,7 +311,7 @@ These are the 10 states where users get permanently stuck with no escape.
 | ✅ 3F.5 | 8 | MED | `session/index.tsx:735` | Add error handling to `setSessionInputMode` mutation. Currently diverges local/server state on failure. |
 | ✅ 3F.6 | 8 | MED | `use-speech-recognition.ts:106-121` | Log (don't silently filter) malformed native STT events. |
 | ✅ 3F.7 | 7 | HIGH | `hooks/use-books.ts:102-110` | Fix stale closure in `useGenerateBookTopics` — `subjectId`/`bookId` captured from wrong render in `onSuccess`. |
-| ⚠️ 3F.8 | 7 | MED | `library.tsx:235` | Add `generateBookTopics.isPending` to useEffect dependency array. **PARTIAL: isPending guard is in effect body, not dep array; code lives in book/[bookId].tsx, not library.tsx.** |
+| ✅ 3F.8 | 7 | MED | `shelf/[subjectId]/book/[bookId].tsx:128-168` | **DELIBERATE:** `isPending` guard in effect body (not dep array) is correct — prevents unnecessary re-runs on mutation state transitions. `alreadyPending` ref is primary idempotency guard. eslint-disable is intentional. |
 | ✅ 3F.9 | 13 | MED | `lib/session-recovery.ts:37-46` | Scope recovery key to profileId to prevent cross-profile marker collision on rapid switch. |
 | ✅ 3F.10 | 1 | MED | `hooks/use-resolve-subject.ts:15` | Add `assertOk(res)` before reading response JSON. 4xx/5xx errors currently swallowed silently. |
 | ✅ 3F.11 | 1 | LOW | `hooks/use-classify-subject.ts:15` | Same `assertOk(res)` fix as 3F.10. |
@@ -337,7 +337,7 @@ These are the 10 states where users get permanently stuck with no escape.
 
 > **Goal:** Close all test gaps identified in the review. Can start partially during Phase 2-3 for items that don't depend on code changes.
 > **Estimated scope:** ~58 items (includes items added 2026-04-14). All streams fully parallel.
-> **Status (verified 2026-04-14):** 49/58 ✅ done, 3 ⚠️ partial, 4 ❌ open, 2 N/A (removed code).
+> **Status (verified 2026-04-15):** 50/58 ✅ done, 2 ⚠️ partial, 4 ❌ open, 2 N/A (removed code).
 
 ### Stream 4A — Epic 6 Service & Hook Tests (8 HIGH gaps) — 8/8 ✅
 
@@ -354,7 +354,7 @@ These are the highest-severity test gaps in the entire review.
 | ✅ 4A.7 | `hooks/use-vocabulary.ts` | Unit tests for `useVocabulary`, `useCreateVocabulary`, `useReviewVocabulary`. |
 | ✅ 4A.8 | `hooks/use-language-progress.ts` | Unit tests for `useLanguageProgress`. |
 
-### Stream 4B — Epic 7-8 Tests (PARALLEL) — 11/13 ✅
+### Stream 4B — Epic 7-8 Tests (PARALLEL) — 12/13 ✅
 
 | ID | Epic | File | Tests Needed |
 |----|------|------|-------------|
@@ -368,7 +368,7 @@ These are the highest-severity test gaps in the entire review.
 | ✅ 4B.8 | 8 | `hooks/use-speech-recognition.ts` | Tests for unmount race condition, rapid `startListening` calls, listener cleanup on hot reload. |
 | ✅ 4B.9 | 7 | `routes/books.test.ts:155-354` | Test `NotFoundError` propagation: verify service error converted to `notFound()` response. **DONE: Null stub matches actual route behavior (null → notFound). Not a deficiency.** |
 | ✅ 4B.10 | 8 | `hooks/use-text-to-speech.ts:113` | Test that `setRate()` only affects next `speak()` call, not currently-playing audio. |
-| ❌ 4B.11 | 8 | `components/session/ChatShell.tsx:252-256` | Test STT-to-transcript race condition: `stopListening()` completes but transcript not yet in state. |
+| ✅ 4B.11 | 8 | `components/session/ChatShell.tsx:252-256` | Test STT-to-transcript race condition: `stopListening()` completes but transcript not yet in state. **DONE: 3 tests added — delayed transcript capture, discard gate, discard+new-mic-press. Also fixed discardedRef not clearing on handleVoicePress start.** |
 | ✅ 4B.12 | 8 | `routes/sessions.ts:267-281` | Test POST `/sessions/:sessionId/input-mode` with invalid input modes — verify 400. |
 | ✅ 4B.13 | 8 | `session/index.tsx` | Test `inputMode` parameter propagation to `startSession` API call. **DONE: session/index.test.tsx verifies inputMode prop via ChatShell mock.** |
 
