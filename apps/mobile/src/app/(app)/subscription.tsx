@@ -862,17 +862,9 @@ export default function SubscriptionScreen() {
       Alert.alert('Top-up', '500 additional credits have been added!');
     } else {
       Alert.alert(
-        'Processing',
-        'Your purchase is being processed. Credits will appear shortly.',
-        [
-          {
-            text: 'Check your usage',
-            onPress: () => {
-              void refetchUsage();
-            },
-          },
-          { text: 'OK', style: 'cancel' },
-        ]
+        'Purchase confirmed',
+        'Your 500 credits are being added. They usually appear within a minute \u2014 pull down to refresh your usage.',
+        [{ text: 'OK' }]
       );
     }
   }, [offerings, usage, queryClient, activeProfile?.id, refetchUsage]);
