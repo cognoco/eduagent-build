@@ -6,36 +6,52 @@ import type {
   RouteResult,
   StreamResult,
 } from './types';
+import type { AgeBracket } from '@eduagent/schemas';
 import type { LLMTier } from '../subscription';
 import { createLogger } from '../logger';
 
 const logger = createLogger({ level: 'info', environment: 'production' });
 
 // ---------------------------------------------------------------------------
-// Content safety preamble for minors (all users are 11-17)
+// Content safety preamble — age-aware identity framing.
 // Applied at the router layer so it covers ALL providers uniformly,
 // including fallback paths through the circuit breaker.
+//
+// The identity statement ("for young learners" vs "adult learner") prevents
+// the LLM from anchoring to a minor-tutor persona when the user is an adult.
+// Safety RULES are identical for all ages — only the framing changes.
 // ---------------------------------------------------------------------------
 
-const SAFETY_SYSTEM_PREAMBLE =
-  'You are an educational AI assistant for students aged 11-17. ' +
+const SAFETY_RULES =
   'You MUST refuse any request involving: harassment, bullying, or threats; ' +
-  'hate speech or discriminatory content; sexually explicit material (even mild); ' +
+  'hate speech or discriminatory content; sexually explicit material; ' +
   'dangerous or harmful activities; or content undermining civic integrity. ' +
   'If a request touches these areas, politely decline and redirect to the learning topic.';
 
-function withSafetyPreamble(messages: ChatMessage[]): ChatMessage[] {
+function getSafetyPreamble(ageBracket?: AgeBracket): string {
+  if (ageBracket === 'adult') {
+    return `You are an educational AI assistant. The current learner is an adult. ${SAFETY_RULES}`;
+  }
+  // Default to minor-safe framing (defence-in-depth for missing age data)
+  return `You are an educational AI assistant for young learners. ${SAFETY_RULES}`;
+}
+
+function withSafetyPreamble(
+  messages: ChatMessage[],
+  ageBracket?: AgeBracket
+): ChatMessage[] {
+  const preamble = getSafetyPreamble(ageBracket);
   const first = messages[0];
   if (first?.role === 'system') {
     return [
       {
         role: 'system',
-        content: `${SAFETY_SYSTEM_PREAMBLE}\n\n${first.content}`,
+        content: `${preamble}\n\n${first.content}`,
       },
       ...messages.slice(1),
     ];
   }
-  return [{ role: 'system', content: SAFETY_SYSTEM_PREAMBLE }, ...messages];
+  return [{ role: 'system', content: preamble }, ...messages];
 }
 
 // ---------------------------------------------------------------------------
@@ -264,9 +280,13 @@ async function withRetry<T>(
 export async function routeAndCall(
   messages: ChatMessage[],
   rung: EscalationRung = 1,
-  _options?: { correlationId?: string; llmTier?: LLMTier }
+  _options?: {
+    correlationId?: string;
+    llmTier?: LLMTier;
+    ageBracket?: AgeBracket;
+  }
 ): Promise<RouteResult> {
-  const safeMessages = withSafetyPreamble(messages);
+  const safeMessages = withSafetyPreamble(messages, _options?.ageBracket);
   const config = getModelConfig(rung, _options?.llmTier);
   const provider = providers.get(config.provider);
   if (!provider) {
@@ -447,9 +467,10 @@ async function* wrapStreamWithCircuitBreaker(
 export async function routeAndStream(
   messages: ChatMessage[],
   rung: EscalationRung = 1,
-  llmTier?: LLMTier
+  llmTier?: LLMTier,
+  ageBracket?: AgeBracket
 ): Promise<StreamResult> {
-  const safeMessages = withSafetyPreamble(messages);
+  const safeMessages = withSafetyPreamble(messages, ageBracket);
   const config = getModelConfig(rung, llmTier);
   const provider = providers.get(config.provider);
   if (!provider) {

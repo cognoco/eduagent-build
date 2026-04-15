@@ -306,13 +306,13 @@ describe('LLM Router', () => {
     });
   });
 
-  describe('safety preamble for minors', () => {
+  describe('age-aware safety preamble', () => {
     beforeEach(() => {
       _clearProviders();
       _resetCircuits();
     });
 
-    it('prepends safety preamble to messages passed to provider', async () => {
+    it('defaults to minor-safe framing when no ageBracket provided', async () => {
       const receivedMessages: ChatMessage[][] = [];
       const spy: LLMProvider = {
         id: 'gemini',
@@ -332,10 +332,55 @@ describe('LLM Router', () => {
       expect(receivedMessages).toHaveLength(1);
       const msgs = receivedMessages[0]!;
       expect(msgs[0]!.role).toBe('system');
-      expect(msgs[0]!.content).toContain(
-        'educational AI assistant for students aged 11-17'
-      );
+      expect(msgs[0]!.content).toContain('for young learners');
+      expect(msgs[0]!.content).not.toContain('adult');
       expect(msgs[1]!.content).toBe('Hello');
+    });
+
+    it('uses adult framing when ageBracket is adult', async () => {
+      const receivedMessages: ChatMessage[][] = [];
+      const spy: LLMProvider = {
+        id: 'gemini',
+        async chat(messages) {
+          receivedMessages.push(messages);
+          return 'ok';
+        },
+        async *chatStream() {
+          yield 'ok';
+        },
+      };
+      registerProvider(spy);
+
+      await routeAndCall([{ role: 'user', content: 'Hello' }], 1, {
+        ageBracket: 'adult',
+      });
+
+      const msgs = receivedMessages[0]!;
+      expect(msgs[0]!.content).toContain('The current learner is an adult');
+      expect(msgs[0]!.content).not.toContain('young learners');
+    });
+
+    it('uses minor framing for child ageBracket', async () => {
+      const receivedMessages: ChatMessage[][] = [];
+      const spy: LLMProvider = {
+        id: 'gemini',
+        async chat(messages) {
+          receivedMessages.push(messages);
+          return 'ok';
+        },
+        async *chatStream() {
+          yield 'ok';
+        },
+      };
+      registerProvider(spy);
+
+      await routeAndCall([{ role: 'user', content: 'Hello' }], 1, {
+        ageBracket: 'child',
+      });
+
+      const msgs = receivedMessages[0]!;
+      expect(msgs[0]!.content).toContain('for young learners');
+      expect(msgs[0]!.content).not.toContain('adult');
     });
 
     it('merges preamble into existing system message', async () => {
@@ -363,8 +408,32 @@ describe('LLM Router', () => {
       const msgs = receivedMessages[0]!;
       // Preamble merged into system message — still 2 messages total
       expect(msgs).toHaveLength(2);
-      expect(msgs[0]!.content).toContain('students aged 11-17');
+      expect(msgs[0]!.content).toContain('for young learners');
       expect(msgs[0]!.content).toContain('You are a tutor.');
+    });
+
+    it('preserves safety rules for all age brackets', async () => {
+      const receivedMessages: ChatMessage[][] = [];
+      const spy: LLMProvider = {
+        id: 'gemini',
+        async chat(messages) {
+          receivedMessages.push(messages);
+          return 'ok';
+        },
+        async *chatStream() {
+          yield 'ok';
+        },
+      };
+      registerProvider(spy);
+
+      // Adult should still get content safety rules
+      await routeAndCall([{ role: 'user', content: 'Hello' }], 1, {
+        ageBracket: 'adult',
+      });
+
+      const msgs = receivedMessages[0]!;
+      expect(msgs[0]!.content).toContain('harassment, bullying, or threats');
+      expect(msgs[0]!.content).toContain('politely decline and redirect');
     });
   });
 });

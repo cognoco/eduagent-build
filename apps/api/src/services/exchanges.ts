@@ -539,10 +539,11 @@ export async function processExchange(
     { role: 'user' as const, content: userMessage },
   ];
 
+  const ageBracket = resolveAgeBracket(context.birthYear);
   const result: RouteResult = await routeAndCall(
     messages,
     context.escalationRung,
-    { llmTier: context.llmTier }
+    { llmTier: context.llmTier, ageBracket }
   );
 
   const isUnderstandingCheck = detectUnderstandingCheck(result.response);
@@ -601,10 +602,12 @@ export async function streamExchange(
     { role: 'user' as const, content: userMessage },
   ];
 
+  const ageBracket = resolveAgeBracket(context.birthYear);
   const result: StreamResult = await routeAndStream(
     messages,
     context.escalationRung,
-    context.llmTier
+    context.llmTier,
+    ageBracket
   );
 
   return {
