@@ -29,6 +29,7 @@ function mockSubjectRow(
     name: string;
     rawInput: string | null;
     status: 'active' | 'paused' | 'archived';
+    updatedAt: Date;
   }>
 ) {
   return {
@@ -38,7 +39,7 @@ function mockSubjectRow(
     rawInput: overrides?.rawInput ?? null,
     status: overrides?.status ?? 'active',
     createdAt: NOW,
-    updatedAt: NOW,
+    updatedAt: overrides?.updatedAt ?? NOW,
   };
 }
 
@@ -120,6 +121,23 @@ describe('listSubjects', () => {
 
     expect(findMany).toHaveBeenCalledTimes(1);
     expect(findMany.mock.calls[0][0]).toBeUndefined();
+  });
+
+  it('returns subjects ordered by updatedAt descending', async () => {
+    const older = mockSubjectRow({
+      id: 'older',
+      name: 'Geography',
+      updatedAt: new Date('2026-01-01'),
+    });
+    const newer = mockSubjectRow({
+      id: 'newer',
+      name: 'Science',
+      updatedAt: new Date('2026-04-01'),
+    });
+    setupScopedRepo({ findManyResult: [older, newer] }); // DB returns older first
+    const db = createMockDb();
+    const result = await listSubjects(db, profileId);
+    expect(result[0].id).toBe('newer');
   });
 });
 

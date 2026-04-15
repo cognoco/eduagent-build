@@ -63,6 +63,9 @@ export async function listSubjects(
     ? undefined
     : eq(subjects.status, 'active');
   const rows = await repo.subjects.findMany(extraWhere);
+  // Sort by most recently updated first — prevents arbitrary subject[0] picks
+  // in freeform classifier fallback and Learn New "Continue with X" card
+  rows.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
   return rows.map(mapSubjectRow);
 }
 
