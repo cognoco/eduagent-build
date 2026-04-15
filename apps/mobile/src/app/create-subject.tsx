@@ -13,7 +13,7 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useCreateSubject } from '../hooks/use-subjects';
+import { useCreateSubject, useSubjects } from '../hooks/use-subjects';
 import { useResolveSubject } from '../hooks/use-resolve-subject';
 import { useThemeColors } from '../lib/theme';
 import { Button } from '../components/common/Button';
@@ -34,16 +34,11 @@ const STARTER_CHIPS = [
   'Science',
   'English',
   'History',
+  'Spanish',
   'Geography',
   'Art',
   'Music',
   'Programming',
-  'Biology',
-  'Physics',
-  'Chemistry',
-  'Spanish',
-  'French',
-  'Economics',
 ] as const;
 
 type ResolveState =
@@ -62,6 +57,7 @@ export default function CreateSubjectScreen() {
   const colors = useThemeColors();
   const createSubject = useCreateSubject();
   const resolveSubject = useResolveSubject();
+  const { data: existingSubjects } = useSubjects();
   const [name, setName] = useState('');
   const [originalInput, setOriginalInput] = useState('');
   const [error, setError] = useState('');
@@ -429,8 +425,41 @@ export default function CreateSubjectScreen() {
           />
         </View>
 
-        {/* Starter chips — shown while idle, hidden during resolve/suggestion to avoid confusion */}
-        {resolveState.phase === 'idle' && !isBusy && (
+        {/* Returning-user quick section — existing subjects as tappable pills */}
+        {resolveState.phase === 'idle' &&
+          !isBusy &&
+          name.trim() === '' &&
+          existingSubjects &&
+          existingSubjects.length > 0 && (
+            <View className="mb-4" testID="your-subjects-section">
+              <Text className="text-body-sm font-semibold text-text-secondary mb-2">
+                Or continue with
+              </Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ gap: 8 }}
+              >
+                {existingSubjects.map((subject) => (
+                  <Pressable
+                    key={subject.id}
+                    onPress={() => router.push('/(app)/library' as never)}
+                    className="rounded-full bg-primary-soft px-4 py-2 h-9 items-center justify-center"
+                    accessibilityRole="button"
+                    accessibilityLabel={`Continue ${subject.name}`}
+                    testID={`your-subject-${subject.id}`}
+                  >
+                    <Text className="text-body-sm font-medium text-primary">
+                      {subject.name}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
+        {/* Starter chips — shown while idle + input empty, hidden during resolve/suggestion or typing */}
+        {resolveState.phase === 'idle' && !isBusy && name.trim() === '' && (
           <View
             className="flex-row flex-wrap gap-2 mb-4"
             testID="starter-chips"
@@ -451,6 +480,17 @@ export default function CreateSubjectScreen() {
               </Pressable>
             ))}
           </View>
+        )}
+
+        {/* Broader category entry point — encourages natural language input */}
+        {resolveState.phase === 'idle' && !isBusy && name.trim() === '' && (
+          <Text
+            className="text-body-sm text-text-secondary mb-4"
+            testID="not-sure-hint"
+          >
+            Not sure? Just describe what interests you — like "I want to
+            understand how plants grow"
+          </Text>
         )}
 
         {/* Resolve loading indicator */}
