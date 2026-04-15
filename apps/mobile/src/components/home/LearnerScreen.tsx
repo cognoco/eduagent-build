@@ -135,6 +135,9 @@ export function LearnerScreen({
               router.push({
                 pathname: '/(app)/session',
                 params: {
+                  ...(continueSuggestion.lastSessionId && {
+                    sessionId: continueSuggestion.lastSessionId,
+                  }),
                   subjectId: continueSuggestion.subjectId,
                   subjectName: continueSuggestion.subjectName,
                   topicId: continueSuggestion.topicId,

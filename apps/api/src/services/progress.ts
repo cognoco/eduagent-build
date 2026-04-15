@@ -457,6 +457,7 @@ export async function getContinueSuggestion(
   subjectName: string;
   topicId: string;
   topicTitle: string;
+  lastSessionId: string | null;
 } | null> {
   const repo = createScopedRepository(db, profileId);
   const activeSubjects = (await repo.subjects.findMany()).filter(
@@ -528,11 +529,24 @@ export async function getContinueSuggestion(
     );
 
     if (nextTopic) {
+      // Look up the most recent active/paused session for this subject so the
+      // mobile client can resume the conversation instead of starting fresh.
+      const recentSessions = await repo.sessions.findMany(
+        and(
+          eq(learningSessions.subjectId, subject.id),
+          inArray(learningSessions.status, ['active', 'paused'])
+        )
+      );
+      const lastSession = recentSessions.sort(
+        (a, b) => b.lastActivityAt.getTime() - a.lastActivityAt.getTime()
+      )[0];
+
       return {
         subjectId: subject.id,
         subjectName: subject.name,
         topicId: nextTopic.id,
         topicTitle: nextTopic.title,
+        lastSessionId: lastSession?.id ?? null,
       };
     }
   }

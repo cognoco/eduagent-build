@@ -554,6 +554,39 @@ describe('getContinueSuggestion', () => {
     expect(result!.topicTitle).toBe('Algebra');
     expect(result!.subjectId).toBe(subjectId);
     expect(result!.subjectName).toBe('Mathematics');
+    expect(result!.lastSessionId).toBeNull();
+  });
+
+  it('includes lastSessionId when an active session exists', async () => {
+    const subject = mockSubjectRow();
+    const topic1 = mockTopicRow({
+      id: 'topic-1',
+      title: 'Algebra',
+      sortOrder: 1,
+    });
+
+    setupScopedRepo({
+      subjectsFindMany: [subject],
+      retentionCardsFindMany: [],
+      assessmentsFindMany: [],
+      sessionsFindMany: [
+        {
+          ...mockSessionRow(),
+          id: 'active-session-1',
+          status: 'active' as const,
+          lastActivityAt: new Date('2026-02-15T09:00:00.000Z'),
+        },
+      ],
+    });
+    const db = createMockDb({
+      curriculumSelectRows: [{ id: curriculumId, subjectId, version: 1 }],
+      topicsFindMany: [topic1],
+    });
+
+    const result = await getContinueSuggestion(db, profileId);
+
+    expect(result).not.toBeNull();
+    expect(result!.lastSessionId).toBe('active-session-1');
   });
 
   it('skips paused subjects', async () => {

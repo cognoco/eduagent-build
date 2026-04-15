@@ -329,6 +329,7 @@ describe('progress routes', () => {
         subjectName: 'Mathematics',
         topicId: TOPIC_ID,
         topicTitle: 'Algebra Basics',
+        lastSessionId: 'session-123',
       });
 
       const res = await app.request(

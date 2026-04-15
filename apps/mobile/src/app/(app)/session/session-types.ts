@@ -234,3 +234,38 @@ export function getContextualQuickChips(
 
   return ['know_this', 'explain_differently', 'too_easy', 'example'];
 }
+
+// ─── Conversation Stage ─────────────────────────────────────────────────────
+
+export type ConversationStage = 'greeting' | 'orienting' | 'teaching';
+
+/**
+ * Derives the current conversation stage from existing state.
+ * Pure function — no mutable state, survives recovery resume.
+ */
+export function getConversationStage(
+  userMessageCount: number,
+  hasSubject: boolean,
+  effectiveMode: string
+): ConversationStage {
+  // Practice, review, relearn, and homework already present assessable content
+  // on the first AI response. Skip warmup stages.
+  if (['practice', 'review', 'relearn', 'homework'].includes(effectiveMode)) {
+    return 'teaching';
+  }
+
+  // User has sent at least 2 messages — first was greeting/subject selection,
+  // second is real engagement. This check runs BEFORE hasSubject intentionally:
+  // in freeform flows the progression is greeting → teaching, skipping orienting.
+  if (userMessageCount >= 2) return 'teaching';
+
+  // Subject is known but conversation hasn't warmed up yet.
+  // Reachable in two cases:
+  // 1. Learning mode with subject pre-set via route params (most common).
+  // 2. Freeform when the first message is substantive (not a greeting) —
+  //    classification sets the subject immediately, but userMessageCount is still 1.
+  if (hasSubject) return 'orienting';
+
+  // No subject, no engagement.
+  return 'greeting';
+}
