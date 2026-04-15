@@ -1,9 +1,21 @@
 # Epic 6: Language Learning — Design Spec
 
 **Date:** 2026-04-04
-**Status:** Draft
+**Status:** Complete (2026-04-15)
 **FRs:** FR96–FR107, FR146
 **Dependencies:** Epics 0–3 (learning infrastructure), Epic 8 (voice infrastructure — complete)
+
+### Implementation Notes
+
+All six stories implemented. Remaining known gap:
+
+| Gap | Severity | Notes |
+|-----|----------|-------|
+| **Mid-session STT language toggle** | N/A | Scoped to Epic 17 (FR248), not Epic 6. |
+
+Addressed in stabilization branch (2026-04-15):
+- **Vocabulary `cefrLevel` preservation** — `onConflictDoUpdate` in vocabulary upsert now preserves existing `cefrLevel`/`milestoneId` instead of overwriting with `null`.
+- **Fluency Drill UI (Story 6.5)** — Structured LLM annotation (`{"fluencyDrill":{...}}`), server-side extraction, SSE propagation, and `FluencyDrillStrip` countdown/score component wired into the session screen.
 
 ---
 

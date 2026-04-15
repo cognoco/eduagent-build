@@ -26,7 +26,9 @@ import {
   detectUnderstandingCheck,
   estimateExpectedResponseMinutes,
   extractNotePrompt,
+  extractFluencyDrill,
   type ExchangeContext,
+  type FluencyDrillAnnotation,
 } from '../exchanges';
 import {
   evaluateEscalation,
@@ -771,6 +773,7 @@ export async function streamMessage(
     aiEventId?: string;
     notePrompt?: boolean;
     notePromptPostSession?: boolean;
+    fluencyDrill?: FluencyDrillAnnotation;
   }>;
 }> {
   // Early exchange limit check — runs before expensive prepareExchangeContext
@@ -793,9 +796,11 @@ export async function streamMessage(
   return {
     stream: result.stream,
     async onComplete(fullResponse: string) {
-      // Extract and strip notePrompt JSON annotation before persisting
+      // Extract and strip annotations before persisting — order matters:
+      // notePrompt first, then fluencyDrill from the (partially) cleaned response.
       const notePromptResult = extractNotePrompt(fullResponse);
-      const cleanedResponse = notePromptResult.cleanResponse;
+      const drillResult = extractFluencyDrill(notePromptResult.cleanResponse);
+      const cleanedResponse = drillResult.cleanResponse;
 
       const expectedResponseMinutes = estimateExpectedResponseMinutes(
         cleanedResponse,
@@ -825,6 +830,7 @@ export async function streamMessage(
         notePrompt: notePromptResult.notePrompt || undefined,
         notePromptPostSession:
           notePromptResult.notePromptPostSession || undefined,
+        fluencyDrill: drillResult.fluencyDrill ?? undefined,
       };
     },
   };

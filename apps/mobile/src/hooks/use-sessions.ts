@@ -28,7 +28,7 @@ import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
 import { getApiUrl } from '../lib/api';
-import { streamSSEViaXHR } from '../lib/sse';
+import { streamSSEViaXHR, type FluencyDrillEvent } from '../lib/sse';
 
 // API-route-specific response wrappers (not in schemas)
 interface SessionStartResult {
@@ -240,6 +240,7 @@ export function useStreamMessage(sessionId: string): {
       aiEventId?: string;
       notePrompt?: boolean;
       notePromptPostSession?: boolean;
+      fluencyDrill?: FluencyDrillEvent;
     }) => void,
     overrideSessionId?: string,
     options?: { homeworkMode?: 'help_me' | 'check_answer' }
@@ -271,6 +272,7 @@ export function useStreamMessage(sessionId: string): {
         aiEventId?: string;
         notePrompt?: boolean;
         notePromptPostSession?: boolean;
+        fluencyDrill?: FluencyDrillEvent;
       }) => void,
       overrideSessionId?: string,
       options?: { homeworkMode?: 'help_me' | 'check_answer' }
@@ -320,6 +322,7 @@ export function useStreamMessage(sessionId: string): {
               aiEventId: (event as { aiEventId?: string }).aiEventId,
               notePrompt: event.notePrompt,
               notePromptPostSession: event.notePromptPostSession,
+              fluencyDrill: event.fluencyDrill,
             });
           }
         }

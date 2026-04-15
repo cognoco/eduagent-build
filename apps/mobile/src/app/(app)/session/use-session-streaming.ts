@@ -5,6 +5,7 @@ import type {
   HomeworkCaptureSource,
   HomeworkProblem,
 } from '@eduagent/schemas';
+import type { FluencyDrillEvent } from '../../../lib/sse';
 import type { ChatMessage } from '../../../components/session';
 import { animateResponse } from '../../../components/session';
 import type {
@@ -68,6 +69,9 @@ export interface UseSessionStreamingOptions {
   >;
   setHomeworkProblemsState: React.Dispatch<
     React.SetStateAction<HomeworkProblem[]>
+  >;
+  setFluencyDrill: React.Dispatch<
+    React.SetStateAction<FluencyDrillEvent | null>
   >;
 
   // Homework state
@@ -140,6 +144,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
     setShowNoteInput,
     setResponseHistory,
     setHomeworkProblemsState,
+    setFluencyDrill,
     homeworkProblemsState,
     currentProblemIndex,
     activeHomeworkProblem,
@@ -501,7 +506,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
             setMessages((prev) =>
               prev.map((m) => {
                 if (m.id !== streamId) return m;
-                // Strip notePrompt JSON annotation from visible message text
+                // Strip JSON annotations from visible message text
                 let content = m.content;
                 if (result.notePrompt) {
                   content = content
@@ -509,6 +514,11 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
                       /\n?\{"notePrompt":\s*true(?:,\s*"postSession":\s*true)?\}\s*$/,
                       ''
                     )
+                    .trimEnd();
+                }
+                if (result.fluencyDrill) {
+                  content = content
+                    .replace(/\n?\{"fluencyDrill":\s*\{[^}]*\}\s*\}\s*$/, '')
                     .trimEnd();
                 }
                 return {
@@ -530,6 +540,11 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
             }
             if (result.notePromptPostSession) {
               setShowNoteInput(true);
+            }
+
+            // Handle fluency drill state
+            if (result.fluencyDrill) {
+              setFluencyDrill(result.fluencyDrill);
             }
 
             if (previousAiAt) {
@@ -661,6 +676,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
       scheduleSilencePrompt,
       setExchangeCount,
       setEscalationRung,
+      setFluencyDrill,
       setHomeworkProblemsState,
       setIsStreaming,
       setMessages,

@@ -13,8 +13,10 @@ import {
   getModeConfig,
   getOpeningMessage,
   SessionTimer,
+  FluencyDrillStrip,
   type ChatMessage,
 } from '../../../components/session';
+import type { FluencyDrillEvent } from '../../../lib/sse';
 import {
   useStreamMessage,
   useStartSession,
@@ -230,6 +232,9 @@ export default function SessionScreen() {
   );
   const [notePromptOffered, setNotePromptOffered] = useState(false);
   const [showNoteInput, setShowNoteInput] = useState(false);
+  const [fluencyDrill, setFluencyDrill] = useState<FluencyDrillEvent | null>(
+    null
+  );
   const [showFilingPrompt, setShowFilingPrompt] = useState(false);
   const [filingDismissed, setFilingDismissed] = useState(false);
   const [quotaError, setQuotaError] = useState<QuotaExceededDetails | null>(
@@ -549,6 +554,7 @@ export default function SessionScreen() {
     setShowNoteInput,
     setResponseHistory,
     setHomeworkProblemsState,
+    setFluencyDrill,
     homeworkProblemsState,
     currentProblemIndex,
     activeHomeworkProblem,
@@ -776,6 +782,13 @@ export default function SessionScreen() {
     />
   );
 
+  const drillStrip = fluencyDrill ? (
+    <FluencyDrillStrip
+      drill={fluencyDrill}
+      onDismissScore={() => setFluencyDrill(null)}
+    />
+  ) : null;
+
   const sessionAccessory = (
     <SessionAccessory
       pendingSubjectResolution={pendingSubjectResolution}
@@ -848,7 +861,16 @@ export default function SessionScreen() {
         inputMode={inputMode}
         onInputModeChange={handleInputModeChange}
         rightAction={headerRight}
-        inputAccessory={sessionAccessory}
+        inputAccessory={
+          drillStrip ? (
+            <View>
+              {drillStrip}
+              {sessionAccessory}
+            </View>
+          ) : (
+            sessionAccessory
+          )
+        }
         belowInput={sessionToolAccessory}
         onDraftChange={setDraftText}
         renderMessageActions={renderMessageActions}

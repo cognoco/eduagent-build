@@ -19,6 +19,13 @@ export interface StreamChunkEvent {
   content: string;
 }
 
+/** Fluency drill annotation surfaced via SSE done event */
+export interface FluencyDrillEvent {
+  active: boolean;
+  durationSeconds?: number;
+  score?: { correct: number; total: number };
+}
+
 export interface StreamDoneEvent {
   type: 'done';
   exchangeCount: number;
@@ -32,6 +39,8 @@ export interface StreamDoneEvent {
   notePrompt?: boolean;
   /** Whether the note prompt is a post-session prompt. */
   notePromptPostSession?: boolean;
+  /** Fluency drill start/end annotation for language sessions. */
+  fluencyDrill?: FluencyDrillEvent;
 }
 
 export type StreamEvent = StreamChunkEvent | StreamDoneEvent;

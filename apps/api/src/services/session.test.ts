@@ -20,6 +20,10 @@ jest.mock('./exchanges', () => ({
     notePrompt: null,
     notePromptPostSession: null,
   }),
+  extractFluencyDrill: jest.fn().mockReturnValue({
+    cleanResponse: 'Hello world! This is the full response.',
+    fluencyDrill: null,
+  }),
 }));
 
 jest.mock('./escalation', () => ({

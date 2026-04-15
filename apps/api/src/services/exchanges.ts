@@ -804,6 +804,57 @@ export function extractNotePrompt(response: string): {
   };
 }
 
+/** Fluency drill annotation extracted from LLM response */
+export interface FluencyDrillAnnotation {
+  active: boolean;
+  durationSeconds?: number;
+  score?: { correct: number; total: number };
+}
+
+/** Extract and strip the fluencyDrill JSON annotation from a response */
+export function extractFluencyDrill(response: string): {
+  cleanResponse: string;
+  fluencyDrill: FluencyDrillAnnotation | null;
+} {
+  const match = response.match(/\n?\{"fluencyDrill":\s*\{[^}]*\}\s*\}\s*$/);
+  if (!match) {
+    return { cleanResponse: response, fluencyDrill: null };
+  }
+  try {
+    const parsed = JSON.parse(match[0].trim()) as {
+      fluencyDrill?: unknown;
+    };
+    const drill = parsed.fluencyDrill;
+    if (typeof drill !== 'object' || drill === null || !('active' in drill)) {
+      return { cleanResponse: response, fluencyDrill: null };
+    }
+    const d = drill as Record<string, unknown>;
+    const annotation: FluencyDrillAnnotation = {
+      active: Boolean(d.active),
+    };
+    if (typeof d.durationSeconds === 'number' && d.durationSeconds > 0) {
+      annotation.durationSeconds = Math.min(
+        90,
+        Math.max(15, d.durationSeconds)
+      );
+    }
+    if (
+      typeof d.score === 'object' &&
+      d.score !== null &&
+      typeof (d.score as Record<string, unknown>).correct === 'number' &&
+      typeof (d.score as Record<string, unknown>).total === 'number'
+    ) {
+      annotation.score = d.score as { correct: number; total: number };
+    }
+    return {
+      cleanResponse: response.slice(0, match.index).trimEnd(),
+      fluencyDrill: annotation,
+    };
+  } catch {
+    return { cleanResponse: response, fluencyDrill: null };
+  }
+}
+
 /** Detect whether the LLM response contains an understanding check */
 export function detectUnderstandingCheck(response: string): boolean {
   const lower = response.toLowerCase();

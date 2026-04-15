@@ -1,4 +1,4 @@
-import { and, asc, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import {
   vocabulary,
   vocabularyRetentionCards,
@@ -118,8 +118,16 @@ export async function createVocabulary(
       set: {
         translation: input.translation.trim(),
         type: input.type,
-        cefrLevel: input.cefrLevel ?? null,
-        milestoneId: input.milestoneId ?? null,
+        // Preserve existing cefrLevel/milestoneId when new input doesn't provide them —
+        // prevents a later session with no CEFR context from clobbering good data.
+        cefrLevel:
+          input.cefrLevel != null
+            ? input.cefrLevel
+            : sql`${vocabulary.cefrLevel}`,
+        milestoneId:
+          input.milestoneId != null
+            ? input.milestoneId
+            : sql`${vocabulary.milestoneId}`,
         updatedAt: new Date(),
       },
     })
