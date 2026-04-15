@@ -43,9 +43,12 @@ function getConversationStage(
   if (userMessageCount >= 2) return 'teaching';
 
   // Subject is known but conversation hasn't warmed up yet.
-  // This state is only reachable in learning mode (subject pre-set via route params).
-  // Freeform sessions never reach orienting because the subject is only established
-  // when the user sends a substantive message, at which point userMessageCount >= 2.
+  // Reachable in two cases:
+  // 1. Learning mode with subject pre-set via route params (most common).
+  // 2. Freeform when the first message is substantive (not a greeting) —
+  //    classification sets the subject immediately, but userMessageCount is still 1.
+  // In both cases this is a brief transitional state; it becomes 'teaching'
+  // as soon as userMessageCount reaches 2.
   if (hasSubject) return 'orienting';
 
   // No subject, no engagement.
@@ -97,7 +100,7 @@ When `effectiveMode === 'freeform'` AND `isGreeting(text)` is true AND no subjec
 
 1. Skip `classifySubject.mutateAsync` — no API call.
 2. Do not call `continueWithMessage` — no session exists, no LLM call.
-3. Animate a client-side companion response using the existing `animateResponse` pattern. The message should be age/experience-appropriate, e.g.:
+3. Use the existing `animateResponse` function (exported from `components/session/ChatShell.tsx`, signature: `animateResponse(response, setMessages, setIsStreaming, onDone?)`) to animate a client-side companion message. This is the same function used in `use-session-streaming.ts:437` for the no-subject error path. The message should be age/experience-appropriate, e.g.:
    - Experience 0: *"Hey! What would you like to learn about? You can ask me anything."*
    - Experience 1+: *"Hey! What's on your mind today?"*
 4. The conversation stage remains `greeting`. No session created, no quota consumed, instant response.
@@ -117,13 +120,13 @@ The current classification guard checks `messages.length <= 1`. This must change
 |---|---|---|
 | Freeform + "hi" | `greeting` | none |
 | Freeform + "hi" then "tell me about volcanoes" | `greeting` → `teaching` | none → full |
-| Freeform + "help me with fractions" (substantive first msg) | `greeting` → classifier runs → `teaching` on 2nd exchange | none → full |
+| Freeform + "help me with fractions" (substantive first msg) | `greeting` → `orienting` (classifier sets subject, userMessageCount is 1) → `teaching` (2nd message) | none → none → full |
 | Learning mode + subject pre-set, first response | `orienting` | none |
 | Learning mode + 2nd exchange | `teaching` | full |
 | Practice / review / homework | `teaching` always | full (or homework's own bar) |
 | Recovery resume with prior exchanges | `teaching` | full |
 
-**Orienting is a learning-mode-only state.** Freeform sessions skip it entirely because the subject is only established when the user sends a substantive message, at which point `userMessageCount >= 2` already qualifies for `teaching`.
+**Orienting is reachable in two scenarios:** (1) learning mode with a subject pre-set via route params, and (2) freeform when the first message is substantive enough to trigger classification (e.g., "help me with fractions" — not a greeting, so `isGreeting` doesn't match, classification runs immediately, subject is set, but `userMessageCount` is still 1). In both cases, `orienting` is a brief transitional state — it becomes `teaching` as soon as `userMessageCount` reaches 2. In pure greeting flows (freeform + "hi"), orienting is skipped entirely because the subject is only set on the second message, at which point `userMessageCount >= 2`.
 
 ### Implementation Guardrails
 
@@ -161,7 +164,7 @@ The current classification guard checks `messages.length <= 1`. This must change
 
 | State | Trigger | User sees | Recovery |
 |---|---|---|---|
-| Greeting response stale | `getOpeningMessage` returns wrong text | Slightly off greeting | Harmless — user sends next message normally |
+| Greeting response stale | `animateResponse` shows slightly wrong companion text | Slightly off greeting | Harmless — user sends next message normally |
 | Classification fails on 2nd message | API error/timeout | Existing error handling (subject picker or "couldn't identify" flow) | User picks subject manually |
 | Stage stuck at greeting | Bug in stage computation | No chips ever shown | User can still type and send messages; chips appear after 2 messages regardless |
 | Re-trigger fires unexpectedly | Edge case in `userMessageCount` counting | Double classification call | Idempotent — classifier returns same result, no user impact |
