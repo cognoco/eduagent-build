@@ -228,3 +228,90 @@ describe('useSubjectClassification — greeting guard', () => {
     expect(opts.continueWithMessage).toHaveBeenCalled();
   });
 });
+
+describe('useSubjectClassification — freeform fallback removal [F-1]', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('Site A: does NOT auto-pick availableSubjects[0] when classifier returns 0 candidates — proceeds without subject', async () => {
+    const classifyResult = {
+      needsConfirmation: false,
+      candidates: [],
+      suggestedSubjectName: null,
+    };
+    const opts = createMockOpts({
+      classifySubject: {
+        mutateAsync: jest.fn().mockResolvedValue(classifyResult),
+      },
+      availableSubjects: [{ id: 's1', name: 'Math' }],
+    });
+    const { result } = renderHook(() => useSubjectClassification(opts as any));
+
+    await act(async () => {
+      await result.current.handleSend('what is 2 + 2?');
+    });
+
+    // Must NOT silently assign the first subject
+    expect(opts.setClassifiedSubject).not.toHaveBeenCalled();
+    // Must still continue — no subject is fine, continueWithMessage handles it
+    expect(opts.continueWithMessage).toHaveBeenCalled();
+  });
+
+  it('Site B: shows disambiguation when classification throws and only 1 subject is enrolled', async () => {
+    const opts = createMockOpts({
+      classifySubject: {
+        mutateAsync: jest.fn().mockRejectedValue(new Error('network error')),
+      },
+      availableSubjects: [{ id: 's1', name: 'Math' }],
+    });
+    const { result } = renderHook(() => useSubjectClassification(opts as any));
+
+    await act(async () => {
+      await result.current.handleSend('what is the quadratic formula?');
+    });
+
+    // Must NOT silently assign the single subject
+    expect(opts.setClassifiedSubject).not.toHaveBeenCalled();
+    // Must show disambiguation prompt
+    expect(opts.setPendingSubjectResolution).toHaveBeenCalledWith(
+      expect.objectContaining({
+        originalText: 'what is the quadratic formula?',
+        prompt: "I couldn't figure out the subject. Which one fits?",
+        candidates: [{ subjectId: 's1', subjectName: 'Math' }],
+      })
+    );
+    // Must NOT call continueWithMessage — we returned early
+    expect(opts.continueWithMessage).not.toHaveBeenCalled();
+  });
+
+  it('Site B: still shows disambiguation when classification throws and multiple subjects are enrolled', async () => {
+    const opts = createMockOpts({
+      classifySubject: {
+        mutateAsync: jest.fn().mockRejectedValue(new Error('network error')),
+      },
+      availableSubjects: [
+        { id: 's1', name: 'Math' },
+        { id: 's2', name: 'History' },
+      ],
+    });
+    const { result } = renderHook(() => useSubjectClassification(opts as any));
+
+    await act(async () => {
+      await result.current.handleSend('tell me something');
+    });
+
+    expect(opts.setClassifiedSubject).not.toHaveBeenCalled();
+    expect(opts.setPendingSubjectResolution).toHaveBeenCalledWith(
+      expect.objectContaining({
+        originalText: 'tell me something',
+        prompt: "I couldn't figure out the subject. Which one fits?",
+        candidates: expect.arrayContaining([
+          { subjectId: 's1', subjectName: 'Math' },
+          { subjectId: 's2', subjectName: 'History' },
+        ]),
+      })
+    );
+    expect(opts.continueWithMessage).not.toHaveBeenCalled();
+  });
+});

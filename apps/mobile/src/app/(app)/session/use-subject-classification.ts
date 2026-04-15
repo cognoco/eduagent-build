@@ -366,15 +366,8 @@ export function useSubjectClassification(
               );
               return;
             }
-            // Single candidate or fallback to first enrolled subject
-            const best =
-              result.candidates[0] ??
-              (availableSubjects[0]
-                ? {
-                    subjectId: availableSubjects[0].id,
-                    subjectName: availableSubjects[0].name,
-                  }
-                : undefined);
+            // Single candidate — never silently fall back to first enrolled subject
+            const best = result.candidates[0];
             if (best) {
               setClassifiedSubject({
                 subjectId: best.subjectId,
@@ -477,16 +470,18 @@ export function useSubjectClassification(
               );
               return;
             }
-            // Single enrolled subject — auto-pick with "wrong subject?" chip
-            const fallback = availableSubjects[0];
-            if (fallback) {
-              setClassifiedSubject({
-                subjectId: fallback.id,
-                subjectName: fallback.name,
-              });
-              setShowWrongSubjectChip(true);
-              sessionSubjectId = fallback.id;
-              sessionSubjectName = fallback.name;
+            // Classification failed — show disambiguation instead of silent fallback
+            const fallbackCandidates = availableSubjects.map((candidate) => ({
+              subjectId: candidate.id,
+              subjectName: candidate.name,
+            }));
+            if (fallbackCandidates.length > 0) {
+              openSubjectResolution(
+                text,
+                "I couldn't figure out the subject. Which one fits?",
+                fallbackCandidates
+              );
+              return;
             }
           } else {
             const fallbackCandidates = availableSubjects.map((candidate) => ({
