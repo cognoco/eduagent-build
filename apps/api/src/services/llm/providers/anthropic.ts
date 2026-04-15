@@ -4,6 +4,9 @@ import {
   type ChatMessage,
   type ModelConfig,
 } from '../types';
+import { createLogger } from '../../logger';
+
+const logger = createLogger({ level: 'info', environment: 'production' });
 
 // ---------------------------------------------------------------------------
 // Anthropic Provider — premium tier (Sonnet)
@@ -195,9 +198,9 @@ export function createAnthropicProvider(apiKey: string): LLMProvider {
               }
             } catch {
               // Log malformed chunks so SSE format changes are detectable
-              console.warn(
-                `[anthropic] Malformed SSE chunk: ${jsonStr.slice(0, 120)}`
-              );
+              logger.warn('[anthropic] Malformed SSE chunk', {
+                chunk: jsonStr.slice(0, 120),
+              });
             }
           }
         }

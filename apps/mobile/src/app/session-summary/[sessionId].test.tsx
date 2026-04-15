@@ -80,7 +80,6 @@ jest.mock('../../lib/theme', () => ({
     muted: '#a3a3a3',
     textInverse: '#0f0f0f',
   }),
-  useTheme: () => ({ persona: 'teen' }),
 }));
 
 jest.mock('../../lib/sentry', () => ({

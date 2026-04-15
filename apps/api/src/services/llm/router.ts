@@ -7,6 +7,9 @@ import type {
   StreamResult,
 } from './types';
 import type { LLMTier } from '../subscription';
+import { createLogger } from '../logger';
+
+const logger = createLogger({ level: 'info', environment: 'production' });
 
 // ---------------------------------------------------------------------------
 // Content safety preamble for minors (all users are 11-17)
@@ -242,13 +245,11 @@ async function withRetry<T>(
       if (attempt < maxRetries) {
         const jitter = Math.random() * 500;
         const delay = INITIAL_RETRY_DELAY_MS * 2 ** attempt + jitter;
-        console.warn(
-          `[llm] ${label} attempt ${
-            attempt + 1
-          } failed, retrying in ${delay}ms: ${
-            err instanceof Error ? err.message : String(err)
-          }`
-        );
+        logger.warn(`[llm] ${label} attempt ${attempt + 1} failed, retrying`, {
+          attempt: attempt + 1,
+          delayMs: Math.round(delay),
+          error: err instanceof Error ? err.message : String(err),
+        });
         await new Promise((resolve) => setTimeout(resolve, delay));
       }
     }
@@ -298,12 +299,13 @@ export async function routeAndCall(
       const fallbackConfig = getFallbackConfig(config, rung);
       if (!fallbackConfig) throw err;
 
-      console.warn(
-        `[llm] Primary provider ${
-          config.provider
-        } failed after retries, trying fallback ${fallbackConfig.provider}: ${
-          err instanceof Error ? err.message : String(err)
-        }`
+      logger.warn(
+        '[llm] Primary provider failed after retries, trying fallback',
+        {
+          provider: config.provider,
+          fallback: fallbackConfig.provider,
+          error: err instanceof Error ? err.message : String(err),
+        }
       );
       return attemptProvider(fallbackConfig, safeMessages);
     }
@@ -312,9 +314,10 @@ export async function routeAndCall(
   // Primary circuit is open — try fallback directly
   const fallbackConfig = getFallbackConfig(config, rung);
   if (fallbackConfig) {
-    console.warn(
-      `[llm] Primary provider ${config.provider} circuit open, using fallback ${fallbackConfig.provider}`
-    );
+    logger.warn('[llm] Primary provider circuit open, using fallback', {
+      provider: config.provider,
+      fallback: fallbackConfig.provider,
+    });
     return attemptProvider(fallbackConfig, safeMessages);
   }
 
@@ -399,10 +402,13 @@ async function* wrapStreamWithCircuitBreaker(
     if (chunksYielded === 0 && fallbackConfig) {
       const fallbackProvider = providers.get(fallbackConfig.provider);
       if (fallbackProvider && canAttempt(fallbackConfig.provider)) {
-        console.warn(
-          `[llm] Primary stream ${providerId} failed before first byte, trying fallback ${
-            fallbackConfig.provider
-          }: ${err instanceof Error ? err.message : String(err)}`
+        logger.warn(
+          '[llm] Primary stream failed before first byte, trying fallback',
+          {
+            provider: providerId,
+            fallback: fallbackConfig.provider,
+            error: err instanceof Error ? err.message : String(err),
+          }
         );
         // Manually iterate so onFallback fires after first successful chunk,
         // confirming the fallback provider actually works.
@@ -479,9 +485,10 @@ export async function routeAndStream(
   // Primary circuit is open — try fallback directly
   const fallbackConfig = getFallbackConfig(config, rung);
   if (fallbackConfig) {
-    console.warn(
-      `[llm] Primary stream ${config.provider} circuit open, using fallback ${fallbackConfig.provider}`
-    );
+    logger.warn('[llm] Primary stream circuit open, using fallback', {
+      provider: config.provider,
+      fallback: fallbackConfig.provider,
+    });
     return attemptStreamProvider(fallbackConfig, safeMessages);
   }
 

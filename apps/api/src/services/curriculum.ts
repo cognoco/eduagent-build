@@ -1250,18 +1250,25 @@ export async function adaptCurriculumFromPerformance(
   // Without a transaction, a mid-loop connection drop leaves
   // topics in a partially-reordered state with no rollback.
   await db.transaction(async (tx) => {
-    for (let i = 0; i < reordered.length; i++) {
-      const entry = reordered[i]!;
-      await tx
-        .update(curriculumTopics)
-        .set({ sortOrder: i, updatedAt: new Date() })
-        .where(
-          and(
-            eq(curriculumTopics.id, entry.id),
-            eq(curriculumTopics.curriculumId, curriculum.id)
-          )
-        );
-    }
+    // [CR-2B.1] Replace N individual UPDATEs with a single CASE expression to
+    // avoid N+1 round-trips. The curriculumId guard is kept in the WHERE clause
+    // so only topics belonging to this curriculum are touched.
+    const now = new Date();
+    await tx.execute(sql`
+      UPDATE curriculum_topics
+      SET sort_order = CASE id
+        ${sql.join(
+          reordered.map((t, i) => sql`WHEN ${t.id} THEN ${i}`),
+          sql` `
+        )}
+      END,
+      updated_at = ${now}
+      WHERE id IN (${sql.join(
+        reordered.map((t) => sql`${t.id}`),
+        sql`, `
+      )})
+        AND curriculum_id = ${curriculum.id}
+    `);
 
     await tx.insert(curriculumAdaptations).values({
       profileId,

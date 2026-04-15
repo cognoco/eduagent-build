@@ -16,8 +16,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth, useUser } from '@clerk/clerk-expo';
 import type { KnowledgeInventory, LearningMode } from '@eduagent/schemas';
-// COMMENTED OUT per BUG-9: accent picker removed (fixed brand decision)
-// import { AccentPicker } from '../../components/common';
 import { useProfile } from '../../lib/profile';
 import { useQueryClient } from '@tanstack/react-query';
 import { isNewLearner } from '../../lib/progressive-disclosure';

@@ -287,6 +287,10 @@ export async function loadTopicTitle(
   topicId: string,
   profileId: string
 ): Promise<string> {
+  // curriculumTopics has no profileId column; ownership is verified by joining
+  // through curricula → subjects where subjects.profileId = profileId.
+  // Raw drizzle JOIN is the correct approach here — the scoped repo only covers
+  // tables with a direct profileId column.
   const query = db
     .select({ title: curriculumTopics.title })
     .from(curriculumTopics)
@@ -307,6 +311,8 @@ export async function createAssessment(
   topicId: string,
   sessionId?: string
 ): Promise<AssessmentRecord> {
+  // Write: raw drizzle insert with profileId bound in values — correct pattern.
+  // createScopedRepository only provides read methods (findFirst/findMany).
   const [row] = await db
     .insert(assessments)
     .values({
@@ -346,6 +352,8 @@ export async function updateAssessment(
     exchangeHistory?: ChatExchange[];
   }
 ): Promise<void> {
+  // Write: raw drizzle with explicit profileId guard is correct here —
+  // createScopedRepository only provides read methods (findFirst/findMany).
   const setValues: Record<string, unknown> = { updatedAt: new Date() };
   if (updates.verificationDepth !== undefined) {
     setValues.verificationDepth = updates.verificationDepth;

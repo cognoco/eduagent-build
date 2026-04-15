@@ -13,6 +13,9 @@ import {
   type Database,
 } from '@eduagent/database';
 import { getProfileAge } from './profile';
+import { createLogger } from './logger';
+
+const logger = createLogger({ level: 'info', environment: 'production' });
 import type {
   LanguageSetupInput,
   SubjectCreateInput,
@@ -252,9 +255,11 @@ export async function createSubjectWithStructure(
       topicCount: structure.topics.length,
     };
   } catch (error) {
-    console.warn(
-      '[createSubjectWithStructure] Falling back to narrow subject flow:',
-      error
+    logger.warn(
+      '[createSubjectWithStructure] Falling back to narrow subject flow',
+      {
+        error: error instanceof Error ? error.message : String(error),
+      }
     );
   }
 

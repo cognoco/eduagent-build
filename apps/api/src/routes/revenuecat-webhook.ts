@@ -24,6 +24,9 @@ import {
 import { findAccountByClerkId } from '../services/account';
 import { getTierConfig } from '../services/subscription';
 import { captureException } from '../services/sentry';
+import { createLogger } from '../services/logger';
+
+const logger = createLogger({ level: 'info', environment: 'production' });
 import { EXTENDED_TRIAL_MONTHLY_EQUIVALENT } from '../services/trial';
 import { inngest } from '../inngest/client';
 import type { Database } from '@eduagent/database';
@@ -564,7 +567,10 @@ export const revenuecatWebhookRoute = new Hono<{
   const webhookSecret = c.env.REVENUECAT_WEBHOOK_SECRET;
 
   if (!webhookSecret) {
-    console.error('[revenuecat] REVENUECAT_WEBHOOK_SECRET is not configured');
+    // [CR-2E.8] Structured log for missing credential — queryable in Logpush
+    logger.error(
+      '[revenuecat] REVENUECAT_WEBHOOK_SECRET is not configured — webhook rejected'
+    );
     return apiError(
       c,
       401,
@@ -638,6 +644,19 @@ export const revenuecatWebhookRoute = new Hono<{
 
   // Ensure free subscription exists for the account (auto-provisioning)
   await ensureFreeSubscription(db, accountId);
+
+  // Warn in non-production environments when RevenueCat sends sandbox events.
+  // Sandbox webhooks from test purchases should not mutate production data.
+  if (event.environment === 'SANDBOX') {
+    logger.warn(
+      '[revenuecat] Received SANDBOX webhook event — verify this is intentional',
+      {
+        eventType: event.type,
+        eventId: event.id,
+        accountId,
+      }
+    );
+  }
 
   // Dispatch to event-specific handler
   switch (event.type) {

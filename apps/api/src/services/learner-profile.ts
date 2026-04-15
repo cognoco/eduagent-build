@@ -13,6 +13,9 @@ import {
   type StruggleEntry,
 } from '@eduagent/schemas';
 import { routeAndCall, type ChatMessage } from './llm';
+import { createLogger } from './logger';
+
+const logger = createLogger({ level: 'info', environment: 'production' });
 
 const MAX_INTERESTS = 20;
 const MAX_COMMUNICATION_NOTES = 10;
@@ -841,7 +844,7 @@ export function buildMemoryBlock(
     block = `About this learner:\n${sections.join('\n')}\n\n${metaInstruction}`;
   }
   if (sections.length < originalSectionCount) {
-    console.warn('[learner-profile] Memory block truncated to fit budget', {
+    logger.warn('[learner-profile] Memory block truncated to fit budget', {
       event: 'learner_profile.memory_block.truncated',
       droppedSections: originalSectionCount - sections.length,
       charBudget: MEMORY_BLOCK_CHAR_BUDGET,

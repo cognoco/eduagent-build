@@ -59,6 +59,9 @@ import {
   MAX_EXCHANGES_PER_SESSION,
   SessionExchangeLimitError,
 } from './session-crud';
+import { createLogger } from '../logger';
+
+const logger = createLogger({ level: 'info', environment: 'production' });
 
 // ---------------------------------------------------------------------------
 // Behavioral metrics data contract — UX-18 (process visibility)
@@ -273,8 +276,11 @@ export async function prepareExchangeContext(
   const topic = topicRows[0];
   const [profile] = profileRows;
   if (!profile) {
-    console.warn(
-      `[processExchange] Profile ${profileId} not found — birthYear will be null, LLM defaults to adult tone`
+    logger.warn(
+      '[processExchange] Profile not found — birthYear will be null, LLM defaults to adult tone',
+      {
+        profileId,
+      }
     );
   }
   const retentionCard = retentionRows[0];

@@ -205,6 +205,8 @@ function createMockDb({
         returning: jest.fn().mockResolvedValue(insertReturning),
       }),
     }),
+    // Raw SQL execution used by batch CASE UPDATE [CR-2B.1]
+    execute: jest.fn().mockResolvedValue(undefined),
     // transaction() executes the callback with the same mock as tx context
     transaction: jest
       .fn()

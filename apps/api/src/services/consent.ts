@@ -20,6 +20,9 @@ import {
   formatConsentRequestEmail,
   type EmailOptions,
 } from './notifications';
+import { createLogger } from './logger';
+
+const logger = createLogger({ level: 'info', environment: 'production' });
 
 // ---------------------------------------------------------------------------
 // Custom error classes — used by route layer for reliable instanceof checks
@@ -334,10 +337,12 @@ export async function requestConsent(
     } catch (rollbackError) {
       // If rollback fails we still throw the delivery error — losing one
       // counter slot is better than silently claiming the email was sent.
-      console.warn(
-        '[consent] Failed to rollback resend counter:',
-        rollbackError
-      );
+      logger.warn('[consent] Failed to rollback resend counter', {
+        error:
+          rollbackError instanceof Error
+            ? rollbackError.message
+            : String(rollbackError),
+      });
     }
     throw new EmailDeliveryError(emailResult.reason ?? undefined);
   }

@@ -3,7 +3,7 @@ import {
   getConsentPendingCopy,
   getConsentWithdrawnCopy,
 } from './consent-copy';
-import type { Persona } from './theme';
+import type { Persona } from './profile';
 
 // ── getConsentRequestCopy ──────────────────────────────────────────────
 

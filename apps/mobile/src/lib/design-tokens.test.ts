@@ -1,5 +1,4 @@
 import { tokens, tokensToCssVars, accentPresets } from './design-tokens';
-import type { Persona } from './theme';
 
 function hexToRgb(hex: string): [number, number, number] {
   const normalized = hex.replace('#', '');
@@ -32,7 +31,7 @@ function expectNavyTintedHex(hex: string) {
 
 describe('tokensToCssVars', () => {
   it('maps all color tokens to CSS variable keys', () => {
-    const base = tokens.learner.dark;
+    const base = tokens.dark;
     const cssVars = tokensToCssVars(base);
 
     expect(cssVars['--color-primary']).toBe(base.colors.primary);
@@ -44,7 +43,7 @@ describe('tokensToCssVars', () => {
   });
 
   it('includes radii and spacing', () => {
-    const base = tokens.teen.light;
+    const base = tokens.light;
     const cssVars = tokensToCssVars(base);
 
     expect(cssVars['--radius-card']).toBe(base.radii.card);
@@ -54,34 +53,29 @@ describe('tokensToCssVars', () => {
 });
 
 describe('accent preset merging', () => {
-  const personas: Persona[] = ['teen', 'learner', 'parent'];
   const schemes = ['light', 'dark'] as const;
 
-  it.each(personas)(
-    'each %s preset overrides primary, primarySoft, secondary, accent, coachBubble',
-    (persona) => {
-      const presets = accentPresets[persona];
-      expect(presets.length).toBeGreaterThan(0);
+  it('each preset overrides primary, primarySoft, secondary, accent, coachBubble', () => {
+    expect(accentPresets.length).toBeGreaterThan(0);
 
-      for (const preset of presets) {
-        for (const scheme of schemes) {
-          const overrides = preset[scheme];
-          expect(overrides).toBeDefined();
-          expect(typeof overrides.primary).toBe('string');
-          expect(typeof overrides.primarySoft).toBe('string');
-          expect(typeof overrides.secondary).toBe('string');
-          expect(typeof overrides.accent).toBe('string');
-          expect(typeof overrides.coachBubble).toBe('string');
-        }
+    for (const preset of accentPresets) {
+      for (const scheme of schemes) {
+        const overrides = preset[scheme];
+        expect(overrides).toBeDefined();
+        expect(typeof overrides.primary).toBe('string');
+        expect(typeof overrides.primarySoft).toBe('string');
+        expect(typeof overrides.secondary).toBe('string');
+        expect(typeof overrides.accent).toBe('string');
+        expect(typeof overrides.coachBubble).toBe('string');
       }
     }
-  );
+  });
 
   it('merging a non-default accent changes CSS variable values', () => {
-    const base = tokens.learner.dark;
+    const base = tokens.dark;
     const baseVars = tokensToCssVars(base);
 
-    const nonDefaultPreset = accentPresets.learner.find((p) => p.id === 'rose');
+    const nonDefaultPreset = accentPresets.find((p) => p.id === 'electric');
     expect(nonDefaultPreset).toBeDefined();
     if (!nonDefaultPreset) return;
 
@@ -110,49 +104,39 @@ describe('accent preset merging', () => {
   });
 
   it('default preset (first in list) matches the base token colors', () => {
-    for (const persona of personas) {
-      const defaultPreset = accentPresets[persona][0]!;
-      for (const scheme of schemes) {
-        const base = tokens[persona][scheme];
-        const overrides = defaultPreset[scheme];
+    const defaultPreset = accentPresets[0]!;
+    for (const scheme of schemes) {
+      const base = tokens[scheme];
+      const overrides = defaultPreset[scheme];
 
-        // The default preset colors should match the base persona tokens
-        expect(overrides.primary).toBe(base.colors.primary);
-        expect(overrides.accent).toBe(base.colors.accent);
-        expect(overrides.secondary).toBe(base.colors.secondary);
-      }
+      // The default preset colors should match the base tokens
+      expect(overrides.primary).toBe(base.colors.primary);
+      expect(overrides.accent).toBe(base.colors.accent);
+      expect(overrides.secondary).toBe(base.colors.secondary);
     }
   });
 
-  it.each(personas)(
-    'every %s preset keeps primarySoft in the same hue family as primary',
-    (persona) => {
-      for (const preset of accentPresets[persona]) {
-        for (const scheme of schemes) {
-          expect(rgbaToRgb(preset[scheme].primarySoft)).toEqual(
-            hexToRgb(preset[scheme].primary)
-          );
-        }
+  it('every preset keeps primarySoft in the same hue family as primary', () => {
+    for (const preset of accentPresets) {
+      for (const scheme of schemes) {
+        expect(rgbaToRgb(preset[scheme].primarySoft)).toEqual(
+          hexToRgb(preset[scheme].primary)
+        );
       }
     }
-  );
+  });
 });
 
-describe('epic 11 dark palette contract', () => {
-  const personas: Persona[] = ['teen', 'learner', 'parent'];
+describe('dark palette contract', () => {
+  it('dark theme uses navy-tinted background surfaces', () => {
+    const dark = tokens.dark.colors;
 
-  it.each(personas)(
-    '%s dark theme uses navy-tinted background surfaces instead of the old neutral black palette',
-    (persona) => {
-      const dark = tokens[persona].dark.colors;
+    expect(dark.background).not.toBe('#18181b');
+    expect(dark.surface).not.toBe('#1a1a1a');
+    expect(dark.surfaceElevated).not.toBe('#262626');
 
-      expect(dark.background).not.toBe('#18181b');
-      expect(dark.surface).not.toBe('#1a1a1a');
-      expect(dark.surfaceElevated).not.toBe('#262626');
-
-      expectNavyTintedHex(dark.background);
-      expectNavyTintedHex(dark.surface);
-      expectNavyTintedHex(dark.surfaceElevated);
-    }
-  );
+    expectNavyTintedHex(dark.background);
+    expectNavyTintedHex(dark.surface);
+    expectNavyTintedHex(dark.surfaceElevated);
+  });
 });

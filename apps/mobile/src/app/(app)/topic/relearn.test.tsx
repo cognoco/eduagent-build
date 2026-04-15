@@ -36,13 +36,9 @@ jest.mock('../../../hooks/use-retention', () => ({
 
 let mockPersona = 'teen';
 
-jest.mock('../../../lib/theme', () => ({
-  useTheme: () => ({
-    persona: mockPersona,
-    setPersona: jest.fn(),
-    accentPresetId: null,
-    setAccentPresetId: jest.fn(),
-  }),
+jest.mock('../../../lib/profile', () => ({
+  useProfile: () => ({ activeProfile: { birthYear: null } }),
+  personaFromBirthYear: () => mockPersona,
 }));
 
 function createWrapper(): React.ComponentType<{ children: React.ReactNode }> {

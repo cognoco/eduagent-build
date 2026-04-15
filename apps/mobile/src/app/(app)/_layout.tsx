@@ -14,8 +14,8 @@ import { useAuth, useClerk, useUser } from '@clerk/clerk-expo';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as SecureStore from '../../lib/secure-storage';
-import { useProfile } from '../../lib/profile';
-import { useTheme, useThemeColors, useTokenVars } from '../../lib/theme';
+import { useProfile, personaFromBirthYear } from '../../lib/profile';
+import { useThemeColors, useTokenVars } from '../../lib/theme';
 import { useConsentStatus, useRequestConsent } from '../../hooks/use-consent';
 import { usePushTokenRegistration } from '../../hooks/use-push-token-registration';
 import { useRevenueCatIdentity } from '../../hooks/use-revenuecat';
@@ -443,7 +443,7 @@ function ConsentWithdrawnGate(): React.ReactElement {
   };
 
   const { profiles, activeProfile, switchProfile } = useProfile();
-  const { persona } = useTheme();
+  const persona = personaFromBirthYear(activeProfile?.birthYear);
   const copy = getConsentWithdrawnCopy(persona);
 
   return (
@@ -541,7 +541,7 @@ function ConsentPendingGate(): React.ReactElement {
   const { data: consentData } = useConsentStatus();
   const resendMutation = useRequestConsent();
   const { user } = useUser();
-  const { persona } = useTheme();
+  const persona = personaFromBirthYear(activeProfile?.birthYear);
   const copy = getConsentPendingCopy(persona);
   const [checking, setChecking] = React.useState(false);
   const [previewMode, setPreviewMode] = React.useState<

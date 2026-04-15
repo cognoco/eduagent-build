@@ -101,6 +101,8 @@ export async function insertSessionEvent(
     touchSession?: boolean;
   }
 ): Promise<void> {
+  // Write: raw drizzle with profileId bound in values / WHERE clause is correct —
+  // createScopedRepository only provides read methods (findFirst/findMany).
   await db.insert(sessionEvents).values({
     sessionId: input.sessionId,
     profileId,

@@ -67,7 +67,7 @@ const PATH_LEN = 150; // approximate bezier arc length
  */
 function useSplashColors(isDark: boolean) {
   return useMemo(() => {
-    const bg = tokens.teen[isDark ? 'dark' : 'light'].colors.background;
+    const bg = tokens[isDark ? 'dark' : 'light'].colors.background;
 
     if (isDark) {
       return {

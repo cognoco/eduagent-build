@@ -10,6 +10,7 @@ import {
   curricula,
   curriculumTopics,
   topicNotes,
+  createScopedRepository,
   type Database,
 } from '@eduagent/database';
 
@@ -95,10 +96,15 @@ export async function buildBookLearningHistoryContext(
   });
   if (!book) return undefined;
 
-  // Fetch shelf (subject) name for richer context
-  const subject = await db.query.subjects.findFirst({
-    where: eq(subjects.id, book.subjectId),
-  });
+  // Verify the subject (and therefore the book) belongs to this profile using
+  // the scoped repo — curriculumBooks has no profileId column so ownership is
+  // verified through the subjects table.
+  const repo = createScopedRepository(db, profileId);
+  const subject = await repo.subjects.findFirst(
+    eq(subjects.id, book.subjectId)
+  );
+  // If the subject doesn't belong to this profile, bail out silently.
+  if (!subject) return undefined;
 
   const curriculum = await db.query.curricula.findFirst({
     where: eq(curricula.subjectId, book.subjectId),
@@ -116,8 +122,10 @@ export async function buildBookLearningHistoryContext(
   const topicIds = topics.map((topic) => topic.id);
   if (topicIds.length === 0) return undefined;
 
-  // Filter to completed/auto_closed sessions with endedAt in SQL to
-  // avoid loading abandoned sessions into memory.
+  // [CR-2E.2] Intentional raw queries: column projection (.select) and .limit()
+  // are not supported by createScopedRepository's findMany. profileId scoping
+  // is enforced explicitly in the WHERE clauses below. Ownership is already
+  // verified through the subject check above (line 102–107).
   const [sessions, notes] = await Promise.all([
     db
       .select({

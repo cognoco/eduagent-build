@@ -18,6 +18,9 @@ import {
   logNotification,
   getRecentNotificationCount,
 } from './settings';
+import { createLogger } from './logger';
+
+const logger = createLogger({ level: 'info', environment: 'production' });
 
 export interface NotificationPayload {
   profileId: string;
@@ -236,7 +239,7 @@ export async function sendEmail(
 ): Promise<EmailResult> {
   const apiKey = options?.resendApiKey;
   if (!apiKey) {
-    console.warn('[email] RESEND_API_KEY not configured — skipping email send');
+    logger.warn('[email] RESEND_API_KEY not configured — skipping email send');
     return { sent: false, reason: 'no_api_key' };
   }
 

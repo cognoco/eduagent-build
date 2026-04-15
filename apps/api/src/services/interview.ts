@@ -36,10 +36,8 @@ export async function getBookTitle(
 ): Promise<string | undefined> {
   // Join through subjects to verify the subject belongs to this profile,
   // preventing IDOR where an attacker passes a bookId from another user's subject.
-  const subject = await db.query.subjects.findFirst({
-    where: and(eq(subjects.id, subjectId), eq(subjects.profileId, profileId)),
-    columns: { id: true },
-  });
+  const repo = createScopedRepository(db, profileId);
+  const subject = await repo.subjects.findFirst(eq(subjects.id, subjectId));
   if (!subject) return undefined;
 
   const row = await db.query.curriculumBooks.findFirst({
@@ -315,6 +313,8 @@ export async function getOrCreateDraft(
       return mapDraftRow(existing);
     }
 
+    // Write: raw drizzle with explicit profileId guard is correct here —
+    // createScopedRepository only provides read methods (findFirst/findMany).
     await db
       .update(onboardingDrafts)
       .set({
@@ -329,6 +329,7 @@ export async function getOrCreateDraft(
       );
   }
 
+  // Write: raw drizzle insert with profileId bound in values — correct pattern.
   const [row] = await db
     .insert(onboardingDrafts)
     .values({
@@ -356,6 +357,8 @@ export async function getDraftState(
   }
 
   const now = new Date();
+  // Write: raw drizzle with explicit profileId guard is correct here —
+  // createScopedRepository only provides read methods (findFirst/findMany).
   await db
     .update(onboardingDrafts)
     .set({
@@ -392,6 +395,8 @@ export async function updateDraft(
       ? undefined
       : new Date(Date.now() + DRAFT_TTL_MS);
 
+  // Write: raw drizzle with explicit profileId guard is correct here —
+  // createScopedRepository only provides read methods (findFirst/findMany).
   await db
     .update(onboardingDrafts)
     .set({
@@ -420,11 +425,10 @@ export async function persistCurriculum(
   bookId?: string,
   bookTitle?: string
 ): Promise<void> {
-  // Verify the subject belongs to this profile before inserting curriculum
-  const subject = await db.query.subjects.findFirst({
-    where: and(eq(subjects.id, subjectId), eq(subjects.profileId, profileId)),
-    columns: { id: true },
-  });
+  // Verify the subject belongs to this profile before inserting curriculum.
+  // Uses scoped repo so profileId is automatically added to the WHERE clause.
+  const repo = createScopedRepository(db, profileId);
+  const subject = await repo.subjects.findFirst(eq(subjects.id, subjectId));
   if (!subject) {
     throw new Error(
       `Subject ${subjectId} does not belong to profile ${profileId}`

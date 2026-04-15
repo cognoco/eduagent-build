@@ -5,6 +5,9 @@
 
 import { eq, and, asc, sql } from 'drizzle-orm';
 import { profiles, familyLinks, type Database } from '@eduagent/database';
+import { createLogger } from './logger';
+
+const logger = createLogger({ level: 'info', environment: 'production' });
 import type {
   ProfileCreateInput,
   ProfileUpdateInput,
@@ -109,8 +112,11 @@ export async function findOwnerProfile(
 
   // Fallback: no owner flag set — pick first profile (defensive edge case).
   // Should not happen in normal operation — log for observability.
-  console.warn(
-    `[findOwnerProfile] No owner profile for account ${accountId}, falling back to oldest profile`
+  logger.warn(
+    '[findOwnerProfile] No owner profile for account, falling back to oldest profile',
+    {
+      accountId,
+    }
   );
   const fallbackRow = await db.query.profiles.findFirst({
     where: eq(profiles.accountId, accountId),
