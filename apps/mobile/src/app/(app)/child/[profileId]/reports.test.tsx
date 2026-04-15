@@ -30,11 +30,11 @@ jest.mock('../../../../lib/navigation', () => ({
   goBackOrReplace: (_router: unknown, path: string) => mockReplace(path),
 }));
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const { default: ChildReportsScreen, getNextReportInfo } = require('./reports') as {
-  default: React.ComponentType;
-  getNextReportInfo: (now?: Date) => { date: string; timeContext: string };
-};
+const { default: ChildReportsScreen, getNextReportInfo } =
+  require('./reports') as {
+    default: React.ComponentType;
+    getNextReportInfo: (now?: Date) => { date: string; timeContext: string };
+  };
 
 describe('ChildReportsScreen', () => {
   beforeEach(() => {
@@ -57,9 +57,7 @@ describe('ChildReportsScreen', () => {
     it('renders the spec heading and body with child name', () => {
       render(<ChildReportsScreen />);
 
-      expect(
-        screen.getByText('Your first report is on its way')
-      ).toBeTruthy();
+      expect(screen.getByText('Your first report is on its way')).toBeTruthy();
       expect(screen.getByTestId('child-reports-empty')).toBeTruthy();
       // Body includes child name
       expect(screen.getByText(/Emma's first report/)).toBeTruthy();
@@ -99,9 +97,7 @@ describe('ChildReportsScreen', () => {
 
       render(<ChildReportsScreen />);
 
-      expect(
-        screen.getByText("See Your child's progress now")
-      ).toBeTruthy();
+      expect(screen.getByText("See Your child's progress now")).toBeTruthy();
     });
   });
 
@@ -133,9 +129,7 @@ describe('ChildReportsScreen', () => {
       render(<ChildReportsScreen />);
 
       expect(screen.getByTestId('child-reports-error')).toBeTruthy();
-      expect(
-        screen.getByText("We couldn't load the reports")
-      ).toBeTruthy();
+      expect(screen.getByText("We couldn't load the reports")).toBeTruthy();
 
       fireEvent.press(screen.getByTestId('child-reports-error-retry'));
       expect(refetch).toHaveBeenCalled();
@@ -176,34 +170,47 @@ describe('ChildReportsScreen', () => {
 });
 
 describe('getNextReportInfo', () => {
-  it('returns "later today" on the 1st before 10:00 UTC', () => {
-    const jan1Morning = new Date(Date.UTC(2026, 0, 1, 5, 0, 0));
-    const result = getNextReportInfo(jan1Morning);
-    expect(result.timeContext).toBe('should be ready later today');
+  it('returns "should be ready later today" on the 1st before 10:00 UTC', () => {
+    const jan1_8am = new Date(Date.UTC(2026, 0, 1, 8, 0, 0));
+    const result = getNextReportInfo(jan1_8am);
     expect(result.date).toBe('');
+    expect(result.timeContext).toBe('should be ready later today');
   });
 
-  it('returns "in a few days" when 3 or fewer days remain', () => {
-    // Dec 30 → next report Jan 1 = 2 days away
+  it('returns next month date on the 1st after 10:00 UTC', () => {
+    const jan1_11am = new Date(Date.UTC(2026, 0, 1, 11, 0, 0));
+    const result = getNextReportInfo(jan1_11am);
+    expect(result.timeContext).toMatch(/arrives in about \d+ days/);
+    expect(result.date).toContain('February');
+  });
+
+  it('returns "arrives in a few days" when 3 or fewer days remain', () => {
+    // Dec 30 — 2 days until Jan 1
     const dec30 = new Date(Date.UTC(2025, 11, 30, 12, 0, 0));
     const result = getNextReportInfo(dec30);
     expect(result.timeContext).toBe('arrives in a few days');
-    expect(result.date).toBeTruthy();
+    expect(result.date).toContain('January');
   });
 
-  it('returns "in about N days" when more than 3 days remain', () => {
-    // Dec 15 → next report Jan 1 = 17 days away
+  it('returns "arrives in about N days" when more than 3 days remain', () => {
+    // Jan 15 — ~17 days until Feb 1
+    const jan15 = new Date(Date.UTC(2026, 0, 15, 12, 0, 0));
+    const result = getNextReportInfo(jan15);
+    expect(result.timeContext).toMatch(/arrives in about \d+ days/);
+    expect(result.date).toContain('February');
+  });
+
+  it('handles month boundary correctly for short months', () => {
+    // Feb 15 — next report is March 1
+    const feb15 = new Date(Date.UTC(2026, 1, 15, 12, 0, 0));
+    const result = getNextReportInfo(feb15);
+    expect(result.date).toContain('March');
+  });
+
+  it('handles year boundary (December → January)', () => {
     const dec15 = new Date(Date.UTC(2025, 11, 15, 12, 0, 0));
     const result = getNextReportInfo(dec15);
-    expect(result.timeContext).toMatch(/arrives in about \d+ days/);
-    expect(result.date).toBeTruthy();
-  });
-
-  it('computes next month on the 1st after cron has run', () => {
-    // Jan 1 at 15:00 UTC (after cron) → next report Feb 1
-    const jan1Afternoon = new Date(Date.UTC(2026, 0, 1, 15, 0, 0));
-    const result = getNextReportInfo(jan1Afternoon);
-    expect(result.timeContext).toMatch(/arrives in about \d+ days/);
+    expect(result.date).toContain('January');
     expect(result.date).toContain('2026');
   });
 });

@@ -582,6 +582,7 @@ export default function SubscriptionScreen() {
   // Top-up IAP state
   const [topUpPurchasing, setTopUpPurchasing] = useState(false);
   const [topUpPolling, setTopUpPolling] = useState(false);
+  const [pollMessage, setPollMessage] = useState('Confirming your purchase...');
 
   // Restore-purchase polling state (BUG-397)
   const [restorePolling, setRestorePolling] = useState(false);
@@ -811,6 +812,14 @@ export default function SubscriptionScreen() {
     if (!mountedRef.current) return;
     setTopUpPurchasing(false);
     setTopUpPolling(true);
+    setPollMessage('Confirming your purchase...');
+    const messageTimer = setTimeout(() => {
+      if (mountedRef.current) {
+        setPollMessage(
+          'Still confirming \u2014 this can take up to 30 seconds. Your purchase is safe.'
+        );
+      }
+    }, 10_000);
 
     const baseCredits = usage?.topUpCreditsRemaining ?? 0;
     const maxAttempts = 15; // ~30 seconds with 2s interval
@@ -843,6 +852,8 @@ export default function SubscriptionScreen() {
         break;
       }
     }
+
+    clearTimeout(messageTimer);
 
     if (!mountedRef.current) return;
     setTopUpPolling(false);
@@ -1310,9 +1321,7 @@ export default function SubscriptionScreen() {
                       testID="top-up-spinner"
                     />
                     <Text className="text-body font-semibold text-primary ml-2">
-                      {topUpPolling
-                        ? 'Purchase processing...'
-                        : 'Opening store...'}
+                      {topUpPolling ? pollMessage : 'Opening store...'}
                     </Text>
                   </View>
                 ) : (
