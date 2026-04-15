@@ -61,6 +61,13 @@ interface StepOutcome {
   qualityRating?: number;
 }
 
+// [CR-119.1]: Extended step results that carry extra data through Inngest
+// replay. Using explicit interfaces because Inngest's Jsonify<T> doesn't
+// always preserve intersection types from spread returns.
+interface DashboardStepResult extends StepOutcome {
+  streak: { currentStreak: number; longestStreak: number } | null;
+}
+
 async function runIsolated(
   name: string,
   profileId: string,
@@ -551,7 +558,9 @@ export const sessionCompleted = inngest.createFunction(
               db,
               profileId,
               analysis,
-              subjectRow?.name ?? null
+              subjectRow?.name ?? null,
+              'inferred',
+              subjectId
             );
 
             stepNotifications = analysisResult.notifications;
@@ -581,41 +590,36 @@ export const sessionCompleted = inngest.createFunction(
     // Step 4: Update dashboard — streaks + XP
     // FR86: Only count toward Honest Streak when recall quality >= 3 (pass)
     // XP insertion still runs for any completed session.
-    let updatedStreak: { currentStreak: number; longestStreak: number } | null =
-      null;
-    outcomes.push(
-      await step.run('update-dashboard', async () => {
-        const result = await runIsolated(
-          'update-dashboard',
-          profileId,
-          async () => {
-            const db = getStepDatabase();
-            const today = timestamp
-              ? new Date(timestamp).toISOString().slice(0, 10)
-              : new Date().toISOString().slice(0, 10);
+    // [CR-119.1]: Return streak as part of the step result so it survives
+    // Inngest replay — same memoization pattern as stepNotifications above.
+    const dashboardOutcome = (await step.run('update-dashboard', async () => {
+      let stepStreak: {
+        currentStreak: number;
+        longestStreak: number;
+      } | null = null;
+      const result = await runIsolated(
+        'update-dashboard',
+        profileId,
+        async () => {
+          const db = getStepDatabase();
+          const today = timestamp
+            ? new Date(timestamp).toISOString().slice(0, 10)
+            : new Date().toISOString().slice(0, 10);
 
-            // Streak and XP are independent writes — no transaction needed.
-            // The neon-http driver does not support multi-statement transactions;
-            // wrapping these in db.transaction() would either fail outright or
-            // fall back to non-atomic execution via the client.ts shim.
-            if (
-              completionQualityRating != null &&
-              completionQualityRating >= 3
-            ) {
-              updatedStreak = await recordSessionActivity(db, profileId, today);
-            }
-
-            await insertSessionXpEntry(
-              db,
-              profileId,
-              topicId ?? null,
-              subjectId
-            );
+          // Streak and XP are independent writes — no transaction needed.
+          // The neon-http driver does not support multi-statement transactions;
+          // wrapping these in db.transaction() would either fail outright or
+          // fall back to non-atomic execution via the client.ts shim.
+          if (completionQualityRating != null && completionQualityRating >= 3) {
+            stepStreak = await recordSessionActivity(db, profileId, today);
           }
-        );
-        return result;
-      })
-    );
+
+          await insertSessionXpEntry(db, profileId, topicId ?? null, subjectId);
+        }
+      );
+      return { ...result, streak: stepStreak } as DashboardStepResult;
+    })) as unknown as DashboardStepResult;
+    outcomes.push(dashboardOutcome);
 
     // Step 5: Generate and store session embedding
     outcomes.push(
@@ -742,10 +746,9 @@ export const sessionCompleted = inngest.createFunction(
             }
           }
 
-          // Use the streak value from the update-dashboard step to avoid
-          // a race condition where concurrent session-completed events
-          // could read the same streak and queue duplicate celebrations.
-          const currentStreak = updatedStreak?.currentStreak ?? 0;
+          // [CR-119.1]: Read streak from the step result (not a closure
+          // variable) so the value survives Inngest replay memoization.
+          const currentStreak = dashboardOutcome.streak?.currentStreak ?? 0;
 
           if (currentStreak === 7) {
             await queueCelebration(db, profileId, 'comet', 'streak_7');

@@ -1203,14 +1203,15 @@ describe('sessionCompleted', () => {
       await executeSteps(createEventData({ qualityRating: 4 }));
 
       expect(mockAnalyzeSessionTranscript).toHaveBeenCalled();
-      // applyAnalysis must fire with the authenticated profileId and the
-      // analysis returned by analyzeSessionTranscript. The fourth arg is
-      // the subject name (null when subjectId lookup misses).
+      // applyAnalysis must fire with the authenticated profileId, the
+      // analysis, subject name, source, and subjectId [CR-119.3].
       expect(mockApplyAnalysis).toHaveBeenCalledWith(
         expect.anything(),
         'profile-001',
         expect.objectContaining({ interests: ['space'] }),
-        null
+        null,
+        'inferred',
+        'subject-001'
       );
     });
 
@@ -1462,6 +1463,110 @@ describe('sessionCompleted', () => {
       expect(mockRecordSessionActivity).toHaveBeenCalled();
 
       consoleSpy.mockRestore();
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // [CR-119.1]: Streak celebrations use step result, not mutable closure
+  // ---------------------------------------------------------------------------
+  describe('queue-celebrations step (streak milestones)', () => {
+    it('queues streak_7 celebration when recordSessionActivity returns 7-day streak', async () => {
+      mockRecordSessionActivity.mockResolvedValue({
+        currentStreak: 7,
+        longestStreak: 7,
+      });
+
+      await executeSteps(createEventData({ qualityRating: 4 }));
+
+      expect(mockQueueCelebration).toHaveBeenCalledWith(
+        expect.anything(),
+        'profile-001',
+        'comet',
+        'streak_7'
+      );
+    });
+
+    it('queues streak_30 celebration when recordSessionActivity returns 30-day streak', async () => {
+      mockRecordSessionActivity.mockResolvedValue({
+        currentStreak: 30,
+        longestStreak: 30,
+      });
+
+      await executeSteps(createEventData({ qualityRating: 4 }));
+
+      expect(mockQueueCelebration).toHaveBeenCalledWith(
+        expect.anything(),
+        'profile-001',
+        'orions_belt',
+        'streak_30'
+      );
+    });
+
+    it('does not queue streak celebrations when streak is not a milestone', async () => {
+      mockRecordSessionActivity.mockResolvedValue({
+        currentStreak: 5,
+        longestStreak: 5,
+      });
+
+      await executeSteps(createEventData({ qualityRating: 4 }));
+
+      expect(mockQueueCelebration).not.toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+        expect.anything(),
+        'streak_7'
+      );
+      expect(mockQueueCelebration).not.toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+        expect.anything(),
+        'streak_30'
+      );
+    });
+
+    it('does not queue streak celebrations when quality < 3 (no streak update)', async () => {
+      await executeSteps(createEventData({ qualityRating: 2 }));
+
+      expect(mockQueueCelebration).not.toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+        expect.anything(),
+        'streak_7'
+      );
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // [CR-119.3]: applyAnalysis receives subjectId for exact urgency boost match
+  // ---------------------------------------------------------------------------
+  describe('analyze-learner-profile step (subjectId threading)', () => {
+    it('passes subjectId to applyAnalysis for urgency boost precision', async () => {
+      mockGetLearningProfile.mockResolvedValue({
+        memoryConsentStatus: 'granted',
+        memoryCollectionEnabled: true,
+      });
+      mockAnalyzeSessionTranscript.mockResolvedValue({
+        explanationEffectiveness: null,
+        interests: null,
+        strengths: null,
+        struggles: null,
+        resolvedTopics: null,
+        communicationNotes: null,
+        engagementLevel: null,
+        confidence: 'high',
+      });
+
+      await executeSteps(createEventData({ qualityRating: 4 }));
+
+      // applyAnalysis args: (db, profileId, analysis, subjectName, source, subjectId)
+      expect(mockApplyAnalysis).toHaveBeenCalledWith(
+        expect.anything(),
+        'profile-001',
+        expect.any(Object),
+        null, // subjectName (null when DB lookup returns no name)
+        'inferred',
+        'subject-001' // subjectId threaded from event data
+      );
     });
   });
 });

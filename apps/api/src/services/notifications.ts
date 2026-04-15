@@ -448,10 +448,13 @@ export async function sendStruggleNotification(
     return { sent: false, reason: 'no_parent_link' };
   }
 
-  // Per-type dedup: skip if a struggle notification of the same type was
-  // already sent to this parent within the last 24 hours. The daily global
-  // cap in sendPushNotification prevents total spam, but this check prevents
-  // redundant alerts when multiple sessions trigger the same struggle signal.
+  // [CR-119.5]: Per-type dedup (intentionally NOT per-topic). A parent
+  // receives at most ONE push per struggle type (e.g. struggle_noticed) in
+  // any 24-hour window, even if multiple distinct topics trigger the signal.
+  // Trade-off: some topic-specific alerts are suppressed, but this prevents
+  // notification fatigue when a learner struggles across several topics in
+  // quick succession. The daily global cap in sendPushNotification is an
+  // additional layer; this check prevents same-type redundancy.
   const recentCount = await getRecentNotificationCount(
     db,
     link.parentProfileId,
