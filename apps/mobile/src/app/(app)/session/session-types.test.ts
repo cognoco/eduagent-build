@@ -1,4 +1,4 @@
-import { getConversationStage } from './session-types';
+import { getConversationStage, isGreeting } from './session-types';
 
 describe('getConversationStage', () => {
   it('returns teaching for practice mode regardless of other inputs', () => {
@@ -41,5 +41,45 @@ describe('getConversationStage', () => {
   it('prioritises userMessageCount >= 2 over hasSubject === false', () => {
     // In freeform: greeting → teaching, skipping orienting
     expect(getConversationStage(2, false, 'freeform')).toBe('teaching');
+  });
+});
+
+describe('isGreeting', () => {
+  it.each([
+    'hi',
+    'Hi!',
+    'hey',
+    'heyyy',
+    'hello',
+    'yo',
+    'sup',
+    "what's up",
+    'hola',
+    'hei',
+    'hej',
+    'ciao',
+    'salut',
+    'bonjour',
+    'hallo',
+    'hei hei',
+    'Hi!  ',
+    '  hello  ',
+  ])('matches pure greeting: "%s"', (text) => {
+    expect(isGreeting(text)).toBe(true);
+  });
+
+  it.each([
+    'hi can you help me with fractions',
+    'hello I need to study for my test',
+    'hey what are volcanoes',
+    'help me with math',
+    'tell me about history',
+    'yo explain photosynthesis',
+    '',
+    '   ',
+    '👋',
+    'hii there',
+  ])('rejects non-greeting: "%s"', (text) => {
+    expect(isGreeting(text)).toBe(false);
   });
 });

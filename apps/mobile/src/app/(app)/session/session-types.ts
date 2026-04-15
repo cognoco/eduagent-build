@@ -269,3 +269,12 @@ export function getConversationStage(
   // No subject, no engagement.
   return 'greeting';
 }
+
+// Anchored with ^...$ so "hi can you help me with fractions" does NOT match.
+// Only pure social greetings are caught. Do not remove the anchors.
+const GREETING_PATTERN =
+  /^(h(i+|e+y+|ello|ola|ei|ej)|yo|sup|what'?s up|hva skjer|hei hei|ciao|salut|bonjour|hallo)\b[!?.\s]*$/i;
+
+export function isGreeting(text: string): boolean {
+  return GREETING_PATTERN.test(text.trim());
+}
