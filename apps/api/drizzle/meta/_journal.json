@@ -162,6 +162,13 @@
       "when": 1776196718122,
       "tag": "0022_brave_beast",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1776259223777,
+      "tag": "0023_shiny_skrulls",
+      "breakpoints": true
     }
   ]
 }
