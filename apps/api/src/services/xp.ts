@@ -37,13 +37,16 @@ export function calculateTopicXp(
 ): number {
   const baseXp = 100 * masteryScore;
 
-  const depthMultiplier: Record<string, number> = {
+  const depthMultiplier: Record<'recall' | 'explain' | 'transfer', number> = {
     recall: 1,
     explain: 1.5,
     transfer: 2,
   };
 
-  return Math.round(baseXp * depthMultiplier[verificationDepth]!);
+  const multiplier = depthMultiplier[verificationDepth];
+  if (multiplier == null)
+    throw new Error(`Unknown verificationDepth: ${verificationDepth}`);
+  return Math.round(baseXp * multiplier);
 }
 
 /**

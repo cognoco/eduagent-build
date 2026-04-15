@@ -10,7 +10,6 @@ const mockPush = jest.fn();
 const mockReadSessionRecoveryMarker = jest.fn();
 const mockClearSessionRecoveryMarker = jest.fn();
 const mockIsRecoveryMarkerFresh = jest.fn();
-const mockUseReviewSummary = jest.fn();
 const mockUseContinueSuggestion = jest.fn();
 
 jest.mock('expo-router', () => ({
@@ -43,7 +42,6 @@ jest.mock('../../hooks/use-subjects', () => ({
 }));
 
 jest.mock('../../hooks/use-progress', () => ({
-  useReviewSummary: () => mockUseReviewSummary(),
   useContinueSuggestion: () => mockUseContinueSuggestion(),
 }));
 
@@ -70,7 +68,6 @@ describe('LearnerScreen', () => {
     mockSubjects = [];
     mockReadSessionRecoveryMarker.mockResolvedValue(null);
     mockIsRecoveryMarkerFresh.mockReturnValue(true);
-    mockUseReviewSummary.mockReturnValue({ data: { totalOverdue: 0 } });
     mockUseContinueSuggestion.mockReturnValue({ data: undefined });
   });
 
@@ -88,12 +85,6 @@ describe('LearnerScreen', () => {
       expect(screen.getByText('Start learning')).toBeTruthy();
       expect(screen.getByText('Help with assignment?')).toBeTruthy();
     });
-
-    it('hides "Repeat & review"', () => {
-      render(<LearnerScreen {...defaultProps} />);
-
-      expect(screen.queryByText('Repeat & review')).toBeNull();
-    });
   });
 
   describe('library with active subjects', () => {
@@ -109,18 +100,16 @@ describe('LearnerScreen', () => {
       });
     });
 
-    it('shows all three intent cards with default review copy', () => {
+    it('shows continue card and core intent cards', () => {
       render(<LearnerScreen {...defaultProps} />);
 
+      expect(screen.getByText('Continue where you left off')).toBeTruthy();
+      expect(screen.getByText('Math')).toBeTruthy();
       expect(screen.getByText('Start learning')).toBeTruthy();
       expect(screen.getByText('Help with assignment?')).toBeTruthy();
-      expect(screen.getByText('Repeat & review')).toBeTruthy();
-      expect(screen.getByText('Keep your knowledge fresh')).toBeTruthy();
     });
 
-    it('moves review to the front and shows a badge when many reviews are due', () => {
-      mockUseReviewSummary.mockReturnValue({ data: { totalOverdue: 6 } });
-
+    it('places continue card before primary cards', () => {
       render(<LearnerScreen {...defaultProps} />);
 
       const cards = within(screen.getByTestId('learner-intent-stack'))
@@ -128,12 +117,10 @@ describe('LearnerScreen', () => {
         .map((card) => card.props.testID);
 
       expect(cards).toEqual([
-        'intent-review',
+        'intent-resume-last',
         'intent-learn-new',
         'intent-homework',
       ]);
-      expect(screen.getByText('6 topics ready for review')).toBeTruthy();
-      expect(screen.getByTestId('intent-review-badge')).toBeTruthy();
     });
 
     it('shows a highlighted resume card first when a fresh recovery marker exists', async () => {
@@ -145,8 +132,6 @@ describe('LearnerScreen', () => {
         mode: 'learning',
         updatedAt: new Date().toISOString(),
       });
-      mockUseReviewSummary.mockReturnValue({ data: { totalOverdue: 6 } });
-
       render(<LearnerScreen {...defaultProps} />);
 
       await waitFor(() => {
@@ -159,7 +144,6 @@ describe('LearnerScreen', () => {
 
       expect(cards).toEqual([
         'intent-resume',
-        'intent-review',
         'intent-learn-new',
         'intent-homework',
       ]);
@@ -177,7 +161,7 @@ describe('LearnerScreen', () => {
       });
     });
 
-    it('shows expired session notice for stale markers instead of clearing them [3C.4]', async () => {
+    it('silently clears stale markers without showing a notice', async () => {
       mockReadSessionRecoveryMarker.mockResolvedValue({
         sessionId: 'session-1',
         updatedAt: new Date().toISOString(),
@@ -186,28 +170,12 @@ describe('LearnerScreen', () => {
 
       render(<LearnerScreen {...defaultProps} />);
 
-      // [3C.4] The marker should NOT be cleared optimistically — SessionScreen
-      // is responsible for clearing after server acknowledges close.
       await waitFor(() => {
-        expect(
-          screen.getByText(
-            'Your previous session has expired and can no longer be resumed.'
-          )
-        ).toBeTruthy();
+        expect(mockClearSessionRecoveryMarker).toHaveBeenCalledWith('p1');
       });
 
-      expect(mockClearSessionRecoveryMarker).not.toHaveBeenCalled();
-      expect(screen.queryByText('Continue where you left off')).toBeNull();
-    });
-  });
-
-  describe('library with only inactive subjects', () => {
-    it('hides "Repeat & review" when all subjects are archived', () => {
-      mockSubjects = [{ id: 's1', name: 'Math', status: 'archived' }];
-
-      render(<LearnerScreen {...defaultProps} />);
-
-      expect(screen.queryByText('Repeat & review')).toBeNull();
+      expect(screen.queryByTestId('intent-resume')).toBeNull();
+      expect(screen.queryByTestId('recently-expired-banner')).toBeNull();
     });
   });
 
@@ -226,8 +194,7 @@ describe('LearnerScreen', () => {
       expect(mockPush).toHaveBeenCalledWith('/(app)/homework/camera');
     });
 
-    it('navigates to library on "Repeat & review"', () => {
-      mockSubjects = [{ id: 's1', name: 'Math', status: 'active' }];
+    it('navigates to session from continue card', () => {
       mockUseContinueSuggestion.mockReturnValue({
         data: {
           subjectId: 's1',
@@ -239,8 +206,16 @@ describe('LearnerScreen', () => {
 
       render(<LearnerScreen {...defaultProps} />);
 
-      fireEvent.press(screen.getByTestId('intent-review'));
-      expect(mockPush).toHaveBeenCalledWith('/(app)/library');
+      fireEvent.press(screen.getByTestId('intent-resume-last'));
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: '/(app)/session',
+        params: {
+          subjectId: 's1',
+          subjectName: 'Math',
+          topicId: 't1',
+          mode: 'learning',
+        },
+      });
     });
   });
 
@@ -267,52 +242,6 @@ describe('LearnerScreen', () => {
       render(<LearnerScreen {...defaultProps} />);
 
       expect(screen.queryByText('Start a fresh session')).toBeNull();
-    });
-  });
-
-  describe('review priority threshold boundary [BUG-251]', () => {
-    beforeEach(() => {
-      mockSubjects = [{ id: 's1', name: 'Math', status: 'active' }];
-      mockUseContinueSuggestion.mockReturnValue({
-        data: {
-          subjectId: 's1',
-          subjectName: 'Math',
-          topicId: 't1',
-          topicTitle: 'Topic 1',
-        },
-      });
-    });
-
-    it('promotes review card above primary when reviewDueCount is exactly 5 (threshold)', () => {
-      mockUseReviewSummary.mockReturnValue({ data: { totalOverdue: 5 } });
-
-      render(<LearnerScreen {...defaultProps} />);
-
-      const cards = within(screen.getByTestId('learner-intent-stack'))
-        .getAllByRole('button')
-        .map((card) => card.props.testID);
-
-      expect(cards).toEqual([
-        'intent-review',
-        'intent-learn-new',
-        'intent-homework',
-      ]);
-    });
-
-    it('keeps review card below primary when reviewDueCount is 4 (below threshold)', () => {
-      mockUseReviewSummary.mockReturnValue({ data: { totalOverdue: 4 } });
-
-      render(<LearnerScreen {...defaultProps} />);
-
-      const cards = within(screen.getByTestId('learner-intent-stack'))
-        .getAllByRole('button')
-        .map((card) => card.props.testID);
-
-      expect(cards).toEqual([
-        'intent-learn-new',
-        'intent-homework',
-        'intent-review',
-      ]);
     });
   });
 
@@ -350,8 +279,8 @@ describe('LearnerScreen', () => {
     });
   });
 
-  describe('continueSuggestion gates "Repeat & review" [HOME-02]', () => {
-    it('shows "Repeat & review" when continueSuggestion is available', () => {
+  describe('continue card behavior', () => {
+    it('shows "Continue where you left off" when continueSuggestion exists', () => {
       mockUseContinueSuggestion.mockReturnValue({
         data: {
           subjectId: 's1',
@@ -363,18 +292,19 @@ describe('LearnerScreen', () => {
 
       render(<LearnerScreen {...defaultProps} />);
 
-      expect(screen.getByText('Repeat & review')).toBeTruthy();
+      expect(screen.getByText('Continue where you left off')).toBeTruthy();
+      expect(screen.getByText('Math')).toBeTruthy();
     });
 
-    it('hides "Repeat & review" when continueSuggestion is null', () => {
+    it('hides continue card when continueSuggestion is null', () => {
       mockUseContinueSuggestion.mockReturnValue({ data: null });
 
       render(<LearnerScreen {...defaultProps} />);
 
-      expect(screen.queryByText('Repeat & review')).toBeNull();
+      expect(screen.queryByTestId('intent-resume-last')).toBeNull();
     });
 
-    it('does not show continue suggestion as subtitle on Start learning card', () => {
+    it('hides continue card when recovery marker is active', async () => {
       mockUseContinueSuggestion.mockReturnValue({
         data: {
           subjectId: 's1',
@@ -383,10 +313,18 @@ describe('LearnerScreen', () => {
           topicTitle: 'Fractions',
         },
       });
+      mockReadSessionRecoveryMarker.mockResolvedValue({
+        sessionId: 'session-1',
+        subjectName: 'Physics',
+        updatedAt: new Date().toISOString(),
+      });
 
       render(<LearnerScreen {...defaultProps} />);
 
-      expect(screen.queryByText(/Continue with/)).toBeNull();
+      await waitFor(() => {
+        expect(screen.getByTestId('intent-resume')).toBeTruthy();
+      });
+      expect(screen.queryByTestId('intent-resume-last')).toBeNull();
     });
   });
 });

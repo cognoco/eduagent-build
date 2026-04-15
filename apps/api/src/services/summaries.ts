@@ -174,7 +174,8 @@ export async function createPendingSessionSummary(
       })
       .returning();
 
-    return row!;
+    if (!row) throw new Error('Insert session summary did not return a row');
+    return row;
   }
 
   const nextStatus = mergeSummaryStatus(existing.status, status);

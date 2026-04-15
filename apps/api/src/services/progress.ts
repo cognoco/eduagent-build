@@ -215,13 +215,11 @@ export async function getTopicProgress(
   )[0];
 
   // Get session summary excerpt from the most recent session
+  const lastTopicSession = topicSessions[topicSessions.length - 1];
   const summaryRow =
-    topicSessions.length > 0
+    lastTopicSession != null
       ? await repo.sessionSummaries.findFirst(
-          eq(
-            sessionSummaries.sessionId,
-            topicSessions[topicSessions.length - 1]!.id
-          )
+          eq(sessionSummaries.sessionId, lastTopicSession.id)
         )
       : undefined;
 
@@ -459,6 +457,7 @@ export async function getContinueSuggestion(
   subjectName: string;
   topicId: string;
   topicTitle: string;
+  lastSessionId: string | null;
 } | null> {
   const repo = createScopedRepository(db, profileId);
   const activeSubjects = (await repo.subjects.findMany()).filter(
@@ -467,6 +466,34 @@ export async function getContinueSuggestion(
   if (activeSubjects.length === 0) return null;
 
   const subjectIds = activeSubjects.map((subject) => subject.id);
+
+  // Fetch all sessions upfront for subject ordering + session lookup (avoids N+1)
+  const allSessions = await repo.sessions.findMany(
+    inArray(learningSessions.subjectId, subjectIds)
+  );
+
+  // Sort subjects by most recent session activity (not insertion order)
+  const lastActivityBySubject = new Map<string, number>();
+  for (const session of allSessions) {
+    const ts = session.lastActivityAt.getTime();
+    const current = lastActivityBySubject.get(session.subjectId) ?? 0;
+    if (ts > current) lastActivityBySubject.set(session.subjectId, ts);
+  }
+  activeSubjects.sort((a, b) => {
+    const aTime = lastActivityBySubject.get(a.id) ?? 0;
+    const bTime = lastActivityBySubject.get(b.id) ?? 0;
+    return bTime - aTime;
+  });
+
+  // Pre-group resumable (active/paused) sessions by subject
+  const resumableBySubject = new Map<string, typeof allSessions>();
+  for (const session of allSessions) {
+    if (session.status === 'active' || session.status === 'paused') {
+      const list = resumableBySubject.get(session.subjectId) ?? [];
+      list.push(session);
+      resumableBySubject.set(session.subjectId, list);
+    }
+  }
   const curriculumRows = await db
     .select({
       id: curricula.id,
@@ -530,11 +557,18 @@ export async function getContinueSuggestion(
     );
 
     if (nextTopic) {
+      // Use pre-fetched resumable sessions instead of per-subject query
+      const resumable = (resumableBySubject.get(subject.id) ?? []).sort(
+        (a, b) => b.lastActivityAt.getTime() - a.lastActivityAt.getTime()
+      );
+      const lastSession = resumable[0];
+
       return {
         subjectId: subject.id,
         subjectName: subject.name,
         topicId: nextTopic.id,
         topicTitle: nextTopic.title,
+        lastSessionId: lastSession?.id ?? null,
       };
     }
   }

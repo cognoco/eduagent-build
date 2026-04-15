@@ -1,20 +1,42 @@
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useChildDetail } from '../../../../hooks/use-dashboard';
 import { useChildReports } from '../../../../hooks/use-progress';
 import { goBackOrReplace } from '../../../../lib/navigation';
 
-function getNextReportDate(): string {
-  const now = new Date();
-  // Monthly report cron runs 10:00 UTC on the 1st of each month
+/** Returns the formatted next report date and a human-friendly time context. */
+export function getNextReportInfo(now = new Date()): {
+  date: string;
+  timeContext: string;
+} {
+  const isFirstOfMonth = now.getUTCDate() === 1;
+  const cronHour = 10; // Monthly report cron runs 10:00 UTC on the 1st
+
+  // If it's the 1st and before the cron, report may arrive today
+  if (isFirstOfMonth && now.getUTCHours() < cronHour) {
+    return { date: '', timeContext: 'should be ready later today' };
+  }
+
+  // Next run is the 1st of next month at 10:00 UTC
   const nextRun = new Date(
     Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 10, 0, 0)
   );
-  return nextRun.toLocaleDateString(undefined, {
+  const daysUntil = Math.ceil(
+    (nextRun.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+  );
+  const formattedDate = nextRun.toLocaleDateString(undefined, {
     month: 'long',
     day: 'numeric',
     year: 'numeric',
   });
+
+  const timeContext =
+    daysUntil <= 3
+      ? 'arrives in a few days'
+      : `arrives in about ${daysUntil} days`;
+
+  return { date: formattedDate, timeContext };
 }
 
 export default function ChildReportsScreen(): React.ReactElement {
@@ -27,12 +49,14 @@ export default function ChildReportsScreen(): React.ReactElement {
   const profileId = Array.isArray(rawProfileId)
     ? rawProfileId[0]
     : rawProfileId;
+  const { data: child } = useChildDetail(profileId);
   const {
     data: reports,
     isLoading,
     isError,
     refetch,
   } = useChildReports(profileId);
+  const childName = child?.displayName ?? 'Your child';
 
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
@@ -172,11 +196,48 @@ export default function ChildReportsScreen(): React.ReactElement {
           >
             <Text className="text-4xl mb-3">📊</Text>
             <Text className="text-h3 font-semibold text-text-primary text-center">
-              First report coming soon
+              Your first report is on its way
             </Text>
-            <Text className="text-body-sm text-text-secondary text-center mt-2">
-              Reports are generated on the 1st of each month. The first one will
-              appear around {getNextReportDate()}.
+            {(() => {
+              const { date, timeContext } = getNextReportInfo();
+              return (
+                <>
+                  <Text className="text-body-sm text-text-secondary text-center mt-2">
+                    Reports are generated on the 1st of each month, summarizing
+                    your child's learning from the previous month.{' '}
+                    {date
+                      ? `${childName}'s first report will arrive on ${date}.`
+                      : `${childName}'s first report ${timeContext}.`}
+                  </Text>
+                  <Text
+                    className="text-body-sm font-semibold text-primary text-center mt-2"
+                    testID="child-reports-empty-time-context"
+                  >
+                    Your first report {timeContext}
+                  </Text>
+                </>
+              );
+            })()}
+            <Pressable
+              onPress={() =>
+                goBackOrReplace(
+                  router,
+                  profileId
+                    ? (`/(app)/child/${profileId}` as const)
+                    : ('/(app)/dashboard' as const)
+                )
+              }
+              className="bg-primary rounded-button px-5 py-3 mt-4 min-h-[48px] justify-center"
+              accessibilityRole="button"
+              accessibilityLabel={`See ${childName}'s progress now`}
+              testID="child-reports-empty-progress"
+            >
+              <Text className="text-body font-semibold text-text-inverse text-center">
+                See {childName}'s progress now
+              </Text>
+            </Pressable>
+            <Text className="text-caption text-text-secondary text-center mt-3">
+              You'll get a push notification when the report is ready.
             </Text>
           </View>
         )}

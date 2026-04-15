@@ -24,7 +24,7 @@ export function useBookSessions(
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['book-sessions', bookId, activeProfile?.id],
+    queryKey: ['book-sessions', subjectId, bookId, activeProfile?.id],
     queryFn: async ({ signal: querySignal }) => {
       if (!subjectId || !bookId)
         throw new Error('subjectId and bookId are required');

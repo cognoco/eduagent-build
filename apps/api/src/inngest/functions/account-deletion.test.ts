@@ -33,13 +33,11 @@ describe('scheduledDeletion', () => {
   });
 
   it('should have the correct function id', () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const config = (scheduledDeletion as any).opts;
     expect(config.id).toBe('scheduled-account-deletion');
   });
 
   it('should trigger on app/account.deletion-scheduled event', () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const triggers = (scheduledDeletion as any).opts?.triggers;
     expect(triggers).toEqual(
       expect.arrayContaining([
@@ -53,7 +51,6 @@ describe('scheduledDeletion', () => {
     mockIsDeletionCancelled.mockResolvedValue(false);
     mockExecuteDeletion.mockResolvedValue(undefined);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const handler = (scheduledDeletion as any).fn;
     await handler({
       event: { data: { accountId: 'acc-1' } },
@@ -67,7 +64,6 @@ describe('scheduledDeletion', () => {
     const step = createMockStep();
     mockIsDeletionCancelled.mockResolvedValue(true);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const handler = (scheduledDeletion as any).fn;
     const result = await handler({
       event: { data: { accountId: 'acc-1' } },
@@ -84,7 +80,6 @@ describe('scheduledDeletion', () => {
     mockIsDeletionCancelled.mockResolvedValue(false);
     mockExecuteDeletion.mockResolvedValue(undefined);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const handler = (scheduledDeletion as any).fn;
     const result = await handler({
       event: { data: { accountId: 'acc-1' } },
@@ -100,7 +95,6 @@ describe('scheduledDeletion', () => {
     mockIsDeletionCancelled.mockResolvedValue(false);
     mockExecuteDeletion.mockResolvedValue(undefined);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const handler = (scheduledDeletion as any).fn;
     await handler({
       event: { data: { accountId: 'acc-1' } },

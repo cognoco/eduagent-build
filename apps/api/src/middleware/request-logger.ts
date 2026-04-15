@@ -22,7 +22,6 @@ export const requestLogger = createMiddleware<{
   const env = c.env ?? {};
   const logger = createLogger({
     level: (env.LOG_LEVEL as LogLevel) ?? 'info',
-    environment: env.ENVIRONMENT ?? 'development',
   });
 
   const context: Record<string, unknown> = {

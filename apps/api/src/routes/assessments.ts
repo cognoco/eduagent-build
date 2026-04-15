@@ -124,7 +124,7 @@ export const assessmentRoutes = new Hono<AssessmentRouteEnv>()
             txDb,
             profileId,
             assessment.topicId,
-            evaluation.qualityRating!
+            evaluation.qualityRating
           );
           await insertSessionXpEntry(
             txDb,

@@ -28,13 +28,9 @@ import {
   QueryClientProvider,
 } from '@tanstack/react-query';
 import { useAuth } from '@clerk/clerk-expo';
-import { ThemeContext, useTokenVars, type Persona } from '../lib/theme';
+import { ThemeContext, useTokenVars } from '../lib/theme';
 import type { ColorScheme } from '../lib/design-tokens';
-import {
-  ProfileProvider,
-  useProfile,
-  personaFromBirthYear,
-} from '../lib/profile';
+import { ProfileProvider, useProfile } from '../lib/profile';
 import { setOnAuthExpired, clearOnAuthExpired } from '../lib/api-client';
 import { markSessionExpired } from '../lib/auth-expiry';
 import { ErrorBoundary, OfflineBanner } from '../components/common';
@@ -96,31 +92,16 @@ const queryClient = new QueryClient({
 
 const ACCENT_STORE_PREFIX = 'accentPreset_';
 
-function derivePersonaFromBirthYear(
-  birthYear: number | null | undefined
-): Persona {
-  return personaFromBirthYear(birthYear);
-}
-
 function ThemedApp() {
   const { activeProfile } = useProfile();
   const { signOut } = useClerk();
-  const [persona, setPersona] = useState<Persona>('teen');
   // Always follow the phone's system color scheme (light/dark).
-  // Persona only controls accent colors and typography, not light/dark.
   const systemColorScheme = useColorScheme();
   const colorScheme: ColorScheme =
     (systemColorScheme as ColorScheme) ?? 'light';
   const [accentPresetId, setAccentPresetIdState] = useState<string | null>(
     null
   );
-
-  // Derive persona from active profile birthYear (age-based visual theming).
-  useEffect(() => {
-    if (activeProfile) {
-      setPersona(derivePersonaFromBirthYear(activeProfile.birthYear));
-    }
-  }, [activeProfile]);
 
   // BM-08: Load accent preset from SecureStore when profile changes.
   // Reset to null immediately on switch to prevent the previous profile's
@@ -192,21 +173,12 @@ function ThemedApp() {
 
   const themeValue = useMemo(
     () => ({
-      persona,
-      setPersona,
       colorScheme,
       setColorScheme,
       accentPresetId,
       setAccentPresetId,
     }),
-    [
-      persona,
-      setPersona,
-      colorScheme,
-      setColorScheme,
-      accentPresetId,
-      setAccentPresetId,
-    ]
+    [colorScheme, setColorScheme, accentPresetId, setAccentPresetId]
   );
 
   return (

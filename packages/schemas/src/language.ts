@@ -22,13 +22,13 @@ export const languageDetectionSchema = z.object({
 export type LanguageDetection = z.infer<typeof languageDetectionSchema>;
 
 export const languageSetupSchema = z.object({
-  nativeLanguage: languageCodeSchema,
+  nativeLanguage: z.string().min(2).max(50),
   startingLevel: cefrLevelSchema,
 });
 export type LanguageSetupInput = z.infer<typeof languageSetupSchema>;
 
 export const nativeLanguageUpdateSchema = z.object({
-  nativeLanguage: languageCodeSchema.nullable(),
+  nativeLanguage: z.string().min(2).max(50).nullable(),
 });
 export type NativeLanguageUpdateInput = z.infer<
   typeof nativeLanguageUpdateSchema

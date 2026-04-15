@@ -44,6 +44,8 @@ interface BooksTabProps {
   onStateChange: (state: BooksTabState) => void;
   onBookPress: (subjectId: string, bookId: string) => void;
   onAddSubject: () => void;
+  isError?: boolean;
+  onRetry?: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -86,6 +88,8 @@ export function BooksTab({
   onStateChange,
   onBookPress,
   onAddSubject,
+  isError,
+  onRetry,
 }: BooksTabProps): React.ReactElement {
   // ---- Derived data -------------------------------------------------------
 
@@ -184,7 +188,30 @@ export function BooksTab({
     return null;
   }, [hasSearch, hasFilters, state, onStateChange]);
 
-  // ---- Empty / no-content states ------------------------------------------
+  // ---- Empty / error / no-content states -----------------------------------
+
+  if (books.length === 0 && isError) {
+    return (
+      <View
+        className="bg-surface rounded-card px-4 py-6 items-center"
+        testID="books-tab-error"
+      >
+        <Text className="text-body text-text-secondary text-center mb-4">
+          Unable to load books. Please try again.
+        </Text>
+        <Pressable
+          onPress={onRetry}
+          className="bg-primary rounded-button px-5 py-3 items-center min-h-[48px] justify-center"
+          accessibilityRole="button"
+          testID="books-tab-retry"
+        >
+          <Text className="text-body font-semibold text-text-inverse">
+            Retry
+          </Text>
+        </Pressable>
+      </View>
+    );
+  }
 
   if (books.length === 0) {
     return (

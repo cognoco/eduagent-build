@@ -1660,41 +1660,56 @@ describe('evaluateRecallQuality', () => {
 // ---------------------------------------------------------------------------
 
 describe('getProfileOverdueCount', () => {
-  it('returns correct count and top topic IDs', async () => {
+  it('returns correct count and top topic IDs with nextReviewTopic', async () => {
     const now = new Date();
     const overduePast = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000); // 2 days ago
     const overdueRecent = new Date(now.getTime() - 1 * 60 * 60 * 1000); // 1 hour ago
-    const future = new Date(now.getTime() + 24 * 60 * 60 * 1000); // tomorrow
 
     const mockRepo = {
       retentionCards: {
         findMany: jest.fn().mockResolvedValue([
           { topicId: 'topic-old', nextReviewAt: overduePast },
           { topicId: 'topic-recent', nextReviewAt: overdueRecent },
-          { topicId: 'topic-future', nextReviewAt: future },
         ]),
+      },
+      subjects: {
+        findFirst: jest
+          .fn()
+          .mockResolvedValue({ id: 'subject-1', name: 'Math' }),
       },
     };
     (createScopedRepository as jest.Mock).mockReturnValue(mockRepo);
 
-    // Note: the query filters by lt(nextReviewAt, now) — but since we mock
-    // findMany directly, all cards are returned and we filter in-query.
-    // To test the correct count, pretend only overdue cards come back:
-    (mockRepo.retentionCards.findMany as jest.Mock).mockResolvedValue([
-      { topicId: 'topic-old', nextReviewAt: overduePast },
-      { topicId: 'topic-recent', nextReviewAt: overdueRecent },
-    ]);
+    const db = {
+      query: {
+        curriculumTopics: {
+          findFirst: jest.fn().mockResolvedValue({
+            id: 'topic-old',
+            curriculumId: 'curr-1',
+            title: 'Algebra Basics',
+          }),
+        },
+        curricula: {
+          findFirst: jest
+            .fn()
+            .mockResolvedValue({ id: 'curr-1', subjectId: 'subject-1' }),
+        },
+      },
+    } as unknown as Database;
 
-    const db = {} as unknown as Database;
-    const { overdueCount, topTopicIds } = await getProfileOverdueCount(
-      db,
-      'profile-1'
-    );
+    const { overdueCount, topTopicIds, nextReviewTopic } =
+      await getProfileOverdueCount(db, 'profile-1');
 
     expect(overdueCount).toBe(2);
     // Most overdue first
     expect(topTopicIds[0]).toBe('topic-old');
     expect(topTopicIds[1]).toBe('topic-recent');
+    expect(nextReviewTopic).toEqual({
+      topicId: 'topic-old',
+      subjectId: 'subject-1',
+      subjectName: 'Math',
+      topicTitle: 'Algebra Basics',
+    });
   });
 
   it('returns empty state when no overdue cards', async () => {
@@ -1708,5 +1723,6 @@ describe('getProfileOverdueCount', () => {
 
     expect(result.overdueCount).toBe(0);
     expect(result.topTopicIds).toHaveLength(0);
+    expect(result.nextReviewTopic).toBeNull();
   });
 });

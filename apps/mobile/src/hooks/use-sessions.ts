@@ -28,7 +28,7 @@ import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
 import { getApiUrl } from '../lib/api';
-import { streamSSEViaXHR } from '../lib/sse';
+import { streamSSEViaXHR, type FluencyDrillEvent } from '../lib/sse';
 
 // API-route-specific response wrappers (not in schemas)
 interface SessionStartResult {
@@ -120,11 +120,7 @@ export function useStartSession(subjectId: string): UseMutationResult<
 
 export function useSetSessionInputMode(
   sessionId: string
-): UseMutationResult<
-  SessionStartResult,
-  Error,
-  { inputMode: InputMode }
-> {
+): UseMutationResult<SessionStartResult, Error, { inputMode: InputMode }> {
   const client = useApiClient();
   const queryClient = useQueryClient();
 
@@ -244,6 +240,7 @@ export function useStreamMessage(sessionId: string): {
       aiEventId?: string;
       notePrompt?: boolean;
       notePromptPostSession?: boolean;
+      fluencyDrill?: FluencyDrillEvent;
     }) => void,
     overrideSessionId?: string,
     options?: { homeworkMode?: 'help_me' | 'check_answer' }
@@ -275,6 +272,7 @@ export function useStreamMessage(sessionId: string): {
         aiEventId?: string;
         notePrompt?: boolean;
         notePromptPostSession?: boolean;
+        fluencyDrill?: FluencyDrillEvent;
       }) => void,
       overrideSessionId?: string,
       options?: { homeworkMode?: 'help_me' | 'check_answer' }
@@ -324,6 +322,7 @@ export function useStreamMessage(sessionId: string): {
               aiEventId: (event as { aiEventId?: string }).aiEventId,
               notePrompt: event.notePrompt,
               notePromptPostSession: event.notePromptPostSession,
+              fluencyDrill: event.fluencyDrill,
             });
           }
         }
@@ -366,6 +365,13 @@ export function useSessionTranscript(
       }
     },
     enabled: !!activeProfile && !!sessionId,
+    // Don't retry client errors (404/403) — the session is gone, retrying
+    // just delays the expired-session UI by several seconds.
+    retry: (failureCount, error) => {
+      const status = (error as { status?: number }).status;
+      if (status && status >= 400 && status < 500) return false;
+      return failureCount < 2;
+    },
   });
 }
 

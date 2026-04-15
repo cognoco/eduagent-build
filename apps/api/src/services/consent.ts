@@ -20,6 +20,9 @@ import {
   formatConsentRequestEmail,
   type EmailOptions,
 } from './notifications';
+import { createLogger } from './logger';
+
+const logger = createLogger();
 
 // ---------------------------------------------------------------------------
 // Custom error classes — used by route layer for reliable instanceof checks
@@ -168,7 +171,8 @@ export async function createPendingConsentState(
     })
     .returning();
 
-  return mapConsentRow(row!);
+  if (!row) throw new Error('Insert into consentStates did not return a row');
+  return mapConsentRow(row);
 }
 
 /**
@@ -227,7 +231,8 @@ export async function createGrantedConsentState(
     return consentRow;
   });
 
-  return mapConsentRow(row!);
+  if (!row) throw new Error('Insert into consentStates did not return a row');
+  return mapConsentRow(row);
 }
 
 /** Maximum number of consent resends (PRD lines 415, 420) */
@@ -334,10 +339,12 @@ export async function requestConsent(
     } catch (rollbackError) {
       // If rollback fails we still throw the delivery error — losing one
       // counter slot is better than silently claiming the email was sent.
-      console.warn(
-        '[consent] Failed to rollback resend counter:',
-        rollbackError
-      );
+      logger.warn('[consent] Failed to rollback resend counter', {
+        error:
+          rollbackError instanceof Error
+            ? rollbackError.message
+            : String(rollbackError),
+      });
     }
     throw new EmailDeliveryError(emailResult.reason ?? undefined);
   }
@@ -567,7 +574,8 @@ export async function revokeConsent(
     )
     .returning();
 
-  return mapConsentRow(row!);
+  if (!row) throw new Error('Update on consentStates did not return a row');
+  return mapConsentRow(row);
 }
 
 /**
@@ -618,5 +626,6 @@ export async function restoreConsent(
     )
     .returning();
 
-  return mapConsentRow(row!);
+  if (!row) throw new Error('Update on consentStates did not return a row');
+  return mapConsentRow(row);
 }

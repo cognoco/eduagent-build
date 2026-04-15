@@ -9,9 +9,7 @@ import {
   getCurrentLanguageMilestoneId,
 } from './language-curriculum';
 import type { Database } from '@eduagent/database';
-import type { CefrLevel } from '@eduagent/schemas';
 
-const NOW = new Date('2026-01-15T10:00:00.000Z');
 const PROFILE_ID = 'profile-001';
 const SUBJECT_ID = 'subject-001';
 const CURRICULUM_ID = 'curriculum-001';
@@ -53,6 +51,9 @@ function createMockDb({
       values: jest.fn().mockReturnValue({
         returning: jest.fn().mockResolvedValue(insertReturning),
       }),
+    }),
+    delete: jest.fn().mockReturnValue({
+      where: jest.fn().mockResolvedValue(undefined),
     }),
   } as unknown as Database;
 
@@ -205,20 +206,17 @@ describe('regenerateLanguageCurriculum', () => {
     expect(db.insert).toHaveBeenCalled();
   });
 
-  it('increments version when existing curriculum is found', async () => {
+  it('deletes old curricula before creating version 1', async () => {
     const db = createMockDb({
-      curriculumFindFirst: {
-        id: 'old-curriculum',
-        subjectId: SUBJECT_ID,
-        version: 3,
-      },
       insertReturning: [
-        { id: CURRICULUM_ID, subjectId: SUBJECT_ID, version: 4 },
+        { id: CURRICULUM_ID, subjectId: SUBJECT_ID, version: 1 },
       ],
     });
 
     await regenerateLanguageCurriculum(db, SUBJECT_ID, 'es', 'B1');
 
+    // Should delete old curricula first, then insert new one
+    expect(db.delete).toHaveBeenCalled();
     expect(db.insert).toHaveBeenCalled();
   });
 

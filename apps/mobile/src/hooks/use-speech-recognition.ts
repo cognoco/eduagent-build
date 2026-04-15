@@ -198,7 +198,8 @@ export function useSpeechRecognition(
       if (mountedRef.current) {
         setStatus('idle');
       }
-    } catch {
+    } catch (err) {
+      console.warn('[Speech] Stop listening failed:', err);
       if (mountedRef.current) {
         setStatus('idle');
       }

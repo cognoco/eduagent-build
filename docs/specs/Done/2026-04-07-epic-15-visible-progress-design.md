@@ -2,7 +2,7 @@
 
 **Author:** Zuzka + Claude
 **Date:** 2026-04-07
-**Status:** Draft
+**Status:** Done
 **FRs:** FR230–FR241
 **Dependencies:** Epics 3 (retention/SM-2), 6 (language/vocabulary), 7 (library), 13 (session lifecycle), 14 (human agency)
 
@@ -559,14 +559,14 @@ The Conversation-First spec introduces session-filed topics with `filed_from = '
 
 | Story | Title | Phase | Status | FRs |
 |---|---|---|---|---|
-| 15.1 | Progress Aggregation Service | A — Data Foundation | PLANNED | FR230, FR231 |
-| 15.2 | Knowledge Inventory Endpoint | A — Data Foundation | PLANNED | FR232, FR233 |
-| 15.3 | My Learning Journey Screen | B — Child-Facing | PLANNED | FR235 |
-| 15.4 | Subject Progress Detail | B — Child-Facing | PLANNED | FR236 |
-| 15.5 | Milestone Celebrations | B — Child-Facing | PLANNED | FR234, FR237 |
-| 15.6 | Parent Progress Dashboard Enhancement | C — Parent-Facing | PLANNED | FR238 |
-| 15.7 | Weekly Progress Push Notification | C — Parent-Facing | PLANNED | FR239 |
-| 15.8 | Monthly Learning Report | C — Parent-Facing | PLANNED | FR240, FR241 |
+| 15.1 | Progress Aggregation Service | A — Data Foundation | DONE | FR230, FR231 |
+| 15.2 | Knowledge Inventory Endpoint | A — Data Foundation | DONE | FR232, FR233 |
+| 15.3 | My Learning Journey Screen | B — Child-Facing | DONE | FR235 |
+| 15.4 | Subject Progress Detail | B — Child-Facing | DONE | FR236 |
+| 15.5 | Milestone Celebrations | B — Child-Facing | DONE | FR234, FR237 |
+| 15.6 | Parent Progress Dashboard Enhancement | C — Parent-Facing | DONE | FR238 |
+| 15.7 | Weekly Progress Push Notification | C — Parent-Facing | DONE | FR239 |
+| 15.8 | Monthly Learning Report | C — Parent-Facing | DONE | FR240, FR241 |
 
 ---
 
@@ -705,7 +705,7 @@ So that I know exactly where I stand and what to explore next.
 
 **Given** a learner views subject progress detail for a non-language subject
 **When** the screen renders
-**Then** every topic in the subject is listed with a color-coded progress bar (green=mastered, teal=in-progress, grey=not-started, orange=review-due)
+**Then** every topic in the subject is listed with a color-coded progress bar (green=mastered, teal=in-progress, grey=not-started, green+refresh-badge=review-due per [UX-2])
 **And** total time spent on the subject is shown
 **And** the vocabulary section is hidden
 
@@ -721,7 +721,7 @@ So that I know exactly where I stand and what to explore next.
 
 **Given** a learner has a topic with review due
 **When** viewing the topic list
-**Then** the topic is marked orange with a "Review due" label
+**Then** the topic retains its green mastered bar with a refresh badge overlay and "Review" label per [UX-2]
 **And** tapping the topic navigates to the review session
 
 **FRs:** FR236
@@ -835,8 +835,8 @@ So that I stay engaged with their learning without having to open the app every 
 
 **Given** a child had declining engagement this week
 **When** the weekly push is generated
-**Then** the message includes a gentle nudge: "Alex hasn't practiced Spanish in 2 weeks. A gentle nudge might help!"
-**And** the tone is supportive, not guilt-inducing
+**Then** the push always leads with something positive per [UX-8] — inactivity mentions appear in-app only (FR238.3), never in push
+**And** if the child had some activity, the push highlights what they did accomplish
 
 **Given** a child had zero activity this week
 **When** the weekly push is generated

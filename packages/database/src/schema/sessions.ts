@@ -101,6 +101,7 @@ export const learningSessions = pgTable(
     }),
     sessionType: sessionTypeEnum('session_type').notNull().default('learning'),
     verificationType: text('verification_type'),
+    /** Stored as text (not enum) to allow new input modes without migrations. Validated at the application layer via InputMode schema type. */
     inputMode: text('input_mode').notNull().default('text'),
     status: sessionStatusEnum('status').notNull().default('active'),
     escalationRung: integer('escalation_rung').notNull().default(1),

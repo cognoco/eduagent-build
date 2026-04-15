@@ -62,9 +62,12 @@
 - **Severity:** High / Security (defense-in-depth)
 - **Description:** Every table has `isRLSEnabled: false`. No Postgres RLS policies exist for multi-tenant data (profiles, sessions, consent, billing). The application-layer profile scoping is the only barrier.
 - **Fix:** Enable RLS on key tenant-data tables and create policies for `profileId`-scoped access. This is a defense-in-depth measure — not blocking launch if application-layer scoping is verified correct, but should be a near-term priority.
-- **Status (2026-04-05):** 🔧 Implementation plan below.
+- **Status (2026-04-15):** 🔧 Implementation plans extracted to standalone documents:
+  - **Phase 0+1 (preparatory, safe):** [`2026-04-15-S06-rls-phase-0-1-preparatory.md`](2026-04-15-S06-rls-phase-0-1-preparatory.md)
+  - **Phase 2-4 (enforcement, high-risk):** [`2026-04-15-S06-rls-phase-2-4-enforcement.md`](2026-04-15-S06-rls-phase-2-4-enforcement.md)
+  - Original inline plan preserved below for audit trail.
 
-#### S-06 Implementation Plan: Row-Level Security (RLS)
+#### S-06 Implementation Plan: Row-Level Security (RLS) — SUPERSEDED
 
 ##### Context & Constraints
 
@@ -514,6 +517,7 @@ If Phase 3 causes issues in production:
 - **Severity:** Medium / CI
 - **Description:** The bulk fallback for >20 staged files uses `nx affected --base=HEAD~1`, which diffs against the last commit rather than staged changes. Can test unrelated projects or miss staged-only changes.
 - **Fix:** Use `--base=HEAD` (diff against current HEAD) or compare against the staged index directly.
+- **Status (2026-04-15):** ✅ Fixed in current branch. Line 31 already uses `--base=HEAD`.
 
 ### CI-03: Gradle cache key missing Android build files
 
@@ -522,6 +526,7 @@ If Phase 3 causes issues in production:
 - **Severity:** Medium / CI
 - **Description:** Cache key hashes `gradle-wrapper.properties` and `package.json` but not `build.gradle` or `settings.gradle`. Native dependency changes won't invalidate the cache.
 - **Fix:** Include `**/build.gradle*` and `**/settings.gradle*` in the cache key hash.
+- **Status (2026-04-15):** ✅ Fixed in current branch. Gradle cache key at line 298 includes `build.gradle`, `app/build.gradle`, and `settings.gradle`.
 
 ### CI-04: packager: npm conflicts with pnpm monorepo
 
@@ -539,6 +544,7 @@ If Phase 3 causes issues in production:
 - **Severity:** Low / Security Hygiene
 - **Description:** `TEST_SEED_SECRET=test-secret` is hardcoded in plaintext. While it only gates test-seed routes in `NODE_ENV=test`, good hygiene says test credentials should come from GitHub Secrets.
 - **Fix:** Move to GitHub Actions secrets: `TEST_SEED_SECRET=${{ secrets.TEST_SEED_SECRET }}`.
+- **Status (2026-04-15):** ✅ Fixed in current branch. Line 263 uses `${{ secrets.TEST_SEED_SECRET }}`.
 
 ### CI-06: Timing-attack-vulnerable secret comparison in test-seed
 
@@ -631,6 +637,7 @@ If Phase 3 causes issues in production:
 - **Origin:** PR #33, PR #36
 - **Description:** Migration uses `vector(1024)` but never runs `CREATE EXTENSION IF NOT EXISTS vector;`. Fails on fresh databases without pgvector pre-installed. Neon provides it by default, so this works in practice but the migration is not self-contained.
 - **Fix:** Add `CREATE EXTENSION IF NOT EXISTS vector;` at the top of the migration.
+- **Status (2026-04-15):** ⏭️ Skipped — Neon provides pgvector by default; not worth a migration slot now.
 
 ### LP-02: KV namespace IDs committed to source control
 
@@ -638,6 +645,7 @@ If Phase 3 causes issues in production:
 - **Origin:** PR #35
 - **Description:** Real Cloudflare KV namespace IDs are committed. These are resource identifiers (not credentials) but expose infrastructure details.
 - **Fix:** Consider moving to environment variables or Doppler if desired.
+- **Status (2026-04-15):** ⏭️ Skipped — resource identifiers, not secrets; no action needed.
 
 ---
 
@@ -1110,6 +1118,7 @@ The following Critical/High findings were addressed and merged:
 - **Severity:** Low / Dev Safety
 - **Description:** Dev-environment KV `preview_id` is identical to `id`. In `wrangler dev --remote`, preview traffic mutates the same dev KV data. Low risk since these are dev namespaces, not production.
 - **Fix:** Create separate preview KV namespaces or accept the shared-dev-namespace pattern.
+- **Status (2026-04-15):** ⏭️ Skipped — accepted dev-namespace pattern; no action needed.
 
 #### BLP-02: COPPA assertions in consent E2E flows have justified `optional: true`
 

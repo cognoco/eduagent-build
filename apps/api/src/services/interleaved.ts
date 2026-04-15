@@ -155,14 +155,17 @@ export async function startInterleavedSession(
     throw new Error('No topics available for interleaved retrieval');
   }
 
-  const primarySubjectId = opts?.subjectId ?? topics[0]!.subjectId;
+  const firstTopic = topics[0];
+  if (!firstTopic)
+    throw new Error('Expected at least one topic after length check');
+  const primarySubjectId = opts?.subjectId ?? firstTopic.subjectId;
 
   const [row] = await db
     .insert(learningSessions)
     .values({
       profileId,
       subjectId: primarySubjectId,
-      topicId: topics[0]!.topicId,
+      topicId: firstTopic.topicId,
       sessionType: 'interleaved',
       status: 'active',
       escalationRung: 1,
@@ -177,8 +180,10 @@ export async function startInterleavedSession(
     })
     .returning();
 
+  if (!row)
+    throw new Error('Insert into learningSessions did not return a row');
   return {
-    sessionId: row!.id,
+    sessionId: row.id,
     topics,
   };
 }
@@ -192,7 +197,9 @@ function shuffleArray<T>(arr: readonly T[]): T[] {
   const result = [...arr];
   for (let i = result.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [result[i], result[j]] = [result[j]!, result[i]!];
+    const tmp = result[i];
+    result[i] = result[j] as T;
+    result[j] = tmp as T;
   }
   return result;
 }

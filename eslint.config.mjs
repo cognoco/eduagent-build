@@ -55,6 +55,10 @@ export default [
       // lazy-loading. This taints the library and blocks static imports in
       // source files. Disable the rule for tests — they are not architectural.
       '@nx/enforce-module-boundaries': 'off',
+      // Non-null assertions (result!) are safe in tests.
+      '@typescript-eslint/no-non-null-assertion': 'off',
+      // Test mocks and fixtures routinely use any.
+      '@typescript-eslint/no-explicit-any': 'off',
     },
   },
   {
@@ -69,6 +73,15 @@ export default [
       '**/*.mjs',
     ],
     // Override or add rules here
-    rules: {},
+    rules: {
+      '@typescript-eslint/no-unused-vars': [
+        'warn',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          destructuredArrayIgnorePattern: '^_',
+        },
+      ],
+    },
   },
 ];

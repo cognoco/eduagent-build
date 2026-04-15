@@ -14,8 +14,8 @@ import { useAuth, useClerk, useUser } from '@clerk/clerk-expo';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as SecureStore from '../../lib/secure-storage';
-import { useProfile } from '../../lib/profile';
-import { useTheme, useThemeColors, useTokenVars } from '../../lib/theme';
+import { useProfile, personaFromBirthYear } from '../../lib/profile';
+import { useThemeColors, useTokenVars } from '../../lib/theme';
 import { useConsentStatus, useRequestConsent } from '../../hooks/use-consent';
 import { usePushTokenRegistration } from '../../hooks/use-push-token-registration';
 import { useRevenueCatIdentity } from '../../hooks/use-revenuecat';
@@ -26,6 +26,21 @@ import {
 import { evaluateSentryForProfile } from '../../lib/sentry';
 import { formatApiError } from '../../lib/format-api-error';
 import { clearTransitionState } from '../../lib/auth-transition';
+
+// ─── Tab visibility whitelist ────────────────────────────────────────
+// Only these routes render a visible tab button. Every other route in
+// (app)/ is auto-hidden — no manual Tabs.Screen entry required.
+const VISIBLE_TABS = new Set(['home', 'library', 'progress', 'more']);
+
+// Routes where the entire tab bar is hidden (immersive / full-screen UX).
+const FULL_SCREEN_ROUTES = new Set([
+  'onboarding',
+  'session',
+  'homework',
+  'shelf',
+  'shelf/[subjectId]',
+  'shelf/[subjectId]/book/[bookId]',
+]);
 
 const iconMap: Record<
   string,
@@ -429,7 +444,7 @@ function ConsentWithdrawnGate(): React.ReactElement {
   };
 
   const { profiles, activeProfile, switchProfile } = useProfile();
-  const { persona } = useTheme();
+  const persona = personaFromBirthYear(activeProfile?.birthYear);
   const copy = getConsentWithdrawnCopy(persona);
 
   return (
@@ -527,7 +542,7 @@ function ConsentPendingGate(): React.ReactElement {
   const { data: consentData } = useConsentStatus();
   const resendMutation = useRequestConsent();
   const { user } = useUser();
-  const { persona } = useTheme();
+  const persona = personaFromBirthYear(activeProfile?.birthYear);
   const copy = getConsentPendingCopy(persona);
   const [checking, setChecking] = React.useState(false);
   const [previewMode, setPreviewMode] = React.useState<
@@ -1096,18 +1111,39 @@ export default function AppLayout() {
   // NativeWind vars() style updates propagate without remounting.
   return (
     <View style={[{ flex: 1 }, tokenVars]}>
+      {/* ─── Whitelist tab pattern ────────────────────────────────────
+           Only routes listed in VISIBLE_TABS render a tab button.
+           Everything else is auto-hidden via screenOptions defaults.
+           Adding a new route file to (app)/ will NEVER create a
+           phantom tab — no manual Tabs.Screen entry needed.
+
+           Routes in FULL_SCREEN_ROUTES also hide the entire tab bar
+           (immersive screens like session, onboarding, homework).
+         ──────────────────────────────────────────────────────────── */}
       <Tabs
-        screenOptions={{
-          headerShown: false,
-          tabBarStyle: {
-            backgroundColor: colors.surface,
-            borderTopColor: colors.border,
-            height: 56 + Math.max(insets.bottom, 24),
-            paddingBottom: Math.max(insets.bottom, 24),
-          },
-          tabBarActiveTintColor: colors.accent,
-          tabBarInactiveTintColor: colors.textSecondary,
-          tabBarLabelStyle: { fontSize: 12 },
+        screenOptions={({ route }) => {
+          const isVisible = VISIBLE_TABS.has(route.name);
+          const isFullScreen = FULL_SCREEN_ROUTES.has(route.name);
+          return {
+            headerShown: false,
+            tabBarStyle: isFullScreen
+              ? { display: 'none' }
+              : {
+                  backgroundColor: colors.surface,
+                  borderTopColor: colors.border,
+                  height: 56 + Math.max(insets.bottom, 24),
+                  paddingBottom: Math.max(insets.bottom, 24),
+                },
+            tabBarActiveTintColor: colors.accent,
+            tabBarInactiveTintColor: colors.textSecondary,
+            tabBarLabelStyle: { fontSize: 12 },
+            // Auto-hide any route not in the whitelist.
+            // href:null removes the link; tabBarItemStyle removes the
+            // flexbox space (Expo Router v6 + React Nav v7 regression).
+            ...(isVisible
+              ? {}
+              : { href: null, tabBarItemStyle: { display: 'none' } }),
+          };
         }}
       >
         <Tabs.Screen
@@ -1152,119 +1188,6 @@ export default function AppLayout() {
             tabBarIcon: ({ focused }) => (
               <TabIcon name="More" focused={focused} />
             ),
-          }}
-        />
-        <Tabs.Screen
-          name="onboarding"
-          options={{
-            href: null,
-            // tabBarItemStyle hides the tab button so it does not occupy
-            // flexbox space when another tab is active (Expo Router v6 +
-            // React Navigation v7 regression — href:null alone is not enough).
-            tabBarItemStyle: { display: 'none' },
-            tabBarStyle: { display: 'none' },
-          }}
-        />
-        <Tabs.Screen
-          name="session"
-          options={{
-            href: null,
-            tabBarItemStyle: { display: 'none' },
-            tabBarStyle: { display: 'none' },
-          }}
-        />
-        <Tabs.Screen
-          name="topic"
-          options={{
-            href: null,
-            tabBarItemStyle: { display: 'none' },
-          }}
-        />
-        <Tabs.Screen
-          name="subscription"
-          options={{
-            href: null,
-            tabBarItemStyle: { display: 'none' },
-          }}
-        />
-        <Tabs.Screen
-          name="homework"
-          options={{
-            href: null,
-            tabBarItemStyle: { display: 'none' },
-            tabBarStyle: { display: 'none' },
-          }}
-        />
-        <Tabs.Screen
-          name="subject"
-          options={{
-            href: null,
-            tabBarItemStyle: { display: 'none' },
-          }}
-        />
-        <Tabs.Screen
-          name="learn"
-          options={{
-            href: null,
-            tabBarItemStyle: { display: 'none' },
-          }}
-        />
-        <Tabs.Screen
-          name="learn-new"
-          options={{
-            href: null,
-            tabBarItemStyle: { display: 'none' },
-          }}
-        />
-        <Tabs.Screen
-          name="shelf"
-          options={{
-            href: null,
-            tabBarItemStyle: { display: 'none' },
-            tabBarStyle: { display: 'none' },
-          }}
-        />
-        <Tabs.Screen
-          name="shelf/[subjectId]"
-          options={{
-            href: null,
-            tabBarItemStyle: { display: 'none' },
-            tabBarStyle: { display: 'none' },
-          }}
-        />
-        <Tabs.Screen
-          name="mentor-memory"
-          options={{
-            href: null,
-            tabBarItemStyle: { display: 'none' },
-          }}
-        />
-        <Tabs.Screen
-          name="pick-book"
-          options={{
-            href: null,
-            tabBarItemStyle: { display: 'none' },
-          }}
-        />
-        <Tabs.Screen
-          name="dashboard"
-          options={{
-            href: null,
-            tabBarItemStyle: { display: 'none' },
-          }}
-        />
-        <Tabs.Screen
-          name="child/[profileId]"
-          options={{
-            href: null,
-            tabBarItemStyle: { display: 'none' },
-          }}
-        />
-        <Tabs.Screen
-          name="progress/[subjectId]"
-          options={{
-            href: null,
-            tabBarItemStyle: { display: 'none' },
           }}
         />
       </Tabs>

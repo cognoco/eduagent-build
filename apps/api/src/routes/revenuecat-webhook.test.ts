@@ -79,7 +79,6 @@ import {
   purchaseTopUpCredits,
 } from '../services/billing';
 import { findAccountByClerkId } from '../services/account';
-import { getTierConfig } from '../services/subscription';
 import { inngest } from '../inngest/client';
 
 // ---------------------------------------------------------------------------

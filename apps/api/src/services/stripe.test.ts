@@ -51,9 +51,6 @@ describe('createStripeClient', () => {
 describe('verifyWebhookSignature', () => {
   it('calls constructEventAsync with correct parameters', async () => {
     const mockEvent = { id: 'evt_123', type: 'customer.subscription.created' };
-    const instance = StripeMock.mock.results[0]?.value ?? {
-      webhooks: { constructEventAsync: jest.fn() },
-    };
 
     // Create a client first so we have an instance
     createStripeClient('unused');

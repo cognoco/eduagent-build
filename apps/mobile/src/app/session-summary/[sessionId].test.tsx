@@ -35,13 +35,15 @@ const mockRecallBridgeMutateAsync = jest.fn();
 const mockUpdateLearningModeMutateAsync = jest.fn();
 const mockOnSuccessfulRecall = jest.fn();
 let mockTranscriptData: Record<string, unknown> | null = null;
+let mockSubmitIsError = false;
+let mockSubmitError: Error | null = null;
 
 jest.mock('../../hooks/use-sessions', () => ({
   useSubmitSummary: () => ({
     mutateAsync: mockSubmitMutateAsync,
     isPending: false,
-    isError: false,
-    error: null,
+    isError: mockSubmitIsError,
+    error: mockSubmitError,
   }),
   useSkipSummary: () => ({
     mutateAsync: mockSkipMutateAsync,
@@ -78,7 +80,6 @@ jest.mock('../../lib/theme', () => ({
     muted: '#a3a3a3',
     textInverse: '#0f0f0f',
   }),
-  useTheme: () => ({ persona: 'teen' }),
 }));
 
 jest.mock('../../lib/sentry', () => ({
@@ -103,6 +104,8 @@ describe('SessionSummaryScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    mockSubmitIsError = false;
+    mockSubmitError = null;
     mockSkipMutateAsync.mockResolvedValue({
       summary: {
         id: 'summary-1',
@@ -381,6 +384,23 @@ describe('SessionSummaryScreen', () => {
     });
 
     expect(mockRecallBridgeMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('shows inline error text when submitSummary fails [SC-1]', async () => {
+    // Set up the mock to show the error state (simulates mutation in error state)
+    mockSubmitIsError = true;
+    mockSubmitError = new Error('Network error');
+    mockSubmitMutateAsync.mockRejectedValue(new Error('Network error'));
+
+    render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+    // The inline error should be visible immediately (driven by isError state)
+    await waitFor(() => {
+      expect(screen.getByTestId('summary-error')).toBeTruthy();
+    });
+
+    // Error text tells user what happened
+    expect(screen.getByText(/Couldn't save your summary/)).toBeTruthy();
   });
 
   it('renders milestone recap and fast celebrations when provided', () => {

@@ -6,6 +6,9 @@
 
 import { findSimilarTopics, type Database } from '@eduagent/database';
 import { generateEmbedding } from './embeddings';
+import { createLogger } from './logger';
+
+const logger = createLogger();
 
 /** Result of memory retrieval — ready for prompt injection */
 export interface MemoryRetrievalResult {
@@ -48,7 +51,7 @@ export async function retrieveRelevantMemory(
   limit?: number
 ): Promise<MemoryRetrievalResult> {
   if (!voyageApiKey) {
-    console.warn(
+    logger.warn(
       '[memory] VOYAGE_API_KEY not provided — embedding retrieval skipped for this exchange'
     );
     return EMPTY_RESULT;
@@ -79,9 +82,11 @@ export async function retrieveRelevantMemory(
 
     return { context, topicIds };
   } catch (err) {
-    console.warn(
-      '[memory] Embedding retrieval failed, continuing without memory:',
-      err instanceof Error ? err.message : err
+    logger.warn(
+      '[memory] Embedding retrieval failed, continuing without memory',
+      {
+        error: err instanceof Error ? err.message : String(err),
+      }
     );
     return EMPTY_RESULT;
   }
@@ -103,10 +108,10 @@ function formatMemoryContext(contents: string[]): string {
 
   for (let i = 0; i < contents.length; i++) {
     // Truncate each content block to avoid overwhelming the prompt
+    const content = contents[i];
+    if (!content) throw new Error(`contents[${i}] is unexpectedly undefined`);
     const truncated =
-      contents[i]!.length > 500
-        ? contents[i]!.slice(0, 500) + '...'
-        : contents[i]!;
+      content.length > 500 ? content.slice(0, 500) + '...' : content;
     lines.push(`[${i + 1}] ${truncated}`);
   }
 

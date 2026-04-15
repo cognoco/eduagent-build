@@ -74,7 +74,11 @@ export function decodeJWTPayload(token: string): JWTPayload {
   if (parts.length !== 3) {
     throw new Error('Invalid JWT: expected 3 segments');
   }
-  return JSON.parse(base64UrlDecode(parts[1]!)) as JWTPayload;
+  const [, payloadB64] = parts;
+  if (!payloadB64) {
+    throw new Error('Invalid JWT: missing payload segment');
+  }
+  return JSON.parse(base64UrlDecode(payloadB64)) as JWTPayload;
 }
 
 // ---------------------------------------------------------------------------
@@ -153,12 +157,18 @@ export async function verifyJWT(
 
   const [headerB64, payloadB64, signatureB64] = parts;
 
+  if (!headerB64 || !payloadB64 || !signatureB64) {
+    throw new Error(
+      'Invalid JWT: missing header, payload, or signature segment'
+    );
+  }
+
   // Import the public key
   const cryptoKey = await importRSAPublicKey(jwk);
 
   // The data that was signed is the raw header.payload (ASCII bytes)
   const data = new TextEncoder().encode(`${headerB64}.${payloadB64}`);
-  const signature = base64UrlToUint8Array(signatureB64!);
+  const signature = base64UrlToUint8Array(signatureB64);
 
   const valid = await crypto.subtle.verify(
     'RSASSA-PKCS1-v1_5',

@@ -19,3 +19,4 @@ export { LivingBook } from './LivingBook';
 export { LibraryPrompt } from './LibraryPrompt';
 export { QuotaExceededCard } from './QuotaExceededCard';
 export type { QuotaExceededCardProps } from './QuotaExceededCard';
+export { FluencyDrillStrip } from './FluencyDrillStrip';

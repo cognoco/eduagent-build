@@ -57,6 +57,8 @@ interface TopicsTabProps {
     retention: RetentionStatus
   ) => void;
   onAddSubject: () => void;
+  isError?: boolean;
+  onRetry?: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -84,6 +86,8 @@ export function TopicsTab({
   onStateChange,
   onTopicPress,
   onAddSubject,
+  isError,
+  onRetry,
 }: TopicsTabProps): React.ReactElement {
   // ---- Derived data -------------------------------------------------------
 
@@ -218,7 +222,30 @@ export function TopicsTab({
     return null;
   }, [hasSearch, hasFilters, state, onStateChange]);
 
-  // ---- Empty / no-content states ------------------------------------------
+  // ---- Empty / error / no-content states -----------------------------------
+
+  if (topics.length === 0 && isError) {
+    return (
+      <View
+        className="bg-surface rounded-card px-4 py-6 items-center"
+        testID="topics-tab-error"
+      >
+        <Text className="text-body text-text-secondary text-center mb-4">
+          Unable to load topics. Please try again.
+        </Text>
+        <Pressable
+          onPress={onRetry}
+          className="bg-primary rounded-button px-5 py-3 items-center min-h-[48px] justify-center"
+          accessibilityRole="button"
+          testID="topics-tab-retry"
+        >
+          <Text className="text-body font-semibold text-text-inverse">
+            Retry
+          </Text>
+        </Pressable>
+      </View>
+    );
+  }
 
   if (topics.length === 0) {
     return (

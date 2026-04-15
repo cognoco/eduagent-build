@@ -241,10 +241,21 @@ export async function getSubjectRetention(
  * Used by recall notifications and daily plan — unlike getSubjectRetention() which
  * requires a subjectId, this aggregates across the entire profile.
  */
+export interface NextReviewTopic {
+  topicId: string;
+  subjectId: string;
+  subjectName: string;
+  topicTitle: string;
+}
+
 export async function getProfileOverdueCount(
   db: Database,
   profileId: string
-): Promise<{ overdueCount: number; topTopicIds: string[] }> {
+): Promise<{
+  overdueCount: number;
+  topTopicIds: string[];
+  nextReviewTopic: NextReviewTopic | null;
+}> {
   const repo = createScopedRepository(db, profileId);
   const now = new Date();
 
@@ -259,9 +270,39 @@ export async function getProfileOverdueCount(
     return aTime - bTime;
   });
 
+  // Resolve subject info for the most overdue topic via the curriculum chain:
+  // retentionCard.topicId → curriculumTopics → curricula → subjects
+  let nextReviewTopic: NextReviewTopic | null = null;
+  const topCard = sorted[0];
+  if (topCard) {
+    const topTopicId = topCard.topicId;
+    const topic = await db.query.curriculumTopics.findFirst({
+      where: eq(curriculumTopics.id, topTopicId),
+    });
+    if (topic) {
+      const curriculum = await db.query.curricula.findFirst({
+        where: eq(curricula.id, topic.curriculumId),
+      });
+      if (curriculum) {
+        const subject = await repo.subjects.findFirst(
+          eq(subjects.id, curriculum.subjectId)
+        );
+        if (subject) {
+          nextReviewTopic = {
+            topicId: topTopicId,
+            subjectId: subject.id,
+            subjectName: subject.name,
+            topicTitle: topic.title,
+          };
+        }
+      }
+    }
+  }
+
   return {
     overdueCount: sorted.length,
     topTopicIds: sorted.slice(0, 3).map((c) => c.topicId),
+    nextReviewTopic,
   };
 }
 
@@ -332,10 +373,12 @@ export async function processRecallTest(
   const lastTestAt = effectiveCard.lastReviewedAt?.toISOString() ?? null;
   const attemptMode = input.attemptMode ?? 'standard';
   if (!canRetestTopic(state, lastTestAt)) {
-    // non-null: canRetestTopic returns true when lastTestAt is null,
-    // so we only reach this branch when lastTestAt is set.
+    // canRetestTopic returns true when lastTestAt is null, so we only reach
+    // this branch when lastTestAt is non-null.
+    if (!lastTestAt)
+      throw new Error('Expected lastTestAt to be set when cooldown is active');
     const cooldownEndsAt = new Date(
-      new Date(lastTestAt!).getTime() + RETEST_COOLDOWN_MS
+      new Date(lastTestAt).getTime() + RETEST_COOLDOWN_MS
     ).toISOString();
     return {
       passed: false,

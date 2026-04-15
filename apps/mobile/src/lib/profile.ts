@@ -26,9 +26,11 @@ export type { Profile };
  * @see computeAgeBracket in @eduagent/schemas — shared consent-gating variant
  *   with labels ('child' | 'adolescent' | 'adult'). Same thresholds, different purpose.
  */
+export type Persona = 'teen' | 'learner' | 'parent';
+
 export function personaFromBirthYear(
   birthYear: number | null | undefined
-): 'teen' | 'learner' | 'parent' {
+): Persona {
   if (birthYear == null) return 'learner';
   const age = new Date().getFullYear() - birthYear;
   if (age < 13) return 'teen';
@@ -129,7 +131,9 @@ export function ProfileProvider({
       }
       const owner = profiles.find((p) => p.isOwner) ?? profiles[0]!;
       setActiveProfileId(owner.id);
-      void SecureStore.setItemAsync(ACTIVE_PROFILE_KEY, owner.id).catch(() => { /* non-fatal — in-memory activeProfileId is already set above */ });
+      void SecureStore.setItemAsync(ACTIVE_PROFILE_KEY, owner.id).catch(() => {
+        /* non-fatal — in-memory activeProfileId is already set above */
+      });
     }
   }, [profiles, activeProfileId, isRestoringId]);
 

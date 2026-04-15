@@ -24,6 +24,9 @@ export const filingRequestSchema = z
     // Context (set server-side, not from client)
     sessionId: z.string().uuid().optional(),
 
+    // Fallback context — used to file under "Uncategorized" when LLM fails
+    subjectId: z.string().uuid().optional(),
+
     // Suggestion tracking — marks the originating suggestion as picked/used
     pickedSuggestionId: z.string().uuid().optional(),
     usedTopicSuggestionId: z.string().uuid().optional(),
@@ -112,5 +115,6 @@ export const filingResultSchema = z.object({
     book: z.boolean(),
     chapter: z.boolean(),
   }),
+  fallback: z.boolean().optional(),
 });
 export type FilingResult = z.infer<typeof filingResultSchema>;

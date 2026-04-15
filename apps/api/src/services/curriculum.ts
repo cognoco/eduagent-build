@@ -212,7 +212,11 @@ export async function ensureCurriculum(
   // Re-read to get the row regardless of whether we inserted or another
   // concurrent caller won the race.
   const row = await getLatestCurriculumRow(db, subjectId);
-  return row!;
+  if (!row)
+    throw new Error(
+      `Curriculum row not found after upsert for subjectId=${subjectId}`
+    );
+  return row;
 }
 
 interface BookProgress {
@@ -285,6 +289,117 @@ async function computeBookStatus(
     status: hasReviewDue ? 'REVIEW_DUE' : 'COMPLETED',
     completedTopicCount: completedTopicIds.size,
   };
+}
+
+/**
+ * Batched variant of computeBookStatus — runs 2 queries total instead of N.
+ * Used by getBooks to avoid N parallel DB round-trips for subjects with many books.
+ */
+async function computeBookStatusesBatch(
+  db: Database,
+  profileId: string,
+  topicsByBook: Map<string, string[]>
+): Promise<Map<string, BookProgress>> {
+  const results = new Map<string, BookProgress>();
+
+  // Build flat topic list + reverse mapping (topicId → bookId)
+  const allTopicIds: string[] = [];
+  const topicToBook = new Map<string, string>();
+  for (const [bookId, topicIds] of topicsByBook) {
+    if (topicIds.length === 0) {
+      results.set(bookId, { status: 'NOT_STARTED', completedTopicCount: 0 });
+      continue;
+    }
+    for (const tid of topicIds) {
+      allTopicIds.push(tid);
+      topicToBook.set(tid, bookId);
+    }
+  }
+
+  if (allTopicIds.length === 0) return results;
+
+  // Single query: all learning sessions across every book
+  const sessionRows = await db
+    .select({
+      topicId: learningSessions.topicId,
+      status: learningSessions.status,
+    })
+    .from(learningSessions)
+    .where(
+      and(
+        eq(learningSessions.profileId, profileId),
+        inArray(learningSessions.topicId, allTopicIds)
+      )
+    );
+
+  // Group completed topic IDs by book
+  const completedByBook = new Map<string, Set<string>>();
+  for (const row of sessionRows) {
+    if (
+      row.topicId &&
+      (row.status === 'completed' || row.status === 'auto_closed')
+    ) {
+      const bookId = topicToBook.get(row.topicId as string);
+      if (!bookId) continue;
+      const set = completedByBook.get(bookId) ?? new Set<string>();
+      set.add(row.topicId as string);
+      completedByBook.set(bookId, set);
+    }
+  }
+
+  // Classify books: NOT_STARTED, IN_PROGRESS, or fully-completed (needs retention check)
+  const fullyCompletedTopicIds: string[] = [];
+  const fullyCompletedBooks = new Set<string>();
+  for (const [bookId, topicIds] of topicsByBook) {
+    if (results.has(bookId)) continue; // already set (empty topics)
+    const completed = completedByBook.get(bookId);
+    if (!completed || completed.size === 0) {
+      results.set(bookId, { status: 'NOT_STARTED', completedTopicCount: 0 });
+    } else if (completed.size < topicIds.length) {
+      results.set(bookId, {
+        status: 'IN_PROGRESS',
+        completedTopicCount: completed.size,
+      });
+    } else {
+      fullyCompletedBooks.add(bookId);
+      for (const tid of topicIds) fullyCompletedTopicIds.push(tid);
+    }
+  }
+
+  if (fullyCompletedBooks.size === 0) return results;
+
+  // Single query: retention cards for fully-completed books only
+  const now = Date.now();
+  const reviewRows = await db
+    .select({
+      topicId: retentionCards.topicId,
+      nextReviewAt: retentionCards.nextReviewAt,
+    })
+    .from(retentionCards)
+    .where(
+      and(
+        eq(retentionCards.profileId, profileId),
+        inArray(retentionCards.topicId, fullyCompletedTopicIds)
+      )
+    );
+
+  const reviewDueByBook = new Set<string>();
+  for (const row of reviewRows) {
+    if (row.topicId && row.nextReviewAt && row.nextReviewAt.getTime() <= now) {
+      const bookId = topicToBook.get(row.topicId as string);
+      if (bookId) reviewDueByBook.add(bookId);
+    }
+  }
+
+  for (const bookId of fullyCompletedBooks) {
+    const topicIds = topicsByBook.get(bookId) ?? [];
+    results.set(bookId, {
+      status: reviewDueByBook.has(bookId) ? 'REVIEW_DUE' : 'COMPLETED',
+      completedTopicCount: topicIds.length,
+    });
+  }
+
+  return results;
 }
 
 // ---------------------------------------------------------------------------
@@ -389,7 +504,9 @@ export async function ensureDefaultBook(
       topicsGenerated: true,
     })
     .returning();
-  return book!.id;
+  if (!book)
+    throw new Error('Insert into curriculumBooks did not return a row');
+  return book.id;
 }
 
 /**
@@ -500,18 +617,20 @@ export async function getBooks(
     topicsByBook.set(t.bookId, existing);
   }
 
-  const statusResults = await Promise.all(
-    rows.map((book) =>
-      computeBookStatus(db, profileId, topicsByBook.get(book.id) ?? [])
-    )
-  );
+  const statusMap = await computeBookStatusesBatch(db, profileId, topicsByBook);
 
-  return rows.map((book, i) => ({
-    ...mapBookRow(book),
-    status: statusResults[i]!.status,
-    topicCount: (topicsByBook.get(book.id) ?? []).length,
-    completedTopicCount: statusResults[i]!.completedTopicCount,
-  }));
+  return rows.map((book) => {
+    const progress = statusMap.get(book.id) ?? {
+      status: 'NOT_STARTED' as const,
+      completedTopicCount: 0,
+    };
+    return {
+      ...mapBookRow(book),
+      status: progress.status,
+      topicCount: (topicsByBook.get(book.id) ?? []).length,
+      completedTopicCount: progress.completedTopicCount,
+    };
+  });
 }
 
 export async function getBookWithTopics(
@@ -768,9 +887,11 @@ export async function addCurriculumTopic(
     .set({ updatedAt: new Date() })
     .where(eq(curricula.id, curriculum.id));
 
+  if (!createdTopic)
+    throw new Error('Insert into curriculumTopics did not return a row');
   return {
     mode: 'create',
-    topic: mapTopicRow(createdTopic!),
+    topic: mapTopicRow(createdTopic),
   };
 }
 
@@ -926,13 +1047,8 @@ export async function challengeCurriculum(
     return result;
   }
 
-  // Load current curriculum to determine new version
-  const current = await db.query.curricula.findFirst({
-    where: eq(curricula.subjectId, subjectId),
-    orderBy: desc(curricula.version),
-  });
-
-  const newVersion = current ? current.version + 1 : 1;
+  // Read onboarding context and generate topics BEFORE touching existing data.
+  // If the LLM call fails, the old curriculum is preserved.
   const latestDraft = await db.query.onboardingDrafts.findFirst({
     where: and(
       eq(onboardingDrafts.profileId, profileId),
@@ -980,7 +1096,7 @@ export async function challengeCurriculum(
     .filter((part) => part.length > 0)
     .join('\n\n');
 
-  // Generate new curriculum with feedback
+  // Generate new curriculum with feedback (LLM call — can fail)
   const topics = await generateCurriculum({
     subjectName: subject.name,
     interviewSummary,
@@ -988,33 +1104,48 @@ export async function challengeCurriculum(
     experienceLevel: draftExperienceLevel,
   });
 
-  const [newCurriculum] = await db
-    .insert(curricula)
-    .values({
+  // Transact the destructive swap: delete old → insert new → add topics.
+  // If any DB step fails, the transaction rolls back and the old curriculum
+  // is preserved. The LLM call above is intentionally outside the transaction
+  // so we never delete until we already have the replacement topics.
+  await db.transaction(async (tx) => {
+    await tx.delete(curricula).where(eq(curricula.subjectId, subjectId));
+
+    const [newCurriculum] = await tx
+      .insert(curricula)
+      .values({
+        subjectId,
+        version: 1,
+      })
+      .returning();
+
+    if (!newCurriculum)
+      throw new Error('Insert into curricula did not return a row');
+    // Known Drizzle pattern: PgTransaction → Database cast (see feedback_drizzle_transaction_cast.md)
+    const bookId = await ensureDefaultBook(
+      tx as unknown as Database,
       subjectId,
-      version: newVersion,
-    })
-    .returning();
-
-  const bookId = await ensureDefaultBook(db, subjectId, subject.name);
-
-  if (topics.length > 0) {
-    await db.insert(curriculumTopics).values(
-      topics.map((t, i) => ({
-        curriculumId: newCurriculum!.id,
-        bookId,
-        title: t.title,
-        description: t.description,
-        sortOrder: i,
-        relevance: t.relevance,
-        estimatedMinutes: t.estimatedMinutes,
-        cefrLevel: t.cefrLevel ?? null,
-        cefrSublevel: t.cefrSublevel ?? null,
-        targetWordCount: t.targetWordCount ?? null,
-        targetChunkCount: t.targetChunkCount ?? null,
-      }))
+      subject.name
     );
-  }
+
+    if (topics.length > 0) {
+      await tx.insert(curriculumTopics).values(
+        topics.map((t, i) => ({
+          curriculumId: newCurriculum.id,
+          bookId,
+          title: t.title,
+          description: t.description,
+          sortOrder: i,
+          relevance: t.relevance,
+          estimatedMinutes: t.estimatedMinutes,
+          cefrLevel: t.cefrLevel ?? null,
+          cefrSublevel: t.cefrSublevel ?? null,
+          targetWordCount: t.targetWordCount ?? null,
+          targetChunkCount: t.targetChunkCount ?? null,
+        }))
+      );
+    }
+  });
 
   // Return the newly generated curriculum
   const result = await getCurriculum(db, profileId, subjectId);
@@ -1137,18 +1268,25 @@ export async function adaptCurriculumFromPerformance(
   // Without a transaction, a mid-loop connection drop leaves
   // topics in a partially-reordered state with no rollback.
   await db.transaction(async (tx) => {
-    for (let i = 0; i < reordered.length; i++) {
-      const entry = reordered[i]!;
-      await tx
-        .update(curriculumTopics)
-        .set({ sortOrder: i, updatedAt: new Date() })
-        .where(
-          and(
-            eq(curriculumTopics.id, entry.id),
-            eq(curriculumTopics.curriculumId, curriculum.id)
-          )
-        );
-    }
+    // [CR-2B.1] Replace N individual UPDATEs with a single CASE expression to
+    // avoid N+1 round-trips. The curriculumId guard is kept in the WHERE clause
+    // so only topics belonging to this curriculum are touched.
+    const now = new Date();
+    await tx.execute(sql`
+      UPDATE curriculum_topics
+      SET sort_order = CASE id
+        ${sql.join(
+          reordered.map((t, i) => sql`WHEN ${t.id} THEN ${i}`),
+          sql` `
+        )}
+      END,
+      updated_at = ${now}
+      WHERE id IN (${sql.join(
+        reordered.map((t) => sql`${t.id}`),
+        sql`, `
+      )})
+        AND curriculum_id = ${curriculum.id}
+    `);
 
     await tx.insert(curriculumAdaptations).values({
       profileId,

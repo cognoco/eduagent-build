@@ -7,14 +7,17 @@ import {
 
 const mockBack = jest.fn();
 const mockReplace = jest.fn();
+const mockPush = jest.fn();
 const mockCreateSubjectMutateAsync = jest.fn();
 const mockResolveSubjectMutateAsync = jest.fn();
 let mockSearchParams: Record<string, string> = {};
+let mockExistingSubjects: Array<{ id: string; name: string }> = [];
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({
     back: mockBack,
     replace: mockReplace,
+    push: mockPush,
     canGoBack: jest.fn(() => true),
   }),
   useLocalSearchParams: () => mockSearchParams,
@@ -27,6 +30,9 @@ jest.mock('react-native-safe-area-context', () => ({
 jest.mock('../hooks/use-subjects', () => ({
   useCreateSubject: () => ({
     mutateAsync: mockCreateSubjectMutateAsync,
+  }),
+  useSubjects: () => ({
+    data: mockExistingSubjects,
   }),
   useUpdateSubject: () => ({
     mutateAsync: jest.fn().mockResolvedValue({ subject: {} }),
@@ -60,6 +66,7 @@ describe('CreateSubjectScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockSearchParams = {};
+    mockExistingSubjects = [];
   });
 
   it('renders starter chips and fills the input on tap', () => {
@@ -566,5 +573,80 @@ describe('CreateSubjectScreen', () => {
     expect(mockReplace).not.toHaveBeenCalledWith(
       expect.objectContaining({ pathname: '/(app)/session' })
     );
+  });
+
+  // ----------------------------------------------------------------
+  // SUBJECT-01: Chip visibility, returning-user section, hint text
+  // ----------------------------------------------------------------
+
+  it('hides starter chips when input has text', () => {
+    render(<CreateSubjectScreen />);
+
+    expect(screen.getByTestId('starter-chips')).toBeTruthy();
+
+    fireEvent.changeText(screen.getByTestId('create-subject-name'), 'Bio');
+
+    expect(screen.queryByTestId('starter-chips')).toBeNull();
+  });
+
+  it('shows "Your subjects" section when user has existing subjects', () => {
+    mockExistingSubjects = [
+      { id: 'sub-1', name: 'Math' },
+      { id: 'sub-2', name: 'History' },
+    ];
+
+    render(<CreateSubjectScreen />);
+
+    expect(screen.getByTestId('your-subjects-section')).toBeTruthy();
+    expect(screen.getByText('Or continue with')).toBeTruthy();
+    expect(screen.getByTestId('your-subject-sub-1')).toBeTruthy();
+    expect(screen.getByTestId('your-subject-sub-2')).toBeTruthy();
+  });
+
+  it('hides "Your subjects" section for first-time users', () => {
+    mockExistingSubjects = [];
+
+    render(<CreateSubjectScreen />);
+
+    expect(screen.queryByTestId('your-subjects-section')).toBeNull();
+  });
+
+  it('tapping a subject pill navigates to library', () => {
+    mockExistingSubjects = [{ id: 'sub-1', name: 'Math' }];
+
+    render(<CreateSubjectScreen />);
+
+    fireEvent.press(screen.getByTestId('your-subject-sub-1'));
+
+    expect(mockPush).toHaveBeenCalledWith('/(app)/library');
+  });
+
+  it('hides "Your subjects" section when input has text', () => {
+    mockExistingSubjects = [{ id: 'sub-1', name: 'Math' }];
+
+    render(<CreateSubjectScreen />);
+
+    expect(screen.getByTestId('your-subjects-section')).toBeTruthy();
+
+    fireEvent.changeText(screen.getByTestId('create-subject-name'), 'Science');
+
+    expect(screen.queryByTestId('your-subjects-section')).toBeNull();
+  });
+
+  it('shows "Not sure?" hint text when input is empty', () => {
+    render(<CreateSubjectScreen />);
+
+    expect(screen.getByTestId('not-sure-hint')).toBeTruthy();
+    expect(
+      screen.getByText(/Not sure\? Just describe what interests you/)
+    ).toBeTruthy();
+  });
+
+  it('hides "Not sure?" hint when input has text', () => {
+    render(<CreateSubjectScreen />);
+
+    fireEvent.changeText(screen.getByTestId('create-subject-name'), 'Art');
+
+    expect(screen.queryByTestId('not-sure-hint')).toBeNull();
   });
 });

@@ -59,7 +59,7 @@ describe('createLogger', () => {
 
   describe('structured output', () => {
     it('emits valid JSON with required fields', () => {
-      const logger = createLogger({ level: 'debug', environment: 'test' });
+      const logger = createLogger({ level: 'debug' });
 
       logger.info('hello');
 
@@ -73,7 +73,7 @@ describe('createLogger', () => {
     });
 
     it('includes context when provided', () => {
-      const logger = createLogger({ level: 'debug', environment: 'test' });
+      const logger = createLogger({ level: 'debug' });
 
       logger.info('with context', { userId: 'u1', action: 'login' });
 
@@ -82,7 +82,7 @@ describe('createLogger', () => {
     });
 
     it('omits context key when context is empty', () => {
-      const logger = createLogger({ level: 'debug', environment: 'test' });
+      const logger = createLogger({ level: 'debug' });
 
       logger.info('no context', {});
 
@@ -91,7 +91,7 @@ describe('createLogger', () => {
     });
 
     it('omits context key when not provided', () => {
-      const logger = createLogger({ level: 'debug', environment: 'test' });
+      const logger = createLogger({ level: 'debug' });
 
       logger.info('bare message');
 
@@ -106,7 +106,7 @@ describe('createLogger', () => {
 
   describe('console method routing', () => {
     it('routes error to console.error', () => {
-      const logger = createLogger({ level: 'debug', environment: 'test' });
+      const logger = createLogger({ level: 'debug' });
 
       logger.error('fail');
 
@@ -116,7 +116,7 @@ describe('createLogger', () => {
     });
 
     it('routes warn to console.warn', () => {
-      const logger = createLogger({ level: 'debug', environment: 'test' });
+      const logger = createLogger({ level: 'debug' });
 
       logger.warn('caution');
 
@@ -126,7 +126,7 @@ describe('createLogger', () => {
     });
 
     it('routes info to console.log', () => {
-      const logger = createLogger({ level: 'debug', environment: 'test' });
+      const logger = createLogger({ level: 'debug' });
 
       logger.info('note');
 
@@ -136,7 +136,7 @@ describe('createLogger', () => {
     });
 
     it('routes debug to console.log', () => {
-      const logger = createLogger({ level: 'debug', environment: 'test' });
+      const logger = createLogger({ level: 'debug' });
 
       logger.debug('trace');
 
@@ -169,7 +169,6 @@ describe('createLogger', () => {
       ({ configLevel, callLevel, shouldEmit }) => {
         const logger = createLogger({
           level: configLevel,
-          environment: 'test',
         });
 
         logger[callLevel]('test message');

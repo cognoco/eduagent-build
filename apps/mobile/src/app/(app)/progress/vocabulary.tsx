@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ErrorFallback } from '../../../components/common';
 import { useProgressInventory } from '../../../hooks/use-progress';
 import { goBackOrReplace } from '../../../lib/navigation';
+import { isNewLearner } from '../../../lib/progressive-disclosure';
 import type { SubjectInventory } from '@eduagent/schemas';
 
 const CEFR_ORDER = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
@@ -81,6 +82,7 @@ export default function VocabularyBrowserScreen(): React.ReactElement {
     inventory?.subjects.filter((s) => s.vocabulary.total > 0) ?? [];
   const totalVocab = inventory?.global.vocabularyTotal ?? 0;
   const isEmpty = !isLoading && !isError && totalVocab === 0;
+  const newLearner = isNewLearner(inventory?.global.totalSessions);
 
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
@@ -135,6 +137,31 @@ export default function VocabularyBrowserScreen(): React.ReactElement {
               }}
               testID="vocab-browser-error-fallback"
             />
+          </View>
+        ) : isEmpty && newLearner ? (
+          <View
+            className="bg-surface rounded-card p-5 mt-4 items-center"
+            testID="vocab-browser-new-learner"
+          >
+            <Text className="text-h3 font-semibold text-text-primary text-center">
+              Your vocabulary will grow here
+            </Text>
+            <Text className="text-body-sm text-text-secondary text-center mt-2">
+              Keep learning and the words you discover will appear here.
+            </Text>
+            <Pressable
+              onPress={() =>
+                goBackOrReplace(router, '/(app)/progress' as const)
+              }
+              className="bg-background rounded-button px-5 py-3 mt-4"
+              accessibilityRole="button"
+              accessibilityLabel="Go back"
+              testID="vocab-browser-new-learner-back"
+            >
+              <Text className="text-body font-semibold text-text-primary">
+                Go back
+              </Text>
+            </Pressable>
           </View>
         ) : isEmpty ? (
           <View

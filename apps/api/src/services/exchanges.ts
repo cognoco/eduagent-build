@@ -46,6 +46,8 @@ export interface ExchangeContext {
   crossSubjectContext?: string;
   learningHistoryContext?: string;
   embeddingMemoryContext?: string;
+  /** Accommodation mode preamble — injected before learner memory (FR254) */
+  accommodationContext?: string;
   learnerMemoryContext?: string;
   workedExampleLevel?: 'full' | 'fading' | 'problem_first';
   /** Teaching method preference for adaptive teaching (FR58) */
@@ -86,6 +88,8 @@ export interface ExchangeContext {
   rawInput?: string | null;
   /** Input mode for this session — controls voice-optimized brevity in the system prompt */
   inputMode?: InputMode;
+  /** Number of completed exchanges in this session — 0 means the LLM's first turn */
+  exchangeCount?: number;
 }
 
 /** Result of processing a single exchange */
@@ -196,8 +200,11 @@ export function buildSystemPrompt(context: ExchangeContext): string {
   } else {
     sections.push(
       'You are MentoMate, a personalised learning mate. ' +
-        'A mate does not lecture — a mate asks the right question at the right time so the learner discovers the answer themselves. ' +
-        'Example: instead of "The mitochondria is the powerhouse of the cell," ask "What part of the cell do you think handles energy production, and why?"'
+        'A mate teaches clearly and checks understanding. Explain concepts using concrete examples, then ask a focused question to verify the learner understood. ' +
+        'Draw out what the learner already knows before adding new material — but never withhold an explanation in the name of "discovery". ' +
+        "If they get it, move to the next concept. If they don't, teach it differently — don't interrogate. " +
+        "Adapt your language complexity, examples, and tone to the learner's age (provided via the age-voice section below). " +
+        'A 9-year-old needs short sentences and everyday analogies. A 16-year-old needs precision and real-world context. An adult needs efficiency and respect for existing knowledge.'
     );
   }
 
@@ -253,6 +260,26 @@ export function buildSystemPrompt(context: ExchangeContext): string {
     );
   }
 
+  // First-exchange teaching opener — tell the LLM to start teaching, not ask
+  if (
+    context.exchangeCount === 0 &&
+    context.sessionType === 'learning' &&
+    !isLanguageMode
+  ) {
+    if (context.topicTitle) {
+      sections.push(
+        'The learner chose this topic. Begin teaching it immediately. ' +
+          'Do not ask what they want to learn — they already told you by choosing the topic. ' +
+          'If prior session history exists for this topic, pick up where the previous session left off.'
+      );
+    } else if (context.rawInput) {
+      sections.push(
+        'The learner expressed interest in the above topic. ' +
+          'Anchor your teaching to their stated intent and begin immediately.'
+      );
+    }
+  }
+
   // Session type
   if (isLanguageMode) {
     sections.push(
@@ -300,6 +327,11 @@ export function buildSystemPrompt(context: ExchangeContext): string {
   // Embedding memory context (pgvector semantic retrieval)
   if (context.embeddingMemoryContext) {
     sections.push(context.embeddingMemoryContext);
+  }
+
+  // FR254.4: Accommodation block injected BEFORE learner memory for priority
+  if (context.accommodationContext) {
+    sections.push(context.accommodationContext);
   }
 
   if (context.learnerMemoryContext) {
@@ -507,10 +539,11 @@ export async function processExchange(
     { role: 'user' as const, content: userMessage },
   ];
 
+  const ageBracket = resolveAgeBracket(context.birthYear);
   const result: RouteResult = await routeAndCall(
     messages,
     context.escalationRung,
-    { llmTier: context.llmTier }
+    { llmTier: context.llmTier, ageBracket }
   );
 
   const isUnderstandingCheck = detectUnderstandingCheck(result.response);
@@ -569,10 +602,11 @@ export async function streamExchange(
     { role: 'user' as const, content: userMessage },
   ];
 
+  const ageBracket = resolveAgeBracket(context.birthYear);
   const result: StreamResult = await routeAndStream(
     messages,
     context.escalationRung,
-    context.llmTier
+    { llmTier: context.llmTier, ageBracket }
   );
 
   return {
@@ -702,11 +736,11 @@ function getSessionTypeGuidance(
   }
   return (
     'Session type: LEARNING\n' +
-    'Help the learner understand concepts deeply.\n' +
-    'You may explain concepts, use examples, and teach new material — but guide first.\n' +
-    'Default to asking a question before explaining. If the learner already has partial understanding, draw it out rather than overwriting it.\n' +
-    'Only provide a direct explanation when the learner has clearly exhausted their own reasoning or explicitly asks "just tell me."\n' +
-    'Balance explanation with questions to verify understanding.'
+    'Teach the concept clearly using a concrete example, then ask one question to verify understanding.\n' +
+    "If the learner's response shows they already know it, acknowledge and move to the next concept.\n" +
+    'If it shows a gap, re-explain from a different angle — do not repeat the same explanation.\n' +
+    'Never wait passively for the learner to drive — you lead the teaching, they confirm understanding.\n' +
+    'The cycle is: explain → verify → next concept.'
   );
 }
 
@@ -777,6 +811,57 @@ export function extractNotePrompt(response: string): {
     notePrompt: true,
     notePromptPostSession: notePromptMatch[0].includes('"postSession"'),
   };
+}
+
+/** Fluency drill annotation extracted from LLM response */
+export interface FluencyDrillAnnotation {
+  active: boolean;
+  durationSeconds?: number;
+  score?: { correct: number; total: number };
+}
+
+/** Extract and strip the fluencyDrill JSON annotation from a response */
+export function extractFluencyDrill(response: string): {
+  cleanResponse: string;
+  fluencyDrill: FluencyDrillAnnotation | null;
+} {
+  const match = response.match(/\n?\{"fluencyDrill":\s*\{[^}]*\}\s*\}\s*$/);
+  if (!match) {
+    return { cleanResponse: response, fluencyDrill: null };
+  }
+  try {
+    const parsed = JSON.parse(match[0].trim()) as {
+      fluencyDrill?: unknown;
+    };
+    const drill = parsed.fluencyDrill;
+    if (typeof drill !== 'object' || drill === null || !('active' in drill)) {
+      return { cleanResponse: response, fluencyDrill: null };
+    }
+    const d = drill as Record<string, unknown>;
+    const annotation: FluencyDrillAnnotation = {
+      active: Boolean(d.active),
+    };
+    if (typeof d.durationSeconds === 'number' && d.durationSeconds > 0) {
+      annotation.durationSeconds = Math.min(
+        90,
+        Math.max(15, d.durationSeconds)
+      );
+    }
+    if (
+      typeof d.score === 'object' &&
+      d.score !== null &&
+      typeof (d.score as Record<string, unknown>).correct === 'number' &&
+      typeof (d.score as Record<string, unknown>).total === 'number'
+    ) {
+      annotation.score = d.score as { correct: number; total: number };
+    }
+    return {
+      cleanResponse: response.slice(0, match.index).trimEnd(),
+      fluencyDrill: annotation,
+    };
+  } catch {
+    return { cleanResponse: response, fluencyDrill: null };
+  }
 }
 
 /** Detect whether the LLM response contains an understanding check */

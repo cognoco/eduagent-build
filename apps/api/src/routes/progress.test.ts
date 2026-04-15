@@ -257,10 +257,16 @@ describe('progress routes', () => {
   // -------------------------------------------------------------------------
 
   describe('GET /v1/progress/review-summary', () => {
-    it('returns 200 with total overdue review count', async () => {
+    it('returns 200 with total overdue review count and nextReviewTopic', async () => {
       (getProfileOverdueCount as jest.Mock).mockResolvedValue({
         overdueCount: 7,
         topTopicIds: ['topic-1', 'topic-2', 'topic-3'],
+        nextReviewTopic: {
+          topicId: 'topic-1',
+          subjectId: SUBJECT_ID,
+          subjectName: 'Mathematics',
+          topicTitle: 'Algebra Basics',
+        },
       });
 
       const res = await app.request(
@@ -273,6 +279,32 @@ describe('progress routes', () => {
 
       const body = await res.json();
       expect(body.totalOverdue).toBe(7);
+      expect(body.nextReviewTopic).toEqual({
+        topicId: 'topic-1',
+        subjectId: SUBJECT_ID,
+        subjectName: 'Mathematics',
+        topicTitle: 'Algebra Basics',
+      });
+    });
+
+    it('returns null nextReviewTopic when no topics are overdue', async () => {
+      (getProfileOverdueCount as jest.Mock).mockResolvedValue({
+        overdueCount: 0,
+        topTopicIds: [],
+        nextReviewTopic: null,
+      });
+
+      const res = await app.request(
+        '/v1/progress/review-summary',
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.totalOverdue).toBe(0);
+      expect(body.nextReviewTopic).toBeNull();
     });
 
     it('returns 401 without auth header', async () => {
@@ -297,6 +329,7 @@ describe('progress routes', () => {
         subjectName: 'Mathematics',
         topicId: TOPIC_ID,
         topicTitle: 'Algebra Basics',
+        lastSessionId: 'session-123',
       });
 
       const res = await app.request(

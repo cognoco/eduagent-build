@@ -44,7 +44,9 @@ import {
   analyzeSessionTranscript,
   applyAnalysis,
   getLearningProfile,
+  type StruggleNotification,
 } from '../../services/learner-profile';
+import { sendStruggleNotification } from '../../services/notifications';
 
 // ---------------------------------------------------------------------------
 // Step error isolation — each step catches its own errors so that a failure
@@ -57,6 +59,13 @@ interface StepOutcome {
   status: 'ok' | 'skipped' | 'failed';
   error?: string;
   qualityRating?: number;
+}
+
+// [CR-119.1]: Extended step results that carry extra data through Inngest
+// replay. Using explicit interfaces because Inngest's Jsonify<T> doesn't
+// always preserve intersection types from spread returns.
+interface DashboardStepResult extends StepOutcome {
+  streak: { currentStreak: number; longestStreak: number } | null;
 }
 
 async function runIsolated(
@@ -164,9 +173,15 @@ export const sessionCompleted = inngest.createFunction(
       if (responseSeconds.length === 0) return null;
       const sorted = [...responseSeconds].sort((a, b) => a - b);
       const middle = Math.floor(sorted.length / 2);
-      return sorted.length % 2 === 0
-        ? Math.round((sorted[middle - 1]! + sorted[middle]!) / 2)
-        : sorted[middle]!;
+      if (sorted.length % 2 === 0) {
+        const lo = sorted[middle - 1];
+        const hi = sorted[middle];
+        if (lo === undefined || hi === undefined) return null;
+        return Math.round((lo + hi) / 2);
+      }
+      const mid = sorted[middle];
+      if (mid === undefined) return null;
+      return mid;
     };
 
     // FR92: Determine which topics need retention updates
@@ -469,114 +484,142 @@ export const sessionCompleted = inngest.createFunction(
     // [EP15-M3]: runs AFTER write-coaching-card — profile analysis is background
     // enrichment and must not delay user-facing coaching card. EP15-C3 confirmed
     // this ordering is safe: snapshot pipeline never reads learning_profiles.
-    outcomes.push(
-      await step.run('analyze-learner-profile', async () =>
-        runIsolated('analyze-learner-profile', profileId, async () => {
-          const db = getStepDatabase();
-          const existingProfile = await getLearningProfile(db, profileId);
+    // step.run memoizes its return value — on Inngest replay the callback is
+    // NOT re-executed, so mutable closure variables would stay []. Returning
+    // notifications as part of the step result ensures they survive replay.
+    const analyzeOutcome = await step.run(
+      'analyze-learner-profile',
+      async () => {
+        let stepNotifications: StruggleNotification[] = [];
+        const outcome = await runIsolated(
+          'analyze-learner-profile',
+          profileId,
+          async () => {
+            const db = getStepDatabase();
+            const existingProfile = await getLearningProfile(db, profileId);
 
-          if (!existingProfile) {
-            return;
+            if (!existingProfile) {
+              return;
+            }
+
+            // Consent gate: memoryConsentStatus is NOT NULL (defaults to
+            // 'pending') for all rows after migration 0019, so the consent
+            // check is authoritative. `memoryEnabled` governs injection only.
+            if (
+              existingProfile.memoryConsentStatus !== 'granted' ||
+              existingProfile.memoryCollectionEnabled === false
+            ) {
+              return;
+            }
+
+            const transcriptEvents = await db.query.sessionEvents.findMany({
+              where: and(
+                eq(sessionEvents.sessionId, sessionId),
+                eq(sessionEvents.profileId, profileId)
+              ),
+              orderBy: asc(sessionEvents.createdAt),
+              columns: {
+                eventType: true,
+                content: true,
+              },
+            });
+
+            const [subjectRow] = subjectId
+              ? await db
+                  .select({ name: subjects.name })
+                  .from(subjects)
+                  .where(eq(subjects.id, subjectId))
+                  .limit(1)
+              : [null];
+
+            const topicTitle = topicId
+              ? await loadTopicTitle(db, topicId)
+              : null;
+            const sessionRow = await db.query.learningSessions.findFirst({
+              where: and(
+                eq(learningSessions.id, sessionId),
+                eq(learningSessions.profileId, profileId)
+              ),
+              columns: { rawInput: true },
+            });
+
+            const analysis = await analyzeSessionTranscript(
+              transcriptEvents,
+              subjectRow?.name ?? null,
+              topicTitle,
+              sessionRow?.rawInput
+            );
+
+            if (!analysis) {
+              return;
+            }
+
+            const analysisResult = await applyAnalysis(
+              db,
+              profileId,
+              analysis,
+              subjectRow?.name ?? null,
+              'inferred',
+              subjectId
+            );
+
+            stepNotifications = analysisResult.notifications;
           }
-
-          // Consent gate: memoryConsentStatus is NOT NULL (defaults to
-          // 'pending') for all rows after migration 0019, so the consent
-          // check is authoritative. `memoryEnabled` governs injection only.
-          if (
-            existingProfile.memoryConsentStatus !== 'granted' ||
-            existingProfile.memoryCollectionEnabled === false
-          ) {
-            return;
-          }
-
-          const transcriptEvents = await db.query.sessionEvents.findMany({
-            where: and(
-              eq(sessionEvents.sessionId, sessionId),
-              eq(sessionEvents.profileId, profileId)
-            ),
-            orderBy: asc(sessionEvents.createdAt),
-            columns: {
-              eventType: true,
-              content: true,
-            },
-          });
-
-          const [subjectRow] = subjectId
-            ? await db
-                .select({ name: subjects.name })
-                .from(subjects)
-                .where(eq(subjects.id, subjectId))
-                .limit(1)
-            : [null];
-
-          const topicTitle = topicId ? await loadTopicTitle(db, topicId) : null;
-          const sessionRow = await db.query.learningSessions.findFirst({
-            where: and(
-              eq(learningSessions.id, sessionId),
-              eq(learningSessions.profileId, profileId)
-            ),
-            columns: { rawInput: true },
-          });
-
-          const analysis = await analyzeSessionTranscript(
-            transcriptEvents,
-            subjectRow?.name ?? null,
-            topicTitle,
-            sessionRow?.rawInput
-          );
-
-          if (!analysis) {
-            return;
-          }
-
-          await applyAnalysis(
-            db,
-            profileId,
-            analysis,
-            subjectRow?.name ?? null
-          );
-        })
-      )
+        );
+        return { ...outcome, notifications: stepNotifications };
+      }
     );
+    outcomes.push(analyzeOutcome);
+
+    // Step 3b: FR247.6 — Send struggle push notifications to parent
+    const pendingStruggleNotifications = analyzeOutcome.notifications ?? [];
+    if (pendingStruggleNotifications.length > 0) {
+      const notifications = [...pendingStruggleNotifications];
+      outcomes.push(
+        await step.run('notify-struggle', async () =>
+          runIsolated('notify-struggle', profileId, async () => {
+            const db = getStepDatabase();
+            for (const notification of notifications) {
+              await sendStruggleNotification(db, profileId, notification);
+            }
+          })
+        )
+      );
+    }
 
     // Step 4: Update dashboard — streaks + XP
     // FR86: Only count toward Honest Streak when recall quality >= 3 (pass)
     // XP insertion still runs for any completed session.
-    let updatedStreak: { currentStreak: number; longestStreak: number } | null =
-      null;
-    outcomes.push(
-      await step.run('update-dashboard', async () => {
-        const result = await runIsolated(
-          'update-dashboard',
-          profileId,
-          async () => {
-            const db = getStepDatabase();
-            const today = timestamp
-              ? new Date(timestamp).toISOString().slice(0, 10)
-              : new Date().toISOString().slice(0, 10);
+    // [CR-119.1]: Return streak as part of the step result so it survives
+    // Inngest replay — same memoization pattern as stepNotifications above.
+    const dashboardOutcome = (await step.run('update-dashboard', async () => {
+      let stepStreak: {
+        currentStreak: number;
+        longestStreak: number;
+      } | null = null;
+      const result = await runIsolated(
+        'update-dashboard',
+        profileId,
+        async () => {
+          const db = getStepDatabase();
+          const today = timestamp
+            ? new Date(timestamp).toISOString().slice(0, 10)
+            : new Date().toISOString().slice(0, 10);
 
-            // Streak and XP are independent writes — no transaction needed.
-            // The neon-http driver does not support multi-statement transactions;
-            // wrapping these in db.transaction() would either fail outright or
-            // fall back to non-atomic execution via the client.ts shim.
-            if (
-              completionQualityRating != null &&
-              completionQualityRating >= 3
-            ) {
-              updatedStreak = await recordSessionActivity(db, profileId, today);
-            }
-
-            await insertSessionXpEntry(
-              db,
-              profileId,
-              topicId ?? null,
-              subjectId
-            );
+          // Streak and XP are independent writes — no transaction needed.
+          // The neon-http driver does not support multi-statement transactions;
+          // wrapping these in db.transaction() would either fail outright or
+          // fall back to non-atomic execution via the client.ts shim.
+          if (completionQualityRating != null && completionQualityRating >= 3) {
+            stepStreak = await recordSessionActivity(db, profileId, today);
           }
-        );
-        return result;
-      })
-    );
+
+          await insertSessionXpEntry(db, profileId, topicId ?? null, subjectId);
+        }
+      );
+      return { ...result, streak: stepStreak } as DashboardStepResult;
+    })) as unknown as DashboardStepResult;
+    outcomes.push(dashboardOutcome);
 
     // Step 5: Generate and store session embedding
     outcomes.push(
@@ -703,10 +746,9 @@ export const sessionCompleted = inngest.createFunction(
             }
           }
 
-          // Use the streak value from the update-dashboard step to avoid
-          // a race condition where concurrent session-completed events
-          // could read the same streak and queue duplicate celebrations.
-          const currentStreak = updatedStreak?.currentStreak ?? 0;
+          // [CR-119.1]: Read streak from the step result (not a closure
+          // variable) so the value survives Inngest replay memoization.
+          const currentStreak = dashboardOutcome.streak?.currentStreak ?? 0;
 
           if (currentStreak === 7) {
             await queueCelebration(db, profileId, 'comet', 'streak_7');

@@ -221,7 +221,7 @@ export function evaluateEscalation(
  */
 export function getEscalationPromptGuidance(
   rung: EscalationRung,
-  sessionType: SessionType
+  _sessionType: SessionType
 ): string {
   switch (rung) {
     case 1:

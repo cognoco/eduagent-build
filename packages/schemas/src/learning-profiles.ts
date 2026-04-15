@@ -32,6 +32,14 @@ export const memoryConsentStatusSchema = z.enum([
 ]);
 export type MemoryConsentStatus = z.infer<typeof memoryConsentStatusSchema>;
 
+export const accommodationModeSchema = z.enum([
+  'none',
+  'short-burst',
+  'audio-first',
+  'predictable',
+]);
+export type AccommodationMode = z.infer<typeof accommodationModeSchema>;
+
 export const learningStyleSchema = z
   .object({
     preferredExplanations: z.array(explanationStyleSchema).optional(),
@@ -78,6 +86,8 @@ export const learningProfileSchema = z.object({
   consentPromptDismissedAt: z.string().datetime().nullable().optional(),
   memoryCollectionEnabled: z.boolean().default(false),
   memoryInjectionEnabled: z.boolean().default(true),
+  accommodationMode: accommodationModeSchema.default('none'),
+  recentlyResolvedTopics: z.array(z.string()).default([]),
   version: z.number().int(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
@@ -121,6 +131,13 @@ export const sessionAnalysisOutputSchema = z.object({
   communicationNotes: z.array(z.string()).nullable(),
   engagementLevel: engagementLevelSchema.nullable(),
   confidence: confidenceLevelSchema,
+  urgencyDeadline: z
+    .object({
+      reason: z.string(),
+      daysFromNow: z.number().int().min(1).max(30),
+    })
+    .nullable()
+    .optional(),
 });
 export type SessionAnalysisOutput = z.infer<typeof sessionAnalysisOutputSchema>;
 
@@ -175,4 +192,13 @@ export const unsuppressInferenceSchema = z.object({
 });
 export type UnsuppressInferenceInput = z.infer<
   typeof unsuppressInferenceSchema
+>;
+
+// --- Accommodation Modes (FR253) ---
+
+export const updateAccommodationModeSchema = z.object({
+  accommodationMode: accommodationModeSchema,
+});
+export type UpdateAccommodationModeInput = z.infer<
+  typeof updateAccommodationModeSchema
 >;

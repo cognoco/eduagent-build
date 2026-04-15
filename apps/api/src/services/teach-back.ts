@@ -5,6 +5,9 @@
 // ---------------------------------------------------------------------------
 
 import type { TeachBackAssessment } from '@eduagent/schemas';
+import { createLogger } from './logger';
+
+const logger = createLogger();
 
 // ---------------------------------------------------------------------------
 // Trigger gating
@@ -113,7 +116,10 @@ export function parseTeachBackAssessment(
       weakestArea,
       gapIdentified,
     };
-  } catch {
+  } catch (err) {
+    logger.warn('Failed to parse teach-back assessment', {
+      error: err instanceof Error ? err.message : String(err),
+    });
     return null;
   }
 }

@@ -85,6 +85,42 @@ export function useTopicRetention(
   });
 }
 
+// FR128-129: Evaluate (Devil's Advocate) eligibility check
+interface EvaluateEligibility {
+  eligible: boolean;
+  topicId: string;
+  topicTitle: string;
+  currentRung: 1 | 2 | 3 | 4;
+  easeFactor: number;
+  repetitions: number;
+  reason?: string;
+}
+
+export function useEvaluateEligibility(
+  topicId: string
+): UseQueryResult<EvaluateEligibility> {
+  const client = useApiClient();
+  const { activeProfile } = useProfile();
+
+  return useQuery({
+    queryKey: ['evaluate-eligibility', topicId, activeProfile?.id],
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const res = await client.topics[':topicId'][
+          'evaluate-eligibility'
+        ].$get({ param: { topicId } }, { init: { signal } });
+        await assertOk(res);
+        return (await res.json()) as EvaluateEligibility;
+      } finally {
+        cleanup();
+      }
+    },
+    enabled: !!activeProfile && !!topicId,
+    staleTime: 5 * 60 * 1000, // 5 min — eligibility changes rarely
+  });
+}
+
 export function useSubmitRecallTest() {
   const client = useApiClient();
   const queryClient = useQueryClient();

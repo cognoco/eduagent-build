@@ -15,11 +15,19 @@ import { clearTransitionState } from '../../lib/auth-transition';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth, useUser } from '@clerk/clerk-expo';
-import type { LearningMode } from '@eduagent/schemas';
-// COMMENTED OUT per BUG-9: accent picker removed (fixed brand decision)
-// import { AccentPicker } from '../../components/common';
+import type {
+  AccommodationMode,
+  KnowledgeInventory,
+  LearningMode,
+} from '@eduagent/schemas';
 import { useProfile } from '../../lib/profile';
+import { useQueryClient } from '@tanstack/react-query';
+import { isNewLearner } from '../../lib/progressive-disclosure';
 import { useExportData } from '../../hooks/use-account';
+import {
+  useLearnerProfile,
+  useUpdateAccommodationMode,
+} from '../../hooks/use-learner-profile';
 import { useFamilySubscription } from '../../hooks/use-subscription';
 import { AccountSecurity } from '../../components/account-security';
 import {
@@ -105,6 +113,34 @@ const LEARNING_MODE_OPTIONS: {
   },
 ];
 
+const ACCOMMODATION_OPTIONS: {
+  mode: AccommodationMode;
+  title: string;
+  description: string;
+}[] = [
+  {
+    mode: 'none',
+    title: 'None',
+    description: 'Standard learning experience',
+  },
+  {
+    mode: 'short-burst',
+    title: 'Short-Burst',
+    description: 'Shorter explanations, frequent check-ins, small steps',
+  },
+  {
+    mode: 'audio-first',
+    title: 'Audio-First',
+    description:
+      'Spoken-style explanations, simple sentences, phonetic support',
+  },
+  {
+    mode: 'predictable',
+    title: 'Predictable',
+    description: 'Clear structure, explicit transitions, concrete examples',
+  },
+];
+
 function LearningModeOption({
   title,
   description,
@@ -153,6 +189,13 @@ export default function MoreScreen() {
   const { signOut } = useAuth();
   const { user } = useUser();
   const { activeProfile, profiles } = useProfile();
+  const queryClient = useQueryClient();
+  const cachedInventory = queryClient.getQueryData<KnowledgeInventory>([
+    'progress',
+    'inventory',
+    activeProfile?.id,
+  ]);
+  const hideMentorMemory = isNewLearner(cachedInventory?.global.totalSessions);
   const exportData = useExportData();
   const [isSigningOut, setIsSigningOut] = useState(false);
   const { data: subscription } = useSubscription();
@@ -167,6 +210,8 @@ export default function MoreScreen() {
   const { data: celebrationLevel, isLoading: celebrationLoading } =
     useCelebrationLevel();
   const updateCelebrationLevel = useUpdateCelebrationLevel();
+  const { data: learnerProfile } = useLearnerProfile();
+  const updateAccommodation = useUpdateAccommodationMode();
 
   const pushEnabled = notifPrefs?.pushEnabled ?? false;
   const weeklyDigest = notifPrefs?.weeklyProgressPush ?? false;
@@ -226,6 +271,21 @@ export default function MoreScreen() {
       }
     },
     [learningMode, updateLearningMode]
+  );
+
+  const handleSelectAccommodation = useCallback(
+    (mode: AccommodationMode) => {
+      if (mode === (learnerProfile?.accommodationMode ?? 'none')) return;
+      updateAccommodation.mutate(
+        { accommodationMode: mode },
+        {
+          onError: () => {
+            Alert.alert('Could not save setting', 'Please try again.');
+          },
+        }
+      );
+    },
+    [learnerProfile?.accommodationMode, updateAccommodation]
   );
 
   const handleExport = useCallback(async () => {
@@ -350,6 +410,23 @@ export default function MoreScreen() {
         ))}
 
         <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2 mt-6">
+          Learning Accommodation
+        </Text>
+        {ACCOMMODATION_OPTIONS.map((opt) => (
+          <LearningModeOption
+            key={opt.mode}
+            title={opt.title}
+            description={opt.description}
+            selected={
+              (learnerProfile?.accommodationMode ?? 'none') === opt.mode
+            }
+            disabled={updateAccommodation.isPending}
+            onPress={() => handleSelectAccommodation(opt.mode)}
+            testID={`accommodation-mode-${opt.mode}`}
+          />
+        ))}
+
+        <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2 mt-6">
           Celebrations
         </Text>
         <LearningModeOption
@@ -401,6 +478,7 @@ export default function MoreScreen() {
           testID="celebration-level-off"
         />
 
+        {/* Homework Help — hidden until parent-controlled toggle is implemented
         <Pressable
           onPress={() => router.push('/(app)/homework/camera')}
           className="bg-surface rounded-card px-4 py-3.5 mb-2 mt-2"
@@ -415,6 +493,7 @@ export default function MoreScreen() {
             Snap a photo and get guided through it step by step
           </Text>
         </Pressable>
+        */}
 
         {activeProfile?.isOwner && (
           <>
@@ -455,10 +534,12 @@ export default function MoreScreen() {
           value={displayName}
           onPress={() => router.push('/profiles')}
         />
-        <SettingsRow
-          label="What My Mentor Knows"
-          onPress={() => router.push('/(app)/mentor-memory')}
-        />
+        {!hideMentorMemory ? (
+          <SettingsRow
+            label="What My Mentor Knows"
+            onPress={() => router.push('/(app)/mentor-memory')}
+          />
+        ) : null}
         <SettingsRow
           label="Subscription"
           value={
@@ -479,7 +560,11 @@ export default function MoreScreen() {
           label="Terms of Service"
           onPress={() => router.push('/terms')}
         />
-        <SettingsRow label="Export my data" onPress={handleExport} />
+        <SettingsRow
+          label="Export my data"
+          onPress={exportData.isPending ? undefined : handleExport}
+          value={exportData.isPending ? 'Preparing export...' : undefined}
+        />
         <SettingsRow
           label="Delete account"
           onPress={() => router.push('/delete-account')}

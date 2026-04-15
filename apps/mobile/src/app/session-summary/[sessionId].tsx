@@ -12,7 +12,8 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useTheme, useThemeColors } from '../../lib/theme';
+import { useThemeColors } from '../../lib/theme';
+import { useProfile, personaFromBirthYear } from '../../lib/profile';
 import { useUpdateLearningMode } from '../../hooks/use-settings';
 import { useRatingPrompt } from '../../hooks/use-rating-prompt';
 import {
@@ -69,7 +70,8 @@ export default function SessionSummaryScreen() {
   const updateLearningMode = useUpdateLearningMode();
   const transcript = useSessionTranscript(sessionId ?? '');
   const { onSuccessfulRecall } = useRatingPrompt();
-  const { persona } = useTheme();
+  const { activeProfile } = useProfile();
+  const persona = personaFromBirthYear(activeProfile?.birthYear);
   const recallBridge = useRecallBridge(sessionId ?? '');
   const [recallQuestions, setRecallQuestions] = useState<string[] | null>(null);
 
@@ -208,8 +210,13 @@ export default function SessionSummaryScreen() {
         },
         level: 'info',
       });
-    } catch {
-      // Error state handled by mutation
+    } catch (err) {
+      // Error state surfaced by submitSummary.isError inline in JSX [SC-1]
+      console.error('[SessionSummary] handleSubmit failed:', err);
+      Alert.alert(
+        'Could not save',
+        'Your reflection could not be saved. Please try again.'
+      );
     } finally {
       submitInFlight.current = false;
     }

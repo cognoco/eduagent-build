@@ -2360,7 +2360,7 @@ _Prerequisite-aware learning — visual knowledge graph, topological ordering, a
 | REQUIRED dependents only | Warning emphasizes "required prerequisite" |
 | RECOMMENDED dependents only | Softer warning: "may be helpful for" |
 | Mixed REQUIRED + RECOMMENDED | List both with labels |
-| "Skip Anyway" tap | Topic marked skipped, prerequisite edges deleted, dependents become unlocked, `prerequisiteContext` logged |
+| "Skip Anyway" tap | Topic marked skipped, skip recorded in `curriculumAdaptations`, prerequisite edges preserved (advisory only) |
 | "Keep" tap | Dialog dismissed, no changes |
 
 **Failure States:**
@@ -2685,7 +2685,7 @@ _Learning verification via devil's advocate challenges — the AI presents delib
 **Implementation Notes:**
 - Reuses existing MessageThread with visual differentiation — not a separate wrapper. CHALLENGE badge and `bg-challenge` background applied to the message container. See MessageThread decomposition above.
 - `buildEvaluatePrompt` template in `services/llm/prompts/` constructs the flawed-explanation prompt
-- `evaluateDifficultyRung` stored on retention card, controls flaw subtlety (1 = obvious flaw, 5 = subtle flaw)
+- `evaluateDifficultyRung` stored on retention card, controls flaw subtlety (1 = obvious flaw, 4 = subtle flaw)
 - Route: same session routes — EVALUATE is a verification sub-mode, not a separate session type
 - Threshold check: `easeFactor >= 2.5 AND repetitions > 0` in verification topic selection
 

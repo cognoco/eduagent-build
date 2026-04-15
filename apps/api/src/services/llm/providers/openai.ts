@@ -4,6 +4,9 @@ import {
   type ChatMessage,
   type ModelConfig,
 } from '../types';
+import { createLogger } from '../../logger';
+
+const logger = createLogger();
 
 // ---------------------------------------------------------------------------
 // OpenAI Provider — fallback for Gemini (ARCH-8, ARCH-9)
@@ -65,9 +68,9 @@ const MODEL_MAP: Record<string, string> = {
 function mapModel(config: ModelConfig): string {
   const mapped = MODEL_MAP[config.model];
   if (!mapped) {
-    console.warn(
-      `[llm:openai] No model mapping for "${config.model}", defaulting to gpt-4o-mini`
-    );
+    logger.warn('[llm:openai] No model mapping, defaulting to gpt-4o-mini', {
+      model: config.model,
+    });
   }
   return mapped ?? 'gpt-4o-mini';
 }

@@ -155,12 +155,17 @@ export default function CameraScreen(): React.ReactNode {
                 action: 'auto-create-subject',
               },
             });
+            Alert.alert(
+              'Could not detect subject',
+              'Please select your subject manually.'
+            );
             setShowSubjectPicker(true);
           }
         } else {
           setShowSubjectPicker(true);
         }
-      } catch {
+      } catch (err) {
+        console.error('[Homework] Subject classification failed:', err);
         setShowSubjectPicker(true);
       }
     }

@@ -80,16 +80,21 @@ export async function extractVocabularyFromTranscript(
           (item.type === 'word' || item.type === 'chunk')
       )
       .slice(0, 8)
-      .map((item) => ({
-        term: item.term.trim(),
-        translation: item.translation.trim(),
-        type: item.type,
-        cefrLevel: cefrLevelSchema.safeParse(item.cefrLevel).success
-          ? (item.cefrLevel as string)
-          : null,
-      }));
+      .map((item) => {
+        const cefrParsed = cefrLevelSchema.safeParse(item.cefrLevel);
+        return {
+          term: item.term.trim(),
+          translation: item.translation.trim(),
+          type: item.type,
+          cefrLevel: cefrParsed.success ? cefrParsed.data : null,
+        };
+      });
   } catch (err) {
-    console.warn('[extractVocabularyFromTranscript] extraction failed:', err);
+    // SC-6: Log at error level for prod observability. Returning [] is intentional —
+    // the caller (session-completed Inngest fn) treats empty-on-error same as
+    // genuine-empty (skips vocabulary update), which is acceptable for this
+    // best-effort extraction step.
+    console.error('[extractVocabularyFromTranscript] extraction failed:', err);
     return [];
   }
 }

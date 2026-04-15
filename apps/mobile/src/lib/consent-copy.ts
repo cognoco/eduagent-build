@@ -1,4 +1,4 @@
-import type { Persona } from './theme';
+import type { Persona } from './profile';
 
 // ── Consent Hand-Off Screen ──────────────────────────────────────────
 

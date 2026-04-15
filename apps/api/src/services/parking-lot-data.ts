@@ -97,6 +97,7 @@ export async function addParkingLotItem(
       })
       .returning();
 
-    return mapRow(row!);
+    if (!row) throw new Error('Insert parking lot item did not return a row');
+    return mapRow(row);
   }) as Promise<ReturnType<typeof mapRow> | null>;
 }

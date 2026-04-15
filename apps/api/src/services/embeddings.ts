@@ -94,7 +94,10 @@ export async function generateEmbedding(
 
   const json = (await response.json()) as VoyageEmbeddingResponse;
 
-  const vector = json.data[0]!.embedding;
+  const firstEmbedding = json.data[0];
+  if (!firstEmbedding)
+    throw new Error('Voyage AI response contained no embedding data');
+  const vector = firstEmbedding.embedding;
 
   return {
     vector,

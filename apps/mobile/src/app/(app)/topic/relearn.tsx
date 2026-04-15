@@ -10,7 +10,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useStartRelearn } from '../../../hooks/use-retention';
 // Persona-conditional copy — documented exception, same pattern as (app)/home.tsx
-import { useTheme } from '../../../lib/theme';
+import { useProfile, personaFromBirthYear } from '../../../lib/profile';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { formatApiError } from '../../../lib/format-api-error';
 
@@ -90,7 +90,8 @@ export default function RelearnScreen() {
   }>();
 
   const startRelearn = useStartRelearn();
-  const { persona } = useTheme();
+  const { activeProfile } = useProfile();
+  const persona = personaFromBirthYear(activeProfile?.birthYear);
 
   const isLearner = persona === 'learner';
   const methods = isLearner ? TEACHING_METHODS_LEARNER : TEACHING_METHODS;

@@ -554,6 +554,39 @@ describe('getContinueSuggestion', () => {
     expect(result!.topicTitle).toBe('Algebra');
     expect(result!.subjectId).toBe(subjectId);
     expect(result!.subjectName).toBe('Mathematics');
+    expect(result!.lastSessionId).toBeNull();
+  });
+
+  it('includes lastSessionId when an active session exists', async () => {
+    const subject = mockSubjectRow();
+    const topic1 = mockTopicRow({
+      id: 'topic-1',
+      title: 'Algebra',
+      sortOrder: 1,
+    });
+
+    setupScopedRepo({
+      subjectsFindMany: [subject],
+      retentionCardsFindMany: [],
+      assessmentsFindMany: [],
+      sessionsFindMany: [
+        {
+          ...mockSessionRow(),
+          id: 'active-session-1',
+          status: 'active' as const,
+          lastActivityAt: new Date('2026-02-15T09:00:00.000Z'),
+        },
+      ],
+    });
+    const db = createMockDb({
+      curriculumSelectRows: [{ id: curriculumId, subjectId, version: 1 }],
+      topicsFindMany: [topic1],
+    });
+
+    const result = await getContinueSuggestion(db, profileId);
+
+    expect(result).not.toBeNull();
+    expect(result!.lastSessionId).toBe('active-session-1');
   });
 
   it('skips paused subjects', async () => {
@@ -562,5 +595,70 @@ describe('getContinueSuggestion', () => {
     const db = createMockDb();
     const result = await getContinueSuggestion(db, profileId);
     expect(result).toBeNull();
+  });
+
+  it('picks the most recently active subject, not the oldest', async () => {
+    const geoSubjectId = 'geo-subject-id';
+    const sciSubjectId = 'sci-subject-id';
+    const geoCurriculumId = 'geo-curriculum-id';
+    const sciCurriculumId = 'sci-curriculum-id';
+
+    // Geography enrolled first (insertion order), Science enrolled second
+    const geography = mockSubjectRow({
+      id: geoSubjectId,
+      name: 'Geography',
+    });
+    const science = mockSubjectRow({ id: sciSubjectId, name: 'Science' });
+
+    const geoTopic = mockTopicRow({
+      id: 'geo-topic',
+      title: 'Map Reading',
+      sortOrder: 1,
+    });
+    // Override curriculumId for science topic
+    const sciTopic = {
+      ...mockTopicRow({
+        id: 'sci-topic',
+        title: 'Photosynthesis',
+        sortOrder: 1,
+      }),
+      curriculumId: sciCurriculumId,
+    };
+
+    setupScopedRepo({
+      subjectsFindMany: [geography, science], // Geography first by insertion order
+      retentionCardsFindMany: [],
+      assessmentsFindMany: [],
+      sessionsFindMany: [
+        {
+          ...mockSessionRow({ subjectId: geoSubjectId }),
+          id: 'old-geo-session',
+          status: 'completed' as const,
+          lastActivityAt: new Date('2026-02-08T10:00:00.000Z'), // 1 week ago
+        },
+        {
+          ...mockSessionRow({ subjectId: sciSubjectId }),
+          id: 'recent-sci-session',
+          status: 'active' as const,
+          lastActivityAt: new Date('2026-02-15T09:00:00.000Z'), // 1 hour ago
+        },
+      ],
+    });
+
+    const db = createMockDb({
+      curriculumSelectRows: [
+        { id: geoCurriculumId, subjectId: geoSubjectId, version: 1 },
+        { id: sciCurriculumId, subjectId: sciSubjectId, version: 1 },
+      ],
+      topicsFindMany: [geoTopic, sciTopic],
+    });
+
+    const result = await getContinueSuggestion(db, profileId);
+
+    expect(result).not.toBeNull();
+    // Should pick Science (most recent activity), NOT Geography (oldest)
+    expect(result!.subjectId).toBe(sciSubjectId);
+    expect(result!.subjectName).toBe('Science');
+    expect(result!.lastSessionId).toBe('recent-sci-session');
   });
 });

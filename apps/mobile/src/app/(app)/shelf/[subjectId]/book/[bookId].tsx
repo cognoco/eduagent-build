@@ -17,14 +17,17 @@ import { SessionRow } from '../../../../../components/library/SessionRow';
 import { ChapterDivider } from '../../../../../components/library/ChapterDivider';
 import {
   useBookWithTopics,
+  useBooks,
   useGenerateBookTopics,
 } from '../../../../../hooks/use-books';
 import {
   useBookSessions,
   type BookSession,
 } from '../../../../../hooks/use-book-sessions';
+import { useMoveTopic } from '../../../../../hooks/use-move-topic';
 import { useTopicSuggestions } from '../../../../../hooks/use-topic-suggestions';
 import { useBookNotes } from '../../../../../hooks/use-notes';
+import { useCurriculum } from '../../../../../hooks/use-curriculum';
 import { useSubjects } from '../../../../../hooks/use-subjects';
 import { InlineNoteCard } from '../../../../../components/library/InlineNoteCard';
 import { formatApiError } from '../../../../../lib/format-api-error';
@@ -97,10 +100,24 @@ export default function BookScreen() {
   const suggestionsQuery = useTopicSuggestions(subjectId, bookId);
   const notesQuery = useBookNotes(subjectId, bookId);
   const generateMutation = useGenerateBookTopics(subjectId, bookId);
+  const curriculumQuery = useCurriculum(subjectId);
+  const hasCurriculum = (curriculumQuery.data?.topics?.length ?? 0) > 0;
   const subjectsQuery = useSubjects();
   const subjectName = subjectsQuery.data?.find((s) => s.id === subjectId)?.name;
+  const allBooksQuery = useBooks(subjectId);
+  const moveTopic = useMoveTopic();
 
   const handleBack = useCallback(() => {
+    const books = Array.isArray(allBooksQuery.data) ? allBooksQuery.data : null;
+
+    // Single-book shelf: go to library directly.
+    // Going to the shelf would hit the auto-skip dead-end (returns null or
+    // redirects back to this book, causing a loop/crash on web).
+    if (books !== null && books.length <= 1) {
+      goBackOrReplace(router, '/(app)/library');
+      return;
+    }
+
     if (subjectId) {
       goBackOrReplace(router, {
         pathname: '/(app)/shelf/[subjectId]',
@@ -110,7 +127,7 @@ export default function BookScreen() {
     }
 
     goBackOrReplace(router, '/(app)/library');
-  }, [router, subjectId]);
+  }, [router, subjectId, allBooksQuery.data]);
 
   // --- Generation auto-trigger ---
   const [genPhase, setGenPhase] = useState<GenerationPhase>('idle');
@@ -165,8 +182,13 @@ export default function BookScreen() {
   }, [needsGeneration]);
 
   const retryTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  // RT-1: ref lock prevents double-fire from rapid taps on the retry button
+  const retryInFlight = useRef(false);
 
   const handleRetryGeneration = () => {
+    if (retryInFlight.current) return;
+    retryInFlight.current = true;
+
     // Clear any leftover retry timers before starting new ones
     for (const t of retryTimersRef.current) clearTimeout(t);
     retryTimersRef.current = [];
@@ -185,6 +207,7 @@ export default function BookScreen() {
       onSuccess: () => {
         setGenPhase('idle');
         alreadyPending.current = false;
+        retryInFlight.current = false;
         for (const t of retryTimersRef.current) clearTimeout(t);
         retryTimersRef.current = [];
         void bookQuery.refetch();
@@ -192,6 +215,7 @@ export default function BookScreen() {
       onError: (error) => {
         setGenPhase('timed_out');
         alreadyPending.current = false;
+        retryInFlight.current = false;
         for (const t of retryTimersRef.current) clearTimeout(t);
         retryTimersRef.current = [];
         Alert.alert('Generation failed', formatApiError(error));
@@ -292,6 +316,58 @@ export default function BookScreen() {
     [router]
   );
 
+  // --- Long-press: context menu for moving topic to a different book ---
+  const handleSessionLongPress = useCallback(
+    (session: BookSession) => {
+      if (!subjectId || !bookId || isReadOnly) return;
+      const otherBooks = (allBooksQuery.data ?? []).filter(
+        (b) => b.id !== bookId
+      );
+
+      if (otherBooks.length === 0) {
+        Alert.alert(
+          session.topicTitle,
+          'This is the only book on this shelf — there is nowhere to move this topic.'
+        );
+        return;
+      }
+
+      const moveButtons = otherBooks.map((targetBook) => ({
+        text: `${targetBook.emoji ? targetBook.emoji + ' ' : ''}${
+          targetBook.title
+        }`,
+        onPress: () => {
+          if (!session.topicId) return;
+          moveTopic.mutate(
+            {
+              subjectId,
+              bookId,
+              topicId: session.topicId,
+              targetBookId: targetBook.id,
+            },
+            {
+              onSuccess: () => {
+                Alert.alert(
+                  'Moved',
+                  `"${session.topicTitle}" moved to ${targetBook.title}.`
+                );
+              },
+              onError: (err) => {
+                Alert.alert('Could not move topic', formatApiError(err));
+              },
+            }
+          );
+        },
+      }));
+
+      Alert.alert(session.topicTitle, 'Move to a different book?', [
+        ...moveButtons,
+        { text: 'Cancel', style: 'cancel' },
+      ]);
+    },
+    [subjectId, bookId, isReadOnly, allBooksQuery.data, moveTopic]
+  );
+
   // --- Start learning: navigate to session with first suggestion or first uncovered topic ---
   const handleStartLearning = useCallback(() => {
     // Try first suggestion card (which may be a pre-generated topic)
@@ -333,6 +409,17 @@ export default function BookScreen() {
       } as never);
     }
   }, [suggestionCards, topics, completedTopicIds, router, subjectId]);
+
+  const handleBuildLearningPath = useCallback(() => {
+    router.push({
+      pathname: '/(app)/onboarding/interview',
+      params: {
+        subjectId,
+        bookId,
+        bookTitle: book?.title ?? '',
+      },
+    } as never);
+  }, [router, subjectId, bookId, book?.title]);
 
   // --- Auto-start session when navigated with autoStart=true (M-12) ---
   const autoStartTriggered = useRef(false);
@@ -620,8 +707,29 @@ export default function BookScreen() {
           </View>
         )}
 
+        {/* Session list error state [SQ-3] */}
+        {sessionsQuery.isError && (
+          <View
+            className="mx-5 mb-4 rounded-card bg-surface-elevated p-4"
+            testID="sessions-error"
+          >
+            <Text className="text-body-sm text-danger mb-2">
+              Could not load session history.
+            </Text>
+            <Pressable
+              onPress={() => void sessionsQuery.refetch()}
+              className="self-start"
+              testID="sessions-retry-button"
+            >
+              <Text className="text-body-sm text-primary font-semibold">
+                Retry
+              </Text>
+            </Pressable>
+          </View>
+        )}
+
         {/* Session list */}
-        {sessions.length > 0 && (
+        {!sessionsQuery.isError && sessions.length > 0 && (
           <View className="mb-4">
             <Text className="text-body-sm font-semibold text-text-secondary mb-1 px-5 uppercase tracking-wide">
               Past sessions
@@ -639,6 +747,11 @@ export default function BookScreen() {
                           s.topicId != null && noteTopicIds.has(s.topicId)
                         }
                         onPress={() => handleSessionPress(s)}
+                        onLongPress={
+                          s.topicId
+                            ? () => handleSessionLongPress(s)
+                            : undefined
+                        }
                         testID={`session-${s.id}`}
                       />
                     ))}
@@ -651,6 +764,9 @@ export default function BookScreen() {
                     relativeDate={formatRelativeDate(s.createdAt)}
                     hasNote={s.topicId != null && noteTopicIds.has(s.topicId)}
                     onPress={() => handleSessionPress(s)}
+                    onLongPress={
+                      s.topicId ? () => handleSessionLongPress(s) : undefined
+                    }
                     testID={`session-${s.id}`}
                   />
                 ))}
@@ -715,6 +831,7 @@ export default function BookScreen() {
 
         {/* Empty state — no sessions yet (only when no topics completed) */}
         {sessions.length === 0 &&
+          !sessionsQuery.isError &&
           !needsGeneration &&
           topics.length > 0 &&
           completedTopicCount === 0 && (
@@ -730,9 +847,29 @@ export default function BookScreen() {
               <Text className="text-body text-text-secondary text-center mt-3 mb-1">
                 No sessions yet
               </Text>
-              <Text className="text-body-sm text-text-secondary text-center mb-4">
-                Pick a topic above to start learning
-              </Text>
+              {hasCurriculum ? (
+                <Text className="text-body-sm text-text-secondary text-center mb-4">
+                  Tap Start learning below to jump in — a topic will be picked
+                  for you automatically.
+                </Text>
+              ) : (
+                <>
+                  <Text className="text-body-sm text-text-secondary text-center mb-4">
+                    Start with a learning path tailored to you, or tap Start
+                    learning below to jump straight in.
+                  </Text>
+                  <Pressable
+                    onPress={handleBuildLearningPath}
+                    className="bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
+                    testID="book-build-learning-path"
+                    accessibilityLabel="Build my learning path"
+                  >
+                    <Text className="text-text-primary text-body font-semibold">
+                      Build my learning path
+                    </Text>
+                  </Pressable>
+                </>
+              )}
             </View>
           )}
 
@@ -787,6 +924,18 @@ export default function BookScreen() {
                 : 'Start learning'}
             </Text>
           </Pressable>
+          {!hasCurriculum && !isReadOnly && (
+            <Pressable
+              onPress={handleBuildLearningPath}
+              className="mt-2 py-2 items-center"
+              testID="book-build-path-link"
+              accessibilityLabel="Build a learning path"
+            >
+              <Text className="text-body-sm text-text-secondary underline">
+                Build a learning path
+              </Text>
+            </Pressable>
+          )}
         </View>
       )}
     </View>

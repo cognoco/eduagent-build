@@ -108,6 +108,9 @@ export const notificationTypeEnum = pgEnum('notification_type', [
   'weekly_progress',
   'monthly_report',
   'progress_refresh',
+  'struggle_noticed',
+  'struggle_flagged',
+  'struggle_resolved',
 ]);
 
 export const notificationLog = pgTable(

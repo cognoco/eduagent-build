@@ -4,6 +4,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { BaseCoachingCard } from './BaseCoachingCard';
 import { RetentionSignal, type RetentionStatus } from '../progress';
 import { useThemeColors } from '../../lib/theme';
+import {
+  isNewLearner,
+  sessionsUntilFullProgress,
+} from '../../lib/progressive-disclosure';
 
 interface SubjectInfo {
   name: string;
@@ -20,6 +24,7 @@ interface ParentDashboardSummaryProps {
   totalTimeThisWeek: number;
   totalTimeLastWeek: number;
   retentionTrend?: 'improving' | 'declining' | 'stable';
+  totalSessions?: number;
   progress?: {
     topicsMastered: number;
     vocabularyTotal: number;
@@ -130,12 +135,15 @@ export function ParentDashboardSummary({
   totalTimeThisWeek,
   totalTimeLastWeek,
   retentionTrend,
+  totalSessions,
   progress,
   onDrillDown,
   isLoading,
 }: ParentDashboardSummaryProps): ReactNode {
   const colors = useThemeColors();
   const aggregateSignal = deriveAggregateSignal(subjects);
+  const showFullSignals = !isNewLearner(totalSessions);
+  const remaining = sessionsUntilFullProgress(totalSessions);
 
   const trendText = `${sessionsThisWeek} sessions, ${formatTime(
     totalTimeThisWeek
@@ -145,61 +153,67 @@ export function ParentDashboardSummary({
 
   const metadata = (
     <>
-      {aggregateSignal ? (
-        <View
-          className="flex-row items-center mt-1"
-          testID="aggregate-signal"
-          accessibilityLabel={`Overall status: ${AGGREGATE_SIGNAL_CONFIG[aggregateSignal].label}`}
-        >
-          <Ionicons
-            name={AGGREGATE_SIGNAL_CONFIG[aggregateSignal].icon}
-            size={16}
-            color={colors[AGGREGATE_SIGNAL_CONFIG[aggregateSignal].colorKey]}
-            style={{ marginRight: 8 }}
-          />
-          <Text
-            className={`text-body-sm font-semibold ${AGGREGATE_SIGNAL_CONFIG[aggregateSignal].textColor}`}
+      {showFullSignals ? (
+        aggregateSignal ? (
+          <View
+            className="flex-row items-center mt-1"
+            testID="aggregate-signal"
+            accessibilityLabel={`Overall status: ${AGGREGATE_SIGNAL_CONFIG[aggregateSignal].label}`}
           >
-            {AGGREGATE_SIGNAL_CONFIG[aggregateSignal].label}
+            <Ionicons
+              name={AGGREGATE_SIGNAL_CONFIG[aggregateSignal].icon}
+              size={16}
+              color={colors[AGGREGATE_SIGNAL_CONFIG[aggregateSignal].colorKey]}
+              style={{ marginRight: 8 }}
+            />
+            <Text
+              className={`text-body-sm font-semibold ${AGGREGATE_SIGNAL_CONFIG[aggregateSignal].textColor}`}
+            >
+              {AGGREGATE_SIGNAL_CONFIG[aggregateSignal].label}
+            </Text>
+          </View>
+        ) : (
+          <Text
+            className="text-caption text-text-secondary mt-1"
+            testID="aggregate-signal-empty"
+          >
+            No data yet
           </Text>
-        </View>
-      ) : (
-        <Text
-          className="text-caption text-text-secondary mt-1"
-          testID="aggregate-signal-empty"
-        >
-          No data yet
-        </Text>
-      )}
+        )
+      ) : null}
       <Text
         className="text-caption text-text-secondary mt-1"
         accessibilityLabel={`Trend: ${trendText}`}
       >
         {trendText}
       </Text>
-      {retentionTrend ? (
-        <View
-          className="flex-row items-center mt-1.5"
-          testID="retention-trend-badge"
-          accessibilityLabel={`Retention: ${retentionTrend}`}
-        >
-          <Text className="text-caption text-text-secondary">Retention: </Text>
-          <Text
-            className={`text-caption font-semibold ${RETENTION_TREND_CONFIG[retentionTrend].className}`}
+      {showFullSignals ? (
+        retentionTrend ? (
+          <View
+            className="flex-row items-center mt-1.5"
+            testID="retention-trend-badge"
+            accessibilityLabel={`Retention: ${retentionTrend}`}
           >
-            {RETENTION_TREND_CONFIG[retentionTrend].arrow}{' '}
-            {RETENTION_TREND_CONFIG[retentionTrend].label}
+            <Text className="text-caption text-text-secondary">
+              Retention:{' '}
+            </Text>
+            <Text
+              className={`text-caption font-semibold ${RETENTION_TREND_CONFIG[retentionTrend].className}`}
+            >
+              {RETENTION_TREND_CONFIG[retentionTrend].arrow}{' '}
+              {RETENTION_TREND_CONFIG[retentionTrend].label}
+            </Text>
+          </View>
+        ) : (
+          <Text
+            className="text-caption text-text-secondary mt-1.5"
+            testID="retention-trend-empty"
+          >
+            No data yet
           </Text>
-        </View>
-      ) : (
-        <Text
-          className="text-caption text-text-secondary mt-1.5"
-          testID="retention-trend-empty"
-        >
-          No data yet
-        </Text>
-      )}
-      {progress ? (
+        )
+      ) : null}
+      {showFullSignals && progress ? (
         <View className="mt-3 gap-2">
           <View className="flex-row flex-wrap gap-2">
             <View className="bg-background rounded-full px-3 py-1.5">
@@ -236,7 +250,7 @@ export function ParentDashboardSummary({
           ) : null}
         </View>
       ) : null}
-      {subjects.length > 0 && (
+      {showFullSignals && subjects.length > 0 ? (
         <View className="flex-row flex-wrap gap-2 mt-2">
           {subjects.map((subject) => (
             <View
@@ -250,7 +264,16 @@ export function ParentDashboardSummary({
             </View>
           ))}
         </View>
-      )}
+      ) : null}
+      {!showFullSignals ? (
+        <Text
+          className="text-caption text-text-secondary mt-2"
+          testID="parent-dashboard-teaser"
+        >
+          After {remaining} more {remaining === 1 ? 'session' : 'sessions'},
+          you'll see {childName}'s retention trends and detailed progress here.
+        </Text>
+      ) : null}
     </>
   );
 

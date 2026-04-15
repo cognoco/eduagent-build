@@ -274,7 +274,7 @@ describe('OpenAI Provider', () => {
       const body = JSON.parse(mockFetch.mock.calls[0][1].body);
       expect(body.model).toBe('gpt-4o-mini');
       expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('No model mapping for "gemini-3.0-flash"')
+        expect.stringContaining('gemini-3.0-flash')
       );
       warnSpy.mockRestore();
     });

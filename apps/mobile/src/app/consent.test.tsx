@@ -48,8 +48,13 @@ jest.mock('../hooks/use-consent', () => ({
   }),
 }));
 
+const mockUseNetworkStatus = jest.fn(() => ({
+  isOffline: false,
+  isReady: true,
+}));
+
 jest.mock('../hooks/use-network-status', () => ({
-  useNetworkStatus: () => ({ isOffline: false, isReady: true }),
+  useNetworkStatus: () => mockUseNetworkStatus(),
 }));
 
 /**
@@ -120,6 +125,7 @@ describe('ConsentScreen', () => {
     jest.useFakeTimers();
     mockChildEmail = undefined;
     mockCanGoBack.mockReturnValue(true);
+    mockUseNetworkStatus.mockReturnValue({ isOffline: false, isReady: true });
   });
 
   afterEach(() => {
@@ -610,6 +616,53 @@ describe('ConsentScreen', () => {
 
       // No intermediate opacity=0 state; pointerEvents should be 'auto'
       // (isTransitioning stays false when reduced motion skips animation)
+    });
+  });
+
+  // ── Offline state (BUG-311) ──────────────────────────────────────
+
+  describe('offline state', () => {
+    beforeEach(() => {
+      mockUseNetworkStatus.mockReturnValue({ isOffline: true, isReady: true });
+    });
+
+    it('disables submit button in child phase when offline', () => {
+      render(<ConsentScreen />, { wrapper: Wrapper });
+      fireEvent.changeText(
+        screen.getByTestId('consent-email'),
+        'parent@example.com'
+      );
+
+      const button = screen.getByTestId('consent-submit');
+      expect(
+        button.props.accessibilityState?.disabled ?? button.props.disabled
+      ).toBeTruthy();
+    });
+
+    it('disables submit button in parent phase when offline', () => {
+      render(<ConsentScreen />, { wrapper: Wrapper });
+      fireEvent.press(screen.getByTestId('consent-handoff-button'));
+      flushFadeAnimation();
+      fireEvent.changeText(
+        screen.getByTestId('consent-email'),
+        'parent@example.com'
+      );
+
+      const button = screen.getByTestId('consent-submit');
+      expect(
+        button.props.accessibilityState?.disabled ?? button.props.disabled
+      ).toBeTruthy();
+    });
+
+    it('does not call the API when submit is pressed while offline', () => {
+      render(<ConsentScreen />, { wrapper: Wrapper });
+      fireEvent.changeText(
+        screen.getByTestId('consent-email'),
+        'parent@example.com'
+      );
+      fireEvent.press(screen.getByTestId('consent-submit'));
+
+      expect(mockMutateAsync).not.toHaveBeenCalled();
     });
   });
 });

@@ -59,7 +59,7 @@ const FIRST_SESSION: Record<string, string> = {
   homework:
     "Welcome! I'm your learning mate. Let's tackle this homework together. What are you working on?",
   learning:
-    "Hey there! I'm excited to learn with you. What topic would you like to explore?",
+    "Hi! I'm your learning mate. I'll teach you stuff and check if it sticks — ask me anything along the way. Ready to start?",
   practice:
     "Welcome to your first practice session! Let's see what you know. Ready?",
   freeform:
@@ -121,7 +121,7 @@ export function getOpeningMessage(
 
   if (topicName) {
     if (sessionExperience <= 0) {
-      return `Today we're exploring "${topicName}". I'll walk you through the key ideas — feel free to ask questions anytime!`;
+      return `Today we're starting with "${topicName}". I'll explain the key ideas and check they make sense — jump in anytime if something's unclear.`;
     }
     if (sessionExperience <= 2) {
       return `Let's dive into "${topicName}". Ready to start, or is there something specific you'd like to focus on?`;

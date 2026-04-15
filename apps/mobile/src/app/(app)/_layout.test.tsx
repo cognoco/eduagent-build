@@ -43,6 +43,7 @@ jest.mock('@clerk/clerk-expo', () => ({
 
 jest.mock('../../lib/profile', () => ({
   useProfile: () => mockUseProfile(),
+  personaFromBirthYear: () => 'learner',
 }));
 
 jest.mock('@tanstack/react-query', () => ({
@@ -60,7 +61,6 @@ jest.mock('../../hooks/use-consent', () => ({
 }));
 
 jest.mock('../../lib/theme', () => ({
-  useTheme: () => ({ persona: 'parent' }),
   useThemeColors: () => ({
     accent: '#0ea5e9',
     border: '#d4d4d8',

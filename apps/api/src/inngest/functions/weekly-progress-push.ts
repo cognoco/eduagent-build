@@ -1,5 +1,6 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import {
+  accounts,
   familyLinks,
   notificationPreferences,
   profiles,
@@ -32,6 +33,23 @@ function sumTopicsExplored(metrics: {
   );
 }
 
+// [FR239.1 UX-9] Returns true when 09:00 local time matches the UTC hour of nowUtc.
+// Parents with no timezone (or an invalid one) fall back to UTC, so they are
+// processed in the 09:00 UTC run.
+function isLocalHour9(timezone: string | null, nowUtc: Date): boolean {
+  if (!timezone) return nowUtc.getUTCHours() === 9;
+  try {
+    const localTimeStr = nowUtc.toLocaleString('en-US', {
+      timeZone: timezone,
+      hour: 'numeric',
+      hour12: false,
+    });
+    return parseInt(localTimeStr, 10) === 9;
+  } catch {
+    return nowUtc.getUTCHours() === 9;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // [EP15-I1 AR-9] Fan-out pattern.
 //
@@ -56,18 +74,41 @@ export const weeklyProgressPushCron = inngest.createFunction(
     id: 'progress-weekly-parent-push',
     name: 'Queue weekly parent progress summary fan-out',
   },
-  { cron: '0 9 * * 1' },
+  { cron: '0 * * * 1' },
   async ({ step }) => {
     const parentIds = await step.run('find-weekly-parents', async () => {
       const db = getStepDatabase();
-      const parents = await db.query.notificationPreferences.findMany({
+      const nowUtc = new Date();
+
+      // 1. Find all parents who have weekly progress push enabled.
+      const prefs = await db.query.notificationPreferences.findMany({
         where: and(
           eq(notificationPreferences.pushEnabled, true),
           eq(notificationPreferences.weeklyProgressPush, true)
         ),
         columns: { profileId: true },
       });
-      return parents.map((p) => p.profileId);
+
+      if (prefs.length === 0) return [];
+
+      const eligibleProfileIds = prefs.map((p) => p.profileId);
+
+      // 2. Fetch each parent profile's account timezone in one query.
+      //    profiles.accountId → accounts.timezone
+      const profileTimezones = await db
+        .select({ profileId: profiles.id, timezone: accounts.timezone })
+        .from(profiles)
+        .innerJoin(accounts, eq(profiles.accountId, accounts.id))
+        .where(inArray(profiles.id, eligibleProfileIds));
+
+      const timezoneByProfileId = new Map(
+        profileTimezones.map((r) => [r.profileId, r.timezone])
+      );
+
+      // 3. Keep only parents whose local time is 09:00 right now. [FR239.1 UX-9]
+      return eligibleProfileIds.filter((id) =>
+        isLocalHour9(timezoneByProfileId.get(id) ?? null, nowUtc)
+      );
     });
 
     if (parentIds.length === 0) {
@@ -181,7 +222,7 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
         const result = await sendPushNotification(db, {
           profileId: parentId,
           title: 'Weekly learning progress',
-          body: childSummaries.slice(0, 2).join(' '),
+          body: childSummaries.join(' '),
           type: 'weekly_progress',
         });
 

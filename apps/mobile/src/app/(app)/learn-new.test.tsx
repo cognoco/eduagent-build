@@ -11,6 +11,7 @@ const mockReplace = jest.fn();
 const mockCanGoBack = jest.fn();
 const mockReadSessionRecoveryMarker = jest.fn();
 const mockUseContinueSuggestion = jest.fn();
+const mockUseReviewSummary = jest.fn();
 const mockUseSubjects = jest.fn();
 
 jest.mock('expo-router', () => ({
@@ -39,6 +40,7 @@ jest.mock('../../lib/theme', () => ({
 
 jest.mock('../../hooks/use-progress', () => ({
   useContinueSuggestion: () => mockUseContinueSuggestion(),
+  useReviewSummary: () => mockUseReviewSummary(),
 }));
 
 jest.mock('../../hooks/use-subjects', () => ({
@@ -60,6 +62,7 @@ describe('LearnNewScreen', () => {
     mockReadSessionRecoveryMarker.mockResolvedValue(null);
     mockCanGoBack.mockReturnValue(true);
     mockUseContinueSuggestion.mockReturnValue({ data: null });
+    mockUseReviewSummary.mockReturnValue({ data: { totalOverdue: 0 } });
     mockUseSubjects.mockReturnValue({ data: undefined });
   });
 
@@ -179,7 +182,7 @@ describe('LearnNewScreen', () => {
       });
     });
 
-    it('hides when continueSuggestion exists (resume-last takes priority)', () => {
+    it('hides when continueSuggestion exists (review takes priority)', () => {
       mockUseContinueSuggestion.mockReturnValue({
         data: { subjectId: 's1', subjectName: 'Math', topicId: 't1' },
       });
@@ -190,7 +193,7 @@ describe('LearnNewScreen', () => {
       render(<LearnNewScreen />);
 
       expect(screen.queryByTestId('intent-continue-subject')).toBeNull();
-      expect(screen.getByTestId('intent-resume-last')).toBeTruthy();
+      expect(screen.getByTestId('intent-review')).toBeTruthy();
     });
 
     it('hides when subjects list is empty', () => {
@@ -202,8 +205,8 @@ describe('LearnNewScreen', () => {
     });
   });
 
-  describe('resume-last-session card [BUG-continue]', () => {
-    it('shows card when continueSuggestion is available and no recovery marker', async () => {
+  describe('review card', () => {
+    it('shows card when continueSuggestion is available', () => {
       mockUseContinueSuggestion.mockReturnValue({
         data: {
           subjectId: 's1',
@@ -215,14 +218,12 @@ describe('LearnNewScreen', () => {
 
       render(<LearnNewScreen />);
 
-      await waitFor(() => {
-        expect(screen.getByTestId('intent-resume-last')).toBeTruthy();
-        expect(screen.getByText('Resume last session')).toBeTruthy();
-        expect(screen.getByText('Math')).toBeTruthy();
-      });
+      expect(screen.getByTestId('intent-review')).toBeTruthy();
+      expect(screen.getByText('Repeat & review')).toBeTruthy();
+      expect(screen.getByText('Keep your knowledge fresh')).toBeTruthy();
     });
 
-    it('hides card when a fresh recovery marker exists', async () => {
+    it('shows overdue count in subtitle and badge', () => {
       mockUseContinueSuggestion.mockReturnValue({
         data: {
           subjectId: 's1',
@@ -231,21 +232,21 @@ describe('LearnNewScreen', () => {
           topicTitle: 'Algebra',
         },
       });
-      mockReadSessionRecoveryMarker.mockResolvedValue({
-        sessionId: 'sess-1',
-        subjectName: 'Physics',
-        updatedAt: new Date().toISOString(),
-      });
+      mockUseReviewSummary.mockReturnValue({ data: { totalOverdue: 3 } });
 
       render(<LearnNewScreen />);
 
-      await waitFor(() => {
-        expect(screen.getByTestId('intent-resume')).toBeTruthy();
-      });
-      expect(screen.queryByTestId('intent-resume-last')).toBeNull();
+      expect(screen.getByText('3 topics ready for review')).toBeTruthy();
+      expect(screen.getByTestId('intent-review-badge')).toBeTruthy();
     });
 
-    it('navigates to session with subjectId and topicId on press', async () => {
+    it('hides card when no continueSuggestion', () => {
+      render(<LearnNewScreen />);
+
+      expect(screen.queryByTestId('intent-review')).toBeNull();
+    });
+
+    it('navigates to relearn when overdue topic exists', () => {
       mockUseContinueSuggestion.mockReturnValue({
         data: {
           subjectId: 's1',
@@ -254,21 +255,39 @@ describe('LearnNewScreen', () => {
           topicTitle: 'Algebra',
         },
       });
+      mockUseReviewSummary.mockReturnValue({
+        data: {
+          totalOverdue: 2,
+          nextReviewTopic: { topicId: 't2', subjectId: 's1' },
+        },
+      });
 
       render(<LearnNewScreen />);
 
-      const card = await screen.findByTestId('intent-resume-last');
-      fireEvent.press(card);
-
+      fireEvent.press(screen.getByTestId('intent-review'));
       expect(mockPush).toHaveBeenCalledWith({
-        pathname: '/(app)/session',
-        params: {
+        pathname: '/(app)/topic/relearn',
+        params: { topicId: 't2', subjectId: 's1' },
+      });
+    });
+
+    it('falls back to library when no overdue topic', () => {
+      mockUseContinueSuggestion.mockReturnValue({
+        data: {
           subjectId: 's1',
           subjectName: 'Math',
           topicId: 't1',
-          mode: 'learning',
+          topicTitle: 'Algebra',
         },
       });
+      mockUseReviewSummary.mockReturnValue({
+        data: { totalOverdue: 0, nextReviewTopic: null },
+      });
+
+      render(<LearnNewScreen />);
+
+      fireEvent.press(screen.getByTestId('intent-review'));
+      expect(mockPush).toHaveBeenCalledWith('/(app)/library');
     });
   });
 });

@@ -91,6 +91,7 @@ export default function PickBookScreen(): React.ReactElement {
         rawInput: suggestion.title,
         selectedSuggestion: suggestion.title,
         pickedSuggestionId: suggestion.id,
+        subjectId,
       });
       filingInFlight.current = false;
       router.push({
@@ -127,6 +128,7 @@ export default function PickBookScreen(): React.ReactElement {
       const result = await filing.mutateAsync({
         rawInput: trimmed,
         selectedSuggestion: subject?.name ?? null,
+        subjectId,
       });
       filingInFlight.current = false;
       router.push({

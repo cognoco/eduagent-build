@@ -9,6 +9,7 @@ import { useChildSubjectTopics } from '../../../../../hooks/use-dashboard';
 import { useChildInventory } from '../../../../../hooks/use-progress';
 import { Button } from '../../../../../components/common/Button';
 import { goBackOrReplace } from '../../../../../lib/navigation';
+import { isNewLearner } from '../../../../../lib/progressive-disclosure';
 
 const COMPLETION_LABELS: Record<string, string> = {
   not_started: 'Not started',
@@ -53,6 +54,7 @@ export default function SubjectTopicsScreen() {
     refetch,
   } = useChildSubjectTopics(profileId, subjectId);
   const { data: inventory } = useChildInventory(profileId);
+  const childIsNew = isNewLearner(inventory?.global.totalSessions);
   const subjectName =
     routeSubjectName ??
     inventory?.subjects.find((subject) => subject.subjectId === subjectId)
@@ -217,6 +219,12 @@ export default function SubjectTopicsScreen() {
                 Retry
               </Text>
             </Pressable>
+          </View>
+        ) : childIsNew ? (
+          <View className="py-8 items-center" testID="topics-new-learner">
+            <Text className="text-body text-text-secondary text-center">
+              Topics will appear here as your child explores this subject.
+            </Text>
           </View>
         ) : (
           <View className="py-8 items-center" testID="topics-empty">

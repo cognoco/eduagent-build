@@ -24,6 +24,9 @@ import {
 import { findAccountByClerkId } from '../services/account';
 import { getTierConfig } from '../services/subscription';
 import { captureException } from '../services/sentry';
+import { createLogger } from '../services/logger';
+
+const logger = createLogger();
 import { EXTENDED_TRIAL_MONTHLY_EQUIVALENT } from '../services/trial';
 import { inngest } from '../inngest/client';
 import type { Database } from '@eduagent/database';
@@ -68,7 +71,7 @@ async function constantTimeCompare(
   // Fixed-length XOR comparison — always 32 bytes, constant time
   let diff = 0;
   for (let i = 0; i < hashA.length; i++) {
-    diff |= hashA[i]! ^ hashB[i]!;
+    diff |= (hashA[i] ?? 0) ^ (hashB[i] ?? 0);
   }
   return diff === 0;
 }
@@ -156,7 +159,7 @@ function extractTierFromProductId(
 
   // Direct lookup
   if (productId in PRODUCT_TIER_MAP) {
-    return PRODUCT_TIER_MAP[productId]!;
+    return PRODUCT_TIER_MAP[productId] ?? null;
   }
 
   // Fallback: parse com.eduagent.<tier>.<interval>
@@ -564,7 +567,10 @@ export const revenuecatWebhookRoute = new Hono<{
   const webhookSecret = c.env.REVENUECAT_WEBHOOK_SECRET;
 
   if (!webhookSecret) {
-    console.error('[revenuecat] REVENUECAT_WEBHOOK_SECRET is not configured');
+    // [CR-2E.8] Structured log for missing credential — queryable in Logpush
+    logger.error(
+      '[revenuecat] REVENUECAT_WEBHOOK_SECRET is not configured — webhook rejected'
+    );
     return apiError(
       c,
       401,
@@ -638,6 +644,19 @@ export const revenuecatWebhookRoute = new Hono<{
 
   // Ensure free subscription exists for the account (auto-provisioning)
   await ensureFreeSubscription(db, accountId);
+
+  // Warn in non-production environments when RevenueCat sends sandbox events.
+  // Sandbox webhooks from test purchases should not mutate production data.
+  if (event.environment === 'SANDBOX') {
+    logger.warn(
+      '[revenuecat] Received SANDBOX webhook event — verify this is intentional',
+      {
+        eventType: event.type,
+        eventId: event.id,
+        accountId,
+      }
+    );
+  }
 
   // Dispatch to event-specific handler
   switch (event.type) {

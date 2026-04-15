@@ -46,6 +46,14 @@ export const learningProfiles = pgTable(
     memoryInjectionEnabled: boolean('memory_injection_enabled')
       .notNull()
       .default(true),
+    accommodationMode: text('accommodation_mode', {
+      enum: ['none', 'short-burst', 'audio-first', 'predictable'],
+    })
+      .notNull()
+      .default('none'),
+    recentlyResolvedTopics: jsonb('recently_resolved_topics')
+      .notNull()
+      .default([]),
     version: integer('version').notNull().default(1),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()

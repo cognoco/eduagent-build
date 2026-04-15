@@ -155,6 +155,34 @@
       "when": 1776124800000,
       "tag": "0021_book_sort_order_unique",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1776196718122,
+      "tag": "0022_brave_beast",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1776259223777,
+      "tag": "0023_shiny_skrulls",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1776267243951,
+      "tag": "0024_regular_crusher_hogan",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1776345637482,
+      "tag": "0025_accommodation_mode_check",
+      "breakpoints": true
     }
   ]
 }

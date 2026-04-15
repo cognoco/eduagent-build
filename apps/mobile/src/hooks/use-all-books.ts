@@ -32,6 +32,8 @@ export function useAllBooks(): {
   const { activeProfile } = useProfile();
   const queryClient = useQueryClient();
   const subjectsQuery = useSubjects({ includeInactive: true });
+  // SQ-1: subjects empty-on-error is acceptable here because isError propagates
+  // to the hook's return value, letting consumers (library.tsx) show a retry UI.
   const subjects = subjectsQuery.data ?? [];
 
   const bookQueries = useQueries({
@@ -65,17 +67,21 @@ export function useAllBooks(): {
     return subjects.flatMap((subject, index) => {
       const queryData = bookQueries[index]?.data;
       if (!Array.isArray(queryData)) return [];
-      return queryData.map((book) => ({
-        book,
-        subjectId: subject.id,
-        subjectName: subject.name,
-        topicCount: 0,
-        completedCount: 0,
-        status: (book.status ??
-          (book.topicsGenerated
-            ? 'IN_PROGRESS'
-            : 'NOT_STARTED')) as BookProgressStatus,
-      }));
+      // Only include books that have been built (topics generated).
+      // Unbuilt books are placeholders — counting them misleads the user.
+      return queryData
+        .filter((book) => book.topicsGenerated)
+        .map((book) => ({
+          book,
+          subjectId: subject.id,
+          subjectName: subject.name,
+          topicCount: 0,
+          completedCount: 0,
+          status: (book.status ??
+            (book.topicsGenerated
+              ? 'IN_PROGRESS'
+              : 'NOT_STARTED')) as BookProgressStatus,
+        }));
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- dataKey is a stable proxy for bookQueries data changes
   }, [subjects, dataKey]);

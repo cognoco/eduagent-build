@@ -213,4 +213,71 @@ describe('ParentDashboardSummary', () => {
     expect(screen.getByTestId('aggregate-signal-empty')).toBeTruthy();
     expect(screen.queryByTestId('aggregate-signal')).toBeNull();
   });
+
+  // --- Progressive disclosure tests ---
+
+  describe('progressive disclosure (totalSessions)', () => {
+    it('hides aggregate signal for new learner (< 4 sessions)', () => {
+      render(<ParentDashboardSummary {...defaultProps} totalSessions={2} />);
+
+      expect(screen.queryByTestId('aggregate-signal')).toBeNull();
+      expect(screen.queryByTestId('aggregate-signal-empty')).toBeNull();
+    });
+
+    it('hides retention trend badge for new learner', () => {
+      render(
+        <ParentDashboardSummary
+          {...defaultProps}
+          totalSessions={1}
+          retentionTrend="improving"
+        />
+      );
+
+      expect(screen.queryByTestId('retention-trend-badge')).toBeNull();
+    });
+
+    it('shows teaser text for new learner', () => {
+      render(<ParentDashboardSummary {...defaultProps} totalSessions={1} />);
+
+      expect(screen.getByTestId('parent-dashboard-teaser')).toBeTruthy();
+      expect(screen.getByText(/3 more sessions/)).toBeTruthy();
+    });
+
+    it('shows singular "session" when only 1 remaining', () => {
+      render(<ParentDashboardSummary {...defaultProps} totalSessions={3} />);
+
+      expect(screen.getByText(/1 more session,/)).toBeTruthy();
+    });
+
+    it('shows full signals for established learner (>= 4 sessions)', () => {
+      render(
+        <ParentDashboardSummary
+          {...defaultProps}
+          totalSessions={10}
+          retentionTrend="improving"
+        />
+      );
+
+      expect(screen.getByTestId('aggregate-signal')).toBeTruthy();
+      expect(screen.getByTestId('retention-trend-badge')).toBeTruthy();
+      expect(screen.queryByTestId('parent-dashboard-teaser')).toBeNull();
+    });
+
+    it('still shows trend text for new learner (always visible)', () => {
+      render(<ParentDashboardSummary {...defaultProps} totalSessions={0} />);
+
+      // Trend text uses sessionsThisWeek (4) from defaultProps, not totalSessions
+      expect(screen.getByText(/4 sessions, 1h 25m this week/)).toBeTruthy();
+    });
+
+    it('defaults to showing full signals when totalSessions is undefined', () => {
+      render(
+        <ParentDashboardSummary {...defaultProps} retentionTrend="stable" />
+      );
+
+      expect(screen.getByTestId('aggregate-signal')).toBeTruthy();
+      expect(screen.getByTestId('retention-trend-badge')).toBeTruthy();
+      expect(screen.queryByTestId('parent-dashboard-teaser')).toBeNull();
+    });
+  });
 });

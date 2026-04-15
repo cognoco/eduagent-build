@@ -6,33 +6,52 @@ import type {
   RouteResult,
   StreamResult,
 } from './types';
+import type { AgeBracket } from '@eduagent/schemas';
 import type { LLMTier } from '../subscription';
+import { createLogger } from '../logger';
+
+const logger = createLogger();
 
 // ---------------------------------------------------------------------------
-// Content safety preamble for minors (all users are 11-17)
+// Content safety preamble — age-aware identity framing.
 // Applied at the router layer so it covers ALL providers uniformly,
 // including fallback paths through the circuit breaker.
+//
+// The identity statement ("for young learners" vs "adult learner") prevents
+// the LLM from anchoring to a minor-tutor persona when the user is an adult.
+// Safety RULES are identical for all ages — only the framing changes.
 // ---------------------------------------------------------------------------
 
-const SAFETY_SYSTEM_PREAMBLE =
-  'You are an educational AI assistant for students aged 11-17. ' +
+const SAFETY_RULES =
   'You MUST refuse any request involving: harassment, bullying, or threats; ' +
-  'hate speech or discriminatory content; sexually explicit material (even mild); ' +
+  'hate speech or discriminatory content; sexually explicit material; ' +
   'dangerous or harmful activities; or content undermining civic integrity. ' +
   'If a request touches these areas, politely decline and redirect to the learning topic.';
 
-function withSafetyPreamble(messages: ChatMessage[]): ChatMessage[] {
+function getSafetyPreamble(ageBracket?: AgeBracket): string {
+  if (ageBracket === 'adult') {
+    return `You are an educational AI assistant. The current learner is an adult. ${SAFETY_RULES}`;
+  }
+  // Default to minor-safe framing (defence-in-depth for missing age data)
+  return `You are an educational AI assistant for young learners. ${SAFETY_RULES}`;
+}
+
+function withSafetyPreamble(
+  messages: ChatMessage[],
+  ageBracket?: AgeBracket
+): ChatMessage[] {
+  const preamble = getSafetyPreamble(ageBracket);
   const first = messages[0];
   if (first?.role === 'system') {
     return [
       {
         role: 'system',
-        content: `${SAFETY_SYSTEM_PREAMBLE}\n\n${first.content}`,
+        content: `${preamble}\n\n${first.content}`,
       },
       ...messages.slice(1),
     ];
   }
-  return [{ role: 'system', content: SAFETY_SYSTEM_PREAMBLE }, ...messages];
+  return [{ role: 'system', content: preamble }, ...messages];
 }
 
 // ---------------------------------------------------------------------------
@@ -242,13 +261,11 @@ async function withRetry<T>(
       if (attempt < maxRetries) {
         const jitter = Math.random() * 500;
         const delay = INITIAL_RETRY_DELAY_MS * 2 ** attempt + jitter;
-        console.warn(
-          `[llm] ${label} attempt ${
-            attempt + 1
-          } failed, retrying in ${delay}ms: ${
-            err instanceof Error ? err.message : String(err)
-          }`
-        );
+        logger.warn(`[llm] ${label} attempt ${attempt + 1} failed, retrying`, {
+          attempt: attempt + 1,
+          delayMs: Math.round(delay),
+          error: err instanceof Error ? err.message : String(err),
+        });
         await new Promise((resolve) => setTimeout(resolve, delay));
       }
     }
@@ -263,9 +280,13 @@ async function withRetry<T>(
 export async function routeAndCall(
   messages: ChatMessage[],
   rung: EscalationRung = 1,
-  _options?: { correlationId?: string; llmTier?: LLMTier }
+  _options?: {
+    correlationId?: string;
+    llmTier?: LLMTier;
+    ageBracket?: AgeBracket;
+  }
 ): Promise<RouteResult> {
-  const safeMessages = withSafetyPreamble(messages);
+  const safeMessages = withSafetyPreamble(messages, _options?.ageBracket);
   const config = getModelConfig(rung, _options?.llmTier);
   const provider = providers.get(config.provider);
   if (!provider) {
@@ -298,12 +319,13 @@ export async function routeAndCall(
       const fallbackConfig = getFallbackConfig(config, rung);
       if (!fallbackConfig) throw err;
 
-      console.warn(
-        `[llm] Primary provider ${
-          config.provider
-        } failed after retries, trying fallback ${fallbackConfig.provider}: ${
-          err instanceof Error ? err.message : String(err)
-        }`
+      logger.warn(
+        '[llm] Primary provider failed after retries, trying fallback',
+        {
+          provider: config.provider,
+          fallback: fallbackConfig.provider,
+          error: err instanceof Error ? err.message : String(err),
+        }
       );
       return attemptProvider(fallbackConfig, safeMessages);
     }
@@ -312,9 +334,10 @@ export async function routeAndCall(
   // Primary circuit is open — try fallback directly
   const fallbackConfig = getFallbackConfig(config, rung);
   if (fallbackConfig) {
-    console.warn(
-      `[llm] Primary provider ${config.provider} circuit open, using fallback ${fallbackConfig.provider}`
-    );
+    logger.warn('[llm] Primary provider circuit open, using fallback', {
+      provider: config.provider,
+      fallback: fallbackConfig.provider,
+    });
     return attemptProvider(fallbackConfig, safeMessages);
   }
 
@@ -399,10 +422,13 @@ async function* wrapStreamWithCircuitBreaker(
     if (chunksYielded === 0 && fallbackConfig) {
       const fallbackProvider = providers.get(fallbackConfig.provider);
       if (fallbackProvider && canAttempt(fallbackConfig.provider)) {
-        console.warn(
-          `[llm] Primary stream ${providerId} failed before first byte, trying fallback ${
-            fallbackConfig.provider
-          }: ${err instanceof Error ? err.message : String(err)}`
+        logger.warn(
+          '[llm] Primary stream failed before first byte, trying fallback',
+          {
+            provider: providerId,
+            fallback: fallbackConfig.provider,
+            error: err instanceof Error ? err.message : String(err),
+          }
         );
         // Manually iterate so onFallback fires after first successful chunk,
         // confirming the fallback provider actually works.
@@ -441,10 +467,13 @@ async function* wrapStreamWithCircuitBreaker(
 export async function routeAndStream(
   messages: ChatMessage[],
   rung: EscalationRung = 1,
-  llmTier?: LLMTier
+  options?: {
+    llmTier?: LLMTier;
+    ageBracket?: AgeBracket;
+  }
 ): Promise<StreamResult> {
-  const safeMessages = withSafetyPreamble(messages);
-  const config = getModelConfig(rung, llmTier);
+  const safeMessages = withSafetyPreamble(messages, options?.ageBracket);
+  const config = getModelConfig(rung, options?.llmTier);
   const provider = providers.get(config.provider);
   if (!provider) {
     throw new Error(`No provider registered for: ${config.provider}`);
@@ -479,9 +508,10 @@ export async function routeAndStream(
   // Primary circuit is open — try fallback directly
   const fallbackConfig = getFallbackConfig(config, rung);
   if (fallbackConfig) {
-    console.warn(
-      `[llm] Primary stream ${config.provider} circuit open, using fallback ${fallbackConfig.provider}`
-    );
+    logger.warn('[llm] Primary stream circuit open, using fallback', {
+      provider: config.provider,
+      fallback: fallbackConfig.provider,
+    });
     return attemptStreamProvider(fallbackConfig, safeMessages);
   }
 

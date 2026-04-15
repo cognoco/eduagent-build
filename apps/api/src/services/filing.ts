@@ -100,7 +100,12 @@ export async function buildLibraryIndex(
         if (!chapterMap.has(chapterName)) {
           chapterMap.set(chapterName, []);
         }
-        chapterMap.get(chapterName)!.push({
+        const chapterTopics = chapterMap.get(chapterName);
+        if (!chapterTopics)
+          throw new Error(
+            `Chapter map entry missing for chapter: ${chapterName}`
+          );
+        chapterTopics.push({
           title: topic.title,
         });
       }
@@ -332,6 +337,29 @@ export async function fileToLibrary(
   const validated = filingResponseSchema.parse(parsed);
 
   return validated;
+}
+
+// ---------------------------------------------------------------------------
+// Fallback — used when the LLM filing call fails but subjectId is known
+// ---------------------------------------------------------------------------
+
+export function buildFallbackFilingResponse(
+  subjectId: string,
+  rawInput: string
+): FilingResponse {
+  return {
+    shelf: { id: subjectId },
+    book: {
+      name: 'Uncategorized',
+      emoji: '📂',
+      description: 'Topics to be organized',
+    },
+    chapter: { name: 'General' },
+    topic: {
+      title: rawInput,
+      description: `Topic about ${rawInput}`,
+    },
+  };
 }
 
 // ---------------------------------------------------------------------------

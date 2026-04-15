@@ -60,7 +60,6 @@ import {
   activateSubscriptionFromCheckout,
   updateQuotaPoolLimit,
 } from '../services/billing';
-import { getTierConfig } from '../services/subscription';
 import { inngest } from '../inngest/client';
 
 // ---------------------------------------------------------------------------

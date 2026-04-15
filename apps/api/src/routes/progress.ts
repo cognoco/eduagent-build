@@ -58,8 +58,11 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
     const db = c.get('db');
     const profileId = requireProfileId(c.get('profileId'));
 
-    const { overdueCount } = await getProfileOverdueCount(db, profileId);
-    return c.json({ totalOverdue: overdueCount });
+    const { overdueCount, nextReviewTopic } = await getProfileOverdueCount(
+      db,
+      profileId
+    );
+    return c.json({ totalOverdue: overdueCount, nextReviewTopic });
   })
 
   // Get "continue where I left off" suggestion

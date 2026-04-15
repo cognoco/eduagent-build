@@ -31,6 +31,12 @@ describe('getOpeningMessage', () => {
       const msg = getOpeningMessage('unknown', 0);
       expect(msg).toContain("I'm your learning mate");
     });
+
+    it('uses teach-first tone for learning first session', () => {
+      const msg = getOpeningMessage('learning', 0);
+      expect(msg).toContain("I'll teach you stuff and check if it sticks");
+      expect(msg).not.toContain('What topic would you like to explore');
+    });
   });
 
   describe('early sessions (experience 1-2)', () => {
@@ -75,6 +81,7 @@ describe('getOpeningMessage', () => {
     it('includes topic name for first session', () => {
       const msg = getOpeningMessage('learning', 0, undefined, 'The Nile River');
       expect(msg).toContain('The Nile River');
+      expect(msg).toContain("I'll explain the key ideas");
     });
 
     it('includes topic name for early session', () => {

@@ -205,6 +205,11 @@ function createMockDb({
         returning: jest.fn().mockResolvedValue(insertReturning),
       }),
     }),
+    delete: jest.fn().mockReturnValue({
+      where: jest.fn().mockResolvedValue(undefined),
+    }),
+    // Raw SQL execution used by batch CASE UPDATE [CR-2B.1]
+    execute: jest.fn().mockResolvedValue(undefined),
     // transaction() executes the callback with the same mock as tx context
     transaction: jest
       .fn()
@@ -611,20 +616,12 @@ describe('challengeCurriculum', () => {
     ).rejects.toThrow('Subject not found');
   });
 
-  it('increments version when existing curriculum found', async () => {
-    // The first call to findFirst (subjects) returns the subject.
-    // The second call to findFirst (curricula) returns existing curriculum.
-    // After insert, getCurriculum is called again which re-queries.
-    const newCurriculum = mockCurriculumRow({ id: 'curr-new', version: 2 });
-
+  it('deletes old curriculum and creates fresh version', async () => {
+    const newCurriculum = mockCurriculumRow({ id: 'curr-new', version: 1 });
     const subjectFindFirst = jest.fn().mockResolvedValue(mockSubjectRow());
-    const curriculaFindFirst = jest
-      .fn()
-      .mockResolvedValueOnce(mockCurriculumRow({ version: 1 }))
-      .mockResolvedValueOnce(newCurriculum);
+    const curriculaFindFirst = jest.fn().mockResolvedValue(newCurriculum);
     const topicsFindMany = jest.fn().mockResolvedValue([]);
-
-    const db = {
+    const db: Record<string, unknown> = {
       query: {
         subjects: { findFirst: subjectFindFirst },
         curricula: { findFirst: curriculaFindFirst },
@@ -639,17 +636,25 @@ describe('challengeCurriculum', () => {
           returning: jest.fn().mockResolvedValue([newCurriculum]),
         }),
       }),
-    } as unknown as Database;
-
+      delete: jest.fn().mockReturnValue({
+        where: jest.fn().mockResolvedValue(undefined),
+      }),
+      transaction: jest
+        .fn()
+        .mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) =>
+          fn(db)
+        ),
+    };
+    const typedDb = db as unknown as Database;
     const result = await challengeCurriculum(
-      db,
+      typedDb,
       PROFILE_ID,
       SUBJECT_ID,
       'Skip intro topics'
     );
-
     expect(result).not.toBeNull();
-    expect(result.version).toBe(2);
+    expect(result.version).toBe(1);
+    expect(db.delete).toHaveBeenCalled();
   });
 
   it('reuses original onboarding signals when regenerating curriculum', async () => {
@@ -679,7 +684,7 @@ describe('challengeCurriculum', () => {
           { role: 'assistant', content: 'What have you already studied?' },
         ],
       },
-      insertReturning: [mockCurriculumRow({ id: 'curr-new', version: 2 })],
+      insertReturning: [mockCurriculumRow({ id: 'curr-new', version: 1 })],
     });
 
     await challengeCurriculum(

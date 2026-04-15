@@ -300,7 +300,6 @@ describe('Gemini Provider', () => {
     it('uses streamGenerateContent endpoint with alt=sse', async () => {
       fetchSpy.mockResolvedValue(mockStreamResponse(sseChunks(['ok'])));
 
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       for await (const _ of provider.chatStream(
         [{ role: 'user', content: 'test' }],
         DEFAULT_CONFIG
@@ -370,7 +369,6 @@ describe('Gemini Provider', () => {
     it('includes safetySettings in stream requests', async () => {
       fetchSpy.mockResolvedValue(mockStreamResponse(sseChunks(['ok'])));
 
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       for await (const _ of provider.chatStream(
         [{ role: 'user', content: 'test' }],
         DEFAULT_CONFIG

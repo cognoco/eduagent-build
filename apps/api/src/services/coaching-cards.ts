@@ -5,7 +5,7 @@
 // Pure business logic — no Hono imports.
 // ---------------------------------------------------------------------------
 
-import { eq, and, gt, asc, sql, inArray } from 'drizzle-orm';
+import { eq, and, gt, asc, desc, sql, inArray } from 'drizzle-orm';
 import {
   learningSessions,
   streaks,
@@ -13,6 +13,7 @@ import {
   curriculumBooks,
   curriculumTopics,
   curricula,
+  profiles,
   createScopedRepository,
   generateUUIDv7,
   type Database,
@@ -32,6 +33,82 @@ const TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 /** Profiles with fewer than this many completed sessions get cold-start fallback */
 const COLD_START_SESSION_THRESHOLD = 5;
+
+// ---------------------------------------------------------------------------
+// FR165.4: Age-adaptive coaching card copy helpers
+// ---------------------------------------------------------------------------
+
+function getLearnerAge(birthYear: number | null): number | null {
+  if (!birthYear) return null;
+  return new Date().getFullYear() - birthYear;
+}
+
+function reviewDueCopy(
+  count: number,
+  topicTitle: string | null,
+  bookTitle: string | null,
+  age: number | null
+): { title: string; body: string } {
+  const young = age !== null && age < 13;
+  if (topicTitle && bookTitle) {
+    return {
+      title: young ? 'Time for a quick review!' : 'Review due',
+      body: young
+        ? `Let's revisit ${topicTitle} in your ${bookTitle} book!`
+        : `${topicTitle} needs a review — in your ${bookTitle} book`,
+    };
+  }
+  return {
+    title: young ? 'Time for a quick review!' : 'Review due',
+    body: young
+      ? `You have ${count} topic${
+          count > 1 ? 's' : ''
+        } waiting to be revisited!`
+      : `You have ${count} topic${count > 1 ? 's' : ''} ready for review.`,
+  };
+}
+
+function continueBookCopy(
+  topicTitle: string,
+  bookTitle: string,
+  topicDesc: string | null,
+  age: number | null
+): { title: string; body: string } {
+  const young = age !== null && age < 13;
+  return {
+    title: young ? `Keep going in ${bookTitle}!` : `Next up in ${bookTitle}`,
+    body: young
+      ? `${topicTitle} is waiting for you — let's learn something cool!`
+      : `${topicTitle} — ${topicDesc ?? 'Continue learning'}`,
+  };
+}
+
+function bookSuggestionCopy(
+  bookTitle: string,
+  subjectName: string,
+  age: number | null
+): { title: string; body: string } {
+  const young = age !== null && age < 13;
+  return {
+    title: young ? 'A new adventure awaits!' : 'Ready for a new book?',
+    body: young
+      ? `${bookTitle} is next on your ${subjectName} shelf — let's explore!`
+      : `${bookTitle} is waiting in your ${subjectName} shelf`,
+  };
+}
+
+function homeworkConnectionCopy(
+  skill: string,
+  age: number | null
+): { title: string; body: string } {
+  const young = age !== null && age < 13;
+  return {
+    title: young ? 'Your homework connects!' : 'Homework meets your Library',
+    body: young
+      ? `You practiced ${skill} in homework — want to learn even more?`
+      : `You worked on ${skill} in homework — want to go deeper in your Library?`,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // precomputeCoachingCard
@@ -54,6 +131,19 @@ export async function precomputeCoachingCard(
   const expiresAt = new Date(now.getTime() + TTL_MS).toISOString();
   const createdAt = now.toISOString();
   const id = generateUUIDv7();
+
+  // FR165.4: Fetch learner age for warm, age-adapted card copy
+  let birthYear: number | null = null;
+  try {
+    const profileRow = await db.query.profiles.findFirst({
+      where: eq(profiles.id, profileId),
+      columns: { birthYear: true },
+    });
+    birthYear = profileRow?.birthYear ?? null;
+  } catch {
+    // Age lookup is optional — use neutral tone as fallback
+  }
+  const learnerAge = getLearnerAge(birthYear);
 
   // Fetch retention cards (scoped to profile)
   const repo = createScopedRepository(db, profileId);
@@ -91,42 +181,49 @@ export async function precomputeCoachingCard(
     const mostOverdue = overdueCards.sort(
       (a, b) =>
         (a.nextReviewAt?.getTime() ?? 0) - (b.nextReviewAt?.getTime() ?? 0)
-    )[0]!;
+    )[0];
+    if (!mostOverdue)
+      throw new Error('Expected most-overdue card after non-empty sort');
 
     // Priority scales: 7 base + 1 per overdue card, capped at 10
     const priority = Math.min(7 + overdueCards.length - 1, 10);
 
     // Enrich with book context if topic belongs to a book
-    let body = `You have ${overdueCards.length} topic${
-      overdueCards.length > 1 ? 's' : ''
-    } ready for review.`;
+    let topicTitle: string | null = null;
+    let bookTitle: string | null = null;
     try {
       const overdueTopicRow = await db.query.curriculumTopics?.findFirst?.({
         where: eq(curriculumTopics.id, mostOverdue.topicId),
       });
+      topicTitle = overdueTopicRow?.title ?? null;
       if (overdueTopicRow?.bookId) {
         const book = await db.query.curriculumBooks?.findFirst?.({
           where: eq(curriculumBooks.id, overdueTopicRow.bookId),
         });
-        if (book) {
-          body = `${overdueTopicRow.title} needs a review — in your ${book.title} book`;
-        }
+        bookTitle = book?.title ?? null;
       }
     } catch {
       // Book context enrichment is optional — use default body
     }
 
+    const reviewCopy = reviewDueCopy(
+      overdueCards.length,
+      topicTitle,
+      bookTitle,
+      learnerAge
+    );
+
     return {
       id,
       profileId,
       type: 'review_due',
-      title: 'Review due',
-      body,
+      title: reviewCopy.title,
+      body: reviewCopy.body,
       priority,
       expiresAt,
       createdAt,
       topicId: mostOverdue.topicId,
-      dueAt: mostOverdue.nextReviewAt!.toISOString(),
+      dueAt: (mostOverdue.nextReviewAt ?? new Date()).toISOString(),
       easeFactor: Number(mostOverdue.easeFactor),
     };
   }
@@ -144,14 +241,19 @@ export async function precomputeCoachingCard(
     const display = getStreakDisplayInfo(streakState, today);
 
     if (display.isOnGracePeriod) {
+      const young = learnerAge !== null && learnerAge < 13;
       return {
         id,
         profileId,
         type: 'streak',
-        title: 'Keep your streak alive!',
-        body: `Your ${streakState.currentStreak}-day streak is at risk. ${
-          display.graceDaysRemaining
-        } grace day${display.graceDaysRemaining === 1 ? '' : 's'} remaining.`,
+        title: young ? "Don't lose your streak!" : 'Keep your streak alive!',
+        body: young
+          ? `You've been learning for ${streakState.currentStreak} days in a row! Come back today to keep it going!`
+          : `Your ${streakState.currentStreak}-day streak is at risk. ${
+              display.graceDaysRemaining
+            } grace day${
+              display.graceDaysRemaining === 1 ? '' : 's'
+            } remaining.`,
         priority: 6,
         expiresAt,
         createdAt,
@@ -159,6 +261,19 @@ export async function precomputeCoachingCard(
         graceRemaining: display.graceDaysRemaining,
       };
     }
+  }
+
+  // --- Priority 2.5: homework_connection (homework matches curriculum) ---
+  try {
+    const hwConnectionCard = await findHomeworkConnectionCard(
+      db,
+      profileId,
+      boostedSubjectIds,
+      { id, expiresAt, createdAt, learnerAge }
+    );
+    if (hwConnectionCard) return hwConnectionCard;
+  } catch {
+    // Homework connection is optional — fall through to next priority
   }
 
   // --- Priority 3: curriculum_complete (all topics verified) ---
@@ -187,7 +302,7 @@ export async function precomputeCoachingCard(
       db,
       profileId,
       boostedSubjectIds,
-      { id, expiresAt, createdAt }
+      { id, expiresAt, createdAt, learnerAge }
     );
     if (continueBookCard) return continueBookCard;
   } catch {
@@ -200,7 +315,7 @@ export async function precomputeCoachingCard(
       db,
       profileId,
       boostedSubjectIds,
-      { id, expiresAt, createdAt }
+      { id, expiresAt, createdAt, learnerAge }
     );
     if (bookSuggestionCard) return bookSuggestionCard;
   } catch {
@@ -210,7 +325,9 @@ export async function precomputeCoachingCard(
   // --- Priority 4: insight (verified topics) ---
   const verifiedCards = allCards.filter((c) => c.xpStatus === 'verified');
   if (verifiedCards.length > 0) {
-    const firstVerified = verifiedCards[0]!;
+    const firstVerified = verifiedCards[0];
+    if (!firstVerified)
+      throw new Error('Expected verified card after non-empty filter');
     return {
       id,
       profileId,
@@ -229,7 +346,7 @@ export async function precomputeCoachingCard(
   // [BUG-55] When no retention cards exist, find a topic from the curriculum
   // instead of using profileId as topicId (which is semantically wrong).
   const fallbackTopicId: string | null =
-    allCards.length > 0 ? allCards[0]!.topicId : null;
+    allCards.length > 0 ? allCards[0]?.topicId ?? null : null;
   // No retention cards = new learner, return curriculum_complete start prompt
   if (!fallbackTopicId) {
     return {
@@ -267,6 +384,7 @@ interface CardMeta {
   id: string;
   expiresAt: string;
   createdAt: string;
+  learnerAge: number | null;
 }
 
 /**
@@ -361,12 +479,19 @@ async function findContinueBookCard(
           ? Math.min(basePriority + 3, 10)
           : basePriority;
 
+        const cbCopy = continueBookCopy(
+          topic.title,
+          book.bookTitle,
+          topic.description,
+          meta.learnerAge
+        );
+
         return {
           id: meta.id,
           profileId,
           type: 'continue_book',
-          title: `Next up in ${book.bookTitle}`,
-          body: `${topic.title} — ${topic.description ?? 'Continue learning'}`,
+          title: cbCopy.title,
+          body: cbCopy.body,
           priority,
           expiresAt: meta.expiresAt,
           createdAt: meta.createdAt,
@@ -399,16 +524,21 @@ async function findBookSuggestionCard(
       and(eq(subjects.profileId, profileId), eq(subjects.status, 'active'))
     );
 
-  for (const subject of activeSubjects) {
-    const books = await db
-      .select()
-      .from(curriculumBooks)
-      .where(eq(curriculumBooks.subjectId, subject.id))
-      .orderBy(asc(curriculumBooks.sortOrder));
+  if (activeSubjects.length === 0) return null;
 
+  // [CR-2B.2] Batch: fetch all books for all active subjects in one query
+  const subjectIds = activeSubjects.map((s) => s.id);
+  const allBooks = await db
+    .select()
+    .from(curriculumBooks)
+    .where(inArray(curriculumBooks.subjectId, subjectIds))
+    .orderBy(asc(curriculumBooks.sortOrder));
+
+  // Group books by subject and find the first unbuilt book
+  for (const subject of activeSubjects) {
+    const books = allBooks.filter((b) => b.subjectId === subject.id);
     if (books.length === 0) continue;
 
-    // Find the first book that hasn't had topics generated yet
     const nextUnbuilt = books.find((b) => !b.topicsGenerated);
     if (nextUnbuilt) {
       const basePriority = 3;
@@ -416,12 +546,18 @@ async function findBookSuggestionCard(
         ? Math.min(basePriority + 3, 10)
         : basePriority;
 
+      const bsCopy = bookSuggestionCopy(
+        nextUnbuilt.title,
+        subject.name,
+        meta.learnerAge
+      );
+
       return {
         id: meta.id,
         profileId,
         type: 'book_suggestion',
-        title: `Ready for a new book?`,
-        body: `${nextUnbuilt.title} is waiting in your ${subject.name} shelf`,
+        title: bsCopy.title,
+        body: bsCopy.body,
         priority,
         expiresAt: meta.expiresAt,
         createdAt: meta.createdAt,
@@ -430,6 +566,165 @@ async function findBookSuggestionCard(
         bookEmoji: nextUnbuilt.emoji,
         subjectName: subject.name,
       };
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Finds a recent homework session whose practicedSkills match an uncovered
+ * curriculum topic. Returns a homework_connection card or null.
+ *
+ * Without FR164 knowledge_signals, we use case-insensitive substring matching
+ * between homework practicedSkills and curriculum topic titles/descriptions.
+ */
+async function findHomeworkConnectionCard(
+  db: Database,
+  profileId: string,
+  boostedSubjectIds: Set<string>,
+  meta: CardMeta
+): Promise<CoachingCard | null> {
+  // Find recent homework sessions (last 7 days) with summaries
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const recentHomework = await db
+    .select({
+      id: learningSessions.id,
+      metadata: learningSessions.metadata,
+      subjectId: learningSessions.subjectId,
+    })
+    .from(learningSessions)
+    .where(
+      and(
+        eq(learningSessions.profileId, profileId),
+        eq(learningSessions.sessionType, 'homework'),
+        gt(learningSessions.createdAt, sevenDaysAgo)
+      )
+    )
+    .orderBy(desc(learningSessions.createdAt))
+    .limit(10);
+
+  if (recentHomework.length === 0) return null;
+
+  // Extract all practiced skills from recent homework
+  const skillsBySubject = new Map<string | null, string[]>();
+  for (const hw of recentHomework) {
+    const meta2 = hw.metadata as Record<string, unknown> | null;
+    const summary = meta2?.homeworkSummary as
+      | { practicedSkills?: string[] }
+      | undefined;
+    const skills = summary?.practicedSkills;
+    if (!skills || skills.length === 0) continue;
+    const existing = skillsBySubject.get(hw.subjectId) ?? [];
+    existing.push(...skills);
+    skillsBySubject.set(hw.subjectId, existing);
+  }
+
+  if (skillsBySubject.size === 0) return null;
+
+  // Get active subjects for this profile
+  const activeSubjects = await db
+    .select({ id: subjects.id, name: subjects.name })
+    .from(subjects)
+    .where(
+      and(eq(subjects.profileId, profileId), eq(subjects.status, 'active'))
+    );
+
+  if (activeSubjects.length === 0) return null;
+
+  const subjectIds = activeSubjects.map((s) => s.id);
+  const allCurricula = await db.query.curricula.findMany({
+    where: inArray(curricula.subjectId, subjectIds),
+  });
+
+  if (allCurricula.length === 0) return null;
+
+  const curriculumIds = allCurricula.map((c) => c.id);
+  const allTopics = await db
+    .select()
+    .from(curriculumTopics)
+    .where(
+      and(
+        inArray(curriculumTopics.curriculumId, curriculumIds),
+        eq(curriculumTopics.skipped, false)
+      )
+    );
+
+  if (allTopics.length === 0) return null;
+
+  // Find topics that already have sessions (covered)
+  const topicIds = allTopics.map((t) => t.id);
+  const sessionsForTopics = await db
+    .select({ topicId: learningSessions.topicId })
+    .from(learningSessions)
+    .where(
+      and(
+        inArray(learningSessions.topicId, topicIds),
+        eq(learningSessions.profileId, profileId)
+      )
+    );
+  const coveredTopicIds = new Set(
+    sessionsForTopics.map((s) => s.topicId).filter(Boolean)
+  );
+
+  // Match skills against uncovered topic titles/descriptions
+  const allSkills = [...skillsBySubject.values()].flat();
+  for (const topic of allTopics) {
+    if (coveredTopicIds.has(topic.id)) continue;
+
+    const titleLower = topic.title.toLowerCase();
+    const descLower = (topic.description ?? '').toLowerCase();
+
+    for (const skill of allSkills) {
+      const skillLower = skill.toLowerCase();
+      if (titleLower.includes(skillLower) || descLower.includes(skillLower)) {
+        // Find the book for context
+        let bookTitle: string | null = null;
+        let bookEmoji: string | null = null;
+        let matchSubjectId: string | null = null;
+
+        if (topic.bookId) {
+          const book = await db.query.curriculumBooks?.findFirst?.({
+            where: eq(curriculumBooks.id, topic.bookId),
+          });
+          if (book) {
+            bookTitle = book.title;
+            bookEmoji = book.emoji;
+            matchSubjectId = book.subjectId;
+          }
+        }
+
+        // Resolve subject for boost check
+        if (!matchSubjectId) {
+          const curriculum = allCurricula.find(
+            (c) => c.id === topic.curriculumId
+          );
+          matchSubjectId = curriculum?.subjectId ?? null;
+        }
+
+        const basePriority = 5;
+        const priority =
+          matchSubjectId && boostedSubjectIds.has(matchSubjectId)
+            ? Math.min(basePriority + 3, 10)
+            : basePriority;
+
+        const hwCopy = homeworkConnectionCopy(skill, meta.learnerAge);
+
+        return {
+          id: meta.id,
+          profileId,
+          type: 'homework_connection' as const,
+          title: hwCopy.title,
+          body: hwCopy.body,
+          priority,
+          expiresAt: meta.expiresAt,
+          createdAt: meta.createdAt,
+          topicId: topic.id,
+          bookTitle,
+          bookEmoji,
+          homeworkSkill: skill,
+        };
+      }
     }
   }
 

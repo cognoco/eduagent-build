@@ -1,6 +1,7 @@
 import { View, Text, Pressable, ScrollView, Alert } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useCallback, useMemo } from 'react';
+import type { AccommodationMode } from '@eduagent/schemas';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useProfile } from '../../../../lib/profile';
 import {
@@ -31,6 +32,7 @@ import {
 import {
   useChildLearnerProfile,
   useGrantMemoryConsent,
+  useUpdateAccommodationMode,
 } from '../../../../hooks/use-learner-profile';
 import { MemoryConsentPrompt } from '../../../../components/memory-consent-prompt';
 import { goBackOrReplace } from '../../../../lib/navigation';
@@ -104,6 +106,34 @@ function buildGrowthData(
 
 const GRACE_PERIOD_DAYS = 7;
 
+const ACCOMMODATION_OPTIONS: {
+  mode: AccommodationMode;
+  title: string;
+  description: string;
+}[] = [
+  {
+    mode: 'none',
+    title: 'None',
+    description: 'Standard learning experience',
+  },
+  {
+    mode: 'short-burst',
+    title: 'Short-Burst',
+    description: 'Shorter explanations, frequent check-ins, small steps',
+  },
+  {
+    mode: 'audio-first',
+    title: 'Audio-First',
+    description:
+      'Spoken-style explanations, simple sentences, phonetic support',
+  },
+  {
+    mode: 'predictable',
+    title: 'Predictable',
+    description: 'Clear structure, explicit transitions, concrete examples',
+  },
+];
+
 function getGracePeriodDaysRemaining(respondedAt: string | null): number {
   if (!respondedAt) return GRACE_PERIOD_DAYS;
   const revokedDate = new Date(respondedAt);
@@ -158,13 +188,22 @@ export default function ChildDetailScreen() {
   const revokeConsent = useRevokeConsent(profileId);
   const restoreConsent = useRestoreConsent(profileId);
   const grantMemoryConsent = useGrantMemoryConsent();
+  const updateAccommodation = useUpdateAccommodationMode();
   const { CelebrationOverlay } = useCelebration({
+    // Celebrations are best-effort — empty on error is acceptable [SQ-4]
     queue: pendingCelebrations.data ?? [],
     celebrationLevel: 'all',
     audience: 'adult',
     onAllComplete: () => {
       if (!profileId) return;
-      void markCelebrationsSeen.mutateAsync({ viewer: 'parent', profileId });
+      markCelebrationsSeen
+        .mutateAsync({ viewer: 'parent', profileId })
+        .catch((err) => {
+          console.warn(
+            '[Celebrations] Failed to mark as seen, will retry on next visit:',
+            err
+          );
+        });
     },
   });
 
@@ -206,6 +245,22 @@ export default function ChildDetailScreen() {
       Alert.alert('Error', 'Could not cancel deletion. Please try again.');
     }
   }, [restoreConsent]);
+
+  const handleAccommodationChange = useCallback(
+    (mode: AccommodationMode) => {
+      if (!profileId || mode === (learnerProfile?.accommodationMode ?? 'none'))
+        return;
+      updateAccommodation.mutate(
+        { childProfileId: profileId, accommodationMode: mode },
+        {
+          onError: () => {
+            Alert.alert('Could not save setting', 'Please try again.');
+          },
+        }
+      );
+    },
+    [profileId, learnerProfile?.accommodationMode, updateAccommodation]
+  );
 
   if (!profileId) {
     return (
@@ -618,6 +673,48 @@ export default function ChildDetailScreen() {
             Review what has been remembered and adjust privacy controls.
           </Text>
         </Pressable>
+
+        <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2 mt-6">
+          Learning Accommodation
+        </Text>
+        <Text className="text-body-sm text-text-secondary mb-2">
+          Choose how the mentor adapts its teaching style. This takes effect on
+          the next session.
+        </Text>
+        {ACCOMMODATION_OPTIONS.map((opt) => (
+          <Pressable
+            key={opt.mode}
+            onPress={() => handleAccommodationChange(opt.mode)}
+            disabled={updateAccommodation.isPending}
+            className={`bg-surface rounded-card px-4 py-3.5 mb-2 ${
+              (learnerProfile?.accommodationMode ?? 'none') === opt.mode
+                ? 'border-2 border-primary'
+                : 'border-2 border-transparent'
+            }`}
+            accessibilityLabel={`${opt.title}: ${opt.description}`}
+            accessibilityRole="radio"
+            accessibilityState={{
+              selected:
+                (learnerProfile?.accommodationMode ?? 'none') === opt.mode,
+              disabled: updateAccommodation.isPending,
+            }}
+            testID={`accommodation-mode-${opt.mode}`}
+          >
+            <View className="flex-row items-center justify-between">
+              <Text className="text-body font-semibold text-text-primary">
+                {opt.title}
+              </Text>
+              {(learnerProfile?.accommodationMode ?? 'none') === opt.mode && (
+                <Text className="text-primary text-body font-semibold">
+                  Active
+                </Text>
+              )}
+            </View>
+            <Text className="text-body-sm text-text-secondary mt-1">
+              {opt.description}
+            </Text>
+          </Pressable>
+        ))}
 
         {/* Consent Management */}
         {consentData?.consentStatus != null && (

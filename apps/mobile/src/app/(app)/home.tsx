@@ -64,6 +64,7 @@ function AddFirstChildScreen(): React.ReactElement {
 }
 
 export default function HomeScreen(): React.ReactElement {
+  const router = useRouter();
   const { profiles, activeProfile, switchProfile, isLoading } = useProfile();
   const { data: subscription } = useSubscription();
   const { data: celebrationLevel = 'all' } = useCelebrationLevel();
@@ -75,9 +76,16 @@ export default function HomeScreen(): React.ReactElement {
     celebrationLevel,
     audience: isOwner ? 'adult' : 'child',
     onAllComplete: () => {
-      void markCelebrationsSeen.mutateAsync({
-        viewer: isOwner ? 'parent' : 'child',
-      });
+      markCelebrationsSeen
+        .mutateAsync({
+          viewer: isOwner ? 'parent' : 'child',
+        })
+        .catch((err) => {
+          console.warn(
+            '[Celebrations] Failed to mark as seen, will retry on next visit:',
+            err
+          );
+        });
     },
   });
 
@@ -103,6 +111,7 @@ export default function HomeScreen(): React.ReactElement {
   }
 
   if (loadingTimedOut) {
+    // [3B.11] Secondary navigation actions prevent dead-end when home times out
     return (
       <View
         className="flex-1 bg-background items-center justify-center px-6"
@@ -121,6 +130,28 @@ export default function HomeScreen(): React.ReactElement {
         >
           <Text className="text-text-inverse text-body font-semibold">
             Retry
+          </Text>
+        </Pressable>
+        <Pressable
+          onPress={() => router.replace('/(app)/library' as never)}
+          className="mt-3 px-6 py-3 min-h-[48px] items-center justify-center"
+          accessibilityRole="button"
+          accessibilityLabel="Go to Library"
+          testID="timeout-library-button"
+        >
+          <Text className="text-primary text-body font-medium">
+            Go to Library
+          </Text>
+        </Pressable>
+        <Pressable
+          onPress={() => router.replace('/(app)/more' as never)}
+          className="px-6 py-3 min-h-[48px] items-center justify-center"
+          accessibilityRole="button"
+          accessibilityLabel="More options"
+          testID="timeout-more-button"
+        >
+          <Text className="text-primary text-body font-medium">
+            More options
           </Text>
         </Pressable>
       </View>

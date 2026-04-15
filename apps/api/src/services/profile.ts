@@ -5,6 +5,9 @@
 
 import { eq, and, asc, sql } from 'drizzle-orm';
 import { profiles, familyLinks, type Database } from '@eduagent/database';
+import { createLogger } from './logger';
+
+const logger = createLogger();
 import type {
   ProfileCreateInput,
   ProfileUpdateInput,
@@ -109,8 +112,11 @@ export async function findOwnerProfile(
 
   // Fallback: no owner flag set — pick first profile (defensive edge case).
   // Should not happen in normal operation — log for observability.
-  console.warn(
-    `[findOwnerProfile] No owner profile for account ${accountId}, falling back to oldest profile`
+  logger.warn(
+    '[findOwnerProfile] No owner profile for account, falling back to oldest profile',
+    {
+      accountId,
+    }
   );
   const fallbackRow = await db.query.profiles.findFirst({
     where: eq(profiles.accountId, accountId),
@@ -173,12 +179,14 @@ export async function createProfile(
   // immediately — the parent IS the consenting adult (BUG-239 fix).
   // Otherwise (child self-registering), create PENDING state for the
   // email-based consent request flow.
+  if (!row) throw new Error('Insert profile did not return a row');
+
   let consentStatus: Profile['consentStatus'] = null;
   if (consentCheck?.required && consentCheck.consentType) {
     if (parentProfileId) {
       const state = await createGrantedConsentState(
         db,
-        row!.id,
+        row.id,
         consentCheck.consentType,
         parentProfileId
       );
@@ -186,14 +194,14 @@ export async function createProfile(
     } else {
       const state = await createPendingConsentState(
         db,
-        row!.id,
+        row.id,
         consentCheck.consentType
       );
       consentStatus = state.status;
     }
   }
 
-  return mapProfileRow(row!, consentStatus);
+  return mapProfileRow(row, consentStatus);
 }
 
 /**

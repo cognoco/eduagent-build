@@ -1,0 +1,269 @@
+jest.mock('./llm', () => ({
+  routeAndCall: jest.fn(),
+}));
+
+jest.mock('./learner-profile', () => ({
+  applyAnalysis: jest.fn(),
+}));
+
+import { routeAndCall } from './llm';
+import { applyAnalysis } from './learner-profile';
+import { parseLearnerInput } from './learner-input';
+import type { Database } from '@eduagent/database';
+
+const mockRouteAndCall = routeAndCall as jest.MockedFunction<
+  typeof routeAndCall
+>;
+const mockApplyAnalysis = applyAnalysis as jest.MockedFunction<
+  typeof applyAnalysis
+>;
+
+const db = {} as Database;
+const profileId = 'profile-123';
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  mockApplyAnalysis.mockResolvedValue({
+    fieldsUpdated: [],
+    notifications: [],
+  });
+});
+
+// ---------------------------------------------------------------------------
+// LLM-parsed path
+// ---------------------------------------------------------------------------
+
+describe('parseLearnerInput — LLM success path', () => {
+  it('extracts interest from "I love dinosaurs"', async () => {
+    mockRouteAndCall.mockResolvedValueOnce({
+      response: JSON.stringify({
+        explanationEffectiveness: null,
+        interests: ['dinosaurs'],
+        strengths: null,
+        struggles: null,
+        resolvedTopics: null,
+        communicationNotes: null,
+        engagementLevel: null,
+        confidence: 'high',
+      }),
+    } as any);
+    mockApplyAnalysis.mockResolvedValueOnce({
+      fieldsUpdated: ['interests'],
+      notifications: [],
+    });
+
+    const result = await parseLearnerInput(
+      db,
+      profileId,
+      'I love dinosaurs',
+      'learner'
+    );
+    expect(result.success).toBe(true);
+    expect(result.fieldsUpdated).toContain('interests');
+    expect(mockApplyAnalysis).toHaveBeenCalledWith(
+      db,
+      profileId,
+      expect.objectContaining({ interests: ['dinosaurs'], confidence: 'high' }),
+      null,
+      'learner'
+    );
+  });
+
+  it('extracts communication note from "I prefer short explanations"', async () => {
+    mockRouteAndCall.mockResolvedValueOnce({
+      response: JSON.stringify({
+        explanationEffectiveness: null,
+        interests: null,
+        strengths: null,
+        struggles: null,
+        resolvedTopics: null,
+        communicationNotes: ['prefers short explanations'],
+        engagementLevel: null,
+        confidence: 'high',
+      }),
+    } as any);
+    mockApplyAnalysis.mockResolvedValueOnce({
+      fieldsUpdated: ['communicationNotes'],
+      notifications: [],
+    });
+
+    const result = await parseLearnerInput(
+      db,
+      profileId,
+      'I prefer short explanations',
+      'learner'
+    );
+    expect(result.success).toBe(true);
+    expect(result.fieldsUpdated).toContain('communicationNotes');
+  });
+
+  it('tags source as parent when source is "parent"', async () => {
+    mockRouteAndCall.mockResolvedValueOnce({
+      response: JSON.stringify({
+        explanationEffectiveness: null,
+        interests: null,
+        strengths: [{ topic: 'reading', subject: null }],
+        struggles: null,
+        resolvedTopics: null,
+        communicationNotes: null,
+        engagementLevel: null,
+        confidence: 'high',
+      }),
+    } as any);
+    mockApplyAnalysis.mockResolvedValueOnce({
+      fieldsUpdated: ['strengths'],
+      notifications: [],
+    });
+
+    await parseLearnerInput(db, profileId, 'She is great at reading', 'parent');
+    expect(mockApplyAnalysis).toHaveBeenCalledWith(
+      db,
+      profileId,
+      expect.objectContaining({
+        strengths: [{ topic: 'reading', subject: null, source: 'parent' }],
+      }),
+      null,
+      'parent'
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Fallback path (LLM failure or invalid response)
+// ---------------------------------------------------------------------------
+
+describe('parseLearnerInput — fallback path', () => {
+  it('falls back to regex when LLM returns invalid JSON', async () => {
+    mockRouteAndCall.mockResolvedValueOnce({
+      response: 'Sorry, I cannot help with that.',
+    } as any);
+    mockApplyAnalysis.mockResolvedValueOnce({
+      fieldsUpdated: ['interests'],
+      notifications: [],
+    });
+
+    const result = await parseLearnerInput(
+      db,
+      profileId,
+      'I love space exploration',
+      'learner'
+    );
+    expect(result.success).toBe(true);
+    // fallbackAnalysis should pick up "I love space exploration" via regex
+    expect(mockApplyAnalysis).toHaveBeenCalledWith(
+      db,
+      profileId,
+      expect.objectContaining({
+        interests: ['space exploration'],
+        confidence: 'high',
+      }),
+      null,
+      'learner'
+    );
+  });
+
+  it('falls back to regex when LLM throws', async () => {
+    mockRouteAndCall.mockRejectedValueOnce(new Error('LLM timeout'));
+    mockApplyAnalysis.mockResolvedValueOnce({
+      fieldsUpdated: ['interests'],
+      notifications: [],
+    });
+
+    const result = await parseLearnerInput(
+      db,
+      profileId,
+      'I enjoy math puzzles',
+      'learner'
+    );
+    expect(result.success).toBe(true);
+    expect(mockApplyAnalysis).toHaveBeenCalledWith(
+      db,
+      profileId,
+      expect.objectContaining({ interests: ['math puzzles'] }),
+      null,
+      'learner'
+    );
+  });
+
+  it('detects struggle pattern in fallback', async () => {
+    mockRouteAndCall.mockRejectedValueOnce(new Error('LLM down'));
+    mockApplyAnalysis.mockResolvedValueOnce({
+      fieldsUpdated: ['struggles'],
+      notifications: [],
+    });
+
+    const result = await parseLearnerInput(
+      db,
+      profileId,
+      'I struggle with fractions',
+      'learner'
+    );
+    expect(result.success).toBe(true);
+    expect(mockApplyAnalysis).toHaveBeenCalledWith(
+      db,
+      profileId,
+      expect.objectContaining({
+        struggles: [{ topic: 'fractions', subject: null, source: 'learner' }],
+      }),
+      null,
+      'learner'
+    );
+  });
+
+  it('puts unrecognized text into communicationNotes in fallback', async () => {
+    mockRouteAndCall.mockRejectedValueOnce(new Error('LLM down'));
+    mockApplyAnalysis.mockResolvedValueOnce({
+      fieldsUpdated: ['communicationNotes'],
+      notifications: [],
+    });
+
+    const result = await parseLearnerInput(
+      db,
+      profileId,
+      'I learn best when it is quiet',
+      'learner'
+    );
+    expect(result.success).toBe(true);
+    expect(mockApplyAnalysis).toHaveBeenCalledWith(
+      db,
+      profileId,
+      expect.objectContaining({
+        communicationNotes: ['I learn best when it is quiet'],
+      }),
+      null,
+      'learner'
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Error path
+// ---------------------------------------------------------------------------
+
+describe('parseLearnerInput — error path', () => {
+  it('returns failure when applyAnalysis throws', async () => {
+    mockRouteAndCall.mockResolvedValueOnce({
+      response: JSON.stringify({
+        explanationEffectiveness: null,
+        interests: ['robots'],
+        strengths: null,
+        struggles: null,
+        resolvedTopics: null,
+        communicationNotes: null,
+        engagementLevel: null,
+        confidence: 'high',
+      }),
+    } as any);
+    mockApplyAnalysis.mockRejectedValueOnce(new Error('DB write failed'));
+
+    const result = await parseLearnerInput(
+      db,
+      profileId,
+      'I love robots',
+      'learner'
+    );
+    expect(result.success).toBe(false);
+    expect(result.message).toBe('Something went wrong. Please try again.');
+    expect(result.fieldsUpdated).toHaveLength(0);
+  });
+});

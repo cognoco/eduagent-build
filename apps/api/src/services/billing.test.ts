@@ -27,7 +27,6 @@ import {
   activateSubscriptionFromCheckout,
   transitionToExtendedTrial,
   findExpiredTrialsByDaysSinceEnd,
-  findSubscriptionsByTrialDateRange,
   getTopUpCreditsRemaining,
   purchaseTopUpCredits,
   findExpiringTopUpCredits,
@@ -381,7 +380,7 @@ describe('updateSubscriptionFromWebhook', () => {
     });
     const db = createMockDb({ subscriptionFindFirst: existing });
 
-    const result = await updateSubscriptionFromWebhook(db, 'sub_stripe_1', {
+    await updateSubscriptionFromWebhook(db, 'sub_stripe_1', {
       status: 'active',
       lastStripeEventTimestamp: NOW.toISOString(), // same timestamp
     });
@@ -2446,7 +2445,6 @@ describe('activateSubscriptionFromRevenuecat — trial fallback', () => {
       tier: 'plus',
       status: 'active', // falls back to non-trial
     });
-    const newQuotaPool = mockQuotaPoolRow({ monthlyLimit: 500 });
     const db = createMockDb({
       subscriptionFindFirst: undefined,
       insertReturning: [newSubRow],

@@ -18,6 +18,9 @@ import {
   logNotification,
   getRecentNotificationCount,
 } from './settings';
+import { createLogger } from './logger';
+
+const logger = createLogger();
 
 export interface NotificationPayload {
   profileId: string;
@@ -36,7 +39,10 @@ export interface NotificationPayload {
     | 'recall_nudge'
     | 'weekly_progress'
     | 'monthly_report'
-    | 'progress_refresh';
+    | 'progress_refresh'
+    | 'struggle_noticed'
+    | 'struggle_flagged'
+    | 'struggle_resolved';
 }
 
 export interface NotificationResult {
@@ -236,7 +242,7 @@ export async function sendEmail(
 ): Promise<EmailResult> {
   const apiKey = options?.resendApiKey;
   if (!apiKey) {
-    console.warn('[email] RESEND_API_KEY not configured — skipping email send');
+    logger.warn('[email] RESEND_API_KEY not configured — skipping email send');
     return { sent: false, reason: 'no_api_key' };
   }
 
@@ -388,4 +394,99 @@ export async function notifyParentToSubscribe(
   await logNotification(db, childProfileId, 'subscribe_request');
 
   return { sent: true, rateLimited: false };
+}
+
+// ---------------------------------------------------------------------------
+// FR247.6/FR247.7: Struggle push notifications to parent
+// ---------------------------------------------------------------------------
+
+import type { StruggleNotification } from './learner-profile';
+
+/**
+ * Format push notification copy for struggle signals.
+ * Two-tier system: softer "noticed" at medium confidence, stronger "flagged" at high.
+ */
+export function formatStruggleNotificationCopy(
+  type: 'struggle_noticed' | 'struggle_flagged' | 'struggle_resolved',
+  topic: string,
+  childName: string | null
+): { title: string; body: string } {
+  const name = childName ?? 'Your child';
+
+  switch (type) {
+    case 'struggle_noticed':
+      return {
+        title: 'Learning update',
+        body: `It looks like ${name} is finding ${topic} challenging. Nothing to worry about — just keeping you in the loop.`,
+      };
+    case 'struggle_flagged':
+      return {
+        title: 'Learning update',
+        body: `${name} has been working hard on ${topic} — they may need some extra support.`,
+      };
+    case 'struggle_resolved':
+      return {
+        title: 'Great news!',
+        body: `${name} seems to have overcome their difficulty with ${topic}.`,
+      };
+  }
+}
+
+/**
+ * Send struggle push notification to the parent of a child profile.
+ * Looks up parent via familyLinks, resolves child display name, sends push.
+ */
+export async function sendStruggleNotification(
+  db: Database,
+  childProfileId: string,
+  notification: StruggleNotification
+): Promise<NotificationResult> {
+  const link = await db.query.familyLinks.findFirst({
+    where: eq(familyLinks.childProfileId, childProfileId),
+  });
+  if (!link) {
+    return { sent: false, reason: 'no_parent_link' };
+  }
+
+  // [CR-119.5]: Per-type dedup (intentionally NOT per-topic). A parent
+  // receives at most ONE push per struggle type (e.g. struggle_noticed) in
+  // any 24-hour window, even if multiple distinct topics trigger the signal.
+  // Trade-off: some topic-specific alerts are suppressed, but this prevents
+  // notification fatigue when a learner struggles across several topics in
+  // quick succession. The daily global cap in sendPushNotification is an
+  // additional layer; this check prevents same-type redundancy.
+  const recentCount = await getRecentNotificationCount(
+    db,
+    link.parentProfileId,
+    notification.type,
+    24
+  );
+  if (recentCount > 0) {
+    logger.info('Struggle notification deduped', {
+      event: 'notification.struggle.deduped',
+      childProfileId,
+      type: notification.type,
+      topic: notification.topic,
+    });
+    return { sent: false, reason: 'dedup_24h' };
+  }
+
+  const childProfile = await db.query.profiles.findFirst({
+    where: eq(profiles.id, childProfileId),
+    columns: { displayName: true },
+  });
+  const childName = childProfile?.displayName ?? null;
+
+  const copy = formatStruggleNotificationCopy(
+    notification.type,
+    notification.topic,
+    childName
+  );
+
+  return sendPushNotification(db, {
+    profileId: link.parentProfileId,
+    title: copy.title,
+    body: copy.body,
+    type: notification.type,
+  });
 }

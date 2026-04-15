@@ -33,7 +33,7 @@ let mockSearchParams = () => ({
 
 // --- useBookWithTopics ---
 const mockBookRefetch = jest.fn();
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 const mockUseBookWithTopics = jest.fn((): any => ({
   data: {
     book: {
@@ -67,19 +67,32 @@ const mockUseBookWithTopics = jest.fn((): any => ({
 
 // --- useGenerateBookTopics ---
 const mockGenerateMutate = jest.fn();
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 const mockUseGenerateBookTopics = jest.fn((): any => ({
   mutate: mockGenerateMutate,
   isPending: false,
 }));
 
+const mockUseBooks = jest.fn((): any => ({
+  data: [
+    { id: 'book-1', title: 'Algebra', emoji: '📐', topicsGenerated: true },
+    { id: 'book-2', title: 'Geometry', emoji: '📏', topicsGenerated: true },
+  ],
+  isLoading: false,
+}));
+
 jest.mock('../../../../../hooks/use-books', () => ({
   useBookWithTopics: () => mockUseBookWithTopics(),
+  useBooks: () => mockUseBooks(),
   useGenerateBookTopics: () => mockUseGenerateBookTopics(),
 }));
 
+jest.mock('../../../../../hooks/use-move-topic', () => ({
+  useMoveTopic: () => ({ mutate: jest.fn(), isPending: false }),
+}));
+
 // --- useBookSessions ---
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 const mockUseBookSessions = jest.fn((): any => ({
   data: [],
   isLoading: false,
@@ -90,7 +103,7 @@ jest.mock('../../../../../hooks/use-book-sessions', () => ({
 }));
 
 // --- useTopicSuggestions ---
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 const mockUseTopicSuggestions = jest.fn((): any => ({
   data: [],
   isLoading: false,
@@ -101,7 +114,7 @@ jest.mock('../../../../../hooks/use-topic-suggestions', () => ({
 }));
 
 // --- useBookNotes ---
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 const mockUseBookNotes = jest.fn((): any => ({
   data: { notes: [] },
   isLoading: false,
@@ -116,6 +129,17 @@ jest.mock('../../../../../hooks/use-subjects', () => ({
   useSubjects: () => ({
     data: [{ id: 'sub-1', name: 'Mathematics' }],
   }),
+}));
+
+// --- useCurriculum ---
+
+const mockUseCurriculum = jest.fn((): any => ({
+  data: null,
+  isLoading: false,
+}));
+
+jest.mock('../../../../../hooks/use-curriculum', () => ({
+  useCurriculum: () => mockUseCurriculum(),
 }));
 
 // --- useThemeColors ---
@@ -213,6 +237,10 @@ describe('BookScreen', () => {
     }));
     mockUseBookNotes.mockImplementation(() => ({
       data: { notes: [] },
+      isLoading: false,
+    }));
+    mockUseCurriculum.mockImplementation(() => ({
+      data: null,
       isLoading: false,
     }));
   });
@@ -454,11 +482,37 @@ describe('BookScreen', () => {
   // -----------------------------------------------------------------------
   // 6. Empty sessions guidance
   // -----------------------------------------------------------------------
-  it('shows empty sessions guidance when no sessions exist', () => {
+  it('shows empty sessions guidance when no sessions exist (no curriculum)', () => {
     const { getByTestId, getByText } = render(<BookScreen />);
     expect(getByTestId('book-empty-sessions')).toBeTruthy();
     expect(getByText('No sessions yet')).toBeTruthy();
-    expect(getByText('Pick a topic above to start learning')).toBeTruthy();
+    expect(
+      getByText(
+        'Start with a learning path tailored to you, or tap Start learning below to jump straight in.'
+      )
+    ).toBeTruthy();
+    // "Build my learning path" button should be visible when no curriculum
+    expect(getByTestId('book-build-learning-path')).toBeTruthy();
+  });
+
+  it('shows "tap Start learning" guidance when curriculum exists (no dead-end)', () => {
+    mockUseCurriculum.mockReturnValue({
+      data: { topics: [{ id: 't1' }] },
+      isLoading: false,
+    });
+
+    const { getByTestId, getByText, queryByTestId } = render(<BookScreen />);
+    expect(getByTestId('book-empty-sessions')).toBeTruthy();
+    expect(getByText('No sessions yet')).toBeTruthy();
+    expect(
+      getByText(
+        'Tap Start learning below to jump in — a topic will be picked for you automatically.'
+      )
+    ).toBeTruthy();
+    // "Build my learning path" button should NOT appear when curriculum exists
+    expect(queryByTestId('book-build-learning-path')).toBeNull();
+    // But the floating "Start learning" button must still be present
+    expect(getByTestId('book-start-learning')).toBeTruthy();
   });
 
   // -----------------------------------------------------------------------
@@ -592,7 +646,7 @@ describe('BookScreen', () => {
     );
   });
 
-  it('long-pressing a session row no longer shows unavailable actions', () => {
+  it('long-pressing a session row shows context menu', () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(jest.fn());
     mockUseBookSessions.mockReturnValue({
       data: makeSessions(1),
@@ -602,7 +656,12 @@ describe('BookScreen', () => {
     const { getByTestId } = render(<BookScreen />);
     fireEvent(getByTestId('session-sess-1'), 'longPress');
 
-    expect(alertSpy).not.toHaveBeenCalled();
+    // Alert offers to move topic to another book (default mock has 2 books)
+    expect(alertSpy).toHaveBeenCalledWith(
+      'Session Topic 1',
+      expect.any(String),
+      expect.any(Array)
+    );
   });
 
   it('shows "Past sessions" heading when sessions exist', () => {
@@ -660,7 +719,7 @@ describe('BookScreen', () => {
     expect(mockBack).toHaveBeenCalledTimes(1);
   });
 
-  it('back button replaces shelf when there is no back history', () => {
+  it('back button replaces shelf when there is no back history (multi-book)', () => {
     mockCanGoBack.mockReturnValue(false);
 
     const { getByTestId } = render(<BookScreen />);
@@ -669,6 +728,18 @@ describe('BookScreen', () => {
       pathname: '/(app)/shelf/[subjectId]',
       params: { subjectId: 'sub-1' },
     });
+  });
+
+  it('back button goes to library for single-book subjects (avoids shelf dead-end)', () => {
+    mockCanGoBack.mockReturnValue(false);
+    mockUseBooks.mockReturnValue({
+      data: [{ id: 'book-1', title: 'Only Book', topicsGenerated: true }],
+      isLoading: false,
+    });
+
+    const { getByTestId } = render(<BookScreen />);
+    fireEvent.press(getByTestId('book-back'));
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
   });
 
   // -----------------------------------------------------------------------
@@ -908,5 +979,144 @@ describe('BookScreen', () => {
     const { getByTestId } = render(<BookScreen />);
     fireEvent.press(getByTestId('book-loading-back'));
     expect(mockBack).toHaveBeenCalledTimes(1);
+  });
+
+  // -----------------------------------------------------------------------
+  // Build learning path button
+  // -----------------------------------------------------------------------
+  it('shows build learning path button in empty state when no curriculum exists', () => {
+    // No curriculum (default mock returns null)
+    const { getByTestId } = render(<BookScreen />);
+    expect(getByTestId('book-build-learning-path')).toBeTruthy();
+  });
+
+  it('hides build learning path button in empty state when curriculum already exists', () => {
+    mockUseCurriculum.mockReturnValue({
+      data: {
+        id: 'cur-1',
+        subjectId: 'sub-1',
+        version: 1,
+        generatedAt: new Date().toISOString(),
+        topics: [
+          {
+            id: 'ctopic-1',
+            title: 'Topic A',
+            description: '',
+            sortOrder: 1,
+            relevance: 'core',
+            estimatedMinutes: 10,
+            bookId: 'book-1',
+            skipped: false,
+          },
+        ],
+      },
+      isLoading: false,
+    });
+
+    const { queryByTestId } = render(<BookScreen />);
+    expect(queryByTestId('book-build-learning-path')).toBeNull();
+  });
+
+  it('shows floating bar link when no curriculum exists', () => {
+    const { getByTestId } = render(<BookScreen />);
+    expect(getByTestId('book-build-path-link')).toBeTruthy();
+  });
+
+  it('hides floating bar link when curriculum exists', () => {
+    mockUseCurriculum.mockReturnValue({
+      data: {
+        id: 'cur-1',
+        subjectId: 'sub-1',
+        version: 1,
+        generatedAt: new Date().toISOString(),
+        topics: [
+          {
+            id: 'ctopic-1',
+            title: 'Topic A',
+            description: '',
+            sortOrder: 1,
+            relevance: 'core',
+            estimatedMinutes: 10,
+            bookId: 'book-1',
+            skipped: false,
+          },
+        ],
+      },
+      isLoading: false,
+    });
+
+    const { queryByTestId } = render(<BookScreen />);
+    expect(queryByTestId('book-build-path-link')).toBeNull();
+  });
+
+  it('pressing build learning path navigates to onboarding interview', () => {
+    const { getByTestId } = render(<BookScreen />);
+    fireEvent.press(getByTestId('book-build-learning-path'));
+
+    expect(mockPush).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pathname: '/(app)/onboarding/interview',
+        params: expect.objectContaining({
+          subjectId: 'sub-1',
+          bookId: 'book-1',
+          bookTitle: 'Algebra',
+        }),
+      })
+    );
+  });
+
+  // -----------------------------------------------------------------------
+  // RT-1: useRef lock prevents double-fire on retry button
+  // -----------------------------------------------------------------------
+  it('pressing retry generation fires mutate exactly once [RT-1]', async () => {
+    // Set up book needing generation
+    mockUseBookWithTopics.mockReturnValue({
+      data: {
+        book: {
+          id: 'book-1',
+          title: 'Algebra',
+          emoji: '📐',
+          topicsGenerated: false, // triggers auto-generation
+          description: 'Basic algebra',
+        },
+        topics: [],
+        completedTopicCount: 0,
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: mockBookRefetch,
+    });
+
+    // Initial auto-trigger fires onError to put us in timed_out phase
+    mockGenerateMutate.mockImplementationOnce(
+      (
+        _input: unknown,
+        callbacks: { onSuccess: () => void; onError: (e: Error) => void }
+      ) => {
+        callbacks.onError(new Error('initial failure'));
+      }
+    );
+
+    const { getByTestId } = render(<BookScreen />);
+
+    await waitFor(() => {
+      expect(getByTestId('book-gen-retry')).toBeTruthy();
+    });
+
+    // Reset mock before testing retry — capture pending retry call
+    let mutateCallCount = 0;
+    mockGenerateMutate.mockImplementation(() => {
+      mutateCallCount++;
+      // Do NOT call callbacks — leave retryInFlight locked
+    });
+
+    // First press: should trigger mutate and lock retryInFlight
+    fireEvent.press(getByTestId('book-gen-retry'));
+
+    // Mutate was called once and retryInFlight.current is now true.
+    // The retry button is hidden because genPhase was set to 'idle',
+    // so a second press is naturally impossible after state update.
+    expect(mutateCallCount).toBe(1);
   });
 });

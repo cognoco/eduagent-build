@@ -175,6 +175,8 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
           sessionsLastWeek: 2,
           totalTimeThisWeek: 180,
           totalTimeLastWeek: 90,
+          exchangesThisWeek: 0,
+          exchangesLastWeek: 0,
           trend: 'up',
           subjects: [
             { name: 'Mathematics', retentionStatus: 'strong' },
@@ -182,6 +184,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
           ],
           guidedVsImmediateRatio: 0.6,
           retentionTrend: 'stable',
+          totalSessions: 12,
         },
         {
           profileId: 'demo-child-2',
@@ -192,10 +195,13 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
           sessionsLastWeek: 3,
           totalTimeThisWeek: 120,
           totalTimeLastWeek: 115,
+          exchangesThisWeek: 0,
+          exchangesLastWeek: 0,
           trend: 'stable',
           subjects: [{ name: 'English', retentionStatus: 'strong' }],
           guidedVsImmediateRatio: 0.3,
           retentionTrend: 'improving',
+          totalSessions: 8,
         },
       ],
     });

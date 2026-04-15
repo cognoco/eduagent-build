@@ -3,6 +3,7 @@ import {
   screen,
   fireEvent,
   waitFor,
+  act,
 } from '@testing-library/react-native';
 import React from 'react';
 import { Alert, Linking, Platform } from 'react-native';
@@ -50,6 +51,8 @@ const mockMutateAsyncPurchase = jest.fn();
 const mockMutateAsyncRestore = jest.fn();
 let mockOfferings: ReturnType<typeof makeMockOfferings> | null = null;
 let mockOfferingsLoading = false;
+let mockOfferingsError = false;
+const mockRefetchOfferings = jest.fn();
 let mockCustomerInfo: ReturnType<typeof makeMockCustomerInfo> | null = null;
 let mockCustomerInfoLoading = false;
 let mockPurchaseIsPending = false;
@@ -59,6 +62,8 @@ jest.mock('../../hooks/use-revenuecat', () => ({
   useOfferings: () => ({
     data: mockOfferings,
     isLoading: mockOfferingsLoading,
+    isError: mockOfferingsError,
+    refetch: mockRefetchOfferings,
   }),
   useCustomerInfo: () => ({
     data: mockCustomerInfo,
@@ -126,6 +131,18 @@ jest.mock('../../hooks/use-settings', () => ({
     mutateAsync: jest.fn(),
     isPending: false,
   }),
+}));
+
+// BUG-397: Restore now polls the API to confirm subscription tier after RevenueCat restore
+const mockSubscriptionGet = jest.fn();
+jest.mock('../../lib/api-client', () => ({
+  useApiClient: () => ({
+    subscription: { $get: mockSubscriptionGet },
+  }),
+}));
+
+jest.mock('../../lib/assert-ok', () => ({
+  assertOk: jest.fn(),
 }));
 
 let mockXpSummary: { topicsCompleted?: number; totalXp?: number } | undefined =
@@ -298,6 +315,8 @@ describe('SubscriptionScreen', () => {
     jest.clearAllMocks();
     mockOfferings = null;
     mockOfferingsLoading = false;
+    mockOfferingsError = false;
+    mockRefetchOfferings.mockClear();
     mockCustomerInfo = null;
     mockCustomerInfoLoading = false;
     mockPurchaseIsPending = false;
@@ -577,44 +596,72 @@ describe('SubscriptionScreen', () => {
     expect(screen.getByText('Restore Purchases')).toBeTruthy();
   });
 
-  it('restores purchases and shows success when entitlements found', async () => {
+  it('restores purchases and shows success when polling confirms paid tier', async () => {
+    jest.useFakeTimers();
     mockOfferings = makeMockOfferings([makeMockPackage()]);
-    const restoredInfo = makeMockCustomerInfo({
-      activeEntitlements: { pro: { isActive: true, identifier: 'pro' } },
+    mockMutateAsyncRestore.mockResolvedValue(undefined);
+    // BUG-397: Restore now polls API to confirm subscription tier
+    mockSubscriptionGet.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ subscription: { tier: 'plus' } }),
     });
-    mockMutateAsyncRestore.mockResolvedValue(restoredInfo);
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
-
     fireEvent.press(screen.getByTestId('restore-purchases-button'));
 
-    await waitFor(() => {
-      expect(mockMutateAsyncRestore).toHaveBeenCalled();
+    // Let restore.mutateAsync resolve
+    await act(async () => {
+      await Promise.resolve();
     });
-    expect(mockRefetchSub).toHaveBeenCalled();
+
+    // Advance past first polling delay (2 s)
+    await act(async () => {
+      jest.advanceTimersByTime(2000);
+    });
+
+    await waitFor(() => {
+      expect(Alert.alert).toHaveBeenCalledWith(
+        'Restored',
+        'Your subscription has been restored.'
+      );
+    });
     expect(mockRefetchUsage).toHaveBeenCalled();
-    expect(Alert.alert).toHaveBeenCalledWith(
-      'Restored',
-      'Your subscription has been restored.'
-    );
+    jest.useRealTimers();
   });
 
-  it('shows no subscriptions alert when restore finds nothing', async () => {
+  it('shows no subscriptions alert when polling never confirms paid tier', async () => {
+    jest.useFakeTimers();
     mockOfferings = makeMockOfferings([makeMockPackage()]);
-    const emptyInfo = makeMockCustomerInfo(); // no active entitlements
-    mockMutateAsyncRestore.mockResolvedValue(emptyInfo);
+    mockMutateAsyncRestore.mockResolvedValue(undefined);
+    // BUG-397: Polling always returns free tier
+    mockSubscriptionGet.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ subscription: { tier: 'free' } }),
+    });
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
-
     fireEvent.press(screen.getByTestId('restore-purchases-button'));
 
-    await waitFor(() => {
-      expect(mockMutateAsyncRestore).toHaveBeenCalled();
+    // Let restore.mutateAsync resolve
+    await act(async () => {
+      await Promise.resolve();
     });
-    expect(Alert.alert).toHaveBeenCalledWith(
-      'No subscriptions found',
-      'We could not find any previous purchases to restore.'
-    );
+
+    // Advance past all 15 polling attempts (15 × 2 s = 30 s)
+    for (let i = 0; i < 15; i++) {
+      await act(async () => {
+        jest.advanceTimersByTime(2000);
+      });
+    }
+
+    await waitFor(() => {
+      expect(Alert.alert).toHaveBeenCalledWith(
+        'No subscriptions found',
+        'We could not find any previous purchases to restore.',
+        expect.any(Array)
+      );
+    });
+    jest.useRealTimers();
   });
 
   it('shows error alert when restore fails', async () => {
@@ -914,19 +961,38 @@ describe('SubscriptionScreen', () => {
       expect(screen.getByText('Buy 500 credits')).toBeTruthy();
     });
 
-    it('shows error alert when no topup package is in offerings', async () => {
+    it('shows graceful error when no topup package is in offerings', async () => {
       mockSubscription = { tier: 'plus', status: 'active' };
-      // Offerings with only a standard monthly package — no 'topup' identifier
       mockOfferings = makeMockOfferings([makeMockPackage()]);
 
       render(<SubscriptionScreen />, { wrapper: createWrapper() });
-
       fireEvent.press(screen.getByTestId('top-up-button'));
 
       await waitFor(() => {
         expect(Alert.alert).toHaveBeenCalledWith(
-          'Error',
-          'Top-up package not available.'
+          'Not available',
+          "Top-up credits aren't available right now. Try again later or contact support.",
+          expect.arrayContaining([
+            expect.objectContaining({ text: 'Retry' }),
+            expect.objectContaining({ text: 'OK' }),
+          ])
+        );
+      });
+    });
+
+    it('shows connection error with retry when offerings failed to load', async () => {
+      mockSubscription = { tier: 'plus', status: 'active' };
+      mockOfferings = null;
+      mockOfferingsError = true;
+
+      render(<SubscriptionScreen />, { wrapper: createWrapper() });
+      fireEvent.press(screen.getByTestId('top-up-button'));
+
+      await waitFor(() => {
+        expect(Alert.alert).toHaveBeenCalledWith(
+          'Connection error',
+          "Couldn't load purchase options. Check your connection and try again.",
+          expect.arrayContaining([expect.objectContaining({ text: 'Retry' })])
         );
       });
     });

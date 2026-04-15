@@ -25,7 +25,9 @@ export function buildFourStrandsPrompt(context: ExchangeContext): string[] {
       '- Balance meaning-focused input, meaning-focused output, language-focused learning, and fluency development.',
       '- Teach directly. Correct errors clearly and immediately.',
       `- Explain grammar using the learner's native language when helpful${
-        context.nativeLanguage ? ` (${context.nativeLanguage})` : ''
+        context.nativeLanguage
+          ? ` (native language: <native_language>${context.nativeLanguage}</native_language>)`
+          : ''
       }.`,
       '- Keep examples in the target language, but make explanations comprehensible.',
       '- Prefer short, high-frequency chunks and collocations, not only isolated words.',
@@ -52,6 +54,16 @@ export function buildFourStrandsPrompt(context: ExchangeContext): string[] {
       language
         ? `- Target STT/TTS locale: ${language.sttLocale}.`
         : '- Use the target language locale when speaking/listening features are available.',
+    ].join('\n'),
+    [
+      'Fluency drill annotation:',
+      'When you start a fluency drill (rapid-fire translation, fill-blank, vocabulary recall),',
+      'append this JSON on its own line at the very end of your message:',
+      '{"fluencyDrill":{"active":true,"durationSeconds":60}}',
+      'Adjust durationSeconds (30–90) based on drill difficulty.',
+      'When you evaluate the drill result, append:',
+      '{"fluencyDrill":{"active":false,"score":{"correct":N,"total":N}}}',
+      'These annotations are machine-parsed and stripped before display — do not reference them in your text.',
     ].join('\n'),
   ];
 }

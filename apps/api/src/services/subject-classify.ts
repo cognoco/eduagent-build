@@ -108,11 +108,14 @@ export async function classifySubject(
 
   // If only one subject, auto-match with high confidence
   if (subjects.length === 1) {
+    const onlySubject = subjects[0];
+    if (!onlySubject)
+      throw new Error('Expected subjects[0] to exist when length is 1');
     return {
       candidates: [
         {
-          subjectId: subjects[0]!.id,
-          subjectName: subjects[0]!.name,
+          subjectId: onlySubject.id,
+          subjectName: onlySubject.name,
           confidence: 0.9,
         },
       ],

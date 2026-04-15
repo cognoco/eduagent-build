@@ -230,7 +230,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     // BUG-51 (re-apply 1C.8): Read subscription-level current_period_end first,
     // with item-level as fallback. The subscription-level field is reliably
     // present on cancel responses even in Stripe SDK v20.
-    const raw = updated as unknown as Record<string, unknown>;
+    const raw = updated as unknown as { current_period_end?: number };
     const subscriptionLevelEnd =
       typeof raw.current_period_end === 'number'
         ? raw.current_period_end

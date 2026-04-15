@@ -12,7 +12,10 @@ import {
   readSessionRecoveryMarker,
   type SessionRecoveryMarker,
 } from '../../lib/session-recovery';
-import { useContinueSuggestion } from '../../hooks/use-progress';
+import {
+  useContinueSuggestion,
+  useReviewSummary,
+} from '../../hooks/use-progress';
 import { useSubjects } from '../../hooks/use-subjects';
 import { useThemeColors } from '../../lib/theme';
 
@@ -23,10 +26,17 @@ export default function LearnNewScreen(): React.ReactElement {
   const { activeProfile, isLoading: isProfileLoading } = useProfile();
   const [recoveryMarker, setRecoveryMarker] =
     useState<SessionRecoveryMarker | null>(null);
-  const [expiredRecoveryMarker, setExpiredRecoveryMarker] =
-    useState<SessionRecoveryMarker | null>(null);
   const { data: continueSuggestion } = useContinueSuggestion();
+  const { data: reviewSummary } = useReviewSummary();
   const { data: subjects } = useSubjects();
+
+  const reviewDueCount = reviewSummary?.totalOverdue ?? 0;
+  const reviewSubtitle =
+    reviewDueCount > 0
+      ? `${reviewDueCount} ${
+          reviewDueCount === 1 ? 'topic' : 'topics'
+        } ready for review`
+      : 'Keep your knowledge fresh';
 
   const handleBack = () => {
     goBackOrReplace(router, '/(app)/home');
@@ -45,23 +55,19 @@ export default function LearnNewScreen(): React.ReactElement {
         if (!cancelled) {
           if (marker && isRecoveryMarkerFresh(marker)) {
             setRecoveryMarker(marker);
-            setExpiredRecoveryMarker(null);
-          } else if (marker) {
-            setRecoveryMarker(null);
-            setExpiredRecoveryMarker(marker);
-            // Clear from storage — show the notice once, not forever
-            void clearSessionRecoveryMarker(activeProfile?.id).catch(
-              () => undefined
-            );
           } else {
             setRecoveryMarker(null);
-            setExpiredRecoveryMarker(null);
+            if (marker) {
+              // Stale marker — clear silently
+              void clearSessionRecoveryMarker(activeProfile?.id).catch(
+                () => undefined
+              );
+            }
           }
         }
       } catch {
         if (!cancelled) {
           setRecoveryMarker(null);
-          setExpiredRecoveryMarker(null);
         }
       }
     }
@@ -109,22 +115,26 @@ export default function LearnNewScreen(): React.ReactElement {
           onPress={() => router.push('/(app)/session?mode=freeform' as never)}
           testID="intent-freeform"
         />
-        {!recoveryMarker && continueSuggestion ? (
+        {continueSuggestion ? (
           <IntentCard
-            title="Resume last session"
-            subtitle={continueSuggestion.subjectName}
-            onPress={() =>
-              router.push({
-                pathname: '/(app)/session',
-                params: {
-                  subjectId: continueSuggestion.subjectId,
-                  subjectName: continueSuggestion.subjectName,
-                  topicId: continueSuggestion.topicId,
-                  mode: 'learning',
-                },
-              } as never)
-            }
-            testID="intent-resume-last"
+            title="Repeat & review"
+            subtitle={reviewSubtitle}
+            badge={reviewDueCount > 0 ? reviewDueCount : undefined}
+            onPress={() => {
+              const nextReviewTopic = reviewSummary?.nextReviewTopic ?? null;
+              if (nextReviewTopic) {
+                router.push({
+                  pathname: '/(app)/topic/relearn',
+                  params: {
+                    topicId: nextReviewTopic.topicId,
+                    subjectId: nextReviewTopic.subjectId,
+                  },
+                } as never);
+              } else {
+                router.push('/(app)/library' as never);
+              }
+            }}
+            testID="intent-review"
           />
         ) : null}
         {!recoveryMarker &&
@@ -172,32 +182,6 @@ export default function LearnNewScreen(): React.ReactElement {
             }
             testID="intent-resume"
           />
-        ) : null}
-        {expiredRecoveryMarker ? (
-          <View
-            className="bg-surface rounded-card px-4 py-4"
-            testID="intent-expired-recovery"
-          >
-            <View className="flex-row items-start justify-between">
-              <Text className="text-body font-semibold text-text-primary flex-1">
-                Your last session ended
-              </Text>
-              <Pressable
-                onPress={() => setExpiredRecoveryMarker(null)}
-                className="ml-2 min-w-[32px] min-h-[32px] items-center justify-center"
-                accessibilityLabel="Dismiss"
-                accessibilityRole="button"
-                testID="dismiss-expired-recovery"
-              >
-                <Ionicons name="close" size={18} color={colors.textSecondary} />
-              </Pressable>
-            </View>
-            <Text className="text-body-sm text-text-secondary mt-1">
-              {expiredRecoveryMarker.subjectName
-                ? `Your ${expiredRecoveryMarker.subjectName} session expired, but you can start a new one anytime.`
-                : 'Your session expired, but you can start a new one anytime.'}
-            </Text>
-          </View>
         ) : null}
       </View>
     </ScrollView>

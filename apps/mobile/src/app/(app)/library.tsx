@@ -342,7 +342,35 @@ export default function LibraryScreen() {
             onAddSubject={() => router.push('/create-subject')}
           />
         )}
-        {activeTab === 'books' && (
+        {activeTab === 'books' && allBooksQuery.isError && (
+          <View
+            className="flex-1 items-center justify-center px-5 py-12"
+            testID="books-tab-error"
+          >
+            <Text className="text-body text-text-secondary text-center mb-4">
+              Could not load your books. Please try again.
+            </Text>
+            <Pressable
+              onPress={() => allBooksQuery.refetch()}
+              className="bg-primary rounded-button px-6 py-3 items-center min-h-[48px] justify-center mb-3"
+              testID="books-tab-retry-button"
+            >
+              <Text className="text-text-inverse text-body font-semibold">
+                Retry
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => router.replace('/(app)')}
+              className="bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
+              testID="books-tab-home-button"
+            >
+              <Text className="text-body text-text-secondary font-semibold">
+                Go Home
+              </Text>
+            </Pressable>
+          </View>
+        )}
+        {activeTab === 'books' && !allBooksQuery.isError && (
           <BooksTab
             books={allBooksQuery.books}
             subjects={subjectList}

@@ -27,12 +27,14 @@ import { goBackOrReplace } from '../../lib/navigation';
 import { useProfile } from '../../lib/profile';
 import { useApiClient } from '../../lib/api-client';
 import { assertOk } from '../../lib/assert-ok';
+
 import { UsageMeter } from '../../components/common';
 import {
   useSubscription,
   useUsage,
   useFamilySubscription,
   useJoinByokWaitlist,
+  fetchUsageData,
   type SubscriptionTier,
 } from '../../hooks/use-subscription';
 import {
@@ -580,6 +582,10 @@ export default function SubscriptionScreen() {
   // Top-up IAP state
   const [topUpPurchasing, setTopUpPurchasing] = useState(false);
   const [topUpPolling, setTopUpPolling] = useState(false);
+  const [pollMessage, setPollMessage] = useState('Confirming your purchase...');
+
+  // Restore-purchase polling state (BUG-397)
+  const [restorePolling, setRestorePolling] = useState(false);
 
   // BUG-403: ScrollView ref so the Upgrade button can scroll to offerings
   const scrollViewRef = useRef<ScrollView>(null);
@@ -653,24 +659,81 @@ export default function SubscriptionScreen() {
 
   const handleRestore = useCallback(async () => {
     try {
-      const info = await restore.mutateAsync();
-      const restoredEntitlement = getActiveEntitlement(info);
-      if (restoredEntitlement) {
-        await Promise.all([refetchSub(), refetchUsage()]);
-        Alert.alert('Restored', 'Your subscription has been restored.');
-      } else {
-        Alert.alert(
-          'No subscriptions found',
-          'We could not find any previous purchases to restore.'
-        );
-      }
+      await restore.mutateAsync();
     } catch {
       Alert.alert(
         'Restore failed',
         'Could not restore purchases. Please try again.'
       );
+      return;
     }
-  }, [refetchSub, refetchUsage, restore]);
+
+    // BUG-397: RevenueCat's CustomerInfo is a local snapshot — the webhook
+    // may not have processed yet, so poll the API (same pattern as top-up)
+    // waiting for a paid subscription tier.
+    if (!mountedRef.current) return;
+    setRestorePolling(true);
+
+    const maxAttempts = 15; // ~30 s at 2 s intervals
+    const pollIntervalMs = 2000;
+    let confirmed = false;
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      if (!mountedRef.current) break;
+      await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+      if (!mountedRef.current) break;
+      try {
+        const freshSub = await queryClient.fetchQuery<{
+          tier: string;
+        }>({
+          queryKey: ['subscription', activeProfile?.id],
+          staleTime: 0,
+          queryFn: async () => {
+            const res = await client.subscription.$get({});
+            await assertOk(res);
+            const data = await res.json();
+            return data.subscription;
+          },
+        });
+        if (freshSub && freshSub.tier !== 'free') {
+          confirmed = true;
+          break;
+        }
+      } catch {
+        // Network error during poll — continue to next attempt
+        continue;
+      }
+    }
+
+    if (!mountedRef.current) return;
+    setRestorePolling(false);
+
+    if (confirmed) {
+      await refetchUsage();
+      Alert.alert('Restored', 'Your subscription has been restored.');
+    } else {
+      Alert.alert(
+        'No subscriptions found',
+        'We could not find any previous purchases to restore.',
+        [
+          {
+            text: 'Check again',
+            onPress: () => {
+              void refetchSub();
+            },
+          },
+          { text: 'OK', style: 'cancel' },
+        ]
+      );
+    }
+  }, [
+    restore,
+    queryClient,
+    activeProfile?.id,
+    client,
+    refetchSub,
+    refetchUsage,
+  ]);
 
   // ---------------------------------------------------------------------------
   // Manage billing — deep link to platform subscription management
@@ -708,9 +771,30 @@ export default function SubscriptionScreen() {
   // ---------------------------------------------------------------------------
 
   const handleTopUp = useCallback(async () => {
+    // If offerings are still loading, do nothing (button should be disabled)
+    if (offeringsLoading) return;
+
+    // If offerings failed to load, give a retry path
+    if (offeringsError || !offerings) {
+      Alert.alert(
+        'Connection error',
+        "Couldn't load purchase options. Check your connection and try again.",
+        [
+          {
+            text: 'Retry',
+            onPress: () => {
+              void refetchOfferings();
+            },
+          },
+          { text: 'OK', style: 'cancel' },
+        ]
+      );
+      return;
+    }
+
     // Find the top-up package from offerings
     // RevenueCat consumables can be in a separate offering or as a non-subscription package
-    const topUpOffering = offerings?.all?.['top_up'] ?? offerings?.current;
+    const topUpOffering = offerings.all?.['top_up'] ?? offerings.current;
     const topUpPkg = topUpOffering?.availablePackages.find(
       (p) =>
         p.packageType === PACKAGE_TYPE.CUSTOM &&
@@ -718,7 +802,19 @@ export default function SubscriptionScreen() {
     );
 
     if (!topUpPkg) {
-      Alert.alert('Error', 'Top-up package not available.');
+      Alert.alert(
+        'Not available',
+        "Top-up credits aren't available right now. Try again later or contact support.",
+        [
+          {
+            text: 'Retry',
+            onPress: () => {
+              void refetchOfferings();
+            },
+          },
+          { text: 'OK', style: 'cancel' },
+        ]
+      );
       return;
     }
 
@@ -749,6 +845,14 @@ export default function SubscriptionScreen() {
     if (!mountedRef.current) return;
     setTopUpPurchasing(false);
     setTopUpPolling(true);
+    setPollMessage('Confirming your purchase...');
+    const messageTimer = setTimeout(() => {
+      if (mountedRef.current) {
+        setPollMessage(
+          'Still confirming \u2014 this can take up to 30 seconds. Your purchase is safe.'
+        );
+      }
+    }, 10_000);
 
     const baseCredits = usage?.topUpCreditsRemaining ?? 0;
     const maxAttempts = 15; // ~30 seconds with 2s interval
@@ -769,12 +873,7 @@ export default function SubscriptionScreen() {
         }>({
           queryKey: ['usage', activeProfile?.id],
           staleTime: 0,
-          queryFn: async () => {
-            const res = await client.usage.$get({}, { init: {} });
-            await assertOk(res);
-            const data = await res.json();
-            return data.usage;
-          },
+          queryFn: () => fetchUsageData(client),
         });
       } catch {
         // Network error during poll — continue to next attempt
@@ -787,6 +886,8 @@ export default function SubscriptionScreen() {
       }
     }
 
+    clearTimeout(messageTimer);
+
     if (!mountedRef.current) return;
     setTopUpPolling(false);
 
@@ -794,20 +895,21 @@ export default function SubscriptionScreen() {
       Alert.alert('Top-up', '500 additional credits have been added!');
     } else {
       Alert.alert(
-        'Processing',
-        'Your purchase is being processed. Credits will appear shortly.',
-        [
-          {
-            text: 'Check your usage',
-            onPress: () => {
-              void refetchUsage();
-            },
-          },
-          { text: 'OK', style: 'cancel' },
-        ]
+        'Purchase confirmed',
+        'Your 500 credits are being added. They usually appear within a minute \u2014 pull down to refresh your usage.',
+        [{ text: 'OK' }]
       );
     }
-  }, [offerings, usage, queryClient, activeProfile?.id, refetchUsage]);
+  }, [
+    offerings,
+    offeringsLoading,
+    offeringsError,
+    refetchOfferings,
+    usage,
+    queryClient,
+    activeProfile?.id,
+    refetchUsage,
+  ]);
 
   const handleContactSupport = useCallback(async () => {
     try {
@@ -1202,19 +1304,26 @@ export default function SubscriptionScreen() {
           <View className="mt-4">
             <Pressable
               onPress={handleRestore}
-              disabled={restore.isPending}
+              disabled={restore.isPending || restorePolling}
               className="bg-surface rounded-card px-4 py-3.5"
               accessibilityLabel="Restore purchases"
               accessibilityRole="button"
               testID="restore-purchases-button"
             >
               <View className="flex-row items-center justify-center">
-                {restore.isPending ? (
-                  <ActivityIndicator
-                    size="small"
-                    color={colors.primary}
-                    testID="restore-loading"
-                  />
+                {restore.isPending || restorePolling ? (
+                  <View className="flex-row items-center">
+                    <ActivityIndicator
+                      size="small"
+                      color={colors.primary}
+                      testID="restore-loading"
+                    />
+                    <Text className="text-body font-semibold text-primary ml-2">
+                      {restorePolling
+                        ? 'Verifying purchase...'
+                        : 'Restoring...'}
+                    </Text>
+                  </View>
                 ) : (
                   <Text className="text-body font-semibold text-primary">
                     Restore Purchases
@@ -1246,9 +1355,7 @@ export default function SubscriptionScreen() {
                       testID="top-up-spinner"
                     />
                     <Text className="text-body font-semibold text-primary ml-2">
-                      {topUpPolling
-                        ? 'Purchase processing...'
-                        : 'Opening store...'}
+                      {topUpPolling ? pollMessage : 'Opening store...'}
                     </Text>
                   </View>
                 ) : (
