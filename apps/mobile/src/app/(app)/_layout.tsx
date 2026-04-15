@@ -39,6 +39,7 @@ const FULL_SCREEN_ROUTES = new Set([
   'homework',
   'shelf',
   'shelf/[subjectId]',
+  'shelf/[subjectId]/book/[bookId]',
 ]);
 
 const iconMap: Record<

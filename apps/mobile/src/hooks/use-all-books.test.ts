@@ -147,7 +147,9 @@ describe('useAllBooks', () => {
     });
 
     await waitFor(() => {
-      expect(result.current.books.length).toBe(3);
+      // Only books with topicsGenerated=true are included (b1, b3).
+      // Unbuilt books (b2, topicsGenerated=false) are filtered out.
+      expect(result.current.books.length).toBe(2);
     });
 
     expect(result.current.isLoading).toBe(false);
@@ -160,17 +162,56 @@ describe('useAllBooks', () => {
     expect(algebra!.subjectName).toBe('Math');
     expect(algebra!.status).toBe('IN_PROGRESS'); // topicsGenerated = true
 
+    // b2 (Geometry, topicsGenerated=false) should NOT appear
     const geometry = result.current.books.find((b) => b.book.id === 'b2');
-    expect(geometry).toBeDefined();
-    expect(geometry!.subjectId).toBe('s1');
-    expect(geometry!.subjectName).toBe('Math');
-    expect(geometry!.status).toBe('NOT_STARTED'); // topicsGenerated = false
+    expect(geometry).toBeUndefined();
 
     const physics = result.current.books.find((b) => b.book.id === 'b3');
     expect(physics).toBeDefined();
     expect(physics!.subjectId).toBe('s2');
     expect(physics!.subjectName).toBe('Science');
     expect(physics!.status).toBe('IN_PROGRESS');
+  });
+
+  it('excludes unbuilt books (topicsGenerated=false) from results', async () => {
+    mockFetch.mockResolvedValueOnce(
+      makeSubjectsResponse([{ id: 's1', name: 'Math' }])
+    );
+    mockFetch.mockResolvedValueOnce(
+      makeBooksResponse([
+        { id: 'b1', title: 'Algebra', subjectId: 's1', topicsGenerated: true },
+        {
+          id: 'b2',
+          title: 'Not Built Yet',
+          subjectId: 's1',
+          topicsGenerated: false,
+        },
+        {
+          id: 'b3',
+          title: 'Also Not Built',
+          subjectId: 's1',
+          topicsGenerated: false,
+        },
+      ])
+    );
+
+    const { result } = renderHook(() => useAllBooks(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.books.length).toBe(1);
+    });
+
+    // Only the built book is included
+    expect(result.current.books[0]!.book.id).toBe('b1');
+    // Unbuilt books are excluded from the count
+    expect(
+      result.current.books.find((b) => b.book.id === 'b2')
+    ).toBeUndefined();
+    expect(
+      result.current.books.find((b) => b.book.id === 'b3')
+    ).toBeUndefined();
   });
 
   it('returns empty array when no subjects exist', async () => {

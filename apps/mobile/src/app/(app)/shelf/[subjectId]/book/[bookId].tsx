@@ -837,21 +837,28 @@ export default function BookScreen() {
               <Text className="text-body text-text-secondary text-center mt-3 mb-1">
                 No sessions yet
               </Text>
-              <Text className="text-body-sm text-text-secondary text-center mb-4">
-                Pick a topic above to dive in, or let me build a personalised
-                learning path for you.
-              </Text>
-              {!hasCurriculum && (
-                <Pressable
-                  onPress={handleBuildLearningPath}
-                  className="bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
-                  testID="book-build-learning-path"
-                  accessibilityLabel="Build my learning path"
-                >
-                  <Text className="text-text-primary text-body font-semibold">
-                    Build my learning path
+              {hasCurriculum ? (
+                <Text className="text-body-sm text-text-secondary text-center mb-4">
+                  Tap Start learning below to jump in — a topic will be picked
+                  for you automatically.
+                </Text>
+              ) : (
+                <>
+                  <Text className="text-body-sm text-text-secondary text-center mb-4">
+                    Start with a learning path tailored to you, or tap Start
+                    learning below to jump straight in.
                   </Text>
-                </Pressable>
+                  <Pressable
+                    onPress={handleBuildLearningPath}
+                    className="bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
+                    testID="book-build-learning-path"
+                    accessibilityLabel="Build my learning path"
+                  >
+                    <Text className="text-text-primary text-body font-semibold">
+                      Build my learning path
+                    </Text>
+                  </Pressable>
+                </>
               )}
             </View>
           )}

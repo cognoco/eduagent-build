@@ -30,7 +30,7 @@ let mockSearchParams = () => ({ subjectId: 'sub-1' });
 
 // --- useBooks ---
 const mockBooksRefetch = jest.fn();
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 const mockUseBooks = jest.fn((): any => ({
   data: [
     {
@@ -58,7 +58,7 @@ jest.mock('../../../../hooks/use-books', () => ({
 
 // --- useSubjects ---
 const mockSubjectsRefetch = jest.fn();
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 const mockUseSubjects = jest.fn((): any => ({
   data: [{ id: 'sub-1', name: 'Mathematics' }],
   isLoading: false,
@@ -72,7 +72,7 @@ jest.mock('../../../../hooks/use-subjects', () => ({
 }));
 
 // --- useBookSuggestions ---
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 const mockUseBookSuggestions = jest.fn((): any => ({
   data: [],
 }));
@@ -83,7 +83,7 @@ jest.mock('../../../../hooks/use-book-suggestions', () => ({
 
 // --- useFiling ---
 const mockFilingMutateAsync = jest.fn();
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 const mockUseFiling = jest.fn((): any => ({
   mutateAsync: mockFilingMutateAsync,
   isPending: false,
@@ -462,6 +462,73 @@ describe('ShelfScreen', () => {
             subjectId: 'sub-1',
             bookId: 'book-new',
             autoStart: 'true',
+          }),
+        })
+      );
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // BUG-FIX: auto-skip must reset when subjectId changes
+  // -----------------------------------------------------------------------
+  it('auto-skip fires again when subjectId changes (component reuse)', async () => {
+    // First render: sub-1 with 1 book → auto-skip fires
+    mockSearchParams = () => ({ subjectId: 'sub-1' });
+    mockUseBooks.mockReturnValue({
+      data: [
+        {
+          id: 'book-A',
+          title: 'Book A',
+          emoji: '📗',
+          topicsGenerated: true,
+        },
+      ],
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: mockBooksRefetch,
+    });
+
+    const { rerender } = render(<ShelfScreen />);
+
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith(
+        expect.objectContaining({
+          params: expect.objectContaining({
+            subjectId: 'sub-1',
+            bookId: 'book-A',
+          }),
+        })
+      );
+    });
+
+    // Simulate Expo Router reusing the component with a different subjectId
+    mockReplace.mockClear();
+    mockSearchParams = () => ({ subjectId: 'sub-2' });
+    mockUseBooks.mockReturnValue({
+      data: [
+        {
+          id: 'book-B',
+          title: 'Book B',
+          emoji: '📘',
+          topicsGenerated: true,
+        },
+      ],
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: mockBooksRefetch,
+    });
+
+    rerender(<ShelfScreen />);
+
+    // Auto-skip must fire again for the new subject's book
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith(
+        expect.objectContaining({
+          params: expect.objectContaining({
+            subjectId: 'sub-2',
+            bookId: 'book-B',
           }),
         })
       );

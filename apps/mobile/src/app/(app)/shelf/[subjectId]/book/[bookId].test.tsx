@@ -474,15 +474,37 @@ describe('BookScreen', () => {
   // -----------------------------------------------------------------------
   // 6. Empty sessions guidance
   // -----------------------------------------------------------------------
-  it('shows empty sessions guidance when no sessions exist', () => {
+  it('shows empty sessions guidance when no sessions exist (no curriculum)', () => {
     const { getByTestId, getByText } = render(<BookScreen />);
     expect(getByTestId('book-empty-sessions')).toBeTruthy();
     expect(getByText('No sessions yet')).toBeTruthy();
     expect(
       getByText(
-        'Pick a topic above to dive in, or let me build a personalised learning path for you.'
+        'Start with a learning path tailored to you, or tap Start learning below to jump straight in.'
       )
     ).toBeTruthy();
+    // "Build my learning path" button should be visible when no curriculum
+    expect(getByTestId('book-build-learning-path')).toBeTruthy();
+  });
+
+  it('shows "tap Start learning" guidance when curriculum exists (no dead-end)', () => {
+    mockUseCurriculum.mockReturnValue({
+      data: { topics: [{ id: 't1' }] },
+      isLoading: false,
+    });
+
+    const { getByTestId, getByText, queryByTestId } = render(<BookScreen />);
+    expect(getByTestId('book-empty-sessions')).toBeTruthy();
+    expect(getByText('No sessions yet')).toBeTruthy();
+    expect(
+      getByText(
+        'Tap Start learning below to jump in — a topic will be picked for you automatically.'
+      )
+    ).toBeTruthy();
+    // "Build my learning path" button should NOT appear when curriculum exists
+    expect(queryByTestId('book-build-learning-path')).toBeNull();
+    // But the floating "Start learning" button must still be present
+    expect(getByTestId('book-start-learning')).toBeTruthy();
   });
 
   // -----------------------------------------------------------------------

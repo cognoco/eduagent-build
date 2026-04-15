@@ -100,6 +100,14 @@ export default function ShelfScreen() {
   // BUG-354: One-shot guard — without this, every React Query refetch
   // re-triggers the replace and bounces the user back after navigating away.
   const autoSkippedRef = useRef(false);
+  // BUG-FIX: Reset guard when subjectId changes — Expo Router reuses the
+  // component instance across different [subjectId] navigations, so the ref
+  // would stay true from a previous subject and block auto-skip for new ones.
+  const prevSubjectIdRef = useRef(subjectId);
+  if (prevSubjectIdRef.current !== subjectId) {
+    prevSubjectIdRef.current = subjectId;
+    autoSkippedRef.current = false;
+  }
   useEffect(() => {
     if (autoSkippedRef.current) return;
     if (booksQuery.data && booksQuery.data.length === 1 && subjectId) {
