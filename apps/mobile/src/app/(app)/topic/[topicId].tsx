@@ -17,6 +17,7 @@ import {
   useEvaluateEligibility,
 } from '../../../hooks/use-retention';
 import { useTopicParkingLot } from '../../../hooks/use-sessions';
+import { useGetTopicNote } from '../../../hooks/use-notes';
 import { useThemeColors } from '../../../lib/theme';
 import { goBackOrReplace } from '../../../lib/navigation';
 
@@ -166,6 +167,8 @@ export default function TopicDetailScreen() {
     useTopicParkingLot(subjectId ?? '', topicId ?? '');
   // FR128-129: Evaluate (Devil's Advocate) eligibility
   const { data: evaluateEligibility } = useEvaluateEligibility(topicId ?? '');
+  // FR68: "Your Words" topic note
+  const { data: noteData } = useGetTopicNote(subjectId, topicId);
 
   const isLoading = progressLoading || retentionLoading || parkingLotLoading;
   // Data-critical queries only — parking lot is secondary and should not suppress errors
@@ -445,6 +448,24 @@ export default function TopicDetailScreen() {
               </Text>
               <Text className="text-body-sm text-text-secondary italic">
                 {topicProgress.summaryExcerpt}
+              </Text>
+            </View>
+          )}
+
+          {/* FR68: Your Words — topic note */}
+          {noteData?.note && (
+            <View
+              className="bg-surface rounded-card p-4 mb-3"
+              testID="your-words-card"
+            >
+              <Text className="text-body-sm font-semibold text-text-primary mb-2">
+                Your Words
+              </Text>
+              <Text className="text-body-sm text-text-secondary">
+                {noteData.note.content}
+              </Text>
+              <Text className="text-caption text-text-tertiary mt-2">
+                Updated {new Date(noteData.note.updatedAt).toLocaleDateString()}
               </Text>
             </View>
           )}

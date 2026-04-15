@@ -53,12 +53,14 @@ jest.mock('../services/profile', () => ({
 // Mock notes service
 // ---------------------------------------------------------------------------
 
+const mockGetNote = jest.fn();
 const mockGetNotesForBook = jest.fn();
 const mockUpsertNote = jest.fn();
 const mockDeleteNote = jest.fn();
 const mockGetTopicIdsWithNotes = jest.fn();
 
 jest.mock('../services/notes', () => ({
+  getNote: (...args: unknown[]) => mockGetNote(...args),
   getNotesForBook: (...args: unknown[]) => mockGetNotesForBook(...args),
   upsertNote: (...args: unknown[]) => mockUpsertNote(...args),
   deleteNote: (...args: unknown[]) => mockDeleteNote(...args),
@@ -82,6 +84,7 @@ jest.mock('../inngest/client', () => ({
 // ---------------------------------------------------------------------------
 
 import { app } from '../index';
+import { NotFoundError } from '../errors';
 
 const TEST_ENV = {
   DATABASE_URL: 'postgresql://test:test@localhost/test',
@@ -151,6 +154,74 @@ describe('note routes', () => {
     it('returns 400 for invalid bookId', async () => {
       const res = await app.request(
         `/v1/subjects/${SUBJECT_ID}/books/not-a-uuid/notes`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(400);
+    });
+  });
+
+  // ---- GET /v1/subjects/:subjectId/topics/:topicId/note ----
+
+  describe('GET /v1/subjects/:subjectId/topics/:topicId/note', () => {
+    it('returns 200 with a note when one exists', async () => {
+      const mockNote = {
+        id: '550e8400-e29b-41d4-a716-446655440099',
+        topicId: TOPIC_ID,
+        content: 'My notes about this topic',
+        updatedAt: new Date('2026-04-04T00:00:00.000Z'),
+      };
+      mockGetNote.mockResolvedValueOnce(mockNote);
+
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/topics/${TOPIC_ID}/note`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.note).toBeTruthy();
+      expect(body.note.topicId).toBe(TOPIC_ID);
+      expect(body.note.content).toBe('My notes about this topic');
+      expect(mockGetNote).toHaveBeenCalledWith(
+        expect.anything(),
+        'test-profile-id',
+        SUBJECT_ID,
+        TOPIC_ID
+      );
+    });
+
+    it('returns 200 with null note when no note exists', async () => {
+      mockGetNote.mockResolvedValueOnce(null);
+
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/topics/${TOPIC_ID}/note`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.note).toBeNull();
+    });
+
+    it('returns 404 when topic ownership fails', async () => {
+      mockGetNote.mockRejectedValueOnce(new NotFoundError('Topic'));
+
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/topics/${TOPIC_ID}/note`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(404);
+    });
+
+    it('returns 400 for invalid topicId', async () => {
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/topics/not-a-uuid/note`,
         { headers: AUTH_HEADERS },
         TEST_ENV
       );

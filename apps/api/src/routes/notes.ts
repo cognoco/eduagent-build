@@ -7,6 +7,7 @@ import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
 import { notFound, NotFoundError } from '../errors';
 import {
+  getNote,
   getNotesForBook,
   upsertNote,
   deleteNote,
@@ -53,6 +54,26 @@ export const noteRoutes = new Hono<NotesRouteEnv>()
       }
     }
   )
+  // GET /subjects/:subjectId/topics/:topicId/note
+  .get(
+    '/subjects/:subjectId/topics/:topicId/note',
+    zValidator('param', topicParamSchema),
+    async (c) => {
+      const db = c.get('db');
+      const profileId = requireProfileId(c.get('profileId'));
+      const { subjectId, topicId } = c.req.valid('param');
+
+      try {
+        const note = await getNote(db, profileId, subjectId, topicId);
+        return c.json({ note });
+      } catch (error) {
+        if (error instanceof NotFoundError) {
+          return notFound(c, error.message);
+        }
+        throw error;
+      }
+    }
+  )
   // PUT /subjects/:subjectId/topics/:topicId/note
   .put(
     '/subjects/:subjectId/topics/:topicId/note',
@@ -65,7 +86,14 @@ export const noteRoutes = new Hono<NotesRouteEnv>()
       const { content, append } = c.req.valid('json');
 
       try {
-        const note = await upsertNote(db, profileId, subjectId, topicId, content, append);
+        const note = await upsertNote(
+          db,
+          profileId,
+          subjectId,
+          topicId,
+          content,
+          append
+        );
         return c.json({ note });
       } catch (error) {
         if (error instanceof NotFoundError) {

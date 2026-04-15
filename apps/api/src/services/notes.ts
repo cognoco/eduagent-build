@@ -55,6 +55,40 @@ async function verifyTopicOwnership(
 }
 
 /**
+ * Get the note for a specific topic+profile pair.
+ * Returns null if no note exists (not an error — notes are optional).
+ * Verifies subject → book → topic ownership to prevent IDOR.
+ */
+export async function getNote(
+  db: Database,
+  profileId: string,
+  subjectId: string,
+  topicId: string
+): Promise<{
+  id: string;
+  topicId: string;
+  content: string;
+  updatedAt: Date;
+} | null> {
+  await verifyTopicOwnership(db, profileId, subjectId, topicId);
+
+  const [row] = await db
+    .select({
+      id: topicNotes.id,
+      topicId: topicNotes.topicId,
+      content: topicNotes.content,
+      updatedAt: topicNotes.updatedAt,
+    })
+    .from(topicNotes)
+    .where(
+      and(eq(topicNotes.topicId, topicId), eq(topicNotes.profileId, profileId))
+    )
+    .limit(1);
+
+  return row ?? null;
+}
+
+/**
  * Fetch all notes for a given book, scoped to the authenticated profile.
  * Verifies subject ownership and book→subject membership.
  */

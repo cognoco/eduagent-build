@@ -219,7 +219,15 @@ import { sessionCompleted } from './session-completed';
 import { createDatabase } from '@eduagent/database';
 
 // ---------------------------------------------------------------------------
-// Helpers — extract Inngest step handlers from the function
+// Helpers — manual step extraction for sessionCompleted
+//
+// Why not InngestTestEngine (@inngest/test)?
+// This function uses per-step try/catch error isolation: each step.run()
+// callback catches its own errors and returns { status: 'failed', error }
+// instead of throwing. This lets the function always resolve with a complete
+// outcomes array. InngestTestEngine intercepts step errors at the engine
+// level, which breaks the error-isolation pattern (18 tests fail). Manual
+// extraction is required until InngestTestEngine supports this pattern.
 // ---------------------------------------------------------------------------
 
 /** Simulates Inngest step.run by capturing step handlers */
@@ -1269,10 +1277,8 @@ describe('sessionCompleted', () => {
 
   // -------------------------------------------------------------------------
   // Step-level retry simulation
-  // TODO: Migrate to InngestTestEngine when `inngest/test` is available
-  // in project dependencies. InngestTestEngine provides native step-level
-  // retry testing and Inngest-specific behaviors (ARCH-25). Currently the
-  // package only provides `inngest/hono` — `inngest/test` is not installed.
+  // Uses manual step extraction (see helper comment above for rationale).
+  // These tests validate retry recovery by calling executeSteps() twice.
   // -------------------------------------------------------------------------
 
   describe('step-level retry behavior', () => {

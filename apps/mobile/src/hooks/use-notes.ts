@@ -47,6 +47,51 @@ export function useBookNotes(
 }
 
 // ---------------------------------------------------------------------------
+// useGetTopicNote — fetch a single note for a specific topic (FR68)
+// ---------------------------------------------------------------------------
+
+export function useGetTopicNote(
+  subjectId: string | undefined,
+  topicId: string | undefined
+): UseQueryResult<{
+  note: {
+    id: string;
+    topicId: string;
+    content: string;
+    updatedAt: string;
+  } | null;
+}> {
+  const client = useApiClient();
+  const { activeProfile } = useProfile();
+
+  return useQuery({
+    queryKey: ['topic-note', subjectId, topicId, activeProfile?.id],
+    queryFn: async ({ signal: querySignal }) => {
+      if (!subjectId || !topicId)
+        throw new Error('subjectId and topicId are required');
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const res = await client.subjects[':subjectId'].topics[
+          ':topicId'
+        ].note.$get({ param: { subjectId, topicId } }, { init: { signal } });
+        await assertOk(res);
+        return (await res.json()) as {
+          note: {
+            id: string;
+            topicId: string;
+            content: string;
+            updatedAt: string;
+          } | null;
+        };
+      } finally {
+        cleanup();
+      }
+    },
+    enabled: !!activeProfile && !!subjectId && !!topicId,
+  });
+}
+
+// ---------------------------------------------------------------------------
 // useUpsertNote — create or update a note for a topic
 // ---------------------------------------------------------------------------
 
