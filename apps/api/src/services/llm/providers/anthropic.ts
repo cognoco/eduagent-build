@@ -6,7 +6,7 @@ import {
 } from '../types';
 import { createLogger } from '../../logger';
 
-const logger = createLogger({ level: 'info', environment: 'production' });
+const logger = createLogger();
 
 // ---------------------------------------------------------------------------
 // Anthropic Provider — premium tier (Sonnet)

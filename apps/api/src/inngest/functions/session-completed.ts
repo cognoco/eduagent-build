@@ -477,81 +477,93 @@ export const sessionCompleted = inngest.createFunction(
     // [EP15-M3]: runs AFTER write-coaching-card — profile analysis is background
     // enrichment and must not delay user-facing coaching card. EP15-C3 confirmed
     // this ordering is safe: snapshot pipeline never reads learning_profiles.
-    let pendingStruggleNotifications: StruggleNotification[] = [];
-    outcomes.push(
-      await step.run('analyze-learner-profile', async () =>
-        runIsolated('analyze-learner-profile', profileId, async () => {
-          const db = getStepDatabase();
-          const existingProfile = await getLearningProfile(db, profileId);
+    // step.run memoizes its return value — on Inngest replay the callback is
+    // NOT re-executed, so mutable closure variables would stay []. Returning
+    // notifications as part of the step result ensures they survive replay.
+    const analyzeOutcome = await step.run(
+      'analyze-learner-profile',
+      async () => {
+        let stepNotifications: StruggleNotification[] = [];
+        const outcome = await runIsolated(
+          'analyze-learner-profile',
+          profileId,
+          async () => {
+            const db = getStepDatabase();
+            const existingProfile = await getLearningProfile(db, profileId);
 
-          if (!existingProfile) {
-            return;
+            if (!existingProfile) {
+              return;
+            }
+
+            // Consent gate: memoryConsentStatus is NOT NULL (defaults to
+            // 'pending') for all rows after migration 0019, so the consent
+            // check is authoritative. `memoryEnabled` governs injection only.
+            if (
+              existingProfile.memoryConsentStatus !== 'granted' ||
+              existingProfile.memoryCollectionEnabled === false
+            ) {
+              return;
+            }
+
+            const transcriptEvents = await db.query.sessionEvents.findMany({
+              where: and(
+                eq(sessionEvents.sessionId, sessionId),
+                eq(sessionEvents.profileId, profileId)
+              ),
+              orderBy: asc(sessionEvents.createdAt),
+              columns: {
+                eventType: true,
+                content: true,
+              },
+            });
+
+            const [subjectRow] = subjectId
+              ? await db
+                  .select({ name: subjects.name })
+                  .from(subjects)
+                  .where(eq(subjects.id, subjectId))
+                  .limit(1)
+              : [null];
+
+            const topicTitle = topicId
+              ? await loadTopicTitle(db, topicId)
+              : null;
+            const sessionRow = await db.query.learningSessions.findFirst({
+              where: and(
+                eq(learningSessions.id, sessionId),
+                eq(learningSessions.profileId, profileId)
+              ),
+              columns: { rawInput: true },
+            });
+
+            const analysis = await analyzeSessionTranscript(
+              transcriptEvents,
+              subjectRow?.name ?? null,
+              topicTitle,
+              sessionRow?.rawInput
+            );
+
+            if (!analysis) {
+              return;
+            }
+
+            const analysisResult = await applyAnalysis(
+              db,
+              profileId,
+              analysis,
+              subjectRow?.name ?? null
+            );
+
+            stepNotifications = analysisResult.notifications;
           }
-
-          // Consent gate: memoryConsentStatus is NOT NULL (defaults to
-          // 'pending') for all rows after migration 0019, so the consent
-          // check is authoritative. `memoryEnabled` governs injection only.
-          if (
-            existingProfile.memoryConsentStatus !== 'granted' ||
-            existingProfile.memoryCollectionEnabled === false
-          ) {
-            return;
-          }
-
-          const transcriptEvents = await db.query.sessionEvents.findMany({
-            where: and(
-              eq(sessionEvents.sessionId, sessionId),
-              eq(sessionEvents.profileId, profileId)
-            ),
-            orderBy: asc(sessionEvents.createdAt),
-            columns: {
-              eventType: true,
-              content: true,
-            },
-          });
-
-          const [subjectRow] = subjectId
-            ? await db
-                .select({ name: subjects.name })
-                .from(subjects)
-                .where(eq(subjects.id, subjectId))
-                .limit(1)
-            : [null];
-
-          const topicTitle = topicId ? await loadTopicTitle(db, topicId) : null;
-          const sessionRow = await db.query.learningSessions.findFirst({
-            where: and(
-              eq(learningSessions.id, sessionId),
-              eq(learningSessions.profileId, profileId)
-            ),
-            columns: { rawInput: true },
-          });
-
-          const analysis = await analyzeSessionTranscript(
-            transcriptEvents,
-            subjectRow?.name ?? null,
-            topicTitle,
-            sessionRow?.rawInput
-          );
-
-          if (!analysis) {
-            return;
-          }
-
-          const analysisResult = await applyAnalysis(
-            db,
-            profileId,
-            analysis,
-            subjectRow?.name ?? null
-          );
-
-          // Capture via closure — runIsolated only propagates number|void
-          pendingStruggleNotifications = analysisResult.notifications;
-        })
-      )
+        );
+        return { ...outcome, notifications: stepNotifications };
+      }
     );
+    outcomes.push(analyzeOutcome);
 
     // Step 3b: FR247.6 — Send struggle push notifications to parent
+    const pendingStruggleNotifications = analyzeOutcome.notifications ?? [];
     if (pendingStruggleNotifications.length > 0) {
       const notifications = [...pendingStruggleNotifications];
       outcomes.push(

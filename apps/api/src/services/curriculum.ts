@@ -1047,9 +1047,8 @@ export async function challengeCurriculum(
     return result;
   }
 
-  // Delete old curricula — topics cascade-delete via FKs.
-  // "Challenge" means full replacement; old versions are never queried.
-  await db.delete(curricula).where(eq(curricula.subjectId, subjectId));
+  // Read onboarding context and generate topics BEFORE touching existing data.
+  // If the LLM call fails, the old curriculum is preserved.
   const latestDraft = await db.query.onboardingDrafts.findFirst({
     where: and(
       eq(onboardingDrafts.profileId, profileId),
@@ -1097,7 +1096,7 @@ export async function challengeCurriculum(
     .filter((part) => part.length > 0)
     .join('\n\n');
 
-  // Generate new curriculum with feedback
+  // Generate new curriculum with feedback (LLM call — can fail)
   const topics = await generateCurriculum({
     subjectName: subject.name,
     interviewSummary,
@@ -1105,35 +1104,48 @@ export async function challengeCurriculum(
     experienceLevel: draftExperienceLevel,
   });
 
-  const [newCurriculum] = await db
-    .insert(curricula)
-    .values({
+  // Transact the destructive swap: delete old → insert new → add topics.
+  // If any DB step fails, the transaction rolls back and the old curriculum
+  // is preserved. The LLM call above is intentionally outside the transaction
+  // so we never delete until we already have the replacement topics.
+  await db.transaction(async (tx) => {
+    await tx.delete(curricula).where(eq(curricula.subjectId, subjectId));
+
+    const [newCurriculum] = await tx
+      .insert(curricula)
+      .values({
+        subjectId,
+        version: 1,
+      })
+      .returning();
+
+    if (!newCurriculum)
+      throw new Error('Insert into curricula did not return a row');
+    // Known Drizzle pattern: PgTransaction → Database cast (see feedback_drizzle_transaction_cast.md)
+    const bookId = await ensureDefaultBook(
+      tx as unknown as Database,
       subjectId,
-      version: 1,
-    })
-    .returning();
-
-  if (!newCurriculum)
-    throw new Error('Insert into curricula did not return a row');
-  const bookId = await ensureDefaultBook(db, subjectId, subject.name);
-
-  if (topics.length > 0) {
-    await db.insert(curriculumTopics).values(
-      topics.map((t, i) => ({
-        curriculumId: newCurriculum.id,
-        bookId,
-        title: t.title,
-        description: t.description,
-        sortOrder: i,
-        relevance: t.relevance,
-        estimatedMinutes: t.estimatedMinutes,
-        cefrLevel: t.cefrLevel ?? null,
-        cefrSublevel: t.cefrSublevel ?? null,
-        targetWordCount: t.targetWordCount ?? null,
-        targetChunkCount: t.targetChunkCount ?? null,
-      }))
+      subject.name
     );
-  }
+
+    if (topics.length > 0) {
+      await tx.insert(curriculumTopics).values(
+        topics.map((t, i) => ({
+          curriculumId: newCurriculum.id,
+          bookId,
+          title: t.title,
+          description: t.description,
+          sortOrder: i,
+          relevance: t.relevance,
+          estimatedMinutes: t.estimatedMinutes,
+          cefrLevel: t.cefrLevel ?? null,
+          cefrSublevel: t.cefrSublevel ?? null,
+          targetWordCount: t.targetWordCount ?? null,
+          targetChunkCount: t.targetChunkCount ?? null,
+        }))
+      );
+    }
+  });
 
   // Return the newly generated curriculum
   const result = await getCurriculum(db, profileId, subjectId);

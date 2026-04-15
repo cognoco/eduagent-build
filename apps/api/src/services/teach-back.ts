@@ -7,7 +7,7 @@
 import type { TeachBackAssessment } from '@eduagent/schemas';
 import { createLogger } from './logger';
 
-const logger = createLogger({ level: 'info', environment: 'production' });
+const logger = createLogger();
 
 // ---------------------------------------------------------------------------
 // Trigger gating

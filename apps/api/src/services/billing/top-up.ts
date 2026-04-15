@@ -3,7 +3,12 @@
 // ---------------------------------------------------------------------------
 
 import { and, eq, gte, lte, sql } from 'drizzle-orm';
-import { subscriptions, topUpCredits, type Database } from '@eduagent/database';
+import {
+  topUpCredits,
+  type Database,
+  findSubscriptionById,
+  findTopUpByTransactionId,
+} from '@eduagent/database';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -79,9 +84,7 @@ export async function isTopUpAlreadyGranted(
   db: Database,
   transactionId: string
 ): Promise<boolean> {
-  const existing = await db.query.topUpCredits.findFirst({
-    where: eq(topUpCredits.revenuecatTransactionId, transactionId),
-  });
+  const existing = await findTopUpByTransactionId(db, transactionId);
   return !!existing;
 }
 
@@ -105,9 +108,7 @@ export async function purchaseTopUpCredits(
   transactionId?: string
 ): Promise<TopUpCreditRow | null> {
   // Verify subscription exists and tier is eligible
-  const sub = await db.query.subscriptions.findFirst({
-    where: eq(subscriptions.id, subscriptionId),
-  });
+  const sub = await findSubscriptionById(db, subscriptionId);
 
   if (!sub || sub.tier === 'free') {
     return null;

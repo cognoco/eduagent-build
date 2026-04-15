@@ -8,7 +8,7 @@ import {
 import type { Database } from '@eduagent/database';
 import { createLogger } from '../services/logger';
 
-const logger = createLogger({ level: 'info', environment: 'production' });
+const logger = createLogger();
 import type { AuthUser } from '../middleware/auth';
 import type { Account } from '../services/account';
 import { requireProfileId } from '../middleware/profile-scope';

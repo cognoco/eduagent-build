@@ -8,7 +8,7 @@ import { findSimilarTopics, type Database } from '@eduagent/database';
 import { generateEmbedding } from './embeddings';
 import { createLogger } from './logger';
 
-const logger = createLogger({ level: 'info', environment: 'production' });
+const logger = createLogger();
 
 /** Result of memory retrieval — ready for prompt injection */
 export interface MemoryRetrievalResult {

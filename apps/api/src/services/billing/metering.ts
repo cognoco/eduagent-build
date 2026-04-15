@@ -4,7 +4,12 @@
 // ---------------------------------------------------------------------------
 
 import { and, eq, sql } from 'drizzle-orm';
-import { quotaPools, topUpCredits, type Database } from '@eduagent/database';
+import {
+  quotaPools,
+  topUpCredits,
+  type Database,
+  findQuotaPool,
+} from '@eduagent/database';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -70,9 +75,7 @@ export async function decrementQuota(
   }
 
   // Atomic update failed — determine why (daily vs monthly)
-  const pool = await db.query.quotaPools.findFirst({
-    where: eq(quotaPools.subscriptionId, subscriptionId),
-  });
+  const pool = await findQuotaPool(db, subscriptionId);
 
   if (!pool) {
     return {

@@ -20,7 +20,7 @@ import { streamSSE } from 'hono/streaming';
 import { captureException } from '../services/sentry';
 import { createLogger } from '../services/logger';
 
-const logger = createLogger({ level: 'info', environment: 'production' });
+const logger = createLogger();
 import {
   startSession,
   SubjectInactiveError,

@@ -10,7 +10,7 @@ import type { AgeBracket } from '@eduagent/schemas';
 import type { LLMTier } from '../subscription';
 import { createLogger } from '../logger';
 
-const logger = createLogger({ level: 'info', environment: 'production' });
+const logger = createLogger();
 
 // ---------------------------------------------------------------------------
 // Content safety preamble — age-aware identity framing.
@@ -467,11 +467,13 @@ async function* wrapStreamWithCircuitBreaker(
 export async function routeAndStream(
   messages: ChatMessage[],
   rung: EscalationRung = 1,
-  llmTier?: LLMTier,
-  ageBracket?: AgeBracket
+  options?: {
+    llmTier?: LLMTier;
+    ageBracket?: AgeBracket;
+  }
 ): Promise<StreamResult> {
-  const safeMessages = withSafetyPreamble(messages, ageBracket);
-  const config = getModelConfig(rung, llmTier);
+  const safeMessages = withSafetyPreamble(messages, options?.ageBracket);
+  const config = getModelConfig(rung, options?.llmTier);
   const provider = providers.get(config.provider);
   if (!provider) {
     throw new Error(`No provider registered for: ${config.provider}`);

@@ -5,7 +5,12 @@
 // ---------------------------------------------------------------------------
 
 import { eq } from 'drizzle-orm';
-import { subscriptions, quotaPools, type Database } from '@eduagent/database';
+import {
+  subscriptions,
+  quotaPools,
+  type Database,
+  createAccountRepository,
+} from '@eduagent/database';
 import type { SubscriptionTier, SubscriptionStatus } from '@eduagent/schemas';
 import { getTierConfig, isValidTransition } from '../subscription';
 import { captureException } from '../sentry';
@@ -46,9 +51,8 @@ export async function isRevenuecatEventProcessed(
   eventId: string,
   eventTimestampMs?: number
 ): Promise<boolean> {
-  const sub = await db.query.subscriptions.findFirst({
-    where: eq(subscriptions.accountId, accountId),
-  });
+  const repo = createAccountRepository(db, accountId);
+  const sub = await repo.subscriptions.findFirst();
   if (!sub) return false;
 
   // Exact duplicate — same event ID
@@ -81,9 +85,8 @@ export async function updateSubscriptionFromRevenuecatWebhook(
     eventTimestampMs?: number;
   }
 ): Promise<SubscriptionRow | null> {
-  const existing = await db.query.subscriptions.findFirst({
-    where: eq(subscriptions.accountId, accountId),
-  });
+  const repo = createAccountRepository(db, accountId);
+  const existing = await repo.subscriptions.findFirst();
 
   if (!existing) return null;
 

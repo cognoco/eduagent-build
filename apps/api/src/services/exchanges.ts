@@ -606,8 +606,7 @@ export async function streamExchange(
   const result: StreamResult = await routeAndStream(
     messages,
     context.escalationRung,
-    context.llmTier,
-    ageBracket
+    { llmTier: context.llmTier, ageBracket }
   );
 
   return {

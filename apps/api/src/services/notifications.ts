@@ -20,7 +20,7 @@ import {
 } from './settings';
 import { createLogger } from './logger';
 
-const logger = createLogger({ level: 'info', environment: 'production' });
+const logger = createLogger();
 
 export interface NotificationPayload {
   profileId: string;
@@ -446,6 +446,26 @@ export async function sendStruggleNotification(
   });
   if (!link) {
     return { sent: false, reason: 'no_parent_link' };
+  }
+
+  // Per-type dedup: skip if a struggle notification of the same type was
+  // already sent to this parent within the last 24 hours. The daily global
+  // cap in sendPushNotification prevents total spam, but this check prevents
+  // redundant alerts when multiple sessions trigger the same struggle signal.
+  const recentCount = await getRecentNotificationCount(
+    db,
+    link.parentProfileId,
+    notification.type,
+    24
+  );
+  if (recentCount > 0) {
+    logger.info('Struggle notification deduped', {
+      event: 'notification.struggle.deduped',
+      childProfileId,
+      type: notification.type,
+      topic: notification.topic,
+    });
+    return { sent: false, reason: 'dedup_24h' };
   }
 
   const childProfile = await db.query.profiles.findFirst({

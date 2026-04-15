@@ -621,7 +621,7 @@ describe('challengeCurriculum', () => {
     const subjectFindFirst = jest.fn().mockResolvedValue(mockSubjectRow());
     const curriculaFindFirst = jest.fn().mockResolvedValue(newCurriculum);
     const topicsFindMany = jest.fn().mockResolvedValue([]);
-    const db = {
+    const db: Record<string, unknown> = {
       query: {
         subjects: { findFirst: subjectFindFirst },
         curricula: { findFirst: curriculaFindFirst },
@@ -639,9 +639,15 @@ describe('challengeCurriculum', () => {
       delete: jest.fn().mockReturnValue({
         where: jest.fn().mockResolvedValue(undefined),
       }),
-    } as unknown as Database;
+      transaction: jest
+        .fn()
+        .mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) =>
+          fn(db)
+        ),
+    };
+    const typedDb = db as unknown as Database;
     const result = await challengeCurriculum(
-      db,
+      typedDb,
       PROFILE_ID,
       SUBJECT_ID,
       'Skip intro topics'

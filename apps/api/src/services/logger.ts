@@ -29,11 +29,8 @@ export interface Logger {
   error(message: string, context?: Record<string, unknown>): void;
 }
 
-export function createLogger(config: {
-  level: LogLevel;
-  environment: string;
-}): Logger {
-  const minLevel = LOG_LEVELS[config.level];
+export function createLogger(config?: { level?: LogLevel }): Logger {
+  const minLevel = LOG_LEVELS[config?.level ?? 'info'];
 
   function log(
     level: LogLevel,

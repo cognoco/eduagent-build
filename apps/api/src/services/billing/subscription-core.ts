@@ -6,7 +6,14 @@
 // ---------------------------------------------------------------------------
 
 import { eq } from 'drizzle-orm';
-import { subscriptions, quotaPools, type Database } from '@eduagent/database';
+import {
+  subscriptions,
+  quotaPools,
+  type Database,
+  createAccountRepository,
+  findSubscriptionByStripeId,
+  findQuotaPool,
+} from '@eduagent/database';
 import type { SubscriptionTier, SubscriptionStatus } from '@eduagent/schemas';
 import { getTierConfig, isValidTransition } from '../subscription';
 import { captureException } from '../sentry';
@@ -30,9 +37,8 @@ export async function getSubscriptionByAccountId(
   db: Database,
   accountId: string
 ): Promise<SubscriptionRow | null> {
-  const row = await db.query.subscriptions.findFirst({
-    where: eq(subscriptions.accountId, accountId),
-  });
+  const repo = createAccountRepository(db, accountId);
+  const row = await repo.subscriptions.findFirst();
   return row ? mapSubscriptionRow(row) : null;
 }
 
@@ -102,10 +108,8 @@ export async function updateSubscriptionFromWebhook(
   stripeSubscriptionId: string,
   updates: WebhookSubscriptionUpdate
 ): Promise<SubscriptionRow | null> {
-  // Load current row
-  const existing = await db.query.subscriptions.findFirst({
-    where: eq(subscriptions.stripeSubscriptionId, stripeSubscriptionId),
-  });
+  // Load current row (BD-10: via standalone helper — keyed by Stripe ID, not accountId)
+  const existing = await findSubscriptionByStripeId(db, stripeSubscriptionId);
 
   if (!existing) {
     return null;
@@ -188,9 +192,8 @@ export async function linkStripeCustomer(
   accountId: string,
   stripeCustomerId: string
 ): Promise<SubscriptionRow | null> {
-  const existing = await db.query.subscriptions.findFirst({
-    where: eq(subscriptions.accountId, accountId),
-  });
+  const repo = createAccountRepository(db, accountId);
+  const existing = await repo.subscriptions.findFirst();
 
   if (!existing) {
     return null;
@@ -221,9 +224,7 @@ export async function getQuotaPool(
   db: Database,
   subscriptionId: string
 ): Promise<QuotaPoolRow | null> {
-  const row = await db.query.quotaPools.findFirst({
-    where: eq(quotaPools.subscriptionId, subscriptionId),
-  });
+  const row = await findQuotaPool(db, subscriptionId);
   return row ? mapQuotaPoolRow(row) : null;
 }
 
@@ -240,9 +241,7 @@ export async function resetMonthlyQuota(
   subscriptionId: string,
   newLimit: number
 ): Promise<QuotaPoolRow | null> {
-  const existing = await db.query.quotaPools.findFirst({
-    where: eq(quotaPools.subscriptionId, subscriptionId),
-  });
+  const existing = await findQuotaPool(db, subscriptionId);
 
   if (!existing) {
     return null;

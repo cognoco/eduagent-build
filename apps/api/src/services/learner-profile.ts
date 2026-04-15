@@ -16,7 +16,7 @@ import {
 import { routeAndCall, type ChatMessage } from './llm';
 import { createLogger } from './logger';
 
-const logger = createLogger({ level: 'info', environment: 'production' });
+const logger = createLogger();
 
 const MAX_INTERESTS = 20;
 const MAX_COMMUNICATION_NOTES = 10;
@@ -946,6 +946,8 @@ export async function applyAnalysis(
     return { fieldsUpdated: [], notifications: [] };
   }
 
+  let finalNotifications = notifications;
+  let finalFieldsUpdated = fieldsUpdated;
   const updated = await updateWithRetry(
     db,
     profileId,
@@ -958,13 +960,17 @@ export async function applyAnalysis(
 
     const retry = buildAnalysisUpdates(fresh, analysis, source, subjectName);
     await updateWithRetry(db, profileId, fresh.version, retry.updates);
+    // Use retry-derived notifications — the first pass was based on a stale
+    // profile snapshot, so its notifications may be spurious.
+    finalNotifications = retry.notifications;
+    finalFieldsUpdated = retry.fieldsUpdated;
   }
 
-  if (notifications.length > 0) {
+  if (finalNotifications.length > 0) {
     console.info('[learner-profile] Struggle notifications emitted', {
       event: 'learner_profile.struggle.notifications',
       profileId,
-      notifications: notifications.map((n) => ({
+      notifications: finalNotifications.map((n) => ({
         type: n.type,
         topic: n.topic,
       })),
@@ -987,7 +993,7 @@ export async function applyAnalysis(
         .where(
           and(eq(subjects.profileId, profileId), eq(subjects.name, subjectName))
         );
-      fieldsUpdated.push('urgencyBoostUntil');
+      finalFieldsUpdated.push('urgencyBoostUntil');
     } catch (err) {
       // Urgency boost is best-effort — log and continue
       logger.warn('Failed to write urgency boost', {
@@ -1001,10 +1007,13 @@ export async function applyAnalysis(
   console.info('[learner-profile] Analysis applied', {
     event: 'learner_profile.analysis.completed',
     profileId,
-    fieldsUpdated,
+    fieldsUpdated: finalFieldsUpdated,
   });
 
-  return { fieldsUpdated, notifications };
+  return {
+    fieldsUpdated: finalFieldsUpdated,
+    notifications: finalNotifications,
+  };
 }
 
 export async function deleteMemoryItem(
@@ -1262,11 +1271,7 @@ export function buildHumanReadableMemoryExport(
 
   const sections: string[] = ['Learner Memory Export'];
 
-  const accommodationMode =
-    'accommodationMode' in profile
-      ? (profile as Record<string, unknown>).accommodationMode
-      : undefined;
-  if (accommodationMode && accommodationMode !== 'none') {
+  if (profile.accommodationMode && profile.accommodationMode !== 'none') {
     const modeLabels: Record<string, string> = {
       'short-burst':
         'Short-Burst — shorter explanations, frequent check-ins, small steps',
@@ -1277,7 +1282,7 @@ export function buildHumanReadableMemoryExport(
     };
     sections.push(
       `Accommodation mode\n${
-        modeLabels[accommodationMode as string] ?? accommodationMode
+        modeLabels[profile.accommodationMode] ?? profile.accommodationMode
       }`
     );
   }

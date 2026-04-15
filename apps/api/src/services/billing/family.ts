@@ -6,10 +6,11 @@
 import { and, eq, sql } from 'drizzle-orm';
 import {
   subscriptions,
-  quotaPools,
   profiles,
   byokWaitlist,
   type Database,
+  findSubscriptionById,
+  findQuotaPool,
 } from '@eduagent/database';
 import type { SubscriptionTier } from '@eduagent/schemas';
 import { getTierConfig } from '../subscription';
@@ -54,9 +55,7 @@ export async function getProfileCountForSubscription(
   db: Database,
   subscriptionId: string
 ): Promise<number> {
-  const sub = await db.query.subscriptions.findFirst({
-    where: eq(subscriptions.id, subscriptionId),
-  });
+  const sub = await findSubscriptionById(db, subscriptionId);
 
   if (!sub) {
     return 0;
@@ -82,9 +81,7 @@ export async function canAddProfile(
   db: Database,
   subscriptionId: string
 ): Promise<boolean> {
-  const sub = await db.query.subscriptions.findFirst({
-    where: eq(subscriptions.id, subscriptionId),
-  });
+  const sub = await findSubscriptionById(db, subscriptionId);
 
   if (!sub) {
     return false;
@@ -133,9 +130,7 @@ export async function listFamilyMembers(
   db: Database,
   subscriptionId: string
 ): Promise<FamilyMember[]> {
-  const sub = await db.query.subscriptions.findFirst({
-    where: eq(subscriptions.id, subscriptionId),
-  });
+  const sub = await findSubscriptionById(db, subscriptionId);
 
   if (!sub) {
     return [];
@@ -172,9 +167,7 @@ export async function addProfileToSubscription(
   subscriptionId: string,
   profileId: string
 ): Promise<{ profileCount: number } | null> {
-  const sub = await db.query.subscriptions.findFirst({
-    where: eq(subscriptions.id, subscriptionId),
-  });
+  const sub = await findSubscriptionById(db, subscriptionId);
 
   if (!sub) {
     return null;
@@ -230,9 +223,7 @@ export async function removeProfileFromSubscription(
   profileId: string,
   newAccountId: string
 ): Promise<{ removedProfileId: string } | null> {
-  const sub = await db.query.subscriptions.findFirst({
-    where: eq(subscriptions.id, subscriptionId),
-  });
+  const sub = await findSubscriptionById(db, subscriptionId);
 
   if (!sub) {
     return null;
@@ -282,9 +273,7 @@ export async function downgradeAllFamilyProfiles(
   subscriptionId: string,
   profileToAccountMap: Map<string, string>
 ): Promise<string[]> {
-  const sub = await db.query.subscriptions.findFirst({
-    where: eq(subscriptions.id, subscriptionId),
-  });
+  const sub = await findSubscriptionById(db, subscriptionId);
 
   if (!sub) {
     return [];
@@ -360,17 +349,13 @@ export async function getFamilyPoolStatus(
   profileCount: number;
   maxProfiles: number;
 } | null> {
-  const sub = await db.query.subscriptions.findFirst({
-    where: eq(subscriptions.id, subscriptionId),
-  });
+  const sub = await findSubscriptionById(db, subscriptionId);
 
   if (!sub) {
     return null;
   }
 
-  const pool = await db.query.quotaPools.findFirst({
-    where: eq(quotaPools.subscriptionId, subscriptionId),
-  });
+  const pool = await findQuotaPool(db, subscriptionId);
 
   if (!pool) {
     return null;

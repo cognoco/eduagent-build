@@ -6,7 +6,7 @@ import {
 } from '../types';
 import { createLogger } from '../../logger';
 
-const logger = createLogger({ level: 'info', environment: 'production' });
+const logger = createLogger();
 
 // ---------------------------------------------------------------------------
 // OpenAI Provider — fallback for Gemini (ARCH-8, ARCH-9)

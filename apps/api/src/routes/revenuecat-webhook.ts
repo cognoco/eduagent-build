@@ -26,7 +26,7 @@ import { getTierConfig } from '../services/subscription';
 import { captureException } from '../services/sentry';
 import { createLogger } from '../services/logger';
 
-const logger = createLogger({ level: 'info', environment: 'production' });
+const logger = createLogger();
 import { EXTENDED_TRIAL_MONTHLY_EQUIVALENT } from '../services/trial';
 import { inngest } from '../inngest/client';
 import type { Database } from '@eduagent/database';

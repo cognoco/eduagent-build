@@ -4,7 +4,12 @@
 // ---------------------------------------------------------------------------
 
 import { eq } from 'drizzle-orm';
-import { subscriptions, quotaPools, type Database } from '@eduagent/database';
+import {
+  quotaPools,
+  type Database,
+  findSubscriptionById,
+  findQuotaPool,
+} from '@eduagent/database';
 import type { SubscriptionTier } from '@eduagent/schemas';
 import { getTierConfig } from '../subscription';
 
@@ -52,17 +57,13 @@ export async function handleTierChange(
   subscriptionId: string,
   newTier: SubscriptionTier
 ): Promise<TierChangeResult | null> {
-  const sub = await db.query.subscriptions.findFirst({
-    where: eq(subscriptions.id, subscriptionId),
-  });
+  const sub = await findSubscriptionById(db, subscriptionId);
 
   if (!sub) {
     return null;
   }
 
-  const pool = await db.query.quotaPools.findFirst({
-    where: eq(quotaPools.subscriptionId, subscriptionId),
-  });
+  const pool = await findQuotaPool(db, subscriptionId);
 
   if (!pool) {
     return null;

@@ -1408,7 +1408,7 @@ Realistic time expectations based on Foreign Service Institute research (for Eng
 | Correct identification | 4-5 | 4-5 | Full understanding demonstrated |
 | Partial identification | 2-3 | 3 | Analytical skill developing |
 | Failed to identify flaw | 0-1 | 2-3 | Missing subtle flaw ≠ no knowledge |
-| "I don't know" response | 0 | 1 | Honest uncertainty, minimal penalty |
+| "I don't know" response | 0 | 2 | Honest uncertainty, floors at EVALUATE minimum |
 
 **EVALUATE Difficulty Calibration:**
 

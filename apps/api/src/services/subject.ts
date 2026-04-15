@@ -15,7 +15,7 @@ import {
 import { getProfileAge } from './profile';
 import { createLogger } from './logger';
 
-const logger = createLogger({ level: 'info', environment: 'production' });
+const logger = createLogger();
 import type {
   LanguageSetupInput,
   SubjectCreateInput,

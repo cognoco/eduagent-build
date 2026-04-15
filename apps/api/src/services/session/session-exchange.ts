@@ -67,7 +67,7 @@ import {
 } from './session-crud';
 import { createLogger } from '../logger';
 
-const logger = createLogger({ level: 'info', environment: 'production' });
+const logger = createLogger();
 
 // ---------------------------------------------------------------------------
 // Behavioral metrics data contract — UX-18 (process visibility)

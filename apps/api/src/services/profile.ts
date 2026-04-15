@@ -7,7 +7,7 @@ import { eq, and, asc, sql } from 'drizzle-orm';
 import { profiles, familyLinks, type Database } from '@eduagent/database';
 import { createLogger } from './logger';
 
-const logger = createLogger({ level: 'info', environment: 'production' });
+const logger = createLogger();
 import type {
   ProfileCreateInput,
   ProfileUpdateInput,

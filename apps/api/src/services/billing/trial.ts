@@ -3,7 +3,12 @@
 // ---------------------------------------------------------------------------
 
 import { and, eq, gte, lte, sql } from 'drizzle-orm';
-import { subscriptions, quotaPools, type Database } from '@eduagent/database';
+import {
+  subscriptions,
+  quotaPools,
+  type Database,
+  findQuotaPool,
+} from '@eduagent/database';
 import type { SubscriptionStatus } from '@eduagent/schemas';
 import { getTierConfig } from '../subscription';
 import { mapSubscriptionRow, type SubscriptionRow } from './types';
@@ -45,9 +50,7 @@ export async function downgradeQuotaPool(
 ): Promise<void> {
   // Only update pools that haven't already been downgraded to this limit.
   // This prevents retries from resetting usage counters for already-transitioned subscriptions.
-  const currentPool = await db.query.quotaPools.findFirst({
-    where: eq(quotaPools.subscriptionId, subscriptionId),
-  });
+  const currentPool = await findQuotaPool(db, subscriptionId);
   if (currentPool && currentPool.monthlyLimit === monthlyLimit) {
     return; // Already at target tier — skip to preserve usage counters
   }

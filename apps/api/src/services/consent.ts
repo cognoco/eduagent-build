@@ -22,7 +22,7 @@ import {
 } from './notifications';
 import { createLogger } from './logger';
 
-const logger = createLogger({ level: 'info', environment: 'production' });
+const logger = createLogger();
 
 // ---------------------------------------------------------------------------
 // Custom error classes — used by route layer for reliable instanceof checks
