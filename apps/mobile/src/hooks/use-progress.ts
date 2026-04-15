@@ -115,7 +115,13 @@ export function useActiveSessionForTopic(topicId: string | undefined) {
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['progress', 'topic', topicId, 'active-session'],
+    queryKey: [
+      'progress',
+      'topic',
+      topicId,
+      'active-session',
+      activeProfile?.id,
+    ],
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
