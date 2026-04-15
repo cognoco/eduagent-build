@@ -41,6 +41,11 @@ jest.mock('./curriculum', () => ({
       estimatedMinutes: 45,
     },
   ]),
+  ensureCurriculum: jest.fn().mockResolvedValue({
+    id: 'curriculum-1',
+    subjectId: '550e8400-e29b-41d4-a716-446655440000',
+    version: 1,
+  }),
   ensureDefaultBook: jest.fn().mockResolvedValue('book-1'),
 }));
 
@@ -653,8 +658,8 @@ describe('persistCurriculum', () => {
     const db = createMockDb();
     await persistCurriculum(db, profileId, subjectId, 'Mathematics', draft);
 
-    // Should insert curriculum + topics (2 insert calls)
-    expect(db.insert).toHaveBeenCalledTimes(2);
+    // ensureCurriculum handles curriculum row; db.insert is called once for topics
+    expect(db.insert).toHaveBeenCalledTimes(1);
   });
 
   it('uses default values when signals are empty', async () => {
@@ -699,8 +704,8 @@ describe('persistCurriculum', () => {
     const db = createMockDb();
     await persistCurriculum(db, profileId, subjectId, 'Art', draft);
 
-    // Only curriculum insert, no topic insert
-    expect(db.insert).toHaveBeenCalledTimes(1);
+    // ensureCurriculum handles curriculum row; no topics to insert
+    expect(db.insert).not.toHaveBeenCalled();
   });
 
   it('throws when subject does not belong to profile (IDOR guard) [CR-1B.1]', async () => {

@@ -60,7 +60,8 @@ export async function readSessionRecoveryMarker(
     }
 
     return parsed;
-  } catch {
+  } catch (err) {
+    console.warn('[SessionRecovery] Failed to parse recovery marker:', err);
     return null;
   }
 }

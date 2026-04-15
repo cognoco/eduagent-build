@@ -282,7 +282,11 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
             homeworkProblemsState,
             currentProblemIndex
           );
-        } catch {
+        } catch (err) {
+          console.warn(
+            '[Session] Homework metadata sync failed during ensureSession:',
+            err
+          );
           // Keep the session alive even if homework metadata sync fails.
         }
       }
@@ -345,7 +349,8 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
 
         try {
           await recordSystemPrompt.mutateAsync({ content: prompt });
-        } catch {
+        } catch (err) {
+          console.warn('[Session] Silence prompt failed to persist:', err);
           // Best effort only.
         }
 

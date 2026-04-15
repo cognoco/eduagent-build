@@ -488,7 +488,11 @@ export default function MoreScreen() {
           label="Terms of Service"
           onPress={() => router.push('/terms')}
         />
-        <SettingsRow label="Export my data" onPress={handleExport} />
+        <SettingsRow
+          label="Export my data"
+          onPress={exportData.isPending ? undefined : handleExport}
+          value={exportData.isPending ? 'Preparing export...' : undefined}
+        />
         <SettingsRow
           label="Delete account"
           onPress={() => router.push('/delete-account')}

@@ -900,6 +900,7 @@ export default function SessionScreen() {
         switcherCurriculum={switcherCurriculum}
         handleTopicSwitch={handleTopicSwitch}
         insetsBottom={insets.bottom}
+        isSwitching={isClosing}
       />
       {confirmationToast ? (
         <View

@@ -1206,7 +1206,10 @@ export async function analyzeSessionTranscript(
     const validated = sessionAnalysisOutputSchema.safeParse(parsed);
     if (!validated.success) return null;
     return validated.data;
-  } catch {
+  } catch (err) {
+    logger.warn('Failed to parse session analysis', {
+      error: err instanceof Error ? err.message : String(err),
+    });
     return null;
   }
 }

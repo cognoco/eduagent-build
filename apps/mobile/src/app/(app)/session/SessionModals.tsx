@@ -148,6 +148,7 @@ export interface TopicSwitcherModalProps {
     subjectName: string
   ) => Promise<void>;
   insetsBottom: number;
+  isSwitching?: boolean;
 }
 
 export function TopicSwitcherModal({
@@ -159,6 +160,7 @@ export function TopicSwitcherModal({
   switcherCurriculum,
   handleTopicSwitch,
   insetsBottom,
+  isSwitching = false,
 }: TopicSwitcherModalProps) {
   return (
     <Modal
@@ -236,6 +238,8 @@ export function TopicSwitcherModal({
                           subjectForTopic.name
                         )
                       }
+                      disabled={isSwitching}
+                      style={{ opacity: isSwitching ? 0.5 : 1 }}
                       className="bg-surface rounded-card px-4 py-3 mb-2"
                       testID={`switch-topic-${topic.id}`}
                     >

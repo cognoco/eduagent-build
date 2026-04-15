@@ -215,13 +215,11 @@ export async function getTopicProgress(
   )[0];
 
   // Get session summary excerpt from the most recent session
+  const lastTopicSession = topicSessions[topicSessions.length - 1];
   const summaryRow =
-    topicSessions.length > 0
+    lastTopicSession != null
       ? await repo.sessionSummaries.findFirst(
-          eq(
-            sessionSummaries.sessionId,
-            topicSessions[topicSessions.length - 1]!.id
-          )
+          eq(sessionSummaries.sessionId, lastTopicSession.id)
         )
       : undefined;
 

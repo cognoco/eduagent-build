@@ -16,6 +16,7 @@ export function ChangePassword(): React.JSX.Element {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   const handleSubmit = useCallback(async () => {
     setError(null);
@@ -49,11 +50,14 @@ export function ChangePassword(): React.JSX.Element {
   }, [user, currentPassword, newPassword, confirmPassword]);
 
   const handleForgotPassword = useCallback(async () => {
+    setIsSigningOut(true);
     try {
       await signOut();
     } catch {
       Alert.alert('Could not sign out', 'Please try again.');
       return;
+    } finally {
+      setIsSigningOut(false);
     }
     router.replace('/(auth)/sign-in' as never);
   }, [signOut, router]);
@@ -67,8 +71,14 @@ export function ChangePassword(): React.JSX.Element {
         testID="current-password"
       />
 
-      <Pressable onPress={handleForgotPassword} className="mt-1 mb-3">
-        <Text className="text-xs text-primary">Forgot your password?</Text>
+      <Pressable
+        onPress={isSigningOut ? undefined : handleForgotPassword}
+        disabled={isSigningOut}
+        className="mt-1 mb-3"
+      >
+        <Text className="text-xs text-primary">
+          {isSigningOut ? 'Signing out...' : 'Forgot your password?'}
+        </Text>
       </Pressable>
 
       <PasswordInput

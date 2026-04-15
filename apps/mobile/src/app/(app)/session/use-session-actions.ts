@@ -120,6 +120,8 @@ export interface UseSessionActionsOptions {
   router: Router;
 }
 
+const CLOSE_TIMEOUT_MS = 15_000;
+
 export function useSessionActions(opts: UseSessionActionsOptions) {
   const {
     activeSessionId,
@@ -177,7 +179,9 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
         void SecureStore.setItemAsync(
           getInputModeKey(activeProfileId),
           nextInputMode
-        ).catch(() => undefined);
+        ).catch((err) =>
+          console.warn('[Session] Failed to persist input mode:', err)
+        );
       }
 
       if (!activeSessionId) {
@@ -231,7 +235,8 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
           updatedProblems,
           nextProblemIndex
         );
-      } catch {
+      } catch (err) {
+        console.warn('[Session] Homework metadata sync failed:', err);
         // Keep the local flow moving even if metadata sync fails.
       }
     }
@@ -334,11 +339,20 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
           text: "I'm Done",
           onPress: async () => {
             try {
-              const result = await closeSession.mutateAsync({
-                reason: 'user_ended',
-                summaryStatus: 'pending',
-                milestonesReached,
-              });
+              const timeoutPromise = new Promise<never>((_, reject) =>
+                setTimeout(
+                  () => reject(new Error('Session close timed out')),
+                  CLOSE_TIMEOUT_MS
+                )
+              );
+              const result = await Promise.race([
+                closeSession.mutateAsync({
+                  reason: 'user_ended',
+                  summaryStatus: 'pending',
+                  milestonesReached,
+                }),
+                timeoutPromise,
+              ]);
               const fastCelebrations = await fetchFastCelebrations();
               await clearSessionRecoveryMarker(activeProfileId);
 
@@ -496,7 +510,11 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
             content: config.systemPrompt,
             metadata: { type: 'quick_chip', chip },
           });
-        } catch {
+        } catch (err) {
+          console.warn(
+            '[Session] Quick-chip system prompt failed to persist:',
+            err
+          );
           // Best effort only. The visible prompt still continues below.
         }
       }
@@ -636,6 +654,7 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
       nextSubjectName: string
     ) => {
       try {
+        setIsClosing(true);
         if (activeSessionId) {
           await closeSession.mutateAsync({
             reason: 'user_ended',
@@ -656,6 +675,7 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
           },
         } as never);
       } catch (err: unknown) {
+        setIsClosing(false);
         Alert.alert('Could not switch topic', formatApiError(err));
       }
     },
@@ -665,6 +685,7 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
       closeSession,
       effectiveMode,
       router,
+      setIsClosing,
       setShowWrongSubjectChip,
       setShowTopicSwitcher,
     ]

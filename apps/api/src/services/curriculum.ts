@@ -1047,13 +1047,9 @@ export async function challengeCurriculum(
     return result;
   }
 
-  // Load current curriculum to determine new version
-  const current = await db.query.curricula.findFirst({
-    where: eq(curricula.subjectId, subjectId),
-    orderBy: desc(curricula.version),
-  });
-
-  const newVersion = current ? current.version + 1 : 1;
+  // Delete old curricula — topics cascade-delete via FKs.
+  // "Challenge" means full replacement; old versions are never queried.
+  await db.delete(curricula).where(eq(curricula.subjectId, subjectId));
   const latestDraft = await db.query.onboardingDrafts.findFirst({
     where: and(
       eq(onboardingDrafts.profileId, profileId),
@@ -1113,7 +1109,7 @@ export async function challengeCurriculum(
     .insert(curricula)
     .values({
       subjectId,
-      version: newVersion,
+      version: 1,
     })
     .returning();
 

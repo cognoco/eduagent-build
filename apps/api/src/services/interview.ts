@@ -1,7 +1,6 @@
 import { eq, and, desc } from 'drizzle-orm';
 import {
   onboardingDrafts,
-  curricula,
   curriculumBooks,
   curriculumTopics,
   subjects,
@@ -341,7 +340,9 @@ export async function getOrCreateDraft(
       expiresAt: new Date(Date.now() + DRAFT_TTL_MS),
     })
     .returning();
-  return mapDraftRow(row!);
+  if (!row)
+    throw new Error('Insert into onboarding drafts did not return a row');
+  return mapDraftRow(row);
 }
 
 export async function getDraftState(
@@ -493,19 +494,13 @@ export async function persistCurriculum(
     experienceLevel: signals.experienceLevel ?? 'beginner',
   });
 
-  const [curriculum] = await db
-    .insert(curricula)
-    .values({
-      subjectId,
-      version: 1,
-    })
-    .returning();
+  const curriculum = await ensureCurriculum(db, subjectId);
 
   if (topics.length > 0) {
     const bookId = await ensureDefaultBook(db, subjectId, subjectName);
     await db.insert(curriculumTopics).values(
       topics.map((t, i) => ({
-        curriculumId: curriculum!.id,
+        curriculumId: curriculum.id,
         bookId,
         title: t.title,
         description: t.description,

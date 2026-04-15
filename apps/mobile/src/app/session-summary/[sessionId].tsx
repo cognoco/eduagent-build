@@ -213,6 +213,10 @@ export default function SessionSummaryScreen() {
     } catch (err) {
       // Error state surfaced by submitSummary.isError inline in JSX [SC-1]
       console.error('[SessionSummary] handleSubmit failed:', err);
+      Alert.alert(
+        'Could not save',
+        'Your reflection could not be saved. Please try again.'
+      );
     } finally {
       submitInFlight.current = false;
     }

@@ -263,7 +263,7 @@ describe('HomeScreen SF-1: markCelebrationsSeen error handling', () => {
 
   it('logs error when markCelebrationsSeen.mutateAsync rejects — no unhandled rejection [SF-1]', async () => {
     const consoleSpy = jest
-      .spyOn(console, 'error')
+      .spyOn(console, 'warn')
       // eslint-disable-next-line @typescript-eslint/no-empty-function
       .mockImplementation(() => {});
     // In jsdom, unhandledrejection is not fully supported; we verify via console.error
@@ -281,7 +281,7 @@ describe('HomeScreen SF-1: markCelebrationsSeen error handling', () => {
 
     // The error must be logged — not silently swallowed
     expect(consoleSpy).toHaveBeenCalledWith(
-      '[Celebrations] Failed to mark seen:',
+      '[Celebrations] Failed to mark as seen, will retry on next visit:',
       expect.any(Error)
     );
 

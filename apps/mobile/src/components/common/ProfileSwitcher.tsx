@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, type ReactNode } from 'react';
-import { View, Text, Pressable, Platform } from 'react-native';
+import { View, Text, Pressable, Platform, Alert } from 'react-native';
 import type { Profile } from '@eduagent/schemas';
 import { isGuardianProfile } from '../../lib/profile';
 
@@ -57,6 +57,7 @@ export function ProfileSwitcher({
         // Switch failed — keep dropdown open so user can retry.
       } catch (err: unknown) {
         console.error('Profile switch failed:', err);
+        Alert.alert('Could not switch profile', 'Please try again.');
         // Dropdown stays open for retry
       } finally {
         switchingRef.current = false;

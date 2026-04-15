@@ -168,7 +168,10 @@ export default function ChildDetailScreen() {
       markCelebrationsSeen
         .mutateAsync({ viewer: 'parent', profileId })
         .catch((err) => {
-          console.error('[Celebrations] Failed to mark seen:', err);
+          console.warn(
+            '[Celebrations] Failed to mark as seen, will retry on next visit:',
+            err
+          );
         });
     },
   });

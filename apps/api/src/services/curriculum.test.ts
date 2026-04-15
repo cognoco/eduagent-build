@@ -205,6 +205,9 @@ function createMockDb({
         returning: jest.fn().mockResolvedValue(insertReturning),
       }),
     }),
+    delete: jest.fn().mockReturnValue({
+      where: jest.fn().mockResolvedValue(undefined),
+    }),
     // Raw SQL execution used by batch CASE UPDATE [CR-2B.1]
     execute: jest.fn().mockResolvedValue(undefined),
     // transaction() executes the callback with the same mock as tx context
@@ -613,19 +616,11 @@ describe('challengeCurriculum', () => {
     ).rejects.toThrow('Subject not found');
   });
 
-  it('increments version when existing curriculum found', async () => {
-    // The first call to findFirst (subjects) returns the subject.
-    // The second call to findFirst (curricula) returns existing curriculum.
-    // After insert, getCurriculum is called again which re-queries.
-    const newCurriculum = mockCurriculumRow({ id: 'curr-new', version: 2 });
-
+  it('deletes old curriculum and creates fresh version', async () => {
+    const newCurriculum = mockCurriculumRow({ id: 'curr-new', version: 1 });
     const subjectFindFirst = jest.fn().mockResolvedValue(mockSubjectRow());
-    const curriculaFindFirst = jest
-      .fn()
-      .mockResolvedValueOnce(mockCurriculumRow({ version: 1 }))
-      .mockResolvedValueOnce(newCurriculum);
+    const curriculaFindFirst = jest.fn().mockResolvedValue(newCurriculum);
     const topicsFindMany = jest.fn().mockResolvedValue([]);
-
     const db = {
       query: {
         subjects: { findFirst: subjectFindFirst },
@@ -641,17 +636,19 @@ describe('challengeCurriculum', () => {
           returning: jest.fn().mockResolvedValue([newCurriculum]),
         }),
       }),
+      delete: jest.fn().mockReturnValue({
+        where: jest.fn().mockResolvedValue(undefined),
+      }),
     } as unknown as Database;
-
     const result = await challengeCurriculum(
       db,
       PROFILE_ID,
       SUBJECT_ID,
       'Skip intro topics'
     );
-
     expect(result).not.toBeNull();
-    expect(result.version).toBe(2);
+    expect(result.version).toBe(1);
+    expect(db.delete).toHaveBeenCalled();
   });
 
   it('reuses original onboarding signals when regenerating curriculum', async () => {
@@ -681,7 +678,7 @@ describe('challengeCurriculum', () => {
           { role: 'assistant', content: 'What have you already studied?' },
         ],
       },
-      insertReturning: [mockCurriculumRow({ id: 'curr-new', version: 2 })],
+      insertReturning: [mockCurriculumRow({ id: 'curr-new', version: 1 })],
     });
 
     await challengeCurriculum(
