@@ -395,3 +395,75 @@ export async function notifyParentToSubscribe(
 
   return { sent: true, rateLimited: false };
 }
+
+// ---------------------------------------------------------------------------
+// FR247.6/FR247.7: Struggle push notifications to parent
+// ---------------------------------------------------------------------------
+
+import type { StruggleNotification } from './learner-profile';
+
+/**
+ * Format push notification copy for struggle signals.
+ * Two-tier system: softer "noticed" at medium confidence, stronger "flagged" at high.
+ */
+export function formatStruggleNotificationCopy(
+  type: 'struggle_noticed' | 'struggle_flagged' | 'struggle_resolved',
+  topic: string,
+  childName: string | null
+): { title: string; body: string } {
+  const name = childName ?? 'Your child';
+
+  switch (type) {
+    case 'struggle_noticed':
+      return {
+        title: 'Learning update',
+        body: `It looks like ${name} is finding ${topic} challenging. Nothing to worry about — just keeping you in the loop.`,
+      };
+    case 'struggle_flagged':
+      return {
+        title: 'Learning update',
+        body: `${name} has been working hard on ${topic} — they may need some extra support.`,
+      };
+    case 'struggle_resolved':
+      return {
+        title: 'Great news!',
+        body: `${name} seems to have overcome their difficulty with ${topic}.`,
+      };
+  }
+}
+
+/**
+ * Send struggle push notification to the parent of a child profile.
+ * Looks up parent via familyLinks, resolves child display name, sends push.
+ */
+export async function sendStruggleNotification(
+  db: Database,
+  childProfileId: string,
+  notification: StruggleNotification
+): Promise<NotificationResult> {
+  const link = await db.query.familyLinks.findFirst({
+    where: eq(familyLinks.childProfileId, childProfileId),
+  });
+  if (!link) {
+    return { sent: false, reason: 'no_parent_link' };
+  }
+
+  const childProfile = await db.query.profiles.findFirst({
+    where: eq(profiles.id, childProfileId),
+    columns: { displayName: true },
+  });
+  const childName = childProfile?.displayName ?? null;
+
+  const copy = formatStruggleNotificationCopy(
+    notification.type,
+    notification.topic,
+    childName
+  );
+
+  return sendPushNotification(db, {
+    profileId: link.parentProfileId,
+    title: copy.title,
+    body: copy.body,
+    type: notification.type,
+  });
+}

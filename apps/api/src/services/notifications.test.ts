@@ -5,6 +5,7 @@ import {
   formatReviewReminderBody,
   formatDailyReminderBody,
   formatRecallNudge,
+  formatStruggleNotificationCopy,
   MAX_DAILY_PUSH,
   type NotificationPayload,
   type EmailPayload,
@@ -317,5 +318,57 @@ describe('formatRecallNudge', () => {
     const result = formatRecallNudge(1, 'Physics', 'guardian', 'Sam');
     expect(result.body).toContain('1 topic');
     expect(result.body).not.toContain('topics');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// formatStruggleNotificationCopy (FR247.6, FR247.7)
+// ---------------------------------------------------------------------------
+
+describe('formatStruggleNotificationCopy', () => {
+  it('returns softer copy for struggle_noticed', () => {
+    const copy = formatStruggleNotificationCopy(
+      'struggle_noticed',
+      'fractions',
+      'Alex'
+    );
+    expect(copy.title).toBe('Learning update');
+    expect(copy.body).toContain('Alex');
+    expect(copy.body).toContain('fractions');
+    expect(copy.body).toContain('challenging');
+    expect(copy.body).not.toContain('extra support');
+  });
+
+  it('returns stronger copy for struggle_flagged', () => {
+    const copy = formatStruggleNotificationCopy(
+      'struggle_flagged',
+      'fractions',
+      'Alex'
+    );
+    expect(copy.title).toBe('Learning update');
+    expect(copy.body).toContain('Alex');
+    expect(copy.body).toContain('fractions');
+    expect(copy.body).toContain('extra support');
+  });
+
+  it('returns celebration copy for struggle_resolved', () => {
+    const copy = formatStruggleNotificationCopy(
+      'struggle_resolved',
+      'fractions',
+      'Alex'
+    );
+    expect(copy.title).toContain('Great news');
+    expect(copy.body).toContain('Alex');
+    expect(copy.body).toContain('fractions');
+    expect(copy.body).toContain('overcome');
+  });
+
+  it('uses fallback name when childName is not provided', () => {
+    const copy = formatStruggleNotificationCopy(
+      'struggle_noticed',
+      'fractions',
+      null
+    );
+    expect(copy.body).toContain('Your child');
   });
 });
