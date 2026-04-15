@@ -73,9 +73,17 @@ const mockUseGenerateBookTopics = jest.fn((): any => ({
   isPending: false,
 }));
 
+const mockUseBooks = jest.fn((): any => ({
+  data: [
+    { id: 'book-1', title: 'Algebra', emoji: '📐', topicsGenerated: true },
+    { id: 'book-2', title: 'Geometry', emoji: '📏', topicsGenerated: true },
+  ],
+  isLoading: false,
+}));
+
 jest.mock('../../../../../hooks/use-books', () => ({
   useBookWithTopics: () => mockUseBookWithTopics(),
-  useBooks: () => ({ data: [], isLoading: false }),
+  useBooks: () => mockUseBooks(),
   useGenerateBookTopics: () => mockUseGenerateBookTopics(),
 }));
 
@@ -648,10 +656,11 @@ describe('BookScreen', () => {
     const { getByTestId } = render(<BookScreen />);
     fireEvent(getByTestId('session-sess-1'), 'longPress');
 
-    // With no other books, the alert explains there's nowhere to move
+    // Alert offers to move topic to another book (default mock has 2 books)
     expect(alertSpy).toHaveBeenCalledWith(
       'Session Topic 1',
-      expect.any(String)
+      expect.any(String),
+      expect.any(Array)
     );
   });
 
@@ -710,7 +719,7 @@ describe('BookScreen', () => {
     expect(mockBack).toHaveBeenCalledTimes(1);
   });
 
-  it('back button replaces shelf when there is no back history', () => {
+  it('back button replaces shelf when there is no back history (multi-book)', () => {
     mockCanGoBack.mockReturnValue(false);
 
     const { getByTestId } = render(<BookScreen />);
@@ -719,6 +728,18 @@ describe('BookScreen', () => {
       pathname: '/(app)/shelf/[subjectId]',
       params: { subjectId: 'sub-1' },
     });
+  });
+
+  it('back button goes to library for single-book subjects (avoids shelf dead-end)', () => {
+    mockCanGoBack.mockReturnValue(false);
+    mockUseBooks.mockReturnValue({
+      data: [{ id: 'book-1', title: 'Only Book', topicsGenerated: true }],
+      isLoading: false,
+    });
+
+    const { getByTestId } = render(<BookScreen />);
+    fireEvent.press(getByTestId('book-back'));
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
   });
 
   // -----------------------------------------------------------------------

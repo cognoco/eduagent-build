@@ -108,6 +108,16 @@ export default function BookScreen() {
   const moveTopic = useMoveTopic();
 
   const handleBack = useCallback(() => {
+    const books = Array.isArray(allBooksQuery.data) ? allBooksQuery.data : null;
+
+    // Single-book shelf: go to library directly.
+    // Going to the shelf would hit the auto-skip dead-end (returns null or
+    // redirects back to this book, causing a loop/crash on web).
+    if (books !== null && books.length <= 1) {
+      goBackOrReplace(router, '/(app)/library');
+      return;
+    }
+
     if (subjectId) {
       goBackOrReplace(router, {
         pathname: '/(app)/shelf/[subjectId]',
@@ -117,7 +127,7 @@ export default function BookScreen() {
     }
 
     goBackOrReplace(router, '/(app)/library');
-  }, [router, subjectId]);
+  }, [router, subjectId, allBooksQuery.data]);
 
   // --- Generation auto-trigger ---
   const [genPhase, setGenPhase] = useState<GenerationPhase>('idle');

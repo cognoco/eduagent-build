@@ -144,9 +144,17 @@ export default function ShelfScreen() {
     );
   }
 
-  // Return null while auto-redirecting to the single book
+  // Single-book shelf: show minimal placeholder while auto-skip fires.
+  // Previously returned null which caused a crash on web and a dead-end
+  // when navigating back (autoSkippedRef blocks the redirect).
   if (booksQuery.data && booksQuery.data.length === 1) {
-    return null;
+    return (
+      <View
+        className="flex-1 bg-background"
+        style={{ paddingTop: insets.top }}
+        testID="shelf-single-book"
+      />
+    );
   }
 
   const isLoading = booksQuery.isLoading || subjectsQuery.isLoading;
