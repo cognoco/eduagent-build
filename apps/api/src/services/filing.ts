@@ -100,7 +100,12 @@ export async function buildLibraryIndex(
         if (!chapterMap.has(chapterName)) {
           chapterMap.set(chapterName, []);
         }
-        chapterMap.get(chapterName)!.push({
+        const chapterTopics = chapterMap.get(chapterName);
+        if (!chapterTopics)
+          throw new Error(
+            `Chapter map entry missing for chapter: ${chapterName}`
+          );
+        chapterTopics.push({
           title: topic.title,
         });
       }

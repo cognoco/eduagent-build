@@ -246,11 +246,11 @@ export async function prepareExchangeContext(
       : fetchCrossSubjectHighlights(db, profileId, session.subjectId),
     // CFLF-23: Pre-session similarity scan — uses rawInput for freeform sessions
     // Graceful degradation: if Voyage API is down, returns empty (never breaks session)
-    isFreeformWithRawInput
+    isFreeformWithRawInput && session.rawInput
       ? retrieveRelevantMemory(
           db,
           profileId,
-          session.rawInput!,
+          session.rawInput,
           options?.voyageApiKey,
           5
         )
@@ -350,7 +350,7 @@ export async function prepareExchangeContext(
       const detailMap = new Map(topicDetails.map((t) => [t.id, t]));
       interleavedTopics = topicIds.map((id) => {
         const detail = detailMap.get(id);
-        const metaTopic = meta.interleavedTopics!.find((t) => t.topicId === id);
+        const metaTopic = meta.interleavedTopics?.find((t) => t.topicId === id);
         return {
           topicId: id,
           title: detail?.title ?? metaTopic?.topicTitle ?? 'Unknown',
@@ -425,16 +425,11 @@ export async function prepareExchangeContext(
     const rung = (e.metadata as Record<string, unknown> | null)?.escalationRung;
     return typeof rung === 'number' && rung >= 2;
   }).length;
-  const lastAiResponseAt =
-    aiResponseEvents.length > 0
-      ? aiResponseEvents[aiResponseEvents.length - 1]!.createdAt
-      : null;
+  const lastAiResponseEvent = aiResponseEvents[aiResponseEvents.length - 1];
+  const lastAiResponseAt = lastAiResponseEvent?.createdAt ?? null;
 
   // 3d. Check the last AI response for [PARTIAL_PROGRESS] marker (Gap 3)
-  const lastAiResponse =
-    aiResponseEvents.length > 0
-      ? aiResponseEvents[aiResponseEvents.length - 1]!.content
-      : '';
+  const lastAiResponse = lastAiResponseEvent?.content ?? '';
   const previousResponseHadPartialProgress =
     detectPartialProgress(lastAiResponse);
 

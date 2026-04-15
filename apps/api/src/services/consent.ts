@@ -171,7 +171,8 @@ export async function createPendingConsentState(
     })
     .returning();
 
-  return mapConsentRow(row!);
+  if (!row) throw new Error('Insert into consentStates did not return a row');
+  return mapConsentRow(row);
 }
 
 /**
@@ -230,7 +231,8 @@ export async function createGrantedConsentState(
     return consentRow;
   });
 
-  return mapConsentRow(row!);
+  if (!row) throw new Error('Insert into consentStates did not return a row');
+  return mapConsentRow(row);
 }
 
 /** Maximum number of consent resends (PRD lines 415, 420) */
@@ -572,7 +574,8 @@ export async function revokeConsent(
     )
     .returning();
 
-  return mapConsentRow(row!);
+  if (!row) throw new Error('Update on consentStates did not return a row');
+  return mapConsentRow(row);
 }
 
 /**
@@ -623,5 +626,6 @@ export async function restoreConsent(
     )
     .returning();
 
-  return mapConsentRow(row!);
+  if (!row) throw new Error('Update on consentStates did not return a row');
+  return mapConsentRow(row);
 }

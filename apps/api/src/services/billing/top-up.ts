@@ -139,7 +139,10 @@ export async function purchaseTopUpCredits(
       // Duplicate transaction — credit already granted
       return null;
     }
-    return mapTopUpCreditRow(rows[0]!);
+    const insertedRow = rows[0];
+    if (!insertedRow)
+      throw new Error('Top-up credit insert did not return a row');
+    return mapTopUpCreditRow(insertedRow);
   }
 
   // No transactionId — plain insert (internal/test usage)
@@ -155,7 +158,8 @@ export async function purchaseTopUpCredits(
     })
     .returning();
 
-  return mapTopUpCreditRow(row!);
+  if (!row) throw new Error('Top-up credit insert did not return a row');
+  return mapTopUpCreditRow(row);
 }
 
 /**

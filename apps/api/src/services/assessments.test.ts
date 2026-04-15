@@ -14,11 +14,7 @@ import {
   getAssessment,
   updateAssessment,
 } from './assessments';
-import type {
-  VerificationDepth,
-  QuickCheckContext,
-  AssessmentContext,
-} from '@eduagent/schemas';
+import type { QuickCheckContext, AssessmentContext } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 
 // ---------------------------------------------------------------------------

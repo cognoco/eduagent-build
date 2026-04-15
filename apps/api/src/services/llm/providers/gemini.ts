@@ -91,10 +91,9 @@ function toGeminiRequest(
   // injected mid-conversation) are converted to user-role messages with a
   // wrapper so they retain their positional context in the conversation.
   let firstSystemBlockEnd = 0;
-  while (
-    firstSystemBlockEnd < messages.length &&
-    messages[firstSystemBlockEnd]!.role === 'system'
-  ) {
+  while (firstSystemBlockEnd < messages.length) {
+    const msg = messages[firstSystemBlockEnd];
+    if (!msg || msg.role !== 'system') break;
     firstSystemBlockEnd++;
   }
 

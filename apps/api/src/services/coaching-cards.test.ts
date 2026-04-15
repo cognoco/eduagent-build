@@ -10,11 +10,7 @@ const mockDatabaseModule = createDatabaseModuleMock({
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
-import {
-  createScopedRepository,
-  generateUUIDv7,
-  type Database,
-} from '@eduagent/database';
+import { createScopedRepository, type Database } from '@eduagent/database';
 import {
   precomputeCoachingCard,
   writeCoachingCardCache,

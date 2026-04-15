@@ -68,6 +68,8 @@ export async function createSubscription(
     })
     .returning();
 
+  if (!subRow) throw new Error('Subscription insert did not return a row');
+
   // Create the quota pool linked to this subscription
   const now = new Date();
   const cycleResetAt = new Date(now);
@@ -75,7 +77,7 @@ export async function createSubscription(
 
   const tierConfig = getTierConfig(tier);
   await db.insert(quotaPools).values({
-    subscriptionId: subRow!.id,
+    subscriptionId: subRow.id,
     monthlyLimit,
     usedThisMonth: 0,
     dailyLimit: tierConfig.dailyLimit,
@@ -83,7 +85,7 @@ export async function createSubscription(
     cycleResetAt,
   });
 
-  return mapSubscriptionRow(subRow!);
+  return mapSubscriptionRow(subRow);
 }
 
 // ---------------------------------------------------------------------------
@@ -169,7 +171,9 @@ export async function updateSubscriptionFromWebhook(
     .where(eq(subscriptions.id, existing.id))
     .returning();
 
-  return mapSubscriptionRow(updated!);
+  if (!updated)
+    throw new Error('Subscription webhook update did not return a row');
+  return mapSubscriptionRow(updated);
 }
 
 // ---------------------------------------------------------------------------
@@ -201,7 +205,9 @@ export async function linkStripeCustomer(
     .where(eq(subscriptions.id, existing.id))
     .returning();
 
-  return mapSubscriptionRow(updated!);
+  if (!updated)
+    throw new Error('Stripe customer link update did not return a row');
+  return mapSubscriptionRow(updated);
 }
 
 // ---------------------------------------------------------------------------
@@ -258,7 +264,8 @@ export async function resetMonthlyQuota(
     .where(eq(quotaPools.id, existing.id))
     .returning();
 
-  return mapQuotaPoolRow(updated!);
+  if (!updated) throw new Error('Quota pool update did not return a row');
+  return mapQuotaPoolRow(updated);
 }
 
 // ---------------------------------------------------------------------------
@@ -386,5 +393,7 @@ export async function activateSubscriptionFromCheckout(
     tierConfig.dailyLimit
   );
 
-  return mapSubscriptionRow(updated!);
+  if (!updated)
+    throw new Error('Subscription activation update did not return a row');
+  return mapSubscriptionRow(updated);
 }

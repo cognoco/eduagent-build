@@ -76,7 +76,6 @@ import { createScopedRepository, profiles } from '@eduagent/database';
 import {
   startSession,
   SubjectInactiveError,
-  SessionExchangeLimitError,
   getSession,
   processMessage,
   streamMessage,

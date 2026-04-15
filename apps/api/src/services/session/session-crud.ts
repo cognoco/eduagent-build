@@ -176,16 +176,18 @@ export async function startSession(
     })
     .returning();
 
+  if (!row) throw new Error('Insert learning session did not return a row');
+
   // Record session_start event for the audit log
   await db.insert(sessionEvents).values({
-    sessionId: row!.id,
+    sessionId: row.id,
     profileId,
     subjectId,
     eventType: 'session_start' as const,
     content: '',
   });
 
-  return mapSessionRow(row!);
+  return mapSessionRow(row);
 }
 
 export async function getSession(

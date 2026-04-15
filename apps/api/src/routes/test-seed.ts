@@ -97,7 +97,7 @@ testSeedRoutes.use('/__test/*', async (c, next) => {
     const hashB = new Uint8Array(digestB);
     let diff = 0;
     for (let i = 0; i < hashA.length; i++) {
-      diff |= hashA[i]! ^ hashB[i]!;
+      diff |= (hashA[i] ?? 0) ^ (hashB[i] ?? 0);
     }
     if (diff !== 0) {
       return c.json(

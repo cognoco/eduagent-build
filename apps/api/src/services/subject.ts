@@ -91,7 +91,8 @@ export async function createSubject(
       languageCode: detectedLanguage?.code ?? input.languageCode ?? null,
     })
     .returning();
-  return mapSubjectRow(row!);
+  if (!row) throw new Error('Insert subject did not return a row');
+  return mapSubjectRow(row);
 }
 
 export interface CreatedSubjectWithStructure {
@@ -118,7 +119,7 @@ async function findExistingSubjectByName(
       eq(subjects.status, 'active')
     )
   );
-  return rows.length > 0 ? mapSubjectRow(rows[0]!) : null;
+  return rows.length > 0 && rows[0] ? mapSubjectRow(rows[0]) : null;
 }
 
 export async function createSubjectWithStructure(
@@ -190,10 +191,12 @@ export async function createSubjectWithStructure(
       })
       .returning();
 
+    if (!bookRow)
+      throw new Error('Insert curriculum book did not return a row');
     return {
       subject: targetSubject,
       structureType: 'focused_book',
-      bookId: bookRow!.id,
+      bookId: bookRow.id,
       bookTitle: effectiveFocus,
       bookCount: 1,
     };

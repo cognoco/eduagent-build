@@ -174,11 +174,7 @@ describe('metering middleware', () => {
     });
 
     it('does not apply to GET /v1/subjects', async () => {
-      const res = await app.request(
-        '/v1/subjects',
-        { headers: AUTH_HEADERS },
-        TEST_ENV
-      );
+      await app.request('/v1/subjects', { headers: AUTH_HEADERS }, TEST_ENV);
 
       expect(mockDecrementQuota).not.toHaveBeenCalled();
     });

@@ -108,10 +108,10 @@ function formatMemoryContext(contents: string[]): string {
 
   for (let i = 0; i < contents.length; i++) {
     // Truncate each content block to avoid overwhelming the prompt
+    const content = contents[i];
+    if (!content) throw new Error(`contents[${i}] is unexpectedly undefined`);
     const truncated =
-      contents[i]!.length > 500
-        ? contents[i]!.slice(0, 500) + '...'
-        : contents[i]!;
+      content.length > 500 ? content.slice(0, 500) + '...' : content;
     lines.push(`[${i + 1}] ${truncated}`);
   }
 

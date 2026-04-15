@@ -248,7 +248,9 @@ export function mergeStrengths(
     );
 
     if (subjectIndex >= 0) {
-      const existingEntry = result[subjectIndex]!;
+      const existingEntry = result[subjectIndex];
+      if (!existingEntry)
+        throw new Error(`result[${subjectIndex}] is unexpectedly undefined`);
       const hasTopic = existingEntry.topics.some((topic) =>
         sameNormalized(topic, signal.topic)
       );
@@ -317,7 +319,9 @@ export function mergeStruggles(
     );
 
     if (existingIndex >= 0) {
-      const existingEntry = result[existingIndex]!;
+      const existingEntry = result[existingIndex];
+      if (!existingEntry)
+        throw new Error(`result[${existingIndex}] is unexpectedly undefined`);
       const attempts = existingEntry.attempts + 1;
       result[existingIndex] = {
         ...existingEntry,
@@ -381,7 +385,8 @@ export function resolveStruggle(
   );
   if (index < 0) return result;
 
-  const existing = result[index]!;
+  const existing = result[index];
+  if (!existing) throw new Error(`result[${index}] is unexpectedly undefined`);
   const nextAttempts = existing.attempts - 1;
   if (nextAttempts <= 0) {
     result.splice(index, 1);

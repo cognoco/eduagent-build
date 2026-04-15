@@ -156,7 +156,9 @@ export async function submitSummary(
       })
       .returning();
 
-    finalRow = inserted!;
+    if (!inserted)
+      throw new Error('Insert session summary did not return a row');
+    finalRow = inserted;
   }
 
   await resetSummarySkips(db, profileId);

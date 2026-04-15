@@ -63,8 +63,9 @@ export function computeActiveSeconds(
 
   // Gaps between consecutive events
   for (let i = 0; i < sorted.length - 1; i++) {
-    const curr = sorted[i]!;
-    const next = sorted[i + 1]!;
+    const curr = sorted[i];
+    const next = sorted[i + 1];
+    if (!curr || !next) continue;
     const gap = Math.max(
       0,
       (next.createdAt.getTime() - curr.createdAt.getTime()) / 1000
@@ -197,7 +198,10 @@ export async function buildBookLearningHistoryContext(
         .slice(0, 5);
       if (coveredTopics.length > 0) {
         const topicNames = coveredTopics.map((t) => {
-          const recency = formatLearningRecency(latestByTopic.get(t.id)!);
+          const latest = latestByTopic.get(t.id);
+          if (!latest)
+            throw new Error(`Expected latestByTopic entry for topic ${t.id}`);
+          const recency = formatLearningRecency(latest);
           return `${t.title} (${recency})`;
         });
         sections.push(`- ${chapterName}: ${topicNames.join(', ')}`);

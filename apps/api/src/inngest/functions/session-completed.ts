@@ -164,9 +164,15 @@ export const sessionCompleted = inngest.createFunction(
       if (responseSeconds.length === 0) return null;
       const sorted = [...responseSeconds].sort((a, b) => a - b);
       const middle = Math.floor(sorted.length / 2);
-      return sorted.length % 2 === 0
-        ? Math.round((sorted[middle - 1]! + sorted[middle]!) / 2)
-        : sorted[middle]!;
+      if (sorted.length % 2 === 0) {
+        const lo = sorted[middle - 1];
+        const hi = sorted[middle];
+        if (lo === undefined || hi === undefined) return null;
+        return Math.round((lo + hi) / 2);
+      }
+      const mid = sorted[middle];
+      if (mid === undefined) return null;
+      return mid;
     };
 
     // FR92: Determine which topics need retention updates

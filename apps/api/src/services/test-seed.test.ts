@@ -123,7 +123,6 @@ describe('seedScenario', () => {
     );
 
     // The first insert call should be for the accounts table
-    const insertValues = (db.insert as jest.Mock).mock.calls[0];
     // Verify the account insert includes the seed prefix by checking the result
     // (clerkUserId is set internally, but we can verify via the returned accountId)
     expect(result.accountId).toBeDefined();

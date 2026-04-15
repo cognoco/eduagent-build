@@ -77,7 +77,7 @@ function clampConfidence(value: unknown): number {
 /** Strip markdown code fences that LLMs commonly wrap around JSON. */
 function stripCodeFences(raw: string): string {
   const fenced = raw.trim().match(/^```(?:\w*)\s*\n?([\s\S]*?)\n?\s*```$/);
-  return fenced ? fenced[1]!.trim() : raw.trim();
+  return fenced ? (fenced[1] ?? '').trim() : raw.trim();
 }
 
 function parseOcrResponse(raw: string): OcrResult {

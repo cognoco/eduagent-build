@@ -163,7 +163,10 @@ export function getNextVerificationDepth(
   if (currentIndex === -1 || currentIndex >= DEPTH_ORDER.length - 1) {
     return null;
   }
-  return DEPTH_ORDER[currentIndex + 1]!;
+  const next = DEPTH_ORDER[currentIndex + 1];
+  if (!next)
+    throw new Error('DEPTH_ORDER index out of range: expected next depth');
+  return next;
 }
 
 /**
@@ -325,7 +328,8 @@ export async function createAssessment(
       exchangeHistory: [],
     })
     .returning();
-  return mapAssessmentRow(row!);
+  if (!row) throw new Error('Assessment insert did not return a row');
+  return mapAssessmentRow(row);
 }
 
 export async function getAssessment(

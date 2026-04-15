@@ -71,7 +71,7 @@ async function constantTimeCompare(
   // Fixed-length XOR comparison — always 32 bytes, constant time
   let diff = 0;
   for (let i = 0; i < hashA.length; i++) {
-    diff |= hashA[i]! ^ hashB[i]!;
+    diff |= (hashA[i] ?? 0) ^ (hashB[i] ?? 0);
   }
   return diff === 0;
 }
@@ -159,7 +159,7 @@ function extractTierFromProductId(
 
   // Direct lookup
   if (productId in PRODUCT_TIER_MAP) {
-    return PRODUCT_TIER_MAP[productId]!;
+    return PRODUCT_TIER_MAP[productId] ?? null;
   }
 
   // Fallback: parse com.eduagent.<tier>.<interval>

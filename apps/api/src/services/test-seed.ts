@@ -212,7 +212,7 @@ async function findClerkUserByEmail(
   }
 
   const users = (await res.json()) as ClerkUser[];
-  return users.length > 0 ? users[0]! : null;
+  return users.length > 0 && users[0] ? users[0] : null;
 }
 
 /**
@@ -496,13 +496,16 @@ async function seedOnboardingComplete(
   }));
   await db.insert(retentionCards).values(retentionCardValues);
 
+  const firstTopicId = topicIds[0];
+  if (!firstTopicId)
+    throw new Error('createSubjectWithCurriculum returned no topics');
   return {
     scenario: 'onboarding-complete',
     accountId,
     profileId,
     email,
     password,
-    ids: { subjectId, topicId: topicIds[0]! },
+    ids: { subjectId, topicId: firstTopicId },
   };
 }
 
@@ -559,13 +562,16 @@ async function seedLearningActive(
     lastActivityDate: new Date().toISOString().split('T')[0],
   });
 
+  const firstTopicId = topicIds[0];
+  if (!firstTopicId)
+    throw new Error('createSubjectWithCurriculum returned no topics');
   return {
     scenario: 'learning-active',
     accountId,
     profileId,
     email,
     password,
-    ids: { subjectId, sessionId, topicId: topicIds[0]! },
+    ids: { subjectId, sessionId, topicId: firstTopicId },
   };
 }
 
@@ -601,13 +607,15 @@ async function seedRetentionDue(
 
   await db.insert(retentionCards).values(cardValues);
 
+  const firstCard = cardValues[0];
+  if (!firstCard) throw new Error('No retention cards created');
   return {
     scenario: 'retention-due',
     accountId,
     profileId,
     email,
     password,
-    ids: { subjectId, retentionCardId: cardValues[0]!.id },
+    ids: { subjectId, retentionCardId: firstCard.id },
   };
 }
 
@@ -629,7 +637,9 @@ async function seedFailedRecall3x(
     'Chemistry'
   );
 
-  const targetTopicId = topicIds[0]!;
+  const targetTopicId = topicIds[0];
+  if (!targetTopicId)
+    throw new Error('createSubjectWithCurriculum returned no topics');
 
   // Create retention card with low ease factor (struggling)
   await db.insert(retentionCards).values({
@@ -924,13 +934,16 @@ async function seedTrialActive(
     'Science'
   );
 
+  const firstTopicId = topicIds[0];
+  if (!firstTopicId)
+    throw new Error('createSubjectWithCurriculum returned no topics');
   return {
     scenario: 'trial-active',
     accountId,
     profileId,
     email,
     password,
-    ids: { subscriptionId, subjectId, topicId: topicIds[0]! },
+    ids: { subscriptionId, subjectId, topicId: firstTopicId },
   };
 }
 
@@ -975,13 +988,16 @@ async function seedTrialExpired(
     'History'
   );
 
+  const firstTopicId = topicIds[0];
+  if (!firstTopicId)
+    throw new Error('createSubjectWithCurriculum returned no topics');
   return {
     scenario: 'trial-expired',
     accountId,
     profileId,
     email,
     password,
-    ids: { subscriptionId, subjectId, topicId: topicIds[0]! },
+    ids: { subscriptionId, subjectId, topicId: firstTopicId },
   };
 }
 
@@ -1100,13 +1116,16 @@ async function seedHomeworkReady(
     endedAt: pastDate(1),
   });
 
+  const firstTopicId = topicIds[0];
+  if (!firstTopicId)
+    throw new Error('createSubjectWithCurriculum returned no topics');
   return {
     scenario: 'homework-ready',
     accountId,
     profileId,
     email,
     password,
-    ids: { subjectId, sessionId, topicId: topicIds[0]! },
+    ids: { subjectId, sessionId, topicId: firstTopicId },
   };
 }
 
@@ -1439,13 +1458,16 @@ async function seedDailyLimitReached(
     }))
   );
 
+  const firstTopicId = topicIds[0];
+  if (!firstTopicId)
+    throw new Error('createSubjectWithCurriculum returned no topics');
   return {
     scenario: 'daily-limit-reached',
     accountId,
     profileId,
     email,
     password,
-    ids: { subscriptionId, subjectId, sessionId, topicId: topicIds[0]! },
+    ids: { subscriptionId, subjectId, sessionId, topicId: firstTopicId },
   };
 }
 

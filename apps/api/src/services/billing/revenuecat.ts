@@ -143,7 +143,8 @@ export async function updateSubscriptionFromRevenuecatWebhook(
     .where(eq(subscriptions.id, existing.id))
     .returning();
 
-  return mapSubscriptionRow(updated!);
+  if (!updated) throw new Error('Subscription update did not return a row');
+  return mapSubscriptionRow(updated);
 }
 
 // ---------------------------------------------------------------------------
@@ -225,12 +226,14 @@ export async function activateSubscriptionFromRevenuecat(
       })
       .returning();
 
+    if (!subRow) throw new Error('Subscription insert did not return a row');
+
     const now = new Date();
     const cycleResetAt = new Date(now);
     cycleResetAt.setMonth(cycleResetAt.getMonth() + 1);
 
     await db.insert(quotaPools).values({
-      subscriptionId: subRow!.id,
+      subscriptionId: subRow.id,
       monthlyLimit: tierConfig.monthlyQuota,
       usedThisMonth: 0,
       dailyLimit: tierConfig.dailyLimit,
@@ -238,7 +241,7 @@ export async function activateSubscriptionFromRevenuecat(
       cycleResetAt,
     });
 
-    return mapSubscriptionRow(subRow!);
+    return mapSubscriptionRow(subRow);
   }
 
   // Update existing subscription
@@ -279,5 +282,7 @@ export async function activateSubscriptionFromRevenuecat(
     tierConfig.dailyLimit
   );
 
-  return mapSubscriptionRow(updated!);
+  if (!updated)
+    throw new Error('Subscription update (revenuecat) did not return a row');
+  return mapSubscriptionRow(updated);
 }

@@ -470,10 +470,18 @@ export async function getChildrenForParent(
 
   const prepared: PreparedChild[] = [];
   for (let i = 0; i < validLinks.length; i++) {
-    const childProfileId = validLinks[i]!.childProfileId;
-    const profile = profilesById.get(childProfileId)!;
-    const progress = progressResults[i]!;
-    const guidedMetrics = guidedMetricsResults[i]!;
+    const link = validLinks[i];
+    if (!link) throw new Error(`validLinks[${i}] is unexpectedly undefined`);
+    const childProfileId = link.childProfileId;
+    const profile = profilesById.get(childProfileId);
+    if (!profile)
+      throw new Error(`Profile not found for childProfileId=${childProfileId}`);
+    const progress = progressResults[i];
+    if (!progress)
+      throw new Error(`progressResults[${i}] is unexpectedly undefined`);
+    const guidedMetrics = guidedMetricsResults[i];
+    if (!guidedMetrics)
+      throw new Error(`guidedMetricsResults[${i}] is unexpectedly undefined`);
     const recentSessions = sessionsByProfile.get(childProfileId) ?? [];
 
     const sessionsThisWeek = recentSessions.filter(
@@ -564,7 +572,10 @@ export async function getChildrenForParent(
   );
 
   const children: DashboardChild[] = prepared.map((p, i) => {
-    const { progress, totalSessions } = progressSummaries[i]!;
+    const progressSummary = progressSummaries[i];
+    if (!progressSummary)
+      throw new Error(`progressSummaries[${i}] is unexpectedly undefined`);
+    const { progress, totalSessions } = progressSummary;
     const summary = generateChildSummary(p.dashboardInput);
     const trend = calculateTrend(p.sessionsThisWeek, p.sessionsLastWeek);
     const retentionTrend = calculateRetentionTrend(

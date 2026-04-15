@@ -1,16 +1,7 @@
 import { Hono } from 'hono';
 import { accountMiddleware } from './account';
-import type { Account } from '../services/account';
 
 // Mock the account service
-const mockAccount: Account = {
-  id: 'test-account-id',
-  clerkUserId: 'user_test',
-  email: 'test@example.com',
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
-};
-
 jest.mock('../services/account', () => ({
   findOrCreateAccount: jest.fn().mockResolvedValue({
     id: 'test-account-id',

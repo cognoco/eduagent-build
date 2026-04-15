@@ -46,9 +46,15 @@ function median(values: number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
   const middle = Math.floor(sorted.length / 2);
   if (sorted.length % 2 === 0) {
-    return (sorted[middle - 1]! + sorted[middle]!) / 2;
+    const lo = sorted[middle - 1];
+    const hi = sorted[middle];
+    if (lo == null || hi == null)
+      throw new Error('Unexpected missing median values');
+    return (lo + hi) / 2;
   }
-  return sorted[middle]!;
+  const mid = sorted[middle];
+  if (mid == null) throw new Error('Unexpected missing median value');
+  return mid;
 }
 
 export function normalizeExpectedResponseMinutes(

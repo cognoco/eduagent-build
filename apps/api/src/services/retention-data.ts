@@ -373,10 +373,12 @@ export async function processRecallTest(
   const lastTestAt = effectiveCard.lastReviewedAt?.toISOString() ?? null;
   const attemptMode = input.attemptMode ?? 'standard';
   if (!canRetestTopic(state, lastTestAt)) {
-    // non-null: canRetestTopic returns true when lastTestAt is null,
-    // so we only reach this branch when lastTestAt is set.
+    // canRetestTopic returns true when lastTestAt is null, so we only reach
+    // this branch when lastTestAt is non-null.
+    if (!lastTestAt)
+      throw new Error('Expected lastTestAt to be set when cooldown is active');
     const cooldownEndsAt = new Date(
-      new Date(lastTestAt!).getTime() + RETEST_COOLDOWN_MS
+      new Date(lastTestAt).getTime() + RETEST_COOLDOWN_MS
     ).toISOString();
     return {
       passed: false,

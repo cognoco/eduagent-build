@@ -75,7 +75,7 @@ describe('envValidationMiddleware', () => {
     });
     const errorSpy = jest.spyOn(console, 'error').mockImplementation();
 
-    const result = await envValidationMiddleware(c, next);
+    await envValidationMiddleware(c, next);
 
     expect(next).not.toHaveBeenCalled();
     expect(c.json).toHaveBeenCalledWith(

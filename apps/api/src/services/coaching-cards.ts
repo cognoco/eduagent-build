@@ -91,7 +91,9 @@ export async function precomputeCoachingCard(
     const mostOverdue = overdueCards.sort(
       (a, b) =>
         (a.nextReviewAt?.getTime() ?? 0) - (b.nextReviewAt?.getTime() ?? 0)
-    )[0]!;
+    )[0];
+    if (!mostOverdue)
+      throw new Error('Expected most-overdue card after non-empty sort');
 
     // Priority scales: 7 base + 1 per overdue card, capped at 10
     const priority = Math.min(7 + overdueCards.length - 1, 10);
@@ -126,7 +128,7 @@ export async function precomputeCoachingCard(
       expiresAt,
       createdAt,
       topicId: mostOverdue.topicId,
-      dueAt: mostOverdue.nextReviewAt!.toISOString(),
+      dueAt: (mostOverdue.nextReviewAt ?? new Date()).toISOString(),
       easeFactor: Number(mostOverdue.easeFactor),
     };
   }
@@ -210,7 +212,9 @@ export async function precomputeCoachingCard(
   // --- Priority 4: insight (verified topics) ---
   const verifiedCards = allCards.filter((c) => c.xpStatus === 'verified');
   if (verifiedCards.length > 0) {
-    const firstVerified = verifiedCards[0]!;
+    const firstVerified = verifiedCards[0];
+    if (!firstVerified)
+      throw new Error('Expected verified card after non-empty filter');
     return {
       id,
       profileId,
@@ -229,7 +233,7 @@ export async function precomputeCoachingCard(
   // [BUG-55] When no retention cards exist, find a topic from the curriculum
   // instead of using profileId as topicId (which is semantically wrong).
   const fallbackTopicId: string | null =
-    allCards.length > 0 ? allCards[0]!.topicId : null;
+    allCards.length > 0 ? allCards[0]?.topicId ?? null : null;
   // No retention cards = new learner, return curriculum_complete start prompt
   if (!fallbackTopicId) {
     return {

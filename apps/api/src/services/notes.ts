@@ -159,7 +159,9 @@ export async function upsertNote(
     });
 
   // Insert + onConflictDoUpdate always returns exactly one row
-  return rows[0]!;
+  const row = rows[0];
+  if (!row) throw new Error('Upsert topic notes did not return a row');
+  return row;
 }
 
 /**
