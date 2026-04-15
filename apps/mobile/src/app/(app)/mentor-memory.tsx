@@ -10,7 +10,7 @@ import {
 import { useCallback, useMemo, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useProfile } from '../../lib/profile';
+import { personaFromBirthYear, useProfile } from '../../lib/profile';
 import {
   CollapsibleMemorySection,
   MemoryRow,
@@ -45,6 +45,42 @@ export default function MentorMemoryScreen() {
     () => getLearningStyleRows(profile?.learningStyle ?? null),
     [profile?.learningStyle]
   );
+
+  const accommodationMode = profile?.accommodationMode ?? 'none';
+
+  const accommodationBadgeText = useMemo(() => {
+    if (accommodationMode === 'none') return null;
+    const persona = personaFromBirthYear(activeProfile?.birthYear);
+    const modeLabels: Record<
+      string,
+      { young: string; mid: string; older: string }
+    > = {
+      'short-burst': {
+        young: 'Your mentor uses a special way to teach you!',
+        mid: 'Learning style: Short-Burst — shorter explanations with lots of check-ins',
+        older:
+          'Accommodation mode: Short-Burst — concise explanations, frequent checkpoints',
+      },
+      'audio-first': {
+        young: 'Your mentor uses a special way to teach you!',
+        mid: 'Learning style: Audio-First — simple, spoken-style explanations',
+        older:
+          'Accommodation mode: Audio-First — spoken-style language, phonetic support',
+      },
+      predictable: {
+        young: 'Your mentor uses a special way to teach you!',
+        mid: 'Learning style: Predictable — clear structure and step-by-step sessions',
+        older:
+          'Accommodation mode: Predictable — structured sessions, explicit transitions',
+      },
+    };
+    const labels = modeLabels[accommodationMode];
+    if (!labels) return null;
+    // personaFromBirthYear returns: 'teen' (under 13), 'learner' (13-17), 'parent' (18+)
+    if (persona === 'teen') return labels.young;
+    if (persona === 'learner') return labels.mid;
+    return labels.older;
+  }, [accommodationMode, activeProfile?.birthYear]);
 
   const handleDeleteAll = useCallback(() => {
     Alert.alert(
@@ -186,6 +222,21 @@ export default function MentorMemoryScreen() {
             />
           </View>
         </View>
+
+        {accommodationBadgeText ? (
+          <View
+            className="bg-primary/10 rounded-card px-4 py-3 mt-3"
+            accessibilityRole="text"
+            testID="accommodation-badge"
+          >
+            <Text className="text-body-sm font-medium text-primary">
+              {accommodationBadgeText}
+            </Text>
+            <Text className="text-caption text-text-secondary mt-1">
+              Set by your parent in their settings.
+            </Text>
+          </View>
+        ) : null}
 
         <MemorySection title="Tell Your Mentor">
           <TellMentorInput
