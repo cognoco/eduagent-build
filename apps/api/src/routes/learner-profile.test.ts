@@ -93,6 +93,7 @@ const mockToggleMemoryInjection = jest.fn();
 const mockGrantMemoryConsent = jest.fn();
 const mockUnsuppressInference = jest.fn();
 const mockBuildHumanReadableMemoryExport = jest.fn();
+const mockUpdateAccommodationMode = jest.fn();
 
 jest.mock('../services/learner-profile', () => ({
   getOrCreateLearningProfile: (...args: unknown[]) =>
@@ -108,6 +109,8 @@ jest.mock('../services/learner-profile', () => ({
   unsuppressInference: (...args: unknown[]) => mockUnsuppressInference(...args),
   buildHumanReadableMemoryExport: (...args: unknown[]) =>
     mockBuildHumanReadableMemoryExport(...args),
+  updateAccommodationMode: (...args: unknown[]) =>
+    mockUpdateAccommodationMode(...args),
 }));
 
 jest.mock('../services/learner-input', () => ({
@@ -168,6 +171,7 @@ describe('learner-profile routes', () => {
     mockGrantMemoryConsent.mockResolvedValue(undefined);
     mockUnsuppressInference.mockResolvedValue(undefined);
     mockBuildHumanReadableMemoryExport.mockReturnValue('Memory export text');
+    mockUpdateAccommodationMode.mockResolvedValue(undefined);
   });
 
   // -------------------------------------------------------------------------
@@ -385,6 +389,91 @@ describe('learner-profile routes', () => {
 
       expect(res.status).toBe(401);
       expect(mockGetOrCreateLearningProfile).not.toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // accommodation-mode self route
+  // -------------------------------------------------------------------------
+
+  describe('PATCH /learner-profile/accommodation-mode (self)', () => {
+    it('returns 200 and calls updateAccommodationMode with valid mode', async () => {
+      const res = await app.request(
+        '/v1/learner-profile/accommodation-mode',
+        {
+          method: 'PATCH',
+          headers: PARENT_HEADERS,
+          body: JSON.stringify({ accommodationMode: 'short-burst' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      expect(mockUpdateAccommodationMode).toHaveBeenCalledWith(
+        undefined,
+        PARENT_PROFILE_ID,
+        'short-burst'
+      );
+      expect(mockHasParentAccess).not.toHaveBeenCalled();
+    });
+
+    it('returns 400 when accommodationMode is not a valid enum value', async () => {
+      const res = await app.request(
+        '/v1/learner-profile/accommodation-mode',
+        {
+          method: 'PATCH',
+          headers: PARENT_HEADERS,
+          body: JSON.stringify({ accommodationMode: 'invalid-mode' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(400);
+      expect(mockUpdateAccommodationMode).not.toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // accommodation-mode parent route
+  // -------------------------------------------------------------------------
+
+  describe('PATCH /learner-profile/:profileId/accommodation-mode (parent)', () => {
+    it('returns 200 and calls updateAccommodationMode for linked child', async () => {
+      mockHasParentAccess.mockResolvedValue(true);
+
+      const res = await app.request(
+        `/v1/learner-profile/${OWN_CHILD_PROFILE_ID}/accommodation-mode`,
+        {
+          method: 'PATCH',
+          headers: PARENT_HEADERS,
+          body: JSON.stringify({ accommodationMode: 'audio-first' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      expect(mockUpdateAccommodationMode).toHaveBeenCalledWith(
+        undefined,
+        OWN_CHILD_PROFILE_ID,
+        'audio-first'
+      );
+    });
+
+    it('returns 403 for non-linked child', async () => {
+      mockHasParentAccess.mockResolvedValue(false);
+
+      const res = await app.request(
+        `/v1/learner-profile/${OTHER_FAMILY_CHILD_ID}/accommodation-mode`,
+        {
+          method: 'PATCH',
+          headers: PARENT_HEADERS,
+          body: JSON.stringify({ accommodationMode: 'predictable' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(403);
+      expect(mockUpdateAccommodationMode).not.toHaveBeenCalled();
     });
   });
 });

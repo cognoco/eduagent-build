@@ -9,6 +9,7 @@ import {
   toggleMemoryEnabledSchema,
   toggleMemoryInjectionSchema,
   unsuppressInferenceSchema,
+  updateAccommodationModeSchema,
 } from '@eduagent/schemas';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
@@ -22,6 +23,7 @@ import {
   toggleMemoryEnabled,
   toggleMemoryInjection,
   unsuppressInference,
+  updateAccommodationMode,
 } from '../services/learner-profile';
 import { parseLearnerInput } from '../services/learner-input';
 import { assertParentAccess } from '../services/family-access';
@@ -257,6 +259,30 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       await assertParentAccess(db, parentProfileId, childProfileId);
       const { value } = c.req.valid('json');
       await unsuppressInference(db, childProfileId, value);
+      return c.json({ success: true });
+    }
+  )
+  .patch(
+    '/learner-profile/accommodation-mode',
+    zValidator('json', updateAccommodationModeSchema),
+    async (c) => {
+      const db = c.get('db');
+      const profileId = requireProfileId(c.get('profileId'));
+      const { accommodationMode } = c.req.valid('json');
+      await updateAccommodationMode(db, profileId, accommodationMode);
+      return c.json({ success: true });
+    }
+  )
+  .patch(
+    '/learner-profile/:profileId/accommodation-mode',
+    zValidator('json', updateAccommodationModeSchema),
+    async (c) => {
+      const db = c.get('db');
+      const parentProfileId = requireProfileId(c.get('profileId'));
+      const childProfileId = c.req.param('profileId');
+      await assertParentAccess(db, parentProfileId, childProfileId);
+      const { accommodationMode } = c.req.valid('json');
+      await updateAccommodationMode(db, childProfileId, accommodationMode);
       return c.json({ success: true });
     }
   );
