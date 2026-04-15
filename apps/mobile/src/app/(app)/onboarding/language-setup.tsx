@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import {
   View,
   Text,
+  TextInput,
   Pressable,
   ScrollView,
   ActivityIndicator,
@@ -28,7 +29,7 @@ const NATIVE_LANGUAGE_OPTIONS = [
   { code: 'ro', label: 'Romanian' },
   { code: 'id', label: 'Indonesian' },
   { code: 'ms', label: 'Malay' },
-  { code: 'sw', label: 'Swahili' },
+  { code: 'other', label: 'Other' },
 ];
 
 const LEVEL_OPTIONS: Array<{
@@ -68,6 +69,7 @@ export default function LanguageSetup() {
   const configureLanguageSubject = useConfigureLanguageSubject();
   const colors = useThemeColors(); // [BUG-118]
   const [nativeLanguage, setNativeLanguage] = useState<string>('en');
+  const [customLanguage, setCustomLanguage] = useState('');
   const [startingLevel, setStartingLevel] = useState<CefrLevel>('A1');
   const [error, setError] = useState('');
 
@@ -76,13 +78,20 @@ export default function LanguageSetup() {
     [languageName]
   );
 
+  const effectiveNativeLanguage =
+    nativeLanguage === 'other' ? customLanguage.trim() : nativeLanguage;
+
   const handleContinue = async () => {
     if (!subjectId) return;
+    if (nativeLanguage === 'other' && customLanguage.trim().length < 2) {
+      setError('Please type your native language.');
+      return;
+    }
     setError('');
     try {
       await configureLanguageSubject.mutateAsync({
         subjectId,
-        nativeLanguage,
+        nativeLanguage: effectiveNativeLanguage,
         startingLevel,
       });
       router.replace({
@@ -151,22 +160,34 @@ export default function LanguageSetup() {
           {NATIVE_LANGUAGE_OPTIONS.map((option) => {
             const selected = nativeLanguage === option.code;
             return (
-              <Pressable
-                key={option.code}
-                onPress={() => setNativeLanguage(option.code)}
-                className={
-                  selected
-                    ? 'rounded-card border border-primary bg-primary/10 px-4 py-3'
-                    : 'rounded-card border border-border bg-surface px-4 py-3'
-                }
-                accessibilityRole="button"
-                accessibilityState={{ selected }}
-                testID={`native-language-${option.code}`}
-              >
-                <Text className="text-body font-semibold text-text-primary">
-                  {option.label}
-                </Text>
-              </Pressable>
+              <View key={option.code} className="gap-2">
+                <Pressable
+                  onPress={() => setNativeLanguage(option.code)}
+                  className={
+                    selected
+                      ? 'rounded-card border border-primary bg-primary/10 px-4 py-3'
+                      : 'rounded-card border border-border bg-surface px-4 py-3'
+                  }
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                  testID={`native-language-${option.code}`}
+                >
+                  <Text className="text-body font-semibold text-text-primary">
+                    {option.label}
+                  </Text>
+                </Pressable>
+                {option.code === 'other' && selected && (
+                  <TextInput
+                    value={customLanguage}
+                    onChangeText={setCustomLanguage}
+                    placeholder="Type your language"
+                    placeholderTextColor={colors.textSecondary}
+                    className="rounded-card border border-primary bg-surface px-4 py-3 text-body text-text-primary"
+                    autoFocus
+                    testID="native-language-other-input"
+                  />
+                )}
+              </View>
             );
           })}
         </View>

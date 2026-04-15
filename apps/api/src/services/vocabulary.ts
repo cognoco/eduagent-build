@@ -125,7 +125,8 @@ export async function createVocabulary(
     })
     .returning();
 
-  return mapVocabularyRow(row!);
+  if (!row) throw new Error('Upsert vocabulary did not return a row');
+  return mapVocabularyRow(row);
 }
 
 export async function updateVocabulary(
@@ -296,9 +297,11 @@ export async function reviewVocabulary(
     )
     .returning();
 
+  if (!updatedCard)
+    throw new Error('Update vocabulary retention card did not return a row');
   return {
     vocabulary: mapVocabularyRow(updatedVocab ?? vocabRow),
-    retention: mapVocabularyRetentionCard(updatedCard!),
+    retention: mapVocabularyRetentionCard(updatedCard),
   };
 }
 

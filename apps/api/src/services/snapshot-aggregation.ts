@@ -174,9 +174,14 @@ async function loadProgressState(
     }
   }
 
-  const curriculumIds = allCurricula.map((curriculum) => curriculum.id);
+  // Only fetch topics for the latest curriculum per subject — old versions
+  // are dead weight (challengeCurriculum now deletes them, but stale rows
+  // may still exist in databases that pre-date the cleanup fix).
+  const curriculumIds = [...latestCurriculumBySubject.values()];
   const curriculumSubjectMap = new Map(
-    allCurricula.map((curriculum) => [curriculum.id, curriculum.subjectId])
+    allCurricula
+      .filter((c) => curriculumIds.includes(c.id))
+      .map((curriculum) => [curriculum.id, curriculum.subjectId])
   );
 
   const topicRows =
@@ -187,10 +192,14 @@ async function loadProgressState(
           })
         )
           .filter((topic) => !topic.skipped)
-          .map((topic) => ({
-            ...topic,
-            subjectId: curriculumSubjectMap.get(topic.curriculumId)!,
-          }))
+          .map((topic) => {
+            const subjectId = curriculumSubjectMap.get(topic.curriculumId);
+            if (!subjectId)
+              throw new Error(
+                `No subject found for curriculumId ${topic.curriculumId}`
+              );
+            return { ...topic, subjectId };
+          })
       : [];
 
   const topicsById = new Map(topicRows.map((topic) => [topic.id, topic]));
@@ -435,7 +444,11 @@ async function buildSubjectInventory(
 ): Promise<SubjectInventory> {
   const subject = state.subjects.find(
     (item) => item.id === subjectMetric.subjectId
-  )!;
+  );
+  if (!subject)
+    throw new Error(
+      `Subject ${subjectMetric.subjectId} not found in progress state`
+    );
   const latestTopics = state.latestTopicsBySubject.get(subject.id) ?? [];
   const allTopics = state.allTopicsBySubject.get(subject.id) ?? [];
   const allTopicIds = new Set(allTopics.map((topic) => topic.id));

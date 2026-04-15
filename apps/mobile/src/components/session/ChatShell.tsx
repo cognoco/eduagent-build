@@ -2,6 +2,7 @@ import type { InputMode } from '@eduagent/schemas';
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   AccessibilityInfo,
+  Alert,
   View,
   Text,
   Pressable,
@@ -165,6 +166,8 @@ export function ChatShell({
   const {
     isListening,
     transcript,
+    status: speechStatus,
+    error: sttError,
     startListening,
     stopListening,
     clearTranscript,
@@ -291,6 +294,13 @@ export function ChatShell({
       setPendingTranscript(transcript);
     }
   }, [isListening, transcript]);
+
+  // Surface STT errors — previously swallowed silently
+  useEffect(() => {
+    if (sttError) {
+      Alert.alert('Voice input error', sttError);
+    }
+  }, [sttError]);
 
   // Voice transcript preview actions
   const handleVoiceSend = useCallback(() => {
@@ -477,6 +487,41 @@ export function ChatShell({
         />
       )}
 
+      {/* Live transcript while recording — gives immediate visual feedback */}
+      {isVoiceEnabled && isListening && (
+        <View
+          className="mx-4 mb-2 p-3 bg-surface-elevated rounded-xl"
+          testID="voice-listening-indicator"
+        >
+          <Text className="text-caption text-text-secondary mb-1">
+            Listening…
+          </Text>
+          {transcript.trim() ? (
+            <Text className="text-body text-text-primary">{transcript}</Text>
+          ) : (
+            <Text className="text-body text-text-tertiary">
+              Speak now — tap the mic again to stop
+            </Text>
+          )}
+        </View>
+      )}
+
+      {/* Processing indicator — shown while STT finalises the result */}
+      {isVoiceEnabled && speechStatus === 'processing' && (
+        <View className="mx-4 mb-1" testID="voice-processing-indicator">
+          <Text className="text-caption text-text-secondary">
+            Processing...
+          </Text>
+        </View>
+      )}
+
+      {/* Inline STT error — shown below the mic area instead of only via Alert */}
+      {isVoiceEnabled && speechStatus === 'error' && sttError && (
+        <View className="mx-4 mb-1" testID="voice-error-indicator">
+          <Text className="text-caption text-error">{sttError}</Text>
+        </View>
+      )}
+
       {/* Voice transcript preview (above input, when voice enabled) */}
       {isVoiceEnabled && pendingTranscript && !isListening && (
         <VoiceTranscriptPreview
@@ -588,7 +633,9 @@ export function ChatShell({
                 <VoiceRecordButton
                   isListening={isListening}
                   onPress={handleVoicePress}
-                  disabled={isStreaming}
+                  disabled={
+                    isStreaming || speechStatus === 'requesting_permission'
+                  }
                 />
               </View>
             )}

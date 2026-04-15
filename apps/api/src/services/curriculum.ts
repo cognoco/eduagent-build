@@ -212,7 +212,11 @@ export async function ensureCurriculum(
   // Re-read to get the row regardless of whether we inserted or another
   // concurrent caller won the race.
   const row = await getLatestCurriculumRow(db, subjectId);
-  return row!;
+  if (!row)
+    throw new Error(
+      `Curriculum row not found after upsert for subjectId=${subjectId}`
+    );
+  return row;
 }
 
 interface BookProgress {
@@ -500,7 +504,9 @@ export async function ensureDefaultBook(
       topicsGenerated: true,
     })
     .returning();
-  return book!.id;
+  if (!book)
+    throw new Error('Insert into curriculumBooks did not return a row');
+  return book.id;
 }
 
 /**
@@ -881,9 +887,11 @@ export async function addCurriculumTopic(
     .set({ updatedAt: new Date() })
     .where(eq(curricula.id, curriculum.id));
 
+  if (!createdTopic)
+    throw new Error('Insert into curriculumTopics did not return a row');
   return {
     mode: 'create',
-    topic: mapTopicRow(createdTopic!),
+    topic: mapTopicRow(createdTopic),
   };
 }
 
@@ -1109,12 +1117,14 @@ export async function challengeCurriculum(
     })
     .returning();
 
+  if (!newCurriculum)
+    throw new Error('Insert into curricula did not return a row');
   const bookId = await ensureDefaultBook(db, subjectId, subject.name);
 
   if (topics.length > 0) {
     await db.insert(curriculumTopics).values(
       topics.map((t, i) => ({
-        curriculumId: newCurriculum!.id,
+        curriculumId: newCurriculum.id,
         bookId,
         title: t.title,
         description: t.description,

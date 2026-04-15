@@ -3,7 +3,6 @@ import type { ReactNode } from 'react';
 import Animated, {
   useSharedValue,
   useAnimatedProps,
-  useAnimatedStyle,
   useReducedMotion,
   withRepeat,
   withTiming,
@@ -11,15 +10,16 @@ import Animated, {
   withDelay,
   Easing,
 } from 'react-native-reanimated';
-import { StyleSheet, View } from 'react-native';
-import Svg, { Path, Polygon } from 'react-native-svg';
+import { View } from 'react-native';
+import Svg, { G, Path, Polygon } from 'react-native-svg';
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
+const AnimatedG = Animated.createAnimatedComponent(G);
 
 interface PenWritingAnimationProps {
   /** Overall size in pixels (default: 120) */
   size?: number;
-  /** Stroke color — defaults to brand violet (#8b5cf6) */
+  /** Stroke color — defaults to brand teal (#0d9488) */
   color?: string;
   /** Line thickness (default: 2.5) */
   strokeWidth?: number;
@@ -55,7 +55,7 @@ const RESET_MS = 300;
  */
 export function PenWritingAnimation({
   size = 120,
-  color = '#8b5cf6',
+  color = '#0d9488',
   strokeWidth = 2.5,
   testID,
 }: PenWritingAnimationProps): ReactNode {
@@ -93,24 +93,14 @@ export function PenWritingAnimation({
   }));
 
   // Pen nib follows the progress linearly between start and end
-  const penStyle = useAnimatedStyle(() => {
-    const x = PEN_START_X + (PEN_END_X - PEN_START_X) * progress.value;
-    const y = PEN_START_Y + (PEN_END_Y - PEN_START_Y) * progress.value;
-    const scale = size / 120;
-    return {
-      transform: [
-        { translateX: x * scale },
-        { translateY: (y - 12) * scale },
-        { scale },
-      ],
-      opacity: reduceMotion ? 0 : 1,
-    };
-  });
+  const penAnimatedProps = useAnimatedProps(() => ({
+    x: PEN_START_X + (PEN_END_X - PEN_START_X) * progress.value,
+    y: PEN_START_Y + (PEN_END_Y - PEN_START_Y) * progress.value,
+  }));
 
   return (
     <View
       testID={testID}
-      style={styles.container}
       accessibilityLabel="Writing animation"
       accessibilityRole="image"
     >
@@ -134,26 +124,13 @@ export function PenWritingAnimation({
           strokeDasharray={PATH_LENGTH}
           animatedProps={pathAnimatedProps}
         />
-      </Svg>
-      {/* Pen nib — absolutely positioned, follows the stroke endpoint */}
-      {!reduceMotion && (
-        <Animated.View style={[styles.pen, penStyle]} pointerEvents="none">
-          <Svg width={8} height={12} viewBox="-4 -12 8 12">
+        {/* Pen nib — inside SVG so it renders on the same native layer */}
+        {!reduceMotion && (
+          <AnimatedG animatedProps={penAnimatedProps}>
             <Polygon points={PEN_TIP} fill={color} />
-          </Svg>
-        </Animated.View>
-      )}
+          </AnimatedG>
+        )}
+      </Svg>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    position: 'relative',
-  },
-  pen: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-  },
-});

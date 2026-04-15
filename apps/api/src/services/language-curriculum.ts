@@ -340,16 +340,15 @@ export async function regenerateLanguageCurriculum(
   languageCode: string,
   startingLevel: CefrLevel = 'A1'
 ): Promise<void> {
-  const latest = await db.query.curricula.findFirst({
-    where: eq(curricula.subjectId, subjectId),
-    orderBy: desc(curricula.version),
-  });
+  // Delete old curricula — topics, progress, etc. cascade-delete via FKs.
+  // This prevents unique-constraint violations when the same bookId is reused.
+  await db.delete(curricula).where(eq(curricula.subjectId, subjectId));
 
   const [curriculum] = await db
     .insert(curricula)
     .values({
       subjectId,
-      version: latest ? latest.version + 1 : 1,
+      version: 1,
     })
     .returning();
 
@@ -358,11 +357,13 @@ export async function regenerateLanguageCurriculum(
     return;
   }
 
+  if (!curriculum)
+    throw new Error('Insert into curricula did not return a row');
   const bookId = await ensureDefaultBook(db, subjectId, languageCode);
 
   await db.insert(curriculumTopics).values(
     topics.map((topic, index) => ({
-      curriculumId: curriculum!.id,
+      curriculumId: curriculum.id,
       bookId,
       title: topic.title,
       description: topic.description,

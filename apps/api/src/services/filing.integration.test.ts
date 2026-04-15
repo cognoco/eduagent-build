@@ -1,6 +1,6 @@
 // NOTE: Named "integration" for historical reasons but uses mock LLM responses.
 // True integration tests for resolveFilingResult require DB fixtures (see TODO below).
-import { buildLibraryIndex, fileToLibrary } from './filing';
+import { fileToLibrary } from './filing';
 import type { LibraryIndex } from '@eduagent/schemas';
 
 describe('filing integration', () => {
