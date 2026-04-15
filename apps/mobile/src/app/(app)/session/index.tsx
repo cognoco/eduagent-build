@@ -822,6 +822,7 @@ export default function SessionScreen() {
       messageFeedback={messageFeedback}
       quotaError={quotaError}
       isOwner={activeProfile?.isOwner === true}
+      stage="teaching"
       handleQuickChip={handleQuickChip}
       handleMessageFeedback={handleMessageFeedback}
       handleReconnect={handleReconnect}

@@ -7,6 +7,7 @@ import {
   QUICK_CHIP_CONFIG,
   type QuickChipId,
   type MessageFeedbackState,
+  type ConversationStage,
 } from './session-types';
 
 export interface SessionMessageActionsProps {
@@ -19,6 +20,7 @@ export interface SessionMessageActionsProps {
   messageFeedback: Record<string, MessageFeedbackState>;
   quotaError: QuotaExceededDetails | null;
   isOwner: boolean;
+  stage: ConversationStage;
   handleQuickChip: (
     chip: QuickChipId,
     sourceMessageId?: string
@@ -40,6 +42,7 @@ export function SessionMessageActions({
   messageFeedback,
   quotaError,
   isOwner,
+  stage,
   handleQuickChip,
   handleMessageFeedback,
   handleReconnect,
@@ -70,6 +73,12 @@ export function SessionMessageActions({
   }
 
   if (isStreaming) {
+    return null;
+  }
+
+  // Conversation-stage gating: only show action buttons during teaching.
+  // Message content (reconnect, quota) renders unconditionally above this point.
+  if (stage !== 'teaching') {
     return null;
   }
 
