@@ -779,6 +779,7 @@ export default function SessionScreen() {
     <SessionToolAccessory
       isStreaming={isStreaming}
       handleQuickChip={handleQuickChip}
+      stage="teaching"
     />
   );
 

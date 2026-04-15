@@ -39,7 +39,10 @@ export interface NotificationPayload {
     | 'recall_nudge'
     | 'weekly_progress'
     | 'monthly_report'
-    | 'progress_refresh';
+    | 'progress_refresh'
+    | 'struggle_noticed'
+    | 'struggle_flagged'
+    | 'struggle_resolved';
 }
 
 export interface NotificationResult {

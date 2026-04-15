@@ -5,6 +5,7 @@ import type { useCreateSubject } from '../../../hooks/use-subjects';
 import {
   type QuickChipId,
   type PendingSubjectResolution,
+  type ConversationStage,
 } from './session-types';
 
 // ─── SessionToolAccessory ────────────────────────────────────────────────────
@@ -12,12 +13,16 @@ import {
 export interface SessionToolAccessoryProps {
   isStreaming: boolean;
   handleQuickChip: (chip: QuickChipId) => Promise<void>;
+  stage: ConversationStage;
 }
 
 export function SessionToolAccessory({
   isStreaming,
   handleQuickChip,
+  stage,
 }: SessionToolAccessoryProps) {
+  if (stage !== 'teaching') return null;
+
   return (
     <View className="bg-surface px-4 py-1.5">
       <ScrollView

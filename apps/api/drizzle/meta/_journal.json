@@ -169,6 +169,13 @@
       "when": 1776259223777,
       "tag": "0023_shiny_skrulls",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1776267243951,
+      "tag": "0024_regular_crusher_hogan",
+      "breakpoints": true
     }
   ]
 }
