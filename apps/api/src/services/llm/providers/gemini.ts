@@ -14,6 +14,22 @@ import {
 const GEMINI_BASE_URL =
   'https://generativelanguage.googleapis.com/v1beta/models';
 
+// BUG-32: Per-chunk read timeout — detects mid-stream stalls within 10s
+// instead of waiting for the overall 20s fetch timeout or 30s XHR timeout.
+const CHUNK_TIMEOUT_MS = 10_000;
+
+function readWithTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () =>
+        reject(new Error('Gemini stream stalled: no data received for 10s')),
+      ms
+    );
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
 // ---------------------------------------------------------------------------
 // Safety settings — all users are minors (11-17)
 // ---------------------------------------------------------------------------
@@ -258,7 +274,13 @@ export function createGeminiProvider(apiKey: string): LLMProvider {
 
       try {
         while (true) {
-          const { done, value } = await reader.read();
+          // BUG-32: Per-chunk timeout — if Gemini stalls mid-stream (sends
+          // first bytes then goes silent), detect within 10s instead of
+          // waiting for the overall fetch AbortSignal or mobile XHR timeout.
+          const { done, value } = await readWithTimeout(
+            reader.read(),
+            CHUNK_TIMEOUT_MS
+          );
           if (done) break;
 
           buffer += decoder.decode(value, { stream: true });

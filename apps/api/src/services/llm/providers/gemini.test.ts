@@ -380,6 +380,44 @@ describe('Gemini Provider', () => {
       expect(body.safetySettings).toHaveLength(5);
     });
 
+    it('throws on mid-stream stall after per-chunk timeout [BUG-32]', async () => {
+      jest.useFakeTimers();
+      const encoder = new TextEncoder();
+      const firstChunk = `data: ${JSON.stringify({
+        candidates: [{ content: { parts: [{ text: 'first' }] } }],
+      })}\n\n`;
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(encoder.encode(firstChunk));
+        },
+      });
+      fetchSpy.mockResolvedValue(
+        new Response(stream, {
+          status: 200,
+          headers: { 'Content-Type': 'text/event-stream' },
+        })
+      );
+      const chunks: string[] = [];
+      const streamPromise = (async () => {
+        for await (const chunk of provider.chatStream(
+          [{ role: 'user', content: 'test' }],
+          DEFAULT_CONFIG
+        )) {
+          chunks.push(chunk);
+        }
+      })();
+      const caughtError = streamPromise.catch((err: unknown) => err);
+      await jest.advanceTimersByTimeAsync(100);
+      await jest.advanceTimersByTimeAsync(10_000);
+      const error = await caughtError;
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).toBe(
+        'Gemini stream stalled: no data received for 10s'
+      );
+      expect(chunks).toEqual(['first']);
+      jest.useRealTimers();
+    });
+
     it('throws on safety block during stream', async () => {
       const sse = `data: ${JSON.stringify({
         candidates: [{ finishReason: 'SAFETY', content: { parts: [] } }],
