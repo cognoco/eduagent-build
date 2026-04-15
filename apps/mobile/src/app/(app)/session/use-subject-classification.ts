@@ -346,9 +346,9 @@ export function useSubjectClassification(
               },
             ]);
           } else if (effectiveMode === 'freeform') {
-            // BUG-31: When multiple candidates exist, don't silently pick —
-            // ask the user which subject they meant. Single-candidate or
-            // zero-candidate cases still auto-pick for a frictionless start.
+            // BUG-31 / F-1: When multiple candidates exist, ask the user which subject
+            // they meant. Single candidate auto-picks. Zero candidates proceed without
+            // subject — continueWithMessage handles the no-subject case.
             if (result.candidates.length > 1) {
               const freeformCandidates = result.candidates.map((c) => ({
                 subjectId: c.subjectId,
@@ -456,21 +456,6 @@ export function useSubjectClassification(
           }
         } catch {
           if (effectiveMode === 'freeform') {
-            // BUG-31: When classification fails and there are multiple enrolled
-            // subjects, show a picker instead of silently picking the first one.
-            if (availableSubjects.length > 1) {
-              const fallbackCandidates = availableSubjects.map((s) => ({
-                subjectId: s.id,
-                subjectName: s.name,
-              }));
-              openSubjectResolution(
-                text,
-                "I couldn't figure out the subject. Which one fits?",
-                fallbackCandidates
-              );
-              return;
-            }
-            // Classification failed — show disambiguation instead of silent fallback
             const fallbackCandidates = availableSubjects.map((candidate) => ({
               subjectId: candidate.id,
               subjectName: candidate.name,
