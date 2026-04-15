@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   useRetentionTopics,
   useTopicRetention,
+  useEvaluateEligibility,
   useSubmitRecallTest,
 } from './use-retention';
 
@@ -149,6 +150,73 @@ describe('useTopicRetention', () => {
     });
 
     expect(result.current.data).toBeNull();
+  });
+});
+
+// FR128-129: Evaluate eligibility
+describe('useEvaluateEligibility', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    queryClient.clear();
+  });
+
+  it('fetches evaluate eligibility for a topic', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          eligible: true,
+          topicId: 'topic-1',
+          topicTitle: 'Algebra Basics',
+          currentRung: 2,
+          easeFactor: 2.7,
+          repetitions: 5,
+        }),
+        { status: 200 }
+      )
+    );
+
+    const { result } = renderHook(() => useEvaluateEligibility('topic-1'), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    expect(result.current.data?.eligible).toBe(true);
+    expect(result.current.data?.currentRung).toBe(2);
+  });
+
+  it('returns ineligible when retention is too weak', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          eligible: false,
+          topicId: 'topic-1',
+          topicTitle: 'New Topic',
+          currentRung: 1,
+          easeFactor: 2.0,
+          repetitions: 0,
+          reason: 'No successful reviews yet',
+        }),
+        { status: 200 }
+      )
+    );
+
+    const { result } = renderHook(() => useEvaluateEligibility('topic-1'), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    expect(result.current.data?.eligible).toBe(false);
+    expect(result.current.data?.reason).toBe('No successful reviews yet');
   });
 });
 

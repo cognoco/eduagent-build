@@ -431,10 +431,8 @@ export default function CreateSubjectScreen() {
 
         {/* Starter chips — shown while idle, hidden during resolve/suggestion to avoid confusion */}
         {resolveState.phase === 'idle' && !isBusy && (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: 8, paddingBottom: 16 }}
+          <View
+            className="flex-row flex-wrap gap-2 mb-4"
             testID="starter-chips"
             accessibilityLabel="Suggested subjects"
           >
@@ -442,7 +440,7 @@ export default function CreateSubjectScreen() {
               <Pressable
                 key={chip}
                 onPress={() => void onChipPress(chip)}
-                className="rounded-full bg-surface-elevated px-4 py-2 min-h-[36px] items-center justify-center"
+                className="rounded-full bg-surface-elevated px-4 py-2 h-9 items-center justify-center"
                 accessibilityRole="button"
                 accessibilityLabel={`Choose ${chip}`}
                 testID={`starter-chip-${chip}`}
@@ -452,7 +450,7 @@ export default function CreateSubjectScreen() {
                 </Text>
               </Pressable>
             ))}
-          </ScrollView>
+          </View>
         )}
 
         {/* Resolve loading indicator */}

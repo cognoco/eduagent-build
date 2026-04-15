@@ -1,4 +1,4 @@
-import { render, screen, act } from '@testing-library/react-native';
+import { render, screen, act, fireEvent } from '@testing-library/react-native';
 
 let mockProfiles: Array<{
   id: string;
@@ -48,8 +48,10 @@ jest.mock('../../hooks/use-settings', () => ({
   useCelebrationLevel: () => ({ data: 'all' }),
 }));
 
+const mockRouterPush = jest.fn();
+const mockRouterReplace = jest.fn();
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ push: jest.fn(), replace: jest.fn() }),
+  useRouter: () => ({ push: mockRouterPush, replace: mockRouterReplace }),
 }));
 
 jest.mock('react-native-safe-area-context', () => ({
@@ -180,6 +182,72 @@ describe('HomeScreen intent router', () => {
     // Falls back to learner while subscription loads — avoids false Add Child flash
     expect(screen.getByTestId('learner-screen')).toBeTruthy();
     expect(screen.queryByTestId('add-first-child-screen')).toBeNull();
+  });
+});
+
+describe('HomeScreen 3B.11: timeout error state secondary navigation', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+    jest.clearAllMocks();
+    mockIsLoading = true;
+    mockProfiles = [];
+    mockActiveProfile = null;
+    mockSubscriptionTier = undefined;
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('shows the timeout error UI after 10s of loading', () => {
+    render(<HomeScreen />);
+
+    act(() => {
+      jest.advanceTimersByTime(10_000);
+    });
+
+    expect(screen.getByTestId('home-loading-timeout')).toBeTruthy();
+    expect(screen.getByTestId('home-loading-retry')).toBeTruthy();
+    expect(screen.getByTestId('timeout-library-button')).toBeTruthy();
+    expect(screen.getByTestId('timeout-more-button')).toBeTruthy();
+  });
+
+  it('navigates to library when "Go to Library" is pressed [3B.11]', () => {
+    render(<HomeScreen />);
+
+    act(() => {
+      jest.advanceTimersByTime(10_000);
+    });
+
+    fireEvent.press(screen.getByTestId('timeout-library-button'));
+
+    expect(mockRouterReplace).toHaveBeenCalledWith('/(app)/library');
+  });
+
+  it('navigates to more when "More options" is pressed [3B.11]', () => {
+    render(<HomeScreen />);
+
+    act(() => {
+      jest.advanceTimersByTime(10_000);
+    });
+
+    fireEvent.press(screen.getByTestId('timeout-more-button'));
+
+    expect(mockRouterReplace).toHaveBeenCalledWith('/(app)/more');
+  });
+
+  it('resets the timeout flag when Retry is pressed', () => {
+    render(<HomeScreen />);
+
+    act(() => {
+      jest.advanceTimersByTime(10_000);
+    });
+
+    expect(screen.getByTestId('home-loading-timeout')).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('home-loading-retry'));
+
+    expect(screen.queryByTestId('home-loading-timeout')).toBeNull();
   });
 });
 

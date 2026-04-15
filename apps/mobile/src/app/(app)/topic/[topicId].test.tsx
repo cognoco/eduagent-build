@@ -20,6 +20,7 @@ jest.mock('react-native-safe-area-context', () => ({
 
 const mockUseTopicProgress = jest.fn();
 const mockUseTopicRetention = jest.fn();
+const mockUseEvaluateEligibility = jest.fn();
 const mockUseTopicParkingLot = jest.fn();
 
 jest.mock('../../../hooks/use-progress', () => ({
@@ -28,6 +29,8 @@ jest.mock('../../../hooks/use-progress', () => ({
 
 jest.mock('../../../hooks/use-retention', () => ({
   useTopicRetention: (...args: unknown[]) => mockUseTopicRetention(...args),
+  useEvaluateEligibility: (...args: unknown[]) =>
+    mockUseEvaluateEligibility(...args),
 }));
 
 jest.mock('../../../hooks/use-sessions', () => ({
@@ -62,6 +65,10 @@ describe('TopicDetailScreen', () => {
     });
     mockUseTopicParkingLot.mockReturnValue({
       data: [],
+      isLoading: false,
+    });
+    mockUseEvaluateEligibility.mockReturnValue({
+      data: undefined,
       isLoading: false,
     });
   });
@@ -590,5 +597,283 @@ describe('TopicDetailScreen', () => {
     expect(
       screen.getByText('No parked questions for this topic yet.')
     ).toBeTruthy();
+  });
+
+  // 3E.2: Evaluate (Devil's Advocate) entry point
+  describe('evaluate challenge button', () => {
+    it('shows Challenge button when topic is eligible for evaluate', () => {
+      mockUseTopicProgress.mockReturnValue({
+        data: {
+          topicId: 'topic-1',
+          title: 'Strong Topic',
+          completionStatus: 'stable',
+          retentionStatus: 'strong',
+          struggleStatus: 'normal',
+          masteryScore: 0.9,
+          summaryExcerpt: null,
+          xpStatus: 'verified',
+        },
+        isLoading: false,
+      });
+      mockUseTopicRetention.mockReturnValue({
+        data: {
+          topicId: 'topic-1',
+          easeFactor: 2.7,
+          intervalDays: 14,
+          repetitions: 5,
+          nextReviewAt: new Date(
+            Date.now() + 7 * 24 * 60 * 60 * 1000
+          ).toISOString(),
+          lastReviewedAt: null,
+          xpStatus: 'verified',
+          failureCount: 0,
+        },
+        isLoading: false,
+      });
+      mockUseEvaluateEligibility.mockReturnValue({
+        data: {
+          eligible: true,
+          topicId: 'topic-1',
+          topicTitle: 'Strong Topic',
+          currentRung: 2,
+          easeFactor: 2.7,
+          repetitions: 5,
+        },
+        isLoading: false,
+      });
+      mockUseTopicParkingLot.mockReturnValue({ data: [], isLoading: false });
+
+      render(<TopicDetailScreen />, { wrapper: createWrapper() });
+
+      expect(screen.getByTestId('evaluate-challenge-button')).toBeTruthy();
+      expect(screen.getByText('Challenge yourself')).toBeTruthy();
+      expect(screen.getByText(/rung 2\/4/)).toBeTruthy();
+    });
+
+    it('hides Challenge button when not eligible', () => {
+      mockUseTopicProgress.mockReturnValue({
+        data: {
+          topicId: 'topic-1',
+          title: 'Weak Topic',
+          completionStatus: 'in_progress',
+          retentionStatus: 'weak',
+          struggleStatus: 'normal',
+          masteryScore: 0.3,
+          summaryExcerpt: null,
+          xpStatus: 'pending',
+        },
+        isLoading: false,
+      });
+      mockUseTopicRetention.mockReturnValue({
+        data: {
+          topicId: 'topic-1',
+          easeFactor: 2.0,
+          intervalDays: 1,
+          repetitions: 0,
+          nextReviewAt: null,
+          lastReviewedAt: null,
+          xpStatus: 'pending',
+          failureCount: 0,
+        },
+        isLoading: false,
+      });
+      mockUseEvaluateEligibility.mockReturnValue({
+        data: { eligible: false, reason: 'Not strong enough' },
+        isLoading: false,
+      });
+      mockUseTopicParkingLot.mockReturnValue({ data: [], isLoading: false });
+
+      render(<TopicDetailScreen />, { wrapper: createWrapper() });
+
+      expect(screen.queryByTestId('evaluate-challenge-button')).toBeNull();
+    });
+  });
+
+  // 3E.1: Teach-back entry point
+  describe('teach-back button', () => {
+    it('shows Teach it back button when retention is strong enough', () => {
+      mockUseTopicProgress.mockReturnValue({
+        data: {
+          topicId: 'topic-1',
+          title: 'Teachable Topic',
+          completionStatus: 'completed',
+          retentionStatus: 'strong',
+          struggleStatus: 'normal',
+          masteryScore: 0.8,
+          summaryExcerpt: null,
+          xpStatus: 'verified',
+        },
+        isLoading: false,
+      });
+      mockUseTopicRetention.mockReturnValue({
+        data: {
+          topicId: 'topic-1',
+          easeFactor: 2.5,
+          intervalDays: 10,
+          repetitions: 3,
+          nextReviewAt: null,
+          lastReviewedAt: null,
+          xpStatus: 'verified',
+          failureCount: 0,
+        },
+        isLoading: false,
+      });
+      mockUseTopicParkingLot.mockReturnValue({ data: [], isLoading: false });
+
+      render(<TopicDetailScreen />, { wrapper: createWrapper() });
+
+      expect(screen.getByTestId('teach-back-button')).toBeTruthy();
+      expect(screen.getByText('Teach it back')).toBeTruthy();
+    });
+
+    it('hides Teach it back when ease factor is too low', () => {
+      mockUseTopicProgress.mockReturnValue({
+        data: {
+          topicId: 'topic-1',
+          title: 'New Topic',
+          completionStatus: 'in_progress',
+          retentionStatus: 'weak',
+          struggleStatus: 'normal',
+          masteryScore: null,
+          summaryExcerpt: null,
+          xpStatus: 'pending',
+        },
+        isLoading: false,
+      });
+      mockUseTopicRetention.mockReturnValue({
+        data: {
+          topicId: 'topic-1',
+          easeFactor: 2.0,
+          intervalDays: 1,
+          repetitions: 0,
+          nextReviewAt: null,
+          lastReviewedAt: null,
+          xpStatus: 'pending',
+          failureCount: 0,
+        },
+        isLoading: false,
+      });
+      mockUseTopicParkingLot.mockReturnValue({ data: [], isLoading: false });
+
+      render(<TopicDetailScreen />, { wrapper: createWrapper() });
+
+      expect(screen.queryByTestId('teach-back-button')).toBeNull();
+    });
+  });
+
+  // FR90: Knowledge decay visualization
+  describe('DecayBar', () => {
+    it('shows decay bar when retention card has lastReviewedAt', () => {
+      mockUseTopicProgress.mockReturnValue({
+        data: {
+          topicId: 'topic-1',
+          title: 'Decay Test',
+          completionStatus: 'completed',
+          retentionStatus: 'strong',
+          struggleStatus: 'normal',
+          masteryScore: 0.8,
+          summaryExcerpt: null,
+          xpStatus: 'verified',
+        },
+        isLoading: false,
+      });
+      mockUseTopicRetention.mockReturnValue({
+        data: {
+          topicId: 'topic-1',
+          easeFactor: 2.5,
+          intervalDays: 10,
+          repetitions: 3,
+          nextReviewAt: new Date(
+            Date.now() + 5 * 24 * 60 * 60 * 1000
+          ).toISOString(),
+          lastReviewedAt: new Date(
+            Date.now() - 5 * 24 * 60 * 60 * 1000
+          ).toISOString(),
+          xpStatus: 'verified',
+          failureCount: 0,
+        },
+        isLoading: false,
+      });
+      mockUseTopicParkingLot.mockReturnValue({ data: [], isLoading: false });
+
+      render(<TopicDetailScreen />, { wrapper: createWrapper() });
+
+      expect(screen.getByTestId('decay-bar')).toBeTruthy();
+      expect(screen.getByText('Memory decay')).toBeTruthy();
+      expect(screen.getByText('5 days left')).toBeTruthy();
+    });
+
+    it('shows "Due for review" when interval has elapsed', () => {
+      mockUseTopicProgress.mockReturnValue({
+        data: {
+          topicId: 'topic-1',
+          title: 'Overdue Topic',
+          completionStatus: 'completed',
+          retentionStatus: 'weak',
+          struggleStatus: 'normal',
+          masteryScore: 0.6,
+          summaryExcerpt: null,
+          xpStatus: 'pending',
+        },
+        isLoading: false,
+      });
+      mockUseTopicRetention.mockReturnValue({
+        data: {
+          topicId: 'topic-1',
+          easeFactor: 2.5,
+          intervalDays: 7,
+          repetitions: 2,
+          nextReviewAt: new Date(
+            Date.now() - 2 * 24 * 60 * 60 * 1000
+          ).toISOString(),
+          lastReviewedAt: new Date(
+            Date.now() - 9 * 24 * 60 * 60 * 1000
+          ).toISOString(),
+          xpStatus: 'pending',
+          failureCount: 0,
+        },
+        isLoading: false,
+      });
+      mockUseTopicParkingLot.mockReturnValue({ data: [], isLoading: false });
+
+      render(<TopicDetailScreen />, { wrapper: createWrapper() });
+
+      expect(screen.getByTestId('decay-bar')).toBeTruthy();
+      expect(screen.getByText('Due for review')).toBeTruthy();
+    });
+
+    it('does not show decay bar when lastReviewedAt is null', () => {
+      mockUseTopicProgress.mockReturnValue({
+        data: {
+          topicId: 'topic-1',
+          title: 'New Topic',
+          completionStatus: 'in_progress',
+          retentionStatus: 'weak',
+          struggleStatus: 'normal',
+          masteryScore: null,
+          summaryExcerpt: null,
+          xpStatus: 'pending',
+        },
+        isLoading: false,
+      });
+      mockUseTopicRetention.mockReturnValue({
+        data: {
+          topicId: 'topic-1',
+          easeFactor: 2.5,
+          intervalDays: 1,
+          repetitions: 0,
+          nextReviewAt: null,
+          lastReviewedAt: null,
+          xpStatus: 'pending',
+          failureCount: 0,
+        },
+        isLoading: false,
+      });
+      mockUseTopicParkingLot.mockReturnValue({ data: [], isLoading: false });
+
+      render(<TopicDetailScreen />, { wrapper: createWrapper() });
+
+      expect(screen.queryByTestId('decay-bar')).toBeNull();
+    });
   });
 });

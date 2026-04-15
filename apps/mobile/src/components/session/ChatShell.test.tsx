@@ -345,6 +345,101 @@ describe('ChatShell', () => {
       expect(mockClearTranscript).toHaveBeenCalled();
     });
 
+    // 4B.11: STT-to-transcript race condition — stopListening() resolves before
+    // expo-speech-recognition has populated the transcript in state.
+    it('captures transcript that arrives after stopListening resolves (STT race)', () => {
+      // Phase 1: Recording just stopped, but transcript is still empty (race window)
+      mockSttState = {
+        ...mockSttState,
+        isListening: false,
+        transcript: '',
+      };
+      const { rerender, props } = renderChatShell({
+        verificationType: 'teach_back',
+      });
+
+      // No preview should appear — transcript is empty even though we stopped
+      expect(screen.queryByTestId('voice-send-button')).toBeNull();
+
+      // Phase 2: Transcript arrives asynchronously from the native STT engine
+      mockSttState = {
+        ...mockSttState,
+        isListening: false,
+        transcript: 'Delayed recognition result',
+      };
+      rerender(<ChatShell {...props} />);
+
+      // The useEffect([isListening, transcript]) should sync to pendingTranscript
+      expect(screen.getByText('Delayed recognition result')).toBeTruthy();
+      expect(screen.getByTestId('voice-send-button')).toBeTruthy();
+    });
+
+    it('does not re-populate preview with late STT after discard', () => {
+      // Start with a transcript available
+      mockSttState = {
+        ...mockSttState,
+        isListening: false,
+        transcript: 'First attempt',
+      };
+      const { rerender, props } = renderChatShell({
+        verificationType: 'teach_back',
+      });
+
+      // Preview shows the transcript
+      expect(screen.getByText('First attempt')).toBeTruthy();
+
+      // User discards the transcript
+      fireEvent.press(screen.getByTestId('voice-discard-button'));
+      expect(mockClearTranscript).toHaveBeenCalled();
+
+      // Late STT update arrives (expo-speech-recognition fires a trailing event)
+      mockSttState = {
+        ...mockSttState,
+        isListening: false,
+        transcript: 'Late trailing update',
+      };
+      rerender(<ChatShell {...props} />);
+
+      // The discardedRef gate should prevent re-populating the preview
+      expect(screen.queryByTestId('voice-send-button')).toBeNull();
+    });
+
+    it('allows transcript capture after discard + new mic press', async () => {
+      // Start with discarded state
+      mockSttState = {
+        ...mockSttState,
+        isListening: false,
+        transcript: 'Old attempt',
+      };
+      const { rerender, props } = renderChatShell({
+        verificationType: 'teach_back',
+      });
+
+      // Discard the transcript
+      fireEvent.press(screen.getByTestId('voice-discard-button'));
+
+      // Press mic to start new recording (not re-record button)
+      mockSttState = { ...mockSttState, isListening: false, transcript: '' };
+      rerender(<ChatShell {...props} />);
+
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('voice-record-button'));
+      });
+
+      // Recording stops, new transcript arrives
+      mockSttState = {
+        ...mockSttState,
+        isListening: false,
+        transcript: 'New attempt after discard',
+      };
+      rerender(<ChatShell {...props} />);
+
+      // discardedRef should have been cleared by handleVoicePress,
+      // allowing the effect to capture this new transcript
+      expect(screen.getByText('New attempt after discard')).toBeTruthy();
+      expect(screen.getByTestId('voice-send-button')).toBeTruthy();
+    });
+
     it('clears and restarts listening on Re-record press', async () => {
       mockSttState = {
         ...mockSttState,

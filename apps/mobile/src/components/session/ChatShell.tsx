@@ -271,6 +271,7 @@ export function ChatShell({
       // We snapshot the transcript in the next effect.
     } else {
       setPendingTranscript('');
+      discardedRef.current = false; // BUG-359: allow effect to capture new transcript
       // Stop TTS when user starts recording
       stopSpeaking();
       await startListening();

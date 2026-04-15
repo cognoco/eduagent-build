@@ -12,7 +12,10 @@ import {
   type RetentionStatus,
 } from '../../../components/progress';
 import { useTopicProgress } from '../../../hooks/use-progress';
-import { useTopicRetention } from '../../../hooks/use-retention';
+import {
+  useTopicRetention,
+  useEvaluateEligibility,
+} from '../../../hooks/use-retention';
 import { useTopicParkingLot } from '../../../hooks/use-sessions';
 import { useThemeColors } from '../../../lib/theme';
 import { goBackOrReplace } from '../../../lib/navigation';
@@ -41,6 +44,87 @@ function deriveRetentionStatus(
   if (daysUntilReview > 3) return 'strong';
   if (daysUntilReview > 0) return 'fading';
   return 'weak';
+}
+
+/**
+ * FR90: Time-based decay visualization. Shows how much of the SM-2 interval
+ * has elapsed since the last review. The bar fills from left (fresh) to right
+ * (due/overdue), with color shifting from retention-strong → fading → weak.
+ */
+function DecayBar({
+  lastReviewedAt,
+  intervalDays,
+  nextReviewAt,
+}: {
+  lastReviewedAt: string | null | undefined;
+  intervalDays: number;
+  nextReviewAt: string | null | undefined;
+}) {
+  const colors = useThemeColors();
+
+  if (!lastReviewedAt || intervalDays <= 0) return null;
+
+  const now = Date.now();
+  const lastReview = new Date(lastReviewedAt).getTime();
+  const elapsed = (now - lastReview) / (1000 * 60 * 60 * 24);
+  const fraction = Math.min(elapsed / intervalDays, 1.2); // cap at 120% for overdue
+  const percent = Math.min(fraction * 100, 100);
+
+  // Determine bar color based on decay fraction
+  let barColor: string;
+  let label: string;
+  if (fraction >= 1) {
+    barColor = colors.retentionWeak;
+    label = 'Due for review';
+  } else if (fraction >= 0.7) {
+    barColor = colors.retentionFading;
+    const daysLeft = nextReviewAt
+      ? Math.max(
+          0,
+          Math.ceil(
+            (new Date(nextReviewAt).getTime() - now) / (1000 * 60 * 60 * 24)
+          )
+        )
+      : Math.max(0, Math.ceil(intervalDays - elapsed));
+    label = daysLeft === 1 ? '1 day left' : `${daysLeft} days left`;
+  } else {
+    barColor = colors.retentionStrong;
+    const daysLeft = nextReviewAt
+      ? Math.max(
+          0,
+          Math.ceil(
+            (new Date(nextReviewAt).getTime() - now) / (1000 * 60 * 60 * 24)
+          )
+        )
+      : Math.max(0, Math.ceil(intervalDays - elapsed));
+    label = daysLeft === 1 ? '1 day left' : `${daysLeft} days left`;
+  }
+
+  return (
+    <View className="mt-1 mb-2" testID="decay-bar">
+      <View className="flex-row justify-between items-center mb-1">
+        <Text className="text-caption text-text-tertiary">Memory decay</Text>
+        <Text className="text-caption text-text-tertiary">{label}</Text>
+      </View>
+      <View
+        className="h-1.5 rounded-full bg-surface-elevated overflow-hidden"
+        accessibilityRole="progressbar"
+        accessibilityValue={{
+          min: 0,
+          max: 100,
+          now: Math.round(percent),
+        }}
+      >
+        <View
+          style={{
+            width: `${percent}%`,
+            backgroundColor: barColor,
+          }}
+          className="h-full rounded-full"
+        />
+      </View>
+    </View>
+  );
 }
 
 const COMPLETION_LABELS: Record<string, string> = {
@@ -80,6 +164,8 @@ export default function TopicDetailScreen() {
   } = useTopicRetention(topicId ?? '');
   const { data: parkedQuestions, isLoading: parkingLotLoading } =
     useTopicParkingLot(subjectId ?? '', topicId ?? '');
+  // FR128-129: Evaluate (Devil's Advocate) eligibility
+  const { data: evaluateEligibility } = useEvaluateEligibility(topicId ?? '');
 
   const isLoading = progressLoading || retentionLoading || parkingLotLoading;
   // Data-critical queries only — parking lot is secondary and should not suppress errors
@@ -296,6 +382,14 @@ export default function TopicDetailScreen() {
               </Text>
               <RetentionSignal status={retentionStatus} />
             </View>
+            {/* FR90: Time-based decay visualization */}
+            {retentionCard && retentionCard.lastReviewedAt && (
+              <DecayBar
+                lastReviewedAt={retentionCard.lastReviewedAt}
+                intervalDays={retentionCard.intervalDays}
+                nextReviewAt={retentionCard.nextReviewAt}
+              />
+            )}
             {nextReviewDate && (
               <View className="flex-row justify-between items-center mb-2">
                 <Text className="text-body-sm text-text-secondary">
@@ -540,6 +634,73 @@ export default function TopicDetailScreen() {
               </Pressable>
             )}
           </View>
+
+          {/* 3E.2: Evaluate (Devil's Advocate) entry point — FR128 */}
+          {evaluateEligibility?.eligible && (
+            <Pressable
+              onPress={() =>
+                router.push({
+                  pathname: '/(app)/session',
+                  params: {
+                    subjectId,
+                    topicId,
+                    verificationType: 'evaluate',
+                  },
+                })
+              }
+              className="bg-surface rounded-card py-3 px-4 mb-2 flex-row items-center justify-between"
+              testID="evaluate-challenge-button"
+              accessibilityRole="button"
+              accessibilityLabel="Challenge yourself on this topic"
+            >
+              <View className="flex-1 me-3">
+                <Text className="text-body-sm font-semibold text-text-primary">
+                  Challenge yourself
+                </Text>
+                <Text className="text-caption text-text-secondary mt-0.5">
+                  Test your understanding with tough questions (rung{' '}
+                  {evaluateEligibility.currentRung}/4)
+                </Text>
+              </View>
+              <Text className="text-primary text-body-sm font-medium">
+                Start &rarr;
+              </Text>
+            </Pressable>
+          )}
+
+          {/* 3E.1: Teach-back entry point — FR138 */}
+          {retentionCard &&
+            retentionCard.repetitions > 0 &&
+            Number(retentionCard.easeFactor) >= 2.3 && (
+              <Pressable
+                onPress={() =>
+                  router.push({
+                    pathname: '/(app)/session',
+                    params: {
+                      subjectId,
+                      topicId,
+                      verificationType: 'teach_back',
+                    },
+                  })
+                }
+                className="bg-surface rounded-card py-3 px-4 mb-2 flex-row items-center justify-between"
+                testID="teach-back-button"
+                accessibilityRole="button"
+                accessibilityLabel="Teach this topic back"
+              >
+                <View className="flex-1 me-3">
+                  <Text className="text-body-sm font-semibold text-text-primary">
+                    Teach it back
+                  </Text>
+                  <Text className="text-caption text-text-secondary mt-0.5">
+                    Explain what you know in your own words
+                  </Text>
+                </View>
+                <Text className="text-primary text-body-sm font-medium">
+                  Start &rarr;
+                </Text>
+              </Pressable>
+            )}
         </View>
       )}
     </View>
