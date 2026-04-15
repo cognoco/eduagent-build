@@ -122,6 +122,13 @@ export const sessionAnalysisOutputSchema = z.object({
   communicationNotes: z.array(z.string()).nullable(),
   engagementLevel: engagementLevelSchema.nullable(),
   confidence: confidenceLevelSchema,
+  urgencyDeadline: z
+    .object({
+      reason: z.string(),
+      daysFromNow: z.number().int().min(1).max(30),
+    })
+    .nullable()
+    .optional(),
 });
 export type SessionAnalysisOutput = z.infer<typeof sessionAnalysisOutputSchema>;
 

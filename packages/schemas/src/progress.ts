@@ -187,6 +187,7 @@ export const coachingCardTypeSchema = z.enum([
   'review_due',
   'challenge',
   'curriculum_complete',
+  'homework_connection',
   'continue_book',
   'book_suggestion',
   'milestone_celebration',
@@ -248,6 +249,18 @@ export type CurriculumCompleteCard = z.infer<
 
 // --- Epic 7: Book-aware coaching cards ---
 
+export const homeworkConnectionCardSchema = z.object({
+  ...baseCoachingCardFields,
+  type: z.literal('homework_connection'),
+  topicId: z.string().uuid(),
+  bookTitle: z.string().nullable(),
+  bookEmoji: z.string().nullable(),
+  homeworkSkill: z.string(),
+});
+export type HomeworkConnectionCard = z.infer<
+  typeof homeworkConnectionCardSchema
+>;
+
 export const continueBookCardSchema = z.object({
   ...baseCoachingCardFields,
   type: z.literal('continue_book'),
@@ -284,6 +297,7 @@ export const coachingCardSchema = z.discriminatedUnion('type', [
   reviewDueCardSchema,
   challengeCardSchema,
   curriculumCompleteCardSchema,
+  homeworkConnectionCardSchema,
   continueBookCardSchema,
   bookSuggestionCardSchema,
   milestoneCelebrationCardSchema,

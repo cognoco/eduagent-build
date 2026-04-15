@@ -1,5 +1,5 @@
 import { and, eq, sql } from 'drizzle-orm';
-import { learningProfiles, type Database } from '@eduagent/database';
+import { learningProfiles, subjects, type Database } from '@eduagent/database';
 import {
   sessionAnalysisOutputSchema,
   type ConfidenceLevel,
@@ -47,7 +47,8 @@ Return valid JSON only using this shape:
   "resolvedTopics": [{"topic": "string", "subject": "string | null"}] | null,
   "communicationNotes": ["string"] | null,
   "engagementLevel": "high" | "medium" | "low" | null,
-  "confidence": "low" | "medium" | "high"
+  "confidence": "low" | "medium" | "high",
+  "urgencyDeadline": {"reason": "string", "daysFromNow": 1-30} | null
 }
 
 Rules:
@@ -56,6 +57,7 @@ Rules:
 - "struggles": only include repeated confusion on the same concept.
 - "resolvedTopics": include concepts that started shaky and ended with understanding.
 - "communicationNotes": short notes like "prefers short explanations" or "responds well to examples".
+- "urgencyDeadline": if the learner mentions an upcoming test, exam, quiz, or deadline, extract the reason and estimate how many days away it is (1-30). Return null if no deadline is mentioned.
 - Return null for any field without signal.
 - If the subject is freeform or unknown, use null for subject when needed.
 
@@ -964,6 +966,33 @@ export async function applyAnalysis(
         topic: n.topic,
       })),
     });
+  }
+
+  // Epic 7 FR165.3: Write urgency boost when test/deadline detected
+  if (analysis.urgencyDeadline && subjectName) {
+    try {
+      const boostUntil = new Date(
+        Date.now() + analysis.urgencyDeadline.daysFromNow * 24 * 60 * 60 * 1000
+      );
+      await db
+        .update(subjects)
+        .set({
+          urgencyBoostUntil: boostUntil,
+          urgencyBoostReason: analysis.urgencyDeadline.reason,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(eq(subjects.profileId, profileId), eq(subjects.name, subjectName))
+        );
+      fieldsUpdated.push('urgencyBoostUntil');
+    } catch (err) {
+      // Urgency boost is best-effort — log and continue
+      logger.warn('Failed to write urgency boost', {
+        event: 'learner_profile.urgency_boost.failed',
+        profileId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
   }
 
   console.info('[learner-profile] Analysis applied', {

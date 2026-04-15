@@ -2,7 +2,7 @@
 
 **Author:** Zuzka + Claude
 **Date:** 2026-04-04
-**Status:** Draft — replaces v2 prerequisite DAG spec
+**Status:** Complete — launch scope (Stories 7.1–7.4) implemented. Stories 7.5 (Visual Topic Map) and 7.6 (Unified Knowledge Tracking) deferred to fast-follow.
 **Revision:** v3 — "Know the Learner, Not the Graph"
 
 ---
