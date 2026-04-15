@@ -2,6 +2,7 @@ import type { StrengthEntry, StruggleEntry } from '@eduagent/schemas';
 import type { MemoryBlockProfile } from './learner-profile';
 import {
   archiveStaleStruggles,
+  buildAccommodationBlock,
   buildMemoryBlock,
   detectStruggleNotifications,
   mergeCommunicationNotes,
@@ -1064,5 +1065,41 @@ describe('detectStruggleNotifications', () => {
     const notifications = detectStruggleNotifications(before, after, null);
     expect(notifications).toHaveLength(1);
     expect(notifications[0]!.type).toBe('struggle_noticed');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildAccommodationBlock
+// ---------------------------------------------------------------------------
+
+describe('buildAccommodationBlock', () => {
+  it('returns empty string for mode "none"', () => {
+    expect(buildAccommodationBlock('none')).toBe('');
+  });
+
+  it('returns short-burst preamble', () => {
+    const block = buildAccommodationBlock('short-burst');
+    expect(block).toContain('Keep explanations concise');
+    expect(block).toContain('2-3 sentences max');
+    expect(block).toContain('parental preference');
+  });
+
+  it('returns audio-first preamble', () => {
+    const block = buildAccommodationBlock('audio-first');
+    expect(block).toContain('spoken-style explanations');
+    expect(block).toContain('phonetic');
+    expect(block).toContain('parental preference');
+  });
+
+  it('returns predictable preamble', () => {
+    const block = buildAccommodationBlock('predictable');
+    expect(block).toContain('clear agenda');
+    expect(block).toContain('explicit transitions');
+    expect(block).toContain('parental preference');
+  });
+
+  it('returns empty string for null/undefined', () => {
+    expect(buildAccommodationBlock(null as unknown as string)).toBe('');
+    expect(buildAccommodationBlock(undefined as unknown as string)).toBe('');
   });
 });

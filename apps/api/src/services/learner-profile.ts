@@ -2,6 +2,7 @@ import { and, eq, sql } from 'drizzle-orm';
 import { learningProfiles, subjects, type Database } from '@eduagent/database';
 import {
   sessionAnalysisOutputSchema,
+  type AccommodationMode,
   type ConfidenceLevel,
   type ExplanationStyle,
   type LearningProfile,
@@ -1259,6 +1260,26 @@ export function buildHumanReadableMemoryExport(
 
   const sections: string[] = ['Learner Memory Export'];
 
+  const accommodationMode =
+    'accommodationMode' in profile
+      ? (profile as Record<string, unknown>).accommodationMode
+      : undefined;
+  if (accommodationMode && accommodationMode !== 'none') {
+    const modeLabels: Record<string, string> = {
+      'short-burst':
+        'Short-Burst — shorter explanations, frequent check-ins, small steps',
+      'audio-first':
+        'Audio-First — spoken-style explanations, simple sentences, phonetic support',
+      predictable:
+        'Predictable — clear structure, explicit transitions, concrete examples',
+    };
+    sections.push(
+      `Accommodation mode\n${
+        modeLabels[accommodationMode as string] ?? accommodationMode
+      }`
+    );
+  }
+
   if (style) {
     const styleParts: string[] = [];
     if (style.preferredExplanations?.length) {
@@ -1320,4 +1341,68 @@ export function buildHumanReadableMemoryExport(
   }
 
   return sections.join('\n\n');
+}
+
+// ---------------------------------------------------------------------------
+// Accommodation mode
+// ---------------------------------------------------------------------------
+
+const ACCOMMODATION_PREAMBLES: Record<string, string> = {
+  'short-burst': [
+    'Learning accommodation (Short-Burst):',
+    '- Keep explanations concise — 2-3 sentences max before checking understanding',
+    '- Break complex topics into small, concrete steps — one concept per exchange',
+    '- Use frequent engagement checkpoints: "Ready for the next part?" or "Want to try one?"',
+    '- Celebrate small wins explicitly — "Nice one!" after each correct step, not just at the end',
+    '- Avoid long blocks of text. If a concept needs depth, split it across multiple exchanges',
+    '- Vary activity types to maintain engagement (explain → try → explain → game → try)',
+  ].join('\n'),
+  'audio-first': [
+    'Learning accommodation (Audio-First):',
+    '- Prefer spoken-style explanations — write as if reading aloud, with natural rhythm',
+    '- Avoid relying on visual-only content (tables, diagrams described only in text, complex formatting)',
+    '- When teaching vocabulary or new terms, always include phonetic breakdowns or syllable splits',
+    '- Use repetition and rhyme as memory aids where natural',
+    '- Keep sentence structure simple — active voice, short clauses, minimal nesting',
+    '- When the learner makes a spelling or reading error, gently model the correct form without highlighting the mistake',
+  ].join('\n'),
+  predictable: [
+    'Learning accommodation (Predictable):',
+    '- Start every session with a clear agenda: "Today we\'ll do X, then Y, then Z"',
+    '- Use explicit transitions between topics: "We\'re done with fractions. Now let\'s move to geometry."',
+    '- Avoid open-ended questions without scaffolding — offer choices or examples alongside "What do you think?"',
+    '- Be literal and concrete — avoid sarcasm, idioms, or figurative language unless teaching them explicitly',
+    '- Maintain a consistent session structure: recap → new concept → practice → summary',
+    '- When something changes (topic shift, difficulty increase), explain why: "This next part is harder because…"',
+  ].join('\n'),
+};
+
+const ACCOMMODATION_META =
+  'The above learning accommodation is a parental preference. Follow it consistently. Do not override it based on inferred learner behavior.';
+
+export function buildAccommodationBlock(
+  mode: AccommodationMode | string | null | undefined
+): string {
+  if (!mode || mode === 'none') return '';
+  const preamble = ACCOMMODATION_PREAMBLES[mode];
+  if (!preamble) return '';
+  return `${preamble}\n\n${ACCOMMODATION_META}`;
+}
+
+export async function updateAccommodationMode(
+  db: Database,
+  profileId: string,
+  mode: AccommodationMode
+): Promise<void> {
+  // FR253.4: create row if it doesn't exist
+  await getOrCreateLearningProfile(db, profileId);
+
+  await db
+    .update(learningProfiles)
+    .set({
+      accommodationMode: mode,
+      version: sql`${learningProfiles.version} + 1`,
+      updatedAt: new Date(),
+    })
+    .where(eq(learningProfiles.profileId, profileId));
 }
