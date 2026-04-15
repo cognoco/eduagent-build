@@ -1,3 +1,5 @@
+const { join } = require('path');
+
 module.exports = {
   displayName: '@eduagent/api',
   rootDir: '../..',
@@ -5,6 +7,9 @@ module.exports = {
   transform: {
     '^.+\\.ts$': ['ts-jest', { tsconfig: '<rootDir>/apps/api/tsconfig.app.json' }],
   },
+  // Swap Neon HTTP driver for standard pg when DATABASE_URL points at
+  // localhost (CI container). Unit tests override with their own jest.mock.
+  setupFilesAfterEnv: [join(__dirname, 'integration-setup.ts')],
   passWithNoTests: true,
   moduleNameMapper: {
     '^@eduagent/schemas$': '<rootDir>/packages/schemas/src/index.ts',

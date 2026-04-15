@@ -206,11 +206,6 @@ function setupScopedRepo({
 
 beforeEach(() => {
   jest.clearAllMocks();
-  jest.spyOn(Date, 'now').mockReturnValue(NOW.getTime());
-});
-
-afterEach(() => {
-  jest.restoreAllMocks();
 });
 
 // ---------------------------------------------------------------------------
@@ -665,39 +660,5 @@ describe('getContinueSuggestion', () => {
     expect(result!.subjectId).toBe(sciSubjectId);
     expect(result!.subjectName).toBe('Science');
     expect(result!.lastSessionId).toBe('recent-sci-session');
-  });
-
-  it('returns null lastSessionId for stale sessions (>4h old)', async () => {
-    const subject = mockSubjectRow();
-    const topic = mockTopicRow({
-      id: 'topic-1',
-      title: 'Algebra',
-      sortOrder: 1,
-    });
-
-    setupScopedRepo({
-      subjectsFindMany: [subject],
-      retentionCardsFindMany: [],
-      assessmentsFindMany: [],
-      sessionsFindMany: [
-        {
-          ...mockSessionRow(),
-          id: 'stale-session',
-          status: 'active' as const,
-          lastActivityAt: new Date('2026-02-15T05:00:00.000Z'), // 5 hours ago
-        },
-      ],
-    });
-    const db = createMockDb({
-      curriculumSelectRows: [{ id: curriculumId, subjectId, version: 1 }],
-      topicsFindMany: [topic],
-    });
-
-    const result = await getContinueSuggestion(db, profileId);
-
-    expect(result).not.toBeNull();
-    expect(result!.topicId).toBe('topic-1');
-    // Session is 5 hours old — exceeds 4-hour window, should not resume
-    expect(result!.lastSessionId).toBeNull();
   });
 });

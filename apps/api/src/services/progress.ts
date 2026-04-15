@@ -459,11 +459,6 @@ export async function getContinueSuggestion(
   topicTitle: string;
   lastSessionId: string | null;
 } | null> {
-  // Sessions older than this are not resumed — a fresh teach-first session
-  // is created instead. Aligns with the 30-min recovery marker on mobile;
-  // the continue suggestion is the broader fallback.
-  const CONTINUE_SESSION_MAX_AGE_MS = 4 * 60 * 60 * 1000; // 4 hours
-
   const repo = createScopedRepository(db, profileId);
   const activeSubjects = (await repo.subjects.findMany()).filter(
     (subject) => subject.status === 'active'
@@ -567,20 +562,13 @@ export async function getContinueSuggestion(
         (a, b) => b.lastActivityAt.getTime() - a.lastActivityAt.getTime()
       );
       const lastSession = resumable[0];
-      // Only resume sessions that are fresh enough — stale ones would show
-      // pre-teach-first greetings. Omitting lastSessionId causes the mobile
-      // client to create a new session with current teach-first behavior.
-      const isFresh =
-        lastSession &&
-        Date.now() - lastSession.lastActivityAt.getTime() <
-          CONTINUE_SESSION_MAX_AGE_MS;
 
       return {
         subjectId: subject.id,
         subjectName: subject.name,
         topicId: nextTopic.id,
         topicTitle: nextTopic.title,
-        lastSessionId: isFresh ? lastSession.id : null,
+        lastSessionId: lastSession?.id ?? null,
       };
     }
   }
