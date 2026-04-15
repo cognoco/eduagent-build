@@ -13,8 +13,8 @@ export function computePaceMultiplier(
   const middle = Math.floor(ratios.length / 2);
   const median =
     ratios.length % 2 === 0
-      ? (ratios[middle - 1]! + ratios[middle]!) / 2
-      : ratios[middle]!;
+      ? ((ratios[middle - 1] ?? 0) + (ratios[middle] ?? 0)) / 2
+      : ratios[middle] ?? 0;
   return Math.min(3, Math.max(0.5, Number(median.toFixed(2))));
 }
 

@@ -649,10 +649,9 @@ function buildAnalysisUpdates(
   // Persist resolved topic names so the next session's buildMemoryBlock can
   // celebrate them.  Overwrites each analysis run — only the most recent
   // session's resolutions are surfaced.
-  const resolvedTopicNames = notifications
+  updates.recentlyResolvedTopics = notifications
     .filter((n) => n.type === 'struggle_resolved')
-    .map((n) => n.topic);
-  updates.recentlyResolvedTopics = resolvedTopicNames;
+    .map((n) => ({ topic: n.topic, subject: n.subject ?? null }));
 
   return {
     updates,
@@ -745,7 +744,7 @@ export function buildMemoryBlock(
   currentSubject: string | null,
   currentTopic: string | null,
   retentionContext?: MemoryRetentionContext | null,
-  recentlyResolved?: string[]
+  recentlyResolved?: Array<string | { topic: string; subject: string | null }>
 ): string {
   const injectionEnabled =
     profile?.memoryInjectionEnabled ?? profile?.memoryEnabled ?? true;
@@ -784,7 +783,14 @@ export function buildMemoryBlock(
   }
 
   if (recentlyResolved && recentlyResolved.length > 0) {
-    const resolvedList = recentlyResolved.join(', ');
+    const resolvedList = recentlyResolved
+      .map((entry) => {
+        if (typeof entry === 'string') return entry;
+        return entry.subject
+          ? `${entry.topic} (${entry.subject})`
+          : entry.topic;
+      })
+      .join(', ');
     sections.push(
       `- They recently overcame difficulties with: ${resolvedList}. Celebrate their growth!`
     );

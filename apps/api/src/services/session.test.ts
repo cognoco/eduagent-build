@@ -1502,33 +1502,26 @@ describe('closeSession', () => {
   });
 
   it('returns interleavedTopicIds from metadata for interleaved sessions (FR92)', async () => {
+    const topicA = '00000000-0000-4000-a000-000000000001';
+    const topicB = '00000000-0000-4000-a000-000000000002';
+    const topicC = '00000000-0000-4000-a000-000000000003';
     setupScopedRepo({
-      sessionFindFirst: mockSessionRow({ sessionType: 'interleaved' }),
+      sessionFindFirst: mockSessionRow({
+        sessionType: 'interleaved',
+        metadata: {
+          interleavedTopics: [
+            { topicId: topicA },
+            { topicId: topicB },
+            { topicId: topicC },
+          ],
+        },
+      }),
     });
-    const db = createMockDb({
-      selectResults: [
-        // metadata query
-        [
-          {
-            metadata: {
-              interleavedTopics: [
-                { topicId: 'topic-001' },
-                { topicId: 'topic-002' },
-                { topicId: 'topic-003' },
-              ],
-            },
-          },
-        ],
-      ],
-    });
+    const db = createMockDb();
     const result = await closeSession(db, profileId, sessionId, {});
 
     expect(result.sessionType).toBe('interleaved');
-    expect(result.interleavedTopicIds).toEqual([
-      'topic-001',
-      'topic-002',
-      'topic-003',
-    ]);
+    expect(result.interleavedTopicIds).toEqual([topicA, topicB, topicC]);
   });
 
   it('increments summary skips immediately when a session is closed as skipped', async () => {

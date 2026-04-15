@@ -538,7 +538,9 @@ export async function prepareExchangeContext(
           strongTopics: strongTopicTitles,
         },
         Array.isArray(learningProfile.recentlyResolvedTopics)
-          ? (learningProfile.recentlyResolvedTopics as string[])
+          ? (learningProfile.recentlyResolvedTopics as Array<
+              string | { topic: string; subject: string | null }
+            >)
           : []
       ) || undefined
     : undefined;

@@ -478,6 +478,7 @@ export default function MoreScreen() {
           testID="celebration-level-off"
         />
 
+        {/* Homework Help — hidden until parent-controlled toggle is implemented
         <Pressable
           onPress={() => router.push('/(app)/homework/camera')}
           className="bg-surface rounded-card px-4 py-3.5 mb-2 mt-2"
@@ -492,6 +493,7 @@ export default function MoreScreen() {
             Snap a photo and get guided through it step by step
           </Text>
         </Pressable>
+        */}
 
         {activeProfile?.isOwner && (
           <>

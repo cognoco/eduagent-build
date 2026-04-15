@@ -836,6 +836,27 @@ describe('buildMemoryBlock', () => {
     expect(block).toMatch(/overcame|growth|celebrate|proud/i);
   });
 
+  it('includes subject context in resolved topics when available', () => {
+    const profile: MemoryBlockProfile = {
+      learningStyle: null,
+      interests: [],
+      strengths: [],
+      struggles: [],
+      communicationNotes: [],
+      memoryEnabled: true,
+      memoryInjectionEnabled: true,
+    };
+    const block = buildMemoryBlock(profile, 'Math', null, null, [
+      { topic: 'fractions', subject: 'Math' },
+      { topic: 'wave theory', subject: 'Physics' },
+      { topic: 'derivatives', subject: null },
+    ]);
+    expect(block).toContain('fractions (Math)');
+    expect(block).toContain('wave theory (Physics)');
+    expect(block).toContain('derivatives');
+    expect(block).not.toContain('derivatives (');
+  });
+
   it('does not include resolved section when list is empty', () => {
     const profile: MemoryBlockProfile = {
       learningStyle: null,

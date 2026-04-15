@@ -25,7 +25,9 @@ export function buildFourStrandsPrompt(context: ExchangeContext): string[] {
       '- Balance meaning-focused input, meaning-focused output, language-focused learning, and fluency development.',
       '- Teach directly. Correct errors clearly and immediately.',
       `- Explain grammar using the learner's native language when helpful${
-        context.nativeLanguage ? ` (${context.nativeLanguage})` : ''
+        context.nativeLanguage
+          ? ` (native language: <native_language>${context.nativeLanguage}</native_language>)`
+          : ''
       }.`,
       '- Keep examples in the target language, but make explanations comprehensible.',
       '- Prefer short, high-frequency chunks and collocations, not only isolated words.',

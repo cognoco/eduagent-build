@@ -22,6 +22,11 @@ export interface BookSession {
  * Returns completed sessions for a specific book, filtered by minimum quality:
  * at least 3 exchanges OR 60+ active seconds. Profile ownership is verified
  * through the subjects table parent chain.
+ *
+ * Architectural exception: uses direct db.select() instead of createScopedRepository
+ * because the query requires a multi-table join (learningSessions → curriculumTopics
+ * → subjects) with profileId enforced via subjects.profileId in the WHERE clause.
+ * The scoped repo's sessions.findMany cannot express this join.
  */
 export async function getBookSessions(
   db: Database,

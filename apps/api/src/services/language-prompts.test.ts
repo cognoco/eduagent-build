@@ -62,7 +62,7 @@ describe('buildFourStrandsPrompt', () => {
     );
     const joined = result.join('\n');
 
-    expect(joined).toContain('English');
+    expect(joined).toContain('<native_language>English</native_language>');
   });
 
   it('mentions four strands pedagogy', () => {

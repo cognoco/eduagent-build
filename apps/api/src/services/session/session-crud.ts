@@ -12,6 +12,7 @@ import {
   createScopedRepository,
   type Database,
 } from '@eduagent/database';
+import { z } from 'zod';
 import type {
   LearningSession,
   SessionStartInput,
@@ -91,24 +92,21 @@ async function resolveInterleavedTopicIds(
     return undefined;
   }
 
-  const [row] = await db
-    .select({ metadata: learningSessions.metadata })
-    .from(learningSessions)
-    .where(
-      and(
-        eq(learningSessions.id, sessionId),
-        eq(learningSessions.profileId, profileId)
-      )
-    )
-    .limit(1);
+  const repo = createScopedRepository(db, profileId);
+  const row = await repo.sessions.findFirst(eq(learningSessions.id, sessionId));
   if (!row?.metadata) {
     return undefined;
   }
 
-  const meta = row.metadata as {
-    interleavedTopics?: Array<{ topicId: string }>;
-  };
-  return meta.interleavedTopics?.map((topic) => topic.topicId);
+  const interleavedMetaSchema = z.object({
+    interleavedTopics: z
+      .array(z.object({ topicId: z.string().uuid() }))
+      .optional(),
+  });
+  const parsed = interleavedMetaSchema.safeParse(row.metadata);
+  return parsed.success
+    ? parsed.data.interleavedTopics?.map((t) => t.topicId)
+    : undefined;
 }
 
 // ---------------------------------------------------------------------------
