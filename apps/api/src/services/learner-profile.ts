@@ -733,6 +733,7 @@ export interface MemoryBlockProfile {
   communicationNotes: string[];
   memoryEnabled?: boolean;
   memoryInjectionEnabled?: boolean;
+  effectivenessSessionCount?: number;
 }
 
 export function buildMemoryBlock(
@@ -830,9 +831,10 @@ export function buildMemoryBlock(
     );
   }
 
-  if (signalCount > 0 && signalCount < 5) {
+  const effectivenessCount = profile.effectivenessSessionCount ?? 0;
+  if (effectivenessCount < 5 && signalCount > 0) {
     sections.push(
-      "- This profile is still sparse. If it fits naturally, ask one gentle check-in question such as 'Did that help?' or 'Want another kind of example?'"
+      "- If it fits naturally, ask one gentle check-in question such as 'Did that help?' or 'Want another kind of example?' — no more than once per session."
     );
   }
 

@@ -689,7 +689,7 @@ describe('buildMemoryBlock', () => {
     expect(block).toContain('Reference interests only when genuinely relevant');
   });
 
-  it('includes sparse-profile guidance when signal count < 5', () => {
+  it('includes check-in guidance when effectivenessSessionCount is low', () => {
     const profile: MemoryBlockProfile = {
       learningStyle: null,
       interests: ['space'],
@@ -700,7 +700,7 @@ describe('buildMemoryBlock', () => {
       memoryInjectionEnabled: true,
     };
     const block = buildMemoryBlock(profile, null, null);
-    expect(block).toContain('still sparse');
+    expect(block).toContain('check-in');
   });
 
   it('includes learning style description when set', () => {
@@ -843,6 +843,36 @@ describe('buildMemoryBlock', () => {
     const blockUndefined = buildMemoryBlock(profile, 'Math', null, null);
     // Both should produce the same output — no resolved section
     expect(blockEmpty).toBe(blockUndefined);
+  });
+
+  it('shows check-in prompt when effectivenessSessionCount < 5 even with many signals', () => {
+    const profile: MemoryBlockProfile = {
+      learningStyle: null,
+      interests: ['space', 'dinosaurs', 'robots', 'trains', 'music', 'art'],
+      strengths: [],
+      struggles: [],
+      communicationNotes: [],
+      memoryEnabled: true,
+      memoryInjectionEnabled: true,
+      effectivenessSessionCount: 2,
+    };
+    const block = buildMemoryBlock(profile, null, null);
+    expect(block).toContain('check-in');
+  });
+
+  it('omits check-in prompt when effectivenessSessionCount >= 5', () => {
+    const profile: MemoryBlockProfile = {
+      learningStyle: null,
+      interests: ['space'],
+      strengths: [],
+      struggles: [],
+      communicationNotes: [],
+      memoryEnabled: true,
+      memoryInjectionEnabled: true,
+      effectivenessSessionCount: 5,
+    };
+    const block = buildMemoryBlock(profile, null, null);
+    expect(block).not.toContain('check-in');
   });
 });
 

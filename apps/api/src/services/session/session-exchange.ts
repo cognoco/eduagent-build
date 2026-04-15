@@ -528,6 +528,8 @@ export async function prepareExchangeContext(
             : [],
           memoryEnabled: learningProfile.memoryEnabled,
           memoryInjectionEnabled: learningProfile.memoryInjectionEnabled,
+          effectivenessSessionCount:
+            learningProfile.effectivenessSessionCount ?? 0,
         },
         subject?.name ?? null,
         topic?.title ?? null,
