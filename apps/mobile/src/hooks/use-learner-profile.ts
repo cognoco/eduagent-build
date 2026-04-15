@@ -5,7 +5,11 @@ import {
   type UseMutationResult,
   type UseQueryResult,
 } from '@tanstack/react-query';
-import type { DeleteMemoryItemInput, LearningProfile } from '@eduagent/schemas';
+import type {
+  DeleteMemoryItemInput,
+  LearningProfile,
+  AccommodationMode,
+} from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
@@ -38,6 +42,11 @@ interface TellMentorParams {
 interface UnsuppressParams {
   value: string;
   childProfileId?: string;
+}
+
+interface UpdateAccommodationInput {
+  childProfileId?: string;
+  accommodationMode: AccommodationMode;
 }
 
 function learnerProfileKey(profileId?: string) {
@@ -295,6 +304,38 @@ export function useUnsuppressInference(): UseMutationResult<
           })
         : await client['learner-profile'].unsuppress.$post({
             json: { value: input.value },
+          });
+      await assertOk(res);
+      return (await res.json()) as { success: boolean };
+    },
+    onSuccess: async (_, vars) => {
+      await qc.invalidateQueries({
+        queryKey: learnerProfileKey(vars.childProfileId ?? activeProfile?.id),
+      });
+    },
+  });
+}
+
+export function useUpdateAccommodationMode(): UseMutationResult<
+  { success: boolean },
+  Error,
+  UpdateAccommodationInput
+> {
+  const client = useApiClient();
+  const qc = useQueryClient();
+  const { activeProfile } = useProfile();
+
+  return useMutation({
+    mutationFn: async (input) => {
+      const res = input.childProfileId
+        ? await client['learner-profile'][':profileId'][
+            'accommodation-mode'
+          ].$patch({
+            param: { profileId: input.childProfileId },
+            json: { accommodationMode: input.accommodationMode },
+          })
+        : await client['learner-profile']['accommodation-mode'].$patch({
+            json: { accommodationMode: input.accommodationMode },
           });
       await assertOk(res);
       return (await res.json()) as { success: boolean };
