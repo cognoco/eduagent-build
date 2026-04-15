@@ -1,3 +1,20 @@
+// @sentry/react-native loads native module config at import time, which fails
+// in Jest with "Config file contains no configuration data". Mock globally.
+jest.mock('@sentry/react-native', () => ({
+  init: jest.fn(),
+  wrap: (component: unknown) => component,
+  captureException: jest.fn(),
+  captureMessage: jest.fn(),
+  addBreadcrumb: jest.fn(),
+  setUser: jest.fn(),
+  getCurrentScope: jest.fn(() => ({ clear: jest.fn() })),
+  getClient: jest.fn(() => null),
+  withScope: jest.fn((cb: (scope: unknown) => void) =>
+    cb({ setExtra: jest.fn() })
+  ),
+  Severity: { Error: 'error', Warning: 'warning', Info: 'info' },
+}));
+
 jest.mock('@expo/vector-icons', () => {
   const React = require('react');
   const mockIcon = React.forwardRef(() => null);
