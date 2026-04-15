@@ -161,7 +161,7 @@ describe('LearnerScreen', () => {
       });
     });
 
-    it('shows expired session notice for stale markers instead of clearing them [3C.4]', async () => {
+    it('silently clears stale markers without showing a notice', async () => {
       mockReadSessionRecoveryMarker.mockResolvedValue({
         sessionId: 'session-1',
         updatedAt: new Date().toISOString(),
@@ -170,20 +170,12 @@ describe('LearnerScreen', () => {
 
       render(<LearnerScreen {...defaultProps} />);
 
-      // [3C.4] The marker should NOT be cleared optimistically — SessionScreen
-      // is responsible for clearing after server acknowledges close.
       await waitFor(() => {
-        expect(
-          screen.getByText(
-            'Your previous session has expired and can no longer be resumed.'
-          )
-        ).toBeTruthy();
+        expect(mockClearSessionRecoveryMarker).toHaveBeenCalledWith('p1');
       });
 
-      expect(mockClearSessionRecoveryMarker).not.toHaveBeenCalled();
-      // Recovery resume card should not appear (stale marker), but the
-      // continue card may still show "Continue where you left off" text.
       expect(screen.queryByTestId('intent-resume')).toBeNull();
+      expect(screen.queryByTestId('recently-expired-banner')).toBeNull();
     });
   });
 

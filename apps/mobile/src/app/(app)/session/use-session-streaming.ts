@@ -46,6 +46,7 @@ export interface UseSessionStreamingOptions {
   topicId: string | undefined;
   inputMode: InputMode;
   rawInput: string | undefined;
+  verificationType: string | undefined; // 3E.1/3E.2: teach_back or evaluate
   normalizedOcrText: string | undefined;
   homeworkCaptureSource: HomeworkCaptureSource | undefined;
 
@@ -127,6 +128,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
     topicId,
     inputMode,
     rawInput,
+    verificationType,
     normalizedOcrText,
     homeworkCaptureSource,
     setMessages,
@@ -250,6 +252,11 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
           topicId: topicId ?? undefined,
           sessionType,
           inputMode,
+          ...(verificationType
+            ? {
+                verificationType: verificationType as 'evaluate' | 'teach_back',
+              }
+            : {}),
           ...(rawInput ? { rawInput } : {}),
           ...(effectiveMode === 'homework' && homeworkProblemsState.length > 0
             ? {

@@ -96,6 +96,7 @@ export default function SessionScreen() {
     ocrText,
     captureSource,
     rawInput,
+    verificationType: routeVerificationType,
   } = useLocalSearchParams<{
     mode?: string;
     subjectId?: string;
@@ -108,6 +109,7 @@ export default function SessionScreen() {
     ocrText?: string;
     captureSource?: HomeworkCaptureSource;
     rawInput?: string;
+    verificationType?: string;
   }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -534,6 +536,7 @@ export default function SessionScreen() {
     topicId: topicId ?? undefined,
     inputMode,
     rawInput: rawInput ?? undefined,
+    verificationType: routeVerificationType ?? undefined,
     normalizedOcrText,
     homeworkCaptureSource,
     messages,

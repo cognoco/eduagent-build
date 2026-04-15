@@ -399,16 +399,21 @@ async function findBookSuggestionCard(
       and(eq(subjects.profileId, profileId), eq(subjects.status, 'active'))
     );
 
-  for (const subject of activeSubjects) {
-    const books = await db
-      .select()
-      .from(curriculumBooks)
-      .where(eq(curriculumBooks.subjectId, subject.id))
-      .orderBy(asc(curriculumBooks.sortOrder));
+  if (activeSubjects.length === 0) return null;
 
+  // [CR-2B.2] Batch: fetch all books for all active subjects in one query
+  const subjectIds = activeSubjects.map((s) => s.id);
+  const allBooks = await db
+    .select()
+    .from(curriculumBooks)
+    .where(inArray(curriculumBooks.subjectId, subjectIds))
+    .orderBy(asc(curriculumBooks.sortOrder));
+
+  // Group books by subject and find the first unbuilt book
+  for (const subject of activeSubjects) {
+    const books = allBooks.filter((b) => b.subjectId === subject.id);
     if (books.length === 0) continue;
 
-    // Find the first book that hasn't had topics generated yet
     const nextUnbuilt = books.find((b) => !b.topicsGenerated);
     if (nextUnbuilt) {
       const basePriority = 3;

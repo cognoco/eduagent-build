@@ -2,6 +2,9 @@ import { Hono } from 'hono';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import type { Account } from '../services/account';
+import { createLogger } from '../services/logger';
+
+const logger = createLogger({ level: 'info', environment: 'production' });
 import {
   scheduleDeletion,
   cancelDeletion,
@@ -33,11 +36,10 @@ export const accountRoutes = new Hono<AccountRouteEnv>()
         },
       });
     } catch (err) {
-      console.warn(
-        `[account] Failed to dispatch deletion event for ${account.id}: ${
-          err instanceof Error ? err.message : String(err)
-        }`
-      );
+      logger.warn('[account] Failed to dispatch deletion event', {
+        accountId: account.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
 
     return c.json({

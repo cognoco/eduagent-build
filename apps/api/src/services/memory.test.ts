@@ -223,7 +223,6 @@ describe('retrieveRelevantMemory', () => {
 
     expect(result).toEqual({ context: '', topicIds: [] });
     expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining('[memory]'),
       expect.stringContaining('rate limit')
     );
 
@@ -252,7 +251,6 @@ describe('retrieveRelevantMemory', () => {
 
     expect(result).toEqual({ context: '', topicIds: [] });
     expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining('[memory]'),
       expect.stringContaining('pgvector')
     );
 

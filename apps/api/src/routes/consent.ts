@@ -6,6 +6,9 @@ import {
   ERROR_CODES,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
+import { createLogger } from '../services/logger';
+
+const logger = createLogger({ level: 'info', environment: 'production' });
 import type { AuthUser } from '../middleware/auth';
 import type { Account } from '../services/account';
 import { requireProfileId } from '../middleware/profile-scope';
@@ -115,7 +118,7 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
           },
         });
       } catch {
-        console.warn(
+        logger.warn(
           '[consent] Failed to dispatch Inngest event — reminder workflow skipped'
         );
       }
@@ -230,7 +233,7 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
           },
         });
       } catch {
-        console.warn(
+        logger.warn(
           '[consent] Failed to dispatch Inngest revocation event — grace period job skipped'
         );
       }

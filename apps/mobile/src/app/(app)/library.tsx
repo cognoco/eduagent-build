@@ -352,11 +352,20 @@ export default function LibraryScreen() {
             </Text>
             <Pressable
               onPress={() => allBooksQuery.refetch()}
-              className="bg-primary rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
+              className="bg-primary rounded-button px-6 py-3 items-center min-h-[48px] justify-center mb-3"
               testID="books-tab-retry-button"
             >
               <Text className="text-text-inverse text-body font-semibold">
                 Retry
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => router.replace('/(app)')}
+              className="bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
+              testID="books-tab-home-button"
+            >
+              <Text className="text-body text-text-secondary font-semibold">
+                Go Home
               </Text>
             </Pressable>
           </View>

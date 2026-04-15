@@ -18,6 +18,9 @@ import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
 import { streamSSE } from 'hono/streaming';
 import { captureException } from '../services/sentry';
+import { createLogger } from '../services/logger';
+
+const logger = createLogger({ level: 'info', environment: 'production' });
 import {
   startSession,
   SubjectInactiveError,
@@ -563,11 +566,10 @@ async function dispatchSessionCompletedEvent(
       profileId,
       extra: { sessionId },
     });
-    console.warn(
-      `[sessions] Failed to dispatch session.completed event for ${sessionId}: ${
-        err instanceof Error ? err.message : String(err)
-      }`
-    );
+    logger.warn('[sessions] Failed to dispatch session.completed event', {
+      sessionId,
+      error: err instanceof Error ? err.message : String(err),
+    });
     return { pipelineQueued: false };
   }
 }
