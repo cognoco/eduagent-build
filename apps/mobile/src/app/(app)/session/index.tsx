@@ -10,6 +10,7 @@ import type {
 } from '@eduagent/schemas';
 import {
   ChatShell,
+  animateResponse,
   getModeConfig,
   getOpeningMessage,
   SessionTimer,
@@ -583,6 +584,15 @@ export default function SessionScreen() {
     responseHistory,
   });
 
+  // BUG-373: Exclude auto-sent messages (homework OCR, queued multi-problem)
+  // so the voice/text toggle stays visible until the user deliberately types.
+  // Defined here (before useSubjectClassification) so the greeting guard can
+  // use it to decide whether to re-trigger classification.
+  const userMessageCount = useMemo(
+    () => messages.filter((m) => m.role === 'user' && !m.isAutoSent).length,
+    [messages]
+  );
+
   const {
     handleResolveSubject,
     handleCreateResolveSuggestion,
@@ -612,6 +622,11 @@ export default function SessionScreen() {
     continueWithMessage,
     createLocalMessageId,
     showConfirmation,
+    animateResponse,
+    userMessageCount,
+    sessionExperience,
+    animationCleanupRef,
+    setIsStreaming,
   });
 
   useEffect(() => {
@@ -702,12 +717,6 @@ export default function SessionScreen() {
   // loads and sets exchangeCount > 0.
   const showEndSession = exchangeCount > 0 || !!routeSessionId;
 
-  // BUG-373: Exclude auto-sent messages (homework OCR, queued multi-problem)
-  // so the voice/text toggle stays visible until the user deliberately types.
-  const userMessageCount = useMemo(
-    () => messages.filter((m) => m.role === 'user' && !m.isAutoSent).length,
-    [messages]
-  );
   const latestAiMessageId = useMemo(
     () =>
       [...messages]

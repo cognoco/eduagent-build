@@ -3,7 +3,7 @@ import type { ChatMessage } from '../../../components/session';
 import type { useClassifySubject } from '../../../hooks/use-classify-subject';
 import type { useResolveSubject } from '../../../hooks/use-resolve-subject';
 import type { useCreateSubject } from '../../../hooks/use-subjects';
-import type { PendingSubjectResolution } from './session-types';
+import { type PendingSubjectResolution, isGreeting } from './session-types';
 
 export interface UseSubjectClassificationOptions {
   // State
@@ -47,6 +47,18 @@ export interface UseSubjectClassificationOptions {
   ) => Promise<void>;
   createLocalMessageId: (prefix: 'user' | 'ai') => string;
   showConfirmation: (message: string) => void;
+
+  // Greeting guard dependencies
+  animateResponse: (
+    response: string,
+    setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>,
+    setIsStreaming: React.Dispatch<React.SetStateAction<boolean>>,
+    onDone?: () => void
+  ) => () => void;
+  userMessageCount: number;
+  sessionExperience: number;
+  animationCleanupRef: React.MutableRefObject<(() => void) | null>;
+  setIsStreaming: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 export function useSubjectClassification(
@@ -64,7 +76,6 @@ export function useSubjectClassification(
     setShowWrongSubjectChip,
     setClassifyError,
     setTopicSwitcherSubjectId,
-    messages,
     setMessages,
     setResumedBanner,
     subjectId,
@@ -76,6 +87,11 @@ export function useSubjectClassification(
     continueWithMessage,
     createLocalMessageId,
     showConfirmation,
+    animateResponse,
+    userMessageCount,
+    sessionExperience,
+    animationCleanupRef,
+    setIsStreaming,
   } = opts;
 
   const openSubjectResolution = useCallback(
@@ -281,11 +297,32 @@ export function useSubjectClassification(
       ]);
       setResumedBanner(false);
 
+      // Greeting guard: intercept pure greetings in freeform mode before
+      // any classification or session creation. Saves quota, prevents
+      // the silent auto-subject-pick bug.
+      if (
+        effectiveMode === 'freeform' &&
+        isGreeting(text) &&
+        !subjectId &&
+        !classifiedSubject
+      ) {
+        const greetingResponse =
+          sessionExperience === 0
+            ? 'Hey! What would you like to learn about? You can ask me anything.'
+            : "Hey! What's on your mind today?";
+        animationCleanupRef.current = animateResponse(
+          greetingResponse,
+          setMessages,
+          setIsStreaming
+        );
+        return;
+      }
+
       // Classify subject from first message when none was provided.
       // Freeform sessions auto-pick the best match silently (no picker).
       let sessionSubjectId: string | undefined;
       let sessionSubjectName: string | undefined;
-      if (!subjectId && !classifiedSubject && messages.length <= 1) {
+      if (!subjectId && !classifiedSubject && userMessageCount <= 2) {
         setPendingClassification(true);
         setClassifyError(null);
         try {
@@ -513,7 +550,7 @@ export function useSubjectClassification(
       createLocalMessageId,
       subjectId,
       classifiedSubject,
-      messages.length,
+      userMessageCount,
       effectiveMode,
       classifySubject,
       resolveSubject,
@@ -528,6 +565,10 @@ export function useSubjectClassification(
       setShowWrongSubjectChip,
       setTopicSwitcherSubjectId,
       showConfirmation,
+      animateResponse,
+      sessionExperience,
+      animationCleanupRef,
+      setIsStreaming,
     ]
   );
 
