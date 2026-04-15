@@ -44,7 +44,9 @@ import {
   analyzeSessionTranscript,
   applyAnalysis,
   getLearningProfile,
+  type StruggleNotification,
 } from '../../services/learner-profile';
+import { sendStruggleNotification } from '../../services/notifications';
 
 // ---------------------------------------------------------------------------
 // Step error isolation — each step catches its own errors so that a failure
@@ -475,6 +477,7 @@ export const sessionCompleted = inngest.createFunction(
     // [EP15-M3]: runs AFTER write-coaching-card — profile analysis is background
     // enrichment and must not delay user-facing coaching card. EP15-C3 confirmed
     // this ordering is safe: snapshot pipeline never reads learning_profiles.
+    let pendingStruggleNotifications: StruggleNotification[] = [];
     outcomes.push(
       await step.run('analyze-learner-profile', async () =>
         runIsolated('analyze-learner-profile', profileId, async () => {
@@ -535,15 +538,33 @@ export const sessionCompleted = inngest.createFunction(
             return;
           }
 
-          await applyAnalysis(
+          const analysisResult = await applyAnalysis(
             db,
             profileId,
             analysis,
             subjectRow?.name ?? null
           );
+
+          // Capture via closure — runIsolated only propagates number|void
+          pendingStruggleNotifications = analysisResult.notifications;
         })
       )
     );
+
+    // Step 3b: FR247.6 — Send struggle push notifications to parent
+    if (pendingStruggleNotifications.length > 0) {
+      const notifications = [...pendingStruggleNotifications];
+      outcomes.push(
+        await step.run('notify-struggle', async () =>
+          runIsolated('notify-struggle', profileId, async () => {
+            const db = getStepDatabase();
+            for (const notification of notifications) {
+              await sendStruggleNotification(db, profileId, notification);
+            }
+          })
+        )
+      );
+    }
 
     // Step 4: Update dashboard — streaks + XP
     // FR86: Only count toward Honest Streak when recall quality >= 3 (pass)
