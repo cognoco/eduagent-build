@@ -1,13 +1,14 @@
 import { render, screen, fireEvent } from '@testing-library/react-native';
 
 const mockReplace = jest.fn();
+const mockPush = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({
     back: jest.fn(),
     canGoBack: jest.fn(() => false),
     replace: mockReplace,
-    push: jest.fn(),
+    push: mockPush,
   }),
   useLocalSearchParams: () => ({ profileId: 'child-001' }),
 }));
@@ -165,6 +166,73 @@ describe('ChildReportsScreen', () => {
       expect(screen.getByTestId('report-card-report-001')).toBeTruthy();
       expect(screen.getByText('New')).toBeTruthy();
       expect(screen.getByText('Sessions: 12')).toBeTruthy();
+    });
+
+    it('navigates to report detail when pressed', () => {
+      mockUseChildReports.mockReturnValue({
+        data: [
+          {
+            id: 'report-001',
+            reportMonth: '2026-03',
+            viewedAt: null,
+            createdAt: '2026-04-01T10:00:00Z',
+            headlineStat: {
+              label: 'Sessions',
+              value: '12',
+              comparison: 'Up from 8 last month',
+            },
+          },
+        ],
+        isLoading: false,
+        isError: false,
+        refetch: jest.fn(),
+      });
+
+      render(<ChildReportsScreen />);
+      fireEvent.press(screen.getByTestId('report-card-report-001'));
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: '/(app)/child/[profileId]/report/[reportId]',
+        params: { profileId: 'child-001', reportId: 'report-001' },
+      });
+    });
+
+    it('does not show empty state when reports exist', () => {
+      mockUseChildReports.mockReturnValue({
+        data: [
+          {
+            id: 'report-001',
+            reportMonth: '2026-03',
+            viewedAt: '2026-04-02T12:00:00Z',
+            createdAt: '2026-04-01T10:00:00Z',
+            headlineStat: {
+              label: 'Sessions',
+              value: '12',
+              comparison: 'Up from 8 last month',
+            },
+          },
+        ],
+        isLoading: false,
+        isError: false,
+        refetch: jest.fn(),
+      });
+
+      render(<ChildReportsScreen />);
+      expect(screen.queryByTestId('child-reports-empty')).toBeNull();
+    });
+  });
+
+  describe('back button', () => {
+    it('navigates back via goBackOrReplace', () => {
+      mockUseChildReports.mockReturnValue({
+        data: [],
+        isLoading: false,
+        isError: false,
+        refetch: jest.fn(),
+      });
+
+      render(<ChildReportsScreen />);
+      fireEvent.press(screen.getByTestId('child-reports-back'));
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/child/child-001');
     });
   });
 });
