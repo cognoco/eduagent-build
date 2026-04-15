@@ -63,6 +63,7 @@ import { parseHomeworkProblems } from '../homework/problem-cards';
 import {
   getInputModeKey,
   errorHasStatus,
+  getConversationStage,
   type MessageFeedbackState,
   type PendingSubjectResolution,
 } from './session-types';
@@ -593,6 +594,13 @@ export default function SessionScreen() {
     [messages]
   );
 
+  const hasSubject = !!(classifiedSubject?.subjectId || subjectId);
+  const conversationStage = getConversationStage(
+    userMessageCount,
+    hasSubject,
+    effectiveMode
+  );
+
   const {
     handleResolveSubject,
     handleCreateResolveSuggestion,
@@ -788,7 +796,7 @@ export default function SessionScreen() {
     <SessionToolAccessory
       isStreaming={isStreaming}
       handleQuickChip={handleQuickChip}
-      stage="teaching"
+      stage={conversationStage}
     />
   );
 
@@ -832,7 +840,7 @@ export default function SessionScreen() {
       messageFeedback={messageFeedback}
       quotaError={quotaError}
       isOwner={activeProfile?.isOwner === true}
-      stage="teaching"
+      stage={conversationStage}
       handleQuickChip={handleQuickChip}
       handleMessageFeedback={handleMessageFeedback}
       handleReconnect={handleReconnect}
