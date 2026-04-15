@@ -861,6 +861,13 @@ export default function SessionScreen() {
             filing={filing}
             activeSessionId={activeSessionId}
             effectiveMode={effectiveMode}
+            filingTopicHint={
+              rawInput ??
+              messages
+                .find((m) => m.role === 'user' && !m.isSystemPrompt)
+                ?.content?.slice(0, 80) ??
+              undefined
+            }
             setShowFilingPrompt={setShowFilingPrompt}
             setFilingDismissed={setFilingDismissed}
             navigateToSessionSummary={navigateToSessionSummary}

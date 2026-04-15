@@ -33,7 +33,7 @@ let mockSearchParams = () => ({
 
 // --- useBookWithTopics ---
 const mockBookRefetch = jest.fn();
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 const mockUseBookWithTopics = jest.fn((): any => ({
   data: {
     book: {
@@ -67,7 +67,7 @@ const mockUseBookWithTopics = jest.fn((): any => ({
 
 // --- useGenerateBookTopics ---
 const mockGenerateMutate = jest.fn();
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 const mockUseGenerateBookTopics = jest.fn((): any => ({
   mutate: mockGenerateMutate,
   isPending: false,
@@ -75,11 +75,16 @@ const mockUseGenerateBookTopics = jest.fn((): any => ({
 
 jest.mock('../../../../../hooks/use-books', () => ({
   useBookWithTopics: () => mockUseBookWithTopics(),
+  useBooks: () => ({ data: [], isLoading: false }),
   useGenerateBookTopics: () => mockUseGenerateBookTopics(),
 }));
 
+jest.mock('../../../../../hooks/use-move-topic', () => ({
+  useMoveTopic: () => ({ mutate: jest.fn(), isPending: false }),
+}));
+
 // --- useBookSessions ---
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 const mockUseBookSessions = jest.fn((): any => ({
   data: [],
   isLoading: false,
@@ -90,7 +95,7 @@ jest.mock('../../../../../hooks/use-book-sessions', () => ({
 }));
 
 // --- useTopicSuggestions ---
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 const mockUseTopicSuggestions = jest.fn((): any => ({
   data: [],
   isLoading: false,
@@ -101,7 +106,7 @@ jest.mock('../../../../../hooks/use-topic-suggestions', () => ({
 }));
 
 // --- useBookNotes ---
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 const mockUseBookNotes = jest.fn((): any => ({
   data: { notes: [] },
   isLoading: false,
@@ -119,7 +124,7 @@ jest.mock('../../../../../hooks/use-subjects', () => ({
 }));
 
 // --- useCurriculum ---
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 const mockUseCurriculum = jest.fn((): any => ({
   data: null,
   isLoading: false,
@@ -611,7 +616,7 @@ describe('BookScreen', () => {
     );
   });
 
-  it('long-pressing a session row no longer shows unavailable actions', () => {
+  it('long-pressing a session row shows context menu', () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(jest.fn());
     mockUseBookSessions.mockReturnValue({
       data: makeSessions(1),
@@ -621,7 +626,11 @@ describe('BookScreen', () => {
     const { getByTestId } = render(<BookScreen />);
     fireEvent(getByTestId('session-sess-1'), 'longPress');
 
-    expect(alertSpy).not.toHaveBeenCalled();
+    // With no other books, the alert explains there's nowhere to move
+    expect(alertSpy).toHaveBeenCalledWith(
+      'Session Topic 1',
+      expect.any(String)
+    );
   });
 
   it('shows "Past sessions" heading when sessions exist', () => {

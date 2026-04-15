@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -45,6 +45,18 @@ export default function ShelfScreen() {
     goBackOrReplace(router, '/(app)/library');
   }, [router]);
 
+  // Filing overlay: show spinner + skip button after 15s (same pattern as pick-book)
+  const [showSkip, setShowSkip] = useState(false);
+
+  useEffect(() => {
+    if (filing.isPending) {
+      const timer = setTimeout(() => setShowSkip(true), 15_000);
+      return () => clearTimeout(timer);
+    }
+    setShowSkip(false);
+    return undefined;
+  }, [filing.isPending]);
+
   // R-1: Ref-based lock — backported from pick-book BUG-361 fix.
   // isPending resets before Alert callbacks fire, allowing double-submission.
   const filingInFlight = useRef(false);
@@ -58,6 +70,7 @@ export default function ShelfScreen() {
         rawInput: suggestion.title,
         selectedSuggestion: suggestion.title,
         pickedSuggestionId: suggestion.id,
+        subjectId,
       });
       // Reset the in-flight lock before navigating so a back-navigation
       // doesn't leave filingInFlight permanently true. [CR-fix-3]
@@ -382,6 +395,36 @@ export default function ShelfScreen() {
           </View>
         }
       />
+
+      {/* Loading overlay during filing */}
+      {filing.isPending ? (
+        <View
+          className="absolute inset-0 bg-background/80 items-center justify-center"
+          testID="shelf-filing-overlay"
+        >
+          <ActivityIndicator size="large" color={themeColors.accent} />
+          <Text className="text-body-sm text-text-secondary mt-3">
+            Organizing your library...
+          </Text>
+          {showSkip && (
+            <Pressable
+              onPress={() =>
+                router.replace({
+                  pathname: '/(app)/shelf/[subjectId]',
+                  params: { subjectId },
+                } as never)
+              }
+              className="mt-6 bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
+              testID="shelf-filing-skip"
+              accessibilityLabel="Skip and start learning anyway"
+            >
+              <Text className="text-body font-semibold text-text-primary">
+                Skip — start learning anyway
+              </Text>
+            </Pressable>
+          )}
+        </View>
+      ) : null}
     </View>
   );
 }

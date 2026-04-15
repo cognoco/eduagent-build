@@ -340,6 +340,29 @@ export async function fileToLibrary(
 }
 
 // ---------------------------------------------------------------------------
+// Fallback — used when the LLM filing call fails but subjectId is known
+// ---------------------------------------------------------------------------
+
+export function buildFallbackFilingResponse(
+  subjectId: string,
+  rawInput: string
+): FilingResponse {
+  return {
+    shelf: { id: subjectId },
+    book: {
+      name: 'Uncategorized',
+      emoji: '📂',
+      description: 'Topics to be organized',
+    },
+    chapter: { name: 'General' },
+    topic: {
+      title: rawInput,
+      description: `Topic about ${rawInput}`,
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Resolution logic — create/reuse DB records from filing response
 // ---------------------------------------------------------------------------
 

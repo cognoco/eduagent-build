@@ -8,6 +8,7 @@ import {
   buildLibraryIndex,
   fileToLibrary,
   resolveFilingResult,
+  buildFallbackFilingResponse,
 } from '../services/filing';
 import {
   markBookSuggestionPicked,
@@ -61,6 +62,7 @@ export const filingRoutes = new Hono<FilingRouteEnv>().post(
 
     // Call LLM to determine placement
     let filingResponse;
+    let usedFallback = false;
     try {
       filingResponse = await fileToLibrary(
         {
@@ -90,10 +92,20 @@ export const filingRoutes = new Hono<FilingRouteEnv>().post(
             console.error('[filing] Failed to send retry event:', retryErr);
           });
       }
-      return c.json(
-        { code: 'FILING_FAILED', message: "Couldn't organize this topic." },
-        500
-      );
+      // Pre-session fallback: file under "Uncategorized" book so the session
+      // can start immediately. The user can move the topic later via long-press.
+      if (body.subjectId && body.rawInput) {
+        filingResponse = buildFallbackFilingResponse(
+          body.subjectId,
+          body.rawInput
+        );
+        usedFallback = true;
+      } else {
+        return c.json(
+          { code: 'FILING_FAILED', message: "Couldn't organize this topic." },
+          500
+        );
+      }
     }
 
     // Resolve into actual DB records
@@ -176,6 +188,6 @@ export const filingRoutes = new Hono<FilingRouteEnv>().post(
         });
       });
 
-    return c.json(result, 200);
+    return c.json(usedFallback ? { ...result, fallback: true } : result, 200);
   }
 );

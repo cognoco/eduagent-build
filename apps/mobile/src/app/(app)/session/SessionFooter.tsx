@@ -20,6 +20,7 @@ export interface SessionFooterProps {
   filing: ReturnType<typeof useFiling>;
   activeSessionId: string | null;
   effectiveMode: string;
+  filingTopicHint?: string;
   setShowFilingPrompt: React.Dispatch<React.SetStateAction<boolean>>;
   setFilingDismissed: React.Dispatch<React.SetStateAction<boolean>>;
   navigateToSessionSummary: () => void;
@@ -53,6 +54,7 @@ export function SessionFooter({
   filing,
   activeSessionId,
   effectiveMode,
+  filingTopicHint,
   setShowFilingPrompt,
   setFilingDismissed,
   navigateToSessionSummary,
@@ -82,7 +84,9 @@ export function SessionFooter({
             Add to your library?
           </Text>
           <Text className="text-body-sm text-text-secondary mb-4">
-            We can organize what you learned into your library.
+            {filingTopicHint
+              ? `We covered "${filingTopicHint}". Want to add it to your library?`
+              : 'We can organize what you learned into your library.'}
           </Text>
           <View className="flex-row gap-3">
             <Pressable

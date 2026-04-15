@@ -9,6 +9,7 @@ interface FilingInput {
   sessionTranscript?: string;
   sessionMode?: 'freeform' | 'homework';
   sessionId?: string;
+  subjectId?: string;
   pickedSuggestionId?: string;
   usedTopicSuggestionId?: string;
 }

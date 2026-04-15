@@ -17,12 +17,14 @@ import { SessionRow } from '../../../../../components/library/SessionRow';
 import { ChapterDivider } from '../../../../../components/library/ChapterDivider';
 import {
   useBookWithTopics,
+  useBooks,
   useGenerateBookTopics,
 } from '../../../../../hooks/use-books';
 import {
   useBookSessions,
   type BookSession,
 } from '../../../../../hooks/use-book-sessions';
+import { useMoveTopic } from '../../../../../hooks/use-move-topic';
 import { useTopicSuggestions } from '../../../../../hooks/use-topic-suggestions';
 import { useBookNotes } from '../../../../../hooks/use-notes';
 import { useCurriculum } from '../../../../../hooks/use-curriculum';
@@ -102,6 +104,8 @@ export default function BookScreen() {
   const hasCurriculum = (curriculumQuery.data?.topics?.length ?? 0) > 0;
   const subjectsQuery = useSubjects();
   const subjectName = subjectsQuery.data?.find((s) => s.id === subjectId)?.name;
+  const allBooksQuery = useBooks(subjectId);
+  const moveTopic = useMoveTopic();
 
   const handleBack = useCallback(() => {
     if (subjectId) {
@@ -300,6 +304,58 @@ export default function BookScreen() {
       } as never);
     },
     [router]
+  );
+
+  // --- Long-press: context menu for moving topic to a different book ---
+  const handleSessionLongPress = useCallback(
+    (session: BookSession) => {
+      if (!subjectId || !bookId || isReadOnly) return;
+      const otherBooks = (allBooksQuery.data ?? []).filter(
+        (b) => b.id !== bookId
+      );
+
+      if (otherBooks.length === 0) {
+        Alert.alert(
+          session.topicTitle,
+          'This is the only book on this shelf — there is nowhere to move this topic.'
+        );
+        return;
+      }
+
+      const moveButtons = otherBooks.map((targetBook) => ({
+        text: `${targetBook.emoji ? targetBook.emoji + ' ' : ''}${
+          targetBook.title
+        }`,
+        onPress: () => {
+          if (!session.topicId) return;
+          moveTopic.mutate(
+            {
+              subjectId,
+              bookId,
+              topicId: session.topicId,
+              targetBookId: targetBook.id,
+            },
+            {
+              onSuccess: () => {
+                Alert.alert(
+                  'Moved',
+                  `"${session.topicTitle}" moved to ${targetBook.title}.`
+                );
+              },
+              onError: (err) => {
+                Alert.alert('Could not move topic', formatApiError(err));
+              },
+            }
+          );
+        },
+      }));
+
+      Alert.alert(session.topicTitle, 'Move to a different book?', [
+        ...moveButtons,
+        { text: 'Cancel', style: 'cancel' },
+      ]);
+    },
+    [subjectId, bookId, isReadOnly, allBooksQuery.data, moveTopic]
   );
 
   // --- Start learning: navigate to session with first suggestion or first uncovered topic ---
@@ -681,6 +737,11 @@ export default function BookScreen() {
                           s.topicId != null && noteTopicIds.has(s.topicId)
                         }
                         onPress={() => handleSessionPress(s)}
+                        onLongPress={
+                          s.topicId
+                            ? () => handleSessionLongPress(s)
+                            : undefined
+                        }
                         testID={`session-${s.id}`}
                       />
                     ))}
@@ -693,6 +754,9 @@ export default function BookScreen() {
                     relativeDate={formatRelativeDate(s.createdAt)}
                     hasNote={s.topicId != null && noteTopicIds.has(s.topicId)}
                     onPress={() => handleSessionPress(s)}
+                    onLongPress={
+                      s.topicId ? () => handleSessionLongPress(s) : undefined
+                    }
                     testID={`session-${s.id}`}
                   />
                 ))}
