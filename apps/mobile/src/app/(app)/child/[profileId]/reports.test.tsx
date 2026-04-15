@@ -2,6 +2,7 @@ import { render, screen, fireEvent } from '@testing-library/react-native';
 
 const mockReplace = jest.fn();
 const mockPush = jest.fn();
+const mockGoBackOrReplace = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({
@@ -28,7 +29,7 @@ jest.mock('../../../../hooks/use-progress', () => ({
 }));
 
 jest.mock('../../../../lib/navigation', () => ({
-  goBackOrReplace: (_router: unknown, path: string) => mockReplace(path),
+  goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
 }));
 
 const { default: ChildReportsScreen, getNextReportInfo } =
@@ -72,7 +73,10 @@ describe('ChildReportsScreen', () => {
       expect(screen.getByText("See Emma's progress now")).toBeTruthy();
 
       fireEvent.press(button);
-      expect(mockReplace).toHaveBeenCalledWith('/(app)/child/child-001');
+      expect(mockGoBackOrReplace).toHaveBeenCalledWith(
+        expect.anything(),
+        '/(app)/child/child-001'
+      );
     });
 
     it('shows push notification subtext', () => {
@@ -136,7 +140,10 @@ describe('ChildReportsScreen', () => {
       expect(refetch).toHaveBeenCalled();
 
       fireEvent.press(screen.getByTestId('child-reports-error-back'));
-      expect(mockReplace).toHaveBeenCalledWith('/(app)/child/child-001');
+      expect(mockGoBackOrReplace).toHaveBeenCalledWith(
+        expect.anything(),
+        '/(app)/child/child-001'
+      );
     });
   });
 
@@ -219,6 +226,31 @@ describe('ChildReportsScreen', () => {
       render(<ChildReportsScreen />);
       expect(screen.queryByTestId('child-reports-empty')).toBeNull();
     });
+
+    it('does not show "New" badge for viewed reports', () => {
+      mockUseChildReports.mockReturnValue({
+        data: [
+          {
+            id: 'report-002',
+            reportMonth: '2026-02',
+            viewedAt: '2026-03-05T14:00:00Z',
+            createdAt: '2026-03-01T10:00:00Z',
+            headlineStat: {
+              label: 'Sessions',
+              value: '8',
+              comparison: 'First month',
+            },
+          },
+        ],
+        isLoading: false,
+        isError: false,
+        refetch: jest.fn(),
+      });
+
+      render(<ChildReportsScreen />);
+      expect(screen.getByTestId('report-card-report-002')).toBeTruthy();
+      expect(screen.queryByText('New')).toBeNull();
+    });
   });
 
   describe('back button', () => {
@@ -232,7 +264,10 @@ describe('ChildReportsScreen', () => {
 
       render(<ChildReportsScreen />);
       fireEvent.press(screen.getByTestId('child-reports-back'));
-      expect(mockReplace).toHaveBeenCalledWith('/(app)/child/child-001');
+      expect(mockGoBackOrReplace).toHaveBeenCalledWith(
+        expect.anything(),
+        '/(app)/child/child-001'
+      );
     });
   });
 });
