@@ -812,7 +812,7 @@ describe('SessionScreen homework flow', () => {
   describe('post-session filing prompt', () => {
     /**
      * Helper: renders a freeform session, sends a message to start it,
-     * then triggers end-session via the Alert "I'm Done" callback to
+     * then triggers end-session via the Alert "End Session" callback to
      * get `showFilingPrompt` set to true.
      */
     async function renderAndTriggerFilingPrompt() {
@@ -828,7 +828,7 @@ describe('SessionScreen homework flow', () => {
         resolvedSubjectId: 'subject-1',
       });
 
-      // Spy on Alert.alert so we can invoke the "I'm Done" button callback
+      // Spy on Alert.alert so we can invoke the "End Session" button callback
       const alertSpy = jest.spyOn(Alert, 'alert');
 
       const screen = render(<SessionScreen />);
@@ -845,11 +845,11 @@ describe('SessionScreen homework flow', () => {
       const endButton = screen.getByTestId('end-session-button');
       fireEvent.press(endButton);
 
-      // Alert.alert was called with "Ready to wrap up?" — invoke the "I'm Done" callback
+      // Alert.alert was called with "End session?" — invoke the "End Session" callback
       // BUG-352 added a 4th options arg { cancelable, onDismiss }
       await waitFor(() => {
         expect(alertSpy).toHaveBeenCalledWith(
-          'Ready to wrap up?',
+          'End session?',
           expect.any(String),
           expect.any(Array),
           expect.objectContaining({ cancelable: true })
@@ -860,9 +860,9 @@ describe('SessionScreen homework flow', () => {
         text: string;
         onPress?: () => void;
       }>;
-      const doneButton = buttons.find((b) => b.text === "I'm Done");
+      const doneButton = buttons.find((b) => b.text === 'End Session');
 
-      // Invoke the "I'm Done" callback — this calls closeSession, then sets showFilingPrompt
+      // Invoke the "End Session" callback — this calls closeSession, then sets showFilingPrompt
       await act(async () => {
         doneButton?.onPress?.();
       });

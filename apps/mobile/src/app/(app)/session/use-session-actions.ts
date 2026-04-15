@@ -321,22 +321,21 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
   const handleEndSession = useCallback(async () => {
     if (!activeSessionId || isClosing) return;
 
-    // BUG-352: Set isClosing immediately — before Alert.alert renders — so a
-    // second tap in the same render frame cannot pass the guard and produce a
-    // duplicate confirmation dialog.
+    // BUG-352: Set isClosing immediately so a second tap in the same render
+    // frame cannot pass the guard.
     setIsClosing(true);
 
     Alert.alert(
-      'Ready to wrap up?',
-      'Keep going or finish this session now.',
+      'End session?',
+      '',
       [
         {
-          text: 'Keep Going',
+          text: 'Continue',
           style: 'cancel',
           onPress: () => setIsClosing(false),
         },
         {
-          text: "I'm Done",
+          text: 'End Session',
           onPress: async () => {
             try {
               const timeoutPromise = new Promise<never>((_, reject) =>
@@ -405,8 +404,6 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
                 );
               }
             } catch (err: unknown) {
-              // R-2: Do NOT reset isClosing here — keep End Session button
-              // disabled while the Alert is visible. Reset inside the callback.
               Alert.alert(
                 'Could not end this session cleanly',
                 `${formatApiError(
@@ -430,9 +427,6 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
           },
         },
       ],
-      // BUG-352: Reset isClosing when the dialog is dismissed without choosing
-      // (e.g. Android back button). Without this the "I'm Done" button stays
-      // permanently disabled after a dismiss.
       { cancelable: true, onDismiss: () => setIsClosing(false) }
     );
   }, [

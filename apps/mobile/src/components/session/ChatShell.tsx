@@ -3,6 +3,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   AccessibilityInfo,
   Alert,
+  Linking,
   View,
   Text,
   Pressable,
@@ -297,9 +298,20 @@ export function ChatShell({
 
   // Surface STT errors — previously swallowed silently
   useEffect(() => {
-    if (sttError) {
-      Alert.alert('Voice input error', sttError);
-    }
+    if (!sttError) return;
+    const isPermissionError = sttError.toLowerCase().includes('permission');
+    Alert.alert(
+      'Voice input error',
+      isPermissionError
+        ? 'Microphone access is needed for voice input. Please enable it in Settings.'
+        : sttError,
+      isPermissionError
+        ? [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Open Settings', onPress: () => Linking.openSettings() },
+          ]
+        : undefined
+    );
   }, [sttError]);
 
   // Voice transcript preview actions
