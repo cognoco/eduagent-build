@@ -5,6 +5,7 @@ import {
   curriculumTopics,
   learningSessions,
   milestones,
+  profiles,
   progressSnapshots,
   streaks,
   subjects,
@@ -14,6 +15,8 @@ import {
   type Database,
 } from '@eduagent/database';
 import type {
+  CelebrationName,
+  CelebrationReason,
   KnowledgeInventory,
   MilestoneRecord,
   ProgressDataPoint,
@@ -29,12 +32,14 @@ import {
   progressHistorySchema,
   progressMetricsSchema,
 } from '@eduagent/schemas';
+import { queueCelebration } from './celebrations';
 import { getCurrentLanguageProgress } from './language-curriculum';
 // [EP15-I7] Static import of milestone-detection. No circular dependency
 // (milestone-detection does not import snapshot-aggregation), so the prior
 // dynamic `await import()` added per-call module-resolution overhead on a
 // hot path with no justification. Static import resolves once at cold start.
 import { detectMilestones, storeMilestones } from './milestone-detection';
+import { captureException } from './sentry';
 
 type SubjectRow = typeof subjects.$inferSelect;
 type TopicRow = typeof curriculumTopics.$inferSelect;
@@ -795,6 +800,65 @@ async function previousSnapshotForToday(
   return parseMetrics(row.metrics);
 }
 
+// [FR237.6] Age-adapted detail text for milestone celebrations.
+function getMilestoneCelebrationDetail(
+  milestone: MilestoneRecord,
+  age: number
+): string | null {
+  const young = age < 12;
+  const t = milestone.threshold;
+  const meta = milestone.metadata as Record<string, unknown> | null | undefined;
+
+  switch (milestone.milestoneType) {
+    case 'vocabulary_count':
+      return young
+        ? `You learned your ${t}th word! Amazing! 🎉`
+        : `${t} words — solid milestone.`;
+    case 'topic_mastered_count':
+      return young
+        ? `You mastered ${t} topic${t === 1 ? '' : 's'}! Keep it up! 🌟`
+        : `${t} topic${t === 1 ? '' : 's'} mastered.`;
+    case 'subject_mastered': {
+      const name =
+        typeof meta?.subjectName === 'string' ? meta.subjectName : 'subject';
+      return young
+        ? `You finished ${name}! You're a superstar! ⭐`
+        : `Completed ${name}.`;
+    }
+    case 'book_completed': {
+      const title =
+        typeof meta?.bookTitle === 'string' ? meta.bookTitle : 'book';
+      return young
+        ? `You finished the book "${title}"! Woohoo! 📚`
+        : `Finished "${title}".`;
+    }
+    case 'streak_length':
+      return young
+        ? `${t}-day streak — you're on fire! 🔥`
+        : `${t}-day streak.`;
+    case 'session_count':
+      return young
+        ? `${t} sessions done — you're amazing! 💪`
+        : `${t} sessions completed.`;
+    case 'learning_time':
+      return young
+        ? `${t} hour${t === 1 ? '' : 's'} of learning — wow! ⏰`
+        : `${t} hour${t === 1 ? '' : 's'} learning.`;
+    case 'topics_explored':
+      return young
+        ? `You explored ${t} topic${t === 1 ? '' : 's'}! Great job! 🔭`
+        : `Explored ${t} topic${t === 1 ? '' : 's'}.`;
+    case 'cefr_level_up': {
+      const level = typeof meta?.level === 'string' ? meta.level : `level ${t}`;
+      return young
+        ? `You reached ${level}! You're a language star! 🌍`
+        : `Reached ${level}.`;
+    }
+    default:
+      return null;
+  }
+}
+
 export interface RefreshProgressSnapshotOptions {
   /**
    * Timestamp of the session completion event that triggered this refresh.
@@ -850,6 +914,67 @@ export async function refreshProgressSnapshot(
     profileId,
     detectMilestones(profileId, previousMetrics, metrics)
   );
+
+  // [FR234.5] Bridge newly inserted milestones to the celebration queue.
+  // [FR237.6] Look up birthYear once so detail text can be age-adapted.
+  if (insertedMilestones.length > 0) {
+    try {
+      const profile = await db.query.profiles.findFirst({
+        where: eq(profiles.id, profileId),
+        columns: { birthYear: true },
+      });
+      const age = new Date().getFullYear() - (profile?.birthYear ?? 2015);
+
+      for (const milestone of insertedMilestones) {
+        const detail = getMilestoneCelebrationDetail(milestone, age);
+        const { milestoneType, threshold } = milestone;
+
+        let celebrationName: CelebrationName;
+        let celebrationReason: CelebrationReason;
+
+        if (milestoneType === 'vocabulary_count') {
+          celebrationName = threshold >= 100 ? 'comet' : 'polar_star';
+          celebrationReason = 'deep_diver';
+        } else if (milestoneType === 'topic_mastered_count') {
+          celebrationName = threshold >= 25 ? 'comet' : 'polar_star';
+          celebrationReason = 'topic_mastered';
+        } else if (milestoneType === 'subject_mastered') {
+          celebrationName = 'orions_belt';
+          celebrationReason = 'curriculum_complete';
+        } else if (milestoneType === 'book_completed') {
+          celebrationName = 'comet';
+          celebrationReason = 'curriculum_complete';
+        } else if (milestoneType === 'streak_length') {
+          celebrationName = threshold >= 30 ? 'comet' : 'polar_star';
+          celebrationReason = threshold >= 30 ? 'streak_30' : 'streak_7';
+        } else if (milestoneType === 'session_count') {
+          celebrationName = 'polar_star';
+          celebrationReason = 'persistent';
+        } else if (milestoneType === 'learning_time') {
+          celebrationName = 'twin_stars';
+          celebrationReason = 'persistent';
+        } else if (milestoneType === 'topics_explored') {
+          celebrationName = 'polar_star';
+          celebrationReason = 'deep_diver';
+        } else if (milestoneType === 'cefr_level_up') {
+          celebrationName = 'orions_belt';
+          celebrationReason = 'deep_diver';
+        } else {
+          continue;
+        }
+
+        await queueCelebration(
+          db,
+          profileId,
+          celebrationName,
+          celebrationReason,
+          detail
+        );
+      }
+    } catch (err) {
+      captureException(err, { profileId });
+    }
+  }
 
   return {
     snapshotDate,

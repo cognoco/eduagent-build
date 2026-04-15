@@ -320,6 +320,12 @@ export default function ProgressScreen(): React.ReactElement {
                       params: { subjectId: subject.subjectId },
                     } as never);
                   }}
+                  onAction={(action) => {
+                    const mode = action === 'review' ? 'review' : 'freeform';
+                    router.push(
+                      `/(app)/session?mode=${mode}&subjectId=${subject.subjectId}` as never
+                    );
+                  }}
                   testID={`journey-subject-${subject.subjectId}`}
                 />
               </View>
@@ -367,6 +373,18 @@ export default function ProgressScreen(): React.ReactElement {
                 </Text>
               </View>
             )}
+
+            <Pressable
+              onPress={() => router.push('/(app)/home' as never)}
+              className="bg-primary rounded-button px-4 py-3 mt-6 items-center"
+              accessibilityRole="button"
+              accessibilityLabel="Keep learning"
+              testID="progress-keep-learning"
+            >
+              <Text className="text-body font-semibold text-text-inverse">
+                Keep learning
+              </Text>
+            </Pressable>
           </>
         )}
       </ScrollView>

@@ -22,6 +22,10 @@ import {
   dailySnapshotRefresh,
 } from './functions/daily-snapshot';
 import {
+  progressBackfillTrigger,
+  progressBackfillProfile,
+} from './functions/progress-backfill';
+import {
   weeklyProgressPushCron,
   weeklyProgressPushGenerate,
 } from './functions/weekly-progress-push';
@@ -47,6 +51,8 @@ export {
   postSessionSuggestions,
   dailySnapshotCron,
   dailySnapshotRefresh,
+  progressBackfillTrigger,
+  progressBackfillProfile,
   weeklyProgressPushCron,
   weeklyProgressPushGenerate,
   monthlyReportCron,
@@ -75,6 +81,8 @@ export const functions = [
   postSessionSuggestions,
   dailySnapshotCron,
   dailySnapshotRefresh,
+  progressBackfillTrigger,
+  progressBackfillProfile,
   // [EP15-I1 AR-9] Weekly push split into cron + per-parent handler.
   weeklyProgressPushCron,
   weeklyProgressPushGenerate,

@@ -2,10 +2,18 @@ import { Pressable, Text, View } from 'react-native';
 import type { SubjectInventory } from '@eduagent/schemas';
 import { ProgressBar } from './ProgressBar';
 
+type SubjectCardAction = 'review' | 'continue' | 'explore';
+
 interface SubjectCardProps {
   subject: SubjectInventory;
   onPress?: () => void;
+  onAction?: (action: SubjectCardAction) => void;
   testID?: string;
+}
+
+function getContextualAction(subject: SubjectInventory): SubjectCardAction {
+  if (subject.topics.notStarted > 0) return 'continue';
+  return 'explore';
 }
 
 function getTopicHeadline(subject: SubjectInventory): {
@@ -52,12 +60,20 @@ function getTopicHeadline(subject: SubjectInventory): {
   };
 }
 
+const ACTION_LABEL: Record<SubjectCardAction, string> = {
+  review: 'Review',
+  continue: 'Continue',
+  explore: 'Explore',
+};
+
 export function SubjectCard({
   subject,
   onPress,
+  onAction,
   testID,
 }: SubjectCardProps): React.ReactElement {
   const topicHeadline = getTopicHeadline(subject);
+  const action = getContextualAction(subject);
   const content = (
     <View className="bg-surface rounded-card p-4">
       <View className="flex-row items-start justify-between">
@@ -93,11 +109,28 @@ export function SubjectCard({
         <Text className="text-caption text-text-secondary">
           {topicHeadline.footnote}
         </Text>
-        <Text className="text-caption text-text-secondary">
-          {subject.vocabulary.total > 0
-            ? `${subject.vocabulary.total} words`
-            : `${subject.sessionsCount} sessions`}
-        </Text>
+        <View className="flex-row items-center gap-3">
+          <Text className="text-caption text-text-secondary">
+            {subject.vocabulary.total > 0
+              ? `${subject.vocabulary.total} words`
+              : `${subject.sessionsCount} sessions`}
+          </Text>
+          {onAction ? (
+            <Pressable
+              onPress={(e) => {
+                e.stopPropagation?.();
+                onAction(action);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={`${ACTION_LABEL[action]} ${subject.subjectName}`}
+              testID={testID ? `${testID}-action` : `subject-card-action`}
+            >
+              <Text className="text-body-sm font-semibold text-primary">
+                {ACTION_LABEL[action]}
+              </Text>
+            </Pressable>
+          ) : null}
+        </View>
       </View>
     </View>
   );
