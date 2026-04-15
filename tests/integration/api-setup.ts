@@ -49,9 +49,7 @@ jest.mock('@eduagent/database', () => {
   };
 });
 
-afterAll(async () => {
-  if (_pool) {
-    await (_pool as unknown as { end: () => Promise<void> }).end();
-    _pool = null;
-  }
-});
+// Pool cleanup is handled by Jest worker process exit.
+// Do NOT end the pool in afterAll — the pool is shared across test files
+// within the same worker, and ending it here causes "Cannot use a pool
+// after calling end" in the next integration test file.

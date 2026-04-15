@@ -9,7 +9,8 @@ module.exports = {
   },
   // Swap Neon HTTP driver for standard pg when DATABASE_URL points at
   // localhost (CI container). Unit tests override with their own jest.mock.
-  setupFilesAfterEnv: [join(__dirname, 'integration-setup.ts')],
+  // File lives outside apps/api/ to avoid NX module-boundary lint cascade.
+  setupFilesAfterEnv: [join(__dirname, '../../tests/integration/api-setup.ts')],
   passWithNoTests: true,
   moduleNameMapper: {
     '^@eduagent/schemas$': '<rootDir>/packages/schemas/src/index.ts',
