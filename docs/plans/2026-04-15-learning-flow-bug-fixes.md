@@ -365,17 +365,35 @@ fix(api): inject prior teaching preference for relearn same-method [F-2]
 
 ---
 
-## Task 5: Schedule filing retry on client-side failure [F-5]
+## Task 5: Schedule filing retry via Inngest on client-side failure [F-5]
 
 **Files:**
 - Modify: `apps/mobile/src/app/(app)/session/use-session-actions.ts:380-390`
-- Modify: `apps/mobile/src/hooks/use-sessions.ts` (add retry-filing mutation if needed)
+- Modify: `apps/api/src/routes/filing.ts` (add a fire-and-forget retry-request endpoint)
+- Test: `apps/api/src/routes/filing.test.ts`
 
-When auto-file fails on the client (network error before the API is reached), the toast says "we'll try next time" but no retry is ever scheduled. The server-side `app/filing.retry` event is only emitted on API-level failure.
+When auto-file fails on the client (network error before the API is reached), the toast says "we'll try next time" but no retry is ever scheduled. The server-side `app/filing.retry` Inngest event is only emitted on API-level failure.
 
-- [ ] **Step 1: Add a server-side retry endpoint or use the existing filing route**
+**Why not client-side setTimeout:** A `setTimeout` with async inside a catch is fire-and-forget — if the component unmounts before the 2-second retry fires, it's a no-op. Inngest already provides durable retry semantics, logging, and observability. Push the retry to the server.
 
-The simplest fix: on catch, fire a second `filing.mutateAsync` attempt after a short delay. If that also fails, accept the loss (the session data is safe, only the topic placement is lost).
+- [ ] **Step 1: Add a lightweight retry-request endpoint**
+
+In `apps/api/src/routes/filing.ts`, add a POST endpoint that only dispatches `app/filing.retry`:
+
+```typescript
+.post('/filing/request-retry', authMiddleware, async (c) => {
+  const { sessionId, sessionMode } = await c.req.json();
+  await inngest.send({
+    name: 'app/filing.retry',
+    data: { sessionId, sessionMode, profileId: c.get('auth').profileId },
+  });
+  return c.json({ queued: true });
+})
+```
+
+This is intentionally thin — the `freeform-filing-retry` Inngest function already handles the actual filing logic with built-in retries.
+
+- [ ] **Step 2: On client catch, POST to the retry endpoint instead of setTimeout**
 
 In `apps/mobile/src/app/(app)/session/use-session-actions.ts:380-390`:
 
@@ -389,36 +407,29 @@ try {
     `Saved to your ${effectiveSubjectName ?? 'library'} shelf`
   );
 } catch {
-  // Retry once after 2s — if both fail, the session content is still safe
-  // but topic placement is lost. The server-side filing.retry Inngest
-  // function only fires on API-level failure, not client network errors.
-  setTimeout(async () => {
-    try {
-      await filing.mutateAsync({
-        sessionId: activeSessionId,
-        sessionMode: 'freeform',
-      });
-    } catch {
-      // Silently accept — session data is safe, topic placement is lost
-    }
-  }, 2000);
+  // Dispatch durable retry via Inngest — survives component unmount,
+  // gets Inngest's retry semantics and observability for free.
+  try {
+    await client.filing['request-retry'].$post({
+      json: { sessionId: activeSessionId, sessionMode: 'freeform' },
+    });
+  } catch {
+    // Best-effort — session data is safe, topic placement is lost
+  }
   showConfirmation?.("Couldn't save to library — retrying in the background");
 }
 ```
 
-- [ ] **Step 2: Update toast message to be accurate**
-
-Changed from "we'll try next time" to "retrying in the background".
-
 - [ ] **Step 3: Run tests**
 
-Run: `cd apps/mobile && pnpm exec jest --findRelatedTests src/app/\\(app\\)/session/use-session-actions.ts --no-coverage`
+Run: `pnpm exec jest apps/api/src/routes/filing.test.ts --no-coverage`
+Then: `cd apps/mobile && pnpm exec jest --findRelatedTests src/app/\\(app\\)/session/use-session-actions.ts --no-coverage`
 Expected: PASS
 
 - [ ] **Step 4: Commit**
 
 ```
-fix(mobile): retry filing on client-side failure [F-5]
+fix(api,mobile): durable filing retry via Inngest on client failure [F-5]
 ```
 
 ---
@@ -460,9 +471,11 @@ if (sessionType === 'homework' || !topicId) {
 }
 ```
 
-Note: `topicId` must be declared with `let` (not destructured as `const`) for this to work. Check the existing declaration.
+- [ ] **Step 2: Check `topicId` declaration scope**
 
-- [ ] **Step 2: Run tests**
+`topicId` must be declared with `let` for reassignment to work. If it's currently destructured as `const` from `event.data`, you need to change the destructuring to extract it into a `let` variable. **Check every other reference to `topicId` in the function** to make sure you're not shadowing or breaking anything — the variable may be captured in closures passed to later `step.run()` calls.
+
+- [ ] **Step 3: Run tests**
 
 Run: `pnpm exec jest apps/api/src/inngest/functions/session-completed.test.ts --no-coverage`
 Expected: PASS
@@ -544,22 +557,33 @@ When a relearn session is closed without a summary (user skips, or stale-cleanup
 In the `update-retention` step, before the existing `if (completionQualityRating == null)` skip:
 
 ```typescript
+// Known close reasons (from closeSession + closeStaleSessions):
+//   - 'user_ended'        — user tapped "I'm Done"
+//   - 'silence_timeout'   — stale-cleanup cron (30min idle)
+//   - 'crash_recovery'    — Epic 13 crash-recovery close
+//   - 'app_background'    — OS backgrounded the app
+//
 // For relearn sessions, the retention card was reset at session start.
-// If the session is closed without a summary (auto-close, skip),
-// use a conservative quality=3 ("correct with difficulty") to advance
-// the card from its reset state rather than leaving it stuck forever.
+// If the session is closed without a summary, use a conservative
+// quality=3 ("correct with difficulty") ONLY for user-initiated closes.
+// Auto-closed and crash-recovered sessions have no quality signal.
+const UNATTENDED_REASONS = ['silence_timeout', 'crash_recovery', 'app_background'];
 let effectiveQuality = completionQualityRating;
-if (effectiveQuality == null && event.data.reason === 'silence_timeout') {
-  // Auto-closed session — no quality data available, skip
-} else if (effectiveQuality == null && retentionTopicIds.length > 0) {
-  // User-closed session without summary — check if this was a relearn
-  // by checking if the card was recently reset (repetitions=0).
-  // Use conservative quality=3 to prevent stuck cards.
-  effectiveQuality = 3;
+if (effectiveQuality == null) {
+  const reason = event.data.reason as string | undefined;
+  if (reason && UNATTENDED_REASONS.includes(reason)) {
+    // No quality signal available — session ended without user action
+  } else if (retentionTopicIds.length > 0) {
+    // User-closed session without summary (e.g., skipped).
+    // Use conservative quality=3 to prevent stuck relearn cards.
+    effectiveQuality = 3;
+  }
 }
 ```
 
 Then use `effectiveQuality` instead of `completionQualityRating` in the SM-2 call.
+
+**Important:** Verify the actual `reason` string values used in `closeSession` and `closeStaleSessions` before implementing — the list above is based on current code reading but the agent must grep for all `reason:` assignments to confirm completeness.
 
 - [ ] **Step 2: Run tests**
 
@@ -581,6 +605,8 @@ fix(api): fallback quality for summary-less relearn sessions [F-8, F-9]
 - Modify: `apps/api/src/services/session/session-crud.ts` (accept mode in metadata)
 
 `mode=practice` always creates `sessionType='learning'`. Adding a new enum value requires a migration. The lighter fix: store the effective UI mode in `metadata.effectiveMode` so the pipeline can distinguish them later.
+
+**Post-launch TODO:** Migrate `effectiveMode` to a proper `session_mode` enum column. Once sessions exist with `metadata.effectiveMode`, any query that filters by `sessionType` alone (analytics, dashboard, export) will conflate practice and learning sessions. The jsonb approach is pragmatic for pre-launch but creates a schema debt — add `ALTER TABLE learning_sessions ADD COLUMN session_mode text` and backfill from metadata before this becomes a reporting problem.
 
 - [ ] **Step 1: Pass effectiveMode through to session creation**
 
@@ -616,15 +642,34 @@ Homework problem text is passed via Expo Router URL params. Long OCR results cou
 
 - [ ] **Step 1: Add length guard before router.replace**
 
+Truncate at the problem boundary (drop excess problems), not mid-string. Mid-string `slice()` can break multi-byte characters (ø, å, ñ, CJK) and corrupt the JSON structure.
+
 ```typescript
 const MAX_PARAM_LENGTH = 8000; // safe URL param budget
-const serialized = serializeHomeworkProblems(problems);
-const truncated = serialized.length > MAX_PARAM_LENGTH
-  ? serialized.slice(0, MAX_PARAM_LENGTH - 20) + '...[truncated]'
-  : serialized;
+
+// Drop trailing problems until the serialized string fits.
+// This preserves complete problems rather than slicing mid-character.
+let truncatedProblems = [...problems];
+let serialized = serializeHomeworkProblems(truncatedProblems);
+while (serialized.length > MAX_PARAM_LENGTH && truncatedProblems.length > 1) {
+  truncatedProblems = truncatedProblems.slice(0, -1);
+  serialized = serializeHomeworkProblems(truncatedProblems);
+}
+// If a single problem still exceeds the budget, truncate its text
+// at a word boundary as a last resort.
+if (serialized.length > MAX_PARAM_LENGTH && truncatedProblems.length === 1) {
+  const problem = truncatedProblems[0];
+  const maxTextLen = problem.text.length - (serialized.length - MAX_PARAM_LENGTH) - 30;
+  const wordBoundary = problem.text.lastIndexOf(' ', Math.max(0, maxTextLen));
+  truncatedProblems[0] = {
+    ...problem,
+    text: problem.text.slice(0, wordBoundary > 0 ? wordBoundary : maxTextLen) + ' [truncated]',
+  };
+  serialized = serializeHomeworkProblems(truncatedProblems);
+}
 ```
 
-Use `truncated` in the `router.replace` params.
+Use `serialized` in the `router.replace` params.
 
 - [ ] **Step 2: Commit**
 
@@ -670,13 +715,17 @@ fix(mobile): default topic sort to retention severity [F-12]
 
 The implicit `orderBy: column` defaults to `asc` but is fragile.
 
-- [ ] **Step 1: Wrap with explicit `asc()`**
+- [ ] **Step 1: Verify `asc` is imported**
+
+Check the import block at the top of `snapshot-aggregation.ts`. If `asc` is not already imported from `drizzle-orm`, add it. The file likely already imports `desc` — add `asc` alongside it.
+
+- [ ] **Step 2: Wrap with explicit `asc()`**
 
 ```typescript
 orderBy: asc(progressSnapshots.snapshotDate),
 ```
 
-- [ ] **Step 2: Commit**
+- [ ] **Step 3: Commit**
 
 ```
 chore(api): make snapshot ordering explicit [F-13]
