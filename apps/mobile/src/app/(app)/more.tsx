@@ -15,11 +15,19 @@ import { clearTransitionState } from '../../lib/auth-transition';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth, useUser } from '@clerk/clerk-expo';
-import type { KnowledgeInventory, LearningMode } from '@eduagent/schemas';
+import type {
+  AccommodationMode,
+  KnowledgeInventory,
+  LearningMode,
+} from '@eduagent/schemas';
 import { useProfile } from '../../lib/profile';
 import { useQueryClient } from '@tanstack/react-query';
 import { isNewLearner } from '../../lib/progressive-disclosure';
 import { useExportData } from '../../hooks/use-account';
+import {
+  useLearnerProfile,
+  useUpdateAccommodationMode,
+} from '../../hooks/use-learner-profile';
 import { useFamilySubscription } from '../../hooks/use-subscription';
 import { AccountSecurity } from '../../components/account-security';
 import {
@@ -105,6 +113,34 @@ const LEARNING_MODE_OPTIONS: {
   },
 ];
 
+const ACCOMMODATION_OPTIONS: {
+  mode: AccommodationMode;
+  title: string;
+  description: string;
+}[] = [
+  {
+    mode: 'none',
+    title: 'None',
+    description: 'Standard learning experience',
+  },
+  {
+    mode: 'short-burst',
+    title: 'Short-Burst',
+    description: 'Shorter explanations, frequent check-ins, small steps',
+  },
+  {
+    mode: 'audio-first',
+    title: 'Audio-First',
+    description:
+      'Spoken-style explanations, simple sentences, phonetic support',
+  },
+  {
+    mode: 'predictable',
+    title: 'Predictable',
+    description: 'Clear structure, explicit transitions, concrete examples',
+  },
+];
+
 function LearningModeOption({
   title,
   description,
@@ -174,6 +210,8 @@ export default function MoreScreen() {
   const { data: celebrationLevel, isLoading: celebrationLoading } =
     useCelebrationLevel();
   const updateCelebrationLevel = useUpdateCelebrationLevel();
+  const { data: learnerProfile } = useLearnerProfile();
+  const updateAccommodation = useUpdateAccommodationMode();
 
   const pushEnabled = notifPrefs?.pushEnabled ?? false;
   const weeklyDigest = notifPrefs?.weeklyProgressPush ?? false;
@@ -233,6 +271,21 @@ export default function MoreScreen() {
       }
     },
     [learningMode, updateLearningMode]
+  );
+
+  const handleSelectAccommodation = useCallback(
+    (mode: AccommodationMode) => {
+      if (mode === (learnerProfile?.accommodationMode ?? 'none')) return;
+      updateAccommodation.mutate(
+        { accommodationMode: mode },
+        {
+          onError: () => {
+            Alert.alert('Could not save setting', 'Please try again.');
+          },
+        }
+      );
+    },
+    [learnerProfile?.accommodationMode, updateAccommodation]
   );
 
   const handleExport = useCallback(async () => {
@@ -353,6 +406,23 @@ export default function MoreScreen() {
             disabled={modeLoading || updateLearningMode.isPending}
             onPress={() => handleSelectMode(opt.mode)}
             testID={`learning-mode-${opt.mode}`}
+          />
+        ))}
+
+        <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2 mt-6">
+          Learning Accommodation
+        </Text>
+        {ACCOMMODATION_OPTIONS.map((opt) => (
+          <LearningModeOption
+            key={opt.mode}
+            title={opt.title}
+            description={opt.description}
+            selected={
+              (learnerProfile?.accommodationMode ?? 'none') === opt.mode
+            }
+            disabled={updateAccommodation.isPending}
+            onPress={() => handleSelectAccommodation(opt.mode)}
+            testID={`accommodation-mode-${opt.mode}`}
           />
         ))}
 
