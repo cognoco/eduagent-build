@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState } from 'react';
 import { Stack } from 'expo-router';
 import type { DictationSentence, DictationMode } from '@eduagent/schemas';
+import type { DictationReviewResult } from '../../../hooks/use-dictation-api';
 
 // ---------------------------------------------------------------------------
 // DictationData context — RF-03: data flows through context, not route params
@@ -12,6 +13,7 @@ export interface DictationData {
   title?: string;
   topic?: string;
   mode: DictationMode;
+  reviewResult?: DictationReviewResult; // Added for review flow
 }
 
 interface DictationDataContextType {

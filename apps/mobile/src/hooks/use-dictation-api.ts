@@ -3,9 +3,34 @@ import type {
   PrepareHomeworkInput,
   PrepareHomeworkOutput,
   GenerateDictationOutput,
+  DictationSentence,
+  DictationMode,
 } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { assertOk } from '../lib/assert-ok';
+
+export interface DictationMistake {
+  sentenceIndex: number;
+  original: string;
+  written: string;
+  error: string;
+  correction: string;
+  explanation: string;
+}
+
+export interface DictationReviewResult {
+  totalSentences: number;
+  correctCount: number;
+  mistakes: DictationMistake[];
+}
+
+export interface RecordDictationResultInput {
+  localDate: string;
+  sentenceCount: number;
+  mistakeCount: number | null;
+  mode: DictationMode;
+  reviewed: boolean;
+}
 
 export function usePrepareHomework() {
   const client = useApiClient();
@@ -31,6 +56,38 @@ export function useGenerateDictation() {
       const res = await client.dictation.generate.$post({});
       await assertOk(res);
       return (await res.json()) as GenerateDictationOutput;
+    },
+  });
+}
+
+export function useReviewDictation() {
+  const client = useApiClient();
+
+  return useMutation({
+    mutationFn: async (input: {
+      imageBase64: string;
+      imageMimeType: string;
+      sentences: DictationSentence[];
+      language: string;
+    }): Promise<DictationReviewResult> => {
+      // @ts-expect-error dictation route types not yet wired
+      const res = await client.dictation.review.$post({ json: input });
+      await assertOk(res);
+      return (await res.json()) as DictationReviewResult;
+    },
+  });
+}
+
+export function useRecordDictationResult() {
+  const client = useApiClient();
+
+  return useMutation({
+    mutationFn: async (
+      input: RecordDictationResultInput
+    ): Promise<void> => {
+      // @ts-expect-error dictation route types not yet wired
+      const res = await client.dictation.result.$post({ json: input });
+      await assertOk(res);
     },
   });
 }
