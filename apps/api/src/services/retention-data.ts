@@ -990,7 +990,7 @@ export async function updateRetentionFromSession(
     },
   });
 
-  await db
+  const updateResult = await db
     .update(retentionCards)
     .set({
       easeFactor: String(result.card.easeFactor),
@@ -1003,9 +1003,25 @@ export async function updateRetentionFromSession(
     .where(
       and(
         eq(retentionCards.id, card.id),
-        eq(retentionCards.profileId, profileId)
+        eq(retentionCards.profileId, profileId),
+        // Optimistic lock: only update if the card hasn't been modified
+        // since we read it. Prevents silent overwrites from concurrent sessions.
+        // When updatedAt is null (brand-new card), skip the lock — no prior write to conflict with.
+        ...(card.updatedAt != null
+          ? [eq(retentionCards.updatedAt, card.updatedAt)]
+          : [])
       )
+    )
+    .returning();
+
+  if (updateResult.length === 0) {
+    // Another session updated the card concurrently — our update was
+    // based on stale data. Log and skip rather than silently overwriting.
+    console.warn(
+      `[retention] Optimistic lock conflict for card ${card.id} — ` +
+        `concurrent update detected, skipping`
     );
+  }
 }
 
 // ---------------------------------------------------------------------------

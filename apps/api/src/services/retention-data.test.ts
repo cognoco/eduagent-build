@@ -1463,6 +1463,54 @@ describe('updateRetentionFromSession', () => {
     // SM-2 should run — no timestamp means no guard
     expect(db.update).toHaveBeenCalled();
   });
+
+  it('F-7: logs warning when optimistic lock conflict is detected (0 rows returned)', async () => {
+    const card = mockRetentionCardRow();
+    setupScopedRepo({ retentionCardFindFirst: card });
+
+    const db = createMockDb();
+    // Simulate another writer updating the card between our read and write —
+    // the WHERE clause matches 0 rows so .returning() returns an empty array.
+    (db.update as jest.Mock).mockReturnValue({
+      set: jest.fn().mockReturnValue({
+        where: jest.fn().mockImplementation(() => {
+          const p = Promise.resolve(undefined);
+          (p as Record<string, unknown>).returning = jest
+            .fn()
+            .mockResolvedValue([]); // 0 rows = optimistic lock conflict
+          return p;
+        }),
+      }),
+    });
+
+    const warnSpy = jest.spyOn(console, 'warn').mockReturnValue(undefined);
+    try {
+      await updateRetentionFromSession(db, profileId, topicId, 4);
+      // The update was attempted but matched 0 rows
+      expect(db.update).toHaveBeenCalled();
+      // Warning must have been emitted for the conflict
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Optimistic lock conflict')
+      );
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it('F-7: no warning when update succeeds (1 row returned)', async () => {
+    const card = mockRetentionCardRow();
+    setupScopedRepo({ retentionCardFindFirst: card });
+
+    // Default mock already returns [{}] — 1 row updated successfully
+    const db = createMockDb();
+
+    const warnSpy = jest.spyOn(console, 'warn').mockReturnValue(undefined);
+    await updateRetentionFromSession(db, profileId, topicId, 4);
+    warnSpy.mockRestore();
+
+    expect(db.update).toHaveBeenCalled();
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
 });
 
 // ---------------------------------------------------------------------------
