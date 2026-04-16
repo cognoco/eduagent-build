@@ -120,6 +120,21 @@ export default function ShelfScreen() {
     }
   }, [booksQuery.data, subjectId, router]);
 
+  // Single-book shelf: if auto-skip already fired, redirect to library.
+  // Without this, navigating back from the book screen can land here
+  // (router.replace doesn't reliably remove the shelf from the back stack)
+  // and autoSkippedRef blocks re-redirect → dead-end blank screen.
+  // MUST run before any early-return so rules-of-hooks are preserved.
+  useEffect(() => {
+    if (
+      booksQuery.data &&
+      booksQuery.data.length === 1 &&
+      autoSkippedRef.current
+    ) {
+      router.replace('/(app)/library' as never);
+    }
+  }, [booksQuery.data, router]);
+
   // Guard: param must exist
   if (!subjectId) {
     return (
@@ -144,10 +159,8 @@ export default function ShelfScreen() {
     );
   }
 
-  // Single-book shelf: show minimal placeholder while auto-skip fires.
-  // Previously returned null which caused a crash on web and a dead-end
-  // when navigating back (autoSkippedRef blocks the redirect).
   if (booksQuery.data && booksQuery.data.length === 1) {
+    // Brief placeholder while redirect fires — never a dead-end.
     return (
       <View
         className="flex-1 bg-background"

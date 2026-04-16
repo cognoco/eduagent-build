@@ -243,6 +243,13 @@ describe('BookScreen', () => {
       data: null,
       isLoading: false,
     }));
+    mockUseBooks.mockImplementation(() => ({
+      data: [
+        { id: 'book-1', title: 'Algebra', emoji: '📐', topicsGenerated: true },
+        { id: 'book-2', title: 'Geometry', emoji: '📏', topicsGenerated: true },
+      ],
+      isLoading: false,
+    }));
   });
 
   // -----------------------------------------------------------------------

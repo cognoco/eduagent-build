@@ -110,23 +110,21 @@ export default function BookScreen() {
   const handleBack = useCallback(() => {
     const books = Array.isArray(allBooksQuery.data) ? allBooksQuery.data : null;
 
-    // Single-book shelf: go to library directly.
-    // Going to the shelf would hit the auto-skip dead-end (returns null or
-    // redirects back to this book, causing a loop/crash on web).
-    if (books !== null && books.length <= 1) {
-      goBackOrReplace(router, '/(app)/library');
+    // Single-book shelf (or books not loaded yet): go to library directly.
+    // Do NOT use router.back() — it can land on the shelf's single-book
+    // placeholder (empty View dead-end). The shelf's auto-skip used
+    // router.replace which doesn't reliably remove the shelf from the
+    // back stack, and autoSkippedRef blocks re-redirect, so back() → blank.
+    if (books === null || books.length <= 1) {
+      router.replace('/(app)/library' as never);
       return;
     }
 
-    if (subjectId) {
-      goBackOrReplace(router, {
-        pathname: '/(app)/shelf/[subjectId]',
-        params: { subjectId },
-      } as never);
-      return;
-    }
-
-    goBackOrReplace(router, '/(app)/library');
+    // Multi-book shelf: navigate to the shelf screen to show all books.
+    goBackOrReplace(router, {
+      pathname: '/(app)/shelf/[subjectId]',
+      params: { subjectId },
+    } as never);
   }, [router, subjectId, allBooksQuery.data]);
 
   // --- Generation auto-trigger ---
