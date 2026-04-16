@@ -32,9 +32,10 @@ function deriveStatus(retentionStatus?: string): RetentionStatus {
 
 export default function RecallTestScreen() {
   const router = useRouter();
-  const { topicId, subjectId } = useLocalSearchParams<{
+  const { topicId, subjectId, topicName } = useLocalSearchParams<{
     topicId: string;
     subjectId: string;
+    topicName?: string;
   }>();
 
   const submitRecallTest = useSubmitRecallTest();
@@ -128,9 +129,9 @@ export default function RecallTestScreen() {
     if (!topicId || !subjectId) return;
     router.push({
       pathname: '/(app)/topic/relearn',
-      params: { topicId, subjectId },
+      params: { topicId, subjectId, ...(topicName ? { topicName } : {}) },
     });
-  }, [router, topicId, subjectId]);
+  }, [router, topicId, subjectId, topicName]);
 
   const handleDontRemember = useCallback(() => {
     if (!topicId) return;

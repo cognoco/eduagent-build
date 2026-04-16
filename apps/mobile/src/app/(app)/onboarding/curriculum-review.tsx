@@ -353,6 +353,7 @@ export default function CurriculumScreen() {
                 params: {
                   subjectId,
                   topicId: firstAvailableTopic.id,
+                  topicName: firstAvailableTopic.title,
                 },
               })
             }

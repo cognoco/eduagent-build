@@ -325,7 +325,11 @@ describe('TopicDetailScreen', () => {
 
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/topic/recall-test',
-      params: { subjectId: 'sub-1', topicId: 'topic-1' },
+      params: {
+        subjectId: 'sub-1',
+        topicId: 'topic-1',
+        topicName: 'Algebra',
+      },
     });
   });
 
@@ -559,7 +563,11 @@ describe('TopicDetailScreen', () => {
 
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/topic/relearn',
-      params: { subjectId: 'sub-1', topicId: 'topic-1' },
+      params: {
+        subjectId: 'sub-1',
+        topicId: 'topic-1',
+        topicName: 'Algebra',
+      },
     });
   });
 

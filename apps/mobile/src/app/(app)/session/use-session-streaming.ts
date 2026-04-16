@@ -45,6 +45,7 @@ export interface UseSessionStreamingOptions {
   effectiveSubjectName: string | undefined;
   effectiveMode: string;
   topicId: string | undefined;
+  topicName: string | undefined;
   inputMode: InputMode;
   rawInput: string | undefined;
   verificationType: string | undefined; // 3E.1/3E.2: teach_back or evaluate
@@ -130,6 +131,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
     effectiveSubjectName,
     effectiveMode,
     topicId,
+    topicName,
     inputMode,
     rawInput,
     verificationType,
@@ -369,6 +371,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
             subjectId: effectiveSubjectId || undefined,
             subjectName: effectiveSubjectName || undefined,
             topicId: topicId ?? undefined,
+            topicName: topicName ?? undefined,
             mode: effectiveMode,
             milestoneTracker: trackerStateRef.current,
             updatedAt: new Date().toISOString(),
@@ -453,6 +456,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
             subjectName:
               sessionSubjectName ?? effectiveSubjectName ?? undefined,
             topicId: topicId ?? undefined,
+            topicName: topicName ?? undefined,
             mode: effectiveMode,
             // CR-2: Read from ref so this callback doesn't re-create on every
             // milestone tracker tick (stale closure fix).

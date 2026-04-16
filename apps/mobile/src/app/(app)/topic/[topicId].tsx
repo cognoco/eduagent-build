@@ -635,6 +635,7 @@ export default function TopicDetailScreen() {
                   params: {
                     subjectId,
                     topicId,
+                    topicName: topicProgress?.title,
                   },
                 })
               }
@@ -657,6 +658,7 @@ export default function TopicDetailScreen() {
                     params: {
                       subjectId,
                       topicId,
+                      topicName: topicProgress?.title,
                     },
                   })
                 }

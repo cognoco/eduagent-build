@@ -10,6 +10,7 @@ export interface SessionRecoveryMarker {
   subjectId?: string;
   subjectName?: string;
   topicId?: string;
+  topicName?: string;
   mode?: string;
   milestoneTracker?: MilestoneTrackerState;
   updatedAt: string;

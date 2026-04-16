@@ -128,6 +128,7 @@ export default function LearnNewScreen(): React.ReactElement {
                   params: {
                     topicId: nextReviewTopic.topicId,
                     subjectId: nextReviewTopic.subjectId,
+                    topicName: nextReviewTopic.topicTitle,
                   },
                 } as never);
               } else {
@@ -176,6 +177,9 @@ export default function LearnNewScreen(): React.ReactElement {
                   }),
                   ...(recoveryMarker.topicId && {
                     topicId: recoveryMarker.topicId,
+                  }),
+                  ...(recoveryMarker.topicName && {
+                    topicName: recoveryMarker.topicName,
                   }),
                 },
               } as never)
