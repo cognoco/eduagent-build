@@ -25,6 +25,7 @@ import {
   learningProfiles,
   vocabulary,
   vocabularyRetentionCards,
+  dictationResults,
 } from './schema/index';
 
 export function createScopedRepository(db: Database, profileId: string) {
@@ -321,6 +322,27 @@ export function createScopedRepository(db: Database, profileId: string) {
         return db.query.topicSuggestions.findMany({
           where: eq(topicSuggestions.bookId, bookId),
         });
+      },
+    },
+
+    dictationResults: {
+      async findMany(extraWhere?: SQL) {
+        return db.query.dictationResults.findMany({
+          where: scopedWhere(dictationResults, extraWhere),
+        });
+      },
+      async insert(values: {
+        date: string;
+        sentenceCount: number;
+        mistakeCount: number | null;
+        mode: 'homework' | 'surprise';
+        reviewed: boolean;
+      }) {
+        const [row] = await db
+          .insert(dictationResults)
+          .values({ profileId, ...values })
+          .returning();
+        return row;
       },
     },
   };

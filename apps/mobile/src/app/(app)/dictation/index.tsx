@@ -79,7 +79,7 @@ export default function DictationChoiceScreen(): React.ReactElement {
         <View className="gap-4">
           <IntentCard
             title="I have a text"
-            subtitle="Take a photo of your dictation"
+            subtitle="Type or paste your own text"
             onPress={() =>
               router.push('/(app)/dictation/text-preview' as never)
             }

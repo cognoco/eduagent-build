@@ -42,6 +42,25 @@ export type GenerateDictationOutput = z.infer<
   typeof generateDictationOutputSchema
 >;
 
+// --- dictation review (AI vision-based grading) ---
+
+export const dictationMistakeSchema = z.object({
+  sentenceIndex: z.number().int().nonnegative(),
+  original: z.string(),
+  written: z.string(),
+  error: z.string(),
+  correction: z.string(),
+  explanation: z.string(),
+});
+export type DictationMistake = z.infer<typeof dictationMistakeSchema>;
+
+export const dictationReviewResultSchema = z.object({
+  totalSentences: z.number().int().nonnegative(),
+  correctCount: z.number().int().nonnegative(),
+  mistakes: z.array(dictationMistakeSchema),
+});
+export type DictationReviewResult = z.infer<typeof dictationReviewResultSchema>;
+
 // --- dictation result (for streak tracking) ---
 
 export const dictationResultSchema = z.object({

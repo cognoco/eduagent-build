@@ -1,5 +1,8 @@
-import { z } from 'zod';
-import type { DictationSentence } from '@eduagent/schemas';
+import {
+  dictationReviewResultSchema,
+  type DictationSentence,
+  type DictationReviewResult,
+} from '@eduagent/schemas';
 import { routeAndCall } from '../llm';
 import type { ChatMessage, MessagePart } from '../llm';
 
@@ -36,22 +39,7 @@ RESPOND WITH ONLY valid JSON in this exact format — no prose before or after:
 If there are no mistakes, return an empty array for "mistakes".
 Generate explanations in the child's language as instructed.`;
 
-export const dictationReviewResultSchema = z.object({
-  totalSentences: z.number().int().nonnegative(),
-  correctCount: z.number().int().nonnegative(),
-  mistakes: z.array(
-    z.object({
-      sentenceIndex: z.number().int().nonnegative(),
-      original: z.string(),
-      written: z.string(),
-      error: z.string(),
-      correction: z.string(),
-      explanation: z.string(),
-    })
-  ),
-});
-
-export type DictationReviewResult = z.infer<typeof dictationReviewResultSchema>;
+export type { DictationReviewResult };
 
 export interface ReviewDictationInput {
   sentences: DictationSentence[];

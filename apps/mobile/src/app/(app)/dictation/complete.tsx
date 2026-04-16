@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { useThemeColors } from '../../../lib/theme';
 import { useDictationData } from './_layout';
 import {
@@ -23,9 +23,6 @@ export default function DictationCompleteScreen(): React.ReactElement {
   const { data, setData } = useDictationData();
   const reviewMutation = useReviewDictation();
   const recordResult = useRecordDictationResult();
-
-  // Image pass-through feature complete — enable review flow
-  const imagePassThroughAvailable = true;
 
   const isReviewing = reviewMutation.isPending;
 
@@ -60,9 +57,11 @@ export default function DictationCompleteScreen(): React.ReactElement {
         ? 'image/png'
         : 'image/jpeg';
     } catch {
-      Alert.alert('Photo error', 'Could not read the photo. Please try again.', [
-        { text: 'OK' },
-      ]);
+      Alert.alert(
+        'Photo error',
+        'Could not read the photo. Please try again.',
+        [{ text: 'OK' }]
+      );
       return;
     }
 
@@ -86,17 +85,13 @@ export default function DictationCompleteScreen(): React.ReactElement {
     } catch (err) {
       const message =
         err instanceof Error ? err.message : 'Something went wrong.';
-      Alert.alert(
-        'Review failed',
-        message,
-        [
-          {
-            text: 'Try again',
-            onPress: () => void handleCheckWriting(),
-          },
-          { text: 'Skip', style: 'cancel' },
-        ]
-      );
+      Alert.alert('Review failed', message, [
+        {
+          text: 'Try again',
+          onPress: () => void handleCheckWriting(),
+        },
+        { text: 'Skip', style: 'cancel' },
+      ]);
     }
   };
 
@@ -113,8 +108,9 @@ export default function DictationCompleteScreen(): React.ReactElement {
         mode,
         reviewed: false,
       });
-    } catch {
+    } catch (err) {
       // Non-blocking: streak recording failure should not prevent navigation
+      console.warn('[dictation] streak recording failed:', err);
     }
 
     router.replace('/(app)/practice' as never);
@@ -147,33 +143,25 @@ export default function DictationCompleteScreen(): React.ReactElement {
           </Text>
 
           <View className="w-full gap-3 mt-8">
-            {imagePassThroughAvailable && (
-              <Pressable
-                onPress={() => void handleCheckWriting()}
-                className="bg-primary rounded-xl py-4 items-center"
-                testID="complete-check-writing"
-                accessibilityRole="button"
-                accessibilityLabel="Check my writing"
-              >
-                <View className="flex-row items-center">
-                  <Ionicons
-                    name="camera"
-                    size={20}
-                    color={colors.textInverse}
-                  />
-                  <Text className="text-text-inverse font-semibold text-body ml-2">
-                    Check my writing
-                  </Text>
-                </View>
-              </Pressable>
-            )}
+            <Pressable
+              onPress={() => void handleCheckWriting()}
+              className="bg-primary rounded-xl py-4 items-center"
+              testID="complete-check-writing"
+              accessibilityRole="button"
+              accessibilityLabel="Check my writing"
+            >
+              <View className="flex-row items-center">
+                <Ionicons name="camera" size={20} color={colors.textInverse} />
+                <Text className="text-text-inverse font-semibold text-body ml-2">
+                  Check my writing
+                </Text>
+              </View>
+            </Pressable>
 
             <Pressable
               onPress={() => void handleDone()}
               disabled={recordResult.isPending}
-              className={`rounded-xl py-4 items-center ${
-                imagePassThroughAvailable ? 'bg-surface-elevated' : 'bg-primary'
-              }`}
+              className="rounded-xl py-4 items-center bg-surface-elevated"
               testID="complete-done"
               accessibilityRole="button"
               accessibilityLabel="I'm done"
@@ -181,13 +169,7 @@ export default function DictationCompleteScreen(): React.ReactElement {
               {recordResult.isPending ? (
                 <ActivityIndicator size="small" color={colors.primary} />
               ) : (
-                <Text
-                  className={`font-semibold text-body ${
-                    imagePassThroughAvailable
-                      ? 'text-text-primary'
-                      : 'text-text-inverse'
-                  }`}
-                >
+                <Text className="font-semibold text-body text-text-primary">
                   I'm done
                 </Text>
               )}

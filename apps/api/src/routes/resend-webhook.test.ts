@@ -230,17 +230,16 @@ describe('POST /webhooks/resend — authentication', () => {
     expect(body.code).toBe('MISSING_SIGNATURE');
   });
 
-  it('returns 200 (acknowledged) when RESEND_WEBHOOK_SECRET is not configured', async () => {
+  it('returns 500 when RESEND_WEBHOOK_SECRET is not configured', async () => {
     const res = await makeRequest(
       { type: 'email.delivered', data: { to: 'test@example.com' } },
       {},
       {} // no RESEND_WEBHOOK_SECRET
     );
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(500);
     const body = await res.json();
-    expect(body.received).toBe(true);
-    expect(body.skipped).toBe(true);
+    expect(body.code).toBe('INTERNAL_ERROR');
   });
 
   it('returns 401 when svix-signature is wrong', async () => {

@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  Alert,
   ActivityIndicator,
   Pressable,
   ScrollView,
@@ -117,7 +116,9 @@ export default function DictationReviewScreen(): React.ReactElement {
         >
           {isPerfect
             ? 'Perfect!'
-            : `You fixed all ${mistakes.length} ${mistakes.length === 1 ? 'mistake' : 'mistakes'}!`}
+            : `You fixed all ${mistakes.length} ${
+                mistakes.length === 1 ? 'mistake' : 'mistakes'
+              }!`}
         </Text>
         <Text className="text-body text-text-secondary mt-2 text-center">
           {reviewResult.correctCount} of {reviewResult.totalSentences} sentences
@@ -160,8 +161,7 @@ export default function DictationReviewScreen(): React.ReactElement {
         className="text-h3 font-bold text-text-primary mb-1"
         accessibilityRole="header"
       >
-        {mistakes.length}{' '}
-        {mistakes.length === 1 ? 'mistake' : 'mistakes'} found
+        {mistakes.length} {mistakes.length === 1 ? 'mistake' : 'mistakes'} found
       </Text>
       <Text className="text-body-sm text-text-secondary mb-6">
         Correction {completedCount + 1} of {mistakes.length}
@@ -187,23 +187,15 @@ export default function DictationReviewScreen(): React.ReactElement {
               <Text className="text-body-sm text-text-secondary mb-1">
                 You wrote
               </Text>
-              <Text
-                className="text-body mb-3"
-                style={{ color: colors.danger }}
-              >
+              <Text className="text-body mb-3" style={{ color: colors.danger }}>
                 {currentMistake.written}
               </Text>
             </>
           ) : null}
 
           {/* Error label */}
-          <Text className="text-body-sm text-text-secondary mb-1">
-            Error
-          </Text>
-          <Text
-            className="text-body-sm mb-3"
-            style={{ color: colors.danger }}
-          >
+          <Text className="text-body-sm text-text-secondary mb-1">Error</Text>
+          <Text className="text-body-sm mb-3" style={{ color: colors.danger }}>
             {currentMistake.error}
           </Text>
 

@@ -326,7 +326,23 @@ export function useSubjectClassification(
       // Freeform sessions auto-pick the best match silently (no picker).
       let sessionSubjectId: string | undefined;
       let sessionSubjectName: string | undefined;
-      if (!subjectId && !classifiedSubject && userMessageCount <= 2) {
+
+      // Recitation mode: silently auto-pick the first available subject.
+      // No classification prompt — the child named a poem, not a subject.
+      if (
+        effectiveMode === 'recitation' &&
+        !subjectId &&
+        !classifiedSubject &&
+        availableSubjects[0]
+      ) {
+        const first = availableSubjects[0];
+        setClassifiedSubject({
+          subjectId: first.id,
+          subjectName: first.name,
+        });
+        sessionSubjectId = first.id;
+        sessionSubjectName = first.name;
+      } else if (!subjectId && !classifiedSubject && userMessageCount <= 2) {
         setPendingClassification(true);
         setClassifyError(null);
         try {

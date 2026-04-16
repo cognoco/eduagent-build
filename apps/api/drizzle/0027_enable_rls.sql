@@ -14,7 +14,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO app_user;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
   GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO app_user;
 
--- 3. Enable RLS on all 21 profile-scoped tables
+-- 3. Enable RLS on all 22 profile-scoped tables
 ALTER TABLE assessments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE retention_cards ENABLE ROW LEVEL SECURITY;
 ALTER TABLE needs_deepening_topics ENABLE ROW LEVEL SECURITY;
@@ -36,6 +36,7 @@ ALTER TABLE coaching_card_cache ENABLE ROW LEVEL SECURITY;
 ALTER TABLE vocabulary ENABLE ROW LEVEL SECURITY;
 ALTER TABLE vocabulary_retention_cards ENABLE ROW LEVEL SECURITY;
 ALTER TABLE session_embeddings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE dictation_results ENABLE ROW LEVEL SECURITY;
 
 -- 4. Enable RLS on account-scoped + special tables
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;

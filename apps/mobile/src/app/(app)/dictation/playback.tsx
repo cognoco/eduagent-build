@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useDictationPlayback } from '../../../hooks/use-dictation-playback';
 import { useDictationPreferences } from '../../../hooks/use-dictation-preferences';
+import { goBackOrReplace } from '../../../lib/navigation';
 import { useProfile } from '../../../lib/profile';
 import { useThemeColors } from '../../../lib/theme';
 import { useDictationData } from './_layout';
@@ -50,18 +51,14 @@ export default function PlaybackScreen(): React.ReactElement {
 
   // Back press confirmation — RF-09: progress is not auto-recorded, explicit user action only
   const handleExit = useCallback(() => {
-    Alert.alert(
-      'Are you sure?',
-      "Your dictation progress won't be saved.",
-      [
-        { text: 'Keep going', style: 'cancel' },
-        {
-          text: 'Leave',
-          style: 'destructive',
-          onPress: () => router.replace('/(app)/practice' as never),
-        },
-      ]
-    );
+    Alert.alert('Are you sure?', "Your dictation progress won't be saved.", [
+      { text: 'Keep going', style: 'cancel' },
+      {
+        text: 'Leave',
+        style: 'destructive',
+        onPress: () => router.replace('/(app)/practice' as never),
+      },
+    ]);
   }, [router]);
 
   useEffect(() => {
@@ -86,11 +83,11 @@ export default function PlaybackScreen(): React.ReactElement {
           No dictation data found. Please go back and try again.
         </Text>
         <Pressable
-          onPress={() => router.replace('/(app)/practice' as never)}
+          onPress={() => goBackOrReplace(router, '/(app)/practice')}
           className="bg-primary rounded-xl py-4 px-8 items-center"
           testID="playback-go-back"
           accessibilityRole="button"
-          accessibilityLabel="Go back to Practice"
+          accessibilityLabel="Go back"
         >
           <Text className="text-text-inverse font-semibold text-body">
             Go back
@@ -113,7 +110,9 @@ export default function PlaybackScreen(): React.ReactElement {
           className="px-3 py-2 rounded-lg bg-surface-elevated mr-2"
           testID="playback-pace"
           accessibilityRole="button"
-          accessibilityLabel={`Pace: ${PACE_LABELS[prefs.pace] ?? prefs.pace}. Tap to change.`}
+          accessibilityLabel={`Pace: ${
+            PACE_LABELS[prefs.pace] ?? prefs.pace
+          }. Tap to change.`}
         >
           <Text className="text-body-sm font-semibold text-text-primary">
             {PACE_LABELS[prefs.pace] ?? prefs.pace}
@@ -186,17 +185,12 @@ export default function PlaybackScreen(): React.ReactElement {
             </Text>
           </View>
         ) : (
-          <Text className="text-h2 text-text-muted tracking-widest">
-            * * *
-          </Text>
+          <Text className="text-h2 text-text-muted tracking-widest">* * *</Text>
         )}
       </Pressable>
 
       {/* Repeat button */}
-      <View
-        className="px-4"
-        style={{ paddingBottom: insets.bottom + 16 }}
-      >
+      <View className="px-4" style={{ paddingBottom: insets.bottom + 16 }}>
         <Pressable
           onPress={playback.repeat}
           className="bg-surface-elevated rounded-xl py-4 items-center"

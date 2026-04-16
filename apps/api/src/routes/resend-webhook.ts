@@ -223,11 +223,15 @@ export const resendWebhookRoute = new Hono<{
 
   const webhookSecret = c.env.RESEND_WEBHOOK_SECRET;
   if (!webhookSecret) {
-    // Log but return 200 to avoid Resend retrying indefinitely when unconfigured
-    logger.warn(
-      '[resend] RESEND_WEBHOOK_SECRET not configured — webhook acknowledged but not verified'
+    logger.error(
+      '[resend] RESEND_WEBHOOK_SECRET not configured — rejecting unverified webhook'
     );
-    return c.json({ received: true, skipped: true });
+    return apiError(
+      c,
+      500,
+      ERROR_CODES.INTERNAL_ERROR,
+      'Webhook signature verification not configured'
+    );
   }
 
   // Read raw body before parsing — signature verification requires raw bytes

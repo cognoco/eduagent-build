@@ -73,6 +73,17 @@ export default function PracticeScreen(): React.ReactElement {
           testID="practice-review"
         />
         <IntentCard
+          title="Recite"
+          subtitle="Recite a poem or text from memory"
+          onPress={() =>
+            router.push({
+              pathname: '/(app)/session',
+              params: { mode: 'recitation' },
+            } as never)
+          }
+          testID="practice-recitation"
+        />
+        <IntentCard
           title="Dictation"
           subtitle="Practice writing what you hear"
           onPress={() => router.push('/(app)/dictation' as never)}

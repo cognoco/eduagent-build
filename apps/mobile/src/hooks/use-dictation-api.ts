@@ -5,24 +5,12 @@ import type {
   GenerateDictationOutput,
   DictationSentence,
   DictationMode,
+  DictationReviewResult,
 } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { assertOk } from '../lib/assert-ok';
 
-export interface DictationMistake {
-  sentenceIndex: number;
-  original: string;
-  written: string;
-  error: string;
-  correction: string;
-  explanation: string;
-}
-
-export interface DictationReviewResult {
-  totalSentences: number;
-  correctCount: number;
-  mistakes: DictationMistake[];
-}
+export type { DictationReviewResult };
 
 export interface RecordDictationResultInput {
   localDate: string;
@@ -70,7 +58,6 @@ export function useReviewDictation() {
       sentences: DictationSentence[];
       language: string;
     }): Promise<DictationReviewResult> => {
-      // @ts-expect-error dictation route types not yet wired
       const res = await client.dictation.review.$post({ json: input });
       await assertOk(res);
       return (await res.json()) as DictationReviewResult;
@@ -82,10 +69,7 @@ export function useRecordDictationResult() {
   const client = useApiClient();
 
   return useMutation({
-    mutationFn: async (
-      input: RecordDictationResultInput
-    ): Promise<void> => {
-      // @ts-expect-error dictation route types not yet wired
+    mutationFn: async (input: RecordDictationResultInput): Promise<void> => {
       const res = await client.dictation.result.$post({ json: input });
       await assertOk(res);
     },

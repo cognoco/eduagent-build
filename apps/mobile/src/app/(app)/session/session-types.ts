@@ -250,7 +250,11 @@ export function getConversationStage(
 ): ConversationStage {
   // Practice, review, relearn, and homework already present assessable content
   // on the first AI response. Skip warmup stages.
-  if (['practice', 'review', 'relearn', 'homework'].includes(effectiveMode)) {
+  if (
+    ['practice', 'review', 'relearn', 'homework', 'recitation'].includes(
+      effectiveMode
+    )
+  ) {
     return 'teaching';
   }
 

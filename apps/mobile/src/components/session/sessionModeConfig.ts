@@ -35,6 +35,15 @@ export const SESSION_MODE_CONFIGS: Record<string, SessionModeConfig> = {
     showTimer: false,
     showQuestionCount: false,
   },
+  recitation: {
+    title: 'Recitation (Beta)',
+    subtitle: 'Recite from memory',
+    placeholder: 'Say or type the title...',
+    openingMessage:
+      "What would you like to recite? A poem, song lyrics, or something else you've memorised?",
+    showTimer: false,
+    showQuestionCount: false,
+  },
   freeform: {
     title: 'Chat',
     subtitle: 'Ask anything',
@@ -62,6 +71,8 @@ const FIRST_SESSION: Record<string, string> = {
     "Hi! I'm your learning mate. I'll teach you stuff and check if it sticks — ask me anything along the way. Ready to start?",
   practice:
     "Welcome to your first practice session! Let's see what you know. Ready?",
+  recitation:
+    "Hi! I'll listen while you recite something from memory — a poem, song lyrics, anything. What would you like to recite?",
   freeform:
     "Hi! I'm your learning mate. Feel free to ask me anything — I'm here to help.",
 };
@@ -70,6 +81,8 @@ const EARLY_SESSIONS: Record<string, string> = {
   homework: 'Good to see you again! What homework are we tackling today?',
   learning: 'Back for more learning — awesome! What shall we dive into?',
   practice: "Ready for another round? Let's test your knowledge.",
+  recitation:
+    'Ready for another recitation? What would you like to recite today?',
   freeform: "Hey again! What's on your mind today?",
 };
 
@@ -77,6 +90,7 @@ const FAMILIAR_SESSIONS: Record<string, string> = {
   homework: "Let's get this homework done. What do you need help with?",
   learning: 'What do you remember from our last session?',
   practice: "Quick: what's the key concept we covered?",
+  recitation: 'What are we reciting today?',
   freeform: "What's on your mind? I'm ready when you are.",
 };
 

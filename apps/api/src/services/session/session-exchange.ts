@@ -603,6 +603,9 @@ export async function prepareExchangeContext(
     inputMode: session.inputMode,
     // Teach-first: expose exchange count so buildSystemPrompt can gate first-exchange behaviour
     exchangeCount: session.exchangeCount,
+    // Client-side effective mode — drives mode-specific prompt sections (e.g. recitation)
+    effectiveMode: (session.metadata as Record<string, unknown> | null)
+      ?.effectiveMode as string | undefined,
   };
 
   return { session, context, effectiveRung, hintCount, lastAiResponseAt };

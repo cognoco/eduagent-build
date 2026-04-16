@@ -1,3 +1,14 @@
+// Unit tests only — these verify call order and error propagation using mocks.
+//
+// DEFERRED: Integration test against a real Postgres database that verifies:
+//   1. current_setting('app.current_profile_id') returns the expected value inside the transaction
+//   2. The setting is NULL / reverted after commit or rollback
+//   3. SET LOCAL does not leak across connections
+//
+// This requires switching from neon-http (stateless HTTP) to neon-ws or node-postgres
+// for the test database connection, since neon-http doesn't support real transactions.
+// Tracked as RLS Phase 0.0 prerequisite in docs/plans/2026-04-15-S06-rls-phase-0-1-preparatory.md.
+
 import { withProfileScope } from './rls.js';
 
 function createMockDb() {
