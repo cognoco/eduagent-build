@@ -1006,10 +1006,7 @@ export async function updateRetentionFromSession(
         eq(retentionCards.profileId, profileId),
         // Optimistic lock: only update if the card hasn't been modified
         // since we read it. Prevents silent overwrites from concurrent sessions.
-        // When updatedAt is null (brand-new card), skip the lock — no prior write to conflict with.
-        ...(card.updatedAt != null
-          ? [eq(retentionCards.updatedAt, card.updatedAt)]
-          : [])
+        eq(retentionCards.updatedAt, card.updatedAt)
       )
     )
     .returning();

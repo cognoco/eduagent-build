@@ -1505,11 +1505,14 @@ describe('updateRetentionFromSession', () => {
     const db = createMockDb();
 
     const warnSpy = jest.spyOn(console, 'warn').mockReturnValue(undefined);
-    await updateRetentionFromSession(db, profileId, topicId, 4);
-    warnSpy.mockRestore();
+    try {
+      await updateRetentionFromSession(db, profileId, topicId, 4);
 
-    expect(db.update).toHaveBeenCalled();
-    expect(warnSpy).not.toHaveBeenCalled();
+      expect(db.update).toHaveBeenCalled();
+      expect(warnSpy).not.toHaveBeenCalled();
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 });
 
