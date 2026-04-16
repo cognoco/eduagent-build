@@ -11,7 +11,6 @@ const mockReplace = jest.fn();
 const mockCanGoBack = jest.fn();
 const mockReadSessionRecoveryMarker = jest.fn();
 const mockUseContinueSuggestion = jest.fn();
-const mockUseReviewSummary = jest.fn();
 const mockUseSubjects = jest.fn();
 
 jest.mock('expo-router', () => ({
@@ -40,7 +39,6 @@ jest.mock('../../lib/theme', () => ({
 
 jest.mock('../../hooks/use-progress', () => ({
   useContinueSuggestion: () => mockUseContinueSuggestion(),
-  useReviewSummary: () => mockUseReviewSummary(),
 }));
 
 jest.mock('../../hooks/use-subjects', () => ({
@@ -62,16 +60,34 @@ describe('LearnNewScreen', () => {
     mockReadSessionRecoveryMarker.mockResolvedValue(null);
     mockCanGoBack.mockReturnValue(true);
     mockUseContinueSuggestion.mockReturnValue({ data: null });
-    mockUseReviewSummary.mockReturnValue({ data: { totalOverdue: 0 } });
     mockUseSubjects.mockReturnValue({ data: undefined });
   });
 
-  it('renders title and two always-visible cards', () => {
+  it('renders title and three always-visible cards', () => {
     render(<LearnNewScreen />);
 
     expect(screen.getByText('What would you like to learn?')).toBeTruthy();
     expect(screen.getByText('Pick a subject')).toBeTruthy();
     expect(screen.getByText('Just ask anything')).toBeTruthy();
+    expect(screen.getByText('Practice')).toBeTruthy();
+  });
+
+  it('renders always-visible Practice card regardless of continueSuggestion', () => {
+    mockUseContinueSuggestion.mockReturnValue({
+      data: { subjectId: 's1', subjectName: 'Math', topicId: 't1' },
+    });
+
+    render(<LearnNewScreen />);
+
+    expect(screen.getByTestId('intent-practice')).toBeTruthy();
+    expect(screen.getByText('Practice')).toBeTruthy();
+  });
+
+  it('navigates to practice on "Practice" card press', () => {
+    render(<LearnNewScreen />);
+
+    fireEvent.press(screen.getByTestId('intent-practice'));
+    expect(mockPush).toHaveBeenCalledWith('/(app)/practice');
   });
 
   it('hides resume card when no recovery marker', () => {
@@ -182,7 +198,7 @@ describe('LearnNewScreen', () => {
       });
     });
 
-    it('hides when continueSuggestion exists (review takes priority)', () => {
+    it('hides when continueSuggestion exists', () => {
       mockUseContinueSuggestion.mockReturnValue({
         data: { subjectId: 's1', subjectName: 'Math', topicId: 't1' },
       });
@@ -193,7 +209,6 @@ describe('LearnNewScreen', () => {
       render(<LearnNewScreen />);
 
       expect(screen.queryByTestId('intent-continue-subject')).toBeNull();
-      expect(screen.getByTestId('intent-review')).toBeTruthy();
     });
 
     it('hides when subjects list is empty', () => {
@@ -205,89 +220,4 @@ describe('LearnNewScreen', () => {
     });
   });
 
-  describe('review card', () => {
-    it('shows card when continueSuggestion is available', () => {
-      mockUseContinueSuggestion.mockReturnValue({
-        data: {
-          subjectId: 's1',
-          subjectName: 'Math',
-          topicId: 't1',
-          topicTitle: 'Algebra',
-        },
-      });
-
-      render(<LearnNewScreen />);
-
-      expect(screen.getByTestId('intent-review')).toBeTruthy();
-      expect(screen.getByText('Repeat & review')).toBeTruthy();
-      expect(screen.getByText('Keep your knowledge fresh')).toBeTruthy();
-    });
-
-    it('shows overdue count in subtitle and badge', () => {
-      mockUseContinueSuggestion.mockReturnValue({
-        data: {
-          subjectId: 's1',
-          subjectName: 'Math',
-          topicId: 't1',
-          topicTitle: 'Algebra',
-        },
-      });
-      mockUseReviewSummary.mockReturnValue({ data: { totalOverdue: 3 } });
-
-      render(<LearnNewScreen />);
-
-      expect(screen.getByText('3 topics ready for review')).toBeTruthy();
-      expect(screen.getByTestId('intent-review-badge')).toBeTruthy();
-    });
-
-    it('hides card when no continueSuggestion', () => {
-      render(<LearnNewScreen />);
-
-      expect(screen.queryByTestId('intent-review')).toBeNull();
-    });
-
-    it('navigates to relearn when overdue topic exists', () => {
-      mockUseContinueSuggestion.mockReturnValue({
-        data: {
-          subjectId: 's1',
-          subjectName: 'Math',
-          topicId: 't1',
-          topicTitle: 'Algebra',
-        },
-      });
-      mockUseReviewSummary.mockReturnValue({
-        data: {
-          totalOverdue: 2,
-          nextReviewTopic: { topicId: 't2', subjectId: 's1' },
-        },
-      });
-
-      render(<LearnNewScreen />);
-
-      fireEvent.press(screen.getByTestId('intent-review'));
-      expect(mockPush).toHaveBeenCalledWith({
-        pathname: '/(app)/topic/relearn',
-        params: { topicId: 't2', subjectId: 's1' },
-      });
-    });
-
-    it('falls back to library when no overdue topic', () => {
-      mockUseContinueSuggestion.mockReturnValue({
-        data: {
-          subjectId: 's1',
-          subjectName: 'Math',
-          topicId: 't1',
-          topicTitle: 'Algebra',
-        },
-      });
-      mockUseReviewSummary.mockReturnValue({
-        data: { totalOverdue: 0, nextReviewTopic: null },
-      });
-
-      render(<LearnNewScreen />);
-
-      fireEvent.press(screen.getByTestId('intent-review'));
-      expect(mockPush).toHaveBeenCalledWith('/(app)/library');
-    });
-  });
 });

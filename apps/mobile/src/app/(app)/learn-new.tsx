@@ -12,10 +12,7 @@ import {
   readSessionRecoveryMarker,
   type SessionRecoveryMarker,
 } from '../../lib/session-recovery';
-import {
-  useContinueSuggestion,
-  useReviewSummary,
-} from '../../hooks/use-progress';
+import { useContinueSuggestion } from '../../hooks/use-progress';
 import { useSubjects } from '../../hooks/use-subjects';
 import { useThemeColors } from '../../lib/theme';
 
@@ -27,16 +24,7 @@ export default function LearnNewScreen(): React.ReactElement {
   const [recoveryMarker, setRecoveryMarker] =
     useState<SessionRecoveryMarker | null>(null);
   const { data: continueSuggestion } = useContinueSuggestion();
-  const { data: reviewSummary } = useReviewSummary();
   const { data: subjects } = useSubjects();
-
-  const reviewDueCount = reviewSummary?.totalOverdue ?? 0;
-  const reviewSubtitle =
-    reviewDueCount > 0
-      ? `${reviewDueCount} ${
-          reviewDueCount === 1 ? 'topic' : 'topics'
-        } ready for review`
-      : 'Keep your knowledge fresh';
 
   const handleBack = () => {
     goBackOrReplace(router, '/(app)/home');
@@ -115,29 +103,12 @@ export default function LearnNewScreen(): React.ReactElement {
           onPress={() => router.push('/(app)/session?mode=freeform' as never)}
           testID="intent-freeform"
         />
-        {continueSuggestion ? (
-          <IntentCard
-            title="Repeat & review"
-            subtitle={reviewSubtitle}
-            badge={reviewDueCount > 0 ? reviewDueCount : undefined}
-            onPress={() => {
-              const nextReviewTopic = reviewSummary?.nextReviewTopic ?? null;
-              if (nextReviewTopic) {
-                router.push({
-                  pathname: '/(app)/topic/relearn',
-                  params: {
-                    topicId: nextReviewTopic.topicId,
-                    subjectId: nextReviewTopic.subjectId,
-                    topicName: nextReviewTopic.topicTitle,
-                  },
-                } as never);
-              } else {
-                router.push('/(app)/library' as never);
-              }
-            }}
-            testID="intent-review"
-          />
-        ) : null}
+        <IntentCard
+          title="Practice"
+          subtitle="Review, dictation, and more"
+          onPress={() => router.push('/(app)/practice' as never)}
+          testID="intent-practice"
+        />
         {!recoveryMarker &&
         !continueSuggestion &&
         subjects &&
