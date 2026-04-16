@@ -172,7 +172,17 @@ export function ChatShell({
     startListening,
     stopListening,
     clearTranscript,
+    requestMicrophonePermission,
   } = useSpeechRecognition({ lang: speechRecognitionLanguage });
+
+  // Proactively prompt for microphone on session entry so voice input is
+  // ready without the user hunting for a toggle. Android forbids silent
+  // grants for RECORD_AUDIO, so this system dialog on first launch is the
+  // closest thing to "allowed by default". Once the user taps Allow, the
+  // grant sticks until they explicitly revoke it in Settings.
+  useEffect(() => {
+    void requestMicrophonePermission();
+  }, [requestMicrophonePermission]);
 
   // TTS hook
   const {

@@ -40,6 +40,7 @@ jest.mock('@expo/vector-icons', () => {
 const mockStartListening = jest.fn().mockResolvedValue(undefined);
 const mockStopListening = jest.fn().mockResolvedValue(undefined);
 const mockClearTranscript = jest.fn();
+const mockRequestMicrophonePermission = jest.fn().mockResolvedValue(true);
 let mockSttState = {
   status: 'idle' as string,
   transcript: '',
@@ -53,6 +54,7 @@ jest.mock('../../hooks/use-speech-recognition', () => ({
     startListening: mockStartListening,
     stopListening: mockStopListening,
     clearTranscript: mockClearTranscript,
+    requestMicrophonePermission: mockRequestMicrophonePermission,
   }),
 }));
 
