@@ -33,3 +33,6 @@ export * from './notes.ts';
 
 // Adaptive Memory (Epic 16)
 export * from './learning-profiles.ts';
+
+// Dictation (Practice)
+export * from './dictation.ts';
