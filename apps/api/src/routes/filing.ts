@@ -31,10 +31,20 @@ type FilingRouteEnv = {
   };
 };
 
-export const filingRoutes = new Hono<FilingRouteEnv>().post(
-  '/filing',
-  zValidator('json', filingRequestSchema),
-  async (c) => {
+export const filingRoutes = new Hono<FilingRouteEnv>()
+  .post('/filing/request-retry', async (c) => {
+    const profileId = requireProfileId(c.get('profileId'));
+    const { sessionId, sessionMode } = await c.req.json<{
+      sessionId: string;
+      sessionMode: string;
+    }>();
+    await inngest.send({
+      name: 'app/filing.retry',
+      data: { sessionId, sessionMode: sessionMode ?? 'freeform', profileId },
+    });
+    return c.json({ queued: true });
+  })
+  .post('/filing', zValidator('json', filingRequestSchema), async (c) => {
     const profileId = requireProfileId(c.get('profileId'));
     const db = c.get('db');
     const body = c.req.valid('json');
@@ -189,5 +199,4 @@ export const filingRoutes = new Hono<FilingRouteEnv>().post(
       });
 
     return c.json(usedFallback ? { ...result, fallback: true } : result, 200);
-  }
-);
+  });

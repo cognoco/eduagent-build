@@ -717,6 +717,12 @@ export default function SessionScreen() {
     fetchFastCelebrations,
     showConfirmation,
     filing,
+    retryFiling: async (input: { sessionId: string; sessionMode: string }) => {
+      const res = await apiClient.filing['request-retry'].$post({
+        json: input,
+      });
+      if (!res.ok) throw new Error(`retry-filing failed: ${res.status}`);
+    },
     router,
   });
 

@@ -117,6 +117,12 @@ export interface UseSessionActionsOptions {
     }) => Promise<{ shelfId: string; bookId: string }>;
   };
 
+  /** Best-effort retry: POST /filing/request-retry to queue via Inngest */
+  retryFiling?: (input: {
+    sessionId: string;
+    sessionMode: string;
+  }) => Promise<void>;
+
   router: Router;
 }
 
@@ -166,6 +172,7 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
     fetchFastCelebrations,
     showConfirmation,
     filing,
+    retryFiling,
     router,
   } = opts;
 
@@ -386,7 +393,17 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
                       `Saved to your ${effectiveSubjectName ?? 'library'} shelf`
                     );
                   } catch {
-                    showConfirmation?.("Couldn't save — we'll try next time");
+                    try {
+                      await retryFiling?.({
+                        sessionId: activeSessionId,
+                        sessionMode: 'freeform',
+                      });
+                    } catch {
+                      // Best-effort — session data is safe
+                    }
+                    showConfirmation?.(
+                      "Couldn't save to library — retrying in the background"
+                    );
                   }
                   navigateToSummary(
                     activeSessionId,
@@ -442,6 +459,7 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
     exchangeCount,
     topicId,
     filing,
+    retryFiling,
     showConfirmation,
     navigateToSummary,
     setIsClosing,
