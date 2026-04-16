@@ -176,12 +176,21 @@ export type EscalationRung = z.infer<typeof escalationRungSchema>;
 
 // Exchange schemas
 
-export const sessionMessageSchema = z.object({
-  message: z.string().min(1).max(10000),
-  sessionType: sessionTypeSchema.optional(),
-  /** FR228: Homework mode — "Help me solve it" or "Check my answer" */
-  homeworkMode: homeworkModeSchema.optional(),
-});
+export const sessionMessageSchema = z
+  .object({
+    message: z.string().min(1).max(10000),
+    sessionType: sessionTypeSchema.optional(),
+    /** FR228: Homework mode — "Help me solve it" or "Check my answer" */
+    homeworkMode: homeworkModeSchema.optional(),
+    /** Base64-encoded image to send alongside the message (homework photos) */
+    imageBase64: z.string().max(2_000_000).optional(),
+    /** MIME type of the attached image */
+    imageMimeType: z.enum(['image/jpeg', 'image/png', 'image/webp']).optional(),
+  })
+  .refine((data) => !!data.imageBase64 === !!data.imageMimeType, {
+    message:
+      'imageBase64 and imageMimeType must both be provided or both omitted',
+  });
 export type SessionMessageInput = z.infer<typeof sessionMessageSchema>;
 
 // Session state response
