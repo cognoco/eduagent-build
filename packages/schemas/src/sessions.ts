@@ -136,6 +136,9 @@ export const sessionMetadataSchema = z
     inputMode: inputModeSchema.optional(),
     homework: homeworkSessionMetadataSchema.optional(),
     homeworkSummary: homeworkSummarySchema.optional(),
+    /** F-10: UI mode stored at session creation so pipeline can distinguish
+     *  practice/review from regular learning without a schema migration. */
+    effectiveMode: z.string().optional(),
   })
   .strip();
 export type SessionMetadata = z.infer<typeof sessionMetadataSchema>;

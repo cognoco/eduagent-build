@@ -230,19 +230,21 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
             sessionType,
             inputMode,
             ...(rawInput ? { rawInput } : {}),
-            ...(effectiveMode === 'homework' && homeworkProblemsState.length > 0
-              ? {
-                  metadata: {
-                    inputMode,
+            metadata: {
+              inputMode,
+              effectiveMode,
+              ...(effectiveMode === 'homework' &&
+              homeworkProblemsState.length > 0
+                ? {
                     homework: buildHomeworkSessionMetadata(
                       homeworkProblemsState,
                       currentProblemIndex,
                       normalizedOcrText,
                       homeworkCaptureSource
                     ),
-                  },
-                }
-              : {}),
+                  }
+                : {}),
+            },
           },
         });
         if (!res.ok) {
@@ -263,19 +265,20 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
               }
             : {}),
           ...(rawInput ? { rawInput } : {}),
-          ...(effectiveMode === 'homework' && homeworkProblemsState.length > 0
-            ? {
-                metadata: {
-                  inputMode,
+          metadata: {
+            inputMode,
+            effectiveMode,
+            ...(effectiveMode === 'homework' && homeworkProblemsState.length > 0
+              ? {
                   homework: buildHomeworkSessionMetadata(
                     homeworkProblemsState,
                     currentProblemIndex,
                     normalizedOcrText,
                     homeworkCaptureSource
                   ),
-                },
-              }
-            : {}),
+                }
+              : {}),
+          },
         });
         newId = result.session.id;
       }
