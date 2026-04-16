@@ -9,6 +9,8 @@ import { Alert } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const mockReplace = jest.fn();
+const mockBack = jest.fn();
+const mockCanGoBack = jest.fn(() => false);
 const mockParams = {
   sessionId: '660e8400-e29b-41d4-a716-446655440000',
   subjectName: 'Mathematics',
@@ -17,7 +19,11 @@ const mockParams = {
 } as Record<string, string | undefined>;
 
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ replace: mockReplace }),
+  useRouter: () => ({
+    replace: mockReplace,
+    back: mockBack,
+    canGoBack: mockCanGoBack,
+  }),
   useLocalSearchParams: () => mockParams,
 }));
 
@@ -37,6 +43,15 @@ const mockOnSuccessfulRecall = jest.fn();
 let mockTranscriptData: Record<string, unknown> | null = null;
 let mockSubmitIsError = false;
 let mockSubmitError: Error | null = null;
+// BUG-449: persisted summary lookup for revisits from book page.
+let mockSessionSummaryData: {
+  id: string;
+  sessionId: string;
+  content: string;
+  aiFeedback: string | null;
+  status: 'pending' | 'submitted' | 'accepted' | 'skipped' | 'auto_closed';
+} | null = null;
+let mockSessionSummaryIsLoading = false;
 
 jest.mock('../../hooks/use-sessions', () => ({
   useSubmitSummary: () => ({
@@ -54,6 +69,10 @@ jest.mock('../../hooks/use-sessions', () => ({
   useSessionTranscript: () => ({
     data: mockTranscriptData,
     isLoading: false,
+  }),
+  useSessionSummary: () => ({
+    data: mockSessionSummaryData,
+    isLoading: mockSessionSummaryIsLoading,
   }),
   useRecallBridge: () => ({
     mutateAsync: mockRecallBridgeMutateAsync,
@@ -124,6 +143,11 @@ describe('SessionSummaryScreen', () => {
     mockParams.fastCelebrations = undefined;
     mockParams.sessionType = undefined;
     mockTranscriptData = null;
+    mockSessionSummaryData = null;
+    mockSessionSummaryIsLoading = false;
+    mockBack.mockClear();
+    mockCanGoBack.mockReset();
+    mockCanGoBack.mockReturnValue(false);
     mockOnSuccessfulRecall.mockResolvedValue(undefined);
     mockRecallBridgeMutateAsync.mockRejectedValue(new Error('not homework'));
   });
@@ -494,5 +518,134 @@ describe('SessionSummaryScreen', () => {
     expect(screen.getByTestId('fast-celebrations')).toBeTruthy();
     expect(screen.getByText('Quadratic Equations')).toBeTruthy();
     expect(screen.getByText(/15 minutes - great session!/)).toBeTruthy();
+  });
+
+  // BUG-449: revisiting a past session (Library → Shelf → Book → tap session)
+  // must render the already-saved summary, not the empty "Your Words" prompt.
+  describe('revisiting a session with an already-persisted summary [BUG-449]', () => {
+    it('renders saved content + AI feedback (not the empty input) when status is submitted', () => {
+      mockSessionSummaryData = {
+        id: 'summary-1',
+        sessionId: '660e8400-e29b-41d4-a716-446655440000',
+        content:
+          'African landscapes vary hugely — from the Sahara to savannah to rainforest.',
+        aiFeedback: 'Nice connection between geography and climate zones.',
+        status: 'submitted',
+      };
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      expect(screen.getByTestId('summary-submitted')).toBeTruthy();
+      expect(
+        screen.getByText(
+          'African landscapes vary hugely — from the Sahara to savannah to rainforest.'
+        )
+      ).toBeTruthy();
+      expect(
+        screen.getByText('Nice connection between geography and climate zones.')
+      ).toBeTruthy();
+      // Input form and chips must not be rendered for a persisted summary.
+      expect(screen.queryByTestId('summary-input')).toBeNull();
+      expect(screen.queryByTestId('summary-prompt-chips')).toBeNull();
+      expect(screen.queryByTestId('submit-summary-button')).toBeNull();
+      expect(screen.queryByTestId('skip-summary-button')).toBeNull();
+    });
+
+    it('renders saved content when status is accepted (post-pipeline)', () => {
+      mockSessionSummaryData = {
+        id: 'summary-2',
+        sessionId: '660e8400-e29b-41d4-a716-446655440000',
+        content:
+          'I learned about the Atlas Mountains and the Great Rift Valley.',
+        aiFeedback: 'Great detail — you remembered specific landmarks.',
+        status: 'accepted',
+      };
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      expect(screen.getByTestId('summary-submitted')).toBeTruthy();
+      expect(
+        screen.getByText(
+          'I learned about the Atlas Mountains and the Great Rift Valley.'
+        )
+      ).toBeTruthy();
+      expect(screen.queryByTestId('summary-input')).toBeNull();
+    });
+
+    it('renders read-only skipped-state (no input, no skip) when status is skipped', () => {
+      mockSessionSummaryData = {
+        id: 'summary-3',
+        sessionId: '660e8400-e29b-41d4-a716-446655440000',
+        content: '',
+        aiFeedback: null,
+        status: 'skipped',
+      };
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      expect(screen.getByTestId('summary-skipped-state')).toBeTruthy();
+      expect(screen.queryByTestId('summary-input')).toBeNull();
+      expect(screen.queryByTestId('summary-prompt-chips')).toBeNull();
+      expect(screen.queryByTestId('skip-summary-button')).toBeNull();
+    });
+
+    it('Continue does NOT call skipSummary when summary is already submitted', async () => {
+      mockSessionSummaryData = {
+        id: 'summary-4',
+        sessionId: '660e8400-e29b-41d4-a716-446655440000',
+        content: 'Previously saved reflection text that must not be skipped.',
+        aiFeedback: 'Good reflection.',
+        status: 'submitted',
+      };
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      fireEvent.press(screen.getByTestId('continue-button'));
+
+      await waitFor(() => {
+        expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
+      });
+      expect(mockSkipMutateAsync).not.toHaveBeenCalled();
+    });
+
+    it('Close (X) does NOT call skipSummary when summary is already submitted', async () => {
+      mockSessionSummaryData = {
+        id: 'summary-5',
+        sessionId: '660e8400-e29b-41d4-a716-446655440000',
+        content: 'Existing summary content — close must be a no-op for skip.',
+        aiFeedback: 'Helpful reflection.',
+        status: 'submitted',
+      };
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      fireEvent.press(screen.getByTestId('summary-close-button'));
+
+      await waitFor(() => {
+        expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
+      });
+      expect(mockSkipMutateAsync).not.toHaveBeenCalled();
+    });
+
+    it('prefers router.back() over replace when canGoBack() is true on revisit continue', async () => {
+      mockSessionSummaryData = {
+        id: 'summary-6',
+        sessionId: '660e8400-e29b-41d4-a716-446655440000',
+        content: 'Previously written summary content, revisited from the book.',
+        aiFeedback: 'Nice work.',
+        status: 'submitted',
+      };
+      mockCanGoBack.mockReturnValue(true);
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      fireEvent.press(screen.getByTestId('continue-button'));
+
+      await waitFor(() => {
+        expect(mockBack).toHaveBeenCalled();
+      });
+      expect(mockReplace).not.toHaveBeenCalledWith('/(app)/home');
+      expect(mockSkipMutateAsync).not.toHaveBeenCalled();
+    });
   });
 });

@@ -18,10 +18,12 @@ import { useUpdateLearningMode } from '../../hooks/use-settings';
 import { useRatingPrompt } from '../../hooks/use-rating-prompt';
 import {
   useSessionTranscript,
+  useSessionSummary,
   useSkipSummary,
   useSubmitSummary,
   useRecallBridge,
 } from '../../hooks/use-sessions';
+import { goBackOrReplace } from '../../lib/navigation';
 import { Sentry } from '../../lib/sentry';
 import {
   CheckmarkPopAnimation,
@@ -84,6 +86,23 @@ export default function SessionSummaryScreen() {
   const persona = personaFromBirthYear(activeProfile?.birthYear);
   const recallBridge = useRecallBridge(sessionId ?? '');
   const [recallQuestions, setRecallQuestions] = useState<string[] | null>(null);
+
+  // BUG-449: when the user re-enters this screen from Library → Shelf → Book →
+  // (past session tap), we must render their previously-saved summary instead
+  // of the empty "Your Words" prompt. The local `submitted` state only covers
+  // the just-submitted case in the same render; persisted state comes from
+  // GET /sessions/:sessionId/summary.
+  const persistedSummary = useSessionSummary(sessionId ?? '');
+  const persisted = persistedSummary.data ?? null;
+  const isPersistedSubmitted =
+    persisted?.status === 'submitted' || persisted?.status === 'accepted';
+  const isPersistedSkipped = persisted?.status === 'skipped';
+  const isAlreadyPersisted = isPersistedSubmitted || isPersistedSkipped;
+  const showSubmittedView = submitted || isPersistedSubmitted;
+  const displayContent = submitted ? summaryText : persisted?.content ?? '';
+  const displayAiFeedback = submitted
+    ? aiFeedback
+    : persisted?.aiFeedback ?? null;
 
   const isHomeworkSession =
     sessionTypeParam === 'homework' ||
@@ -233,8 +252,12 @@ export default function SessionSummaryScreen() {
   };
 
   const handleContinue = async (): Promise<void> => {
-    // Story 10.8 Phase 0: summary_skipped event (only when not yet submitted)
-    if (!submitted) {
+    // BUG-449: Only run the skip flow for a fresh session that hasn't been
+    // resolved yet. If the user is revisiting an already-submitted or
+    // already-skipped summary (e.g., tapping a PAST SESSION from the book
+    // page), calling skipSummary would wrongly mark their saved reflection
+    // as "skipped" server-side.
+    if (!submitted && !isAlreadyPersisted) {
       if (skipSummary.isPending || skipInFlight.current) return;
       skipInFlight.current = true;
 
@@ -287,7 +310,7 @@ export default function SessionSummaryScreen() {
               onPress: () => {
                 void (async () => {
                   await maybePromptForRecall();
-                  router.replace('/(app)/home');
+                  goBackOrReplace(router, '/(app)/home');
                 })();
               },
             },
@@ -307,7 +330,7 @@ export default function SessionSummaryScreen() {
               onPress: () => {
                 void (async () => {
                   await maybePromptForRecall();
-                  router.replace('/(app)/home');
+                  goBackOrReplace(router, '/(app)/home');
                 })();
               },
             },
@@ -318,7 +341,7 @@ export default function SessionSummaryScreen() {
                   try {
                     await updateLearningMode.mutateAsync('casual');
                     await maybePromptForRecall();
-                    router.replace('/(app)/home');
+                    goBackOrReplace(router, '/(app)/home');
                   } catch {
                     Alert.alert(
                       "Couldn't switch right now",
@@ -329,7 +352,7 @@ export default function SessionSummaryScreen() {
                           onPress: () => {
                             void (async () => {
                               await maybePromptForRecall();
-                              router.replace('/(app)/home');
+                              goBackOrReplace(router, '/(app)/home');
                             })();
                           },
                         },
@@ -346,7 +369,7 @@ export default function SessionSummaryScreen() {
     }
 
     await maybePromptForRecall();
-    router.replace('/(app)/home');
+    goBackOrReplace(router, '/(app)/home');
   };
 
   const handleGoToLibrary = (): void => {
@@ -550,108 +573,15 @@ export default function SessionSummaryScreen() {
           </View>
         )}
 
-        {/* Your Words section */}
-        <View className="mb-4">
-          <Text className="text-body font-semibold text-text-primary mb-2">
-            Your Words
-          </Text>
-          <Text className="text-body-sm text-text-secondary mb-3">
-            Write a short summary of what you learned. This helps you remember
-            and helps me plan what comes next.
-          </Text>
-
-          {!submitted ? (
-            <>
-              {/* BUG-33 Phase 1: Sentence starter chips */}
-              <View
-                className="flex-row flex-wrap gap-2 mb-3"
-                testID="summary-prompt-chips"
-                accessibilityLabel="Sentence starter suggestions"
-              >
-                {SUMMARY_PROMPTS.map((prompt) => (
-                  <Pressable
-                    key={prompt}
-                    onPress={() => setSummaryText(prompt)}
-                    className="bg-surface-elevated rounded-button px-3 py-2"
-                    testID={`summary-prompt-chip-${prompt}`}
-                    accessibilityLabel={prompt}
-                    accessibilityRole="button"
-                    accessibilityHint="Tap to use this sentence starter"
-                  >
-                    <Text className="text-caption text-text-secondary">
-                      {prompt}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-
-              <TextInput
-                className="bg-surface rounded-card px-4 py-3 text-body text-text-primary min-h-[120px]"
-                placeholder="In my own words, I learned that..."
-                placeholderTextColor={colors.muted}
-                value={summaryText}
-                onChangeText={setSummaryText}
-                multiline
-                maxLength={2000}
-                textAlignVertical="top"
-                editable={!submitSummary.isPending}
-                testID="summary-input"
-                accessibilityLabel="Write your learning summary"
-              />
-              <Text className="text-caption text-text-secondary mt-1 text-right">
-                {summaryText.length}/2000
-              </Text>
-
-              {submitSummary.isError && (
-                <Text
-                  className="text-body-sm text-danger mt-2"
-                  testID="summary-error"
-                >
-                  Couldn't save your summary. Check your connection and try
-                  again — your work won't be lost.
-                </Text>
-              )}
-
-              {skipSummary.isError && (
-                <Text
-                  className="text-body-sm text-danger mt-2"
-                  testID="skip-summary-error"
-                >
-                  Couldn't skip your summary right now. Check your connection
-                  and try again.
-                </Text>
-              )}
-
-              <Pressable
-                onPress={handleSubmit}
-                disabled={
-                  summaryText.trim().length < 10 || submitSummary.isPending
-                }
-                className={`rounded-button py-3 items-center mt-3 ${
-                  summaryText.trim().length >= 10 && !submitSummary.isPending
-                    ? 'bg-primary'
-                    : 'bg-surface-elevated'
-                }`}
-                testID="submit-summary-button"
-                accessibilityLabel="Submit summary"
-                accessibilityRole="button"
-              >
-                {submitSummary.isPending ? (
-                  <ActivityIndicator color={colors.textInverse} />
-                ) : (
-                  <Text
-                    className={`text-body font-semibold ${
-                      summaryText.trim().length >= 10
-                        ? 'text-text-inverse'
-                        : 'text-text-secondary'
-                    }`}
-                  >
-                    Submit Summary
-                  </Text>
-                )}
-              </Pressable>
-            </>
-          ) : (
+        {/* Your Words section — branches on three states:
+            (a) submitted in this render OR persisted submitted/accepted → show saved content + feedback
+            (b) persisted skipped → read-only skipped-state message
+            (c) otherwise → input form with chips (happy path for just-ended sessions) */}
+        {showSubmittedView ? (
+          <View className="mb-4">
+            <Text className="text-body font-semibold text-text-primary mb-2">
+              Your Words
+            </Text>
             <View
               className="bg-surface rounded-card p-4"
               testID="summary-submitted"
@@ -660,38 +590,138 @@ export default function SessionSummaryScreen() {
                 <CheckmarkPopAnimation size={56} />
               </View>
               <Text className="text-body text-text-primary mb-2">
-                {summaryText}
+                {displayContent}
               </Text>
-              <View className="h-px bg-surface-elevated my-3" />
-              <Text className="text-body-sm font-semibold text-text-primary mb-1">
-                Mate feedback
-              </Text>
-              <Text
-                className="text-body-sm text-text-secondary"
-                testID="ai-feedback"
-              >
-                {aiFeedback}
+              {displayAiFeedback ? (
+                <>
+                  <View className="h-px bg-surface-elevated my-3" />
+                  <Text className="text-body-sm font-semibold text-text-primary mb-1">
+                    Mate feedback
+                  </Text>
+                  <Text
+                    className="text-body-sm text-text-secondary"
+                    testID="ai-feedback"
+                  >
+                    {displayAiFeedback}
+                  </Text>
+                </>
+              ) : null}
+            </View>
+          </View>
+        ) : isPersistedSkipped ? (
+          <View className="mb-4" testID="summary-skipped-state">
+            <Text className="text-body font-semibold text-text-primary mb-2">
+              Your Words
+            </Text>
+            <View className="bg-surface rounded-card p-4">
+              <Text className="text-body text-text-secondary">
+                You skipped writing a summary for this session.
               </Text>
             </View>
-          )}
-        </View>
-
-        {/* Skip / Continue */}
-        {!submitted ? (
-          <Pressable
-            onPress={() => {
-              void handleContinue();
-            }}
-            className="py-3 items-center"
-            testID="skip-summary-button"
-            accessibilityLabel="Skip summary"
-            accessibilityRole="button"
-          >
-            <Text className="text-body-sm text-text-secondary">
-              {skipSummary.isPending ? 'Skipping...' : 'Skip for now'}
-            </Text>
-          </Pressable>
+          </View>
         ) : (
+          <View className="mb-4">
+            <Text className="text-body font-semibold text-text-primary mb-2">
+              Your Words
+            </Text>
+            <Text className="text-body-sm text-text-secondary mb-3">
+              Write a short summary of what you learned. This helps you remember
+              and helps me plan what comes next.
+            </Text>
+
+            {/* BUG-33 Phase 1: Sentence starter chips */}
+            <View
+              className="flex-row flex-wrap gap-2 mb-3"
+              testID="summary-prompt-chips"
+              accessibilityLabel="Sentence starter suggestions"
+            >
+              {SUMMARY_PROMPTS.map((prompt) => (
+                <Pressable
+                  key={prompt}
+                  onPress={() => setSummaryText(prompt)}
+                  className="bg-surface-elevated rounded-button px-3 py-2"
+                  testID={`summary-prompt-chip-${prompt}`}
+                  accessibilityLabel={prompt}
+                  accessibilityRole="button"
+                  accessibilityHint="Tap to use this sentence starter"
+                >
+                  <Text className="text-caption text-text-secondary">
+                    {prompt}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <TextInput
+              className="bg-surface rounded-card px-4 py-3 text-body text-text-primary min-h-[120px]"
+              placeholder="In my own words, I learned that..."
+              placeholderTextColor={colors.muted}
+              value={summaryText}
+              onChangeText={setSummaryText}
+              multiline
+              maxLength={2000}
+              textAlignVertical="top"
+              editable={!submitSummary.isPending}
+              testID="summary-input"
+              accessibilityLabel="Write your learning summary"
+            />
+            <Text className="text-caption text-text-secondary mt-1 text-right">
+              {summaryText.length}/2000
+            </Text>
+
+            {submitSummary.isError && (
+              <Text
+                className="text-body-sm text-danger mt-2"
+                testID="summary-error"
+              >
+                Couldn't save your summary. Check your connection and try again
+                — your work won't be lost.
+              </Text>
+            )}
+
+            {skipSummary.isError && (
+              <Text
+                className="text-body-sm text-danger mt-2"
+                testID="skip-summary-error"
+              >
+                Couldn't skip your summary right now. Check your connection and
+                try again.
+              </Text>
+            )}
+
+            <Pressable
+              onPress={handleSubmit}
+              disabled={
+                summaryText.trim().length < 10 || submitSummary.isPending
+              }
+              className={`rounded-button py-3 items-center mt-3 ${
+                summaryText.trim().length >= 10 && !submitSummary.isPending
+                  ? 'bg-primary'
+                  : 'bg-surface-elevated'
+              }`}
+              testID="submit-summary-button"
+              accessibilityLabel="Submit summary"
+              accessibilityRole="button"
+            >
+              {submitSummary.isPending ? (
+                <ActivityIndicator color={colors.textInverse} />
+              ) : (
+                <Text
+                  className={`text-body font-semibold ${
+                    summaryText.trim().length >= 10
+                      ? 'text-text-inverse'
+                      : 'text-text-secondary'
+                  }`}
+                >
+                  Submit Summary
+                </Text>
+              )}
+            </Pressable>
+          </View>
+        )}
+
+        {/* Skip / Continue — skip is only shown for the unresolved / happy path */}
+        {showSubmittedView || isPersistedSkipped ? (
           <Pressable
             onPress={() => {
               void handleContinue();
@@ -703,6 +733,20 @@ export default function SessionSummaryScreen() {
           >
             <Text className="text-text-inverse text-body font-semibold">
               Continue
+            </Text>
+          </Pressable>
+        ) : (
+          <Pressable
+            onPress={() => {
+              void handleContinue();
+            }}
+            className="py-3 items-center"
+            testID="skip-summary-button"
+            accessibilityLabel="Skip summary"
+            accessibilityRole="button"
+          >
+            <Text className="text-body-sm text-text-secondary">
+              {skipSummary.isPending ? 'Skipping...' : 'Skip for now'}
             </Text>
           </Pressable>
         )}
