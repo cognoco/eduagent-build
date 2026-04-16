@@ -717,7 +717,10 @@ export default function SessionScreen() {
     fetchFastCelebrations,
     showConfirmation,
     filing,
-    retryFiling: async (input: { sessionId: string; sessionMode: string }) => {
+    retryFiling: async (input: {
+      sessionId: string;
+      sessionMode: 'freeform' | 'homework';
+    }) => {
       const res = await apiClient.filing['request-retry'].$post({
         json: input,
       });

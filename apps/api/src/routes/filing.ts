@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
+import { z } from 'zod';
 import type { Database } from '@eduagent/database';
 import { filingRequestSchema } from '@eduagent/schemas';
 import type { AuthUser } from '../middleware/auth';
@@ -31,19 +32,25 @@ type FilingRouteEnv = {
   };
 };
 
+const retryRequestSchema = z.object({
+  sessionId: z.string(),
+  sessionMode: z.enum(['freeform', 'homework']).default('freeform'),
+});
+
 export const filingRoutes = new Hono<FilingRouteEnv>()
-  .post('/filing/request-retry', async (c) => {
-    const profileId = requireProfileId(c.get('profileId'));
-    const { sessionId, sessionMode } = await c.req.json<{
-      sessionId: string;
-      sessionMode: string;
-    }>();
-    await inngest.send({
-      name: 'app/filing.retry',
-      data: { sessionId, sessionMode: sessionMode ?? 'freeform', profileId },
-    });
-    return c.json({ queued: true });
-  })
+  .post(
+    '/filing/request-retry',
+    zValidator('json', retryRequestSchema),
+    async (c) => {
+      const profileId = requireProfileId(c.get('profileId'));
+      const { sessionId, sessionMode } = c.req.valid('json');
+      await inngest.send({
+        name: 'app/filing.retry',
+        data: { sessionId, sessionMode, profileId },
+      });
+      return c.json({ queued: true });
+    }
+  )
   .post('/filing', zValidator('json', filingRequestSchema), async (c) => {
     const profileId = requireProfileId(c.get('profileId'));
     const db = c.get('db');

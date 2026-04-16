@@ -120,7 +120,7 @@ export interface UseSessionActionsOptions {
   /** Best-effort retry: POST /filing/request-retry to queue via Inngest */
   retryFiling?: (input: {
     sessionId: string;
-    sessionMode: string;
+    sessionMode: 'freeform' | 'homework';
   }) => Promise<void>;
 
   router: Router;

@@ -250,6 +250,34 @@ describe('filing routes', () => {
         })
       );
     });
+
+    it('returns 400 when sessionId is missing', async () => {
+      const res = await app.request(
+        '/v1/filing/request-retry',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ sessionMode: 'freeform' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 400 when sessionMode is an invalid value', async () => {
+      const res = await app.request(
+        '/v1/filing/request-retry',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ sessionId: 'sess-1', sessionMode: 'invalid' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(400);
+    });
   });
 
   // -------------------------------------------------------------------------
