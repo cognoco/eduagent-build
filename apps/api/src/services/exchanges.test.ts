@@ -3,6 +3,7 @@ import {
   createMockProvider,
   type LLMProvider,
   type ChatMessage,
+  type MessagePart,
   type ModelConfig,
 } from './llm';
 import {
@@ -635,5 +636,83 @@ describe('streamExchange', () => {
     const result = await streamExchange(context, 'Help');
 
     expect(result.newEscalationRung).toBe(4);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// processExchange — multimodal image [IMG-VISION]
+// ---------------------------------------------------------------------------
+
+describe('processExchange — multimodal image', () => {
+  it('builds a MessagePart[] user message when imageData is provided', async () => {
+    let capturedMessages: ChatMessage[] = [];
+    const capturingProvider: LLMProvider = {
+      id: 'gemini',
+      async chat(
+        messages: ChatMessage[],
+        _config: ModelConfig
+      ): Promise<string> {
+        capturedMessages = messages;
+        return 'I see a diagram of a cell.';
+      },
+      async *chatStream(): AsyncIterable<string> {
+        yield 'not used';
+      },
+    };
+    registerProvider(capturingProvider);
+
+    const result = await processExchange(
+      { ...baseContext, exchangeHistory: [] },
+      'What is this?',
+      { base64: 'aW1hZ2VkYXRh', mimeType: 'image/jpeg' }
+    );
+
+    expect(result.response).toContain('diagram');
+
+    const userMsg = capturedMessages[capturedMessages.length - 1];
+    expect(Array.isArray(userMsg.content)).toBe(true);
+
+    const parts = userMsg.content as MessagePart[];
+    expect(parts).toHaveLength(2);
+    expect(parts[0]).toEqual({
+      type: 'inline_data',
+      mimeType: 'image/jpeg',
+      data: 'aW1hZ2VkYXRh',
+    });
+    expect(parts[1]).toEqual({
+      type: 'text',
+      text: 'What is this?',
+    });
+
+    registerProvider(createMockProvider('gemini'));
+  });
+
+  it('builds a string user message when no imageData is provided', async () => {
+    let capturedMessages: ChatMessage[] = [];
+    const capturingProvider: LLMProvider = {
+      id: 'gemini',
+      async chat(
+        messages: ChatMessage[],
+        _config: ModelConfig
+      ): Promise<string> {
+        capturedMessages = messages;
+        return 'Sure, I can help.';
+      },
+      async *chatStream(): AsyncIterable<string> {
+        yield 'not used';
+      },
+    };
+    registerProvider(capturingProvider);
+
+    await processExchange(
+      { ...baseContext, exchangeHistory: [] },
+      'Help me with this problem'
+    );
+
+    const userMsg = capturedMessages[capturedMessages.length - 1];
+    expect(typeof userMsg.content).toBe('string');
+    expect(userMsg.content).toBe('Help me with this problem');
+
+    registerProvider(createMockProvider('gemini'));
   });
 });

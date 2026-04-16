@@ -2,6 +2,7 @@ import { routeAndCall, routeAndStream } from './llm';
 import type {
   ChatMessage,
   EscalationRung,
+  MessagePart,
   RouteResult,
   StreamResult,
 } from './llm';
@@ -21,6 +22,30 @@ import {
 } from '@eduagent/schemas';
 import { buildFourStrandsPrompt } from './language-prompts';
 import type { LLMTier } from './subscription';
+
+// ---------------------------------------------------------------------------
+// Multimodal image support — IMG-VISION
+// ---------------------------------------------------------------------------
+
+export interface ImageData {
+  base64: string;
+  mimeType: string;
+}
+
+function buildUserContent(
+  userMessage: string,
+  imageData?: ImageData
+): string | MessagePart[] {
+  if (!imageData) return userMessage;
+  return [
+    {
+      type: 'inline_data' as const,
+      mimeType: imageData.mimeType,
+      data: imageData.base64,
+    },
+    { type: 'text' as const, text: userMessage },
+  ];
+}
 
 // ---------------------------------------------------------------------------
 // Core Exchange Processing Pipeline — Story 2.1
@@ -528,7 +553,8 @@ export function buildSystemPrompt(context: ExchangeContext): string {
  */
 export async function processExchange(
   context: ExchangeContext,
-  userMessage: string
+  userMessage: string,
+  imageData?: ImageData
 ): Promise<ExchangeResult> {
   const systemPrompt = buildSystemPrompt(context);
 
@@ -538,7 +564,10 @@ export async function processExchange(
       role: e.role,
       content: e.content,
     })),
-    { role: 'user' as const, content: userMessage },
+    {
+      role: 'user' as const,
+      content: buildUserContent(userMessage, imageData),
+    },
   ];
 
   const ageBracket = resolveAgeBracket(context.birthYear);
@@ -591,7 +620,8 @@ export async function processExchange(
  */
 export async function streamExchange(
   context: ExchangeContext,
-  userMessage: string
+  userMessage: string,
+  imageData?: ImageData
 ): Promise<ExchangeStreamResult> {
   const systemPrompt = buildSystemPrompt(context);
 
@@ -601,7 +631,10 @@ export async function streamExchange(
       role: e.role,
       content: e.content,
     })),
-    { role: 'user' as const, content: userMessage },
+    {
+      role: 'user' as const,
+      content: buildUserContent(userMessage, imageData),
+    },
   ];
 
   const ageBracket = resolveAgeBracket(context.birthYear);
