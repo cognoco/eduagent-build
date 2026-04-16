@@ -141,6 +141,22 @@ export async function getSubjectProgress(
       gte(learningSessions.exchangeCount, 1)
     )
   );
+
+  // [BUG-LIB-TOPICS] A completed session on a curriculum topic also counts as
+  // completion — matches the book-view semantic (services/curriculum.ts
+  // computeBookStatusesBatch). Without this, library showed 0/N while the book
+  // screen showed 1/N for the same topic after a session finished.
+  const curriculumTopicIds = new Set(topics.map((t) => t.id));
+  for (const session of sessions) {
+    if (
+      session.topicId &&
+      curriculumTopicIds.has(session.topicId) &&
+      (session.status === 'completed' || session.status === 'auto_closed')
+    ) {
+      completedTopics.add(session.topicId);
+    }
+  }
+
   const lastSession = sessions.sort(
     (a, b) => b.lastActivityAt.getTime() - a.lastActivityAt.getTime()
   )[0];
@@ -414,6 +430,22 @@ export async function getOverallProgress(
 
     // Last session
     const subjectSessions = sessionsBySubject.get(subject.id) ?? [];
+
+    // [BUG-LIB-TOPICS] A completed session on a curriculum topic also counts
+    // as completion — matches the book-view semantic in
+    // services/curriculum.ts:computeBookStatusesBatch. Keeps the library card
+    // aligned with what the book screen shows.
+    const curriculumTopicIds = new Set(topics.map((t) => t.id));
+    for (const session of subjectSessions) {
+      if (
+        session.topicId &&
+        curriculumTopicIds.has(session.topicId) &&
+        (session.status === 'completed' || session.status === 'auto_closed')
+      ) {
+        completedTopics.add(session.topicId);
+      }
+    }
+
     const lastSession = subjectSessions.sort(
       (a, b) => b.lastActivityAt.getTime() - a.lastActivityAt.getTime()
     )[0];
