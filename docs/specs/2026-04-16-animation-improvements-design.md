@@ -18,40 +18,38 @@ Additionally, no distinction exists between "AI is thinking" and "waiting for ch
 
 ### 1. Magic Pen Animation (new: `MagicPenAnimation`)
 
-**Purpose:** "Waiting for the child to respond" indicator. Shown after 20s of idle time when the AI has finished and the child hasn't typed.
+**Purpose:** "Waiting for the child to respond" indicator. Shown on the idle timer when the AI has finished and the child hasn't typed (see Section 4 for idle threshold).
 
 **Visual concept:** A cartoon fountain pen with a visible body, grip section, and nib. The pen follows a cursive stroke path as ink flows from the tip.
 
-**Pen shape (static SVG group):**
-- Barrel: elongated rounded rectangle, angled ~45deg for a natural writing posture
-- Grip section: slightly tapered, darker shade
-- Nib: pointed triangle tip where ink appears
-- Optional: subtle sparkle/glow aura at the nib tip (magic feel)
+#### Baseline (48px — ChatShell idle, primary use case)
 
-**Ink animation:**
-- The cursive stroke draws itself (existing `strokeDashoffset` technique — proven to work on Fabric)
-- Ink starts bold/opaque near the nib and fades behind (gradient opacity via a second overlay path)
-- 2-3 tiny ink droplets occasionally detach from the nib (animated `Animated.View` dots that fall and fade out)
-- On reset, the ink trail fades away like being absorbed into the page
+The 48px version is the core deliverable. At this size, detail is limited so the animation is kept clean:
 
-**Pen movement:**
-- The entire pen is positioned via `Animated.View` overlay with `useAnimatedStyle` (translateX, translateY, rotate) — the proven reliable approach on Fabric
-- The static SVG pen shape sits inside this `Animated.View`
-- The animated transform tracks `progress` (0→1) to follow the stroke start→end
+- **Pen shape:** Static SVG group — barrel (rounded rectangle), grip section, nib tip. Angled ~45deg for natural writing posture.
+- **Ink stroke:** Cursive path draws itself via `strokeDashoffset` (proven Fabric-safe). Single color at full opacity.
+- **Pen movement:** Entire pen positioned via `Animated.View` overlay with `useAnimatedStyle` (translateX, translateY, rotate). Tracks `progress` (0→1) to follow stroke start→end.
+- **No droplets, no gradient, no sparkle** at this size — they'd be sub-pixel noise.
+
+#### Enhanced (100px — book topic loading)
+
+At 100px, the pen is large enough for additional detail:
+
+- **Ink gradient:** A second overlay path behind the main stroke, same shape but lower opacity, creates a fading ink trail behind the nib
+- **Ink droplets:** 2-3 tiny `Animated.View` dots occasionally detach from the nib, fall and fade out
+- **Nib glow:** Subtle warm amber (`#fbbf24`) aura at the pen tip — the "magic" feel
+
+#### Shared
 
 **Loop timing:**
 - Draw: 1500ms (cursive stroke draws, pen follows)
 - Pause: 600ms (pen rests at end)
 - Fade/Reset: 300ms (ink fades, pen returns to start)
 
-**Sizes used:**
-- Book topic loading (`[bookId].tsx`): 100px — full animation with ink droplets
-- ChatShell idle: 48px — simplified (no droplets, pen + stroke only)
-
 **Colors:**
 - Pen body: theme `accent` color (passed via `color` prop)
 - Ink: same color at varying opacity
-- Nib glow: warm amber (`#fbbf24`) at low opacity
+- Enhanced nib glow: warm amber at low opacity (100px only)
 
 **Replaces:** `PenWritingAnimation` at the `showIdleAnim` location in ChatShell, and the book topic loading screen.
 
@@ -66,11 +64,17 @@ Additionally, no distinction exists between "AI is thinking" and "waiting for ch
 - Filament lines inside (2-3 curved paths)
 - Screw base at bottom (horizontal ridges)
 
-**Animation phases:**
-1. **Filament heats up** (0-400ms): filament paths draw themselves (strokeDashoffset), turning from dark to warm amber
-2. **Glow fills** (400-800ms): a radial glow `Animated.View` behind the bulb scales up and fades in (warm golden, `#fbbf24` → `#f59e0b`, opacity 0→0.4)
-3. **Pulse** (800ms+, looping): the glow pulses gently (scale 0.95→1.05, opacity 0.3→0.5) with `withRepeat`
-4. **Rays appear** (only at size >= 80px): 6-8 short lines radiate from the bulb, animated via strokeDashoffset
+**Core animation (required):**
+- **Pulsing glow** behind the bulb outline: `Animated.View` with `useAnimatedStyle` (scale 0.95→1.05, opacity 0.3→0.5), `withRepeat`. This is the steady-state that users will actually perceive at 48px. Starts immediately on mount.
+
+**Nice-to-have entrance (implement only if time allows):**
+1. **Filament draw** (0-400ms): filament paths draw themselves via strokeDashoffset, turning from dark to warm amber
+2. **Glow ramp** (400-800ms): glow scales up from 0 before entering the pulse loop
+
+At 48px these entrance phases are barely perceptible — the user just sees "bulb appears and pulses." If skipped, start with the glow already at its pulse baseline.
+
+**Large-size bonus (>= 80px only):**
+- **Rays:** 6-8 short lines radiate from the bulb, animated via `AnimatedPath` strokeDashoffset
 
 **Implementation:**
 - Bulb outline + filament: static SVG paths (no AnimatedG/AnimatedCircle — Fabric-safe)
@@ -79,7 +83,7 @@ Additionally, no distinction exists between "AI is thinking" and "waiting for ch
 - All animation driven by `useSharedValue` + `withTiming`/`withRepeat`
 
 **Sizes used:**
-- ChatShell "AI thinking": 48px — bulb + glow only, no rays
+- ChatShell "AI thinking": 48px — bulb + glow pulse only
 - Could be reused elsewhere at larger sizes if needed
 
 **Colors:**
@@ -108,6 +112,9 @@ Additionally, no distinction exists between "AI is thinking" and "waiting for ch
 - Stagger: 300ms between pages (same as current)
 - Pages have a slight color gradient — the front side uses `color` prop, the back side is slightly darker (simulated by changing backgroundColor mid-flip at the 90deg crossover point)
 
+**Fabric risk — `transformOrigin` with percentage values:**
+The current `BookPageFlipAnimation` already uses `transformOrigin: ['0%', '50%', 0]` with `scaleX` on Fabric and it works. The upgrade keeps the same `transformOrigin` but replaces `scaleX` with `rotateY`. This MUST be verified in a quick spike before full implementation — if `transformOrigin` doesn't behave with `rotateY` on Fabric, the fallback is to use `transform: [{ translateX: -pageW/2 }, { rotateY }, { translateX: pageW/2 }]` which achieves the same left-edge anchor without relying on `transformOrigin`.
+
 **Timing (unchanged):**
 - Page flip: 500ms per page
 - Stagger: 300ms
@@ -134,12 +141,18 @@ isStreaming=false → AI finished
 ```
 isStreaming=true  → show LightBulbAnimation (AI is thinking)
 isStreaming=false → AI finished
-  → 20s idle timer → showIdleAnim=true → MagicPenAnimation (child should write)
+  → idle timer → showIdleAnim=true → MagicPenAnimation (child should write)
+  → child starts typing (input.trim()) → showIdleAnim=false → pen fades out
 ```
+
+**Idle threshold:** Currently `IDLE_TIMEOUT_MS = 20_000` (20s). This is an initial guess — not validated with real users. For a child who's stuck, 20s is a long wait. Consider reducing to 12-15s after initial deployment. The constant is already extracted, so tuning is trivial. Leave at 20s for the initial implementation but add a code comment marking it as a tuning candidate.
+
+**Exit transition when child starts typing:**
+The existing `useEffect` already sets `setShowIdleAnim(false)` when `input.trim()` becomes truthy. The pen simply unmounts. For a smoother UX, wrap the `MagicPenAnimation` in `Animated.View` with `exiting={FadeOut.duration(200)}` (reanimated layout animation) so it fades out rather than popping away. This is a one-liner enhancement, not a structural change.
 
 **Changes to ChatShell.tsx:**
 - Import `LightBulbAnimation` and `MagicPenAnimation` (replacing `PenWritingAnimation` import)
-- Add a new conditional block before the messages list OR at the bottom of the scroll area:
+- Add a new conditional block at the bottom of the scroll area:
   ```tsx
   {isStreaming && (
     <View className="items-center py-4" testID="thinking-bulb-animation">
@@ -150,9 +163,13 @@ isStreaming=false → AI finished
 - Replace the existing `showIdleAnim` block:
   ```tsx
   {showIdleAnim && (
-    <View className="items-center py-4" testID="idle-pen-animation">
+    <Animated.View
+      className="items-center py-4"
+      testID="idle-pen-animation"
+      exiting={FadeOut.duration(200)}
+    >
       <MagicPenAnimation size={48} color={colors.muted} />
-    </View>
+    </Animated.View>
   )}
   ```
 
@@ -167,7 +184,8 @@ isStreaming=false → AI finished
 **Fabric animation safety net:** Add a fallback timer in `BrandCelebration` and `CelebrationAnimation`:
 ```tsx
 useEffect(() => {
-  // If animations haven't started after 150ms (Fabric native module hiccup),
+  // If animations haven't started after 300ms (Fabric native module hiccup
+  // or JS thread contention on heavy screens like session-summary),
   // jump shared values to their final static positions
   const fallback = setTimeout(() => {
     if (studentR.value < 0.1) {
@@ -175,12 +193,12 @@ useEffect(() => {
       studentR.value = 15;
       // ... all other final values
     }
-  }, 150);
+  }, 300);
   return () => clearTimeout(fallback);
 }, []);
 ```
 
-This ensures celebrations are always visible, even if `AnimatedCircle` prop updates don't fire on Fabric. The animation is single-shot (~700ms), so the 150ms detection window is well within the first frame.
+This ensures celebrations are always visible, even if `AnimatedCircle` prop updates don't fire on Fabric. 300ms is well within the 700ms animation window while being resilient to JS thread contention during layout-heavy screen mounts (session-summary runs layout calculations alongside the animation).
 
 ## Components Summary
 
@@ -231,5 +249,7 @@ ChatShell wiring test:
 | State | Trigger | User sees | Recovery |
 |---|---|---|---|
 | Reanimated native module fails | Fabric init error | Static fallback (reduced motion path) | Automatic — `useReducedMotion` returns true |
-| AnimatedCircle r=0 stuck | Fabric prop update miss | BrandCelebration invisible | Fallback timer sets final values at 150ms |
+| AnimatedCircle r=0 stuck | Fabric prop update miss | BrandCelebration invisible | Fallback timer sets final values at 300ms |
 | SVG not rendering | react-native-svg crash | Empty space where animation should be | Graceful — no crash, just missing visual |
+| transformOrigin + rotateY broken on Fabric | Fabric 3D transform issue | Page flips from center, not spine | Use translate-rotate-translate fallback (see Section 3) |
+| Child types during idle pen | Normal interaction | Pen fades out (200ms FadeOut) | Automatic — existing useEffect clears showIdleAnim |
