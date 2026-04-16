@@ -15,6 +15,17 @@ const TEST_MESSAGES: ChatMessage[] = [
   { role: 'user', content: 'Hello' },
 ];
 
+const MULTIMODAL_MESSAGES: ChatMessage[] = [
+  { role: 'system', content: 'You are helpful.' },
+  {
+    role: 'user',
+    content: [
+      { type: 'inline_data', mimeType: 'image/jpeg', data: 'base64data==' },
+      { type: 'text', text: 'What is in this image?' },
+    ],
+  },
+];
+
 const TEST_CONFIG: ModelConfig = {
   provider: 'openai',
   model: 'gpt-4o-mini',
@@ -123,6 +134,27 @@ describe('OpenAI Provider', () => {
       await expect(provider.chat(TEST_MESSAGES, TEST_CONFIG)).rejects.toThrow(
         'OpenAI returned empty response'
       );
+    });
+
+    it('maps InlineDataPart to OpenAI image_url content blocks', async () => {
+      mockFetch.mockResolvedValueOnce(createOkResponse('I see a diagram'));
+
+      await provider.chat(MULTIMODAL_MESSAGES, TEST_CONFIG);
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.messages).toEqual([
+        { role: 'system', content: 'You are helpful.' },
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'image_url',
+              image_url: { url: 'data:image/jpeg;base64,base64data==' },
+            },
+            { type: 'text', text: 'What is in this image?' },
+          ],
+        },
+      ]);
     });
   });
 

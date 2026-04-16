@@ -3,6 +3,7 @@ import {
   type LLMProvider,
   type ChatMessage,
   type ModelConfig,
+  type MessagePart,
 } from '../types';
 import { createLogger } from '../../logger';
 
@@ -23,9 +24,13 @@ const OPENAI_TIMEOUT_MS = 25_000;
 // Message conversion
 // ---------------------------------------------------------------------------
 
+type OpenAIContentBlock =
+  | { type: 'text'; text: string }
+  | { type: 'image_url'; image_url: { url: string } };
+
 interface OpenAIMessage {
   role: 'system' | 'user' | 'assistant';
-  content: string;
+  content: string | OpenAIContentBlock[];
 }
 
 interface OpenAIRequest {
@@ -46,10 +51,25 @@ interface OpenAIResponse {
   error?: { message: string; type: string; code?: string };
 }
 
+function toOpenAIContent(
+  content: string | MessagePart[]
+): string | OpenAIContentBlock[] {
+  if (typeof content === 'string') return content;
+  const hasImages = content.some((p) => p.type === 'inline_data');
+  if (!hasImages) return getTextContent(content);
+  return content.map((part): OpenAIContentBlock => {
+    if (part.type === 'text') return { type: 'text', text: part.text };
+    return {
+      type: 'image_url',
+      image_url: { url: `data:${part.mimeType};base64,${part.data}` },
+    };
+  });
+}
+
 function toOpenAIMessages(messages: ChatMessage[]): OpenAIMessage[] {
   return messages.map((m) => ({
     role: m.role,
-    content: getTextContent(m.content),
+    content: toOpenAIContent(m.content),
   }));
 }
 
