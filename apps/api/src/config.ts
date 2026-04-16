@@ -34,6 +34,8 @@ const envSchema = z.object({
 
   // Resend — transactional email
   RESEND_API_KEY: z.string().min(1).optional(),
+  // Resend webhook signing secret (whsec_... format from Resend dashboard)
+  RESEND_WEBHOOK_SECRET: z.string().min(1).optional(),
   EMAIL_FROM: z.string().email().default('noreply@mentomate.com'),
 
   // Sentry — error tracking

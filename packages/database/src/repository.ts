@@ -23,6 +23,8 @@ import {
   topicSuggestions,
   curriculumBooks,
   learningProfiles,
+  vocabulary,
+  vocabularyRetentionCards,
 } from './schema/index';
 
 export function createScopedRepository(db: Database, profileId: string) {
@@ -263,6 +265,32 @@ export function createScopedRepository(db: Database, profileId: string) {
         });
       },
     },
+    vocabulary: {
+      async findMany(extraWhere?: SQL) {
+        return db.query.vocabulary.findMany({
+          where: scopedWhere(vocabulary, extraWhere),
+        });
+      },
+      async findFirst(extraWhere?: SQL) {
+        return db.query.vocabulary.findFirst({
+          where: scopedWhere(vocabulary, extraWhere),
+        });
+      },
+    },
+
+    vocabularyRetentionCards: {
+      async findMany(extraWhere?: SQL) {
+        return db.query.vocabularyRetentionCards.findMany({
+          where: scopedWhere(vocabularyRetentionCards, extraWhere),
+        });
+      },
+      async findFirst(extraWhere?: SQL) {
+        return db.query.vocabularyRetentionCards.findFirst({
+          where: scopedWhere(vocabularyRetentionCards, extraWhere),
+        });
+      },
+    },
+
     bookSuggestions: {
       async findBySubject(subjectId: string) {
         const subject = await db.query.subjects.findFirst({

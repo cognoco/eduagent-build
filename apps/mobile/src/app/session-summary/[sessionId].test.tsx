@@ -403,6 +403,78 @@ describe('SessionSummaryScreen', () => {
     expect(screen.getByText(/Couldn't save your summary/)).toBeTruthy();
   });
 
+  // BUG-33 Phase 1: Structured sentence starter prompt chips
+  describe('summary prompt chips (BUG-33 Phase 1)', () => {
+    it('renders all five sentence starter chips', () => {
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      expect(screen.getByTestId('summary-prompt-chips')).toBeTruthy();
+      expect(screen.getByText('Today I learned that...')).toBeTruthy();
+      expect(
+        screen.getByText('The most interesting thing was...')
+      ).toBeTruthy();
+      expect(screen.getByText('I want to learn more about...')).toBeTruthy();
+      expect(
+        screen.getByText('Something that surprised me was...')
+      ).toBeTruthy();
+      expect(screen.getByText('I found it easy/hard to...')).toBeTruthy();
+    });
+
+    it('tapping a prompt chip pre-fills the text input', () => {
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      fireEvent.press(screen.getByText('Today I learned that...'));
+
+      expect(screen.getByTestId('summary-input').props.value).toBe(
+        'Today I learned that...'
+      );
+    });
+
+    it('tapping a different prompt chip replaces the input text', () => {
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      fireEvent.press(screen.getByText('Today I learned that...'));
+      fireEvent.press(screen.getByText('The most interesting thing was...'));
+
+      expect(screen.getByTestId('summary-input').props.value).toBe(
+        'The most interesting thing was...'
+      );
+    });
+
+    it('each prompt chip has an accessible label matching its text', () => {
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      const chip = screen.getByLabelText('Today I learned that...');
+      expect(chip).toBeTruthy();
+    });
+
+    it('prompt chips are not shown after submission', async () => {
+      mockSubmitMutateAsync.mockResolvedValue({
+        summary: {
+          id: 'summary-1',
+          sessionId: '660e8400-e29b-41d4-a716-446655440000',
+          content: 'I learned about equations and how to solve them today',
+          aiFeedback: 'Great job!',
+          status: 'accepted',
+        },
+      });
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      fireEvent.changeText(
+        screen.getByTestId('summary-input'),
+        'I learned about equations and how to solve them today'
+      );
+      fireEvent.press(screen.getByTestId('submit-summary-button'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('summary-submitted')).toBeTruthy();
+      });
+
+      expect(screen.queryByTestId('summary-prompt-chips')).toBeNull();
+    });
+  });
+
   it('renders milestone recap and fast celebrations when provided', () => {
     mockParams.wallClockSeconds = '900';
     mockParams.milestones = encodeURIComponent(

@@ -28,6 +28,16 @@ import {
   BrandCelebration,
 } from '../../components/common';
 
+// BUG-33 Phase 1: Structured sentence starters shown as suggestion chips
+// above the text input to reduce skip rate. Kid-friendly, plain language.
+const SUMMARY_PROMPTS = [
+  'Today I learned that...',
+  'The most interesting thing was...',
+  'I want to learn more about...',
+  'Something that surprised me was...',
+  'I found it easy/hard to...',
+] as const;
+
 export default function SessionSummaryScreen() {
   const {
     sessionId,
@@ -552,6 +562,29 @@ export default function SessionSummaryScreen() {
 
           {!submitted ? (
             <>
+              {/* BUG-33 Phase 1: Sentence starter chips */}
+              <View
+                className="flex-row flex-wrap gap-2 mb-3"
+                testID="summary-prompt-chips"
+                accessibilityLabel="Sentence starter suggestions"
+              >
+                {SUMMARY_PROMPTS.map((prompt) => (
+                  <Pressable
+                    key={prompt}
+                    onPress={() => setSummaryText(prompt)}
+                    className="bg-surface-elevated rounded-button px-3 py-2"
+                    testID={`summary-prompt-chip-${prompt}`}
+                    accessibilityLabel={prompt}
+                    accessibilityRole="button"
+                    accessibilityHint="Tap to use this sentence starter"
+                  >
+                    <Text className="text-caption text-text-secondary">
+                      {prompt}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+
               <TextInput
                 className="bg-surface rounded-card px-4 py-3 text-body text-text-primary min-h-[120px]"
                 placeholder="In my own words, I learned that..."

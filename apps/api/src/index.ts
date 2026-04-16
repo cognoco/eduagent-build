@@ -54,6 +54,7 @@ import { billingRoutes } from './routes/billing';
 import { stripeWebhookRoute } from './routes/stripe-webhook';
 import { testSeedRoutes } from './routes/test-seed';
 import { revenuecatWebhookRoute } from './routes/revenuecat-webhook';
+import { resendWebhookRoute } from './routes/resend-webhook';
 import { filingRoutes } from './routes/filing';
 import { bookSuggestionRoutes } from './routes/book-suggestions';
 import { topicSuggestionRoutes } from './routes/topic-suggestions';
@@ -80,6 +81,7 @@ type Bindings = {
   SUBSCRIPTION_KV?: KVNamespace;
   VOYAGE_API_KEY?: string;
   RESEND_API_KEY?: string;
+  RESEND_WEBHOOK_SECRET?: string;
   EMAIL_FROM?: string;
   SENTRY_DSN?: string;
   TEST_SEED_SECRET?: string;
@@ -199,6 +201,7 @@ const routes = api
   .route('/', billingRoutes)
   .route('/', stripeWebhookRoute)
   .route('/', revenuecatWebhookRoute)
+  .route('/', resendWebhookRoute)
   .route('/', testSeedRoutes)
   .route('/', filingRoutes)
   .route('/', bookSuggestionRoutes)
