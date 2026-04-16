@@ -68,6 +68,11 @@ interface DashboardStepResult extends StepOutcome {
   streak: { currentStreak: number; longestStreak: number } | null;
 }
 
+// Close reasons that indicate no user engagement — SM-2 fallback should not apply.
+// The plan listed 'crash_recovery' and 'app_background' but these do not exist
+// in the codebase as of 2026-04-16. Add them here if they are introduced.
+const UNATTENDED_REASONS = ['silence_timeout'] as const;
+
 async function runIsolated(
   name: string,
   profileId: string,
@@ -294,11 +299,13 @@ export const sessionCompleted = inngest.createFunction(
     // apps/mobile/src/app/(app)/session/use-session-actions.ts:349):
     //   'silence_timeout' — stale-cleanup cron (30 min idle, no user action)
     //   'user_ended'      — user explicitly ended the session
-    const UNATTENDED_REASONS = ['silence_timeout'];
     let effectiveQuality = completionQualityRating;
     if (effectiveQuality == null) {
       const closeReason = event.data.reason as string | undefined;
-      if (closeReason && UNATTENDED_REASONS.includes(closeReason)) {
+      if (
+        closeReason &&
+        (UNATTENDED_REASONS as readonly string[]).includes(closeReason)
+      ) {
         // No quality signal — session ended without user action, skip SM-2.
       } else if (retentionTopicIds.length > 0) {
         // User-closed session without a summary (e.g., skipped or crash).
