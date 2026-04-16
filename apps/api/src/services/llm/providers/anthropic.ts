@@ -3,6 +3,7 @@ import {
   type LLMProvider,
   type ChatMessage,
   type ModelConfig,
+  type MessagePart,
 } from '../types';
 import { createLogger } from '../../logger';
 
@@ -23,9 +24,16 @@ const ANTHROPIC_TIMEOUT_MS = 25_000;
 // Message conversion
 // ---------------------------------------------------------------------------
 
+type AnthropicContentBlock =
+  | { type: 'text'; text: string }
+  | {
+      type: 'image';
+      source: { type: 'base64'; media_type: string; data: string };
+    };
+
 interface AnthropicMessage {
   role: 'user' | 'assistant';
-  content: string;
+  content: string | AnthropicContentBlock[];
 }
 
 interface AnthropicRequest {
@@ -36,14 +44,33 @@ interface AnthropicRequest {
   stream?: boolean;
 }
 
-interface AnthropicContentBlock {
+interface AnthropicResponseBlock {
   type: 'text';
   text: string;
 }
 
 interface AnthropicResponse {
-  content?: AnthropicContentBlock[];
+  content?: AnthropicResponseBlock[];
   error?: { type: string; message: string };
+}
+
+function toAnthropicContent(
+  content: string | MessagePart[]
+): string | AnthropicContentBlock[] {
+  if (typeof content === 'string') return content;
+  const hasImages = content.some((p) => p.type === 'inline_data');
+  if (!hasImages) return getTextContent(content);
+  return content.map((part): AnthropicContentBlock => {
+    if (part.type === 'text') return { type: 'text', text: part.text };
+    return {
+      type: 'image',
+      source: {
+        type: 'base64',
+        media_type: part.mimeType,
+        data: part.data,
+      },
+    };
+  });
 }
 
 /**
@@ -67,7 +94,7 @@ function toAnthropicFormat(messages: ChatMessage[]): {
     } else {
       converted.push({
         role: msg.role as 'user' | 'assistant',
-        content: getTextContent(msg.content),
+        content: toAnthropicContent(msg.content),
       });
     }
   }
