@@ -183,6 +183,13 @@
       "when": 1776345637482,
       "tag": "0025_accommodation_mode_check",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1776363267018,
+      "tag": "0026_premium_shiver_man",
+      "breakpoints": true
     }
   ]
 }

@@ -9,3 +9,4 @@ export * from './embeddings';
 export * from './language';
 export * from './notes';
 export * from './learning-profiles';
+export * from './dictation';
