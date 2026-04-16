@@ -395,8 +395,46 @@ describe('sessionCompleted', () => {
       expect(retentionOutcome.status).toBe('skipped');
     });
 
-    it('skips retention update when qualityRating not provided (issue #19)', async () => {
-      const { result } = (await executeSteps(createEventData())) as any;
+    it('skips retention update when qualityRating not provided and reason is silence_timeout (F-8)', async () => {
+      const { result } = (await executeSteps(
+        createEventData({ reason: 'silence_timeout' })
+      )) as any;
+
+      expect(mockUpdateRetentionFromSession).not.toHaveBeenCalled();
+      const retentionOutcome = result.outcomes.find(
+        (o: any) => o.step === 'update-retention'
+      );
+      expect(retentionOutcome.status).toBe('skipped');
+    });
+
+    it('uses fallback quality=3 when no qualityRating and session has topicId and reason is user_ended (F-8)', async () => {
+      await executeSteps(createEventData({ reason: 'user_ended' }));
+
+      expect(mockUpdateRetentionFromSession).toHaveBeenCalledWith(
+        expect.anything(),
+        'profile-001',
+        'topic-001',
+        3,
+        '2026-02-17T10:00:00.000Z'
+      );
+    });
+
+    it('uses fallback quality=3 when no qualityRating, no reason, and session has topicId (F-8)', async () => {
+      await executeSteps(createEventData());
+
+      expect(mockUpdateRetentionFromSession).toHaveBeenCalledWith(
+        expect.anything(),
+        'profile-001',
+        'topic-001',
+        3,
+        '2026-02-17T10:00:00.000Z'
+      );
+    });
+
+    it('skips retention update when no qualityRating and no topicId and no reason (F-8)', async () => {
+      const { result } = (await executeSteps(
+        createEventData({ topicId: null })
+      )) as any;
 
       expect(mockUpdateRetentionFromSession).not.toHaveBeenCalled();
       const retentionOutcome = result.outcomes.find(

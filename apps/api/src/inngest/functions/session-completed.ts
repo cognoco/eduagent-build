@@ -283,14 +283,40 @@ export const sessionCompleted = inngest.createFunction(
     const completionQualityRating =
       derivedQualityRating ?? (event.data.qualityRating as number | undefined);
 
+    // F-8/F-9: For relearn sessions closed without a summary, SM-2 was
+    // silently skipped, leaving reset cards stuck at intervalDays=1 forever.
+    // Apply a conservative fallback quality=3 ("correct with difficulty") when
+    // no explicit rating is available, UNLESS the session ended without any
+    // user action (e.g. stale-cleanup cron). In that case no learning occurred
+    // and we should not advance the card.
+    //
+    // Verified close reasons via grep (apps/api/src/services/session/session-crud.ts:390,
+    // apps/mobile/src/app/(app)/session/use-session-actions.ts:349):
+    //   'silence_timeout' — stale-cleanup cron (30 min idle, no user action)
+    //   'user_ended'      — user explicitly ended the session
+    const UNATTENDED_REASONS = ['silence_timeout'];
+    let effectiveQuality = completionQualityRating;
+    if (effectiveQuality == null) {
+      const closeReason = event.data.reason as string | undefined;
+      if (closeReason && UNATTENDED_REASONS.includes(closeReason)) {
+        // No quality signal — session ended without user action, skip SM-2.
+      } else if (retentionTopicIds.length > 0) {
+        // User-closed session without a summary (e.g., skipped or crash).
+        // Use conservative quality=3 to advance relearn cards out of reset.
+        effectiveQuality = 3;
+      }
+    }
+
     // Step 1b: Update retention data via SM-2
     // Conservative: skip retention update when no quality rating was provided,
     // rather than defaulting to 3 (which inflates metrics). Issue #19.
+    // F-8/F-9: effectiveQuality applies a fallback=3 for user-closed sessions
+    // without a summary so relearn cards are not stuck at intervalDays=1.
     outcomes.push(
       await step.run('update-retention', async () => {
         if (retentionTopicIds.length === 0)
           return { step: 'update-retention', status: 'skipped' as const };
-        if (completionQualityRating == null) {
+        if (effectiveQuality == null) {
           console.warn(
             `[session-completed] No qualityRating for session ${sessionId} — skipping retention update`
           );
@@ -303,7 +329,7 @@ export const sessionCompleted = inngest.createFunction(
               db,
               profileId,
               tid,
-              completionQualityRating,
+              effectiveQuality,
               timestamp
             );
           }
