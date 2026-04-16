@@ -98,7 +98,7 @@ Minimal by design. The child is looking at their paper, not the phone.
 
 ```
 +-----------------------------------+
-| [Pace] [Punctuation]     4 / 12  |  <- top control strip
+| [Pace] [Punct] [Skip]    4 / 12  |  <- top control strip
 |-----------------------------------|
 |                                   |
 |              * * *                |  <- sentence (hidden, tap to peek)
@@ -123,7 +123,7 @@ No swipe gestures. Accidental swipes while the phone is on a desk are too likely
 
 ### Current Sentence Display
 
-Hidden by default (shows dots). Child can tap the sentence area to peek at the text. Optional per-profile setting to always show the sentence text during playback.
+Hidden by default (shows dots). Child can tap the sentence area to peek at the text. Always-show setting deferred to a future version -- peek-on-tap is sufficient for v1.
 
 ### Pace Presets
 
@@ -148,12 +148,16 @@ The `base` pause constant (roughly 1-2 seconds of silence before word-count scal
 
 ### Playback Sequence
 
-1. Brief countdown: "Ready? 3... 2... 1..."
+1. Brief countdown in the dictation language (not the app language): "Ready? 3... 2... 1..." — e.g., "Pripravit? 3... 2... 1..." for Czech. Sets the child's ear to the correct language before the first sentence.
 2. TTS reads sentence 1 at the selected speech rate.
 3. Pause for the calculated duration (pace preset + word count).
 4. TTS reads sentence 2.
 5. Repeat until the last sentence.
 6. Completion chime. Transition to review prompt.
+
+### Mid-Dictation Exit
+
+If the child taps back or closes the app during playback, progress is lost. Dictations are short (2-4 minutes) so state preservation is not worth the complexity for v1. On back-press, show a confirmation dialog: "Are you sure? Your dictation progress won't be saved." Two options: "Keep going" (dismiss) or "Leave" (exit to practice menu).
 
 ### Interaction During Playback
 
@@ -164,10 +168,9 @@ The `base` pause constant (roughly 1-2 seconds of silence before word-count scal
 | Repeat         | Tap repeat button                           | Replays current sentence from start    |
 | Change pace    | Tap pace indicator in top strip             | Cycles slow -> normal -> fast          |
 | Toggle punct.  | Tap punctuation icon in top strip           | Switches read-aloud on/off             |
+| Skip sentence  | Tap skip button in top strip                | Advances to next sentence              |
 
 No voice commands in v1. TTS audio would interfere with STT (echo cancellation needed). Tap controls only.
-
-No skip sentence in v1. If the child wants to move on, they pause and wait for the next auto-advance. Deliberate skip is a future enhancement.
 
 ## Review and Remediation
 
@@ -218,7 +221,8 @@ After all corrections: celebration screen.
 Sentence splitting and punctuation annotation of existing text.
 
 - Input: `{ text: string }`
-- Output: `{ sentences: [{ text: string, withPunctuation: string, wordCount: number }] }`
+- Output: `{ sentences: [{ text: string, withPunctuation: string, wordCount: number }], language: string }`
+- The LLM detects the language from the text content. Required for correct TTS voice selection (a Czech dictation must use a Czech TTS voice, not the device default).
 - LLM prompt: restructuring only. Fast.
 - Timeout: standard.
 
@@ -235,7 +239,7 @@ Two separate endpoints because they have different prompts, latency profiles, to
 
 ### Review
 
-Creates a real `learning_sessions` row with `sessionType = 'homework'` and `effectiveMode = 'dictation'`. The review exchange sends the photo + original text as a multimodal message. The LLM responds with structured feedback. This gives us session history, event tracking, and a natural home for the remediation exchanges that follow.
+Creates a real `learning_sessions` row with `sessionType = 'learning'` and `effectiveMode = 'dictation'`. The `mode` field in `dictation_results` distinguishes homework vs surprise -- not the session type. This keeps session analytics clean: homework dictation and spontaneous dictation are both "dictation" sessions, differentiated by the dictation history metadata. The review exchange sends the photo + original text as a multimodal message. The LLM responds with structured feedback. This gives us session history, event tracking, and a natural home for the remediation exchanges that follow.
 
 ### Stored Preferences (SecureStore, per profile)
 
@@ -293,9 +297,9 @@ For streak tracking. Entries in `session_events` or a lightweight `dictation_res
 
 - **Voice commands** during playback (needs echo cancellation or wake-word system).
 - **Clause-level repeat** (replay just the last phrase, not the full sentence).
-- **Skip sentence** button.
 - **Timed challenge mode** (no manual pause, for advanced learners).
 - **Keyboard correction loop** in remediation (checking retyped sentence accuracy).
 - **Teacher/parent assignment** flow (parent picks text and assigns to child).
 - **Dictation analytics** (common mistake patterns, weak spelling areas over time).
 - **Always-show sentence** setting (currently peek-on-tap only).
+- **State preservation on exit** (resume a partially completed dictation).
