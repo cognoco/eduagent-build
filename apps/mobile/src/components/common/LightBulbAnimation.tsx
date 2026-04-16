@@ -4,6 +4,7 @@ import { View } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
+  useAnimatedProps,
   useReducedMotion,
   withTiming,
   withRepeat,

@@ -24,7 +24,8 @@ import { useSpeechRecognition } from '../../hooks/use-speech-recognition';
 import { useTextToSpeech } from '../../hooks/use-text-to-speech';
 import { useThemeColors } from '../../lib/theme';
 import { goBackOrReplace } from '../../lib/navigation';
-import { PenWritingAnimation } from '../common';
+import { LightBulbAnimation, MagicPenAnimation } from '../common';
+import Animated, { FadeOut } from 'react-native-reanimated';
 
 export interface ChatMessage {
   id: string;
@@ -395,9 +396,10 @@ export function ChatShell({
     ]
   );
 
-  // --- Idle "pen writing" animation ---
-  // Show a gentle pen animation after 20s of silence when the AI has finished
-  // speaking and the student hasn't responded yet. Resets on any user input.
+  // --- Idle "magic pen" animation ---
+  // Show a gentle pen animation after idle timeout when the AI has finished
+  // speaking and the student hasn't responded. Threshold is a tuning candidate
+  // (consider 12-15s for younger users). Resets on any user input.
   const IDLE_TIMEOUT_MS = 20_000;
   const [showIdleAnim, setShowIdleAnim] = useState(false);
 
@@ -525,10 +527,19 @@ export function ChatShell({
             </View>
           ))
         )}
-        {showIdleAnim && (
-          <View className="items-center py-4" testID="idle-pen-animation">
-            <PenWritingAnimation size={48} color={colors.muted} />
+        {isStreaming && (
+          <View className="items-center py-4" testID="thinking-bulb-animation">
+            <LightBulbAnimation size={48} color={colors.muted} />
           </View>
+        )}
+        {showIdleAnim && (
+          <Animated.View
+            className="items-center py-4"
+            testID="idle-pen-animation"
+            exiting={FadeOut.duration(200)}
+          >
+            <MagicPenAnimation size={48} color={colors.muted} />
+          </Animated.View>
         )}
         {footer}
       </ScrollView>

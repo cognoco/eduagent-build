@@ -11,7 +11,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import type { CurriculumTopic } from '@eduagent/schemas';
-import { PenWritingAnimation } from '../../../../../components/common';
+import { MagicPenAnimation } from '../../../../../components/common';
 import { SuggestionCard } from '../../../../../components/library/SuggestionCard';
 import { SessionRow } from '../../../../../components/library/SessionRow';
 import { ChapterDivider } from '../../../../../components/library/ChapterDivider';
@@ -569,7 +569,7 @@ export default function BookScreen() {
         style={{ paddingTop: insets.top }}
         testID="book-generating"
       >
-        <PenWritingAnimation size={100} color={themeColors.accent} />
+        <MagicPenAnimation size={100} color={themeColors.accent} />
         {book?.emoji && <Text className="text-3xl mt-4">{book.emoji}</Text>}
         <Text className="text-h2 font-bold text-text-primary mt-3 text-center">
           {book?.title ?? 'Writing your book...'}

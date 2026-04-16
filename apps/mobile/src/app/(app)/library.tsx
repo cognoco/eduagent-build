@@ -480,7 +480,7 @@ export default function LibraryScreen() {
             >
               <View className="flex-row items-start">
                 <View className="me-3 mt-1">
-                  <BrandCelebration size={36} />
+                  <BrandCelebration size={56} />
                 </View>
                 <View className="flex-1">
                   <Text className="text-body font-semibold text-text-primary">

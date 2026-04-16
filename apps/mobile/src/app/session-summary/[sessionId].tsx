@@ -453,7 +453,7 @@ export default function SessionSummaryScreen() {
           >
             <Ionicons name="close" size={24} color={colors.textPrimary} />
           </Pressable>
-          <BrandCelebration size={36} />
+          <BrandCelebration size={56} />
           <Text
             className="text-h3 font-semibold text-text-primary ms-2"
             testID="summary-title"
