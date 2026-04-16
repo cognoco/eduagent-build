@@ -3,7 +3,7 @@
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
-import { eq, and, notInArray, sql } from 'drizzle-orm';
+import { eq, and, gte, notInArray, sql } from 'drizzle-orm';
 import {
   subjects,
   curriculumBooks,
@@ -342,11 +342,17 @@ export async function archiveInactiveSubjects(
 ): Promise<{ id: string }[]> {
   const now = new Date();
 
-  // Subquery: subjects that had at least one session after the cutoff
+  // Subquery: subjects that had at least one real session after the cutoff
+  // Ghost sessions (exchangeCount=0) must not prevent archival.
   const recentlyActiveSubjectIds = db
     .select({ subjectId: learningSessions.subjectId })
     .from(learningSessions)
-    .where(sql`${learningSessions.lastActivityAt} >= ${cutoffDate}`)
+    .where(
+      and(
+        sql`${learningSessions.lastActivityAt} >= ${cutoffDate}`,
+        gte(learningSessions.exchangeCount, 1)
+      )
+    )
     .groupBy(learningSessions.subjectId);
 
   // Archive all active subjects NOT in the recently-active set.

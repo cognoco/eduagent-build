@@ -5,7 +5,7 @@
 // Pure business logic — no Hono imports.
 // ---------------------------------------------------------------------------
 
-import { eq, and, gt, asc, desc, sql, inArray } from 'drizzle-orm';
+import { eq, and, gt, gte, asc, desc, sql, inArray } from 'drizzle-orm';
 import {
   learningSessions,
   streaks,
@@ -453,7 +453,8 @@ async function findContinueBookCard(
     .where(
       and(
         inArray(learningSessions.topicId, topicIds),
-        eq(learningSessions.profileId, profileId)
+        eq(learningSessions.profileId, profileId),
+        gte(learningSessions.exchangeCount, 1)
       )
     );
   const topicsWithSessions = new Set(
@@ -652,7 +653,7 @@ async function findHomeworkConnectionCard(
 
   if (allTopics.length === 0) return null;
 
-  // Find topics that already have sessions (covered)
+  // Find topics that already have sessions (covered — real activity only)
   const topicIds = allTopics.map((t) => t.id);
   const sessionsForTopics = await db
     .select({ topicId: learningSessions.topicId })
@@ -660,7 +661,8 @@ async function findHomeworkConnectionCard(
     .where(
       and(
         inArray(learningSessions.topicId, topicIds),
-        eq(learningSessions.profileId, profileId)
+        eq(learningSessions.profileId, profileId),
+        gte(learningSessions.exchangeCount, 1)
       )
     );
   const coveredTopicIds = new Set(
@@ -828,11 +830,16 @@ export async function getCoachingCardForProfile(
   db: Database,
   profileId: string
 ): Promise<CoachingCardResponse> {
-  // Check session count for cold-start detection
+  // Check session count for cold-start detection (real activity only)
   const countResult = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(learningSessions)
-    .where(eq(learningSessions.profileId, profileId));
+    .where(
+      and(
+        eq(learningSessions.profileId, profileId),
+        gte(learningSessions.exchangeCount, 1)
+      )
+    );
 
   const sessionCount = countResult[0]?.count ?? 0;
 

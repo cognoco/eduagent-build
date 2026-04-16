@@ -24,8 +24,9 @@ Enforce row-level security so that even if application-layer scoping has a bug, 
 
 | Condition | How to verify |
 |---|---|
-| Phase 0 complete — transaction fallback removed | `client.ts` has no catch block swallowing transaction errors |
-| Phase 0 complete — `withProfileScope()` exists and tested | `packages/database/src/rls.ts` exists, integration test passes |
+| **Phase 0.0 complete — real transactions exist on the client used by `withProfileScope`** | `drizzle-orm` has been upgraded to a version that implements `neon-http` transactions, OR a `neon-serverless` (WS) client has been added (Option B/C). See preparatory plan Phase 0.0. Without this, `SET LOCAL` inside `withProfileScope` is a no-op and RLS is unreachable. |
+| Phase 0 complete — transaction fallback removed | `client.ts` has no catch block swallowing transaction errors for the client used by `withProfileScope` |
+| Phase 0 complete — `withProfileScope()` exists and tested | `packages/database/src/rls.ts` exists, integration test passes — including a test that proves `SET LOCAL` inside the transaction is visible to a subsequent `SELECT` in the same transaction |
 | Phase 1 complete — RLS enabled on all 26 tables | `SELECT tablename, rowsecurity FROM pg_tables WHERE schemaname = 'public'` — all true |
 | Phase 1 complete — `app_user` role exists | `SELECT rolname FROM pg_roles WHERE rolname = 'app_user'` |
 | Full API test suite green | `pnpm exec nx run api:test` |

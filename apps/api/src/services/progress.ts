@@ -3,7 +3,7 @@
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
-import { eq, and, asc, desc, inArray } from 'drizzle-orm';
+import { eq, and, asc, desc, gte, inArray } from 'drizzle-orm';
 import {
   subjects,
   curricula,
@@ -134,9 +134,12 @@ export async function getSubjectProgress(
     }
   }
 
-  // Get last session for this subject
+  // Get last session for this subject (only sessions with real activity)
   const sessions = await repo.sessions.findMany(
-    eq(learningSessions.subjectId, subjectId)
+    and(
+      eq(learningSessions.subjectId, subjectId),
+      gte(learningSessions.exchangeCount, 1)
+    )
   );
   const lastSession = sessions.sort(
     (a, b) => b.lastActivityAt.getTime() - a.lastActivityAt.getTime()
@@ -349,11 +352,14 @@ export async function getOverallProgress(
     assessmentsByTopic.set(assessment.topicId, list);
   }
 
-  // Fetch all sessions in one query
+  // Fetch all sessions in one query (only sessions with real activity)
   const allSessions =
     subjectIds.length > 0
       ? await repo.sessions.findMany(
-          inArray(learningSessions.subjectId, subjectIds)
+          and(
+            inArray(learningSessions.subjectId, subjectIds),
+            gte(learningSessions.exchangeCount, 1)
+          )
         )
       : [];
 
@@ -488,8 +494,13 @@ export async function getContinueSuggestion(
   const subjectIds = activeSubjects.map((subject) => subject.id);
 
   // Fetch all sessions upfront for subject ordering + session lookup (avoids N+1)
+  // Only sessions with real activity — ghost sessions (exchangeCount=0) must not
+  // skew subject ordering or appear as resumable.
   const allSessions = await repo.sessions.findMany(
-    inArray(learningSessions.subjectId, subjectIds)
+    and(
+      inArray(learningSessions.subjectId, subjectIds),
+      gte(learningSessions.exchangeCount, 1)
+    )
   );
 
   // Sort subjects by most recent session activity (not insertion order)

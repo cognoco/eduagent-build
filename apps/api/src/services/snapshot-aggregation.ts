@@ -1,4 +1,4 @@
-import { asc, desc, eq, inArray } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray } from 'drizzle-orm';
 import {
   assessments,
   curricula,
@@ -232,7 +232,10 @@ async function loadProgressState(
     vocabularyCardRows,
   ] = await Promise.all([
     db.query.learningSessions.findMany({
-      where: eq(learningSessions.profileId, profileId),
+      where: and(
+        eq(learningSessions.profileId, profileId),
+        gte(learningSessions.exchangeCount, 1)
+      ),
     }),
     db.query.assessments.findMany({
       where: eq(assessments.profileId, profileId),

@@ -20,7 +20,7 @@ Lay the groundwork for Row-Level Security without changing any runtime behavior.
 
 ---
 
-## Context & Constraints (Verified 2026-04-15)
+## Context & Constraints (Verified 2026-04-15, revised 2026-04-16)
 
 | Assumption | Status |
 |---|---|
@@ -29,6 +29,13 @@ Lay the groundwork for Row-Level Security without changing any runtime behavior.
 | `vocabulary` + `vocabularyRetentionCards` missing from `createScopedRepository` | ✅ Confirmed — `packages/database/src/repository.ts` |
 | All tables have `isRLSEnabled: false` | ✅ Confirmed — all drizzle meta snapshots |
 | Next available migration number | **Corrected:** `0025` (not `0012` as original plan stated; migrations go through `0024`) |
+| ~~Transaction fallback is a relic of an older driver~~ | ❌ **WRONG** — verified 2026-04-16. `drizzle-orm@0.39.3` `neon-http/session.js` throws `"No transactions support in neon-http driver"` **unconditionally** (both `NeonHttpSession.transaction` and `NeonTransaction.transaction`). The fallback is load-bearing, not vestigial. |
+| `db.batch()` is equivalent to a transaction | ❌ **No** — `db.batch([...])` uses Neon's HTTP batch API (one round-trip, multiple statements), but it is **not** ACID: no rollback on partial failure, no `SET LOCAL` visibility across statements in the way RLS requires. |
+| `@neondatabase/serverless` HTTP client has ACID transactions | ❌ **No** — confirmed at `@neondatabase/serverless@0.10.4`. Real multi-statement transactions require the WebSocket driver (`neon-serverless`), not HTTP (`neon-http`). |
+
+### Implication
+
+**Phase 0 cannot simply remove the fallback.** Doing so on the current stack crashes every `db.transaction()` caller. A driver/library decision must precede task 0.1. See Phase 0.0 below.
 
 ---
 
@@ -36,15 +43,36 @@ Lay the groundwork for Row-Level Security without changing any runtime behavior.
 
 ### Why This Matters
 
-`packages/database/src/client.ts` has a `catch` block that intercepts the `"No transactions support in neon-http driver"` error and re-runs the callback directly on `db` — **without atomicity or rollback**. Every `db.transaction()` call in the codebase silently runs as individual statements. This must be fixed before RLS can work (RLS requires `SET LOCAL` inside a real transaction).
+`packages/database/src/client.ts` has a `catch` block that intercepts the `"No transactions support in neon-http driver"` error and re-runs the callback directly on `db` — **without atomicity or rollback**. Every `db.transaction()` call in the codebase silently runs as individual statements. This must be fixed before RLS can work (RLS requires `SET LOCAL` inside a real transaction that subsequent statements also run inside).
+
+**The fallback is protective, not vestigial.** See Context & Constraints above. Removing it without first providing a real transaction mechanism crashes every current caller.
 
 ### Tasks
 
-#### 0.1 — Verify neon-http transaction support
+#### 0.0 — Driver / library decision (NEW PREREQUISITE — blocks 0.1+)
 
-The `@neondatabase/serverless` HTTP driver **does** support transactions via batch mode. Drizzle's neon-http adapter wraps this. The current fallback may be a relic from an older driver version.
+Before touching `client.ts`, we must give the codebase a real transaction primitive. Three options:
 
-**Action:** Remove the try/catch fallback in `client.ts`. If the driver throws, we want to know — silent non-atomicity is worse than a crash.
+| Option | What changes | Pros | Cons |
+|---|---|---|---|
+| **A. Upgrade `drizzle-orm`** to a version where `neon-http` implements real transactions | `package.json` bump in `apps/api` + `packages/database` | Smallest surface area; keeps HTTP driver (no connection model change) | Needs verification that any released drizzle version actually ships real `neon-http` transactions — as of 0.39.3 the throw is unconditional. May not exist. |
+| **B. Switch to `drizzle-orm/neon-serverless` (WebSocket)** | Import path + driver construction in `client.ts`; Doppler needs pooled/unpooled URL discipline; worker runtime must support WS | Real ACID transactions today; no upstream dependency | Changes connection lifecycle; WebSockets behave differently under Cloudflare Workers/edge; connection-pool tuning required; latency profile changes |
+| **C. Dual-client approach** | Keep `neon-http` for single-statement queries; add a `neon-serverless` WS client used only for `withProfileScope` / explicit transactions | Isolates blast radius; single-statement hot path unchanged | Two connection strings, two Doppler vars, two code paths; complicates Inngest/owner connection story in Phase 3 |
+
+**Recommendation:** Start with Option A (verify upstream) → if no released drizzle version supports `neon-http` transactions, default to **Option C**. Option B changes the runtime model for every query, which expands blast radius beyond what this plan absorbs.
+
+**Action items:**
+- Check `drizzle-orm` GitHub for any release that removes the unconditional throw in `neon-http/session.js`. If yes, record the version. If no, go to Option C.
+- If Option C: prototype a `wsDb` client in `client.ts` gated behind `DATABASE_URL_POOLED` (or equivalent), wire it into a single `db.transaction()` call, confirm `SET LOCAL` propagates to a subsequent `SELECT` inside the same transaction.
+- Document the decision inline in `client.ts` with a comment referencing this plan, so the next reader knows why two clients exist.
+
+**Exit criteria for 0.0:** there is a working code path where `db.transaction(async (tx) => { await tx.execute(SET LOCAL x = '1'); return tx.execute(SELECT current_setting('x', true)); })` returns `'1'` without hitting the fallback.
+
+#### 0.1 — Remove the fallback (depends on 0.0)
+
+Once 0.0 is proven, remove the try/catch fallback in `client.ts` **for the client used inside `withProfileScope`**. If an HTTP-only client remains (Option C), that client's `db.transaction()` calls must be migrated to the WS client or refactored to non-transactional code — no silent atomicity loss is acceptable once RLS is on the table.
+
+If the driver throws after 0.0 is done, we want to know — silent non-atomicity is worse than a crash.
 
 **File:** `packages/database/src/client.ts`
 
@@ -182,7 +210,9 @@ Run `pnpm run db:generate` to produce the corresponding snapshot JSON. Verify th
 
 ## Rollback
 
-**Phase 0:** Revert the `client.ts` change to restore the transaction fallback. All callers fall back to non-atomic behavior (the prior status quo).
+**Phase 0.0:** If Option B/C is taken and the WS driver misbehaves under load, revert the new client (or flip a feature flag) so the HTTP client is used for all traffic. `withProfileScope` becomes a no-op transaction → RLS is unreachable, but the app runs. No data migration involved; this is a code-only revert.
+
+**Phase 0.1:** Revert the `client.ts` change to restore the transaction fallback. All callers fall back to non-atomic behavior (the prior status quo). Note: only safe while RLS is *not* enforced (i.e. Phase 3 has not shipped) — silent non-atomicity under RLS would corrupt scoped-write semantics.
 
 **Phase 1:** Run `ALTER TABLE <table> DISABLE ROW LEVEL SECURITY` for each table and `DROP ROLE app_user`. Or simply revert the migration. Since owner bypasses RLS, even leaving it enabled is harmless.
 
@@ -196,7 +226,8 @@ After Phase 0+1, the system is ready for Phase 2 (write policies) and Phase 3 (s
 
 ## Checklist
 
-- [ ] 0.1 — Remove transaction fallback in `client.ts`
+- [ ] **0.0 — Driver/library decision: verify or choose A / B / C; prove `SET LOCAL` propagates inside a real transaction** (blocks everything below)
+- [ ] 0.1 — Remove transaction fallback in `client.ts` (only after 0.0 is proven)
 - [ ] 0.2 — Create `withProfileScope()` in `packages/database/src/rls.ts`
 - [ ] 0.3 — Integration test for context propagation
 - [ ] 0.4 — Audit existing `db.transaction()` callers

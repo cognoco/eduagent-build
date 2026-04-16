@@ -414,7 +414,8 @@ export async function getChildrenForParent(
   const allRecentSessions = await db.query.learningSessions.findMany({
     where: and(
       inArray(learningSessions.profileId, childProfileIds),
-      gte(learningSessions.startedAt, startOfLastWeek)
+      gte(learningSessions.startedAt, startOfLastWeek),
+      gte(learningSessions.exchangeCount, 1)
     ),
   });
   const sessionsByProfile = new Map<string, typeof allRecentSessions>();
@@ -716,7 +717,10 @@ export async function getChildSessions(
   await assertParentAccess(db, parentProfileId, childProfileId);
 
   const sessions = await db.query.learningSessions.findMany({
-    where: eq(learningSessions.profileId, childProfileId),
+    where: and(
+      eq(learningSessions.profileId, childProfileId),
+      gte(learningSessions.exchangeCount, 1)
+    ),
     orderBy: desc(learningSessions.startedAt),
     limit: 50,
   });
