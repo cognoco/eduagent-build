@@ -30,7 +30,7 @@ export interface TopicsTabState {
 
 export const TOPICS_TAB_INITIAL_STATE: TopicsTabState = {
   search: '',
-  sortKey: 'name-asc',
+  sortKey: 'retention',
   filters: {
     subjectIds: [],
     bookIds: [],

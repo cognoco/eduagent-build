@@ -267,7 +267,7 @@ describe('TopicsTab', () => {
   it('exports TOPICS_TAB_INITIAL_STATE with correct defaults', () => {
     expect(TOPICS_TAB_INITIAL_STATE).toEqual({
       search: '',
-      sortKey: 'name-asc',
+      sortKey: 'retention',
       filters: {
         subjectIds: [],
         bookIds: [],
