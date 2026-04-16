@@ -14,7 +14,6 @@ export function usePrepareHomework() {
     mutationFn: async (
       input: PrepareHomeworkInput
     ): Promise<PrepareHomeworkOutput> => {
-      // @ts-expect-error dictation route not yet wired in API client
       const res = await client.dictation['prepare-homework'].$post({
         json: input,
       });
@@ -29,7 +28,6 @@ export function useGenerateDictation() {
 
   return useMutation({
     mutationFn: async (): Promise<GenerateDictationOutput> => {
-      // @ts-expect-error dictation route not yet wired in API client
       const res = await client.dictation.generate.$post({});
       await assertOk(res);
       return (await res.json()) as GenerateDictationOutput;

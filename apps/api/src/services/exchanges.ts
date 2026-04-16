@@ -32,7 +32,7 @@ export interface ImageData {
   mimeType: string;
 }
 
-function buildUserContent(
+export function buildUserContent(
   userMessage: string,
   imageData?: ImageData
 ): string | MessagePart[] {

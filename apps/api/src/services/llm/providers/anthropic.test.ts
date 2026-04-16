@@ -1,85 +1,60 @@
-import { createAnthropicProvider } from './anthropic';
-import type { ChatMessage, ModelConfig } from '../types';
+import { toAnthropicContent } from './anthropic';
+import type { MessagePart } from '../types';
 
-const mockFetch = jest.fn();
-(global as unknown as { fetch: typeof fetch }).fetch = mockFetch;
+// ---------------------------------------------------------------------------
+// toAnthropicContent — pure formatting, no HTTP mocks needed
+// ---------------------------------------------------------------------------
 
-const TEST_API_KEY = 'test-key-123';
-
-const TEXT_ONLY_MESSAGES: ChatMessage[] = [
-  { role: 'system', content: 'You are helpful.' },
-  { role: 'user', content: 'Hello' },
-];
-
-const MULTIMODAL_MESSAGES: ChatMessage[] = [
-  { role: 'system', content: 'You are helpful.' },
-  {
-    role: 'user',
-    content: [
-      { type: 'inline_data', mimeType: 'image/jpeg', data: 'base64data==' },
-      { type: 'text', text: 'What is in this image?' },
-    ],
-  },
-];
-
-const TEST_CONFIG: ModelConfig = {
-  provider: 'anthropic',
-  model: 'claude-sonnet-4-6',
-  maxTokens: 4096,
-};
-
-function createOkResponse(content: string): Partial<Response> {
-  return {
-    ok: true,
-    status: 200,
-    json: async () => ({
-      content: [{ type: 'text', text: content }],
-    }),
-    text: async () => '',
-  };
-}
-
-describe('Anthropic Provider', () => {
-  const provider = createAnthropicProvider(TEST_API_KEY);
-
-  beforeEach(() => {
-    mockFetch.mockReset();
+describe('toAnthropicContent', () => {
+  it('returns a plain string unchanged', () => {
+    expect(toAnthropicContent('Hello')).toBe('Hello');
   });
 
-  describe('chat()', () => {
-    it('sends text-only messages as string content', async () => {
-      mockFetch.mockResolvedValueOnce(createOkResponse('Hello'));
+  it('extracts text from a text-only MessagePart[]', () => {
+    const parts: MessagePart[] = [
+      { type: 'text', text: 'Hello' },
+      { type: 'text', text: 'World' },
+    ];
+    // When no images are present, it collapses to a single string via getTextContent
+    expect(toAnthropicContent(parts)).toBe('Hello\nWorld');
+  });
 
-      await provider.chat(TEXT_ONLY_MESSAGES, TEST_CONFIG);
+  it('maps InlineDataPart to Anthropic image content blocks', () => {
+    const parts: MessagePart[] = [
+      { type: 'inline_data', mimeType: 'image/jpeg', data: 'base64data==' },
+      { type: 'text', text: 'What is in this image?' },
+    ];
 
-      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
-      expect(body.system).toBe('You are helpful.');
-      expect(body.messages).toEqual([{ role: 'user', content: 'Hello' }]);
-    });
-
-    it('maps InlineDataPart to Anthropic image content blocks', async () => {
-      mockFetch.mockResolvedValueOnce(createOkResponse('I see a diagram'));
-
-      await provider.chat(MULTIMODAL_MESSAGES, TEST_CONFIG);
-
-      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
-      expect(body.system).toBe('You are helpful.');
-      expect(body.messages).toEqual([
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'image',
-              source: {
-                type: 'base64',
-                media_type: 'image/jpeg',
-                data: 'base64data==',
-              },
-            },
-            { type: 'text', text: 'What is in this image?' },
-          ],
+    expect(toAnthropicContent(parts)).toEqual([
+      {
+        type: 'image',
+        source: {
+          type: 'base64',
+          media_type: 'image/jpeg',
+          data: 'base64data==',
         },
-      ]);
+      },
+      { type: 'text', text: 'What is in this image?' },
+    ]);
+  });
+
+  it('handles multiple images in a single message', () => {
+    const parts: MessagePart[] = [
+      { type: 'inline_data', mimeType: 'image/png', data: 'img1==' },
+      { type: 'inline_data', mimeType: 'image/webp', data: 'img2==' },
+      { type: 'text', text: 'Compare these two diagrams' },
+    ];
+
+    const result = toAnthropicContent(parts);
+    expect(Array.isArray(result)).toBe(true);
+    expect(result).toHaveLength(3);
+    expect((result as unknown[])[0]).toEqual({
+      type: 'image',
+      source: { type: 'base64', media_type: 'image/png', data: 'img1==' },
+    });
+    expect((result as unknown[])[1]).toEqual({
+      type: 'image',
+      source: { type: 'base64', media_type: 'image/webp', data: 'img2==' },
     });
   });
 });

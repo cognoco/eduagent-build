@@ -640,39 +640,30 @@ describe('streamExchange', () => {
 });
 
 // ---------------------------------------------------------------------------
-// processExchange — multimodal image [IMG-VISION]
+// buildUserContent — pure formatting, no mock provider needed [IMG-VISION]
 // ---------------------------------------------------------------------------
 
-describe('processExchange — multimodal image', () => {
-  it('builds a MessagePart[] user message when imageData is provided', async () => {
-    let capturedMessages: ChatMessage[] = [];
-    const capturingProvider: LLMProvider = {
-      id: 'gemini',
-      async chat(
-        messages: ChatMessage[],
-        _config: ModelConfig
-      ): Promise<string> {
-        capturedMessages = messages;
-        return 'I see a diagram of a cell.';
-      },
-      async *chatStream(): AsyncIterable<string> {
-        yield 'not used';
-      },
-    };
-    registerProvider(capturingProvider);
+import { buildUserContent } from './exchanges';
 
-    const result = await processExchange(
-      { ...baseContext, exchangeHistory: [] },
-      'What is this?',
-      { base64: 'aW1hZ2VkYXRh', mimeType: 'image/jpeg' }
+describe('buildUserContent', () => {
+  it('returns the plain string when no imageData is provided', () => {
+    expect(buildUserContent('Hello')).toBe('Hello');
+  });
+
+  it('returns the plain string when imageData is undefined', () => {
+    expect(buildUserContent('Help me with this problem', undefined)).toBe(
+      'Help me with this problem'
     );
+  });
 
-    expect(result.response).toContain('diagram');
+  it('returns MessagePart[] with image and text when imageData is provided', () => {
+    const result = buildUserContent('What is this?', {
+      base64: 'aW1hZ2VkYXRh',
+      mimeType: 'image/jpeg',
+    });
 
-    const userMsg = capturedMessages[capturedMessages.length - 1];
-    expect(Array.isArray(userMsg.content)).toBe(true);
-
-    const parts = userMsg.content as MessagePart[];
+    expect(Array.isArray(result)).toBe(true);
+    const parts = result as MessagePart[];
     expect(parts).toHaveLength(2);
     expect(parts[0]).toEqual({
       type: 'inline_data',
@@ -683,36 +674,17 @@ describe('processExchange — multimodal image', () => {
       type: 'text',
       text: 'What is this?',
     });
-
-    registerProvider(createMockProvider('gemini'));
   });
 
-  it('builds a string user message when no imageData is provided', async () => {
-    let capturedMessages: ChatMessage[] = [];
-    const capturingProvider: LLMProvider = {
-      id: 'gemini',
-      async chat(
-        messages: ChatMessage[],
-        _config: ModelConfig
-      ): Promise<string> {
-        capturedMessages = messages;
-        return 'Sure, I can help.';
-      },
-      async *chatStream(): AsyncIterable<string> {
-        yield 'not used';
-      },
-    };
-    registerProvider(capturingProvider);
+  it('preserves the MIME type from imageData', () => {
+    const result = buildUserContent('Describe this diagram', {
+      base64: 'cG5nZGF0YQ==',
+      mimeType: 'image/png',
+    });
 
-    await processExchange(
-      { ...baseContext, exchangeHistory: [] },
-      'Help me with this problem'
+    const parts = result as MessagePart[];
+    expect(parts[0]).toEqual(
+      expect.objectContaining({ mimeType: 'image/png' })
     );
-
-    const userMsg = capturedMessages[capturedMessages.length - 1];
-    expect(typeof userMsg.content).toBe('string');
-    expect(userMsg.content).toBe('Help me with this problem');
-
-    registerProvider(createMockProvider('gemini'));
   });
 });

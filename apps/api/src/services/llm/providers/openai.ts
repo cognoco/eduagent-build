@@ -51,7 +51,7 @@ interface OpenAIResponse {
   error?: { message: string; type: string; code?: string };
 }
 
-function toOpenAIContent(
+export function toOpenAIContent(
   content: string | MessagePart[]
 ): string | OpenAIContentBlock[] {
   if (typeof content === 'string') return content;

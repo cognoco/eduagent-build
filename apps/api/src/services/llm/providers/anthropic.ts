@@ -54,7 +54,7 @@ interface AnthropicResponse {
   error?: { type: string; message: string };
 }
 
-function toAnthropicContent(
+export function toAnthropicContent(
   content: string | MessagePart[]
 ): string | AnthropicContentBlock[] {
   if (typeof content === 'string') return content;
