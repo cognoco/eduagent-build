@@ -19,8 +19,6 @@ import { requireProfileId } from '../middleware/profile-scope';
 import { streamSSE } from 'hono/streaming';
 import { captureException } from '../services/sentry';
 import { createLogger } from '../services/logger';
-
-const logger = createLogger();
 import {
   startSession,
   SubjectInactiveError,
@@ -50,6 +48,8 @@ import {
 } from '../services/settings';
 import { startInterleavedSession } from '../services/interleaved';
 import { generateRecallBridge } from '../services/recall-bridge';
+
+const logger = createLogger();
 
 type SessionRouteEnv = {
   Bindings: {

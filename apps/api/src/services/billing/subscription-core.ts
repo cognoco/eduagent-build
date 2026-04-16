@@ -17,6 +17,7 @@ import {
 import type { SubscriptionTier, SubscriptionStatus } from '@eduagent/schemas';
 import { getTierConfig, isValidTransition } from '../subscription';
 import { captureException } from '../sentry';
+import { createLogger } from '../logger';
 import {
   mapSubscriptionRow,
   mapQuotaPoolRow,
@@ -24,6 +25,8 @@ import {
   type QuotaPoolRow,
   type WebhookSubscriptionUpdate,
 } from './types';
+
+const logger = createLogger();
 
 // ---------------------------------------------------------------------------
 // getSubscriptionByAccountId
@@ -138,9 +141,11 @@ export async function updateSubscriptionFromWebhook(
   }
   if (updates.status !== undefined && updates.status !== existing.status) {
     if (!isValidTransition(existing.status, updates.status)) {
-      console.error(
-        `[billing] Invalid Stripe subscription transition: ${existing.status} -> ${updates.status} (sub: ${existing.id})`
-      );
+      logger.error('Invalid Stripe subscription transition', {
+        from: existing.status,
+        to: updates.status,
+        subscriptionId: existing.id,
+      });
       captureException(
         new Error(
           `Invalid Stripe subscription transition: ${existing.status} -> ${updates.status}`

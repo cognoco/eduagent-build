@@ -142,8 +142,11 @@ export const filingRoutes = new Hono<FilingRouteEnv>()
       });
     } catch (err) {
       console.error('[filing] resolveFilingResult failed:', err);
-      // Fire async retry for freeform/homework sessions
-      if (sessionTranscript && body.sessionId) {
+      // Fire async retry for freeform/homework sessions — but only if
+      // the first catch block didn't already enqueue a retry (usedFallback).
+      // Without this guard, two app/filing.retry events fire for the same
+      // sessionId, causing duplicate topic rows + ghost filing.completed events.
+      if (!usedFallback && sessionTranscript && body.sessionId) {
         await inngest
           .send({
             name: 'app/filing.retry',
