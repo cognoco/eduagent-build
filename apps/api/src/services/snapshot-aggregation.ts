@@ -1,4 +1,4 @@
-import { desc, eq, inArray } from 'drizzle-orm';
+import { asc, desc, eq, inArray } from 'drizzle-orm';
 import {
   assessments,
   curricula,
@@ -656,7 +656,7 @@ export async function getSnapshotsInRange(
 ): Promise<Array<{ snapshotDate: string; metrics: ProgressMetrics }>> {
   const rows = await db.query.progressSnapshots.findMany({
     where: eq(progressSnapshots.profileId, profileId),
-    orderBy: progressSnapshots.snapshotDate,
+    orderBy: asc(progressSnapshots.snapshotDate),
   });
 
   // Range consumers (history chart) don't need `updatedAt`; strip to the
