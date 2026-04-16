@@ -184,21 +184,20 @@ The existing `useEffect` already sets `setShowIdleAnim(false)` when `input.trim(
 **Fabric animation safety net:** Add a fallback timer in `BrandCelebration` and `CelebrationAnimation`:
 ```tsx
 useEffect(() => {
-  // If animations haven't started after 300ms (Fabric native module hiccup
-  // or JS thread contention on heavy screens like session-summary),
-  // jump shared values to their final static positions
+  // If animations haven't started after 500ms (cold start, JS thread busy,
+  // Fabric native module init delay), jump to final static positions.
   const fallback = setTimeout(() => {
     if (studentR.value < 0.1) {
       // Animation didn't fire — set final state
       studentR.value = 15;
       // ... all other final values
     }
-  }, 300);
+  }, 500);
   return () => clearTimeout(fallback);
 }, []);
 ```
 
-This ensures celebrations are always visible, even if `AnimatedCircle` prop updates don't fire on Fabric. 300ms is well within the 700ms animation window while being resilient to JS thread contention during layout-heavy screen mounts (session-summary runs layout calculations alongside the animation).
+This ensures celebrations are always visible, even if `AnimatedCircle` prop updates don't fire on Fabric. 500ms is generous enough to avoid false positives on slow devices while still within the 700ms animation window.
 
 ## Components Summary
 
@@ -249,7 +248,7 @@ ChatShell wiring test:
 | State | Trigger | User sees | Recovery |
 |---|---|---|---|
 | Reanimated native module fails | Fabric init error | Static fallback (reduced motion path) | Automatic — `useReducedMotion` returns true |
-| AnimatedCircle r=0 stuck | Fabric prop update miss | BrandCelebration invisible | Fallback timer sets final values at 300ms |
+| AnimatedCircle r=0 stuck | Fabric prop update miss | BrandCelebration invisible | Fallback timer sets final values at 500ms |
 | SVG not rendering | react-native-svg crash | Empty space where animation should be | Graceful — no crash, just missing visual |
 | transformOrigin + rotateY broken on Fabric | Fabric 3D transform issue | Page flips from center, not spine | Use translate-rotate-translate fallback (see Section 3) |
 | Child types during idle pen | Normal interaction | Pen fades out (200ms FadeOut) | Automatic — existing useEffect clears showIdleAnim |

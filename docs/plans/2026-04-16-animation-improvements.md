@@ -87,16 +87,9 @@ describe('LightBulbAnimation', () => {
     }).not.toThrow();
   });
 
-  it('cancels animations on unmount', () => {
-    const reanimated = require('react-native-reanimated');
-    const cancelSpy = jest.spyOn(reanimated, 'cancelAnimation');
-
-    const { unmount } = render(<LightBulbAnimation testID="bulb" />);
-    unmount();
-
-    expect(cancelSpy).toHaveBeenCalled();
-    cancelSpy.mockRestore();
-  });
+  // Note: cancelAnimation cleanup is handled by useEffect return, but testing
+  // it via spy is brittle (couples to implementation detail). Memory leak risk
+  // is better caught by runtime profiling than mock assertions.
 });
 ```
 
@@ -359,16 +352,9 @@ describe('MagicPenAnimation', () => {
     }).not.toThrow();
   });
 
-  it('cancels animations on unmount', () => {
-    const reanimated = require('react-native-reanimated');
-    const cancelSpy = jest.spyOn(reanimated, 'cancelAnimation');
-
-    const { unmount } = render(<MagicPenAnimation testID="pen" />);
-    unmount();
-
-    expect(cancelSpy).toHaveBeenCalled();
-    cancelSpy.mockRestore();
-  });
+  // Note: cancelAnimation cleanup is handled by useEffect return, but testing
+  // it via spy is brittle (couples to implementation detail). Memory leak risk
+  // is better caught by runtime profiling than mock assertions.
 });
 ```
 
@@ -440,7 +426,9 @@ const NIB_GLOW = '#fbbf24';
  * as ink draws itself. The pen body is a static SVG positioned via
  * Animated.View overlay (Fabric-safe).
  *
- * 48px: pen + stroke only (no droplets, no glow)
+ * 48px: pen + stroke only (no droplets, no glow). At this size the pen barrel
+ *   is ~12px wide — verify on device it still reads as "pen writing." ChatShell
+ *   uses 48px; the book screen uses 100px where the full effect lands.
  * 80px+: adds nib glow, ink gradient trail, and 2 ink droplets
  */
 export function MagicPenAnimation({
@@ -679,14 +667,17 @@ git commit -m "feat(mobile): add MagicPenAnimation — cartoon pen with ink writ
 Add to `apps/mobile/src/components/common/BookPageFlipAnimation.test.tsx`, after the existing `transformOrigin` test:
 
 ```tsx
-  // ANIM-IMPROVE: pages should use perspective for 3D depth
+  // ANIM-IMPROVE: pages should use perspective for 3D depth.
+  // Fragility note: toString() source inspection can break under minification
+  // or transpilation. Ideally we'd assert on the animated style output, but
+  // the reanimated mock returns empty objects for useAnimatedStyle. This is
+  // acceptable for a regression guard in dev — revisit if it becomes flaky.
   it('uses perspective in page styles (ANIM-IMPROVE)', () => {
     const sourceModule = require('./BookPageFlipAnimation');
     const sourceText = sourceModule.BookPageFlipAnimation.toString();
     expect(sourceText).toContain('perspective');
   });
 
-  // ANIM-IMPROVE: pages should use rotateY instead of scaleX
   it('uses rotateY instead of scaleX for 3D flip (ANIM-IMPROVE)', () => {
     const sourceModule = require('./BookPageFlipAnimation');
     const sourceText = sourceModule.BookPageFlipAnimation.toString();
@@ -957,11 +948,14 @@ git commit -m "feat(mobile): 3D perspective book page-flip animation [ANIM-IMPRO
 
 - [ ] **Step 1: Add Fabric fallback to BrandCelebration**
 
-In `apps/mobile/src/components/common/BrandCelebration.tsx`, add a second `useEffect` after the existing animation `useEffect` (after line 168 `}, [done, reduceMotion]);`):
+In `apps/mobile/src/components/common/BrandCelebration.tsx`, add a second `useEffect` after the existing animation `useEffect`. Search for `}, [done, reduceMotion]);` to find the insertion point:
 
 ```tsx
-  // Fabric safety net: if AnimatedCircle prop updates didn't fire after 300ms,
-  // jump to final static state so the celebration is always visible.
+  // Fabric safety net: if AnimatedCircle prop updates didn't fire after 500ms
+  // (cold start, JS thread busy, Fabric native module init delay), jump to
+  // final static state so the celebration is always visible. 500ms is generous
+  // enough to avoid false positives on slow devices while still well within
+  // the 700ms animation window.
   useEffect(() => {
     if (reduceMotion) return;
     const fallback = setTimeout(() => {
@@ -977,18 +971,17 @@ In `apps/mobile/src/components/common/BrandCelebration.tsx`, add a second `useEf
         pathDraw.value = 1;
         happyBounce.value = 1;
       }
-    }, 300);
+    }, 500);
     return () => clearTimeout(fallback);
   }, [reduceMotion, studentR, studentInR, dot1R, dot2R, dot3R, mentorR, mentorInR, ringOp, pathDraw, happyBounce]);
 ```
 
 - [ ] **Step 2: Add Fabric fallback to CelebrationAnimation**
 
-In `apps/mobile/src/components/common/CelebrationAnimation.tsx`, add a second `useEffect` after the existing animation `useEffect` (after line 104 `}, [reduceMotion, progress, opacity, centerScale]);`):
+In `apps/mobile/src/components/common/CelebrationAnimation.tsx`, add a second `useEffect` after the existing animation `useEffect`. Search for `}, [reduceMotion, progress, opacity, centerScale]);` to find the insertion point:
 
 ```tsx
-  // Fabric safety net: if AnimatedCircle prop updates didn't fire after 300ms,
-  // jump to final state so the burst is visible.
+  // Fabric safety net: same rationale as BrandCelebration (see above).
   useEffect(() => {
     if (reduceMotion) return;
     const fallback = setTimeout(() => {
@@ -998,7 +991,7 @@ In `apps/mobile/src/components/common/CelebrationAnimation.tsx`, add a second `u
         opacity.value = 0; // already faded = done
         onCompleteRef.current?.();
       }
-    }, 300);
+    }, 500);
     return () => clearTimeout(fallback);
   }, [reduceMotion, progress, centerScale, opacity]);
 ```
@@ -1018,44 +1011,7 @@ git commit -m "fix(mobile): add 300ms Fabric fallback timer to celebrations [ANI
 
 ---
 
-### Task 5: Barrel Exports + Delete PenWritingAnimation
-
-**Files:**
-- Modify: `apps/mobile/src/components/common/index.ts`
-- Delete: `apps/mobile/src/components/common/PenWritingAnimation.tsx`
-- Delete: `apps/mobile/src/components/common/PenWritingAnimation.test.tsx`
-
-- [ ] **Step 1: Update barrel exports**
-
-In `apps/mobile/src/components/common/index.ts`, replace:
-
-```ts
-export { PenWritingAnimation } from './PenWritingAnimation';
-```
-
-with:
-
-```ts
-export { LightBulbAnimation } from './LightBulbAnimation';
-export { MagicPenAnimation } from './MagicPenAnimation';
-```
-
-- [ ] **Step 2: Delete old PenWritingAnimation files**
-
-```bash
-git rm apps/mobile/src/components/common/PenWritingAnimation.tsx apps/mobile/src/components/common/PenWritingAnimation.test.tsx
-```
-
-- [ ] **Step 3: Commit**
-
-```bash
-git add apps/mobile/src/components/common/index.ts
-git commit -m "refactor(mobile): replace PenWritingAnimation exports with LightBulb + MagicPen [ANIM-IMPROVE]"
-```
-
----
-
-### Task 6: Wire Animations in ChatShell
+### Task 5: Wire Animations in ChatShell
 
 **Files:**
 - Modify: `apps/mobile/src/components/session/ChatShell.tsx`
@@ -1065,7 +1021,7 @@ git commit -m "refactor(mobile): replace PenWritingAnimation exports with LightB
 
 In `apps/mobile/src/components/session/ChatShell.tsx`:
 
-**Replace import** (line 27):
+**Replace import** — search for `import { PenWritingAnimation } from '../common';`:
 ```tsx
 import { PenWritingAnimation } from '../common';
 ```
@@ -1075,7 +1031,7 @@ import { LightBulbAnimation, MagicPenAnimation } from '../common';
 import { FadeOut } from 'react-native-reanimated';
 ```
 
-**Add the LightBulb block.** After the existing `showIdleAnim` block (line 528-533), add above it:
+**Add the LightBulb block.** Search for `{showIdleAnim &&` and add this block directly above it:
 
 ```tsx
         {isStreaming && (
@@ -1108,9 +1064,9 @@ with:
         )}
 ```
 
-Note: `Animated` is already imported from `react-native-reanimated` in the file (check line 4 area — if not, it's imported via `FadeOut` from the same package). Use `Animated.View` from reanimated (already available as the `Animated` default import in test-setup mock).
+Note: `Animated` is already imported from `react-native-reanimated` in the file. `Animated.View` from reanimated is already available (the test-setup mock provides it).
 
-**Update the idle timer comment** (line 398):
+**Update the idle timer comment** — search for `// --- Idle "pen writing" animation ---`:
 
 Replace:
 ```tsx
@@ -1127,7 +1083,7 @@ with:
 
 - [ ] **Step 2: Update ChatShell test mock**
 
-In `apps/mobile/src/components/session/ChatShell.test.tsx`, replace (line 79-81):
+In `apps/mobile/src/components/session/ChatShell.test.tsx`, search for `PenWritingAnimation: () => null` and replace the enclosing mock:
 
 ```tsx
 jest.mock('../common', () => ({
@@ -1181,7 +1137,7 @@ git commit -m "feat(mobile): wire LightBulb + MagicPen in ChatShell with FadeOut
 
 ---
 
-### Task 7: Update Call Sites — Book, Library, Session Summary
+### Task 6: Update Call Sites — Book, Library, Session Summary
 
 **Files:**
 - Modify: `apps/mobile/src/app/(app)/shelf/[subjectId]/book/[bookId].tsx`
@@ -1193,7 +1149,7 @@ git commit -m "feat(mobile): wire LightBulb + MagicPen in ChatShell with FadeOut
 
 In `apps/mobile/src/app/(app)/shelf/[subjectId]/book/[bookId].tsx`:
 
-**Replace import** (line 14):
+**Replace import** — search for `import { PenWritingAnimation } from '../../../../../components/common';`:
 ```tsx
 import { PenWritingAnimation } from '../../../../../components/common';
 ```
@@ -1202,7 +1158,7 @@ with:
 import { MagicPenAnimation } from '../../../../../components/common';
 ```
 
-**Replace usage** (line 572):
+**Replace usage** — search for `<PenWritingAnimation size={100}`:
 ```tsx
         <PenWritingAnimation size={100} color={themeColors.accent} />
 ```
@@ -1233,7 +1189,7 @@ jest.mock('../../../../../components/common', () => ({
 
 - [ ] **Step 3: Bump BrandCelebration size in library**
 
-In `apps/mobile/src/app/(app)/library.tsx`, replace (line 483):
+In `apps/mobile/src/app/(app)/library.tsx`, search for `<BrandCelebration size={36}` in the curriculum-complete section:
 
 ```tsx
                   <BrandCelebration size={36} />
@@ -1247,7 +1203,7 @@ with:
 
 - [ ] **Step 4: Bump BrandCelebration size in session summary**
 
-In `apps/mobile/src/app/session-summary/[sessionId].tsx`, replace (line 456):
+In `apps/mobile/src/app/session-summary/[sessionId].tsx`, search for `<BrandCelebration size={36}`:
 
 ```tsx
           <BrandCelebration size={36} />
@@ -1272,6 +1228,45 @@ Expected: all PASS.
 ```bash
 git add "apps/mobile/src/app/(app)/shelf/[subjectId]/book/[bookId].tsx" "apps/mobile/src/app/(app)/shelf/[subjectId]/book/[bookId].test.tsx" "apps/mobile/src/app/(app)/library.tsx" "apps/mobile/src/app/session-summary/[sessionId].tsx"
 git commit -m "feat(mobile): wire MagicPen in book, bump celebration size 36→56 [ANIM-IMPROVE]"
+```
+
+---
+
+### Task 7: Barrel Exports + Delete PenWritingAnimation
+
+**Why this is Task 7 (not earlier):** Tasks 5 and 6 wire the new components into all consumer files first. Only after all consumers are updated is it safe to delete the old files. This prevents broken intermediate states.
+
+**Files:**
+- Modify: `apps/mobile/src/components/common/index.ts`
+- Delete: `apps/mobile/src/components/common/PenWritingAnimation.tsx`
+- Delete: `apps/mobile/src/components/common/PenWritingAnimation.test.tsx`
+
+- [ ] **Step 1: Update barrel exports**
+
+In `apps/mobile/src/components/common/index.ts`, replace:
+
+```ts
+export { PenWritingAnimation } from './PenWritingAnimation';
+```
+
+with:
+
+```ts
+export { LightBulbAnimation } from './LightBulbAnimation';
+export { MagicPenAnimation } from './MagicPenAnimation';
+```
+
+- [ ] **Step 2: Delete old PenWritingAnimation files**
+
+```bash
+git rm apps/mobile/src/components/common/PenWritingAnimation.tsx apps/mobile/src/components/common/PenWritingAnimation.test.tsx
+```
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add apps/mobile/src/components/common/index.ts
+git commit -m "refactor(mobile): replace PenWritingAnimation exports with LightBulb + MagicPen [ANIM-IMPROVE]"
 ```
 
 ---
@@ -1304,3 +1299,16 @@ Expected: all PASS.
 git add -A
 git commit -m "fix(mobile): resolve lint/type issues from animation improvements [ANIM-IMPROVE]"
 ```
+
+---
+
+## Follow-Up: Visual Regression Testing
+
+Unit tests confirm "it renders" but not "it looks right." SVG path typos, layout miscalculations, or transform bugs only surface visually. After implementation, add one Maestro screenshot assertion per animation at its primary size:
+
+- `LightBulbAnimation` at 48px
+- `MagicPenAnimation` at 100px
+- `BookPageFlipAnimation` at 80px
+- `BrandCelebration` at 56px
+
+This is a follow-up task, not a blocker for the implementation — but should be done before shipping to production.
