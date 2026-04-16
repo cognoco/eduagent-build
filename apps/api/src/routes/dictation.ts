@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import {
   prepareHomeworkInputSchema,
+  dictationSentenceSchema,
   dictationModeSchema,
   ERROR_CODES,
 } from '@eduagent/schemas';
@@ -14,7 +15,11 @@ import type { AuthUser } from '../middleware/auth';
 import type { ProfileMeta } from '../middleware/profile-scope';
 import { requireProfileId } from '../middleware/profile-scope';
 import { apiError, validationError } from '../errors';
-import { prepareHomework, generateDictation } from '../services/dictation';
+import {
+  prepareHomework,
+  generateDictation,
+  reviewDictation,
+} from '../services/dictation';
 
 // ---------------------------------------------------------------------------
 // Dictation Routes
@@ -53,6 +58,16 @@ const dictationResultInputSchema = z.object({
   reviewed: z.boolean().optional().default(false),
 });
 
+// 2 MB base64 limit (~1.5 MB raw image)
+const MAX_BASE64_LENGTH = 2 * 1024 * 1024;
+
+const dictationReviewInputSchema = z.object({
+  imageBase64: z.string().min(1).max(MAX_BASE64_LENGTH),
+  imageMimeType: z.enum(['image/jpeg', 'image/png', 'image/webp']),
+  sentences: z.array(dictationSentenceSchema).min(1),
+  language: z.string().min(2).max(10),
+});
+
 function getServerDate(): string {
   return new Date().toISOString().slice(0, 10);
 }
@@ -64,7 +79,8 @@ function getServerDate(): string {
 function validateLocalDate(localDate: string): string | null {
   const serverDateMs = new Date(getServerDate()).getTime();
   const clientDateMs = new Date(localDate).getTime();
-  const diffDays = Math.abs(serverDateMs - clientDateMs) / (24 * 60 * 60 * 1000);
+  const diffDays =
+    Math.abs(serverDateMs - clientDateMs) / (24 * 60 * 60 * 1000);
   if (diffDays > 1) {
     return `localDate "${localDate}" is more than 1 day from server UTC date "${getServerDate()}". Use the current local date.`;
   }
@@ -89,7 +105,10 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
 
     const parsed = prepareHomeworkInputSchema.safeParse(body);
     if (!parsed.success) {
-      return validationError(c, 'text is required and must be between 1 and 10000 characters');
+      return validationError(
+        c,
+        'text is required and must be between 1 and 10000 characters'
+      );
     }
 
     const result = await prepareHomework(parsed.data.text);
@@ -160,7 +179,10 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
 
     const parsed = dictationResultInputSchema.safeParse(body);
     if (!parsed.success) {
-      return validationError(c, 'Invalid input: localDate, sentenceCount, and mode are required');
+      return validationError(
+        c,
+        'Invalid input: localDate, sentenceCount, and mode are required'
+      );
     }
 
     // RF-04: Validate client-supplied date is within ±1 day of server UTC
@@ -182,6 +204,39 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
       .returning();
 
     return c.json({ result: row }, 201);
+  })
+
+  // -------------------------------------------------------------------------
+  // POST /dictation/review
+  // Accepts a photo of handwritten dictation and original sentences, returns
+  // an AI-powered review of spelling/punctuation mistakes.
+  // -------------------------------------------------------------------------
+  .post('/dictation/review', async (c) => {
+    requireProfileId(c.get('profileId'));
+
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return validationError(c, 'Request body must be valid JSON');
+    }
+
+    const parsed = dictationReviewInputSchema.safeParse(body);
+    if (!parsed.success) {
+      return validationError(
+        c,
+        'imageBase64 (max 2MB), imageMimeType (jpeg/png/webp), sentences (min 1), and language are required'
+      );
+    }
+
+    const result = await reviewDictation({
+      sentences: parsed.data.sentences,
+      imageBase64: parsed.data.imageBase64,
+      imageMimeType: parsed.data.imageMimeType,
+      language: parsed.data.language,
+    });
+
+    return c.json(result, 200);
   })
 
   // -------------------------------------------------------------------------

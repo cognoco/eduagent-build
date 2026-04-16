@@ -64,10 +64,15 @@ jest.mock('../services/profile', () => ({
 jest.mock('../services/dictation', () => ({
   prepareHomework: jest.fn(),
   generateDictation: jest.fn(),
+  reviewDictation: jest.fn(),
 }));
 
 import { app } from '../index';
-import { prepareHomework, generateDictation } from '../services/dictation';
+import {
+  prepareHomework,
+  generateDictation,
+  reviewDictation,
+} from '../services/dictation';
 
 const TEST_ENV = {
   CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',
@@ -326,8 +331,12 @@ describe('POST /v1/dictation/result', () => {
         createdAt: new Date().toISOString(),
       },
     ]);
-    const insertValues = jest.fn().mockReturnValue({ returning: insertReturning });
-    (mockDb as any).insert = jest.fn().mockReturnValue({ values: insertValues });
+    const insertValues = jest
+      .fn()
+      .mockReturnValue({ returning: insertReturning });
+    (mockDb as any).insert = jest
+      .fn()
+      .mockReturnValue({ values: insertValues });
 
     const res = await app.request(
       '/v1/dictation/result',
@@ -509,9 +518,11 @@ describe('GET /v1/dictation/streak', () => {
     (mockDb as any).query = {
       ...((mockDb as any).query ?? {}),
       dictationResults: {
-        findMany: jest.fn().mockResolvedValue([
-          { profileId: 'test-profile-id', date: twoDaysAgo },
-        ]),
+        findMany: jest
+          .fn()
+          .mockResolvedValue([
+            { profileId: 'test-profile-id', date: twoDaysAgo },
+          ]),
       },
     };
 
@@ -544,6 +555,149 @@ describe('GET /v1/dictation/streak', () => {
 
   it('returns 401 without auth header', async () => {
     const res = await app.request('/v1/dictation/streak', {}, TEST_ENV);
+    expect(res.status).toBe(401);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// POST /v1/dictation/review
+// ---------------------------------------------------------------------------
+
+const REVIEW_SENTENCES = [
+  {
+    text: 'The cat sat on the mat.',
+    withPunctuation: 'The cat sat on the mat period',
+    wordCount: 6,
+  },
+  {
+    text: 'It was a sunny day.',
+    withPunctuation: 'It was a sunny day period',
+    wordCount: 5,
+  },
+];
+
+const REVIEW_BODY = {
+  imageBase64: 'aGVsbG8=',
+  imageMimeType: 'image/jpeg',
+  sentences: REVIEW_SENTENCES,
+  language: 'en',
+};
+
+describe('POST /v1/dictation/review', () => {
+  it('returns 200 with review result', async () => {
+    (reviewDictation as jest.Mock).mockResolvedValueOnce({
+      totalSentences: 2,
+      correctCount: 1,
+      mistakes: [
+        {
+          sentenceIndex: 1,
+          original: 'It was a sunny day.',
+          written: 'It was a suny day.',
+          error: 'spelling',
+          correction: 'It was a sunny day.',
+          explanation: '"sunny" has double n.',
+        },
+      ],
+    });
+
+    const res = await app.request(
+      '/v1/dictation/review',
+      {
+        method: 'POST',
+        headers: AUTH_HEADERS,
+        body: JSON.stringify(REVIEW_BODY),
+      },
+      TEST_ENV
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.totalSentences).toBe(2);
+    expect(body.correctCount).toBe(1);
+    expect(body.mistakes).toHaveLength(1);
+    expect(body.mistakes[0].error).toBe('spelling');
+  });
+
+  it('returns 400 when X-Profile-Id header is missing', async () => {
+    const res = await app.request(
+      '/v1/dictation/review',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer valid.jwt.token',
+          'Content-Type': 'application/json',
+          // No X-Profile-Id
+        },
+        body: JSON.stringify(REVIEW_BODY),
+      },
+      TEST_ENV
+    );
+
+    expect(res.status).toBe(400);
+    expect(reviewDictation).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when imageBase64 is missing', async () => {
+    const { imageBase64: _omitted, ...bodyWithoutImage } = REVIEW_BODY;
+
+    const res = await app.request(
+      '/v1/dictation/review',
+      {
+        method: 'POST',
+        headers: AUTH_HEADERS,
+        body: JSON.stringify(bodyWithoutImage),
+      },
+      TEST_ENV
+    );
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('returns 400 when imageMimeType is unsupported', async () => {
+    const res = await app.request(
+      '/v1/dictation/review',
+      {
+        method: 'POST',
+        headers: AUTH_HEADERS,
+        body: JSON.stringify({ ...REVIEW_BODY, imageMimeType: 'image/gif' }),
+      },
+      TEST_ENV
+    );
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('returns 400 when sentences array is empty', async () => {
+    const res = await app.request(
+      '/v1/dictation/review',
+      {
+        method: 'POST',
+        headers: AUTH_HEADERS,
+        body: JSON.stringify({ ...REVIEW_BODY, sentences: [] }),
+      },
+      TEST_ENV
+    );
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('returns 401 without auth header', async () => {
+    const res = await app.request(
+      '/v1/dictation/review',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(REVIEW_BODY),
+      },
+      TEST_ENV
+    );
+
     expect(res.status).toBe(401);
   });
 });
