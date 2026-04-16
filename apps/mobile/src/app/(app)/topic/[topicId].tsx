@@ -515,6 +515,7 @@ export default function TopicDetailScreen() {
                     mode: 'freeform',
                     subjectId,
                     topicId,
+                    topicName: topicProgress?.title,
                   },
                 })
               }
@@ -538,6 +539,7 @@ export default function TopicDetailScreen() {
                       mode: 'freeform',
                       subjectId,
                       topicId,
+                      topicName: topicProgress?.title,
                       ...(activeSession?.sessionId && {
                         sessionId: activeSession.sessionId,
                       }),
@@ -561,6 +563,7 @@ export default function TopicDetailScreen() {
                       mode: 'practice',
                       subjectId,
                       topicId,
+                      topicName: topicProgress?.title,
                     },
                   })
                 }
@@ -585,6 +588,7 @@ export default function TopicDetailScreen() {
                       mode: 'practice',
                       subjectId,
                       topicId,
+                      topicName: topicProgress?.title,
                     },
                   })
                 }
@@ -605,6 +609,7 @@ export default function TopicDetailScreen() {
                       mode: 'freeform',
                       subjectId,
                       topicId,
+                      topicName: topicProgress?.title,
                       ...(activeSession?.sessionId && {
                         sessionId: activeSession.sessionId,
                       }),
@@ -676,6 +681,7 @@ export default function TopicDetailScreen() {
                   params: {
                     subjectId,
                     topicId,
+                    topicName: topicProgress?.title,
                     verificationType: 'evaluate',
                   },
                 })
@@ -711,6 +717,7 @@ export default function TopicDetailScreen() {
                     params: {
                       subjectId,
                       topicId,
+                      topicName: topicProgress?.title,
                       verificationType: 'teach_back',
                     },
                   })

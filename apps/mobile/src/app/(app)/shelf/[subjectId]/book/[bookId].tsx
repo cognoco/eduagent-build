@@ -376,7 +376,12 @@ export default function BookScreen() {
       if (first.type === 'topic') {
         router.push({
           pathname: '/(app)/session',
-          params: { mode: 'learning', subjectId, topicId: first.id },
+          params: {
+            mode: 'learning',
+            subjectId,
+            topicId: first.id,
+            topicName: first.title,
+          },
         } as never);
         return;
       }
@@ -397,7 +402,12 @@ export default function BookScreen() {
     if (next) {
       router.push({
         pathname: '/(app)/session',
-        params: { mode: 'learning', subjectId, topicId: next.id },
+        params: {
+          mode: 'learning',
+          subjectId,
+          topicId: next.id,
+          topicName: next.title,
+        },
       } as never);
       return;
     }
@@ -405,7 +415,12 @@ export default function BookScreen() {
     if (sorted.length > 0) {
       router.push({
         pathname: '/(app)/session',
-        params: { mode: 'learning', subjectId, topicId: sorted[0]!.id },
+        params: {
+          mode: 'learning',
+          subjectId,
+          topicId: sorted[0]!.id,
+          topicName: sorted[0]!.title,
+        },
       } as never);
     }
   }, [suggestionCards, topics, completedTopicIds, router, subjectId]);
@@ -442,7 +457,12 @@ export default function BookScreen() {
       if (card.type === 'topic') {
         router.push({
           pathname: '/(app)/session',
-          params: { mode: 'learning', subjectId, topicId: card.id },
+          params: {
+            mode: 'learning',
+            subjectId,
+            topicId: card.id,
+            topicName: card.title,
+          },
         } as never);
       } else {
         // For API-generated suggestions, pass title as rawInput for contextual session

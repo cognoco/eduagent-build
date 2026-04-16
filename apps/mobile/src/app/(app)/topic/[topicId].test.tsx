@@ -293,7 +293,12 @@ describe('TopicDetailScreen', () => {
 
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/session',
-      params: { mode: 'practice', subjectId: 'sub-1', topicId: 'topic-1' },
+      params: {
+        mode: 'practice',
+        subjectId: 'sub-1',
+        topicId: 'topic-1',
+        topicName: 'Algebra',
+      },
     });
   });
 
@@ -372,7 +377,12 @@ describe('TopicDetailScreen', () => {
 
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/session',
-      params: { mode: 'freeform', subjectId: 'sub-1', topicId: 'topic-1' },
+      params: {
+        mode: 'freeform',
+        subjectId: 'sub-1',
+        topicId: 'topic-1',
+        topicName: 'New Topic',
+      },
     });
   });
 
@@ -424,7 +434,12 @@ describe('TopicDetailScreen', () => {
 
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/session',
-      params: { mode: 'freeform', subjectId: 'sub-1', topicId: 'topic-1' },
+      params: {
+        mode: 'freeform',
+        subjectId: 'sub-1',
+        topicId: 'topic-1',
+        topicName: 'Calculus',
+      },
     });
   });
 
@@ -459,6 +474,7 @@ describe('TopicDetailScreen', () => {
         mode: 'freeform',
         subjectId: 'sub-1',
         topicId: 'topic-1',
+        topicName: 'Calculus',
         sessionId: 'active-session-123',
       },
     });
@@ -511,7 +527,12 @@ describe('TopicDetailScreen', () => {
 
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/session',
-      params: { mode: 'freeform', subjectId: 'sub-1', topicId: 'topic-1' },
+      params: {
+        mode: 'freeform',
+        subjectId: 'sub-1',
+        topicId: 'topic-1',
+        topicName: 'Algebra',
+      },
     });
   });
 

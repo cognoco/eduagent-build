@@ -213,6 +213,7 @@ describe('LearnerScreen', () => {
           subjectId: 's1',
           subjectName: 'Math',
           topicId: 't1',
+          topicName: 'Topic 1',
           mode: 'learning',
         },
       });

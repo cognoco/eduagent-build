@@ -371,6 +371,7 @@ export default function CurriculumScreen() {
                   mode: 'learning',
                   subjectId,
                   topicId: firstAvailableTopic.id,
+                  topicName: firstAvailableTopic.title,
                 },
               })
             }
@@ -406,6 +407,7 @@ export default function CurriculumScreen() {
                   mode: 'learning',
                   subjectId,
                   topicId: firstAvailableTopic.id,
+                  topicName: firstAvailableTopic.title,
                 },
               })
             }

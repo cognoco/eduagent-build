@@ -77,7 +77,7 @@ describe('buildSystemPrompt', () => {
         topicTitle: 'Quadratic Equations',
         sessionType: 'learning',
       });
-      expect(prompt).toContain('Begin teaching it immediately');
+      expect(prompt).toContain('fun fact about it to spark curiosity');
       expect(prompt).toContain('Do not ask what they want to learn');
     });
 
@@ -90,7 +90,7 @@ describe('buildSystemPrompt', () => {
         sessionType: 'learning',
       });
       expect(prompt).toContain(
-        'Anchor your teaching to their stated intent and begin immediately'
+        'fun fact related to their question to spark curiosity'
       );
     });
 
@@ -101,7 +101,7 @@ describe('buildSystemPrompt', () => {
         topicTitle: 'Quadratic Equations',
         sessionType: 'learning',
       });
-      expect(prompt).not.toContain('Begin teaching it immediately');
+      expect(prompt).not.toContain('fun fact about it to spark curiosity');
     });
 
     it('does NOT inject opener for non-learning sessions', () => {
@@ -112,7 +112,7 @@ describe('buildSystemPrompt', () => {
         sessionType: 'homework',
         homeworkMode: 'help_me',
       });
-      expect(prompt).not.toContain('Begin teaching it immediately');
+      expect(prompt).not.toContain('fun fact about it to spark curiosity');
     });
 
     it('does NOT inject opener for freeform (no topic, no rawInput)', () => {
@@ -123,7 +123,7 @@ describe('buildSystemPrompt', () => {
         rawInput: undefined,
         sessionType: 'learning',
       });
-      expect(prompt).not.toContain('Begin teaching it immediately');
+      expect(prompt).not.toContain('fun fact about it to spark curiosity');
       expect(prompt).not.toContain('Anchor your teaching');
     });
   });

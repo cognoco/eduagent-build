@@ -261,7 +261,8 @@ export default function LibraryScreen() {
   const openTopic = (
     topicId: string,
     subjectId: string,
-    retention?: RetentionStatus
+    retention?: RetentionStatus,
+    topicName?: string
   ): void => {
     const mode =
       retention === 'weak' || retention === 'forgotten'
@@ -269,7 +270,12 @@ export default function LibraryScreen() {
         : 'learning';
     router.push({
       pathname: '/(app)/session',
-      params: { mode, subjectId, topicId },
+      params: {
+        mode,
+        subjectId,
+        topicId,
+        ...(topicName ? { topicName } : {}),
+      },
     } as never);
   };
 
@@ -393,8 +399,8 @@ export default function LibraryScreen() {
             noteTopicIds={noteIdSet}
             state={topicsTabState}
             onStateChange={setTopicsTabState}
-            onTopicPress={(topicId, subjectId, retention) =>
-              openTopic(topicId, subjectId, retention)
+            onTopicPress={(topicId, subjectId, retention, topicName) =>
+              openTopic(topicId, subjectId, retention, topicName)
             }
             onAddSubject={() => router.push('/create-subject')}
           />

@@ -268,14 +268,16 @@ export function buildSystemPrompt(context: ExchangeContext): string {
   ) {
     if (context.topicTitle) {
       sections.push(
-        'The learner chose this topic. Begin teaching it immediately. ' +
+        'The learner chose this topic. Open with a surprising or fun fact about it to spark curiosity, ' +
+          'then invite them into the conversation (e.g. "Have you heard about…?" or "What do you already know about…?"). ' +
           'Do not ask what they want to learn — they already told you by choosing the topic. ' +
-          'If prior session history exists for this topic, pick up where the previous session left off.'
+          'If prior session history exists for this topic, pick up where the previous session left off instead of repeating the fun-fact opener.'
       );
     } else if (context.rawInput) {
       sections.push(
         'The learner expressed interest in the above topic. ' +
-          'Anchor your teaching to their stated intent and begin immediately.'
+          'Open with a surprising or fun fact related to their question to spark curiosity, ' +
+          'then anchor your teaching to their stated intent and begin immediately.'
       );
     }
   }

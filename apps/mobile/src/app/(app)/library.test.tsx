@@ -210,6 +210,7 @@ describe('LibraryScreen', () => {
         mode: 'learning',
         subjectId: 'sub-1',
         topicId: 'topic-1',
+        topicName: 'Fractions',
       },
     });
   });

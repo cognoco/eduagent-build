@@ -141,6 +141,7 @@ export function LearnerScreen({
                   subjectId: continueSuggestion.subjectId,
                   subjectName: continueSuggestion.subjectName,
                   topicId: continueSuggestion.topicId,
+                  topicName: continueSuggestion.topicTitle,
                   mode: 'learning',
                 },
               } as never),
