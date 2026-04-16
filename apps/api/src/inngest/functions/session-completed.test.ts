@@ -26,7 +26,7 @@ const mockSessionCompletedDb = createTransactionalMockDb({
     streaks: { findFirst: jest.fn().mockResolvedValue(null) },
     // analyze-learner-profile reads the session row for rawInput
     learningSessions: {
-      findFirst: jest.fn().mockResolvedValue({ rawInput: null }),
+      findFirst: jest.fn().mockResolvedValue({ rawInput: null, topicId: null }),
     },
     // Snapshot aggregation reads these directly — supply empty results
     // so production code can use db.query.progressSnapshots and
@@ -1533,6 +1533,110 @@ describe('sessionCompleted', () => {
         expect.anything(),
         'streak_7'
       );
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // [F-6]: Re-read topicId after filing wait timeout
+  // When a freeform session's topicId is null in the event, the pipeline
+  // re-reads the session row after waitForEvent in case filing completed just
+  // before the 60s timeout. Downstream steps must use the backfilled topicId.
+  // ---------------------------------------------------------------------------
+  describe('re-read-session step [F-6]', () => {
+    beforeEach(() => {
+      // Reset the once-queue on findFirst so tests don't bleed into each other.
+      // jest.clearAllMocks() clears call counts but not mockResolvedValueOnce
+      // queues; mockReset() clears everything and re-applies the default.
+      mockSessionCompletedDb.query.learningSessions.findFirst.mockReset();
+      mockSessionCompletedDb.query.learningSessions.findFirst.mockResolvedValue(
+        {
+          rawInput: null,
+          topicId: null,
+        }
+      );
+    });
+
+    it('runs re-read-session step when topicId is null', async () => {
+      // Sequence: first findFirst call is from re-read-session (returns backfilled topicId),
+      // second call is from analyze-learner-profile (returns rawInput only).
+      mockSessionCompletedDb.query.learningSessions.findFirst
+        .mockResolvedValueOnce({ rawInput: null, topicId: 'topic-from-db' })
+        .mockResolvedValueOnce({ rawInput: null, topicId: null });
+
+      const { mockStep } = (await executeSteps(
+        createEventData({ topicId: null, qualityRating: 4 })
+      )) as any;
+
+      // re-read-session step must have been invoked
+      expect(mockStep.run).toHaveBeenCalledWith(
+        're-read-session',
+        expect.any(Function)
+      );
+    });
+
+    it('uses backfilled topicId for downstream steps when re-read returns a topicId', async () => {
+      // re-read finds topicId; downstream session summary must receive it
+      mockSessionCompletedDb.query.learningSessions.findFirst
+        .mockResolvedValueOnce({ rawInput: null, topicId: 'topic-from-db' })
+        .mockResolvedValueOnce({ rawInput: null, topicId: null });
+
+      await executeSteps(createEventData({ topicId: null, qualityRating: 4 }));
+
+      // createPendingSessionSummary is in the write-coaching-card step and
+      // receives topicId. It must now get the backfilled value, not null.
+      expect(mockCreatePendingSessionSummary).toHaveBeenCalledWith(
+        expect.anything(),
+        'session-001',
+        'profile-001',
+        'topic-from-db',
+        'pending'
+      );
+    });
+
+    it('keeps topicId null when re-read returns no row', async () => {
+      // Both findFirst calls return null row (no session found)
+      mockSessionCompletedDb.query.learningSessions.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null);
+
+      await executeSteps(createEventData({ topicId: null, qualityRating: 4 }));
+
+      // topicId stays null — summary must receive null
+      expect(mockCreatePendingSessionSummary).toHaveBeenCalledWith(
+        expect.anything(),
+        'session-001',
+        'profile-001',
+        null,
+        'pending'
+      );
+    });
+
+    it('keeps topicId null when re-read row has no topicId', async () => {
+      mockSessionCompletedDb.query.learningSessions.findFirst
+        .mockResolvedValueOnce({ rawInput: null, topicId: null })
+        .mockResolvedValueOnce({ rawInput: null, topicId: null });
+
+      await executeSteps(createEventData({ topicId: null, qualityRating: 4 }));
+
+      expect(mockCreatePendingSessionSummary).toHaveBeenCalledWith(
+        expect.anything(),
+        'session-001',
+        'profile-001',
+        null,
+        'pending'
+      );
+    });
+
+    it('skips re-read-session step when topicId is already set', async () => {
+      const { mockStep } = (await executeSteps(
+        createEventData({ topicId: 'topic-001' })
+      )) as any;
+
+      // re-read-session must NOT be called when topicId is already known
+      const reReadCall = (mockStep.run as jest.Mock).mock.calls.find(
+        ([name]: [string]) => name === 're-read-session'
+      );
+      expect(reReadCall).toBeUndefined();
     });
   });
 

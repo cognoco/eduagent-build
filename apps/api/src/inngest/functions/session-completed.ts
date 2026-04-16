@@ -99,13 +99,15 @@ export const sessionCompleted = inngest.createFunction(
     const {
       profileId,
       sessionId,
-      topicId,
       subjectId,
       summaryStatus,
       timestamp,
       verificationType,
       sessionType,
     } = event.data;
+    // topicId must be `let` so it can be backfilled after the waitForEvent
+    // re-read (F-6: filing may complete just before the 60s timeout fires).
+    let topicId = event.data.topicId as string | null | undefined;
 
     // AD6: Wait for filing to complete before progressing, so that the
     // progress snapshot captures topic placement from the filing step.
@@ -117,6 +119,22 @@ export const sessionCompleted = inngest.createFunction(
         match: 'data.sessionId',
         timeout: '60s',
       });
+    }
+
+    // F-6: Filing may have backfilled topicId even if the event didn't arrive
+    // in time (network delay, retry succeeded). Re-read the session row so
+    // downstream steps use the correct topicId.
+    if (!topicId) {
+      const freshSession = await step.run('re-read-session', async () => {
+        const db = getStepDatabase();
+        const row = await db.query.learningSessions.findFirst({
+          where: eq(learningSessions.id, sessionId),
+        });
+        return row ? { topicId: row.topicId } : null;
+      });
+      if (freshSession?.topicId) {
+        topicId = freshSession.topicId;
+      }
     }
 
     const outcomes: StepOutcome[] = [];
