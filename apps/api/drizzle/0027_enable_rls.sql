@@ -1,6 +1,14 @@
 -- S-06 Phase 1: Create app_user role and enable RLS on profile-scoped tables
 -- SAFE: owner role (neondb_owner) bypasses RLS. No behavior change until
 -- a future phase switches the connection role to app_user.
+--
+-- ## Rollback
+-- This migration is non-destructive (no data is dropped). To roll back:
+--   ALTER TABLE <each table below> DISABLE ROW LEVEL SECURITY;
+--   REVOKE SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public FROM app_user;
+--   REVOKE USAGE ON SCHEMA public FROM app_user;
+--   DROP ROLE IF EXISTS app_user;
+-- No data is lost by rolling back — RLS enablement is metadata-only.
 
 -- 1. Create app_user role (idempotent)
 DO $$ BEGIN

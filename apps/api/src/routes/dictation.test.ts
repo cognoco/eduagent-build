@@ -16,26 +16,7 @@ jest.mock('../middleware/jwt', () => ({
 
 import { createDatabaseModuleMock } from '../test-utils/database-module';
 
-// Provide a mock scoped repository so the /dictation/generate route's
-// createScopedRepository call doesn't blow up in tests.
-const mockScopedRepo = {
-  teachingPreferences: {
-    findFirst: jest.fn().mockResolvedValue({ nativeLanguage: 'en' }),
-  },
-  sessions: {
-    findMany: jest.fn().mockResolvedValue([]),
-  },
-  subjects: {
-    findMany: jest.fn().mockResolvedValue([]),
-  },
-};
-
-const mockDatabaseModule = createDatabaseModuleMock({
-  exports: {
-    createScopedRepository: jest.fn().mockReturnValue(mockScopedRepo),
-    dictationResults: {},
-  },
-});
+const mockDatabaseModule = createDatabaseModuleMock();
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
@@ -65,6 +46,9 @@ jest.mock('../services/dictation', () => ({
   prepareHomework: jest.fn(),
   generateDictation: jest.fn(),
   reviewDictation: jest.fn(),
+  recordDictationResult: jest.fn(),
+  getDictationStreak: jest.fn(),
+  fetchGenerateContext: jest.fn(),
 }));
 
 import { app } from '../index';
@@ -72,6 +56,9 @@ import {
   prepareHomework,
   generateDictation,
   reviewDictation,
+  recordDictationResult,
+  getDictationStreak,
+  fetchGenerateContext,
 } from '../services/dictation';
 
 const TEST_ENV = {
@@ -224,6 +211,11 @@ describe('POST /v1/dictation/prepare-homework', () => {
 
 describe('POST /v1/dictation/generate', () => {
   it('returns 200 with generated dictation content', async () => {
+    (fetchGenerateContext as jest.Mock).mockResolvedValueOnce({
+      recentTopics: [],
+      nativeLanguage: 'cs',
+      ageYears: 10,
+    });
     (generateDictation as jest.Mock).mockResolvedValueOnce({
       sentences: [
         {
@@ -253,7 +245,13 @@ describe('POST /v1/dictation/generate', () => {
     expect(body.language).toBe('cs');
   });
 
-  it('calls generateDictation with context derived from profile', async () => {
+  it('calls fetchGenerateContext then generateDictation with the result', async () => {
+    const mockCtx = {
+      recentTopics: ['Nature'],
+      nativeLanguage: 'en',
+      ageYears: 10,
+    };
+    (fetchGenerateContext as jest.Mock).mockResolvedValueOnce(mockCtx);
     (generateDictation as jest.Mock).mockResolvedValueOnce({
       sentences: [
         {
@@ -276,11 +274,9 @@ describe('POST /v1/dictation/generate', () => {
       TEST_ENV
     );
 
+    expect(fetchGenerateContext).toHaveBeenCalledTimes(1);
     expect(generateDictation).toHaveBeenCalledTimes(1);
-    const callArgs = (generateDictation as jest.Mock).mock.calls[0][0];
-    expect(callArgs).toHaveProperty('ageYears');
-    expect(callArgs).toHaveProperty('nativeLanguage');
-    expect(callArgs).toHaveProperty('recentTopics');
+    expect(generateDictation).toHaveBeenCalledWith(mockCtx);
   });
 
   // RF-01: Missing X-Profile-Id header must return 400
@@ -318,25 +314,16 @@ describe('POST /v1/dictation/generate', () => {
 
 describe('POST /v1/dictation/result', () => {
   it('returns 201 when result is recorded successfully', async () => {
-    const mockDb = mockDatabaseModule.db;
-    const insertReturning = jest.fn().mockResolvedValue([
-      {
-        id: 'result-uuid-001',
-        profileId: 'test-profile-id',
-        date: TODAY,
-        sentenceCount: 5,
-        mistakeCount: 2,
-        mode: 'homework',
-        reviewed: false,
-        createdAt: new Date().toISOString(),
-      },
-    ]);
-    const insertValues = jest
-      .fn()
-      .mockReturnValue({ returning: insertReturning });
-    (mockDb as any).insert = jest
-      .fn()
-      .mockReturnValue({ values: insertValues });
+    (recordDictationResult as jest.Mock).mockResolvedValueOnce({
+      id: 'result-uuid-001',
+      profileId: 'test-profile-id',
+      date: TODAY,
+      sentenceCount: 5,
+      mistakeCount: 2,
+      mode: 'homework',
+      reviewed: false,
+      createdAt: new Date().toISOString(),
+    });
 
     const res = await app.request(
       '/v1/dictation/result',
@@ -357,6 +344,15 @@ describe('POST /v1/dictation/result', () => {
     expect(res.status).toBe(201);
     const body = await res.json();
     expect(body.result).toBeDefined();
+    expect(recordDictationResult).toHaveBeenCalledWith(
+      expect.anything(), // db
+      'test-profile-id',
+      expect.objectContaining({
+        localDate: TODAY,
+        sentenceCount: 5,
+        mode: 'homework',
+      })
+    );
   });
 
   it('returns 400 when localDate is missing', async () => {
@@ -467,13 +463,10 @@ describe('POST /v1/dictation/result', () => {
 
 describe('GET /v1/dictation/streak', () => {
   it('returns 200 with streak 0 when no results exist', async () => {
-    const mockDb = mockDatabaseModule.db;
-    (mockDb as any).query = {
-      ...((mockDb as any).query ?? {}),
-      dictationResults: {
-        findMany: jest.fn().mockResolvedValue([]),
-      },
-    };
+    (getDictationStreak as jest.Mock).mockResolvedValueOnce({
+      streak: 0,
+      lastDate: null,
+    });
 
     const res = await app.request(
       '/v1/dictation/streak',
@@ -488,17 +481,10 @@ describe('GET /v1/dictation/streak', () => {
   });
 
   it('returns 200 with correct streak when practiced today', async () => {
-    const mockDb = mockDatabaseModule.db;
-    const yesterday = getPreviousDateStr(TODAY);
-    (mockDb as any).query = {
-      ...((mockDb as any).query ?? {}),
-      dictationResults: {
-        findMany: jest.fn().mockResolvedValue([
-          { profileId: 'test-profile-id', date: TODAY },
-          { profileId: 'test-profile-id', date: yesterday },
-        ]),
-      },
-    };
+    (getDictationStreak as jest.Mock).mockResolvedValueOnce({
+      streak: 2,
+      lastDate: TODAY,
+    });
 
     const res = await app.request(
       '/v1/dictation/streak',
@@ -513,18 +499,11 @@ describe('GET /v1/dictation/streak', () => {
   });
 
   it('returns streak 0 when last practice was more than 1 day ago', async () => {
-    const twoDaysAgo = getPreviousDateStr(getPreviousDateStr(TODAY));
-    const mockDb = mockDatabaseModule.db;
-    (mockDb as any).query = {
-      ...((mockDb as any).query ?? {}),
-      dictationResults: {
-        findMany: jest
-          .fn()
-          .mockResolvedValue([
-            { profileId: 'test-profile-id', date: twoDaysAgo },
-          ]),
-      },
-    };
+    const twoDaysAgo = '2020-01-01';
+    (getDictationStreak as jest.Mock).mockResolvedValueOnce({
+      streak: 0,
+      lastDate: twoDaysAgo,
+    });
 
     const res = await app.request(
       '/v1/dictation/streak',
@@ -536,6 +515,24 @@ describe('GET /v1/dictation/streak', () => {
     const body = await res.json();
     expect(body.streak).toBe(0);
     expect(body.lastDate).toBe(twoDaysAgo);
+  });
+
+  it('delegates to getDictationStreak with profileId', async () => {
+    (getDictationStreak as jest.Mock).mockResolvedValueOnce({
+      streak: 0,
+      lastDate: null,
+    });
+
+    await app.request(
+      '/v1/dictation/streak',
+      { headers: AUTH_HEADERS },
+      TEST_ENV
+    );
+
+    expect(getDictationStreak).toHaveBeenCalledWith(
+      expect.anything(), // db
+      'test-profile-id'
+    );
   });
 
   // RF-01: Missing X-Profile-Id header must return 400
@@ -701,13 +698,3 @@ describe('POST /v1/dictation/review', () => {
     expect(res.status).toBe(401);
   });
 });
-
-// ---------------------------------------------------------------------------
-// Test helpers
-// ---------------------------------------------------------------------------
-
-function getPreviousDateStr(dateStr: string): string {
-  const d = new Date(dateStr);
-  d.setUTCDate(d.getUTCDate() - 1);
-  return d.toISOString().slice(0, 10);
-}

@@ -3,8 +3,7 @@ import * as SecureStore from '../lib/secure-storage';
 import type { DictationPace } from '@eduagent/schemas';
 
 const getPaceKey = (profileId: string) => `dictation-pace-${profileId}`;
-const getPunctKey = (profileId: string) =>
-  `dictation-punctuation-${profileId}`;
+const getPunctKey = (profileId: string) => `dictation-punctuation-${profileId}`;
 
 export interface DictationPreferences {
   pace: DictationPace;
@@ -43,7 +42,8 @@ export function useDictationPreferences(
       setPaceState(next);
       if (profileId) {
         void SecureStore.setItemAsync(getPaceKey(profileId), next).catch(
-          (err) => console.warn('[Dictation] Failed to persist pace:', err)
+          (err) =>
+            console.warn('[Dictation] SecureStore write failed (pace):', err)
         );
       }
     },
@@ -58,7 +58,10 @@ export function useDictationPreferences(
           getPunctKey(profileId),
           String(next)
         ).catch((err) =>
-          console.warn('[Dictation] Failed to persist punctuation:', err)
+          console.warn(
+            '[Dictation] SecureStore write failed (punctuation):',
+            err
+          )
         );
       }
       return next;
@@ -71,7 +74,8 @@ export function useDictationPreferences(
       const next = PACE_CYCLE[(idx + 1) % PACE_CYCLE.length]!;
       if (profileId) {
         void SecureStore.setItemAsync(getPaceKey(profileId), next).catch(
-          (err) => console.warn('[Dictation] Failed to persist pace:', err)
+          (err) =>
+            console.warn('[Dictation] SecureStore write failed (pace):', err)
         );
       }
       return next;

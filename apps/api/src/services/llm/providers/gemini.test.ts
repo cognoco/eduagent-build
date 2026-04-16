@@ -1,5 +1,10 @@
-import { createGeminiProvider } from './gemini';
-import type { LLMProvider, ChatMessage, ModelConfig } from '../types';
+import { createGeminiProvider, toGeminiParts } from './gemini';
+import type {
+  LLMProvider,
+  ChatMessage,
+  ModelConfig,
+  MessagePart,
+} from '../types';
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -278,6 +283,53 @@ describe('Gemini Provider', () => {
       await expect(
         provider.chat([{ role: 'user', content: 'test' }], DEFAULT_CONFIG)
       ).rejects.toThrow('blocked by content safety filters');
+    });
+  });
+
+  // toGeminiParts — pure formatting, no HTTP mocks needed [IMG-VISION]
+  // Mirrors tests for toAnthropicContent and toOpenAIContent.
+  describe('toGeminiParts', () => {
+    it('converts plain string to text part', () => {
+      expect(toGeminiParts('Hello')).toEqual([{ text: 'Hello' }]);
+    });
+
+    it('converts text-only MessagePart[] to text parts', () => {
+      const parts: MessagePart[] = [
+        { type: 'text', text: 'Hello' },
+        { type: 'text', text: 'World' },
+      ];
+      expect(toGeminiParts(parts)).toEqual([
+        { text: 'Hello' },
+        { text: 'World' },
+      ]);
+    });
+
+    it('converts inline_data parts to Gemini inline_data format', () => {
+      const parts: MessagePart[] = [
+        { type: 'text', text: 'Describe this image' },
+        { type: 'inline_data', mimeType: 'image/jpeg', data: 'base64data' },
+      ];
+      expect(toGeminiParts(parts)).toEqual([
+        { text: 'Describe this image' },
+        { inline_data: { mime_type: 'image/jpeg', data: 'base64data' } },
+      ]);
+    });
+
+    it('handles multiple image parts', () => {
+      const parts: MessagePart[] = [
+        { type: 'inline_data', mimeType: 'image/png', data: 'img1' },
+        { type: 'text', text: 'Compare these' },
+        { type: 'inline_data', mimeType: 'image/webp', data: 'img2' },
+      ];
+      const result = toGeminiParts(parts);
+      expect(result).toHaveLength(3);
+      expect(result[0]).toEqual({
+        inline_data: { mime_type: 'image/png', data: 'img1' },
+      });
+      expect(result[1]).toEqual({ text: 'Compare these' });
+      expect(result[2]).toEqual({
+        inline_data: { mime_type: 'image/webp', data: 'img2' },
+      });
     });
   });
 

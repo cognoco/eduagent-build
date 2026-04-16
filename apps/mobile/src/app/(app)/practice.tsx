@@ -3,6 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IntentCard } from '../../components/home/IntentCard';
+import { useQuizStats } from '../../hooks/use-quiz';
 import { goBackOrReplace } from '../../lib/navigation';
 import { useReviewSummary } from '../../hooks/use-progress';
 import { useThemeColors } from '../../lib/theme';
@@ -12,6 +13,7 @@ export default function PracticeScreen(): React.ReactElement {
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
   const { data: reviewSummary } = useReviewSummary();
+  const { data: quizStats } = useQuizStats();
 
   const reviewDueCount = reviewSummary?.totalOverdue ?? 0;
   const reviewSubtitle =
@@ -20,6 +22,14 @@ export default function PracticeScreen(): React.ReactElement {
           reviewDueCount === 1 ? 'topic' : 'topics'
         } ready for review`
       : 'Keep your knowledge fresh';
+  const capitalsStats = quizStats?.find(
+    (stat) => stat.activityType === 'capitals'
+  );
+  const quizSubtitle = capitalsStats
+    ? capitalsStats.bestScore != null && capitalsStats.bestTotal != null
+      ? `Best: ${capitalsStats.bestScore}/${capitalsStats.bestTotal} · Played: ${capitalsStats.roundsPlayed}`
+      : `Played: ${capitalsStats.roundsPlayed}`
+    : 'Test yourself with multiple choice questions';
 
   const handleBack = () => {
     goBackOrReplace(router, '/(app)/learn-new');
@@ -88,6 +98,12 @@ export default function PracticeScreen(): React.ReactElement {
           subtitle="Practice writing what you hear"
           onPress={() => router.push('/(app)/dictation' as never)}
           testID="practice-dictation"
+        />
+        <IntentCard
+          title="Quiz"
+          subtitle={quizSubtitle}
+          onPress={() => router.push('/(app)/quiz' as never)}
+          testID="practice-quiz"
         />
       </View>
     </ScrollView>

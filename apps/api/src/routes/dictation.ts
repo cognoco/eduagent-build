@@ -6,11 +6,7 @@ import {
   dictationModeSchema,
   ERROR_CODES,
 } from '@eduagent/schemas';
-import {
-  createScopedRepository,
-  dictationResults,
-  type Database,
-} from '@eduagent/database';
+import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import type { ProfileMeta } from '../middleware/profile-scope';
 import { requireProfileId } from '../middleware/profile-scope';
@@ -19,6 +15,9 @@ import {
   prepareHomework,
   generateDictation,
   reviewDictation,
+  recordDictationResult,
+  getDictationStreak,
+  fetchGenerateContext,
 } from '../services/dictation';
 
 // ---------------------------------------------------------------------------
@@ -124,40 +123,12 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
     const db = c.get('db');
     const profileMeta = c.get('profileMeta');
 
-    // Derive age from birthYear available in profileMeta (injected by profileScopeMiddleware)
-    const ageYears = profileMeta?.birthYear
-      ? new Date().getFullYear() - profileMeta.birthYear
-      : 10; // sensible default for unknown age
-
-    // Fetch nativeLanguage from teachingPreferences (not on profile directly)
-    const repo = createScopedRepository(db, profileId);
-    const prefs = await repo.teachingPreferences.findFirst();
-    const nativeLanguage = prefs?.nativeLanguage ?? 'en';
-
-    // Pull recent subject names for thematic context
-    // learningSessions links to subjects — grab the most recent ones
-    const recentSessions = await repo.sessions.findMany();
-    const subjectIds = [
-      ...new Set(
-        recentSessions
-          .slice(0, 10)
-          .map((s) => s.subjectId)
-          .filter(Boolean)
-      ),
-    ];
-
-    // Fetch subject names from the scoped repository
-    const recentSubjects = await repo.subjects.findMany();
-    const recentTopics = recentSubjects
-      .filter((s) => subjectIds.includes(s.id))
-      .map((s) => s.name)
-      .slice(0, 3);
-
-    const result = await generateDictation({
-      recentTopics,
-      nativeLanguage,
-      ageYears,
-    });
+    const ctx = await fetchGenerateContext(
+      db,
+      profileId,
+      profileMeta?.birthYear ?? null
+    );
+    const result = await generateDictation(ctx);
 
     return c.json(result, 200);
   })
@@ -191,17 +162,13 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
       return apiError(c, 400, ERROR_CODES.VALIDATION_ERROR, dateError);
     }
 
-    const [row] = await db
-      .insert(dictationResults)
-      .values({
-        profileId,
-        date: parsed.data.localDate,
-        sentenceCount: parsed.data.sentenceCount,
-        mistakeCount: parsed.data.mistakeCount ?? null,
-        mode: parsed.data.mode,
-        reviewed: parsed.data.reviewed,
-      })
-      .returning();
+    const row = await recordDictationResult(db, profileId, {
+      localDate: parsed.data.localDate,
+      sentenceCount: parsed.data.sentenceCount,
+      mistakeCount: parsed.data.mistakeCount ?? null,
+      mode: parsed.data.mode,
+      reviewed: parsed.data.reviewed,
+    });
 
     return c.json({ result: row }, 201);
   })
@@ -247,49 +214,6 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
     const profileId = requireProfileId(c.get('profileId'));
     const db = c.get('db');
 
-    // Fetch all dictation result dates for this profile, ordered desc
-    const rows = await db.query.dictationResults.findMany({
-      where: (table, { eq }) => eq(table.profileId, profileId),
-      orderBy: (table, { desc }) => [desc(table.date)],
-    });
-
-    if (rows.length === 0) {
-      return c.json({ streak: 0, lastDate: null });
-    }
-
-    // Compute consecutive-day streak from the most recent date backwards
-    const today = getServerDate();
-    const dates = rows.map((r) => r.date);
-
-    let streak = 0;
-    let expected = today;
-
-    for (const date of dates) {
-      if (date === expected) {
-        streak++;
-        expected = getPreviousDate(expected);
-      } else if (date < expected) {
-        // Gap detected — streak ends
-        break;
-      }
-      // Skip duplicates (same date, multiple results)
-    }
-
-    // If the most recent date is not today or yesterday, streak is 0
-    const mostRecentDate = dates[0]!;
-    const daysSinceMostRecent =
-      (new Date(today).getTime() - new Date(mostRecentDate).getTime()) /
-      (24 * 60 * 60 * 1000);
-
-    if (daysSinceMostRecent > 1) {
-      return c.json({ streak: 0, lastDate: mostRecentDate });
-    }
-
-    return c.json({ streak, lastDate: mostRecentDate });
+    const result = await getDictationStreak(db, profileId);
+    return c.json(result);
   });
-
-function getPreviousDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  d.setUTCDate(d.getUTCDate() - 1);
-  return d.toISOString().slice(0, 10);
-}

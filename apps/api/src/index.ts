@@ -60,6 +60,7 @@ import { bookSuggestionRoutes } from './routes/book-suggestions';
 import { topicSuggestionRoutes } from './routes/topic-suggestions';
 import { learnerProfileRoutes } from './routes/learner-profile';
 import { dictationRoutes } from './routes/dictation';
+import { quizRoutes } from './routes/quiz';
 
 type Bindings = {
   ENVIRONMENT: string;
@@ -208,7 +209,8 @@ const routes = api
   .route('/', bookSuggestionRoutes)
   .route('/', topicSuggestionRoutes)
   .route('/', learnerProfileRoutes)
-  .route('/', dictationRoutes);
+  .route('/', dictationRoutes)
+  .route('/', quizRoutes);
 
 // ---------------------------------------------------------------------------
 // App — mounts routes under /v1 for the actual Cloudflare Worker runtime.

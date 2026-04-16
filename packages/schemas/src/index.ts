@@ -36,3 +36,6 @@ export * from './learning-profiles.ts';
 
 // Dictation (Practice)
 export * from './dictation.ts';
+
+// Quiz Activities (Practice)
+export * from './quiz.ts';

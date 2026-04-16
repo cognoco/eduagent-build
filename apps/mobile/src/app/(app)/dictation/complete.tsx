@@ -109,8 +109,18 @@ export default function DictationCompleteScreen(): React.ReactElement {
         reviewed: false,
       });
     } catch (err) {
-      // Non-blocking: streak recording failure should not prevent navigation
       console.warn('[dictation] streak recording failed:', err);
+      Alert.alert(
+        'Note',
+        'Your progress was saved but the streak could not be updated. It will sync next time.',
+        [
+          {
+            text: 'OK',
+            onPress: () => router.replace('/(app)/practice' as never),
+          },
+        ]
+      );
+      return;
     }
 
     router.replace('/(app)/practice' as never);

@@ -26,6 +26,8 @@ import {
   vocabulary,
   vocabularyRetentionCards,
   dictationResults,
+  quizRounds,
+  quizMissedItems,
 } from './schema/index';
 
 export function createScopedRepository(db: Database, profileId: string) {
@@ -343,6 +345,32 @@ export function createScopedRepository(db: Database, profileId: string) {
           .values({ profileId, ...values })
           .returning();
         return row;
+      },
+    },
+
+    quizRounds: {
+      async findMany(extraWhere?: SQL) {
+        return db.query.quizRounds.findMany({
+          where: scopedWhere(quizRounds, extraWhere),
+        });
+      },
+      async findFirst(extraWhere?: SQL) {
+        return db.query.quizRounds.findFirst({
+          where: scopedWhere(quizRounds, extraWhere),
+        });
+      },
+    },
+
+    quizMissedItems: {
+      async findMany(extraWhere?: SQL) {
+        return db.query.quizMissedItems.findMany({
+          where: scopedWhere(quizMissedItems, extraWhere),
+        });
+      },
+      async findFirst(extraWhere?: SQL) {
+        return db.query.quizMissedItems.findFirst({
+          where: scopedWhere(quizMissedItems, extraWhere),
+        });
       },
     },
   };

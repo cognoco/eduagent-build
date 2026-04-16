@@ -1,6 +1,7 @@
 import type { DictationMode } from '@eduagent/schemas';
 import { createScopedRepository } from '@eduagent/database';
 import type { Database } from '@eduagent/database';
+import type { GenerateContext } from './generate';
 
 // ---------------------------------------------------------------------------
 // Dictation Result & Streak Service
@@ -80,12 +81,6 @@ export async function getDictationStreak(
   }
 
   return { streak, lastDate: mostRecentDate };
-}
-
-export interface GenerateContext {
-  recentTopics: string[];
-  nativeLanguage: string;
-  ageYears: number;
 }
 
 /**

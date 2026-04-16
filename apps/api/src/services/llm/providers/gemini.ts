@@ -87,7 +87,7 @@ interface GeminiResponse {
 // ---------------------------------------------------------------------------
 
 /** Convert ChatMessage content to Gemini API parts. */
-function toGeminiParts(content: string | MessagePart[]): GeminiPart[] {
+export function toGeminiParts(content: string | MessagePart[]): GeminiPart[] {
   if (typeof content === 'string') {
     return [{ text: content }];
   }
