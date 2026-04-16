@@ -727,4 +727,30 @@ describe('ChatShell', () => {
       ).toBeTruthy();
     });
   });
+
+  // -----------------------------------------------------------------------
+  // Homework image rendering
+  // -----------------------------------------------------------------------
+
+  it('renders image in MessageBubble when imageUri is present', () => {
+    const messagesWithImage: ChatMessage[] = [
+      {
+        id: 'msg-img',
+        role: 'user',
+        content: 'What is this diagram?',
+        imageUri: 'file:///cache/homework-123.jpg',
+      },
+    ];
+
+    const { getByTestId } = render(
+      <ChatShell
+        title="Test"
+        messages={messagesWithImage}
+        onSend={jest.fn()}
+        isStreaming={false}
+      />
+    );
+
+    expect(getByTestId('message-image-msg-img')).toBeTruthy();
+  });
 });

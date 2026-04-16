@@ -101,7 +101,10 @@ export interface UseSessionActionsOptions {
   setSessionInputMode: ReturnType<typeof useSetSessionInputMode>;
 
   // Functions from other hooks
-  handleSend: (text: string, opts?: { isAutoSent?: boolean }) => Promise<void>;
+  handleSend: (
+    text: string,
+    opts?: { isAutoSent?: boolean; imageUri?: string }
+  ) => Promise<void>;
   syncHomeworkMetadata: (
     sessionId: string,
     problems: HomeworkProblem[],

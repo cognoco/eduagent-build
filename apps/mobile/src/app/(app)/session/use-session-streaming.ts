@@ -104,6 +104,11 @@ export interface UseSessionStreamingOptions {
   trackerStateRef: React.MutableRefObject<
     ReturnType<typeof useMilestoneTracker>['trackerState']
   >;
+  /** Base64-encoded homework image to send with the first message (set once, cleared after send) */
+  imageBase64Ref: React.MutableRefObject<string | null>;
+  imageMimeTypeRef: React.MutableRefObject<
+    'image/jpeg' | 'image/png' | 'image/webp' | null
+  >;
 
   // Profile
   activeProfileId: string | undefined;
@@ -164,6 +169,8 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
     lastExpectedMinutesRef,
     lastRetryPayloadRef,
     trackerStateRef,
+    imageBase64Ref,
+    imageMimeTypeRef,
     activeProfileId,
     apiClient,
     startSession,
@@ -486,6 +493,22 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
         ]);
         setIsStreaming(true);
 
+        const streamOptions: {
+          homeworkMode?: 'help_me' | 'check_answer';
+          imageBase64?: string;
+          imageMimeType?: 'image/jpeg' | 'image/png' | 'image/webp';
+        } = {};
+        if (effectiveMode === 'homework' && homeworkMode) {
+          streamOptions.homeworkMode = homeworkMode;
+        }
+        if (imageBase64Ref.current && imageMimeTypeRef.current) {
+          streamOptions.imageBase64 = imageBase64Ref.current;
+          streamOptions.imageMimeType = imageMimeTypeRef.current;
+          // Clear after first send — subsequent messages are text-only
+          imageBase64Ref.current = null;
+          imageMimeTypeRef.current = null;
+        }
+
         await streamMessage(
           text,
           (accumulated) => {
@@ -585,9 +608,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
             );
           },
           sid,
-          effectiveMode === 'homework' && homeworkMode
-            ? { homeworkMode }
-            : undefined
+          Object.keys(streamOptions).length > 0 ? streamOptions : undefined
         );
       } catch (err: unknown) {
         // Detect quota before reconnect classification — QuotaExceededError is
@@ -676,6 +697,8 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
       ensureSession,
       homeworkMode,
       homeworkProblemsState,
+      imageBase64Ref,
+      imageMimeTypeRef,
       lastAiAtRef,
       lastExpectedMinutesRef,
       lastRetryPayloadRef,

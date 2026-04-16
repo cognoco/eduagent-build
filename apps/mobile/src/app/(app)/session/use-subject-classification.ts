@@ -277,7 +277,10 @@ export function useSubjectClassification(
   ]);
 
   const handleSend = useCallback(
-    async (text: string, opts?: { isAutoSent?: boolean }) => {
+    async (
+      text: string,
+      opts?: { isAutoSent?: boolean; imageUri?: string }
+    ) => {
       // CR-1: Guard on quotaError so programmatic callers (quick chips, homework
       // auto-send, queued problems) can't bypass the UI-disabled input guard.
       if (isStreaming || pendingClassification || quotaError) return;
@@ -293,6 +296,7 @@ export function useSubjectClassification(
           role: 'user',
           content: text,
           isAutoSent: opts?.isAutoSent,
+          imageUri: opts?.imageUri,
         },
       ]);
       setResumedBanner(false);

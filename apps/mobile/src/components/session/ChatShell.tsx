@@ -3,6 +3,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   AccessibilityInfo,
   Alert,
+  Image,
   Linking,
   View,
   Text,
@@ -39,6 +40,8 @@ export interface ChatMessage {
    *  multi-problem). Used to exclude from userMessageCount so the voice/text
    *  toggle stays visible until the user deliberately sends a message. */
   isAutoSent?: boolean;
+  /** Local file URI of a homework image attached to this message */
+  imageUri?: string;
 }
 
 interface ChatShellProps {
@@ -141,6 +144,7 @@ export function ChatShell({
   const scrollRef = useRef<ScrollView>(null);
   const [input, setInput] = useState('');
   const [screenReaderEnabled, setScreenReaderEnabled] = useState(false);
+  const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
 
   // Voice toggle — explicit initialVoiceEnabled (from input mode toggle) takes precedence.
   // Falls back to teach_back detection. Session-scoped only — NOT a persistent preference.
@@ -203,8 +207,12 @@ export function ChatShell({
   // Track last spoken message id to avoid re-speaking
   const lastSpokenIdRef = useRef<string | null>(null);
 
+  // Snap to bottom on every message change. animated:false is intentional —
+  // animated scroll from the top to the bottom of a long transcript (resumed
+  // sessions) can stall short of the end when interrupted by onContentSizeChange
+  // events from async bubble layout. Snap is what chat UIs typically do anyway.
   useEffect(() => {
-    scrollRef.current?.scrollToEnd({ animated: true });
+    scrollRef.current?.scrollToEnd({ animated: false });
   }, [messages]);
 
   useEffect(() => {
@@ -460,7 +468,7 @@ export function ChatShell({
         testID={messagesTestID ?? 'chat-messages'}
         contentContainerStyle={{ paddingBottom: 16 }}
         onContentSizeChange={() =>
-          scrollRef.current?.scrollToEnd({ animated: true })
+          scrollRef.current?.scrollToEnd({ animated: false })
         }
       >
         {messages.length === 0 ? (
@@ -474,15 +482,47 @@ export function ChatShell({
           </View>
         ) : (
           messages.map((msg) => (
-            <MessageBubble
-              key={msg.id}
-              role={msg.role}
-              content={msg.content}
-              streaming={msg.streaming}
-              escalationRung={msg.escalationRung}
-              verificationBadge={msg.verificationBadge}
-              actions={renderMessageActions?.(msg)}
-            />
+            <View key={msg.id}>
+              {msg.imageUri && !failedImages.has(msg.id) && (
+                <View className="self-end max-w-[85%] mb-1">
+                  <Image
+                    testID={`message-image-${msg.id}`}
+                    source={{ uri: msg.imageUri }}
+                    className="w-full aspect-[4/3] rounded-lg"
+                    resizeMode="contain"
+                    accessibilityLabel="Homework image"
+                    onError={() => {
+                      setFailedImages((prev) => new Set(prev).add(msg.id));
+                    }}
+                  />
+                </View>
+              )}
+              {msg.imageUri && failedImages.has(msg.id) && (
+                <View className="self-end max-w-[85%] mb-1">
+                  <View
+                    testID={`message-image-fallback-${msg.id}`}
+                    className="w-full aspect-[4/3] rounded-lg bg-surface items-center justify-center"
+                  >
+                    <Ionicons
+                      name="camera-outline"
+                      size={32}
+                      color={colors.muted}
+                    />
+                    <Text className="text-body-sm text-text-secondary mt-1">
+                      Image no longer available
+                    </Text>
+                  </View>
+                </View>
+              )}
+              <MessageBubble
+                role={msg.role}
+                content={msg.content}
+                streaming={msg.streaming}
+                escalationRung={msg.escalationRung}
+                verificationBadge={msg.verificationBadge}
+                actions={renderMessageActions?.(msg)}
+              />
+            </View>
           ))
         )}
         {showIdleAnim && (

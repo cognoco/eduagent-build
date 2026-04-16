@@ -74,6 +74,7 @@ import {
   writeSessionRecoveryMarker,
 } from '../../../lib/session-recovery';
 import * as SecureStore from '../../../lib/secure-storage';
+import * as FileSystem from 'expo-file-system';
 import { parseHomeworkProblems } from '../homework/problem-cards';
 import {
   getInputModeKey,
@@ -244,6 +245,7 @@ function SessionScreenInner() {
     captureSource,
     rawInput,
     verificationType: routeVerificationType,
+    imageUri,
   } = useLocalSearchParams<{
     mode?: string;
     subjectId?: string;
@@ -257,6 +259,7 @@ function SessionScreenInner() {
     captureSource?: HomeworkCaptureSource;
     rawInput?: string;
     verificationType?: string;
+    imageUri?: string;
   }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -427,6 +430,10 @@ function SessionScreenInner() {
   // current value, not a stale closure capture from when setTimeout was created.
   const trackerStateRef = useRef(trackerState);
   trackerStateRef.current = trackerState;
+  const imageBase64Ref = useRef<string | null>(null);
+  const imageMimeTypeRef = useRef<
+    'image/jpeg' | 'image/png' | 'image/webp' | null
+  >(null);
   const { CelebrationOverlay, trigger } = useCelebration({
     celebrationLevel,
     audience: 'child',
@@ -673,6 +680,37 @@ function SessionScreenInner() {
     topicId,
   ]);
 
+  useEffect(() => {
+    if (!imageUri) return;
+    let cancelled = false;
+
+    async function convertImage() {
+      try {
+        const base64 = await FileSystem.readAsStringAsync(imageUri!, {
+          encoding: 'base64',
+        });
+        if (!cancelled) {
+          imageBase64Ref.current = base64;
+          const ext = imageUri!.split('.').pop()?.toLowerCase();
+          const mimeType: 'image/jpeg' | 'image/png' | 'image/webp' =
+            ext === 'png'
+              ? 'image/png'
+              : ext === 'webp'
+              ? 'image/webp'
+              : 'image/jpeg';
+          imageMimeTypeRef.current = mimeType;
+        }
+      } catch (err) {
+        console.warn('[Session] Failed to read image as base64:', err);
+      }
+    }
+
+    void convertImage();
+    return () => {
+      cancelled = true;
+    };
+  }, [imageUri]);
+
   const {
     syncHomeworkMetadata,
     continueWithMessage,
@@ -719,6 +757,8 @@ function SessionScreenInner() {
     lastExpectedMinutesRef,
     lastRetryPayloadRef,
     trackerStateRef,
+    imageBase64Ref,
+    imageMimeTypeRef,
     activeProfileId: activeProfile?.id,
     apiClient,
     startSession,
@@ -803,12 +843,15 @@ function SessionScreenInner() {
       hasAutoSentRef.current = true;
       const timer = setTimeout(() => {
         // BUG-373: Mark homework auto-send as auto-sent
-        void handleSend(problemText, { isAutoSent: true });
+        void handleSend(problemText, {
+          isAutoSent: true,
+          imageUri: imageUri ?? undefined,
+        });
       }, 500);
       return () => clearTimeout(timer);
     }
     return undefined;
-  }, [problemText, handleSend, routeSessionId]);
+  }, [problemText, handleSend, routeSessionId, imageUri]);
 
   const {
     handleInputModeChange,

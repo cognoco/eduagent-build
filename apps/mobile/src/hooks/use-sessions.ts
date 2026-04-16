@@ -243,7 +243,11 @@ export function useStreamMessage(sessionId: string): {
       fluencyDrill?: FluencyDrillEvent;
     }) => void,
     overrideSessionId?: string,
-    options?: { homeworkMode?: 'help_me' | 'check_answer' }
+    options?: {
+      homeworkMode?: 'help_me' | 'check_answer';
+      imageBase64?: string;
+      imageMimeType?: 'image/jpeg' | 'image/png' | 'image/webp';
+    }
   ) => Promise<void>;
   isStreaming: boolean;
 } {
@@ -275,7 +279,11 @@ export function useStreamMessage(sessionId: string): {
         fluencyDrill?: FluencyDrillEvent;
       }) => void,
       overrideSessionId?: string,
-      options?: { homeworkMode?: 'help_me' | 'check_answer' }
+      options?: {
+        homeworkMode?: 'help_me' | 'check_answer';
+        imageBase64?: string;
+        imageMimeType?: string;
+      }
     ): Promise<void> => {
       const effectiveSessionId = overrideSessionId ?? sessionIdRef.current;
       if (isStreamingRef.current || !effectiveSessionId) return;
@@ -300,6 +308,15 @@ export function useStreamMessage(sessionId: string): {
           message,
           ...(options?.homeworkMode
             ? { homeworkMode: options.homeworkMode }
+            : {}),
+          ...(options?.imageBase64 && options?.imageMimeType
+            ? {
+                imageBase64: options.imageBase64,
+                imageMimeType: options.imageMimeType as
+                  | 'image/jpeg'
+                  | 'image/png'
+                  | 'image/webp',
+              }
             : {}),
         };
         const { events, abort } = streamSSEViaXHR(url, {

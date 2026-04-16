@@ -86,6 +86,10 @@ function createMockOpts(overrides: Record<string, unknown> = {}) {
     lastExpectedMinutesRef: { current: 10 },
     lastRetryPayloadRef: { current: null },
     trackerStateRef: { current: {} },
+    imageBase64Ref: { current: null as string | null },
+    imageMimeTypeRef: {
+      current: null as 'image/jpeg' | 'image/png' | 'image/webp' | null,
+    },
 
     activeProfileId: 'profile-1',
 
