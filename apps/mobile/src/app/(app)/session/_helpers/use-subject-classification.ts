@@ -1,8 +1,8 @@
 import { useCallback } from 'react';
-import type { ChatMessage } from '../../../components/session';
-import type { useClassifySubject } from '../../../hooks/use-classify-subject';
-import type { useResolveSubject } from '../../../hooks/use-resolve-subject';
-import type { useCreateSubject } from '../../../hooks/use-subjects';
+import type { ChatMessage } from '../../../../components/session';
+import type { useClassifySubject } from '../../../../hooks/use-classify-subject';
+import type { useResolveSubject } from '../../../../hooks/use-resolve-subject';
+import type { useCreateSubject } from '../../../../hooks/use-subjects';
 import { type PendingSubjectResolution, isGreeting } from './session-types';
 
 export interface UseSubjectClassificationOptions {

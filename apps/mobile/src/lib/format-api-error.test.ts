@@ -108,6 +108,28 @@ describe('formatApiError', () => {
     );
   });
 
+  // --- ForbiddenError with apiCode [BUG-100] ---
+
+  it('returns subject-inactive message when ForbiddenError carries SUBJECT_INACTIVE apiCode', () => {
+    const err = Object.assign(
+      new Error('Subject is paused — resume it before starting a session'),
+      { name: 'ForbiddenError', code: 'FORBIDDEN', apiCode: 'SUBJECT_INACTIVE' }
+    );
+    expect(formatApiError(err)).toBe(
+      'Subject is paused — resume it before starting a session'
+    );
+  });
+
+  it('passes through ForbiddenError message when apiCode is not a special code', () => {
+    const err = Object.assign(
+      new Error('You do not have permission to access this resource'),
+      { name: 'ForbiddenError', code: 'FORBIDDEN', apiCode: undefined }
+    );
+    expect(formatApiError(err)).toBe(
+      'You do not have permission to access this resource'
+    );
+  });
+
   // --- QuotaExceededError ---
 
   it('passes through QuotaExceededError message', () => {

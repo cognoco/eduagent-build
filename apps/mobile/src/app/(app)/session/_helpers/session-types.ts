@@ -1,5 +1,5 @@
 import type { PendingCelebration } from '@eduagent/schemas';
-import type { ChatMessage } from '../../../components/session';
+import type { ChatMessage } from '../../../../components/session';
 
 export function computePaceMultiplier(
   history: Array<{ actualSeconds: number; expectedMinutes: number }>
@@ -154,13 +154,19 @@ export function errorHasStatus(error: unknown, status: number): boolean {
 }
 
 export function errorHasCode(error: unknown, code: string): boolean {
-  if (
-    typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    (error as { code?: unknown }).code === code
-  ) {
-    return true;
+  if (typeof error === 'object' && error !== null) {
+    // Direct .code match (e.g. QuotaExceededError.code)
+    if ('code' in error && (error as { code?: unknown }).code === code) {
+      return true;
+    }
+    // [BUG-100] ForbiddenError preserves the server's error code in .apiCode
+    // (e.g. 'SUBJECT_INACTIVE') while .code stays 'FORBIDDEN' for HTTP-level typing.
+    if (
+      'apiCode' in error &&
+      (error as { apiCode?: unknown }).apiCode === code
+    ) {
+      return true;
+    }
   }
 
   if (error instanceof Error) {

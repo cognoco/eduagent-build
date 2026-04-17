@@ -1,4 +1,9 @@
-import { getConversationStage, isGreeting } from './session-types';
+import {
+  getConversationStage,
+  isGreeting,
+  errorHasCode,
+  isReconnectableSessionError,
+} from './session-types';
 
 describe('getConversationStage', () => {
   it('returns teaching for practice mode regardless of other inputs', () => {
@@ -81,5 +86,53 @@ describe('isGreeting', () => {
     'hii there',
   ])('rejects non-greeting: "%s"', (text) => {
     expect(isGreeting(text)).toBe(false);
+  });
+});
+
+// [BUG-100] errorHasCode must detect server error codes preserved in ForbiddenError.apiCode
+describe('errorHasCode', () => {
+  it('matches direct .code property', () => {
+    const err = { code: 'SUBJECT_INACTIVE' };
+    expect(errorHasCode(err, 'SUBJECT_INACTIVE')).toBe(true);
+  });
+
+  it('matches .apiCode property from ForbiddenError', () => {
+    const err = Object.assign(
+      new Error('Subject is paused — resume it before starting a session'),
+      { code: 'FORBIDDEN', apiCode: 'SUBJECT_INACTIVE' }
+    );
+    expect(errorHasCode(err, 'SUBJECT_INACTIVE')).toBe(true);
+  });
+
+  it('does not match when apiCode is different', () => {
+    const err = Object.assign(new Error('Forbidden'), {
+      code: 'FORBIDDEN',
+      apiCode: 'SOME_OTHER_CODE',
+    });
+    expect(errorHasCode(err, 'SUBJECT_INACTIVE')).toBe(false);
+  });
+
+  it('falls back to message string matching', () => {
+    const err = new Error('API error 403: {"code":"SUBJECT_INACTIVE"}');
+    expect(errorHasCode(err, 'SUBJECT_INACTIVE')).toBe(true);
+  });
+});
+
+describe('isReconnectableSessionError', () => {
+  it('returns false for ForbiddenError with SUBJECT_INACTIVE apiCode', () => {
+    const err = Object.assign(
+      new Error('Subject is paused — resume it before starting a session'),
+      { name: 'ForbiddenError', code: 'FORBIDDEN', apiCode: 'SUBJECT_INACTIVE' }
+    );
+    expect(isReconnectableSessionError(err)).toBe(false);
+  });
+
+  it('returns false for ForbiddenError with EXCHANGE_LIMIT_EXCEEDED apiCode', () => {
+    const err = Object.assign(new Error('Session limit reached'), {
+      name: 'ForbiddenError',
+      code: 'FORBIDDEN',
+      apiCode: 'EXCHANGE_LIMIT_EXCEEDED',
+    });
+    expect(isReconnectableSessionError(err)).toBe(false);
   });
 });

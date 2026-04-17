@@ -1,33 +1,33 @@
 import { renderHook, act } from '@testing-library/react-native';
 import { useSessionStreaming } from './use-session-streaming';
-import { QuotaExceededError } from '../../../lib/api-client';
+import { QuotaExceededError } from '../../../../lib/api-client';
 
 // Mock session components barrel (animateResponse)
-jest.mock('../../../components/session', () => ({
+jest.mock('../../../../components/session', () => ({
   animateResponse: jest.fn(() => jest.fn()),
 }));
 
 // Mock session recovery
 const mockWriteRecoveryMarker = jest.fn().mockResolvedValue(undefined);
-jest.mock('../../../lib/session-recovery', () => ({
+jest.mock('../../../../lib/session-recovery', () => ({
   writeSessionRecoveryMarker: (...args: unknown[]) =>
     mockWriteRecoveryMarker(...args),
 }));
 
 // Mock format-api-error
-jest.mock('../../../lib/format-api-error', () => ({
+jest.mock('../../../../lib/format-api-error', () => ({
   formatApiError: (err: unknown) =>
     err instanceof Error ? err.message : 'Unknown error',
 }));
 
 // Mock homework problem-cards
-jest.mock('../homework/problem-cards', () => ({
+jest.mock('../../homework/_helpers/problem-cards', () => ({
   buildHomeworkSessionMetadata: jest.fn(() => ({})),
   withProblemMode: jest.fn((problems: unknown[]) => problems),
 }));
 
 // Mock milestone tracker
-jest.mock('../../../hooks/use-milestone-tracker', () => ({
+jest.mock('../../../../hooks/use-milestone-tracker', () => ({
   celebrationForReason: jest.fn((reason: string) => reason),
 }));
 
@@ -348,7 +348,7 @@ describe('useSessionStreaming', () => {
       });
 
       // animateResponse should be called with an error message
-      const { animateResponse } = require('../../../components/session');
+      const { animateResponse } = require('../../../../components/session');
       expect(animateResponse).toHaveBeenCalledWith(
         expect.stringContaining('select a subject'),
         opts.setMessages,

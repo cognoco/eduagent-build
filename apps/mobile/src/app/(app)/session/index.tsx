@@ -75,21 +75,24 @@ import {
 } from '../../../lib/session-recovery';
 import * as SecureStore from '../../../lib/secure-storage';
 import * as FileSystem from 'expo-file-system';
-import { parseHomeworkProblems } from '../homework/problem-cards';
+import { parseHomeworkProblems } from '../homework/_helpers/problem-cards';
 import {
   getInputModeKey,
   errorHasStatus,
   getConversationStage,
   type MessageFeedbackState,
   type PendingSubjectResolution,
-} from './session-types';
-import { useSessionStreaming } from './use-session-streaming';
-import { useSubjectClassification } from './use-subject-classification';
-import { useSessionActions } from './use-session-actions';
-import { SessionMessageActions } from './SessionMessageActions';
-import { SessionToolAccessory, SessionAccessory } from './SessionAccessories';
-import { ParkingLotModal, TopicSwitcherModal } from './SessionModals';
-import { SessionFooter } from './SessionFooter';
+} from './_helpers/session-types';
+import { useSessionStreaming } from './_helpers/use-session-streaming';
+import { useSubjectClassification } from './_helpers/use-subject-classification';
+import { useSessionActions } from './_helpers/use-session-actions';
+import { SessionMessageActions } from './_helpers/SessionMessageActions';
+import {
+  SessionToolAccessory,
+  SessionAccessory,
+} from './_helpers/SessionAccessories';
+import { ParkingLotModal, TopicSwitcherModal } from './_helpers/SessionModals';
+import { SessionFooter } from './_helpers/SessionFooter';
 import { Sentry } from '../../../lib/sentry';
 
 /**

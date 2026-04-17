@@ -7,7 +7,7 @@ import type {
   CelebrationReason,
 } from '@eduagent/schemas';
 import type { Router } from 'expo-router';
-import type { ChatMessage } from '../../../components/session';
+import type { ChatMessage } from '../../../../components/session';
 import type {
   useCloseSession,
   useRecordSystemPrompt,
@@ -15,11 +15,11 @@ import type {
   useFlagSessionContent,
   useAddParkingLotItem,
   useSetSessionInputMode,
-} from '../../../hooks/use-sessions';
-import { clearSessionRecoveryMarker } from '../../../lib/session-recovery';
-import * as SecureStore from '../../../lib/secure-storage';
-import { formatApiError } from '../../../lib/format-api-error';
-import { withProblemMode } from '../homework/problem-cards';
+} from '../../../../hooks/use-sessions';
+import { clearSessionRecoveryMarker } from '../../../../lib/session-recovery';
+import * as SecureStore from '../../../../lib/secure-storage';
+import { formatApiError } from '../../../../lib/format-api-error';
+import { withProblemMode } from '../../homework/_helpers/problem-cards';
 import {
   getInputModeKey,
   serializeMilestones,

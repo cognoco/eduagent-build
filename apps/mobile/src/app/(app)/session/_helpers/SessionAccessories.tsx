@@ -1,7 +1,7 @@
 import { View, Text, Pressable, ScrollView } from 'react-native';
 import type { HomeworkProblem } from '@eduagent/schemas';
 import type { Router } from 'expo-router';
-import type { useCreateSubject } from '../../../hooks/use-subjects';
+import type { useCreateSubject } from '../../../../hooks/use-subjects';
 import {
   type QuickChipId,
   type PendingSubjectResolution,

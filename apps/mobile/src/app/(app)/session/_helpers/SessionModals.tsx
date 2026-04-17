@@ -10,8 +10,8 @@ import {
 import type {
   useParkingLot,
   useAddParkingLotItem,
-} from '../../../hooks/use-sessions';
-import type { useCurriculum } from '../../../hooks/use-curriculum';
+} from '../../../../hooks/use-sessions';
+import type { useCurriculum } from '../../../../hooks/use-curriculum';
 
 // ─── ParkingLotModal ─────────────────────────────────────────────────────────
 

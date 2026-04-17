@@ -5,13 +5,13 @@ import {
   SessionInputModeToggle,
   QuestionCounter,
   LibraryPrompt,
-} from '../../../components/session';
-import { NoteInput } from '../../../components/library/NoteInput';
-import type { useFiling } from '../../../hooks/use-filing';
-import type { useUpsertNote } from '../../../hooks/use-notes';
-import { formatApiError } from '../../../lib/format-api-error';
+} from '../../../../components/session';
+import { NoteInput } from '../../../../components/library/NoteInput';
+import type { useFiling } from '../../../../hooks/use-filing';
+import type { useUpsertNote } from '../../../../hooks/use-notes';
+import { formatApiError } from '../../../../lib/format-api-error';
 import type { Router } from 'expo-router';
-import type { useThemeColors } from '../../../lib/theme';
+import type { useThemeColors } from '../../../../lib/theme';
 
 export interface SessionFooterProps {
   // Filing prompt
