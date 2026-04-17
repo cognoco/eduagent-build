@@ -30,8 +30,17 @@ export default function QuizIndexScreen(): React.ReactElement {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
-  const { data: stats } = useQuizStats();
-  const { data: allSubjects } = useSubjects();
+  const {
+    data: stats,
+    isError: statsError,
+    refetch: refetchStats,
+  } = useQuizStats();
+  const {
+    data: allSubjects,
+    isError: subjectsError,
+    refetch: refetchSubjects,
+  } = useSubjects();
+  const hasLoadError = statsError || subjectsError;
   const {
     setActivityType,
     setSubjectId,
@@ -90,6 +99,24 @@ export default function QuizIndexScreen(): React.ReactElement {
         </Pressable>
         <Text className="flex-1 text-h2 font-bold text-text-primary">Quiz</Text>
       </View>
+
+      {hasLoadError ? (
+        <Pressable
+          onPress={() => {
+            void refetchStats();
+            void refetchSubjects();
+          }}
+          className="mb-4 rounded-card bg-surface p-4"
+          accessibilityRole="button"
+          accessibilityLabel="Retry loading quiz data"
+          testID="quiz-load-retry"
+        >
+          <Text className="text-body-sm text-text-secondary">
+            Couldn&apos;t load quiz data.{' '}
+            <Text className="font-semibold text-primary">Tap to retry.</Text>
+          </Text>
+        </Pressable>
+      ) : null}
 
       <View className="gap-4">
         <IntentCard

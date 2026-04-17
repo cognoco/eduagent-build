@@ -1,3 +1,4 @@
+import React from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -12,20 +13,23 @@ export default function PracticeScreen(): React.ReactElement {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
-  const { data: reviewSummary } = useReviewSummary();
-  const { data: quizStats } = useQuizStats();
+  const { data: reviewSummary, isError: reviewError } = useReviewSummary();
+  const { data: quizStats, isError: statsError } = useQuizStats();
 
   const reviewDueCount = reviewSummary?.totalOverdue ?? 0;
-  const reviewSubtitle =
-    reviewDueCount > 0
-      ? `${reviewDueCount} ${
-          reviewDueCount === 1 ? 'topic' : 'topics'
-        } ready for review`
-      : 'Keep your knowledge fresh';
+  const reviewSubtitle = reviewError
+    ? 'Could not load review status'
+    : reviewDueCount > 0
+    ? `${reviewDueCount} ${
+        reviewDueCount === 1 ? 'topic' : 'topics'
+      } ready for review`
+    : 'Keep your knowledge fresh';
   const capitalsStats = quizStats?.find(
     (stat) => stat.activityType === 'capitals'
   );
-  const quizSubtitle = capitalsStats
+  const quizSubtitle = statsError
+    ? 'Could not load quiz stats'
+    : capitalsStats
     ? capitalsStats.bestScore != null && capitalsStats.bestTotal != null
       ? `Best: ${capitalsStats.bestScore}/${capitalsStats.bestTotal} · Played: ${capitalsStats.roundsPlayed}`
       : `Played: ${capitalsStats.roundsPlayed}`
@@ -64,7 +68,9 @@ export default function PracticeScreen(): React.ReactElement {
         <IntentCard
           title="Review topics"
           subtitle={reviewSubtitle}
-          badge={reviewDueCount > 0 ? reviewDueCount : undefined}
+          badge={
+            !reviewError && reviewDueCount > 0 ? reviewDueCount : undefined
+          }
           onPress={() => {
             const nextReviewTopic = reviewSummary?.nextReviewTopic ?? null;
             if (nextReviewTopic) {
