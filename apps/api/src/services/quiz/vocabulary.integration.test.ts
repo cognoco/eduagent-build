@@ -169,7 +169,11 @@ async function seedVocabularyBank(profileId: string, subjectId: string) {
 }
 
 beforeEach(async () => {
-  jest.useFakeTimers().setSystemTime(new Date('2026-04-17T12:00:00.000Z'));
+  // Only fake Date — leave setTimeout/setInterval real so the Neon HTTP
+  // driver's internal timeouts still fire in CI's PostgreSQL container.
+  jest
+    .useFakeTimers({ doNotFake: ['setTimeout', 'setInterval', 'setImmediate'] })
+    .setSystemTime(new Date('2026-04-17T12:00:00.000Z'));
   await cleanupTestAccounts();
 });
 
