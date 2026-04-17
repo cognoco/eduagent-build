@@ -611,14 +611,17 @@ describe('CreateSubjectScreen', () => {
     expect(screen.queryByTestId('your-subjects-section')).toBeNull();
   });
 
-  it('tapping a subject pill navigates to library', () => {
+  it('tapping a subject pill navigates to session with subject', () => {
     mockExistingSubjects = [{ id: 'sub-1', name: 'Math' }];
 
     render(<CreateSubjectScreen />);
 
     fireEvent.press(screen.getByTestId('your-subject-sub-1'));
 
-    expect(mockPush).toHaveBeenCalledWith('/(app)/library');
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/session',
+      params: { mode: 'learning', subjectId: 'sub-1', subjectName: 'Math' },
+    });
   });
 
   it('hides "Your subjects" section when input has text', () => {

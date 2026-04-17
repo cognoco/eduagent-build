@@ -318,9 +318,12 @@ export default function BookScreen() {
   const handleSessionLongPress = useCallback(
     (session: BookSession) => {
       if (!subjectId || !bookId || isReadOnly) return;
-      const otherBooks = (allBooksQuery.data ?? []).filter(
-        (b) => b.id !== bookId
-      );
+      // BUG-418 class: Array.isArray guard — select is bypassed when enabled=false,
+      // so data can be a wrapped object instead of an array. ?? [] only guards null/undefined.
+      const safeAllBooks = Array.isArray(allBooksQuery.data)
+        ? allBooksQuery.data
+        : [];
+      const otherBooks = safeAllBooks.filter((b) => b.id !== bookId);
 
       if (otherBooks.length === 0) {
         Alert.alert(

@@ -1153,6 +1153,7 @@ export default function AppLayout() {
             title: 'Home',
             tabBarButtonTestID: 'tab-home',
             tabBarAccessibilityLabel: 'Home Tab',
+            lazy: true,
             tabBarIcon: ({ focused }) => (
               <TabIcon name="Home" focused={focused} />
             ),

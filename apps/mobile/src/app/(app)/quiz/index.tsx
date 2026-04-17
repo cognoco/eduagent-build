@@ -116,57 +116,57 @@ export default function QuizIndexScreen(): React.ReactElement {
             <Text className="font-semibold text-primary">Tap to retry.</Text>
           </Text>
         </Pressable>
-      ) : null}
+      ) : (
+        <View className="gap-4">
+          <IntentCard
+            title="Capitals"
+            subtitle={capitalsSubtitle}
+            onPress={() => {
+              setActivityType('capitals');
+              setSubjectId(null);
+              setLanguageName(null);
+              setRound(null);
+              setPrefetchedRoundId(null);
+              setCompletionResult(null);
+              router.push('/(app)/quiz/launch' as never);
+            }}
+            testID="quiz-capitals"
+          />
+          {languageSubjects.map((subject) => {
+            const displayLanguage =
+              getLanguageDisplayName(subject.languageCode) ??
+              subject.name ??
+              'Language';
+            const vocabStats = stats?.find(
+              (stat) => stat.activityType === 'vocabulary'
+            );
+            const statsSubtitle =
+              vocabStats &&
+              vocabStats.bestScore != null &&
+              vocabStats.bestTotal != null
+                ? `Best: ${vocabStats.bestScore}/${vocabStats.bestTotal} · Played: ${vocabStats.roundsPlayed}`
+                : vocabStats
+                ? `Played: ${vocabStats.roundsPlayed}`
+                : 'New!';
+            const subtitle =
+              subject.name && subject.name !== displayLanguage
+                ? `${subject.name} · ${statsSubtitle}`
+                : statsSubtitle;
 
-      <View className="gap-4">
-        <IntentCard
-          title="Capitals"
-          subtitle={capitalsSubtitle}
-          onPress={() => {
-            setActivityType('capitals');
-            setSubjectId(null);
-            setLanguageName(null);
-            setRound(null);
-            setPrefetchedRoundId(null);
-            setCompletionResult(null);
-            router.push('/(app)/quiz/launch' as never);
-          }}
-          testID="quiz-capitals"
-        />
-        {languageSubjects.map((subject) => {
-          const displayLanguage =
-            getLanguageDisplayName(subject.languageCode) ??
-            subject.name ??
-            'Language';
-          const vocabStats = stats?.find(
-            (stat) => stat.activityType === 'vocabulary'
-          );
-          const statsSubtitle =
-            vocabStats &&
-            vocabStats.bestScore != null &&
-            vocabStats.bestTotal != null
-              ? `Best: ${vocabStats.bestScore}/${vocabStats.bestTotal} · Played: ${vocabStats.roundsPlayed}`
-              : vocabStats
-              ? `Played: ${vocabStats.roundsPlayed}`
-              : 'New!';
-          const subtitle =
-            subject.name && subject.name !== displayLanguage
-              ? `${subject.name} · ${statsSubtitle}`
-              : statsSubtitle;
-
-          return (
-            <IntentCard
-              key={subject.id}
-              title={`Vocabulary: ${displayLanguage}`}
-              subtitle={subtitle}
-              onPress={() =>
-                handleSelectVocabulary(subject.id, displayLanguage)
-              }
-              testID={`quiz-vocabulary-${subject.id}`}
-            />
-          );
-        })}
-      </View>
+            return (
+              <IntentCard
+                key={subject.id}
+                title={`Vocabulary: ${displayLanguage}`}
+                subtitle={subtitle}
+                onPress={() =>
+                  handleSelectVocabulary(subject.id, displayLanguage)
+                }
+                testID={`quiz-vocabulary-${subject.id}`}
+              />
+            );
+          })}
+        </View>
+      )}
     </ScrollView>
   );
 }

@@ -7,6 +7,8 @@ import { goBackOrReplace } from '../../../lib/navigation';
 import { useGenerateDictation } from '../../../hooks/use-dictation-api';
 import { useThemeColors } from '../../../lib/theme';
 import { useDictationData } from './_layout';
+import { formatApiError } from '../../../lib/format-api-error';
+import { useState } from 'react';
 
 export default function DictationChoiceScreen(): React.ReactElement {
   const router = useRouter();
@@ -14,8 +16,10 @@ export default function DictationChoiceScreen(): React.ReactElement {
   const colors = useThemeColors();
   const generateMutation = useGenerateDictation();
   const { setData } = useDictationData();
+  const [lastError, setLastError] = useState<string | null>(null);
 
   const handleSurpriseMe = async () => {
+    setLastError(null);
     try {
       const result = await generateMutation.mutateAsync();
       setData({
@@ -26,15 +30,13 @@ export default function DictationChoiceScreen(): React.ReactElement {
         mode: 'surprise',
       });
       router.push('/(app)/dictation/playback' as never);
-    } catch {
-      Alert.alert(
-        "Couldn't create a dictation right now",
-        'Would you like to try again?',
-        [
-          { text: 'Try again', onPress: () => void handleSurpriseMe() },
-          { text: 'Go back', style: 'cancel' },
-        ]
-      );
+    } catch (err: unknown) {
+      const message = formatApiError(err);
+      setLastError(message);
+      Alert.alert("Couldn't create a dictation right now", message, [
+        { text: 'Try again', onPress: () => void handleSurpriseMe() },
+        { text: 'Go back', style: 'cancel' },
+      ]);
     }
   };
 
@@ -62,6 +64,27 @@ export default function DictationChoiceScreen(): React.ReactElement {
           Dictation
         </Text>
       </View>
+
+      {lastError && !generateMutation.isPending ? (
+        <View
+          className="mb-4 rounded-card bg-surface p-4"
+          testID="dictation-error"
+        >
+          <Text className="text-body-sm text-text-secondary mb-2">
+            {lastError}
+          </Text>
+          <Pressable
+            onPress={() => void handleSurpriseMe()}
+            accessibilityRole="button"
+            accessibilityLabel="Retry dictation"
+            testID="dictation-error-retry"
+          >
+            <Text className="font-semibold text-primary text-body-sm">
+              Tap to retry
+            </Text>
+          </Pressable>
+        </View>
+      ) : null}
 
       {generateMutation.isPending ? (
         <View
