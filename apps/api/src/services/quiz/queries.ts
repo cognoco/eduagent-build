@@ -1,12 +1,23 @@
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import {
   createScopedRepository,
   quizRounds,
+  subjects,
+  vocabulary,
+  vocabularyRetentionCards,
   type Database,
 } from '@eduagent/database';
-import type { QuizActivityType } from '@eduagent/schemas';
+import { languageCodeSchema, type QuizActivityType } from '@eduagent/schemas';
 import { NotFoundError } from '../../errors';
 import { QUIZ_CONFIG } from './config';
+import type { LibraryItem } from './content-resolver';
+import {
+  getCefrCeilingForDiscovery,
+  type VocabularyPromptParams,
+} from './vocabulary-provider';
+import { createLogger } from '../logger';
+
+const logger = createLogger();
 
 // ---------------------------------------------------------------------------
 // Quiz read queries
@@ -19,6 +30,16 @@ import { QUIZ_CONFIG } from './config';
 
 interface StoredQuestion {
   correctAnswer?: string;
+}
+
+export interface VocabularyRoundContext {
+  languageCode: string;
+  cefrCeiling: VocabularyPromptParams['cefrCeiling'];
+  allVocabulary: Array<{
+    term: string;
+    translation: string;
+  }>;
+  libraryItems: LibraryItem[];
 }
 
 /**
@@ -104,4 +125,88 @@ export async function listRecentCompletedRounds(
 export async function computeRoundStats(db: Database, profileId: string) {
   const repo = createScopedRepository(db, profileId);
   return repo.quizRounds.aggregateCompletedStats();
+}
+
+export async function getVocabularyRoundContext(
+  db: Database,
+  profileId: string,
+  subjectId: string
+): Promise<VocabularyRoundContext> {
+  const repo = createScopedRepository(db, profileId);
+  const subject = await repo.subjects.findFirst(eq(subjects.id, subjectId));
+
+  if (!subject) {
+    throw new NotFoundError('Subject');
+  }
+  if (subject.status !== 'active') {
+    throw new Error('Subject is not active');
+  }
+  if (!subject.languageCode) {
+    throw new Error('Subject is not a language subject');
+  }
+
+  const parsedLanguageCode = languageCodeSchema.safeParse(subject.languageCode);
+  if (!parsedLanguageCode.success) {
+    throw new Error('Subject has invalid languageCode');
+  }
+
+  const allVocabularyRows = await repo.vocabulary.findMany(
+    eq(vocabulary.subjectId, subjectId)
+  );
+  const vocabularyIds = allVocabularyRows.map((row) => row.id);
+  const cardRows =
+    vocabularyIds.length === 0
+      ? []
+      : await repo.vocabularyRetentionCards.findMany(
+          inArray(vocabularyRetentionCards.vocabularyId, vocabularyIds)
+        );
+  const cardByVocabularyId = new Map(
+    cardRows.map((card) => [card.vocabularyId, card] as const)
+  );
+  const now = new Date();
+  const allVocabulary = allVocabularyRows.map((row) => ({
+    term: row.term,
+    translation: row.translation,
+  }));
+  const distinctTranslationCount = new Set(
+    allVocabulary.map((entry) => entry.translation.trim().toLowerCase())
+  ).size;
+  const libraryItems =
+    distinctTranslationCount < 4
+      ? []
+      : allVocabularyRows
+          .filter((row) => {
+            const card = cardByVocabularyId.get(row.id);
+            return card?.nextReviewAt != null && card.nextReviewAt <= now;
+          })
+          .map(
+            (row) =>
+              ({
+                id: row.id,
+                question: row.term,
+                answer: row.translation,
+                vocabularyId: row.id,
+                cefrLevel: row.cefrLevel,
+              } satisfies LibraryItem)
+          );
+
+  if (distinctTranslationCount < 4 && allVocabularyRows.length > 0) {
+    logger.warn('quiz.vocabulary.mastery_pool_too_small', {
+      profileId,
+      subjectId,
+      poolSize: distinctTranslationCount,
+    });
+  }
+
+  return {
+    languageCode: parsedLanguageCode.data,
+    cefrCeiling: getCefrCeilingForDiscovery(
+      allVocabularyRows.map((row) => ({
+        cefrLevel: row.cefrLevel,
+        repetitions: cardByVocabularyId.get(row.id)?.repetitions ?? null,
+      }))
+    ),
+    allVocabulary,
+    libraryItems,
+  };
 }

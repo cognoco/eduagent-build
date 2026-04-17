@@ -21,7 +21,11 @@ import { combinedSignal } from '../lib/query-timeout';
 export function useGenerateRound(): UseMutationResult<
   QuizRoundResponse,
   Error,
-  { activityType: QuizActivityType; themePreference?: string }
+  {
+    activityType: QuizActivityType;
+    themePreference?: string;
+    subjectId?: string;
+  }
 > {
   const client = useApiClient();
 
@@ -37,7 +41,11 @@ export function useGenerateRound(): UseMutationResult<
 export function usePrefetchRound(): UseMutationResult<
   { id: string },
   Error,
-  { activityType: QuizActivityType; themePreference?: string }
+  {
+    activityType: QuizActivityType;
+    themePreference?: string;
+    subjectId?: string;
+  }
 > {
   const client = useApiClient();
 

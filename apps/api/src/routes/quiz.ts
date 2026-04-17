@@ -3,6 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import {
   completeRoundInputSchema,
   generateRoundInputSchema,
+  type CefrLevel,
   type GenerateRoundInput,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
@@ -12,6 +13,7 @@ import { requireProfileId } from '../middleware/profile-scope';
 import { validationError } from '../errors';
 import {
   completeQuizRound,
+  getVocabularyRoundContext,
   computeRoundStats,
   generateQuizRound,
   getRecentAnswers,
@@ -49,6 +51,33 @@ async function buildAndGenerateRound(
     profileId,
     input.activityType
   );
+  let languageCode: string | undefined;
+  let cefrCeiling: CefrLevel | undefined;
+  let allVocabulary: Array<{ term: string; translation: string }> | undefined;
+  let libraryItems: Array<{
+    id: string;
+    question: string;
+    answer: string;
+    topicId?: string;
+    vocabularyId?: string;
+    cefrLevel?: string | null;
+  }> = [];
+
+  if (input.activityType === 'vocabulary') {
+    if (!input.subjectId) {
+      throw new Error('subjectId is required for vocabulary rounds');
+    }
+
+    const context = await getVocabularyRoundContext(
+      db,
+      profileId,
+      input.subjectId
+    );
+    languageCode = context.languageCode;
+    cefrCeiling = context.cefrCeiling;
+    allVocabulary = context.allVocabulary;
+    libraryItems = context.libraryItems;
+  }
 
   return generateQuizRound({
     db,
@@ -56,12 +85,24 @@ async function buildAndGenerateRound(
     activityType: input.activityType,
     birthYear: profileMeta.birthYear,
     themePreference: input.themePreference,
-    // Phase 2: wired when vocabulary retention lands. Until then, all
-    // capitals questions are discovery — the mastery path is unit-tested in
-    // isolation via content-resolver.test.ts.
-    libraryItems: [],
+    libraryItems,
     recentAnswers,
+    languageCode,
+    cefrCeiling,
+    allVocabulary,
   });
+}
+
+function isVocabularyContextValidationError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    [
+      'subjectId is required for vocabulary rounds',
+      'Subject is not active',
+      'Subject is not a language subject',
+      'Subject has invalid languageCode',
+    ].includes(error.message)
+  );
 }
 
 export const quizRoutes = new Hono<QuizRouteEnv>()
@@ -85,12 +126,25 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
       );
     }
 
-    const round = await buildAndGenerateRound(
-      db,
-      profileId,
-      profileMeta,
-      parsed.data
-    );
+    let round;
+    try {
+      round = await buildAndGenerateRound(
+        db,
+        profileId,
+        profileMeta,
+        parsed.data
+      );
+    } catch (error) {
+      if (isVocabularyContextValidationError(error)) {
+        return validationError(
+          c,
+          error instanceof Error
+            ? error.message
+            : 'Invalid vocabulary round context'
+        );
+      }
+      throw error;
+    }
 
     return c.json(
       {
@@ -123,12 +177,25 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
       );
     }
 
-    const round = await buildAndGenerateRound(
-      db,
-      profileId,
-      profileMeta,
-      parsed.data
-    );
+    let round;
+    try {
+      round = await buildAndGenerateRound(
+        db,
+        profileId,
+        profileMeta,
+        parsed.data
+      );
+    } catch (error) {
+      if (isVocabularyContextValidationError(error)) {
+        return validationError(
+          c,
+          error instanceof Error
+            ? error.message
+            : 'Invalid vocabulary round context'
+        );
+      }
+      throw error;
+    }
 
     return c.json({ id: round.id }, 200);
   })

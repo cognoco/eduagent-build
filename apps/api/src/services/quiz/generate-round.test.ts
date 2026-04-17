@@ -1,8 +1,10 @@
-import type { CapitalsQuestion } from '@eduagent/schemas';
+import type { CapitalsQuestion, VocabularyQuestion } from '@eduagent/schemas';
 import type { LibraryItem } from './content-resolver';
 import {
   assembleRound,
+  buildVocabularyDiscoveryQuestions,
   buildCapitalsPrompt,
+  injectAtRandomPositions,
   injectMasteryQuestions,
 } from './generate-round';
 
@@ -30,6 +32,23 @@ describe('buildCapitalsPrompt', () => {
     });
 
     expect(prompt).toContain('Choose an age-appropriate theme');
+  });
+});
+
+describe('injectAtRandomPositions', () => {
+  it('inserts items without replacing the base array', () => {
+    const result = injectAtRandomPositions(['a', 'b', 'c'], ['X', 'Y']);
+
+    expect(result).toHaveLength(5);
+    expect(result).toContain('a');
+    expect(result).toContain('X');
+    expect(result).toContain('Y');
+  });
+
+  it('returns the base array when nothing is injected', () => {
+    const base = ['a', 'b', 'c'];
+
+    expect(injectAtRandomPositions(base, [])).toEqual(base);
   });
 });
 
@@ -75,6 +94,36 @@ describe('injectMasteryQuestions', () => {
 
     expect(round).toHaveLength(1);
     expect(round[0]?.isLibraryItem).toBe(false);
+  });
+});
+
+describe('buildVocabularyDiscoveryQuestions', () => {
+  it('converts validated questions into typed vocabulary questions', () => {
+    const result: VocabularyQuestion[] = buildVocabularyDiscoveryQuestions({
+      questions: [
+        {
+          term: 'die Katze',
+          correctAnswer: 'cat',
+          acceptedAnswers: ['cat', 'the cat'],
+          distractors: ['dog', 'bird', 'fish'],
+          funFact: 'Fact.',
+          cefrLevel: 'A1',
+        },
+      ],
+    });
+
+    expect(result).toEqual([
+      {
+        type: 'vocabulary',
+        term: 'die Katze',
+        correctAnswer: 'cat',
+        acceptedAnswers: ['cat', 'the cat'],
+        distractors: ['dog', 'bird', 'fish'],
+        funFact: 'Fact.',
+        cefrLevel: 'A1',
+        isLibraryItem: false,
+      },
+    ]);
   });
 });
 

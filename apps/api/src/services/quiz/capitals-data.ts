@@ -1,7 +1,10 @@
 export interface CapitalEntry {
   country: string;
   capital: string;
-  acceptedAliases: string[];
+  /** Non-empty — must contain at least the canonical capital name.
+   *  Enforced as a tuple type so the schema's `.min(1)` can't be violated
+   *  by an accidental empty array in the data. */
+  acceptedAliases: [string, ...string[]];
   region: string;
   funFact: string;
 }

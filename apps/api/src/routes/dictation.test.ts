@@ -41,6 +41,44 @@ jest.mock('../services/profile', () => ({
   }),
 }));
 
+// [CRIT-1/IMP-7] Billing/metering mock — POST /v1/dictation/generate,
+// /prepare-homework, and /review are now LLM-metered, so the metering
+// middleware runs before our handler and needs these service boundaries
+// mocked. Values chosen so quota check always passes unless a specific
+// test overrides them.
+jest.mock('../services/billing', () => ({
+  getSubscriptionByAccountId: jest.fn().mockResolvedValue({
+    id: 'sub-1',
+    accountId: 'test-account-id',
+    tier: 'free',
+    status: 'ACTIVE',
+  }),
+  ensureFreeSubscription: jest.fn().mockResolvedValue({
+    id: 'sub-1',
+    accountId: 'test-account-id',
+    tier: 'free',
+    status: 'ACTIVE',
+  }),
+  getQuotaPool: jest.fn().mockResolvedValue({
+    id: 'qp-1',
+    subscriptionId: 'sub-1',
+    monthlyLimit: 500,
+    usedThisMonth: 10,
+    dailyLimit: null,
+    usedToday: 0,
+  }),
+  decrementQuota: jest.fn().mockResolvedValue({
+    success: true,
+    source: 'monthly',
+    remainingMonthly: 489,
+    remainingTopUp: 0,
+    remainingDaily: null,
+  }),
+  getTopUpCreditsRemaining: jest.fn().mockResolvedValue(0),
+  incrementQuota: jest.fn().mockResolvedValue(undefined),
+  createSubscription: jest.fn(),
+}));
+
 // Mock the dictation services — they are the internal boundary
 jest.mock('../services/dictation', () => ({
   prepareHomework: jest.fn(),
@@ -60,6 +98,11 @@ import {
   getDictationStreak,
   fetchGenerateContext,
 } from '../services/dictation';
+import {
+  ensureFreeSubscription,
+  getQuotaPool,
+  decrementQuota,
+} from '../services/billing';
 
 const TEST_ENV = {
   CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',
@@ -696,5 +739,98 @@ describe('POST /v1/dictation/review', () => {
     );
 
     expect(res.status).toBe(401);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [IMP-7] Quota-exhaustion tests for dictation LLM routes
+// Ensures the metering middleware correctly rejects requests when quota is
+// exceeded. Without these tests, the CRIT-1 billing fix can silently regress.
+// ---------------------------------------------------------------------------
+
+describe('Dictation LLM routes — quota exhaustion [IMP-7]', () => {
+  beforeEach(() => {
+    // Override the billing mock so quota check fails (monthly exhausted)
+    (ensureFreeSubscription as jest.Mock).mockResolvedValue({
+      id: 'sub-1',
+      accountId: 'test-account-id',
+      tier: 'free',
+      status: 'ACTIVE',
+    });
+    (getQuotaPool as jest.Mock).mockResolvedValue({
+      id: 'qp-1',
+      subscriptionId: 'sub-1',
+      monthlyLimit: 50,
+      usedThisMonth: 50,
+      dailyLimit: null,
+      usedToday: 0,
+    });
+    (decrementQuota as jest.Mock).mockResolvedValue({
+      success: false,
+      source: 'monthly_exceeded',
+      remainingMonthly: 0,
+      remainingTopUp: 0,
+      remainingDaily: null,
+    });
+  });
+
+  it('POST /dictation/generate returns 402 QUOTA_EXCEEDED', async () => {
+    const res = await app.request(
+      '/v1/dictation/generate',
+      { method: 'POST', headers: AUTH_HEADERS, body: '{}' },
+      TEST_ENV
+    );
+
+    expect(res.status).toBe(402);
+    const body = await res.json();
+    expect(body.code).toBe('QUOTA_EXCEEDED');
+  });
+
+  it('POST /dictation/prepare-homework returns 402 QUOTA_EXCEEDED', async () => {
+    const res = await app.request(
+      '/v1/dictation/prepare-homework',
+      {
+        method: 'POST',
+        headers: AUTH_HEADERS,
+        body: JSON.stringify({ text: 'Hello world.' }),
+      },
+      TEST_ENV
+    );
+
+    expect(res.status).toBe(402);
+    const body = await res.json();
+    expect(body.code).toBe('QUOTA_EXCEEDED');
+  });
+
+  it('POST /dictation/review returns 402 QUOTA_EXCEEDED', async () => {
+    const res = await app.request(
+      '/v1/dictation/review',
+      {
+        method: 'POST',
+        headers: AUTH_HEADERS,
+        body: JSON.stringify(REVIEW_BODY),
+      },
+      TEST_ENV
+    );
+
+    expect(res.status).toBe(402);
+    const body = await res.json();
+    expect(body.code).toBe('QUOTA_EXCEEDED');
+  });
+
+  it('GET /dictation/streak is NOT metered (DB-only)', async () => {
+    (getDictationStreak as jest.Mock).mockResolvedValueOnce({
+      streak: 0,
+      lastDate: null,
+    });
+
+    const res = await app.request(
+      '/v1/dictation/streak',
+      { method: 'GET', headers: AUTH_HEADERS },
+      TEST_ENV
+    );
+
+    // Streak endpoint should still return 200 even when quota is exhausted
+    expect(res.status).toBe(200);
   });
 });

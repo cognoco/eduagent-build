@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useCallback, useContext, useState } from 'react';
 import { Stack } from 'expo-router';
 import type { DictationSentence, DictationMode } from '@eduagent/schemas';
 import type { DictationReviewResult } from '../../../hooks/use-dictation-api';
@@ -29,7 +29,9 @@ const DictationDataContext = createContext<DictationDataContextType | null>(
 export function useDictationData(): DictationDataContextType {
   const ctx = useContext(DictationDataContext);
   if (!ctx) {
-    throw new Error('useDictationData must be used within DictationDataProvider');
+    throw new Error(
+      'useDictationData must be used within DictationDataProvider'
+    );
   }
   return ctx;
 }
@@ -41,8 +43,9 @@ function DictationDataProvider({
 }): React.ReactElement {
   const [data, setDataState] = useState<DictationData | null>(null);
 
-  const setData = (next: DictationData) => setDataState(next);
-  const clear = () => setDataState(null);
+  // [MIN-5] useCallback prevents unnecessary re-renders in children consuming context
+  const setData = useCallback((next: DictationData) => setDataState(next), []);
+  const clear = useCallback(() => setDataState(null), []);
 
   return (
     <DictationDataContext.Provider value={{ data, setData, clear }}>

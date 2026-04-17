@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { CapitalsQuestion, QuestionResult } from '@eduagent/schemas';
+import type { QuestionResult, QuizQuestion } from '@eduagent/schemas';
 import { useCompleteRound, usePrefetchRound } from '../../../hooks/use-quiz';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { useThemeColors } from '../../../lib/theme';
@@ -25,20 +25,33 @@ function shuffle<T>(items: T[]): T[] {
   return shuffled;
 }
 
-function isCorrectOption(question: CapitalsQuestion, answer: string): boolean {
+function isCorrectOption(question: QuizQuestion, answer: string): boolean {
   const normalized = answer.toLowerCase();
-  return (
-    question.correctAnswer.toLowerCase() === normalized ||
-    question.acceptedAliases.some((alias) => alias.toLowerCase() === normalized)
-  );
+  if (question.correctAnswer.toLowerCase() === normalized) return true;
+  if (question.type === 'capitals') {
+    return question.acceptedAliases.some(
+      (alias) => alias.toLowerCase() === normalized
+    );
+  }
+  if (question.type === 'vocabulary') {
+    return question.acceptedAnswers.some(
+      (acceptedAnswer) => acceptedAnswer.toLowerCase() === normalized
+    );
+  }
+  return false;
 }
 
 export default function QuizPlayScreen(): React.ReactElement {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
-  const { round, activityType, setPrefetchedRoundId, setCompletionResult } =
-    useQuizFlow();
+  const {
+    round,
+    activityType,
+    subjectId,
+    setPrefetchedRoundId,
+    setCompletionResult,
+  } = useQuizFlow();
   const completeRound = useCompleteRound();
   const prefetchRound = usePrefetchRound();
   // [ASSUMP-F10] When completeRound fails we surface an inline retry UI
@@ -46,7 +59,7 @@ export default function QuizPlayScreen(): React.ReactElement {
   // Users should always know when the server didn't accept their round.
   const [completeError, setCompleteError] = useState<string | null>(null);
 
-  const questions = (round?.questions ?? []) as CapitalsQuestion[];
+  const questions = (round?.questions ?? []) as QuizQuestion[];
   const totalQuestions = round?.total ?? 0;
 
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -108,7 +121,7 @@ export default function QuizPlayScreen(): React.ReactElement {
 
     prefetchTriggeredRef.current = true;
     prefetchRound.mutate(
-      { activityType },
+      { activityType, subjectId: subjectId ?? undefined },
       {
         onSuccess: (data) => setPrefetchedRoundId(data.id),
       }
@@ -118,6 +131,7 @@ export default function QuizPlayScreen(): React.ReactElement {
     currentIndex,
     prefetchRound,
     setPrefetchedRoundId,
+    subjectId,
     totalQuestions,
   ]);
 
@@ -148,7 +162,7 @@ export default function QuizPlayScreen(): React.ReactElement {
 
   // Re-bind as non-nullable locals after the guard so closures in the
   // hoisted function declarations below carry the narrowed type through.
-  const question: CapitalsQuestion = currentQuestion;
+  const question: QuizQuestion = currentQuestion;
   const activeRound = round;
 
   // [ASSUMP-F10] Shared submit path so Retry re-uses the same success/error
@@ -294,12 +308,25 @@ export default function QuizPlayScreen(): React.ReactElement {
       </View>
 
       <View className="mb-8 px-5">
-        <Text className="mb-2 text-body text-text-secondary">
-          What is the capital of...
-        </Text>
-        <Text className="text-display font-bold text-text-primary">
-          {currentQuestion.country}?
-        </Text>
+        {currentQuestion.type === 'capitals' ? (
+          <>
+            <Text className="mb-2 text-body text-text-secondary">
+              What is the capital of...
+            </Text>
+            <Text className="text-display font-bold text-text-primary">
+              {currentQuestion.country}?
+            </Text>
+          </>
+        ) : currentQuestion.type === 'vocabulary' ? (
+          <>
+            <Text className="mb-2 text-body text-text-secondary">
+              Translate:
+            </Text>
+            <Text className="text-display font-bold text-text-primary">
+              {currentQuestion.term}
+            </Text>
+          </>
+        ) : null}
       </View>
 
       <View className="gap-3 px-5">
@@ -335,11 +362,13 @@ export default function QuizPlayScreen(): React.ReactElement {
 
       {answerState !== 'unanswered' ? (
         <View className="mt-6 px-5">
-          <View className="rounded-card bg-surface p-4">
-            <Text className="text-body-sm text-text-secondary">
-              {currentQuestion.funFact}
-            </Text>
-          </View>
+          {currentQuestion.funFact ? (
+            <View className="rounded-card bg-surface p-4">
+              <Text className="text-body-sm text-text-secondary">
+                {currentQuestion.funFact}
+              </Text>
+            </View>
+          ) : null}
           <Text className="mt-3 text-center text-caption text-text-secondary">
             {showContinueHint
               ? 'Tap anywhere to continue'

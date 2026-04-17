@@ -8,6 +8,7 @@ export interface LibraryItem {
   answer: string;
   topicId?: string;
   vocabularyId?: string;
+  cefrLevel?: string | null;
 }
 
 export interface ResolveParams {
@@ -27,8 +28,20 @@ export interface RoundContentPlan {
 export function resolveRoundContent(params: ResolveParams): RoundContentPlan {
   const { activityType, recentAnswers, libraryItems } = params;
   const { defaults, perActivity } = QUIZ_CONFIG;
+  const activityConfig = (perActivity[
+    activityType as keyof typeof QUIZ_CONFIG.perActivity
+  ] ?? {}) as Partial<typeof defaults> & { roundSize?: number };
 
-  const roundSize = perActivity[activityType].roundSize ?? defaults.roundSize;
+  const roundSize = activityConfig?.roundSize ?? defaults.roundSize;
+  const libraryRatio = activityConfig?.libraryRatio ?? defaults.libraryRatio;
+  const libraryRatioMinItems =
+    activityConfig?.libraryRatioMinItems ?? defaults.libraryRatioMinItems;
+  const libraryRatioScaleUpThreshold =
+    activityConfig?.libraryRatioScaleUpThreshold ??
+    defaults.libraryRatioScaleUpThreshold;
+  const libraryRatioScaleUpValue =
+    activityConfig?.libraryRatioScaleUpValue ??
+    defaults.libraryRatioScaleUpValue;
   const recentSet = new Set(
     recentAnswers.map((answer) => answer.toLowerCase())
   );
@@ -38,11 +51,11 @@ export function resolveRoundContent(params: ResolveParams): RoundContentPlan {
 
   let masteryCount = 0;
 
-  if (eligibleLibrary.length >= defaults.libraryRatioMinItems) {
+  if (eligibleLibrary.length >= libraryRatioMinItems) {
     const ratio =
-      eligibleLibrary.length > defaults.libraryRatioScaleUpThreshold
-        ? defaults.libraryRatioScaleUpValue
-        : defaults.libraryRatio;
+      eligibleLibrary.length > libraryRatioScaleUpThreshold
+        ? libraryRatioScaleUpValue
+        : libraryRatio;
     masteryCount = Math.min(
       Math.floor(ratio * roundSize),
       eligibleLibrary.length

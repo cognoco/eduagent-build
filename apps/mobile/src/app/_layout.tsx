@@ -205,14 +205,14 @@ function ThemedContent({ colorScheme }: { colorScheme: ColorScheme }) {
         <Stack.Screen name="(app)" />
         <Stack.Screen name="sso-callback" />
         <Stack.Screen
-          name="assessment"
+          name="assessment/index"
           options={{
             presentation: 'fullScreenModal',
             animation: 'slide_from_bottom',
           }}
         />
         <Stack.Screen
-          name="session-summary"
+          name="session-summary/[sessionId]"
           options={{
             presentation: 'fullScreenModal',
             animation: 'slide_from_bottom',

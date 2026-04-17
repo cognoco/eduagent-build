@@ -10,7 +10,13 @@ export const QUIZ_CONFIG = {
   },
   perActivity: {
     capitals: { roundSize: 8 },
-    vocabulary: { roundSize: 6 },
+    vocabulary: {
+      roundSize: 6,
+      libraryRatio: 0.5,
+      libraryRatioMinItems: 1,
+      libraryRatioScaleUpThreshold: 10,
+      libraryRatioScaleUpValue: 0.67,
+    },
     guess_who: { roundSize: 4 },
   },
   xp: {

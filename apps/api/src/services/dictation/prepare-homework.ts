@@ -2,6 +2,8 @@ import { prepareHomeworkOutputSchema } from '@eduagent/schemas';
 import type { PrepareHomeworkOutput } from '@eduagent/schemas';
 import { routeAndCall } from '../llm';
 import type { ChatMessage } from '../llm';
+import { UpstreamLlmError } from '../../errors';
+import { captureException } from '../sentry';
 
 // ---------------------------------------------------------------------------
 // Prepare-Homework Dictation Service
@@ -50,9 +52,27 @@ export async function prepareHomework(
 
   const jsonMatch = result.response.match(/\{[\s\S]*\}/);
   if (!jsonMatch) {
-    throw new Error('LLM returned no JSON in prepare-homework response');
+    const err = new UpstreamLlmError(
+      'LLM returned no JSON in prepare-homework response'
+    );
+    captureException(err, {
+      requestPath: 'services/dictation/prepare-homework',
+    });
+    throw err;
   }
 
-  const parsed = JSON.parse(jsonMatch[0]);
-  return prepareHomeworkOutputSchema.parse(parsed);
+  try {
+    const parsed = JSON.parse(jsonMatch[0]);
+    return prepareHomeworkOutputSchema.parse(parsed);
+  } catch (parseErr) {
+    captureException(
+      parseErr instanceof Error
+        ? parseErr
+        : new Error('Prepare-homework parse failed'),
+      { requestPath: 'services/dictation/prepare-homework' }
+    );
+    throw new UpstreamLlmError(
+      'Prepare-homework LLM returned invalid structured output'
+    );
+  }
 }

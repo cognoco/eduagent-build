@@ -5,6 +5,9 @@ import {
   generateRoundInputSchema,
   questionResultSchema,
   quizActivityTypeSchema,
+  quizQuestionSchema,
+  vocabularyLlmOutputSchema,
+  vocabularyQuestionSchema,
 } from './quiz.js';
 
 describe('quiz schemas', () => {
@@ -42,6 +45,84 @@ describe('quiz schemas', () => {
         capitalsQuestionSchema.parse({
           ...validQuestion,
           distractors: ['Berlin', 'Madrid'],
+        })
+      ).toThrow();
+    });
+  });
+
+  describe('vocabularyQuestionSchema', () => {
+    const validQuestion = {
+      type: 'vocabulary' as const,
+      term: 'der Hund',
+      correctAnswer: 'dog',
+      acceptedAnswers: ['dog', 'the dog'],
+      distractors: ['cat', 'bird', 'fish'],
+      funFact: 'Hund is one of the first German words many learners meet.',
+      cefrLevel: 'A1',
+      isLibraryItem: false,
+    };
+
+    it('accepts a valid vocabulary question', () => {
+      expect(vocabularyQuestionSchema.parse(validQuestion)).toEqual(
+        validQuestion
+      );
+    });
+
+    it('requires exactly 3 distractors', () => {
+      expect(() =>
+        vocabularyQuestionSchema.parse({
+          ...validQuestion,
+          distractors: ['cat', 'bird'],
+        })
+      ).toThrow();
+    });
+
+    it('requires at least 1 accepted answer', () => {
+      expect(() =>
+        vocabularyQuestionSchema.parse({
+          ...validQuestion,
+          acceptedAnswers: [],
+        })
+      ).toThrow();
+    });
+  });
+
+  describe('quizQuestionSchema', () => {
+    it('accepts capitals questions', () => {
+      expect(
+        quizQuestionSchema.parse({
+          type: 'capitals',
+          country: 'France',
+          correctAnswer: 'Paris',
+          acceptedAliases: ['Paris'],
+          distractors: ['Berlin', 'Madrid', 'Rome'],
+          funFact: 'Fact.',
+          isLibraryItem: false,
+        }).type
+      ).toBe('capitals');
+    });
+
+    it('accepts vocabulary questions', () => {
+      expect(
+        quizQuestionSchema.parse({
+          type: 'vocabulary',
+          term: 'der Hund',
+          correctAnswer: 'dog',
+          acceptedAnswers: ['dog'],
+          distractors: ['cat', 'bird', 'fish'],
+          funFact: 'Fact.',
+          cefrLevel: 'A1',
+          isLibraryItem: true,
+          vocabularyId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+        }).type
+      ).toBe('vocabulary');
+    });
+
+    it('rejects unknown types', () => {
+      expect(() =>
+        quizQuestionSchema.parse({
+          type: 'flashcard',
+          question: 'test',
         })
       ).toThrow();
     });
@@ -91,6 +172,26 @@ describe('quiz schemas', () => {
         themePreference: 'Central Europe',
       });
     });
+
+    it('accepts vocabulary input with subjectId', () => {
+      expect(
+        generateRoundInputSchema.parse({
+          activityType: 'vocabulary',
+          subjectId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+        })
+      ).toEqual({
+        activityType: 'vocabulary',
+        subjectId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+      });
+    });
+
+    it('rejects vocabulary input without subjectId', () => {
+      expect(() =>
+        generateRoundInputSchema.parse({
+          activityType: 'vocabulary',
+        })
+      ).toThrow(/subjectId/);
+    });
   });
 
   describe('completeRoundInputSchema', () => {
@@ -114,6 +215,27 @@ describe('quiz schemas', () => {
       };
 
       expect(capitalsLlmOutputSchema.parse(output)).toEqual(output);
+    });
+  });
+
+  describe('vocabularyLlmOutputSchema', () => {
+    it('accepts valid LLM output', () => {
+      const output = {
+        theme: 'German Animals',
+        targetLanguage: 'German',
+        questions: [
+          {
+            term: 'die Katze',
+            correctAnswer: 'cat',
+            acceptedAnswers: ['cat', 'the cat'],
+            distractors: ['dog', 'bird', 'fish'],
+            funFact: 'Katze comes from Latin cattus.',
+            cefrLevel: 'A1',
+          },
+        ],
+      };
+
+      expect(vocabularyLlmOutputSchema.parse(output)).toEqual(output);
     });
   });
 });

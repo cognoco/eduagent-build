@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -32,10 +32,19 @@ export default function QuizResultsScreen(): React.ReactElement {
   // the Play Again press would add a perceptible wait on the hot path.
   const prefetchedRound = useFetchRound(prefetchedRoundId);
 
-  const score = completionResult?.score ?? 0;
-  const total = completionResult?.total ?? 0;
-  const xpEarned = completionResult?.xpEarned ?? 0;
-  const celebrationTier = completionResult?.celebrationTier ?? 'nice';
+  // [MIN-6] Guard against direct navigation with cleared context — redirect
+  // to practice rather than rendering a meaningless "0/0" screen.
+  useEffect(() => {
+    if (!completionResult) {
+      goBackOrReplace(router, '/(app)/practice');
+    }
+  }, [completionResult, router]);
+
+  if (!completionResult) {
+    return <View className="flex-1 bg-background" />;
+  }
+
+  const { score, total, xpEarned, celebrationTier } = completionResult;
 
   const tierConfig = {
     perfect: {

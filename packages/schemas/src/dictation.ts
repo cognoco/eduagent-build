@@ -61,6 +61,32 @@ export const dictationReviewResultSchema = z.object({
 });
 export type DictationReviewResult = z.infer<typeof dictationReviewResultSchema>;
 
+// --- dictation result input (for recording results) ---
+
+export const recordDictationResultInputSchema = z.object({
+  localDate: z.string().date(),
+  sentenceCount: z.number().int().positive(),
+  mistakeCount: z.number().int().nonnegative().nullable().optional(),
+  mode: dictationModeSchema,
+  reviewed: z.boolean().optional().default(false),
+});
+export type RecordDictationResultInput = z.infer<
+  typeof recordDictationResultInputSchema
+>;
+
+// --- dictation review input (vision-based grading) ---
+
+/** Max base64 length: ~2 MB base64 ≈ 1.5 MB raw image */
+const MAX_BASE64_LENGTH = 2 * 1024 * 1024;
+
+export const dictationReviewInputSchema = z.object({
+  imageBase64: z.string().min(1).max(MAX_BASE64_LENGTH),
+  imageMimeType: z.enum(['image/jpeg', 'image/png', 'image/webp']),
+  sentences: z.array(dictationSentenceSchema).min(1),
+  language: z.string().min(2).max(10),
+});
+export type DictationReviewInput = z.infer<typeof dictationReviewInputSchema>;
+
 // --- dictation result (for streak tracking) ---
 
 export const dictationResultSchema = z.object({

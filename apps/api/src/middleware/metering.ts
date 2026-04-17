@@ -65,6 +65,11 @@ const LLM_ROUTE_PATTERNS = [
   // Completion/recent/stats are DB-only and must not decrement quota.
   /\/quiz\/rounds\/?$/,
   /\/quiz\/rounds\/prefetch\/?$/,
+  // [CRIT-1] Dictation LLM-consuming routes — all POST-only.
+  // generate + prepare-homework use rung 1, review uses rung 2 (vision).
+  /\/dictation\/generate\/?$/,
+  /\/dictation\/prepare-homework\/?$/,
+  /\/dictation\/review\/?$/,
 ];
 
 function isLlmRoute(path: string, method: string): boolean {

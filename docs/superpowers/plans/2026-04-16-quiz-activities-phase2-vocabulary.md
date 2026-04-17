@@ -22,16 +22,13 @@
 
 **Revisit trigger.** If Phase 1 ships to `main` before Phase 2 execution completes, re-evaluate split vs. gate — once learners exist, time-to-ship becomes scarce and the split's incremental-delivery benefit reasserts.
 
-## Decisions Required (User)
+## Decisions (Confirmed 2026-04-17)
 
-Two design calls are needed before Task 4 can start. Both are yours to make.
-
-| ID | Decision | Default if no decision |
+| ID | Decision | Status |
 |---|---|---|
-| QP2-D1 | **MC SM-2 quality mapping.** Use timing-adjusted quality (correct+fast=4, correct+slow=3, wrong=2) OR flat 4/2 OR something else? | Flat 4/2 — correct per SM-2 definition for MC-with-feedback. Timing is a separate axis, defer. |
-| QP2-D2 | **Separate retention cards per recall mode** (MC vs future free-recall)? | No. Single card, MC-only for now. Flag for Phase 5 re-evaluation when free-recall ships. Don't pre-schema. |
-
-Confirm both before Task 4 executes, or the defaults above will be implemented and flagged for later review.
+| QP2-D1 | **MC SM-2 quality mapping:** Flat 4/2. Correct = quality 4, wrong = quality 2 (learner sees answer on feedback screen = SM-2 definition of quality 2). Timing-based refinement is a separate axis, deferred. | **Confirmed.** |
+| QP2-D2 | **Single retention card per vocabulary item.** No `recall_mode` column. Revisit when Phase 5 (free-recall) is designed. Extension path: unique constraint on `(vocabularyId)` alone → Phase 5 migration drops it, adds `(vocabularyId, recallMode)`. Clean migration-with-backfill, not a schema blocker. | **Confirmed.** |
+| QP2-D3 | **Bootstrap: Option C (discovery-only for new learners).** Mastery pool = items with `nextReviewAt IS NOT NULL AND nextReviewAt <= now`. New bank items sit unreviewed until an introduction flow (Phase 2.5) explicitly creates their first card. First vocabulary rounds for new learners are 100% LLM-generated discovery. Option A (cold-call MC on unseen words) rejected — violates SM-2 assumption that first review follows a learning phase; causes ease-factor damage from guess-correct responses. | **Confirmed.** |
 
 ## Review Findings (2026-04-16)
 
@@ -42,11 +39,11 @@ Confirm both before Task 4 executes, or the defaults above will be implemented a
 | ID | Severity | Task | Short title | Verified By |
 |---|---|---|---|---|
 | QP2-R1 | Serious | Task 5 | CEFR ceiling uses unfiltered `max`, not mastery-weighted signal | TBD — test + integration |
-| QP2-R2 | Serious | Task 4 | SM-2 quality scores 4/1 are crude; need timing + MC discount | TBD — unit test |
+| QP2-R2 | ~~Serious~~ **Resolved** | Task 4 | SM-2 quality scores → **flat 4/2 confirmed** (see QP2-D1) | N/A — decision, not bug |
 | QP2-R3 | Serious | Task 2/3 | `Math.random()` biased shuffle in capitals mastery path | TBD — unit test for Fisher-Yates |
-| QP2-R4 | Serious | Task 5 | "Due for review" filter treats never-studied items as due | TBD — unit test for filter |
-| QP2-R5 | Serious | Task 3 | `plan.masteryItems` / `plan.discoveryCount` source not specified; vocab-adaptive ratio needed | TBD — unit test for planner |
-| QP2-R6 | Medium | Task 1 | Discriminated union may break parsing of existing Phase 1 `quiz_rounds` rows | TBD — migration + parse test |
+| QP2-R4 | Serious | Task 5 | "Due for review" filter treats never-studied items as due → **fix via QP2-D3 (Option C)** | TBD — unit test for filter |
+| QP2-R5 | ~~Serious~~ Medium | Task 3/Config | `resolveRoundContent` is generic and already activity-aware; vocab needs higher mastery ratio (see QP2-R16) | TBD — config + unit test |
+| QP2-R6 | ~~Medium~~ **RESOLVED** | — | Discriminated union: Phase 1 already has `type: z.literal('capitals')` at `quiz.ts:18`. NO-OP. | Audit Q1 — verified |
 | QP2-R7 | Medium | New Task 11 | No end-to-end vocabulary round integration test | TBD — integration test |
 | QP2-R8 | Medium | Task 2 | `buildVocabularyMasteryQuestion` returns `null` silently with no telemetry | TBD — unit test + log assertion |
 | QP2-R9 | Medium | Task 2 | `Intl.DisplayNames` try/catch silently falls back to raw code | TBD — explicit fallback test OR remove try/catch |
@@ -54,6 +51,9 @@ Confirm both before Task 4 executes, or the defaults above will be implemented a
 | QP2-R11 | Polish | Task 6 | `@ts-expect-error` on `client.quiz.rounds.$post` masks `subjectId` type errors | N/A — tracked as tech debt |
 | QP2-R12 | Polish | Task 2 | `nextCefrLevel('A1 ')` silently coerces to `A2` — trim or throw | TBD — unit test for bad input |
 | QP2-R13 | Polish | Task 2 | `pickDistractors` dedup is case-insensitive; confirm intended behavior | N/A — intended, documented here |
+| QP2-R14 | Medium | Task 3/5 | LLM discovery can duplicate terms already in the vocab bank (same word as discovery + mastery in one round) | TBD — pass bank terms as exclusions |
+| QP2-R15 | Medium | Task 4 | SM-2 update loop is a partial-failure hazard (for-await after round marked complete) | TBD — transaction or idempotency |
+| QP2-R16 | Serious | Task 3/Config | Vocab mastery ratio (25%/35%) too low for mature SM-2 banks; 40 due items → only 2 per round | TBD — vocab-specific config + unit test |
 
 ---
 
@@ -177,28 +177,9 @@ libraryItems = dueVocab
 
 ---
 
-### QP2-R6 — Discriminated union may break parsing of existing Phase 1 rows (Medium) — Task 1
+### QP2-R6 — ~~Discriminated union may break parsing of existing Phase 1 rows~~ RESOLVED (2026-04-17)
 
-**Problem.** `z.discriminatedUnion('type', ...)` requires every row to have the discriminator field. Existing `quiz_rounds.questions` JSON rows were written with the Phase 1 schema — if Phase 1's `capitalsQuestionSchema` did NOT require a literal `type: 'capitals'`, those rows will fail to parse after this change. The plan claims "No database migration" on line 1840, which is wrong if backfill is needed.
-
-**Fix.**
-1. **Audit first.** Read `packages/schemas/src/quiz.ts` on `main` and check whether `capitalsQuestionSchema` includes `type: z.literal('capitals')`. Report back before proceeding.
-2. **If missing:** Add a data migration (Drizzle) that backfills `type: 'capitals'` on every existing row's `questions[*]`. SQL shape:
-   ```sql
-   UPDATE quiz_rounds
-   SET questions = (
-     SELECT jsonb_agg(jsonb_set(q, '{type}', '"capitals"'))
-     FROM jsonb_array_elements(questions) AS q
-   )
-   WHERE activity_type = 'capitals'
-     AND NOT (questions -> 0 ? 'type');
-   ```
-3. **Alternative:** Use `z.union([capitalsQuestionSchema, vocabularyQuestionSchema])` (non-discriminated) with a `.transform` that adds `type: 'capitals'` when missing. Lower migration risk, slightly slower parse. Recommended for Phase 2.
-4. **Fix the "No database migration" claim** in the "What Phase 2 Does NOT Include" section.
-
-**Tasks to update.** Task 1 (audit step + conditional migration), final section (remove "No database migration" claim).
-
-**Verified By.** Test: "quizQuestionSchema parses a Phase 1 row without explicit type field" (using a fixture from before the migration).
+**Status: NO-OP.** Audit Q1 confirmed that Phase 1's `capitalsQuestionSchema` already includes `type: z.literal('capitals')` at `packages/schemas/src/quiz.ts:18`. All existing `quiz_rounds.questions` rows have the discriminator field. `z.discriminatedUnion('type', [...])` works as-is. No migration, no transform needed.
 
 ---
 
@@ -316,17 +297,78 @@ Validate `cefrCeiling` at the route layer so bad values never reach the generato
 
 ---
 
+### QP2-R14 — LLM discovery can duplicate vocab bank terms (Medium) — Task 3/5
+
+**Problem.** Discovery questions are LLM-generated; mastery questions are pulled from the vocab bank. Nothing prevents the LLM from generating a word that's already in the learner's bank. Same word appears twice in one round with different semantics (discovery + mastery), doubling the SM-2 signal on one item. Confusing for the learner.
+
+**Fix.** Pass the learner's bank terms into the `recentAnswers` exclusion list (or a separate `bankTerms` exclusion) so the LLM prompt includes them. The prompt already says "Do NOT include these words (recently seen)." Extend it to also exclude banked terms.
+
+**Tasks to update.** Task 5 (route passes `allVocabulary.map(v => v.translation)` into `recentAnswers` or a new exclusion field), Task 2/3 (prompt builder accepts bank exclusions).
+
+**Verified By.** Unit test: "buildVocabularyPrompt includes bank terms in exclusion list".
+
+---
+
+### QP2-R15 — SM-2 update loop partial-failure hazard (Medium) — Task 4
+
+**Problem.** In Task 4, the SM-2 update loop is `for (const idx of libraryIndices) { await reviewVocabulary(...) }`. If the learner backgrounds the app or the connection drops mid-loop, cards 1-3 update and cards 4-6 don't. The round is already marked complete, so retry isn't straightforward. Partial SM-2 application with no visibility.
+
+**Fix.** Wrap the SM-2 updates and round-completion DB write in a single transaction. If any SM-2 update fails, the whole batch rolls back and the round remains active. Alternatively, record per-item `sm2_applied_at` so completion is idempotent and resumable.
+
+**Recommendation:** Transaction is simpler and matches existing patterns (per `feedback_drizzle_transaction_cast.md` — PgTransaction → Database cast).
+
+**Tasks to update.** Task 4 (wrap completion + SM-2 updates in `db.transaction()`).
+
+**Verified By.** Integration test: "if SM-2 update throws mid-loop, round status remains active and no cards are updated".
+
+---
+
+### QP2-R16 — Vocabulary mastery ratio too low for mature banks (Serious) — Task 3/Config
+
+**Problem.** `resolveRoundContent` uses `libraryRatio = 0.25` (scale to `0.35` above 20 items). For vocabulary `roundSize = 6`: `0.25 * 6 = 1` mastery item normally, `0.35 * 6 = 2` at scale-up. With 40 SM-2-due items, 2 per round means ~20 rounds to clear the backlog (~7-10 sessions). Due items accumulate faster than they're reviewed.
+
+**Fix.** Add vocabulary-specific overrides in `QUIZ_CONFIG.perActivity.vocabulary`:
+```typescript
+vocabulary: {
+  roundSize: 6,
+  libraryRatio: 0.5,              // 3 mastery + 3 discovery per round
+  libraryRatioMinItems: 1,        // start mastery with even 1 due item
+  libraryRatioScaleUpThreshold: 10,
+  libraryRatioScaleUpValue: 0.67, // 4 mastery + 2 discovery when backlog > 10
+},
+```
+The exact numbers are tunable; the point is vocabulary needs a materially higher mastery ratio than capitals because SM-2 due items have real scheduling consequences (interval penalties accrue when cards are overdue).
+
+**Tasks to update.** Task 3/Config (add vocab-specific config values), test: "resolveRoundContent for vocabulary with 40 due items returns ≥ 3 mastery".
+
+**Verified By.** Unit test: "vocabulary ratio produces expected mastery count at various library sizes".
+
+---
+
+## Audit Results (2026-04-17)
+
+| Question | Answer | Impact |
+|---|---|---|
+| Q1: `capitalsQuestionSchema` has `type: z.literal('capitals')`? | **YES** (`packages/schemas/src/quiz.ts:18`) | QP2-R6 → NO-OP |
+| Q2: `reviewVocabulary` lazy-creates retention cards? | **YES** (via `ensureVocabularyRetentionCard` at `vocabulary.ts:258`) | Missed-A → resolved; card initialization is automatic |
+| Q3: `planRound` signature? | **Function is `resolveRoundContent`** in `content-resolver.ts:30-63`. Returns `{ discoveryCount, masteryItems, totalQuestions, recentAnswers }`. Activity-aware via `perActivity[activityType].roundSize`. | QP2-R5 → smaller extension; QP2-R16 raised for ratio tuning |
+
+**Additional finding from audit:** `resolveRoundContent` handles zero-mastery correctly: `discoveryCount = roundSize - 0 = roundSize` (full discovery round for new learners). No code change needed for 0→1 edge case under QP2-D3 (Option C).
+
+---
+
 ## Finding → Task Map
 
 | Task | Findings that gate it |
 |---|---|
-| Task 1 | QP2-R6 |
+| Task 1 | ~~QP2-R6~~ (resolved — NO-OP) |
 | Task 2 | QP2-R3, QP2-R8, QP2-R9, QP2-R12, QP2-R13 |
-| Task 3 | QP2-R3, QP2-R5 |
-| Task 4 | QP2-R2 |
-| Task 5 | QP2-R1, QP2-R4 |
+| Task 3 | QP2-R3, QP2-R14, QP2-R16 |
+| Task 4 | ~~QP2-R2~~ (resolved — D1 confirmed 4/2), QP2-R15 |
+| Task 5 | QP2-R1, QP2-R4, QP2-R14 |
 | Task 6 | QP2-R11 |
 | Task 7 | QP2-R10 |
+| Config | QP2-R16 (vocab-specific mastery ratio) |
 | **Task 11 (new)** | QP2-R7 (integration test) |
 
 ---
@@ -361,31 +403,23 @@ Validate `cefrCeiling` at the route layer so bad values never reach the generato
 
 ---
 
-### Task 0: Pre-Implementation Audit
+### Task 0: Pre-Implementation Audit ✅ COMPLETE (2026-04-17)
 
-**Purpose.** Resolve three uncertainties in the current codebase before writing any Phase 2 code. The answers dominate: (a) whether R6 needs a data migration or just a schema transform, (b) whether R4/Missed-A require an initialization flow or `reviewVocabulary` handles it lazily, (c) whether Task 3 needs a new planner branch or the existing `planRound` already dispatches on activity type.
+**Audit results** are in the "Audit Results" section above. Summary:
+- Q1 → YES (`type: z.literal('capitals')` exists) → QP2-R6 resolved as NO-OP
+- Q2 → lazy-create (via `ensureVocabularyRetentionCard`) → Missed-A resolved; card init is automatic
+- Q3 → `resolveRoundContent` in `content-resolver.ts:30-63`, already activity-aware → QP2-R5 downgraded to config tuning; QP2-R16 raised for mastery ratio
 
-**Execution.** Dispatched as a read-only Explore agent on 2026-04-16. Three questions, no drafting:
+**Additional finding:** `resolveRoundContent` handles zero-mastery correctly (`discoveryCount = roundSize`). No special-casing needed for new learners under QP2-D3 (Option C).
 
-1. Does `capitalsQuestionSchema` in `packages/schemas/src/quiz.ts` include `type: z.literal('capitals')`?
-2. Does `reviewVocabulary(db, profileId, vocabularyId, { quality })` lazy-create a `vocabularyRetentionCards` row, or require one to exist?
-3. What is the current `planRound` signature and does it branch on `activityType`?
+**Decisions confirmed (2026-04-17):**
+- [x] QP2-D1: Flat 4/2 quality mapping
+- [x] QP2-D2: Single retention card, revisit Phase 5
+- [x] QP2-D3: Option C — discovery-only for new learners; mastery pool requires `nextReviewAt IS NOT NULL`
 
-- [ ] **Step 1:** Read the audit report (dispatched in background).
-- [ ] **Step 2:** Update the Review Findings section with audit-resolved items:
-   - **QP2-R6:** If Q1 = yes → mark as NO-OP (no migration, no transform needed). If Q1 = no → confirm `z.union` + transform path in Task 1.
-   - **Missed-A / QP2-R4:** If Q2 = lazy-create → bootstrap mini-spec shrinks. If Q2 = require-and-throw → bootstrap mini-spec MUST define card-creation flow before Task 4.
-   - **QP2-R5:** If Q3 = activity-aware → minor planner extension. If Q3 = single-shape → larger Task 3 refactor.
-- [ ] **Step 3:** Write the bootstrap mini-spec (gated on Q2 answer). Covers: first-ever vocabulary round content source, card creation timing, sub-4-item bank handling.
-- [ ] **Step 4:** Confirm QP2-D1 and QP2-D2 with user.
-- [ ] **Step 5:** Commit the plan updates (no code yet).
+**Bootstrap mini-spec scope (confirmed 2026-04-17):** Dramatically shrunk by audit. `reviewVocabulary` lazy-creates cards, so there is no "who creates the first card" problem — the first SM-2 call handles it automatically. Under QP2-D3, the first vocabulary rounds are 100% discovery. The remaining bootstrap work is Phase 2.5's introduction flow (a "learn this word" screen that calls `reviewVocabulary` to seed the first card before the word enters the mastery pool). Phase 2 does NOT need a separate bootstrap mini-spec.
 
-```bash
-git add docs/superpowers/plans/2026-04-16-quiz-activities-phase2-vocabulary.md
-git commit -m "docs(quiz): Phase 2 Task 0 audit + bootstrap mini-spec [QUIZ-P2]"
-```
-
-**Gate.** Tasks 4 and 5 MUST NOT start until Task 0 Step 3 (bootstrap mini-spec) and Step 4 (decisions) are complete. Tasks 1-3 may execute in parallel with Steps 3-4.
+**Gate.** ~~Tasks 4 and 5 MUST NOT start until bootstrap mini-spec and decisions are complete.~~ All decisions are confirmed. Tasks 1-5 may now execute. Tasks 4 and 5 must incorporate QP2-R4, QP2-R15, and QP2-R16 as part of implementation.
 
 ---
 
@@ -2182,5 +2216,6 @@ git commit -m "chore(quiz): lint and typecheck fixes for Phase 2 vocabulary [QUI
 - **Capitals SM-2 tracking** — Capitals remain pure discovery. SM-2 only for vocabulary.
 - **Free-text unlock / difficulty adaptation** — Phase 5
 - **Round history screen / per-activity stats** — Phase 5
-- **Database migration** — Phase 1 already creates the `'vocabulary'` enum value and all needed tables, **BUT** see QP2-R6: a data backfill on `quiz_rounds.questions` may be required if Phase 1's `capitalsQuestionSchema` did not include a literal `type` discriminator. Audit before proceeding.
+- **No database migration needed** — Phase 1 already creates the `'vocabulary'` enum value and all needed tables. Audit confirmed `capitalsQuestionSchema` has `type: z.literal('capitals')`, so the discriminated union works without backfill (QP2-R6 resolved).
+- **Vocabulary introduction flow ("learn this word" screen)** — Phase 2.5 scope. Phase 2 ships with Option C: new bank items sit unreviewed, mastery pool requires `nextReviewAt IS NOT NULL`. See QP2-D3.
 - **Hono RPC type wiring for the quiz route** — see QP2-R11. `@ts-expect-error` remains in `use-quiz.ts` until a cross-cutting RPC wiring task lands. Adding `subjectId` passes through without compile-time checking.

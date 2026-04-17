@@ -44,9 +44,11 @@ export async function getDictationStreak(
 ): Promise<StreakResult> {
   const repo = createScopedRepository(db, profileId);
 
-  // The scoped repo returns all results for the profile; we need them
-  // ordered by date desc to compute the streak.
-  const rows = await repo.dictationResults.findMany();
+  // [IMP-3] Only fetch the most recent 60 dates — the streak algorithm
+  // breaks at the first gap, so 60 days is more than sufficient. Without a
+  // limit, a child practising daily for years would load every row into
+  // memory. The (profile_id, date) index covers this query efficiently.
+  const rows = await repo.dictationResults.findMany(undefined, undefined, 60);
   if (rows.length === 0) {
     return { streak: 0, lastDate: null };
   }

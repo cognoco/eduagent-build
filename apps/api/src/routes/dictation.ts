@@ -1,9 +1,8 @@
 import { Hono } from 'hono';
-import { z } from 'zod';
 import {
   prepareHomeworkInputSchema,
-  dictationSentenceSchema,
-  dictationModeSchema,
+  recordDictationResultInputSchema,
+  dictationReviewInputSchema,
   ERROR_CODES,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
@@ -48,24 +47,8 @@ type DictationRouteEnv = {
   };
 };
 
-// RF-04: Accept localDate from client; validate it is within ±1 day of server UTC.
-const dictationResultInputSchema = z.object({
-  localDate: z.string().date(),
-  sentenceCount: z.number().int().positive(),
-  mistakeCount: z.number().int().nonnegative().nullable().optional(),
-  mode: dictationModeSchema,
-  reviewed: z.boolean().optional().default(false),
-});
-
-// 2 MB base64 limit (~1.5 MB raw image)
-const MAX_BASE64_LENGTH = 2 * 1024 * 1024;
-
-const dictationReviewInputSchema = z.object({
-  imageBase64: z.string().min(1).max(MAX_BASE64_LENGTH),
-  imageMimeType: z.enum(['image/jpeg', 'image/png', 'image/webp']),
-  sentences: z.array(dictationSentenceSchema).min(1),
-  language: z.string().min(2).max(10),
-});
+// [MIN-1] Input schemas now live in @eduagent/schemas (shared contract rule).
+// Imported above as recordDictationResultInputSchema and dictationReviewInputSchema.
 
 function getServerDate(): string {
   return new Date().toISOString().slice(0, 10);
@@ -148,7 +131,7 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
       return validationError(c, 'Request body must be valid JSON');
     }
 
-    const parsed = dictationResultInputSchema.safeParse(body);
+    const parsed = recordDictationResultInputSchema.safeParse(body);
     if (!parsed.success) {
       return validationError(
         c,

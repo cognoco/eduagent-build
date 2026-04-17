@@ -143,6 +143,7 @@ jest.mock('../services/llm', () => ({
 }));
 
 import { app } from '../index';
+import { routeAndCall } from '../services/llm';
 
 const TEST_ENV = {
   CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',
@@ -210,6 +211,18 @@ beforeEach(() => {
       findMany: jest.fn().mockResolvedValue([]),
       findFirst: jest.fn().mockResolvedValue(undefined),
     },
+    subjects: {
+      findFirst: jest.fn().mockResolvedValue(undefined),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
+    vocabulary: {
+      findFirst: jest.fn().mockResolvedValue(undefined),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
+    vocabularyRetentionCards: {
+      findFirst: jest.fn().mockResolvedValue(undefined),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
   };
   setInsertReturning();
   setUpdateReturning();
@@ -268,6 +281,149 @@ describe('Quiz routes', () => {
       );
 
       expect(res.status).toBe(400);
+    });
+
+    it('returns 400 for vocabulary without subjectId', async () => {
+      const res = await app.request(
+        '/v1/quiz/rounds',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ activityType: 'vocabulary' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(400);
+    });
+
+    it('generates a vocabulary round with a valid language subject', async () => {
+      (mockDb as any).query.subjects.findFirst = jest.fn().mockResolvedValue({
+        id: '01933b3c-0000-7000-8000-000000000111',
+        profileId: 'test-profile-id',
+        name: "Emma's German",
+        status: 'active',
+        pedagogyMode: 'four_strands',
+        languageCode: 'de',
+      });
+      (mockDb as any).query.vocabulary.findMany = jest.fn().mockResolvedValue([
+        {
+          id: '01933b3c-0000-7000-8000-000000000211',
+          profileId: 'test-profile-id',
+          subjectId: '01933b3c-0000-7000-8000-000000000111',
+          term: 'der Hund',
+          translation: 'dog',
+          cefrLevel: 'A1',
+        },
+        {
+          id: '01933b3c-0000-7000-8000-000000000212',
+          profileId: 'test-profile-id',
+          subjectId: '01933b3c-0000-7000-8000-000000000111',
+          term: 'die Katze',
+          translation: 'cat',
+          cefrLevel: 'A1',
+        },
+        {
+          id: '01933b3c-0000-7000-8000-000000000213',
+          profileId: 'test-profile-id',
+          subjectId: '01933b3c-0000-7000-8000-000000000111',
+          term: 'der Vogel',
+          translation: 'bird',
+          cefrLevel: 'A1',
+        },
+        {
+          id: '01933b3c-0000-7000-8000-000000000214',
+          profileId: 'test-profile-id',
+          subjectId: '01933b3c-0000-7000-8000-000000000111',
+          term: 'der Fisch',
+          translation: 'fish',
+          cefrLevel: 'A1',
+        },
+      ]);
+      (mockDb as any).query.vocabularyRetentionCards.findMany = jest
+        .fn()
+        .mockResolvedValue([
+          {
+            vocabularyId: '01933b3c-0000-7000-8000-000000000211',
+            repetitions: 3,
+            nextReviewAt: new Date('2026-04-16T00:00:00.000Z'),
+          },
+          {
+            vocabularyId: '01933b3c-0000-7000-8000-000000000212',
+            repetitions: 3,
+            nextReviewAt: new Date('2026-04-18T00:00:00.000Z'),
+          },
+        ]);
+      (routeAndCall as jest.Mock).mockResolvedValueOnce({
+        response: JSON.stringify({
+          theme: 'German Animals',
+          targetLanguage: 'German',
+          questions: [
+            {
+              term: 'das Pferd',
+              correctAnswer: 'horse',
+              acceptedAnswers: ['horse'],
+              distractors: ['dog', 'cat', 'bird'],
+              funFact: 'Pferd comes from an old High German root.',
+              cefrLevel: 'A1',
+            },
+            {
+              term: 'die Maus',
+              correctAnswer: 'mouse',
+              acceptedAnswers: ['mouse'],
+              distractors: ['fish', 'cat', 'dog'],
+              funFact: 'Maus is also used for computer mouse.',
+              cefrLevel: 'A1',
+            },
+            {
+              term: 'die Kuh',
+              correctAnswer: 'cow',
+              acceptedAnswers: ['cow'],
+              distractors: ['horse', 'bird', 'fish'],
+              funFact: 'Kuh is a common farm-animal word.',
+              cefrLevel: 'A1',
+            },
+            {
+              term: 'das Schaf',
+              correctAnswer: 'sheep',
+              acceptedAnswers: ['sheep'],
+              distractors: ['cow', 'dog', 'cat'],
+              funFact: 'Schaf has the same singular and plural meaning.',
+              cefrLevel: 'A1',
+            },
+            {
+              term: 'die Ente',
+              correctAnswer: 'duck',
+              acceptedAnswers: ['duck'],
+              distractors: ['bird', 'fish', 'horse'],
+              funFact: 'Ente is a useful early-storybook word.',
+              cefrLevel: 'A1',
+            },
+          ],
+        }),
+        provider: 'mock',
+        model: 'mock',
+        latencyMs: 50,
+      });
+
+      const res = await app.request(
+        '/v1/quiz/rounds',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            activityType: 'vocabulary',
+            subjectId: '01933b3c-0000-7000-8000-000000000111',
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.activityType).toBe('vocabulary');
+      expect(body.questions[0].type).toBe('vocabulary');
+      expect(body.total).toBe(6);
     });
   });
 

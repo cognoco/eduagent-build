@@ -5,21 +5,48 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IntentCard } from '../../../components/home/IntentCard';
 import { useQuizStats } from '../../../hooks/use-quiz';
+import { useSubjects } from '../../../hooks/use-subjects';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { useThemeColors } from '../../../lib/theme';
 import { useQuizFlow } from './_layout';
+
+function getLanguageDisplayName(
+  code: string | null | undefined
+): string | null {
+  if (!code) return null;
+
+  try {
+    return (
+      new Intl.DisplayNames(['en'], { type: 'language' }).of(
+        code.toLowerCase()
+      ) ?? null
+    );
+  } catch {
+    return null;
+  }
+}
 
 export default function QuizIndexScreen(): React.ReactElement {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
   const { data: stats } = useQuizStats();
+  const { data: allSubjects } = useSubjects();
   const {
     setActivityType,
+    setSubjectId,
+    setLanguageName,
     setRound,
     setPrefetchedRoundId,
     setCompletionResult,
   } = useQuizFlow();
+  const languageSubjects =
+    allSubjects?.filter(
+      (subject) =>
+        subject.pedagogyMode === 'four_strands' &&
+        subject.languageCode &&
+        subject.status === 'active'
+    ) ?? [];
 
   const capitalsStats = stats?.find((stat) => stat.activityType === 'capitals');
   const capitalsSubtitle =
@@ -30,6 +57,16 @@ export default function QuizIndexScreen(): React.ReactElement {
       : capitalsStats
       ? `Played: ${capitalsStats.roundsPlayed}`
       : 'Test yourself on world capitals';
+
+  const handleSelectVocabulary = (subjectId: string, languageName: string) => {
+    setActivityType('vocabulary');
+    setSubjectId(subjectId);
+    setLanguageName(languageName);
+    setRound(null);
+    setPrefetchedRoundId(null);
+    setCompletionResult(null);
+    router.push('/(app)/quiz/launch' as never);
+  };
 
   return (
     <ScrollView
@@ -60,6 +97,8 @@ export default function QuizIndexScreen(): React.ReactElement {
           subtitle={capitalsSubtitle}
           onPress={() => {
             setActivityType('capitals');
+            setSubjectId(null);
+            setLanguageName(null);
             setRound(null);
             setPrefetchedRoundId(null);
             setCompletionResult(null);
@@ -67,6 +106,39 @@ export default function QuizIndexScreen(): React.ReactElement {
           }}
           testID="quiz-capitals"
         />
+        {languageSubjects.map((subject) => {
+          const displayLanguage =
+            getLanguageDisplayName(subject.languageCode) ??
+            subject.name ??
+            'Language';
+          const vocabStats = stats?.find(
+            (stat) => stat.activityType === 'vocabulary'
+          );
+          const statsSubtitle =
+            vocabStats &&
+            vocabStats.bestScore != null &&
+            vocabStats.bestTotal != null
+              ? `Best: ${vocabStats.bestScore}/${vocabStats.bestTotal} · Played: ${vocabStats.roundsPlayed}`
+              : vocabStats
+              ? `Played: ${vocabStats.roundsPlayed}`
+              : 'New!';
+          const subtitle =
+            subject.name && subject.name !== displayLanguage
+              ? `${subject.name} · ${statsSubtitle}`
+              : statsSubtitle;
+
+          return (
+            <IntentCard
+              key={subject.id}
+              title={`Vocabulary: ${displayLanguage}`}
+              subtitle={subtitle}
+              onPress={() =>
+                handleSelectVocabulary(subject.id, displayLanguage)
+              }
+              testID={`quiz-vocabulary-${subject.id}`}
+            />
+          );
+        })}
       </View>
     </ScrollView>
   );

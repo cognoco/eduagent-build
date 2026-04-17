@@ -1,8 +1,14 @@
-import type { CapitalsQuestion, QuestionResult } from '@eduagent/schemas';
+import type {
+  CapitalsQuestion,
+  QuestionResult,
+  QuizQuestion,
+} from '@eduagent/schemas';
 import {
+  buildMissedItemText,
   calculateScore,
   calculateXp,
   getCelebrationTier,
+  getVocabSm2Quality,
   isAnswerCorrect,
   validateResults,
 } from './complete-round';
@@ -74,6 +80,47 @@ describe('getCelebrationTier', () => {
   });
 });
 
+describe('buildMissedItemText', () => {
+  it('formats capitals missed items', () => {
+    expect(
+      buildMissedItemText({
+        type: 'capitals',
+        country: 'France',
+        correctAnswer: 'Paris',
+        acceptedAliases: ['Paris'],
+        distractors: ['Berlin', 'Madrid', 'Rome'],
+        funFact: '',
+        isLibraryItem: false,
+      })
+    ).toBe('What is the capital of France?');
+  });
+
+  it('formats vocabulary missed items', () => {
+    expect(
+      buildMissedItemText({
+        type: 'vocabulary',
+        term: 'der Hund',
+        correctAnswer: 'dog',
+        acceptedAnswers: ['dog'],
+        distractors: ['cat', 'bird', 'fish'],
+        funFact: '',
+        cefrLevel: 'A1',
+        isLibraryItem: false,
+      })
+    ).toBe('Translate: der Hund');
+  });
+});
+
+describe('getVocabSm2Quality', () => {
+  it('returns 4 for correct answers', () => {
+    expect(getVocabSm2Quality(true)).toBe(4);
+  });
+
+  it('returns 2 for wrong answers', () => {
+    expect(getVocabSm2Quality(false)).toBe(2);
+  });
+});
+
 // [ASSUMP-F5] Break tests: prove the server never trusts client `correct`.
 describe('isAnswerCorrect (server-side truth)', () => {
   const question: CapitalsQuestion = {
@@ -98,6 +145,22 @@ describe('isAnswerCorrect (server-side truth)', () => {
     expect(isAnswerCorrect(q, 'paname')).toBe(true);
   });
 
+  it('accepts vocabulary answers from acceptedAnswers', () => {
+    const question: QuizQuestion = {
+      type: 'vocabulary',
+      term: 'der Hund',
+      correctAnswer: 'dog',
+      acceptedAnswers: ['dog', 'the dog'],
+      distractors: ['cat', 'bird', 'fish'],
+      funFact: '',
+      cefrLevel: 'A1',
+      isLibraryItem: false,
+    };
+
+    expect(isAnswerCorrect(question, 'the dog')).toBe(true);
+    expect(isAnswerCorrect(question, 'cat')).toBe(false);
+  });
+
   it('rejects wrong answers even if client claims correct', () => {
     expect(isAnswerCorrect(question, 'Lyon')).toBe(false);
   });
@@ -108,7 +171,7 @@ describe('isAnswerCorrect (server-side truth)', () => {
 });
 
 describe('validateResults (anti-tampering)', () => {
-  const questions: CapitalsQuestion[] = [
+  const questions: QuizQuestion[] = [
     {
       type: 'capitals',
       country: 'France',

@@ -241,11 +241,26 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const body = c.req.valid('json');
+
+      // [ASSUMP-F5-sweep] Only 'pending' and 'skipped' are valid client-declared
+      // summaryStatus values. 'accepted' and 'submitted' are server-side
+      // transitions (summary evaluation → session-completed pipeline).
+      // 'auto_closed' is set exclusively by the stale-session cleanup job.
+      // If a tampered client sends 'accepted', it would bypass the summary
+      // review gate and trigger the completion pipeline prematurely (XP,
+      // retention, vocabulary extraction) without the learner ever writing
+      // a summary. Silently downgrade to undefined so closeSession falls
+      // back to its default logic.
+      const sanitizedSummaryStatus =
+        body.summaryStatus === 'pending' || body.summaryStatus === 'skipped'
+          ? body.summaryStatus
+          : undefined;
+
       const result = await closeSession(
         db,
         profileId,
         c.req.param('sessionId'),
-        body
+        { ...body, summaryStatus: sanitizedSummaryStatus }
       );
 
       const shouldDispatchCompletionEvent =

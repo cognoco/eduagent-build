@@ -34,6 +34,13 @@ ALTER TABLE "quiz_rounds" ADD CONSTRAINT "quiz_rounds_profile_id_profiles_id_fk"
 CREATE INDEX "idx_quiz_missed_items_profile" ON "quiz_missed_items" USING btree ("profile_id","activity_type","surfaced");--> statement-breakpoint
 CREATE INDEX "idx_quiz_rounds_profile_activity" ON "quiz_rounds" USING btree ("profile_id","activity_type");--> statement-breakpoint
 CREATE INDEX "idx_quiz_rounds_profile_status" ON "quiz_rounds" USING btree ("profile_id","status");--> statement-breakpoint
+-- [CRIT-3] Explicit GRANT for quiz tables. Migration 0027's ALTER DEFAULT
+-- PRIVILEGES only covers tables created by the same grantor *after* 0027 ran.
+-- These tables are created in this migration, so the DEFAULT PRIVILEGES should
+-- cover them, but an explicit GRANT is defense-in-depth against role mismatch
+-- (e.g. schema migration role != app owner on Neon).
+GRANT SELECT, INSERT, UPDATE, DELETE ON "quiz_rounds" TO app_user;--> statement-breakpoint
+GRANT SELECT, INSERT, UPDATE, DELETE ON "quiz_missed_items" TO app_user;--> statement-breakpoint
 -- [ASSUMP-F14] Parity with 0027_enable_rls.sql. Quiz tables landed after the
 -- RLS-enablement migration, so they would be the only profile-scoped tables
 -- without RLS when the S-06 Phase 2-4 enforcement cut-over lands. Enable

@@ -5,6 +5,8 @@ import {
 } from '@eduagent/schemas';
 import { routeAndCall } from '../llm';
 import type { ChatMessage, MessagePart } from '../llm';
+import { UpstreamLlmError } from '../../errors';
+import { captureException } from '../sentry';
 
 // ---------------------------------------------------------------------------
 // Dictation Review Service
@@ -74,14 +76,34 @@ export async function reviewDictation(
   const result = await routeAndCall(messages, 2);
 
   if (!result.response || result.response.trim() === '') {
-    throw new Error('LLM returned empty response in review-dictation');
+    const err = new UpstreamLlmError(
+      'LLM returned empty response in review-dictation'
+    );
+    captureException(err, { requestPath: 'services/dictation/review' });
+    throw err;
   }
 
   const jsonMatch = result.response.match(/\{[\s\S]*\}/);
   if (!jsonMatch) {
-    throw new Error('LLM returned no JSON in review-dictation response');
+    const err = new UpstreamLlmError(
+      'LLM returned no JSON in review-dictation response'
+    );
+    captureException(err, { requestPath: 'services/dictation/review' });
+    throw err;
   }
 
-  const parsed = JSON.parse(jsonMatch[0]);
-  return dictationReviewResultSchema.parse(parsed);
+  try {
+    const parsed = JSON.parse(jsonMatch[0]);
+    return dictationReviewResultSchema.parse(parsed);
+  } catch (parseErr) {
+    captureException(
+      parseErr instanceof Error
+        ? parseErr
+        : new Error('Dictation review parse failed'),
+      { requestPath: 'services/dictation/review' }
+    );
+    throw new UpstreamLlmError(
+      'Dictation review LLM returned invalid structured output'
+    );
+  }
 }

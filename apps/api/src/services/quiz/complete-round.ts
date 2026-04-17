@@ -5,11 +5,12 @@ import {
   type Database,
 } from '@eduagent/database';
 import type {
-  CapitalsQuestion,
   CompleteRoundResponse,
   QuestionResult,
+  QuizQuestion,
 } from '@eduagent/schemas';
 import { ConflictError, NotFoundError } from '../../errors';
+import { reviewVocabulary } from '../vocabulary';
 import { QUIZ_CONFIG } from './config';
 
 /**
@@ -20,15 +21,23 @@ import { QUIZ_CONFIG } from './config';
  * round row.
  */
 export function isAnswerCorrect(
-  question: CapitalsQuestion,
+  question: QuizQuestion,
   answerGiven: string
 ): boolean {
   const normalized = answerGiven.trim().toLowerCase();
   if (!normalized) return false;
   if (question.correctAnswer.trim().toLowerCase() === normalized) return true;
-  return question.acceptedAliases.some(
-    (alias) => alias.trim().toLowerCase() === normalized
-  );
+  if (question.type === 'capitals') {
+    return question.acceptedAliases.some(
+      (alias) => alias.trim().toLowerCase() === normalized
+    );
+  }
+  if (question.type === 'vocabulary') {
+    return question.acceptedAnswers.some(
+      (answer) => answer.trim().toLowerCase() === normalized
+    );
+  }
+  return false;
 }
 
 /**
@@ -37,7 +46,7 @@ export function isAnswerCorrect(
  * dropped (rather than trusted) — it can't match any real question.
  */
 export function validateResults(
-  questions: CapitalsQuestion[],
+  questions: QuizQuestion[],
   clientResults: QuestionResult[]
 ): QuestionResult[] {
   const validated: QuestionResult[] = [];
@@ -50,6 +59,20 @@ export function validateResults(
     });
   }
   return validated;
+}
+
+export function buildMissedItemText(question: QuizQuestion): string {
+  if (question.type === 'capitals') {
+    return `What is the capital of ${question.country}?`;
+  }
+  if (question.type === 'vocabulary') {
+    return `Translate: ${question.term}`;
+  }
+  return '';
+}
+
+export function getVocabSm2Quality(correct: boolean): number {
+  return correct ? 4 : 2;
 }
 
 export function calculateScore(results: QuestionResult[]): number {
@@ -103,6 +126,8 @@ export async function completeQuizRound(
   return db.transaction(async (tx) => {
     // Scoped repository bound to the transaction connection: read, update,
     // and missed-items insert all run in the same transactional snapshot.
+    // Cast through `unknown` because Drizzle's PgTransaction type doesn't
+    // directly extend Database — see feedback_drizzle_transaction_cast.md.
     const txRepo = createScopedRepository(tx as unknown as Database, profileId);
 
     const round = await txRepo.quizRounds.findFirst(eq(quizRounds.id, roundId));
@@ -114,7 +139,7 @@ export async function completeQuizRound(
       throw new ConflictError('Round already completed');
     }
 
-    const questions = round.questions as CapitalsQuestion[];
+    const questions = round.questions as QuizQuestion[];
     const total = round.total;
     const validatedResults = validateResults(questions, results);
     const score = calculateScore(validatedResults);
@@ -137,7 +162,7 @@ export async function completeQuizRound(
       if (result.correct) continue;
       const question = questions[result.questionIndex];
       if (!question || question.isLibraryItem) continue;
-      const questionText = `What is the capital of ${question.country}?`;
+      const questionText = buildMissedItemText(question);
       const key = `${round.activityType}:${questionText}`;
       if (missedMap.has(key)) continue;
       missedMap.set(key, {
@@ -160,6 +185,29 @@ export async function completeQuizRound(
 
     if (!updated) {
       throw new ConflictError('Round already completed');
+    }
+
+    if (round.activityType === 'vocabulary') {
+      const libraryIndices = Array.isArray(round.libraryQuestionIndices)
+        ? (round.libraryQuestionIndices as number[])
+        : [];
+
+      for (const index of libraryIndices) {
+        const question = questions[index];
+        if (question?.type !== 'vocabulary' || !question.vocabularyId) continue;
+
+        const result = validatedResults.find(
+          (entry) => entry.questionIndex === index
+        );
+        if (!result) continue;
+
+        await reviewVocabulary(
+          tx as unknown as Database,
+          profileId,
+          question.vocabularyId,
+          { quality: getVocabSm2Quality(result.correct) }
+        );
+      }
     }
 
     if (missedMap.size > 0) {

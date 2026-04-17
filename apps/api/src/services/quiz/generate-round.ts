@@ -1,8 +1,12 @@
 import {
   capitalsLlmOutputSchema,
+  type CefrLevel,
   computeAgeBracket,
   type CapitalsQuestion,
+  type QuizQuestion,
   type QuizActivityType,
+  vocabularyLlmOutputSchema,
+  type VocabularyQuestion,
 } from '@eduagent/schemas';
 import { createScopedRepository, type Database } from '@eduagent/database';
 import type { ChatMessage } from '../llm';
@@ -13,6 +17,11 @@ import { CAPITALS_BY_COUNTRY, CAPITALS_DATA } from './capitals-data';
 import { resolveRoundContent, type LibraryItem } from './content-resolver';
 import { validateCapitalsRound } from './capitals-validation';
 import { shuffle } from './shuffle';
+import {
+  buildVocabularyMasteryQuestion,
+  buildVocabularyPrompt,
+  validateVocabularyRound,
+} from './vocabulary-provider';
 
 interface CapitalsPromptParams {
   discoveryCount: number;
@@ -94,11 +103,9 @@ export function injectMasteryQuestions(
     return discoveryQuestions;
   }
 
-  const combined = [...discoveryQuestions];
-
-  for (const item of masteryItems) {
+  const masteryQuestions = masteryItems.map((item) => {
     const reference = CAPITALS_BY_COUNTRY.get(item.question.toLowerCase());
-    const masteryQuestion: CapitalsQuestion = {
+    return {
       type: 'capitals',
       country: reference?.country ?? item.question,
       correctAnswer: reference?.capital ?? item.answer,
@@ -107,25 +114,56 @@ export function injectMasteryQuestions(
       funFact: reference?.funFact ?? '',
       isLibraryItem: true,
       topicId: item.topicId ?? undefined,
-    };
+    } satisfies CapitalsQuestion;
+  });
 
+  return injectAtRandomPositions(discoveryQuestions, masteryQuestions);
+}
+
+export function injectAtRandomPositions<T>(base: T[], injected: T[]): T[] {
+  if (injected.length === 0) return base;
+
+  const combined = [...base];
+  for (const item of injected) {
     const insertIndex = Math.floor(Math.random() * (combined.length + 1));
-    combined.splice(insertIndex, 0, masteryQuestion);
+    combined.splice(insertIndex, 0, item);
   }
 
   return combined;
 }
 
+export function buildVocabularyDiscoveryQuestions(validated: {
+  questions: Array<{
+    term: string;
+    correctAnswer: string;
+    acceptedAnswers: string[];
+    distractors: string[];
+    funFact: string;
+    cefrLevel: string;
+  }>;
+}): VocabularyQuestion[] {
+  return validated.questions.map((question) => ({
+    type: 'vocabulary',
+    term: question.term,
+    correctAnswer: question.correctAnswer,
+    acceptedAnswers: question.acceptedAnswers,
+    distractors: question.distractors,
+    funFact: question.funFact,
+    cefrLevel: question.cefrLevel,
+    isLibraryItem: false,
+  }));
+}
+
 export interface AssembledRound {
   theme: string;
-  questions: CapitalsQuestion[];
+  questions: QuizQuestion[];
   total: number;
   libraryQuestionIndices: number[];
 }
 
 export function assembleRound(
   theme: string,
-  questions: CapitalsQuestion[]
+  questions: QuizQuestion[]
 ): AssembledRound {
   const libraryQuestionIndices = questions
     .map((question, index) => (question.isLibraryItem ? index : -1))
@@ -193,12 +231,15 @@ interface GenerateParams {
   themePreference?: string;
   libraryItems: LibraryItem[];
   recentAnswers: string[];
+  languageCode?: string;
+  cefrCeiling?: CefrLevel;
+  allVocabulary?: Array<{ term: string; translation: string }>;
 }
 
 export async function generateQuizRound(params: GenerateParams): Promise<{
   id: string;
   theme: string;
-  questions: CapitalsQuestion[];
+  questions: QuizQuestion[];
   total: number;
 }> {
   const {
@@ -209,13 +250,10 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
     themePreference,
     libraryItems,
     recentAnswers,
+    languageCode,
+    cefrCeiling,
+    allVocabulary,
   } = params;
-
-  if (activityType !== 'capitals') {
-    throw new UpstreamLlmError(
-      `Unsupported quiz activity type: ${activityType}`
-    );
-  }
 
   const plan = resolveRoundContent({
     activityType,
@@ -223,69 +261,145 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
     recentAnswers,
     libraryItems,
   });
+  const ageBracket = birthYear == null ? 'adult' : computeAgeBracket(birthYear);
+  let theme = '';
+  let questions: QuizQuestion[] = [];
 
-  const prompt = buildCapitalsPrompt({
-    discoveryCount: plan.discoveryCount,
-    ageBracket: birthYear == null ? 'adult' : computeAgeBracket(birthYear),
-    recentAnswers,
-    themePreference,
-  });
+  if (activityType === 'capitals') {
+    const prompt = buildCapitalsPrompt({
+      discoveryCount: plan.discoveryCount,
+      ageBracket,
+      recentAnswers,
+      themePreference,
+    });
 
-  const messages: ChatMessage[] = [
-    { role: 'system', content: prompt },
-    { role: 'user', content: 'Generate the quiz round.' },
-  ];
+    const messages: ChatMessage[] = [
+      { role: 'system', content: prompt },
+      { role: 'user', content: 'Generate the quiz round.' },
+    ];
 
-  const llmResult = await routeAndCall(messages, 1, {
-    ageBracket: birthYear == null ? 'adult' : computeAgeBracket(birthYear),
-  });
+    const llmResult = await routeAndCall(messages, 1, {
+      ageBracket,
+    });
 
-  // Clamp the raw response before parsing — defends against pathological
-  // provider output sizes even if maxOutputTokens is mis-configured.
-  const raw = llmResult.response.slice(0, 64 * 1024);
+    const raw = llmResult.response.slice(0, 64 * 1024);
 
-  let llmOutput;
-  try {
-    llmOutput = capitalsLlmOutputSchema.parse(
-      JSON.parse(extractJsonObject(raw))
+    let llmOutput;
+    try {
+      llmOutput = capitalsLlmOutputSchema.parse(
+        JSON.parse(extractJsonObject(raw))
+      );
+    } catch (parseErr) {
+      captureException(
+        parseErr instanceof Error
+          ? parseErr
+          : new Error('Quiz LLM parse failed'),
+        {
+          userId: undefined,
+          profileId,
+          requestPath: 'services/quiz/generate-round',
+        }
+      );
+      throw new UpstreamLlmError('Quiz LLM returned invalid structured output');
+    }
+
+    const validated = validateCapitalsRound(llmOutput);
+    if (validated.questions.length === 0) {
+      throw new UpstreamLlmError('No valid questions after validation');
+    }
+
+    const discoveryQuestions: CapitalsQuestion[] = validated.questions
+      .slice(0, plan.discoveryCount)
+      .map((question) => ({
+        type: 'capitals',
+        country: question.country,
+        correctAnswer: question.correctAnswer,
+        acceptedAliases: question.acceptedAliases,
+        distractors: question.distractors,
+        funFact: question.funFact,
+        isLibraryItem: false,
+      }));
+
+    questions = injectMasteryQuestions(
+      discoveryQuestions,
+      plan.masteryItems,
+      activityType
     );
-  } catch (parseErr) {
-    // Capture the raw failure for LLM drift monitoring instead of silently
-    // swallowing it with a bare `catch {}`.
-    captureException(
-      parseErr instanceof Error ? parseErr : new Error('Quiz LLM parse failed'),
-      {
-        userId: undefined,
-        profileId,
-        requestPath: 'services/quiz/generate-round',
-      }
+    theme = validated.theme;
+  } else if (activityType === 'vocabulary') {
+    if (!languageCode || !cefrCeiling) {
+      throw new Error(
+        'languageCode and cefrCeiling are required for vocabulary rounds'
+      );
+    }
+
+    const prompt = buildVocabularyPrompt({
+      discoveryCount: plan.discoveryCount,
+      ageBracket,
+      recentAnswers,
+      bankEntries: allVocabulary ?? [],
+      languageCode,
+      cefrCeiling,
+      themePreference,
+    });
+
+    const messages: ChatMessage[] = [
+      { role: 'system', content: prompt },
+      { role: 'user', content: 'Generate the quiz round.' },
+    ];
+
+    const llmResult = await routeAndCall(messages, 1, {
+      ageBracket,
+    });
+
+    const raw = llmResult.response.slice(0, 64 * 1024);
+
+    let llmOutput;
+    try {
+      llmOutput = vocabularyLlmOutputSchema.parse(
+        JSON.parse(extractJsonObject(raw))
+      );
+    } catch (parseErr) {
+      captureException(
+        parseErr instanceof Error
+          ? parseErr
+          : new Error('Quiz LLM parse failed'),
+        {
+          userId: undefined,
+          profileId,
+          requestPath: 'services/quiz/generate-round',
+          extra: { activityType },
+        }
+      );
+      throw new UpstreamLlmError('Quiz LLM returned invalid structured output');
+    }
+
+    const validated = validateVocabularyRound(llmOutput, cefrCeiling);
+    if (validated.questions.length === 0) {
+      throw new UpstreamLlmError('No valid questions after validation');
+    }
+
+    const discoveryQuestions = buildVocabularyDiscoveryQuestions({
+      questions: validated.questions.slice(0, plan.discoveryCount),
+    });
+    const masteryQuestions = plan.masteryItems.flatMap((item) => {
+      const result = buildVocabularyMasteryQuestion(
+        item,
+        allVocabulary ?? [],
+        item.cefrLevel ?? cefrCeiling
+      );
+      return result.ok ? [result.question] : [];
+    });
+
+    questions = injectAtRandomPositions(discoveryQuestions, masteryQuestions);
+    theme = validated.theme;
+  } else {
+    throw new UpstreamLlmError(
+      `Unsupported quiz activity type: ${activityType}`
     );
-    throw new UpstreamLlmError('Quiz LLM returned invalid structured output');
   }
 
-  const validated = validateCapitalsRound(llmOutput);
-  if (validated.questions.length === 0) {
-    throw new UpstreamLlmError('No valid questions after validation');
-  }
-
-  const discoveryQuestions: CapitalsQuestion[] = validated.questions
-    .slice(0, plan.discoveryCount)
-    .map((question) => ({
-      type: 'capitals',
-      country: question.country,
-      correctAnswer: question.correctAnswer,
-      acceptedAliases: question.acceptedAliases,
-      distractors: question.distractors,
-      funFact: question.funFact,
-      isLibraryItem: false,
-    }));
-
-  const questions = injectMasteryQuestions(
-    discoveryQuestions,
-    plan.masteryItems,
-    activityType
-  );
-  const round = assembleRound(validated.theme, questions);
+  const round = assembleRound(theme, questions);
 
   const repo = createScopedRepository(db, profileId);
   const inserted = await repo.quizRounds.insert({

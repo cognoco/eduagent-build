@@ -7,7 +7,18 @@ export {
 export { generateQuizRound } from './generate-round';
 export { completeQuizRound } from './complete-round';
 export {
+  buildVocabularyMasteryQuestion,
+  buildVocabularyPrompt,
+  detectCefrCeilingMasteryWeighted,
+  getCefrCeilingForDiscovery,
+  getLanguageDisplayName,
+  nextCefrLevel,
+  pickDistractors,
+  validateVocabularyRound,
+} from './vocabulary-provider';
+export {
   getRecentAnswers,
+  getVocabularyRoundContext,
   getRoundById,
   getRoundByIdOrThrow,
   listRecentCompletedRounds,

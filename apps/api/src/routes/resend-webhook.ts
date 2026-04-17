@@ -109,7 +109,12 @@ function decodeBase64Secret(secret: string): Uint8Array | null {
   }
 }
 
-/** Converts ArrayBuffer to base64 string */
+/**
+ * Converts ArrayBuffer to base64 string.
+ * Uses char-by-char concatenation because TextDecoder cannot safely decode
+ * arbitrary binary buffers (HMAC digests). For 32-byte HMAC output the
+ * performance overhead is negligible.
+ */
 function bufferToBase64(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
   let binary = '';

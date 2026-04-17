@@ -26,7 +26,23 @@ export const capitalsQuestionSchema = z.object({
 });
 export type CapitalsQuestion = z.infer<typeof capitalsQuestionSchema>;
 
-export const quizQuestionSchema = capitalsQuestionSchema;
+export const vocabularyQuestionSchema = z.object({
+  type: z.literal('vocabulary'),
+  term: z.string(),
+  correctAnswer: z.string(),
+  acceptedAnswers: z.array(z.string()).min(1),
+  distractors: z.array(z.string()).length(3),
+  funFact: z.string(),
+  cefrLevel: z.string(),
+  isLibraryItem: z.boolean(),
+  vocabularyId: z.string().uuid().nullable().optional(),
+});
+export type VocabularyQuestion = z.infer<typeof vocabularyQuestionSchema>;
+
+export const quizQuestionSchema = z.discriminatedUnion('type', [
+  capitalsQuestionSchema,
+  vocabularyQuestionSchema,
+]);
 export type QuizQuestion = z.infer<typeof quizQuestionSchema>;
 
 export const questionResultSchema = z.object({
@@ -37,10 +53,16 @@ export const questionResultSchema = z.object({
 });
 export type QuestionResult = z.infer<typeof questionResultSchema>;
 
-export const generateRoundInputSchema = z.object({
-  activityType: quizActivityTypeSchema,
-  themePreference: z.string().optional(),
-});
+export const generateRoundInputSchema = z
+  .object({
+    activityType: quizActivityTypeSchema,
+    themePreference: z.string().optional(),
+    subjectId: z.string().uuid().optional(),
+  })
+  .refine((data) => data.activityType !== 'vocabulary' || !!data.subjectId, {
+    message: 'subjectId is required for vocabulary rounds',
+    path: ['subjectId'],
+  });
 export type GenerateRoundInput = z.infer<typeof generateRoundInputSchema>;
 
 export const completeRoundInputSchema = z.object({
@@ -97,3 +119,19 @@ export const capitalsLlmOutputSchema = z.object({
   questions: z.array(capitalsLlmQuestionSchema).min(1),
 });
 export type CapitalsLlmOutput = z.infer<typeof capitalsLlmOutputSchema>;
+
+export const vocabularyLlmQuestionSchema = z.object({
+  term: z.string(),
+  correctAnswer: z.string(),
+  acceptedAnswers: z.array(z.string()).min(1),
+  distractors: z.array(z.string()).length(3),
+  funFact: z.string(),
+  cefrLevel: z.string(),
+});
+
+export const vocabularyLlmOutputSchema = z.object({
+  theme: z.string(),
+  targetLanguage: z.string(),
+  questions: z.array(vocabularyLlmQuestionSchema).min(1),
+});
+export type VocabularyLlmOutput = z.infer<typeof vocabularyLlmOutputSchema>;

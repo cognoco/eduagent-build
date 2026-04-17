@@ -328,9 +328,11 @@ export function createScopedRepository(db: Database, profileId: string) {
     },
 
     dictationResults: {
-      async findMany(extraWhere?: SQL) {
+      async findMany(extraWhere?: SQL, orderBy?: SQL, limit?: number) {
         return db.query.dictationResults.findMany({
           where: scopedWhere(dictationResults, extraWhere),
+          ...(orderBy ? { orderBy } : {}),
+          ...(limit ? { limit } : {}),
         });
       },
       async insert(values: {

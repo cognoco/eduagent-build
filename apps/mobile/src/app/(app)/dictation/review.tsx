@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   ScrollView,
   Text,
@@ -56,11 +57,28 @@ export default function DictationReviewScreen(): React.ReactElement {
         mode,
         reviewed: true,
       });
-    } catch {
-      // Non-blocking: streak recording failure should not prevent navigation
+      // [CRIT-2] Navigate only after successful save — guarded per CLAUDE.md
+      router.replace('/(app)/practice' as never);
+    } catch (err) {
+      // [CRIT-2] Show user-visible feedback on failure — bare catch {} is forbidden.
+      // Pattern matches complete.tsx [ASSUMP-F11].
+      console.warn('[dictation] review result recording failed:', err);
+      const message =
+        err instanceof Error && err.message
+          ? err.message
+          : 'We couldn\u2019t save your review result.';
+      Alert.alert('Couldn\u2019t save result', message, [
+        {
+          text: 'Retry',
+          onPress: () => void handleDone(),
+        },
+        {
+          text: 'Continue without saving',
+          style: 'cancel',
+          onPress: () => router.replace('/(app)/practice' as never),
+        },
+      ]);
     }
-
-    router.replace('/(app)/practice' as never);
   };
 
   const handleBack = () => {

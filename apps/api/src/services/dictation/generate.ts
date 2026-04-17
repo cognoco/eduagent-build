@@ -2,6 +2,8 @@ import { generateDictationOutputSchema } from '@eduagent/schemas';
 import type { GenerateDictationOutput } from '@eduagent/schemas';
 import { routeAndCall } from '../llm';
 import type { ChatMessage } from '../llm';
+import { UpstreamLlmError } from '../../errors';
+import { captureException } from '../sentry';
 
 // ---------------------------------------------------------------------------
 // Generate Dictation Service
@@ -26,7 +28,9 @@ function buildGeneratePrompt(ctx: GenerateContext): string {
 
   const punctuationNames = getPunctuationNames(ctx.nativeLanguage);
 
-  return `You are a dictation content generator for a ${ctx.ageYears}-year-old child.
+  return `You are a dictation content generator for a ${
+    ctx.ageYears
+  }-year-old child.
 
 LANGUAGE: Write the dictation in ${ctx.nativeLanguage} (ISO 639-1 code).
 
@@ -34,9 +38,17 @@ THEME: Base the dictation on one of these recent study topics: ${topicList}. Cho
 
 CONSTRAINTS:
 - 6-12 sentences total (aim for ~3 minutes of writing time at a slow pace)
-- Sentence length: ${ctx.ageYears <= 8 ? '6-10 words' : ctx.ageYears <= 12 ? '8-15 words' : '10-20 words'}
+- Sentence length: ${
+    ctx.ageYears <= 8
+      ? '6-10 words'
+      : ctx.ageYears <= 12
+      ? '8-15 words'
+      : '10-20 words'
+  }
 - Target age-appropriate spelling patterns and vocabulary
-- Punctuation: commas and periods always. Question marks occasionally.${ctx.ageYears >= 12 ? ' Colons and semicolons sparingly.' : ''}
+- Punctuation: commas and periods always. Question marks occasionally.${
+    ctx.ageYears >= 12 ? ' Colons and semicolons sparingly.' : ''
+  }
 - Sentences must sound natural when read aloud — good rhythm, no awkward constructions
 - Include 1-2 sentences that are slightly challenging (unusual spelling, tricky grammar)
 
@@ -93,9 +105,25 @@ export async function generateDictation(
 
   const jsonMatch = result.response.match(/\{[\s\S]*\}/);
   if (!jsonMatch) {
-    throw new Error('LLM returned no JSON in generate-dictation response');
+    const err = new UpstreamLlmError(
+      'LLM returned no JSON in generate-dictation response'
+    );
+    captureException(err, { requestPath: 'services/dictation/generate' });
+    throw err;
   }
 
-  const parsed = JSON.parse(jsonMatch[0]);
-  return generateDictationOutputSchema.parse(parsed);
+  try {
+    const parsed = JSON.parse(jsonMatch[0]);
+    return generateDictationOutputSchema.parse(parsed);
+  } catch (parseErr) {
+    captureException(
+      parseErr instanceof Error
+        ? parseErr
+        : new Error('Dictation generate parse failed'),
+      { requestPath: 'services/dictation/generate' }
+    );
+    throw new UpstreamLlmError(
+      'Dictation LLM returned invalid structured output'
+    );
+  }
 }

@@ -18,7 +18,7 @@ export default function QuizLaunchScreen(): React.ReactElement {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
-  const { activityType, setRound } = useQuizFlow();
+  const { activityType, subjectId, setRound } = useQuizFlow();
   const generateRound = useGenerateRound();
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
   // [ASSUMP-F4] Surface a "still trying" hint after 20s so users on slow
@@ -35,7 +35,7 @@ export default function QuizLaunchScreen(): React.ReactElement {
   const startRound = useCallback(() => {
     if (!activityType) return;
     generateRound.mutate(
-      { activityType },
+      { activityType, subjectId: subjectId ?? undefined },
       {
         onSuccess: (round) => {
           setRound(round);
@@ -43,7 +43,7 @@ export default function QuizLaunchScreen(): React.ReactElement {
         },
       }
     );
-  }, [activityType, generateRound, router, setRound]);
+  }, [activityType, generateRound, router, setRound, subjectId]);
 
   useEffect(() => {
     if (!activityType) {
@@ -91,13 +91,20 @@ export default function QuizLaunchScreen(): React.ReactElement {
         ? generateRound.error.message
         : 'Try again, or head back and pick a different activity.';
 
-    // [ASSUMP-F3] Hide the Retry button when retrying can't possibly help
-    // (quota exhausted, consent required). We detect these by inspecting the
-    // error message for known code strings — the apiClient prefixes messages
-    // with the server code tag so string matching is safe here.
-    const isUnretryable = /QUOTA_EXCEEDED|CONSENT_|FORBIDDEN/i.test(
-      errorMessage
-    );
+    // [ASSUMP-F3] [IMP-2] Hide the Retry button when retrying can't possibly
+    // help (quota exhausted, consent required). Classify on the typed error
+    // code from assertOk's ApiResponseError — never string-match on the
+    // formatted message, which can drift without test coverage.
+    const errorCode =
+      generateRound.error instanceof Error &&
+      'code' in generateRound.error &&
+      typeof (generateRound.error as { code?: string }).code === 'string'
+        ? (generateRound.error as { code: string }).code
+        : undefined;
+    const isUnretryable =
+      errorCode === 'QUOTA_EXCEEDED' ||
+      errorCode === 'FORBIDDEN' ||
+      (errorCode != null && errorCode.startsWith('CONSENT_'));
 
     return (
       <View
