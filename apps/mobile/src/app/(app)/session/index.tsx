@@ -97,7 +97,10 @@ import { Sentry } from '../../../lib/sentry';
 
 /**
  * Session-specific error boundary with visible diagnostics.
- * Uses inline styles so it always renders readable text regardless of theme context.
+ * Uses hardcoded hex colors intentionally — theme context may not be
+ * available during a crash, so inline styles guarantee readable text
+ * regardless of whether ThemeProvider is mounted. Do not replace with
+ * semantic tokens.
  */
 class SessionErrorBoundary extends Component<
   { children: ReactNode },
@@ -249,6 +252,7 @@ function SessionScreenInner() {
     rawInput,
     verificationType: routeVerificationType,
     imageUri,
+    imageMimeType,
   } = useLocalSearchParams<{
     mode?: string;
     subjectId?: string;
@@ -263,6 +267,7 @@ function SessionScreenInner() {
     rawInput?: string;
     verificationType?: string;
     imageUri?: string;
+    imageMimeType?: string;
   }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -694,9 +699,20 @@ function SessionScreenInner() {
         });
         if (!cancelled) {
           imageBase64Ref.current = base64;
+          // [IMP-1] Prefer route-supplied mimeType from image picker over
+          // extension sniffing. Camera captures are always JPEG; gallery
+          // picks provide OS-level mimeType. Falls back to extension
+          // sniffing for backward compat with deep links or missing values.
           const ext = imageUri!.split('.').pop()?.toLowerCase();
           const mimeType: 'image/jpeg' | 'image/png' | 'image/webp' =
-            ext === 'png'
+            imageMimeType === 'image/png'
+              ? 'image/png'
+              : imageMimeType === 'image/webp'
+              ? 'image/webp'
+              : imageMimeType?.includes('jpeg') ||
+                imageMimeType?.includes('jpg')
+              ? 'image/jpeg'
+              : ext === 'png'
               ? 'image/png'
               : ext === 'webp'
               ? 'image/webp'

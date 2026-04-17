@@ -1,6 +1,7 @@
-import { eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, lt } from 'drizzle-orm';
 import {
   createScopedRepository,
+  quizRounds,
   subjects,
   vocabulary,
   vocabularyRetentionCards,
@@ -153,6 +154,10 @@ export async function getVocabularyRoundContext(
     eq(vocabulary.subjectId, subjectId)
   );
   const vocabularyIds = allVocabularyRows.map((row) => row.id);
+  // [IMP-4] Safe cross-table inArray: vocabularyIds were fetched from
+  // repo.vocabulary.findMany which is profile-scoped, so these IDs already
+  // belong to the current profile. The inArray cannot leak cards from
+  // other profiles because the scoped repo adds AND profile_id = $profileId.
   const cardRows =
     vocabularyIds.length === 0
       ? []
@@ -208,4 +213,31 @@ export async function getVocabularyRoundContext(
     allVocabulary,
     libraryItems,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Cross-profile batch operations (cron/cleanup)
+// ---------------------------------------------------------------------------
+
+/**
+ * [CRIT-2] Mark stale active quiz rounds as abandoned. Prefetched rounds that
+ * the user never completed stay `active` forever and consume one quota unit
+ * each. This batch operation cleans them up so the quiz_rounds table doesn't
+ * become a graveyard of orphaned prefetch artifacts.
+ *
+ * Intentional cross-profile query: the stale-cleanup cron scans all active
+ * rounds globally, so scoped-repo access does not apply here.
+ */
+export async function abandonStaleQuizRounds(
+  db: Database,
+  cutoff: Date
+): Promise<number> {
+  const result = await db
+    .update(quizRounds)
+    .set({ status: 'abandoned' })
+    .where(
+      and(eq(quizRounds.status, 'active'), lt(quizRounds.createdAt, cutoff))
+    )
+    .returning({ id: quizRounds.id });
+  return result.length;
 }

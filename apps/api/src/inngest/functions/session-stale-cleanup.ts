@@ -1,8 +1,10 @@
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
 import { closeStaleSessions } from '../../services/session';
+import { abandonStaleQuizRounds } from '../../services/quiz';
 
 const STALE_MINUTES = 30;
+const QUIZ_ROUND_STALE_HOURS = 2;
 
 export const sessionStaleCleanup = inngest.createFunction(
   {
@@ -38,9 +40,24 @@ export const sessionStaleCleanup = inngest.createFunction(
       }
     });
 
+    // [CRIT-2] Abandon quiz rounds that have been active for too long.
+    // Prefetched rounds the user never completed stay 'active' forever and
+    // are quota-charged. Mark them 'abandoned' so they don't accumulate.
+    const quizRoundCutoff = new Date(
+      now.getTime() - QUIZ_ROUND_STALE_HOURS * 60 * 60 * 1000
+    );
+    const abandonedRounds = await step.run(
+      'abandon-stale-quiz-rounds',
+      async () => {
+        const db = getStepDatabase();
+        return abandonStaleQuizRounds(db, quizRoundCutoff);
+      }
+    );
+
     return {
       status: 'completed',
       closedCount: closedSessions.length,
+      abandonedQuizRounds: abandonedRounds,
       cutoff: cutoff.toISOString(),
       timestamp: now.toISOString(),
     };

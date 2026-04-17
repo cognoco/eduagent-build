@@ -1,10 +1,6 @@
 import { z } from 'zod';
 
-export const quizActivityTypeSchema = z.enum([
-  'capitals',
-  'vocabulary',
-  'guess_who',
-]);
+export const quizActivityTypeSchema = z.enum(['capitals', 'vocabulary']);
 export type QuizActivityType = z.infer<typeof quizActivityTypeSchema>;
 
 export const quizRoundStatusSchema = z.enum([

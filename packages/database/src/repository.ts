@@ -50,9 +50,10 @@ export function createScopedRepository(db: Database, profileId: string) {
     },
 
     sessions: {
-      async findMany(extraWhere?: SQL) {
+      async findMany(extraWhere?: SQL, limit?: number) {
         return db.query.learningSessions.findMany({
           where: scopedWhere(learningSessions, extraWhere),
+          ...(limit ? { limit } : {}),
         });
       },
       async findFirst(extraWhere?: SQL) {

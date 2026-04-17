@@ -17,6 +17,7 @@ export {
   validateVocabularyRound,
 } from './vocabulary-provider';
 export {
+  abandonStaleQuizRounds,
   getRecentAnswers,
   getVocabularyRoundContext,
   getRoundById,

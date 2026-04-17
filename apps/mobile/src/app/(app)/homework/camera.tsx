@@ -54,6 +54,9 @@ export default function CameraScreen(): React.ReactNode {
   const [manualText, setManualText] = useState('');
   const [flash, setFlash] = useState<FlashMode>('off');
   const [showCelebration, setShowCelebration] = useState(true);
+  // [IMP-1] Track MIME type from the image source for reliable detection.
+  // Camera always produces JPEG; gallery picks provide OS-level mimeType.
+  const [imageMimeType, setImageMimeType] = useState<string | null>(null);
 
   // Subject auto-classification state
   const classifyMutation = useClassifySubject();
@@ -177,6 +180,7 @@ export default function CameraScreen(): React.ReactNode {
     try {
       const photo = await cameraRef.current?.takePictureAsync();
       if (photo?.uri) {
+        setImageMimeType('image/jpeg'); // expo-camera always produces JPEG
         dispatch({ type: 'PHOTO_TAKEN', uri: photo.uri, source: 'camera' });
       }
     } catch (error) {
@@ -209,6 +213,7 @@ export default function CameraScreen(): React.ReactNode {
         return;
       }
 
+      setImageMimeType(selectedImage.mimeType ?? null);
       dispatch({
         type: 'PHOTO_TAKEN',
         uri: selectedImage.uri,
@@ -318,6 +323,7 @@ export default function CameraScreen(): React.ReactNode {
             : {}),
           ...(sourceOcrText ? { ocrText: sourceOcrText } : {}),
           ...(imageUri ? { imageUri } : {}),
+          ...(imageMimeType ? { imageMimeType } : {}),
           ...(captureSource ? { captureSource } : {}),
         },
       } as never);

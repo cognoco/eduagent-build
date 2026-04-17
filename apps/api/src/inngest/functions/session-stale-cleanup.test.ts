@@ -10,9 +10,15 @@
 import type { Database } from '@eduagent/database';
 
 const mockCloseStaleSessions = jest.fn();
+const mockAbandonStaleQuizRounds = jest.fn();
 
 jest.mock('../../services/session', () => ({
   closeStaleSessions: (...args: unknown[]) => mockCloseStaleSessions(...args),
+}));
+
+jest.mock('../../services/quiz', () => ({
+  abandonStaleQuizRounds: (...args: unknown[]) =>
+    mockAbandonStaleQuizRounds(...args),
 }));
 
 const mockGetStepDatabase = jest.fn();
@@ -94,6 +100,7 @@ describe('session-stale-cleanup Inngest function', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetStepDatabase.mockReturnValue(mockDb);
+    mockAbandonStaleQuizRounds.mockResolvedValue(0);
   });
 
   it('is configured with the correct function ID and cron schedule', () => {
@@ -257,6 +264,26 @@ describe('session-stale-cleanup Inngest function', () => {
     // Timestamp should be between before and after
     expect(result.timestamp >= before).toBe(true);
     expect(result.timestamp <= after).toBe(true);
+  });
+
+  it('calls abandonStaleQuizRounds with a 2-hour cutoff', async () => {
+    mockCloseStaleSessions.mockResolvedValue([]);
+    mockAbandonStaleQuizRounds.mockResolvedValue(3);
+
+    const before = Date.now();
+    const { result } = await executeHandler();
+    const after = Date.now();
+
+    expect(mockAbandonStaleQuizRounds).toHaveBeenCalledWith(
+      mockDb,
+      expect.any(Date)
+    );
+
+    const cutoff = mockAbandonStaleQuizRounds.mock.calls[0][1] as Date;
+    const twoHoursMs = 2 * 60 * 60 * 1000;
+    expect(cutoff.getTime()).toBeGreaterThanOrEqual(before - twoHoursMs - 1000);
+    expect(cutoff.getTime()).toBeLessThanOrEqual(after - twoHoursMs + 1000);
+    expect(result.abandonedQuizRounds).toBe(3);
   });
 
   it('propagates closeStaleSessions errors to Inngest for retry', async () => {

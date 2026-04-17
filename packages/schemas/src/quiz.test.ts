@@ -15,11 +15,12 @@ describe('quiz schemas', () => {
     it('accepts valid activity types', () => {
       expect(quizActivityTypeSchema.parse('capitals')).toBe('capitals');
       expect(quizActivityTypeSchema.parse('vocabulary')).toBe('vocabulary');
-      expect(quizActivityTypeSchema.parse('guess_who')).toBe('guess_who');
     });
 
     it('rejects invalid types', () => {
       expect(() => quizActivityTypeSchema.parse('flashcards')).toThrow();
+      // guess_who is a planned future activity — not yet accepted by the API
+      expect(() => quizActivityTypeSchema.parse('guess_who')).toThrow();
     });
   });
 

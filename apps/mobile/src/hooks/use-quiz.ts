@@ -17,6 +17,7 @@ import { useApiClient } from '../lib/api-client';
 import { assertOk } from '../lib/assert-ok';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
+import { Sentry } from '../lib/sentry';
 
 export function useGenerateRound(): UseMutationResult<
   QuizRoundResponse,
@@ -60,7 +61,13 @@ export function usePrefetchRound(): UseMutationResult<
     // reliably rejecting prefetch (quota, backend outage, etc.). Silent
     // recovery without any signal is banned per ~/.claude/CLAUDE.md.
     onError: (err) => {
-      console.warn('[quiz] prefetch failed:', err);
+      // [IMP-5] Escalate to Sentry so prefetch failures are queryable,
+      // not just in local console. Per ~/.claude/CLAUDE.md: silent recovery
+      // without escalation is banned on quota paths.
+      Sentry.captureMessage(
+        `[quiz] prefetch failed: ${err.message}`,
+        'warning'
+      );
     },
   });
 }

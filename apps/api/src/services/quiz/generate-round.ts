@@ -394,9 +394,11 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
     questions = injectAtRandomPositions(discoveryQuestions, masteryQuestions);
     theme = validated.theme;
   } else {
-    throw new UpstreamLlmError(
-      `Unsupported quiz activity type: ${activityType}`
-    );
+    // Exhaustive check — TypeScript narrows to `never` here. If a new
+    // activity type is added to the schema without a handler, this line
+    // produces a compile error rather than a silent runtime 502.
+    const _exhaustive: never = activityType;
+    throw new Error(`Unsupported quiz activity type: ${_exhaustive}`);
   }
 
   const round = assembleRound(theme, questions);
