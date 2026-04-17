@@ -67,6 +67,18 @@ export default function QuizIndexScreen(): React.ReactElement {
       ? `Played: ${capitalsStats.roundsPlayed}`
       : 'Test yourself on world capitals';
 
+  const guessWhoStats = stats?.find(
+    (stat) => stat.activityType === 'guess_who'
+  );
+  const guessWhoSubtitle =
+    guessWhoStats &&
+    guessWhoStats.bestScore != null &&
+    guessWhoStats.bestTotal != null
+      ? `Best: ${guessWhoStats.bestScore}/${guessWhoStats.bestTotal} · Played: ${guessWhoStats.roundsPlayed}`
+      : guessWhoStats
+      ? `Played: ${guessWhoStats.roundsPlayed}`
+      : 'Name the famous person from clues';
+
   const handleSelectVocabulary = (subjectId: string, languageName: string) => {
     setActivityType('vocabulary');
     setSubjectId(subjectId);
@@ -101,21 +113,34 @@ export default function QuizIndexScreen(): React.ReactElement {
       </View>
 
       {hasLoadError ? (
-        <Pressable
-          onPress={() => {
-            void refetchStats();
-            void refetchSubjects();
-          }}
-          className="mb-4 rounded-card bg-surface p-4"
-          accessibilityRole="button"
-          accessibilityLabel="Retry loading quiz data"
-          testID="quiz-load-retry"
-        >
-          <Text className="text-body-sm text-text-secondary">
-            Couldn&apos;t load quiz data.{' '}
-            <Text className="font-semibold text-primary">Tap to retry.</Text>
-          </Text>
-        </Pressable>
+        <View className="mb-4 gap-3">
+          <Pressable
+            onPress={() => {
+              void refetchStats();
+              void refetchSubjects();
+            }}
+            className="rounded-card bg-surface p-4"
+            accessibilityRole="button"
+            accessibilityLabel="Retry loading quiz data"
+            testID="quiz-load-retry"
+          >
+            <Text className="text-body-sm text-text-secondary">
+              Couldn&apos;t load quiz data.{' '}
+              <Text className="font-semibold text-primary">Tap to retry.</Text>
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => goBackOrReplace(router, '/(app)/practice')}
+            className="min-h-[44px] items-center justify-center rounded-button bg-surface-elevated px-4 py-3"
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+            testID="quiz-error-back"
+          >
+            <Text className="text-body-sm font-semibold text-text-primary">
+              Go back
+            </Text>
+          </Pressable>
+        </View>
       ) : (
         <View className="gap-4">
           <IntentCard
@@ -165,6 +190,20 @@ export default function QuizIndexScreen(): React.ReactElement {
               />
             );
           })}
+          <IntentCard
+            title="Guess Who"
+            subtitle={guessWhoSubtitle}
+            onPress={() => {
+              setActivityType('guess_who');
+              setSubjectId(null);
+              setLanguageName(null);
+              setRound(null);
+              setPrefetchedRoundId(null);
+              setCompletionResult(null);
+              router.push('/(app)/quiz/launch' as never);
+            }}
+            testID="quiz-guess-who"
+          />
         </View>
       )}
     </ScrollView>

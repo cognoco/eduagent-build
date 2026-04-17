@@ -1,6 +1,10 @@
 import { z } from 'zod';
 
-export const quizActivityTypeSchema = z.enum(['capitals', 'vocabulary']);
+export const quizActivityTypeSchema = z.enum([
+  'capitals',
+  'vocabulary',
+  'guess_who',
+]);
 export type QuizActivityType = z.infer<typeof quizActivityTypeSchema>;
 
 export const quizRoundStatusSchema = z.enum([
@@ -35,9 +39,28 @@ export const vocabularyQuestionSchema = z.object({
 });
 export type VocabularyQuestion = z.infer<typeof vocabularyQuestionSchema>;
 
+export const guessWhoQuestionSchema = z
+  .object({
+    type: z.literal('guess_who'),
+    canonicalName: z.string(),
+    correctAnswer: z.string(),
+    acceptedAliases: z.array(z.string()).min(1),
+    clues: z.array(z.string().max(200)).length(5),
+    mcFallbackOptions: z.array(z.string()).length(4),
+    funFact: z.string().max(200),
+    isLibraryItem: z.boolean(),
+    topicId: z.string().uuid().nullable().optional(),
+  })
+  .refine((question) => question.correctAnswer === question.canonicalName, {
+    message: 'correctAnswer must match canonicalName',
+    path: ['correctAnswer'],
+  });
+export type GuessWhoQuestion = z.infer<typeof guessWhoQuestionSchema>;
+
 export const quizQuestionSchema = z.discriminatedUnion('type', [
   capitalsQuestionSchema,
   vocabularyQuestionSchema,
+  guessWhoQuestionSchema,
 ]);
 export type QuizQuestion = z.infer<typeof quizQuestionSchema>;
 
@@ -46,6 +69,8 @@ export const questionResultSchema = z.object({
   correct: z.boolean(),
   answerGiven: z.string(),
   timeMs: z.number().int().min(0),
+  cluesUsed: z.number().int().min(1).max(5).optional(),
+  answerMode: z.enum(['free_text', 'multiple_choice']).optional(),
 });
 export type QuestionResult = z.infer<typeof questionResultSchema>;
 
@@ -132,3 +157,18 @@ export const vocabularyLlmOutputSchema = z.object({
   questions: z.array(vocabularyLlmQuestionSchema).min(1),
 });
 export type VocabularyLlmOutput = z.infer<typeof vocabularyLlmOutputSchema>;
+
+export const guessWhoLlmPersonSchema = z.object({
+  canonicalName: z.string(),
+  acceptedAliases: z.array(z.string()).min(1),
+  clues: z.array(z.string().max(200)).length(5),
+  mcFallbackOptions: z.array(z.string()).length(4),
+  funFact: z.string().max(200),
+});
+export type GuessWhoLlmPerson = z.infer<typeof guessWhoLlmPersonSchema>;
+
+export const guessWhoLlmOutputSchema = z.object({
+  theme: z.string(),
+  questions: z.array(guessWhoLlmPersonSchema).min(1),
+});
+export type GuessWhoLlmOutput = z.infer<typeof guessWhoLlmOutputSchema>;

@@ -20,8 +20,15 @@ export {
   abandonStaleQuizRounds,
   getRecentAnswers,
   getVocabularyRoundContext,
+  getGuessWhoRoundContext,
   getRoundById,
   getRoundByIdOrThrow,
   listRecentCompletedRounds,
   computeRoundStats,
 } from './queries';
+export {
+  buildGuessWhoPrompt,
+  validateGuessWhoRound,
+  buildGuessWhoDiscoveryQuestions,
+  clueMentionsGuessWhoName,
+} from './guess-who-provider';

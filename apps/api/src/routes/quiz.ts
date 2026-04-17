@@ -14,6 +14,7 @@ import { validationError, VocabularyContextError } from '../errors';
 import {
   completeQuizRound,
   getVocabularyRoundContext,
+  getGuessWhoRoundContext,
   computeRoundStats,
   generateQuizRound,
   getRecentAnswers,
@@ -62,6 +63,7 @@ async function buildAndGenerateRound(
     vocabularyId?: string;
     cefrLevel?: string | null;
   }> = [];
+  let topicTitles: string[] | undefined;
 
   if (input.activityType === 'vocabulary') {
     if (!input.subjectId) {
@@ -79,6 +81,9 @@ async function buildAndGenerateRound(
     cefrCeiling = context.cefrCeiling;
     allVocabulary = context.allVocabulary;
     libraryItems = context.libraryItems;
+  } else if (input.activityType === 'guess_who') {
+    const context = await getGuessWhoRoundContext(db, profileId);
+    topicTitles = context.topicTitles;
   }
 
   return generateQuizRound({
@@ -92,6 +97,7 @@ async function buildAndGenerateRound(
     languageCode,
     cefrCeiling,
     allVocabulary,
+    topicTitles,
   });
 }
 

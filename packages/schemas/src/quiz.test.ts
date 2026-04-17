@@ -3,6 +3,8 @@ import {
   capitalsQuestionSchema,
   completeRoundInputSchema,
   generateRoundInputSchema,
+  guessWhoLlmOutputSchema,
+  guessWhoQuestionSchema,
   questionResultSchema,
   quizActivityTypeSchema,
   quizQuestionSchema,
@@ -15,12 +17,11 @@ describe('quiz schemas', () => {
     it('accepts valid activity types', () => {
       expect(quizActivityTypeSchema.parse('capitals')).toBe('capitals');
       expect(quizActivityTypeSchema.parse('vocabulary')).toBe('vocabulary');
+      expect(quizActivityTypeSchema.parse('guess_who')).toBe('guess_who');
     });
 
     it('rejects invalid types', () => {
       expect(() => quizActivityTypeSchema.parse('flashcards')).toThrow();
-      // guess_who is a planned future activity — not yet accepted by the API
-      expect(() => quizActivityTypeSchema.parse('guess_who')).toThrow();
     });
   });
 
@@ -237,6 +238,166 @@ describe('quiz schemas', () => {
       };
 
       expect(vocabularyLlmOutputSchema.parse(output)).toEqual(output);
+    });
+  });
+
+  describe('guessWhoQuestionSchema', () => {
+    const validGuessWho = {
+      type: 'guess_who' as const,
+      canonicalName: 'Isaac Newton',
+      correctAnswer: 'Isaac Newton',
+      acceptedAliases: ['Newton', 'Sir Isaac Newton'],
+      clues: ['Clue 1', 'Clue 2', 'Clue 3', 'Clue 4', 'Clue 5'],
+      mcFallbackOptions: [
+        'Isaac Newton',
+        'Galileo Galilei',
+        'Albert Einstein',
+        'Nikola Tesla',
+      ],
+      funFact: 'Newton invented the cat flap.',
+      isLibraryItem: false,
+    };
+
+    it('accepts valid guess_who question', () => {
+      expect(guessWhoQuestionSchema.parse(validGuessWho)).toEqual(
+        validGuessWho
+      );
+    });
+
+    it('requires exactly 5 clues', () => {
+      expect(() =>
+        guessWhoQuestionSchema.parse({
+          ...validGuessWho,
+          clues: ['Clue 1', 'Clue 2', 'Clue 3'],
+        })
+      ).toThrow();
+    });
+
+    it('requires exactly 4 MC fallback options', () => {
+      expect(() =>
+        guessWhoQuestionSchema.parse({
+          ...validGuessWho,
+          mcFallbackOptions: ['A', 'B'],
+        })
+      ).toThrow();
+    });
+
+    it('requires at least 1 accepted alias', () => {
+      expect(() =>
+        guessWhoQuestionSchema.parse({
+          ...validGuessWho,
+          acceptedAliases: [],
+        })
+      ).toThrow();
+    });
+
+    it('rejects when correctAnswer does not match canonicalName', () => {
+      expect(() =>
+        guessWhoQuestionSchema.parse({
+          ...validGuessWho,
+          correctAnswer: 'Wrong Name',
+        })
+      ).toThrow();
+    });
+  });
+
+  describe('quizQuestionSchema (discriminated union with guess_who)', () => {
+    it('accepts guess_who question via discriminated union', () => {
+      const q = {
+        type: 'guess_who' as const,
+        canonicalName: 'Newton',
+        correctAnswer: 'Newton',
+        acceptedAliases: ['Newton'],
+        clues: ['C1', 'C2', 'C3', 'C4', 'C5'],
+        mcFallbackOptions: ['Newton', 'Einstein', 'Tesla', 'Curie'],
+        funFact: 'Fact.',
+        isLibraryItem: false,
+      };
+      expect(quizQuestionSchema.parse(q).type).toBe('guess_who');
+    });
+  });
+
+  describe('questionResultSchema with Guess Who fields', () => {
+    it('accepts result with cluesUsed and answerMode', () => {
+      const result = {
+        questionIndex: 0,
+        correct: true,
+        answerGiven: 'Newton',
+        timeMs: 8000,
+        cluesUsed: 3,
+        answerMode: 'free_text' as const,
+      };
+      expect(questionResultSchema.parse(result)).toEqual(result);
+    });
+
+    it('accepts result without optional Guess Who fields (backward compat)', () => {
+      const result = {
+        questionIndex: 0,
+        correct: true,
+        answerGiven: 'Paris',
+        timeMs: 2000,
+      };
+      expect(questionResultSchema.parse(result)).toEqual(result);
+    });
+
+    it('rejects cluesUsed outside 1-5 range', () => {
+      expect(() =>
+        questionResultSchema.parse({
+          questionIndex: 0,
+          correct: true,
+          answerGiven: 'X',
+          timeMs: 1000,
+          cluesUsed: 0,
+        })
+      ).toThrow();
+      expect(() =>
+        questionResultSchema.parse({
+          questionIndex: 0,
+          correct: true,
+          answerGiven: 'X',
+          timeMs: 1000,
+          cluesUsed: 6,
+        })
+      ).toThrow();
+    });
+
+    it('rejects invalid answerMode', () => {
+      expect(() =>
+        questionResultSchema.parse({
+          questionIndex: 0,
+          correct: true,
+          answerGiven: 'X',
+          timeMs: 1000,
+          answerMode: 'voice',
+        })
+      ).toThrow();
+    });
+  });
+
+  describe('guessWhoLlmOutputSchema', () => {
+    it('accepts valid LLM output', () => {
+      const output = {
+        theme: 'Scientists',
+        questions: [
+          {
+            canonicalName: 'Isaac Newton',
+            acceptedAliases: ['Newton'],
+            clues: ['C1', 'C2', 'C3', 'C4', 'C5'],
+            mcFallbackOptions: ['Newton', 'Einstein', 'Tesla', 'Curie'],
+            funFact: 'Fact.',
+          },
+        ],
+      };
+      expect(guessWhoLlmOutputSchema.parse(output)).toEqual(output);
+    });
+
+    it('rejects empty questions array', () => {
+      expect(() =>
+        guessWhoLlmOutputSchema.parse({
+          theme: 'X',
+          questions: [],
+        })
+      ).toThrow();
     });
   });
 });

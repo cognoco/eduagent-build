@@ -23,6 +23,7 @@ export const QUIZ_CONFIG = {
     perCorrect: 10,
     timerBonus: 2,
     perfectBonus: 25,
+    guessWhoClueBonus: 3,
   },
   celebrationThresholds: {
     perfect: 1,

@@ -1,5 +1,6 @@
 import type {
   CapitalsQuestion,
+  GuessWhoQuestion,
   QuestionResult,
   QuizQuestion,
 } from '@eduagent/schemas';
@@ -8,6 +9,7 @@ import {
   calculateScore,
   calculateXp,
   getCelebrationTier,
+  getGuessWhoSm2Quality,
   getVocabSm2Quality,
   isAnswerCorrect,
   validateResults,
@@ -226,5 +228,157 @@ describe('validateResults (anti-tampering)', () => {
     const validated = validateResults(questions, malicious);
     expect(validated).toHaveLength(1);
     expect(validated[0]?.questionIndex).toBe(0);
+  });
+});
+
+describe('isAnswerCorrect — guess_who', () => {
+  const guessWhoQuestion: GuessWhoQuestion = {
+    type: 'guess_who',
+    canonicalName: 'Isaac Newton',
+    correctAnswer: 'Isaac Newton',
+    acceptedAliases: ['Newton', 'Sir Isaac Newton'],
+    clues: ['C1', 'C2', 'C3', 'C4', 'C5'],
+    mcFallbackOptions: ['Isaac Newton', 'Einstein', 'Tesla', 'Curie'],
+    funFact: 'Fact.',
+    isLibraryItem: false,
+  };
+
+  it('matches exact canonical name', () => {
+    expect(isAnswerCorrect(guessWhoQuestion, 'Isaac Newton')).toBe(true);
+  });
+
+  it('matches exact alias', () => {
+    expect(isAnswerCorrect(guessWhoQuestion, 'Newton')).toBe(true);
+  });
+
+  it('matches fuzzy (Levenshtein within threshold)', () => {
+    // "Newten" vs "Newton" (6 chars) → maxDistance = 1, distance = 1 → match
+    expect(isAnswerCorrect(guessWhoQuestion, 'Newten')).toBe(true);
+  });
+
+  it('rejects answer exceeding distance threshold', () => {
+    expect(isAnswerCorrect(guessWhoQuestion, 'Mozart')).toBe(false);
+  });
+
+  it('rejects empty answer', () => {
+    expect(isAnswerCorrect(guessWhoQuestion, '')).toBe(false);
+  });
+});
+
+describe('buildMissedItemText — guess_who', () => {
+  it('formats guess_who missed items with easiest clue', () => {
+    expect(
+      buildMissedItemText({
+        type: 'guess_who',
+        canonicalName: 'Marie Curie',
+        correctAnswer: 'Marie Curie',
+        acceptedAliases: ['Curie'],
+        clues: [
+          'Vague',
+          'Less vague',
+          'Hint',
+          'Big hint',
+          'Nobel Prize for radioactivity',
+        ],
+        mcFallbackOptions: ['Curie', 'Darwin', 'Tesla', 'Pasteur'],
+        funFact: 'Fact.',
+        isLibraryItem: false,
+      })
+    ).toBe('Who is this person? Nobel Prize for radioactivity');
+  });
+});
+
+describe('calculateXp — guess_who clue bonus', () => {
+  it('adds clue bonus for free-text correct answers', () => {
+    const results: QuestionResult[] = [
+      {
+        questionIndex: 0,
+        correct: true,
+        answerGiven: 'Newton',
+        timeMs: 8000,
+        cluesUsed: 2,
+        answerMode: 'free_text',
+      },
+      {
+        questionIndex: 1,
+        correct: true,
+        answerGiven: 'Curie',
+        timeMs: 3000,
+        cluesUsed: 1,
+        answerMode: 'free_text',
+      },
+      {
+        questionIndex: 2,
+        correct: false,
+        answerGiven: 'Wrong',
+        timeMs: 15000,
+        cluesUsed: 5,
+        answerMode: 'free_text',
+      },
+      {
+        questionIndex: 3,
+        correct: true,
+        answerGiven: 'Tesla',
+        timeMs: 12000,
+        cluesUsed: 4,
+        answerMode: 'multiple_choice',
+      },
+    ];
+    // base: 3 correct × 10 = 30
+    // timer: 1 answer < 5000ms (Curie) × 2 = 2
+    // perfect: 3/4 ≠ perfect → 0
+    // clue bonus (free_text only): (5-2)×3 + (5-1)×3 = 9 + 12 = 21. MC gets 0.
+    // total: 30 + 2 + 0 + 21 = 53
+    expect(calculateXp(results, 4, 'guess_who')).toBe(53);
+  });
+
+  it('gives no clue bonus for MC answers', () => {
+    const results: QuestionResult[] = [
+      {
+        questionIndex: 0,
+        correct: true,
+        answerGiven: 'Newton',
+        timeMs: 8000,
+        cluesUsed: 4,
+        answerMode: 'multiple_choice',
+      },
+    ];
+    // base: 10, timer: 0, perfect: 25 (1/1), clue bonus: 0 (MC)
+    expect(calculateXp(results, 1, 'guess_who')).toBe(35);
+  });
+
+  it('works unchanged for non-guess_who activities', () => {
+    const results: QuestionResult[] = [
+      { questionIndex: 0, correct: true, answerGiven: 'Paris', timeMs: 2000 },
+    ];
+    // base: 10, timer: 2, perfect: 25
+    expect(calculateXp(results, 1)).toBe(37);
+    expect(calculateXp(results, 1, 'capitals')).toBe(37);
+  });
+});
+
+describe('getGuessWhoSm2Quality', () => {
+  it('returns 5 for free-text guess in 1-2 clues', () => {
+    expect(getGuessWhoSm2Quality(true, 1, 'free_text')).toBe(5);
+    expect(getGuessWhoSm2Quality(true, 2, 'free_text')).toBe(5);
+  });
+
+  it('returns 3 for free-text guess in 3-4 clues', () => {
+    expect(getGuessWhoSm2Quality(true, 3, 'free_text')).toBe(3);
+    expect(getGuessWhoSm2Quality(true, 4, 'free_text')).toBe(3);
+  });
+
+  it('returns 2 for free-text guess in 5 clues', () => {
+    expect(getGuessWhoSm2Quality(true, 5, 'free_text')).toBe(2);
+  });
+
+  it('returns 2 for MC tap regardless of clue count', () => {
+    expect(getGuessWhoSm2Quality(true, 4, 'multiple_choice')).toBe(2);
+    expect(getGuessWhoSm2Quality(true, 5, 'multiple_choice')).toBe(2);
+  });
+
+  it('returns 1 for missed entirely', () => {
+    expect(getGuessWhoSm2Quality(false, 5, 'free_text')).toBe(1);
+    expect(getGuessWhoSm2Quality(false, 5, 'multiple_choice')).toBe(1);
   });
 });

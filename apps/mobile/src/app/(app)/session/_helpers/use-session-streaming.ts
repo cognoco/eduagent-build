@@ -225,8 +225,9 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
           ? ('homework' as const)
           : ('learning' as const);
 
-      // Errors propagate to continueWithMessage's catch block, which handles
-      // them with proper user-facing UI (error messages, reconnect prompts).
+      // Session-creation errors propagate to the sendMessage catch block,
+      // which classifies quota / reconnectable / fatal errors properly.
+      // Previously swallowed here, collapsing all failures to a generic message. [IMP-3]
       let newId: string;
       if (overrideSubjectId) {
         // Use API client directly — useStartSession's URL param may be

@@ -1153,6 +1153,10 @@ export default function AppLayout() {
             title: 'Home',
             tabBarButtonTestID: 'tab-home',
             tabBarAccessibilityLabel: 'Home Tab',
+            // Lazy-load the Home tab so the initial mount only renders the
+            // visible gate screens (consent, profile creation). The trade-off
+            // is a brief spinner on the first Home tap, but it cuts ~200ms
+            // off the critical auth→gate path on low-end devices.
             lazy: true,
             tabBarIcon: ({ focused }) => (
               <TabIcon name="Home" focused={focused} />

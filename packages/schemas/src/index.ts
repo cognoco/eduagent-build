@@ -39,3 +39,4 @@ export * from './dictation.ts';
 
 // Quiz Activities (Practice)
 export * from './quiz.ts';
+export * from './quiz-utils.ts';

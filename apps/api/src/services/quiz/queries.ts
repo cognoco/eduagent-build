@@ -1,6 +1,8 @@
-import { and, eq, inArray, lt } from 'drizzle-orm';
+import { and, desc, eq, inArray, lt } from 'drizzle-orm';
 import {
   createScopedRepository,
+  curricula,
+  curriculumTopics,
   quizRounds,
   subjects,
   vocabulary,
@@ -213,6 +215,35 @@ export async function getVocabularyRoundContext(
     allVocabulary,
     libraryItems,
   };
+}
+
+export interface GuessWhoRoundContext {
+  topicTitles: string[];
+}
+
+/**
+ * Fetch the learner's studied topic titles for Guess Who person selection.
+ * Returns up to 30 recent non-skipped topics across all subjects.
+ */
+export async function getGuessWhoRoundContext(
+  db: Database,
+  profileId: string
+): Promise<GuessWhoRoundContext> {
+  const topics = await db
+    .select({ title: curriculumTopics.title })
+    .from(curriculumTopics)
+    .innerJoin(curricula, eq(curriculumTopics.curriculumId, curricula.id))
+    .innerJoin(subjects, eq(curricula.subjectId, subjects.id))
+    .where(
+      and(
+        eq(subjects.profileId, profileId),
+        eq(curriculumTopics.skipped, false)
+      )
+    )
+    .orderBy(desc(curriculumTopics.createdAt))
+    .limit(30);
+
+  return { topicTitles: topics.map((t) => t.title) };
 }
 
 // ---------------------------------------------------------------------------

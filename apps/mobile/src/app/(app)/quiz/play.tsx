@@ -9,6 +9,10 @@ import { useCompleteRound, usePrefetchRound } from '../../../hooks/use-quiz';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { useThemeColors } from '../../../lib/theme';
 import { useQuizFlow } from './_layout';
+import {
+  GuessWhoQuestion,
+  type GuessWhoResolvedResult,
+} from './_components/GuessWhoQuestion';
 
 type AnswerState = 'unanswered' | 'correct' | 'wrong';
 
@@ -68,6 +72,7 @@ export default function QuizPlayScreen(): React.ReactElement {
   const [showContinueHint, setShowContinueHint] = useState(false);
   const [shuffledOptions, setShuffledOptions] = useState<string[]>([]);
   const [elapsedMs, setElapsedMs] = useState(0);
+  const [guessWhoCluesUsed, setGuessWhoCluesUsed] = useState(1);
 
   const questionStartTimeRef = useRef(Date.now());
   const resultsRef = useRef<QuestionResult[]>([]);
@@ -88,14 +93,20 @@ export default function QuizPlayScreen(): React.ReactElement {
   useEffect(() => {
     if (!currentQuestion) return;
 
-    // Dedup before shuffling in case the LLM produces a distractor that
-    // collides with the correct answer. Without this, React would warn on
-    // duplicate keys and the "wrong distractor is also correct" edge case
-    // would render as a silent win/loss mismatch.
-    const uniqueOptions = Array.from(
-      new Set([currentQuestion.correctAnswer, ...currentQuestion.distractors])
-    );
-    setShuffledOptions(shuffle(uniqueOptions));
+    if (currentQuestion.type !== 'guess_who') {
+      // Dedup before shuffling in case the LLM produces a distractor that
+      // collides with the correct answer. Without this, React would warn on
+      // duplicate keys and the "wrong distractor is also correct" edge case
+      // would render as a silent win/loss mismatch.
+      const uniqueOptions = Array.from(
+        new Set([currentQuestion.correctAnswer, ...currentQuestion.distractors])
+      );
+      setShuffledOptions(shuffle(uniqueOptions));
+    } else {
+      setShuffledOptions([]);
+      setGuessWhoCluesUsed(1);
+    }
+
     setAnswerState('unanswered');
     setSelectedAnswer(null);
     setShowContinueHint(false);
@@ -181,7 +192,7 @@ export default function QuizPlayScreen(): React.ReactElement {
           setCompleteError(
             err instanceof Error
               ? err.message
-              : 'We couldn\u2019t save your round. Please try again.'
+              : "We couldn't save your round. Please try again."
           );
         },
       }
@@ -283,8 +294,6 @@ export default function QuizPlayScreen(): React.ReactElement {
 
           <View className="flex-row gap-1">
             {Array.from({ length: totalQuestions }, (_, index) => {
-              // Three-state dots so "current" is visually distinct from
-              // "past" — otherwise the user loses the you-are-here signal.
               const state =
                 index < currentIndex
                   ? 'past'
@@ -326,42 +335,95 @@ export default function QuizPlayScreen(): React.ReactElement {
               {currentQuestion.term}
             </Text>
           </>
+        ) : answerState === 'unanswered' ? (
+          <Text className="text-center text-h3 font-semibold text-text-primary">
+            Who is this person?
+          </Text>
         ) : null}
       </View>
 
-      <View className="gap-3 px-5">
-        {shuffledOptions.map((option, index) => (
-          <Pressable
-            // Key/testID use a positional index so apostrophes/spaces in
-            // capital names (e.g. "N'Djamena", "St. John's") don't break
-            // Detox selectors or React reconciliation.
-            key={`${index}-${option}`}
-            onPress={() => handleAnswer(option)}
-            disabled={answerState !== 'unanswered'}
-            className={`min-h-[64px] items-center justify-center rounded-card px-5 py-4 ${getOptionContainerClass(
-              option
-            )}`}
-            accessibilityRole="button"
-            accessibilityLabel={option}
-            accessibilityState={{
-              selected: option === selectedAnswer,
-              disabled: answerState !== 'unanswered',
-            }}
-            testID={`quiz-option-${index}`}
-          >
-            <Text
-              className={`text-body font-semibold ${getOptionTextClass(
+      {question.type !== 'guess_who' ? (
+        <View className="gap-3 px-5">
+          {shuffledOptions.map((option, index) => (
+            <Pressable
+              key={`${index}-${option}`}
+              onPress={() => handleAnswer(option)}
+              disabled={answerState !== 'unanswered'}
+              className={`min-h-[64px] items-center justify-center rounded-card px-5 py-4 ${getOptionContainerClass(
                 option
               )}`}
+              accessibilityRole="button"
+              accessibilityLabel={option}
+              accessibilityState={{
+                selected: option === selectedAnswer,
+                disabled: answerState !== 'unanswered',
+              }}
+              testID={`quiz-option-${index}`}
             >
-              {option}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
+              <Text
+                className={`text-body font-semibold ${getOptionTextClass(
+                  option
+                )}`}
+              >
+                {option}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : answerState === 'unanswered' ? (
+        <View className="px-5">
+          <GuessWhoQuestion
+            question={question}
+            onResolved={(result: GuessWhoResolvedResult) => {
+              const timeMs = Date.now() - questionStartTimeRef.current;
+              resultsRef.current = [
+                ...resultsRef.current,
+                {
+                  questionIndex: currentIndex,
+                  correct: result.correct,
+                  answerGiven: result.answerGiven,
+                  timeMs,
+                  cluesUsed: result.cluesUsed,
+                  answerMode: result.answerMode,
+                },
+              ];
+              setGuessWhoCluesUsed(result.cluesUsed);
+              setSelectedAnswer(result.answerGiven);
+              setAnswerState(result.correct ? 'correct' : 'wrong');
+              setShowContinueHint(false);
+              continueEnabledAtRef.current = Date.now() + 250;
+              if (continueHintTimerRef.current) {
+                clearTimeout(continueHintTimerRef.current);
+              }
+              continueHintTimerRef.current = setTimeout(() => {
+                setShowContinueHint(true);
+              }, 4000);
+              void Haptics.notificationAsync(
+                result.correct
+                  ? Haptics.NotificationFeedbackType.Success
+                  : Haptics.NotificationFeedbackType.Error
+              );
+            }}
+          />
+        </View>
+      ) : null}
 
       {answerState !== 'unanswered' ? (
         <View className="mt-6 px-5">
+          {question.type === 'guess_who' ? (
+            <View className="mb-3">
+              {answerState === 'correct' ? (
+                <Text className="text-center text-body-lg font-semibold text-success">
+                  You got it in {guessWhoCluesUsed} clue
+                  {guessWhoCluesUsed !== 1 ? 's' : ''}!
+                </Text>
+              ) : (
+                <Text className="text-center text-body-lg text-text-primary">
+                  The answer was: {question.canonicalName}
+                </Text>
+              )}
+            </View>
+          ) : null}
           {currentQuestion.funFact ? (
             <View className="rounded-card bg-surface p-4">
               <Text className="text-body-sm text-text-secondary">

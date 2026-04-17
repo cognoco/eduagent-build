@@ -116,6 +116,11 @@ export default function QuizResultsScreen(): React.ReactElement {
       <Text className="mt-6 text-display font-bold text-text-primary">
         {score}/{total}
       </Text>
+      {activityType === 'guess_who' ? (
+        <Text className="mt-1 text-body-sm text-text-secondary">
+          {score} of {total} people identified
+        </Text>
+      ) : null}
 
       {round?.theme ? (
         <Text className="mt-2 text-center text-body text-text-secondary">

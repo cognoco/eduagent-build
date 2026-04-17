@@ -4,6 +4,7 @@ import type {
   QuestionResult,
   QuizQuestion,
 } from '@eduagent/schemas';
+import { isGuessWhoFuzzyMatch } from '@eduagent/schemas';
 import { ConflictError, NotFoundError } from '../../errors';
 import { reviewVocabulary } from '../vocabulary';
 import { QUIZ_CONFIG } from './config';
@@ -30,6 +31,13 @@ export function isAnswerCorrect(
   if (question.type === 'vocabulary') {
     return question.acceptedAnswers.some(
       (answer) => answer.trim().toLowerCase() === normalized
+    );
+  }
+  if (question.type === 'guess_who') {
+    return isGuessWhoFuzzyMatch(
+      answerGiven,
+      question.canonicalName,
+      question.acceptedAliases
     );
   }
   return false;
@@ -63,6 +71,10 @@ export function buildMissedItemText(question: QuizQuestion): string {
   if (question.type === 'vocabulary') {
     return `Translate: ${question.term}`;
   }
+  if (question.type === 'guess_who') {
+    const easiestClue = question.clues[question.clues.length - 1];
+    return `Who is this person? ${easiestClue}`;
+  }
   return '';
 }
 
@@ -74,7 +86,11 @@ export function calculateScore(results: QuestionResult[]): number {
   return results.filter((result) => result.correct).length;
 }
 
-export function calculateXp(results: QuestionResult[], total: number): number {
+export function calculateXp(
+  results: QuestionResult[],
+  total: number,
+  activityType?: string
+): number {
   const correctResults = results.filter((result) => result.correct);
   const baseXp = correctResults.length * QUIZ_CONFIG.xp.perCorrect;
   const timerBonus =
@@ -84,7 +100,34 @@ export function calculateXp(results: QuestionResult[], total: number): number {
   const perfectBonus =
     correctResults.length === total ? QUIZ_CONFIG.xp.perfectBonus : 0;
 
-  return baseXp + timerBonus + perfectBonus;
+  let guessWhoClueBonus = 0;
+  if (activityType === 'guess_who') {
+    guessWhoClueBonus = correctResults
+      .filter((r) => r.answerMode === 'free_text' && r.cluesUsed != null)
+      .reduce(
+        (sum, r) => sum + (5 - r.cluesUsed!) * QUIZ_CONFIG.xp.guessWhoClueBonus,
+        0
+      );
+  }
+
+  return baseXp + timerBonus + perfectBonus + guessWhoClueBonus;
+}
+
+/**
+ * SM-2 quality mapping for Guess Who mastery questions.
+ * Dormant in Phase 3 (no mastery items). Written now so Phase 4+
+ * can enable mastery without touching the scoring layer.
+ */
+export function getGuessWhoSm2Quality(
+  correct: boolean,
+  cluesUsed: number,
+  answerMode: 'free_text' | 'multiple_choice'
+): number {
+  if (!correct) return 1;
+  if (answerMode === 'multiple_choice') return 2;
+  if (cluesUsed <= 2) return 5;
+  if (cluesUsed <= 4) return 3;
+  return 2;
 }
 
 export function getCelebrationTier(
@@ -139,7 +182,7 @@ export async function completeQuizRound(
     const validatedResults = validateResults(questions, results);
     const droppedResults = results.length - validatedResults.length;
     const score = calculateScore(validatedResults);
-    const xpEarned = calculateXp(validatedResults, total);
+    const xpEarned = calculateXp(validatedResults, total, round.activityType);
     const celebrationTier = getCelebrationTier(score, total);
 
     // Build missed items from discovery (non-library) questions only.

@@ -3,6 +3,8 @@ import {
   type CefrLevel,
   computeAgeBracket,
   type CapitalsQuestion,
+  guessWhoLlmOutputSchema,
+  type GuessWhoQuestion,
   type QuizQuestion,
   type QuizActivityType,
   vocabularyLlmOutputSchema,
@@ -22,6 +24,11 @@ import {
   buildVocabularyPrompt,
   validateVocabularyRound,
 } from './vocabulary-provider';
+import {
+  buildGuessWhoDiscoveryQuestions,
+  buildGuessWhoPrompt,
+  validateGuessWhoRound,
+} from './guess-who-provider';
 
 interface CapitalsPromptParams {
   discoveryCount: number;
@@ -154,6 +161,18 @@ export function buildVocabularyDiscoveryQuestions(validated: {
   }));
 }
 
+export function buildGuessWhoQuestions(validated: {
+  questions: Array<{
+    canonicalName: string;
+    acceptedAliases: string[];
+    clues: string[];
+    mcFallbackOptions: string[];
+    funFact: string;
+  }>;
+}): GuessWhoQuestion[] {
+  return buildGuessWhoDiscoveryQuestions(validated);
+}
+
 export interface AssembledRound {
   theme: string;
   questions: QuizQuestion[];
@@ -234,6 +253,7 @@ interface GenerateParams {
   languageCode?: string;
   cefrCeiling?: CefrLevel;
   allVocabulary?: Array<{ term: string; translation: string }>;
+  topicTitles?: string[];
 }
 
 export async function generateQuizRound(params: GenerateParams): Promise<{
@@ -253,6 +273,7 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
     languageCode,
     cefrCeiling,
     allVocabulary,
+    topicTitles,
   } = params;
 
   const plan = resolveRoundContent({
@@ -392,6 +413,55 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
     });
 
     questions = injectAtRandomPositions(discoveryQuestions, masteryQuestions);
+    theme = validated.theme;
+  } else if (activityType === 'guess_who') {
+    const prompt = buildGuessWhoPrompt({
+      discoveryCount: plan.discoveryCount,
+      ageBracket,
+      recentAnswers,
+      topicTitles,
+      themePreference,
+    });
+
+    const messages: ChatMessage[] = [
+      { role: 'system', content: prompt },
+      { role: 'user', content: 'Generate the quiz round.' },
+    ];
+
+    const llmResult = await routeAndCall(messages, 1, {
+      ageBracket,
+    });
+
+    const raw = llmResult.response.slice(0, 64 * 1024);
+
+    let llmOutput;
+    try {
+      llmOutput = guessWhoLlmOutputSchema.parse(
+        JSON.parse(extractJsonObject(raw))
+      );
+    } catch (parseErr) {
+      captureException(
+        parseErr instanceof Error
+          ? parseErr
+          : new Error('Quiz LLM parse failed'),
+        {
+          userId: undefined,
+          profileId,
+          requestPath: 'services/quiz/generate-round',
+          extra: { activityType },
+        }
+      );
+      throw new UpstreamLlmError('Quiz LLM returned invalid structured output');
+    }
+
+    const validated = validateGuessWhoRound(llmOutput);
+    if (validated.questions.length === 0) {
+      throw new UpstreamLlmError('No valid questions after validation');
+    }
+
+    questions = buildGuessWhoQuestions({
+      questions: validated.questions.slice(0, plan.discoveryCount),
+    });
     theme = validated.theme;
   } else {
     // Exhaustive check — TypeScript narrows to `never` here. If a new
