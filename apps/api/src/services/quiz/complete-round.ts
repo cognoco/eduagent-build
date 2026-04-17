@@ -1,9 +1,4 @@
-import { eq } from 'drizzle-orm';
-import {
-  createScopedRepository,
-  quizRounds,
-  type Database,
-} from '@eduagent/database';
+import { createScopedRepository, type Database } from '@eduagent/database';
 import type {
   CompleteRoundResponse,
   QuestionResult,
@@ -130,7 +125,7 @@ export async function completeQuizRound(
     // directly extend Database — see feedback_drizzle_transaction_cast.md.
     const txRepo = createScopedRepository(tx as unknown as Database, profileId);
 
-    const round = await txRepo.quizRounds.findFirst(eq(quizRounds.id, roundId));
+    const round = await txRepo.quizRounds.findById(roundId);
 
     if (!round) {
       throw new NotFoundError('Round');
@@ -142,6 +137,7 @@ export async function completeQuizRound(
     const questions = round.questions as QuizQuestion[];
     const total = round.total;
     const validatedResults = validateResults(questions, results);
+    const droppedResults = results.length - validatedResults.length;
     const score = calculateScore(validatedResults);
     const xpEarned = calculateXp(validatedResults, total);
     const celebrationTier = getCelebrationTier(score, total);
@@ -219,6 +215,7 @@ export async function completeQuizRound(
       total,
       xpEarned,
       celebrationTier,
+      droppedResults,
     };
   });
 }

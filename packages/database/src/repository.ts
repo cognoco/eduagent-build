@@ -361,6 +361,12 @@ export function createScopedRepository(db: Database, profileId: string) {
           where: scopedWhere(quizRounds, extraWhere),
         });
       },
+      /** Look up a single round by id (scoped to the current profile). */
+      async findById(roundId: string) {
+        return db.query.quizRounds.findFirst({
+          where: scopedWhere(quizRounds, eq(quizRounds.id, roundId)),
+        });
+      },
       async findRecentByActivity(
         activityType: (typeof quizRounds.$inferSelect)['activityType'],
         limit: number
@@ -407,6 +413,11 @@ export function createScopedRepository(db: Database, profileId: string) {
        * Two queries total (one GROUP BY + one DISTINCT ON per activity via
        * a correlated subquery). Bounded by the number of activity types,
        * not by the number of rounds.
+       *
+       * TODO(quiz-phase-3): The 1+N pattern (one aggregate + one best-round
+       * lookup per activity type) is acceptable at Phase 1 (N=1) but should
+       * be collapsed into a single query with a window function before
+       * Phase 3 adds a third activity type.
        */
       async aggregateCompletedStats() {
         // Aggregate cheap fields per activity.

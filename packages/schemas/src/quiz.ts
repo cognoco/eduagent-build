@@ -84,6 +84,7 @@ export const completeRoundResponseSchema = z.object({
   total: z.number().int().positive(),
   xpEarned: z.number().int().nonnegative(),
   celebrationTier: z.enum(['perfect', 'great', 'nice']),
+  droppedResults: z.number().int().nonnegative().default(0),
 });
 export type CompleteRoundResponse = z.infer<typeof completeRoundResponseSchema>;
 

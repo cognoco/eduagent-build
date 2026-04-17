@@ -63,6 +63,19 @@ export class UpstreamLlmError extends Error {
   }
 }
 
+/**
+ * Typed domain error for invalid vocabulary round context. Thrown when the
+ * caller provides a missing or invalid subjectId, or the subject is not a
+ * language subject. The route layer catches this to return a 400 instead of
+ * letting it bubble as a 500.
+ */
+export class VocabularyContextError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'VocabularyContextError';
+  }
+}
+
 export function apiError(
   c: Context,
   status: 400 | 401 | 403 | 404 | 409 | 410 | 422 | 429 | 500 | 501 | 502 | 503,

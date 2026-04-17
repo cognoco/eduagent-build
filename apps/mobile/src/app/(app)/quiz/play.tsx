@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
@@ -380,7 +380,8 @@ export default function QuizPlayScreen(): React.ReactElement {
       ) : null}
 
       {completeRound.isPending ? (
-        <View className="mt-6 px-5">
+        <View className="mt-6 items-center gap-2 px-5">
+          <ActivityIndicator size="small" color={colors.primary} />
           <Text className="text-center text-body-sm text-text-secondary">
             Scoring your round...
           </Text>

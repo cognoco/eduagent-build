@@ -4,6 +4,7 @@ import { routeAndCall } from '../llm';
 import type { ChatMessage } from '../llm';
 import { UpstreamLlmError } from '../../errors';
 import { captureException } from '../sentry';
+import { extractJsonObject } from '../quiz';
 
 // ---------------------------------------------------------------------------
 // Generate Dictation Service
@@ -103,8 +104,10 @@ export async function generateDictation(
 
   const result = await routeAndCall(messages, 1);
 
-  const jsonMatch = result.response.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) {
+  let jsonStr: string;
+  try {
+    jsonStr = extractJsonObject(result.response);
+  } catch {
     const err = new UpstreamLlmError(
       'LLM returned no JSON in generate-dictation response'
     );
@@ -113,7 +116,7 @@ export async function generateDictation(
   }
 
   try {
-    const parsed = JSON.parse(jsonMatch[0]);
+    const parsed = JSON.parse(jsonStr);
     return generateDictationOutputSchema.parse(parsed);
   } catch (parseErr) {
     captureException(

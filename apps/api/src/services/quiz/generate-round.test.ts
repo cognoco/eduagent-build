@@ -4,6 +4,7 @@ import {
   assembleRound,
   buildVocabularyDiscoveryQuestions,
   buildCapitalsPrompt,
+  extractJsonObject,
   injectAtRandomPositions,
   injectMasteryQuestions,
 } from './generate-round';
@@ -124,6 +125,54 @@ describe('buildVocabularyDiscoveryQuestions', () => {
         isLibraryItem: false,
       },
     ]);
+  });
+});
+
+describe('extractJsonObject', () => {
+  it('extracts from a clean JSON string', () => {
+    const result = extractJsonObject('{"theme":"Test","questions":[]}');
+    expect(JSON.parse(result)).toEqual({ theme: 'Test', questions: [] });
+  });
+
+  it('extracts from a code-fenced response', () => {
+    const input = '```json\n{"theme":"Fenced","questions":[]}\n```';
+    expect(JSON.parse(extractJsonObject(input))).toEqual({
+      theme: 'Fenced',
+      questions: [],
+    });
+  });
+
+  it('handles trailing prose after the closing brace', () => {
+    const input =
+      '```json\n{"theme":"Test","questions":[]}\n```\nHere is your quiz!';
+    expect(JSON.parse(extractJsonObject(input))).toEqual({
+      theme: 'Test',
+      questions: [],
+    });
+  });
+
+  it('handles preamble prose before the JSON object', () => {
+    const input = 'Sure, here is your quiz:\n{"a":1,"b":2}';
+    expect(JSON.parse(extractJsonObject(input))).toEqual({ a: 1, b: 2 });
+  });
+
+  it('takes the first fence block when multiple fences exist', () => {
+    const input =
+      '```json\n{"first":true}\n```\nNotes:\n```json\n{"second":true}\n```';
+    expect(JSON.parse(extractJsonObject(input))).toEqual({ first: true });
+  });
+
+  it('handles nested braces in strings', () => {
+    const input = '{"funFact":"The city has {many} parks"}';
+    expect(JSON.parse(extractJsonObject(input))).toEqual({
+      funFact: 'The city has {many} parks',
+    });
+  });
+
+  it('throws UpstreamLlmError when no JSON object is found', () => {
+    expect(() => extractJsonObject('No JSON here')).toThrow(
+      'Quiz LLM returned no JSON object'
+    );
   });
 });
 

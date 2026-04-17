@@ -1,14 +1,13 @@
 import { eq, inArray } from 'drizzle-orm';
 import {
   createScopedRepository,
-  quizRounds,
   subjects,
   vocabulary,
   vocabularyRetentionCards,
   type Database,
 } from '@eduagent/database';
 import { languageCodeSchema, type QuizActivityType } from '@eduagent/schemas';
-import { NotFoundError } from '../../errors';
+import { NotFoundError, VocabularyContextError } from '../../errors';
 import { QUIZ_CONFIG } from './config';
 import type { LibraryItem } from './content-resolver';
 import {
@@ -88,7 +87,7 @@ export async function getRoundById(
   roundId: string
 ) {
   const repo = createScopedRepository(db, profileId);
-  return repo.quizRounds.findFirst(eq(quizRounds.id, roundId));
+  return repo.quizRounds.findById(roundId);
 }
 
 /**
@@ -139,15 +138,15 @@ export async function getVocabularyRoundContext(
     throw new NotFoundError('Subject');
   }
   if (subject.status !== 'active') {
-    throw new Error('Subject is not active');
+    throw new VocabularyContextError('Subject is not active');
   }
   if (!subject.languageCode) {
-    throw new Error('Subject is not a language subject');
+    throw new VocabularyContextError('Subject is not a language subject');
   }
 
   const parsedLanguageCode = languageCodeSchema.safeParse(subject.languageCode);
   if (!parsedLanguageCode.success) {
-    throw new Error('Subject has invalid languageCode');
+    throw new VocabularyContextError('Subject has invalid languageCode');
   }
 
   const allVocabularyRows = await repo.vocabulary.findMany(

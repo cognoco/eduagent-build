@@ -10,7 +10,7 @@ import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import type { ProfileMeta } from '../middleware/profile-scope';
 import { requireProfileId } from '../middleware/profile-scope';
-import { validationError } from '../errors';
+import { validationError, VocabularyContextError } from '../errors';
 import {
   completeQuizRound,
   getVocabularyRoundContext,
@@ -65,7 +65,9 @@ async function buildAndGenerateRound(
 
   if (input.activityType === 'vocabulary') {
     if (!input.subjectId) {
-      throw new Error('subjectId is required for vocabulary rounds');
+      throw new VocabularyContextError(
+        'subjectId is required for vocabulary rounds'
+      );
     }
 
     const context = await getVocabularyRoundContext(
@@ -93,111 +95,70 @@ async function buildAndGenerateRound(
   });
 }
 
-function isVocabularyContextValidationError(error: unknown): boolean {
-  return (
-    error instanceof Error &&
-    [
-      'subjectId is required for vocabulary rounds',
-      'Subject is not active',
-      'Subject is not a language subject',
-      'Subject has invalid languageCode',
-    ].includes(error.message)
-  );
+/**
+ * Shared parsing + round generation used by both /quiz/rounds and
+ * /quiz/rounds/prefetch. Returns the parsed input and generated round, or
+ * an early validation-error Response if the request is malformed.
+ */
+async function parseAndGenerate(c: import('hono').Context<QuizRouteEnv>) {
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    return { error: validationError(c, 'Request body must be valid JSON') };
+  }
+
+  const parsed = generateRoundInputSchema.safeParse(body);
+  if (!parsed.success) {
+    return {
+      error: validationError(
+        c,
+        `Invalid input: ${parsed.error.issues[0]?.message ?? 'unknown'}`
+      ),
+    };
+  }
+
+  const profileId = requireProfileId(c.get('profileId'));
+  const db = c.get('db');
+  const profileMeta = c.get('profileMeta');
+
+  try {
+    const round = await buildAndGenerateRound(
+      db,
+      profileId,
+      profileMeta,
+      parsed.data
+    );
+    return { round, input: parsed.data };
+  } catch (error) {
+    if (error instanceof VocabularyContextError) {
+      return { error: validationError(c, error.message) };
+    }
+    throw error;
+  }
 }
 
 export const quizRoutes = new Hono<QuizRouteEnv>()
   .post('/quiz/rounds', async (c) => {
-    const profileId = requireProfileId(c.get('profileId'));
-    const db = c.get('db');
-    const profileMeta = c.get('profileMeta');
-
-    let body: unknown;
-    try {
-      body = await c.req.json();
-    } catch {
-      return validationError(c, 'Request body must be valid JSON');
-    }
-
-    const parsed = generateRoundInputSchema.safeParse(body);
-    if (!parsed.success) {
-      return validationError(
-        c,
-        `Invalid input: ${parsed.error.issues[0]?.message ?? 'unknown'}`
-      );
-    }
-
-    let round;
-    try {
-      round = await buildAndGenerateRound(
-        db,
-        profileId,
-        profileMeta,
-        parsed.data
-      );
-    } catch (error) {
-      if (isVocabularyContextValidationError(error)) {
-        return validationError(
-          c,
-          error instanceof Error
-            ? error.message
-            : 'Invalid vocabulary round context'
-        );
-      }
-      throw error;
-    }
+    const result = await parseAndGenerate(c);
+    if ('error' in result) return result.error;
 
     return c.json(
       {
-        id: round.id,
-        activityType: parsed.data.activityType,
-        theme: round.theme,
-        questions: round.questions,
-        total: round.total,
+        id: result.round.id,
+        activityType: result.input.activityType,
+        theme: result.round.theme,
+        questions: result.round.questions,
+        total: result.round.total,
       },
       200
     );
   })
   .post('/quiz/rounds/prefetch', async (c) => {
-    const profileId = requireProfileId(c.get('profileId'));
-    const db = c.get('db');
-    const profileMeta = c.get('profileMeta');
+    const result = await parseAndGenerate(c);
+    if ('error' in result) return result.error;
 
-    let body: unknown;
-    try {
-      body = await c.req.json();
-    } catch {
-      return validationError(c, 'Request body must be valid JSON');
-    }
-
-    const parsed = generateRoundInputSchema.safeParse(body);
-    if (!parsed.success) {
-      return validationError(
-        c,
-        `Invalid input: ${parsed.error.issues[0]?.message ?? 'unknown'}`
-      );
-    }
-
-    let round;
-    try {
-      round = await buildAndGenerateRound(
-        db,
-        profileId,
-        profileMeta,
-        parsed.data
-      );
-    } catch (error) {
-      if (isVocabularyContextValidationError(error)) {
-        return validationError(
-          c,
-          error instanceof Error
-            ? error.message
-            : 'Invalid vocabulary round context'
-        );
-      }
-      throw error;
-    }
-
-    return c.json({ id: round.id }, 200);
+    return c.json({ id: result.round.id }, 200);
   })
   .get('/quiz/rounds/recent', async (c) => {
     const profileId = requireProfileId(c.get('profileId'));
