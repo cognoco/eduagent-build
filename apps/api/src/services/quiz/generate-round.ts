@@ -4,7 +4,6 @@ import {
   computeAgeBracket,
   type CapitalsQuestion,
   guessWhoLlmOutputSchema,
-  type GuessWhoQuestion,
   type QuizQuestion,
   type QuizActivityType,
   vocabularyLlmOutputSchema,
@@ -29,25 +28,13 @@ import {
   buildGuessWhoPrompt,
   validateGuessWhoRound,
 } from './guess-who-provider';
+import { describeAgeBracket, type AgeBracket } from './config';
 
 interface CapitalsPromptParams {
   discoveryCount: number;
-  ageBracket: 'child' | 'adolescent' | 'adult';
+  ageBracket: AgeBracket;
   recentAnswers: string[];
   themePreference?: string;
-}
-
-function describeAgeBracket(
-  ageBracket: CapitalsPromptParams['ageBracket']
-): string {
-  switch (ageBracket) {
-    case 'child':
-      return '6-9';
-    case 'adolescent':
-      return '10-13';
-    default:
-      return '14+';
-  }
 }
 
 export function buildCapitalsPrompt(params: CapitalsPromptParams): string {
@@ -159,18 +146,6 @@ export function buildVocabularyDiscoveryQuestions(validated: {
     cefrLevel: question.cefrLevel,
     isLibraryItem: false,
   }));
-}
-
-export function buildGuessWhoQuestions(validated: {
-  questions: Array<{
-    canonicalName: string;
-    acceptedAliases: string[];
-    clues: string[];
-    mcFallbackOptions: string[];
-    funFact: string;
-  }>;
-}): GuessWhoQuestion[] {
-  return buildGuessWhoDiscoveryQuestions(validated);
 }
 
 export interface AssembledRound {
@@ -459,7 +434,7 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
       throw new UpstreamLlmError('No valid questions after validation');
     }
 
-    questions = buildGuessWhoQuestions({
+    questions = buildGuessWhoDiscoveryQuestions({
       questions: validated.questions.slice(0, plan.discoveryCount),
     });
     theme = validated.theme;

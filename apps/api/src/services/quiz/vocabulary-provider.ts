@@ -6,6 +6,7 @@ import {
 } from '@eduagent/schemas';
 import { createLogger } from '../logger';
 import type { LibraryItem } from './content-resolver';
+import { describeAgeBracket, type AgeBracket } from './config';
 import { shuffle } from './shuffle';
 
 const logger = createLogger();
@@ -14,7 +15,7 @@ export const CEFR_ORDER = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'] as const;
 
 export interface VocabularyPromptParams {
   discoveryCount: number;
-  ageBracket: 'child' | 'adolescent' | 'adult';
+  ageBracket: AgeBracket;
   recentAnswers: string[];
   bankEntries?: Array<{ term: string; translation: string }>;
   languageCode: string;
@@ -47,19 +48,6 @@ export type VocabularyMasteryQuestionResult =
       reason: 'insufficient_distractors';
       distractorsFound: number;
     };
-
-function describeAgeBracket(
-  ageBracket: VocabularyPromptParams['ageBracket']
-): string {
-  switch (ageBracket) {
-    case 'child':
-      return '6-9';
-    case 'adolescent':
-      return '10-13';
-    default:
-      return '14+';
-  }
-}
 
 function tryNormalizeCefrLevel(
   level: string | null | undefined

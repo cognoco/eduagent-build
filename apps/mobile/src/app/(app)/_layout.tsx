@@ -38,6 +38,7 @@ const FULL_SCREEN_ROUTES = new Set([
   'session',
   'homework',
   'dictation',
+  'quiz',
   'shelf',
   'shelf/[subjectId]',
   'shelf/[subjectId]/book/[bookId]',

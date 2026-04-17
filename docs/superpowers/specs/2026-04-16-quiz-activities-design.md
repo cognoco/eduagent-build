@@ -69,7 +69,7 @@ const maxDistance = Math.max(1, Math.floor(name.length / 4));
 
 | Name length | Max Levenshtein distance | Example |
 |---|---|---|
-| 4 ("Bach") | 1 | "Bahc" OK, "Bash" rejected |
+| 4 ("Bach") | 1 | "Bash" OK (distance 1), "Bahc" rejected (distance 2) |
 | 6 ("Newton") | 1 | "Newten" OK |
 | 8 ("Einstein") | 2 | "Einstien" OK |
 | 11 ("Tchaikovsky") | 2 | "Tchaikovski" OK |
@@ -413,7 +413,8 @@ Rules:
 base_xp = correct_count x 10
 timer_bonus = fast_answers x 2            (answered under 5s)
 perfect_bonus = (score === total) ? 25 : 0
-guess_who_clue_bonus = sum of (5 - clues_used) x 3 per question
+guess_who_clue_bonus = sum of (5 - clues_used) x 3 per correct free-text answer
+                       (MC answers earn zero clue bonus — incentivizes typing)
 
 total_xp = base_xp + timer_bonus + perfect_bonus + guess_who_clue_bonus
 ```

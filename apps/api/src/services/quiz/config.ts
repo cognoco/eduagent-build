@@ -32,3 +32,16 @@ export const QUIZ_CONFIG = {
 } as const;
 
 export type QuizActivityConfig = typeof QUIZ_CONFIG;
+
+export type AgeBracket = 'child' | 'adolescent' | 'adult';
+
+export function describeAgeBracket(ageBracket: AgeBracket): string {
+  switch (ageBracket) {
+    case 'child':
+      return '6-9';
+    case 'adolescent':
+      return '10-13';
+    default:
+      return '14+';
+  }
+}

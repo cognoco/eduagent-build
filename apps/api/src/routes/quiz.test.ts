@@ -427,6 +427,125 @@ describe('Quiz routes', () => {
     });
   });
 
+  describe('POST /v1/quiz/rounds/prefetch', () => {
+    it('returns only the round id on success', async () => {
+      const res = await app.request(
+        '/v1/quiz/rounds/prefetch',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ activityType: 'capitals' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.id).toBeDefined();
+      // prefetch must NOT leak questions/theme to the response
+      expect(body.questions).toBeUndefined();
+      expect(body.theme).toBeUndefined();
+    });
+
+    it('returns 400 for an invalid activity type', async () => {
+      const res = await app.request(
+        '/v1/quiz/rounds/prefetch',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ activityType: 'bogus' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(400);
+    });
+  });
+
+  describe('POST /v1/quiz/rounds (guess_who)', () => {
+    it('generates a guess_who round with topic titles', async () => {
+      // Mock the select().from().innerJoin()... chain used by getGuessWhoRoundContext
+      const chainResult = [
+        { title: 'Albert Einstein' },
+        { title: 'Marie Curie' },
+        { title: 'Isaac Newton' },
+      ];
+      const limitFn = jest.fn().mockResolvedValue(chainResult);
+      const orderByFn = jest.fn().mockReturnValue({ limit: limitFn });
+      const whereFn = jest.fn().mockReturnValue({ orderBy: orderByFn });
+      const innerJoinFn2 = jest.fn().mockReturnValue({ where: whereFn });
+      const innerJoinFn1 = jest
+        .fn()
+        .mockReturnValue({ innerJoin: innerJoinFn2 });
+      const fromFn = jest.fn().mockReturnValue({ innerJoin: innerJoinFn1 });
+      (mockDb as any).select = jest.fn().mockReturnValue({ from: fromFn });
+
+      (routeAndCall as jest.Mock).mockResolvedValueOnce({
+        response: JSON.stringify({
+          theme: 'Famous Scientists',
+          questions: [
+            {
+              canonicalName: 'Albert Einstein',
+              acceptedAliases: ['Einstein'],
+              clues: [
+                'Born in Germany in 1879.',
+                'Developed the theory of relativity.',
+                'Won the Nobel Prize in Physics in 1921.',
+                'Famous equation: E=mc².',
+                'Worked at the Institute for Advanced Study.',
+              ],
+              mcFallbackOptions: [
+                'Albert Einstein',
+                'Isaac Newton',
+                'Niels Bohr',
+                'Marie Curie',
+              ],
+              funFact: 'He played the violin.',
+            },
+            {
+              canonicalName: 'Marie Curie',
+              acceptedAliases: ['Curie', 'Maria Sklodowska'],
+              clues: [
+                'Born in Poland in 1867.',
+                'Pioneered research on radioactivity.',
+                'First woman to win a Nobel Prize.',
+                'Won Nobel Prizes in both Physics and Chemistry.',
+                'Discovered polonium and radium.',
+              ],
+              mcFallbackOptions: [
+                'Marie Curie',
+                'Rosalind Franklin',
+                'Ada Lovelace',
+                'Dorothy Hodgkin',
+              ],
+              funFact: 'She carried test tubes in her pockets.',
+            },
+          ],
+        }),
+        provider: 'mock',
+        model: 'mock',
+        latencyMs: 50,
+      });
+
+      const res = await app.request(
+        '/v1/quiz/rounds',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ activityType: 'guess_who' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.activityType).toBe('guess_who');
+      expect(body.questions[0].type).toBe('guess_who');
+      expect(body.questions[0].clues).toHaveLength(5);
+      expect(body.questions[0].mcFallbackOptions).toBeDefined();
+    });
+  });
+
   describe('GET /v1/quiz/rounds/:id', () => {
     it('returns 404 for a round not owned by the caller (IDOR break-test)', async () => {
       // Scoped-repo findFirst returns undefined because profile_id predicate

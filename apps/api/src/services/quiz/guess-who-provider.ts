@@ -1,8 +1,9 @@
 import type { GuessWhoLlmOutput, GuessWhoQuestion } from '@eduagent/schemas';
+import { describeAgeBracket, type AgeBracket } from './config';
 
 export interface GuessWhoPromptParams {
   discoveryCount: number;
-  ageBracket: 'child' | 'adolescent' | 'adult';
+  ageBracket: AgeBracket;
   recentAnswers: string[];
   topicTitles?: string[];
   themePreference?: string;
@@ -19,19 +20,6 @@ export interface ValidatedGuessWhoQuestion {
 export interface ValidatedGuessWhoRound {
   theme: string;
   questions: ValidatedGuessWhoQuestion[];
-}
-
-function describeAgeBracket(
-  ageBracket: GuessWhoPromptParams['ageBracket']
-): string {
-  switch (ageBracket) {
-    case 'child':
-      return '6-9';
-    case 'adolescent':
-      return '10-13';
-    default:
-      return '14+';
-  }
 }
 
 function dedupeCaseInsensitive(values: string[]): string[] {

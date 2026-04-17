@@ -105,7 +105,7 @@ export function GuessWhoQuestion({
     Keyboard.dismiss();
 
     if (isFinalClue) {
-      resolveFreeText(false, '');
+      resolveFreeText(false, '[skipped]');
       return;
     }
 
