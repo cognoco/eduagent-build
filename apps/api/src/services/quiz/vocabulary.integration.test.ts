@@ -169,10 +169,21 @@ async function seedVocabularyBank(profileId: string, subjectId: string) {
 }
 
 beforeEach(async () => {
-  // Only fake Date — leave setTimeout/setInterval real so the Neon HTTP
-  // driver's internal timeouts still fire in CI's PostgreSQL container.
+  // Only fake Date (for SM-2 calculations) — keep all timer/microtask
+  // functions real so the Neon HTTP driver doesn't hang in CI.
   jest
-    .useFakeTimers({ doNotFake: ['setTimeout', 'setInterval', 'setImmediate'] })
+    .useFakeTimers({
+      doNotFake: [
+        'setTimeout',
+        'clearTimeout',
+        'setInterval',
+        'clearInterval',
+        'setImmediate',
+        'clearImmediate',
+        'queueMicrotask',
+        'performance',
+      ],
+    })
     .setSystemTime(new Date('2026-04-17T12:00:00.000Z'));
   await cleanupTestAccounts();
 });
