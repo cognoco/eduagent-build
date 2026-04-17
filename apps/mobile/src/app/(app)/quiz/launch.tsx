@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -21,16 +21,19 @@ export default function QuizLaunchScreen(): React.ReactElement {
   const { activityType, setRound } = useQuizFlow();
   const generateRound = useGenerateRound();
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
+  // [ASSUMP-F4] Surface a "still trying" hint after 20s so users on slow
+  // networks know the app isn't frozen and can fall back to the explicit
+  // Cancel button. Prevents the "infinite spinner" dead-end that the UX
+  // audit flagged as the #1 source of kid abandonment.
+  const [timedOut, setTimedOut] = useState(false);
   const startedRef = useRef(false);
 
-  useEffect(() => {
-    if (!activityType) {
-      router.replace('/(app)/quiz' as never);
-      return;
-    }
-    if (startedRef.current) return;
-    startedRef.current = true;
-
+  // [ASSUMP-F1] Single entry point so retry gets the same onSuccess handler
+  // as the initial mutation. Previously retry called `generateRound.mutate()`
+  // with no callbacks, so on retry success nothing navigated and the user
+  // was stuck on the loading spinner.
+  const startRound = useCallback(() => {
+    if (!activityType) return;
     generateRound.mutate(
       { activityType },
       {
@@ -43,6 +46,16 @@ export default function QuizLaunchScreen(): React.ReactElement {
   }, [activityType, generateRound, router, setRound]);
 
   useEffect(() => {
+    if (!activityType) {
+      router.replace('/(app)/quiz' as never);
+      return;
+    }
+    if (startedRef.current) return;
+    startedRef.current = true;
+    startRound();
+  }, [activityType, router, startRound]);
+
+  useEffect(() => {
     const interval = setInterval(() => {
       setLoadingMessageIndex(
         (current) => (current + 1) % LOADING_MESSAGES.length
@@ -52,11 +65,40 @@ export default function QuizLaunchScreen(): React.ReactElement {
     return () => clearInterval(interval);
   }, []);
 
+  // [ASSUMP-F4] After 20s of loading, show a "taking longer than usual"
+  // nudge alongside the Cancel button so users don't assume the app hung.
+  useEffect(() => {
+    if (!generateRound.isPending) {
+      setTimedOut(false);
+      return;
+    }
+    const timer = setTimeout(() => setTimedOut(true), 20000);
+    return () => clearTimeout(timer);
+  }, [generateRound.isPending]);
+
   if (!activityType) {
     return <View className="flex-1 bg-background" />;
   }
 
   if (generateRound.isError) {
+    // [ASSUMP-F3] Prefer the server-extracted error message (quota reached,
+    // consent required, forbidden) over a generic fallback. Our apiClient's
+    // assertOk parses the JSON body and throws an Error whose `.message`
+    // already carries the server's human message. Never replace that with
+    // "check your connection" — the CLAUDE.md rule is explicit about this.
+    const errorMessage =
+      generateRound.error instanceof Error && generateRound.error.message
+        ? generateRound.error.message
+        : 'Try again, or head back and pick a different activity.';
+
+    // [ASSUMP-F3] Hide the Retry button when retrying can't possibly help
+    // (quota exhausted, consent required). We detect these by inspecting the
+    // error message for known code strings — the apiClient prefixes messages
+    // with the server code tag so string matching is safe here.
+    const isUnretryable = /QUOTA_EXCEEDED|CONSENT_|FORBIDDEN/i.test(
+      errorMessage
+    );
+
     return (
       <View
         className="flex-1 items-center justify-center bg-background px-6"
@@ -67,20 +109,25 @@ export default function QuizLaunchScreen(): React.ReactElement {
         <Text className="mt-4 text-center text-h3 font-bold text-text-primary">
           Couldn&apos;t create a round
         </Text>
-        <Text className="mt-2 text-center text-body text-text-secondary">
-          Try again, or head back and pick a different activity.
+        <Text
+          className="mt-2 text-center text-body text-text-secondary"
+          testID="quiz-launch-error-message"
+        >
+          {errorMessage}
         </Text>
 
         <View className="mt-8 w-full gap-3">
-          <Pressable
-            onPress={() => generateRound.mutate({ activityType })}
-            className="min-h-[48px] items-center justify-center rounded-button bg-primary px-6 py-3"
-            testID="quiz-launch-retry"
-          >
-            <Text className="text-body font-semibold text-text-inverse">
-              Retry
-            </Text>
-          </Pressable>
+          {isUnretryable ? null : (
+            <Pressable
+              onPress={startRound}
+              className="min-h-[48px] items-center justify-center rounded-button bg-primary px-6 py-3"
+              testID="quiz-launch-retry"
+            >
+              <Text className="text-body font-semibold text-text-inverse">
+                Retry
+              </Text>
+            </Pressable>
+          )}
 
           <Pressable
             onPress={() => goBackOrReplace(router, '/(app)/quiz')}
@@ -96,16 +143,39 @@ export default function QuizLaunchScreen(): React.ReactElement {
     );
   }
 
+  // [ASSUMP-F2] Loading state gives the user a Cancel escape hatch in case
+  // the mutation hangs (slow network, stuck LLM). Avoids a dead-end where
+  // Android users have only hardware back.
   return (
     <View
       className="flex-1 items-center justify-center bg-background px-6"
-      style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
+      style={{ paddingTop: insets.top, paddingBottom: insets.bottom + 16 }}
       testID="quiz-launch-loading"
     >
       <ActivityIndicator size="large" color={colors.primary} />
       <Text className="mt-4 text-body text-text-secondary">
         {LOADING_MESSAGES[loadingMessageIndex]}
       </Text>
+      {timedOut ? (
+        <Text
+          className="mt-2 text-center text-body-sm text-text-secondary"
+          testID="quiz-launch-timed-out"
+        >
+          This is taking longer than usual — tap Cancel if you&apos;d rather try
+          again later.
+        </Text>
+      ) : null}
+      <Pressable
+        onPress={() => goBackOrReplace(router, '/(app)/quiz')}
+        className="mt-10 min-h-[44px] items-center justify-center rounded-button px-6 py-3"
+        testID="quiz-launch-cancel"
+        accessibilityRole="button"
+        accessibilityLabel="Cancel"
+      >
+        <Text className="text-body-sm font-semibold text-text-secondary">
+          Cancel
+        </Text>
+      </Pressable>
     </View>
   );
 }

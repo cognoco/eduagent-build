@@ -1,4 +1,4 @@
-import { eq, and, type SQL, type Column } from 'drizzle-orm';
+import { eq, and, desc, sql, type SQL, type Column } from 'drizzle-orm';
 import type { Database } from './client';
 import {
   profiles,
@@ -359,6 +359,153 @@ export function createScopedRepository(db: Database, profileId: string) {
           where: scopedWhere(quizRounds, extraWhere),
         });
       },
+      async findRecentByActivity(
+        activityType: (typeof quizRounds.$inferSelect)['activityType'],
+        limit: number
+      ) {
+        return db.query.quizRounds.findMany({
+          where: and(
+            eq(quizRounds.profileId, profileId),
+            eq(quizRounds.activityType, activityType)
+          ),
+          orderBy: [desc(quizRounds.createdAt)],
+          limit,
+        });
+      },
+      async findCompletedRecent(limit: number) {
+        return db.query.quizRounds.findMany({
+          where: and(
+            eq(quizRounds.profileId, profileId),
+            eq(quizRounds.status, 'completed')
+          ),
+          orderBy: [desc(quizRounds.completedAt)],
+          limit,
+          columns: {
+            id: true,
+            activityType: true,
+            theme: true,
+            score: true,
+            total: true,
+            xpEarned: true,
+            createdAt: true,
+            completedAt: true,
+          },
+        });
+      },
+      /**
+       * [Q-10] Per-activity completed-round aggregates computed in SQL so the
+       * endpoint stays constant-time regardless of how many rounds a profile
+       * has played. Returns one row per activity_type with:
+       *   - roundsPlayed  : COUNT(*)
+       *   - totalXp       : SUM(xp_earned), coalesced to 0
+       *   - bestScore     : score from the round with the highest score/total
+       *                     ratio (null if no rounds yet)
+       *   - bestTotal     : total from that same round (null if no rounds yet)
+       *
+       * Two queries total (one GROUP BY + one DISTINCT ON per activity via
+       * a correlated subquery). Bounded by the number of activity types,
+       * not by the number of rounds.
+       */
+      async aggregateCompletedStats() {
+        // Aggregate cheap fields per activity.
+        const aggregates = await db
+          .select({
+            activityType: quizRounds.activityType,
+            roundsPlayed: sql<number>`count(*)::int`,
+            totalXp: sql<number>`coalesce(sum(${quizRounds.xpEarned}), 0)::int`,
+            bestRatio: sql<
+              number | null
+            >`max(cast(${quizRounds.score} as float) / nullif(${quizRounds.total}, 0))`,
+          })
+          .from(quizRounds)
+          .where(
+            and(
+              eq(quizRounds.profileId, profileId),
+              eq(quizRounds.status, 'completed')
+            )
+          )
+          .groupBy(quizRounds.activityType);
+
+        // Resolve (score, total) of the round that achieved each best ratio.
+        const results = await Promise.all(
+          aggregates.map(async (agg) => {
+            let bestScore: number | null = null;
+            let bestTotal: number | null = null;
+            if (agg.bestRatio != null) {
+              const [best] = await db
+                .select({
+                  score: quizRounds.score,
+                  total: quizRounds.total,
+                })
+                .from(quizRounds)
+                .where(
+                  and(
+                    eq(quizRounds.profileId, profileId),
+                    eq(quizRounds.status, 'completed'),
+                    eq(quizRounds.activityType, agg.activityType),
+                    sql`cast(${quizRounds.score} as float) / nullif(${quizRounds.total}, 0) = ${agg.bestRatio}`
+                  )
+                )
+                .limit(1);
+              bestScore = best?.score ?? null;
+              bestTotal = best?.total ?? null;
+            }
+            return {
+              activityType: agg.activityType,
+              roundsPlayed: agg.roundsPlayed,
+              totalXp: agg.totalXp,
+              bestScore,
+              bestTotal,
+            };
+          })
+        );
+
+        return results;
+      },
+      async insert(values: Omit<typeof quizRounds.$inferInsert, 'profileId'>) {
+        const [row] = await db
+          .insert(quizRounds)
+          .values({ ...values, profileId })
+          .returning({ id: quizRounds.id });
+        return row;
+      },
+      /**
+       * Atomically mark an ACTIVE round completed. Returns the affected row if
+       * the UPDATE actually changed status 'active' → 'completed' (under the
+       * profile scope). Returns undefined if another caller has already
+       * completed the round, which callers MUST translate to a ConflictError.
+       *
+       * Uses `WHERE status = 'active'` so concurrent complete calls can't
+       * double-award XP — only one UPDATE wins.
+       */
+      async completeActive(
+        roundId: string,
+        values: {
+          results: unknown;
+          score: number;
+          xpEarned: number;
+          completedAt: Date;
+        }
+      ) {
+        const rows = await db
+          .update(quizRounds)
+          .set({
+            results: values.results,
+            score: values.score,
+            xpEarned: values.xpEarned,
+            status: 'completed',
+            completedAt: values.completedAt,
+          })
+          .where(
+            and(
+              eq(quizRounds.id, roundId),
+              eq(quizRounds.profileId, profileId),
+              eq(quizRounds.status, 'active')
+            )
+          )
+          .returning({ id: quizRounds.id });
+        return rows[0];
+      },
     },
 
     quizMissedItems: {
@@ -371,6 +518,15 @@ export function createScopedRepository(db: Database, profileId: string) {
         return db.query.quizMissedItems.findFirst({
           where: scopedWhere(quizMissedItems, extraWhere),
         });
+      },
+      async insertMany(
+        values: Array<Omit<typeof quizMissedItems.$inferInsert, 'profileId'>>
+      ) {
+        if (values.length === 0) return [];
+        return db
+          .insert(quizMissedItems)
+          .values(values.map((v) => ({ ...v, profileId })))
+          .returning({ id: quizMissedItems.id });
       },
     },
   };

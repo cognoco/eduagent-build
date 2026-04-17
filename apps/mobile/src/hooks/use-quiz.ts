@@ -47,6 +47,13 @@ export function usePrefetchRound(): UseMutationResult<
       await assertOk(res);
       return (await res.json()) as { id: string };
     },
+    // Prefetch failures fall back to the normal launch path, so the UX is
+    // unaffected — but we still want visibility when the backend starts
+    // reliably rejecting prefetch (quota, backend outage, etc.). Silent
+    // recovery without any signal is banned per ~/.claude/CLAUDE.md.
+    onError: (err) => {
+      console.warn('[quiz] prefetch failed:', err);
+    },
   });
 }
 
@@ -148,5 +155,9 @@ export function useQuizStats(): UseQueryResult<QuizStats[]> {
       }
     },
     enabled: !!activeProfile,
+    // Stats only change when a round completes, at which point
+    // useCompleteRound invalidates this key. Coalesce remounts within 30s so
+    // tabbing between /practice and /quiz doesn't hammer the endpoint.
+    staleTime: 30_000,
   });
 }

@@ -23,6 +23,43 @@ const mockDatabaseModule = createDatabaseModuleMock({
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
+// Billing/metering mock — POST /v1/quiz/rounds + /prefetch are now
+// LLM-metered, so the metering middleware runs before our handler and needs
+// these service boundaries mocked. Values chosen so quota check always
+// passes unless a specific test overrides them.
+jest.mock('../services/billing', () => ({
+  getSubscriptionByAccountId: jest.fn().mockResolvedValue({
+    id: 'sub-1',
+    accountId: 'test-account-id',
+    tier: 'free',
+    status: 'ACTIVE',
+  }),
+  ensureFreeSubscription: jest.fn().mockResolvedValue({
+    id: 'sub-1',
+    accountId: 'test-account-id',
+    tier: 'free',
+    status: 'ACTIVE',
+  }),
+  getQuotaPool: jest.fn().mockResolvedValue({
+    id: 'qp-1',
+    subscriptionId: 'sub-1',
+    monthlyLimit: 500,
+    usedThisMonth: 10,
+    dailyLimit: null,
+    usedToday: 0,
+  }),
+  decrementQuota: jest.fn().mockResolvedValue({
+    success: true,
+    source: 'monthly',
+    remainingMonthly: 489,
+    remainingTopUp: 0,
+    remainingDaily: null,
+  }),
+  getTopUpCreditsRemaining: jest.fn().mockResolvedValue(0),
+  incrementQuota: jest.fn().mockResolvedValue(undefined),
+  createSubscription: jest.fn(),
+}));
+
 jest.mock('../services/account', () => ({
   findOrCreateAccount: jest.fn().mockResolvedValue({
     id: 'test-account-id',
@@ -118,17 +155,53 @@ const AUTH_HEADERS = {
   'X-Profile-Id': 'test-profile-id',
 };
 
-function setRoundInsertReturning(id = '01933b3c-0000-7000-8000-000000000999') {
+function setInsertReturning(id = '01933b3c-0000-7000-8000-000000000999') {
   const returning = jest.fn().mockResolvedValue([{ id }]);
   const values = jest.fn().mockReturnValue({ returning });
   (mockDb as any).insert = jest.fn().mockReturnValue({ values });
 }
 
-function setRoundUpdateWhere() {
-  const where = jest.fn().mockResolvedValue(undefined);
+/**
+ * By default simulate the happy path: the UPDATE affects one row
+ * (status: 'active' → 'completed' succeeded). Tests that exercise the
+ * concurrent-race guard override this to return [] so `completeActive`
+ * returns undefined and the service throws ConflictError.
+ */
+function setUpdateReturning(rows: Array<{ id: string }> = [{ id: 'round-1' }]) {
+  const returning = jest.fn().mockResolvedValue(rows);
+  const where = jest.fn().mockReturnValue({ returning });
   const set = jest.fn().mockReturnValue({ where });
   (mockDb as any).update = jest.fn().mockReturnValue({ set });
 }
+
+const ACTIVE_ROUND = {
+  id: 'round-1',
+  profileId: 'test-profile-id',
+  activityType: 'capitals',
+  theme: 'Central European Capitals',
+  questions: [
+    {
+      type: 'capitals',
+      country: 'Austria',
+      correctAnswer: 'Vienna',
+      acceptedAliases: ['Vienna'],
+      distractors: ['Salzburg', 'Graz', 'Innsbruck'],
+      funFact: 'Fact',
+      isLibraryItem: false,
+    },
+    {
+      type: 'capitals',
+      country: 'Germany',
+      correctAnswer: 'Berlin',
+      acceptedAliases: ['Berlin'],
+      distractors: ['Munich', 'Hamburg', 'Frankfurt'],
+      funFact: 'Fact',
+      isLibraryItem: false,
+    },
+  ],
+  total: 2,
+  status: 'active' as const,
+};
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -138,8 +211,8 @@ beforeEach(() => {
       findFirst: jest.fn().mockResolvedValue(undefined),
     },
   };
-  setRoundInsertReturning();
-  setRoundUpdateWhere();
+  setInsertReturning();
+  setUpdateReturning();
   (mockDb as any).transaction = jest
     .fn()
     .mockImplementation(async (fn: (tx: unknown) => unknown) => fn(mockDb));
@@ -198,36 +271,46 @@ describe('Quiz routes', () => {
     });
   });
 
+  describe('GET /v1/quiz/rounds/:id', () => {
+    it('returns 404 for a round not owned by the caller (IDOR break-test)', async () => {
+      // Scoped-repo findFirst returns undefined because profile_id predicate
+      // eliminates rounds owned by a different profile. That's the guard:
+      // the route MUST surface 404, not 500 or 200 with someone else's data.
+      (mockDb as any).query.quizRounds.findFirst = jest
+        .fn()
+        .mockResolvedValue(undefined);
+
+      const res = await app.request(
+        '/v1/quiz/rounds/round-belonging-to-profile-b',
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(404);
+    });
+
+    it('returns the round for the owning profile', async () => {
+      (mockDb as any).query.quizRounds.findFirst = jest
+        .fn()
+        .mockResolvedValue(ACTIVE_ROUND);
+
+      const res = await app.request(
+        '/v1/quiz/rounds/round-1',
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.id).toBe('round-1');
+    });
+  });
+
   describe('POST /v1/quiz/rounds/:id/complete', () => {
     it('scores the round and persists results', async () => {
-      (mockDb as any).query.quizRounds.findFirst = jest.fn().mockResolvedValue({
-        id: 'round-1',
-        profileId: 'test-profile-id',
-        activityType: 'capitals',
-        theme: 'Central European Capitals',
-        questions: [
-          {
-            type: 'capitals',
-            country: 'Austria',
-            correctAnswer: 'Vienna',
-            acceptedAliases: ['Vienna'],
-            distractors: ['Salzburg', 'Graz', 'Innsbruck'],
-            funFact: 'Fact',
-            isLibraryItem: false,
-          },
-          {
-            type: 'capitals',
-            country: 'Germany',
-            correctAnswer: 'Berlin',
-            acceptedAliases: ['Berlin'],
-            distractors: ['Munich', 'Hamburg', 'Frankfurt'],
-            funFact: 'Fact',
-            isLibraryItem: false,
-          },
-        ],
-        total: 2,
-        status: 'active',
-      });
+      (mockDb as any).query.quizRounds.findFirst = jest
+        .fn()
+        .mockResolvedValue(ACTIVE_ROUND);
 
       const res = await app.request(
         '/v1/quiz/rounds/round-1/complete',
@@ -274,6 +357,92 @@ describe('Quiz routes', () => {
 
       expect(res.status).toBe(400);
     });
+
+    it("returns 404 when completing another profile's round (IDOR break-test)", async () => {
+      // Scoped lookup filters out rows owned by a different profile.
+      (mockDb as any).query.quizRounds.findFirst = jest
+        .fn()
+        .mockResolvedValue(undefined);
+
+      const res = await app.request(
+        '/v1/quiz/rounds/someone-elses-round/complete',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            results: [
+              {
+                questionIndex: 0,
+                correct: true,
+                answerGiven: 'Vienna',
+                timeMs: 3000,
+              },
+            ],
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(404);
+    });
+
+    it('returns 409 when the round is already completed', async () => {
+      (mockDb as any).query.quizRounds.findFirst = jest
+        .fn()
+        .mockResolvedValue({ ...ACTIVE_ROUND, status: 'completed' });
+
+      const res = await app.request(
+        '/v1/quiz/rounds/round-1/complete',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            results: [
+              {
+                questionIndex: 0,
+                correct: true,
+                answerGiven: 'Vienna',
+                timeMs: 3000,
+              },
+            ],
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(409);
+    });
+
+    it('returns 409 when a concurrent complete wins the race (double-grading break-test)', async () => {
+      // Initial SELECT saw status='active', but by the time our UPDATE fires,
+      // another transaction has already flipped it. completeActive returns
+      // zero rows → service must throw ConflictError → 409 (no double XP).
+      (mockDb as any).query.quizRounds.findFirst = jest
+        .fn()
+        .mockResolvedValue(ACTIVE_ROUND);
+      setUpdateReturning([]);
+
+      const res = await app.request(
+        '/v1/quiz/rounds/round-1/complete',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            results: [
+              {
+                questionIndex: 0,
+                correct: true,
+                answerGiven: 'Vienna',
+                timeMs: 3000,
+              },
+            ],
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(409);
+    });
   });
 
   describe('GET /v1/quiz/rounds/recent', () => {
@@ -286,7 +455,6 @@ describe('Quiz routes', () => {
           score: 7,
           total: 8,
           xpEarned: 74,
-          status: 'completed',
           createdAt: new Date('2026-04-16T10:00:00.000Z'),
           completedAt: new Date('2026-04-16T10:05:00.000Z'),
         },
@@ -307,26 +475,42 @@ describe('Quiz routes', () => {
 
   describe('GET /v1/quiz/stats', () => {
     it('returns aggregate stats per activity', async () => {
-      (mockDb as any).query.quizRounds.findMany = jest.fn().mockResolvedValue([
+      // [Q-10] The aggregator issues two SQL shapes:
+      //   1. `.select({...}).from().where().groupBy()` for count/sum/bestRatio
+      //      per activity (one row per activityType).
+      //   2. `.select({ score, total }).from().where(...ratio...).limit(1)`
+      //      once per aggregate row, to resolve the best round's score/total.
+      // The first call returns the aggregate rows; subsequent calls resolve
+      // the best-round rows for each activity.
+      const aggregateRows = [
         {
-          id: 'round-1',
           activityType: 'capitals',
-          theme: 'Theme 1',
-          score: 6,
-          total: 8,
-          xpEarned: 60,
-          status: 'completed',
+          roundsPlayed: 2,
+          totalXp: 140,
+          bestRatio: 1,
         },
-        {
-          id: 'round-2',
-          activityType: 'capitals',
-          theme: 'Theme 2',
-          score: 8,
-          total: 8,
-          xpEarned: 80,
-          status: 'completed',
-        },
-      ]);
+      ];
+      const bestRoundRows = [{ score: 8, total: 8 }];
+
+      const groupByReturn = Promise.resolve(aggregateRows);
+      const limitReturn = Promise.resolve(bestRoundRows);
+      const whereAggregate = Object.assign(Promise.resolve(aggregateRows), {
+        groupBy: jest.fn().mockReturnValue(groupByReturn),
+      });
+      const whereBestRound = {
+        limit: jest.fn().mockReturnValue(limitReturn),
+      };
+      const fromReturn = {
+        where: jest
+          .fn()
+          // First call → aggregate GROUP BY (thenable)
+          .mockReturnValueOnce(whereAggregate)
+          // Subsequent calls → best-round lookup per activity (has .limit)
+          .mockReturnValue(whereBestRound),
+      };
+      (mockDb as any).select = jest
+        .fn()
+        .mockReturnValue({ from: jest.fn().mockReturnValue(fromReturn) });
 
       const res = await app.request(
         '/v1/quiz/stats',
@@ -343,6 +527,32 @@ describe('Quiz routes', () => {
         bestTotal: 8,
         totalXp: 140,
       });
+    });
+
+    it('returns an empty array when the profile has no completed rounds', async () => {
+      // [Q-10 break test] When no rounds exist, the GROUP BY returns no rows
+      // and the best-round sub-query must not run at all. Previously the
+      // in-memory aggregator handled this via a Map default; now we rely on
+      // SQL returning [].
+      const fromReturn = {
+        where: jest.fn().mockReturnValue(
+          Object.assign(Promise.resolve([]), {
+            groupBy: jest.fn().mockReturnValue(Promise.resolve([])),
+          })
+        ),
+      };
+      (mockDb as any).select = jest
+        .fn()
+        .mockReturnValue({ from: jest.fn().mockReturnValue(fromReturn) });
+
+      const res = await app.request(
+        '/v1/quiz/stats',
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual([]);
     });
   });
 });

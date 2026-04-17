@@ -7,7 +7,12 @@ import { ERROR_CODES } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 
 import { captureException } from './services/sentry';
-import { ForbiddenError, NotFoundError } from './errors';
+import {
+  ForbiddenError,
+  NotFoundError,
+  ConflictError,
+  UpstreamLlmError,
+} from './errors';
 
 import { envValidationMiddleware } from './middleware/env-validation';
 import { authMiddleware } from './middleware/auth';
@@ -240,6 +245,21 @@ app.onError((err, c) => {
   }
   if (err instanceof NotFoundError) {
     return c.json({ code: ERROR_CODES.NOT_FOUND, message: err.message }, 404);
+  }
+  if (err instanceof ConflictError) {
+    return c.json({ code: ERROR_CODES.CONFLICT, message: err.message }, 409);
+  }
+  if (err instanceof UpstreamLlmError) {
+    // Track LLM-provider drift in Sentry; surface 502 so clients can retry.
+    captureException(err, {
+      userId: c.get('user')?.userId,
+      profileId: c.get('profileId'),
+      requestPath: c.req.path,
+    });
+    return c.json(
+      { code: ERROR_CODES.UPSTREAM_ERROR, message: err.message },
+      502
+    );
   }
 
   // Report to Sentry with user/request context (primary observability channel)

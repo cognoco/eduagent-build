@@ -29,6 +29,7 @@ export default function DictationCompleteScreen(): React.ReactElement {
   const handleCheckWriting = async () => {
     // 1. Launch camera
     let uri: string | undefined;
+    let assetMimeType: string | undefined;
     try {
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes: ['images'],
@@ -36,7 +37,13 @@ export default function DictationCompleteScreen(): React.ReactElement {
         allowsEditing: false,
       });
       if (result.canceled) return;
-      uri = result.assets?.[0]?.uri;
+      const asset = result.assets?.[0];
+      uri = asset?.uri;
+      // [ASSUMP-F8] Prefer the picker's reported mimeType when present.
+      // Extension sniffing fails for Android content:// URIs (no extension)
+      // and misclassifies unusual camera outputs. The server whitelists
+      // only jpeg/png/webp, so normalize anything else to jpeg.
+      assetMimeType = asset?.mimeType;
     } catch {
       Alert.alert('Camera error', 'Could not open camera. Please try again.', [
         { text: 'OK' },
@@ -48,14 +55,24 @@ export default function DictationCompleteScreen(): React.ReactElement {
 
     // 2. Convert to base64
     let imageBase64: string;
-    let imageMimeType: string;
+    let imageMimeType: 'image/jpeg' | 'image/png' | 'image/webp';
     try {
       imageBase64 = await FileSystem.readAsStringAsync(uri, {
         encoding: FileSystem.EncodingType.Base64,
       });
-      imageMimeType = uri.toLowerCase().endsWith('.png')
-        ? 'image/png'
-        : 'image/jpeg';
+      if (
+        assetMimeType === 'image/png' ||
+        assetMimeType === 'image/webp' ||
+        assetMimeType === 'image/jpeg'
+      ) {
+        imageMimeType = assetMimeType;
+      } else if (uri.toLowerCase().endsWith('.png')) {
+        imageMimeType = 'image/png';
+      } else if (uri.toLowerCase().endsWith('.webp')) {
+        imageMimeType = 'image/webp';
+      } else {
+        imageMimeType = 'image/jpeg';
+      }
     } catch {
       Alert.alert(
         'Photo error',
@@ -109,17 +126,26 @@ export default function DictationCompleteScreen(): React.ReactElement {
         reviewed: false,
       });
     } catch (err) {
-      console.warn('[dictation] streak recording failed:', err);
-      Alert.alert(
-        'Note',
-        'Your progress was saved but the streak could not be updated. It will sync next time.',
-        [
-          {
-            text: 'OK',
-            onPress: () => router.replace('/(app)/practice' as never),
-          },
-        ]
-      );
+      // [ASSUMP-F11] If mutateAsync threw, nothing was saved server-side.
+      // Previously the Alert said "Your progress was saved" — a lie that
+      // also violated the "silent recovery without escalation" rule. Now we
+      // tell the user honestly and offer Retry / Continue.
+      console.warn('[dictation] result recording failed:', err);
+      const message =
+        err instanceof Error && err.message
+          ? err.message
+          : 'We couldn\u2019t save your dictation result.';
+      Alert.alert('Couldn\u2019t save your result', message, [
+        {
+          text: 'Retry',
+          onPress: () => void handleDone(),
+        },
+        {
+          text: 'Continue without saving',
+          style: 'cancel',
+          onPress: () => router.replace('/(app)/practice' as never),
+        },
+      ]);
       return;
     }
 

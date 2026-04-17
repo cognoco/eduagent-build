@@ -36,6 +36,33 @@ export class ForbiddenError extends Error {
   }
 }
 
+/**
+ * Typed domain error for concurrent/out-of-order mutations.
+ * Thrown when a resource is not in the expected state (e.g. attempting to
+ * complete a round that is already completed, or a race lost the UPDATE).
+ * The central `app.onError` handler converts this to a 409 response.
+ */
+export class ConflictError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ConflictError';
+  }
+}
+
+/**
+ * Typed domain error for unrecoverable upstream LLM failures (invalid JSON,
+ * schema drift, no valid candidates after cross-checking). The central
+ * `app.onError` handler converts this to a 502 Bad Gateway response.
+ * Unlike generic internal errors, these are surfaced to Sentry at the throw
+ * site so we can track LLM-provider drift over time.
+ */
+export class UpstreamLlmError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'UpstreamLlmError';
+  }
+}
+
 export function apiError(
   c: Context,
   status: 400 | 401 | 403 | 404 | 409 | 410 | 422 | 429 | 500 | 501 | 502 | 503,

@@ -4,12 +4,15 @@ import {
   type CapitalsQuestion,
   type QuizActivityType,
 } from '@eduagent/schemas';
-import { quizRounds, type Database } from '@eduagent/database';
+import { createScopedRepository, type Database } from '@eduagent/database';
 import type { ChatMessage } from '../llm';
 import { routeAndCall } from '../llm';
+import { captureException } from '../sentry';
+import { UpstreamLlmError } from '../../errors';
 import { CAPITALS_BY_COUNTRY, CAPITALS_DATA } from './capitals-data';
 import { resolveRoundContent, type LibraryItem } from './content-resolver';
 import { validateCapitalsRound } from './capitals-validation';
+import { shuffle } from './shuffle';
 
 interface CapitalsPromptParams {
   discoveryCount: number;
@@ -74,10 +77,10 @@ Respond with ONLY valid JSON in this shape:
 }
 
 function buildMasteryDistractors(correctAnswer: string): string[] {
-  return CAPITALS_DATA.filter(
+  const pool = CAPITALS_DATA.filter(
     (entry) => entry.capital.toLowerCase() !== correctAnswer.toLowerCase()
-  )
-    .sort(() => Math.random() - 0.5)
+  );
+  return shuffle(pool)
     .slice(0, 3)
     .map((entry) => entry.capital);
 }
@@ -136,12 +139,50 @@ export function assembleRound(
   };
 }
 
-function extractJsonObject(response: string): string {
-  const jsonMatch = response.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) {
-    throw new Error('Quiz LLM returned no JSON');
+/**
+ * Extract the first balanced JSON object from an LLM response. Handles
+ * triple-backtick fences (```json ... ```) AND stray prose preamble by
+ * walking brace depth until the first complete object closes. Avoids the
+ * greedy `/\{[\s\S]*\}/` regex which mis-matches when the response contains
+ * multiple objects or has trailing prose.
+ */
+export function extractJsonObject(response: string): string {
+  // Strip markdown code-fence wrappers if present.
+  const fenceMatch = response.match(/```(?:json)?\s*([\s\S]*?)```/);
+  const body = (fenceMatch?.[1] ?? response).trim();
+
+  let start = -1;
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+
+  for (let i = 0; i < body.length; i++) {
+    const ch = body[i];
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    if (ch === '\\' && inString) {
+      escape = true;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+    if (ch === '{') {
+      if (depth === 0) start = i;
+      depth += 1;
+    } else if (ch === '}') {
+      depth -= 1;
+      if (depth === 0 && start !== -1) {
+        return body.slice(start, i + 1);
+      }
+    }
   }
-  return jsonMatch[0];
+
+  throw new UpstreamLlmError('Quiz LLM returned no JSON object');
 }
 
 interface GenerateParams {
@@ -171,7 +212,9 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
   } = params;
 
   if (activityType !== 'capitals') {
-    throw new Error(`Unsupported quiz activity type: ${activityType}`);
+    throw new UpstreamLlmError(
+      `Unsupported quiz activity type: ${activityType}`
+    );
   }
 
   const plan = resolveRoundContent({
@@ -197,18 +240,32 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
     ageBracket: birthYear == null ? 'adult' : computeAgeBracket(birthYear),
   });
 
+  // Clamp the raw response before parsing — defends against pathological
+  // provider output sizes even if maxOutputTokens is mis-configured.
+  const raw = llmResult.response.slice(0, 64 * 1024);
+
   let llmOutput;
   try {
     llmOutput = capitalsLlmOutputSchema.parse(
-      JSON.parse(extractJsonObject(llmResult.response))
+      JSON.parse(extractJsonObject(raw))
     );
-  } catch {
-    throw new Error('Quiz LLM returned invalid structured output');
+  } catch (parseErr) {
+    // Capture the raw failure for LLM drift monitoring instead of silently
+    // swallowing it with a bare `catch {}`.
+    captureException(
+      parseErr instanceof Error ? parseErr : new Error('Quiz LLM parse failed'),
+      {
+        userId: undefined,
+        profileId,
+        requestPath: 'services/quiz/generate-round',
+      }
+    );
+    throw new UpstreamLlmError('Quiz LLM returned invalid structured output');
   }
 
   const validated = validateCapitalsRound(llmOutput);
   if (validated.questions.length === 0) {
-    throw new Error('No valid questions after validation');
+    throw new UpstreamLlmError('No valid questions after validation');
   }
 
   const discoveryQuestions: CapitalsQuestion[] = validated.questions
@@ -230,18 +287,15 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
   );
   const round = assembleRound(validated.theme, questions);
 
-  const [inserted] = await db
-    .insert(quizRounds)
-    .values({
-      profileId,
-      activityType,
-      theme: round.theme,
-      questions: round.questions,
-      total: round.total,
-      libraryQuestionIndices: round.libraryQuestionIndices,
-      status: 'active',
-    })
-    .returning({ id: quizRounds.id });
+  const repo = createScopedRepository(db, profileId);
+  const inserted = await repo.quizRounds.insert({
+    activityType,
+    theme: round.theme,
+    questions: round.questions,
+    total: round.total,
+    libraryQuestionIndices: round.libraryQuestionIndices,
+    status: 'active',
+  });
 
   if (!inserted) {
     throw new Error('Failed to persist quiz round');

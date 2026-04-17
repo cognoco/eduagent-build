@@ -14,6 +14,323 @@
 
 ---
 
+## Execution Strategy (2026-04-16)
+
+**Decision: gate, don't split.** Tasks 1-3 (schemas, provider helpers, generation dispatch) execute against the Task 0 audit output. Tasks 4-5 (SM-2 wiring, due-review filter, route) are **gated** on a bootstrap mini-spec being written first. Single merge. No Phase 2a/2b split.
+
+**Rationale.** Phase 1 is not yet merged, so incremental-delivery benefits of a split don't apply. Gate-with-audit gets the same risk reduction with one merge. Tasks 1-3 are bootstrap-agnostic; only Task 4 (SM-2) and Task 5 (route layer) touch the bootstrap-sensitive flow.
+
+**Revisit trigger.** If Phase 1 ships to `main` before Phase 2 execution completes, re-evaluate split vs. gate — once learners exist, time-to-ship becomes scarce and the split's incremental-delivery benefit reasserts.
+
+## Decisions Required (User)
+
+Two design calls are needed before Task 4 can start. Both are yours to make.
+
+| ID | Decision | Default if no decision |
+|---|---|---|
+| QP2-D1 | **MC SM-2 quality mapping.** Use timing-adjusted quality (correct+fast=4, correct+slow=3, wrong=2) OR flat 4/2 OR something else? | Flat 4/2 — correct per SM-2 definition for MC-with-feedback. Timing is a separate axis, defer. |
+| QP2-D2 | **Separate retention cards per recall mode** (MC vs future free-recall)? | No. Single card, MC-only for now. Flag for Phase 5 re-evaluation when free-recall ships. Don't pre-schema. |
+
+Confirm both before Task 4 executes, or the defaults above will be implemented and flagged for later review.
+
+## Review Findings (2026-04-16)
+
+> **Read before executing.** These findings were raised against this plan and must be resolved as part of the task they affect. Each finding has an ID — fix commits MUST include the ID tag (e.g., `fix(quiz): mastery-weighted CEFR ceiling [QP2-R1]`). Per the Fix Verification Rules, every fix needs a "Verified By" entry (test or manual check) before the task is marked Done.
+
+### Severity Summary
+
+| ID | Severity | Task | Short title | Verified By |
+|---|---|---|---|---|
+| QP2-R1 | Serious | Task 5 | CEFR ceiling uses unfiltered `max`, not mastery-weighted signal | TBD — test + integration |
+| QP2-R2 | Serious | Task 4 | SM-2 quality scores 4/1 are crude; need timing + MC discount | TBD — unit test |
+| QP2-R3 | Serious | Task 2/3 | `Math.random()` biased shuffle in capitals mastery path | TBD — unit test for Fisher-Yates |
+| QP2-R4 | Serious | Task 5 | "Due for review" filter treats never-studied items as due | TBD — unit test for filter |
+| QP2-R5 | Serious | Task 3 | `plan.masteryItems` / `plan.discoveryCount` source not specified; vocab-adaptive ratio needed | TBD — unit test for planner |
+| QP2-R6 | Medium | Task 1 | Discriminated union may break parsing of existing Phase 1 `quiz_rounds` rows | TBD — migration + parse test |
+| QP2-R7 | Medium | New Task 11 | No end-to-end vocabulary round integration test | TBD — integration test |
+| QP2-R8 | Medium | Task 2 | `buildVocabularyMasteryQuestion` returns `null` silently with no telemetry | TBD — unit test + log assertion |
+| QP2-R9 | Medium | Task 2 | `Intl.DisplayNames` try/catch silently falls back to raw code | TBD — explicit fallback test OR remove try/catch |
+| QP2-R10 | Polish | Task 7 | `subject.name` assumed to be language display name — confirm or override | Manual: check subject creation path |
+| QP2-R11 | Polish | Task 6 | `@ts-expect-error` on `client.quiz.rounds.$post` masks `subjectId` type errors | N/A — tracked as tech debt |
+| QP2-R12 | Polish | Task 2 | `nextCefrLevel('A1 ')` silently coerces to `A2` — trim or throw | TBD — unit test for bad input |
+| QP2-R13 | Polish | Task 2 | `pickDistractors` dedup is case-insensitive; confirm intended behavior | N/A — intended, documented here |
+
+---
+
+### QP2-R1 — CEFR ceiling logic is backwards for new learners (Serious) — Task 5
+
+**Problem.** In Task 5, `cefrCeiling = nextCefrLevel(detectCefrCeiling(allVocab))` has two defects:
+
+1. **Beginner bootstrap bug.** For a learner with zero vocabulary, `detectCefrCeiling([])` returns `'A1'`, so `nextCefrLevel('A1')` returns `'A2'`. A brand-new beginner who has never added a word immediately gets A2 content instead of A1.
+2. **Max-not-mastery bug.** `detectCefrCeiling` takes the max CEFR level across **all** vocabulary, not a mastery-weighted signal. One accidentally-imported C1 word (from a parent, an LLM out-of-range item that got persisted, or a manual add) jumps the ceiling to C2. The spec says "CEFR level + 1" — that should mean "one above what the learner has **mastered**," not "one above the hardest word that exists anywhere in their bank."
+
+**Fix.**
+- **Beginner path:** If the learner has no vocabulary yet (or no vocabulary with `cefrLevel` set), the ceiling MUST be `A1` (not `A2`). Introduce a `cefrCeilingForDiscovery` that returns `'A1'` for an empty mastery set rather than always advancing one level.
+- **Mastery filter:** `detectCefrCeiling` must only consider vocabulary the learner has actually mastered. Define mastered as **either** `vocabularyRetentionCards.repetitions >= 3` **or** `vocabularyRetentionCards.interval >= 7` (pick one; I recommend `repetitions >= 3` because it's invariant to scheduling changes).
+- Consider **percentile instead of max** for robustness (e.g., 90th percentile of mastered CEFR levels) so a single outlier doesn't shift the ceiling.
+
+**New signature.**
+```typescript
+export function detectCefrCeilingMasteryWeighted(
+  vocabWithCards: Array<{ cefrLevel: string | null; repetitions: number | null }>,
+  minRepetitions = 3,
+): string // returns 'A1' when no mastered items
+```
+
+**Tasks to update.** Task 2 (new helper + unit tests), Task 5 (route uses new helper, joins retention card repetitions).
+
+**Verified By.** Unit test: "detectCefrCeilingMasteryWeighted returns A1 for empty bank", "returns A1 for bank with unmastered items", "ignores outlier with <3 repetitions", "returns 90th-percentile mastered level".
+
+---
+
+### QP2-R2 — SM-2 quality scores of 4/1 are crude and probably wrong (Serious) — Task 4
+
+**Problem.** `getVocabSm2Quality(correct) → 4 | 1` ignores timing and MC mode. Standard SM-2 uses 0–5:
+- 5 = perfect recall; 4 = correct with hesitation; 3 = correct with serious difficulty
+- 2 = incorrect but remembered on seeing the answer; 1 = incorrect, familiar; 0 = complete blackout
+
+Two consequences:
+
+1. **Under-rating correct answers compresses intervals.** Always returning 4 for correct means intervals grow more slowly than they should, which over-schedules reviews — the opposite of what SRS is for.
+2. **Wrong-answer score of 1 is wrong.** After a wrong answer, the learner sees the correct answer on the feedback screen. That's SM-2 quality 2 ("incorrect but remembered on seeing the answer"), not 1.
+
+**Fix.** Use the `timeMs` already captured in `handleAnswer`:
+```typescript
+export function getVocabSm2Quality(
+  correct: boolean,
+  timeMs: number,
+  mode: 'mc' | 'free-recall' = 'mc',
+): number {
+  if (!correct) return 2;                           // saw answer on feedback screen
+  const fastThresholdMs = 3000;
+  if (mode === 'mc') {
+    // MC is easier than free recall — cap at 4, don't let it drive intervals like free recall
+    return timeMs < fastThresholdMs ? 4 : 3;
+  }
+  return timeMs < fastThresholdMs ? 5 : 4;
+}
+```
+
+**Design decision (flag for user).** The MC discount (cap at 4) is a pedagogical choice. Document it in the plan so it's intentional rather than emergent. Alternative: store raw `quality` and apply mode discount at schedule time — keeps data richer for future free-recall modes.
+
+**Tasks to update.** Task 1 (pass `timeMs` through completion payload), Task 4 (new signature + tests), Task 9 (pass `timeMs` from client to server).
+
+**Verified By.** Unit tests: "correct + fast MC → 4", "correct + slow MC → 3", "wrong → 2", "correct + fast free-recall → 5".
+
+---
+
+### QP2-R3 — `Math.random()` biased shuffle in capitals mastery path (Serious) — Task 3
+
+**Problem.** In the capitals mastery branch:
+```typescript
+const otherCapitals = CAPITALS_DATA
+  .filter((c) => c.capital.toLowerCase() !== item.answer.toLowerCase())
+  .sort(() => Math.random() - 0.5)    // biased shuffle
+  .slice(0, 3)
+```
+`.sort(() => Math.random() - 0.5)` is a biased shuffle (known statistically non-uniform across V8's TimSort) and matches the exact instability pattern previously flagged on MentoMate. The vocabulary path uses Fisher-Yates correctly; the capitals path regressed.
+
+**Fix.** Replace the capitals mastery shuffle with the Fisher-Yates already in `vocabulary-provider.ts`. Extract `shuffle<T>(arr: T[]): T[]` to a shared utility (e.g., `apps/api/src/services/quiz/shuffle.ts`) and use it in both paths.
+
+**Design decision (flag).** Per-request redistribution of distractors is fine for vocabulary (variety aids learning), but it's not stable across repeated views of the same question in a session. That's an intentional design call; state it in the plan so it's not re-flagged later.
+
+**Tasks to update.** Task 3 (capitals mastery uses shared `shuffle`), Task 2 (export `shuffle` from vocabulary-provider or new module).
+
+**Verified By.** Unit test: "shuffle is unbiased over 10,000 runs" (chi-squared on position frequency).
+
+---
+
+### QP2-R4 — "Due for review" filter treats never-studied items as due (Serious) — Task 5
+
+**Problem.**
+```typescript
+libraryItems = dueVocab
+  .filter((v) => !v.nextReviewAt || v.nextReviewAt <= now)
+```
+`!v.nextReviewAt` treats every vocabulary item **without a retention card** as due. The moment a learner adds a word, it becomes a mastery candidate in the next round — **before they've ever studied it**. Mastery questions are supposed to test things the learner has seen. This conflates "new, never-studied" with "due for review" and corrupts SM-2 data (the first "review" of an item is really a first exposure).
+
+**Fix.**
+- **Mastery pool = items with a retention card AND `nextReviewAt <= now`**. Never-studied items are excluded from the mastery pool.
+- **New items flow through a different path** — either (a) the discovery LLM path (surface them as "new" vocabulary to introduce), or (b) an explicit "introduce new vocab" pre-round step that creates the first retention card via `reviewVocabulary(..., { quality: 3 })` after the learner answers.
+
+**Tasks to update.** Task 5 (tighten the filter — require `nextReviewAt IS NOT NULL`). A separate spec may be needed for the "introduce new vocab" flow; flag to the user before implementing.
+
+**Verified By.** Unit test: "filter excludes items with null nextReviewAt", "filter includes items with past nextReviewAt", "filter excludes items with future nextReviewAt".
+
+---
+
+### QP2-R5 — `plan.masteryItems` / `plan.discoveryCount` source unspecified; vocab-adaptive ratio needed (Serious) — Task 3
+
+**Problem.** The vocabulary path calls `plan.masteryItems` and `plan.discoveryCount` but the plan never shows where `plan` is built. Phase 1 presumably has a `planRound()` helper; this plan assumes its shape works unmodified for vocabulary. For vocabulary with SM-2, the mastery/discovery ratio **must adapt to how many items are due** — if 40 items are due, a 2-mastery/6-discovery round buries review behind new content and inflates the due queue.
+
+**Fix.**
+1. Document the existing `planRound()` signature in this plan (Task 3, Step 0: "Read `planRound` before modifying"). Include its current output for capitals.
+2. Add a vocabulary-specific planner input — e.g., `dueCount: number` — so the planner can cap discovery and scale mastery:
+   ```typescript
+   // rule of thumb: mastery = min(dueCount, 6), discovery = max(8 - mastery, 2)
+   ```
+3. If `planRound` is activity-type-aware, add a `vocabulary` branch. If it isn't, extract the ratio logic into an activity-specific strategy.
+
+**Tasks to update.** Task 3 (add planner branch + test), Task 5 (pass `dueCount` into planner input).
+
+**Verified By.** Unit test: "planner with 40 due items returns mastery ≥ 4", "planner with 0 due items returns all discovery", "planner with 2 due items returns 2 mastery + 6 discovery".
+
+---
+
+### QP2-R6 — Discriminated union may break parsing of existing Phase 1 rows (Medium) — Task 1
+
+**Problem.** `z.discriminatedUnion('type', ...)` requires every row to have the discriminator field. Existing `quiz_rounds.questions` JSON rows were written with the Phase 1 schema — if Phase 1's `capitalsQuestionSchema` did NOT require a literal `type: 'capitals'`, those rows will fail to parse after this change. The plan claims "No database migration" on line 1840, which is wrong if backfill is needed.
+
+**Fix.**
+1. **Audit first.** Read `packages/schemas/src/quiz.ts` on `main` and check whether `capitalsQuestionSchema` includes `type: z.literal('capitals')`. Report back before proceeding.
+2. **If missing:** Add a data migration (Drizzle) that backfills `type: 'capitals'` on every existing row's `questions[*]`. SQL shape:
+   ```sql
+   UPDATE quiz_rounds
+   SET questions = (
+     SELECT jsonb_agg(jsonb_set(q, '{type}', '"capitals"'))
+     FROM jsonb_array_elements(questions) AS q
+   )
+   WHERE activity_type = 'capitals'
+     AND NOT (questions -> 0 ? 'type');
+   ```
+3. **Alternative:** Use `z.union([capitalsQuestionSchema, vocabularyQuestionSchema])` (non-discriminated) with a `.transform` that adds `type: 'capitals'` when missing. Lower migration risk, slightly slower parse. Recommended for Phase 2.
+4. **Fix the "No database migration" claim** in the "What Phase 2 Does NOT Include" section.
+
+**Tasks to update.** Task 1 (audit step + conditional migration), final section (remove "No database migration" claim).
+
+**Verified By.** Test: "quizQuestionSchema parses a Phase 1 row without explicit type field" (using a fixture from before the migration).
+
+---
+
+### QP2-R7 — No end-to-end vocabulary round integration test (Medium) — New Task 11
+
+**Problem.** Every task has unit tests for its own function, but there is **no integration test that runs `generateQuizRound` → `completeQuizRound` for vocabulary and asserts SM-2 cards got updated correctly**. The SM-2 wiring is the core point of Phase 2 ("the first activity type where mastery questions have real spaced-repetition consequences"), so covering only the helpers in isolation is a miss.
+
+**Fix.** Add a **Task 11: Vocabulary end-to-end integration test** before Task 10 (validation). The test must:
+
+1. Seed a profile with a language subject and ≥ 10 vocabulary items with retention cards (some due, some not).
+2. Call `generateQuizRound({ activityType: 'vocabulary', ... })` with a mocked LLM returning valid vocabulary LLM output.
+3. Assert the returned round has the expected mastery/discovery split (per planner).
+4. Call `completeQuizRound` with a mix of correct/wrong answers for mastery questions.
+5. **Re-read the retention cards** and assert `nextReviewAt`, `interval`, `easiness`, and `repetitions` advanced per SM-2 rules.
+6. Assert missed discovery items were written to `quiz_missed_items` with the vocabulary-formatted text (`Translate: ...`).
+
+Use real DB (per `feedback_testing_no_mocks` + integration-test-no-internal-mocks rule); mock only the LLM router.
+
+**Verified By.** The integration test itself (`apps/api/src/services/quiz/vocabulary-e2e.integration.test.ts`).
+
+---
+
+### QP2-R8 — `buildVocabularyMasteryQuestion` returns `null` silently (Medium) — Task 2
+
+**Problem.** When the vocab pool is too small for 3 distractors, the item is silently dropped. Two consequences:
+- **Zero telemetry.** In production, there's no way to detect how often this happens.
+- **100%-discovery rounds for small banks.** A learner with < 4 vocab items gets zero SM-2 updates because every mastery attempt returns `null`, and nothing signals that the round was effectively all-discovery.
+
+**Fix.**
+1. **Precondition at the route layer.** Skip the mastery branch entirely when `allVocabulary.length < 4` and log a structured event (`quiz.vocabulary.mastery_pool_too_small`, with `profileId` and `poolSize`).
+2. **Telemetry in the builder.** When `buildVocabularyMasteryQuestion` returns `null` despite the precondition passing (edge case: dedup removed too many), emit a warning with `{ vocabularyId, poolSize, distractorsFound }`.
+3. **Return a reason enum instead of `null`:** `{ ok: false, reason: 'insufficient_distractors' } | { ok: true, question: VocabularyQuestion }` — forces callers to handle the failure explicitly and makes logging easier.
+
+Per the global rule: "Silent Recovery Without Escalation is Banned" — `console.warn` alone isn't enough; use a structured log / metric.
+
+**Tasks to update.** Task 2 (new return type + precondition + logging), Task 5 (route-level precondition).
+
+**Verified By.** Unit test: "builder returns `insufficient_distractors` when pool has < 4 items", "route skips mastery branch for small pools and emits metric".
+
+---
+
+### QP2-R9 — `Intl.DisplayNames` silently falls back to raw language code (Medium) — Task 2
+
+**Problem.** `getLanguageDisplayName` wraps `Intl.DisplayNames` in try/catch and falls back to the raw code. In a misconfigured Node version, the prompt to the LLM contains `"de"` instead of `"German"`, and the existing test passes because it only asserts `prompt.toContain('German')` on the happy path. A prod regression would ship silently.
+
+**Fix.** Remove the try/catch. `Intl.DisplayNames` is standard since Node 14 (API 17) and available in all supported Jest environments. If it truly can throw in some environments, add an explicit test for the fallback path that asserts the raw code is used and logs a warning.
+
+**Recommended:**
+```typescript
+function getLanguageDisplayName(code: string): string {
+  const name = new Intl.DisplayNames(['en'], { type: 'language' }).of(code);
+  if (!name) throw new Error(`Unknown language code: ${code}`);
+  return name;
+}
+```
+
+**Tasks to update.** Task 2 (remove try/catch; add `languageCode` validation at the route layer so bad codes fail early with a user-visible error, not a bad prompt).
+
+**Verified By.** Unit test: "getLanguageDisplayName throws for unknown code". Route test: "POST /quiz/rounds returns 400 for subject with invalid languageCode".
+
+---
+
+### QP2-R10 — `subject.name` assumed to be language display name (Polish) — Task 7
+
+**Problem.** In Task 7, `languageName = subject.name` is used for the card title (`Vocabulary: ${languageName}`). If a parent names the subject "Emma's German," the card reads "Vocabulary: Emma's German" — not broken, but awkward.
+
+**Fix.** Use `subject.languageCode` → `getLanguageDisplayName(subject.languageCode)` for the display-language portion, keeping `subject.name` only for a secondary subtitle when it differs:
+```typescript
+const languageName = getLanguageDisplayName(subject.languageCode);
+const subtitle = subject.name !== languageName ? subject.name : undefined;
+```
+
+**Verified By.** Manual: visual check of the quiz index card with a subject named `"Emma's German"` (expected: "Vocabulary: German" with subtitle "Emma's German").
+
+---
+
+### QP2-R11 — `@ts-expect-error` masks `subjectId` type errors (Polish, tech debt) — Task 6
+
+**Problem.** `// @ts-expect-error quiz route types not yet wired to RPC client` in `use-quiz.ts` means the `subjectId` addition passes through without the type system catching mistakes (field-name typos, wrong type, missing at call site).
+
+**Fix.** Low priority for this phase. Track as tech debt to wire Hono RPC types through to the mobile client. Do NOT remove the `@ts-expect-error` — without the RPC wiring, the call will break at compile time.
+
+**Verified By.** N/A — tracked as tech debt. Add a follow-up note in the plan's "What Phase 2 Does NOT Include" section.
+
+---
+
+### QP2-R12 — `nextCefrLevel('A1 ')` coerces to `A2` silently (Polish) — Task 2
+
+**Problem.** `nextCefrLevel(level: string)` defaults unknown input to `'A2'`. Trailing whitespace (`'A1 '`) or typos (`'a1'`) are silently "promoted" to `A2`, corrupting the difficulty curve.
+
+**Fix.**
+```typescript
+export function nextCefrLevel(level: string): string {
+  const normalized = level.trim().toUpperCase();
+  const idx = CEFR_ORDER.indexOf(normalized as (typeof CEFR_ORDER)[number]);
+  if (idx < 0) throw new Error(`Invalid CEFR level: "${level}"`);
+  return CEFR_ORDER[Math.min(idx + 1, CEFR_ORDER.length - 1)];
+}
+```
+Validate `cefrCeiling` at the route layer so bad values never reach the generator.
+
+**Tasks to update.** Task 2 (throw on unknown), update the test `nextCefrLevel defaults to A2 for unknown input` to `throws on unknown input`.
+
+**Verified By.** Unit test: "nextCefrLevel trims whitespace", "nextCefrLevel throws on 'X9'", "nextCefrLevel throws on empty string".
+
+---
+
+### QP2-R13 — `pickDistractors` case-insensitive dedup (Polish) — Task 2
+
+**Problem.** Dedup is case-insensitive but output preserves original casing. If the bank has `"Dog"` and `"dog"`, only one survives.
+
+**Fix.** Intended behavior — duplicates with different casing almost always represent a data-entry error. Document this in a code comment so future readers don't "fix" it into a case-sensitive dedup.
+
+**Verified By.** N/A — intended. Add a comment in `pickDistractors` referencing QP2-R13.
+
+---
+
+## Finding → Task Map
+
+| Task | Findings that gate it |
+|---|---|
+| Task 1 | QP2-R6 |
+| Task 2 | QP2-R3, QP2-R8, QP2-R9, QP2-R12, QP2-R13 |
+| Task 3 | QP2-R3, QP2-R5 |
+| Task 4 | QP2-R2 |
+| Task 5 | QP2-R1, QP2-R4 |
+| Task 6 | QP2-R11 |
+| Task 7 | QP2-R10 |
+| **Task 11 (new)** | QP2-R7 (integration test) |
+
+---
+
 ## File Structure
 
 ### New Files
@@ -41,6 +358,34 @@
 | `apps/mobile/src/app/(app)/quiz/index.tsx` | Add Vocabulary card per language subject, conditional rendering |
 | `apps/mobile/src/app/(app)/quiz/launch.tsx` | Pass `subjectId` to generate mutation |
 | `apps/mobile/src/app/(app)/quiz/play.tsx` | Dispatch question rendering by `type`, vocabulary question layout, guard empty funFact |
+
+---
+
+### Task 0: Pre-Implementation Audit
+
+**Purpose.** Resolve three uncertainties in the current codebase before writing any Phase 2 code. The answers dominate: (a) whether R6 needs a data migration or just a schema transform, (b) whether R4/Missed-A require an initialization flow or `reviewVocabulary` handles it lazily, (c) whether Task 3 needs a new planner branch or the existing `planRound` already dispatches on activity type.
+
+**Execution.** Dispatched as a read-only Explore agent on 2026-04-16. Three questions, no drafting:
+
+1. Does `capitalsQuestionSchema` in `packages/schemas/src/quiz.ts` include `type: z.literal('capitals')`?
+2. Does `reviewVocabulary(db, profileId, vocabularyId, { quality })` lazy-create a `vocabularyRetentionCards` row, or require one to exist?
+3. What is the current `planRound` signature and does it branch on `activityType`?
+
+- [ ] **Step 1:** Read the audit report (dispatched in background).
+- [ ] **Step 2:** Update the Review Findings section with audit-resolved items:
+   - **QP2-R6:** If Q1 = yes → mark as NO-OP (no migration, no transform needed). If Q1 = no → confirm `z.union` + transform path in Task 1.
+   - **Missed-A / QP2-R4:** If Q2 = lazy-create → bootstrap mini-spec shrinks. If Q2 = require-and-throw → bootstrap mini-spec MUST define card-creation flow before Task 4.
+   - **QP2-R5:** If Q3 = activity-aware → minor planner extension. If Q3 = single-shape → larger Task 3 refactor.
+- [ ] **Step 3:** Write the bootstrap mini-spec (gated on Q2 answer). Covers: first-ever vocabulary round content source, card creation timing, sub-4-item bank handling.
+- [ ] **Step 4:** Confirm QP2-D1 and QP2-D2 with user.
+- [ ] **Step 5:** Commit the plan updates (no code yet).
+
+```bash
+git add docs/superpowers/plans/2026-04-16-quiz-activities-phase2-vocabulary.md
+git commit -m "docs(quiz): Phase 2 Task 0 audit + bootstrap mini-spec [QUIZ-P2]"
+```
+
+**Gate.** Tasks 4 and 5 MUST NOT start until Task 0 Step 3 (bootstrap mini-spec) and Step 4 (decisions) are complete. Tasks 1-3 may execute in parallel with Steps 3-4.
 
 ---
 
@@ -1837,4 +2182,5 @@ git commit -m "chore(quiz): lint and typecheck fixes for Phase 2 vocabulary [QUI
 - **Capitals SM-2 tracking** — Capitals remain pure discovery. SM-2 only for vocabulary.
 - **Free-text unlock / difficulty adaptation** — Phase 5
 - **Round history screen / per-activity stats** — Phase 5
-- **No database migration** — Phase 1 already creates the `'vocabulary'` enum value and all needed tables
+- **Database migration** — Phase 1 already creates the `'vocabulary'` enum value and all needed tables, **BUT** see QP2-R6: a data backfill on `quiz_rounds.questions` may be required if Phase 1's `capitalsQuestionSchema` did not include a literal `type` discriminator. Audit before proceeding.
+- **Hono RPC type wiring for the quiz route** — see QP2-R11. `@ts-expect-error` remains in `use-quiz.ts` until a cross-cutting RPC wiring task lands. Adding `subjectId` passes through without compile-time checking.

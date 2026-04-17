@@ -33,4 +33,11 @@ ALTER TABLE "quiz_missed_items" ADD CONSTRAINT "quiz_missed_items_source_round_i
 ALTER TABLE "quiz_rounds" ADD CONSTRAINT "quiz_rounds_profile_id_profiles_id_fk" FOREIGN KEY ("profile_id") REFERENCES "public"."profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "idx_quiz_missed_items_profile" ON "quiz_missed_items" USING btree ("profile_id","activity_type","surfaced");--> statement-breakpoint
 CREATE INDEX "idx_quiz_rounds_profile_activity" ON "quiz_rounds" USING btree ("profile_id","activity_type");--> statement-breakpoint
-CREATE INDEX "idx_quiz_rounds_profile_status" ON "quiz_rounds" USING btree ("profile_id","status");
+CREATE INDEX "idx_quiz_rounds_profile_status" ON "quiz_rounds" USING btree ("profile_id","status");--> statement-breakpoint
+-- [ASSUMP-F14] Parity with 0027_enable_rls.sql. Quiz tables landed after the
+-- RLS-enablement migration, so they would be the only profile-scoped tables
+-- without RLS when the S-06 Phase 2-4 enforcement cut-over lands. Enable
+-- here so they travel with the table creation. Policies will be added in
+-- the S-06 phase that writes policies for all profile-scoped tables.
+ALTER TABLE "quiz_rounds" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
+ALTER TABLE "quiz_missed_items" ENABLE ROW LEVEL SECURITY;

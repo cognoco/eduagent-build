@@ -61,14 +61,19 @@ const LLM_ROUTE_PATTERNS = [
   /\/sessions\/[^/]+\/stream\/?$/,
   /\/subjects\/[^/]+\/interview\/?$/,
   /\/subjects\/[^/]+\/interview\/stream\/?$/,
+  // Quiz round generation + prefetch both call the LLM (one call per round).
+  // Completion/recent/stats are DB-only and must not decrement quota.
+  /\/quiz\/rounds\/?$/,
+  /\/quiz\/rounds\/prefetch\/?$/,
 ];
 
 function isLlmRoute(path: string, method: string): boolean {
-  // Interview routes only consume LLM quota on POST (creating an interview).
-  // GET /interview fetches existing state and must not trigger a decrement.
+  // GET methods never decrement quota (we only bill POST requests that
+  // trigger an LLM call). Interview + quiz have GET endpoints on the same
+  // path prefix — filter them out from the GET match list.
   if (method === 'GET') {
     return LLM_ROUTE_PATTERNS.filter(
-      (p) => !p.source.includes('interview')
+      (p) => !p.source.includes('interview') && !p.source.includes('quiz')
     ).some((pattern) => pattern.test(path));
   }
   return LLM_ROUTE_PATTERNS.some((pattern) => pattern.test(path));

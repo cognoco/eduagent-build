@@ -3147,3 +3147,39 @@ git commit -m "chore(quiz): final validation pass — typecheck, tests, lint cle
 | 13 | quiz/play.tsx | MC gameplay core |
 | 14 | quiz/results.tsx | Score + celebration + play again |
 | 15 | — | DB push + full validation |
+
+## Failure Modes
+
+Required by project CLAUDE.md ("Every feature spec must include a Failure Modes table").
+
+| State | Trigger | User sees | Recovery |
+|-------|---------|-----------|----------|
+| LLM returns malformed JSON | Provider outage, prompt drift, fence wrapping | Launch screen error: "We couldn't start your round" | Retry button (re-generates) + Go Back to activity picker |
+| LLM returns 0 valid questions after `validateCapitalsQuestions` | Hallucinated country names, all answers fail cross-check | Same as above (`QuizLlmError` → 502) | Retry + Go Back |
+| `db.insert(quiz_rounds)` fails | DB outage / FK violation | Launch error banner | Retry + Go Back |
+| Round fetched by different profile | IDOR attempt or stale client state | 404 "Round not found" | Start a new round (Go Back) |
+| Round already `completed` when POST /complete arrives | Double-tap Done, network retry on success response | Silent fast-path: re-fetch completed round, navigate to results | No user-visible error — `QuizRoundAlreadyCompletedError` handled by hook |
+| Round `abandoned` when user re-enters app | Long idle → background expiry cron (phase 2) | Results screen with "This round expired" banner | Start a new round |
+| Transaction fails mid-complete (insert missed items OR update round) | DB contention | "Couldn't save your score" alert | Retry (idempotent via round id) + Go Home |
+| Network loss mid-round | Airplane mode / WiFi drop | Offline banner on play screen | Answers buffered client-side; submit on reconnect, otherwise Go Home loses progress (documented trade-off for Phase 1) |
+| Mastery item list empty + LLM discovery fails | First-time user with no history + LLM down | Error → Retry | Same as LLM-failure path above |
+| `xp_earned` cosmetic in Phase 1 | Ledger not wired | User sees XP on results screen but total doesn't move | **Known limitation — Phase 2 wires XP ledger via Inngest `quiz/round.completed` event** |
+
+## Rollback
+
+Per project CLAUDE.md ("Destructive Migrations Need a Rollback Section").
+
+**Migration 0028_safe_anita_blake.sql is non-destructive** — it creates two new tables (`quiz_rounds`, `quiz_missed_items`) and two enums (`quiz_activity_type`, `quiz_round_status`). It does not drop columns, rename, or alter existing data.
+
+Rollback procedure:
+
+```sql
+DROP TABLE IF EXISTS quiz_missed_items;  -- FK to quiz_rounds, drop first
+DROP TABLE IF EXISTS quiz_rounds;
+DROP TYPE IF EXISTS quiz_round_status;
+DROP TYPE IF EXISTS quiz_activity_type;
+```
+
+**Data loss on rollback:** All quiz round history and missed-item records are permanently destroyed. Acceptable because Phase 1 ships before production users exist; no regulated/financial data is stored.
+
+**Rollback is possible** but requires a forward-migration (`0029_...`) — do not edit 0028 in place once applied to any environment (per project migration policy).

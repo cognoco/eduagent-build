@@ -1,19 +1,23 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
-import { and, desc, eq } from 'drizzle-orm';
 import {
   completeRoundInputSchema,
   generateRoundInputSchema,
   type GenerateRoundInput,
 } from '@eduagent/schemas';
-import { quizRounds, type Database } from '@eduagent/database';
+import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import type { ProfileMeta } from '../middleware/profile-scope';
 import { requireProfileId } from '../middleware/profile-scope';
 import { validationError } from '../errors';
-import { QUIZ_CONFIG } from '../services/quiz/config';
-import { completeQuizRound } from '../services/quiz/complete-round';
-import { generateQuizRound } from '../services/quiz/generate-round';
+import {
+  completeQuizRound,
+  computeRoundStats,
+  generateQuizRound,
+  getRecentAnswers,
+  getRoundByIdOrThrow,
+  listRecentCompletedRounds,
+} from '../services/quiz';
 
 type QuizRouteEnv = {
   Bindings: {
@@ -28,30 +32,23 @@ type QuizRouteEnv = {
   };
 };
 
+/**
+ * Route-layer orchestration only. Every read goes through
+ * `services/quiz/queries.ts`, every mutation through `generate-round.ts` or
+ * `complete-round.ts`. This file must not import `drizzle-orm`,
+ * `@eduagent/database` schema tables, or `createScopedRepository` directly.
+ */
 async function buildAndGenerateRound(
   db: Database,
   profileId: string,
   profileMeta: ProfileMeta,
   input: GenerateRoundInput
 ) {
-  const recentRounds = await db.query.quizRounds.findMany({
-    where: and(
-      eq(quizRounds.profileId, profileId),
-      eq(quizRounds.activityType, input.activityType)
-    ),
-    orderBy: [desc(quizRounds.createdAt)],
-    limit: 5,
-  });
-
-  const recentAnswers = recentRounds
-    .flatMap((round) => {
-      const questions =
-        (round.questions as Array<{ correctAnswer?: string }>) ?? [];
-      return questions
-        .map((question) => question.correctAnswer)
-        .filter((answer): answer is string => Boolean(answer));
-    })
-    .slice(0, QUIZ_CONFIG.defaults.recentlySeenBufferSize);
+  const recentAnswers = await getRecentAnswers(
+    db,
+    profileId,
+    input.activityType
+  );
 
   return generateQuizRound({
     db,
@@ -59,6 +56,9 @@ async function buildAndGenerateRound(
     activityType: input.activityType,
     birthYear: profileMeta.birthYear,
     themePreference: input.themePreference,
+    // Phase 2: wired when vocabulary retention lands. Until then, all
+    // capitals questions are discovery — the mastery path is unit-tested in
+    // isolation via content-resolver.test.ts.
     libraryItems: [],
     recentAnswers,
   });
@@ -136,14 +136,7 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
     const profileId = requireProfileId(c.get('profileId'));
     const db = c.get('db');
 
-    const rounds = await db.query.quizRounds.findMany({
-      where: and(
-        eq(quizRounds.profileId, profileId),
-        eq(quizRounds.status, 'completed')
-      ),
-      orderBy: [desc(quizRounds.completedAt)],
-      limit: 10,
-    });
+    const rounds = await listRecentCompletedRounds(db, profileId, 10);
 
     return c.json(
       rounds.map((round) => ({
@@ -164,16 +157,9 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
     const db = c.get('db');
     const roundId = c.req.param('id');
 
-    const round = await db.query.quizRounds.findFirst({
-      where: and(
-        eq(quizRounds.id, roundId),
-        eq(quizRounds.profileId, profileId)
-      ),
-    });
-
-    if (!round) {
-      return c.json({ error: 'Round not found' }, 404);
-    }
+    // Throws NotFoundError if the round doesn't exist OR belongs to a
+    // different profile — handled centrally by `app.onError` → 404.
+    const round = await getRoundByIdOrThrow(db, profileId, roundId);
 
     return c.json(
       {
@@ -203,52 +189,6 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
     const profileId = requireProfileId(c.get('profileId'));
     const db = c.get('db');
 
-    const rounds = await db.query.quizRounds.findMany({
-      where: and(
-        eq(quizRounds.profileId, profileId),
-        eq(quizRounds.status, 'completed')
-      ),
-    });
-
-    const statsByActivity = new Map<
-      string,
-      {
-        roundsPlayed: number;
-        bestScore: number | null;
-        bestTotal: number | null;
-        totalXp: number;
-      }
-    >();
-
-    for (const round of rounds) {
-      const current = statsByActivity.get(round.activityType) ?? {
-        roundsPlayed: 0,
-        bestScore: null,
-        bestTotal: null,
-        totalXp: 0,
-      };
-
-      current.roundsPlayed += 1;
-      current.totalXp += round.xpEarned ?? 0;
-
-      if (
-        round.score != null &&
-        (current.bestScore == null ||
-          round.score / round.total >
-            current.bestScore / (current.bestTotal ?? 1))
-      ) {
-        current.bestScore = round.score;
-        current.bestTotal = round.total;
-      }
-
-      statsByActivity.set(round.activityType, current);
-    }
-
-    return c.json(
-      Array.from(statsByActivity.entries()).map(([activityType, stats]) => ({
-        activityType,
-        ...stats,
-      })),
-      200
-    );
+    const stats = await computeRoundStats(db, profileId);
+    return c.json(stats, 200);
   });

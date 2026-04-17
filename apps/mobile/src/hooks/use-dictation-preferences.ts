@@ -1,6 +1,21 @@
 import { useCallback, useEffect, useState } from 'react';
 import * as SecureStore from '../lib/secure-storage';
+import { Sentry } from '../lib/sentry';
 import type { DictationPace } from '@eduagent/schemas';
+
+// [escalation] SecureStore writes here are best-effort, but per project
+// CLAUDE.md "console.warn alone is never sufficient" for fallback paths.
+// We log to Sentry with a tag so we can quantify how often these silently
+// fail in production without flooding the breadcrumb stream with noise.
+function reportSecureStoreFailure(
+  scope: 'pace' | 'punctuation',
+  err: unknown
+): void {
+  console.warn(`[Dictation] SecureStore write failed (${scope}):`, err);
+  Sentry.captureException(err, {
+    tags: { feature: 'dictation', secure_store_scope: scope },
+  });
+}
 
 const getPaceKey = (profileId: string) => `dictation-pace-${profileId}`;
 const getPunctKey = (profileId: string) => `dictation-punctuation-${profileId}`;
@@ -42,8 +57,7 @@ export function useDictationPreferences(
       setPaceState(next);
       if (profileId) {
         void SecureStore.setItemAsync(getPaceKey(profileId), next).catch(
-          (err) =>
-            console.warn('[Dictation] SecureStore write failed (pace):', err)
+          (err) => reportSecureStoreFailure('pace', err)
         );
       }
     },
@@ -57,12 +71,7 @@ export function useDictationPreferences(
         void SecureStore.setItemAsync(
           getPunctKey(profileId),
           String(next)
-        ).catch((err) =>
-          console.warn(
-            '[Dictation] SecureStore write failed (punctuation):',
-            err
-          )
-        );
+        ).catch((err) => reportSecureStoreFailure('punctuation', err));
       }
       return next;
     });
@@ -74,8 +83,7 @@ export function useDictationPreferences(
       const next = PACE_CYCLE[(idx + 1) % PACE_CYCLE.length]!;
       if (profileId) {
         void SecureStore.setItemAsync(getPaceKey(profileId), next).catch(
-          (err) =>
-            console.warn('[Dictation] SecureStore write failed (pace):', err)
+          (err) => reportSecureStoreFailure('pace', err)
         );
       }
       return next;

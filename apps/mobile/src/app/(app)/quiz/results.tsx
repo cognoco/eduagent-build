@@ -23,6 +23,13 @@ export default function QuizResultsScreen(): React.ReactElement {
     setRound,
     clear,
   } = useQuizFlow();
+  // [Q-13] Eagerly hydrate the prefetched round into the query cache as soon
+  // as the results screen mounts so "Play Again" is instantaneous. For users
+  // who tap Done we pay one extra GET /quiz/rounds/:id, which is intentional:
+  // the server-side round is already generated and persisted during mid-round
+  // prefetch, and the cached response warms the hook so the transition from
+  // results → play renders without a loading state. Deferring the fetch to
+  // the Play Again press would add a perceptible wait on the hot path.
   const prefetchedRound = useFetchRound(prefetchedRoundId);
 
   const score = completionResult?.score ?? 0;
@@ -58,6 +65,14 @@ export default function QuizResultsScreen(): React.ReactElement {
       setPrefetchedRoundId(null);
       router.replace('/(app)/quiz/play' as never);
       return;
+    }
+
+    // [ASSUMP-F3] If the prefetched round id was set but its fetch failed,
+    // clear it here. Otherwise the stale id lingers in context and could
+    // confuse a future handler that assumes a non-null id implies a fetchable
+    // round.
+    if (prefetchedRoundId) {
+      setPrefetchedRoundId(null);
     }
 
     if (!activityType) {

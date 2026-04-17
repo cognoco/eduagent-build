@@ -6,3 +6,10 @@ export {
 } from './capitals-validation';
 export { generateQuizRound } from './generate-round';
 export { completeQuizRound } from './complete-round';
+export {
+  getRecentAnswers,
+  getRoundById,
+  getRoundByIdOrThrow,
+  listRecentCompletedRounds,
+  computeRoundStats,
+} from './queries';

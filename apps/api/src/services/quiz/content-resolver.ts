@@ -1,5 +1,6 @@
 import type { QuizActivityType } from '@eduagent/schemas';
 import { QUIZ_CONFIG } from './config';
+import { shuffle } from './shuffle';
 
 export interface LibraryItem {
   id: string;
@@ -21,10 +22,6 @@ export interface RoundContentPlan {
   masteryItems: LibraryItem[];
   totalQuestions: number;
   recentAnswers: string[];
-}
-
-function shuffle<T>(items: T[]): T[] {
-  return [...items].sort(() => Math.random() - 0.5);
 }
 
 export function resolveRoundContent(params: ResolveParams): RoundContentPlan {

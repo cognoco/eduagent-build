@@ -1,5 +1,6 @@
 import type { CapitalsLlmOutput } from '@eduagent/schemas';
 import { CAPITALS_BY_COUNTRY, CAPITALS_DATA } from './capitals-data';
+import { shuffle } from './shuffle';
 
 export interface ValidatedCapitalsQuestion {
   country: string;
@@ -23,7 +24,10 @@ function buildFallbackDistractors(
   );
   const padded = [...existing];
 
-  for (const entry of CAPITALS_DATA) {
+  // [Q-17] Shuffle the reference pool so that if the LLM returns 0 valid
+  // distractors for a given country, we don't always fall back to the same
+  // deterministic first three capitals alphabetically.
+  for (const entry of shuffle(CAPITALS_DATA)) {
     const candidate = entry.capital;
     const key = candidate.trim().toLowerCase();
     if (seen.has(key)) continue;

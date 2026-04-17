@@ -20,6 +20,7 @@ export const ERROR_CODES = {
   GONE: 'GONE',
   NOT_IMPLEMENTED: 'NOT_IMPLEMENTED',
   ENV_VALIDATION_ERROR: 'ENV_VALIDATION_ERROR',
+  UPSTREAM_ERROR: 'UPSTREAM_ERROR',
 } as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];

@@ -1,8 +1,10 @@
-import type { QuestionResult } from '@eduagent/schemas';
+import type { CapitalsQuestion, QuestionResult } from '@eduagent/schemas';
 import {
   calculateScore,
   calculateXp,
   getCelebrationTier,
+  isAnswerCorrect,
+  validateResults,
 } from './complete-round';
 
 describe('calculateScore', () => {
@@ -69,5 +71,97 @@ describe('getCelebrationTier', () => {
 
   it('returns nice for zero', () => {
     expect(getCelebrationTier(0, 8)).toBe('nice');
+  });
+});
+
+// [ASSUMP-F5] Break tests: prove the server never trusts client `correct`.
+describe('isAnswerCorrect (server-side truth)', () => {
+  const question: CapitalsQuestion = {
+    type: 'capitals',
+    country: 'France',
+    correctAnswer: 'Paris',
+    acceptedAliases: ['Paris'],
+    distractors: ['Lyon', 'Marseille', 'Nice'],
+    funFact: '',
+    isLibraryItem: false,
+  };
+
+  it('accepts the canonical answer', () => {
+    expect(isAnswerCorrect(question, 'Paris')).toBe(true);
+  });
+
+  it('accepts aliases case-insensitively', () => {
+    const q: CapitalsQuestion = {
+      ...question,
+      acceptedAliases: ['Paris', 'Paname'],
+    };
+    expect(isAnswerCorrect(q, 'paname')).toBe(true);
+  });
+
+  it('rejects wrong answers even if client claims correct', () => {
+    expect(isAnswerCorrect(question, 'Lyon')).toBe(false);
+  });
+
+  it('rejects empty string', () => {
+    expect(isAnswerCorrect(question, '')).toBe(false);
+  });
+});
+
+describe('validateResults (anti-tampering)', () => {
+  const questions: CapitalsQuestion[] = [
+    {
+      type: 'capitals',
+      country: 'France',
+      correctAnswer: 'Paris',
+      acceptedAliases: ['Paris'],
+      distractors: ['Lyon', 'Marseille', 'Nice'],
+      funFact: '',
+      isLibraryItem: false,
+    },
+    {
+      type: 'capitals',
+      country: 'Germany',
+      correctAnswer: 'Berlin',
+      acceptedAliases: ['Berlin'],
+      distractors: ['Munich', 'Hamburg', 'Cologne'],
+      funFact: '',
+      isLibraryItem: false,
+    },
+  ];
+
+  it('overrides client-reported correct=true when answer is wrong', () => {
+    // Attacker sends all-correct to farm XP
+    const tampered: QuestionResult[] = [
+      { questionIndex: 0, correct: true, answerGiven: 'Lyon', timeMs: 100 },
+      { questionIndex: 1, correct: true, answerGiven: 'Munich', timeMs: 100 },
+    ];
+
+    const validated = validateResults(questions, tampered);
+
+    expect(validated).toEqual([
+      { questionIndex: 0, correct: false, answerGiven: 'Lyon', timeMs: 100 },
+      { questionIndex: 1, correct: false, answerGiven: 'Munich', timeMs: 100 },
+    ]);
+    expect(calculateScore(validated)).toBe(0);
+  });
+
+  it('overrides client-reported correct=false when answer is actually right', () => {
+    const underReported: QuestionResult[] = [
+      { questionIndex: 0, correct: false, answerGiven: 'Paris', timeMs: 3000 },
+    ];
+
+    const validated = validateResults(questions, underReported);
+    expect(validated[0]?.correct).toBe(true);
+  });
+
+  it('drops results with out-of-bounds questionIndex', () => {
+    const malicious: QuestionResult[] = [
+      { questionIndex: 999, correct: true, answerGiven: 'whatever', timeMs: 1 },
+      { questionIndex: 0, correct: true, answerGiven: 'Paris', timeMs: 3000 },
+    ];
+
+    const validated = validateResults(questions, malicious);
+    expect(validated).toHaveLength(1);
+    expect(validated[0]?.questionIndex).toBe(0);
   });
 });

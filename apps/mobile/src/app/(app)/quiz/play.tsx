@@ -1,10 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { CapitalsQuestion, QuestionResult } from '@eduagent/schemas';
 import { useCompleteRound, usePrefetchRound } from '../../../hooks/use-quiz';
+import { goBackOrReplace } from '../../../lib/navigation';
+import { useThemeColors } from '../../../lib/theme';
 import { useQuizFlow } from './_layout';
 
 type AnswerState = 'unanswered' | 'correct' | 'wrong';
@@ -33,10 +36,15 @@ function isCorrectOption(question: CapitalsQuestion, answer: string): boolean {
 export default function QuizPlayScreen(): React.ReactElement {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const colors = useThemeColors();
   const { round, activityType, setPrefetchedRoundId, setCompletionResult } =
     useQuizFlow();
   const completeRound = useCompleteRound();
   const prefetchRound = usePrefetchRound();
+  // [ASSUMP-F10] When completeRound fails we surface an inline retry UI
+  // instead of silently fabricating a 0-XP "nice" result and navigating.
+  // Users should always know when the server didn't accept their round.
+  const [completeError, setCompleteError] = useState<string | null>(null);
 
   const questions = (round?.questions ?? []) as CapitalsQuestion[];
   const totalQuestions = round?.total ?? 0;
@@ -67,9 +75,14 @@ export default function QuizPlayScreen(): React.ReactElement {
   useEffect(() => {
     if (!currentQuestion) return;
 
-    setShuffledOptions(
-      shuffle([currentQuestion.correctAnswer, ...currentQuestion.distractors])
+    // Dedup before shuffling in case the LLM produces a distractor that
+    // collides with the correct answer. Without this, React would warn on
+    // duplicate keys and the "wrong distractor is also correct" edge case
+    // would render as a silent win/loss mismatch.
+    const uniqueOptions = Array.from(
+      new Set([currentQuestion.correctAnswer, ...currentQuestion.distractors])
     );
+    setShuffledOptions(shuffle(uniqueOptions));
     setAnswerState('unanswered');
     setSelectedAnswer(null);
     setShowContinueHint(false);
@@ -116,6 +129,15 @@ export default function QuizPlayScreen(): React.ReactElement {
     };
   }, []);
 
+  // [ASSUMP-F2] Confirmed exit — ensures mid-round users always have a way
+  // out. Quitting routes back to the quiz home; the flow-context resets on
+  // the next round launch. Declared BEFORE the early-return so React's
+  // rules-of-hooks invariant (no conditional hooks) is respected even though
+  // this particular handler is a plain function.
+  const handleQuit = () => {
+    goBackOrReplace(router, '/(app)/quiz');
+  };
+
   if (!round || !currentQuestion) {
     return (
       <View className="flex-1 items-center justify-center bg-background">
@@ -128,6 +150,29 @@ export default function QuizPlayScreen(): React.ReactElement {
   // hoisted function declarations below carry the narrowed type through.
   const question: CapitalsQuestion = currentQuestion;
   const activeRound = round;
+
+  // [ASSUMP-F10] Shared submit path so Retry re-uses the same success/error
+  // handlers. Previously the onError branch faked a completion result and
+  // navigated — violating "silent recovery without escalation is banned".
+  function submitRound() {
+    setCompleteError(null);
+    completeRound.mutate(
+      { roundId: activeRound.id, results: resultsRef.current },
+      {
+        onSuccess: (result) => {
+          setCompletionResult(result);
+          router.replace('/(app)/quiz/results' as never);
+        },
+        onError: (err) => {
+          setCompleteError(
+            err instanceof Error
+              ? err.message
+              : 'We couldn\u2019t save your round. Please try again.'
+          );
+        },
+      }
+    );
+  }
 
   function handleAnswer(answer: string) {
     if (answerState !== 'unanswered') return;
@@ -172,25 +217,7 @@ export default function QuizPlayScreen(): React.ReactElement {
     }
 
     if (currentIndex + 1 >= totalQuestions) {
-      completeRound.mutate(
-        { roundId: activeRound.id, results: resultsRef.current },
-        {
-          onSuccess: (result) => {
-            setCompletionResult(result);
-            router.replace('/(app)/quiz/results' as never);
-          },
-          onError: () => {
-            setCompletionResult({
-              score: resultsRef.current.filter((result) => result.correct)
-                .length,
-              total: totalQuestions,
-              xpEarned: 0,
-              celebrationTier: 'nice',
-            });
-            router.replace('/(app)/quiz/results' as never);
-          },
-        }
-      );
+      submitRound();
       return;
     }
 
@@ -216,23 +243,49 @@ export default function QuizPlayScreen(): React.ReactElement {
     <Pressable
       className="flex-1 bg-background"
       style={{ paddingTop: insets.top + 12, paddingBottom: insets.bottom + 20 }}
-      onPress={answerState !== 'unanswered' ? handleContinue : undefined}
+      onPress={
+        answerState !== 'unanswered' && !completeError
+          ? handleContinue
+          : undefined
+      }
       testID="quiz-play-screen"
     >
       <View className="mb-6 flex-row items-center justify-between px-5">
-        <Text className="text-body-sm font-semibold text-text-secondary">
-          {currentIndex + 1} of {totalQuestions}
-        </Text>
+        <Pressable
+          onPress={handleQuit}
+          className="min-h-[32px] min-w-[32px] items-center justify-center"
+          accessibilityRole="button"
+          accessibilityLabel="Quit quiz"
+          testID="quiz-play-quit"
+          hitSlop={8}
+        >
+          <Ionicons name="close" size={24} color={colors.textSecondary} />
+        </Pressable>
 
-        <View className="flex-row gap-1">
-          {Array.from({ length: totalQuestions }, (_, index) => (
-            <View
-              key={index}
-              className={`h-2 w-2 rounded-full ${
-                index <= currentIndex ? 'bg-primary' : 'bg-surface-elevated'
-              }`}
-            />
-          ))}
+        <View className="flex-row items-center gap-3">
+          <Text className="text-body-sm font-semibold text-text-secondary">
+            {currentIndex + 1} of {totalQuestions}
+          </Text>
+
+          <View className="flex-row gap-1">
+            {Array.from({ length: totalQuestions }, (_, index) => {
+              // Three-state dots so "current" is visually distinct from
+              // "past" — otherwise the user loses the you-are-here signal.
+              const state =
+                index < currentIndex
+                  ? 'past'
+                  : index === currentIndex
+                  ? 'current'
+                  : 'future';
+              const dotClass =
+                state === 'past'
+                  ? 'h-2 w-2 rounded-full bg-primary opacity-60'
+                  : state === 'current'
+                  ? 'h-2.5 w-2.5 rounded-full bg-primary'
+                  : 'h-2 w-2 rounded-full bg-surface-elevated';
+              return <View key={index} className={dotClass} />;
+            })}
+          </View>
         </View>
 
         <Text className="text-body-sm font-semibold text-text-secondary">
@@ -250,9 +303,12 @@ export default function QuizPlayScreen(): React.ReactElement {
       </View>
 
       <View className="gap-3 px-5">
-        {shuffledOptions.map((option) => (
+        {shuffledOptions.map((option, index) => (
           <Pressable
-            key={option}
+            // Key/testID use a positional index so apostrophes/spaces in
+            // capital names (e.g. "N'Djamena", "St. John's") don't break
+            // Detox selectors or React reconciliation.
+            key={`${index}-${option}`}
             onPress={() => handleAnswer(option)}
             disabled={answerState !== 'unanswered'}
             className={`min-h-[64px] items-center justify-center rounded-card px-5 py-4 ${getOptionContainerClass(
@@ -264,7 +320,7 @@ export default function QuizPlayScreen(): React.ReactElement {
               selected: option === selectedAnswer,
               disabled: answerState !== 'unanswered',
             }}
-            testID={`quiz-option-${option}`}
+            testID={`quiz-option-${index}`}
           >
             <Text
               className={`text-body font-semibold ${getOptionTextClass(
@@ -285,7 +341,11 @@ export default function QuizPlayScreen(): React.ReactElement {
             </Text>
           </View>
           <Text className="mt-3 text-center text-caption text-text-secondary">
-            {showContinueHint ? 'Tap anywhere to continue' : 'Nice work'}
+            {showContinueHint
+              ? 'Tap anywhere to continue'
+              : answerState === 'correct'
+              ? 'Nice work'
+              : 'Good try'}
           </Text>
         </View>
       ) : null}
@@ -295,6 +355,43 @@ export default function QuizPlayScreen(): React.ReactElement {
           <Text className="text-center text-body-sm text-text-secondary">
             Scoring your round...
           </Text>
+        </View>
+      ) : null}
+
+      {completeError ? (
+        <View className="mt-6 px-5" testID="quiz-play-error">
+          <View className="rounded-card bg-surface p-4">
+            <Text className="text-body-sm font-semibold text-text-primary">
+              Couldn&apos;t save your round
+            </Text>
+            <Text className="mt-1 text-body-sm text-text-secondary">
+              {completeError}
+            </Text>
+            <View className="mt-3 flex-row gap-3">
+              <Pressable
+                onPress={submitRound}
+                className="flex-1 min-h-[44px] items-center justify-center rounded-button bg-primary px-4 py-2"
+                accessibilityRole="button"
+                accessibilityLabel="Retry"
+                testID="quiz-play-retry"
+              >
+                <Text className="text-body-sm font-semibold text-text-inverse">
+                  Retry
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={handleQuit}
+                className="flex-1 min-h-[44px] items-center justify-center rounded-button bg-surface-elevated px-4 py-2"
+                accessibilityRole="button"
+                accessibilityLabel="Exit without saving"
+                testID="quiz-play-exit"
+              >
+                <Text className="text-body-sm font-semibold text-text-primary">
+                  Exit
+                </Text>
+              </Pressable>
+            </View>
+          </View>
         </View>
       ) : null}
     </Pressable>
