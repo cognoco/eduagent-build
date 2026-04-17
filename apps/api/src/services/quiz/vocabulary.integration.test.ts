@@ -182,6 +182,8 @@ afterAll(async () => {
 });
 
 describe('vocabulary quiz round lifecycle (integration)', () => {
+  // Timeout raised to 15s — CI PostgreSQL service container is slower than
+  // Neon for seeding + full generate → complete lifecycle with real DB writes.
   it('generates a round, completes it, updates SM-2 cards, and stores missed discovery items', async () => {
     const { db, profile, subject } = await seedProfileAndSubject();
     await seedVocabularyBank(profile.id, subject.id);
@@ -341,5 +343,5 @@ describe('vocabulary quiz round lifecycle (integration)', () => {
     expect(
       missedItems.some((item) => item.questionText.startsWith('Translate: '))
     ).toBe(true);
-  });
+  }, 15_000);
 });
