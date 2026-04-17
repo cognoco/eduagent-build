@@ -128,17 +128,23 @@ export const sessionCompleted = inngest.createFunction(
 
     // F-6: Filing may have backfilled topicId even if the event didn't arrive
     // in time (network delay, retry succeeded). Re-read the session row so
-    // downstream steps use the correct topicId.
-    if (!topicId) {
+    // downstream steps use the correct topicId and exchangeCount.
+    let exchangeCount = event.data.exchangeCount as number | undefined;
+    if (!topicId || exchangeCount == null) {
       const freshSession = await step.run('re-read-session', async () => {
         const db = getStepDatabase();
         const row = await db.query.learningSessions.findFirst({
           where: eq(learningSessions.id, sessionId),
         });
-        return row ? { topicId: row.topicId } : null;
+        return row
+          ? { topicId: row.topicId, exchangeCount: row.exchangeCount }
+          : null;
       });
-      if (freshSession?.topicId) {
+      if (freshSession?.topicId && !topicId) {
         topicId = freshSession.topicId;
+      }
+      if (freshSession != null && exchangeCount == null) {
+        exchangeCount = freshSession.exchangeCount;
       }
     }
 
@@ -307,10 +313,7 @@ export const sessionCompleted = inngest.createFunction(
         (UNATTENDED_REASONS as readonly string[]).includes(closeReason)
       ) {
         // No quality signal — session ended without user action, skip SM-2.
-      } else if (
-        retentionTopicIds.length > 0 &&
-        (event.data.exchangeCount as number | undefined) !== 0
-      ) {
+      } else if (retentionTopicIds.length > 0 && (exchangeCount ?? 0) > 0) {
         // User-closed session with at least one exchange but no summary
         // (e.g., skipped or crash). Use conservative quality=3 to advance
         // relearn cards out of reset. Zero-exchange sessions have no learning

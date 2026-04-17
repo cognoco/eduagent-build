@@ -265,6 +265,7 @@ function createEventData(
     summaryStatus: 'pending',
     sessionType: 'learning',
     escalationRungs: [1, 2],
+    exchangeCount: 2,
     timestamp: '2026-02-17T10:00:00.000Z',
     ...overrides,
   };
