@@ -1006,7 +1006,10 @@ export async function updateRetentionFromSession(
         eq(retentionCards.profileId, profileId),
         // Optimistic lock: only update if the card hasn't been modified
         // since we read it. Prevents silent overwrites from concurrent sessions.
-        eq(retentionCards.updatedAt, card.updatedAt)
+        // Skip the lock for newly-created cards — no concurrent write is possible,
+        // and PostgreSQL microsecond timestamps truncate to JS milliseconds causing
+        // false conflicts on the WHERE updatedAt = ? clause.
+        ...(ensured.isNew ? [] : [eq(retentionCards.updatedAt, card.updatedAt)])
       )
     )
     .returning();

@@ -307,9 +307,14 @@ export const sessionCompleted = inngest.createFunction(
         (UNATTENDED_REASONS as readonly string[]).includes(closeReason)
       ) {
         // No quality signal — session ended without user action, skip SM-2.
-      } else if (retentionTopicIds.length > 0) {
-        // User-closed session without a summary (e.g., skipped or crash).
-        // Use conservative quality=3 to advance relearn cards out of reset.
+      } else if (
+        retentionTopicIds.length > 0 &&
+        (event.data.exchangeCount as number | undefined) !== 0
+      ) {
+        // User-closed session with at least one exchange but no summary
+        // (e.g., skipped or crash). Use conservative quality=3 to advance
+        // relearn cards out of reset. Zero-exchange sessions have no learning
+        // signal — skip SM-2 entirely.
         effectiveQuality = 3;
       }
     }

@@ -416,6 +416,7 @@ export async function getSessionCompletionContext(
   subjectId: string;
   sessionType: string;
   verificationType: string | null;
+  exchangeCount: number;
   interleavedTopicIds?: string[];
   escalationRungs?: number[];
 }> {
@@ -438,6 +439,7 @@ export async function getSessionCompletionContext(
     subjectId: session.subjectId,
     sessionType: session.sessionType,
     verificationType: session.verificationType ?? null,
+    exchangeCount: session.exchangeCount,
     interleavedTopicIds: await resolveInterleavedTopicIds(
       db,
       profileId,

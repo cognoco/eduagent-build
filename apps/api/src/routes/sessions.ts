@@ -565,6 +565,7 @@ async function dispatchSessionCompletedEvent(
         verificationType: completion.verificationType,
         interleavedTopicIds: completion.interleavedTopicIds,
         escalationRungs: completion.escalationRungs,
+        exchangeCount: completion.exchangeCount,
         summaryStatus: options.summaryStatus,
         ...(options.qualityRating != null
           ? { qualityRating: options.qualityRating }
