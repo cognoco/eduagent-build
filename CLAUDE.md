@@ -72,7 +72,7 @@ cd apps/mobile && pnpm exec jest --findRelatedTests src/path/to/file.tsx --no-co
 cd apps/mobile && pnpm exec tsc --noEmit
 
 # Database
-pnpm run db:push:dev
+pnpm run db:push:stg
 pnpm run db:generate
 pnpm run db:migrate:dev
 ```

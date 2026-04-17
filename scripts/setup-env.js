@@ -29,7 +29,7 @@ const { execSync, spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-const DOPPLER_CONFIG = 'dev';
+const DOPPLER_CONFIG = 'stg';
 const STALENESS_DAYS = 7;
 
 const OUTPUT_FILES = [
@@ -133,10 +133,10 @@ function checkStaleness(filePath) {
 }
 
 // Doppler config → EAS build profile mapping
+// stg covers both development (local Expo dev client) and preview (staging builds)
 const EAS_PROFILE_MAP = {
-  dev: 'development',
-  stg: 'preview',
-  prd: 'production',
+  stg: ['development', 'preview'],
+  prd: ['production'],
 };
 
 // Non-EXPO_PUBLIC_* vars that should also be synced into eas.json env blocks
@@ -180,11 +180,14 @@ function updateEasJson() {
   let updatedCount = 0;
   let skippedCount = 0;
 
-  for (const [envKey, profileName] of Object.entries(EAS_PROFILE_MAP)) {
+  for (const [envKey, profileNames] of Object.entries(EAS_PROFILE_MAP)) {
+    const profiles = Array.isArray(profileNames)
+      ? profileNames
+      : [profileNames];
     const secrets = downloadSecretsJson(envKey);
     if (!secrets) {
       console.log(
-        `\x1b[33m[Doppler]\x1b[0m   Skipping ${profileName} ` +
+        `\x1b[33m[Doppler]\x1b[0m   Skipping ${profiles.join(', ')} ` +
           `(cannot access Doppler config "${envKey}")`
       );
       skippedCount++;
@@ -201,41 +204,44 @@ function updateEasJson() {
       }
     }
 
-    // Ensure profile exists
-    if (!easConfig.build[profileName]) {
-      easConfig.build[profileName] = {};
-    }
+    const varCount = Object.keys(managedVars).length;
 
-    // Merge: preserve unmanaged vars, set managed vars from Doppler
-    const existingEnv = easConfig.build[profileName].env || {};
-    const mergedEnv = {};
+    for (const profileName of profiles) {
+      // Ensure profile exists
+      if (!easConfig.build[profileName]) {
+        easConfig.build[profileName] = {};
+      }
 
-    // Keep any vars not managed by this script
-    for (const [key, value] of Object.entries(existingEnv)) {
-      if (!key.startsWith('EXPO_PUBLIC_') && !EAS_EXTRA_VARS.includes(key)) {
+      // Merge: preserve unmanaged vars, set managed vars from Doppler
+      const existingEnv = easConfig.build[profileName].env || {};
+      const mergedEnv = {};
+
+      // Keep any vars not managed by this script
+      for (const [key, value] of Object.entries(existingEnv)) {
+        if (!key.startsWith('EXPO_PUBLIC_') && !EAS_EXTRA_VARS.includes(key)) {
+          mergedEnv[key] = value;
+        }
+      }
+
+      // Set all managed vars from Doppler
+      for (const [key, value] of Object.entries(managedVars)) {
         mergedEnv[key] = value;
       }
+
+      // Sort keys for deterministic output
+      const sortedEnv = {};
+      for (const key of Object.keys(mergedEnv).sort()) {
+        sortedEnv[key] = mergedEnv[key];
+      }
+
+      easConfig.build[profileName].env = sortedEnv;
+
+      console.log(
+        `\x1b[32m[Doppler]\x1b[0m   ${profileName} \u2190 ${envKey}: ` +
+          `${varCount} vars synced`
+      );
+      updatedCount++;
     }
-
-    // Set all managed vars from Doppler
-    for (const [key, value] of Object.entries(managedVars)) {
-      mergedEnv[key] = value;
-    }
-
-    // Sort keys for deterministic output
-    const sortedEnv = {};
-    for (const key of Object.keys(mergedEnv).sort()) {
-      sortedEnv[key] = mergedEnv[key];
-    }
-
-    easConfig.build[profileName].env = sortedEnv;
-
-    const varCount = Object.keys(managedVars).length;
-    console.log(
-      `\x1b[32m[Doppler]\x1b[0m   ${profileName} \u2190 ${envKey}: ` +
-        `${varCount} vars synced`
-    );
-    updatedCount++;
   }
 
   if (updatedCount === 0) {
@@ -294,7 +300,7 @@ function main() {
       '\x1b[33m[Doppler]\x1b[0m Doppler not configured for this project.\n'
     );
     console.log(
-      '   Run: doppler setup  (select project: mentomate, config: dev)'
+      '   Run: doppler setup  (select project: mentomate, config: stg)'
     );
     console.log('   Then: pnpm env:sync\n');
     process.exit(0);
@@ -352,7 +358,7 @@ function main() {
   // Sync secrets to Cloudflare Workers (non-fatal — skips if wrangler not authenticated)
   try {
     const { syncSecrets } = require('./sync-secrets');
-    syncSecrets(['dev']);
+    syncSecrets(['stg']);
   } catch (err) {
     console.log(
       '\x1b[33m[Doppler]\x1b[0m Cloudflare Workers sync skipped:',
