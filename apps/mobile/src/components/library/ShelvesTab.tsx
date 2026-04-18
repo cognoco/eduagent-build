@@ -220,6 +220,8 @@ export function ShelvesTab({
       <Pressable
         onPress={() => onShelfPress(subject.id)}
         className="bg-surface rounded-card px-4 py-4 mb-3"
+        accessibilityRole="button"
+        accessibilityLabel={`Open ${subject.name} shelf`}
         testID={`subject-card-${subject.id}`}
       >
         <View className="flex-row items-start justify-between">
