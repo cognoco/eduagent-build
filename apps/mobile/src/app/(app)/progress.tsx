@@ -288,21 +288,28 @@ export default function ProgressScreen(): React.ReactElement {
                       {inventory.global.currentStreak}-day streak
                     </Text>
                   </View>
-                  {inventory.global.vocabularyTotal > 0 ? (
-                    <Pressable
-                      onPress={() =>
-                        router.push('/(app)/progress/vocabulary' as never)
-                      }
-                      className="bg-background rounded-full px-3 py-1.5"
-                      accessibilityRole="button"
-                      accessibilityLabel={`View ${inventory.global.vocabularyTotal} vocabulary words`}
-                      testID="progress-vocab-stat"
-                    >
-                      <Text className="text-caption font-semibold text-primary">
-                        {inventory.global.vocabularyTotal} words →
-                      </Text>
-                    </Pressable>
-                  ) : null}
+                  {/* [F-012] Always render the vocabulary pill, not only
+                      when vocabularyTotal > 0 — otherwise users with zero
+                      words never discover the browser and its guidance. */}
+                  <Pressable
+                    onPress={() =>
+                      router.push('/(app)/progress/vocabulary' as never)
+                    }
+                    className="bg-background rounded-full px-3 py-1.5"
+                    accessibilityRole="button"
+                    accessibilityLabel={
+                      inventory.global.vocabularyTotal > 0
+                        ? `View ${inventory.global.vocabularyTotal} vocabulary words`
+                        : 'View vocabulary'
+                    }
+                    testID="progress-vocab-stat"
+                  >
+                    <Text className="text-caption font-semibold text-primary">
+                      {inventory.global.vocabularyTotal > 0
+                        ? `${inventory.global.vocabularyTotal} words →`
+                        : 'Vocabulary →'}
+                    </Text>
+                  </Pressable>
                 </View>
               ) : null}
             </View>
@@ -344,7 +351,11 @@ export default function ProgressScreen(): React.ReactElement {
               <Text className="text-h3 font-semibold text-text-primary">
                 Recent milestones
               </Text>
-              {milestonesQuery.data && milestonesQuery.data.length >= 5 ? (
+              {/* [F-012] Always show "See all" when the query has resolved —
+                  previously gated on `length >= 5`, which hid the screen
+                  from users who most needed to see its empty-state copy
+                  ("milestones will collect here as you grow"). */}
+              {milestonesQuery.data ? (
                 <Pressable
                   onPress={() =>
                     router.push('/(app)/progress/milestones' as never)

@@ -168,6 +168,61 @@ export default function QuizPlayScreen(): React.ReactElement {
   const question: ClientQuizQuestion = currentQuestion;
   const activeRound = round;
 
+  // [F-015] Malformed round guard: capitals/vocabulary questions REQUIRE a
+  // pre-shuffled `options` array from the server. If `options` is missing
+  // or empty (e.g. because a stale API version stripped the wrong fields),
+  // we must never silently render a dead-end with no choices — every state
+  // must have an action per the UX resilience rules.
+  const isMalformedMcQuestion =
+    (question.type === 'capitals' || question.type === 'vocabulary') &&
+    (!Array.isArray(question.options) || question.options.length < 2);
+
+  if (isMalformedMcQuestion) {
+    return (
+      <View
+        className="flex-1 bg-background px-5"
+        style={{
+          paddingTop: insets.top + 12,
+          paddingBottom: insets.bottom + 20,
+        }}
+        testID="quiz-play-malformed"
+      >
+        <View className="flex-row items-center justify-between mb-6">
+          <Pressable
+            onPress={handleQuit}
+            className="min-h-[32px] min-w-[32px] items-center justify-center"
+            accessibilityRole="button"
+            accessibilityLabel="Quit quiz"
+            testID="quiz-play-quit"
+            hitSlop={8}
+          >
+            <Ionicons name="close" size={24} color={colors.textSecondary} />
+          </Pressable>
+        </View>
+        <View className="flex-1 items-center justify-center">
+          <Text className="text-h3 font-semibold text-text-primary text-center mb-2">
+            This round couldn&apos;t load
+          </Text>
+          <Text className="text-body text-text-secondary text-center mb-6">
+            We didn&apos;t get the answer choices for this question. Try a fresh
+            round, or come back in a moment.
+          </Text>
+          <Pressable
+            onPress={handleQuit}
+            className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center"
+            accessibilityRole="button"
+            accessibilityLabel="Back to quiz home"
+            testID="quiz-play-malformed-back"
+          >
+            <Text className="text-body font-semibold text-text-inverse">
+              Back to quiz home
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
+
   // [ASSUMP-F10] Shared submit path so Retry re-uses the same success/error
   // handlers. Previously the onError branch faked a completion result and
   // navigated — violating "silent recovery without escalation is banned".
