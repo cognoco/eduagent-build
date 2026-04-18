@@ -5,6 +5,7 @@ import {
   type CapitalsQuestion,
   guessWhoLlmOutputSchema,
   type QuizQuestion,
+  type GuessWhoQuestion,
   type QuizActivityType,
   vocabularyLlmOutputSchema,
   type VocabularyQuestion,
@@ -25,7 +26,9 @@ import {
 } from './vocabulary-provider';
 import {
   buildGuessWhoDiscoveryQuestions,
+  buildGuessWhoMasteryCluePrompt,
   buildGuessWhoPrompt,
+  guessWhoMasteryClueSchema,
   validateGuessWhoRound,
 } from './guess-who-provider';
 import { describeAgeBracket, type AgeBracket } from './config';
@@ -434,9 +437,55 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
       throw new UpstreamLlmError('No valid questions after validation');
     }
 
-    questions = buildGuessWhoDiscoveryQuestions({
+    const discoveryQuestions = buildGuessWhoDiscoveryQuestions({
       questions: validated.questions.slice(0, plan.discoveryCount),
     });
+
+    // Inject mastery items with fresh LLM-generated clues
+    if (plan.masteryItems.length > 0) {
+      const masteryQuestions: GuessWhoQuestion[] = [];
+      for (const item of plan.masteryItems) {
+        const cluePrompt = buildGuessWhoMasteryCluePrompt(
+          item.answer,
+          ageBracket
+        );
+        const clueMessages: ChatMessage[] = [
+          { role: 'system', content: cluePrompt },
+          { role: 'user', content: 'Generate clues for this person.' },
+        ];
+
+        try {
+          const clueResult = await routeAndCall(clueMessages, 1, {
+            ageBracket,
+          });
+          const clueRaw = clueResult.response.slice(0, 16 * 1024);
+          const parsed = guessWhoMasteryClueSchema.parse(
+            JSON.parse(extractJsonObject(clueRaw))
+          );
+          if (
+            parsed.clues.length === 5 &&
+            parsed.mcFallbackOptions.length === 4
+          ) {
+            masteryQuestions.push({
+              type: 'guess_who',
+              canonicalName: item.answer,
+              correctAnswer: item.answer,
+              acceptedAliases: parsed.acceptedAliases,
+              clues: parsed.clues,
+              mcFallbackOptions: parsed.mcFallbackOptions,
+              funFact: '',
+              isLibraryItem: true,
+            });
+          }
+        } catch {
+          // If LLM fails for this mastery item, skip — don't block the round
+          continue;
+        }
+      }
+      questions = injectAtRandomPositions(discoveryQuestions, masteryQuestions);
+    } else {
+      questions = discoveryQuestions;
+    }
     theme = validated.theme;
   } else {
     // Exhaustive check — TypeScript narrows to `never` here. If a new

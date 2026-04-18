@@ -26,6 +26,7 @@ export {
   listRecentCompletedRounds,
   computeRoundStats,
   markMissedItemsSurfaced,
+  getDueMasteryItems,
 } from './queries';
 export {
   buildGuessWhoPrompt,

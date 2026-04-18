@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import type { GuessWhoLlmOutput, GuessWhoQuestion } from '@eduagent/schemas';
 import { describeAgeBracket, type AgeBracket } from './config';
 
@@ -12,6 +13,7 @@ export interface GuessWhoPromptParams {
 export interface ValidatedGuessWhoQuestion {
   canonicalName: string;
   acceptedAliases: string[];
+  era?: string;
   clues: string[];
   mcFallbackOptions: string[];
   funFact: string;
@@ -122,6 +124,7 @@ Rules:
 - NEVER mention the person's canonical name or any accepted alias inside any clue.
 - mcFallbackOptions must contain exactly 4 names total: the correct answer plus 3 plausible distractors from a related domain, era, or category.
 - funFact should be a single short sentence under 200 characters.
+- Include the person's era or century (e.g. "17th century", "19th century", "5th century BCE").
 
 Respond with ONLY valid JSON in this shape:
 {
@@ -129,6 +132,7 @@ Respond with ONLY valid JSON in this shape:
   "questions": [
     {
       "canonicalName": "Isaac Newton",
+      "era": "17th century",
       "acceptedAliases": ["Newton", "Sir Isaac Newton"],
       "clues": ["Clue 1", "Clue 2", "Clue 3", "Clue 4", "Clue 5"],
       "mcFallbackOptions": ["Isaac Newton", "Albert Einstein", "Galileo Galilei", "Nikola Tesla"],
@@ -168,6 +172,7 @@ export function validateGuessWhoRound(
       {
         canonicalName,
         acceptedAliases,
+        era: question.era?.trim() || undefined,
         clues,
         mcFallbackOptions,
         funFact,
@@ -189,9 +194,39 @@ export function buildGuessWhoDiscoveryQuestions(validated: {
     canonicalName: question.canonicalName,
     correctAnswer: question.canonicalName,
     acceptedAliases: question.acceptedAliases,
+    era: question.era,
     clues: question.clues,
     mcFallbackOptions: question.mcFallbackOptions,
     funFact: question.funFact,
     isLibraryItem: false,
   }));
+}
+
+// ─── Mastery clue generation ────────────────────────────────────────────
+
+export const guessWhoMasteryClueSchema = z.object({
+  clues: z.array(z.string().max(200)).length(5),
+  acceptedAliases: z.array(z.string()).min(1),
+  mcFallbackOptions: z.array(z.string()).length(4),
+});
+
+export function buildGuessWhoMasteryCluePrompt(
+  canonicalName: string,
+  ageBracket: AgeBracket
+): string {
+  const ageLabel = describeAgeBracket(ageBracket);
+  return `Generate 5 progressive clues for a Guess Who quiz about "${canonicalName}" for a ${ageLabel} learner.
+
+Rules:
+- Clue 1 = hardest (broad context), clue 5 = near-giveaway
+- NEVER mention "${canonicalName}" or any common variant in any clue
+- Also provide accepted aliases (common names/titles the learner might type)
+- Provide exactly 4 mcFallbackOptions: "${canonicalName}" plus 3 plausible distractors from a related domain/era
+
+Respond with ONLY valid JSON:
+{
+  "clues": ["Clue 1", "Clue 2", "Clue 3", "Clue 4", "Clue 5"],
+  "acceptedAliases": ["${canonicalName}", "Alias1"],
+  "mcFallbackOptions": ["${canonicalName}", "Distractor1", "Distractor2", "Distractor3"]
+}`;
 }

@@ -9,6 +9,7 @@ export interface LibraryItem {
   topicId?: string;
   vocabularyId?: string;
   cefrLevel?: string | null;
+  mcSuccessCount?: number;
 }
 
 export interface ResolveParams {

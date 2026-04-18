@@ -223,6 +223,14 @@ beforeEach(() => {
       findFirst: jest.fn().mockResolvedValue(undefined),
       findMany: jest.fn().mockResolvedValue([]),
     },
+    quizMasteryItems: {
+      findFirst: jest.fn().mockResolvedValue(undefined),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
+    quizMissedItems: {
+      findFirst: jest.fn().mockResolvedValue(undefined),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
   };
   setInsertReturning();
   setUpdateReturning();

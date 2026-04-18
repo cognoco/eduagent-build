@@ -262,6 +262,26 @@ export async function markMissedItemsSurfaced(
   return repo.quizMissedItems.markSurfaced(activityType);
 }
 
+/**
+ * Fetch due mastery items for capitals or guess_who. Returns items whose
+ * nextReviewAt <= now, ordered oldest-first, limited to 20 per call.
+ */
+export async function getDueMasteryItems(
+  db: Database,
+  profileId: string,
+  activityType: 'capitals' | 'guess_who'
+): Promise<LibraryItem[]> {
+  const repo = createScopedRepository(db, profileId);
+  const rows = await repo.quizMasteryItems.findDueByActivity(activityType, 20);
+
+  return rows.map((row) => ({
+    id: row.itemKey,
+    question: row.itemKey,
+    answer: row.itemAnswer,
+    mcSuccessCount: row.mcSuccessCount,
+  }));
+}
+
 // ---------------------------------------------------------------------------
 // Cross-profile batch operations (cron/cleanup)
 // ---------------------------------------------------------------------------

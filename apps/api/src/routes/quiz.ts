@@ -26,6 +26,7 @@ import {
   getRoundByIdOrThrow,
   listRecentCompletedRounds,
   markMissedItemsSurfaced,
+  getDueMasteryItems,
 } from '../services/quiz';
 import { recordSessionActivity } from '../services/streaks';
 
@@ -141,6 +142,9 @@ async function buildAndGenerateRound(
   } else if (input.activityType === 'guess_who') {
     const context = await getGuessWhoRoundContext(db, profileId);
     topicTitles = context.topicTitles;
+    libraryItems = await getDueMasteryItems(db, profileId, 'guess_who');
+  } else if (input.activityType === 'capitals') {
+    libraryItems = await getDueMasteryItems(db, profileId, 'capitals');
   }
 
   return generateQuizRound({
