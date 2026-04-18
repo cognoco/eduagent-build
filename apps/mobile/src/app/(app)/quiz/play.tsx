@@ -1,5 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
@@ -49,6 +55,7 @@ export default function QuizPlayScreen(): React.ReactElement {
   const [shuffledOptions, setShuffledOptions] = useState<string[]>([]);
   const [elapsedMs, setElapsedMs] = useState(0);
   const [guessWhoCluesUsed, setGuessWhoCluesUsed] = useState(1);
+  const [freeTextAnswer, setFreeTextAnswer] = useState('');
   const [showBanner, setShowBanner] = useState(
     () => round?.difficultyBump === true
   );
@@ -86,6 +93,7 @@ export default function QuizPlayScreen(): React.ReactElement {
     setAnswerState('unanswered');
     setSelectedAnswer(null);
     setShowContinueHint(false);
+    setFreeTextAnswer('');
     questionStartTimeRef.current = Date.now();
     setElapsedMs(0);
 
@@ -184,12 +192,15 @@ export default function QuizPlayScreen(): React.ReactElement {
   const activeRound = round;
 
   // [F-015] Malformed round guard: capitals/vocabulary questions REQUIRE a
-  // pre-shuffled `options` array from the server. If `options` is missing
-  // or empty (e.g. because a stale API version stripped the wrong fields),
-  // we must never silently render a dead-end with no choices — every state
-  // must have an action per the UX resilience rules.
+  // pre-shuffled `options` array from the server — UNLESS they are
+  // freeTextEligible, in which case no options are needed.
+  // If `options` is missing or empty on a non-freeText question (e.g. because
+  // a stale API version stripped the wrong fields), we must never silently
+  // render a dead-end with no choices — every state must have an action per
+  // the UX resilience rules.
   const isMalformedMcQuestion =
     (question.type === 'capitals' || question.type === 'vocabulary') &&
+    !question.freeTextEligible &&
     (!Array.isArray(question.options) || question.options.length < 2);
 
   if (isMalformedMcQuestion) {
@@ -264,7 +275,10 @@ export default function QuizPlayScreen(): React.ReactElement {
   // [CR-1] Answer checking is now async — the server validates via
   // POST /quiz/rounds/:id/check. A ref prevents double-submission during
   // the network round-trip.
-  async function handleAnswer(answer: string) {
+  async function handleAnswer(
+    answer: string,
+    answerMode?: 'free_text' | 'multiple_choice'
+  ) {
     if (answerState !== 'unanswered' || answerSubmittedRef.current) return;
     answerSubmittedRef.current = true;
 
@@ -290,6 +304,7 @@ export default function QuizPlayScreen(): React.ReactElement {
       correct,
       answerGiven: answer,
       timeMs,
+      ...(answerMode !== undefined ? { answerMode } : {}),
     };
 
     resultsRef.current = [...resultsRef.current, nextResult];
@@ -309,6 +324,12 @@ export default function QuizPlayScreen(): React.ReactElement {
         ? Haptics.NotificationFeedbackType.Success
         : Haptics.NotificationFeedbackType.Error
     );
+  }
+
+  function handleFreeTextSubmit() {
+    if (!freeTextAnswer.trim()) return;
+    void handleAnswer(freeTextAnswer.trim(), 'free_text');
+    setFreeTextAnswer('');
   }
 
   function handleContinue() {
@@ -452,33 +473,63 @@ export default function QuizPlayScreen(): React.ReactElement {
       ) : null}
 
       {question.type !== 'guess_who' ? (
-        <View className="gap-3 px-5">
-          {shuffledOptions.map((option, index) => (
+        question.freeTextEligible && answerState === 'unanswered' ? (
+          <View className="px-5" testID="quiz-free-text-input">
+            <Text className="text-on-surface-muted mb-2 text-sm">
+              Type your answer
+            </Text>
+            <TextInput
+              testID="quiz-free-text-field"
+              className="bg-surface-elevated text-on-surface rounded-xl p-4"
+              placeholder="Type your answer..."
+              value={freeTextAnswer}
+              onChangeText={setFreeTextAnswer}
+              autoFocus
+              returnKeyType="done"
+              onSubmitEditing={() => handleFreeTextSubmit()}
+            />
             <Pressable
-              key={`${index}-${option}`}
-              onPress={() => handleAnswer(option)}
-              disabled={answerState !== 'unanswered'}
-              className={`min-h-[64px] items-center justify-center rounded-card px-5 py-4 ${getOptionContainerClass(
-                option
-              )}`}
+              testID="quiz-free-text-submit"
+              className="bg-primary mt-3 rounded-xl px-6 py-3"
+              onPress={() => handleFreeTextSubmit()}
+              disabled={!freeTextAnswer.trim()}
               accessibilityRole="button"
-              accessibilityLabel={option}
-              accessibilityState={{
-                selected: option === selectedAnswer,
-                disabled: answerState !== 'unanswered',
-              }}
-              testID={`quiz-option-${index}`}
+              accessibilityLabel="Submit answer"
             >
-              <Text
-                className={`text-body font-semibold ${getOptionTextClass(
-                  option
-                )}`}
-              >
-                {option}
+              <Text className="text-on-primary text-center font-semibold">
+                Submit
               </Text>
             </Pressable>
-          ))}
-        </View>
+          </View>
+        ) : (
+          <View className="gap-3 px-5">
+            {shuffledOptions.map((option, index) => (
+              <Pressable
+                key={`${index}-${option}`}
+                onPress={() => handleAnswer(option, 'multiple_choice')}
+                disabled={answerState !== 'unanswered'}
+                className={`min-h-[64px] items-center justify-center rounded-card px-5 py-4 ${getOptionContainerClass(
+                  option
+                )}`}
+                accessibilityRole="button"
+                accessibilityLabel={option}
+                accessibilityState={{
+                  selected: option === selectedAnswer,
+                  disabled: answerState !== 'unanswered',
+                }}
+                testID={`quiz-option-${index}`}
+              >
+                <Text
+                  className={`text-body font-semibold ${getOptionTextClass(
+                    option
+                  )}`}
+                >
+                  {option}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        )
       ) : answerState === 'unanswered' ? (
         <View className="px-5">
           <GuessWhoQuestion
