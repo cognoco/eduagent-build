@@ -374,10 +374,17 @@ export async function completeQuizRound(
         }
 
         try {
-          await txRepo.quizMasteryItems.upsertFromCorrectAnswer({
-            activityType: round.activityType as 'capitals' | 'guess_who',
+          const upserted =
+            await txRepo.quizMasteryItems.upsertFromCorrectAnswer({
+              activityType: round.activityType as 'capitals' | 'guess_who',
+              itemKey,
+              itemAnswer,
+            });
+          logger.info('quiz_mastery_item.upsert.success', {
+            profileId,
+            activityType: round.activityType,
             itemKey,
-            itemAnswer,
+            wasInserted: upserted !== null,
           });
         } catch (err) {
           logger.error('quiz_mastery_item.upsert.failure', {

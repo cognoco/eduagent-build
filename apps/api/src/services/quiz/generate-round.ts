@@ -33,6 +33,9 @@ import {
   validateGuessWhoRound,
 } from './guess-who-provider';
 import { describeAgeBracket, type AgeBracket } from './config';
+import { createLogger } from '../logger';
+
+const logger = createLogger();
 
 interface CapitalsPromptParams {
   discoveryCount: number;
@@ -282,6 +285,10 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
     if (difficultyBump) {
       prompt +=
         '\n\nDIFFICULTY BUMP: The learner is on a streak. Choose lesser-known countries. Distractors should be from the same region as the correct answer.';
+      logger.info('quiz_round.difficulty_bump.applied', {
+        profileId,
+        activityType,
+      });
     }
 
     const messages: ChatMessage[] = [
