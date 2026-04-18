@@ -25,6 +25,7 @@ export {
   getRoundByIdOrThrow,
   listRecentCompletedRounds,
   computeRoundStats,
+  markMissedItemsSurfaced,
 } from './queries';
 export {
   buildGuessWhoPrompt,
@@ -33,3 +34,10 @@ export {
   clueMentionsGuessWhoName,
 } from './guess-who-provider';
 export { shouldApplyDifficultyBump } from './difficulty-bump';
+export {
+  applyQuizSm2,
+  buildCapitalsMasteryLibraryItem,
+  buildGuessWhoMasteryLibraryItem,
+} from './mastery-provider';
+export { computeCapitalsItemKey, computeGuessWhoItemKey } from './mastery-keys';
+export { getCapitalsSm2Quality, getGuessWhoSm2Quality } from './complete-round';

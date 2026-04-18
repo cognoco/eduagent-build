@@ -3,6 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import {
   completeRoundInputSchema,
   generateRoundInputSchema,
+  markSurfacedInputSchema,
   questionCheckInputSchema,
   type ClientQuizQuestion,
   type CefrLevel,
@@ -24,6 +25,7 @@ import {
   getRecentAnswers,
   getRoundByIdOrThrow,
   listRecentCompletedRounds,
+  markMissedItemsSurfaced,
 } from '../services/quiz';
 import { recordSessionActivity } from '../services/streaks';
 
@@ -303,6 +305,33 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
       return c.json(result, 200);
     }
   )
+  .post('/quiz/missed-items/mark-surfaced', async (c) => {
+    const profileId = requireProfileId(c.get('profileId'));
+    const db = c.get('db');
+
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return validationError(c, 'Request body must be valid JSON');
+    }
+
+    const parsed = markSurfacedInputSchema.safeParse(body);
+    if (!parsed.success) {
+      return validationError(
+        c,
+        `Invalid input: ${parsed.error.issues[0]?.message ?? 'unknown'}`
+      );
+    }
+
+    const markedCount = await markMissedItemsSurfaced(
+      db,
+      profileId,
+      parsed.data.activityType
+    );
+
+    return c.json({ markedCount }, 200);
+  })
   .get('/quiz/stats', async (c) => {
     const profileId = requireProfileId(c.get('profileId'));
     const db = c.get('db');

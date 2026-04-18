@@ -246,6 +246,22 @@ export async function getGuessWhoRoundContext(
   return { topicTitles: topics.map((t) => t.title) };
 }
 
+/**
+ * Mark all unsurfaced missed items for the given profile + activity type as
+ * surfaced. Called when the learner taps or dismisses the quiz discovery card
+ * so the card doesn't re-appear for already-addressed items.
+ *
+ * Returns the number of rows updated.
+ */
+export async function markMissedItemsSurfaced(
+  db: Database,
+  profileId: string,
+  activityType: QuizActivityType
+): Promise<number> {
+  const repo = createScopedRepository(db, profileId);
+  return repo.quizMissedItems.markSurfaced(activityType);
+}
+
 // ---------------------------------------------------------------------------
 // Cross-profile batch operations (cron/cleanup)
 // ---------------------------------------------------------------------------

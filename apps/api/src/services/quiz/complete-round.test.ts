@@ -8,6 +8,7 @@ import {
   buildMissedItemText,
   calculateScore,
   calculateXp,
+  getCapitalsSm2Quality,
   getCelebrationTier,
   getGuessWhoSm2Quality,
   getVocabSm2Quality,
@@ -120,6 +121,16 @@ describe('getVocabSm2Quality', () => {
 
   it('returns 2 for wrong answers', () => {
     expect(getVocabSm2Quality(false)).toBe(2);
+  });
+});
+
+describe('getCapitalsSm2Quality', () => {
+  it('returns 4 for correct', () => {
+    expect(getCapitalsSm2Quality(true)).toBe(4);
+  });
+
+  it('returns 1 for incorrect', () => {
+    expect(getCapitalsSm2Quality(false)).toBe(1);
   });
 });
 

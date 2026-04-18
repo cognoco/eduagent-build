@@ -106,6 +106,10 @@ export function getVocabSm2Quality(correct: boolean): number {
   return correct ? 4 : 2;
 }
 
+export function getCapitalsSm2Quality(correct: boolean): number {
+  return correct ? 4 : 1;
+}
+
 export function calculateScore(results: QuestionResult[]): number {
   return results.filter((result) => result.correct).length;
 }
