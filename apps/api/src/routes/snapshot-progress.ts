@@ -12,10 +12,7 @@ import {
   listRecentMilestones,
   refreshProgressSnapshot,
 } from '../services/snapshot-aggregation';
-import {
-  getRecentNotificationCount,
-  logNotification,
-} from '../services/settings';
+import { checkAndLogRateLimit } from '../services/settings';
 
 type SnapshotProgressRouteEnv = {
   Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
@@ -70,24 +67,22 @@ export const snapshotProgressRoutes = new Hono<SnapshotProgressRouteEnv>()
     const db = c.get('db');
     const profileId = requireProfileId(c.get('profileId'));
 
-    const refreshCount = await getRecentNotificationCount(
+    const rateLimited = await checkAndLogRateLimit(
       db,
       profileId,
       'progress_refresh',
-      1
+      { hours: 1, maxCount: 10 }
     );
-
-    if (refreshCount >= 10) {
+    if (rateLimited) {
       return apiError(
         c,
         429,
-        ERROR_CODES.CONFLICT,
+        ERROR_CODES.RATE_LIMITED,
         'Progress refresh is limited to 10 times per hour.'
       );
     }
 
     const snapshot = await refreshProgressSnapshot(db, profileId);
-    await logNotification(db, profileId, 'progress_refresh');
 
     return c.json(snapshot);
   });

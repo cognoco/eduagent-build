@@ -118,7 +118,14 @@ export type QuestionResult = z.infer<typeof questionResultSchema>;
 export const generateRoundInputSchema = z
   .object({
     activityType: quizActivityTypeSchema,
-    themePreference: z.string().optional(),
+    themePreference: z
+      .string()
+      .max(100)
+      .regex(
+        /^[\p{L}\p{N} ,.'!?_-]+$/u,
+        'Theme must contain only letters, numbers, spaces, and basic punctuation'
+      )
+      .optional(),
     subjectId: z.string().uuid().optional(),
   })
   .refine((data) => data.activityType !== 'vocabulary' || !!data.subjectId, {

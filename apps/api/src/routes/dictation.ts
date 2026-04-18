@@ -18,10 +18,7 @@ import {
   getDictationStreak,
   fetchGenerateContext,
 } from '../services/dictation';
-import {
-  getRecentNotificationCount,
-  logNotification,
-} from '../services/settings';
+import { checkAndLogRateLimit } from '../services/settings';
 
 // ---------------------------------------------------------------------------
 // Dictation Routes
@@ -188,22 +185,22 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
     // [CR-4] Per-profile rate limit: 10 requests per minute.
     // Placed after validation so invalid input gets 400, not a DB hit.
     // Placed before the LLM call so the expensive operation is gated.
-    const recentCount = await getRecentNotificationCount(
+    // Atomic check-and-log avoids TOCTOU where two concurrent requests
+    // both read count=9, both pass, and both fire the expensive LLM call.
+    const rateLimited = await checkAndLogRateLimit(
       db,
       profileId,
       'dictation_review',
-      1 / 60
+      { hours: 1 / 60, maxCount: 10 }
     );
-    if (recentCount >= 10) {
+    if (rateLimited) {
       return apiError(
         c,
         429,
-        ERROR_CODES.CONFLICT,
+        ERROR_CODES.RATE_LIMITED,
         'Dictation review is limited to 10 requests per minute.'
       );
     }
-
-    await logNotification(db, profileId, 'dictation_review');
 
     const result = await reviewDictation({
       sentences: parsed.data.sentences,

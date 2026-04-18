@@ -95,7 +95,7 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
         });
       } catch (error) {
         if (error instanceof ConsentResendLimitError) {
-          return apiError(c, 429, ERROR_CODES.VALIDATION_ERROR, error.message);
+          return apiError(c, 429, ERROR_CODES.RATE_LIMITED, error.message);
         }
         if (error instanceof EmailDeliveryError) {
           return apiError(c, 502, ERROR_CODES.INTERNAL_ERROR, error.message);
