@@ -156,6 +156,12 @@ export default function PracticeScreen(): React.ReactElement {
           onPress={() => router.push('/(app)/quiz' as never)}
           testID="practice-quiz"
         />
+        <Pressable
+          testID="practice-quiz-history"
+          onPress={() => router.push('/(app)/quiz/history' as never)}
+        >
+          <Text className="text-primary text-sm">History</Text>
+        </Pressable>
       </View>
     </ScrollView>
   );

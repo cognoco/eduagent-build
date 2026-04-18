@@ -49,6 +49,9 @@ export default function QuizPlayScreen(): React.ReactElement {
   const [shuffledOptions, setShuffledOptions] = useState<string[]>([]);
   const [elapsedMs, setElapsedMs] = useState(0);
   const [guessWhoCluesUsed, setGuessWhoCluesUsed] = useState(1);
+  const [showBanner, setShowBanner] = useState(
+    () => round?.difficultyBump === true
+  );
 
   const questionStartTimeRef = useRef(Date.now());
   const resultsRef = useRef<QuestionResult[]>([]);
@@ -126,6 +129,18 @@ export default function QuizPlayScreen(): React.ReactElement {
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (!showBanner) return;
+    const timer = setTimeout(() => setShowBanner(false), 3000);
+    return () => clearTimeout(timer);
+  }, [showBanner]);
+
+  useEffect(() => {
+    if (currentIndex > 0 && showBanner) {
+      setShowBanner(false);
+    }
+  }, [currentIndex, showBanner]);
 
   // [ASSUMP-F2] Confirmed exit — ensures mid-round users always have a way
   // out. Quitting routes back to the quiz home; the flow-context resets on
@@ -386,6 +401,20 @@ export default function QuizPlayScreen(): React.ReactElement {
           {Math.floor(elapsedMs / 1000)}s
         </Text>
       </View>
+
+      {showBanner && (
+        <View
+          testID="quiz-challenge-banner"
+          className="bg-primary-soft mx-4 mb-4 rounded-xl p-4"
+          accessibilityRole="alert"
+          accessibilityLiveRegion="polite"
+          accessibilityLabel="Challenge round. This round is harder than usual."
+        >
+          <Text className="text-on-surface text-center text-lg font-semibold">
+            Challenge round — you&apos;re on a streak! This one is harder.
+          </Text>
+        </View>
+      )}
 
       <View className="mb-8 px-5">
         {currentQuestion.type === 'capitals' ? (

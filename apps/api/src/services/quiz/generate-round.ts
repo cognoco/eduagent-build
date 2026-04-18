@@ -101,8 +101,11 @@ export function injectMasteryQuestions(
     return discoveryQuestions;
   }
 
+  const FREE_TEXT_UNLOCK_THRESHOLD = 3;
   const masteryQuestions = masteryItems.map((item) => {
     const reference = CAPITALS_BY_COUNTRY.get(item.question.toLowerCase());
+    const freeTextEligible =
+      (item.mcSuccessCount ?? 0) >= FREE_TEXT_UNLOCK_THRESHOLD;
     return {
       type: 'capitals',
       country: reference?.country ?? item.question,
@@ -112,6 +115,7 @@ export function injectMasteryQuestions(
       funFact: reference?.funFact ?? '',
       isLibraryItem: true,
       topicId: item.topicId ?? undefined,
+      freeTextEligible: freeTextEligible || undefined,
     } satisfies CapitalsQuestion;
   });
 

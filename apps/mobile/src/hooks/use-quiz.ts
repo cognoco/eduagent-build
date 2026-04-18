@@ -171,6 +171,33 @@ export function useRecentRounds(): UseQueryResult<RecentRound[]> {
   });
 }
 
+export function useRoundDetail(
+  roundId: string | undefined
+): UseQueryResult<QuizRoundResponse> {
+  const client = useApiClient();
+  const { activeProfile } = useProfile();
+
+  return useQuery({
+    queryKey: ['quiz-round-detail', roundId],
+    queryFn: async ({ signal: querySignal }) => {
+      if (!roundId) throw new Error('No round ID');
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const res = await client.quiz.rounds[':id'].$get(
+          { param: { id: roundId } },
+          { init: { signal } }
+        );
+        await assertOk(res);
+        return (await res.json()) as QuizRoundResponse;
+      } finally {
+        cleanup();
+      }
+    },
+    enabled: !!activeProfile && !!roundId,
+    staleTime: 60_000,
+  });
+}
+
 export function useQuizStats(): UseQueryResult<QuizStats[]> {
   const client = useApiClient();
   const { activeProfile } = useProfile();

@@ -145,7 +145,14 @@ export function calculateXp(
       }, 0);
   }
 
-  return baseXp + timerBonus + perfectBonus + guessWhoClueBonus;
+  let freeTextBonus = 0;
+  if (activityType === 'capitals' || activityType === 'vocabulary') {
+    freeTextBonus =
+      correctResults.filter((r) => r.answerMode === 'free_text').length *
+      QUIZ_CONFIG.xp.freeTextBonus;
+  }
+
+  return baseXp + timerBonus + perfectBonus + guessWhoClueBonus + freeTextBonus;
 }
 
 /**
@@ -379,6 +386,41 @@ export async function completeQuizRound(
             itemKey,
             error: err instanceof Error ? err.message : 'unknown',
           });
+        }
+      }
+
+      // 3. Track MC success count for free-text unlock progression
+      for (const result of validatedResults) {
+        const question = questions[result.questionIndex];
+        if (!question || !question.isLibraryItem) continue;
+
+        let itemKey: string;
+        if (question.type === 'capitals') {
+          itemKey = computeCapitalsItemKey(question.country);
+        } else if (question.type === 'guess_who') {
+          itemKey = computeGuessWhoItemKey(
+            question.canonicalName,
+            question.era
+          );
+        } else {
+          continue;
+        }
+
+        if (
+          result.correct &&
+          (result.answerMode === 'multiple_choice' || !result.answerMode)
+        ) {
+          await txRepo.quizMasteryItems.incrementMcSuccessCount(
+            itemKey,
+            round.activityType as 'capitals' | 'guess_who'
+          );
+        } else if (!result.correct && result.answerMode === 'free_text') {
+          // Free-text wrong → reset to 2 (one MC success away from re-unlock)
+          await txRepo.quizMasteryItems.resetMcSuccessCount(
+            itemKey,
+            round.activityType as 'capitals' | 'guess_who',
+            2
+          );
         }
       }
     }

@@ -23,6 +23,7 @@ export const capitalsQuestionSchema = z.object({
   funFact: z.string(),
   isLibraryItem: z.boolean(),
   topicId: z.string().uuid().nullable().optional(),
+  freeTextEligible: z.boolean().optional(),
 });
 export type CapitalsQuestion = z.infer<typeof capitalsQuestionSchema>;
 
