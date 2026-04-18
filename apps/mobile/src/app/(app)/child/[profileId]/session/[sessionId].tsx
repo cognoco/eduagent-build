@@ -1,236 +1,179 @@
-import { View, Text, Pressable, ScrollView, Alert } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import {
+  View,
+  Text,
+  ScrollView,
+  Pressable,
+  ActivityIndicator,
+} from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useChildSessionTranscript } from '../../../../../hooks/use-dashboard';
-import { Button } from '../../../../../components/common/Button';
+import { useChildSessionDetail } from '../../../../../hooks/use-dashboard';
 import { goBackOrReplace } from '../../../../../lib/navigation';
 
-function MessageSkeleton(): React.ReactNode {
-  return (
-    <View className="bg-surface rounded-card p-3 mt-3 w-3/4">
-      <View className="bg-border rounded h-4 w-full mb-2" />
-      <View className="bg-border rounded h-4 w-2/3" />
-    </View>
-  );
-}
-
-function formatTimestamp(iso: string): string {
-  return new Date(iso).toLocaleTimeString(undefined, {
-    hour: '2-digit',
-    minute: '2-digit',
+function formatDate(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
   });
 }
 
-export default function SessionTranscriptScreen() {
+function formatDuration(seconds: number | null): string {
+  if (!seconds) return '';
+  const mins = Math.round(seconds / 60);
+  return mins === 1 ? '1 min' : `${mins} min`;
+}
+
+export default function SessionDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { profileId: rawProfileId, sessionId: rawSessionId } =
-    useLocalSearchParams<{
-      profileId: string;
-      sessionId: string;
-    }>();
-  // Expo Router can deliver string[] for repeated params — extract scalar
-  const profileId = Array.isArray(rawProfileId)
-    ? rawProfileId[0]
-    : rawProfileId;
-  const sessionId = Array.isArray(rawSessionId)
-    ? rawSessionId[0]
-    : rawSessionId;
+  const params = useLocalSearchParams<{
+    profileId: string;
+    sessionId: string;
+  }>();
+  const profileId = Array.isArray(params.profileId)
+    ? params.profileId[0]
+    : params.profileId;
+  const sessionId = Array.isArray(params.sessionId)
+    ? params.sessionId[0]
+    : params.sessionId;
+
   const {
-    data: transcript,
+    data: session,
     isLoading,
     isError,
     refetch,
-    error: transcriptError,
-  } = useChildSessionTranscript(profileId, sessionId);
+  } = useChildSessionDetail(profileId, sessionId);
 
-  const isSessionNotFound =
-    transcriptError !== null &&
-    typeof transcriptError === 'object' &&
-    'status' in transcriptError &&
-    (transcriptError as { status?: unknown }).status === 404;
+  if (isLoading) {
+    return (
+      <View className="flex-1 items-center justify-center bg-background">
+        <ActivityIndicator testID="loading" />
+      </View>
+    );
+  }
 
-  const sessionDate = transcript?.session.startedAt
-    ? new Date(transcript.session.startedAt).toLocaleDateString(undefined, {
-        month: 'long',
-        day: 'numeric',
-        year: 'numeric',
-      })
-    : '';
+  if (isError) {
+    return (
+      <View className="flex-1 items-center justify-center bg-background px-6">
+        <Text className="text-text-secondary mb-4 text-center">
+          Something went wrong loading this session.
+        </Text>
+        <Pressable
+          testID="retry-session"
+          onPress={() => refetch()}
+          className="rounded-lg bg-primary px-6 py-3"
+        >
+          <Text className="text-text-inverse font-medium">Retry</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  if (!session) {
+    return (
+      <View
+        testID="session-not-found"
+        className="flex-1 items-center justify-center bg-background px-6"
+      >
+        <Ionicons name="document-text-outline" size={48} color="#888" />
+        <Text className="text-text-secondary mt-4 text-center text-base">
+          This session is no longer available.
+        </Text>
+        <Pressable
+          onPress={() => goBackOrReplace(router, '/(app)/home')}
+          className="mt-4 rounded-lg bg-primary px-6 py-3"
+        >
+          <Text className="text-text-inverse font-medium">Go Back</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  const duration = formatDuration(
+    session.wallClockSeconds ?? session.durationSeconds
+  );
 
   return (
-    <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
-      <View className="px-5 pt-4 pb-2 flex-row items-center">
+    <ScrollView
+      className="flex-1 bg-background"
+      contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}
+    >
+      {/* Header */}
+      <View className="px-4 pt-4">
         <Pressable
-          onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
-          className="me-3 py-2 pe-2"
-          accessibilityLabel="Go back"
+          onPress={() => goBackOrReplace(router, '/(app)/home')}
+          className="mb-4 flex-row items-center"
           accessibilityRole="button"
-          testID="back-button"
+          accessibilityLabel="Go back"
         >
-          <Text className="text-primary text-body font-semibold">
-            {'\u2190'}
-          </Text>
+          <Ionicons name="arrow-back" size={24} />
         </Pressable>
-        <View className="flex-1">
-          <Text className="text-h2 font-bold text-text-primary">
-            {transcript?.session.homeworkSummary?.displayTitle ??
-              'Session Transcript'}
-          </Text>
-          {transcript && (
-            <>
-              <Text className="text-body-sm text-text-secondary mt-0.5">
-                {sessionDate} &middot; {transcript.session.exchangeCount}{' '}
-                exchanges &middot; {transcript.session.sessionType}
-              </Text>
-              {transcript.session.displaySummary ? (
-                <Text className="text-caption text-text-secondary mt-1">
-                  {transcript.session.displaySummary}
-                </Text>
-              ) : null}
-            </>
-          )}
+
+        <Text className="text-text-primary text-xl font-bold">
+          {session.displayTitle}
+        </Text>
+        <Text className="text-text-secondary mt-1 text-sm">
+          {formatDate(session.startedAt)}
+        </Text>
+      </View>
+
+      {/* Metadata */}
+      <View
+        testID="session-metadata"
+        className="mx-4 mt-4 rounded-xl bg-surface p-4"
+      >
+        <View className="flex-row justify-between">
+          <View>
+            <Text className="text-text-secondary text-xs">Duration</Text>
+            <Text className="text-text-primary text-base font-medium">
+              {duration || '—'}
+            </Text>
+          </View>
+          <View>
+            <Text className="text-text-secondary text-xs">Exchanges</Text>
+            <Text className="text-text-primary text-base font-medium">
+              {session.exchangeCount}
+            </Text>
+          </View>
+          <View>
+            <Text className="text-text-secondary text-xs">Type</Text>
+            <Text className="text-text-primary text-base font-medium capitalize">
+              {session.sessionType}
+            </Text>
+          </View>
         </View>
       </View>
 
-      <ScrollView
-        className="flex-1 px-5"
-        contentContainerStyle={{ paddingBottom: 24 }}
-        testID="transcript-scroll"
-      >
-        {isLoading ? (
-          <>
-            <MessageSkeleton />
-            <View className="self-end">
-              <MessageSkeleton />
-            </View>
-            <MessageSkeleton />
-          </>
-        ) : isError && !isSessionNotFound ? (
-          <View
-            style={{
-              flex: 1,
-              justifyContent: 'center',
-              alignItems: 'center',
-              padding: 24,
-            }}
-          >
-            <Text className="text-text-primary text-body mb-4">
-              Could not load session
-            </Text>
-            <Button
-              variant="primary"
-              label="Try again"
-              onPress={() => refetch()}
-              testID="retry-session"
-            />
-          </View>
-        ) : isSessionNotFound ? (
-          <View className="py-8 items-center" testID="session-not-found">
-            <Text className="text-h3 font-semibold text-text-primary text-center mb-2">
-              This session has ended
-            </Text>
-            <Text className="text-body text-text-secondary text-center mb-6">
-              This session is no longer available. You can review other sessions
-              from the home screen.
-            </Text>
-            <Pressable
-              onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
-              className="bg-primary rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
-              accessibilityRole="button"
-              accessibilityLabel="Go back"
-              testID="session-not-found-back"
-            >
-              <Text className="text-body font-semibold text-text-inverse">
-                Go Back
-              </Text>
-            </Pressable>
-          </View>
-        ) : transcript && transcript.exchanges.length > 0 ? (
-          transcript.exchanges.map((exchange, i) => {
-            const isUser = exchange.role === 'user';
-            return (
-              <View
-                key={i}
-                className={`mt-3 max-w-[85%] ${
-                  isUser ? 'self-end' : 'self-start'
-                }`}
-                testID={`exchange-${i}`}
-              >
-                <View
-                  className={`rounded-2xl p-3 ${
-                    isUser ? 'bg-primary' : 'bg-surface'
-                  }`}
-                >
-                  <Text
-                    className={`text-body ${
-                      isUser ? 'text-white' : 'text-text-primary'
-                    }`}
-                  >
-                    {exchange.content}
-                  </Text>
-                </View>
-                <View
-                  className={`flex-row mt-1 ${
-                    isUser ? 'justify-end' : 'justify-start'
-                  }`}
-                >
-                  <Text className="text-caption text-text-secondary">
-                    {formatTimestamp(exchange.timestamp)}
-                  </Text>
-                  {exchange.escalationRung !== undefined &&
-                    exchange.escalationRung !== null &&
-                    exchange.escalationRung >= 3 && (
-                      <Pressable
-                        testID={`guided-info-${i}`}
-                        className="flex-row items-center ms-2"
-                        accessibilityLabel="Guided — tap for more info"
-                        accessibilityRole="button"
-                        onPress={() =>
-                          Alert.alert(
-                            'What does Guided mean?',
-                            'Your child needed extra help here, so their learning mate provided more direct guidance. This is normal — it means a tricky concept is being worked through together.',
-                            [{ text: 'OK' }]
-                          )
-                        }
-                      >
-                        <Text className="text-caption text-text-secondary">
-                          Guided
-                        </Text>
-                        <Ionicons
-                          name="information-circle-outline"
-                          size={14}
-                          className="text-text-secondary ms-0.5"
-                        />
-                      </Pressable>
-                    )}
-                </View>
-              </View>
-            );
-          })
+      {/* Summary */}
+      <View className="mx-4 mt-4 rounded-xl bg-surface p-4">
+        <Text className="text-text-secondary mb-2 text-xs font-medium uppercase">
+          Session Summary
+        </Text>
+        {session.displaySummary ? (
+          <Text className="text-text-primary text-base leading-relaxed">
+            {session.displaySummary}
+          </Text>
         ) : (
-          <View className="py-8 items-center" testID="empty-transcript">
-            <Text className="text-h3 font-semibold text-text-primary text-center mb-2">
-              No transcript available
-            </Text>
-            <Text className="text-body text-text-secondary text-center mb-6">
-              No transcript is available for this session.
-            </Text>
-            <Pressable
-              onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
-              className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center"
-              accessibilityRole="button"
-              accessibilityLabel="Go back"
-              testID="empty-transcript-back"
-            >
-              <Text className="text-body font-semibold text-text-inverse">
-                Go back
-              </Text>
-            </Pressable>
-          </View>
+          <Text className="text-text-tertiary text-base italic">
+            Session summary not available for older sessions
+          </Text>
         )}
-      </ScrollView>
-    </View>
+      </View>
+
+      {/* Homework details */}
+      {session.homeworkSummary && (
+        <View className="mx-4 mt-4 rounded-xl bg-surface p-4">
+          <Text className="text-text-secondary mb-2 text-xs font-medium uppercase">
+            Homework Help
+          </Text>
+          <Text className="text-text-primary text-base leading-relaxed">
+            {session.homeworkSummary.summary}
+          </Text>
+        </View>
+      )}
+    </ScrollView>
   );
 }

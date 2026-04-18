@@ -132,7 +132,7 @@ export function useChildSessions(childProfileId: string | undefined) {
   });
 }
 
-export function useChildSessionTranscript(
+export function useChildSessionDetail(
   childProfileId: string | undefined,
   sessionId: string | undefined
 ) {
@@ -140,26 +140,25 @@ export function useChildSessionTranscript(
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: [
-      'dashboard',
-      'children',
-      childProfileId,
-      'sessions',
-      sessionId,
-      'transcript',
-    ],
+    queryKey: ['dashboard', 'children', childProfileId, 'session', sessionId],
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
         const res = await client.dashboard.children[':profileId'].sessions[
           ':sessionId'
-        ].transcript.$get(
-          { param: { profileId: childProfileId!, sessionId: sessionId! } },
+        ].$get(
+          {
+            param: {
+              profileId: childProfileId!,
+              sessionId: sessionId!,
+            },
+          },
           { init: { signal } }
         );
+        if (res.status === 404) return null;
         await assertOk(res);
         const data = await res.json();
-        return data.transcript;
+        return data.session;
       } finally {
         cleanup();
       }

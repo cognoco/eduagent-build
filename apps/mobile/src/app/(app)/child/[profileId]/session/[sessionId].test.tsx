@@ -1,10 +1,7 @@
-import { render, screen, fireEvent } from '@testing-library/react-native';
-import { Alert } from 'react-native';
-
-const mockBack = jest.fn();
+import { render, screen } from '@testing-library/react-native';
 
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ back: mockBack, canGoBack: jest.fn(() => true) }),
+  useRouter: () => ({ back: jest.fn(), canGoBack: jest.fn(() => true) }),
   useLocalSearchParams: () => ({
     profileId: 'child-profile-001',
     sessionId: 'session-001',
@@ -24,198 +21,102 @@ jest.mock('@expo/vector-icons', () => {
   };
 });
 
-const mockUseChildSessionTranscript = jest.fn();
+const mockUseChildSessionDetail = jest.fn();
 
 jest.mock('../../../../../hooks/use-dashboard', () => ({
-  useChildSessionTranscript: (...args: unknown[]) =>
-    mockUseChildSessionTranscript(...args),
+  useChildSessionDetail: (...args: unknown[]) =>
+    mockUseChildSessionDetail(...args),
 }));
 
-const SessionTranscriptScreen = require('./[sessionId]').default;
+const SessionDetailScreen = require('./[sessionId]').default;
 
-function makeTranscript(
-  exchanges: Array<{
-    role: 'user' | 'assistant';
-    content: string;
-    timestamp: string;
-    escalationRung?: number | null;
-  }>
-) {
+function makeSession(overrides: Record<string, unknown> = {}) {
   return {
-    session: {
-      startedAt: '2026-03-20T10:00:00Z',
-      exchangeCount: exchanges.length,
-      sessionType: 'learning',
-    },
-    exchanges,
+    sessionId: 'session-001',
+    subjectId: 'subject-1',
+    topicId: 'topic-1',
+    sessionType: 'learning',
+    startedAt: '2026-03-20T10:00:00Z',
+    endedAt: '2026-03-20T10:08:00Z',
+    exchangeCount: 5,
+    escalationRung: 1,
+    durationSeconds: 480,
+    wallClockSeconds: 500,
+    displayTitle: 'Learning',
+    displaySummary: null,
+    homeworkSummary: null,
+    ...overrides,
   };
 }
 
-describe('SessionTranscriptScreen', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    jest.spyOn(Alert, 'alert');
-  });
+describe('SessionDetailScreen (summary-only)', () => {
+  beforeEach(() => jest.clearAllMocks());
 
-  it('renders "Guided" label with info icon when escalationRung >= 3', () => {
-    mockUseChildSessionTranscript.mockReturnValue({
-      data: makeTranscript([
-        {
-          role: 'assistant',
-          content: 'Let me help you with that.',
-          timestamp: '2026-03-20T10:01:00Z',
-          escalationRung: 3,
-        },
-      ]),
+  it('shows session metadata when displaySummary is present', () => {
+    mockUseChildSessionDetail.mockReturnValue({
+      data: makeSession({ displaySummary: 'Practiced light reactions' }),
       isLoading: false,
     });
 
-    render(<SessionTranscriptScreen />);
+    render(<SessionDetailScreen />);
 
-    expect(screen.getByText('Guided')).toBeTruthy();
-    expect(screen.getByTestId('guided-info-0')).toBeTruthy();
-    expect(screen.getByTestId('icon-information-circle-outline')).toBeTruthy();
+    expect(screen.getByText('Practiced light reactions')).toBeTruthy();
+    expect(screen.getByTestId('session-metadata')).toBeTruthy();
   });
 
-  it('renders "Guided" label for escalationRung > 3', () => {
-    mockUseChildSessionTranscript.mockReturnValue({
-      data: makeTranscript([
-        {
-          role: 'assistant',
-          content: 'Here is the answer.',
-          timestamp: '2026-03-20T10:02:00Z',
-          escalationRung: 5,
-        },
-      ]),
+  it('shows fallback text when displaySummary is null', () => {
+    mockUseChildSessionDetail.mockReturnValue({
+      data: makeSession({ displaySummary: null }),
       isLoading: false,
     });
 
-    render(<SessionTranscriptScreen />);
+    render(<SessionDetailScreen />);
 
-    expect(screen.getByText('Guided')).toBeTruthy();
-    expect(screen.getByTestId('guided-info-0')).toBeTruthy();
+    expect(
+      screen.getByText('Session summary not available for older sessions')
+    ).toBeTruthy();
   });
 
-  it('does NOT render "Guided" when escalationRung < 3', () => {
-    mockUseChildSessionTranscript.mockReturnValue({
-      data: makeTranscript([
-        {
-          role: 'assistant',
-          content: 'Good thinking!',
-          timestamp: '2026-03-20T10:01:00Z',
-          escalationRung: 2,
+  it('shows homework summary when present', () => {
+    mockUseChildSessionDetail.mockReturnValue({
+      data: makeSession({
+        displayTitle: 'Math Homework',
+        homeworkSummary: {
+          displayTitle: 'Math Homework',
+          summary: 'Walked through fraction simplification step by step',
         },
-      ]),
+        displaySummary: 'Helped with fractions',
+      }),
       isLoading: false,
     });
 
-    render(<SessionTranscriptScreen />);
+    render(<SessionDetailScreen />);
 
-    expect(screen.queryByText('Guided')).toBeNull();
-    expect(screen.queryByTestId('guided-info-0')).toBeNull();
+    expect(screen.getByText('Helped with fractions')).toBeTruthy();
+    expect(
+      screen.getByText('Walked through fraction simplification step by step')
+    ).toBeTruthy();
   });
 
-  it('does NOT render "Guided" when escalationRung is undefined', () => {
-    mockUseChildSessionTranscript.mockReturnValue({
-      data: makeTranscript([
-        {
-          role: 'assistant',
-          content: 'Keep going!',
-          timestamp: '2026-03-20T10:01:00Z',
-          escalationRung: undefined,
-        },
-      ]),
+  it('shows session-not-found when session is missing', () => {
+    mockUseChildSessionDetail.mockReturnValue({
+      data: null,
       isLoading: false,
     });
 
-    render(<SessionTranscriptScreen />);
+    render(<SessionDetailScreen />);
 
-    expect(screen.queryByText('Guided')).toBeNull();
-    expect(screen.queryByTestId('guided-info-0')).toBeNull();
+    expect(screen.getByTestId('session-not-found')).toBeTruthy();
   });
 
-  it('does NOT render "Guided" when escalationRung is null', () => {
-    mockUseChildSessionTranscript.mockReturnValue({
-      data: makeTranscript([
-        {
-          role: 'assistant',
-          content: 'Nice work!',
-          timestamp: '2026-03-20T10:01:00Z',
-          escalationRung: null,
-        },
-      ]),
+  it('does NOT render transcript exchanges', () => {
+    mockUseChildSessionDetail.mockReturnValue({
+      data: makeSession(),
       isLoading: false,
     });
 
-    render(<SessionTranscriptScreen />);
+    render(<SessionDetailScreen />);
 
-    expect(screen.queryByText('Guided')).toBeNull();
-    expect(screen.queryByTestId('guided-info-0')).toBeNull();
-  });
-
-  it('shows alert with explanation when Guided info is tapped', () => {
-    mockUseChildSessionTranscript.mockReturnValue({
-      data: makeTranscript([
-        {
-          role: 'assistant',
-          content: 'Let me explain step by step.',
-          timestamp: '2026-03-20T10:01:00Z',
-          escalationRung: 4,
-        },
-      ]),
-      isLoading: false,
-    });
-
-    render(<SessionTranscriptScreen />);
-
-    fireEvent.press(screen.getByTestId('guided-info-0'));
-
-    expect(Alert.alert).toHaveBeenCalledWith(
-      'What does Guided mean?',
-      'Your child needed extra help here, so their learning mate provided more direct guidance. This is normal — it means a tricky concept is being worked through together.',
-      [{ text: 'OK' }]
-    );
-  });
-
-  it('renders Guided on correct exchanges in a multi-exchange transcript', () => {
-    mockUseChildSessionTranscript.mockReturnValue({
-      data: makeTranscript([
-        {
-          role: 'user',
-          content: 'What is 2+2?',
-          timestamp: '2026-03-20T10:00:00Z',
-          escalationRung: 0,
-        },
-        {
-          role: 'assistant',
-          content: 'Think about it!',
-          timestamp: '2026-03-20T10:00:30Z',
-          escalationRung: 1,
-        },
-        {
-          role: 'user',
-          content: 'I do not know.',
-          timestamp: '2026-03-20T10:01:00Z',
-          escalationRung: 0,
-        },
-        {
-          role: 'assistant',
-          content: 'Let me walk you through it.',
-          timestamp: '2026-03-20T10:01:30Z',
-          escalationRung: 3,
-        },
-      ]),
-      isLoading: false,
-    });
-
-    render(<SessionTranscriptScreen />);
-
-    // Exchanges 0, 1, 2 should NOT have Guided
-    expect(screen.queryByTestId('guided-info-0')).toBeNull();
-    expect(screen.queryByTestId('guided-info-1')).toBeNull();
-    expect(screen.queryByTestId('guided-info-2')).toBeNull();
-
-    // Exchange 3 (escalationRung=3) SHOULD have Guided
-    expect(screen.getByTestId('guided-info-3')).toBeTruthy();
+    expect(screen.queryByTestId('transcript-exchange')).toBeNull();
   });
 });

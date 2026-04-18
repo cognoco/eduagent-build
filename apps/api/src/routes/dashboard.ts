@@ -14,7 +14,7 @@ import {
   markChildReportViewed,
   getChildSubjectTopics,
   getChildSessions,
-  getChildSessionTranscript,
+  getChildSessionDetail,
 } from '../services/dashboard';
 
 type DashboardRouteEnv = {
@@ -108,24 +108,24 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     return c.json({ sessions });
   })
 
-  // Get session transcript
-  .get(
-    '/dashboard/children/:profileId/sessions/:sessionId/transcript',
-    async (c) => {
-      const db = c.get('db');
-      const parentProfileId = requireProfileId(c.get('profileId'));
-      const childProfileId = c.req.param('profileId');
-      const sessionId = c.req.param('sessionId');
+  // Single session detail (summary only, no transcript)
+  .get('/dashboard/children/:profileId/sessions/:sessionId', async (c) => {
+    const db = c.get('db');
+    const parentProfileId = requireProfileId(c.get('profileId'));
+    const childProfileId = c.req.param('profileId');
+    const sessionId = c.req.param('sessionId');
 
-      const transcript = await getChildSessionTranscript(
-        db,
-        parentProfileId,
-        childProfileId,
-        sessionId
-      );
-      return c.json({ transcript });
+    const session = await getChildSessionDetail(
+      db,
+      parentProfileId,
+      childProfileId,
+      sessionId
+    );
+    if (!session) {
+      return c.json({ error: 'Session not found' }, 404);
     }
-  )
+    return c.json({ session });
+  })
 
   .get('/dashboard/children/:profileId/reports', async (c) => {
     const db = c.get('db');

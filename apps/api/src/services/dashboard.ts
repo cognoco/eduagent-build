@@ -684,28 +684,6 @@ export interface ChildSession {
   homeworkSummary: HomeworkSummary | null;
 }
 
-export interface TranscriptExchange {
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: string;
-  escalationRung?: number;
-}
-
-export interface ChildSessionTranscript {
-  session: {
-    sessionId: string;
-    subjectId: string;
-    topicId: string | null;
-    sessionType: string;
-    startedAt: string;
-    exchangeCount: number;
-    displayTitle: string;
-    displaySummary: string | null;
-    homeworkSummary: HomeworkSummary | null;
-  };
-  exchanges: TranscriptExchange[];
-}
-
 /**
  * Lists recent sessions for a child, with parent access check.
  * Returns up to 50 most recent sessions ordered by startedAt descending.
@@ -750,21 +728,14 @@ export async function getChildSessions(
   });
 }
 
-/**
- * Gets full transcript of a session, with parent access check.
- * Returns null when the session doesn't belong to the child or no link exists.
- */
-export async function getChildSessionTranscript(
+export async function getChildSessionDetail(
   db: Database,
   parentProfileId: string,
   childProfileId: string,
   sessionId: string
-): Promise<ChildSessionTranscript | null> {
-  // [EP15-I5] ForbiddenError → 403. null from here now means "access
-  // granted but that session doesn't belong to this child" — 404-like.
+): Promise<ChildSession | null> {
   await assertParentAccess(db, parentProfileId, childProfileId);
 
-  // Get session scoped to child
   const session = await db.query.learningSessions.findFirst({
     where: and(
       eq(learningSessions.id, sessionId),
@@ -773,55 +744,26 @@ export async function getChildSessionTranscript(
   });
   if (!session) return null;
 
-  // Get message events ordered chronologically
-  const events = await db.query.sessionEvents.findMany({
-    where: and(
-      eq(sessionEvents.sessionId, sessionId),
-      inArray(sessionEvents.eventType, ['user_message', 'ai_response'])
-    ),
-    orderBy: sessionEvents.createdAt,
-  });
-
-  const exchanges: TranscriptExchange[] = events.map((e) => {
-    const exchange: TranscriptExchange = {
-      role: e.eventType === 'user_message' ? 'user' : 'assistant',
-      content: e.content,
-      timestamp: e.createdAt.toISOString(),
-    };
-
-    if (e.eventType === 'ai_response') {
-      const meta = e.metadata as Record<string, unknown> | null;
-      const rung =
-        typeof meta?.escalationRung === 'number'
-          ? meta.escalationRung
-          : undefined;
-      if (rung !== undefined) {
-        exchange.escalationRung = rung;
-      }
-    }
-
-    return exchange;
-  });
-
   const metadata = getSessionMetadata(session.metadata);
   const homeworkSummary = metadata.homeworkSummary ?? null;
 
   return {
-    session: {
-      sessionId: session.id,
-      subjectId: session.subjectId,
-      topicId: session.topicId,
-      sessionType: session.sessionType,
-      startedAt: session.startedAt.toISOString(),
-      exchangeCount: session.exchangeCount,
-      displayTitle: formatSessionDisplayTitle(
-        session.sessionType,
-        homeworkSummary
-      ),
-      displaySummary: homeworkSummary?.summary ?? null,
-      homeworkSummary,
-    },
-    exchanges,
+    sessionId: session.id,
+    subjectId: session.subjectId,
+    topicId: session.topicId,
+    sessionType: session.sessionType,
+    startedAt: session.startedAt.toISOString(),
+    endedAt: session.endedAt?.toISOString() ?? null,
+    exchangeCount: session.exchangeCount,
+    escalationRung: session.escalationRung,
+    durationSeconds: session.durationSeconds,
+    wallClockSeconds: session.wallClockSeconds,
+    displayTitle: formatSessionDisplayTitle(
+      session.sessionType,
+      homeworkSummary
+    ),
+    displaySummary: homeworkSummary?.summary ?? null,
+    homeworkSummary,
   };
 }
 
