@@ -185,6 +185,9 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
           guidedVsImmediateRatio: 0.6,
           retentionTrend: 'stable',
           totalSessions: 12,
+          currentStreak: 3,
+          longestStreak: 7,
+          totalXp: 450,
         },
         {
           profileId: 'demo-child-2',
@@ -202,6 +205,9 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
           guidedVsImmediateRatio: 0.3,
           retentionTrend: 'improving',
           totalSessions: 8,
+          currentStreak: 1,
+          longestStreak: 5,
+          totalXp: 280,
         },
       ],
     });

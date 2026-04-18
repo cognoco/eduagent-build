@@ -11,6 +11,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Profile } from '@eduagent/schemas';
 import { ProfileSwitcher } from '../common';
+import { useQuizDiscoveryCard } from '../../hooks/use-coaching-card';
 import {
   useContinueSuggestion,
   useReviewSummary,
@@ -50,6 +51,7 @@ export function LearnerScreen({
   const { data: subjects, isLoading, isError, refetch } = useSubjects();
   const { data: continueSuggestion } = useContinueSuggestion();
   const { data: reviewSummary } = useReviewSummary();
+  const { data: quizDiscovery } = useQuizDiscoveryCard();
   const [recoveryMarker, setRecoveryMarker] =
     useState<SessionRecoveryMarker | null>(null);
 
@@ -70,8 +72,8 @@ export function LearnerScreen({
         if (marker) {
           // Stale marker — clear silently. The "Continue where you left off"
           // card uses continueSuggestion (API-driven) and doesn't need this.
-          void clearSessionRecoveryMarker(activeProfile?.id).catch(
-            () => undefined
+          void clearSessionRecoveryMarker(activeProfile?.id).catch((err) =>
+            console.error('[LearnerScreen] stale marker cleanup failed:', err)
           );
         }
       } catch {
@@ -111,8 +113,11 @@ export function LearnerScreen({
         icon: 'play-circle-outline',
         variant: 'highlight',
         onPress: () => {
-          void clearSessionRecoveryMarker(activeProfile?.id).catch(
-            () => undefined
+          void clearSessionRecoveryMarker(activeProfile?.id).catch((err) =>
+            console.error(
+              '[LearnerScreen] clearSessionRecoveryMarker failed:',
+              err
+            )
           );
           router.push({
             pathname: '/(app)/session',
@@ -180,6 +185,21 @@ export function LearnerScreen({
       });
     }
 
+    if (quizDiscovery) {
+      cards.push({
+        testID: 'intent-quiz-discovery',
+        title: quizDiscovery.title,
+        subtitle: quizDiscovery.body,
+        icon: 'sparkles-outline',
+        variant: 'highlight',
+        onPress: () =>
+          router.push({
+            pathname: '/(app)/quiz',
+            params: { activityType: quizDiscovery.activityType },
+          } as never),
+      });
+    }
+
     cards.push(
       {
         testID: 'intent-learn',
@@ -215,6 +235,7 @@ export function LearnerScreen({
   }, [
     activeProfile?.id,
     continueSuggestion,
+    quizDiscovery,
     recoveryMarker,
     reviewSummary,
     router,

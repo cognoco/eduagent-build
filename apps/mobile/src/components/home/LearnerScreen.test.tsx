@@ -55,6 +55,11 @@ jest.mock('../../hooks/use-progress', () => ({
   useReviewSummary: () => mockUseReviewSummary(),
 }));
 
+const mockUseQuizDiscoveryCard = jest.fn();
+jest.mock('../../hooks/use-coaching-card', () => ({
+  useQuizDiscoveryCard: () => mockUseQuizDiscoveryCard(),
+}));
+
 jest.mock('../../lib/session-recovery', () => ({
   readSessionRecoveryMarker: (...args: unknown[]) =>
     mockReadSessionRecoveryMarker(...args),
@@ -83,6 +88,7 @@ describe('LearnerScreen', () => {
     mockIsRecoveryMarkerFresh.mockReturnValue(true);
     mockUseContinueSuggestion.mockReturnValue({ data: null });
     mockUseReviewSummary.mockReturnValue({ data: null });
+    mockUseQuizDiscoveryCard.mockReturnValue({ data: undefined });
   });
 
   it('renders greeting with profile name', () => {

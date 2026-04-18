@@ -607,6 +607,9 @@ export async function getChildrenForParent(
       retentionTrend,
       totalSessions,
       progress,
+      currentStreak: 0,
+      longestStreak: 0,
+      totalXp: 0,
     };
   });
 

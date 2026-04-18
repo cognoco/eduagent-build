@@ -42,10 +42,15 @@ const PACE_CONFIG: Record<
 // 3-second countdown before first sentence
 const COUNTDOWN_MS = 3500;
 
-/** Split text into chunks of approximately `size` words. */
+/**
+ * Fallback: split text into chunks of approximately `size` words.
+ * Short sentences (≤4 words) are never split — they come as one chunk.
+ */
 export function splitIntoChunks(text: string, size: number): string[] {
   const words = text.split(/\s+/).filter(Boolean);
   if (words.length === 0) return [text];
+  // Short sentences stay whole (up to 4 real words, period doesn't count as a word)
+  if (words.length <= 4) return [text];
   const chunks: string[] = [];
   for (let i = 0; i < words.length; i += size) {
     chunks.push(words.slice(i, i + size).join(' '));
@@ -93,6 +98,16 @@ export function useDictationPlayback(config: PlaybackConfig): PlaybackControls {
   };
 
   const getChunksForSentence = (sentenceIndex: number): string[] => {
+    const sentence = configRef.current.sentences[sentenceIndex];
+    if (!sentence) return [];
+
+    // Prefer LLM-generated natural chunks when available
+    const preComputed = configRef.current.punctuationReadAloud
+      ? sentence.chunksWithPunctuation
+      : sentence.chunks;
+    if (preComputed && preComputed.length > 0) return preComputed;
+
+    // Fallback to mechanical splitting for older data without chunks
     const text = getSentenceText(sentenceIndex);
     const size = configRef.current.chunkSize ?? 3;
     return splitIntoChunks(text, size);

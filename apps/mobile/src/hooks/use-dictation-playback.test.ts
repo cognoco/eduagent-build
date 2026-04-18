@@ -28,7 +28,7 @@ const TEST_SENTENCES: DictationSentence[] = [
   },
 ];
 
-// Longer sentences for chunk splitting tests
+// Longer sentences for chunk splitting tests (fallback — no pre-computed chunks)
 const LONG_SENTENCES: DictationSentence[] = [
   {
     text: 'The little rabbit ran through the forest.',
@@ -39,6 +39,33 @@ const LONG_SENTENCES: DictationSentence[] = [
     text: 'A bright star shone above.',
     withPunctuation: 'A bright star shone above period',
     wordCount: 5,
+  },
+];
+
+// Sentences with LLM-generated natural chunks
+const CHUNKED_SENTENCES: DictationSentence[] = [
+  {
+    text: 'A black cat that I usually see out of window is not there today.',
+    withPunctuation:
+      'A black cat that I usually see out of window is not there today period',
+    wordCount: 13,
+    chunks: [
+      'A black cat',
+      'that I usually see out of window',
+      'is not there today.',
+    ],
+    chunksWithPunctuation: [
+      'A black cat',
+      'that I usually see out of window',
+      'is not there today period',
+    ],
+  },
+  {
+    text: 'Hello there.',
+    withPunctuation: 'Hello there period',
+    wordCount: 2,
+    chunks: ['Hello there.'],
+    chunksWithPunctuation: ['Hello there period'],
   },
 ];
 
@@ -60,6 +87,20 @@ describe('splitIntoChunks', () => {
 
   it('returns single chunk when text is shorter than size', () => {
     expect(splitIntoChunks('hello world', 5)).toEqual(['hello world']);
+  });
+
+  it('keeps short sentences (≤4 words) as a single chunk', () => {
+    expect(splitIntoChunks('A black cat.', 2)).toEqual(['A black cat.']);
+    expect(splitIntoChunks('Run fast now.', 2)).toEqual(['Run fast now.']);
+    expect(splitIntoChunks('She is here today.', 2)).toEqual([
+      'She is here today.',
+    ]);
+  });
+
+  it('splits sentences with more than 4 words', () => {
+    expect(
+      splitIntoChunks('The little rabbit ran through the forest.', 3)
+    ).toEqual(['The little rabbit', 'ran through the', 'forest.']);
   });
 
   it('handles empty text', () => {
@@ -489,5 +530,141 @@ describe('useDictationPlayback', () => {
       jest.advanceTimersByTime(5000);
     });
     expect(result.current.currentIndex).toBe(1); // Now sentence 1
+  });
+
+  it('uses pre-computed LLM chunks instead of mechanical splitting', () => {
+    let capturedOnDone: (() => void) | undefined;
+    mockSpeak.mockImplementation((_text, options) => {
+      capturedOnDone = options?.onDone;
+    });
+
+    const { result } = renderHook(() =>
+      useDictationPlayback({
+        sentences: CHUNKED_SENTENCES,
+        pace: 'normal',
+        punctuationReadAloud: false,
+        language: 'en',
+        chunkSize: 3, // should be ignored — pre-computed chunks take priority
+      })
+    );
+
+    act(() => {
+      result.current.start();
+    });
+    act(() => {
+      jest.advanceTimersByTime(4000);
+    });
+
+    // First chunk should be the natural phrase, not a 3-word mechanical split
+    expect(mockSpeak).toHaveBeenLastCalledWith(
+      'A black cat',
+      expect.objectContaining({ language: 'en' })
+    );
+
+    // Complete chunk 0 → chunk pause (3 words × 2000ms = 6000ms) → chunk 1
+    act(() => {
+      capturedOnDone?.();
+    });
+    act(() => {
+      jest.advanceTimersByTime(6000);
+    });
+
+    expect(mockSpeak).toHaveBeenLastCalledWith(
+      'that I usually see out of window',
+      expect.objectContaining({ language: 'en' })
+    );
+
+    // Complete chunk 1 → chunk pause (7 words × 2000ms = 14000ms) → chunk 2
+    act(() => {
+      capturedOnDone?.();
+    });
+    act(() => {
+      jest.advanceTimersByTime(14000);
+    });
+
+    expect(mockSpeak).toHaveBeenLastCalledWith(
+      'is not there today.',
+      expect.objectContaining({ language: 'en' })
+    );
+  });
+
+  it('uses chunksWithPunctuation when punctuationReadAloud is true', () => {
+    let capturedOnDone: (() => void) | undefined;
+    mockSpeak.mockImplementation((_text, options) => {
+      capturedOnDone = options?.onDone;
+    });
+
+    const { result } = renderHook(() =>
+      useDictationPlayback({
+        sentences: CHUNKED_SENTENCES,
+        pace: 'normal',
+        punctuationReadAloud: true,
+        language: 'en',
+      })
+    );
+
+    act(() => {
+      result.current.start();
+    });
+    act(() => {
+      jest.advanceTimersByTime(4000);
+    });
+
+    // First chunk same in both variants (no punctuation in it)
+    expect(mockSpeak).toHaveBeenLastCalledWith(
+      'A black cat',
+      expect.objectContaining({ language: 'en' })
+    );
+
+    // Complete chunk 0 → pause (3 words × 2000ms) → chunk 1
+    act(() => {
+      capturedOnDone?.();
+    });
+    act(() => {
+      jest.advanceTimersByTime(6000);
+    });
+
+    // Complete chunk 1 → pause (7 words × 2000ms) → chunk 2
+    act(() => {
+      capturedOnDone?.();
+    });
+    act(() => {
+      jest.advanceTimersByTime(14000);
+    });
+
+    // Last chunk uses spoken punctuation: "period" instead of "."
+    expect(mockSpeak).toHaveBeenLastCalledWith(
+      'is not there today period',
+      expect.objectContaining({ language: 'en' })
+    );
+  });
+
+  it('falls back to splitIntoChunks when no pre-computed chunks exist', () => {
+    mockSpeak.mockImplementation((_text, options) => {
+      options?.onDone?.();
+    });
+
+    const { result } = renderHook(() =>
+      useDictationPlayback({
+        sentences: LONG_SENTENCES, // no chunks/chunksWithPunctuation
+        pace: 'normal',
+        punctuationReadAloud: false,
+        language: 'en',
+        chunkSize: 3,
+      })
+    );
+
+    act(() => {
+      result.current.start();
+    });
+    act(() => {
+      jest.advanceTimersByTime(4000);
+    });
+
+    // Should fall back to mechanical 3-word splitting
+    expect(mockSpeak).toHaveBeenCalledWith(
+      'The little rabbit',
+      expect.objectContaining({ language: 'en' })
+    );
   });
 });

@@ -1,20 +1,33 @@
 # Learning Path Flows — End-User Perspective
 
-Complete trace of every learning path in EduAgent, from the learner's first tap to post-session recording. Written as of 2026-04-14.
+Complete trace of every learning path in EduAgent, from the learner's first tap to post-session recording. Last updated 2026-04-18.
+
+> **What changed since 2026-04-14**
+> - The five tutoring-session paths below are unchanged in shape; only their **entry points** moved. The intermediate `/(app)/learn-new` screen was deleted in the home IA simplification (commit 55ddcbdb). Learners now tap an IntentCard directly on `/(app)/home` to start any path.
+> - **Three new "practice" paths** (Quiz, Dictation, Recitation) ship out of the home Practice card. They are not full tutoring sessions — they are bounded activities with their own scoring loops. Recitation is a session mode; Quiz and Dictation are standalone flows with their own context state.
+> - The homework path now optionally passes the captured image straight to a multimodal LLM (vision) instead of OCR-only — the same image-pass-through pipeline powers dictation photo-review.
 
 ---
 
-## Overview: The Five Learning Paths
+## Overview: Tutoring Session Paths
 
-| Path | Entry Point | Session Type (DB) | UI Mode | Summary |
+| Path | Entry Point (current IA) | Session Type (DB) | UI Mode | Summary |
 |---|---|---|---|---|
-| **Freeform Chat** | "Just ask anything" | `learning` | `freeform` | Open-ended — no subject or topic chosen upfront |
+| **Freeform Chat** | Home "Ask" intent card | `learning` | `freeform` | Open-ended — no subject or topic chosen upfront |
 | **Guided Learning** | Topic detail or book | `learning` | `freeform` (scoped) | Focused on a specific topic within a subject |
-| **Homework Help** | Camera / manual entry | `homework` | `homework` | Photo or typed math/science problem |
+| **Homework Help** | Home "Homework" intent card | `homework` | `homework` | Photo or typed math/science problem |
 | **Practice / Review** | Topic detail | `learning` | `practice` | Timed review of a previously studied topic |
-| **Retention Relearn** | Library / retention alerts | `learning` | `relearn` | Re-study a fading or forgotten topic |
+| **Retention Relearn** | Library / retention alerts / Practice hub "Review topics" | `learning` | `relearn` | Re-study a fading or forgotten topic |
+| **Recitation** | Practice hub "Recite" card | `learning` | `recitation` | Recite a poem or text from memory; AI listens and prompts |
 
-Additionally, two **verification overlays** can activate within any learning session:
+## Overview: Practice Activity Paths (non-session)
+
+| Path | Entry Point | Backend | Summary |
+|---|---|---|---|
+| **Quiz** | Practice hub "Quiz" card | `POST /quiz/rounds` (generate), `POST /quiz/rounds/:id/check` (per answer), `POST /quiz/rounds/:id/complete` (submit) | Three activity types — Capitals, Vocabulary (per language subject), Guess Who. Server-validated answers with mid-round prefetch for instant Play Again. |
+| **Dictation** | Practice hub "Dictation" card | `POST /dictation/generate` (LLM topic), `POST /dictation/prepare-homework` (sentence split), `POST /dictation/review` (multimodal photo review), `POST /dictation/results` (record) | TTS dictation with paced playback; optional photo review of handwriting; sentence-level remediation. |
+
+Additionally, two **verification overlays** can activate within any tutoring session:
 - **Devil's Advocate** (`evaluate`) — AI presents a flawed explanation; learner finds the error
 - **Feynman Technique** (`teach_back`) — learner explains the concept to a "clueless" AI
 
@@ -28,11 +41,9 @@ Learners who are curious about something but don't want to navigate subjects or 
 ### Flow
 
 ```
-Home Screen
-  └─ Tap "Start learning"
-      └─ Learn New Screen
-          └─ Tap "Just ask anything"
-              └─ Session Screen (mode=freeform, no subject, no topic)
+Home Screen (LearnerScreen)
+  └─ Tap "Ask" intent card           ← was: tap "Start learning" → "Just ask anything"
+      └─ Session Screen (mode=freeform, no subject, no topic)
                   │
                   ├─ Opening: "What's on your mind? I'm ready when you are."
                   │
@@ -144,8 +155,8 @@ Learners with homework problems — typically math or science. Can photograph th
 ### Flow
 
 ```
-Home Screen
-  └─ Tap "Homework help"
+Home Screen (LearnerScreen)
+  └─ Tap "Homework" intent card     ← directly from home now (no /learn-new step)
       └─ Camera Screen
           ├─ Camera permission check
           ├─ Take photo of homework problem
@@ -153,7 +164,8 @@ Home Screen
           │       ├─ OCR succeeds → extracted text shown for review
           │       │   └─ Learner can edit/correct OCR text
           │       └─ OCR fails/weak → manual text entry fallback
-          ├─ OR pick from gallery
+          ├─ OR pick from gallery (HOMEWORK-05)
+          ├─ OR pass image straight to multimodal LLM (HOMEWORK-06)
           └─ OR type manually
               │
               └─ Session Screen (mode=homework)
@@ -271,6 +283,216 @@ Same as guided learning, with the SM-2 retention card getting a fresh review cyc
 
 ---
 
+## Path 6: Recitation Session
+
+### Who uses it
+Learners memorising something verbatim — a poem, lines for a play, a multiplication table chant, a religious text. Recitation differs from chat tutoring: the learner produces the content and the AI listens for fidelity.
+
+### Flow
+
+```
+Home Screen
+  └─ Tap "Practice" intent card
+      └─ Practice Hub (/(app)/practice)
+          └─ Tap "Recite"
+              └─ Session Screen (mode=recitation)
+                  │
+                  ├─ Opening: AI asks what to recite (or accepts a paste)
+                  │
+                  ├─ Voice mode is the natural input here
+                  │
+                  ├─ Each exchange: learner recites, AI prompts at gaps,
+                  │   confirms correct lines, gently surfaces the missed word
+                  │   when the learner stalls (no Socratic ladder)
+                  │
+                  └─ Learner taps "I'm Done"
+                      └─ Session Summary (filing prompt available)
+```
+
+### What gets recorded
+Same shape as a guided session — `learning_sessions.uiMode = 'recitation'`. Verification overlays are not used. Whether the post-session pipeline awards XP, marks streak, or files into a topic depends on whether the learner picks an existing topic or files at close.
+
+---
+
+## Path 7: Quiz Activity
+
+### Who uses it
+Learners who want low-friction practice — three to ten questions, instant feedback, an XP bump, no commitment to a tutoring session.
+
+### Flow
+
+```
+Home Screen
+  └─ Tap "Practice" intent card
+      └─ Practice Hub (/(app)/practice)
+          └─ Tap "Quiz"
+              └─ Quiz Index (/(app)/quiz)
+                  ├─ Capitals card             — always available
+                  ├─ Vocabulary: <Language>    — one card per active four_strands subject
+                  └─ Guess Who card            — always available
+                      │
+                      └─ Quiz Launch (/(app)/quiz/launch)
+                          ├─ POST /quiz/rounds (LLM generates round)
+                          ├─ Rotating loading copy:
+                          │   "Shuffling questions..." → "Picking a theme..." → "Almost ready..."
+                          ├─ After 20s: "taking longer than usual" hint + Cancel still available
+                          └─ Errors classified by typed code:
+                              ├─ QUOTA_EXCEEDED  → message + no Retry button (Go Back only)
+                              ├─ FORBIDDEN       → message + no Retry
+                              ├─ CONSENT_*       → message + no Retry (consent gate handles it)
+                              └─ Other           → message + Retry button
+                              │
+                              └─ Quiz Play (/(app)/quiz/play)
+                                  │
+                                  ├─ Question header: "1 of 7" + dot indicators + elapsed seconds
+                                  │
+                                  ├─ For Capitals/Vocabulary:
+                                  │   "What is the capital of <Country>?" / "Translate: <term>"
+                                  │   4 options as large tappable cards
+                                  │   Server checks via POST /quiz/rounds/:id/check
+                                  │   Wrong answer: selected option turns red, others fade
+                                  │   Correct answer: selected option turns green
+                                  │   Optional fun fact card under the answer
+                                  │
+                                  ├─ For Guess Who:
+                                  │   Reveals clues progressively, learner submits guess
+                                  │   Score scales with cluesUsed (fewer clues → higher quality)
+                                  │
+                                  ├─ Mid-round prefetch at 50% progress
+                                  │   POST /quiz/rounds (next round generated server-side)
+                                  │   so "Play Again" on the results screen feels instant
+                                  │
+                                  ├─ Mid-round quit: close icon top-left → goBackOrReplace('/(app)/quiz')
+                                  │
+                                  ├─ After last question: POST /quiz/rounds/:id/complete
+                                  │   On error: inline retry card with Retry / Exit (no silent recovery)
+                                  │
+                                  └─ Quiz Results (/(app)/quiz/results)
+                                      │
+                                      ├─ Celebration tier (server-decided):
+                                      │   perfect → trophy + BrandCelebration animation
+                                      │   great   → star    + BrandCelebration animation
+                                      │   nice    → thumbs-up (no big animation)
+                                      │
+                                      ├─ Score: <correct>/<total> + theme + +XP pill
+                                      ├─ For Guess Who: also "X of Y people identified"
+                                      │
+                                      ├─ Play Again
+                                      │   ├─ If prefetched round is hydrated → replace to /play
+                                      │   └─ Else → replace to /launch (fresh generate)
+                                      │
+                                      └─ Done → goBackOrReplace('/(app)/practice')
+```
+
+### What gets recorded
+
+| When | What | Where |
+|---|---|---|
+| Round generate | Round seed, theme, questions (with answers stripped before send to client) | `quiz_rounds` |
+| Per-answer check | Server validates answer; client never sees the correct option until results | `quiz_rounds` (per-question result rows on complete) |
+| Round complete | Score, total, time per question, clues used (Guess Who), `celebrationTier`, XP awarded | `quiz_rounds`, `xp_ledger` |
+| Round complete | Stats aggregate (best score, rounds played per activity) | `quiz_stats` (powers Practice hub + Quiz Index subtitles) |
+| Round complete | Celebration queued (perfect / great rounds) | celebration queue surfaced on next Home visit |
+
+### Key behavior
+
+- **Server-checked answers only** — the client receives shuffled options with the correct answer stripped, then submits each guess to `POST /quiz/rounds/:id/check`. This blocks "open the bundle and read the answer" cheating.
+- **Mid-round prefetch** — at 50% progress the next round is generated and persisted server-side; the results screen eagerly hydrates that round into TanStack Query so Play Again skips the loading screen.
+- **Typed error classification** — quota, consent, and forbidden errors hide the Retry button instead of bouncing the user into a useless retry loop. Code lives in `(app)/quiz/launch.tsx` and matches CLAUDE.md's "classify errors before formatting" rule.
+- **Full-screen layout** — the tab bar is hidden across all four quiz screens (`FULL_SCREEN_ROUTES` in `(app)/_layout.tsx`).
+
+---
+
+## Path 8: Dictation Activity
+
+### Who uses it
+Learners practising spelling and writing in a target language — primary use case is grade-school children doing home dictation in Czech, English, French, etc. Either photograph a school text and have the app read it back, or let the LLM generate an age-appropriate piece.
+
+### Flow
+
+```
+Home Screen
+  └─ Tap "Practice" intent card
+      └─ Practice Hub
+          └─ Tap "Dictation"
+              └─ Dictation Choice (/(app)/dictation)
+                  │
+                  ├─ "I have a text"  → Camera (homework camera) → OCR
+                  │   └─ Text Preview (/(app)/dictation/text-preview)
+                  │       ├─ Shows OCR'd text in editable TextInput
+                  │       ├─ Learner edits any OCR errors
+                  │       └─ Tap "Start dictation"
+                  │           └─ POST /dictation/prepare-homework
+                  │               (LLM splits sentences + annotates punctuation)
+                  │               └─ → Playback
+                  │
+                  └─ "Surprise me"  → POST /dictation/generate
+                      ├─ Loading: "Picking a topic..." then reveals topic
+                      ├─ LLM generates 6-12 sentences age-appropriate to recent topics
+                      └─ → Playback
+                          │
+                          └─ Playback (/(app)/dictation/playback)
+                              │
+                              ├─ Top control strip:
+                              │   ├─ Pace pill (Slow / Normal / Fast — cycles on tap)
+                              │   ├─ Punctuation toggle (read-aloud on/off)
+                              │   ├─ Skip current sentence
+                              │   └─ Progress "n / total"
+                              │
+                              ├─ Countdown in target language ("Pripravit? 3...2...1...")
+                              ├─ TTS reads each sentence at selected pace
+                              ├─ Pause = base + wordCount * paceMultiplier
+                              ├─ Tap anywhere below the strip → pause/resume
+                              ├─ Tap repeat button → replays current sentence from start
+                              ├─ Hardware back → confirm dialog ("Are you sure?")
+                              │
+                              └─ After last sentence
+                                  └─ Complete (/(app)/dictation/complete)
+                                      │
+                                      ├─ "Well done! Want to check your work?"
+                                      │
+                                      ├─ "Check my writing"
+                                      │   ├─ Camera capture of handwritten paper
+                                      │   ├─ POST /dictation/review (image base64 + sentences)
+                                      │   │   (multimodal LLM compares handwriting to original)
+                                      │   └─ Review (/(app)/dictation/review)
+                                      │       │
+                                      │       ├─ If 0 mistakes:
+                                      │       │   "Perfect!" celebration screen → Done
+                                      │       │
+                                      │       └─ If mistakes:
+                                      │           "{N} mistakes found"
+                                      │           Per-mistake card:
+                                      │             Original / You wrote / Error / Correct version / Explanation
+                                      │           Retype input (autocorrect off, accepts whatever child types)
+                                      │           Submit → next mistake → "You fixed all {N} mistakes!"
+                                      │           Done → POST /dictation/results (reviewed=true)
+                                      │
+                                      ├─ "I'm done"
+                                      │   └─ POST /dictation/results (reviewed=false)
+                                      │       On save error: Alert with Retry / Continue without saving
+                                      │
+                                      └─ "Try another dictation" → back to Dictation Choice
+```
+
+### What gets recorded
+
+| When | What | Where |
+|---|---|---|
+| Result save (Done or after Review) | `localDate`, sentenceCount, mistakeCount (null if not reviewed), mode (`homework` / `surprise`), reviewed flag | `dictation_results` |
+| Pace + punctuation preferences | Per profile, stored on device | SecureStore keys `dictation-pace-${profileId}`, `dictation-punctuation-${profileId}` |
+| Streak | Consecutive days of dictation practice (any dictation counts), per profile | `dictation_streaks` |
+
+### Key behavior
+
+- **Client-driven playback** — once the structured sentences arrive from the server, the entire playback is local. No network calls during dictation.
+- **Tab bar is hidden across all five screens** — minimises mis-taps while the child is looking at paper, not the phone.
+- **Photo review depends on multimodal LLM** — same image-pass-through pipeline that powers the homework vision feature. If the feature flag is off the "Check my writing" button is hidden.
+- **Mid-dictation exit is an explicit user choice** — hardware back triggers a destructive-style Alert ("Your dictation progress won't be saved") with Keep going / Leave.
+- **No silent recovery on result save failure** — both `complete.tsx` and `review.tsx` surface the typed error message and offer Retry / Continue without saving (per CLAUDE.md "silent recovery without escalation is banned").
+
+---
+
 ## Verification Overlays (Within Any Learning Session)
 
 These are not separate paths — they activate **within** an ongoing learning or practice session when the SM-2 system determines the learner is ready.
@@ -339,23 +561,40 @@ Session Close
 
 ---
 
-## Mode Comparison Matrix
+## Mode Comparison Matrix — Tutoring Sessions
 
-| Aspect | Freeform | Guided | Homework | Practice | Relearn |
-|---|---|---|---|---|---|
-| Subject known at start | No | Yes | Sometimes | Yes | Yes |
-| Topic known at start | No | Yes | No | Yes | Yes |
-| Subject classification | On first message | Skipped | On first message | Skipped | Skipped |
-| Filing prompt on close | Yes | No | Yes | No | No |
-| Pedagogy | Depends on subject | Depends on subject | Direct (no Socratic) | Depends on subject | Remediation-focused |
-| Escalation ladder | Yes (if Socratic) | Yes (if Socratic) | No | Yes (if Socratic) | Yes (if Socratic) |
-| Verification overlays | None | evaluate / teach_back | None | evaluate / teach_back | None |
-| Timer visible | No | No | No | Yes | No |
-| Question count visible | No | No | Yes | No | No |
-| Recall bridge | No | No | Yes | No | No |
-| Homework summary | No | No | Yes (parent-facing) | No | No |
-| Voice mode available | Yes | Yes | Yes | Yes | Yes |
-| Session type in DB | `learning` | `learning` | `homework` | `learning` | `learning` |
+| Aspect | Freeform | Guided | Homework | Practice | Relearn | Recitation |
+|---|---|---|---|---|---|---|
+| Subject known at start | No | Yes | Sometimes | Yes | Yes | Optional |
+| Topic known at start | No | Yes | No | Yes | Yes | Optional |
+| Subject classification | On first message | Skipped | On first message | Skipped | Skipped | Skipped |
+| Filing prompt on close | Yes | No | Yes | No | No | Yes |
+| Pedagogy | Depends on subject | Depends on subject | Direct (no Socratic) | Depends on subject | Remediation-focused | Verbatim recall, no Socratic |
+| Escalation ladder | Yes (if Socratic) | Yes (if Socratic) | No | Yes (if Socratic) | Yes (if Socratic) | No |
+| Verification overlays | None | evaluate / teach_back | None | evaluate / teach_back | None | None |
+| Timer visible | No | No | No | Yes | No | No |
+| Question count visible | No | No | Yes | No | No | No |
+| Recall bridge | No | No | Yes | No | No | No |
+| Homework summary | No | No | Yes (parent-facing) | No | No | No |
+| Voice mode available | Yes | Yes | Yes | Yes | Yes | Yes (primary) |
+| Session type in DB | `learning` | `learning` | `homework` | `learning` | `learning` | `learning` |
+| UI mode | `freeform` | `freeform` | `homework` | `practice` | `relearn` | `recitation` |
+
+## Mode Comparison Matrix — Practice Activities (non-session)
+
+| Aspect | Quiz | Dictation |
+|---|---|---|
+| Subject known at start | Optional (Vocab quiz needs one) | No |
+| Topic known at start | No | No |
+| Filing prompt on close | No | No |
+| Verification overlays | N/A | N/A |
+| Server-validated answers | Yes (per-question check) | Yes (multimodal review of handwriting, optional) |
+| Mid-activity prefetch | Yes (next round at 50% progress) | No |
+| XP awarded | Yes (`celebrationTier`) | Streak only — no XP in v1 |
+| Streak | Daily quiz play counts | Daily dictation play counts |
+| Tab bar visible | No | No |
+| Persistence on mid-activity exit | No (round dropped) | No (Alert on hardware back) |
+| Database table | `quiz_rounds`, `quiz_stats` | `dictation_results`, `dictation_streaks` |
 
 ---
 

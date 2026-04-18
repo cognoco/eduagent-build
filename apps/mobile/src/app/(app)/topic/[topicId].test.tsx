@@ -284,3 +284,241 @@ describe('TopicDetailScreen action buttons', () => {
     expect(screen.getByText('Teach it back')).toBeTruthy();
   });
 });
+
+// ---------------------------------------------------------------------------
+// UX resilience: error, empty, missing-params states (restored from prior suite)
+// ---------------------------------------------------------------------------
+
+describe('TopicDetailScreen error / empty / missing-params states', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUseLocalSearchParams.mockReturnValue({
+      subjectId: 's1',
+      topicId: 't1',
+    });
+  });
+
+  it('shows missing-params state when route params are absent', () => {
+    mockUseLocalSearchParams.mockReturnValue(
+      {} as unknown as { subjectId: string; topicId: string }
+    );
+    mockTopicProgress.mockReturnValue({
+      data: null,
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+    mockTopicRetention.mockReturnValue({
+      data: null,
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+    mockEvaluateEligibility.mockReturnValue({ data: undefined });
+    mockActiveSession.mockReturnValue({ data: null });
+    mockParkingLot.mockReturnValue({ data: [], isLoading: false });
+    mockTopicNote.mockReturnValue({ data: null });
+
+    render(<TopicDetailScreen />);
+
+    expect(screen.getByTestId('topic-detail-missing-params-back')).toBeTruthy();
+    expect(screen.getByText('Topic not found')).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('topic-detail-missing-params-back'));
+    expect(mockGoBackOrReplace).toHaveBeenCalled();
+  });
+
+  it('shows empty state when topic data is null after loading', () => {
+    mockTopicProgress.mockReturnValue({
+      data: null,
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+    mockTopicRetention.mockReturnValue({
+      data: null,
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+    mockEvaluateEligibility.mockReturnValue({ data: undefined });
+    mockActiveSession.mockReturnValue({ data: null });
+    mockParkingLot.mockReturnValue({ data: [], isLoading: false });
+    mockTopicNote.mockReturnValue({ data: null });
+
+    render(<TopicDetailScreen />);
+
+    expect(screen.getByTestId('topic-detail-empty')).toBeTruthy();
+    expect(screen.getByText('Topic not found')).toBeTruthy();
+    expect(screen.getByTestId('topic-detail-empty-back')).toBeTruthy();
+  });
+
+  it('shows retry, go-back, and go-home when queries error [3B.6]', () => {
+    const mockRefetchProgress = jest.fn().mockResolvedValue(undefined);
+    const mockRefetchRetention = jest.fn().mockResolvedValue(undefined);
+
+    mockTopicProgress.mockReturnValue({
+      data: null,
+      isLoading: false,
+      isError: true,
+      refetch: mockRefetchProgress,
+    });
+    mockTopicRetention.mockReturnValue({
+      data: null,
+      isLoading: false,
+      isError: true,
+      refetch: mockRefetchRetention,
+    });
+    mockEvaluateEligibility.mockReturnValue({ data: undefined });
+    mockActiveSession.mockReturnValue({ data: null });
+    mockParkingLot.mockReturnValue({ data: [], isLoading: false });
+    mockTopicNote.mockReturnValue({ data: null });
+
+    render(<TopicDetailScreen />);
+
+    expect(screen.getByTestId('topic-detail-retry')).toBeTruthy();
+    expect(screen.getByTestId('topic-detail-go-back')).toBeTruthy();
+    expect(screen.getByTestId('topic-detail-go-home')).toBeTruthy();
+    expect(screen.getByText("We couldn't load this topic")).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('topic-detail-retry'));
+    expect(mockRefetchProgress).toHaveBeenCalled();
+    expect(mockRefetchRetention).toHaveBeenCalled();
+
+    fireEvent.press(screen.getByTestId('topic-detail-go-back'));
+    expect(mockGoBackOrReplace).toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Rendering: retention details, parking lot, back navigation
+// ---------------------------------------------------------------------------
+
+describe('TopicDetailScreen rendering details', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUseLocalSearchParams.mockReturnValue({
+      subjectId: 's1',
+      topicId: 't1',
+    });
+  });
+
+  it('renders retention card with interval, repetitions, and next review', () => {
+    mockTopicProgress.mockReturnValue({
+      data: {
+        topicId: 't1',
+        title: 'Algebra Basics',
+        description: 'Introduction to algebraic expressions',
+        completionStatus: 'completed',
+        retentionStatus: 'strong',
+        struggleStatus: 'normal',
+        masteryScore: 0.85,
+        summaryExcerpt: 'Learned about variables and equations',
+        xpStatus: 'verified',
+      },
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+    mockTopicRetention.mockReturnValue({
+      data: {
+        topicId: 't1',
+        easeFactor: 2.7,
+        intervalDays: 14,
+        repetitions: 5,
+        nextReviewAt: new Date(
+          Date.now() + 7 * 24 * 60 * 60 * 1000
+        ).toISOString(),
+        lastReviewedAt: null,
+        xpStatus: 'verified',
+        failureCount: 0,
+      },
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+    mockEvaluateEligibility.mockReturnValue({ data: undefined });
+    mockActiveSession.mockReturnValue({ data: null });
+    mockParkingLot.mockReturnValue({
+      data: [
+        {
+          id: 'parked-1',
+          question: 'Why does factoring help here?',
+          explored: false,
+          createdAt: '2026-02-15T10:00:00.000Z',
+        },
+      ],
+      isLoading: false,
+    });
+    mockTopicNote.mockReturnValue({ data: null });
+
+    render(<TopicDetailScreen />);
+
+    expect(screen.getByText('Algebra Basics')).toBeTruthy();
+    expect(
+      screen.getByText('Introduction to algebraic expressions')
+    ).toBeTruthy();
+    expect(screen.getByText('Completed')).toBeTruthy();
+    expect(screen.getByText('85%')).toBeTruthy();
+    expect(screen.getByText('14 days')).toBeTruthy();
+    expect(screen.getByText('5')).toBeTruthy();
+    expect(
+      screen.getByText('Learned about variables and equations')
+    ).toBeTruthy();
+    expect(screen.getByText('Parking Lot')).toBeTruthy();
+    expect(screen.getByText('Why does factoring help here?')).toBeTruthy();
+  });
+
+  it('shows struggle status when not normal', () => {
+    mockTopicProgress.mockReturnValue({
+      data: {
+        topicId: 't1',
+        title: 'Calculus',
+        description: 'Derivatives and integrals',
+        completionStatus: 'in_progress',
+        retentionStatus: 'weak',
+        struggleStatus: 'needs_deepening',
+        masteryScore: null,
+        summaryExcerpt: null,
+        xpStatus: null,
+      },
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+    mockTopicRetention.mockReturnValue({
+      data: null,
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+    mockEvaluateEligibility.mockReturnValue({ data: undefined });
+    mockActiveSession.mockReturnValue({ data: null });
+    mockParkingLot.mockReturnValue({ data: [], isLoading: false });
+    mockTopicNote.mockReturnValue({ data: null });
+
+    render(<TopicDetailScreen />);
+
+    expect(screen.getByText('Exploring further')).toBeTruthy();
+  });
+
+  it('navigates back on back button press', () => {
+    setupDefaults({ completionStatus: 'completed' });
+
+    render(<TopicDetailScreen />);
+
+    fireEvent.press(screen.getByTestId('topic-detail-back'));
+    expect(mockGoBackOrReplace).toHaveBeenCalled();
+  });
+
+  it('shows empty parking lot message when no parked questions', () => {
+    setupDefaults({ completionStatus: 'completed' });
+
+    render(<TopicDetailScreen />);
+
+    expect(screen.getByText('Parking Lot')).toBeTruthy();
+    expect(
+      screen.getByText('No parked questions for this topic yet.')
+    ).toBeTruthy();
+  });
+});

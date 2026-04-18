@@ -71,10 +71,26 @@ ${punctuationNames}
 
 Count the words in each sentence (original text, not the punctuation variant).
 
+CHUNKING FOR DICTATION PLAYBACK:
+Split each sentence into natural spoken chunks for dictation. The child hears one chunk, writes it, then hears the next.
+- Short sentences (up to 4 words including any trailing punctuation): return as a SINGLE chunk. Do not split.
+- Longer sentences: break at natural phrase boundaries — clause edges, prepositional phrases, relative clauses. Think about where a teacher would naturally pause when dictating.
+  Example: "A black cat that I usually see out of window is not there today." →
+    chunks: ["A black cat", "that I usually see out of window", "is not there today."]
+- Never break inside a noun phrase, verb phrase, or prepositional phrase.
+- Each chunk should carry a complete thought fragment that a child can hold in working memory.
+- Produce matching "chunksWithPunctuation" where punctuation in each chunk is replaced with spoken words (same rules as withPunctuation).
+
 RESPOND WITH ONLY valid JSON:
 {
   "sentences": [
-    { "text": "original sentence.", "withPunctuation": "original sentence tečka", "wordCount": 2 }
+    {
+      "text": "original sentence.",
+      "withPunctuation": "original sentence tečka",
+      "wordCount": 2,
+      "chunks": ["original sentence."],
+      "chunksWithPunctuation": ["original sentence tečka"]
+    }
   ],
   "title": "Short title for this dictation",
   "topic": "The literary theme you chose",

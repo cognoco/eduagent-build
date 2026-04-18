@@ -60,9 +60,21 @@ This screen currently fetches and renders the transcript. Change it to:
 - Remove the transcript exchange list
 - If `displaySummary` is null (sessions completed before summary generation was added), show "Session summary not available for older sessions"
 
-### Schema changes
+### Schema and orphan code cleanup
 
-Remove `ChildSessionTranscript` and `TranscriptExchange` from `@eduagent/schemas` if they exist there. If they're only defined in the dashboard service, remove them there.
+Transcript-related types and code paths must be removed everywhere, not just at the primary call site. Before the change is merged, grep the repo for every occurrence of the following identifiers and remove matches in schemas, services, route definitions, React Query cache keys, hooks, mobile screens, tests, mock fixtures, and any commented-out JSX:
+
+- `ChildSessionTranscript`
+- `TranscriptExchange`
+- `getChildSessionTranscript`
+- Any route constant or hook keyed to `/dashboard/children/:id/sessions/:sid/transcript`
+- Mobile query hooks such as `useChildSessionTranscript` (or the current name)
+
+A single overlooked reference is a runtime crash on the first parent who deep-links to a cached transcript screen. Treat this as part of the implementation, not a follow-up cleanup.
+
+### Client cache invalidation
+
+The mobile app likely has React Query entries cached under transcript query keys. After deploy, the first fetch against the removed endpoint will 404. The session detail screen (Section 1 mobile changes) must handle 404 gracefully and display the summary-only view. No explicit cache purge is required because the screen redesign replaces the data it renders; stale cache entries simply become unused.
 
 ---
 
@@ -123,9 +135,19 @@ interface MemoryCategory {
 }
 
 interface CuratedMemoryItem {
-  id: string;                       // maps to the underlying inference item ID (for deletion)
-  statement: string;                // human-readable: "fractions", "visual analogies", "needs extra time on new concepts"
+  // Items have no database-level ID — the learning_profiles table stores inferences
+  // as JSONB arrays of strings on per-category columns. Deletion is by (category, value).
+  category: MemoryCategoryKey;      // which underlying column: 'struggles' | 'interests' | 'strengths' | 'communicationNotes' | 'learningStyle'
+  value: string;                    // the inference string itself, e.g. "fractions", "visual analogies"
+  statement: string;                // human-readable rendering of value for the parent UI
 }
+
+type MemoryCategoryKey =
+  | 'struggles'
+  | 'interests'
+  | 'strengths'
+  | 'communicationNotes'
+  | 'learningStyle';
 
 interface ParentTellItem {
   id: string;
@@ -136,18 +158,32 @@ interface ParentTellItem {
 
 ### Categorization logic
 
-The service reads the raw learner profile and groups inferences into categories by their `inferenceType` or `tag` field (depending on how the profile stores them). The `statement` field is the inference content, already human-readable. The categorization is a simple mapping — no LLM call needed.
+The `learning_profiles` table (see `packages/database/src/schema/learning-profiles.ts`) already stores inferences on separate JSONB columns — one column per category. Categorization is purely a column-to-label mapping, not a classification step. No LLM call, no tag inspection, no `inferenceType` switch.
 
-Categories:
-- **Struggles with** — inferences tagged as struggles/difficulties
-- **Prefers** — learning style preferences (visual, audio, analogies)
-- **Learning pace** — pace/timing observations
-- **Interests** — topic interests and engagement patterns
-- **Other** — anything that doesn't fit the above
+| Underlying column (`learning_profiles`) | Shape | Parent-facing label |
+|---|---|---|
+| `struggles` | `string[]` | "Struggles with" |
+| `interests` | `string[]` | "Interests" |
+| `strengths` | `string[]` | "Strengths" |
+| `communicationNotes` | `string[]` | "Learning pace & notes" |
+| `learningStyle` | single `object` (serialized to descriptive strings) | "Learning style" |
+
+**Excluded from the curated view:**
+- `suppressedInferences` — these were already deleted/suppressed by the parent; do not re-surface
+- `interestTimestamps`, `recentlyResolvedTopics` — internal bookkeeping
+- `effectivenessSessionCount`, `version` — internal counters
+
+The service reads each column, wraps each entry in `CuratedMemoryItem`, and groups them into `MemoryCategory` objects keyed by the column label. Empty columns yield empty categories and are omitted from the response (the UI shows only non-empty groups).
+
+**`learningStyle` special case:** This column is a single object, not an array. The service serializes its populated fields into one or more descriptive strings (e.g., `{ modality: "visual" }` → `"Prefers visual learning"`). The `value` sent to the delete endpoint is the raw field path (e.g., `"modality"`) so that the existing `deleteMemoryItem` service can null it out. Deletion semantics for `learningStyle` follow whatever `deleteMemoryItem` already supports — confirm during implementation.
 
 ### Memory deletion
 
-The existing `DELETE /learner-profile/:profileId/item` endpoint stays unchanged. The parent taps the [x] button on a curated item, the mobile app sends the item's `id` to the existing delete endpoint. Direct, reversible, no LLM interpretation needed.
+The existing `deleteMemoryItem(db, profileId, category, value, suppress?, subject?)` service function (in `apps/api/src/services/learner-profile.ts`) is the deletion primitive. It takes a `(category, value)` tuple — no item IDs involved, because inferences are stored as JSONB array entries rather than individual rows.
+
+The parent taps the [x] button on a curated item; the mobile app sends `{ category, value }` to the existing delete endpoint. The service removes the entry from the relevant column (or, when `suppress = true`, appends it to `suppressedInferences` so the inference engine won't re-infer it).
+
+**Default to `suppress = true` for parent corrections.** When a parent deletes an item, the learner shouldn't re-acquire that inference on the next session. Plain deletion without suppression would let the system re-learn the struggle/preference the parent just said is wrong. This matches the intent of the feature: the parent is stating "the system is wrong about this," not "this was once true and is no longer."
 
 ### Secondary escape hatch
 
@@ -198,6 +234,8 @@ CREATE POLICY family_child_access ON family_links
 - The parent needs to see all their children
 - The child needs to see who their parent is (consent UI)
 - Neither needs to INSERT/UPDATE/DELETE — that's handled by the consent service which will use `ownerDb`
+
+**Implicit write denial:** No `FOR INSERT`, `FOR UPDATE`, or `FOR DELETE` policies are declared for the `app_user` role on `family_links`. In Postgres, a role with RLS enabled and no matching policy for a command is implicitly denied. That means any attempt by `app_user` to write to `family_links` (e.g., a future service bug that uses the scoped DB instead of `ownerDb`) is rejected at the database layer with `permission denied for table family_links`. The consent service must continue to run as the owner role — typically via `ownerDb` — to perform link creation, acceptance, and revocation.
 
 ### Update to Phase 2-4 plan
 
@@ -278,11 +316,24 @@ CREATE INDEX IF NOT EXISTS family_links_parent_profile_id_idx
   ON family_links (parent_profile_id);
 ```
 
+### Pre-implementation verification (required before writing migrations)
+
+The table list above is derived from a brainstorm-phase code walk, not an exhaustive audit. A missed table under Phase 3 RLS enforcement means the parent dashboard returns empty or 500s for that data surface, silently, in production. An included-but-unread table means a policy with no consumer (low-cost but noise).
+
+**Do before writing the Phase 2 migration edit:**
+
+1. Enumerate every table read by `apps/api/src/services/dashboard.ts` and its transitive service imports (e.g., whatever `getChildInventory` calls, whatever `getChildProgressHistory` reaches into).
+2. Cross-reference each read table against the "needs parent-read policy" list in Section 5.
+3. For every table in the "does NOT get parent-read policies" list, confirm no dashboard read path touches it. A grep for the table name across `apps/api/src/services/` is sufficient.
+4. Record the verification result inline in the implementation plan — list each table and the service function(s) that read it, or "no parent-visible reader" for excluded tables.
+
+Do not write the Phase 2 migration update until this verification is complete and recorded.
+
 ### Deliverable
 
 Update `2026-04-15-S06-rls-phase-2-4-enforcement.md` Phase 2 section to include:
 1. The revised `family_links` policies (Section 4 above)
-2. `parent_read_via_family` policies on the 11 tables listed above
+2. `parent_read_via_family` policies on the verified tables (list finalized during pre-implementation verification; Section 5 provides the starting candidate list)
 3. The `session_events` exclusion with rationale
 4. The `parent_profile_id` index
 
