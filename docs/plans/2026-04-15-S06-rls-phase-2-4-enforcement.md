@@ -56,18 +56,69 @@ CREATE POLICY profile_isolation ON assessments
 
 #### Special-case tables
 
-**`family_links`** — bidirectional access:
+**`family_links`** — separate read policies for parent and child roles:
 ```sql
-CREATE POLICY family_access ON family_links
-  FOR ALL TO app_user
+-- Parent reads their own family links
+CREATE POLICY family_parent_access ON family_links
+  FOR SELECT TO app_user
   USING (
     parent_profile_id = current_setting('app.current_profile_id', true)::uuid
-    OR child_profile_id = current_setting('app.current_profile_id', true)::uuid
-  )
-  WITH CHECK (
-    parent_profile_id = current_setting('app.current_profile_id', true)::uuid
-    OR child_profile_id = current_setting('app.current_profile_id', true)::uuid
   );
+
+-- Child reads links where they are the child (consent UI)
+CREATE POLICY family_child_access ON family_links
+  FOR SELECT TO app_user
+  USING (
+    child_profile_id = current_setting('app.current_profile_id', true)::uuid
+  );
+
+-- No INSERT/UPDATE/DELETE via app_user — consent service uses ownerDb
+```
+
+**Parent read access via `family_links`** — additive policies (OR'd with `profile_isolation`).
+Applied to all tables the parent dashboard reads through `getChildrenForParent`, `getChildSessions`,
+`getChildSessionDetail`, `getChildInventory`, `getChildProgressHistory`, and `getChildSubjectTopics`:
+
+| Table | Read via | Policy |
+|---|---|---|
+| `learning_sessions` | `getChildSessions`, `getChildSessionDetail` | `parent_read_via_family` |
+| `session_summaries` | `getChildSessions` (joined after companion plan lands) | `parent_read_via_family` |
+| `progress_snapshots` | `getChildProgressHistory` → `snapshot-aggregation.ts` | `parent_read_via_family` |
+| `milestones` | `snapshot-aggregation.ts`, progress routes | `parent_read_via_family` |
+| `streaks` | `getChildrenForParent` | `parent_read_via_family` |
+| `xp_ledger` | `getChildrenForParent`, `progress.ts` | `parent_read_via_family` |
+| `vocabulary` | `getChildInventory` → `snapshot-aggregation.ts` | `parent_read_via_family` |
+| `vocabulary_retention_cards` | `getChildInventory` → `snapshot-aggregation.ts` | `parent_read_via_family` |
+| `retention_cards` | `getChildInventory` → `snapshot-aggregation.ts` | `parent_read_via_family` |
+| `assessments` | `getChildInventory` → `snapshot-aggregation.ts`, `progress.ts` | `parent_read_via_family` |
+| `subjects` | `getChildSubjectTopics` + most inventory paths | `parent_read_via_family` |
+| `curricula` | `getChildSubjectTopics` | `parent_read_via_family` |
+| `curriculum_topics` | `getChildSubjectTopics` | `parent_read_via_family` |
+| `profiles` | `getChildrenForParent` joins for `displayName` | covered by `profile_own_or_child` above |
+| `needs_deepening_topics` | `progress.ts` | `parent_read_via_family` |
+
+**Explicitly excluded (privacy boundary):**
+- `session_events` — raw transcripts; parent endpoint removed in [PV-S1]
+- `session_embeddings` — internal vector data
+- `parking_lot_items` — child's private queue
+- `coaching_card_cache` — child-facing display
+- `notification_preferences`, `notification_log` — child's settings/history
+- `learning_modes`, `teaching_preferences`, `curriculum_adaptations` — internal pedagogy
+
+```sql
+-- Template applied to each verified parent-read table:
+CREATE POLICY parent_read_via_family ON <table_name>
+  FOR SELECT TO app_user
+  USING (
+    profile_id IN (
+      SELECT child_profile_id FROM family_links
+      WHERE parent_profile_id = current_setting('app.current_profile_id', true)::uuid
+    )
+  );
+
+-- Performance index for the subquery
+CREATE INDEX IF NOT EXISTS family_links_parent_profile_id_idx
+  ON family_links (parent_profile_id);
 ```
 
 **`consent_states`** — parents access children's consent via family link:
