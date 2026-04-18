@@ -1,4 +1,9 @@
-import { useQuery, type UseQueryResult } from '@tanstack/react-query';
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type UseQueryResult,
+} from '@tanstack/react-query';
 import type { CoachingCard } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
@@ -46,4 +51,27 @@ export function useQuizDiscoveryCard() {
     data?.card?.type === 'quiz_discovery' ? data.card : undefined;
 
   return { data: quizCard, ...rest };
+}
+
+/**
+ * Marks a quiz discovery activity as surfaced so it won't be shown again
+ * until the next eligible session. Fire-and-forget — navigation proceeds
+ * immediately. If the mutation fails, the card reappears next session.
+ */
+export function useMarkQuizDiscoverySurfaced() {
+  const client = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (activityType: string) => {
+      const res = await client.quiz['missed-items']['mark-surfaced'].$post({
+        json: { activityType },
+      });
+      await assertOk(res);
+      return (await res.json()) as { markedCount: number };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['coaching-card'] });
+    },
+  });
 }
