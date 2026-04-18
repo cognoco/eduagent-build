@@ -19,6 +19,7 @@ export {
 export {
   abandonStaleQuizRounds,
   getRecentAnswers,
+  getRecentCompletedByActivity,
   getVocabularyRoundContext,
   getGuessWhoRoundContext,
   getRoundById,

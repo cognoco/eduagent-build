@@ -22,6 +22,7 @@ import { shuffle } from './shuffle';
 import {
   buildVocabularyMasteryQuestion,
   buildVocabularyPrompt,
+  nextCefrLevel,
   validateVocabularyRound,
 } from './vocabulary-provider';
 import {
@@ -232,6 +233,7 @@ interface GenerateParams {
   cefrCeiling?: CefrLevel;
   allVocabulary?: Array<{ term: string; translation: string }>;
   topicTitles?: string[];
+  difficultyBump?: boolean;
 }
 
 export async function generateQuizRound(params: GenerateParams): Promise<{
@@ -239,6 +241,7 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
   theme: string;
   questions: QuizQuestion[];
   total: number;
+  difficultyBump: boolean;
 }> {
   const {
     db,
@@ -252,6 +255,7 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
     cefrCeiling,
     allVocabulary,
     topicTitles,
+    difficultyBump = false,
   } = params;
 
   const plan = resolveRoundContent({
@@ -265,12 +269,16 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
   let questions: QuizQuestion[] = [];
 
   if (activityType === 'capitals') {
-    const prompt = buildCapitalsPrompt({
+    let prompt = buildCapitalsPrompt({
       discoveryCount: plan.discoveryCount,
       ageBracket,
       recentAnswers,
       themePreference,
     });
+    if (difficultyBump) {
+      prompt +=
+        '\n\nDIFFICULTY BUMP: The learner is on a streak. Choose lesser-known countries. Distractors should be from the same region as the correct answer.';
+    }
 
     const messages: ChatMessage[] = [
       { role: 'system', content: prompt },
@@ -332,13 +340,17 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
       );
     }
 
+    const effectiveCefrCeiling = difficultyBump
+      ? nextCefrLevel(cefrCeiling)
+      : cefrCeiling;
+
     const prompt = buildVocabularyPrompt({
       discoveryCount: plan.discoveryCount,
       ageBracket,
       recentAnswers,
       bankEntries: allVocabulary ?? [],
       languageCode,
-      cefrCeiling,
+      cefrCeiling: effectiveCefrCeiling,
       themePreference,
     });
 
@@ -373,7 +385,7 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
       throw new UpstreamLlmError('Quiz LLM returned invalid structured output');
     }
 
-    const validated = validateVocabularyRound(llmOutput, cefrCeiling);
+    const validated = validateVocabularyRound(llmOutput, effectiveCefrCeiling);
     if (validated.questions.length === 0) {
       throw new UpstreamLlmError('No valid questions after validation');
     }
@@ -385,7 +397,7 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
       const result = buildVocabularyMasteryQuestion(
         item,
         allVocabulary ?? [],
-        item.cefrLevel ?? cefrCeiling
+        item.cefrLevel ?? effectiveCefrCeiling
       );
       return result.ok ? [result.question] : [];
     });
@@ -393,13 +405,17 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
     questions = injectAtRandomPositions(discoveryQuestions, masteryQuestions);
     theme = validated.theme;
   } else if (activityType === 'guess_who') {
-    const prompt = buildGuessWhoPrompt({
+    let prompt = buildGuessWhoPrompt({
       discoveryCount: plan.discoveryCount,
       ageBracket,
       recentAnswers,
       topicTitles,
       themePreference,
     });
+    if (difficultyBump) {
+      prompt +=
+        '\n\nDIFFICULTY BUMP: The learner is on a streak. Choose less famous historical figures. Make clue 1 and 2 significantly harder.';
+    }
 
     const messages: ChatMessage[] = [
       { role: 'system', content: prompt },
@@ -516,5 +532,6 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
     theme: round.theme,
     questions: round.questions,
     total: round.total,
+    difficultyBump,
   };
 }

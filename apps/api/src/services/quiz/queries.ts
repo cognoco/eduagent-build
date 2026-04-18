@@ -247,6 +247,20 @@ export async function getGuessWhoRoundContext(
 }
 
 /**
+ * Fetch the most recent rounds for a given activity type, used for the
+ * difficulty bump check. Returns all statuses (caller filters to 'completed').
+ */
+export async function getRecentCompletedByActivity(
+  db: Database,
+  profileId: string,
+  activityType: QuizActivityType,
+  limit: number
+) {
+  const repo = createScopedRepository(db, profileId);
+  return repo.quizRounds.findRecentByActivity(activityType, limit);
+}
+
+/**
  * Mark all unsurfaced missed items for the given profile + activity type as
  * surfaced. Called when the learner taps or dismisses the quiz discovery card
  * so the card doesn't re-appear for already-addressed items.

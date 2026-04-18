@@ -23,10 +23,12 @@ import {
   computeRoundStats,
   generateQuizRound,
   getRecentAnswers,
+  getRecentCompletedByActivity,
   getRoundByIdOrThrow,
   listRecentCompletedRounds,
   markMissedItemsSurfaced,
   getDueMasteryItems,
+  shouldApplyDifficultyBump,
 } from '../services/quiz';
 import { recordSessionActivity } from '../services/streaks';
 
@@ -147,6 +149,21 @@ async function buildAndGenerateRound(
     libraryItems = await getDueMasteryItems(db, profileId, 'capitals');
   }
 
+  const recentForBump = await getRecentCompletedByActivity(
+    db,
+    profileId,
+    input.activityType,
+    3
+  );
+  const completedForBump = recentForBump
+    .filter((r) => r.status === 'completed')
+    .map((r) => ({
+      score: r.score,
+      total: r.total,
+      completedAt: r.completedAt,
+    }));
+  const difficultyBump = shouldApplyDifficultyBump(completedForBump);
+
   return generateQuizRound({
     db,
     profileId,
@@ -159,6 +176,7 @@ async function buildAndGenerateRound(
     cefrCeiling,
     allVocabulary,
     topicTitles,
+    difficultyBump,
   });
 }
 
@@ -219,6 +237,7 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
           result.round.questions as QuizQuestion[]
         ),
         total: result.round.total,
+        difficultyBump: result.round.difficultyBump,
       },
       200
     );
@@ -257,13 +276,35 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
     // Throws NotFoundError if the round doesn't exist OR belongs to a
     // different profile — handled centrally by `app.onError` → 404.
     const round = await getRoundByIdOrThrow(db, profileId, roundId);
+    const questions = round.questions as QuizQuestion[];
+
+    if (round.status === 'completed') {
+      return c.json(
+        {
+          id: round.id,
+          activityType: round.activityType,
+          theme: round.theme,
+          status: round.status,
+          score: round.score,
+          total: round.total,
+          xpEarned: round.xpEarned,
+          completedAt: round.completedAt?.toISOString(),
+          questions: questions.map((q) => ({
+            ...toClientSafeQuestions([q])[0],
+            correctAnswer: q.correctAnswer,
+          })),
+          results: round.results,
+        },
+        200
+      );
+    }
 
     return c.json(
       {
         id: round.id,
         activityType: round.activityType,
         theme: round.theme,
-        questions: toClientSafeQuestions(round.questions as QuizQuestion[]),
+        questions: toClientSafeQuestions(questions),
         total: round.total,
       },
       200
