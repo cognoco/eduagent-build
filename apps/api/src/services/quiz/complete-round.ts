@@ -3,6 +3,7 @@ import type {
   CompleteRoundResponse,
   QuestionResult,
   QuizQuestion,
+  ValidatedQuestionResult,
 } from '@eduagent/schemas';
 import { isGuessWhoFuzzyMatch } from '@eduagent/schemas';
 import { ConflictError, NotFoundError } from '../../errors';
@@ -41,6 +42,29 @@ export function isAnswerCorrect(
     );
   }
   return false;
+}
+
+/**
+ * Lightweight answer check for a single question within an active round.
+ * Used by POST /quiz/rounds/:id/check to provide per-question feedback
+ * without exposing the correct answer to the client.
+ */
+export async function checkQuizAnswer(
+  db: Database,
+  profileId: string,
+  roundId: string,
+  questionIndex: number,
+  answerGiven: string
+): Promise<boolean> {
+  const repo = createScopedRepository(db, profileId);
+  const round = await repo.quizRounds.findById(roundId);
+  if (!round) throw new NotFoundError('Round');
+  if (round.status !== 'active')
+    throw new ConflictError('Round already completed');
+  const questions = round.questions as QuizQuestion[];
+  const question = questions[questionIndex];
+  if (!question) throw new NotFoundError('Question');
+  return isAnswerCorrect(question, answerGiven);
 }
 
 /**
@@ -104,10 +128,12 @@ export function calculateXp(
   if (activityType === 'guess_who') {
     guessWhoClueBonus = correctResults
       .filter((r) => r.answerMode === 'free_text' && r.cluesUsed != null)
-      .reduce(
-        (sum, r) => sum + (5 - r.cluesUsed!) * QUIZ_CONFIG.xp.guessWhoClueBonus,
-        0
-      );
+      .reduce((sum, r) => {
+        // Defense-in-depth: clamp to [0,5] so bonus is always non-negative
+        // even if the schema validation is loosened in the future.
+        const clamped = Math.max(0, Math.min(5, r.cluesUsed!));
+        return sum + (5 - clamped) * QUIZ_CONFIG.xp.guessWhoClueBonus;
+      }, 0);
   }
 
   return baseXp + timerBonus + perfectBonus + guessWhoClueBonus;
@@ -253,12 +279,26 @@ export async function completeQuizRound(
       await txRepo.quizMissedItems.insertMany(Array.from(missedMap.values()));
     }
 
+    // Build per-question results with the correct answer revealed.
+    // Safe to expose now — the round is completed (status = 'completed').
+    const questionResults: ValidatedQuestionResult[] = validatedResults.map(
+      (result) => {
+        const question = questions[result.questionIndex];
+        return {
+          questionIndex: result.questionIndex,
+          correct: result.correct,
+          correctAnswer: question?.correctAnswer ?? '',
+        };
+      }
+    );
+
     return {
       score,
       total,
       xpEarned,
       celebrationTier,
       droppedResults,
+      questionResults,
     };
   });
 }

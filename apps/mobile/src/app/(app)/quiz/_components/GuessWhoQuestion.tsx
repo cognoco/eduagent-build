@@ -1,7 +1,19 @@
 import React, { useEffect, useState } from 'react';
-import { Keyboard, Pressable, Text, TextInput, View } from 'react-native';
-import { isGuessWhoFuzzyMatch, type GuessWhoQuestion } from '@eduagent/schemas';
+import {
+  ActivityIndicator,
+  Keyboard,
+  Pressable,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import type { ClientQuizQuestion } from '@eduagent/schemas';
 import { useThemeColors } from '../../../../lib/theme';
+
+type ClientGuessWhoQuestion = Extract<
+  ClientQuizQuestion,
+  { type: 'guess_who' }
+>;
 
 export interface GuessWhoResolvedResult {
   correct: boolean;
@@ -39,12 +51,14 @@ function getHintMessage(
 }
 
 interface GuessWhoQuestionProps {
-  question: GuessWhoQuestion;
+  question: ClientGuessWhoQuestion;
+  onCheckAnswer: (answerGiven: string) => Promise<boolean>;
   onResolved: (result: GuessWhoResolvedResult) => void;
 }
 
 export function GuessWhoQuestion({
   question,
+  onCheckAnswer,
   onResolved,
 }: GuessWhoQuestionProps): React.ReactElement {
   const colors = useThemeColors();
@@ -52,6 +66,7 @@ export function GuessWhoQuestion({
   const [visibleClueCount, setVisibleClueCount] = useState(1);
   const [helperText, setHelperText] = useState<string | null>(null);
   const [fallbackOptions, setFallbackOptions] = useState<string[]>([]);
+  const [isChecking, setIsChecking] = useState(false);
 
   useEffect(() => {
     setGuess('');
@@ -60,7 +75,7 @@ export function GuessWhoQuestion({
     setFallbackOptions(shuffle(question.mcFallbackOptions));
   }, [question]);
 
-  const canSubmit = guess.trim().length > 0;
+  const canSubmit = guess.trim().length > 0 && !isChecking;
   const canShowFallback = visibleClueCount >= 3;
   const isFinalClue = visibleClueCount >= question.clues.length;
 
@@ -73,32 +88,51 @@ export function GuessWhoQuestion({
     });
   }
 
-  function handleSubmitGuess() {
+  // [CR-1] Free-text guesses are now validated server-side via the check
+  // endpoint. The server performs fuzzy matching (Levenshtein) against
+  // canonicalName + acceptedAliases, which are no longer sent to the client.
+  async function handleSubmitGuess() {
     const normalizedGuess = guess.trim();
-    if (!normalizedGuess) return;
+    if (!normalizedGuess || isChecking) return;
 
     Keyboard.dismiss();
+    setIsChecking(true);
 
-    if (
-      isGuessWhoFuzzyMatch(
-        normalizedGuess,
-        question.canonicalName,
-        question.acceptedAliases
-      )
-    ) {
-      resolveFreeText(true, normalizedGuess);
-      return;
+    try {
+      const correct = await onCheckAnswer(normalizedGuess);
+
+      if (correct) {
+        resolveFreeText(true, normalizedGuess);
+        return;
+      }
+
+      if (isFinalClue) {
+        resolveFreeText(false, normalizedGuess);
+        return;
+      }
+
+      const nextClueCount = Math.min(
+        question.clues.length,
+        visibleClueCount + 1
+      );
+      setVisibleClueCount(nextClueCount);
+      setGuess('');
+      setHelperText(getHintMessage(nextClueCount, true));
+    } catch {
+      if (isFinalClue) {
+        resolveFreeText(false, normalizedGuess);
+      } else {
+        const nextClueCount = Math.min(
+          question.clues.length,
+          visibleClueCount + 1
+        );
+        setVisibleClueCount(nextClueCount);
+        setGuess('');
+        setHelperText(getHintMessage(nextClueCount, true));
+      }
+    } finally {
+      setIsChecking(false);
     }
-
-    if (isFinalClue) {
-      resolveFreeText(false, normalizedGuess);
-      return;
-    }
-
-    const nextClueCount = Math.min(question.clues.length, visibleClueCount + 1);
-    setVisibleClueCount(nextClueCount);
-    setGuess('');
-    setHelperText(getHintMessage(nextClueCount, true));
   }
 
   function handleRevealNextClue() {
@@ -114,15 +148,28 @@ export function GuessWhoQuestion({
     setHelperText(getHintMessage(nextClueCount, false));
   }
 
-  function handleFallbackChoice(option: string) {
-    onResolved({
-      correct:
-        option.trim().toLowerCase() ===
-        question.canonicalName.trim().toLowerCase(),
-      answerGiven: option,
-      cluesUsed: visibleClueCount,
-      answerMode: 'multiple_choice',
-    });
+  async function handleFallbackChoice(option: string) {
+    if (isChecking) return;
+    setIsChecking(true);
+
+    try {
+      const correct = await onCheckAnswer(option);
+      onResolved({
+        correct,
+        answerGiven: option,
+        cluesUsed: visibleClueCount,
+        answerMode: 'multiple_choice',
+      });
+    } catch {
+      onResolved({
+        correct: false,
+        answerGiven: option,
+        cluesUsed: visibleClueCount,
+        answerMode: 'multiple_choice',
+      });
+    } finally {
+      setIsChecking(false);
+    }
   }
 
   return (
@@ -172,13 +219,17 @@ export function GuessWhoQuestion({
             accessibilityLabel="Submit guess"
             testID="guess-who-submit"
           >
-            <Text
-              className={`text-body-sm font-semibold ${
-                canSubmit ? 'text-text-inverse' : 'text-text-secondary'
-              }`}
-            >
-              Submit guess
-            </Text>
+            {isChecking ? (
+              <ActivityIndicator size="small" color={colors.textInverse} />
+            ) : (
+              <Text
+                className={`text-body-sm font-semibold ${
+                  canSubmit ? 'text-text-inverse' : 'text-text-secondary'
+                }`}
+              >
+                Submit guess
+              </Text>
+            )}
           </Pressable>
           <Pressable
             onPress={handleRevealNextClue}
@@ -211,7 +262,10 @@ export function GuessWhoQuestion({
             <Pressable
               key={`${index}-${option}`}
               onPress={() => handleFallbackChoice(option)}
-              className="min-h-[56px] items-center justify-center rounded-card bg-surface-elevated px-5 py-4"
+              disabled={isChecking}
+              className={`min-h-[56px] items-center justify-center rounded-card bg-surface-elevated px-5 py-4 ${
+                isChecking ? 'opacity-60' : ''
+              }`}
               accessibilityRole="button"
               accessibilityLabel={option}
               testID={`guess-who-option-${index}`}

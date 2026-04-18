@@ -64,12 +64,53 @@ export const quizQuestionSchema = z.discriminatedUnion('type', [
 ]);
 export type QuizQuestion = z.infer<typeof quizQuestionSchema>;
 
+// ─── Client-safe question schemas ────────────────────────────────────────
+// Answer fields (correctAnswer, acceptedAliases, acceptedAnswers,
+// canonicalName) stripped to prevent answer leaking via network inspection.
+// MC types get a pre-shuffled `options` array; guess_who keeps
+// mcFallbackOptions as-is (already contains the correct answer unlabeled).
+
+export const clientCapitalsQuestionSchema = z.object({
+  type: z.literal('capitals'),
+  country: z.string(),
+  options: z.array(z.string()).min(2),
+  funFact: z.string(),
+  isLibraryItem: z.boolean(),
+  topicId: z.string().uuid().nullable().optional(),
+});
+
+export const clientVocabularyQuestionSchema = z.object({
+  type: z.literal('vocabulary'),
+  term: z.string(),
+  options: z.array(z.string()).min(2),
+  funFact: z.string(),
+  cefrLevel: z.string(),
+  isLibraryItem: z.boolean(),
+  vocabularyId: z.string().uuid().nullable().optional(),
+});
+
+export const clientGuessWhoQuestionSchema = z.object({
+  type: z.literal('guess_who'),
+  clues: z.array(z.string().max(200)).length(5),
+  mcFallbackOptions: z.array(z.string()).length(4),
+  funFact: z.string().max(200),
+  isLibraryItem: z.boolean(),
+  topicId: z.string().uuid().nullable().optional(),
+});
+
+export const clientQuizQuestionSchema = z.discriminatedUnion('type', [
+  clientCapitalsQuestionSchema,
+  clientVocabularyQuestionSchema,
+  clientGuessWhoQuestionSchema,
+]);
+export type ClientQuizQuestion = z.infer<typeof clientQuizQuestionSchema>;
+
 export const questionResultSchema = z.object({
   questionIndex: z.number().int().min(0),
   correct: z.boolean(),
   answerGiven: z.string(),
   timeMs: z.number().int().min(0),
-  cluesUsed: z.number().int().min(1).max(5).optional(),
+  cluesUsed: z.number().int().min(0).max(5).optional(),
   answerMode: z.enum(['free_text', 'multiple_choice']).optional(),
 });
 export type QuestionResult = z.infer<typeof questionResultSchema>;
@@ -91,14 +132,42 @@ export const completeRoundInputSchema = z.object({
 });
 export type CompleteRoundInput = z.infer<typeof completeRoundInputSchema>;
 
+export const questionCheckInputSchema = z.object({
+  questionIndex: z.number().int().min(0),
+  answerGiven: z.string().min(1),
+});
+export type QuestionCheckInput = z.infer<typeof questionCheckInputSchema>;
+
+// Client-safe round response — answer fields stripped from questions
 export const quizRoundResponseSchema = z.object({
+  id: z.string().uuid(),
+  activityType: quizActivityTypeSchema,
+  theme: z.string(),
+  questions: z.array(clientQuizQuestionSchema),
+  total: z.number().int().positive(),
+});
+export type QuizRoundResponse = z.infer<typeof quizRoundResponseSchema>;
+
+// Server-internal round response — full question data for DB/service use
+export const internalQuizRoundResponseSchema = z.object({
   id: z.string().uuid(),
   activityType: quizActivityTypeSchema,
   theme: z.string(),
   questions: z.array(quizQuestionSchema),
   total: z.number().int().positive(),
 });
-export type QuizRoundResponse = z.infer<typeof quizRoundResponseSchema>;
+export type InternalQuizRoundResponse = z.infer<
+  typeof internalQuizRoundResponseSchema
+>;
+
+export const validatedQuestionResultSchema = z.object({
+  questionIndex: z.number().int().min(0),
+  correct: z.boolean(),
+  correctAnswer: z.string(),
+});
+export type ValidatedQuestionResult = z.infer<
+  typeof validatedQuestionResultSchema
+>;
 
 export const completeRoundResponseSchema = z.object({
   score: z.number().int().nonnegative(),
@@ -106,6 +175,7 @@ export const completeRoundResponseSchema = z.object({
   xpEarned: z.number().int().nonnegative(),
   celebrationTier: z.enum(['perfect', 'great', 'nice']),
   droppedResults: z.number().int().nonnegative().default(0),
+  questionResults: z.array(validatedQuestionResultSchema),
 });
 export type CompleteRoundResponse = z.infer<typeof completeRoundResponseSchema>;
 

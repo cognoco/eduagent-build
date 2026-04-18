@@ -373,8 +373,8 @@ export function createScopedRepository(db: Database, profileId: string) {
         limit: number
       ) {
         return db.query.quizRounds.findMany({
-          where: and(
-            eq(quizRounds.profileId, profileId),
+          where: scopedWhere(
+            quizRounds,
             eq(quizRounds.activityType, activityType)
           ),
           orderBy: [desc(quizRounds.createdAt)],
@@ -383,10 +383,7 @@ export function createScopedRepository(db: Database, profileId: string) {
       },
       async findCompletedRecent(limit: number) {
         return db.query.quizRounds.findMany({
-          where: and(
-            eq(quizRounds.profileId, profileId),
-            eq(quizRounds.status, 'completed')
-          ),
+          where: scopedWhere(quizRounds, eq(quizRounds.status, 'completed')),
           orderBy: [desc(quizRounds.completedAt)],
           limit,
           columns: {
@@ -402,34 +399,27 @@ export function createScopedRepository(db: Database, profileId: string) {
         });
       },
       /**
-       * [Q-10] Per-activity completed-round aggregates computed in SQL so the
-       * endpoint stays constant-time regardless of how many rounds a profile
-       * has played. Returns one row per activity_type with:
-       *   - roundsPlayed  : COUNT(*)
-       *   - totalXp       : SUM(xp_earned), coalesced to 0
-       *   - bestScore     : score from the round with the highest score/total
-       *                     ratio (null if no rounds yet)
-       *   - bestTotal     : total from that same round (null if no rounds yet)
-       *
-       * Two queries total (one GROUP BY + one DISTINCT ON per activity via
-       * a correlated subquery). Bounded by the number of activity types,
-       * not by the number of rounds.
-       *
-       * TODO(quiz-phase-3): The 1+N pattern (one aggregate + one best-round
-       * lookup per activity type) is acceptable at Phase 1 (N=1) but should
-       * be collapsed into a single query with a window function before
-       * Phase 3 adds a third activity type.
+       * [Q-10] [CR-3] Per-activity completed-round aggregates in a single
+       * query. Uses `array_agg(... ORDER BY ratio DESC)[1]` to resolve the
+       * best-round score/total in the same GROUP BY scan — no correlated
+       * subqueries, single table pass regardless of activity type count.
        */
       async aggregateCompletedStats() {
-        // Aggregate cheap fields per activity.
-        const aggregates = await db
+        const rows = await db
           .select({
             activityType: quizRounds.activityType,
             roundsPlayed: sql<number>`count(*)::int`,
             totalXp: sql<number>`coalesce(sum(${quizRounds.xpEarned}), 0)::int`,
-            bestRatio: sql<
-              number | null
-            >`max(cast(${quizRounds.score} as float) / nullif(${quizRounds.total}, 0))`,
+            bestScore: sql<number | null>`(array_agg(
+              ${quizRounds.score}
+              order by cast(${quizRounds.score} as float)
+                / nullif(${quizRounds.total}, 0) desc nulls last
+            ))[1]::int`,
+            bestTotal: sql<number | null>`(array_agg(
+              ${quizRounds.total}
+              order by cast(${quizRounds.score} as float)
+                / nullif(${quizRounds.total}, 0) desc nulls last
+            ))[1]::int`,
           })
           .from(quizRounds)
           .where(
@@ -440,41 +430,13 @@ export function createScopedRepository(db: Database, profileId: string) {
           )
           .groupBy(quizRounds.activityType);
 
-        // Resolve (score, total) of the round that achieved each best ratio.
-        const results = await Promise.all(
-          aggregates.map(async (agg) => {
-            let bestScore: number | null = null;
-            let bestTotal: number | null = null;
-            if (agg.bestRatio != null) {
-              const [best] = await db
-                .select({
-                  score: quizRounds.score,
-                  total: quizRounds.total,
-                })
-                .from(quizRounds)
-                .where(
-                  and(
-                    eq(quizRounds.profileId, profileId),
-                    eq(quizRounds.status, 'completed'),
-                    eq(quizRounds.activityType, agg.activityType),
-                    sql`cast(${quizRounds.score} as float) / nullif(${quizRounds.total}, 0) = ${agg.bestRatio}`
-                  )
-                )
-                .limit(1);
-              bestScore = best?.score ?? null;
-              bestTotal = best?.total ?? null;
-            }
-            return {
-              activityType: agg.activityType,
-              roundsPlayed: agg.roundsPlayed,
-              totalXp: agg.totalXp,
-              bestScore,
-              bestTotal,
-            };
-          })
-        );
-
-        return results;
+        return rows.map((row) => ({
+          activityType: row.activityType,
+          roundsPlayed: row.roundsPlayed,
+          totalXp: row.totalXp,
+          bestScore: row.bestScore ?? null,
+          bestTotal: row.bestTotal ?? null,
+        }));
       },
       async insert(values: Omit<typeof quizRounds.$inferInsert, 'profileId'>) {
         const [row] = await db

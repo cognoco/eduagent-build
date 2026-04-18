@@ -1,5 +1,9 @@
 -- [ASSUMP-F14 sweep] Profile-scoped tables missed by 0027_enable_rls.sql.
 --
+-- TODO(S-06-phase2): Same as 0027 — RLS is enabled here but no CREATE POLICY
+-- statements exist. These five tables will block all app_user access until
+-- permissive policies are added in Phase 2–4. Do NOT activate app_user first.
+--
 -- The original 0027 migration enumerated all known profile-scoped tables at
 -- the time, but the following five were overlooked. Each of them has a
 -- `profile_id` column with a NOT NULL FK to profiles.id, so they MUST travel

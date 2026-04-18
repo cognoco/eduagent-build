@@ -255,62 +255,75 @@ export async function reviewVocabulary(
     throw new Error('Vocabulary item not found');
   }
 
-  const card = await ensureVocabularyRetentionCard(db, profileId, vocabularyId);
-  const now = new Date().toISOString();
-  const result = sm2({
-    quality: input.quality,
-    card: {
-      easeFactor: Number(card.easeFactor),
-      interval: Math.max(1, card.intervalDays),
-      repetitions: card.repetitions,
-      lastReviewedAt: card.lastReviewedAt?.toISOString() ?? now,
-      nextReviewAt: card.nextReviewAt?.toISOString() ?? now,
-    },
-  });
+  // Wrap read-compute-write in a transaction to prevent SM-2 race conditions:
+  // concurrent reviews reading the same consecutiveSuccesses would silently
+  // overwrite each other's SM-2 parameters without serialization.
+  return db.transaction(async (tx) => {
+    const txDb = tx as unknown as Database;
+    const card = await ensureVocabularyRetentionCard(
+      txDb,
+      profileId,
+      vocabularyId
+    );
+    const now = new Date().toISOString();
+    const result = sm2({
+      quality: input.quality,
+      card: {
+        easeFactor: Number(card.easeFactor),
+        interval: Math.max(1, card.intervalDays),
+        repetitions: card.repetitions,
+        lastReviewedAt: card.lastReviewedAt?.toISOString() ?? now,
+        nextReviewAt: card.nextReviewAt?.toISOString() ?? now,
+      },
+    });
 
-  const consecutiveSuccesses =
-    input.quality >= 3 ? card.consecutiveSuccesses + 1 : 0;
-  const failureCount =
-    input.quality >= 3 ? card.failureCount : card.failureCount + 1;
-  const mastered = consecutiveSuccesses >= 3;
+    const consecutiveSuccesses =
+      input.quality >= 3 ? card.consecutiveSuccesses + 1 : 0;
+    const failureCount =
+      input.quality >= 3 ? card.failureCount : card.failureCount + 1;
+    const mastered = consecutiveSuccesses >= 3;
 
-  const [updatedCard] = await db
-    .update(vocabularyRetentionCards)
-    .set({
-      easeFactor: String(result.card.easeFactor),
-      intervalDays: result.card.interval,
-      repetitions: result.card.repetitions,
-      lastReviewedAt: new Date(result.card.lastReviewedAt),
-      nextReviewAt: new Date(result.card.nextReviewAt),
-      failureCount,
-      consecutiveSuccesses,
-      updatedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(vocabularyRetentionCards.vocabularyId, vocabularyId),
-        eq(vocabularyRetentionCards.profileId, profileId)
+    const [updatedCard] = await txDb
+      .update(vocabularyRetentionCards)
+      .set({
+        easeFactor: String(result.card.easeFactor),
+        intervalDays: result.card.interval,
+        repetitions: result.card.repetitions,
+        lastReviewedAt: new Date(result.card.lastReviewedAt),
+        nextReviewAt: new Date(result.card.nextReviewAt),
+        failureCount,
+        consecutiveSuccesses,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(vocabularyRetentionCards.vocabularyId, vocabularyId),
+          eq(vocabularyRetentionCards.profileId, profileId)
+        )
       )
-    )
-    .returning();
+      .returning();
 
-  const [updatedVocab] = await db
-    .update(vocabulary)
-    .set({
-      mastered,
-      updatedAt: new Date(),
-    })
-    .where(
-      and(eq(vocabulary.id, vocabularyId), eq(vocabulary.profileId, profileId))
-    )
-    .returning();
+    const [updatedVocab] = await txDb
+      .update(vocabulary)
+      .set({
+        mastered,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(vocabulary.id, vocabularyId),
+          eq(vocabulary.profileId, profileId)
+        )
+      )
+      .returning();
 
-  if (!updatedCard)
-    throw new Error('Update vocabulary retention card did not return a row');
-  return {
-    vocabulary: mapVocabularyRow(updatedVocab ?? vocabRow),
-    retention: mapVocabularyRetentionCard(updatedCard),
-  };
+    if (!updatedCard)
+      throw new Error('Update vocabulary retention card did not return a row');
+    return {
+      vocabulary: mapVocabularyRow(updatedVocab ?? vocabRow),
+      retention: mapVocabularyRetentionCard(updatedCard),
+    };
+  });
 }
 
 export async function upsertExtractedVocabulary(

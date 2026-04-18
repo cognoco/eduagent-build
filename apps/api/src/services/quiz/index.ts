@@ -5,7 +5,7 @@ export {
   validateDistractors,
 } from './capitals-validation';
 export { extractJsonObject, generateQuizRound } from './generate-round';
-export { completeQuizRound } from './complete-round';
+export { checkQuizAnswer, completeQuizRound } from './complete-round';
 export {
   buildVocabularyMasteryQuestion,
   buildVocabularyPrompt,

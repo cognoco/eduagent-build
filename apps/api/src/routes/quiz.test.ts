@@ -249,7 +249,12 @@ describe('Quiz routes', () => {
       expect(body.id).toBeDefined();
       expect(body.theme).toBe('Central European Capitals');
       expect(body.questions.length).toBeGreaterThanOrEqual(1);
-      expect(body.questions[0].acceptedAliases).toBeDefined();
+      // [CR-1] Answer fields (correctAnswer, acceptedAliases) are now stripped.
+      // Client receives pre-shuffled `options` instead.
+      expect(body.questions[0].options).toBeDefined();
+      expect(body.questions[0].options.length).toBeGreaterThanOrEqual(2);
+      expect(body.questions[0].correctAnswer).toBeUndefined();
+      expect(body.questions[0].acceptedAliases).toBeUndefined();
     });
 
     it('returns 400 without a profile id header', async () => {
@@ -757,31 +762,24 @@ describe('Quiz routes', () => {
       //      once per aggregate row, to resolve the best round's score/total.
       // The first call returns the aggregate rows; subsequent calls resolve
       // the best-round rows for each activity.
-      const aggregateRows = [
+      // [CR-3] Single-query approach: array_agg resolves bestScore/bestTotal
+      // in the same GROUP BY scan — no separate best-round lookup.
+      const statsRows = [
         {
           activityType: 'capitals',
           roundsPlayed: 2,
           totalXp: 140,
-          bestRatio: 1,
+          bestScore: 8,
+          bestTotal: 8,
         },
       ];
-      const bestRoundRows = [{ score: 8, total: 8 }];
 
-      const groupByReturn = Promise.resolve(aggregateRows);
-      const limitReturn = Promise.resolve(bestRoundRows);
-      const whereAggregate = Object.assign(Promise.resolve(aggregateRows), {
+      const groupByReturn = Promise.resolve(statsRows);
+      const whereReturn = Object.assign(Promise.resolve(statsRows), {
         groupBy: jest.fn().mockReturnValue(groupByReturn),
       });
-      const whereBestRound = {
-        limit: jest.fn().mockReturnValue(limitReturn),
-      };
       const fromReturn = {
-        where: jest
-          .fn()
-          // First call → aggregate GROUP BY (thenable)
-          .mockReturnValueOnce(whereAggregate)
-          // Subsequent calls → best-round lookup per activity (has .limit)
-          .mockReturnValue(whereBestRound),
+        where: jest.fn().mockReturnValue(whereReturn),
       };
       (mockDb as any).select = jest
         .fn()

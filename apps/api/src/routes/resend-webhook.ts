@@ -79,7 +79,7 @@ export async function verifyResendSignature(
     const version = parts[0];
     const providedSig = parts.slice(1).join(',');
     if (version !== 'v1') continue;
-    if (await timingSafeEqual(expectedSig, providedSig)) {
+    if (timingSafeEqual(expectedSig, providedSig)) {
       return true;
     }
   }
@@ -125,28 +125,45 @@ function bufferToBase64(buffer: ArrayBuffer): string {
 }
 
 /**
- * Constant-time base64 string comparison using HMAC to prevent timing attacks.
+ * [CR-2] Constant-time base64 string comparison via direct byte XOR.
+ * Both inputs are base64-encoded HMAC-SHA256 digests (always 44 chars / 32
+ * bytes decoded), so the lengths always match. The XOR loop runs all 32
+ * iterations regardless of where (or whether) the strings differ.
+ *
+ * Previous implementation wrapped inputs in an unnecessary inner HMAC with
+ * a hardcoded static key. Removed because the HMAC added no security — its
+ * only purpose was length normalisation, which is guaranteed by the inputs.
  */
-async function timingSafeEqual(a: string, b: string): Promise<boolean> {
-  const encoder = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    'raw',
-    encoder.encode('svix-comparison-key'),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
-  );
-  const [digestA, digestB] = await Promise.all([
-    crypto.subtle.sign('HMAC', key, encoder.encode(a)),
-    crypto.subtle.sign('HMAC', key, encoder.encode(b)),
-  ]);
-  const hashA = new Uint8Array(digestA);
-  const hashB = new Uint8Array(digestB);
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  const bytesA = base64ToBytes(a);
+  const bytesB = base64ToBytes(b);
+  if (bytesA.length !== bytesB.length) return false;
   let diff = 0;
-  for (let i = 0; i < hashA.length; i++) {
-    diff |= (hashA[i] ?? 0) ^ (hashB[i] ?? 0);
+  for (let i = 0; i < bytesA.length; i++) {
+    diff |= (bytesA[i] ?? 0) ^ (bytesB[i] ?? 0);
   }
   return diff === 0;
+}
+
+function base64ToBytes(b64: string): Uint8Array {
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Mask an email address for logging: "user@example.com" → "u***@example.com" */
+function maskEmail(email: string | undefined): string {
+  if (!email || !email.includes('@')) return '***';
+  const [local, domain] = email.split('@');
+  return `${local![0]}***@${domain}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -161,7 +178,7 @@ async function handleEmailBounced(
   logger.warn('[resend] Email delivery failure', {
     event: 'email.bounced',
     type: eventType,
-    to: data.to,
+    to: maskEmail(data.to),
     emailId: data.email_id,
   });
 
@@ -180,7 +197,7 @@ async function handleEmailBounced(
 function handleEmailDelivered(data: ResendEmailEventData): void {
   logger.info('[resend] Email delivered', {
     event: 'email.delivered',
-    to: data.to,
+    to: maskEmail(data.to),
     emailId: data.email_id,
   });
 }

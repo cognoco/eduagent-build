@@ -1,11 +1,15 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { QuestionResult, QuizQuestion } from '@eduagent/schemas';
-import { useCompleteRound, usePrefetchRound } from '../../../hooks/use-quiz';
+import type { ClientQuizQuestion, QuestionResult } from '@eduagent/schemas';
+import {
+  useCheckAnswer,
+  useCompleteRound,
+  usePrefetchRound,
+} from '../../../hooks/use-quiz';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { useThemeColors } from '../../../lib/theme';
 import { useQuizFlow } from './_layout';
@@ -14,36 +18,7 @@ import {
   type GuessWhoResolvedResult,
 } from './_components/GuessWhoQuestion';
 
-type AnswerState = 'unanswered' | 'correct' | 'wrong';
-
-function shuffle<T>(items: T[]): T[] {
-  const shuffled = [...items];
-  for (let i = shuffled.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(Math.random() * (i + 1));
-    const current = shuffled[i];
-    const replacement = shuffled[j];
-    if (current === undefined || replacement === undefined) continue;
-    shuffled[i] = replacement;
-    shuffled[j] = current;
-  }
-  return shuffled;
-}
-
-function isCorrectOption(question: QuizQuestion, answer: string): boolean {
-  const normalized = answer.toLowerCase();
-  if (question.correctAnswer.toLowerCase() === normalized) return true;
-  if (question.type === 'capitals') {
-    return question.acceptedAliases.some(
-      (alias) => alias.toLowerCase() === normalized
-    );
-  }
-  if (question.type === 'vocabulary') {
-    return question.acceptedAnswers.some(
-      (acceptedAnswer) => acceptedAnswer.toLowerCase() === normalized
-    );
-  }
-  return false;
-}
+type AnswerState = 'unanswered' | 'checking' | 'correct' | 'wrong';
 
 export default function QuizPlayScreen(): React.ReactElement {
   const router = useRouter();
@@ -58,12 +33,13 @@ export default function QuizPlayScreen(): React.ReactElement {
   } = useQuizFlow();
   const completeRound = useCompleteRound();
   const prefetchRound = usePrefetchRound();
+  const checkAnswer = useCheckAnswer();
   // [ASSUMP-F10] When completeRound fails we surface an inline retry UI
   // instead of silently fabricating a 0-XP "nice" result and navigating.
   // Users should always know when the server didn't accept their round.
   const [completeError, setCompleteError] = useState<string | null>(null);
 
-  const questions = (round?.questions ?? []) as QuizQuestion[];
+  const questions = (round?.questions ?? []) as ClientQuizQuestion[];
   const totalQuestions = round?.total ?? 0;
 
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -81,6 +57,7 @@ export default function QuizPlayScreen(): React.ReactElement {
   const continueHintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
   );
+  const answerSubmittedRef = useRef(false);
 
   const currentQuestion = questions[currentIndex];
 
@@ -94,19 +71,15 @@ export default function QuizPlayScreen(): React.ReactElement {
     if (!currentQuestion) return;
 
     if (currentQuestion.type !== 'guess_who') {
-      // Dedup before shuffling in case the LLM produces a distractor that
-      // collides with the correct answer. Without this, React would warn on
-      // duplicate keys and the "wrong distractor is also correct" edge case
-      // would render as a silent win/loss mismatch.
-      const uniqueOptions = Array.from(
-        new Set([currentQuestion.correctAnswer, ...currentQuestion.distractors])
-      );
-      setShuffledOptions(shuffle(uniqueOptions));
+      // [CR-1] Options arrive pre-shuffled from the server with answer fields
+      // stripped. Dedup in case the LLM produced a duplicate distractor.
+      setShuffledOptions(Array.from(new Set(currentQuestion.options)));
     } else {
       setShuffledOptions([]);
       setGuessWhoCluesUsed(1);
     }
 
+    answerSubmittedRef.current = false;
     setAnswerState('unanswered');
     setSelectedAnswer(null);
     setShowContinueHint(false);
@@ -163,6 +136,25 @@ export default function QuizPlayScreen(): React.ReactElement {
     goBackOrReplace(router, '/(app)/quiz');
   };
 
+  // [CR-1] Callback for server-side answer checking, declared before the
+  // early return so the rules-of-hooks invariant is satisfied.
+  const roundId = round?.id ?? '';
+  const handleCheckGuessWhoAnswer = useCallback(
+    async (answerGiven: string): Promise<boolean> => {
+      try {
+        const result = await checkAnswer.mutateAsync({
+          roundId,
+          questionIndex: currentIndex,
+          answerGiven,
+        });
+        return result.correct;
+      } catch {
+        return false;
+      }
+    },
+    [roundId, checkAnswer, currentIndex]
+  );
+
   if (!round || !currentQuestion) {
     return (
       <View className="flex-1 items-center justify-center bg-background">
@@ -173,7 +165,7 @@ export default function QuizPlayScreen(): React.ReactElement {
 
   // Re-bind as non-nullable locals after the guard so closures in the
   // hoisted function declarations below carry the narrowed type through.
-  const question: QuizQuestion = currentQuestion;
+  const question: ClientQuizQuestion = currentQuestion;
   const activeRound = round;
 
   // [ASSUMP-F10] Shared submit path so Retry re-uses the same success/error
@@ -199,11 +191,30 @@ export default function QuizPlayScreen(): React.ReactElement {
     );
   }
 
-  function handleAnswer(answer: string) {
-    if (answerState !== 'unanswered') return;
+  // [CR-1] Answer checking is now async — the server validates via
+  // POST /quiz/rounds/:id/check. A ref prevents double-submission during
+  // the network round-trip.
+  async function handleAnswer(answer: string) {
+    if (answerState !== 'unanswered' || answerSubmittedRef.current) return;
+    answerSubmittedRef.current = true;
 
     const timeMs = Date.now() - questionStartTimeRef.current;
-    const correct = isCorrectOption(question, answer);
+    setSelectedAnswer(answer);
+    setAnswerState('checking');
+
+    let correct = false;
+    try {
+      const result = await checkAnswer.mutateAsync({
+        roundId: activeRound.id,
+        questionIndex: currentIndex,
+        answerGiven: answer,
+      });
+      correct = result.correct;
+    } catch {
+      // On check failure, assume wrong — server re-validates on complete
+      correct = false;
+    }
+
     const nextResult: QuestionResult = {
       questionIndex: currentIndex,
       correct,
@@ -212,7 +223,6 @@ export default function QuizPlayScreen(): React.ReactElement {
     };
 
     resultsRef.current = [...resultsRef.current, nextResult];
-    setSelectedAnswer(answer);
     setAnswerState(correct ? 'correct' : 'wrong');
     setShowContinueHint(false);
     continueEnabledAtRef.current = Date.now() + 250;
@@ -232,7 +242,7 @@ export default function QuizPlayScreen(): React.ReactElement {
   }
 
   function handleContinue() {
-    if (answerState === 'unanswered') return;
+    if (answerState === 'unanswered' || answerState === 'checking') return;
     if (Date.now() < continueEnabledAtRef.current) return;
     if (completeRound.isPending) return;
 
@@ -249,18 +259,22 @@ export default function QuizPlayScreen(): React.ReactElement {
     setCurrentIndex((current) => current + 1);
   }
 
+  // [CR-1] Without the correct answer client-side, we highlight only the
+  // selected option — green if correct, red if wrong. The correct answer
+  // (when wrong) is revealed on the results screen via questionResults.
   function getOptionContainerClass(option: string): string {
-    if (answerState === 'unanswered') return 'bg-surface-elevated';
-    if (isCorrectOption(question, option)) return 'bg-primary';
-    if (option === selectedAnswer) return 'bg-danger';
+    if (answerState === 'unanswered' || answerState === 'checking')
+      return 'bg-surface-elevated';
+    if (option === selectedAnswer) {
+      return answerState === 'correct' ? 'bg-primary' : 'bg-danger';
+    }
     return 'bg-surface opacity-60';
   }
 
   function getOptionTextClass(option: string): string {
-    if (answerState === 'unanswered') return 'text-text-primary';
-    if (isCorrectOption(question, option) || option === selectedAnswer) {
-      return 'text-text-inverse';
-    }
+    if (answerState === 'unanswered' || answerState === 'checking')
+      return 'text-text-primary';
+    if (option === selectedAnswer) return 'text-text-inverse';
     return 'text-text-secondary';
   }
 
@@ -269,7 +283,9 @@ export default function QuizPlayScreen(): React.ReactElement {
       className="flex-1 bg-background"
       style={{ paddingTop: insets.top + 12, paddingBottom: insets.bottom + 20 }}
       onPress={
-        answerState !== 'unanswered' && !completeError
+        answerState !== 'unanswered' &&
+        answerState !== 'checking' &&
+        !completeError
           ? handleContinue
           : undefined
       }
@@ -342,6 +358,15 @@ export default function QuizPlayScreen(): React.ReactElement {
         ) : null}
       </View>
 
+      {answerState === 'checking' ? (
+        <View className="mt-6 items-center gap-2 px-5">
+          <ActivityIndicator size="small" color={colors.primary} />
+          <Text className="text-center text-body-sm text-text-secondary">
+            Checking...
+          </Text>
+        </View>
+      ) : null}
+
       {question.type !== 'guess_who' ? (
         <View className="gap-3 px-5">
           {shuffledOptions.map((option, index) => (
@@ -374,6 +399,7 @@ export default function QuizPlayScreen(): React.ReactElement {
         <View className="px-5">
           <GuessWhoQuestion
             question={question}
+            onCheckAnswer={handleCheckGuessWhoAnswer}
             onResolved={(result: GuessWhoResolvedResult) => {
               const timeMs = Date.now() - questionStartTimeRef.current;
               resultsRef.current = [
@@ -408,7 +434,7 @@ export default function QuizPlayScreen(): React.ReactElement {
         </View>
       ) : null}
 
-      {answerState !== 'unanswered' ? (
+      {answerState !== 'unanswered' && answerState !== 'checking' ? (
         <View className="mt-6 px-5">
           {question.type === 'guess_who' ? (
             <View className="mb-3">
@@ -419,7 +445,7 @@ export default function QuizPlayScreen(): React.ReactElement {
                 </Text>
               ) : (
                 <Text className="text-center text-body-lg text-text-primary">
-                  The answer was: {question.canonicalName}
+                  Better luck next time!
                 </Text>
               )}
             </View>

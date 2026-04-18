@@ -2,6 +2,11 @@
 -- SAFE: owner role (neondb_owner) bypasses RLS. No behavior change until
 -- a future phase switches the connection role to app_user.
 --
+-- TODO(S-06-phase2): No CREATE POLICY statements exist yet. Before activating
+-- the app_user connection role (Phase 2–4), permissive RLS policies must be
+-- added for every table below. Without policies, app_user sees zero rows and
+-- all writes are blocked. Do NOT activate app_user before policies land.
+--
 -- ## Rollback
 -- This migration is non-destructive (no data is dropped). To roll back:
 --   ALTER TABLE <each table below> DISABLE ROW LEVEL SECURITY;

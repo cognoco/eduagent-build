@@ -102,6 +102,25 @@ export function useFetchRound(
   });
 }
 
+export function useCheckAnswer(): UseMutationResult<
+  { correct: boolean },
+  Error,
+  { roundId: string; questionIndex: number; answerGiven: string }
+> {
+  const client = useApiClient();
+
+  return useMutation({
+    mutationFn: async ({ roundId, questionIndex, answerGiven }) => {
+      const res = await client.quiz.rounds[':id'].check.$post({
+        param: { id: roundId },
+        json: { questionIndex, answerGiven },
+      });
+      await assertOk(res);
+      return (await res.json()) as { correct: boolean };
+    },
+  });
+}
+
 export function useCompleteRound(): UseMutationResult<
   CompleteRoundResponse,
   Error,

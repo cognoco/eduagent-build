@@ -3,8 +3,11 @@ import { zValidator } from '@hono/zod-validator';
 import {
   completeRoundInputSchema,
   generateRoundInputSchema,
+  questionCheckInputSchema,
+  type ClientQuizQuestion,
   type CefrLevel,
   type GenerateRoundInput,
+  type QuizQuestion,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
@@ -12,6 +15,7 @@ import type { ProfileMeta } from '../middleware/profile-scope';
 import { requireProfileId } from '../middleware/profile-scope';
 import { validationError, VocabularyContextError } from '../errors';
 import {
+  checkQuizAnswer,
   completeQuizRound,
   getVocabularyRoundContext,
   getGuessWhoRoundContext,
@@ -34,6 +38,56 @@ type QuizRouteEnv = {
     profileMeta: ProfileMeta;
   };
 };
+
+// ─── Answer-stripping projection ─────────────────────────────────────────
+// [CR-1] Prevent answer leaking: correctAnswer, acceptedAliases,
+// acceptedAnswers, canonicalName are stripped. MC types get a pre-shuffled
+// `options` array; guess_who keeps mcFallbackOptions as-is.
+
+function shuffle<T>(arr: T[]): T[] {
+  const result = [...arr];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j]!, result[i]!];
+  }
+  return result;
+}
+
+function toClientSafeQuestions(
+  questions: QuizQuestion[]
+): ClientQuizQuestion[] {
+  return questions.map((q): ClientQuizQuestion => {
+    if (q.type === 'capitals') {
+      return {
+        type: 'capitals',
+        country: q.country,
+        options: shuffle([q.correctAnswer, ...q.distractors]),
+        funFact: q.funFact,
+        isLibraryItem: q.isLibraryItem,
+        topicId: q.topicId,
+      };
+    }
+    if (q.type === 'vocabulary') {
+      return {
+        type: 'vocabulary',
+        term: q.term,
+        options: shuffle([q.correctAnswer, ...q.distractors]),
+        funFact: q.funFact,
+        cefrLevel: q.cefrLevel,
+        isLibraryItem: q.isLibraryItem,
+        vocabularyId: q.vocabularyId,
+      };
+    }
+    return {
+      type: 'guess_who',
+      clues: q.clues,
+      mcFallbackOptions: q.mcFallbackOptions,
+      funFact: q.funFact,
+      isLibraryItem: q.isLibraryItem,
+      topicId: q.topicId,
+    };
+  });
+}
 
 /**
  * Route-layer orchestration only. Every read goes through
@@ -154,7 +208,9 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
         id: result.round.id,
         activityType: result.input.activityType,
         theme: result.round.theme,
-        questions: result.round.questions,
+        questions: toClientSafeQuestions(
+          result.round.questions as QuizQuestion[]
+        ),
         total: result.round.total,
       },
       200
@@ -200,12 +256,31 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
         id: round.id,
         activityType: round.activityType,
         theme: round.theme,
-        questions: round.questions,
+        questions: toClientSafeQuestions(round.questions as QuizQuestion[]),
         total: round.total,
       },
       200
     );
   })
+  .post(
+    '/quiz/rounds/:id/check',
+    zValidator('json', questionCheckInputSchema),
+    async (c) => {
+      const profileId = requireProfileId(c.get('profileId'));
+      const db = c.get('db');
+      const roundId = c.req.param('id');
+      const { questionIndex, answerGiven } = c.req.valid('json');
+
+      const correct = await checkQuizAnswer(
+        db,
+        profileId,
+        roundId,
+        questionIndex,
+        answerGiven
+      );
+      return c.json({ correct }, 200);
+    }
+  )
   .post(
     '/quiz/rounds/:id/complete',
     zValidator('json', completeRoundInputSchema),

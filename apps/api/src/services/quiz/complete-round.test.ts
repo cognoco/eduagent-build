@@ -347,6 +347,39 @@ describe('calculateXp — guess_who clue bonus', () => {
     expect(calculateXp(results, 1, 'guess_who')).toBe(35);
   });
 
+  it('[CR-HIGH-1] clamps cluesUsed to [0,5] — prevents negative XP from out-of-range values', () => {
+    // Even if schema validation is bypassed or loosened, the XP calculation
+    // must never produce negative clue bonus.
+    const results: QuestionResult[] = [
+      {
+        questionIndex: 0,
+        correct: true,
+        answerGiven: 'Newton',
+        timeMs: 8000,
+        cluesUsed: 100 as unknown as number, // simulates bypassed validation
+        answerMode: 'free_text',
+      },
+    ];
+    // Without clamping: (5-100)*3 = -285. With clamping: (5-5)*3 = 0.
+    // base: 10, timer: 0, perfect: 25 (1/1), clue bonus: 0
+    expect(calculateXp(results, 1, 'guess_who')).toBe(35);
+  });
+
+  it('[CR-HIGH-1] awards maximum clue bonus when cluesUsed is 0', () => {
+    const results: QuestionResult[] = [
+      {
+        questionIndex: 0,
+        correct: true,
+        answerGiven: 'Newton',
+        timeMs: 8000,
+        cluesUsed: 0,
+        answerMode: 'free_text',
+      },
+    ];
+    // base: 10, timer: 0, perfect: 25, clue bonus: (5-0)*3 = 15
+    expect(calculateXp(results, 1, 'guess_who')).toBe(50);
+  });
+
   it('works unchanged for non-guess_who activities', () => {
     const results: QuestionResult[] = [
       { questionIndex: 0, correct: true, answerGiven: 'Paris', timeMs: 2000 },

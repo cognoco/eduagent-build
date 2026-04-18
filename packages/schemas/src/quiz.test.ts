@@ -340,14 +340,25 @@ describe('quiz schemas', () => {
       expect(questionResultSchema.parse(result)).toEqual(result);
     });
 
-    it('rejects cluesUsed outside 1-5 range', () => {
+    it('accepts cluesUsed: 0 (no clues shown)', () => {
+      const result = {
+        questionIndex: 0,
+        correct: true,
+        answerGiven: 'X',
+        timeMs: 1000,
+        cluesUsed: 0,
+      };
+      expect(questionResultSchema.parse(result)).toEqual(result);
+    });
+
+    it('rejects cluesUsed outside 0-5 range', () => {
       expect(() =>
         questionResultSchema.parse({
           questionIndex: 0,
           correct: true,
           answerGiven: 'X',
           timeMs: 1000,
-          cluesUsed: 0,
+          cluesUsed: -1,
         })
       ).toThrow();
       expect(() =>

@@ -18,6 +18,10 @@ import {
   getDictationStreak,
   fetchGenerateContext,
 } from '../services/dictation';
+import {
+  getRecentNotificationCount,
+  logNotification,
+} from '../services/settings';
 
 // ---------------------------------------------------------------------------
 // Dictation Routes
@@ -59,12 +63,13 @@ function getServerDate(): string {
  * Returns null if the date is acceptable, or an error message string if not.
  */
 function validateLocalDate(localDate: string): string | null {
-  const serverDateMs = new Date(getServerDate()).getTime();
+  const serverDate = getServerDate();
+  const serverDateMs = new Date(serverDate).getTime();
   const clientDateMs = new Date(localDate).getTime();
   const diffDays =
     Math.abs(serverDateMs - clientDateMs) / (24 * 60 * 60 * 1000);
   if (diffDays > 1) {
-    return `localDate "${localDate}" is more than 1 day from server UTC date "${getServerDate()}". Use the current local date.`;
+    return `localDate "${localDate}" is more than 1 day from server UTC date "${serverDate}". Use the current local date.`;
   }
   return null;
 }
@@ -162,7 +167,8 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
   // an AI-powered review of spelling/punctuation mistakes.
   // -------------------------------------------------------------------------
   .post('/dictation/review', async (c) => {
-    requireProfileId(c.get('profileId'));
+    const profileId = requireProfileId(c.get('profileId'));
+    const db = c.get('db');
 
     let body: unknown;
     try {
@@ -178,6 +184,26 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
         'imageBase64 (max 2MB), imageMimeType (jpeg/png/webp), sentences (min 1), and language are required'
       );
     }
+
+    // [CR-4] Per-profile rate limit: 10 requests per minute.
+    // Placed after validation so invalid input gets 400, not a DB hit.
+    // Placed before the LLM call so the expensive operation is gated.
+    const recentCount = await getRecentNotificationCount(
+      db,
+      profileId,
+      'dictation_review',
+      1 / 60
+    );
+    if (recentCount >= 10) {
+      return apiError(
+        c,
+        429,
+        ERROR_CODES.CONFLICT,
+        'Dictation review is limited to 10 requests per minute.'
+      );
+    }
+
+    await logNotification(db, profileId, 'dictation_review');
 
     const result = await reviewDictation({
       sentences: parsed.data.sentences,

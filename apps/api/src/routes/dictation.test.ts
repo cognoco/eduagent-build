@@ -79,6 +79,12 @@ jest.mock('../services/billing', () => ({
   createSubscription: jest.fn(),
 }));
 
+// [CR-4] Mock settings service for rate limiting on POST /dictation/review
+jest.mock('../services/settings', () => ({
+  getRecentNotificationCount: jest.fn().mockResolvedValue(0),
+  logNotification: jest.fn().mockResolvedValue(undefined),
+}));
+
 // Mock the dictation services — they are the internal boundary
 jest.mock('../services/dictation', () => ({
   prepareHomework: jest.fn(),
