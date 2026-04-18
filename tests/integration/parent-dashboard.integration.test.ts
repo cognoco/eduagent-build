@@ -459,7 +459,7 @@ describe('Parent Visibility functional tests', () => {
 
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.memory.categories).toBeInstanceOf(Array);
+    expect(Array.isArray(body.memory.categories)).toBe(true);
     expect(body.memory.settings).toHaveProperty('memoryEnabled');
   });
 
