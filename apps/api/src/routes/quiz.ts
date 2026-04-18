@@ -71,6 +71,7 @@ function toClientSafeQuestions(
         funFact: q.funFact,
         isLibraryItem: q.isLibraryItem,
         topicId: q.topicId,
+        freeTextEligible: q.freeTextEligible,
       };
     }
     if (q.type === 'vocabulary') {
@@ -82,6 +83,7 @@ function toClientSafeQuestions(
         cefrLevel: q.cefrLevel,
         isLibraryItem: q.isLibraryItem,
         vocabularyId: q.vocabularyId,
+        freeTextEligible: q.freeTextEligible,
       };
     }
     return {

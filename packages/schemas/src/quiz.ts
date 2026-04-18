@@ -37,6 +37,7 @@ export const vocabularyQuestionSchema = z.object({
   cefrLevel: z.string(),
   isLibraryItem: z.boolean(),
   vocabularyId: z.string().uuid().nullable().optional(),
+  freeTextEligible: z.boolean().optional(),
 });
 export type VocabularyQuestion = z.infer<typeof vocabularyQuestionSchema>;
 

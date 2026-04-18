@@ -126,7 +126,31 @@ export async function listRecentCompletedRounds(
  */
 export async function computeRoundStats(db: Database, profileId: string) {
   const repo = createScopedRepository(db, profileId);
-  return repo.quizRounds.aggregateCompletedStats();
+  const baseStats = await repo.quizRounds.aggregateCompletedStats();
+
+  // Compute bestConsecutive per activity by scanning results arrays
+  const allCompleted = await repo.quizRounds.findMany(
+    eq(quizRounds.status, 'completed')
+  );
+
+  const consecutiveByActivity = new Map<string, number>();
+  for (const round of allCompleted) {
+    const results = (round.results ?? []) as Array<{ correct: boolean }>;
+    let maxStreak = 0;
+    let current = 0;
+    for (const r of results) {
+      current = r.correct ? current + 1 : 0;
+      if (current > maxStreak) maxStreak = current;
+    }
+    const prev = consecutiveByActivity.get(round.activityType) ?? 0;
+    if (maxStreak > prev)
+      consecutiveByActivity.set(round.activityType, maxStreak);
+  }
+
+  return baseStats.map((stat) => ({
+    ...stat,
+    bestConsecutive: consecutiveByActivity.get(stat.activityType) ?? null,
+  }));
 }
 
 export async function getVocabularyRoundContext(
