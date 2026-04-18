@@ -23,6 +23,7 @@ export const capitalsQuestionSchema = z.object({
   funFact: z.string(),
   isLibraryItem: z.boolean(),
   topicId: z.string().uuid().nullable().optional(),
+  freeTextEligible: z.boolean().optional(),
 });
 export type CapitalsQuestion = z.infer<typeof capitalsQuestionSchema>;
 
@@ -36,6 +37,7 @@ export const vocabularyQuestionSchema = z.object({
   cefrLevel: z.string(),
   isLibraryItem: z.boolean(),
   vocabularyId: z.string().uuid().nullable().optional(),
+  freeTextEligible: z.boolean().optional(),
 });
 export type VocabularyQuestion = z.infer<typeof vocabularyQuestionSchema>;
 
@@ -45,6 +47,7 @@ export const guessWhoQuestionSchema = z
     canonicalName: z.string(),
     correctAnswer: z.string(),
     acceptedAliases: z.array(z.string()).min(1),
+    era: z.string().optional(),
     clues: z.array(z.string().max(200)).length(5),
     mcFallbackOptions: z.array(z.string()).length(4),
     funFact: z.string().max(200),
@@ -77,6 +80,7 @@ export const clientCapitalsQuestionSchema = z.object({
   funFact: z.string(),
   isLibraryItem: z.boolean(),
   topicId: z.string().uuid().nullable().optional(),
+  freeTextEligible: z.boolean().optional(),
 });
 
 export const clientVocabularyQuestionSchema = z.object({
@@ -87,6 +91,7 @@ export const clientVocabularyQuestionSchema = z.object({
   cefrLevel: z.string(),
   isLibraryItem: z.boolean(),
   vocabularyId: z.string().uuid().nullable().optional(),
+  freeTextEligible: z.boolean().optional(),
 });
 
 export const clientGuessWhoQuestionSchema = z.object({
@@ -152,6 +157,7 @@ export const quizRoundResponseSchema = z.object({
   theme: z.string(),
   questions: z.array(clientQuizQuestionSchema),
   total: z.number().int().positive(),
+  difficultyBump: z.boolean().optional(),
 });
 export type QuizRoundResponse = z.infer<typeof quizRoundResponseSchema>;
 
@@ -203,6 +209,7 @@ export const quizStatsSchema = z.object({
   bestScore: z.number().int().nonnegative().nullable(),
   bestTotal: z.number().int().positive().nullable(),
   totalXp: z.number().int().nonnegative(),
+  bestConsecutive: z.number().int().nonnegative().nullable().optional(),
 });
 export type QuizStats = z.infer<typeof quizStatsSchema>;
 
@@ -238,6 +245,7 @@ export type VocabularyLlmOutput = z.infer<typeof vocabularyLlmOutputSchema>;
 export const guessWhoLlmPersonSchema = z.object({
   canonicalName: z.string(),
   acceptedAliases: z.array(z.string()).min(1),
+  era: z.string().optional(),
   clues: z.array(z.string().max(200)).length(5),
   mcFallbackOptions: z.array(z.string()).length(4),
   funFact: z.string().max(200),
@@ -249,3 +257,8 @@ export const guessWhoLlmOutputSchema = z.object({
   questions: z.array(guessWhoLlmPersonSchema).min(1),
 });
 export type GuessWhoLlmOutput = z.infer<typeof guessWhoLlmOutputSchema>;
+
+export const markSurfacedInputSchema = z.object({
+  activityType: quizActivityTypeSchema,
+});
+export type MarkSurfacedInput = z.infer<typeof markSurfacedInputSchema>;

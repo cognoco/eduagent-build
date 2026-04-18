@@ -14,6 +14,7 @@ import {
   curriculumTopics,
   curricula,
   profiles,
+  quizMissedItems,
   createScopedRepository,
   generateUUIDv7,
   type Database,
@@ -276,6 +277,19 @@ export async function precomputeCoachingCard(
     // Homework connection is optional — fall through to next priority
   }
 
+  // --- Priority 3.25: quiz_discovery (missed quiz items bridge) ---
+  try {
+    const quizDiscoveryCard = await findQuizDiscoveryCard(db, profileId, {
+      id,
+      expiresAt,
+      createdAt,
+      learnerAge,
+    });
+    if (quizDiscoveryCard) return quizDiscoveryCard;
+  } catch {
+    // Quiz discovery is optional — fall through to next priority
+  }
+
   // --- Priority 3: curriculum_complete (all topics verified) ---
   // If there are multiple retention cards and ALL of them are verified,
   // the learner has completed their curriculum. Require >= 3 to distinguish from
@@ -373,6 +387,85 @@ export async function precomputeCoachingCard(
     topicId: fallbackTopicId,
     difficulty: 'easy',
     xpReward: 10,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Quiz discovery card helpers (Phase 4 — quiz missed items bridge)
+// ---------------------------------------------------------------------------
+
+const QUIZ_DISCOVERY_MIN_ITEMS = 3;
+
+const ACTIVITY_TYPE_LABELS: Record<string, { domain: string; emoji: string }> =
+  {
+    capitals: { domain: 'world capitals', emoji: 'globe' },
+    vocabulary: { domain: 'vocabulary', emoji: 'book' },
+    guess_who: { domain: 'famous people', emoji: 'person' },
+  };
+
+function quizDiscoveryCopy(
+  activityType: string,
+  count: number,
+  age: number | null
+): { title: string; body: string } {
+  const young = age !== null && age < 13;
+  const label = ACTIVITY_TYPE_LABELS[activityType] ?? {
+    domain: 'topics',
+    emoji: 'star',
+  };
+
+  return {
+    title: young ? 'Want to explore more?' : 'Dive deeper?',
+    body: young
+      ? `You've been discovering ${label.domain} — want to learn even more?`
+      : `You have ${count} ${label.domain} discoveries waiting to become knowledge.`,
+  };
+}
+
+/**
+ * Finds unsurfaced quiz missed items grouped by activity type.
+ * Returns a quiz_discovery card if any domain has >= 3 unsurfaced items.
+ */
+async function findQuizDiscoveryCard(
+  db: Database,
+  profileId: string,
+  meta: CardMeta
+): Promise<CoachingCard | null> {
+  const counts = await db
+    .select({
+      activityType: quizMissedItems.activityType,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(quizMissedItems)
+    .where(
+      and(
+        eq(quizMissedItems.profileId, profileId),
+        eq(quizMissedItems.surfaced, false)
+      )
+    )
+    .groupBy(quizMissedItems.activityType);
+
+  // Pick the domain with the most unsurfaced items
+  const qualifying = counts
+    .filter((row) => row.count >= QUIZ_DISCOVERY_MIN_ITEMS)
+    .sort((a, b) => b.count - a.count);
+
+  if (qualifying.length === 0) return null;
+
+  const top = qualifying[0]!;
+  const copy = quizDiscoveryCopy(top.activityType, top.count, meta.learnerAge);
+
+  return {
+    id: meta.id,
+    profileId,
+    type: 'quiz_discovery',
+    title: copy.title,
+    body: copy.body,
+    priority: 4,
+    expiresAt: meta.expiresAt,
+    createdAt: meta.createdAt,
+    activityType: top.activityType as 'capitals' | 'vocabulary' | 'guess_who',
+    missedItemCount: top.count,
   };
 }
 

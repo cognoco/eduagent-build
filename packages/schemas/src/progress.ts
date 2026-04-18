@@ -159,6 +159,9 @@ export const dashboardChildSchema = z.object({
   retentionTrend: z.enum(['improving', 'declining', 'stable']),
   totalSessions: z.number().int(),
   progress: dashboardChildProgressSchema.nullable().optional(),
+  currentStreak: z.number().int().default(0),
+  longestStreak: z.number().int().default(0),
+  totalXp: z.number().int().default(0),
 });
 export type DashboardChild = z.infer<typeof dashboardChildSchema>;
 
@@ -191,6 +194,7 @@ export const coachingCardTypeSchema = z.enum([
   'continue_book',
   'book_suggestion',
   'milestone_celebration',
+  'quiz_discovery',
 ]);
 export type CoachingCardType = z.infer<typeof coachingCardTypeSchema>;
 
@@ -291,6 +295,14 @@ export type MilestoneCelebrationCard = z.infer<
   typeof milestoneCelebrationCardSchema
 >;
 
+export const quizDiscoveryCardSchema = z.object({
+  ...baseCoachingCardFields,
+  type: z.literal('quiz_discovery'),
+  activityType: z.enum(['capitals', 'vocabulary', 'guess_who']),
+  missedItemCount: z.number().int().min(1),
+});
+export type QuizDiscoveryCard = z.infer<typeof quizDiscoveryCardSchema>;
+
 export const coachingCardSchema = z.discriminatedUnion('type', [
   streakCardSchema,
   insightCardSchema,
@@ -301,6 +313,7 @@ export const coachingCardSchema = z.discriminatedUnion('type', [
   continueBookCardSchema,
   bookSuggestionCardSchema,
   milestoneCelebrationCardSchema,
+  quizDiscoveryCardSchema,
 ]);
 export type CoachingCard = z.infer<typeof coachingCardSchema>;
 

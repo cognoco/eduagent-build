@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { Alert, BackHandler, Pressable, Text, View } from 'react-native';
+import { BackHandler, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useDictationPlayback } from '../../../hooks/use-dictation-playback';
 import { useDictationPreferences } from '../../../hooks/use-dictation-preferences';
 import { goBackOrReplace } from '../../../lib/navigation';
+import { platformAlert } from '../../../lib/platform-alert';
 import { useProfile } from '../../../lib/profile';
 import { useThemeColors } from '../../../lib/theme';
 import { useDictationData } from './_layout';
@@ -25,14 +26,23 @@ export default function PlaybackScreen(): React.ReactElement {
 
   const prefs = useDictationPreferences(activeProfile?.id);
 
+  const ageYears = activeProfile?.birthYear
+    ? new Date().getFullYear() - activeProfile.birthYear
+    : 10;
+  const chunkSize = ageYears <= 8 ? 2 : ageYears <= 12 ? 3 : 4;
+
   const playback = useDictationPlayback({
     sentences: data?.sentences ?? [],
     pace: prefs.pace,
     punctuationReadAloud: prefs.punctuationReadAloud,
     language: data?.language ?? 'en',
+    chunkSize,
   });
 
-  // RF-08: Guard prevents auto-start from re-triggering on re-renders
+  // RF-08: Guard prevents auto-start from re-triggering on re-renders.
+  // [F-030] dep on data — if context state hasn't flushed by mount time
+  // (race between setData and router.push), auto-start fires on the next
+  // render once data arrives. hasStartedRef prevents double-start.
   const hasStartedRef = useRef(false);
   useEffect(() => {
     if (!hasStartedRef.current && (data?.sentences?.length ?? 0) > 0) {
@@ -40,7 +50,7 @@ export default function PlaybackScreen(): React.ReactElement {
       playback.start();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [data]);
 
   // Navigate to complete screen when done
   useEffect(() => {
@@ -51,7 +61,7 @@ export default function PlaybackScreen(): React.ReactElement {
 
   // Back press confirmation — RF-09: progress is not auto-recorded, explicit user action only
   const handleExit = useCallback(() => {
-    Alert.alert('Are you sure?', "Your dictation progress won't be saved.", [
+    platformAlert('Are you sure?', "Your dictation progress won't be saved.", [
       { text: 'Keep going', style: 'cancel' },
       {
         text: 'Leave',
@@ -196,7 +206,7 @@ export default function PlaybackScreen(): React.ReactElement {
           className="bg-surface-elevated rounded-xl py-4 items-center"
           testID="playback-repeat"
           accessibilityRole="button"
-          accessibilityLabel="Repeat current sentence"
+          accessibilityLabel="Repeat last phrase"
         >
           <View className="flex-row items-center">
             <Ionicons name="refresh" size={20} color={colors.textPrimary} />

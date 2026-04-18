@@ -32,13 +32,19 @@ import {
 import { captureException } from '../../services/sentry';
 import { queueCelebration } from '../../services/celebrations';
 import {
+  generateLlmHighlight,
+  buildBrowseHighlight,
+} from '../../services/session-highlights';
+import {
   curriculumTopics,
   learningSessions,
+  profiles,
   retentionCards,
   sessionEvents,
+  sessionSummaries,
   subjects,
 } from '@eduagent/database';
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, inArray } from 'drizzle-orm';
 import { cefrLevelSchema, verificationTypeSchema } from '@eduagent/schemas';
 import {
   analyzeSessionTranscript,
@@ -535,6 +541,108 @@ export const sessionCompleted = inngest.createFunction(
           // Precompute coaching card and write to cache (ARCH-11)
           const card = await precomputeCoachingCard(db, profileId);
           await writeCoachingCardCache(db, profileId, card);
+        })
+      )
+    );
+
+    // Step 2b: Generate session highlight for parent session feed [PEH-S2]
+    outcomes.push(
+      await step.run('generate-session-highlight', async () =>
+        runIsolated('generate-session-highlight', profileId, async () => {
+          const db = getStepDatabase();
+
+          // Find the session_summaries row created by write-coaching-card
+          const [summaryRow] = await db
+            .select({ id: sessionSummaries.id })
+            .from(sessionSummaries)
+            .where(
+              and(
+                eq(sessionSummaries.sessionId, sessionId),
+                eq(sessionSummaries.profileId, profileId)
+              )
+            )
+            .limit(1);
+
+          if (!summaryRow) {
+            console.warn(
+              `[session-completed] generate-session-highlight: no session_summaries row for session=${sessionId}, profile=${profileId} — highlight skipped`
+            );
+            return;
+          }
+
+          // Determine highlight based on exchange count
+          let highlight: string | null = null;
+
+          if ((exchangeCount ?? 0) >= 3) {
+            // LLM-generated highlight for substantive sessions
+            const transcriptEvents = await db.query.sessionEvents.findMany({
+              where: and(
+                eq(sessionEvents.sessionId, sessionId),
+                eq(sessionEvents.profileId, profileId),
+                inArray(sessionEvents.eventType, [
+                  'user_message',
+                  'ai_response',
+                ])
+              ),
+              orderBy: asc(sessionEvents.createdAt),
+              columns: { eventType: true, content: true },
+            });
+
+            const transcriptText = transcriptEvents
+              .map(
+                (e) =>
+                  `${e.eventType === 'user_message' ? 'Student' : 'Mentor'}: ${
+                    e.content
+                  }`
+              )
+              .join('\n\n');
+
+            const result = await generateLlmHighlight(transcriptText);
+
+            if (result.valid) {
+              highlight = result.highlight;
+            } else {
+              console.warn(
+                `[session-completed] generate-session-highlight: LLM validation failed (${result.reason}) for session=${sessionId}, falling back to template`
+              );
+            }
+          }
+
+          // Template fallback: if LLM failed or < 3 exchanges
+          if (!highlight) {
+            const [profile] = await db
+              .select({ displayName: profiles.displayName })
+              .from(profiles)
+              .where(eq(profiles.id, profileId))
+              .limit(1);
+            const topicTitle = topicId
+              ? await loadTopicTitle(db, topicId)
+              : null;
+            const topics = topicTitle ? [topicTitle] : ['a topic'];
+
+            const [session] = await db
+              .select({
+                wallClockSeconds: learningSessions.wallClockSeconds,
+                durationSeconds: learningSessions.durationSeconds,
+              })
+              .from(learningSessions)
+              .where(eq(learningSessions.id, sessionId))
+              .limit(1);
+            const duration =
+              session?.wallClockSeconds ?? session?.durationSeconds ?? 60;
+
+            highlight = buildBrowseHighlight(
+              profile?.displayName ?? 'Your child',
+              topics,
+              duration
+            );
+          }
+
+          // Write the highlight to session_summaries
+          await db
+            .update(sessionSummaries)
+            .set({ highlight })
+            .where(eq(sessionSummaries.id, summaryRow.id));
         })
       )
     );

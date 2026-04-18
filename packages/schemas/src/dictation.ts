@@ -8,6 +8,10 @@ export const dictationSentenceSchema = z.object({
     .string()
     .describe('Sentence with punctuation spoken as words'),
   wordCount: z.number().int().positive(),
+  /** Natural phrase-boundary chunks for TTS playback (original text). */
+  chunks: z.array(z.string()).optional(),
+  /** Natural phrase-boundary chunks with punctuation spoken as words. */
+  chunksWithPunctuation: z.array(z.string()).optional(),
 });
 export type DictationSentence = z.infer<typeof dictationSentenceSchema>;
 

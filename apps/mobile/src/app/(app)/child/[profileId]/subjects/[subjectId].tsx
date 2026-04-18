@@ -166,6 +166,7 @@ export default function SubjectTopicsScreen() {
                     masteryScore: String(topic.masteryScore ?? 0),
                     retentionStatus: topic.retentionStatus ?? '',
                     subjectId: subjectId ?? '',
+                    subjectName: subjectName ?? '',
                   },
                 } as never)
               }

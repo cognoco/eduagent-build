@@ -1,8 +1,9 @@
 # Flow N9b: Topic Detail — Adaptive Buttons for In-Progress Topic (Story 4.14)
-# Validates: adaptive action buttons show correct layout for in_progress topics.
+# Validates: smart primary + expandable secondary actions show correct layout
+# for in_progress topics.
 # When completionStatus = in_progress:
-#   - Primary: "Continue Learning" (continue-learning-button)
-#   - Secondary: "Start Review Session" (start-review-button)
+#   - Primary: "Continue learning" (primary-action-button)
+#   - Secondary section: "More ways to practice" -> "Recall Check"
 # Tags: nightly, retention
 #
 # Journey: UX Journey 2 (Retention management)
@@ -13,11 +14,10 @@
 # so computeCompletionStatus returns "in_progress" (sessionCount > 0, no
 # passed assessment). This triggers the in_progress button layout.
 #
-# testID mapping (topic/[topicId].tsx — Story 4.14 adaptive buttons):
-#   - continue-learning-button  -> primary button for in_progress
-#   - start-review-button       -> secondary button for in_progress
-#   - start-learning-button     -> only shown for not_started (should NOT appear)
-#   - request-retest-button     -> always visible bottom row
+# testID mapping (topic/[topicId].tsx — smart primary + expandable secondary):
+#   - primary-action-button     -> primary button for in_progress
+#   - more-ways-toggle          -> expands secondary actions
+#   - secondary-recall-check    -> recall check action
 appId: com.mentomate.app
 tags:
   - nightly
@@ -72,22 +72,25 @@ tags:
       text: "Progress"
     timeout: 10000
 
-# 8. Story 4.14: Verify in_progress adaptive buttons
-# Primary button: "Continue Learning"
+# 8. Verify in_progress smart primary action
 - assertVisible:
-    id: "continue-learning-button"
-
-# Secondary button: "Start Review Session"
+    id: "primary-action-button"
 - assertVisible:
-    id: "start-review-button"
+    text: "Continue learning"
 
-# 9. Verify not_started button is NOT shown for in_progress topic
+# 9. Verify the secondary section is available and exposes Recall Check
+- assertVisible:
+    id: "more-ways-toggle"
+- tapOn:
+    id: "more-ways-toggle"
+- assertVisible:
+    id: "secondary-recall-check"
+- assertVisible:
+    text: "Recall Check"
+
+# 10. Verify not_started primary label is not shown
 - assertNotVisible:
-    id: "start-learning-button"
-
-# 10. Verify request-retest-button is present (always visible bottom row)
-- assertVisible:
-    id: "request-retest-button"
+    text: "Start learning"
 
 # 11. Screenshot of in_progress adaptive buttons
 - takeScreenshot: topic-detail-in-progress-adaptive-buttons

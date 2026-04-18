@@ -9,6 +9,7 @@ import React from 'react';
 const mockBack = jest.fn();
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
+const mockGoBackOrReplace = jest.fn();
 const mockSkipMutate = jest.fn();
 const mockUnskipMutate = jest.fn();
 const mockChallengeMutateAsync = jest.fn();
@@ -39,6 +40,9 @@ jest.mock('expo-router', () => ({
   }),
   useLocalSearchParams: () => ({
     subjectId: 'subject-1',
+    subjectName: 'History',
+    step: '4',
+    totalSteps: '4',
   }),
 }));
 
@@ -78,6 +82,10 @@ jest.mock('../../../lib/theme', () => ({
     textInverse: '#ffffff',
     primary: '#2563eb',
   }),
+}));
+
+jest.mock('../../../lib/navigation', () => ({
+  goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
 }));
 
 jest.mock('../../../hooks/use-curriculum', () => ({
@@ -213,7 +221,24 @@ describe('CurriculumReviewScreen', () => {
     render(<CurriculumReviewScreen />);
 
     fireEvent.press(screen.getByTestId('curriculum-back'));
-    expect(mockBack).toHaveBeenCalled();
+    expect(mockGoBackOrReplace).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        pathname: '/(app)/onboarding/accommodations',
+        params: expect.objectContaining({
+          subjectId: 'subject-1',
+          subjectName: 'History',
+          step: '3',
+          totalSteps: '4',
+        }),
+      })
+    );
+  });
+
+  it('renders the onboarding step indicator', () => {
+    render(<CurriculumReviewScreen />);
+
+    expect(screen.getByText('Step 4 of 4')).toBeTruthy();
   });
 
   it('cancels add-topic modal without creating', async () => {

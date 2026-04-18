@@ -4,11 +4,11 @@ import {
   Text,
   Pressable,
   ScrollView,
-  Alert,
   ActivityIndicator,
   Linking,
   Platform,
 } from 'react-native';
+import { platformAlert } from '../../lib/platform-alert';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import * as SecureStore from '../../lib/secure-storage';
 import { migrateSecureStoreKey } from '../../lib/migrate-secure-store-key';
@@ -388,15 +388,15 @@ function ChildPaywall(): React.ReactElement {
             String(now)
           ).catch(() => undefined);
         }
-        Alert.alert('Sent!', 'We let your parent know!');
+        platformAlert('Sent!', 'We let your parent know!');
       } else {
-        Alert.alert(
+        platformAlert(
           'Ask your parent',
           'Ask your parent to open the app and subscribe.'
         );
       }
     } catch {
-      Alert.alert(
+      platformAlert(
         'Could not send notification',
         'Please check your connection and try again.'
       );
@@ -631,20 +631,20 @@ export default function SubscriptionScreen() {
       try {
         await purchase.mutateAsync(pkg);
         await Promise.all([refetchSub(), refetchUsage()]);
-        Alert.alert('Success', 'Your subscription is now active!');
+        platformAlert('Success', 'Your subscription is now active!');
       } catch (error: unknown) {
         if (isPurchaseCancelledError(error)) {
           // User cancelled — not an error, just dismiss silently
           return;
         }
         if (isNetworkError(error)) {
-          Alert.alert(
+          platformAlert(
             'Network error',
             'Please check your internet connection and try again.'
           );
           return;
         }
-        Alert.alert(
+        platformAlert(
           'Purchase failed',
           'Something unexpected happened with your purchase. Please try again.'
         );
@@ -661,7 +661,7 @@ export default function SubscriptionScreen() {
     try {
       await restore.mutateAsync();
     } catch {
-      Alert.alert(
+      platformAlert(
         'Restore failed',
         'Could not restore purchases. Please try again.'
       );
@@ -710,9 +710,9 @@ export default function SubscriptionScreen() {
 
     if (confirmed) {
       await refetchUsage();
-      Alert.alert('Restored', 'Your subscription has been restored.');
+      platformAlert('Restored', 'Your subscription has been restored.');
     } else {
-      Alert.alert(
+      platformAlert(
         'No subscriptions found',
         'We could not find any previous purchases to restore.',
         [
@@ -748,7 +748,7 @@ export default function SubscriptionScreen() {
       await openSubscriptionManagement();
     } catch {
       // BUG-400: Provide retry + fallback URL so the user isn't stuck.
-      Alert.alert(
+      platformAlert(
         'Could not open subscription management',
         `You can manage your subscription directly at:\n${url}`,
         [
@@ -776,7 +776,7 @@ export default function SubscriptionScreen() {
 
     // If offerings failed to load, give a retry path
     if (offeringsError || !offerings) {
-      Alert.alert(
+      platformAlert(
         'Connection error',
         "Couldn't load purchase options. Check your connection and try again.",
         [
@@ -802,7 +802,7 @@ export default function SubscriptionScreen() {
     );
 
     if (!topUpPkg) {
-      Alert.alert(
+      platformAlert(
         'Not available',
         "Top-up credits aren't available right now. Try again later or contact support.",
         [
@@ -828,13 +828,13 @@ export default function SubscriptionScreen() {
       setTopUpPurchasing(false);
       if (isPurchaseCancelledError(error)) return;
       if (isNetworkError(error)) {
-        Alert.alert(
+        platformAlert(
           'Network error',
           'Please check your internet connection and try again.'
         );
         return;
       }
-      Alert.alert(
+      platformAlert(
         'Purchase failed',
         'Something unexpected happened with your purchase. Please try again.'
       );
@@ -892,18 +892,20 @@ export default function SubscriptionScreen() {
     setTopUpPolling(false);
 
     if (confirmed) {
-      Alert.alert('Top-up', '500 additional credits have been added!');
+      platformAlert('Top-up', '500 additional credits have been added!');
     } else {
-      Alert.alert(
+      platformAlert(
         'Purchase confirmed',
         'Your 500 credits are being added. They usually appear within a minute \u2014 pull down to refresh your usage.',
         [{ text: 'OK' }]
       );
     }
   }, [
+    client,
     offerings,
     offeringsLoading,
     offeringsError,
+    purchase,
     refetchOfferings,
     usage,
     queryClient,
@@ -917,7 +919,7 @@ export default function SubscriptionScreen() {
         'mailto:support@mentomate.app?subject=Subscription%20Help'
       );
     } catch {
-      Alert.alert(
+      platformAlert(
         'Contact support',
         'Email support@mentomate.app for help with subscriptions.'
       );
@@ -935,9 +937,9 @@ export default function SubscriptionScreen() {
       void SecureStore.setItemAsync(BYOK_JOINED_KEY, 'true').catch(
         () => undefined
       );
-      Alert.alert('Waitlist', 'You have been added to the BYOK waitlist.');
+      platformAlert('Waitlist', 'You have been added to the BYOK waitlist.');
     } catch {
-      Alert.alert('Error', 'Could not join waitlist. Try again.');
+      platformAlert('Error', 'Could not join waitlist. Try again.');
     }
   }, [byokWaitlist]);
 
@@ -1067,22 +1069,37 @@ export default function SubscriptionScreen() {
                 {cancelAtPeriodEnd
                   ? `Access until ${new Date(
                       subscription.currentPeriodEnd
-                    ).toLocaleDateString()}`
+                    ).toLocaleDateString(undefined, {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                    })}`
                   : `Renews ${new Date(
                       subscription.currentPeriodEnd
-                    ).toLocaleDateString()}`}
+                    ).toLocaleDateString(undefined, {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                    })}`}
               </Text>
             )}
             {!isPaidTier && (
               <Pressable
                 onPress={() => {
-                  if (availablePackages.length > 0) {
-                    // BUG-403: Scroll to the offerings section
-                    scrollViewRef.current?.scrollTo({
-                      y: offeringsYRef.current,
-                      animated: true,
-                    });
-                  } else {
+                  // BUG-403: Scroll to the offerings section.
+                  // BUG-[NOTION-3468bce9]: Always scroll — the Plans section
+                  // renders a static tier comparison when RevenueCat offerings
+                  // are unavailable (e.g. Expo Web, store-publishing blocked),
+                  // so the ref target exists regardless of availablePackages.
+                  // Without this the button was a silent no-op on web.
+                  scrollViewRef.current?.scrollTo({
+                    y: offeringsYRef.current,
+                    animated: true,
+                  });
+                  // Background retry if offerings failed to load — the user
+                  // is now looking at the Plans section; a fresh fetch can
+                  // swap in real packages without a second button press.
+                  if (availablePackages.length === 0 && !offeringsLoading) {
                     void refetchOfferings();
                   }
                 }}
@@ -1107,8 +1124,11 @@ export default function SubscriptionScreen() {
               <Text className="text-caption text-text-secondary mt-0.5">
                 Your subscription has been cancelled. You can continue using all
                 features until{' '}
-                {new Date(subscription.currentPeriodEnd).toLocaleDateString()}.
-                After that, your account will revert to the Free tier.
+                {new Date(subscription.currentPeriodEnd).toLocaleDateString(
+                  undefined,
+                  { year: 'numeric', month: 'long', day: 'numeric' }
+                )}
+                . After that, your account will revert to the Free tier.
               </Text>
             </View>
           )}
@@ -1140,7 +1160,12 @@ export default function SubscriptionScreen() {
                   </Text>
                 )}
                 <Text className="text-caption text-text-secondary mt-1">
-                  Resets {new Date(usage.cycleResetAt).toLocaleDateString()}
+                  Resets{' '}
+                  {new Date(usage.cycleResetAt).toLocaleDateString(undefined, {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                  })}
                 </Text>
               </View>
               {/* BUG-395: Show daily quota for free-tier users */}

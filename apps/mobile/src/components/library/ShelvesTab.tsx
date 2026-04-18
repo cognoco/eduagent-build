@@ -207,9 +207,12 @@ export function ShelvesTab({
     item: ShelfItem;
   }): React.ReactElement => {
     const { subject, progress } = item;
+    // BUG-[NOTION-3468bce9]: Library shows `topicsCompleted` (learning content
+    // finished) while Progress shows `mastered` (retention-verified). Same
+    // "X/Y topics" string hid the semantic difference. Labelled explicitly.
     const progressLabel =
       progress && progress.topicsTotal > 0
-        ? `${progress.topicsCompleted}/${progress.topicsTotal} topics`
+        ? `${progress.topicsCompleted}/${progress.topicsTotal} topics completed`
         : 'Shelf ready to explore';
     const reviewLabel =
       item.reviewDueCount && item.reviewDueCount > 0
@@ -220,6 +223,12 @@ export function ShelvesTab({
       <Pressable
         onPress={() => onShelfPress(subject.id)}
         className="bg-surface rounded-card px-4 py-4 mb-3"
+        accessibilityRole="button"
+        accessibilityLabel={`${subject.name}. ${
+          subject.status !== 'active'
+            ? `${subject.status === 'paused' ? 'Paused' : 'Archived'}. `
+            : ''
+        }${progressLabel}.`}
         testID={`subject-card-${subject.id}`}
       >
         <View className="flex-row items-start justify-between">

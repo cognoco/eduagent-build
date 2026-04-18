@@ -30,7 +30,7 @@ interface DeleteMemoryInput extends DeleteMemoryItemInput {
 }
 
 interface GrantConsentInput {
-  childProfileId: string;
+  childProfileId?: string;
   consent: 'granted' | 'declined';
 }
 
@@ -234,19 +234,24 @@ export function useGrantMemoryConsent(): UseMutationResult<
 > {
   const client = useApiClient();
   const qc = useQueryClient();
+  const { activeProfile } = useProfile();
 
   return useMutation({
     mutationFn: async (input) => {
-      const res = await client['learner-profile'][':profileId'].consent.$post({
-        param: { profileId: input.childProfileId },
-        json: { consent: input.consent },
-      });
+      const res = input.childProfileId
+        ? await client['learner-profile'][':profileId'].consent.$post({
+            param: { profileId: input.childProfileId },
+            json: { consent: input.consent },
+          })
+        : await client['learner-profile'].consent.$post({
+            json: { consent: input.consent },
+          });
       await assertOk(res);
       return (await res.json()) as { success: boolean };
     },
     onSuccess: async (_, vars) => {
       await qc.invalidateQueries({
-        queryKey: learnerProfileKey(vars.childProfileId),
+        queryKey: learnerProfileKey(vars.childProfileId ?? activeProfile?.id),
       });
     },
   });

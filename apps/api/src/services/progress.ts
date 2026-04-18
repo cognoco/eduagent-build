@@ -620,10 +620,18 @@ export async function getContinueSuggestion(
     );
 
     if (nextTopic) {
-      // Use pre-fetched resumable sessions instead of per-subject query
-      const resumable = (resumableBySubject.get(subject.id) ?? []).sort(
-        (a, b) => b.lastActivityAt.getTime() - a.lastActivityAt.getTime()
-      );
+      // [F-001] lastSessionId MUST match nextTopic.id — otherwise the client
+      // navigates to nextTopic but with a sessionId that belongs to a
+      // different topic, causing the session handler to either refuse the
+      // mismatch or append events to the wrong `learning_sessions` row.
+      // Previous behavior took the most-recent resumable session across the
+      // whole subject regardless of topic; that's the mismatch described in
+      // F-001 of the 2026-04-18 end-user test report.
+      const resumable = (resumableBySubject.get(subject.id) ?? [])
+        .filter((session) => session.topicId === nextTopic.id)
+        .sort(
+          (a, b) => b.lastActivityAt.getTime() - a.lastActivityAt.getTime()
+        );
       const lastSession = resumable[0];
 
       return {

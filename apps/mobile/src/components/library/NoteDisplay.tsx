@@ -56,6 +56,7 @@ export function NoteDisplay({
             testID="note-edit-button"
             onPress={onEdit}
             className="p-1"
+            accessibilityRole="button"
             accessibilityLabel="Edit note"
           >
             <Ionicons name="pencil" size={18} color={themeColors.primary} />
@@ -64,6 +65,7 @@ export function NoteDisplay({
             testID="note-delete-button"
             onPress={onDelete}
             className="p-1"
+            accessibilityRole="button"
             accessibilityLabel="Delete note"
           >
             <Ionicons

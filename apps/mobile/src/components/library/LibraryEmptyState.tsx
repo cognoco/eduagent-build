@@ -28,6 +28,8 @@ export function LibraryEmptyState(
         <Pressable
           onPress={props.onClear}
           className="bg-surface-elevated rounded-button px-5 py-3 items-center"
+          accessibilityRole="button"
+          accessibilityLabel={props.clearLabel ?? 'Clear search'}
           testID="library-clear-search"
         >
           <Text className="text-body font-semibold text-primary">
@@ -49,6 +51,8 @@ export function LibraryEmptyState(
       <Pressable
         onPress={props.onAddSubject}
         className="bg-primary rounded-button px-5 py-3 items-center"
+        accessibilityRole="button"
+        accessibilityLabel="Add Subject"
         testID="library-add-subject-empty"
       >
         <Text className="text-body font-semibold text-text-inverse">

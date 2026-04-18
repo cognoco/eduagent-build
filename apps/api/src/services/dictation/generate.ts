@@ -15,36 +15,48 @@ import { extractJsonObject } from '../quiz';
 // ---------------------------------------------------------------------------
 
 export interface GenerateContext {
-  /** Recent topic names from the learner's study history (used for thematic context). */
-  recentTopics: string[];
   /** ISO 639-1 language code — the language to write the dictation in. */
   nativeLanguage: string;
-  /** Learner's age in years — used to calibrate sentence length and vocabulary. */
+  /** Learner's age in years — used to calibrate sentence length, vocabulary, and literary themes. */
   ageYears: number;
 }
 
-function buildGeneratePrompt(ctx: GenerateContext): string {
-  const topicList =
-    ctx.recentTopics.slice(0, 3).join(', ') || 'general knowledge';
+function getLiteraryTheme(ageYears: number): string {
+  if (ageYears <= 7) {
+    return `Draw from fairy tales, fables, and simple picture book stories — animals talking, magical adventures, friendship and kindness. Think Brothers Grimm, Aesop, or classic picture books.`;
+  }
+  if (ageYears <= 10) {
+    return `Draw from classic children's stories and adventure tales — exploring forests, brave young heroes, mysteries to solve, magical worlds. Think Narnia, Roald Dahl, or Astrid Lindgren.`;
+  }
+  if (ageYears <= 13) {
+    return `Draw from children's novels and chapter books — school adventures, fantasy quests, historical stories, nature and discovery. Think Harry Potter, Percy Jackson, or Jules Verne.`;
+  }
+  return `Draw from classic and contemporary literature — novels, short stories, literary fiction. Think Hemingway, Kafka, Čapek, or contemporary bestsellers. Use adult-level vocabulary and sentence structure.`;
+}
 
+export function buildGeneratePrompt(ctx: GenerateContext): string {
   const punctuationNames = getPunctuationNames(ctx.nativeLanguage);
+  const literaryTheme = getLiteraryTheme(ctx.ageYears);
 
-  return `You are a dictation content generator for a ${
-    ctx.ageYears
-  }-year-old child.
+  return `You are a dictation content generator for a ${ctx.ageYears}-year-old${
+    ctx.ageYears >= 14 ? ' person' : ' child'
+  }.
 
 LANGUAGE: Write the dictation in ${ctx.nativeLanguage} (ISO 639-1 code).
 
-THEME: Base the dictation on one of these recent study topics: ${topicList}. Choose the most interesting one. The topic provides flavor — the linguistic quality of the sentences matters more than the factual content.
+THEME: Write sentences inspired by age-appropriate literature and stories.
+${literaryTheme}
+Write sentences that feel like they come from a story — natural prose with vivid imagery.
+Do NOT use geographical, scientific, or encyclopaedia-style factual content.
 
 CONSTRAINTS:
-- 6-12 sentences total (aim for ~3 minutes of writing time at a slow pace)
+- 6-10 sentences total
 - Sentence length: ${
     ctx.ageYears <= 8
-      ? '6-10 words'
+      ? '4-7 words (short phrases a child can hold in memory)'
       : ctx.ageYears <= 12
-      ? '8-15 words'
-      : '10-20 words'
+      ? '5-10 words'
+      : '7-14 words'
   }
 - Target age-appropriate spelling patterns and vocabulary
 - Punctuation: commas and periods always. Question marks occasionally.${
@@ -59,13 +71,29 @@ ${punctuationNames}
 
 Count the words in each sentence (original text, not the punctuation variant).
 
+CHUNKING FOR DICTATION PLAYBACK:
+Split each sentence into natural spoken chunks for dictation. The child hears one chunk, writes it, then hears the next.
+- Short sentences (up to 4 words including any trailing punctuation): return as a SINGLE chunk. Do not split.
+- Longer sentences: break at natural phrase boundaries — clause edges, prepositional phrases, relative clauses. Think about where a teacher would naturally pause when dictating.
+  Example: "A black cat that I usually see out of window is not there today." →
+    chunks: ["A black cat", "that I usually see out of window", "is not there today."]
+- Never break inside a noun phrase, verb phrase, or prepositional phrase.
+- Each chunk should carry a complete thought fragment that a child can hold in working memory.
+- Produce matching "chunksWithPunctuation" where punctuation in each chunk is replaced with spoken words (same rules as withPunctuation).
+
 RESPOND WITH ONLY valid JSON:
 {
   "sentences": [
-    { "text": "original sentence.", "withPunctuation": "original sentence tečka", "wordCount": 2 }
+    {
+      "text": "original sentence.",
+      "withPunctuation": "original sentence tečka",
+      "wordCount": 2,
+      "chunks": ["original sentence."],
+      "chunksWithPunctuation": ["original sentence tečka"]
+    }
   ],
   "title": "Short title for this dictation",
-  "topic": "The topic you chose",
+  "topic": "The literary theme you chose",
   "language": "${ctx.nativeLanguage}"
 }`;
 }

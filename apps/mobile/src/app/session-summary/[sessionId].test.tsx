@@ -5,7 +5,7 @@ import {
   waitFor,
 } from '@testing-library/react-native';
 import React from 'react';
-import { Alert } from 'react-native';
+import { platformAlert } from '../../lib/platform-alert';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const mockReplace = jest.fn();
@@ -107,6 +107,10 @@ jest.mock('../../lib/sentry', () => ({
   },
 }));
 
+jest.mock('../../lib/platform-alert', () => ({
+  platformAlert: jest.fn(),
+}));
+
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false, gcTime: 0 } },
 });
@@ -122,7 +126,7 @@ const SessionSummaryScreen = require('./[sessionId]').default;
 describe('SessionSummaryScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    (platformAlert as jest.Mock).mockClear();
     mockSubmitIsError = false;
     mockSubmitError = null;
     mockSkipMutateAsync.mockResolvedValue({
@@ -328,7 +332,7 @@ describe('SessionSummaryScreen', () => {
     fireEvent.press(screen.getByTestId('skip-summary-button'));
 
     await waitFor(() => {
-      expect(Alert.alert).toHaveBeenCalledWith(
+      expect(platformAlert).toHaveBeenCalledWith(
         'Try Casual Explorer?',
         'You can keep learning without writing a summary each time. Switch now?',
         expect.arrayContaining([
@@ -339,7 +343,7 @@ describe('SessionSummaryScreen', () => {
     });
     expect(mockReplace).not.toHaveBeenCalled();
 
-    const promptButtons = (Alert.alert as jest.Mock).mock.calls[0]?.[2] as
+    const promptButtons = (platformAlert as jest.Mock).mock.calls[0]?.[2] as
       | Array<{ text?: string; onPress?: () => void }>
       | undefined;
     const switchButton = promptButtons?.find(

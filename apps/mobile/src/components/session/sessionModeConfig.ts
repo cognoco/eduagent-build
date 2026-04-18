@@ -35,6 +35,24 @@ export const SESSION_MODE_CONFIGS: Record<string, SessionModeConfig> = {
     showTimer: false,
     showQuestionCount: false,
   },
+  relearn: {
+    title: 'Relearn',
+    subtitle: 'A fresh angle on this topic',
+    placeholder: 'Type a message...',
+    openingMessage:
+      "Let's approach this one differently. What felt unclear last time?",
+    showTimer: false,
+    showQuestionCount: false,
+  },
+  review: {
+    title: 'Review',
+    subtitle: 'Refresh what you know',
+    placeholder: 'Your answer...',
+    openingMessage:
+      'Quick refresh — tell me the core idea from this topic in your own words.',
+    showTimer: true,
+    showQuestionCount: false,
+  },
   recitation: {
     title: 'Recitation (Beta)',
     subtitle: 'Recite from memory',

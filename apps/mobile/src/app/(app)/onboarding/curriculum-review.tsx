@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '../../../lib/theme';
 import { goBackOrReplace } from '../../../lib/navigation';
+import { OnboardingStepIndicator } from '../../../components/onboarding/OnboardingStepIndicator';
 import {
   useCurriculum,
   useSkipTopic,
@@ -45,10 +46,26 @@ const RELEVANCE_LABEL: Record<string, string> = {
 };
 
 export default function CurriculumScreen() {
-  const { subjectId } = useLocalSearchParams<{ subjectId: string }>();
+  const {
+    subjectId,
+    subjectName,
+    languageCode,
+    languageName,
+    step: stepParam,
+    totalSteps: totalStepsParam,
+  } = useLocalSearchParams<{
+    subjectId?: string;
+    subjectName?: string;
+    languageCode?: string;
+    languageName?: string;
+    step?: string;
+    totalSteps?: string;
+  }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
+  const step = Number(stepParam) || 4;
+  const totalSteps = Number(totalStepsParam) || 4;
   const {
     data: curriculum,
     isLoading,
@@ -74,6 +91,28 @@ export default function CurriculumScreen() {
   const [explainingTopicId, setExplainingTopicId] = useState<string | null>(
     null
   );
+
+  const handleBack = useCallback(() => {
+    goBackOrReplace(router, {
+      pathname: '/(app)/onboarding/accommodations',
+      params: {
+        subjectId: subjectId ?? '',
+        subjectName: subjectName ?? '',
+        languageCode: languageCode ?? '',
+        languageName: languageName ?? '',
+        step: String(Math.max(step - 1, 3)),
+        totalSteps: String(totalSteps),
+      },
+    });
+  }, [
+    languageCode,
+    languageName,
+    router,
+    step,
+    subjectId,
+    subjectName,
+    totalSteps,
+  ]);
 
   if (!subjectId) {
     return (
@@ -187,30 +226,32 @@ export default function CurriculumScreen() {
     !!curriculum &&
     curriculum.topics.length > 0 &&
     skippedTopicCount / curriculum.topics.length > 0.8;
-
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
       {/* Header */}
-      <View className="px-5 pt-4 pb-3 flex-row items-center justify-between">
-        <Pressable
-          onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
-          className="me-3 p-2 min-h-[44px] min-w-[44px] items-center justify-center"
-          testID="curriculum-back"
-        >
-          <Text className="text-primary text-h3">&larr;</Text>
-        </Pressable>
-        <Text className="text-h2 font-bold text-text-primary flex-1">
-          Your Curriculum
-        </Text>
-        <Pressable
-          onPress={() => setShowChallengeModal(true)}
-          className="bg-surface-elevated rounded-button px-3 py-1.5 min-h-[44px] items-center justify-center"
-          testID="challenge-button"
-        >
-          <Text className="text-body-sm text-primary font-semibold">
-            Suggest changes
+      <View className="px-5 pt-4 pb-3">
+        <View className="flex-row items-center justify-between">
+          <Pressable
+            onPress={handleBack}
+            className="me-3 p-2 min-h-[44px] min-w-[44px] items-center justify-center"
+            testID="curriculum-back"
+          >
+            <Text className="text-primary text-h3">&larr;</Text>
+          </Pressable>
+          <Text className="text-h2 font-bold text-text-primary flex-1">
+            Your Curriculum
           </Text>
-        </Pressable>
+          <Pressable
+            onPress={() => setShowChallengeModal(true)}
+            className="bg-surface-elevated rounded-button px-3 py-1.5 min-h-[44px] items-center justify-center"
+            testID="challenge-button"
+          >
+            <Text className="text-body-sm text-primary font-semibold">
+              Suggest changes
+            </Text>
+          </Pressable>
+        </View>
+        <OnboardingStepIndicator step={step} totalSteps={totalSteps} />
       </View>
 
       {isLoading ? (

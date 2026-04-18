@@ -45,7 +45,6 @@ describe('generateDictation', () => {
     });
 
     const result = await generateDictation({
-      recentTopics: ['volcanoes', 'earth science'],
       nativeLanguage: 'cs',
       ageYears: 10,
     });
@@ -66,7 +65,6 @@ describe('generateDictation', () => {
 
     await expect(
       generateDictation({
-        recentTopics: ['math'],
         nativeLanguage: 'en',
         ageYears: 8,
       })
@@ -83,7 +81,6 @@ describe('generateDictation', () => {
 
     await expect(
       generateDictation({
-        recentTopics: ['science'],
         nativeLanguage: 'en',
         ageYears: 9,
       })
@@ -111,25 +108,24 @@ describe('generateDictation', () => {
 
     await expect(
       generateDictation({
-        recentTopics: ['greetings'],
         nativeLanguage: 'en',
         ageYears: 8,
       })
     ).rejects.toThrow();
   });
 
-  it('uses general knowledge when recentTopics is empty', async () => {
+  it('uses age-appropriate literary themes in the prompt', async () => {
     mockRouteAndCall.mockResolvedValueOnce({
       response: JSON.stringify({
         sentences: [
           {
-            text: 'The sun is bright.',
-            withPunctuation: 'The sun is bright period',
-            wordCount: 4,
+            text: 'The brave knight rode on.',
+            withPunctuation: 'The brave knight rode on period',
+            wordCount: 5,
           },
         ],
-        title: 'General Knowledge',
-        topic: 'general knowledge',
+        title: 'The Brave Knight',
+        topic: 'adventure tales',
         language: 'en',
       }),
       provider: 'gemini',
@@ -138,7 +134,6 @@ describe('generateDictation', () => {
     });
 
     const result = await generateDictation({
-      recentTopics: [],
       nativeLanguage: 'en',
       ageYears: 10,
     });
@@ -146,10 +141,42 @@ describe('generateDictation', () => {
     expect(result.sentences).toHaveLength(1);
     expect(result.language).toBe('en');
 
-    // Verify the LLM was called — the prompt should contain "general knowledge"
     const callArgs = mockRouteAndCall.mock.calls[0];
     const systemContent = callArgs[0][0].content as string;
-    expect(systemContent).toContain('general knowledge');
+    expect(systemContent).toContain('children');
+    expect(systemContent).toContain('stories');
+    expect(systemContent).toContain('Do NOT use geographical');
+  });
+
+  it('uses adult literature themes for learners 14+', async () => {
+    mockRouteAndCall.mockResolvedValueOnce({
+      response: JSON.stringify({
+        sentences: [
+          {
+            text: 'The old man stared at the sea.',
+            withPunctuation: 'The old man stared at the sea period',
+            wordCount: 7,
+          },
+        ],
+        title: 'By the Shore',
+        topic: 'literary fiction',
+        language: 'en',
+      }),
+      provider: 'gemini',
+      model: 'gemini-2.5-flash',
+      latencyMs: 80,
+    });
+
+    await generateDictation({
+      nativeLanguage: 'en',
+      ageYears: 16,
+    });
+
+    const callArgs = mockRouteAndCall.mock.calls[0];
+    const systemContent = callArgs[0][0].content as string;
+    expect(systemContent).toContain('contemporary literature');
+    expect(systemContent).toContain('person');
+    expect(systemContent).not.toContain('fairy tales');
   });
 
   it('includes Norwegian punctuation names in the prompt for nb language [RF-06]', async () => {
@@ -172,7 +199,6 @@ describe('generateDictation', () => {
     });
 
     await generateDictation({
-      recentTopics: ['nature'],
       nativeLanguage: 'nb',
       ageYears: 10,
     });
@@ -205,7 +231,6 @@ describe('generateDictation', () => {
     });
 
     await generateDictation({
-      recentTopics: ['animals'],
       nativeLanguage: 'fr',
       ageYears: 11,
     });

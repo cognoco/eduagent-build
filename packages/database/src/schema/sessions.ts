@@ -171,6 +171,7 @@ export const sessionSummaries = pgTable('session_summaries', {
   }),
   content: text('content'),
   aiFeedback: text('ai_feedback'),
+  highlight: text('highlight'),
   status: summaryStatusEnum('status').notNull().default('pending'),
   createdAt: timestamp('created_at', { withTimezone: true })
     .notNull()

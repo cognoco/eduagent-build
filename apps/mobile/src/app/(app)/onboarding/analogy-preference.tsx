@@ -3,14 +3,27 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AnalogyDomainPicker } from '../../../components/common';
+import { OnboardingStepIndicator } from '../../../components/onboarding/OnboardingStepIndicator';
 import { useUpdateAnalogyDomain } from '../../../hooks/use-settings';
 import type { AnalogyDomain } from '@eduagent/schemas';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 
 export default function AnalogyPreferenceScreen() {
   const router = useRouter();
-  const { subjectId } = useLocalSearchParams<{ subjectId: string }>();
+  const {
+    subjectId,
+    subjectName,
+    step: stepParam,
+    totalSteps: totalStepsParam,
+  } = useLocalSearchParams<{
+    subjectId?: string;
+    subjectName?: string;
+    step?: string;
+    totalSteps?: string;
+  }>();
   const insets = useSafeAreaInsets();
+  const step = Number(stepParam) || 2;
+  const totalSteps = Number(totalStepsParam) || 4;
   const [selectedDomain, setSelectedDomain] = useState<AnalogyDomain | null>(
     null
   );
@@ -22,7 +35,7 @@ export default function AnalogyPreferenceScreen() {
     if (selectedDomain) {
       updateAnalogyDomain(selectedDomain, {
         onSuccess: () => {
-          navigateToCurriculum();
+          navigateToAccommodations();
         },
         onError: (err) => {
           Alert.alert(
@@ -35,20 +48,37 @@ export default function AnalogyPreferenceScreen() {
         },
       });
     } else {
-      navigateToCurriculum();
+      navigateToAccommodations();
     }
   };
 
   const handleSkip = (): void => {
-    navigateToCurriculum();
+    navigateToAccommodations();
   };
 
-  const navigateToCurriculum = (): void => {
+  const navigateToAccommodations = useCallback((): void => {
     router.replace({
-      pathname: '/(app)/onboarding/curriculum-review',
-      params: { subjectId },
+      pathname: '/(app)/onboarding/accommodations',
+      params: {
+        subjectId,
+        subjectName: subjectName ?? '',
+        step: String(Math.min(step + 1, totalSteps)),
+        totalSteps: String(totalSteps),
+      },
     } as never);
-  };
+  }, [router, step, subjectId, subjectName, totalSteps]);
+
+  const handleBack = useCallback(() => {
+    goBackOrReplace(router, {
+      pathname: '/(app)/onboarding/interview',
+      params: {
+        subjectId: subjectId ?? '',
+        subjectName: subjectName ?? '',
+        step: '1',
+        totalSteps: String(totalSteps),
+      },
+    });
+  }, [router, subjectId, subjectName, totalSteps]);
 
   if (!subjectId) {
     return (
@@ -74,7 +104,7 @@ export default function AnalogyPreferenceScreen() {
       {/* Header */}
       <View className="px-5 pt-4 pb-3">
         <Pressable
-          onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
+          onPress={handleBack}
           className="mb-3 min-w-[44px] min-h-[44px] justify-center self-start"
           accessibilityLabel="Go back"
           accessibilityRole="button"
@@ -82,6 +112,7 @@ export default function AnalogyPreferenceScreen() {
         >
           <Text className="text-primary text-body font-semibold">Back</Text>
         </Pressable>
+        <OnboardingStepIndicator step={step} totalSteps={totalSteps} />
         <Text
           className="text-h2 font-bold text-text-primary"
           testID="analogy-preference-title"

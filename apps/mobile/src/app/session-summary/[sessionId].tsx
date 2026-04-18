@@ -7,7 +7,6 @@ import {
   TextInput,
   KeyboardAvoidingView,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -24,6 +23,7 @@ import {
   useRecallBridge,
 } from '../../hooks/use-sessions';
 import { goBackOrReplace } from '../../lib/navigation';
+import { platformAlert } from '../../lib/platform-alert';
 import { Sentry } from '../../lib/sentry';
 import {
   CheckmarkPopAnimation,
@@ -195,6 +195,32 @@ export default function SessionSummaryScreen() {
     );
   }
 
+  // [F-025] Catch-all for non-404 errors (e.g. 400 from a garbage session ID,
+  // 500 from a server error). The original guard only covered 404.
+  if (transcript.isError) {
+    return (
+      <View className="flex-1 bg-background items-center justify-center px-6">
+        <Text className="text-h3 font-semibold text-text-primary text-center mb-3">
+          Session not found
+        </Text>
+        <Text className="text-body text-text-secondary text-center mb-6">
+          We couldn&apos;t load this session. It may no longer exist.
+        </Text>
+        <Pressable
+          onPress={() => router.replace('/(app)/home')}
+          className="bg-primary rounded-button py-3 px-8 items-center"
+          testID="session-not-found-go-home"
+          accessibilityLabel="Go home"
+          accessibilityRole="button"
+        >
+          <Text className="text-text-inverse text-body font-semibold">
+            Go Home
+          </Text>
+        </Pressable>
+      </View>
+    );
+  }
+
   if (
     !exchangeCount &&
     !wallClockSeconds &&
@@ -207,6 +233,38 @@ export default function SessionSummaryScreen() {
         <Text className="text-text-secondary text-body text-center mt-3">
           Loading your session summary...
         </Text>
+      </View>
+    );
+  }
+
+  // [F-025] If loading is done but we have no real data from either URL params
+  // or the transcript query, this is a deep-link to a bogus session ID.
+  // Guard against rendering phantom "1 minute" / "0 exchanges" summaries.
+  if (
+    !transcript.isLoading &&
+    !transcript.data &&
+    !exchangeCount &&
+    !wallClockSeconds
+  ) {
+    return (
+      <View className="flex-1 bg-background items-center justify-center px-6">
+        <Text className="text-h3 font-semibold text-text-primary text-center mb-3">
+          Session not found
+        </Text>
+        <Text className="text-body text-text-secondary text-center mb-6">
+          This session could not be loaded. Head home to start a new one.
+        </Text>
+        <Pressable
+          onPress={() => router.replace('/(app)/home')}
+          className="bg-primary rounded-button py-3 px-8 items-center"
+          testID="session-not-found-go-home"
+          accessibilityLabel="Go home"
+          accessibilityRole="button"
+        >
+          <Text className="text-text-inverse text-body font-semibold">
+            Go Home
+          </Text>
+        </Pressable>
       </View>
     );
   }
@@ -242,7 +300,7 @@ export default function SessionSummaryScreen() {
     } catch (err) {
       // Error state surfaced by submitSummary.isError inline in JSX [SC-1]
       console.error('[SessionSummary] handleSubmit failed:', err);
-      Alert.alert(
+      platformAlert(
         'Could not save',
         'Your reflection could not be saved. Please try again.'
       );
@@ -269,7 +327,7 @@ export default function SessionSummaryScreen() {
       } catch {
         skipInFlight.current = false;
         // S-3: Surface skip failures — bare catch { return } was silent.
-        Alert.alert('Could not skip', 'Please try again.');
+        platformAlert('Could not skip', 'Please try again.');
         return;
       }
       skipInFlight.current = false;
@@ -301,7 +359,7 @@ export default function SessionSummaryScreen() {
         skipResult?.shouldWarnSummarySkip &&
         !skipResult?.shouldPromptCasualSwitch
       ) {
-        Alert.alert(
+        platformAlert(
           'Summaries help you learn',
           'Writing a quick summary after each session strengthens your memory. Try it next time!',
           [
@@ -320,7 +378,7 @@ export default function SessionSummaryScreen() {
       }
 
       if (skipResult?.shouldPromptCasualSwitch) {
-        Alert.alert(
+        platformAlert(
           'Try Casual Explorer?',
           'You can keep learning without writing a summary each time. Switch now?',
           [
@@ -343,7 +401,7 @@ export default function SessionSummaryScreen() {
                     await maybePromptForRecall();
                     goBackOrReplace(router, '/(app)/home');
                   } catch {
-                    Alert.alert(
+                    platformAlert(
                       "Couldn't switch right now",
                       'You can change your learning mode later in More.',
                       [

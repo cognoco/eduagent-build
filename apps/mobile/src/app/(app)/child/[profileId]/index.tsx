@@ -1,5 +1,7 @@
-import { View, Text, Pressable, ScrollView, Alert } from 'react-native';
+import { View, Text, Pressable, ScrollView } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { platformAlert } from '../../../../lib/platform-alert';
 import { useCallback, useMemo } from 'react';
 import type { AccommodationMode } from '@eduagent/schemas';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -34,6 +36,7 @@ import {
   useGrantMemoryConsent,
   useUpdateAccommodationMode,
 } from '../../../../hooks/use-learner-profile';
+import { ACCOMMODATION_OPTIONS } from '../../../../lib/accommodation-options';
 import { MemoryConsentPrompt } from '../../../../components/memory-consent-prompt';
 import { goBackOrReplace } from '../../../../lib/navigation';
 
@@ -105,34 +108,6 @@ function buildGrowthData(
 }
 
 const GRACE_PERIOD_DAYS = 7;
-
-const ACCOMMODATION_OPTIONS: {
-  mode: AccommodationMode;
-  title: string;
-  description: string;
-}[] = [
-  {
-    mode: 'none',
-    title: 'None',
-    description: 'Standard learning experience',
-  },
-  {
-    mode: 'short-burst',
-    title: 'Short-Burst',
-    description: 'Shorter explanations, frequent check-ins, small steps',
-  },
-  {
-    mode: 'audio-first',
-    title: 'Audio-First',
-    description:
-      'Spoken-style explanations, simple sentences, phonetic support',
-  },
-  {
-    mode: 'predictable',
-    title: 'Predictable',
-    description: 'Clear structure, explicit transitions, concrete examples',
-  },
-];
 
 function getGracePeriodDaysRemaining(respondedAt: string | null): number {
   if (!respondedAt) return GRACE_PERIOD_DAYS;
@@ -215,7 +190,7 @@ export default function ChildDetailScreen() {
 
   const handleWithdrawConsent = useCallback(() => {
     const childName = child?.displayName ?? 'this child';
-    Alert.alert(
+    platformAlert(
       `Withdraw consent for ${childName}?`,
       `${childName}'s account and all learning data will be deleted after a 7-day grace period.\n\nYou can reverse this within 7 days.`,
       [
@@ -227,7 +202,7 @@ export default function ChildDetailScreen() {
             try {
               await revokeConsent.mutateAsync();
             } catch {
-              Alert.alert(
+              platformAlert(
                 'Error',
                 'Could not withdraw consent. Please try again.'
               );
@@ -242,7 +217,7 @@ export default function ChildDetailScreen() {
     try {
       await restoreConsent.mutateAsync();
     } catch {
-      Alert.alert('Error', 'Could not cancel deletion. Please try again.');
+      platformAlert('Error', 'Could not cancel deletion. Please try again.');
     }
   }, [restoreConsent]);
 
@@ -254,7 +229,7 @@ export default function ChildDetailScreen() {
         { childProfileId: profileId, accommodationMode: mode },
         {
           onError: () => {
-            Alert.alert('Could not save setting', 'Please try again.');
+            platformAlert('Could not save setting', 'Please try again.');
           },
         }
       );
@@ -367,6 +342,31 @@ export default function ChildDetailScreen() {
           )}
         </View>
       </View>
+
+      {/* Streak & XP stats */}
+      {child && (child.currentStreak > 0 || child.totalXp > 0) && (
+        <View
+          testID="streak-xp-stats"
+          className="mx-5 mt-3 flex-row items-center gap-4"
+        >
+          {child.currentStreak > 0 && (
+            <View className="flex-row items-center gap-1">
+              <Ionicons name="flame-outline" size={16} color="#f97316" />
+              <Text className="text-text-secondary text-sm">
+                {child.currentStreak}-day streak
+              </Text>
+            </View>
+          )}
+          {child.totalXp > 0 && (
+            <View className="flex-row items-center gap-1">
+              <Ionicons name="star-outline" size={16} color="#eab308" />
+              <Text className="text-text-secondary text-sm">
+                {child.totalXp} XP
+              </Text>
+            </View>
+          )}
+        </View>
+      )}
 
       <ScrollView
         className="flex-1 px-5"
@@ -595,6 +595,14 @@ export default function ChildDetailScreen() {
                   {session.displaySummary}
                 </Text>
               ) : null}
+              {session.highlight && (
+                <Text
+                  className="text-text-tertiary mt-0.5 text-xs"
+                  numberOfLines={2}
+                >
+                  {session.highlight}
+                </Text>
+              )}
               <View className="flex-row items-center">
                 <Text className="text-caption text-text-secondary me-4">
                   {session.exchangeCount} exchanges
@@ -608,9 +616,10 @@ export default function ChildDetailScreen() {
             </Pressable>
           ))
         ) : (
-          <View className="py-4 items-center">
-            <Text className="text-body text-text-secondary">
-              No sessions yet
+          <View className="mx-4 mt-4 rounded-xl bg-surface p-6">
+            <Text className="text-text-secondary text-center text-base">
+              No sessions yet. When {child?.displayName ?? 'your child'} starts
+              learning, you'll see what they work on here.
             </Text>
           </View>
         )}
@@ -631,7 +640,10 @@ export default function ChildDetailScreen() {
                       consent: 'granted',
                     });
                   } catch {
-                    Alert.alert('Could not enable memory', 'Please try again.');
+                    platformAlert(
+                      'Could not enable memory',
+                      'Please try again.'
+                    );
                   }
                 })()
               }
@@ -643,7 +655,7 @@ export default function ChildDetailScreen() {
                       consent: 'declined',
                     });
                   } catch {
-                    Alert.alert(
+                    platformAlert(
                       'Could not save preference',
                       'Please try again.'
                     );

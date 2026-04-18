@@ -1,10 +1,11 @@
 import React from 'react';
-import { Alert, ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
+import { platformAlert } from '../../../lib/platform-alert';
 import { useThemeColors } from '../../../lib/theme';
 import { useDictationData } from './_layout';
 import {
@@ -26,6 +27,46 @@ export default function DictationCompleteScreen(): React.ReactElement {
 
   const isReviewing = reviewMutation.isPending;
 
+  // [F-020] If a user lands on /dictation/complete via a deep link, back
+  // gesture, or browser refresh, `data` is null (context is stack-lifecycle
+  // scoped). Tapping "I'm done" in that case would POST /dictation/results
+  // with sentenceCount=0 — polluting the user's streak history with a fake
+  // entry. Mirror the existing `/dictation/review` guard: show an inline
+  // "session data not found" empty state with an explicit recovery path.
+  const hasValidSession = !!data && (data.sentences?.length ?? 0) > 0;
+  if (!hasValidSession) {
+    return (
+      <View
+        className="flex-1 bg-background items-center justify-center px-8"
+        style={{ paddingTop: insets.top, paddingBottom: insets.bottom + 24 }}
+        testID="dictation-complete-missing-data"
+      >
+        <Ionicons name="help-circle-outline" size={56} color={colors.muted} />
+        <Text
+          className="text-h3 font-semibold text-text-primary mt-4 text-center"
+          accessibilityRole="header"
+        >
+          No dictation to finish
+        </Text>
+        <Text className="text-body text-text-secondary mt-2 text-center">
+          Start a dictation first — your completion screen will appear here when
+          you&apos;ve finished one.
+        </Text>
+        <Pressable
+          onPress={() => router.replace('/(app)/dictation' as never)}
+          className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center mt-6"
+          accessibilityRole="button"
+          accessibilityLabel="Start a dictation"
+          testID="dictation-complete-missing-start"
+        >
+          <Text className="text-body font-semibold text-text-inverse">
+            Start a dictation
+          </Text>
+        </Pressable>
+      </View>
+    );
+  }
+
   const handleCheckWriting = async () => {
     // 1. Launch camera
     let uri: string | undefined;
@@ -45,9 +86,11 @@ export default function DictationCompleteScreen(): React.ReactElement {
       // only jpeg/png/webp, so normalize anything else to jpeg.
       assetMimeType = asset?.mimeType;
     } catch {
-      Alert.alert('Camera error', 'Could not open camera. Please try again.', [
-        { text: 'OK' },
-      ]);
+      platformAlert(
+        'Camera error',
+        'Could not open camera. Please try again.',
+        [{ text: 'OK' }]
+      );
       return;
     }
 
@@ -74,7 +117,7 @@ export default function DictationCompleteScreen(): React.ReactElement {
         imageMimeType = 'image/jpeg';
       }
     } catch {
-      Alert.alert(
+      platformAlert(
         'Photo error',
         'Could not read the photo. Please try again.',
         [{ text: 'OK' }]
@@ -102,7 +145,7 @@ export default function DictationCompleteScreen(): React.ReactElement {
     } catch (err) {
       const message =
         err instanceof Error ? err.message : 'Something went wrong.';
-      Alert.alert('Review failed', message, [
+      platformAlert('Review failed', message, [
         {
           text: 'Try again',
           onPress: () => void handleCheckWriting(),
@@ -135,7 +178,7 @@ export default function DictationCompleteScreen(): React.ReactElement {
         err instanceof Error && err.message
           ? err.message
           : 'We couldn\u2019t save your dictation result.';
-      Alert.alert('Couldn\u2019t save your result', message, [
+      platformAlert('Couldn\u2019t save your result', message, [
         {
           text: 'Retry',
           onPress: () => void handleDone(),

@@ -156,6 +156,13 @@ export default function QuizResultsScreen(): React.ReactElement {
             Done
           </Text>
         </Pressable>
+
+        <Pressable
+          testID="quiz-results-history"
+          onPress={() => router.push('/(app)/quiz/history')}
+        >
+          <Text className="text-primary mt-2">View History</Text>
+        </Pressable>
       </View>
     </View>
   );

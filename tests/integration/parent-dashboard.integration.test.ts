@@ -9,17 +9,14 @@
  * 2. GET /v1/dashboard — returns empty when no family links exist
  * 3. GET /v1/dashboard/children/:profileId — returns child detail
  * 4. GET /v1/dashboard/children/:profileId/sessions — returns child sessions
- * 5. GET /v1/dashboard/children/:profileId/sessions/:sessionId/transcript — returns transcript
+ * 5. GET /v1/dashboard/children/:profileId/sessions/:sessionId/transcript — returns 404 (removed)
+ * 8. GET /v1/dashboard/children/:profileId/memory — returns curated memory categories
+ * 9. GET /v1/dashboard/children/:profileId/sessions/:sessionId — returns session detail
  * 6. GET /v1/dashboard/demo — returns hardcoded demo data
  * 7. GET /v1/dashboard — 401 without auth
  */
 
-import {
-  familyLinks,
-  learningSessions,
-  sessionEvents,
-  subjects,
-} from '@eduagent/database';
+import { familyLinks, learningSessions, subjects } from '@eduagent/database';
 
 import { jwtMock, configureValidJWT, configureInvalidJWT } from './mocks';
 import {
@@ -148,25 +145,6 @@ async function seedSession(
     })
     .returning({ id: learningSessions.id });
   return row!.id;
-}
-
-async function seedSessionEvent(
-  sessionId: string,
-  profileId: string,
-  subjectId: string,
-  eventType: 'user_message' | 'ai_response',
-  content: string,
-  metadata: Record<string, unknown> = {}
-): Promise<void> {
-  const db = createIntegrationDb();
-  await db.insert(sessionEvents).values({
-    sessionId,
-    profileId,
-    subjectId,
-    eventType,
-    content,
-    metadata,
-  });
 }
 
 // ---------------------------------------------------------------------------
@@ -389,8 +367,12 @@ describe('Integration: GET /v1/dashboard/children/:profileId/sessions', () => {
   });
 });
 
-describe('Integration: GET /v1/dashboard/children/:profileId/sessions/:sessionId/transcript', () => {
-  it('returns 200 with transcript exchanges', async () => {
+// ---------------------------------------------------------------------------
+// Parent Visibility break tests [PV-BT1/BT2/FT1/FT2]
+// ---------------------------------------------------------------------------
+
+describe('Parent Visibility break tests', () => {
+  it('[PV-BT1] GET transcript returns 404', async () => {
     const parentProfileId = await createProfile(
       PARENT_USER_ID,
       PARENT_EMAIL,
@@ -416,23 +398,6 @@ describe('Integration: GET /v1/dashboard/children/:profileId/sessions/:sessionId
       exchangeCount: 2,
     });
 
-    // Seed transcript events
-    await seedSessionEvent(
-      sessionId,
-      childProfileId,
-      subjectId,
-      'user_message',
-      'How does photosynthesis work?'
-    );
-    await seedSessionEvent(
-      sessionId,
-      childProfileId,
-      subjectId,
-      'ai_response',
-      'Great question! Photosynthesis is the process plants use to convert sunlight into energy.',
-      { escalationRung: 1 }
-    );
-
     configureValidJWT(jwt, { sub: PARENT_USER_ID, email: PARENT_EMAIL });
     const res = await app.request(
       `/v1/dashboard/children/${childProfileId}/sessions/${sessionId}/transcript`,
@@ -440,18 +405,37 @@ describe('Integration: GET /v1/dashboard/children/:profileId/sessions/:sessionId
       TEST_ENV
     );
 
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.transcript).toBeDefined();
-    expect(body.transcript.session.sessionId).toBe(sessionId);
-    expect(body.transcript.exchanges).toHaveLength(2);
-    expect(body.transcript.exchanges[0].role).toBe('user');
-    expect(body.transcript.exchanges[0].content).toContain('photosynthesis');
-    expect(body.transcript.exchanges[1].role).toBe('assistant');
-    expect(body.transcript.exchanges[1].escalationRung).toBe(1);
+    expect(res.status).toBe(404);
   });
 
-  it('returns null when session does not belong to child', async () => {
+  it('[PV-BT2] parent cannot see unlinked child memory', async () => {
+    const parentProfileId = await createProfile(
+      PARENT_USER_ID,
+      PARENT_EMAIL,
+      'Test Parent',
+      1985
+    );
+    const childProfileId = await createProfile(
+      CHILD_USER_ID,
+      CHILD_EMAIL,
+      'Test Child',
+      2004
+    );
+    // No family link — assertParentAccess rejects with 403
+
+    configureValidJWT(jwt, { sub: PARENT_USER_ID, email: PARENT_EMAIL });
+    const res = await app.request(
+      `/v1/dashboard/children/${childProfileId}/memory`,
+      { method: 'GET', headers: buildAuthHeaders(parentProfileId) },
+      TEST_ENV
+    );
+
+    expect(res.status).toBe(403);
+  });
+});
+
+describe('Parent Visibility functional tests', () => {
+  it('[PV-FT1] curated memory returns categories and settings', async () => {
     const parentProfileId = await createProfile(
       PARENT_USER_ID,
       PARENT_EMAIL,
@@ -468,14 +452,92 @@ describe('Integration: GET /v1/dashboard/children/:profileId/sessions/:sessionId
 
     configureValidJWT(jwt, { sub: PARENT_USER_ID, email: PARENT_EMAIL });
     const res = await app.request(
-      `/v1/dashboard/children/${childProfileId}/sessions/00000000-0000-4000-8000-999999999999/transcript`,
+      `/v1/dashboard/children/${childProfileId}/memory`,
       { method: 'GET', headers: buildAuthHeaders(parentProfileId) },
       TEST_ENV
     );
 
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.transcript).toBeNull();
+    expect(Array.isArray(body.memory.categories)).toBe(true);
+    expect(body.memory.settings).toHaveProperty('memoryEnabled');
+  });
+
+  it('[PV-FT2] dashboard child includes streak and XP', async () => {
+    const parentProfileId = await createProfile(
+      PARENT_USER_ID,
+      PARENT_EMAIL,
+      'Test Parent',
+      1985
+    );
+    const childProfileId = await createProfile(
+      CHILD_USER_ID,
+      CHILD_EMAIL,
+      'Test Child',
+      2004
+    );
+    await seedFamilyLink(parentProfileId, childProfileId);
+
+    const subjectId = await createSubjectForProfile(
+      CHILD_USER_ID,
+      CHILD_EMAIL,
+      childProfileId,
+      'Mathematics'
+    );
+    await seedSession(childProfileId, subjectId);
+
+    configureValidJWT(jwt, { sub: PARENT_USER_ID, email: PARENT_EMAIL });
+    const res = await app.request(
+      '/v1/dashboard',
+      { method: 'GET', headers: buildAuthHeaders(parentProfileId) },
+      TEST_ENV
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    for (const child of body.children) {
+      expect(typeof child.currentStreak).toBe('number');
+      expect(typeof child.totalXp).toBe('number');
+    }
+  });
+
+  it('[PV-FT3] session detail returns summary-only by ID', async () => {
+    const parentProfileId = await createProfile(
+      PARENT_USER_ID,
+      PARENT_EMAIL,
+      'Test Parent',
+      1985
+    );
+    const childProfileId = await createProfile(
+      CHILD_USER_ID,
+      CHILD_EMAIL,
+      'Test Child',
+      2004
+    );
+    await seedFamilyLink(parentProfileId, childProfileId);
+
+    const subjectId = await createSubjectForProfile(
+      CHILD_USER_ID,
+      CHILD_EMAIL,
+      childProfileId,
+      'Science'
+    );
+    const sessionId = await seedSession(childProfileId, subjectId, {
+      exchangeCount: 5,
+    });
+
+    configureValidJWT(jwt, { sub: PARENT_USER_ID, email: PARENT_EMAIL });
+    const res = await app.request(
+      `/v1/dashboard/children/${childProfileId}/sessions/${sessionId}`,
+      { method: 'GET', headers: buildAuthHeaders(parentProfileId) },
+      TEST_ENV
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.session.sessionId).toBe(sessionId);
+    expect(body.session.exchangeCount).toBe(5);
+    expect(body.session).not.toHaveProperty('exchanges');
   });
 });
 

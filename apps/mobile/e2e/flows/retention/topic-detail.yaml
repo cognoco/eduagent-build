@@ -12,16 +12,16 @@
 # or assessments, so computeCompletionStatus returns "not_started".
 # This means the adaptive buttons show: primary "Start Learning" only.
 #
-# testID mapping (topic/[topicId].tsx — Story 4.14 adaptive buttons):
+# testID mapping (topic/[topicId].tsx — smart primary + expandable secondary):
 #   - topic-detail-back         -> back button
 #   - topic-detail-loading      -> loading state
 #   - topic-detail-empty        -> empty/not-found state
 #   - retention-card            -> retention metrics card
-#   - start-learning-button     -> primary action for not_started topics
-#   - continue-learning-button  -> primary for in_progress, secondary for completed/verified/stable
-#   - start-review-button       -> secondary for in_progress, primary for completed/verified/stable
-#   - request-retest-button     -> recall check / review-and-retest (always visible)
-#   - relearn-button            -> relearn (only after 3+ failures or needs_deepening)
+#   - primary-action-button     -> smart primary action
+#   - more-ways-toggle          -> expandable secondary action section
+#   - secondary-recall-check    -> recall check action
+#   - secondary-challenge       -> challenge yourself action
+#   - secondary-teach-back      -> teach it back action
 #
 # testID mapping (library/index.tsx):
 #   - subject-filter-tabs     -> subject filter strip
@@ -103,33 +103,29 @@ tags:
 - assertVisible:
     text: "Progress"
 
-# 13. Story 4.14: Verify adaptive action buttons for not_started topic
-# retention-due seed has no sessions/assessments → completionStatus = not_started
-# not_started shows only "Start Learning" as primary button
+# 13. Verify smart primary action for not_started topic
+# retention-due seed has no sessions/assessments -> completionStatus = not_started
+# not_started shows only the primary "Start learning" button
 - assertVisible:
-    id: "start-learning-button"
-
-# 14. Verify in_progress/completed buttons are NOT shown for not_started topic
-- assertNotVisible:
-    id: "continue-learning-button"
-- assertNotVisible:
-    id: "start-review-button"
-
-# 15. Verify request-retest-button is present (always visible bottom row)
+    id: "primary-action-button"
 - assertVisible:
-    id: "request-retest-button"
+    text: "Start learning"
 
-# 16. Screenshot of topic detail with adaptive buttons
+# 14. Verify secondary actions stay hidden for not_started topic
+- assertNotVisible:
+    id: "more-ways-toggle"
+
+# 15. Screenshot of topic detail with adaptive buttons
 - takeScreenshot: topic-detail-adaptive-buttons
 
-# 17. Screenshot of full topic detail with retention metrics
+# 16. Screenshot of full topic detail with retention metrics
 - takeScreenshot: topic-detail-retention
 
-# 18. Tap back to return to Library
+# 17. Tap back to return to Library
 - tapOn:
     id: "topic-detail-back"
 
-# 19. Verify we're back on Library
+# 18. Verify we're back on Library
 - extendedWaitUntil:
     visible:
       text: "Library"

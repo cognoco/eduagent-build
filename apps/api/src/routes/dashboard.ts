@@ -14,8 +14,11 @@ import {
   markChildReportViewed,
   getChildSubjectTopics,
   getChildSessions,
-  getChildSessionTranscript,
+  getChildSessionDetail,
 } from '../services/dashboard';
+import { getLearningProfile } from '../services/learner-profile';
+import { buildCuratedMemoryView } from '../services/curated-memory';
+import { assertParentAccess } from '../services/family-access';
 
 type DashboardRouteEnv = {
   Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
@@ -108,24 +111,52 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     return c.json({ sessions });
   })
 
-  // Get session transcript
-  .get(
-    '/dashboard/children/:profileId/sessions/:sessionId/transcript',
-    async (c) => {
-      const db = c.get('db');
-      const parentProfileId = requireProfileId(c.get('profileId'));
-      const childProfileId = c.req.param('profileId');
-      const sessionId = c.req.param('sessionId');
+  // Single session detail (summary only, no transcript)
+  .get('/dashboard/children/:profileId/sessions/:sessionId', async (c) => {
+    const db = c.get('db');
+    const parentProfileId = requireProfileId(c.get('profileId'));
+    const childProfileId = c.req.param('profileId');
+    const sessionId = c.req.param('sessionId');
 
-      const transcript = await getChildSessionTranscript(
-        db,
-        parentProfileId,
-        childProfileId,
-        sessionId
-      );
-      return c.json({ transcript });
+    const session = await getChildSessionDetail(
+      db,
+      parentProfileId,
+      childProfileId,
+      sessionId
+    );
+    if (!session) {
+      return c.json({ error: 'Session not found' }, 404);
     }
-  )
+    return c.json({ session });
+  })
+
+  // Curated memory view for parent
+  .get('/dashboard/children/:profileId/memory', async (c) => {
+    const db = c.get('db');
+    const parentProfileId = requireProfileId(c.get('profileId'));
+    const childProfileId = c.req.param('profileId');
+
+    await assertParentAccess(db, parentProfileId, childProfileId);
+    const profile = await getLearningProfile(db, childProfileId);
+
+    if (!profile) {
+      return c.json({
+        memory: {
+          categories: [],
+          parentContributions: [],
+          settings: {
+            memoryEnabled: true,
+            collectionEnabled: false,
+            injectionEnabled: true,
+            accommodationMode: null,
+          },
+        },
+      });
+    }
+
+    const memory = buildCuratedMemoryView(profile);
+    return c.json({ memory });
+  })
 
   .get('/dashboard/children/:profileId/reports', async (c) => {
     const db = c.get('db');
@@ -185,6 +216,9 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
           guidedVsImmediateRatio: 0.6,
           retentionTrend: 'stable',
           totalSessions: 12,
+          currentStreak: 3,
+          longestStreak: 7,
+          totalXp: 450,
         },
         {
           profileId: 'demo-child-2',
@@ -202,6 +236,9 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
           guidedVsImmediateRatio: 0.3,
           retentionTrend: 'improving',
           totalSessions: 8,
+          currentStreak: 1,
+          longestStreak: 5,
+          totalXp: 280,
         },
       ],
     });

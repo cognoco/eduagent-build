@@ -122,6 +122,8 @@ export default function CreateSubjectScreen() {
               subjectName: result.subject.name,
               bookId: result.bookId,
               bookTitle: result.bookTitle ?? focus,
+              step: '1',
+              totalSteps: '4',
             },
           } as never);
           return;
@@ -139,11 +141,14 @@ export default function CreateSubjectScreen() {
 
         if (result.subject.pedagogyMode === 'four_strands') {
           router.replace({
-            pathname: '/(app)/onboarding/language-setup',
+            pathname: '/(app)/onboarding/interview',
             params: {
               subjectId: result.subject.id,
+              subjectName: result.subject.name,
               languageCode: result.subject.languageCode ?? '',
               languageName: result.subject.name,
+              step: '1',
+              totalSteps: '4',
             },
           } as never);
           return;
@@ -154,6 +159,8 @@ export default function CreateSubjectScreen() {
           params: {
             subjectId: result.subject.id,
             subjectName: result.subject.name,
+            step: '1',
+            totalSteps: '4',
           },
         } as never);
       } catch (err: unknown) {
@@ -330,7 +337,7 @@ export default function CreateSubjectScreen() {
     [resolveInput]
   );
 
-  const availableChips = useMemo(() => {
+  const starterChips = useMemo(() => {
     const existingNames = new Set(
       (existingSubjects ?? []).map((s) => s.name.toLowerCase())
     );
@@ -434,70 +441,64 @@ export default function CreateSubjectScreen() {
           />
         </View>
 
-        {/* Returning-user quick section — existing subjects as tappable pills */}
         {resolveState.phase === 'idle' &&
           !isBusy &&
           name.trim() === '' &&
-          existingSubjects &&
-          existingSubjects.length > 0 && (
-            <View className="mb-4" testID="your-subjects-section">
-              <Text className="text-body-sm font-semibold text-text-secondary mb-2">
-                Or continue with
-              </Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ gap: 8 }}
-              >
-                {existingSubjects.map((subject) => (
-                  <Pressable
-                    key={subject.id}
-                    onPress={() =>
-                      router.push({
-                        pathname: '/(app)/session',
-                        params: {
-                          mode: 'learning',
-                          subjectId: subject.id,
-                          subjectName: subject.name,
-                        },
-                      } as never)
-                    }
-                    className="rounded-full bg-primary-soft px-4 py-2 h-9 items-center justify-center"
-                    accessibilityRole="button"
-                    accessibilityLabel={`Continue ${subject.name}`}
-                    testID={`your-subject-${subject.id}`}
-                  >
-                    <Text className="text-body-sm font-medium text-primary">
-                      {subject.name}
-                    </Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
-            </View>
-          )}
-
-        {/* Starter chips — shown while idle + input empty, hidden during resolve/suggestion or typing */}
-        {resolveState.phase === 'idle' &&
-          !isBusy &&
-          name.trim() === '' &&
-          availableChips.length > 0 && (
+          ((existingSubjects?.length ?? 0) > 0 || starterChips.length > 0) && (
             <View
-              className="flex-row flex-wrap gap-2 mb-4"
-              testID="starter-chips"
+              className="gap-3 mt-4 mb-4"
+              testID="subject-options"
               accessibilityLabel="Suggested subjects"
             >
-              {availableChips.map((chip) => (
+              {(existingSubjects ?? []).map((subject) => (
+                <Pressable
+                  key={subject.id}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/(app)/session',
+                      params: {
+                        mode: 'learning',
+                        subjectId: subject.id,
+                        subjectName: subject.name,
+                      },
+                    } as never)
+                  }
+                  className="rounded-card bg-surface-elevated px-4 py-3 flex-row items-center"
+                  accessibilityRole="button"
+                  accessibilityLabel={`Continue ${subject.name}`}
+                  testID={`subject-continue-${subject.id}`}
+                >
+                  <View className="flex-1">
+                    <Text className="text-body font-semibold text-text-primary">
+                      Continue {subject.name}
+                    </Text>
+                  </View>
+                  <Ionicons
+                    name="chevron-forward"
+                    size={18}
+                    color={colors.muted}
+                  />
+                </Pressable>
+              ))}
+              {starterChips.map((chip) => (
                 <Pressable
                   key={chip}
                   onPress={() => void onChipPress(chip)}
-                  className="rounded-full bg-surface-elevated px-4 py-2 h-9 items-center justify-center"
+                  className="rounded-card bg-surface-elevated px-4 py-3 flex-row items-center"
                   accessibilityRole="button"
-                  accessibilityLabel={`Choose ${chip}`}
-                  testID={`starter-chip-${chip}`}
+                  accessibilityLabel={`Start ${chip}`}
+                  testID={`subject-start-${chip.toLowerCase()}`}
                 >
-                  <Text className="text-body-sm font-medium text-text-secondary">
-                    {chip}
-                  </Text>
+                  <View className="flex-1">
+                    <Text className="text-body font-semibold text-text-primary">
+                      Start {chip}
+                    </Text>
+                  </View>
+                  <Ionicons
+                    name="chevron-forward"
+                    size={18}
+                    color={colors.muted}
+                  />
                 </Pressable>
               ))}
             </View>

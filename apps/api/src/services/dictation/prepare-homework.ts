@@ -31,11 +31,24 @@ TASK:
    Remove the punctuation character itself and insert the word in its place.
 3. Count the words in each sentence (original text, not the punctuation variant).
 4. Detect the language of the text.
+5. Split each sentence into natural spoken chunks for dictation playback:
+   - Short sentences (up to 4 words including any trailing punctuation): return as a SINGLE chunk.
+   - Longer sentences: break at natural phrase boundaries — clause edges, prepositional phrases, relative clauses. Think about where a teacher would naturally pause when dictating.
+     Example: "The old man walked slowly through the park." →
+       chunks: ["The old man", "walked slowly", "through the park."]
+   - Never break inside a noun phrase, verb phrase, or prepositional phrase.
+   - Produce matching "chunksWithPunctuation" using the same spoken-punctuation rules.
 
 RESPOND WITH ONLY valid JSON in this exact format:
 {
   "sentences": [
-    { "text": "original sentence.", "withPunctuation": "original sentence period", "wordCount": 2 }
+    {
+      "text": "original sentence.",
+      "withPunctuation": "original sentence period",
+      "wordCount": 2,
+      "chunks": ["original sentence."],
+      "chunksWithPunctuation": ["original sentence period"]
+    }
   ],
   "language": "ISO 639-1 code (e.g. cs, en, de, sk, nb, fr)"
 }`;

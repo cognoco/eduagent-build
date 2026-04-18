@@ -48,6 +48,25 @@ describe('IntentCard', () => {
     expect(screen.getByText('6')).toBeTruthy();
   });
 
+  it('renders icon when provided', () => {
+    render(
+      <IntentCard
+        title="Learn"
+        onPress={jest.fn()}
+        icon="book-outline"
+        testID="card"
+      />
+    );
+
+    expect(screen.getByTestId('card-icon')).toBeTruthy();
+  });
+
+  it('does not render icon element when omitted', () => {
+    render(<IntentCard title="Learn" onPress={jest.fn()} testID="card" />);
+
+    expect(screen.queryByTestId('card-icon')).toBeNull();
+  });
+
   it('applies highlight styling when requested', () => {
     render(
       <IntentCard
@@ -70,5 +89,24 @@ describe('IntentCard', () => {
     const card = screen.getByTestId('card');
     expect(card.props.accessibilityRole).toBe('button');
     expect(card.props.accessibilityLabel).toBe('Pick a subject');
+  });
+
+  it('renders a dismiss action when provided and does not trigger card press', () => {
+    const onPress = jest.fn();
+    const onDismiss = jest.fn();
+
+    render(
+      <IntentCard
+        title="Discover more"
+        onPress={onPress}
+        onDismiss={onDismiss}
+        testID="card"
+      />
+    );
+
+    fireEvent.press(screen.getByTestId('card-dismiss'));
+
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+    expect(onPress).not.toHaveBeenCalled();
   });
 });

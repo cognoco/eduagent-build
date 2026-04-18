@@ -7,8 +7,13 @@ import type {
 } from '@eduagent/schemas';
 import { isGuessWhoFuzzyMatch } from '@eduagent/schemas';
 import { ConflictError, NotFoundError } from '../../errors';
+import { createLogger } from '../logger';
 import { reviewVocabulary } from '../vocabulary';
 import { QUIZ_CONFIG } from './config';
+import { applyQuizSm2 } from './mastery-provider';
+import { computeCapitalsItemKey, computeGuessWhoItemKey } from './mastery-keys';
+
+const logger = createLogger();
 
 /**
  * [ASSUMP-F5] Server-side truth for `correct`. The client's `result.correct`
@@ -106,6 +111,10 @@ export function getVocabSm2Quality(correct: boolean): number {
   return correct ? 4 : 2;
 }
 
+export function getCapitalsSm2Quality(correct: boolean): number {
+  return correct ? 4 : 1;
+}
+
 export function calculateScore(results: QuestionResult[]): number {
   return results.filter((result) => result.correct).length;
 }
@@ -136,7 +145,14 @@ export function calculateXp(
       }, 0);
   }
 
-  return baseXp + timerBonus + perfectBonus + guessWhoClueBonus;
+  let freeTextBonus = 0;
+  if (activityType === 'capitals' || activityType === 'vocabulary') {
+    freeTextBonus =
+      correctResults.filter((r) => r.answerMode === 'free_text').length *
+      QUIZ_CONFIG.xp.freeTextBonus;
+  }
+
+  return baseXp + timerBonus + perfectBonus + guessWhoClueBonus + freeTextBonus;
 }
 
 /**
@@ -272,6 +288,147 @@ export async function completeQuizRound(
           question.vocabularyId,
           { quality: getVocabSm2Quality(result.correct) }
         );
+      }
+    }
+
+    // --- Mastery: capitals + guess_who ---
+    if (
+      round.activityType === 'capitals' ||
+      round.activityType === 'guess_who'
+    ) {
+      const libraryIndices = Array.isArray(round.libraryQuestionIndices)
+        ? (round.libraryQuestionIndices as number[])
+        : [];
+
+      // 1. SM-2 update for mastery questions (isLibraryItem: true)
+      for (const index of libraryIndices) {
+        const question = questions[index];
+        if (!question) continue;
+
+        const result = validatedResults.find(
+          (entry) => entry.questionIndex === index
+        );
+        if (!result) continue;
+
+        let quality: number;
+        let itemKey: string;
+
+        if (question.type === 'capitals') {
+          quality = getCapitalsSm2Quality(result.correct);
+          itemKey = computeCapitalsItemKey(question.country);
+        } else if (question.type === 'guess_who') {
+          quality = getGuessWhoSm2Quality(
+            result.correct,
+            result.cluesUsed ?? 5,
+            result.answerMode ?? 'multiple_choice'
+          );
+          itemKey = computeGuessWhoItemKey(
+            question.canonicalName,
+            question.era
+          );
+        } else {
+          continue;
+        }
+
+        const existing = await txRepo.quizMasteryItems.findByKey(
+          round.activityType as 'capitals' | 'guess_who',
+          itemKey
+        );
+        if (existing) {
+          const sm2Result = applyQuizSm2(
+            {
+              easeFactor: String(existing.easeFactor),
+              interval: existing.interval,
+              repetitions: existing.repetitions,
+            },
+            quality
+          );
+          await txRepo.quizMasteryItems.updateSm2(
+            itemKey,
+            round.activityType as 'capitals' | 'guess_who',
+            sm2Result
+          );
+        }
+      }
+
+      // 2. Upsert new mastery items from correct discovery answers
+      for (const result of validatedResults) {
+        if (!result.correct) continue;
+        const question = questions[result.questionIndex];
+        if (!question || question.isLibraryItem) continue;
+
+        let itemKey: string;
+        let itemAnswer: string;
+
+        if (question.type === 'capitals') {
+          itemKey = computeCapitalsItemKey(question.country);
+          itemAnswer = question.correctAnswer;
+        } else if (question.type === 'guess_who') {
+          itemKey = computeGuessWhoItemKey(
+            question.canonicalName,
+            question.era
+          );
+          itemAnswer = question.canonicalName;
+        } else {
+          continue;
+        }
+
+        try {
+          const upserted =
+            await txRepo.quizMasteryItems.upsertFromCorrectAnswer({
+              activityType: round.activityType as 'capitals' | 'guess_who',
+              itemKey,
+              itemAnswer,
+            });
+          logger.info('quiz_mastery_item.upsert.success', {
+            profileId,
+            activityType: round.activityType,
+            itemKey,
+            wasInserted: upserted !== null,
+          });
+        } catch (err) {
+          logger.error('quiz_mastery_item.upsert.failure', {
+            profileId,
+            roundId,
+            itemKey,
+            error: err instanceof Error ? err.message : 'unknown',
+          });
+        }
+      }
+
+      // 3. Track MC success count for free-text unlock progression
+      for (const result of validatedResults) {
+        const question = questions[result.questionIndex];
+        if (!question || !question.isLibraryItem) continue;
+
+        let itemKey: string;
+        if (question.type === 'capitals') {
+          itemKey = computeCapitalsItemKey(question.country);
+        } else if (question.type === 'guess_who') {
+          itemKey = computeGuessWhoItemKey(
+            question.canonicalName,
+            question.era
+          );
+        } else {
+          continue;
+        }
+
+        if (
+          result.correct &&
+          (result.answerMode === 'multiple_choice' || !result.answerMode)
+        ) {
+          await txRepo.quizMasteryItems.incrementMcSuccessCount(
+            itemKey,
+            round.activityType as 'capitals' | 'guess_who'
+          );
+        } else if (!result.correct && result.answerMode === 'free_text') {
+          // Free-text wrong → reset to 2 (one MC success away from re-unlock)
+          await txRepo.quizMasteryItems.resetMcSuccessCount(
+            itemKey,
+            round.activityType as 'capitals' | 'guess_who',
+            2
+          );
+        }
       }
     }
 

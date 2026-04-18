@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -11,7 +11,14 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Profile } from '@eduagent/schemas';
 import { ProfileSwitcher } from '../common';
-import { useContinueSuggestion } from '../../hooks/use-progress';
+import {
+  useMarkQuizDiscoverySurfaced,
+  useQuizDiscoveryCard,
+} from '../../hooks/use-coaching-card';
+import {
+  useContinueSuggestion,
+  useReviewSummary,
+} from '../../hooks/use-progress';
 import { useSubjects } from '../../hooks/use-subjects';
 import { getGreeting } from '../../lib/greeting';
 import {
@@ -46,8 +53,14 @@ export function LearnerScreen({
   const colors = useThemeColors();
   const { data: subjects, isLoading, isError, refetch } = useSubjects();
   const { data: continueSuggestion } = useContinueSuggestion();
+  const { data: reviewSummary } = useReviewSummary();
+  const { data: quizDiscovery } = useQuizDiscoveryCard();
+  const markQuizDiscoverySurfaced = useMarkQuizDiscoverySurfaced();
   const [recoveryMarker, setRecoveryMarker] =
     useState<SessionRecoveryMarker | null>(null);
+  const [dismissedQuizDiscoveryId, setDismissedQuizDiscoveryId] = useState<
+    string | null
+  >(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -58,21 +71,26 @@ export function LearnerScreen({
         if (cancelled) return;
 
         if (marker && isRecoveryMarkerFresh(marker)) {
-          setRecoveryMarker(marker);
+          setRecoveryMarker((current) =>
+            current?.sessionId === marker.sessionId &&
+            current?.updatedAt === marker.updatedAt
+              ? current
+              : marker
+          );
           return;
         }
 
-        setRecoveryMarker(null);
+        setRecoveryMarker((current) => (current === null ? current : null));
         if (marker) {
           // Stale marker — clear silently. The "Continue where you left off"
           // card uses continueSuggestion (API-driven) and doesn't need this.
-          void clearSessionRecoveryMarker(activeProfile?.id).catch(
-            () => undefined
+          void clearSessionRecoveryMarker(activeProfile?.id).catch((err) =>
+            console.error('[LearnerScreen] stale marker cleanup failed:', err)
           );
         }
       } catch {
         if (!cancelled) {
-          setRecoveryMarker(null);
+          setRecoveryMarker((current) => (current === null ? current : null));
         }
       }
     }
@@ -84,81 +102,174 @@ export function LearnerScreen({
     };
   }, [activeProfile?.id]);
 
+  useEffect(() => {
+    setDismissedQuizDiscoveryId(null);
+  }, [activeProfile?.id, quizDiscovery?.id]);
+
   const { title, subtitle } = getGreeting(
     activeProfile?.displayName ?? '',
     now
   );
 
-  const intentCards = useMemo(() => {
-    const primaryCard = {
-      title: 'Start learning',
-      onPress: () => router.push('/learn-new' as never),
-      testID: 'intent-learn-new',
-    };
-    const homeworkCard = {
-      title: 'Help with assignment?',
-      subtitle: "Take a picture and we'll look at it together",
-      onPress: () => router.push('/(app)/homework/camera' as never),
-      testID: 'intent-homework',
-    };
-    const resumeCard = recoveryMarker
-      ? {
-          title: 'Continue where you left off',
-          subtitle: recoveryMarker.subjectName ?? 'Your last session',
-          variant: 'highlight' as const,
-          onPress: () =>
-            router.push({
-              pathname: '/(app)/session',
-              params: {
-                sessionId: recoveryMarker.sessionId,
-                ...(recoveryMarker.subjectId && {
-                  subjectId: recoveryMarker.subjectId,
-                }),
-                ...(recoveryMarker.subjectName && {
-                  subjectName: recoveryMarker.subjectName,
-                }),
-                ...(recoveryMarker.mode && { mode: recoveryMarker.mode }),
-                ...(recoveryMarker.topicId && {
-                  topicId: recoveryMarker.topicId,
-                }),
-                ...(recoveryMarker.topicName && {
-                  topicName: recoveryMarker.topicName,
-                }),
-              },
-            } as never),
-          testID: 'intent-resume',
-        }
-      : null;
-    const continueCard =
-      !recoveryMarker && continueSuggestion
-        ? {
-            title: 'Continue where you left off',
-            subtitle: continueSuggestion.subjectName,
-            onPress: () =>
-              router.push({
-                pathname: '/(app)/session',
-                params: {
-                  ...(continueSuggestion.lastSessionId && {
-                    sessionId: continueSuggestion.lastSessionId,
-                  }),
-                  subjectId: continueSuggestion.subjectId,
-                  subjectName: continueSuggestion.subjectName,
-                  topicId: continueSuggestion.topicId,
-                  topicName: continueSuggestion.topicTitle,
-                  mode: 'learning',
-                },
-              } as never),
-            testID: 'intent-resume-last',
-          }
-        : null;
+  const markQuizDiscoveryHandled = useCallback(() => {
+    if (!quizDiscovery) return;
+    setDismissedQuizDiscoveryId(quizDiscovery.id);
+    markQuizDiscoverySurfaced.mutate(quizDiscovery.activityType);
+  }, [markQuizDiscoverySurfaced, quizDiscovery]);
 
-    const cards = [];
-    if (resumeCard) cards.push(resumeCard);
-    if (continueCard) cards.push(continueCard);
-    cards.push(primaryCard, homeworkCard);
+  const intentCards = useMemo(() => {
+    const cards: Array<{
+      testID: string;
+      title: string;
+      subtitle?: string;
+      icon: React.ComponentProps<typeof Ionicons>['name'];
+      variant?: 'default' | 'highlight';
+      onPress: () => void;
+      onDismiss?: () => void;
+    }> = [];
+
+    if (recoveryMarker) {
+      cards.push({
+        testID: 'intent-continue',
+        title: 'Continue',
+        subtitle: `${recoveryMarker.subjectName ?? 'Session'} \u00b7 resume`,
+        icon: 'play-circle-outline',
+        variant: 'highlight',
+        onPress: () => {
+          void clearSessionRecoveryMarker(activeProfile?.id).catch((err) =>
+            console.error(
+              '[LearnerScreen] clearSessionRecoveryMarker failed:',
+              err
+            )
+          );
+          router.push({
+            pathname: '/(app)/session',
+            params: {
+              sessionId: recoveryMarker.sessionId,
+              ...(recoveryMarker.subjectId && {
+                subjectId: recoveryMarker.subjectId,
+              }),
+              ...(recoveryMarker.subjectName && {
+                subjectName: recoveryMarker.subjectName,
+              }),
+              ...(recoveryMarker.mode && { mode: recoveryMarker.mode }),
+              ...(recoveryMarker.topicId && {
+                topicId: recoveryMarker.topicId,
+              }),
+              ...(recoveryMarker.topicName && {
+                topicName: recoveryMarker.topicName,
+              }),
+            },
+          } as never);
+        },
+      });
+    } else if (continueSuggestion) {
+      cards.push({
+        testID: 'intent-continue',
+        title: 'Continue',
+        subtitle: `${continueSuggestion.subjectName} \u00b7 ${continueSuggestion.topicTitle}`,
+        icon: 'play-circle-outline',
+        onPress: () =>
+          router.push({
+            pathname: '/(app)/session',
+            params: {
+              ...(continueSuggestion.lastSessionId && {
+                sessionId: continueSuggestion.lastSessionId,
+              }),
+              subjectId: continueSuggestion.subjectId,
+              subjectName: continueSuggestion.subjectName,
+              topicId: continueSuggestion.topicId,
+              topicName: continueSuggestion.topicTitle,
+              mode: 'learning',
+            },
+          } as never),
+      });
+    } else if (
+      reviewSummary &&
+      reviewSummary.totalOverdue > 0 &&
+      reviewSummary.nextReviewTopic
+    ) {
+      cards.push({
+        testID: 'intent-continue',
+        title: 'Continue',
+        subtitle: `${reviewSummary.nextReviewTopic.subjectName} \u00b7 ${
+          reviewSummary.totalOverdue
+        } topic${reviewSummary.totalOverdue === 1 ? '' : 's'} to review`,
+        icon: 'play-circle-outline',
+        onPress: () =>
+          router.push({
+            pathname: '/(app)/topic/relearn',
+            params: {
+              topicId: reviewSummary.nextReviewTopic?.topicId,
+              subjectId: reviewSummary.nextReviewTopic?.subjectId,
+              topicName: reviewSummary.nextReviewTopic?.topicTitle,
+            },
+          } as never),
+      });
+    }
+
+    if (quizDiscovery && dismissedQuizDiscoveryId !== quizDiscovery.id) {
+      cards.push({
+        testID: 'intent-quiz-discovery',
+        title: quizDiscovery.title,
+        subtitle: quizDiscovery.body,
+        icon: 'sparkles-outline',
+        variant: 'highlight',
+        onDismiss: () => {
+          markQuizDiscoveryHandled();
+        },
+        onPress: () => {
+          markQuizDiscoveryHandled();
+          router.push({
+            pathname: '/(app)/quiz',
+            params: { activityType: quizDiscovery.activityType },
+          } as never);
+        },
+      });
+    }
+
+    cards.push(
+      {
+        testID: 'intent-learn',
+        title: 'Learn',
+        subtitle: 'Start a new subject or pick one',
+        icon: 'book-outline',
+        onPress: () => router.push('/create-subject' as never),
+      },
+      {
+        testID: 'intent-ask',
+        title: 'Ask',
+        subtitle: 'Get answers to any question',
+        icon: 'chatbubble-ellipses-outline',
+        onPress: () => router.push('/(app)/session?mode=freeform' as never),
+      },
+      {
+        testID: 'intent-practice',
+        title: 'Practice',
+        subtitle: 'Games and reviews to sharpen what you know',
+        icon: 'game-controller-outline',
+        onPress: () => router.push('/(app)/practice' as never),
+      },
+      {
+        testID: 'intent-homework',
+        title: 'Homework',
+        subtitle: 'Snap a photo, get help',
+        icon: 'camera-outline',
+        onPress: () => router.push('/(app)/homework/camera' as never),
+      }
+    );
 
     return cards;
-  }, [continueSuggestion, recoveryMarker, router]);
+  }, [
+    activeProfile?.id,
+    continueSuggestion,
+    dismissedQuizDiscoveryId,
+    markQuizDiscoveryHandled,
+    quizDiscovery,
+    recoveryMarker,
+    reviewSummary,
+    router,
+  ]);
 
   if (isLoading) {
     return (

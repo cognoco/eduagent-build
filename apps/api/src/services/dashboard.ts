@@ -3,7 +3,7 @@
 // Pure business logic + DB-aware query functions, no Hono imports
 // ---------------------------------------------------------------------------
 
-import { eq, and, gte, inArray, desc } from 'drizzle-orm';
+import { eq, and, gte, inArray, desc, sum } from 'drizzle-orm';
 import {
   familyLinks,
   profiles,
@@ -12,6 +12,9 @@ import {
   subjects,
   curricula,
   curriculumTopics,
+  sessionSummaries,
+  streaks,
+  xpLedger,
   type Database,
 } from '@eduagent/database';
 import type {
@@ -453,6 +456,26 @@ export async function getChildrenForParent(
     ),
   ]);
 
+  // Batch streaks + XP for all children (reuse childProfileIds from links)
+  const [streakResults, xpResults] = await Promise.all([
+    db.query.streaks.findMany({
+      where: inArray(streaks.profileId, childProfileIds),
+    }),
+    db
+      .select({
+        profileId: xpLedger.profileId,
+        totalXp: sum(xpLedger.amount).mapWith(Number),
+      })
+      .from(xpLedger)
+      .where(inArray(xpLedger.profileId, childProfileIds))
+      .groupBy(xpLedger.profileId),
+  ]);
+
+  const streaksByProfile = new Map(streakResults.map((s) => [s.profileId, s]));
+  const xpByProfile = new Map(
+    xpResults.map((x) => [x.profileId, x.totalXp ?? 0])
+  );
+
   // Pre-compute per-child display inputs (first pass) so that the
   // progress-summary fan-out can run in parallel without needing the
   // `children.push` loop to complete sequentially.
@@ -607,6 +630,9 @@ export async function getChildrenForParent(
       retentionTrend,
       totalSessions,
       progress,
+      currentStreak: streaksByProfile.get(p.childProfileId)?.currentStreak ?? 0,
+      longestStreak: streaksByProfile.get(p.childProfileId)?.longestStreak ?? 0,
+      totalXp: xpByProfile.get(p.childProfileId) ?? 0,
     };
   });
 
@@ -679,28 +705,7 @@ export interface ChildSession {
   displayTitle: string;
   displaySummary: string | null;
   homeworkSummary: HomeworkSummary | null;
-}
-
-export interface TranscriptExchange {
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: string;
-  escalationRung?: number;
-}
-
-export interface ChildSessionTranscript {
-  session: {
-    sessionId: string;
-    subjectId: string;
-    topicId: string | null;
-    sessionType: string;
-    startedAt: string;
-    exchangeCount: number;
-    displayTitle: string;
-    displaySummary: string | null;
-    homeworkSummary: HomeworkSummary | null;
-  };
-  exchanges: TranscriptExchange[];
+  highlight: string | null;
 }
 
 /**
@@ -725,6 +730,18 @@ export async function getChildSessions(
     limit: 50,
   });
 
+  if (sessions.length === 0) return [];
+
+  // Batch-fetch highlights from session_summaries for all sessions
+  const sessionIds = sessions.map((s) => s.id);
+  const summaries = await db.query.sessionSummaries.findMany({
+    where: inArray(sessionSummaries.sessionId, sessionIds),
+    columns: { sessionId: true, highlight: true },
+  });
+  const highlightBySession = new Map(
+    summaries.map((s) => [s.sessionId, s.highlight ?? null])
+  );
+
   return sessions.map((s) => {
     const metadata = getSessionMetadata(s.metadata);
     const homeworkSummary = metadata.homeworkSummary ?? null;
@@ -743,25 +760,19 @@ export async function getChildSessions(
       displayTitle: formatSessionDisplayTitle(s.sessionType, homeworkSummary),
       displaySummary: homeworkSummary?.summary ?? null,
       homeworkSummary,
+      highlight: highlightBySession.get(s.id) ?? null,
     };
   });
 }
 
-/**
- * Gets full transcript of a session, with parent access check.
- * Returns null when the session doesn't belong to the child or no link exists.
- */
-export async function getChildSessionTranscript(
+export async function getChildSessionDetail(
   db: Database,
   parentProfileId: string,
   childProfileId: string,
   sessionId: string
-): Promise<ChildSessionTranscript | null> {
-  // [EP15-I5] ForbiddenError → 403. null from here now means "access
-  // granted but that session doesn't belong to this child" — 404-like.
+): Promise<ChildSession | null> {
   await assertParentAccess(db, parentProfileId, childProfileId);
 
-  // Get session scoped to child
   const session = await db.query.learningSessions.findFirst({
     where: and(
       eq(learningSessions.id, sessionId),
@@ -770,55 +781,33 @@ export async function getChildSessionTranscript(
   });
   if (!session) return null;
 
-  // Get message events ordered chronologically
-  const events = await db.query.sessionEvents.findMany({
-    where: and(
-      eq(sessionEvents.sessionId, sessionId),
-      inArray(sessionEvents.eventType, ['user_message', 'ai_response'])
-    ),
-    orderBy: sessionEvents.createdAt,
-  });
-
-  const exchanges: TranscriptExchange[] = events.map((e) => {
-    const exchange: TranscriptExchange = {
-      role: e.eventType === 'user_message' ? 'user' : 'assistant',
-      content: e.content,
-      timestamp: e.createdAt.toISOString(),
-    };
-
-    if (e.eventType === 'ai_response') {
-      const meta = e.metadata as Record<string, unknown> | null;
-      const rung =
-        typeof meta?.escalationRung === 'number'
-          ? meta.escalationRung
-          : undefined;
-      if (rung !== undefined) {
-        exchange.escalationRung = rung;
-      }
-    }
-
-    return exchange;
-  });
-
   const metadata = getSessionMetadata(session.metadata);
   const homeworkSummary = metadata.homeworkSummary ?? null;
 
+  // Fetch highlight for this single session
+  const summary = await db.query.sessionSummaries.findFirst({
+    where: eq(sessionSummaries.sessionId, sessionId),
+    columns: { highlight: true },
+  });
+
   return {
-    session: {
-      sessionId: session.id,
-      subjectId: session.subjectId,
-      topicId: session.topicId,
-      sessionType: session.sessionType,
-      startedAt: session.startedAt.toISOString(),
-      exchangeCount: session.exchangeCount,
-      displayTitle: formatSessionDisplayTitle(
-        session.sessionType,
-        homeworkSummary
-      ),
-      displaySummary: homeworkSummary?.summary ?? null,
-      homeworkSummary,
-    },
-    exchanges,
+    sessionId: session.id,
+    subjectId: session.subjectId,
+    topicId: session.topicId,
+    sessionType: session.sessionType,
+    startedAt: session.startedAt.toISOString(),
+    endedAt: session.endedAt?.toISOString() ?? null,
+    exchangeCount: session.exchangeCount,
+    escalationRung: session.escalationRung,
+    durationSeconds: session.durationSeconds,
+    wallClockSeconds: session.wallClockSeconds,
+    displayTitle: formatSessionDisplayTitle(
+      session.sessionType,
+      homeworkSummary
+    ),
+    displaySummary: homeworkSummary?.summary ?? null,
+    homeworkSummary,
+    highlight: summary?.highlight ?? null,
   };
 }
 

@@ -3,6 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import {
   completeRoundInputSchema,
   generateRoundInputSchema,
+  markSurfacedInputSchema,
   questionCheckInputSchema,
   type ClientQuizQuestion,
   type CefrLevel,
@@ -22,9 +23,14 @@ import {
   computeRoundStats,
   generateQuizRound,
   getRecentAnswers,
+  getRecentCompletedByActivity,
   getRoundByIdOrThrow,
   listRecentCompletedRounds,
+  markMissedItemsSurfaced,
+  getDueMasteryItems,
+  shouldApplyDifficultyBump,
 } from '../services/quiz';
+import { recordSessionActivity } from '../services/streaks';
 
 type QuizRouteEnv = {
   Bindings: {
@@ -65,6 +71,7 @@ function toClientSafeQuestions(
         funFact: q.funFact,
         isLibraryItem: q.isLibraryItem,
         topicId: q.topicId,
+        freeTextEligible: q.freeTextEligible,
       };
     }
     if (q.type === 'vocabulary') {
@@ -76,6 +83,7 @@ function toClientSafeQuestions(
         cefrLevel: q.cefrLevel,
         isLibraryItem: q.isLibraryItem,
         vocabularyId: q.vocabularyId,
+        freeTextEligible: q.freeTextEligible,
       };
     }
     return {
@@ -138,7 +146,25 @@ async function buildAndGenerateRound(
   } else if (input.activityType === 'guess_who') {
     const context = await getGuessWhoRoundContext(db, profileId);
     topicTitles = context.topicTitles;
+    libraryItems = await getDueMasteryItems(db, profileId, 'guess_who');
+  } else if (input.activityType === 'capitals') {
+    libraryItems = await getDueMasteryItems(db, profileId, 'capitals');
   }
+
+  const recentForBump = await getRecentCompletedByActivity(
+    db,
+    profileId,
+    input.activityType,
+    3
+  );
+  const completedForBump = recentForBump
+    .filter((r) => r.status === 'completed')
+    .map((r) => ({
+      score: r.score,
+      total: r.total,
+      completedAt: r.completedAt,
+    }));
+  const difficultyBump = shouldApplyDifficultyBump(completedForBump);
 
   return generateQuizRound({
     db,
@@ -152,6 +178,7 @@ async function buildAndGenerateRound(
     cefrCeiling,
     allVocabulary,
     topicTitles,
+    difficultyBump,
   });
 }
 
@@ -212,6 +239,7 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
           result.round.questions as QuizQuestion[]
         ),
         total: result.round.total,
+        difficultyBump: result.round.difficultyBump,
       },
       200
     );
@@ -250,13 +278,35 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
     // Throws NotFoundError if the round doesn't exist OR belongs to a
     // different profile — handled centrally by `app.onError` → 404.
     const round = await getRoundByIdOrThrow(db, profileId, roundId);
+    const questions = round.questions as QuizQuestion[];
+
+    if (round.status === 'completed') {
+      return c.json(
+        {
+          id: round.id,
+          activityType: round.activityType,
+          theme: round.theme,
+          status: round.status,
+          score: round.score,
+          total: round.total,
+          xpEarned: round.xpEarned,
+          completedAt: round.completedAt?.toISOString(),
+          questions: questions.map((q) => ({
+            ...toClientSafeQuestions([q])[0],
+            correctAnswer: q.correctAnswer,
+          })),
+          results: round.results,
+        },
+        200
+      );
+    }
 
     return c.json(
       {
         id: round.id,
         activityType: round.activityType,
         theme: round.theme,
-        questions: toClientSafeQuestions(round.questions as QuizQuestion[]),
+        questions: toClientSafeQuestions(questions),
         total: round.total,
       },
       200
@@ -291,9 +341,44 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
       const { results } = c.req.valid('json');
 
       const result = await completeQuizRound(db, profileId, roundId, results);
+
+      // Record streak activity — quiz round counts as daily learning activity.
+      // Fire-and-forget: streak failure must not block the completion response.
+      const today = new Date().toISOString().slice(0, 10);
+      recordSessionActivity(db, profileId, today).catch((err) =>
+        console.error('[quiz] recordSessionActivity failed:', err)
+      );
+
       return c.json(result, 200);
     }
   )
+  .post('/quiz/missed-items/mark-surfaced', async (c) => {
+    const profileId = requireProfileId(c.get('profileId'));
+    const db = c.get('db');
+
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return validationError(c, 'Request body must be valid JSON');
+    }
+
+    const parsed = markSurfacedInputSchema.safeParse(body);
+    if (!parsed.success) {
+      return validationError(
+        c,
+        `Invalid input: ${parsed.error.issues[0]?.message ?? 'unknown'}`
+      );
+    }
+
+    const markedCount = await markMissedItemsSurfaced(
+      db,
+      profileId,
+      parsed.data.activityType
+    );
+
+    return c.json({ markedCount }, 200);
+  })
   .get('/quiz/stats', async (c) => {
     const profileId = requireProfileId(c.get('profileId'));
     const db = c.get('db');

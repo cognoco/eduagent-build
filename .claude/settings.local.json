@@ -16,7 +16,9 @@
       "mcp__Claude_Preview__preview_start",
       "mcp__24dc3c08-1f26-4def-bcab-f98cad4118b5__notion-search",
       "mcp__24dc3c08-1f26-4def-bcab-f98cad4118b5__notion-fetch",
-      "mcp__24dc3c08-1f26-4def-bcab-f98cad4118b5__notion-create-pages"
+      "mcp__24dc3c08-1f26-4def-bcab-f98cad4118b5__notion-create-pages",
+      "mcp__24dc3c08-1f26-4def-bcab-f98cad4118b5__notion-update-page",
+      "mcp__Windows-MCP__Wait"
     ],
     "deny": [],
     "ask": []

@@ -110,7 +110,7 @@ describe('RLS coverage invariant', () => {
     }
 
     if (missing.length > 0) {
-      fail(
+      throw new Error(
         `[ASSUMP-F14] ${missing.length} profile-scoped table(s) missing ` +
           `ENABLE ROW LEVEL SECURITY in migrations:\n` +
           missing.map((t) => `  - ${t}`).join('\n') +

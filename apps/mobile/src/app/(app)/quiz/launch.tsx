@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import type { QuizRoundResponse } from '@eduagent/schemas';
 import { useGenerateRound } from '../../../hooks/use-quiz';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { useThemeColors } from '../../../lib/theme';
@@ -21,12 +22,23 @@ export default function QuizLaunchScreen(): React.ReactElement {
   const { activityType, subjectId, setRound } = useQuizFlow();
   const generateRound = useGenerateRound();
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
+  const [challengeRound, setChallengeRound] =
+    useState<QuizRoundResponse | null>(null);
   // [ASSUMP-F4] Surface a "still trying" hint after 20s so users on slow
   // networks know the app isn't frozen and can fall back to the explicit
   // Cancel button. Prevents the "infinite spinner" dead-end that the UX
   // audit flagged as the #1 source of kid abandonment.
   const [timedOut, setTimedOut] = useState(false);
   const startedRef = useRef(false);
+
+  const enterPlay = useCallback(
+    (round: QuizRoundResponse) => {
+      setRound(round);
+      setChallengeRound(null);
+      router.replace('/(app)/quiz/play' as never);
+    },
+    [router, setRound]
+  );
 
   // [ASSUMP-F1] Single entry point so retry gets the same onSuccess handler
   // as the initial mutation. Previously retry called `generateRound.mutate()`
@@ -38,12 +50,15 @@ export default function QuizLaunchScreen(): React.ReactElement {
       { activityType, subjectId: subjectId ?? undefined },
       {
         onSuccess: (round) => {
-          setRound(round);
-          router.replace('/(app)/quiz/play' as never);
+          if (round.difficultyBump) {
+            setChallengeRound(round);
+            return;
+          }
+          enterPlay(round);
         },
       }
     );
-  }, [activityType, generateRound, router, setRound, subjectId]);
+  }, [activityType, enterPlay, generateRound, subjectId]);
 
   useEffect(() => {
     if (!activityType) {
@@ -76,8 +91,52 @@ export default function QuizLaunchScreen(): React.ReactElement {
     return () => clearTimeout(timer);
   }, [generateRound.isPending]);
 
+  useEffect(() => {
+    if (!challengeRound) return;
+    const timer = setTimeout(() => {
+      enterPlay(challengeRound);
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [challengeRound, enterPlay]);
+
   if (!activityType) {
     return <View className="flex-1 bg-background" />;
+  }
+
+  if (challengeRound) {
+    return (
+      <View
+        className="flex-1 items-center justify-center bg-background px-6"
+        style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
+        testID="quiz-challenge-banner-screen"
+      >
+        <View
+          className="w-full rounded-card border border-primary bg-primary-soft p-6"
+          accessible
+          accessibilityRole="alert"
+          accessibilityLabel="Challenge round. This round is harder than usual."
+          testID="quiz-challenge-banner"
+        >
+          <Text className="text-center text-h3 font-bold text-text-primary">
+            Challenge round
+          </Text>
+          <Text className="mt-3 text-center text-body text-text-secondary">
+            You&apos;re on a streak. This one is harder.
+          </Text>
+          <Pressable
+            onPress={() => enterPlay(challengeRound)}
+            className="mt-5 min-h-[48px] items-center justify-center rounded-button bg-primary px-6 py-3"
+            accessibilityRole="button"
+            accessibilityLabel="Start challenge round"
+            testID="quiz-challenge-start"
+          >
+            <Text className="text-body font-semibold text-text-inverse">
+              Start
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+    );
   }
 
   if (generateRound.isError) {

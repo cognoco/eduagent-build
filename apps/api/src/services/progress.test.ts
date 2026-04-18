@@ -748,7 +748,7 @@ describe('getContinueSuggestion', () => {
       assessmentsFindMany: [],
       sessionsFindMany: [
         {
-          ...mockSessionRow(),
+          ...mockSessionRow({ topicId: 'topic-1' }),
           id: 'active-session-1',
           status: 'active' as const,
           lastActivityAt: new Date('2026-02-15T09:00:00.000Z'),
@@ -764,6 +764,54 @@ describe('getContinueSuggestion', () => {
 
     expect(result).not.toBeNull();
     expect(result!.lastSessionId).toBe('active-session-1');
+  });
+
+  it('[F-001] returns null lastSessionId when resumable session is on a different topic', async () => {
+    // Scenario from 2026-04-18 end-user test report:
+    //   - Resumable session exists, but it's on topic-2 (a topic already
+    //     paused/skipped-over in the curriculum).
+    //   - First unpassed topic (nextTopic) is topic-1.
+    //   - Previous behavior: returned sessionId from topic-2 with topicId
+    //     of topic-1 — a mismatch that caused the client to create a new
+    //     session row on top of a mismatched sessionId param.
+    //   - Correct behavior: lastSessionId is null so the client starts a
+    //     fresh session on topic-1 cleanly.
+    const subject = mockSubjectRow();
+    const topic1 = mockTopicRow({
+      id: 'topic-1',
+      title: 'Algebra',
+      sortOrder: 1,
+    });
+    const topic2 = mockTopicRow({
+      id: 'topic-2',
+      title: 'Geometry',
+      sortOrder: 2,
+    });
+
+    setupScopedRepo({
+      subjectsFindMany: [subject],
+      retentionCardsFindMany: [],
+      assessmentsFindMany: [],
+      sessionsFindMany: [
+        {
+          // resumable session on topic-2 — nextTopic will be topic-1
+          ...mockSessionRow({ topicId: 'topic-2' }),
+          id: 'mismatched-session',
+          status: 'active' as const,
+          lastActivityAt: new Date('2026-02-15T09:00:00.000Z'),
+        },
+      ],
+    });
+    const db = createMockDb({
+      curriculumSelectRows: [{ id: curriculumId, subjectId, version: 1 }],
+      topicsFindMany: [topic1, topic2],
+    });
+
+    const result = await getContinueSuggestion(db, profileId);
+
+    expect(result).not.toBeNull();
+    expect(result!.topicId).toBe('topic-1');
+    expect(result!.lastSessionId).toBeNull();
   });
 
   it('skips paused subjects', async () => {
@@ -808,13 +856,17 @@ describe('getContinueSuggestion', () => {
       assessmentsFindMany: [],
       sessionsFindMany: [
         {
-          ...mockSessionRow({ subjectId: geoSubjectId }),
+          // [F-001] Sessions must carry topicId matching the subject's
+          // nextTopic so the resumable filter finds them. Previously this
+          // test relied on the default topicId=null because the service
+          // didn't filter by topic.
+          ...mockSessionRow({ subjectId: geoSubjectId, topicId: 'geo-topic' }),
           id: 'old-geo-session',
           status: 'completed' as const,
           lastActivityAt: new Date('2026-02-08T10:00:00.000Z'), // 1 week ago
         },
         {
-          ...mockSessionRow({ subjectId: sciSubjectId }),
+          ...mockSessionRow({ subjectId: sciSubjectId, topicId: 'sci-topic' }),
           id: 'recent-sci-session',
           status: 'active' as const,
           lastActivityAt: new Date('2026-02-15T09:00:00.000Z'), // 1 hour ago

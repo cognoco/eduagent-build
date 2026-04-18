@@ -15,6 +15,8 @@ const mockCurriculumTopicsFindMany = jest.fn();
 const mockProgressSnapshotsFindFirst = jest.fn();
 const mockProgressSnapshotsFindMany = jest.fn();
 const mockMilestonesFindMany = jest.fn();
+const mockStreaksFindMany = jest.fn();
+const mockXpSelect = jest.fn();
 
 import { createDatabaseModuleMock } from '../test-utils/database-module';
 
@@ -51,6 +53,19 @@ const mockDatabaseModule = createDatabaseModuleMock({
     milestones: {
       profileId: 'profile_id',
       createdAt: 'created_at',
+    },
+    streaks: {
+      profileId: 'profile_id',
+    },
+    xpLedger: {
+      profileId: 'profile_id',
+      amount: 'amount',
+    },
+    sessionSummaries: {
+      id: 'id',
+      sessionId: 'session_id',
+      profileId: 'profile_id',
+      highlight: 'highlight',
     },
   },
 });
@@ -282,7 +297,15 @@ function createMockDb() {
       milestones: {
         findMany: mockMilestonesFindMany,
       },
+      streaks: {
+        findMany: mockStreaksFindMany,
+      },
+      sessionSummaries: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
     },
+    select: mockXpSelect,
   } as unknown;
 }
 
@@ -300,6 +323,15 @@ beforeEach(() => {
   mockProgressSnapshotsFindFirst.mockResolvedValue(null);
   mockProgressSnapshotsFindMany.mockResolvedValue([]);
   mockMilestonesFindMany.mockResolvedValue([]);
+  mockStreaksFindMany.mockResolvedValue([]);
+  // XP query uses db.select().from().where().groupBy() chain
+  mockXpSelect.mockReturnValue({
+    from: jest.fn().mockReturnValue({
+      where: jest.fn().mockReturnValue({
+        groupBy: jest.fn().mockResolvedValue([]),
+      }),
+    }),
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -710,188 +742,5 @@ describe('getChildSessions', () => {
     expect(result[1].displaySummary).toBe(
       '5 problems, practiced linear equations.'
     );
-  });
-});
-
-// ---------------------------------------------------------------------------
-// getChildSessionTranscript
-// ---------------------------------------------------------------------------
-
-describe('getChildSessionTranscript', () => {
-  // [EP15-I5] Break test — transcripts contain full conversation history.
-  // Access denial must be a 403, not a 200 with null body. Note the
-  // "returns null when session does not belong to child" test further down
-  // is still correct — that null means "access granted but 404", not "forbidden".
-  it('throws ForbiddenError when no parent-child link exists', async () => {
-    const { getChildSessionTranscript } = await importDbFunctions();
-    const { ForbiddenError } = await import('../errors');
-    const db = createMockDb();
-
-    mockFamilyLinksFindFirst.mockResolvedValue(null);
-
-    await expect(
-      getChildSessionTranscript(db as never, PARENT_ID, CHILD_ID, SESSION_ID_1)
-    ).rejects.toBeInstanceOf(ForbiddenError);
-    expect(mockSessionsFindFirst).not.toHaveBeenCalled();
-  });
-
-  it('returns null when session does not belong to child', async () => {
-    const { getChildSessionTranscript } = await importDbFunctions();
-    const db = createMockDb();
-
-    mockFamilyLinksFindFirst.mockResolvedValue({
-      parentProfileId: PARENT_ID,
-      childProfileId: CHILD_ID,
-    });
-    mockSessionsFindFirst.mockResolvedValue(null);
-
-    const result = await getChildSessionTranscript(
-      db as never,
-      PARENT_ID,
-      CHILD_ID,
-      SESSION_ID_1
-    );
-
-    expect(result).toBeNull();
-  });
-
-  it('returns transcript with exchanges in chronological order', async () => {
-    const { getChildSessionTranscript } = await importDbFunctions();
-    const db = createMockDb();
-
-    mockFamilyLinksFindFirst.mockResolvedValue({
-      parentProfileId: PARENT_ID,
-      childProfileId: CHILD_ID,
-    });
-
-    const sessionStart = new Date('2025-06-01T10:00:00Z');
-    mockSessionsFindFirst.mockResolvedValue({
-      id: SESSION_ID_1,
-      subjectId: SUBJECT_ID,
-      topicId: TOPIC_ID_1,
-      sessionType: 'learning',
-      startedAt: sessionStart,
-      exchangeCount: 4,
-      metadata: {
-        homeworkSummary: {
-          problemCount: 2,
-          practicedSkills: ['fractions'],
-          independentProblemCount: 1,
-          guidedProblemCount: 1,
-          summary: '2 problems, practiced fractions.',
-          displayTitle: 'Math Homework',
-        },
-      },
-    });
-
-    const t1 = new Date('2025-06-01T10:00:10Z');
-    const t2 = new Date('2025-06-01T10:00:20Z');
-    const t3 = new Date('2025-06-01T10:00:30Z');
-    const t4 = new Date('2025-06-01T10:00:40Z');
-
-    mockSessionEventsFindMany.mockResolvedValue([
-      {
-        eventType: 'user_message',
-        content: 'What is gravity?',
-        createdAt: t1,
-        metadata: null,
-      },
-      {
-        eventType: 'ai_response',
-        content:
-          'Great question! What do you think happens when you drop a ball?',
-        createdAt: t2,
-        metadata: { escalationRung: 1 },
-      },
-      {
-        eventType: 'user_message',
-        content: 'It falls down',
-        createdAt: t3,
-        metadata: null,
-      },
-      {
-        eventType: 'ai_response',
-        content: 'Exactly! Gravity pulls objects toward Earth.',
-        createdAt: t4,
-        metadata: { escalationRung: 2 },
-      },
-    ]);
-
-    const result = await getChildSessionTranscript(
-      db as never,
-      PARENT_ID,
-      CHILD_ID,
-      SESSION_ID_1
-    );
-
-    expect(result).not.toBeNull();
-    expect(result!.session.sessionId).toBe(SESSION_ID_1);
-    expect(result!.session.subjectId).toBe(SUBJECT_ID);
-    expect(result!.session.topicId).toBe(TOPIC_ID_1);
-    expect(result!.session.startedAt).toBe(sessionStart.toISOString());
-    expect(result!.session.exchangeCount).toBe(4);
-    expect(result!.session.displayTitle).toBe('Math Homework');
-    expect(result!.session.displaySummary).toBe(
-      '2 problems, practiced fractions.'
-    );
-
-    expect(result!.exchanges).toHaveLength(4);
-    expect(result!.exchanges[0].role).toBe('user');
-    expect(result!.exchanges[0].content).toBe('What is gravity?');
-    expect(result!.exchanges[1].role).toBe('assistant');
-    expect(result!.exchanges[1].escalationRung).toBe(1);
-    expect(result!.exchanges[2].role).toBe('user');
-    expect(result!.exchanges[2].escalationRung).toBeUndefined();
-    expect(result!.exchanges[3].role).toBe('assistant');
-    expect(result!.exchanges[3].escalationRung).toBe(2);
-  });
-
-  it('handles AI responses with missing metadata gracefully', async () => {
-    const { getChildSessionTranscript } = await importDbFunctions();
-    const db = createMockDb();
-
-    mockFamilyLinksFindFirst.mockResolvedValue({
-      parentProfileId: PARENT_ID,
-      childProfileId: CHILD_ID,
-    });
-
-    mockSessionsFindFirst.mockResolvedValue({
-      id: SESSION_ID_1,
-      subjectId: SUBJECT_ID,
-      topicId: null,
-      sessionType: 'learning',
-      startedAt: new Date('2025-06-01T10:00:00Z'),
-      exchangeCount: 2,
-    });
-
-    const t1 = new Date('2025-06-01T10:00:10Z');
-    const t2 = new Date('2025-06-01T10:00:20Z');
-
-    mockSessionEventsFindMany.mockResolvedValue([
-      {
-        eventType: 'user_message',
-        content: 'Hello',
-        createdAt: t1,
-        metadata: null,
-      },
-      {
-        eventType: 'ai_response',
-        content: 'Hi there!',
-        createdAt: t2,
-        metadata: null,
-      },
-    ]);
-
-    const result = await getChildSessionTranscript(
-      db as never,
-      PARENT_ID,
-      CHILD_ID,
-      SESSION_ID_1
-    );
-
-    expect(result).not.toBeNull();
-    expect(result!.exchanges).toHaveLength(2);
-    expect(result!.exchanges[1].role).toBe('assistant');
-    expect(result!.exchanges[1].escalationRung).toBeUndefined();
   });
 });

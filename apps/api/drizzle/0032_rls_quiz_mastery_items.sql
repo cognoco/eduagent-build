@@ -1,0 +1,1 @@
+ALTER TABLE "quiz_mastery_items" ENABLE ROW LEVEL SECURITY;

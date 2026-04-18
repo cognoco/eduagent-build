@@ -223,6 +223,14 @@ beforeEach(() => {
       findFirst: jest.fn().mockResolvedValue(undefined),
       findMany: jest.fn().mockResolvedValue([]),
     },
+    quizMasteryItems: {
+      findFirst: jest.fn().mockResolvedValue(undefined),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
+    quizMissedItems: {
+      findFirst: jest.fn().mockResolvedValue(undefined),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
   };
   setInsertReturning();
   setUpdateReturning();
@@ -429,6 +437,19 @@ describe('Quiz routes', () => {
       expect(body.activityType).toBe('vocabulary');
       expect(body.questions[0].type).toBe('vocabulary');
       expect(body.total).toBe(6);
+      // [F-014 break test] Answer fields MUST be stripped from vocabulary
+      // questions. Pre-shuffled `options` is the only legitimate answer-
+      // bearing field. This catches a stale deploy regression where the
+      // client sees correctAnswer/acceptedAnswers/distractors in DevTools.
+      for (const q of body.questions) {
+        expect(q.options).toBeDefined();
+        expect(Array.isArray(q.options)).toBe(true);
+        expect(q.options.length).toBeGreaterThanOrEqual(2);
+        expect(q.correctAnswer).toBeUndefined();
+        expect(q.acceptedAnswers).toBeUndefined();
+        expect(q.acceptedAliases).toBeUndefined();
+        expect(q.distractors).toBeUndefined();
+      }
     });
   });
 
@@ -548,6 +569,16 @@ describe('Quiz routes', () => {
       expect(body.questions[0].type).toBe('guess_who');
       expect(body.questions[0].clues).toHaveLength(5);
       expect(body.questions[0].mcFallbackOptions).toBeDefined();
+      // [F-014 break test] Guess Who questions leak correctAnswer +
+      // canonicalName + acceptedAliases if the answer-stripping projection
+      // is bypassed. Users can peek the answer in DevTools before the first
+      // clue is revealed. Clues and mcFallbackOptions are the only fields
+      // the client legitimately needs.
+      for (const q of body.questions) {
+        expect(q.correctAnswer).toBeUndefined();
+        expect(q.canonicalName).toBeUndefined();
+        expect(q.acceptedAliases).toBeUndefined();
+      }
     });
   });
 
@@ -583,6 +614,38 @@ describe('Quiz routes', () => {
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.id).toBe('round-1');
+    });
+
+    it('strips answer fields and returns pre-shuffled options (GET endpoint)', async () => {
+      // [F-014 break test] The POST endpoint already has stripping tests,
+      // but the GET endpoint was untested. Observed 2026-04-18: staging
+      // returned unstripped questions on GET /v1/quiz/rounds/:id, leaking
+      // correctAnswer / acceptedAliases / distractors to the network layer.
+      // This asserts BOTH: the functional requirement (client gets options)
+      // AND the security requirement (no answer fields in response).
+      (mockDb as any).query.quizRounds.findFirst = jest
+        .fn()
+        .mockResolvedValue(ACTIVE_ROUND);
+
+      const res = await app.request(
+        '/v1/quiz/rounds/round-1',
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.questions.length).toBeGreaterThanOrEqual(1);
+      for (const q of body.questions) {
+        expect(q.options).toBeDefined();
+        expect(Array.isArray(q.options)).toBe(true);
+        expect(q.options.length).toBeGreaterThanOrEqual(2);
+        expect(q.correctAnswer).toBeUndefined();
+        expect(q.acceptedAliases).toBeUndefined();
+        expect(q.acceptedAnswers).toBeUndefined();
+        expect(q.distractors).toBeUndefined();
+        expect(q.canonicalName).toBeUndefined();
+      }
     });
   });
 

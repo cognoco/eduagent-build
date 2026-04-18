@@ -50,6 +50,7 @@ export default function TopicDetailScreen() {
     masteryScore,
     retentionStatus,
     subjectId: rawSubjectId,
+    subjectName: rawSubjectName,
   } = useLocalSearchParams<{
     topicId: string;
     profileId: string;
@@ -58,6 +59,7 @@ export default function TopicDetailScreen() {
     masteryScore: string;
     retentionStatus: string;
     subjectId: string;
+    subjectName: string;
   }>();
   const topicId = Array.isArray(rawTopicId) ? rawTopicId[0] : rawTopicId;
   const profileId = Array.isArray(rawProfileId)
@@ -66,6 +68,9 @@ export default function TopicDetailScreen() {
   const subjectId = Array.isArray(rawSubjectId)
     ? rawSubjectId[0]
     : rawSubjectId;
+  const subjectName = Array.isArray(rawSubjectName)
+    ? rawSubjectName[0]
+    : rawSubjectName;
 
   const mastery =
     masteryScore !== undefined && masteryScore !== ''
@@ -99,9 +104,9 @@ export default function TopicDetailScreen() {
           <Text className="text-h2 font-bold text-text-primary">
             {title ?? 'Topic'}
           </Text>
-          {subjectId ? (
+          {subjectName || subjectId ? (
             <Text className="text-body-sm text-text-secondary mt-0.5">
-              {subjectId}
+              {subjectName ?? subjectId}
             </Text>
           ) : null}
         </View>

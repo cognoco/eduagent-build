@@ -1,4 +1,4 @@
-import { eq, and, desc, sql, type SQL, type Column } from 'drizzle-orm';
+import { eq, and, desc, lte, sql, type SQL, type Column } from 'drizzle-orm';
 import type { Database } from './client';
 import {
   profiles,
@@ -28,6 +28,7 @@ import {
   dictationResults,
   quizRounds,
   quizMissedItems,
+  quizMasteryItems,
 } from './schema/index';
 
 export function createScopedRepository(db: Database, profileId: string) {
@@ -503,6 +504,157 @@ export function createScopedRepository(db: Database, profileId: string) {
           .insert(quizMissedItems)
           .values(values.map((v) => ({ ...v, profileId })))
           .returning({ id: quizMissedItems.id });
+      },
+      async markSurfaced(
+        activityType: (typeof quizMissedItems.$inferSelect)['activityType']
+      ) {
+        const rows = await db
+          .update(quizMissedItems)
+          .set({ surfaced: true })
+          .where(
+            and(
+              eq(quizMissedItems.profileId, profileId),
+              eq(quizMissedItems.activityType, activityType),
+              eq(quizMissedItems.surfaced, false)
+            )
+          )
+          .returning({ id: quizMissedItems.id });
+        return rows.length;
+      },
+    },
+
+    quizMasteryItems: {
+      async findDueByActivity(
+        activityType: 'capitals' | 'guess_who',
+        limit: number
+      ) {
+        return db.query.quizMasteryItems.findMany({
+          where: scopedWhere(
+            quizMasteryItems,
+            and(
+              eq(quizMasteryItems.activityType, activityType),
+              lte(quizMasteryItems.nextReviewAt, new Date())
+            )
+          ),
+          orderBy: [quizMasteryItems.nextReviewAt],
+          limit,
+        });
+      },
+
+      async upsertFromCorrectAnswer(values: {
+        activityType: 'capitals' | 'guess_who';
+        itemKey: string;
+        itemAnswer: string;
+      }) {
+        const nextReview = new Date();
+        nextReview.setDate(nextReview.getDate() + 1);
+
+        const [row] = await db
+          .insert(quizMasteryItems)
+          .values({
+            profileId,
+            activityType: values.activityType,
+            itemKey: values.itemKey,
+            itemAnswer: values.itemAnswer,
+            easeFactor: '2.5',
+            interval: 1,
+            repetitions: 0,
+            nextReviewAt: nextReview,
+          })
+          .onConflictDoNothing({
+            target: [
+              quizMasteryItems.profileId,
+              quizMasteryItems.activityType,
+              quizMasteryItems.itemKey,
+            ],
+          })
+          .returning({ id: quizMasteryItems.id });
+        return row ?? null;
+      },
+
+      async updateSm2(
+        itemKey: string,
+        activityType: 'capitals' | 'guess_who',
+        values: {
+          easeFactor: string;
+          interval: number;
+          repetitions: number;
+          nextReviewAt: Date;
+        }
+      ) {
+        return db
+          .update(quizMasteryItems)
+          .set({
+            easeFactor: values.easeFactor,
+            interval: values.interval,
+            repetitions: values.repetitions,
+            nextReviewAt: values.nextReviewAt,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(quizMasteryItems.profileId, profileId),
+              eq(quizMasteryItems.activityType, activityType),
+              eq(quizMasteryItems.itemKey, itemKey)
+            )
+          )
+          .returning({ id: quizMasteryItems.id });
+      },
+
+      async findByKey(activityType: 'capitals' | 'guess_who', itemKey: string) {
+        return db.query.quizMasteryItems.findFirst({
+          where: scopedWhere(
+            quizMasteryItems,
+            and(
+              eq(quizMasteryItems.activityType, activityType),
+              eq(quizMasteryItems.itemKey, itemKey)
+            )
+          ),
+        });
+      },
+
+      async incrementMcSuccessCount(
+        itemKey: string,
+        activityType: 'capitals' | 'guess_who'
+      ) {
+        return db
+          .update(quizMasteryItems)
+          .set({
+            mcSuccessCount: sql`${quizMasteryItems.mcSuccessCount} + 1`,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(quizMasteryItems.profileId, profileId),
+              eq(quizMasteryItems.activityType, activityType),
+              eq(quizMasteryItems.itemKey, itemKey)
+            )
+          )
+          .returning({
+            id: quizMasteryItems.id,
+            mcSuccessCount: quizMasteryItems.mcSuccessCount,
+          });
+      },
+
+      async resetMcSuccessCount(
+        itemKey: string,
+        activityType: 'capitals' | 'guess_who',
+        resetTo: number
+      ) {
+        return db
+          .update(quizMasteryItems)
+          .set({
+            mcSuccessCount: resetTo,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(quizMasteryItems.profileId, profileId),
+              eq(quizMasteryItems.activityType, activityType),
+              eq(quizMasteryItems.itemKey, itemKey)
+            )
+          )
+          .returning({ id: quizMasteryItems.id });
       },
     },
   };

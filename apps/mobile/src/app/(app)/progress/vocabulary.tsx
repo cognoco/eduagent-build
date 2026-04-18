@@ -83,6 +83,20 @@ export default function VocabularyBrowserScreen(): React.ReactElement {
   const totalVocab = inventory?.global.vocabularyTotal ?? 0;
   const isEmpty = !isLoading && !isError && totalVocab === 0;
   const newLearner = isNewLearner(inventory?.global.totalSessions);
+  // [F-013] If the user already has a language subject but zero words yet,
+  // suggest practicing it by name rather than implying they need a new one.
+  // `four_strands` is the language-pedagogy discriminator used across the app.
+  const existingLanguageSubjects =
+    inventory?.subjects
+      .filter((s) => s.pedagogyMode === 'four_strands')
+      .map((s) => s.subjectName) ?? [];
+  const hasLanguageSubject = existingLanguageSubjects.length > 0;
+  const emptyMessage =
+    existingLanguageSubjects.length === 1
+      ? `Practice ${existingLanguageSubjects[0]} to start building your word list.`
+      : existingLanguageSubjects.length > 1
+      ? 'Practice a language subject to start building your word list.'
+      : 'Start a language subject and the words you learn will appear here.';
 
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
@@ -138,6 +152,26 @@ export default function VocabularyBrowserScreen(): React.ReactElement {
               testID="vocab-browser-error-fallback"
             />
           </View>
+        ) : !isLoading && !isError && !hasLanguageSubject ? (
+          <View
+            className="flex-1 items-center justify-center px-6"
+            testID="vocab-browser-no-language"
+          >
+            <Text className="text-text-secondary text-center text-base">
+              Vocabulary tracking is available for language subjects.
+            </Text>
+            <Pressable
+              onPress={() =>
+                goBackOrReplace(router, '/(app)/progress' as const)
+              }
+              className="mt-4 rounded-lg bg-primary px-6 py-3"
+              accessibilityRole="button"
+              accessibilityLabel="Go back"
+              testID="vocab-browser-no-language-back"
+            >
+              <Text className="text-text-inverse font-medium">Go Back</Text>
+            </Pressable>
+          </View>
         ) : isEmpty && newLearner ? (
           <View
             className="bg-surface rounded-card p-5 mt-4 items-center"
@@ -172,7 +206,7 @@ export default function VocabularyBrowserScreen(): React.ReactElement {
               No vocabulary yet
             </Text>
             <Text className="text-body-sm text-text-secondary text-center mt-2">
-              Start a language subject and the words you learn will appear here.
+              {emptyMessage}
             </Text>
             <Pressable
               onPress={() =>

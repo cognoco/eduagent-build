@@ -1,12 +1,12 @@
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   Switch,
   Text,
   View,
 } from 'react-native';
+import { platformAlert } from '../../lib/platform-alert';
 import { useCallback, useMemo, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -23,11 +23,13 @@ import { goBackOrReplace } from '../../lib/navigation';
 import {
   useDeleteAllMemory,
   useDeleteMemoryItem,
+  useGrantMemoryConsent,
   useLearnerProfile,
   useTellMentor,
   useToggleMemoryInjection,
   useUnsuppressInference,
 } from '../../hooks/use-learner-profile';
+import { MemoryConsentPrompt } from '../../components/memory-consent-prompt';
 
 export default function MentorMemoryScreen() {
   const insets = useSafeAreaInsets();
@@ -39,11 +41,24 @@ export default function MentorMemoryScreen() {
   const tellMentor = useTellMentor();
   const toggleInjection = useToggleMemoryInjection();
   const unsuppress = useUnsuppressInference();
+  const grantConsent = useGrantMemoryConsent();
   const [draft, setDraft] = useState('');
 
   const learningStyleRows = useMemo(
     () => getLearningStyleRows(profile?.learningStyle ?? null),
     [profile?.learningStyle]
+  );
+
+  // [F-021] Check if all five data sections are empty — if so, render a
+  // single hero empty state instead of five repetitive "Nothing saved yet."
+  const allSectionsEmpty = useMemo(
+    () =>
+      learningStyleRows.length === 0 &&
+      (profile?.interests ?? []).length === 0 &&
+      (profile?.strengths ?? []).length === 0 &&
+      (profile?.struggles ?? []).length === 0 &&
+      (profile?.communicationNotes ?? []).length === 0,
+    [learningStyleRows, profile]
   );
 
   const accommodationMode = profile?.accommodationMode ?? 'none';
@@ -83,7 +98,7 @@ export default function MentorMemoryScreen() {
   }, [accommodationMode, activeProfile?.birthYear]);
 
   const handleDeleteAll = useCallback(() => {
-    Alert.alert(
+    platformAlert(
       'Clear mentor memory?',
       'This removes everything the mentor has remembered about you and turns memory off until you enable it again.',
       [
@@ -95,7 +110,7 @@ export default function MentorMemoryScreen() {
             try {
               await deleteAll.mutateAsync({});
             } catch {
-              Alert.alert('Could not clear memory', 'Please try again.');
+              platformAlert('Could not clear memory', 'Please try again.');
             }
           },
         },
@@ -110,7 +125,7 @@ export default function MentorMemoryScreen() {
       await tellMentor.mutateAsync({ text });
       setDraft('');
     } catch {
-      Alert.alert('Could not save that', 'Please try again.');
+      platformAlert('Could not save that', 'Please try again.');
     }
   }, [draft, tellMentor]);
 
@@ -122,7 +137,7 @@ export default function MentorMemoryScreen() {
             memoryInjectionEnabled: value,
           });
         } catch {
-          Alert.alert('Could not update memory', 'Please try again.');
+          platformAlert('Could not update memory', 'Please try again.');
         }
       })();
     },
@@ -203,11 +218,21 @@ export default function MentorMemoryScreen() {
           <Text className="text-body font-semibold text-text-primary">
             Memory status
           </Text>
-          <Text className="text-body-sm text-text-secondary mt-1">
+          <Text
+            className="text-body-sm text-text-secondary mt-1"
+            testID="memory-status-text"
+          >
             {consentStatus === 'granted'
               ? 'Memory collection is enabled.'
               : consentStatus === 'declined'
               ? 'Memory collection is turned off.'
+              : // BUG-[NOTION-3468bce9]: role-aware pending copy.
+              // Adult/owner accounts (isOwner === true) control their own
+              // consent — don't tell them a guardian must act. Child
+              // profiles under a family link (isOwner === false) DO need
+              // a parent/guardian to enable memory collection.
+              activeProfile?.isOwner
+              ? "Memory collection hasn't been enabled yet."
               : 'A parent or guardian still needs to enable memory collection.'}
           </Text>
           <View className="flex-row items-center justify-between mt-4">
@@ -222,6 +247,40 @@ export default function MentorMemoryScreen() {
             />
           </View>
         </View>
+
+        {consentStatus === 'pending' && activeProfile?.isOwner && (
+          <View className="mt-3">
+            <MemoryConsentPrompt
+              title="Enable mentor memory"
+              description="Let the mentor remember what works for you — your strengths, preferred explanations, and topics you find tricky."
+              isPending={grantConsent.isPending}
+              onGrant={() =>
+                void (async () => {
+                  try {
+                    await grantConsent.mutateAsync({ consent: 'granted' });
+                  } catch {
+                    platformAlert(
+                      'Could not enable memory',
+                      'Please try again.'
+                    );
+                  }
+                })()
+              }
+              onDecline={() =>
+                void (async () => {
+                  try {
+                    await grantConsent.mutateAsync({ consent: 'declined' });
+                  } catch {
+                    platformAlert(
+                      'Could not update memory',
+                      'Please try again.'
+                    );
+                  }
+                })()
+              }
+            />
+          </View>
+        )}
 
         {accommodationBadgeText ? (
           <View
@@ -248,6 +307,22 @@ export default function MentorMemoryScreen() {
           />
         </MemorySection>
 
+        {allSectionsEmpty ? (
+          <View
+            className="items-center py-10 px-4"
+            testID="mentor-memory-all-empty"
+          >
+            <Text className="text-body font-semibold text-text-primary text-center">
+              Your mentor is getting to know you
+            </Text>
+            <Text className="text-body-sm text-text-secondary text-center mt-2">
+              As you study, your mentor will learn about your interests,
+              strengths, and how you like to learn. Everything will appear here
+              over time.
+            </Text>
+          </View>
+        ) : null}
+
         <MemorySection title="Learning Style">
           {learningStyleRows.length > 0 ? (
             learningStyleRows.map((row) => (
@@ -263,7 +338,7 @@ export default function MentorMemoryScreen() {
                       suppress: true,
                     });
                   } catch {
-                    Alert.alert('Could not delete item', 'Please try again.');
+                    platformAlert('Could not delete item', 'Please try again.');
                   }
                 }}
               />
@@ -287,7 +362,7 @@ export default function MentorMemoryScreen() {
                       suppress: true,
                     });
                   } catch {
-                    Alert.alert('Could not delete item', 'Please try again.');
+                    platformAlert('Could not delete item', 'Please try again.');
                   }
                 }}
               />
@@ -312,7 +387,7 @@ export default function MentorMemoryScreen() {
                       suppress: true,
                     });
                   } catch {
-                    Alert.alert('Could not delete item', 'Please try again.');
+                    platformAlert('Could not delete item', 'Please try again.');
                   }
                 }}
               />
@@ -347,7 +422,10 @@ export default function MentorMemoryScreen() {
                         suppress: true,
                       });
                     } catch {
-                      Alert.alert('Could not delete item', 'Please try again.');
+                      platformAlert(
+                        'Could not delete item',
+                        'Please try again.'
+                      );
                     }
                   }}
                 />
@@ -372,7 +450,7 @@ export default function MentorMemoryScreen() {
                       suppress: true,
                     });
                   } catch {
-                    Alert.alert('Could not delete item', 'Please try again.');
+                    platformAlert('Could not delete item', 'Please try again.');
                   }
                 }}
               />
@@ -396,7 +474,10 @@ export default function MentorMemoryScreen() {
                   try {
                     await unsuppress.mutateAsync({ value });
                   } catch {
-                    Alert.alert('Could not restore item', 'Please try again.');
+                    platformAlert(
+                      'Could not restore item',
+                      'Please try again.'
+                    );
                   }
                 }}
               />

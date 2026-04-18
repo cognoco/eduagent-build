@@ -11,3 +11,4 @@ export * from './notes';
 export * from './learning-profiles';
 export * from './dictation';
 export * from './quiz';
+export * from './quiz-mastery';

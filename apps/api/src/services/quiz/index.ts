@@ -19,12 +19,15 @@ export {
 export {
   abandonStaleQuizRounds,
   getRecentAnswers,
+  getRecentCompletedByActivity,
   getVocabularyRoundContext,
   getGuessWhoRoundContext,
   getRoundById,
   getRoundByIdOrThrow,
   listRecentCompletedRounds,
   computeRoundStats,
+  markMissedItemsSurfaced,
+  getDueMasteryItems,
 } from './queries';
 export {
   buildGuessWhoPrompt,
@@ -32,3 +35,11 @@ export {
   buildGuessWhoDiscoveryQuestions,
   clueMentionsGuessWhoName,
 } from './guess-who-provider';
+export { shouldApplyDifficultyBump } from './difficulty-bump';
+export {
+  applyQuizSm2,
+  buildCapitalsMasteryLibraryItem,
+  buildGuessWhoMasteryLibraryItem,
+} from './mastery-provider';
+export { computeCapitalsItemKey, computeGuessWhoItemKey } from './mastery-keys';
+export { getCapitalsSm2Quality, getGuessWhoSm2Quality } from './complete-round';

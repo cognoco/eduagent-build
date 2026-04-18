@@ -126,7 +126,31 @@ export async function listRecentCompletedRounds(
  */
 export async function computeRoundStats(db: Database, profileId: string) {
   const repo = createScopedRepository(db, profileId);
-  return repo.quizRounds.aggregateCompletedStats();
+  const baseStats = await repo.quizRounds.aggregateCompletedStats();
+
+  // Compute bestConsecutive per activity by scanning results arrays
+  const allCompleted = await repo.quizRounds.findMany(
+    eq(quizRounds.status, 'completed')
+  );
+
+  const consecutiveByActivity = new Map<string, number>();
+  for (const round of allCompleted) {
+    const results = (round.results ?? []) as Array<{ correct: boolean }>;
+    let maxStreak = 0;
+    let current = 0;
+    for (const r of results) {
+      current = r.correct ? current + 1 : 0;
+      if (current > maxStreak) maxStreak = current;
+    }
+    const prev = consecutiveByActivity.get(round.activityType) ?? 0;
+    if (maxStreak > prev)
+      consecutiveByActivity.set(round.activityType, maxStreak);
+  }
+
+  return baseStats.map((stat) => ({
+    ...stat,
+    bestConsecutive: consecutiveByActivity.get(stat.activityType) ?? null,
+  }));
 }
 
 export async function getVocabularyRoundContext(
@@ -244,6 +268,56 @@ export async function getGuessWhoRoundContext(
     .limit(30);
 
   return { topicTitles: topics.map((t) => t.title) };
+}
+
+/**
+ * Fetch the most recent rounds for a given activity type, used for the
+ * difficulty bump check. Returns all statuses (caller filters to 'completed').
+ */
+export async function getRecentCompletedByActivity(
+  db: Database,
+  profileId: string,
+  activityType: QuizActivityType,
+  limit: number
+) {
+  const repo = createScopedRepository(db, profileId);
+  return repo.quizRounds.findRecentByActivity(activityType, limit);
+}
+
+/**
+ * Mark all unsurfaced missed items for the given profile + activity type as
+ * surfaced. Called when the learner taps or dismisses the quiz discovery card
+ * so the card doesn't re-appear for already-addressed items.
+ *
+ * Returns the number of rows updated.
+ */
+export async function markMissedItemsSurfaced(
+  db: Database,
+  profileId: string,
+  activityType: QuizActivityType
+): Promise<number> {
+  const repo = createScopedRepository(db, profileId);
+  return repo.quizMissedItems.markSurfaced(activityType);
+}
+
+/**
+ * Fetch due mastery items for capitals or guess_who. Returns items whose
+ * nextReviewAt <= now, ordered oldest-first, limited to 20 per call.
+ */
+export async function getDueMasteryItems(
+  db: Database,
+  profileId: string,
+  activityType: 'capitals' | 'guess_who'
+): Promise<LibraryItem[]> {
+  const repo = createScopedRepository(db, profileId);
+  const rows = await repo.quizMasteryItems.findDueByActivity(activityType, 20);
+
+  return rows.map((row) => ({
+    id: row.itemKey,
+    question: row.itemKey,
+    answer: row.itemAnswer,
+    mcSuccessCount: row.mcSuccessCount,
+  }));
 }
 
 // ---------------------------------------------------------------------------

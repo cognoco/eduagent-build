@@ -1,0 +1,1 @@
+ALTER TABLE "session_summaries" ADD COLUMN "highlight" text;

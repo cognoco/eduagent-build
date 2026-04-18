@@ -5,6 +5,7 @@ import {
   type CapitalsQuestion,
   guessWhoLlmOutputSchema,
   type QuizQuestion,
+  type GuessWhoQuestion,
   type QuizActivityType,
   vocabularyLlmOutputSchema,
   type VocabularyQuestion,
@@ -21,14 +22,20 @@ import { shuffle } from './shuffle';
 import {
   buildVocabularyMasteryQuestion,
   buildVocabularyPrompt,
+  nextCefrLevel,
   validateVocabularyRound,
 } from './vocabulary-provider';
 import {
   buildGuessWhoDiscoveryQuestions,
+  buildGuessWhoMasteryCluePrompt,
   buildGuessWhoPrompt,
+  guessWhoMasteryClueSchema,
   validateGuessWhoRound,
 } from './guess-who-provider';
 import { describeAgeBracket, type AgeBracket } from './config';
+import { createLogger } from '../logger';
+
+const logger = createLogger();
 
 interface CapitalsPromptParams {
   discoveryCount: number;
@@ -97,8 +104,11 @@ export function injectMasteryQuestions(
     return discoveryQuestions;
   }
 
+  const FREE_TEXT_UNLOCK_THRESHOLD = 3;
   const masteryQuestions = masteryItems.map((item) => {
     const reference = CAPITALS_BY_COUNTRY.get(item.question.toLowerCase());
+    const freeTextEligible =
+      (item.mcSuccessCount ?? 0) >= FREE_TEXT_UNLOCK_THRESHOLD;
     return {
       type: 'capitals',
       country: reference?.country ?? item.question,
@@ -108,6 +118,7 @@ export function injectMasteryQuestions(
       funFact: reference?.funFact ?? '',
       isLibraryItem: true,
       topicId: item.topicId ?? undefined,
+      freeTextEligible: freeTextEligible || undefined,
     } satisfies CapitalsQuestion;
   });
 
@@ -229,6 +240,7 @@ interface GenerateParams {
   cefrCeiling?: CefrLevel;
   allVocabulary?: Array<{ term: string; translation: string }>;
   topicTitles?: string[];
+  difficultyBump?: boolean;
 }
 
 export async function generateQuizRound(params: GenerateParams): Promise<{
@@ -236,6 +248,7 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
   theme: string;
   questions: QuizQuestion[];
   total: number;
+  difficultyBump: boolean;
 }> {
   const {
     db,
@@ -249,6 +262,7 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
     cefrCeiling,
     allVocabulary,
     topicTitles,
+    difficultyBump = false,
   } = params;
 
   const plan = resolveRoundContent({
@@ -262,12 +276,20 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
   let questions: QuizQuestion[] = [];
 
   if (activityType === 'capitals') {
-    const prompt = buildCapitalsPrompt({
+    let prompt = buildCapitalsPrompt({
       discoveryCount: plan.discoveryCount,
       ageBracket,
       recentAnswers,
       themePreference,
     });
+    if (difficultyBump) {
+      prompt +=
+        '\n\nDIFFICULTY BUMP: The learner is on a streak. Choose lesser-known countries. Distractors should be from the same region as the correct answer.';
+      logger.info('quiz_round.difficulty_bump.applied', {
+        profileId,
+        activityType,
+      });
+    }
 
     const messages: ChatMessage[] = [
       { role: 'system', content: prompt },
@@ -329,13 +351,17 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
       );
     }
 
+    const effectiveCefrCeiling = difficultyBump
+      ? nextCefrLevel(cefrCeiling)
+      : cefrCeiling;
+
     const prompt = buildVocabularyPrompt({
       discoveryCount: plan.discoveryCount,
       ageBracket,
       recentAnswers,
       bankEntries: allVocabulary ?? [],
       languageCode,
-      cefrCeiling,
+      cefrCeiling: effectiveCefrCeiling,
       themePreference,
     });
 
@@ -370,7 +396,7 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
       throw new UpstreamLlmError('Quiz LLM returned invalid structured output');
     }
 
-    const validated = validateVocabularyRound(llmOutput, cefrCeiling);
+    const validated = validateVocabularyRound(llmOutput, effectiveCefrCeiling);
     if (validated.questions.length === 0) {
       throw new UpstreamLlmError('No valid questions after validation');
     }
@@ -382,7 +408,7 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
       const result = buildVocabularyMasteryQuestion(
         item,
         allVocabulary ?? [],
-        item.cefrLevel ?? cefrCeiling
+        item.cefrLevel ?? effectiveCefrCeiling
       );
       return result.ok ? [result.question] : [];
     });
@@ -390,13 +416,17 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
     questions = injectAtRandomPositions(discoveryQuestions, masteryQuestions);
     theme = validated.theme;
   } else if (activityType === 'guess_who') {
-    const prompt = buildGuessWhoPrompt({
+    let prompt = buildGuessWhoPrompt({
       discoveryCount: plan.discoveryCount,
       ageBracket,
       recentAnswers,
       topicTitles,
       themePreference,
     });
+    if (difficultyBump) {
+      prompt +=
+        '\n\nDIFFICULTY BUMP: The learner is on a streak. Choose less famous historical figures. Make clue 1 and 2 significantly harder.';
+    }
 
     const messages: ChatMessage[] = [
       { role: 'system', content: prompt },
@@ -434,9 +464,55 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
       throw new UpstreamLlmError('No valid questions after validation');
     }
 
-    questions = buildGuessWhoDiscoveryQuestions({
+    const discoveryQuestions = buildGuessWhoDiscoveryQuestions({
       questions: validated.questions.slice(0, plan.discoveryCount),
     });
+
+    // Inject mastery items with fresh LLM-generated clues
+    if (plan.masteryItems.length > 0) {
+      const masteryQuestions: GuessWhoQuestion[] = [];
+      for (const item of plan.masteryItems) {
+        const cluePrompt = buildGuessWhoMasteryCluePrompt(
+          item.answer,
+          ageBracket
+        );
+        const clueMessages: ChatMessage[] = [
+          { role: 'system', content: cluePrompt },
+          { role: 'user', content: 'Generate clues for this person.' },
+        ];
+
+        try {
+          const clueResult = await routeAndCall(clueMessages, 1, {
+            ageBracket,
+          });
+          const clueRaw = clueResult.response.slice(0, 16 * 1024);
+          const parsed = guessWhoMasteryClueSchema.parse(
+            JSON.parse(extractJsonObject(clueRaw))
+          );
+          if (
+            parsed.clues.length === 5 &&
+            parsed.mcFallbackOptions.length === 4
+          ) {
+            masteryQuestions.push({
+              type: 'guess_who',
+              canonicalName: item.answer,
+              correctAnswer: item.answer,
+              acceptedAliases: parsed.acceptedAliases,
+              clues: parsed.clues,
+              mcFallbackOptions: parsed.mcFallbackOptions,
+              funFact: '',
+              isLibraryItem: true,
+            });
+          }
+        } catch {
+          // If LLM fails for this mastery item, skip — don't block the round
+          continue;
+        }
+      }
+      questions = injectAtRandomPositions(discoveryQuestions, masteryQuestions);
+    } else {
+      questions = discoveryQuestions;
+    }
     theme = validated.theme;
   } else {
     // Exhaustive check — TypeScript narrows to `never` here. If a new
@@ -467,5 +543,6 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
     theme: round.theme,
     questions: round.questions,
     total: round.total,
+    difficultyBump,
   };
 }

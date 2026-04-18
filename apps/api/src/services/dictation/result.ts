@@ -87,7 +87,7 @@ export async function getDictationStreak(
 
 /**
  * Fetches the context needed by generateDictation from the learner's profile:
- * native language from teaching preferences, and recent topic names from sessions.
+ * native language from teaching preferences and age from birth year.
  */
 export async function fetchGenerateContext(
   db: Database,
@@ -101,27 +101,7 @@ export async function fetchGenerateContext(
   const prefs = await repo.teachingPreferences.findFirst();
   const nativeLanguage = prefs?.nativeLanguage ?? 'en';
 
-  // [IMP-2] Pull recent sessions → subject IDs → subject names. Limited to
-  // 20 rows: subjects are deduplicated via Set, so even 10–20 sessions gives
-  // sufficient coverage. Without a limit a learner with years of history
-  // would load every session into memory just to extract the last 10 IDs.
-  const recentSessions = await repo.sessions.findMany(undefined, 20);
-  const subjectIds = [
-    ...new Set(
-      recentSessions
-        .slice(0, 10)
-        .map((s) => s.subjectId)
-        .filter(Boolean)
-    ),
-  ];
-
-  const allSubjects = await repo.subjects.findMany();
-  const recentTopics = allSubjects
-    .filter((s) => subjectIds.includes(s.id))
-    .map((s) => s.name)
-    .slice(0, 3);
-
-  return { recentTopics, nativeLanguage, ageYears };
+  return { nativeLanguage, ageYears };
 }
 
 function getServerDate(): string {
