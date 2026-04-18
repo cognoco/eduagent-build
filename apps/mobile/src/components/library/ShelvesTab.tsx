@@ -224,7 +224,11 @@ export function ShelvesTab({
         onPress={() => onShelfPress(subject.id)}
         className="bg-surface rounded-card px-4 py-4 mb-3"
         accessibilityRole="button"
-        accessibilityLabel={`Open ${subject.name} shelf`}
+        accessibilityLabel={`${subject.name}. ${
+          subject.status !== 'active'
+            ? `${subject.status === 'paused' ? 'Paused' : 'Archived'}. `
+            : ''
+        }${progressLabel}.`}
         testID={`subject-card-${subject.id}`}
       >
         <View className="flex-row items-start justify-between">
