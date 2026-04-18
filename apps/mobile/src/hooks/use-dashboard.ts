@@ -170,3 +170,28 @@ export function useChildSessionDetail(
       !!sessionId,
   });
 }
+
+export function useChildMemory(childProfileId: string | undefined) {
+  const client = useApiClient();
+  const { activeProfile } = useProfile();
+
+  return useQuery({
+    queryKey: ['dashboard', 'children', childProfileId, 'memory'],
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const res = await client.dashboard.children[':profileId'].memory.$get(
+          { param: { profileId: childProfileId! } },
+          { init: { signal } }
+        );
+        await assertOk(res);
+        const data = await res.json();
+        return data.memory;
+      } finally {
+        cleanup();
+      }
+    },
+    enabled:
+      !!activeProfile && activeProfile.isOwner === true && !!childProfileId,
+  });
+}

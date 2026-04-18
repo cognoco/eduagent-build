@@ -1,4 +1,5 @@
 import { View, Text, Pressable, ScrollView, Alert } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useCallback, useMemo } from 'react';
 import type { AccommodationMode } from '@eduagent/schemas';
@@ -340,6 +341,31 @@ export default function ChildDetailScreen() {
           )}
         </View>
       </View>
+
+      {/* Streak & XP stats */}
+      {child && (child.currentStreak > 0 || child.totalXp > 0) && (
+        <View
+          testID="streak-xp-stats"
+          className="mx-5 mt-3 flex-row items-center gap-4"
+        >
+          {child.currentStreak > 0 && (
+            <View className="flex-row items-center gap-1">
+              <Ionicons name="flame-outline" size={16} color="#f97316" />
+              <Text className="text-text-secondary text-sm">
+                {child.currentStreak}-day streak
+              </Text>
+            </View>
+          )}
+          {child.totalXp > 0 && (
+            <View className="flex-row items-center gap-1">
+              <Ionicons name="star-outline" size={16} color="#eab308" />
+              <Text className="text-text-secondary text-sm">
+                {child.totalXp} XP
+              </Text>
+            </View>
+          )}
+        </View>
+      )}
 
       <ScrollView
         className="flex-1 px-5"

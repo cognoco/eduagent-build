@@ -135,11 +135,11 @@ function buildStringArrayItems(
 // ---------------------------------------------------------------------------
 
 export function buildCuratedMemoryView(profile: {
-  interests?: unknown[];
-  strengths?: unknown[];
-  struggles?: unknown[];
-  communicationNotes?: unknown[];
-  learningStyle?: Record<string, unknown> | null;
+  interests?: unknown;
+  strengths?: unknown;
+  struggles?: unknown;
+  communicationNotes?: unknown;
+  learningStyle?: unknown;
   memoryEnabled?: boolean;
   memoryCollectionEnabled?: boolean;
   memoryInjectionEnabled?: boolean;
@@ -152,27 +152,37 @@ export function buildCuratedMemoryView(profile: {
 
     switch (config.key) {
       case 'interests':
-        items = buildStringArrayItems(
-          profile.interests ?? [],
-          'interests',
-          (v) => `Interested in ${v}`
-        );
+        items = Array.isArray(profile.interests)
+          ? buildStringArrayItems(
+              profile.interests,
+              'interests',
+              (v) => `Interested in ${v}`
+            )
+          : [];
         break;
       case 'strengths':
-        items = buildStrengthItems(profile.strengths ?? []);
+        items = Array.isArray(profile.strengths)
+          ? buildStrengthItems(profile.strengths)
+          : [];
         break;
       case 'struggles':
-        items = buildStruggleItems(profile.struggles ?? []);
+        items = Array.isArray(profile.struggles)
+          ? buildStruggleItems(profile.struggles)
+          : [];
         break;
       case 'communicationNotes':
-        items = buildStringArrayItems(
-          profile.communicationNotes ?? [],
-          'communicationNotes',
-          (v) => capitalize(v)
-        );
+        items = Array.isArray(profile.communicationNotes)
+          ? buildStringArrayItems(
+              profile.communicationNotes,
+              'communicationNotes',
+              (v) => capitalize(v)
+            )
+          : [];
         break;
       case 'learningStyle':
-        items = serializeLearningStyle(profile.learningStyle ?? null);
+        items = serializeLearningStyle(
+          (profile.learningStyle as Record<string, unknown> | null) ?? null
+        );
         break;
     }
 
