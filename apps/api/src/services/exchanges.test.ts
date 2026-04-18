@@ -3,6 +3,7 @@ import {
   createMockProvider,
   type LLMProvider,
   type ChatMessage,
+  type MessagePart,
   type ModelConfig,
 } from './llm';
 import {
@@ -77,7 +78,7 @@ describe('buildSystemPrompt', () => {
         topicTitle: 'Quadratic Equations',
         sessionType: 'learning',
       });
-      expect(prompt).toContain('Begin teaching it immediately');
+      expect(prompt).toContain('fun fact about it to spark curiosity');
       expect(prompt).toContain('Do not ask what they want to learn');
     });
 
@@ -90,7 +91,7 @@ describe('buildSystemPrompt', () => {
         sessionType: 'learning',
       });
       expect(prompt).toContain(
-        'Anchor your teaching to their stated intent and begin immediately'
+        'fun fact related to their question to spark curiosity'
       );
     });
 
@@ -101,7 +102,7 @@ describe('buildSystemPrompt', () => {
         topicTitle: 'Quadratic Equations',
         sessionType: 'learning',
       });
-      expect(prompt).not.toContain('Begin teaching it immediately');
+      expect(prompt).not.toContain('fun fact about it to spark curiosity');
     });
 
     it('does NOT inject opener for non-learning sessions', () => {
@@ -112,7 +113,7 @@ describe('buildSystemPrompt', () => {
         sessionType: 'homework',
         homeworkMode: 'help_me',
       });
-      expect(prompt).not.toContain('Begin teaching it immediately');
+      expect(prompt).not.toContain('fun fact about it to spark curiosity');
     });
 
     it('does NOT inject opener for freeform (no topic, no rawInput)', () => {
@@ -123,7 +124,7 @@ describe('buildSystemPrompt', () => {
         rawInput: undefined,
         sessionType: 'learning',
       });
-      expect(prompt).not.toContain('Begin teaching it immediately');
+      expect(prompt).not.toContain('fun fact about it to spark curiosity');
       expect(prompt).not.toContain('Anchor your teaching');
     });
   });
@@ -635,5 +636,55 @@ describe('streamExchange', () => {
     const result = await streamExchange(context, 'Help');
 
     expect(result.newEscalationRung).toBe(4);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildUserContent — pure formatting, no mock provider needed [IMG-VISION]
+// ---------------------------------------------------------------------------
+
+import { buildUserContent } from './exchanges';
+
+describe('buildUserContent', () => {
+  it('returns the plain string when no imageData is provided', () => {
+    expect(buildUserContent('Hello')).toBe('Hello');
+  });
+
+  it('returns the plain string when imageData is undefined', () => {
+    expect(buildUserContent('Help me with this problem', undefined)).toBe(
+      'Help me with this problem'
+    );
+  });
+
+  it('returns MessagePart[] with image and text when imageData is provided', () => {
+    const result = buildUserContent('What is this?', {
+      base64: 'aW1hZ2VkYXRh',
+      mimeType: 'image/jpeg',
+    });
+
+    expect(Array.isArray(result)).toBe(true);
+    const parts = result as MessagePart[];
+    expect(parts).toHaveLength(2);
+    expect(parts[0]).toEqual({
+      type: 'inline_data',
+      mimeType: 'image/jpeg',
+      data: 'aW1hZ2VkYXRh',
+    });
+    expect(parts[1]).toEqual({
+      type: 'text',
+      text: 'What is this?',
+    });
+  });
+
+  it('preserves the MIME type from imageData', () => {
+    const result = buildUserContent('Describe this diagram', {
+      base64: 'cG5nZGF0YQ==',
+      mimeType: 'image/png',
+    });
+
+    const parts = result as MessagePart[];
+    expect(parts[0]).toEqual(
+      expect.objectContaining({ mimeType: 'image/png' })
+    );
   });
 });

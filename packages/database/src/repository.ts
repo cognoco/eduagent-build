@@ -1,4 +1,4 @@
-import { eq, and, type SQL, type Column } from 'drizzle-orm';
+import { eq, and, desc, sql, type SQL, type Column } from 'drizzle-orm';
 import type { Database } from './client';
 import {
   profiles,
@@ -23,6 +23,11 @@ import {
   topicSuggestions,
   curriculumBooks,
   learningProfiles,
+  vocabulary,
+  vocabularyRetentionCards,
+  dictationResults,
+  quizRounds,
+  quizMissedItems,
 } from './schema/index';
 
 export function createScopedRepository(db: Database, profileId: string) {
@@ -45,9 +50,10 @@ export function createScopedRepository(db: Database, profileId: string) {
     },
 
     sessions: {
-      async findMany(extraWhere?: SQL) {
+      async findMany(extraWhere?: SQL, limit?: number) {
         return db.query.learningSessions.findMany({
           where: scopedWhere(learningSessions, extraWhere),
+          ...(limit ? { limit } : {}),
         });
       },
       async findFirst(extraWhere?: SQL) {
@@ -263,6 +269,32 @@ export function createScopedRepository(db: Database, profileId: string) {
         });
       },
     },
+    vocabulary: {
+      async findMany(extraWhere?: SQL) {
+        return db.query.vocabulary.findMany({
+          where: scopedWhere(vocabulary, extraWhere),
+        });
+      },
+      async findFirst(extraWhere?: SQL) {
+        return db.query.vocabulary.findFirst({
+          where: scopedWhere(vocabulary, extraWhere),
+        });
+      },
+    },
+
+    vocabularyRetentionCards: {
+      async findMany(extraWhere?: SQL) {
+        return db.query.vocabularyRetentionCards.findMany({
+          where: scopedWhere(vocabularyRetentionCards, extraWhere),
+        });
+      },
+      async findFirst(extraWhere?: SQL) {
+        return db.query.vocabularyRetentionCards.findFirst({
+          where: scopedWhere(vocabularyRetentionCards, extraWhere),
+        });
+      },
+    },
+
     bookSuggestions: {
       async findBySubject(subjectId: string) {
         const subject = await db.query.subjects.findFirst({
@@ -293,6 +325,184 @@ export function createScopedRepository(db: Database, profileId: string) {
         return db.query.topicSuggestions.findMany({
           where: eq(topicSuggestions.bookId, bookId),
         });
+      },
+    },
+
+    dictationResults: {
+      async findMany(extraWhere?: SQL, orderBy?: SQL, limit?: number) {
+        return db.query.dictationResults.findMany({
+          where: scopedWhere(dictationResults, extraWhere),
+          ...(orderBy ? { orderBy } : {}),
+          ...(limit ? { limit } : {}),
+        });
+      },
+      async insert(values: {
+        date: string;
+        sentenceCount: number;
+        mistakeCount: number | null;
+        mode: 'homework' | 'surprise';
+        reviewed: boolean;
+      }) {
+        const [row] = await db
+          .insert(dictationResults)
+          .values({ profileId, ...values })
+          .returning();
+        return row;
+      },
+    },
+
+    quizRounds: {
+      async findMany(extraWhere?: SQL) {
+        return db.query.quizRounds.findMany({
+          where: scopedWhere(quizRounds, extraWhere),
+        });
+      },
+      async findFirst(extraWhere?: SQL) {
+        return db.query.quizRounds.findFirst({
+          where: scopedWhere(quizRounds, extraWhere),
+        });
+      },
+      /** Look up a single round by id (scoped to the current profile). */
+      async findById(roundId: string) {
+        return db.query.quizRounds.findFirst({
+          where: scopedWhere(quizRounds, eq(quizRounds.id, roundId)),
+        });
+      },
+      async findRecentByActivity(
+        activityType: (typeof quizRounds.$inferSelect)['activityType'],
+        limit: number
+      ) {
+        return db.query.quizRounds.findMany({
+          where: scopedWhere(
+            quizRounds,
+            eq(quizRounds.activityType, activityType)
+          ),
+          orderBy: [desc(quizRounds.createdAt)],
+          limit,
+        });
+      },
+      async findCompletedRecent(limit: number) {
+        return db.query.quizRounds.findMany({
+          where: scopedWhere(quizRounds, eq(quizRounds.status, 'completed')),
+          orderBy: [desc(quizRounds.completedAt)],
+          limit,
+          columns: {
+            id: true,
+            activityType: true,
+            theme: true,
+            score: true,
+            total: true,
+            xpEarned: true,
+            createdAt: true,
+            completedAt: true,
+          },
+        });
+      },
+      /**
+       * [Q-10] [CR-3] Per-activity completed-round aggregates in a single
+       * query. Uses `array_agg(... ORDER BY ratio DESC)[1]` to resolve the
+       * best-round score/total in the same GROUP BY scan — no correlated
+       * subqueries, single table pass regardless of activity type count.
+       */
+      async aggregateCompletedStats() {
+        const rows = await db
+          .select({
+            activityType: quizRounds.activityType,
+            roundsPlayed: sql<number>`count(*)::int`,
+            totalXp: sql<number>`coalesce(sum(${quizRounds.xpEarned}), 0)::int`,
+            bestScore: sql<number | null>`(array_agg(
+              ${quizRounds.score}
+              order by cast(${quizRounds.score} as float)
+                / nullif(${quizRounds.total}, 0) desc nulls last
+            ))[1]::int`,
+            bestTotal: sql<number | null>`(array_agg(
+              ${quizRounds.total}
+              order by cast(${quizRounds.score} as float)
+                / nullif(${quizRounds.total}, 0) desc nulls last
+            ))[1]::int`,
+          })
+          .from(quizRounds)
+          .where(
+            and(
+              eq(quizRounds.profileId, profileId),
+              eq(quizRounds.status, 'completed')
+            )
+          )
+          .groupBy(quizRounds.activityType);
+
+        return rows.map((row) => ({
+          activityType: row.activityType,
+          roundsPlayed: row.roundsPlayed,
+          totalXp: row.totalXp,
+          bestScore: row.bestScore ?? null,
+          bestTotal: row.bestTotal ?? null,
+        }));
+      },
+      async insert(values: Omit<typeof quizRounds.$inferInsert, 'profileId'>) {
+        const [row] = await db
+          .insert(quizRounds)
+          .values({ ...values, profileId })
+          .returning({ id: quizRounds.id });
+        return row;
+      },
+      /**
+       * Atomically mark an ACTIVE round completed. Returns the affected row if
+       * the UPDATE actually changed status 'active' → 'completed' (under the
+       * profile scope). Returns undefined if another caller has already
+       * completed the round, which callers MUST translate to a ConflictError.
+       *
+       * Uses `WHERE status = 'active'` so concurrent complete calls can't
+       * double-award XP — only one UPDATE wins.
+       */
+      async completeActive(
+        roundId: string,
+        values: {
+          results: unknown;
+          score: number;
+          xpEarned: number;
+          completedAt: Date;
+        }
+      ) {
+        const rows = await db
+          .update(quizRounds)
+          .set({
+            results: values.results,
+            score: values.score,
+            xpEarned: values.xpEarned,
+            status: 'completed',
+            completedAt: values.completedAt,
+          })
+          .where(
+            and(
+              eq(quizRounds.id, roundId),
+              eq(quizRounds.profileId, profileId),
+              eq(quizRounds.status, 'active')
+            )
+          )
+          .returning({ id: quizRounds.id });
+        return rows[0];
+      },
+    },
+
+    quizMissedItems: {
+      async findMany(extraWhere?: SQL) {
+        return db.query.quizMissedItems.findMany({
+          where: scopedWhere(quizMissedItems, extraWhere),
+        });
+      },
+      async findFirst(extraWhere?: SQL) {
+        return db.query.quizMissedItems.findFirst({
+          where: scopedWhere(quizMissedItems, extraWhere),
+        });
+      },
+      async insertMany(
+        values: Array<Omit<typeof quizMissedItems.$inferInsert, 'profileId'>>
+      ) {
+        if (values.length === 0) return [];
+        return db
+          .insert(quizMissedItems)
+          .values(values.map((v) => ({ ...v, profileId })))
+          .returning({ id: quizMissedItems.id });
       },
     },
   };

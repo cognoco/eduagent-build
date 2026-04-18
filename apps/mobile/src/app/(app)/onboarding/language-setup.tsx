@@ -105,10 +105,21 @@ export default function LanguageSetup() {
 
   if (!subjectId) {
     return (
-      <View className="flex-1 bg-background items-center justify-center">
-        <Text className="text-text-secondary">
+      <View className="flex-1 bg-background items-center justify-center px-5">
+        <Text className="text-text-secondary mb-4">
           No language subject selected
         </Text>
+        <Pressable
+          onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
+          className="bg-primary rounded-button px-6 py-3 items-center"
+          accessibilityRole="button"
+          accessibilityLabel="Go home"
+          testID="language-setup-guard-home"
+        >
+          <Text className="text-text-inverse text-body font-semibold">
+            Go home
+          </Text>
+        </Pressable>
       </View>
     );
   }

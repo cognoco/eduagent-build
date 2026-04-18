@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm';
-import { progressSnapshots } from '@eduagent/database';
+import { progressSnapshots, learningSessions } from '@eduagent/database';
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
 import { refreshProgressSnapshot } from '../../services/snapshot-aggregation';
@@ -17,11 +17,13 @@ export const progressBackfillTrigger = inngest.createFunction(
       async () => {
         const db = getStepDatabase();
 
-        const rows = await db.query.learningSessions.findMany({
-          columns: { profileId: true },
-        });
+        // Push deduplication into Postgres — avoids materializing every
+        // session row into JS memory on large datasets.
+        const rows = await db
+          .selectDistinct({ profileId: learningSessions.profileId })
+          .from(learningSessions);
 
-        return [...new Set(rows.map((row) => row.profileId))];
+        return rows.map((row) => row.profileId);
       }
     );
 

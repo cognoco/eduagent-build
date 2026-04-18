@@ -17,6 +17,7 @@ import {
   curricula,
   curriculumBooks,
   curriculumTopics,
+  learningSessions,
   createDatabase,
 } from '@eduagent/database';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
@@ -355,7 +356,22 @@ describe('resolveFilingResult (integration)', () => {
     const { profile } = await seedAccountAndProfile();
     const db = createIntegrationDb();
 
-    const fakeSessionId = '019012ab-cdef-7000-8000-ffffffffffff';
+    // Seed a real subject + learning session to satisfy the FK constraint
+    const [subject] = await db
+      .insert(subjects)
+      .values({
+        profileId: profile.id,
+        name: `${PREFIX}-art-subject`,
+        status: 'active',
+      })
+      .returning();
+    const [session] = await db
+      .insert(learningSessions)
+      .values({
+        profileId: profile.id,
+        subjectId: subject!.id,
+      })
+      .returning();
 
     const filingResponse: FilingResponse = {
       shelf: { name: 'Art' },
@@ -372,13 +388,13 @@ describe('resolveFilingResult (integration)', () => {
       profileId: profile.id,
       filingResponse,
       filedFrom: 'session_filing',
-      sessionId: fakeSessionId,
+      sessionId: session!.id,
     });
 
     const topic = await db.query.curriculumTopics.findFirst({
       where: eq(curriculumTopics.id, result.topicId),
     });
-    expect(topic!.sessionId).toBe(fakeSessionId);
+    expect(topic!.sessionId).toBe(session!.id);
   });
 
   it('assigns correct sortOrder to second topic in same book', async () => {

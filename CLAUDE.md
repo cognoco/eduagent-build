@@ -43,6 +43,7 @@ Run the smallest useful verification first, then the project-level checks for th
 
 Do not call work complete if related tests, lint, typecheck, or required migrations are still failing.
 - Follow the Fix Verification Rules in `~/.claude/CLAUDE.md` — every fix needs a verified-by entry, finding ID in commits, and break tests for security fixes.
+- No suppression, no shortcuts — always address the root of the error. Never use `eslint-disable` or suppress warnings to make lint pass. Fix the actual code or improve the lint rule to handle the pattern correctly.
 
 ## Repo-Specific Guardrails
 
@@ -72,7 +73,7 @@ cd apps/mobile && pnpm exec jest --findRelatedTests src/path/to/file.tsx --no-co
 cd apps/mobile && pnpm exec tsc --noEmit
 
 # Database
-pnpm run db:push:dev
+pnpm run db:push:stg
 pnpm run db:generate
 pnpm run db:migrate:dev
 ```

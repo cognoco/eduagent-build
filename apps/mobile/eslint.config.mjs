@@ -1,5 +1,6 @@
 import nx from '@nx/eslint-plugin';
 import baseConfig from '../../eslint.config.mjs';
+import requireMutateErrorHandling from './eslint-rules/require-mutate-error-handling.mjs';
 
 // Filter out jsx-a11y/accessible-emoji rule (deprecated in v6.6.0, removed in later versions)
 // @nx/eslint-plugin's flat/react config still references it
@@ -11,6 +12,13 @@ const reactConfig = nx.configs['flat/react'].map((config) => {
   return config;
 });
 
+// Local plugin for project-specific rules
+const localPlugin = {
+  rules: {
+    'require-mutate-error-handling': requireMutateErrorHandling,
+  },
+};
+
 export default [
   ...baseConfig,
   ...reactConfig,
@@ -18,6 +26,15 @@ export default [
     files: ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx'],
     // Override or add rules here
     rules: {},
+  },
+  // Require visible error handling on every mutateAsync() call.
+  {
+    files: ['src/**/*.ts', 'src/**/*.tsx'],
+    ignores: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+    plugins: { local: localPlugin },
+    rules: {
+      'local/require-mutate-error-handling': 'warn',
+    },
   },
   // Ban hardcoded hex colors in non-token source files.
   // Forces use of NativeWind theme classes or design-tokens instead.

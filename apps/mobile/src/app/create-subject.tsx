@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -330,6 +330,15 @@ export default function CreateSubjectScreen() {
     [resolveInput]
   );
 
+  const availableChips = useMemo(() => {
+    const existingNames = new Set(
+      (existingSubjects ?? []).map((s) => s.name.toLowerCase())
+    );
+    return STARTER_CHIPS.filter(
+      (chip) => !existingNames.has(chip.toLowerCase())
+    );
+  }, [existingSubjects]);
+
   const isAmbiguous =
     showSuggestion && resolveState.result.status === 'ambiguous';
   const isNoMatch = showSuggestion && resolveState.result.status === 'no_match';
@@ -443,7 +452,16 @@ export default function CreateSubjectScreen() {
                 {existingSubjects.map((subject) => (
                   <Pressable
                     key={subject.id}
-                    onPress={() => router.push('/(app)/library' as never)}
+                    onPress={() =>
+                      router.push({
+                        pathname: '/(app)/session',
+                        params: {
+                          mode: 'learning',
+                          subjectId: subject.id,
+                          subjectName: subject.name,
+                        },
+                      } as never)
+                    }
                     className="rounded-full bg-primary-soft px-4 py-2 h-9 items-center justify-center"
                     accessibilityRole="button"
                     accessibilityLabel={`Continue ${subject.name}`}
@@ -459,28 +477,31 @@ export default function CreateSubjectScreen() {
           )}
 
         {/* Starter chips — shown while idle + input empty, hidden during resolve/suggestion or typing */}
-        {resolveState.phase === 'idle' && !isBusy && name.trim() === '' && (
-          <View
-            className="flex-row flex-wrap gap-2 mb-4"
-            testID="starter-chips"
-            accessibilityLabel="Suggested subjects"
-          >
-            {STARTER_CHIPS.map((chip) => (
-              <Pressable
-                key={chip}
-                onPress={() => void onChipPress(chip)}
-                className="rounded-full bg-surface-elevated px-4 py-2 h-9 items-center justify-center"
-                accessibilityRole="button"
-                accessibilityLabel={`Choose ${chip}`}
-                testID={`starter-chip-${chip}`}
-              >
-                <Text className="text-body-sm font-medium text-text-secondary">
-                  {chip}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        )}
+        {resolveState.phase === 'idle' &&
+          !isBusy &&
+          name.trim() === '' &&
+          availableChips.length > 0 && (
+            <View
+              className="flex-row flex-wrap gap-2 mb-4"
+              testID="starter-chips"
+              accessibilityLabel="Suggested subjects"
+            >
+              {availableChips.map((chip) => (
+                <Pressable
+                  key={chip}
+                  onPress={() => void onChipPress(chip)}
+                  className="rounded-full bg-surface-elevated px-4 py-2 h-9 items-center justify-center"
+                  accessibilityRole="button"
+                  accessibilityLabel={`Choose ${chip}`}
+                  testID={`starter-chip-${chip}`}
+                >
+                  <Text className="text-body-sm font-medium text-text-secondary">
+                    {chip}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
 
         {/* Broader category entry point — encourages natural language input */}
         {resolveState.phase === 'idle' && !isBusy && name.trim() === '' && (

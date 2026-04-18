@@ -46,32 +46,72 @@ export class ErrorBoundary extends Component<
 
   override render(): ReactNode {
     if (this.state.hasError) {
+      // Use inline styles — NOT NativeWind classes. This boundary may render
+      // outside ThemeContext (e.g. it wraps ThemedApp), so CSS custom
+      // properties like --color-text-primary won't exist. Hardcoded colors
+      // guarantee the error message is always readable.
       return (
         <ScrollView
-          className="flex-1 bg-background"
-          contentContainerClassName="items-center justify-center px-8 py-12"
+          style={{ flex: 1, backgroundColor: '#faf5ef' }}
+          contentContainerStyle={{
+            alignItems: 'center',
+            justifyContent: 'center',
+            paddingHorizontal: 32,
+            paddingVertical: 48,
+          }}
           accessibilityRole="alert"
         >
-          <Text className="text-h2 font-bold text-text-primary mb-2">
+          <Text
+            style={{
+              fontSize: 22,
+              fontWeight: 'bold',
+              color: '#1a1a1a',
+              marginBottom: 8,
+            }}
+          >
             Something went wrong
           </Text>
-          <Text className="text-body text-text-secondary text-center mb-4">
+          <Text
+            style={{
+              fontSize: 16,
+              color: '#555',
+              textAlign: 'center',
+              marginBottom: 16,
+            }}
+          >
             {this.state.error?.message ?? 'An unexpected error occurred.'}
           </Text>
-          {__DEV__ && this.state.componentStack && (
-            <View className="bg-surface rounded-card px-3 py-2 mb-4 w-full">
-              <Text className="text-caption text-text-tertiary font-mono">
-                {this.state.componentStack.trim().slice(0, 500)}
+          {this.state.componentStack && (
+            <View
+              style={{
+                backgroundColor: '#eee',
+                borderRadius: 8,
+                paddingHorizontal: 12,
+                paddingVertical: 8,
+                marginBottom: 16,
+                width: '100%',
+              }}
+            >
+              <Text
+                style={{ fontSize: 11, color: '#333', fontFamily: 'monospace' }}
+                selectable
+              >
+                {this.state.componentStack.trim().slice(0, 800)}
               </Text>
             </View>
           )}
           <Pressable
             onPress={this.handleRetry}
-            className="bg-primary rounded-button px-6 py-3"
+            style={{
+              backgroundColor: '#0d9488',
+              borderRadius: 12,
+              paddingHorizontal: 24,
+              paddingVertical: 14,
+            }}
             accessibilityLabel="Try again"
             accessibilityRole="button"
           >
-            <Text className="text-text-inverse text-body font-semibold">
+            <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>
               Try Again
             </Text>
           </Pressable>

@@ -21,6 +21,13 @@ export interface UseSpeechRecognitionResult {
   startListening: () => Promise<void>;
   stopListening: () => Promise<void>;
   clearTranscript: () => void;
+  /**
+   * Prompt the user for microphone permission without starting the listener.
+   * Safe to call on mount — the OS will only show a dialog the first time;
+   * subsequent calls return the cached grant silently.
+   * Returns `true` if granted (or already granted), `false` otherwise.
+   */
+  requestMicrophonePermission: () => Promise<boolean>;
 }
 
 type SpeechRecognitionModule = {
@@ -212,6 +219,20 @@ export function useSpeechRecognition(
     setStatus('idle');
   }, []);
 
+  const requestMicrophonePermission =
+    useCallback(async (): Promise<boolean> => {
+      try {
+        const speechModule = await loadModule();
+        if (!speechModule) return false;
+        const { granted } = await speechModule.requestPermissionsAsync();
+        return granted;
+      } catch {
+        // Swallow errors: this is a best-effort pre-warm. The button-press path
+        // will surface a user-facing error if permission is still missing later.
+        return false;
+      }
+    }, [loadModule]);
+
   return {
     status,
     transcript,
@@ -220,5 +241,6 @@ export function useSpeechRecognition(
     startListening,
     stopListening,
     clearTranscript,
+    requestMicrophonePermission,
   };
 }

@@ -1,4 +1,4 @@
-import { eq, and, desc, asc, inArray, sql } from 'drizzle-orm';
+import { eq, and, desc, asc, gte, inArray, sql } from 'drizzle-orm';
 import {
   curricula,
   curriculumBooks,
@@ -242,7 +242,8 @@ async function computeBookStatus(
     .where(
       and(
         eq(learningSessions.profileId, profileId),
-        inArray(learningSessions.topicId, topicIds)
+        inArray(learningSessions.topicId, topicIds),
+        gte(learningSessions.exchangeCount, 1)
       )
     );
 
@@ -318,7 +319,7 @@ async function computeBookStatusesBatch(
 
   if (allTopicIds.length === 0) return results;
 
-  // Single query: all learning sessions across every book
+  // Single query: all learning sessions across every book (real activity only)
   const sessionRows = await db
     .select({
       topicId: learningSessions.topicId,
@@ -328,7 +329,8 @@ async function computeBookStatusesBatch(
     .where(
       and(
         eq(learningSessions.profileId, profileId),
-        inArray(learningSessions.topicId, allTopicIds)
+        inArray(learningSessions.topicId, allTopicIds),
+        gte(learningSessions.exchangeCount, 1)
       )
     );
 

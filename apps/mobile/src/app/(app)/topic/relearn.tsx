@@ -84,9 +84,10 @@ const COPY_LEARNER = {
 export default function RelearnScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { topicId, subjectId } = useLocalSearchParams<{
+  const { topicId, subjectId, topicName } = useLocalSearchParams<{
     topicId: string;
     subjectId: string;
+    topicName?: string;
   }>();
 
   const startRelearn = useStartRelearn();
@@ -115,6 +116,7 @@ export default function RelearnScreen() {
               sessionId: result.sessionId,
               subjectId,
               topicId,
+              ...(topicName ? { topicName } : {}),
               mode: 'relearn',
             },
           });
@@ -125,7 +127,7 @@ export default function RelearnScreen() {
         onSettled: () => setIsSubmitting(false),
       }
     );
-  }, [topicId, subjectId, startRelearn, router]);
+  }, [topicId, topicName, subjectId, startRelearn, router]);
 
   const handleSelectMethod = useCallback(
     (preferredMethod: string) => {
@@ -142,6 +144,7 @@ export default function RelearnScreen() {
                 sessionId: result.sessionId,
                 subjectId,
                 topicId,
+                ...(topicName ? { topicName } : {}),
                 mode: 'relearn',
               },
             });

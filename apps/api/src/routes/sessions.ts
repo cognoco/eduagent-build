@@ -19,8 +19,6 @@ import { requireProfileId } from '../middleware/profile-scope';
 import { streamSSE } from 'hono/streaming';
 import { captureException } from '../services/sentry';
 import { createLogger } from '../services/logger';
-
-const logger = createLogger();
 import {
   startSession,
   SubjectInactiveError,
@@ -50,6 +48,8 @@ import {
 } from '../services/settings';
 import { startInterleavedSession } from '../services/interleaved';
 import { generateRecallBridge } from '../services/recall-bridge';
+
+const logger = createLogger();
 
 type SessionRouteEnv = {
   Bindings: {
@@ -241,11 +241,26 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const body = c.req.valid('json');
+
+      // [ASSUMP-F5-sweep] Only 'pending' and 'skipped' are valid client-declared
+      // summaryStatus values. 'accepted' and 'submitted' are server-side
+      // transitions (summary evaluation → session-completed pipeline).
+      // 'auto_closed' is set exclusively by the stale-session cleanup job.
+      // If a tampered client sends 'accepted', it would bypass the summary
+      // review gate and trigger the completion pipeline prematurely (XP,
+      // retention, vocabulary extraction) without the learner ever writing
+      // a summary. Silently downgrade to undefined so closeSession falls
+      // back to its default logic.
+      const sanitizedSummaryStatus =
+        body.summaryStatus === 'pending' || body.summaryStatus === 'skipped'
+          ? body.summaryStatus
+          : undefined;
+
       const result = await closeSession(
         db,
         profileId,
         c.req.param('sessionId'),
-        body
+        { ...body, summaryStatus: sanitizedSummaryStatus }
       );
 
       const shouldDispatchCompletionEvent =
@@ -550,6 +565,7 @@ async function dispatchSessionCompletedEvent(
         verificationType: completion.verificationType,
         interleavedTopicIds: completion.interleavedTopicIds,
         escalationRungs: completion.escalationRungs,
+        exchangeCount: completion.exchangeCount,
         summaryStatus: options.summaryStatus,
         ...(options.qualityRating != null
           ? { qualityRating: options.qualityRating }

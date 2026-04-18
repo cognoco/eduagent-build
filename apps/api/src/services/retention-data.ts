@@ -637,6 +637,15 @@ export async function startRelearn(
     resetPerformed,
   };
 
+  // Look up the prior teaching preference when the learner wants
+  // the same method — inject it so the session prompt can use it.
+  if (input.method === 'same' && subjectId) {
+    const pref = await getTeachingPreference(db, profileId, subjectId);
+    if (pref) {
+      response.preferredMethod = pref.method;
+    }
+  }
+
   if (input.method === 'different' && input.preferredMethod) {
     response.preferredMethod = input.preferredMethod;
   }
@@ -981,7 +990,7 @@ export async function updateRetentionFromSession(
     },
   });
 
-  await db
+  const updateResult = await db
     .update(retentionCards)
     .set({
       easeFactor: String(result.card.easeFactor),
@@ -994,9 +1003,25 @@ export async function updateRetentionFromSession(
     .where(
       and(
         eq(retentionCards.id, card.id),
-        eq(retentionCards.profileId, profileId)
+        eq(retentionCards.profileId, profileId),
+        // Optimistic lock: only update if the card hasn't been modified
+        // since we read it. Prevents silent overwrites from concurrent sessions.
+        // Skip the lock for newly-created cards — no concurrent write is possible,
+        // and PostgreSQL microsecond timestamps truncate to JS milliseconds causing
+        // false conflicts on the WHERE updatedAt = ? clause.
+        ...(ensured.isNew ? [] : [eq(retentionCards.updatedAt, card.updatedAt)])
       )
+    )
+    .returning();
+
+  if (updateResult.length === 0) {
+    // Another session updated the card concurrently — our update was
+    // based on stale data. Log and skip rather than silently overwriting.
+    console.warn(
+      `[retention] Optimistic lock conflict for card ${card.id} — ` +
+        `concurrent update detected, skipping`
     );
+  }
 }
 
 // ---------------------------------------------------------------------------

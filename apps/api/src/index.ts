@@ -7,7 +7,12 @@ import { ERROR_CODES } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 
 import { captureException } from './services/sentry';
-import { ForbiddenError, NotFoundError } from './errors';
+import {
+  ForbiddenError,
+  NotFoundError,
+  ConflictError,
+  UpstreamLlmError,
+} from './errors';
 
 import { envValidationMiddleware } from './middleware/env-validation';
 import { authMiddleware } from './middleware/auth';
@@ -54,10 +59,13 @@ import { billingRoutes } from './routes/billing';
 import { stripeWebhookRoute } from './routes/stripe-webhook';
 import { testSeedRoutes } from './routes/test-seed';
 import { revenuecatWebhookRoute } from './routes/revenuecat-webhook';
+import { resendWebhookRoute } from './routes/resend-webhook';
 import { filingRoutes } from './routes/filing';
 import { bookSuggestionRoutes } from './routes/book-suggestions';
 import { topicSuggestionRoutes } from './routes/topic-suggestions';
 import { learnerProfileRoutes } from './routes/learner-profile';
+import { dictationRoutes } from './routes/dictation';
+import { quizRoutes } from './routes/quiz';
 
 type Bindings = {
   ENVIRONMENT: string;
@@ -80,6 +88,7 @@ type Bindings = {
   SUBSCRIPTION_KV?: KVNamespace;
   VOYAGE_API_KEY?: string;
   RESEND_API_KEY?: string;
+  RESEND_WEBHOOK_SECRET?: string;
   EMAIL_FROM?: string;
   SENTRY_DSN?: string;
   TEST_SEED_SECRET?: string;
@@ -199,11 +208,14 @@ const routes = api
   .route('/', billingRoutes)
   .route('/', stripeWebhookRoute)
   .route('/', revenuecatWebhookRoute)
+  .route('/', resendWebhookRoute)
   .route('/', testSeedRoutes)
   .route('/', filingRoutes)
   .route('/', bookSuggestionRoutes)
   .route('/', topicSuggestionRoutes)
-  .route('/', learnerProfileRoutes);
+  .route('/', learnerProfileRoutes)
+  .route('/', dictationRoutes)
+  .route('/', quizRoutes);
 
 // ---------------------------------------------------------------------------
 // App — mounts routes under /v1 for the actual Cloudflare Worker runtime.
@@ -233,6 +245,21 @@ app.onError((err, c) => {
   }
   if (err instanceof NotFoundError) {
     return c.json({ code: ERROR_CODES.NOT_FOUND, message: err.message }, 404);
+  }
+  if (err instanceof ConflictError) {
+    return c.json({ code: ERROR_CODES.CONFLICT, message: err.message }, 409);
+  }
+  if (err instanceof UpstreamLlmError) {
+    // Track LLM-provider drift in Sentry; surface 502 so clients can retry.
+    captureException(err, {
+      userId: c.get('user')?.userId,
+      profileId: c.get('profileId'),
+      requestPath: c.req.path,
+    });
+    return c.json(
+      { code: ERROR_CODES.UPSTREAM_ERROR, message: err.message },
+      502
+    );
   }
 
   // Report to Sentry with user/request context (primary observability channel)

@@ -1,5 +1,20 @@
-import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { AppState, View, Text, Pressable, Alert } from 'react-native';
+import {
+  Component,
+  useState,
+  useCallback,
+  useRef,
+  useEffect,
+  useMemo,
+} from 'react';
+import type { ErrorInfo, ReactNode } from 'react';
+import {
+  AppState,
+  View,
+  Text,
+  Pressable,
+  Alert,
+  ScrollView,
+} from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type {
@@ -59,21 +74,148 @@ import {
   writeSessionRecoveryMarker,
 } from '../../../lib/session-recovery';
 import * as SecureStore from '../../../lib/secure-storage';
-import { parseHomeworkProblems } from '../homework/problem-cards';
+import * as FileSystem from 'expo-file-system';
+import { parseHomeworkProblems } from '../homework/_helpers/problem-cards';
 import {
   getInputModeKey,
   errorHasStatus,
   getConversationStage,
   type MessageFeedbackState,
   type PendingSubjectResolution,
-} from './session-types';
-import { useSessionStreaming } from './use-session-streaming';
-import { useSubjectClassification } from './use-subject-classification';
-import { useSessionActions } from './use-session-actions';
-import { SessionMessageActions } from './SessionMessageActions';
-import { SessionToolAccessory, SessionAccessory } from './SessionAccessories';
-import { ParkingLotModal, TopicSwitcherModal } from './SessionModals';
-import { SessionFooter } from './SessionFooter';
+} from './_helpers/session-types';
+import { useSessionStreaming } from './_helpers/use-session-streaming';
+import { useSubjectClassification } from './_helpers/use-subject-classification';
+import { useSessionActions } from './_helpers/use-session-actions';
+import { SessionMessageActions } from './_helpers/SessionMessageActions';
+import {
+  SessionToolAccessory,
+  SessionAccessory,
+} from './_helpers/SessionAccessories';
+import { ParkingLotModal, TopicSwitcherModal } from './_helpers/SessionModals';
+import { SessionFooter } from './_helpers/SessionFooter';
+import { Sentry } from '../../../lib/sentry';
+
+/**
+ * Session-specific error boundary with visible diagnostics.
+ * Uses hardcoded hex colors intentionally — theme context may not be
+ * available during a crash, so inline styles guarantee readable text
+ * regardless of whether ThemeProvider is mounted. Do not replace with
+ * semantic tokens.
+ */
+class SessionErrorBoundary extends Component<
+  { children: ReactNode },
+  { hasError: boolean; error: Error | null; componentStack: string | null }
+> {
+  override state = {
+    hasError: false,
+    error: null as Error | null,
+    componentStack: null as string | null,
+  };
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  override componentDidCatch(error: Error, info: ErrorInfo) {
+    const stack = info.componentStack ?? '';
+    this.setState({ componentStack: stack });
+    console.error(
+      '[SessionScreen CRASH]',
+      error.message,
+      '\n\nError stack:',
+      error.stack,
+      '\n\nComponent stack:',
+      stack
+    );
+    Sentry.captureException(error, {
+      tags: { screen: 'session', crashLocation: 'SessionErrorBoundary' },
+      extra: { componentStack: stack },
+    });
+  }
+
+  override render() {
+    if (this.state.hasError) {
+      return (
+        <ScrollView
+          style={{ flex: 1, backgroundColor: '#faf5ef' }}
+          contentContainerStyle={{
+            padding: 24,
+            paddingTop: 60,
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 20,
+              fontWeight: 'bold',
+              color: '#b91c1c',
+              marginBottom: 12,
+            }}
+          >
+            Session screen crashed
+          </Text>
+          <Text
+            style={{
+              fontSize: 15,
+              color: '#1a1a1a',
+              marginBottom: 16,
+              fontWeight: '600',
+            }}
+          >
+            {this.state.error?.message ?? 'Unknown error'}
+          </Text>
+          <Text
+            style={{
+              fontSize: 11,
+              color: '#444',
+              fontFamily: 'monospace',
+              marginBottom: 16,
+            }}
+            selectable
+          >
+            {this.state.error?.stack?.slice(0, 1200) ?? ''}
+          </Text>
+          {this.state.componentStack && (
+            <View
+              style={{
+                backgroundColor: '#fee2e2',
+                borderRadius: 8,
+                padding: 12,
+                marginBottom: 16,
+              }}
+            >
+              <Text
+                style={{ fontSize: 10, color: '#333', fontFamily: 'monospace' }}
+                selectable
+              >
+                {this.state.componentStack.trim().slice(0, 1000)}
+              </Text>
+            </View>
+          )}
+          <Pressable
+            onPress={() =>
+              this.setState({
+                hasError: false,
+                error: null,
+                componentStack: null,
+              })
+            }
+            style={{
+              backgroundColor: '#0d9488',
+              borderRadius: 12,
+              paddingVertical: 14,
+              alignItems: 'center',
+            }}
+          >
+            <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>
+              Try Again
+            </Text>
+          </Pressable>
+        </ScrollView>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 function MilestoneDots({ count }: { count: number }) {
   if (count <= 0) return null;
@@ -88,6 +230,14 @@ function MilestoneDots({ count }: { count: number }) {
 }
 
 export default function SessionScreen() {
+  return (
+    <SessionErrorBoundary>
+      <SessionScreenInner />
+    </SessionErrorBoundary>
+  );
+}
+
+function SessionScreenInner() {
   const {
     mode,
     subjectId,
@@ -101,6 +251,8 @@ export default function SessionScreen() {
     captureSource,
     rawInput,
     verificationType: routeVerificationType,
+    imageUri,
+    imageMimeType,
   } = useLocalSearchParams<{
     mode?: string;
     subjectId?: string;
@@ -114,6 +266,8 @@ export default function SessionScreen() {
     captureSource?: HomeworkCaptureSource;
     rawInput?: string;
     verificationType?: string;
+    imageUri?: string;
+    imageMimeType?: string;
   }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -284,6 +438,10 @@ export default function SessionScreen() {
   // current value, not a stale closure capture from when setTimeout was created.
   const trackerStateRef = useRef(trackerState);
   trackerStateRef.current = trackerState;
+  const imageBase64Ref = useRef<string | null>(null);
+  const imageMimeTypeRef = useRef<
+    'image/jpeg' | 'image/png' | 'image/webp' | null
+  >(null);
   const { CelebrationOverlay, trigger } = useCelebration({
     celebrationLevel,
     audience: 'child',
@@ -509,6 +667,7 @@ export default function SessionScreen() {
             subjectId: effectiveSubjectId || undefined,
             subjectName: effectiveSubjectName || undefined,
             topicId: topicId ?? undefined,
+            topicName: topicName ?? undefined,
             mode: effectiveMode,
             milestoneTracker: trackerState,
             updatedAt: new Date().toISOString(),
@@ -529,6 +688,48 @@ export default function SessionScreen() {
     topicId,
   ]);
 
+  useEffect(() => {
+    if (!imageUri) return;
+    let cancelled = false;
+
+    async function convertImage() {
+      try {
+        const base64 = await FileSystem.readAsStringAsync(imageUri!, {
+          encoding: 'base64',
+        });
+        if (!cancelled) {
+          imageBase64Ref.current = base64;
+          // [IMP-1] Prefer route-supplied mimeType from image picker over
+          // extension sniffing. Camera captures are always JPEG; gallery
+          // picks provide OS-level mimeType. Falls back to extension
+          // sniffing for backward compat with deep links or missing values.
+          const ext = imageUri!.split('.').pop()?.toLowerCase();
+          const mimeType: 'image/jpeg' | 'image/png' | 'image/webp' =
+            imageMimeType === 'image/png'
+              ? 'image/png'
+              : imageMimeType === 'image/webp'
+              ? 'image/webp'
+              : imageMimeType?.includes('jpeg') ||
+                imageMimeType?.includes('jpg')
+              ? 'image/jpeg'
+              : ext === 'png'
+              ? 'image/png'
+              : ext === 'webp'
+              ? 'image/webp'
+              : 'image/jpeg';
+          imageMimeTypeRef.current = mimeType;
+        }
+      } catch (err) {
+        console.warn('[Session] Failed to read image as base64:', err);
+      }
+    }
+
+    void convertImage();
+    return () => {
+      cancelled = true;
+    };
+  }, [imageUri]);
+
   const {
     syncHomeworkMetadata,
     continueWithMessage,
@@ -541,6 +742,7 @@ export default function SessionScreen() {
     effectiveSubjectName,
     effectiveMode,
     topicId: topicId ?? undefined,
+    topicName: topicName ?? undefined,
     inputMode,
     rawInput: rawInput ?? undefined,
     verificationType: routeVerificationType ?? undefined,
@@ -574,6 +776,8 @@ export default function SessionScreen() {
     lastExpectedMinutesRef,
     lastRetryPayloadRef,
     trackerStateRef,
+    imageBase64Ref,
+    imageMimeTypeRef,
     activeProfileId: activeProfile?.id,
     apiClient,
     startSession,
@@ -658,12 +862,15 @@ export default function SessionScreen() {
       hasAutoSentRef.current = true;
       const timer = setTimeout(() => {
         // BUG-373: Mark homework auto-send as auto-sent
-        void handleSend(problemText, { isAutoSent: true });
+        void handleSend(problemText, {
+          isAutoSent: true,
+          imageUri: imageUri ?? undefined,
+        });
       }, 500);
       return () => clearTimeout(timer);
     }
     return undefined;
-  }, [problemText, handleSend, routeSessionId]);
+  }, [problemText, handleSend, routeSessionId, imageUri]);
 
   const {
     handleInputModeChange,
@@ -717,6 +924,15 @@ export default function SessionScreen() {
     fetchFastCelebrations,
     showConfirmation,
     filing,
+    retryFiling: async (input: {
+      sessionId: string;
+      sessionMode: 'freeform' | 'homework';
+    }) => {
+      const res = await apiClient.filing['request-retry'].$post({
+        json: input,
+      });
+      if (!res.ok) throw new Error(`retry-filing failed: ${res.status}`);
+    },
     router,
   });
 

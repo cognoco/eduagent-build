@@ -7,6 +7,7 @@ import {
   getTopicProgress,
   getOverallProgress,
   getContinueSuggestion,
+  getActiveSessionForTopic,
 } from '../services/progress';
 import { getProfileOverdueCount } from '../services/retention-data';
 import { notFound } from '../errors';
@@ -63,6 +64,16 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
       profileId
     );
     return c.json({ totalOverdue: overdueCount, nextReviewTopic });
+  })
+
+  // Get active/paused session for a specific topic [F-4]
+  .get('/progress/topic/:topicId/active-session', async (c) => {
+    const db = c.get('db');
+    const profileId = requireProfileId(c.get('profileId'));
+    const topicId = c.req.param('topicId');
+
+    const result = await getActiveSessionForTopic(db, profileId, topicId);
+    return c.json(result);
   })
 
   // Get "continue where I left off" suggestion

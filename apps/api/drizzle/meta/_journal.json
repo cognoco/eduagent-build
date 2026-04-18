@@ -183,6 +183,34 @@
       "when": 1776345637482,
       "tag": "0025_accommodation_mode_check",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1776363267018,
+      "tag": "0026_premium_shiver_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1776449667018,
+      "tag": "0027_enable_rls",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1776722400000,
+      "tag": "0028_safe_anita_blake",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1776730000000,
+      "tag": "0029_rls_sweep_gaps",
+      "breakpoints": true
     }
   ]
 }

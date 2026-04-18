@@ -65,4 +65,22 @@ describe('BookPageFlipAnimation', () => {
     expect(cancelSpy).toHaveBeenCalledTimes(3);
     cancelSpy.mockRestore();
   });
+
+  // ANIM-IMPROVE: pages should use perspective for 3D depth.
+  // Fragility note: toString() source inspection can break under minification
+  // or transpilation. Ideally we'd assert on the animated style output, but
+  // the reanimated mock returns empty objects for useAnimatedStyle. This is
+  // acceptable for a regression guard in dev — revisit if it becomes flaky.
+  it('uses perspective in page styles (ANIM-IMPROVE)', () => {
+    const sourceModule = require('./BookPageFlipAnimation');
+    const sourceText = sourceModule.BookPageFlipAnimation.toString();
+    expect(sourceText).toContain('perspective');
+  });
+
+  it('uses rotateY instead of scaleX for 3D flip (ANIM-IMPROVE)', () => {
+    const sourceModule = require('./BookPageFlipAnimation');
+    const sourceText = sourceModule.BookPageFlipAnimation.toString();
+    expect(sourceText).toContain('rotateY');
+    expect(sourceText).not.toContain('scaleX');
+  });
 });

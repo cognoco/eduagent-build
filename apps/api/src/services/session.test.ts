@@ -721,7 +721,8 @@ describe('processMessage', () => {
         escalationRung: 1,
         birthYear: null,
       }),
-      'What is gravity?'
+      'What is gravity?',
+      undefined
     );
   });
 
@@ -760,7 +761,8 @@ describe('processMessage', () => {
     expect(result.escalationRung).toBe(2);
     expect(processExchange).toHaveBeenCalledWith(
       expect.objectContaining({ escalationRung: 2 }),
-      "I don't understand"
+      "I don't understand",
+      undefined
     );
   });
 
@@ -817,7 +819,8 @@ describe('processMessage', () => {
           { role: 'assistant', content: 'The answer is 4.' },
         ],
       }),
-      'And 3+3?'
+      'And 3+3?',
+      undefined
     );
   });
 
@@ -832,7 +835,8 @@ describe('processMessage', () => {
     expect(result.response).toBeDefined();
     expect(processExchange).toHaveBeenCalledWith(
       expect.objectContaining({ subjectName: 'Unknown' }),
-      'Hello'
+      'Hello',
+      undefined
     );
   });
 
@@ -855,7 +859,8 @@ describe('processMessage', () => {
         topicTitle: 'Quadratic Equations',
         topicDescription: 'Solving ax²+bx+c=0',
       }),
-      'How do I solve quadratics?'
+      'How do I solve quadratics?',
+      undefined
     );
   });
 
@@ -872,7 +877,8 @@ describe('processMessage', () => {
       expect.objectContaining({
         topicTitle: undefined,
       }),
-      'General question'
+      'General question',
+      undefined
     );
   });
 
@@ -891,7 +897,8 @@ describe('processMessage', () => {
       expect.objectContaining({
         birthYear: 2014,
       }),
-      'Hey there'
+      'Hey there',
+      undefined
     );
   });
 
@@ -910,7 +917,8 @@ describe('processMessage', () => {
       expect.objectContaining({
         birthYear: null,
       }),
-      'Hello'
+      'Hello',
+      undefined
     );
   });
 
@@ -942,7 +950,8 @@ describe('processMessage', () => {
         expect.objectContaining({
           workedExampleLevel: expected,
         }),
-        'Teach me'
+        'Teach me',
+        undefined
       );
     }
   );
@@ -966,7 +975,8 @@ describe('processMessage', () => {
       expect.objectContaining({
         workedExampleLevel: 'full',
       }),
-      'New topic'
+      'New topic',
+      undefined
     );
   });
 
@@ -1053,7 +1063,8 @@ describe('processMessage', () => {
         topicDescription: undefined,
         workedExampleLevel: undefined,
       }),
-      'Start interleaved review'
+      'Start interleaved review',
+      undefined
     );
   });
 
@@ -1070,7 +1081,8 @@ describe('processMessage', () => {
       expect.objectContaining({
         interleavedTopics: undefined,
       }),
-      'Normal learning'
+      'Normal learning',
+      undefined
     );
   });
 
@@ -1225,7 +1237,8 @@ describe('escalation tracking', () => {
       expect.objectContaining({
         priorLearningContext: expect.stringContaining('Prior Learning Context'),
       }),
-      'Teach me quadratics'
+      'Teach me quadratics',
+      undefined
     );
   });
 
@@ -1290,7 +1303,8 @@ describe('escalation tracking', () => {
       expect.not.objectContaining({
         priorLearningContext: expect.any(String),
       }),
-      'First lesson'
+      'First lesson',
+      undefined
     );
   });
 
@@ -1313,7 +1327,8 @@ describe('escalation tracking', () => {
           'Related past learning'
         ),
       }),
-      'Teach me quadratics'
+      'Teach me quadratics',
+      undefined
     );
   });
 
@@ -1329,7 +1344,8 @@ describe('escalation tracking', () => {
       expect.not.objectContaining({
         embeddingMemoryContext: expect.any(String),
       }),
-      'First lesson'
+      'First lesson',
+      undefined
     );
   });
 
@@ -1415,7 +1431,8 @@ describe('teaching preference (FR58)', () => {
       expect.objectContaining({
         teachingPreference: 'visual_diagrams',
       }),
-      'Teach me'
+      'Teach me',
+      undefined
     );
   });
 
@@ -1431,7 +1448,8 @@ describe('teaching preference (FR58)', () => {
       expect.objectContaining({
         teachingPreference: undefined,
       }),
-      'Hello'
+      'Hello',
+      undefined
     );
   });
 });

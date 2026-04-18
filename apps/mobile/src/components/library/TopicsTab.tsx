@@ -30,7 +30,7 @@ export interface TopicsTabState {
 
 export const TOPICS_TAB_INITIAL_STATE: TopicsTabState = {
   search: '',
-  sortKey: 'name-asc',
+  sortKey: 'retention',
   filters: {
     subjectIds: [],
     bookIds: [],
@@ -54,7 +54,8 @@ interface TopicsTabProps {
   onTopicPress: (
     topicId: string,
     subjectId: string,
-    retention: RetentionStatus
+    retention: RetentionStatus,
+    topicName: string
   ) => void;
   onAddSubject: () => void;
   isError?: boolean;
@@ -269,7 +270,7 @@ export function TopicsTab({
     return (
       <Pressable
         onPress={() =>
-          onTopicPress(item.topicId, item.subjectId, item.retention)
+          onTopicPress(item.topicId, item.subjectId, item.retention, item.name)
         }
         className="bg-surface rounded-card px-4 py-3 mb-3"
         accessibilityRole="button"

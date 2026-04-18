@@ -19,12 +19,15 @@ jest.mock('react-native-safe-area-context', () => ({
 }));
 
 const mockUseTopicProgress = jest.fn();
+const mockUseActiveSessionForTopic = jest.fn();
 const mockUseTopicRetention = jest.fn();
 const mockUseEvaluateEligibility = jest.fn();
 const mockUseTopicParkingLot = jest.fn();
 
 jest.mock('../../../hooks/use-progress', () => ({
   useTopicProgress: (...args: unknown[]) => mockUseTopicProgress(...args),
+  useActiveSessionForTopic: (...args: unknown[]) =>
+    mockUseActiveSessionForTopic(...args),
 }));
 
 jest.mock('../../../hooks/use-retention', () => ({
@@ -68,6 +71,10 @@ describe('TopicDetailScreen', () => {
       isLoading: false,
     });
     mockUseEvaluateEligibility.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+    });
+    mockUseActiveSessionForTopic.mockReturnValue({
       data: undefined,
       isLoading: false,
     });
@@ -286,7 +293,12 @@ describe('TopicDetailScreen', () => {
 
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/session',
-      params: { mode: 'practice', subjectId: 'sub-1', topicId: 'topic-1' },
+      params: {
+        mode: 'practice',
+        subjectId: 'sub-1',
+        topicId: 'topic-1',
+        topicName: 'Algebra',
+      },
     });
   });
 
@@ -313,7 +325,11 @@ describe('TopicDetailScreen', () => {
 
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/topic/recall-test',
-      params: { subjectId: 'sub-1', topicId: 'topic-1' },
+      params: {
+        subjectId: 'sub-1',
+        topicId: 'topic-1',
+        topicName: 'Algebra',
+      },
     });
   });
 
@@ -365,7 +381,12 @@ describe('TopicDetailScreen', () => {
 
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/session',
-      params: { mode: 'freeform', subjectId: 'sub-1', topicId: 'topic-1' },
+      params: {
+        mode: 'freeform',
+        subjectId: 'sub-1',
+        topicId: 'topic-1',
+        topicName: 'New Topic',
+      },
     });
   });
 
@@ -417,7 +438,49 @@ describe('TopicDetailScreen', () => {
 
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/session',
-      params: { mode: 'freeform', subjectId: 'sub-1', topicId: 'topic-1' },
+      params: {
+        mode: 'freeform',
+        subjectId: 'sub-1',
+        topicId: 'topic-1',
+        topicName: 'Calculus',
+      },
+    });
+  });
+
+  it('includes sessionId in Continue Learning navigation when active session exists [F-4]', () => {
+    mockUseTopicProgress.mockReturnValue({
+      data: {
+        topicId: 'topic-1',
+        title: 'Calculus',
+        description: '',
+        completionStatus: 'in_progress',
+        retentionStatus: 'weak',
+        struggleStatus: 'normal',
+        masteryScore: null,
+        summaryExcerpt: null,
+        xpStatus: null,
+      },
+      isLoading: false,
+    });
+    mockUseTopicRetention.mockReturnValue({ data: null, isLoading: false });
+    mockUseActiveSessionForTopic.mockReturnValue({
+      data: { sessionId: 'active-session-123' },
+      isLoading: false,
+    });
+
+    render(<TopicDetailScreen />, { wrapper: createWrapper() });
+
+    fireEvent.press(screen.getByTestId('continue-learning-button'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/session',
+      params: {
+        mode: 'freeform',
+        subjectId: 'sub-1',
+        topicId: 'topic-1',
+        topicName: 'Calculus',
+        sessionId: 'active-session-123',
+      },
     });
   });
 
@@ -468,7 +531,12 @@ describe('TopicDetailScreen', () => {
 
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/session',
-      params: { mode: 'freeform', subjectId: 'sub-1', topicId: 'topic-1' },
+      params: {
+        mode: 'freeform',
+        subjectId: 'sub-1',
+        topicId: 'topic-1',
+        topicName: 'Algebra',
+      },
     });
   });
 
@@ -495,7 +563,11 @@ describe('TopicDetailScreen', () => {
 
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/topic/relearn',
-      params: { subjectId: 'sub-1', topicId: 'topic-1' },
+      params: {
+        subjectId: 'sub-1',
+        topicId: 'topic-1',
+        topicName: 'Algebra',
+      },
     });
   });
 

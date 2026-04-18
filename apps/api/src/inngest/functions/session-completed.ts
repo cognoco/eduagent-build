@@ -68,6 +68,11 @@ interface DashboardStepResult extends StepOutcome {
   streak: { currentStreak: number; longestStreak: number } | null;
 }
 
+// Close reasons that indicate no user engagement — SM-2 fallback should not apply.
+// The plan listed 'crash_recovery' and 'app_background' but these do not exist
+// in the codebase as of 2026-04-16. Add them here if they are introduced.
+const UNATTENDED_REASONS = ['silence_timeout'] as const;
+
 async function runIsolated(
   name: string,
   profileId: string,
@@ -99,13 +104,15 @@ export const sessionCompleted = inngest.createFunction(
     const {
       profileId,
       sessionId,
-      topicId,
       subjectId,
       summaryStatus,
       timestamp,
       verificationType,
       sessionType,
     } = event.data;
+    // topicId must be `let` so it can be backfilled after the waitForEvent
+    // re-read (F-6: filing may complete just before the 60s timeout fires).
+    let topicId = event.data.topicId as string | null | undefined;
 
     // AD6: Wait for filing to complete before progressing, so that the
     // progress snapshot captures topic placement from the filing step.
@@ -117,6 +124,28 @@ export const sessionCompleted = inngest.createFunction(
         match: 'data.sessionId',
         timeout: '60s',
       });
+    }
+
+    // F-6: Filing may have backfilled topicId even if the event didn't arrive
+    // in time (network delay, retry succeeded). Re-read the session row so
+    // downstream steps use the correct topicId and exchangeCount.
+    let exchangeCount = event.data.exchangeCount as number | undefined;
+    if (!topicId || exchangeCount == null) {
+      const freshSession = await step.run('re-read-session', async () => {
+        const db = getStepDatabase();
+        const row = await db.query.learningSessions.findFirst({
+          where: eq(learningSessions.id, sessionId),
+        });
+        return row
+          ? { topicId: row.topicId, exchangeCount: row.exchangeCount }
+          : null;
+      });
+      if (freshSession?.topicId && !topicId) {
+        topicId = freshSession.topicId;
+      }
+      if (freshSession != null && exchangeCount == null) {
+        exchangeCount = freshSession.exchangeCount;
+      }
     }
 
     const outcomes: StepOutcome[] = [];
@@ -265,14 +294,44 @@ export const sessionCompleted = inngest.createFunction(
     const completionQualityRating =
       derivedQualityRating ?? (event.data.qualityRating as number | undefined);
 
+    // F-8/F-9: For relearn sessions closed without a summary, SM-2 was
+    // silently skipped, leaving reset cards stuck at intervalDays=1 forever.
+    // Apply a conservative fallback quality=3 ("correct with difficulty") when
+    // no explicit rating is available, UNLESS the session ended without any
+    // user action (e.g. stale-cleanup cron). In that case no learning occurred
+    // and we should not advance the card.
+    //
+    // Verified close reasons via grep (apps/api/src/services/session/session-crud.ts:390,
+    // apps/mobile/src/app/(app)/session/use-session-actions.ts:349):
+    //   'silence_timeout' — stale-cleanup cron (30 min idle, no user action)
+    //   'user_ended'      — user explicitly ended the session
+    let effectiveQuality = completionQualityRating;
+    if (effectiveQuality == null) {
+      const closeReason = event.data.reason as string | undefined;
+      if (
+        closeReason &&
+        (UNATTENDED_REASONS as readonly string[]).includes(closeReason)
+      ) {
+        // No quality signal — session ended without user action, skip SM-2.
+      } else if (retentionTopicIds.length > 0 && (exchangeCount ?? 0) > 0) {
+        // User-closed session with at least one exchange but no summary
+        // (e.g., skipped or crash). Use conservative quality=3 to advance
+        // relearn cards out of reset. Zero-exchange sessions have no learning
+        // signal — skip SM-2 entirely.
+        effectiveQuality = 3;
+      }
+    }
+
     // Step 1b: Update retention data via SM-2
     // Conservative: skip retention update when no quality rating was provided,
     // rather than defaulting to 3 (which inflates metrics). Issue #19.
+    // F-8/F-9: effectiveQuality applies a fallback=3 for user-closed sessions
+    // without a summary so relearn cards are not stuck at intervalDays=1.
     outcomes.push(
       await step.run('update-retention', async () => {
         if (retentionTopicIds.length === 0)
           return { step: 'update-retention', status: 'skipped' as const };
-        if (completionQualityRating == null) {
+        if (effectiveQuality == null) {
           console.warn(
             `[session-completed] No qualityRating for session ${sessionId} — skipping retention update`
           );
@@ -285,7 +344,7 @@ export const sessionCompleted = inngest.createFunction(
               db,
               profileId,
               tid,
-              completionQualityRating,
+              effectiveQuality,
               timestamp
             );
           }

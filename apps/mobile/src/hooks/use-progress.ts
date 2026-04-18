@@ -110,6 +110,34 @@ export function useContinueSuggestion() {
   });
 }
 
+export function useActiveSessionForTopic(topicId: string | undefined) {
+  const client = useApiClient();
+  const { activeProfile } = useProfile();
+
+  return useQuery({
+    queryKey: [
+      'progress',
+      'topic',
+      topicId,
+      'active-session',
+      activeProfile?.id,
+    ],
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const res = await client.progress.topic[':topicId'][
+          'active-session'
+        ].$get({ param: { topicId: topicId! } }, { init: { signal } });
+        await assertOk(res);
+        return (await res.json()) as { sessionId: string } | null;
+      } finally {
+        cleanup();
+      }
+    },
+    enabled: !!activeProfile && !!topicId,
+  });
+}
+
 export function useReviewSummary(): UseQueryResult<ReviewSummary> {
   const client = useApiClient();
   const { activeProfile } = useProfile();

@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
+import { z } from 'zod';
 import type { Database } from '@eduagent/database';
 import { filingRequestSchema } from '@eduagent/schemas';
 import type { AuthUser } from '../middleware/auth';
@@ -31,10 +32,26 @@ type FilingRouteEnv = {
   };
 };
 
-export const filingRoutes = new Hono<FilingRouteEnv>().post(
-  '/filing',
-  zValidator('json', filingRequestSchema),
-  async (c) => {
+const retryRequestSchema = z.object({
+  sessionId: z.string(),
+  sessionMode: z.enum(['freeform', 'homework']).default('freeform'),
+});
+
+export const filingRoutes = new Hono<FilingRouteEnv>()
+  .post(
+    '/filing/request-retry',
+    zValidator('json', retryRequestSchema),
+    async (c) => {
+      const profileId = requireProfileId(c.get('profileId'));
+      const { sessionId, sessionMode } = c.req.valid('json');
+      await inngest.send({
+        name: 'app/filing.retry',
+        data: { sessionId, sessionMode, profileId },
+      });
+      return c.json({ queued: true });
+    }
+  )
+  .post('/filing', zValidator('json', filingRequestSchema), async (c) => {
     const profileId = requireProfileId(c.get('profileId'));
     const db = c.get('db');
     const body = c.req.valid('json');
@@ -125,8 +142,11 @@ export const filingRoutes = new Hono<FilingRouteEnv>().post(
       });
     } catch (err) {
       console.error('[filing] resolveFilingResult failed:', err);
-      // Fire async retry for freeform/homework sessions
-      if (sessionTranscript && body.sessionId) {
+      // Fire async retry for freeform/homework sessions — but only if
+      // the first catch block didn't already enqueue a retry (usedFallback).
+      // Without this guard, two app/filing.retry events fire for the same
+      // sessionId, causing duplicate topic rows + ghost filing.completed events.
+      if (!usedFallback && sessionTranscript && body.sessionId) {
         await inngest
           .send({
             name: 'app/filing.retry',
@@ -189,5 +209,4 @@ export const filingRoutes = new Hono<FilingRouteEnv>().post(
       });
 
     return c.json(usedFallback ? { ...result, fallback: true } : result, 200);
-  }
-);
+  });

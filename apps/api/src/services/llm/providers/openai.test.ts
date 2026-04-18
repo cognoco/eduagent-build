@@ -1,5 +1,5 @@
-import { createOpenAIProvider } from './openai';
-import type { ChatMessage, ModelConfig } from '../types';
+import { createOpenAIProvider, toOpenAIContent } from './openai';
+import type { ChatMessage, MessagePart, ModelConfig } from '../types';
 
 // ---------------------------------------------------------------------------
 // Mock fetch — OpenAI provider uses raw fetch() for CF Workers compatibility
@@ -277,6 +277,52 @@ describe('OpenAI Provider', () => {
         expect.stringContaining('gemini-3.0-flash')
       );
       warnSpy.mockRestore();
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// toOpenAIContent — pure formatting, no HTTP mocks needed [IMG-VISION]
+// ---------------------------------------------------------------------------
+
+describe('toOpenAIContent', () => {
+  it('returns a plain string unchanged', () => {
+    expect(toOpenAIContent('Hello')).toBe('Hello');
+  });
+
+  it('extracts text from a text-only MessagePart[]', () => {
+    const parts: MessagePart[] = [
+      { type: 'text', text: 'Hello' },
+      { type: 'text', text: 'World' },
+    ];
+    expect(toOpenAIContent(parts)).toBe('Hello\nWorld');
+  });
+
+  it('maps InlineDataPart to OpenAI image_url content blocks', () => {
+    const parts: MessagePart[] = [
+      { type: 'inline_data', mimeType: 'image/jpeg', data: 'base64data==' },
+      { type: 'text', text: 'What is in this image?' },
+    ];
+
+    expect(toOpenAIContent(parts)).toEqual([
+      {
+        type: 'image_url',
+        image_url: { url: 'data:image/jpeg;base64,base64data==' },
+      },
+      { type: 'text', text: 'What is in this image?' },
+    ]);
+  });
+
+  it('embeds MIME type in the data URL', () => {
+    const parts: MessagePart[] = [
+      { type: 'inline_data', mimeType: 'image/png', data: 'pngdata==' },
+      { type: 'text', text: 'Describe this' },
+    ];
+
+    const result = toOpenAIContent(parts) as unknown[];
+    expect(result[0]).toEqual({
+      type: 'image_url',
+      image_url: { url: 'data:image/png;base64,pngdata==' },
     });
   });
 });

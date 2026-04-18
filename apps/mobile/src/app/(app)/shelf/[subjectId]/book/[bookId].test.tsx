@@ -157,9 +157,9 @@ jest.mock('../../../../../lib/format-api-error', () => ({
     err instanceof Error ? err.message : 'Unknown error',
 }));
 
-// --- PenWritingAnimation (simple stub) ---
+// --- MagicPenAnimation (simple stub) ---
 jest.mock('../../../../../components/common', () => ({
-  PenWritingAnimation: () => null,
+  MagicPenAnimation: () => null,
 }));
 
 // --- Library components: render real implementations for text assertions ---
@@ -241,6 +241,13 @@ describe('BookScreen', () => {
     }));
     mockUseCurriculum.mockImplementation(() => ({
       data: null,
+      isLoading: false,
+    }));
+    mockUseBooks.mockImplementation(() => ({
+      data: [
+        { id: 'book-1', title: 'Algebra', emoji: '📐', topicsGenerated: true },
+        { id: 'book-2', title: 'Geometry', emoji: '📏', topicsGenerated: true },
+      ],
       isLoading: false,
     }));
   });

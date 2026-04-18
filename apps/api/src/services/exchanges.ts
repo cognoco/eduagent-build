@@ -2,6 +2,7 @@ import { routeAndCall, routeAndStream } from './llm';
 import type {
   ChatMessage,
   EscalationRung,
+  MessagePart,
   RouteResult,
   StreamResult,
 } from './llm';
@@ -21,6 +22,30 @@ import {
 } from '@eduagent/schemas';
 import { buildFourStrandsPrompt } from './language-prompts';
 import type { LLMTier } from './subscription';
+
+// ---------------------------------------------------------------------------
+// Multimodal image support — IMG-VISION
+// ---------------------------------------------------------------------------
+
+export interface ImageData {
+  base64: string;
+  mimeType: string;
+}
+
+export function buildUserContent(
+  userMessage: string,
+  imageData?: ImageData
+): string | MessagePart[] {
+  if (!imageData) return userMessage;
+  return [
+    {
+      type: 'inline_data' as const,
+      mimeType: imageData.mimeType,
+      data: imageData.base64,
+    },
+    { type: 'text' as const, text: userMessage },
+  ];
+}
 
 // ---------------------------------------------------------------------------
 // Core Exchange Processing Pipeline — Story 2.1
@@ -90,6 +115,8 @@ export interface ExchangeContext {
   inputMode?: InputMode;
   /** Number of completed exchanges in this session — 0 means the LLM's first turn */
   exchangeCount?: number;
+  /** Client-side effective mode — drives mode-specific prompt sections (e.g. recitation) */
+  effectiveMode?: string;
 }
 
 /** Result of processing a single exchange */
@@ -191,6 +218,7 @@ export function estimateExpectedResponseMinutes(
 export function buildSystemPrompt(context: ExchangeContext): string {
   const sections: string[] = [];
   const isLanguageMode = context.pedagogyMode === 'four_strands';
+  const isRecitation = context.effectiveMode === 'recitation';
 
   // Role and identity
   if (isLanguageMode) {
@@ -262,26 +290,51 @@ export function buildSystemPrompt(context: ExchangeContext): string {
 
   // First-exchange teaching opener — tell the LLM to start teaching, not ask
   if (
+    !isRecitation &&
     context.exchangeCount === 0 &&
     context.sessionType === 'learning' &&
     !isLanguageMode
   ) {
     if (context.topicTitle) {
       sections.push(
-        'The learner chose this topic. Begin teaching it immediately. ' +
+        'The learner chose this topic. Open with a surprising or fun fact about it to spark curiosity, ' +
+          'then invite them into the conversation (e.g. "Have you heard about…?" or "What do you already know about…?"). ' +
           'Do not ask what they want to learn — they already told you by choosing the topic. ' +
-          'If prior session history exists for this topic, pick up where the previous session left off.'
+          'If prior session history exists for this topic, pick up where the previous session left off instead of repeating the fun-fact opener.'
       );
     } else if (context.rawInput) {
       sections.push(
         'The learner expressed interest in the above topic. ' +
-          'Anchor your teaching to their stated intent and begin immediately.'
+          'Open with a surprising or fun fact related to their question to spark curiosity, ' +
+          'then anchor your teaching to their stated intent and begin immediately.'
       );
     }
   }
 
-  // Session type
-  if (isLanguageMode) {
+  // Recitation mode — overrides teaching/escalation behaviour
+  if (isRecitation) {
+    sections.push(
+      'Session type: RECITATION PRACTICE (BETA)\n' +
+        'The learner wants to recite something from memory — a poem, song lyrics, multiplication tables, or other memorised text.\n' +
+        'Your role is to LISTEN and give feedback. Do NOT teach, quiz, or use the escalation ladder.\n\n' +
+        'Flow:\n' +
+        '1. Ask what they would like to recite (title, author, or description).\n' +
+        '2. Once they tell you, say you are ready and encourage them to begin.\n' +
+        '3. After they recite, provide honest but kind feedback:\n' +
+        '   - Quote the parts that came through clearly.\n' +
+        '   - Note any parts that seemed unclear, garbled, or missing.\n' +
+        '   - If you recognise the text, gently note any differences from the original — but frame them as "I noticed a small change" not "you got it wrong".\n' +
+        '   - Comment briefly on delivery: pace, confidence, expression.\n' +
+        '4. Offer to let them try again or move on.\n\n' +
+        'Keep feedback encouraging. Use "not yet" framing for missed parts.\n' +
+        'If you do not recognise the text, say so honestly and base feedback only on clarity and delivery.'
+    );
+  }
+
+  // Session type — skip for recitation (dedicated prompt section handles it)
+  if (isRecitation) {
+    // Handled by the recitation block above
+  } else if (isLanguageMode) {
     sections.push(
       [
         'Session type: LANGUAGE LEARNING',
@@ -299,8 +352,10 @@ export function buildSystemPrompt(context: ExchangeContext): string {
     );
   }
 
-  // Escalation state and guidance
-  if (!isLanguageMode) {
+  // Escalation state and guidance — skip for recitation (no teaching ladder)
+  if (isRecitation) {
+    // No escalation in recitation mode
+  } else if (!isLanguageMode) {
     sections.push(
       getEscalationPromptGuidance(context.escalationRung, context.sessionType)
     );
@@ -391,14 +446,15 @@ export function buildSystemPrompt(context: ExchangeContext): string {
     sections.push(retentionGuidance);
   }
 
-  // Curriculum scope boundaries
-  sections.push(
-    'Scope boundaries:\n' +
-      '- Stay within the loaded topic and subject. Do not teach unrelated material even if the learner asks about it.\n' +
-      '- If the learner asks a question outside the current topic, acknowledge it briefly and redirect: ' +
-      '"Good question — that\'s a different topic. Let\'s finish this one first, then you can start a session on that."\n' +
-      '- Do not introduce concepts from future topics in the curriculum unless they are prerequisites for the current topic.'
-  );
+  // Curriculum scope boundaries — skip for recitation (poems are inherently cross-topic)
+  if (!isRecitation)
+    sections.push(
+      'Scope boundaries:\n' +
+        '- Stay within the loaded topic and subject. Do not teach unrelated material even if the learner asks about it.\n' +
+        '- If the learner asks a question outside the current topic, acknowledge it briefly and redirect: ' +
+        '"Good question — that\'s a different topic. Let\'s finish this one first, then you can start a session on that."\n' +
+        '- Do not introduce concepts from future topics in the curriculum unless they are prerequisites for the current topic.'
+    );
 
   // Worked example level
   if (!isLanguageMode && context.workedExampleLevel) {
@@ -455,26 +511,29 @@ export function buildSystemPrompt(context: ExchangeContext): string {
     );
   }
 
-  // Partial progress signaling — LLM self-reports student progress (Gap 3)
-  sections.push(getPartialProgressInstruction());
+  // Partial progress, cognitive load, knowledge capture — skip for recitation
+  if (!isRecitation) {
+    // Partial progress signaling — LLM self-reports student progress (Gap 3)
+    sections.push(getPartialProgressInstruction());
 
-  // Cognitive load management
-  sections.push(
-    'Cognitive load management:\n' +
-      '- Introduce at most 1-2 new concepts per message.\n' +
-      '- Build on what the learner already knows.\n' +
-      '- Use concrete examples before abstract rules.'
-  );
+    // Cognitive load management
+    sections.push(
+      'Cognitive load management:\n' +
+        '- Introduce at most 1-2 new concepts per message.\n' +
+        '- Build on what the learner already knows.\n' +
+        '- Use concrete examples before abstract rules.'
+    );
 
-  // Knowledge capture — prompts the learner to save a note mid-session or post-session
-  sections.push(
-    `KNOWLEDGE CAPTURE:\n` +
-      `After the learner has exchanged at least 5 messages with you, if they give a correct answer where they explain something in their own words (not short factual recall like "yes", a number, or a single term), respond naturally to their answer and then ask: "Shall we put down this knowledge?"\n` +
-      `When you ask this, append a JSON block at the very end of your response on its own line: {"notePrompt": true}\n` +
-      `Only ask this ONCE per session. After asking once (whether the learner agrees or not), never ask again in this session.\n` +
-      `At the end of the session, in your final closing message, ask: "Want to put down what you learned today?" and append: {"notePrompt": true, "postSession": true}\n` +
-      `The JSON block will be stripped before the learner sees it — they will only see your conversational text.`
-  );
+    // Knowledge capture — prompts the learner to save a note mid-session or post-session
+    sections.push(
+      `KNOWLEDGE CAPTURE:\n` +
+        `After the learner has exchanged at least 5 messages with you, if they give a correct answer where they explain something in their own words (not short factual recall like "yes", a number, or a single term), respond naturally to their answer and then ask: "Shall we put down this knowledge?"\n` +
+        `When you ask this, append a JSON block at the very end of your response on its own line: {"notePrompt": true}\n` +
+        `Only ask this ONCE per session. After asking once (whether the learner agrees or not), never ask again in this session.\n` +
+        `At the end of the session, in your final closing message, ask: "Want to put down what you learned today?" and append: {"notePrompt": true, "postSession": true}\n` +
+        `The JSON block will be stripped before the learner sees it — they will only see your conversational text.`
+    );
+  }
 
   // Prohibitions
   sections.push(
@@ -526,7 +585,8 @@ export function buildSystemPrompt(context: ExchangeContext): string {
  */
 export async function processExchange(
   context: ExchangeContext,
-  userMessage: string
+  userMessage: string,
+  imageData?: ImageData
 ): Promise<ExchangeResult> {
   const systemPrompt = buildSystemPrompt(context);
 
@@ -536,7 +596,10 @@ export async function processExchange(
       role: e.role,
       content: e.content,
     })),
-    { role: 'user' as const, content: userMessage },
+    {
+      role: 'user' as const,
+      content: buildUserContent(userMessage, imageData),
+    },
   ];
 
   const ageBracket = resolveAgeBracket(context.birthYear);
@@ -589,7 +652,8 @@ export async function processExchange(
  */
 export async function streamExchange(
   context: ExchangeContext,
-  userMessage: string
+  userMessage: string,
+  imageData?: ImageData
 ): Promise<ExchangeStreamResult> {
   const systemPrompt = buildSystemPrompt(context);
 
@@ -599,7 +663,10 @@ export async function streamExchange(
       role: e.role,
       content: e.content,
     })),
-    { role: 'user' as const, content: userMessage },
+    {
+      role: 'user' as const,
+      content: buildUserContent(userMessage, imageData),
+    },
   ];
 
   const ageBracket = resolveAgeBracket(context.birthYear);

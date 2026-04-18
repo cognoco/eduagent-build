@@ -49,7 +49,12 @@ export default function CurriculumScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
-  const { data: curriculum, isLoading } = useCurriculum(subjectId ?? '');
+  const {
+    data: curriculum,
+    isLoading,
+    isError,
+    refetch,
+  } = useCurriculum(subjectId ?? '');
   const skipTopic = useSkipTopic(subjectId ?? '');
   const unskipTopic = useUnskipTopic(subjectId ?? '');
   const challengeCurriculum = useChallengeCurriculum(subjectId ?? '');
@@ -72,8 +77,19 @@ export default function CurriculumScreen() {
 
   if (!subjectId) {
     return (
-      <View className="flex-1 bg-background items-center justify-center">
-        <Text className="text-text-secondary">No subject selected</Text>
+      <View className="flex-1 bg-background items-center justify-center px-5">
+        <Text className="text-text-secondary mb-4">No subject selected</Text>
+        <Pressable
+          onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
+          className="bg-primary rounded-button px-6 py-3 items-center"
+          accessibilityRole="button"
+          accessibilityLabel="Go home"
+          testID="curriculum-guard-home"
+        >
+          <Text className="text-text-inverse text-body font-semibold">
+            Go home
+          </Text>
+        </Pressable>
       </View>
     );
   }
@@ -203,6 +219,36 @@ export default function CurriculumScreen() {
           <Text className="text-text-secondary mt-2">
             Loading curriculum...
           </Text>
+        </View>
+      ) : isError ? (
+        <View
+          className="flex-1 items-center justify-center px-8"
+          testID="curriculum-error"
+        >
+          <Text className="text-h3 font-semibold text-text-primary text-center mb-2">
+            Couldn't load curriculum
+          </Text>
+          <Text className="text-body text-text-secondary text-center mb-6">
+            Check your connection and try again.
+          </Text>
+          <Pressable
+            onPress={() => void refetch()}
+            className="bg-primary rounded-button px-6 py-3 items-center min-h-[48px] justify-center mb-3 w-full"
+            testID="curriculum-error-retry"
+          >
+            <Text className="text-text-inverse text-body font-semibold">
+              Try again
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
+            className="bg-surface rounded-button px-6 py-3 items-center min-h-[48px] justify-center w-full"
+            testID="curriculum-error-home"
+          >
+            <Text className="text-text-primary text-body font-semibold">
+              Go home
+            </Text>
+          </Pressable>
         </View>
       ) : !curriculum ? (
         <View className="flex-1 items-center justify-center px-8">
@@ -353,6 +399,7 @@ export default function CurriculumScreen() {
                 params: {
                   subjectId,
                   topicId: firstAvailableTopic.id,
+                  topicName: firstAvailableTopic.title,
                 },
               })
             }
@@ -371,6 +418,7 @@ export default function CurriculumScreen() {
                   mode: 'learning',
                   subjectId,
                   topicId: firstAvailableTopic.id,
+                  topicName: firstAvailableTopic.title,
                 },
               })
             }
@@ -406,6 +454,7 @@ export default function CurriculumScreen() {
                   mode: 'learning',
                   subjectId,
                   topicId: firstAvailableTopic.id,
+                  topicName: firstAvailableTopic.title,
                 },
               })
             }

@@ -3,7 +3,7 @@
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
-import { eq, and, asc, desc, inArray } from 'drizzle-orm';
+import { eq, and, asc, desc, gte, inArray } from 'drizzle-orm';
 import {
   subjects,
   curricula,
@@ -134,10 +134,29 @@ export async function getSubjectProgress(
     }
   }
 
-  // Get last session for this subject
+  // Get last session for this subject (only sessions with real activity)
   const sessions = await repo.sessions.findMany(
-    eq(learningSessions.subjectId, subjectId)
+    and(
+      eq(learningSessions.subjectId, subjectId),
+      gte(learningSessions.exchangeCount, 1)
+    )
   );
+
+  // [BUG-LIB-TOPICS] A completed session on a curriculum topic also counts as
+  // completion — matches the book-view semantic (services/curriculum.ts
+  // computeBookStatusesBatch). Without this, library showed 0/N while the book
+  // screen showed 1/N for the same topic after a session finished.
+  const curriculumTopicIds = new Set(topics.map((t) => t.id));
+  for (const session of sessions) {
+    if (
+      session.topicId &&
+      curriculumTopicIds.has(session.topicId) &&
+      (session.status === 'completed' || session.status === 'auto_closed')
+    ) {
+      completedTopics.add(session.topicId);
+    }
+  }
+
   const lastSession = sessions.sort(
     (a, b) => b.lastActivityAt.getTime() - a.lastActivityAt.getTime()
   )[0];
@@ -349,11 +368,14 @@ export async function getOverallProgress(
     assessmentsByTopic.set(assessment.topicId, list);
   }
 
-  // Fetch all sessions in one query
+  // Fetch all sessions in one query (only sessions with real activity)
   const allSessions =
     subjectIds.length > 0
       ? await repo.sessions.findMany(
-          inArray(learningSessions.subjectId, subjectIds)
+          and(
+            inArray(learningSessions.subjectId, subjectIds),
+            gte(learningSessions.exchangeCount, 1)
+          )
         )
       : [];
 
@@ -408,6 +430,22 @@ export async function getOverallProgress(
 
     // Last session
     const subjectSessions = sessionsBySubject.get(subject.id) ?? [];
+
+    // [BUG-LIB-TOPICS] A completed session on a curriculum topic also counts
+    // as completion — matches the book-view semantic in
+    // services/curriculum.ts:computeBookStatusesBatch. Keeps the library card
+    // aligned with what the book screen shows.
+    const curriculumTopicIds = new Set(topics.map((t) => t.id));
+    for (const session of subjectSessions) {
+      if (
+        session.topicId &&
+        curriculumTopicIds.has(session.topicId) &&
+        (session.status === 'completed' || session.status === 'auto_closed')
+      ) {
+        completedTopics.add(session.topicId);
+      }
+    }
+
     const lastSession = subjectSessions.sort(
       (a, b) => b.lastActivityAt.getTime() - a.lastActivityAt.getTime()
     )[0];
@@ -449,6 +487,26 @@ export async function getOverallProgress(
   };
 }
 
+export async function getActiveSessionForTopic(
+  db: Database,
+  profileId: string,
+  topicId: string
+): Promise<{ sessionId: string } | null> {
+  const repo = createScopedRepository(db, profileId);
+  const sessions = await repo.sessions.findMany(
+    and(
+      eq(learningSessions.topicId, topicId),
+      inArray(learningSessions.status, ['active', 'paused'])
+    )
+  );
+  if (sessions.length === 0) return null;
+  // Use spread to avoid mutating the repo array (consistent with getContinueSuggestion pattern)
+  const sorted = [...sessions].sort(
+    (a, b) => b.lastActivityAt.getTime() - a.lastActivityAt.getTime()
+  );
+  return { sessionId: sorted[0]!.id };
+}
+
 export async function getContinueSuggestion(
   db: Database,
   profileId: string
@@ -468,8 +526,13 @@ export async function getContinueSuggestion(
   const subjectIds = activeSubjects.map((subject) => subject.id);
 
   // Fetch all sessions upfront for subject ordering + session lookup (avoids N+1)
+  // Only sessions with real activity — ghost sessions (exchangeCount=0) must not
+  // skew subject ordering or appear as resumable.
   const allSessions = await repo.sessions.findMany(
-    inArray(learningSessions.subjectId, subjectIds)
+    and(
+      inArray(learningSessions.subjectId, subjectIds),
+      gte(learningSessions.exchangeCount, 1)
+    )
   );
 
   // Sort subjects by most recent session activity (not insertion order)

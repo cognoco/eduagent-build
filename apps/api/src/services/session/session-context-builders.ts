@@ -2,7 +2,7 @@
 // Session Context Builders — active time computation and context helpers
 // ---------------------------------------------------------------------------
 
-import { eq, and, asc, desc, inArray, isNotNull } from 'drizzle-orm';
+import { eq, and, asc, desc, gte, inArray, isNotNull } from 'drizzle-orm';
 import {
   learningSessions,
   curriculumBooks,
@@ -139,7 +139,8 @@ export async function buildBookLearningHistoryContext(
           eq(learningSessions.profileId, profileId),
           inArray(learningSessions.topicId, topicIds),
           inArray(learningSessions.status, ['completed', 'auto_closed']),
-          isNotNull(learningSessions.endedAt)
+          isNotNull(learningSessions.endedAt),
+          gte(learningSessions.exchangeCount, 1)
         )
       ),
     // Fetch recent topic notes for this book (last 3, full text)

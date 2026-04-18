@@ -121,6 +121,9 @@ export function LearnerScreen({
                 ...(recoveryMarker.topicId && {
                   topicId: recoveryMarker.topicId,
                 }),
+                ...(recoveryMarker.topicName && {
+                  topicName: recoveryMarker.topicName,
+                }),
               },
             } as never),
           testID: 'intent-resume',
@@ -141,6 +144,7 @@ export function LearnerScreen({
                   subjectId: continueSuggestion.subjectId,
                   subjectName: continueSuggestion.subjectName,
                   topicId: continueSuggestion.topicId,
+                  topicName: continueSuggestion.topicTitle,
                   mode: 'learning',
                 },
               } as never),

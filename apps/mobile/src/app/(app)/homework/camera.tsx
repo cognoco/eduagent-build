@@ -16,7 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import type { HomeworkCaptureSource, HomeworkProblem } from '@eduagent/schemas';
 import { useThemeColors } from '../../../lib/theme';
-import { cameraReducer, initialCameraState } from './camera-reducer';
+import { cameraReducer, initialCameraState } from './_helpers/camera-reducer';
 import { useHomeworkOcr } from '../../../hooks/use-homework-ocr';
 import { useCreateSubject, useSubjects } from '../../../hooks/use-subjects';
 import { useClassifySubject } from '../../../hooks/use-classify-subject';
@@ -29,7 +29,7 @@ import {
   getHomeworkProblemText,
   serializeHomeworkProblems,
   splitHomeworkProblems,
-} from './problem-cards';
+} from './_helpers/problem-cards';
 
 type FlashMode = 'off' | 'on' | 'auto';
 
@@ -54,6 +54,9 @@ export default function CameraScreen(): React.ReactNode {
   const [manualText, setManualText] = useState('');
   const [flash, setFlash] = useState<FlashMode>('off');
   const [showCelebration, setShowCelebration] = useState(true);
+  // [IMP-1] Track MIME type from the image source for reliable detection.
+  // Camera always produces JPEG; gallery picks provide OS-level mimeType.
+  const [imageMimeType, setImageMimeType] = useState<string | null>(null);
 
   // Subject auto-classification state
   const classifyMutation = useClassifySubject();
@@ -177,6 +180,7 @@ export default function CameraScreen(): React.ReactNode {
     try {
       const photo = await cameraRef.current?.takePictureAsync();
       if (photo?.uri) {
+        setImageMimeType('image/jpeg'); // expo-camera always produces JPEG
         dispatch({ type: 'PHOTO_TAKEN', uri: photo.uri, source: 'camera' });
       }
     } catch (error) {
@@ -209,6 +213,7 @@ export default function CameraScreen(): React.ReactNode {
         return;
       }
 
+      setImageMimeType(selectedImage.mimeType ?? null);
       dispatch({
         type: 'PHOTO_TAKEN',
         uri: selectedImage.uri,
@@ -268,6 +273,44 @@ export default function CameraScreen(): React.ReactNode {
       sourceOcrText?: string,
       captureSource?: HomeworkCaptureSource
     ) => {
+      const MAX_PARAM_LENGTH = 8000; // safe URL param budget
+
+      let homeworkProblemsParam: string | undefined;
+      if (problems && problems.length > 0) {
+        // Drop trailing problems until the serialized string fits.
+        let truncatedProblems = [...problems];
+        let serialized = serializeHomeworkProblems(truncatedProblems);
+        while (
+          serialized.length > MAX_PARAM_LENGTH &&
+          truncatedProblems.length > 1
+        ) {
+          truncatedProblems = truncatedProblems.slice(0, -1);
+          serialized = serializeHomeworkProblems(truncatedProblems);
+        }
+        // If a single problem still exceeds the budget, truncate its text
+        // at a word boundary as a last resort.
+        if (
+          serialized.length > MAX_PARAM_LENGTH &&
+          truncatedProblems.length === 1
+        ) {
+          const problem = truncatedProblems[0]!;
+          const maxTextLen =
+            problem.text.length - (serialized.length - MAX_PARAM_LENGTH) - 30;
+          const wordBoundary = problem.text.lastIndexOf(
+            ' ',
+            Math.max(0, maxTextLen)
+          );
+          const truncatedText =
+            problem.text.slice(
+              0,
+              wordBoundary > 0 ? wordBoundary : maxTextLen
+            ) + ' [truncated]';
+          truncatedProblems = [{ ...problem, text: truncatedText }];
+          serialized = serializeHomeworkProblems(truncatedProblems);
+        }
+        homeworkProblemsParam = serialized;
+      }
+
       router.replace({
         pathname: '/(app)/session',
         params: {
@@ -275,11 +318,12 @@ export default function CameraScreen(): React.ReactNode {
           subjectId: sid,
           subjectName: sName,
           problemText,
-          ...(problems && problems.length > 0
-            ? { homeworkProblems: serializeHomeworkProblems(problems) }
+          ...(homeworkProblemsParam !== undefined
+            ? { homeworkProblems: homeworkProblemsParam }
             : {}),
           ...(sourceOcrText ? { ocrText: sourceOcrText } : {}),
           ...(imageUri ? { imageUri } : {}),
+          ...(imageMimeType ? { imageMimeType } : {}),
           ...(captureSource ? { captureSource } : {}),
         },
       } as never);

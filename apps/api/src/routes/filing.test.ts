@@ -177,6 +177,110 @@ describe('filing routes', () => {
   });
 
   // -------------------------------------------------------------------------
+  // POST /v1/filing/request-retry
+  // -------------------------------------------------------------------------
+
+  describe('POST /v1/filing/request-retry', () => {
+    it('returns 401 without auth header', async () => {
+      const res = await app.request(
+        '/v1/filing/request-retry',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sessionId: 'sess-1',
+            sessionMode: 'freeform',
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(401);
+    });
+
+    it('dispatches app/filing.retry event and returns queued: true', async () => {
+      const { inngest } = await import('../inngest/client');
+
+      const res = await app.request(
+        '/v1/filing/request-retry',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            sessionId: 'sess-abc',
+            sessionMode: 'freeform',
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body).toEqual({ queued: true });
+
+      expect(inngest.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'app/filing.retry',
+          data: expect.objectContaining({
+            sessionId: 'sess-abc',
+            sessionMode: 'freeform',
+            profileId: 'test-profile-id',
+          }),
+        })
+      );
+    });
+
+    it('defaults sessionMode to freeform when omitted', async () => {
+      const { inngest } = await import('../inngest/client');
+
+      const res = await app.request(
+        '/v1/filing/request-retry',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ sessionId: 'sess-xyz' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      expect(inngest.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ sessionMode: 'freeform' }),
+        })
+      );
+    });
+
+    it('returns 400 when sessionId is missing', async () => {
+      const res = await app.request(
+        '/v1/filing/request-retry',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ sessionMode: 'freeform' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 400 when sessionMode is an invalid value', async () => {
+      const res = await app.request(
+        '/v1/filing/request-retry',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ sessionId: 'sess-1', sessionMode: 'invalid' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(400);
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // POST /v1/filing
   // -------------------------------------------------------------------------
 

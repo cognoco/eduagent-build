@@ -42,7 +42,8 @@ export interface NotificationPayload {
     | 'progress_refresh'
     | 'struggle_noticed'
     | 'struggle_flagged'
-    | 'struggle_resolved';
+    | 'struggle_resolved'
+    | 'dictation_review';
 }
 
 export interface NotificationResult {

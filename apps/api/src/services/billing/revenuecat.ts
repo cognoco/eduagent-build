@@ -14,7 +14,10 @@ import {
 import type { SubscriptionTier, SubscriptionStatus } from '@eduagent/schemas';
 import { getTierConfig, isValidTransition } from '../subscription';
 import { captureException } from '../sentry';
+import { createLogger } from '../logger';
 import { mapSubscriptionRow, type SubscriptionRow } from './types';
+
+const logger = createLogger();
 import {
   updateQuotaPoolLimit,
   getSubscriptionByAccountId,
@@ -104,9 +107,11 @@ export async function updateSubscriptionFromRevenuecatWebhook(
   }
   if (updates.status !== undefined && updates.status !== existing.status) {
     if (!isValidTransition(existing.status, updates.status)) {
-      console.error(
-        `[billing] Invalid subscription transition: ${existing.status} -> ${updates.status} (sub: ${existing.id})`
-      );
+      logger.error('Invalid subscription transition', {
+        from: existing.status,
+        to: updates.status,
+        subscriptionId: existing.id,
+      });
       captureException(
         new Error(
           `Invalid subscription transition: ${existing.status} -> ${updates.status}`
@@ -184,9 +189,9 @@ export async function activateSubscriptionFromRevenuecat(
 
   // BD-03: enforce trialEndsAt when isTrial is true
   if (isTrial && !trialEndsAt) {
-    console.error(
-      `[billing] trialEndsAt is required when isTrial is true (account: ${accountId})`
-    );
+    logger.error('trialEndsAt is required when isTrial is true', {
+      accountId,
+    });
     captureException(
       new Error(
         'Trial activation missing trialEndsAt — falling back to non-trial'

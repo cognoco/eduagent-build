@@ -942,6 +942,32 @@ describe('startRelearn', () => {
     // Only 1 insert call: learningSessions (no needsDeepening insert)
     expect(db.insert).toHaveBeenCalledTimes(1);
   });
+
+  it('includes prior teaching preference when method is same', async () => {
+    setupScopedRepo({ needsDeepeningFindMany: [] });
+    const db = createMockDb();
+    (db.query.teachingPreferences.findFirst as jest.Mock).mockResolvedValue({
+      id: 'pref-1',
+      profileId,
+      subjectId,
+      method: 'visual_diagrams',
+      analogyDomain: null,
+      nativeLanguage: null,
+    });
+    (db.insert as jest.Mock).mockReturnValue({
+      values: jest.fn().mockReturnValue({
+        returning: jest.fn().mockResolvedValue([{ id: 'session-new' }]),
+      }),
+    });
+
+    const result = await startRelearn(db, profileId, {
+      topicId,
+      method: 'same',
+    });
+
+    expect(result.method).toBe('same');
+    expect(result.preferredMethod).toBe('visual_diagrams');
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1436,6 +1462,57 @@ describe('updateRetentionFromSession', () => {
 
     // SM-2 should run — no timestamp means no guard
     expect(db.update).toHaveBeenCalled();
+  });
+
+  it('F-7: logs warning when optimistic lock conflict is detected (0 rows returned)', async () => {
+    const card = mockRetentionCardRow();
+    setupScopedRepo({ retentionCardFindFirst: card });
+
+    const db = createMockDb();
+    // Simulate another writer updating the card between our read and write —
+    // the WHERE clause matches 0 rows so .returning() returns an empty array.
+    (db.update as jest.Mock).mockReturnValue({
+      set: jest.fn().mockReturnValue({
+        where: jest.fn().mockImplementation(() => {
+          const p = Promise.resolve(undefined);
+          (p as Record<string, unknown>).returning = jest
+            .fn()
+            .mockResolvedValue([]); // 0 rows = optimistic lock conflict
+          return p;
+        }),
+      }),
+    });
+
+    const warnSpy = jest.spyOn(console, 'warn').mockReturnValue(undefined);
+    try {
+      await updateRetentionFromSession(db, profileId, topicId, 4);
+      // The update was attempted but matched 0 rows
+      expect(db.update).toHaveBeenCalled();
+      // Warning must have been emitted for the conflict
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Optimistic lock conflict')
+      );
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it('F-7: no warning when update succeeds (1 row returned)', async () => {
+    const card = mockRetentionCardRow();
+    setupScopedRepo({ retentionCardFindFirst: card });
+
+    // Default mock already returns [{}] — 1 row updated successfully
+    const db = createMockDb();
+
+    const warnSpy = jest.spyOn(console, 'warn').mockReturnValue(undefined);
+    try {
+      await updateRetentionFromSession(db, profileId, topicId, 4);
+
+      expect(db.update).toHaveBeenCalled();
+      expect(warnSpy).not.toHaveBeenCalled();
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 });
 

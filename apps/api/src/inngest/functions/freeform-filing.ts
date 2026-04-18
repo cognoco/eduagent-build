@@ -5,6 +5,7 @@ import {
   fileToLibrary,
   resolveFilingResult,
 } from '../../services/filing';
+import { getSessionTranscript } from '../../services/session';
 import { routeAndCall } from '../../services/llm';
 
 export const freeformFilingRetry = inngest.createFunction(
@@ -15,13 +16,29 @@ export const freeformFilingRetry = inngest.createFunction(
   },
   { event: 'app/filing.retry' },
   async ({ event, step }) => {
-    const { profileId, sessionId, sessionTranscript, sessionMode } =
-      event.data as {
-        profileId: string;
-        sessionId: string;
-        sessionTranscript: string;
-        sessionMode: 'freeform' | 'homework';
-      };
+    const { profileId, sessionId, sessionMode } = event.data as {
+      profileId: string;
+      sessionId: string;
+      sessionTranscript?: string;
+      sessionMode: 'freeform' | 'homework';
+    };
+
+    // Self-heal: fetch transcript from DB if the caller did not supply it
+    let sessionTranscript = (event.data as { sessionTranscript?: string })
+      .sessionTranscript;
+    if (!sessionTranscript && sessionId) {
+      const fetched = await step.run('fetch-transcript', async () => {
+        const db = getStepDatabase();
+        const transcript = await getSessionTranscript(db, profileId, sessionId);
+        if (!transcript) return null;
+        return transcript.exchanges
+          .map(
+            (e) => `${e.role === 'user' ? 'Learner' : 'Tutor'}: ${e.content}`
+          )
+          .join('\n');
+      });
+      sessionTranscript = fetched ?? undefined;
+    }
 
     const result = await step.run('retry-filing', async () => {
       const db = getStepDatabase();

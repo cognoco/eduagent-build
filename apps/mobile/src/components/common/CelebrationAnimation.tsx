@@ -103,6 +103,20 @@ export function CelebrationAnimation({
     // onComplete intentionally omitted — stabilised via ref
   }, [reduceMotion, progress, opacity, centerScale]);
 
+  // Fabric safety net: same rationale as BrandCelebration (see above).
+  useEffect(() => {
+    if (reduceMotion) return;
+    const fallback = setTimeout(() => {
+      if (progress.value < 0.1) {
+        progress.value = 1;
+        centerScale.value = 1;
+        opacity.value = 0; // already faded = done
+        onCompleteRef.current?.();
+      }
+    }, 500);
+    return () => clearTimeout(fallback);
+  }, [reduceMotion, progress, centerScale, opacity]);
+
   const containerStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
   }));

@@ -18,6 +18,8 @@ import {
   notificationPreferences,
   learningModes,
   sessionEmbeddings,
+  quizRounds,
+  quizMissedItems,
 } from './schema/index.js';
 import { createScopedRepository } from './repository.js';
 import type { Database } from './client.js';
@@ -93,6 +95,8 @@ describe('createScopedRepository', () => {
     ['notificationPreferences', notificationPreferences],
     ['learningModes', learningModes],
     ['sessionEmbeddings', sessionEmbeddings],
+    ['quizRounds', quizRounds],
+    ['quizMissedItems', quizMissedItems],
   ] as const)('%s.findMany', (namespace, table) => {
     it('auto-injects profileId filter', async () => {
       const { db, findMany } = createMockDb();
@@ -129,6 +133,8 @@ describe('createScopedRepository', () => {
     ['notificationPreferences', notificationPreferences],
     ['learningModes', learningModes],
     ['sessionEmbeddings', sessionEmbeddings],
+    ['quizRounds', quizRounds],
+    ['quizMissedItems', quizMissedItems],
   ] as const)('%s.findMany with extraWhere', (namespace, table) => {
     it('composes profileId with extra condition', async () => {
       const { db, findMany } = createMockDb();
@@ -167,6 +173,8 @@ describe('createScopedRepository', () => {
     ['notificationPreferences', notificationPreferences],
     ['learningModes', learningModes],
     ['sessionEmbeddings', sessionEmbeddings],
+    ['quizRounds', quizRounds],
+    ['quizMissedItems', quizMissedItems],
   ] as const)('%s.findFirst', (namespace, table) => {
     it('auto-injects profileId filter', async () => {
       const { db, findFirst } = createMockDb();
@@ -291,6 +299,8 @@ describe('createScopedRepository', () => {
       expect(repo.notificationPreferences).toBeDefined();
       expect(repo.learningModes).toBeDefined();
       expect(repo.sessionEmbeddings).toBeDefined();
+      expect(repo.quizRounds).toBeDefined();
+      expect(repo.quizMissedItems).toBeDefined();
     });
   });
 });

@@ -768,6 +768,79 @@ describe('session routes', () => {
 
       expect(res.status).toBe(401);
     });
+
+    // [ASSUMP-F5-sweep] Break test: a tampered client sending
+    // summaryStatus:'accepted' must NOT bypass the summary review gate.
+    // The route should strip the value before it reaches closeSession,
+    // so the mock's echo-back produces 'pending' (its default).
+    it('strips summaryStatus accepted — does not bypass summary review', async () => {
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/close`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ summaryStatus: 'accepted' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+
+      // closeSession should receive undefined (stripped), not 'accepted'
+      expect(closeSession).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.any(String),
+        SESSION_ID,
+        expect.objectContaining({ summaryStatus: undefined })
+      );
+
+      const body = await res.json();
+      // With summaryStatus stripped → defaults to 'pending' → no event dispatch
+      expect(body.summaryStatus).toBe('pending');
+      expect(sendSpy).not.toHaveBeenCalled();
+    });
+
+    it('strips summaryStatus auto_closed from external callers', async () => {
+      await app.request(
+        `/v1/sessions/${SESSION_ID}/close`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            reason: 'user_ended',
+            summaryStatus: 'auto_closed',
+          }),
+        },
+        TEST_ENV
+      );
+
+      // auto_closed is an internal-only value — route strips it
+      expect(closeSession).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.any(String),
+        SESSION_ID,
+        expect.objectContaining({ summaryStatus: undefined })
+      );
+    });
+
+    it('allows summaryStatus skipped from external callers', async () => {
+      await app.request(
+        `/v1/sessions/${SESSION_ID}/close`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ summaryStatus: 'skipped' }),
+        },
+        TEST_ENV
+      );
+
+      expect(closeSession).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.any(String),
+        SESSION_ID,
+        expect.objectContaining({ summaryStatus: 'skipped' })
+      );
+    });
   });
 
   describe('POST /v1/sessions/:sessionId/homework-state', () => {

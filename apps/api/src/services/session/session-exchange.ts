@@ -29,6 +29,7 @@ import {
   extractFluencyDrill,
   type ExchangeContext,
   type FluencyDrillAnnotation,
+  type ImageData,
 } from '../exchanges';
 import {
   evaluateEscalation,
@@ -602,6 +603,9 @@ export async function prepareExchangeContext(
     inputMode: session.inputMode,
     // Teach-first: expose exchange count so buildSystemPrompt can gate first-exchange behaviour
     exchangeCount: session.exchangeCount,
+    // Client-side effective mode — drives mode-specific prompt sections (e.g. recitation)
+    effectiveMode: (session.metadata as Record<string, unknown> | null)
+      ?.effectiveMode as string | undefined,
   };
 
   return { session, context, effectiveRung, hintCount, lastAiResponseAt };
@@ -733,7 +737,11 @@ export async function processMessage(
       homeworkMode: input.homeworkMode,
     });
 
-  const result = await processExchange(context, input.message);
+  const imageData: ImageData | undefined =
+    input.imageBase64 && input.imageMimeType
+      ? { base64: input.imageBase64, mimeType: input.imageMimeType }
+      : undefined;
+  const result = await processExchange(context, input.message, imageData);
 
   // Compute time-to-answer: ms between last AI response and now
   const timeToAnswerMs = lastAiResponseAt
@@ -807,7 +815,11 @@ export async function streamMessage(
     ? Date.now() - lastAiResponseAt.getTime()
     : null;
 
-  const result = await streamExchange(context, input.message);
+  const imageData: ImageData | undefined =
+    input.imageBase64 && input.imageMimeType
+      ? { base64: input.imageBase64, mimeType: input.imageMimeType }
+      : undefined;
+  const result = await streamExchange(context, input.message, imageData);
 
   return {
     stream: result.stream,

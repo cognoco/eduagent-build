@@ -164,10 +164,20 @@ describe('TopicsTab', () => {
     render(<TopicsTab {...defaultProps} onTopicPress={onTopicPress} />);
 
     fireEvent.press(screen.getByTestId('topic-row-topic-1'));
-    expect(onTopicPress).toHaveBeenCalledWith('topic-1', 'sub-1', 'strong');
+    expect(onTopicPress).toHaveBeenCalledWith(
+      'topic-1',
+      'sub-1',
+      'strong',
+      'Fractions'
+    );
 
     fireEvent.press(screen.getByTestId('topic-row-topic-2'));
-    expect(onTopicPress).toHaveBeenCalledWith('topic-2', 'sub-2', 'forgotten');
+    expect(onTopicPress).toHaveBeenCalledWith(
+      'topic-2',
+      'sub-2',
+      'forgotten',
+      'Pharaohs'
+    );
   });
 
   it('shows empty state when no topics exist', () => {
@@ -267,7 +277,7 @@ describe('TopicsTab', () => {
   it('exports TOPICS_TAB_INITIAL_STATE with correct defaults', () => {
     expect(TOPICS_TAB_INITIAL_STATE).toEqual({
       search: '',
-      sortKey: 'name-asc',
+      sortKey: 'retention',
       filters: {
         subjectIds: [],
         bookIds: [],

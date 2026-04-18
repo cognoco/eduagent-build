@@ -1,5 +1,10 @@
-import { createGeminiProvider } from './gemini';
-import type { LLMProvider, ChatMessage, ModelConfig } from '../types';
+import { createGeminiProvider, toGeminiParts } from './gemini';
+import type {
+  LLMProvider,
+  ChatMessage,
+  ModelConfig,
+  MessagePart,
+} from '../types';
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -281,6 +286,53 @@ describe('Gemini Provider', () => {
     });
   });
 
+  // toGeminiParts — pure formatting, no HTTP mocks needed [IMG-VISION]
+  // Mirrors tests for toAnthropicContent and toOpenAIContent.
+  describe('toGeminiParts', () => {
+    it('converts plain string to text part', () => {
+      expect(toGeminiParts('Hello')).toEqual([{ text: 'Hello' }]);
+    });
+
+    it('converts text-only MessagePart[] to text parts', () => {
+      const parts: MessagePart[] = [
+        { type: 'text', text: 'Hello' },
+        { type: 'text', text: 'World' },
+      ];
+      expect(toGeminiParts(parts)).toEqual([
+        { text: 'Hello' },
+        { text: 'World' },
+      ]);
+    });
+
+    it('converts inline_data parts to Gemini inline_data format', () => {
+      const parts: MessagePart[] = [
+        { type: 'text', text: 'Describe this image' },
+        { type: 'inline_data', mimeType: 'image/jpeg', data: 'base64data' },
+      ];
+      expect(toGeminiParts(parts)).toEqual([
+        { text: 'Describe this image' },
+        { inline_data: { mime_type: 'image/jpeg', data: 'base64data' } },
+      ]);
+    });
+
+    it('handles multiple image parts', () => {
+      const parts: MessagePart[] = [
+        { type: 'inline_data', mimeType: 'image/png', data: 'img1' },
+        { type: 'text', text: 'Compare these' },
+        { type: 'inline_data', mimeType: 'image/webp', data: 'img2' },
+      ];
+      const result = toGeminiParts(parts);
+      expect(result).toHaveLength(3);
+      expect(result[0]).toEqual({
+        inline_data: { mime_type: 'image/png', data: 'img1' },
+      });
+      expect(result[1]).toEqual({ text: 'Compare these' });
+      expect(result[2]).toEqual({
+        inline_data: { mime_type: 'image/webp', data: 'img2' },
+      });
+    });
+  });
+
   describe('chatStream()', () => {
     it('yields text chunks from SSE stream', async () => {
       const sse = sseChunks(['Hello ', 'world', '!']);
@@ -378,6 +430,44 @@ describe('Gemini Provider', () => {
 
       const body = JSON.parse(fetchSpy.mock.calls[0][1].body);
       expect(body.safetySettings).toHaveLength(5);
+    });
+
+    it('throws on mid-stream stall after per-chunk timeout [BUG-32]', async () => {
+      jest.useFakeTimers();
+      const encoder = new TextEncoder();
+      const firstChunk = `data: ${JSON.stringify({
+        candidates: [{ content: { parts: [{ text: 'first' }] } }],
+      })}\n\n`;
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(encoder.encode(firstChunk));
+        },
+      });
+      fetchSpy.mockResolvedValue(
+        new Response(stream, {
+          status: 200,
+          headers: { 'Content-Type': 'text/event-stream' },
+        })
+      );
+      const chunks: string[] = [];
+      const streamPromise = (async () => {
+        for await (const chunk of provider.chatStream(
+          [{ role: 'user', content: 'test' }],
+          DEFAULT_CONFIG
+        )) {
+          chunks.push(chunk);
+        }
+      })();
+      const caughtError = streamPromise.catch((err: unknown) => err);
+      await jest.advanceTimersByTimeAsync(100);
+      await jest.advanceTimersByTimeAsync(10_000);
+      const error = await caughtError;
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).toBe(
+        'Gemini stream stalled: no data received for 10s'
+      );
+      expect(chunks).toEqual(['first']);
+      jest.useRealTimers();
     });
 
     it('throws on safety block during stream', async () => {

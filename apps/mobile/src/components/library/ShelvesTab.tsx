@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { FlatList, Pressable, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import type { Subject } from '@eduagent/schemas';
 import { LibrarySearchBar } from './LibrarySearchBar';
 import {
@@ -296,13 +296,13 @@ export function ShelvesTab({
           clearLabel={clearAction.label}
         />
       ) : (
-        <FlatList
-          data={filtered}
-          keyExtractor={(item) => item.subject.id}
-          renderItem={renderShelfCard}
-          scrollEnabled={false}
-          testID="shelves-list"
-        />
+        <View testID="shelves-list">
+          {filtered.map((item) => (
+            <React.Fragment key={item.subject.id}>
+              {renderShelfCard({ item })}
+            </React.Fragment>
+          ))}
+        </View>
       )}
     </View>
   );

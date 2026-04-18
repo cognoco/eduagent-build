@@ -150,6 +150,11 @@ function createMockDb({
         }),
       }),
     }),
+    transaction: jest
+      .fn()
+      .mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) =>
+        fn(db)
+      ),
   } as unknown as Database;
 
   return db;

@@ -11,7 +11,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import type { CurriculumTopic } from '@eduagent/schemas';
-import { PenWritingAnimation } from '../../../../../components/common';
+import { MagicPenAnimation } from '../../../../../components/common';
 import { SuggestionCard } from '../../../../../components/library/SuggestionCard';
 import { SessionRow } from '../../../../../components/library/SessionRow';
 import { ChapterDivider } from '../../../../../components/library/ChapterDivider';
@@ -110,23 +110,21 @@ export default function BookScreen() {
   const handleBack = useCallback(() => {
     const books = Array.isArray(allBooksQuery.data) ? allBooksQuery.data : null;
 
-    // Single-book shelf: go to library directly.
-    // Going to the shelf would hit the auto-skip dead-end (returns null or
-    // redirects back to this book, causing a loop/crash on web).
-    if (books !== null && books.length <= 1) {
-      goBackOrReplace(router, '/(app)/library');
+    // Single-book shelf (or books not loaded yet): go to library directly.
+    // Do NOT use router.back() — it can land on the shelf's single-book
+    // placeholder (empty View dead-end). The shelf's auto-skip used
+    // router.replace which doesn't reliably remove the shelf from the
+    // back stack, and autoSkippedRef blocks re-redirect, so back() → blank.
+    if (books === null || books.length <= 1) {
+      router.replace('/(app)/library' as never);
       return;
     }
 
-    if (subjectId) {
-      goBackOrReplace(router, {
-        pathname: '/(app)/shelf/[subjectId]',
-        params: { subjectId },
-      } as never);
-      return;
-    }
-
-    goBackOrReplace(router, '/(app)/library');
+    // Multi-book shelf: navigate to the shelf screen to show all books.
+    goBackOrReplace(router, {
+      pathname: '/(app)/shelf/[subjectId]',
+      params: { subjectId },
+    } as never);
   }, [router, subjectId, allBooksQuery.data]);
 
   // --- Generation auto-trigger ---
@@ -320,9 +318,12 @@ export default function BookScreen() {
   const handleSessionLongPress = useCallback(
     (session: BookSession) => {
       if (!subjectId || !bookId || isReadOnly) return;
-      const otherBooks = (allBooksQuery.data ?? []).filter(
-        (b) => b.id !== bookId
-      );
+      // BUG-418 class: Array.isArray guard — select is bypassed when enabled=false,
+      // so data can be a wrapped object instead of an array. ?? [] only guards null/undefined.
+      const safeAllBooks = Array.isArray(allBooksQuery.data)
+        ? allBooksQuery.data
+        : [];
+      const otherBooks = safeAllBooks.filter((b) => b.id !== bookId);
 
       if (otherBooks.length === 0) {
         Alert.alert(
@@ -376,7 +377,12 @@ export default function BookScreen() {
       if (first.type === 'topic') {
         router.push({
           pathname: '/(app)/session',
-          params: { mode: 'learning', subjectId, topicId: first.id },
+          params: {
+            mode: 'learning',
+            subjectId,
+            topicId: first.id,
+            topicName: first.title,
+          },
         } as never);
         return;
       }
@@ -397,7 +403,12 @@ export default function BookScreen() {
     if (next) {
       router.push({
         pathname: '/(app)/session',
-        params: { mode: 'learning', subjectId, topicId: next.id },
+        params: {
+          mode: 'learning',
+          subjectId,
+          topicId: next.id,
+          topicName: next.title,
+        },
       } as never);
       return;
     }
@@ -405,7 +416,12 @@ export default function BookScreen() {
     if (sorted.length > 0) {
       router.push({
         pathname: '/(app)/session',
-        params: { mode: 'learning', subjectId, topicId: sorted[0]!.id },
+        params: {
+          mode: 'learning',
+          subjectId,
+          topicId: sorted[0]!.id,
+          topicName: sorted[0]!.title,
+        },
       } as never);
     }
   }, [suggestionCards, topics, completedTopicIds, router, subjectId]);
@@ -442,7 +458,12 @@ export default function BookScreen() {
       if (card.type === 'topic') {
         router.push({
           pathname: '/(app)/session',
-          params: { mode: 'learning', subjectId, topicId: card.id },
+          params: {
+            mode: 'learning',
+            subjectId,
+            topicId: card.id,
+            topicName: card.title,
+          },
         } as never);
       } else {
         // For API-generated suggestions, pass title as rawInput for contextual session
@@ -551,7 +572,7 @@ export default function BookScreen() {
         style={{ paddingTop: insets.top }}
         testID="book-generating"
       >
-        <PenWritingAnimation size={100} color={themeColors.accent} />
+        <MagicPenAnimation size={100} color={themeColors.accent} />
         {book?.emoji && <Text className="text-3xl mt-4">{book.emoji}</Text>}
         <Text className="text-h2 font-bold text-text-primary mt-3 text-center">
           {book?.title ?? 'Writing your book...'}

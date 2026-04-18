@@ -3,6 +3,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   AccessibilityInfo,
   Alert,
+  Image,
   Linking,
   View,
   Text,
@@ -23,7 +24,8 @@ import { useSpeechRecognition } from '../../hooks/use-speech-recognition';
 import { useTextToSpeech } from '../../hooks/use-text-to-speech';
 import { useThemeColors } from '../../lib/theme';
 import { goBackOrReplace } from '../../lib/navigation';
-import { PenWritingAnimation } from '../common';
+import { LightBulbAnimation, MagicPenAnimation } from '../common';
+import Animated, { FadeOut } from 'react-native-reanimated';
 
 export interface ChatMessage {
   id: string;
@@ -39,6 +41,8 @@ export interface ChatMessage {
    *  multi-problem). Used to exclude from userMessageCount so the voice/text
    *  toggle stays visible until the user deliberately sends a message. */
   isAutoSent?: boolean;
+  /** Local file URI of a homework image attached to this message */
+  imageUri?: string;
 }
 
 interface ChatShellProps {
@@ -141,6 +145,7 @@ export function ChatShell({
   const scrollRef = useRef<ScrollView>(null);
   const [input, setInput] = useState('');
   const [screenReaderEnabled, setScreenReaderEnabled] = useState(false);
+  const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
 
   // Voice toggle — explicit initialVoiceEnabled (from input mode toggle) takes precedence.
   // Falls back to teach_back detection. Session-scoped only — NOT a persistent preference.
@@ -172,7 +177,17 @@ export function ChatShell({
     startListening,
     stopListening,
     clearTranscript,
+    requestMicrophonePermission,
   } = useSpeechRecognition({ lang: speechRecognitionLanguage });
+
+  // Proactively prompt for microphone on session entry so voice input is
+  // ready without the user hunting for a toggle. Android forbids silent
+  // grants for RECORD_AUDIO, so this system dialog on first launch is the
+  // closest thing to "allowed by default". Once the user taps Allow, the
+  // grant sticks until they explicitly revoke it in Settings.
+  useEffect(() => {
+    void requestMicrophonePermission();
+  }, [requestMicrophonePermission]);
 
   // TTS hook
   const {
@@ -193,8 +208,12 @@ export function ChatShell({
   // Track last spoken message id to avoid re-speaking
   const lastSpokenIdRef = useRef<string | null>(null);
 
+  // Snap to bottom on every message change. animated:false is intentional —
+  // animated scroll from the top to the bottom of a long transcript (resumed
+  // sessions) can stall short of the end when interrupted by onContentSizeChange
+  // events from async bubble layout. Snap is what chat UIs typically do anyway.
   useEffect(() => {
-    scrollRef.current?.scrollToEnd({ animated: true });
+    scrollRef.current?.scrollToEnd({ animated: false });
   }, [messages]);
 
   useEffect(() => {
@@ -377,9 +396,10 @@ export function ChatShell({
     ]
   );
 
-  // --- Idle "pen writing" animation ---
-  // Show a gentle pen animation after 20s of silence when the AI has finished
-  // speaking and the student hasn't responded yet. Resets on any user input.
+  // --- Idle "magic pen" animation ---
+  // Show a gentle pen animation after idle timeout when the AI has finished
+  // speaking and the student hasn't responded. Threshold is a tuning candidate
+  // (consider 12-15s for younger users). Resets on any user input.
   const IDLE_TIMEOUT_MS = 20_000;
   const [showIdleAnim, setShowIdleAnim] = useState(false);
 
@@ -450,7 +470,7 @@ export function ChatShell({
         testID={messagesTestID ?? 'chat-messages'}
         contentContainerStyle={{ paddingBottom: 16 }}
         onContentSizeChange={() =>
-          scrollRef.current?.scrollToEnd({ animated: true })
+          scrollRef.current?.scrollToEnd({ animated: false })
         }
       >
         {messages.length === 0 ? (
@@ -464,21 +484,62 @@ export function ChatShell({
           </View>
         ) : (
           messages.map((msg) => (
-            <MessageBubble
-              key={msg.id}
-              role={msg.role}
-              content={msg.content}
-              streaming={msg.streaming}
-              escalationRung={msg.escalationRung}
-              verificationBadge={msg.verificationBadge}
-              actions={renderMessageActions?.(msg)}
-            />
+            <View key={msg.id}>
+              {msg.imageUri && !failedImages.has(msg.id) && (
+                <View className="self-end max-w-[85%] mb-1">
+                  <Image
+                    testID={`message-image-${msg.id}`}
+                    source={{ uri: msg.imageUri }}
+                    className="w-full aspect-[4/3] rounded-lg"
+                    resizeMode="contain"
+                    accessibilityLabel="Homework image"
+                    onError={() => {
+                      setFailedImages((prev) => new Set(prev).add(msg.id));
+                    }}
+                  />
+                </View>
+              )}
+              {msg.imageUri && failedImages.has(msg.id) && (
+                <View className="self-end max-w-[85%] mb-1">
+                  <View
+                    testID={`message-image-fallback-${msg.id}`}
+                    className="w-full aspect-[4/3] rounded-lg bg-surface items-center justify-center"
+                  >
+                    <Ionicons
+                      name="camera-outline"
+                      size={32}
+                      color={colors.muted}
+                    />
+                    <Text className="text-body-sm text-text-secondary mt-1">
+                      Image no longer available
+                    </Text>
+                  </View>
+                </View>
+              )}
+              <MessageBubble
+                role={msg.role}
+                content={msg.content}
+                streaming={msg.streaming}
+                escalationRung={msg.escalationRung}
+                verificationBadge={msg.verificationBadge}
+                actions={renderMessageActions?.(msg)}
+              />
+            </View>
           ))
         )}
-        {showIdleAnim && (
-          <View className="items-center py-4" testID="idle-pen-animation">
-            <PenWritingAnimation size={48} color={colors.muted} />
+        {isStreaming && (
+          <View className="items-center py-4" testID="thinking-bulb-animation">
+            <LightBulbAnimation size={48} color={colors.muted} />
           </View>
+        )}
+        {showIdleAnim && (
+          <Animated.View
+            className="items-center py-4"
+            testID="idle-pen-animation"
+            exiting={FadeOut.duration(200)}
+          >
+            <MagicPenAnimation size={48} color={colors.muted} />
+          </Animated.View>
         )}
         {footer}
       </ScrollView>

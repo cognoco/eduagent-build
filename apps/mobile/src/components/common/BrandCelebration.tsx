@@ -167,6 +167,42 @@ export function BrandCelebration({
     );
   }, [done, reduceMotion]);
 
+  // Fabric safety net: if AnimatedCircle prop updates didn't fire after 500ms
+  // (cold start, JS thread busy, Fabric native module init delay), jump to
+  // final static state so the celebration is always visible. 500ms is generous
+  // enough to avoid false positives on slow devices while still well within
+  // the 700ms animation window.
+  useEffect(() => {
+    if (reduceMotion) return;
+    const fallback = setTimeout(() => {
+      if (studentR.value < 0.1) {
+        studentR.value = 15;
+        studentInR.value = 6.5;
+        dot1R.value = 4;
+        dot2R.value = 5;
+        dot3R.value = 6;
+        mentorR.value = 17;
+        mentorInR.value = 7;
+        ringOp.value = 0.18;
+        pathDraw.value = 1;
+        happyBounce.value = 1;
+      }
+    }, 500);
+    return () => clearTimeout(fallback);
+  }, [
+    reduceMotion,
+    studentR,
+    studentInR,
+    dot1R,
+    dot2R,
+    dot3R,
+    mentorR,
+    mentorInR,
+    ringOp,
+    pathDraw,
+    happyBounce,
+  ]);
+
   // --- Animated props ---
   // Android SVG fix: Android's native SVG renderer permanently discards circles
   // created with r=0. Ensure r is never zero via Math.max with a sub-pixel floor,

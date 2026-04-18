@@ -40,6 +40,7 @@ jest.mock('@expo/vector-icons', () => {
 const mockStartListening = jest.fn().mockResolvedValue(undefined);
 const mockStopListening = jest.fn().mockResolvedValue(undefined);
 const mockClearTranscript = jest.fn();
+const mockRequestMicrophonePermission = jest.fn().mockResolvedValue(true);
 let mockSttState = {
   status: 'idle' as string,
   transcript: '',
@@ -53,6 +54,7 @@ jest.mock('../../hooks/use-speech-recognition', () => ({
     startListening: mockStartListening,
     stopListening: mockStopListening,
     clearTranscript: mockClearTranscript,
+    requestMicrophonePermission: mockRequestMicrophonePermission,
   }),
 }));
 
@@ -73,9 +75,10 @@ jest.mock('../../hooks/use-text-to-speech', () => ({
   }),
 }));
 
-// Stub animated SVG component to avoid reanimated timer leaks in tests
+// Stub animated SVG components to avoid reanimated timer leaks in tests
 jest.mock('../common', () => ({
-  PenWritingAnimation: () => null,
+  LightBulbAnimation: () => null,
+  MagicPenAnimation: () => null,
 }));
 
 // ---------------------------------------------------------------------------
@@ -723,6 +726,50 @@ describe('ChatShell', () => {
           'Screen reader is on, so voice mode keeps manual playback only.'
         )
       ).toBeTruthy();
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Homework image rendering
+  // -----------------------------------------------------------------------
+
+  it('renders image in MessageBubble when imageUri is present', () => {
+    const messagesWithImage: ChatMessage[] = [
+      {
+        id: 'msg-img',
+        role: 'user',
+        content: 'What is this diagram?',
+        imageUri: 'file:///cache/homework-123.jpg',
+      },
+    ];
+
+    const { getByTestId } = render(
+      <ChatShell
+        title="Test"
+        messages={messagesWithImage}
+        onSend={jest.fn()}
+        isStreaming={false}
+      />
+    );
+
+    expect(getByTestId('message-image-msg-img')).toBeTruthy();
+  });
+
+  // -----------------------------------------------------------------------
+  // Animation wiring (ANIM-IMPROVE)
+  // -----------------------------------------------------------------------
+
+  describe('animation wiring (ANIM-IMPROVE)', () => {
+    it('shows LightBulbAnimation when streaming', () => {
+      renderChatShell({ isStreaming: true });
+      expect(screen.getByTestId('thinking-bulb-animation')).toBeTruthy();
+      expect(screen.queryByTestId('idle-pen-animation')).toBeNull();
+    });
+
+    it('does not show animations during normal conversation', () => {
+      renderChatShell({ isStreaming: false });
+      expect(screen.queryByTestId('thinking-bulb-animation')).toBeNull();
+      expect(screen.queryByTestId('idle-pen-animation')).toBeNull();
     });
   });
 });

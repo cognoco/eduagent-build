@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { View } from 'react-native';
 import Animated, {
+  type SharedValue,
   useSharedValue,
   useAnimatedStyle,
   useReducedMotion,
@@ -32,9 +33,13 @@ const PAGE_OPACITY = 0.6;
 const SPINE_OPACITY = 0.5;
 
 /**
- * Looping book page-flip animation. Three pages stagger-flip from right
- * to left (simulated via scaleX on Views), then reset simultaneously.
- * Built with react-native-reanimated Views (no SVG — avoids Fabric crash).
+ * Looping book page-flip animation with 3D perspective. Three pages
+ * stagger-flip from right to left using rotateY + perspective, then
+ * reset simultaneously. Pure Animated.View — no SVG.
+ *
+ * Fabric safety: transformOrigin with array syntax + rotateY is used.
+ * If transformOrigin doesn't cooperate with rotateY on a specific
+ * Fabric build, the fallback is translate-rotate-translate.
  */
 export function BookPageFlipAnimation({
   size = 120,
@@ -43,41 +48,38 @@ export function BookPageFlipAnimation({
 }: BookPageFlipAnimationProps): ReactNode {
   const reduceMotion = useReducedMotion();
 
-  const page1 = useSharedValue(1);
-  const page2 = useSharedValue(1);
-  const page3 = useSharedValue(1);
+  const page1 = useSharedValue(0);
+  const page2 = useSharedValue(0);
+  const page3 = useSharedValue(0);
 
   useEffect(() => {
     if (reduceMotion) return;
 
     const easing = Easing.inOut(Easing.ease);
 
-    function buildFlipSequence(
-      staggerDelay: number
-    ): ReturnType<typeof withRepeat> {
+    function buildFlipSequence(staggerDelay: number) {
       return withRepeat(
         withSequence(
           withDelay(
             staggerDelay,
-            withTiming(-1, { duration: PAGE_FLIP_MS, easing })
+            withTiming(-180, { duration: PAGE_FLIP_MS, easing })
           ),
           withDelay(
             2 * STAGGER_MS - staggerDelay + PAUSE_MS,
-            withTiming(-1, { duration: 0 })
+            withTiming(-180, { duration: 0 })
           ),
-          withTiming(1, { duration: RESET_MS }),
-          withDelay(PAUSE_MS, withTiming(1, { duration: 0 }))
+          withTiming(0, { duration: RESET_MS }),
+          withDelay(PAUSE_MS, withTiming(0, { duration: 0 }))
         ),
         -1,
         false
       );
     }
 
-    page1.value = buildFlipSequence(0) as number;
-    page2.value = buildFlipSequence(STAGGER_MS) as number;
-    page3.value = buildFlipSequence(STAGGER_MS * 2) as number;
+    page1.value = buildFlipSequence(0);
+    page2.value = buildFlipSequence(STAGGER_MS);
+    page3.value = buildFlipSequence(STAGGER_MS * 2);
 
-    // BR-01: cancel animations on unmount to prevent leaked UI-thread work
     return () => {
       cancelAnimation(page1);
       cancelAnimation(page2);
@@ -85,24 +87,6 @@ export function BookPageFlipAnimation({
     };
   }, [reduceMotion, page1, page2, page3]);
 
-  // transformOrigin 'left center' pivots the scaleX around the left (spine) edge,
-  // matching the original SVG translate-scale-translate trick.
-  const page1Style = useAnimatedStyle(() => ({
-    transform: [{ scaleX: page1.value }],
-    transformOrigin: ['0%', '50%', 0],
-  }));
-
-  const page2Style = useAnimatedStyle(() => ({
-    transform: [{ scaleX: page2.value }],
-    transformOrigin: ['0%', '50%', 0],
-  }));
-
-  const page3Style = useAnimatedStyle(() => ({
-    transform: [{ scaleX: page3.value }],
-    transformOrigin: ['0%', '50%', 0],
-  }));
-
-  // Proportional layout — all values relative to the logical 120×120 viewbox
   const scale = size / 120;
   const bookY = 25 * scale;
   const bookH = 70 * scale;
@@ -116,6 +100,24 @@ export function BookPageFlipAnimation({
   const pageY = bookY + pageInset;
   const pageW = rightW - pageInset * 2;
   const pageH = bookH - pageInset * 2;
+
+  function usePageStyle(sv: SharedValue<number>) {
+    return useAnimatedStyle(() => {
+      const deg = sv.value;
+      // At -90deg the page is edge-on: swap to "back" appearance
+      // Elevation increases mid-flip for depth
+      const midFlip = Math.abs(deg) > 45 && Math.abs(deg) < 135;
+      return {
+        transform: [{ perspective: 800 }, { rotateY: `${deg}deg` }],
+        transformOrigin: ['0%', '50%', 0],
+        elevation: midFlip ? 4 : 0,
+      };
+    });
+  }
+
+  const page1Style = usePageStyle(page1);
+  const page2Style = usePageStyle(page2);
+  const page3Style = usePageStyle(page3);
 
   return (
     <View
@@ -152,7 +154,7 @@ export function BookPageFlipAnimation({
         }}
       />
 
-      {/* Page 1 — scaleX flips around the left (spine) edge via transformOrigin */}
+      {/* Page 1 — rotateY flips around the left (spine) edge via transformOrigin */}
       <Animated.View
         style={[
           {
@@ -164,6 +166,7 @@ export function BookPageFlipAnimation({
             borderRadius: 1 * scale,
             backgroundColor: color,
             opacity: PAGE_OPACITY,
+            backfaceVisibility: 'hidden',
           },
           page1Style,
         ]}
@@ -181,6 +184,7 @@ export function BookPageFlipAnimation({
             borderRadius: 1 * scale,
             backgroundColor: color,
             opacity: PAGE_OPACITY * 0.8,
+            backfaceVisibility: 'hidden',
           },
           page2Style,
         ]}
@@ -198,6 +202,7 @@ export function BookPageFlipAnimation({
             borderRadius: 1 * scale,
             backgroundColor: color,
             opacity: PAGE_OPACITY * 0.6,
+            backfaceVisibility: 'hidden',
           },
           page3Style,
         ]}

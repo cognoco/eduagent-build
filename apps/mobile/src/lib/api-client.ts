@@ -64,13 +64,22 @@ export class QuotaExceededError extends Error {
  * [EP15-I5] Typed error for 403 responses.
  * Thrown by customFetch so callers can `instanceof ForbiddenError` instead
  * of parsing status codes from generic Error message strings.
+ *
+ * [BUG-100] `apiCode` preserves the server's application-level error code
+ * (e.g. 'SUBJECT_INACTIVE') so downstream classifiers like `errorHasCode`
+ * can distinguish specific 403 reasons without string-matching the message.
  */
 export class ForbiddenError extends Error {
   readonly code = 'FORBIDDEN' as const;
+  readonly apiCode: string | undefined;
 
-  constructor(message = 'You do not have permission to access this resource') {
+  constructor(
+    message = 'You do not have permission to access this resource',
+    apiCode?: string
+  ) {
     super(message);
     this.name = 'ForbiddenError';
+    this.apiCode = apiCode;
   }
 }
 
@@ -146,11 +155,16 @@ export function useApiClient(): ApiClient {
         // [EP15-I5] Classify 403 into typed ForbiddenError so screens can
         // distinguish "access denied" from generic API errors.  Always throw
         // here to avoid double-consuming the response body with text() below.
+        // [BUG-100] Also preserve the server's error code (e.g. SUBJECT_INACTIVE)
+        // so errorHasCode() and formatApiError() can classify the specific reason.
         if (res.status === 403) {
           const body = await res
             .json()
             .catch(() => null as Record<string, unknown> | null);
-          throw new ForbiddenError((body?.message as string) ?? undefined);
+          throw new ForbiddenError(
+            (body?.message as string) ?? undefined,
+            (body?.code as string) ?? undefined
+          );
         }
 
         const errBody = await res.text().catch(() => '');

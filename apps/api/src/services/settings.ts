@@ -497,3 +497,44 @@ export async function getRecentNotificationCount(
 
   return rows.length;
 }
+
+/**
+ * Atomic rate-limit check: counts recent notifications and logs a new one
+ * inside a single transaction to avoid TOCTOU races where concurrent
+ * requests both read a below-limit count and both proceed.
+ *
+ * Returns `true` if the caller is rate-limited (count >= maxCount),
+ * `false` if the request was allowed and logged.
+ */
+export async function checkAndLogRateLimit(
+  db: Database,
+  profileId: string,
+  type: NotificationPayload['type'],
+  opts: { hours: number; maxCount: number }
+): Promise<boolean> {
+  return db.transaction(async (tx) => {
+    const since = new Date(Date.now() - opts.hours * 60 * 60 * 1000);
+    const rows = await tx
+      .select()
+      .from(notificationLog)
+      .where(
+        and(
+          eq(notificationLog.profileId, profileId),
+          eq(notificationLog.type, type),
+          gte(notificationLog.sentAt, since)
+        )
+      );
+
+    if (rows.length >= opts.maxCount) {
+      return true;
+    }
+
+    await tx.insert(notificationLog).values({
+      profileId,
+      type,
+      ticketId: null,
+    });
+
+    return false;
+  });
+}

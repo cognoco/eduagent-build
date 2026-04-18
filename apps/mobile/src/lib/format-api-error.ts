@@ -103,14 +103,19 @@ export function formatApiError(error: unknown): string {
     const apiErrorLike = error as Error & {
       status?: number;
       code?: string;
+      apiCode?: string;
       details?: unknown;
     };
 
-    if (apiErrorLike.code === 'EXCHANGE_LIMIT_EXCEEDED') {
+    // [BUG-100] Check both .code and .apiCode — ForbiddenError stores the
+    // server's error code in .apiCode while .code stays 'FORBIDDEN'.
+    const effectiveCode = apiErrorLike.apiCode ?? apiErrorLike.code;
+
+    if (effectiveCode === 'EXCHANGE_LIMIT_EXCEEDED') {
       return 'Session limit reached. Start a new session to keep going.';
     }
 
-    if (apiErrorLike.code === 'SUBJECT_INACTIVE') {
+    if (effectiveCode === 'SUBJECT_INACTIVE') {
       return msg;
     }
 
