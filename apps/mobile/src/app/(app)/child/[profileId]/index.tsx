@@ -1,6 +1,7 @@
-import { View, Text, Pressable, ScrollView, Alert } from 'react-native';
+import { View, Text, Pressable, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { platformAlert } from '../../../../lib/platform-alert';
 import { useCallback, useMemo } from 'react';
 import type { AccommodationMode } from '@eduagent/schemas';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -189,7 +190,7 @@ export default function ChildDetailScreen() {
 
   const handleWithdrawConsent = useCallback(() => {
     const childName = child?.displayName ?? 'this child';
-    Alert.alert(
+    platformAlert(
       `Withdraw consent for ${childName}?`,
       `${childName}'s account and all learning data will be deleted after a 7-day grace period.\n\nYou can reverse this within 7 days.`,
       [
@@ -201,7 +202,7 @@ export default function ChildDetailScreen() {
             try {
               await revokeConsent.mutateAsync();
             } catch {
-              Alert.alert(
+              platformAlert(
                 'Error',
                 'Could not withdraw consent. Please try again.'
               );
@@ -216,7 +217,7 @@ export default function ChildDetailScreen() {
     try {
       await restoreConsent.mutateAsync();
     } catch {
-      Alert.alert('Error', 'Could not cancel deletion. Please try again.');
+      platformAlert('Error', 'Could not cancel deletion. Please try again.');
     }
   }, [restoreConsent]);
 
@@ -228,7 +229,7 @@ export default function ChildDetailScreen() {
         { childProfileId: profileId, accommodationMode: mode },
         {
           onError: () => {
-            Alert.alert('Could not save setting', 'Please try again.');
+            platformAlert('Could not save setting', 'Please try again.');
           },
         }
       );
@@ -639,7 +640,10 @@ export default function ChildDetailScreen() {
                       consent: 'granted',
                     });
                   } catch {
-                    Alert.alert('Could not enable memory', 'Please try again.');
+                    platformAlert(
+                      'Could not enable memory',
+                      'Please try again.'
+                    );
                   }
                 })()
               }
@@ -651,7 +655,7 @@ export default function ChildDetailScreen() {
                       consent: 'declined',
                     });
                   } catch {
-                    Alert.alert(
+                    platformAlert(
                       'Could not save preference',
                       'Please try again.'
                     );

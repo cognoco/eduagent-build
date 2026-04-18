@@ -12,6 +12,7 @@ const mockClearSessionRecoveryMarker = jest.fn();
 const mockIsRecoveryMarkerFresh = jest.fn();
 const mockUseContinueSuggestion = jest.fn();
 const mockUseReviewSummary = jest.fn();
+const mockMarkQuizDiscoverySurfaced = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
@@ -56,8 +57,10 @@ jest.mock('../../hooks/use-progress', () => ({
 }));
 
 const mockUseQuizDiscoveryCard = jest.fn();
+const mockUseMarkQuizDiscoverySurfaced = jest.fn();
 jest.mock('../../hooks/use-coaching-card', () => ({
   useQuizDiscoveryCard: () => mockUseQuizDiscoveryCard(),
+  useMarkQuizDiscoverySurfaced: () => mockUseMarkQuizDiscoverySurfaced(),
 }));
 
 jest.mock('../../lib/session-recovery', () => ({
@@ -89,6 +92,9 @@ describe('LearnerScreen', () => {
     mockUseContinueSuggestion.mockReturnValue({ data: null });
     mockUseReviewSummary.mockReturnValue({ data: null });
     mockUseQuizDiscoveryCard.mockReturnValue({ data: undefined });
+    mockUseMarkQuizDiscoverySurfaced.mockReturnValue({
+      mutate: mockMarkQuizDiscoverySurfaced,
+    });
   });
 
   it('renders greeting with profile name', () => {
@@ -295,5 +301,50 @@ describe('LearnerScreen', () => {
     render(<LearnerScreen {...defaultProps} />);
 
     expect(screen.queryByTestId('learner-back')).toBeNull();
+  });
+
+  it('marks quiz discovery surfaced when the card is tapped', () => {
+    mockUseQuizDiscoveryCard.mockReturnValue({
+      data: {
+        id: 'quiz-card-1',
+        type: 'quiz_discovery',
+        title: 'Discover more',
+        body: 'Try a capitals quiz',
+        activityType: 'capitals',
+      },
+    });
+
+    render(<LearnerScreen {...defaultProps} />);
+
+    fireEvent.press(screen.getByTestId('intent-quiz-discovery'));
+
+    expect(mockMarkQuizDiscoverySurfaced).toHaveBeenCalledWith('capitals');
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/quiz',
+      params: { activityType: 'capitals' },
+    });
+  });
+
+  it('marks quiz discovery surfaced and hides the card when dismissed', async () => {
+    mockUseQuizDiscoveryCard.mockReturnValue({
+      data: {
+        id: 'quiz-card-1',
+        type: 'quiz_discovery',
+        title: 'Discover more',
+        body: 'Try a capitals quiz',
+        activityType: 'capitals',
+      },
+    });
+
+    render(<LearnerScreen {...defaultProps} />);
+
+    fireEvent.press(screen.getByTestId('intent-quiz-discovery-dismiss'));
+
+    expect(mockMarkQuizDiscoverySurfaced).toHaveBeenCalledWith('capitals');
+    expect(mockPush).not.toHaveBeenCalled();
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('intent-quiz-discovery')).toBeNull();
+    });
   });
 });

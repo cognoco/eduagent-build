@@ -1,5 +1,4 @@
 import {
-  Alert,
   Pressable,
   ScrollView,
   Share,
@@ -8,6 +7,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { platformAlert } from '../../../../lib/platform-alert';
 import { useCallback, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -65,7 +65,7 @@ export default function ChildMentorMemoryScreen() {
       try {
         await deleteItem.mutateAsync(args);
       } catch {
-        Alert.alert('Could not delete item', 'Please try again.');
+        platformAlert('Could not delete item', 'Please try again.');
       }
     },
     [deleteItem]
@@ -76,7 +76,7 @@ export default function ChildMentorMemoryScreen() {
       try {
         await unsuppress.mutateAsync(args);
       } catch {
-        Alert.alert('Could not restore item', 'Please try again.');
+        platformAlert('Could not restore item', 'Please try again.');
       }
     },
     [unsuppress]
@@ -84,7 +84,7 @@ export default function ChildMentorMemoryScreen() {
 
   const handleDeleteAll = useCallback(() => {
     if (!childProfileId) return;
-    Alert.alert(
+    platformAlert(
       'Clear mentor memory?',
       'This removes the saved learner-memory data for this child and turns it off.',
       [
@@ -96,7 +96,7 @@ export default function ChildMentorMemoryScreen() {
             try {
               await deleteAll.mutateAsync({ childProfileId });
             } catch {
-              Alert.alert('Could not clear memory', 'Please try again.');
+              platformAlert('Could not clear memory', 'Please try again.');
             }
           },
         },
@@ -113,7 +113,7 @@ export default function ChildMentorMemoryScreen() {
       });
       setDraft('');
     } catch {
-      Alert.alert('Could not save that', 'Please try again.');
+      platformAlert('Could not save that', 'Please try again.');
     }
   }, [childProfileId, draft, tellMentor]);
 
@@ -127,7 +127,7 @@ export default function ChildMentorMemoryScreen() {
             memoryCollectionEnabled: value,
           });
         } catch {
-          Alert.alert('Could not update memory', 'Please try again.');
+          platformAlert('Could not update memory', 'Please try again.');
         }
       })();
     },
@@ -144,7 +144,7 @@ export default function ChildMentorMemoryScreen() {
             memoryInjectionEnabled: value,
           });
         } catch {
-          Alert.alert('Could not update memory', 'Please try again.');
+          platformAlert('Could not update memory', 'Please try again.');
         }
       })();
     },
@@ -167,7 +167,7 @@ export default function ChildMentorMemoryScreen() {
           title: `${child?.displayName ?? 'Learner'} memory summary`,
         });
       } catch {
-        Alert.alert('Could not export memory', 'Please try again.');
+        platformAlert('Could not export memory', 'Please try again.');
       }
     })();
   }, [child?.displayName, childProfileId, client]);
@@ -239,7 +239,10 @@ export default function ChildMentorMemoryScreen() {
                       consent: 'granted',
                     });
                   } catch {
-                    Alert.alert('Could not enable memory', 'Please try again.');
+                    platformAlert(
+                      'Could not enable memory',
+                      'Please try again.'
+                    );
                   }
                 })()
               }
@@ -251,7 +254,7 @@ export default function ChildMentorMemoryScreen() {
                       consent: 'declined',
                     });
                   } catch {
-                    Alert.alert(
+                    platformAlert(
                       'Could not save preference',
                       'Please try again.'
                     );

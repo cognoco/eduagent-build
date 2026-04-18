@@ -1,12 +1,12 @@
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   Switch,
   Text,
   View,
 } from 'react-native';
+import { platformAlert } from '../../lib/platform-alert';
 import { useCallback, useMemo, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -98,7 +98,7 @@ export default function MentorMemoryScreen() {
   }, [accommodationMode, activeProfile?.birthYear]);
 
   const handleDeleteAll = useCallback(() => {
-    Alert.alert(
+    platformAlert(
       'Clear mentor memory?',
       'This removes everything the mentor has remembered about you and turns memory off until you enable it again.',
       [
@@ -110,7 +110,7 @@ export default function MentorMemoryScreen() {
             try {
               await deleteAll.mutateAsync({});
             } catch {
-              Alert.alert('Could not clear memory', 'Please try again.');
+              platformAlert('Could not clear memory', 'Please try again.');
             }
           },
         },
@@ -125,7 +125,7 @@ export default function MentorMemoryScreen() {
       await tellMentor.mutateAsync({ text });
       setDraft('');
     } catch {
-      Alert.alert('Could not save that', 'Please try again.');
+      platformAlert('Could not save that', 'Please try again.');
     }
   }, [draft, tellMentor]);
 
@@ -137,7 +137,7 @@ export default function MentorMemoryScreen() {
             memoryInjectionEnabled: value,
           });
         } catch {
-          Alert.alert('Could not update memory', 'Please try again.');
+          platformAlert('Could not update memory', 'Please try again.');
         }
       })();
     },
@@ -259,7 +259,10 @@ export default function MentorMemoryScreen() {
                   try {
                     await grantConsent.mutateAsync({ consent: 'granted' });
                   } catch {
-                    Alert.alert('Could not enable memory', 'Please try again.');
+                    platformAlert(
+                      'Could not enable memory',
+                      'Please try again.'
+                    );
                   }
                 })()
               }
@@ -268,7 +271,10 @@ export default function MentorMemoryScreen() {
                   try {
                     await grantConsent.mutateAsync({ consent: 'declined' });
                   } catch {
-                    Alert.alert('Could not update memory', 'Please try again.');
+                    platformAlert(
+                      'Could not update memory',
+                      'Please try again.'
+                    );
                   }
                 })()
               }
@@ -332,7 +338,7 @@ export default function MentorMemoryScreen() {
                       suppress: true,
                     });
                   } catch {
-                    Alert.alert('Could not delete item', 'Please try again.');
+                    platformAlert('Could not delete item', 'Please try again.');
                   }
                 }}
               />
@@ -356,7 +362,7 @@ export default function MentorMemoryScreen() {
                       suppress: true,
                     });
                   } catch {
-                    Alert.alert('Could not delete item', 'Please try again.');
+                    platformAlert('Could not delete item', 'Please try again.');
                   }
                 }}
               />
@@ -381,7 +387,7 @@ export default function MentorMemoryScreen() {
                       suppress: true,
                     });
                   } catch {
-                    Alert.alert('Could not delete item', 'Please try again.');
+                    platformAlert('Could not delete item', 'Please try again.');
                   }
                 }}
               />
@@ -416,7 +422,10 @@ export default function MentorMemoryScreen() {
                         suppress: true,
                       });
                     } catch {
-                      Alert.alert('Could not delete item', 'Please try again.');
+                      platformAlert(
+                        'Could not delete item',
+                        'Please try again.'
+                      );
                     }
                   }}
                 />
@@ -441,7 +450,7 @@ export default function MentorMemoryScreen() {
                       suppress: true,
                     });
                   } catch {
-                    Alert.alert('Could not delete item', 'Please try again.');
+                    platformAlert('Could not delete item', 'Please try again.');
                   }
                 }}
               />
@@ -465,7 +474,10 @@ export default function MentorMemoryScreen() {
                   try {
                     await unsuppress.mutateAsync({ value });
                   } catch {
-                    Alert.alert('Could not restore item', 'Please try again.');
+                    platformAlert(
+                      'Could not restore item',
+                      'Please try again.'
+                    );
                   }
                 }}
               />

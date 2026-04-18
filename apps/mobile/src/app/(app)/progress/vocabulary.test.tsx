@@ -27,7 +27,7 @@ const mockInventory = {
     {
       subjectId: 's1',
       subjectName: 'Spanish',
-      pedagogyMode: 'language',
+      pedagogyMode: 'four_strands',
       topics: {
         total: 10,
         explored: 5,
@@ -68,7 +68,32 @@ describe('VocabularyBrowserScreen', () => {
     expect(screen.getByTestId('vocab-browser-back')).toBeTruthy();
   });
 
-  it('shows empty state when no vocabulary', () => {
+  it('shows empty state when no vocabulary but has language subject', () => {
+    (useProgressInventory as jest.Mock).mockReturnValue({
+      data: {
+        ...mockInventory,
+        global: { ...mockInventory.global, vocabularyTotal: 0 },
+        subjects: [
+          {
+            ...mockInventory.subjects[0],
+            vocabulary: {
+              total: 0,
+              mastered: 0,
+              learning: 0,
+              new: 0,
+              byCefrLevel: {},
+            },
+          },
+        ],
+      },
+      isLoading: false,
+      isError: false,
+    });
+    render(<VocabularyBrowserScreen />);
+    expect(screen.getByTestId('vocab-browser-empty')).toBeTruthy();
+  });
+
+  it('shows no-language gate when no language subjects', () => {
     (useProgressInventory as jest.Mock).mockReturnValue({
       data: {
         ...mockInventory,
@@ -79,7 +104,7 @@ describe('VocabularyBrowserScreen', () => {
       isError: false,
     });
     render(<VocabularyBrowserScreen />);
-    expect(screen.getByTestId('vocab-browser-empty')).toBeTruthy();
+    expect(screen.getByTestId('vocab-browser-no-language')).toBeTruthy();
   });
 
   it('shows error state with retry and back buttons', () => {
@@ -103,7 +128,18 @@ describe('VocabularyBrowserScreen', () => {
           vocabularyTotal: 0,
           totalSessions: 2,
         },
-        subjects: [],
+        subjects: [
+          {
+            ...mockInventory.subjects[0],
+            vocabulary: {
+              total: 0,
+              mastered: 0,
+              learning: 0,
+              new: 0,
+              byCefrLevel: {},
+            },
+          },
+        ],
       },
       isLoading: false,
       isError: false,
@@ -122,7 +158,18 @@ describe('VocabularyBrowserScreen', () => {
           vocabularyTotal: 0,
           totalSessions: 10,
         },
-        subjects: [],
+        subjects: [
+          {
+            ...mockInventory.subjects[0],
+            vocabulary: {
+              total: 0,
+              mastered: 0,
+              learning: 0,
+              new: 0,
+              byCefrLevel: {},
+            },
+          },
+        ],
       },
       isLoading: false,
       isError: false,

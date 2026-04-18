@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -11,7 +11,10 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Profile } from '@eduagent/schemas';
 import { ProfileSwitcher } from '../common';
-import { useQuizDiscoveryCard } from '../../hooks/use-coaching-card';
+import {
+  useMarkQuizDiscoverySurfaced,
+  useQuizDiscoveryCard,
+} from '../../hooks/use-coaching-card';
 import {
   useContinueSuggestion,
   useReviewSummary,
@@ -52,8 +55,12 @@ export function LearnerScreen({
   const { data: continueSuggestion } = useContinueSuggestion();
   const { data: reviewSummary } = useReviewSummary();
   const { data: quizDiscovery } = useQuizDiscoveryCard();
+  const markQuizDiscoverySurfaced = useMarkQuizDiscoverySurfaced();
   const [recoveryMarker, setRecoveryMarker] =
     useState<SessionRecoveryMarker | null>(null);
+  const [dismissedQuizDiscoveryId, setDismissedQuizDiscoveryId] = useState<
+    string | null
+  >(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -64,11 +71,16 @@ export function LearnerScreen({
         if (cancelled) return;
 
         if (marker && isRecoveryMarkerFresh(marker)) {
-          setRecoveryMarker(marker);
+          setRecoveryMarker((current) =>
+            current?.sessionId === marker.sessionId &&
+            current?.updatedAt === marker.updatedAt
+              ? current
+              : marker
+          );
           return;
         }
 
-        setRecoveryMarker(null);
+        setRecoveryMarker((current) => (current === null ? current : null));
         if (marker) {
           // Stale marker — clear silently. The "Continue where you left off"
           // card uses continueSuggestion (API-driven) and doesn't need this.
@@ -78,7 +90,7 @@ export function LearnerScreen({
         }
       } catch {
         if (!cancelled) {
-          setRecoveryMarker(null);
+          setRecoveryMarker((current) => (current === null ? current : null));
         }
       }
     }
@@ -90,10 +102,20 @@ export function LearnerScreen({
     };
   }, [activeProfile?.id]);
 
+  useEffect(() => {
+    setDismissedQuizDiscoveryId(null);
+  }, [activeProfile?.id, quizDiscovery?.id]);
+
   const { title, subtitle } = getGreeting(
     activeProfile?.displayName ?? '',
     now
   );
+
+  const markQuizDiscoveryHandled = useCallback(() => {
+    if (!quizDiscovery) return;
+    setDismissedQuizDiscoveryId(quizDiscovery.id);
+    markQuizDiscoverySurfaced.mutate(quizDiscovery.activityType);
+  }, [markQuizDiscoverySurfaced, quizDiscovery]);
 
   const intentCards = useMemo(() => {
     const cards: Array<{
@@ -103,6 +125,7 @@ export function LearnerScreen({
       icon: React.ComponentProps<typeof Ionicons>['name'];
       variant?: 'default' | 'highlight';
       onPress: () => void;
+      onDismiss?: () => void;
     }> = [];
 
     if (recoveryMarker) {
@@ -185,18 +208,23 @@ export function LearnerScreen({
       });
     }
 
-    if (quizDiscovery) {
+    if (quizDiscovery && dismissedQuizDiscoveryId !== quizDiscovery.id) {
       cards.push({
         testID: 'intent-quiz-discovery',
         title: quizDiscovery.title,
         subtitle: quizDiscovery.body,
         icon: 'sparkles-outline',
         variant: 'highlight',
-        onPress: () =>
+        onDismiss: () => {
+          markQuizDiscoveryHandled();
+        },
+        onPress: () => {
+          markQuizDiscoveryHandled();
           router.push({
             pathname: '/(app)/quiz',
             params: { activityType: quizDiscovery.activityType },
-          } as never),
+          } as never);
+        },
       });
     }
 
@@ -235,6 +263,8 @@ export function LearnerScreen({
   }, [
     activeProfile?.id,
     continueSuggestion,
+    dismissedQuizDiscoveryId,
+    markQuizDiscoveryHandled,
     quizDiscovery,
     recoveryMarker,
     reviewSummary,

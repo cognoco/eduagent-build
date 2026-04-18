@@ -90,4 +90,23 @@ describe('IntentCard', () => {
     expect(card.props.accessibilityRole).toBe('button');
     expect(card.props.accessibilityLabel).toBe('Pick a subject');
   });
+
+  it('renders a dismiss action when provided and does not trigger card press', () => {
+    const onPress = jest.fn();
+    const onDismiss = jest.fn();
+
+    render(
+      <IntentCard
+        title="Discover more"
+        onPress={onPress}
+        onDismiss={onDismiss}
+        testID="card"
+      />
+    );
+
+    fireEvent.press(screen.getByTestId('card-dismiss'));
+
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+    expect(onPress).not.toHaveBeenCalled();
+  });
 });

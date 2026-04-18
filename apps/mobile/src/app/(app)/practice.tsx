@@ -38,15 +38,25 @@ export default function PracticeScreen(): React.ReactElement {
         reviewDueCount === 1 ? 'topic' : 'topics'
       } ready for review`
     : 'Nothing to review right now';
-  const capitalsStats = quizStats?.find(
-    (stat) => stat.activityType === 'capitals'
-  );
+  // [F-034] Aggregate stats across ALL activity types so Guess Who / Vocabulary
+  // players also see their stats on the Practice hub card.
+  const bestActivity = quizStats
+    ?.filter(
+      (s) => s.bestScore != null && s.bestTotal != null && s.bestTotal > 0
+    )
+    .sort(
+      (a, b) =>
+        (b.bestScore ?? 0) / (b.bestTotal ?? 1) -
+        (a.bestScore ?? 0) / (a.bestTotal ?? 1)
+    )[0];
+  const totalRoundsPlayed =
+    quizStats?.reduce((sum, s) => sum + (s.roundsPlayed ?? 0), 0) ?? 0;
   const quizSubtitle = statsError
     ? 'Could not load quiz stats'
-    : capitalsStats
-    ? capitalsStats.bestScore != null && capitalsStats.bestTotal != null
-      ? `Best: ${capitalsStats.bestScore}/${capitalsStats.bestTotal} · Played: ${capitalsStats.roundsPlayed}`
-      : `Played: ${capitalsStats.roundsPlayed}`
+    : bestActivity && bestActivity.bestScore != null
+    ? `Best: ${bestActivity.bestScore}/${bestActivity.bestTotal} · Played: ${totalRoundsPlayed}`
+    : totalRoundsPlayed > 0
+    ? `Played: ${totalRoundsPlayed}`
     : 'Test yourself with multiple choice questions';
 
   const handleBack = () => {

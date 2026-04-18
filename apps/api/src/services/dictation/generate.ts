@@ -34,7 +34,7 @@ function getLiteraryTheme(ageYears: number): string {
   return `Draw from classic and contemporary literature — novels, short stories, literary fiction. Think Hemingway, Kafka, Čapek, or contemporary bestsellers. Use adult-level vocabulary and sentence structure.`;
 }
 
-function buildGeneratePrompt(ctx: GenerateContext): string {
+export function buildGeneratePrompt(ctx: GenerateContext): string {
   const punctuationNames = getPunctuationNames(ctx.nativeLanguage);
   const literaryTheme = getLiteraryTheme(ctx.ageYears);
 

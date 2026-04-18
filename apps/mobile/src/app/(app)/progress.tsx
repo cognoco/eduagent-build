@@ -1,12 +1,12 @@
 import { useMemo } from 'react';
 import {
-  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
   Text,
   View,
 } from 'react-native';
+import { platformAlert } from '../../lib/platform-alert';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ErrorFallback } from '../../components/common';
@@ -147,7 +147,7 @@ export default function ProgressScreen(): React.ReactElement {
         err instanceof Error
           ? err.message
           : "We couldn't refresh your progress right now.";
-      Alert.alert('Refresh failed', message);
+      platformAlert('Refresh failed', message);
     }
 
     await Promise.all([

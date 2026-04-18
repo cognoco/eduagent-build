@@ -1,4 +1,10 @@
-import { Platform, Pressable, Text, View } from 'react-native';
+import {
+  Platform,
+  Pressable,
+  Text,
+  View,
+  type GestureResponderEvent,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeColors } from '../../lib/theme';
 
@@ -9,6 +15,8 @@ interface IntentCardProps {
   variant?: 'default' | 'highlight';
   icon?: React.ComponentProps<typeof Ionicons>['name'];
   onPress: () => void;
+  onDismiss?: () => void;
+  dismissLabel?: string;
   testID?: string;
 }
 
@@ -19,9 +27,17 @@ export function IntentCard({
   variant = 'default',
   icon,
   onPress,
+  onDismiss,
+  dismissLabel = 'Dismiss',
   testID,
 }: IntentCardProps): React.ReactElement {
   const colors = useThemeColors();
+
+  function handleDismiss(event?: GestureResponderEvent) {
+    event?.stopPropagation?.();
+    onDismiss?.();
+  }
+
   return (
     <Pressable
       onPress={onPress}
@@ -66,7 +82,23 @@ export function IntentCard({
           ) : null}
         </View>
       </View>
-      <Ionicons name="chevron-forward" size={22} color={colors.primary} />
+      {onDismiss ? (
+        <View className="ml-3 self-stretch items-end justify-between">
+          <Pressable
+            onPress={handleDismiss}
+            className="min-h-[32px] min-w-[32px] items-center justify-center"
+            accessibilityRole="button"
+            accessibilityLabel={dismissLabel}
+            testID={testID ? `${testID}-dismiss` : undefined}
+            hitSlop={8}
+          >
+            <Ionicons name="close" size={18} color={colors.textPrimary} />
+          </Pressable>
+          <Ionicons name="chevron-forward" size={22} color={colors.primary} />
+        </View>
+      ) : (
+        <Ionicons name="chevron-forward" size={22} color={colors.primary} />
+      )}
     </Pressable>
   );
 }

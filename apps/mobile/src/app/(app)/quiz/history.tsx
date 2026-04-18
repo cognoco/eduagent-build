@@ -3,6 +3,25 @@ import { useRouter } from 'expo-router';
 import { useRecentRounds } from '../../../hooks/use-quiz';
 import { goBackOrReplace } from '../../../lib/navigation';
 
+// [F-037] Friendly date label — "Today" / "Yesterday" / locale long date.
+function formatDateHeader(isoDate: string): string {
+  const d = new Date(`${isoDate}T00:00:00`);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const diffDays = Math.round(
+    (today.getTime() - d.getTime()) / (1000 * 60 * 60 * 24)
+  );
+
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
+
+  return d.toLocaleDateString(undefined, {
+    month: 'long',
+    day: 'numeric',
+    year: d.getFullYear() !== now.getFullYear() ? 'numeric' : undefined,
+  });
+}
+
 export default function QuizHistoryScreen() {
   const router = useRouter();
   const { data: rounds, isLoading } = useRecentRounds();
@@ -73,7 +92,7 @@ export default function QuizHistoryScreen() {
         renderItem={({ item: section }) => (
           <View className="mb-4">
             <Text className="text-on-surface-muted px-4 py-2 text-sm font-medium">
-              {section.date}
+              {formatDateHeader(section.date)}
             </Text>
             {section.items.map((round) => (
               <Pressable

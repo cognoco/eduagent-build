@@ -4,7 +4,7 @@ import {
   useQueryClient,
   type UseQueryResult,
 } from '@tanstack/react-query';
-import type { CoachingCard } from '@eduagent/schemas';
+import type { CoachingCard, QuizActivityType } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
@@ -63,15 +63,16 @@ export function useMarkQuizDiscoverySurfaced() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (activityType: string) => {
+    mutationFn: async (activityType: QuizActivityType) => {
       const res = await client.quiz['missed-items']['mark-surfaced'].$post({
         json: { activityType },
       });
       await assertOk(res);
       return (await res.json()) as { markedCount: number };
     },
+    retry: 3,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['coaching-card'] });
+      void queryClient.invalidateQueries({ queryKey: ['coaching-card'] });
     },
   });
 }

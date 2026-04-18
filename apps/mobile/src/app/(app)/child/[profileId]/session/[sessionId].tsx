@@ -68,6 +68,17 @@ export default function SessionDetailScreen() {
         >
           <Text className="text-text-inverse font-medium">Retry</Text>
         </Pressable>
+        {/* [F-033] Secondary escape — UX resilience rule requires a Go Back
+            action on every error state, not just Retry. */}
+        <Pressable
+          testID="error-go-back"
+          onPress={() => goBackOrReplace(router, '/(app)/home')}
+          className="mt-3 px-6 py-3"
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
+          <Text className="text-text-secondary font-medium">Go Back</Text>
+        </Pressable>
       </View>
     );
   }
