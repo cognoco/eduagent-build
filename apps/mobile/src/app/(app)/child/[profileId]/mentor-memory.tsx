@@ -5,9 +5,10 @@ import {
   Share,
   Switch,
   Text,
+  TextInput,
   View,
 } from 'react-native';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MemoryConsentPrompt } from '../../../../components/memory-consent-prompt';
@@ -15,12 +16,13 @@ import {
   CollapsibleMemorySection,
   MemoryRow,
   MemorySection,
-  getLearningStyleRows,
-  getStruggleProgress,
 } from '../../../../components/mentor-memory-sections';
 import { TellMentorInput } from '../../../../components/tell-mentor-input';
 import { useProfile } from '../../../../lib/profile';
-import { useChildDetail } from '../../../../hooks/use-dashboard';
+import {
+  useChildDetail,
+  useChildMemory,
+} from '../../../../hooks/use-dashboard';
 import {
   useChildLearnerProfile,
   useDeleteAllMemory,
@@ -44,6 +46,7 @@ export default function ChildMentorMemoryScreen() {
   const childProfileId = profileId as string | undefined;
   const { data: child } = useChildDetail(childProfileId);
   const { data: profile, isLoading } = useChildLearnerProfile(childProfileId);
+  const { data: memory } = useChildMemory(childProfileId);
   const deleteItem = useDeleteMemoryItem();
   const deleteAll = useDeleteAllMemory();
   const tellMentor = useTellMentor();
@@ -52,6 +55,8 @@ export default function ChildMentorMemoryScreen() {
   const grantConsent = useGrantMemoryConsent();
   const unsuppress = useUnsuppressInference();
   const [draft, setDraft] = useState('');
+  const [correctionOpen, setCorrectionOpen] = useState(false);
+  const [correctionText, setCorrectionText] = useState('');
 
   // S-2: Wrap mutateAsync calls so delete/unsuppress failures show user feedback.
   // Previously all 6 onRemove handlers used `void mutateAsync(...)` with no catch.
@@ -75,11 +80,6 @@ export default function ChildMentorMemoryScreen() {
       }
     },
     [unsuppress]
-  );
-
-  const learningStyleRows = useMemo(
-    () => getLearningStyleRows(profile?.learningStyle ?? null),
-    [profile?.learningStyle]
   );
 
   const handleDeleteAll = useCallback(() => {
@@ -308,124 +308,36 @@ export default function ChildMentorMemoryScreen() {
           />
         </MemorySection>
 
-        <MemorySection title="Learning Style">
-          {learningStyleRows.length > 0 ? (
-            learningStyleRows.map((row) => (
+        {/* Curated categories from memory endpoint */}
+        {memory?.categories.map((cat) => (
+          <MemorySection key={cat.label} title={cat.label}>
+            {cat.items.map((item) => (
               <MemoryRow
-                key={row.key}
-                label={row.label}
-                source={row.source}
+                key={`${item.category}-${item.value}`}
+                label={item.statement}
                 onRemove={() =>
                   void safeDelete({
                     childProfileId,
-                    category: 'learningStyle',
-                    value: row.key,
+                    category: item.category,
+                    value: item.value,
                     suppress: true,
                   })
                 }
               />
-            ))
-          ) : (
-            <MemoryRow label="Nothing saved yet." />
-          )}
-        </MemorySection>
+            ))}
+          </MemorySection>
+        ))}
 
-        <MemorySection title="Interests">
-          {(profile?.interests ?? []).length > 0 ? (
-            profile?.interests.map((interest) => (
-              <MemoryRow
-                key={interest}
-                label={interest}
-                onRemove={() =>
-                  void safeDelete({
-                    childProfileId,
-                    category: 'interests',
-                    value: interest,
-                    suppress: true,
-                  })
-                }
-              />
-            ))
-          ) : (
-            <MemoryRow label="Nothing saved yet." />
-          )}
-        </MemorySection>
-
-        <MemorySection title="Strengths">
-          {(profile?.strengths ?? []).length > 0 ? (
-            profile?.strengths.map((entry) => (
-              <MemoryRow
-                key={entry.subject}
-                label={`${entry.subject}: ${entry.topics.join(', ')}`}
-                source={entry.source}
-                onRemove={() =>
-                  void safeDelete({
-                    childProfileId,
-                    category: 'strengths',
-                    value: entry.subject,
-                    suppress: true,
-                  })
-                }
-              />
-            ))
-          ) : (
-            <MemoryRow label="Nothing saved yet." />
-          )}
-        </MemorySection>
-
-        <CollapsibleMemorySection
-          title="Things You're Improving At"
-          defaultExpanded={false}
-        >
-          {(profile?.struggles ?? []).length > 0 ? (
-            profile?.struggles.map((entry) => {
-              const progress = getStruggleProgress(entry);
-              return (
-                <MemoryRow
-                  key={`${entry.subject ?? 'freeform'}:${entry.topic}`}
-                  label={`${entry.subject ? `${entry.subject}: ` : ''}${
-                    entry.topic
-                  }`}
-                  source={entry.source}
-                  progressLabel={progress.progressLabel}
-                  progressValue={progress.progressValue}
-                  onRemove={() =>
-                    void safeDelete({
-                      childProfileId,
-                      category: 'struggles',
-                      value: entry.topic,
-                      subject: entry.subject ?? undefined,
-                      suppress: true,
-                    })
-                  }
-                />
-              );
-            })
-          ) : (
-            <MemoryRow label="Nothing saved yet." />
-          )}
-        </CollapsibleMemorySection>
-
-        <MemorySection title="Communication Notes">
-          {(profile?.communicationNotes ?? []).length > 0 ? (
-            profile?.communicationNotes.map((note) => (
-              <MemoryRow
-                key={note}
-                label={note}
-                onRemove={() =>
-                  void safeDelete({
-                    childProfileId,
-                    category: 'communicationNotes',
-                    value: note,
-                    suppress: true,
-                  })
-                }
-              />
-            ))
-          ) : (
-            <MemoryRow label="Nothing saved yet." />
-          )}
-        </MemorySection>
+        {/* Empty state when no categories */}
+        {memory && memory.categories.length === 0 && (
+          <View className="bg-surface rounded-card p-6 mt-4">
+            <Text className="text-text-secondary text-center text-base">
+              No learning observations yet. As{' '}
+              {child?.displayName ?? 'your child'} uses the app, the mentor will
+              learn about their preferences and pace.
+            </Text>
+          </View>
+        )}
 
         {(profile?.suppressedInferences ?? []).length > 0 ? (
           <CollapsibleMemorySection
@@ -465,6 +377,75 @@ export default function ChildMentorMemoryScreen() {
             </Text>
           </Pressable>
         </MemorySection>
+
+        {/* Something else is wrong — escape hatch (cross-platform) */}
+        {!correctionOpen ? (
+          <Pressable
+            testID="something-wrong-button"
+            onPress={() => setCorrectionOpen(true)}
+            className="bg-surface rounded-card px-4 py-3 mt-4"
+          >
+            <Text className="text-text-secondary text-center text-sm">
+              Something else is wrong?
+            </Text>
+          </Pressable>
+        ) : (
+          <View className="bg-surface rounded-card p-4 mt-4">
+            <Text className="text-body font-medium text-text-primary mb-2">
+              What seems wrong?
+            </Text>
+            <Text className="text-body-sm text-text-secondary mb-3">
+              Describe what the mentor got wrong. We&apos;ll review your note.
+            </Text>
+            <TextInput
+              testID="correction-input"
+              value={correctionText}
+              onChangeText={setCorrectionText}
+              multiline
+              numberOfLines={3}
+              placeholder="e.g. She doesn't actually struggle with fractions anymore"
+              className="border-border mb-3 rounded-lg border p-3 text-text-primary"
+            />
+            <View className="flex-row gap-2">
+              <Pressable
+                onPress={() => {
+                  setCorrectionOpen(false);
+                  setCorrectionText('');
+                }}
+                className="flex-1 rounded-lg border border-border p-3"
+              >
+                <Text className="text-text-secondary text-center text-sm">
+                  Cancel
+                </Text>
+              </Pressable>
+              <Pressable
+                testID="correction-submit"
+                disabled={!correctionText.trim() || tellMentor.isPending}
+                onPress={() =>
+                  void (async () => {
+                    const text = correctionText.trim();
+                    if (!text) return;
+                    try {
+                      await tellMentor.mutateAsync({
+                        childProfileId: childProfileId!,
+                        text: `[parent_correction] ${text}`,
+                      });
+                      setCorrectionOpen(false);
+                      setCorrectionText('');
+                    } catch {
+                      // tellMentor mutation handles its own error toast
+                    }
+                  })()
+                }
+                className="flex-1 rounded-lg bg-primary p-3 disabled:opacity-50"
+              >
+                <Text className="text-text-inverse text-center text-sm font-medium">
+                  Submit
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        )}
       </ScrollView>
     </View>
   );
