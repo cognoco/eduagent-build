@@ -1,0 +1,196 @@
+// ---------------------------------------------------------------------------
+// Curated Memory View — Parent-facing categorized presentation of learning profile
+// ---------------------------------------------------------------------------
+
+export type MemoryCategoryKey =
+  | 'struggles'
+  | 'interests'
+  | 'strengths'
+  | 'communicationNotes'
+  | 'learningStyle';
+
+export interface CuratedMemoryItem {
+  category: MemoryCategoryKey;
+  value: string;
+  statement: string;
+}
+
+export interface MemoryCategory {
+  label: string;
+  items: CuratedMemoryItem[];
+}
+
+export interface ParentTellItem {
+  id: string;
+  content: string;
+  createdAt: string;
+}
+
+export interface CuratedMemoryView {
+  categories: MemoryCategory[];
+  parentContributions: ParentTellItem[];
+  settings: {
+    memoryEnabled: boolean;
+    collectionEnabled: boolean;
+    injectionEnabled: boolean;
+    accommodationMode: string | null;
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Column → Label mapping
+// ---------------------------------------------------------------------------
+
+const CATEGORY_CONFIG: Array<{
+  key: MemoryCategoryKey;
+  label: string;
+}> = [
+  { key: 'interests', label: 'Interests' },
+  { key: 'strengths', label: 'Strengths' },
+  { key: 'struggles', label: 'Struggles with' },
+  { key: 'communicationNotes', label: 'Learning pace & notes' },
+  { key: 'learningStyle', label: 'Learning style' },
+];
+
+// ---------------------------------------------------------------------------
+// Learning style serialization
+// ---------------------------------------------------------------------------
+
+const STYLE_FIELD_LABELS: Record<string, (v: string) => string> = {
+  modality: (v) => `Prefers ${v} learning`,
+  pacing: (v) => `Prefers ${v} pacing`,
+  scaffolding: (v) => `Responds to ${v} scaffolding`,
+  feedback: (v) => `Prefers ${v} feedback`,
+  engagement: (v) => `${capitalize(v)} engagement style`,
+};
+
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function serializeLearningStyle(
+  style: Record<string, unknown> | null
+): CuratedMemoryItem[] {
+  if (!style || typeof style !== 'object') return [];
+
+  const items: CuratedMemoryItem[] = [];
+  for (const [field, rawValue] of Object.entries(style)) {
+    if (rawValue == null || typeof rawValue !== 'string') continue;
+    const labelFn = STYLE_FIELD_LABELS[field];
+    const statement = labelFn
+      ? labelFn(rawValue)
+      : `${capitalize(field)}: ${rawValue}`;
+    items.push({ category: 'learningStyle', value: field, statement });
+  }
+  return items;
+}
+
+// ---------------------------------------------------------------------------
+// Strength / Struggle item builders
+// ---------------------------------------------------------------------------
+
+interface StrengthEntry {
+  subject: string;
+  topics: string[];
+}
+
+interface StruggleEntry {
+  topic: string;
+  subject?: string;
+  severity?: string;
+}
+
+function buildStrengthItems(strengths: unknown[]): CuratedMemoryItem[] {
+  return (strengths as StrengthEntry[]).map((entry) => ({
+    category: 'strengths' as const,
+    value: entry.subject,
+    statement: `Strong in ${entry.subject}: ${entry.topics.join(', ')}`,
+  }));
+}
+
+function buildStruggleItems(struggles: unknown[]): CuratedMemoryItem[] {
+  return (struggles as StruggleEntry[]).map((entry) => ({
+    category: 'struggles' as const,
+    value: entry.topic,
+    statement: entry.subject
+      ? `Struggles with ${entry.topic} (${entry.subject})`
+      : `Struggles with ${entry.topic}`,
+  }));
+}
+
+function buildStringArrayItems(
+  items: unknown[],
+  category: MemoryCategoryKey,
+  formatter: (s: string) => string
+): CuratedMemoryItem[] {
+  return (items as string[]).map((value) => ({
+    category,
+    value,
+    statement: formatter(value),
+  }));
+}
+
+// ---------------------------------------------------------------------------
+// Main builder
+// ---------------------------------------------------------------------------
+
+export function buildCuratedMemoryView(profile: {
+  interests?: unknown[];
+  strengths?: unknown[];
+  struggles?: unknown[];
+  communicationNotes?: unknown[];
+  learningStyle?: Record<string, unknown> | null;
+  memoryEnabled?: boolean;
+  memoryCollectionEnabled?: boolean;
+  memoryInjectionEnabled?: boolean;
+  accommodationMode?: string | null;
+}): CuratedMemoryView {
+  const categories: MemoryCategory[] = [];
+
+  for (const config of CATEGORY_CONFIG) {
+    let items: CuratedMemoryItem[];
+
+    switch (config.key) {
+      case 'interests':
+        items = buildStringArrayItems(
+          profile.interests ?? [],
+          'interests',
+          (v) => `Interested in ${v}`
+        );
+        break;
+      case 'strengths':
+        items = buildStrengthItems(profile.strengths ?? []);
+        break;
+      case 'struggles':
+        items = buildStruggleItems(profile.struggles ?? []);
+        break;
+      case 'communicationNotes':
+        items = buildStringArrayItems(
+          profile.communicationNotes ?? [],
+          'communicationNotes',
+          (v) => capitalize(v)
+        );
+        break;
+      case 'learningStyle':
+        items = serializeLearningStyle(profile.learningStyle ?? null);
+        break;
+    }
+
+    if (items.length > 0) {
+      categories.push({ label: config.label, items });
+    }
+  }
+
+  return {
+    categories,
+    // Raw parent tell texts are not persisted separately — see spec correction note.
+    // When tell-text persistence is added, query them here.
+    parentContributions: [],
+    settings: {
+      memoryEnabled: profile.memoryEnabled ?? true,
+      collectionEnabled: profile.memoryCollectionEnabled ?? false,
+      injectionEnabled: profile.memoryInjectionEnabled ?? true,
+      accommodationMode: profile.accommodationMode ?? null,
+    },
+  };
+}

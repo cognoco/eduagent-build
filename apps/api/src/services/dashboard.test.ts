@@ -15,6 +15,8 @@ const mockCurriculumTopicsFindMany = jest.fn();
 const mockProgressSnapshotsFindFirst = jest.fn();
 const mockProgressSnapshotsFindMany = jest.fn();
 const mockMilestonesFindMany = jest.fn();
+const mockStreaksFindMany = jest.fn();
+const mockXpSelect = jest.fn();
 
 import { createDatabaseModuleMock } from '../test-utils/database-module';
 
@@ -51,6 +53,13 @@ const mockDatabaseModule = createDatabaseModuleMock({
     milestones: {
       profileId: 'profile_id',
       createdAt: 'created_at',
+    },
+    streaks: {
+      profileId: 'profile_id',
+    },
+    xpLedger: {
+      profileId: 'profile_id',
+      amount: 'amount',
     },
   },
 });
@@ -282,7 +291,11 @@ function createMockDb() {
       milestones: {
         findMany: mockMilestonesFindMany,
       },
+      streaks: {
+        findMany: mockStreaksFindMany,
+      },
     },
+    select: mockXpSelect,
   } as unknown;
 }
 
@@ -300,6 +313,15 @@ beforeEach(() => {
   mockProgressSnapshotsFindFirst.mockResolvedValue(null);
   mockProgressSnapshotsFindMany.mockResolvedValue([]);
   mockMilestonesFindMany.mockResolvedValue([]);
+  mockStreaksFindMany.mockResolvedValue([]);
+  // XP query uses db.select().from().where().groupBy() chain
+  mockXpSelect.mockReturnValue({
+    from: jest.fn().mockReturnValue({
+      where: jest.fn().mockReturnValue({
+        groupBy: jest.fn().mockResolvedValue([]),
+      }),
+    }),
+  });
 });
 
 // ---------------------------------------------------------------------------

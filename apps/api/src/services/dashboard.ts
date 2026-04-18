@@ -3,7 +3,7 @@
 // Pure business logic + DB-aware query functions, no Hono imports
 // ---------------------------------------------------------------------------
 
-import { eq, and, gte, inArray, desc } from 'drizzle-orm';
+import { eq, and, gte, inArray, desc, sum } from 'drizzle-orm';
 import {
   familyLinks,
   profiles,
@@ -12,6 +12,8 @@ import {
   subjects,
   curricula,
   curriculumTopics,
+  streaks,
+  xpLedger,
   type Database,
 } from '@eduagent/database';
 import type {
@@ -453,6 +455,26 @@ export async function getChildrenForParent(
     ),
   ]);
 
+  // Batch streaks + XP for all children (reuse childProfileIds from links)
+  const [streakResults, xpResults] = await Promise.all([
+    db.query.streaks.findMany({
+      where: inArray(streaks.profileId, childProfileIds),
+    }),
+    db
+      .select({
+        profileId: xpLedger.profileId,
+        totalXp: sum(xpLedger.amount).mapWith(Number),
+      })
+      .from(xpLedger)
+      .where(inArray(xpLedger.profileId, childProfileIds))
+      .groupBy(xpLedger.profileId),
+  ]);
+
+  const streaksByProfile = new Map(streakResults.map((s) => [s.profileId, s]));
+  const xpByProfile = new Map(
+    xpResults.map((x) => [x.profileId, x.totalXp ?? 0])
+  );
+
   // Pre-compute per-child display inputs (first pass) so that the
   // progress-summary fan-out can run in parallel without needing the
   // `children.push` loop to complete sequentially.
@@ -607,9 +629,9 @@ export async function getChildrenForParent(
       retentionTrend,
       totalSessions,
       progress,
-      currentStreak: 0,
-      longestStreak: 0,
-      totalXp: 0,
+      currentStreak: streaksByProfile.get(p.childProfileId)?.currentStreak ?? 0,
+      longestStreak: streaksByProfile.get(p.childProfileId)?.longestStreak ?? 0,
+      totalXp: xpByProfile.get(p.childProfileId) ?? 0,
     };
   });
 
