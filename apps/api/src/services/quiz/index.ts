@@ -32,3 +32,4 @@ export {
   buildGuessWhoDiscoveryQuestions,
   clueMentionsGuessWhoName,
 } from './guess-who-provider';
+export { shouldApplyDifficultyBump } from './difficulty-bump';
