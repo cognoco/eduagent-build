@@ -33,8 +33,8 @@ This report is **incremental** — each section is filled as flows are tested. T
 ### Profiles, Family, Consent, Account
 | ID | Flow | Status | Notes |
 |---|---|---|---|
-| ACCOUNT-01..03 | Profile creation | ⏭️ | Skipped — would create real profile data |
-| ACCOUNT-04 | Profile switching | ⏭️ | Need ≥2 profiles |
+| ACCOUNT-01..03 | Profile creation | ✅ | Tested 2026-04-18 continuation #3 — `POST /v1/profiles` → 201 for TestKid (birthYear: 2015, isOwner: false, consentStatus: "CONSENTED"). Note: CONSENTED immediately when parent creates — skips ACCOUNT-19..22 consent flow |
+| ACCOUNT-04 | Profile switching | ✅ | Tested 2026-04-18 — `profile-switcher-chip` opens `profile-switcher-menu` with both TestKid + Zuzana options; switched successfully both directions |
 | ACCOUNT-06 | More tab navigation | ✅ | Full layout renders, all sections present |
 | ACCOUNT-07 | Settings toggles | 🔍 | Visible (Push notifications, Weekly digest); not toggled (would mutate) |
 | ACCOUNT-08 | Learning mode + accommodations + celebrations | ✅ | All three radios render with active state on user's current selection (Challenge mode / None / Big milestones only) |
@@ -48,13 +48,16 @@ This report is **incremental** — each section is filled as flows are tested. T
 | ID | Flow | Status | Notes |
 |---|---|---|---|
 | HOME-01 | Learner home with intent cards | ✅ | 5 cards: Continue (Geography topic) / Learn / Ask / Practice / Homework |
-| HOME-02 | Parent gateway home | ⏭️ | Owner has no children, so AddFirstChild gate would render — but free plan, see HOME-07 |
+| HOME-02 | Parent gateway home | ✅ | Tested 2026-04-18 after family-tier + child added. `parent-gateway` testid + "Check child's progress" + "Learn something" CTAs |
 | HOME-03 | Tab shell + Progress tab promoted | ✅ | All 4 tabs render |
+| HOME-05 | Empty first-user state | ✅ | Tested 2026-04-18 — switched to fresh TestKid profile, home showed 4 intent cards (no Continue) with "Good afternoon, TestKid!" |
 | HOME-06 | Continue intent card | ⚠️ | F-001: missing `lastSessionId` |
-| HOME-07 | AddFirstChild gate | ⏭️ | Not triggered — Free plan owner doesn't qualify |
+| HOME-07 | AddFirstChild gate | ✅ | Tested 2026-04-18 — triggered automatically when Zuzana upgraded to family tier; rendered `add-first-child-screen` + `add-first-child-cta` |
 | HOME-08 | Home loading-timeout fallback | ⏭️ | Not triggered |
-| SUBJECT-01 | Create subject from home | ✅ | Screen renders with subject suggestions (Continue X / Start Y); not actually created |
-| SUBJECT-12 | View curriculum | ⏭️ | Not reached |
+| SUBJECT-01 | Create subject from home | ✅ | Screen renders with 9 quick-start subjects (Math/Science/English/History/Spanish/Geography/Art/Music/Programming), `not-sure-hint`, `create-subject-validation-hint`, `create-subject-submit` |
+| SUBJECT-06 | Broad subject → pick a book | ✅ | Tested live 2026-04-18. Tapped "Math" → `/v1/subjects/resolve` → 200 → `/v1/subjects` POST 201 → `/v1/subjects/{id}/book-suggestions` → 7 book suggestions at `/pick-book/{subjectId}` with `pick-book-something-else` escape |
+| SUBJECT-11 | Curriculum review | ✅ | Tested live 2026-04-18. After picking a book, curriculum was generated via `GET /v1/subjects/{id}/curriculum` (version 1, with topics array). Book-detail at `/shelf/{subjectId}/book/{bookId}` rendered with "Study next / [Topic Name] / Tap Start learning below" |
+| SUBJECT-12 | View curriculum | ⏭️ | Not directly reached as standalone, but the curriculum-review path covers the critical SUBJECT-11 → LEARN-04 bridge |
 | SUBJECT-15 | Accommodations onboarding step | 🔍 | Code only — not in onboarding session this run |
 
 ### Learning, Library, Practice
@@ -62,6 +65,7 @@ This report is **incremental** — each section is filled as flows are tested. T
 |---|---|---|---|
 | LEARN-01 | Freeform chat from Ask card | ✅ | Renders with "Chat / Ask anything" header + greeting |
 | LEARN-02 | Guided learning from Continue | ✅ | Session opens with topic-specific greeting (F-001 + F-005) |
+| LEARN-04 | Core learning loop | ✅ | Tested live 2026-04-18 continuation #3. Sent "What is the difference between positive and negative numbers?" to TestKid's Math session → got full streaming response with thermometer analogy + positive/negative explanation + Socratic recall check ("Can you tell me if 5 cookies is a positive or negative number?"). Answered, got validation "Nice! That's exactly it." + number-line teaching + follow-up question. **2 complete exchanges, quick chips visible (Too hard / Explain differently / Hint / Helpful / Not helpful / That's incorrect — CC-01 verified).** |
 | LEARN-08 | Library shelves | ✅ | 4 shelves render with retention badges + last-session label |
 | LEARN-09 | Subject shelf → book selection | ✅ | Single-book shelves bypass to book detail |
 | LEARN-10 | Book detail + Start learning | ✅ | "STUDY NEXT" + "PAST SESSIONS" sections render — F-002 + F-004 |
@@ -101,7 +105,7 @@ This report is **incremental** — each section is filled as flows are tested. T
 | DICT-07 | Photo review (multimodal LLM) | 🔍 | Code path only; web has no camera |
 | DICT-08 | Sentence remediation | ⏭️ | Not reachable without review data |
 | DICT-09 | Perfect-score celebration | ⏭️ | Not reached |
-| DICT-10 | Recording dictation result | ⏭️ | Not exercised (would mutate user data) |
+| DICT-10 | Recording dictation result | ✅ | Tested live 2026-04-18 continuation #3. Tapped "I'm done" on complete screen → `POST /v1/dictation/result` → 201 with `{id, profileId, date: "2026-04-18", sentenceCount: 10, mistakeCount: null, mode: "surprise", reviewed: false}`. **Observation F-031**: request fired TWICE in the same interaction (possibly web-test artifact from dispatching both pointer events AND click). Worth confirming on native. |
 
 ### Homework
 | ID | Flow | Status | Notes |
@@ -313,6 +317,27 @@ This report is **incremental** — each section is filled as flows are tested. T
   - Or use a proper RN modal component cross-platform instead of `Alert.alert`. The existing codebase already has modal components.
   - Related: **This is a systemic gap.** `Alert.alert` appears in [use-session-actions.ts:338, :427, :641, :655, :694](apps/mobile/src/app/(app)/session/_helpers/use-session-actions.ts:338), [use-dictation-playback.ts DICT-05](apps/mobile/src/hooks/use-dictation-playback.ts) (flagged in initial report), subscription restore failure, etc. Every one of these is silently broken on web. Worth one sweep.
 
+### F-030 🟡 Dictation generate → playback state loss on first attempt
+- **Where:** Dictation "Surprise me" flow — `/dictation/generate` → `/dictation/playback` — tested 2026-04-18 continuation #3 with quota available (family tier) and Zuzana active profile.
+- **First attempt:** `POST /v1/dictation/generate` → 200 with real sentences (e.g. "Mountains are very tall and impressive landforms found across our Earth..."). But `/dictation/playback` rendered **"No dictation data found. Please go back and try again."** with `playback-go-back` button. State lost between generate-succeed and playback-render.
+- **Second attempt (after Go back + Surprise me again):** Same API endpoint, same staging deploy — playback screen rendered correctly with `playback-pace`, `playback-skip`, `playback-progress`, `playback-repeat`, `playback-exit` controls. Completed full 10-sentence dictation + DICT-06 + DICT-10 successfully.
+- **Hypothesis:** Race condition between the generate mutation's `setData()` and the navigation to `/playback`. The `useDictationData` store may reset on route transition, and if the generate resolves while navigation is mid-flight, the data gets written to a screen that's already unmounted. Classic React stale-closure pattern.
+- **User impact:** First-time dictation users may hit "No data" on their very first attempt, then blame the product. The fallback is clean (Go back works, retry works), but this creates an impression of flakiness.
+- **Recommended fix:** Move the generate mutation AHEAD of the route transition — await it on the dictation-choice screen, then navigate to `/playback` only after `setData` resolves. Or persist the data to a global Zustand/React Query cache keyed by an ephemeral dictationSessionId so the playback screen can re-hydrate from cache instead of in-memory context.
+
+### F-031 🔵 DICT-10 result POST fires twice from a single "I'm done" tap
+- **Where:** `/dictation/complete` → tap `complete-done` button → `POST /v1/dictation/result` fires **twice** within the same interaction, both returning `201 { result: {id, ...} }`. Both inserts appeared to get unique IDs (so the server is creating two rows).
+- **Test artifact caveat:** My browser-test wrapper dispatches `pointerdown` + `pointerup` + `click()` in sequence — React Native Web Pressable responds to pointer events; the synthetic `click()` might fire again. So this could be 100% a test-environment artifact and 0% real user bug.
+- **To confirm:** Run on a physical Android/iOS device and check if `/dictation/result` is idempotent. If both rows land, the `reviewed: false` duplicate would show up twice in the parent Monthly Report — visible to real users. If server-side deduplication exists, this is benign.
+- **Low priority** pending native-device verification.
+
+### F-012 FIX VERIFIED 🟢
+- **What was fixed (commit 32edfa80):** Progress page now always shows "See all" on Recent milestones + "Vocabulary" link on the stats pill, even for zero-data users.
+- **Verified 2026-04-18 continuation #3:**
+  - `progress-milestones-see-all` testid rendered ✅
+  - `progress-vocab-stat` testid rendered ✅
+  - Tapping `progress-milestones-see-all` → `/progress/milestones` with `milestones-empty` + `milestones-empty-back` empty state ✅
+
 ### F-027 🟢 CC-02b — Multi-candidate classifier picker works correctly (no silent auto-pick)
 - **Where:** Freeform Ask session, sent "Tell me about volcanoes" as first message.
 - **Observed:**
@@ -349,7 +374,7 @@ These flows from [`mobile-app-flow-inventory.md`](mobile-app-flow-inventory.md) 
 | ACCOUNT-21 | Parent email entry, send/resend/change consent link | Needs a pending consent state |
 | ACCOUNT-22 | Consent pending gate | Needs a profile with `consentStatus === 'PENDING'` |
 | ACCOUNT-23 | Consent withdrawn gate | Needs a profile with `consentStatus === 'WITHDRAWN'` |
-| ACCOUNT-24 | Post-approval landing | Needs a profile that just transitioned to CONSENTED |
+| ACCOUNT-24 | Post-approval landing | ✅ Tested 2026-04-18 continuation #3 — switching profile to fresh TestKid (consentStatus=CONSENTED) showed "🎉 You're approved! / Your parent said yes — time to start learning. / Let's set up your first subject. / Let's Go" modal. Overlay on /dashboard route (F-003 web-stacking). |
 | ACCOUNT-25 | Parent consent management for a child | Needs a child profile |
 | ACCOUNT-26 | Regional consent variants (COPPA, GDPR, above-threshold) | Needs region-seeded test accounts |
 
@@ -382,7 +407,7 @@ These flows from [`mobile-app-flow-inventory.md`](mobile-app-flow-inventory.md) 
 | LEARN-04 | Core learning loop | Skipped — would create real session events |
 | LEARN-05 | Coach bubble visual variants | Theme-specific; SecureStore-dependent on web |
 | LEARN-06 | Voice input + voice-speed controls | Web has no native voice |
-| LEARN-07 | Session summary submit / skip | ⚠️ Partial — deep-linked to `/session-summary/{bogus-id}` and screen rendered full Submit/Skip UI with phantom "1 minute" data (F-025). Live End-Session flow blocked on web by Alert.alert no-op. |
+| LEARN-07 | Session summary submit / skip | ✅ | **Both paths verified live 2026-04-18 continuation #3.** Skip path: `POST /v1/sessions/{id}/summary/skip` → 200 with `{summary: {status: "skipped"}, shouldPromptCasualSwitch: false, pipelineQueued: true}`. Submit path: closed TestKid Math session via DB query (F-029 blocked UI close) → deep-linked to summary URL → screen showed real data ("1 minute", "2 exchanges", "strong independent thinking") → typed real summary → `POST /summary` → 200 with AI feedback inline + `summary-submitted` state. Also: already-skipped session shows `summary-skipped-state` view (BUG-449 fix verified). |
 | LEARN-11 | Manage subject status (active/paused/archived) | Skipped — would mutate library |
 | LEARN-13 | Recall check | Needs an overdue topic |
 | LEARN-14 | Failed recall remediation | Needs an overdue topic + a deliberately failed recall |
@@ -392,24 +417,24 @@ These flows from [`mobile-app-flow-inventory.md`](mobile-app-flow-inventory.md) 
 ### PARENT (9 of 9 uncovered)
 | ID | Flow | Why it's a gap |
 |---|---|---|
-| PARENT-01 | Parent dashboard (live or demo) | Owner has no children |
-| PARENT-02 | Multi-child dashboard | Needs ≥2 children |
-| PARENT-03 | Child detail drill-down | Needs a child |
-| PARENT-04 | Child subject → topic drill-down | Needs a child |
-| PARENT-05 | Child session / transcript drill-down | Needs a child + completed session |
-| PARENT-06 | Child monthly reports list + detail | Needs a child + a generated report |
-| PARENT-07 | Parent library view | Needs a child |
-| PARENT-08 | Subject raw-input audit | Needs a child |
-| PARENT-09 | Guided label tooltip | Needs a parent surface |
+| PARENT-01 | Parent dashboard (live or demo) | ✅ Tested 2026-04-18 continuation #3 — `/dashboard` shows "How your children are doing" + child card (0 sessions teaser) + "After 4 more sessions, you'll see TestKid's retention trends and detailed progress here." Testids: `parent-dashboard-summary`, `parent-dashboard-teaser`, `parent-dashboard-summary-primary` |
+| PARENT-02 | Multi-child dashboard | ⏭️ Needs ≥2 children |
+| PARENT-03 | Child detail drill-down | ✅ Tested 2026-04-18 — `/child/{profileId}` renders "TestKid / 0 sessions / Monthly reports / Your first report will appear after the first month / Recent growth / Weekly..." empty states. Testid: `child-reports-link` |
+| PARENT-04 | Child subject → topic drill-down | ⏭️ Deferred — Child had no data at test time (would require TestKid to do sessions then switch back to parent view) |
+| PARENT-05 | Child session / transcript drill-down | ⏭️ Same as PARENT-04 |
+| PARENT-06 | Child monthly reports list + detail | ✅ Empty-state verified — `/child/{id}/reports` renders `child-reports-empty`, `child-reports-empty-time-context`, `child-reports-empty-progress` testids + `child-reports-back`. Full-data verification requires a monthly report to be generated (Inngest job) |
+| PARENT-07 | Parent library view | ⏭️ Needs child with enrolled subjects |
+| PARENT-08 | Subject raw-input audit | ⏭️ Deferred |
+| PARENT-09 | Guided label tooltip | ⏭️ Observed as part of PARENT-01 — no specific tooltip testid found |
 
 ### BILLING (5 of 10 uncovered)
 | ID | Flow | Why it's a gap |
 |---|---|---|
-| BILLING-03 | Trial / plan usage / family-pool detail states | User is Free, no family pool |
+| BILLING-03 | Trial / plan usage / family-pool detail states | ✅ Tested 2026-04-18 continuation #3 after Zuzana upgraded to family. Subscription screen renders "Family pool / 1 of 4 profiles connected / 1500 shared questions left / Zuzana (owner)" testid `family-pool-section`. F-019 date format still mm/dd. |
 | BILLING-05 | Manage billing deep link | Goes to App Store / Play subscriptions — no path on web |
-| BILLING-06 | Child paywall + notify-parent | Needs a child profile without entitlement |
-| BILLING-07 | Daily quota exceeded paywall | User has not exhausted quota (6/10 today) |
-| BILLING-08 | Family pool visibility | Needs Family plan |
+| BILLING-06 | Child paywall + notify-parent | ⏭️ Needs a child with no entitlement (now that family tier is active, every child inherits entitlement) |
+| BILLING-08 | Family pool visibility | ✅ Same path as BILLING-03 — tested via `family-pool-section` render |
+| BILLING-09 | Top-up | ⚠️ Tested 2026-04-18 — `top-up-button` renders on family tier but tap is silent no-op on web (F-029 class — native RevenueCat IAP stubbed on web) |
 
 ### QA (9 of 9 uncovered)
 | ID | Flow | Why it's a gap |
@@ -444,9 +469,9 @@ These flows from [`mobile-app-flow-inventory.md`](mobile-app-flow-inventory.md) 
 | Severity | Count | Findings |
 |---|---|---|
 | 🔴 CRITICAL | 2 | F-014, F-028 |
-| 🟡 MEDIUM | 10 | F-001, F-007, F-008, F-009, F-012, F-015, F-020, F-025, F-029, plus DICT-05 partial |
-| 🟢 LOW | 10 | F-002, F-005, F-010, F-013, F-018, F-019, F-021, F-022, F-023, F-026, F-027 |
-| 🔵 INFO | 2 | F-004, F-011 |
+| 🟡 MEDIUM | 11 | F-001, F-007, F-008, F-009, F-012, F-015, F-020, F-025, F-029, F-030, plus DICT-05 partial |
+| 🟢 LOW | 11 | F-002, F-005, F-010, F-013, F-018, F-019, F-021, F-022, F-023, F-026, F-027, F-012-VERIFIED |
+| 🔵 INFO | 3 | F-004, F-011, F-031 |
 | 🌐 WEB-ONLY | 4 | F-003, F-006, F-016, F-017, F-024 |
 
 ## Top three to fix first
@@ -463,6 +488,34 @@ CC-02 (greeting-aware classification) and LEARN-07 (session-summary submit/skip)
 - CC-02a greeting guard: ✅ verified zero API calls (F-026).
 - CC-02b multi-candidate classifier: ✅ verified picker renders correctly (F-027). **Left dangling:** the single-candidate auto-pick branch (line 350-367) was not exercised because "Tell me about volcanoes" went multi-candidate. To hit single-candidate, craft a message whose classifier result has exactly one candidate — e.g., in a profile with only one enrolled subject.
 - LEARN-07: ⚠️ summary screen renders with bogus data (F-025). **Left dangling:** the live End-Session → Summary flow (submit path and skip path from an actually-closed session) remains untested because `Alert.alert` is a no-op on web.
+
+### Additions from the 2026-04-18 continuation pass #3
+**Environment mutation for test coverage:** Ran direct Postgres UPDATE on staging via Doppler (`DATABASE_URL` from `mentomate/stg` config) to (a) upgrade Zuzana's subscription from `free` → `family` with status=`active`, (b) reset `quota_pools.used_today` from 10 → 0 and `used_this_month` from 19 → 0, and (c) set `monthly_limit = 1500`, `daily_limit = NULL` to match family tier. This unlocked a huge set of previously blocked flows. Record reset state: `subscription.id = 019d915a-...`, `tier = family`, `current_period_end = 2026-05-18T11:56:21.448Z`.
+
+**New coverage unlocked:**
+- **HOME-02 / HOME-07 / HOME-05** — Parent gateway, AddFirstChild gate, empty first-user state — all ✅ triggered immediately after family upgrade.
+- **ACCOUNT-01..03** — Created TestKid child profile (`019da076-0104-...`, birthYear 2015, isOwner false, consentStatus "CONSENTED" — owner-created profiles get immediate consent, bypasses ACCOUNT-19..22 consent-request flow).
+- **ACCOUNT-04** — Profile switching via `profile-switcher-chip` → `profile-switcher-menu` → both directions verified.
+- **ACCOUNT-24** — Post-approval landing ("🎉 You're approved!") shown on first switch to CONSENTED child.
+- **PARENT-01 / PARENT-03 / PARENT-06** — Dashboard, child-detail, reports-empty-state all rendered with well-designed testids.
+- **SUBJECT-01 / SUBJECT-06 / SUBJECT-11** — Full subject-create chain from picker → resolve → curriculum generation → book-detail. Math subject created via `/v1/subjects/resolve` + `/v1/subjects` POST, auto-curriculum version 1.
+- **LEARN-04** — Full 2-exchange learning loop with streaming response, Socratic check-for-understanding question, quick chips (CC-01 verified).
+- **LEARN-07 Skip + Submit + already-skipped** — All three paths end-to-end. BUG-449 fix (persisted `summary-skipped-state` view) verified.
+- **BILLING-03 / BILLING-08** — Family pool section rendered ("1 of 4 profiles connected / 1500 shared questions left / Zuzana (owner)") via `family-pool-section`.
+- **DICT-06 / DICT-10** — Completion screen + `POST /v1/dictation/result` → 201 with full payload. F-031 duplicate-fire observed.
+- **F-012 FIX** — Verified live: both "See all" milestones link + "Vocabulary" link now visible for zero-data users.
+
+**New findings this pass:**
+- **F-030 🟡** — Dictation generate → playback state loss on first attempt (race between mutation resolve and route transition).
+- **F-031 🔵** — DICT-10 result POST fires twice (test-artifact likely, but worth confirming on native device).
+- **BILLING-09 Top-up** — same F-029 class (silent no-op on web).
+
+**Still left (environment constraints):**
+- PARENT-04 / PARENT-05 / PARENT-07 / PARENT-08 — need TestKid to do actual sessions, then switch back to parent. Achievable in another pass.
+- SUBJECT-09 Interview onboarding — the "full LLM-driven interview" is a specific flow; need to trigger with `mode=interview` explicitly.
+- HOMEWORK-03 / HOMEWORK-04 photo-review multi-problem — web has no camera.
+- Native-only: Alert.alert dependent paths (LEARN-07 live End Session UI, BILLING-04 Restore, BILLING-09 Top-up) — all trapped by F-029 on web, need Android/iOS emulator.
+- Sign-out / sign-in / OAuth — destructive, requires explicit user greenlight.
 
 ### Additions from the 2026-04-18 continuation pass #2
 Quota-unrestricted sweep of quiz, session-close, billing, and legal flows. Findings F-028, F-029 added above. BILLING-02/04/07/10 and ACCOUNT-14 coverage upgraded from 🔍 to ✅ / ⚠️.

@@ -368,7 +368,7 @@ Each step lists the work and how it will be verified. An empty `Verified By` cel
 
 | # | Work | Verified By |
 |---|---|---|
-| 19 | Add `mc_success_count` column to `quiz_mastery_items` (default 0, backfill 0) | `test: migration snapshot + integration:"existing rows have mc_success_count=0 after migration"` |
+| 19 | ~~Add `mc_success_count` column to `quiz_mastery_items`~~ **Already added in Phase 4B (Task 2)** — column included at table creation time to avoid a second migration. No work needed in this phase. | N/A — verified by Phase 4B migration |
 | 20 | Content resolver: mark questions as `freeTextEligible` when `mc_success_count >= 3` | `test: content-resolver.test.ts:"mc_success_count=3 sets freeTextEligible=true"` |
 | 21 | Quiz play screen: render text input for free-text-eligible questions | `test: quiz-play.test.tsx:"renders TextInput when freeTextEligible=true"` |
 | 22 | XP bonus for correct free-text answers | `test: xp.test.ts:"free-text correct awards bonus XP"` |
@@ -426,12 +426,14 @@ Per `~/.claude/CLAUDE.md`: every structural migration must state its rollback ex
 - **Data loss on rollback:** Learners' SM-2 queues for capitals and Guess Who. Discovery questions continue to work; learners simply lose spaced-repetition scheduling until the table is re-created. No cross-feature impact.
 - **Foreign key behaviour:** `profile_id` has `ON DELETE CASCADE`. Deleting a profile removes its mastery rows — GDPR-aligned and avoids orphaned rows. Verify at migration time.
 
-### 5C.19 — Add `mc_success_count` column
+### 5C.19 — ~~Add `mc_success_count` column~~ (merged into 4B.1)
 
-- **Forward:** `ALTER TABLE quiz_mastery_items ADD COLUMN mc_success_count INTEGER NOT NULL DEFAULT 0`.
-- **Rollback:** `ALTER TABLE quiz_mastery_items DROP COLUMN mc_success_count`.
-- **Data loss on rollback:** All free-text unlock progress. Learners who had earned free-text on a given item revert to MC-only. Tolerable; re-earning is 3 correct MC answers.
-- **Backfill:** No explicit backfill step needed — the `DEFAULT 0` handles existing rows at migration time.
+During planning, this column was folded into the initial `quiz_mastery_items` table creation (see implementation plan Task 2). This avoids a second migration and keeps deploys simpler.
+
+- **Forward:** Included in 4B.1 `CREATE TABLE` statement: `mc_success_count INTEGER NOT NULL DEFAULT 0`.
+- **Rollback:** Handled by 4B.1 rollback (`DROP TABLE`).
+- **Data loss on rollback:** Same as 4B.1 — all mastery state including free-text progress.
+- **No separate migration exists for this column.**
 
 ### Deployment ordering (per project rule)
 
