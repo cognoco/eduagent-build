@@ -34,6 +34,7 @@ import {
   useGrantMemoryConsent,
   useUpdateAccommodationMode,
 } from '../../../../hooks/use-learner-profile';
+import { ACCOMMODATION_OPTIONS } from '../../../../lib/accommodation-options';
 import { MemoryConsentPrompt } from '../../../../components/memory-consent-prompt';
 import { goBackOrReplace } from '../../../../lib/navigation';
 
@@ -105,34 +106,6 @@ function buildGrowthData(
 }
 
 const GRACE_PERIOD_DAYS = 7;
-
-const ACCOMMODATION_OPTIONS: {
-  mode: AccommodationMode;
-  title: string;
-  description: string;
-}[] = [
-  {
-    mode: 'none',
-    title: 'None',
-    description: 'Standard learning experience',
-  },
-  {
-    mode: 'short-burst',
-    title: 'Short-Burst',
-    description: 'Shorter explanations, frequent check-ins, small steps',
-  },
-  {
-    mode: 'audio-first',
-    title: 'Audio-First',
-    description:
-      'Spoken-style explanations, simple sentences, phonetic support',
-  },
-  {
-    mode: 'predictable',
-    title: 'Predictable',
-    description: 'Clear structure, explicit transitions, concrete examples',
-  },
-];
 
 function getGracePeriodDaysRemaining(respondedAt: string | null): number {
   if (!respondedAt) return GRACE_PERIOD_DAYS;

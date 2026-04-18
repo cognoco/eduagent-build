@@ -39,6 +39,7 @@ import {
   useUpdateCelebrationLevel,
 } from '../../hooks/use-settings';
 import { useSubscription } from '../../hooks/use-subscription';
+import { ACCOMMODATION_OPTIONS } from '../../lib/accommodation-options';
 import { formatApiError } from '../../lib/format-api-error';
 
 function SettingsRow({
@@ -110,34 +111,6 @@ const LEARNING_MODE_OPTIONS: {
     title: 'Challenge mode',
     description:
       'Push yourself further. Your mentor keeps you on track. You earn points after proving you remember, and recaps help lock it in.',
-  },
-];
-
-const ACCOMMODATION_OPTIONS: {
-  mode: AccommodationMode;
-  title: string;
-  description: string;
-}[] = [
-  {
-    mode: 'none',
-    title: 'None',
-    description: 'Standard learning experience',
-  },
-  {
-    mode: 'short-burst',
-    title: 'Short-Burst',
-    description: 'Shorter explanations, frequent check-ins, small steps',
-  },
-  {
-    mode: 'audio-first',
-    title: 'Audio-First',
-    description:
-      'Spoken-style explanations, simple sentences, phonetic support',
-  },
-  {
-    mode: 'predictable',
-    title: 'Predictable',
-    description: 'Clear structure, explicit transitions, concrete examples',
   },
 ];
 

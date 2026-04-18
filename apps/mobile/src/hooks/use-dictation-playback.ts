@@ -15,6 +15,8 @@ export interface PlaybackConfig {
   pace: DictationPace;
   punctuationReadAloud: boolean;
   language: string;
+  /** Words per spoken chunk. Young children get 2-3, older learners 4-5. Defaults to 3. */
+  chunkSize?: number;
 }
 
 export interface PlaybackControls {
@@ -30,15 +32,26 @@ export interface PlaybackControls {
 
 const PACE_CONFIG: Record<
   DictationPace,
-  { rate: number; basePause: number; perWordPause: number }
+  { rate: number; chunkPausePerWord: number; sentencePause: number }
 > = {
-  slow: { rate: 0.5, basePause: 2000, perWordPause: 1500 },
-  normal: { rate: 0.6, basePause: 1500, perWordPause: 1000 },
-  fast: { rate: 0.75, basePause: 1000, perWordPause: 700 },
+  slow: { rate: 0.5, chunkPausePerWord: 3000, sentencePause: 4000 },
+  normal: { rate: 0.6, chunkPausePerWord: 2000, sentencePause: 3000 },
+  fast: { rate: 0.75, chunkPausePerWord: 1200, sentencePause: 2000 },
 };
 
 // 3-second countdown before first sentence
 const COUNTDOWN_MS = 3500;
+
+/** Split text into chunks of approximately `size` words. */
+export function splitIntoChunks(text: string, size: number): string[] {
+  const words = text.split(/\s+/).filter(Boolean);
+  if (words.length === 0) return [text];
+  const chunks: string[] = [];
+  for (let i = 0; i < words.length; i += size) {
+    chunks.push(words.slice(i, i + size).join(' '));
+  }
+  return chunks;
+}
 
 export function useDictationPlayback(config: PlaybackConfig): PlaybackControls {
   const [state, setState] = useState<PlaybackState>('idle');
@@ -50,14 +63,19 @@ export function useDictationPlayback(config: PlaybackConfig): PlaybackControls {
   const indexRef = useRef(currentIndex);
   indexRef.current = currentIndex;
 
-  // RF-02: All runtime reads of pace, punctuationReadAloud, and sentences go
-  // through configRef.current to prevent stale closure bugs when config changes
-  // mid-playback (e.g. child changes pace during dictation).
+  const chunkIndexRef = useRef(0);
+
+  // RF-02: All runtime reads of pace, punctuationReadAloud, sentences, and
+  // chunkSize go through configRef.current to prevent stale closure bugs when
+  // config changes mid-playback.
   const configRef = useRef(config);
   configRef.current = config;
 
   const pauseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const preStateRef = useRef<PlaybackState>('idle');
+  const nextActionRef = useRef<() => void>(() => {
+    return;
+  });
 
   const clearPauseTimer = useCallback(() => {
     if (pauseTimerRef.current) {
@@ -66,8 +84,6 @@ export function useDictationPlayback(config: PlaybackConfig): PlaybackControls {
     }
   }, []);
 
-  // Plain functions (not useCallback) that read from configRef.current — RF-02 fix.
-  // This ensures pace/punctuation changes are picked up even inside onDone callbacks.
   const getSentenceText = (index: number): string => {
     const sentence = configRef.current.sentences[index];
     if (!sentence) return '';
@@ -76,44 +92,70 @@ export function useDictationPlayback(config: PlaybackConfig): PlaybackControls {
       : sentence.text;
   };
 
-  const getPauseDuration = (index: number): number => {
-    const sentence = configRef.current.sentences[index];
-    if (!sentence) return 0;
-    const paceConfig = PACE_CONFIG[configRef.current.pace];
-    return paceConfig.basePause + sentence.wordCount * paceConfig.perWordPause;
+  const getChunksForSentence = (sentenceIndex: number): string[] => {
+    const text = getSentenceText(sentenceIndex);
+    const size = configRef.current.chunkSize ?? 3;
+    return splitIntoChunks(text, size);
   };
 
-  const speakSentence = useCallback(
-    (index: number) => {
-      const text = getSentenceText(index);
-      if (!text) {
+  const speakChunk = useCallback(
+    (sentenceIndex: number, chunkIndex: number) => {
+      const chunks = getChunksForSentence(sentenceIndex);
+      chunkIndexRef.current = chunkIndex;
+
+      if (chunkIndex >= chunks.length || chunks.length === 0) {
         setState('complete');
         return;
       }
 
       setState('speaking');
-      const paceConfig = PACE_CONFIG[configRef.current.pace];
+      const { rate } = PACE_CONFIG[configRef.current.pace];
 
-      Speech.speak(text, {
+      Speech.speak(chunks[chunkIndex] ?? '', {
         language: configRef.current.language,
-        rate: paceConfig.rate,
+        rate,
         onDone: () => {
           if (stateRef.current === 'paused') return;
 
-          const isLast =
-            indexRef.current >= configRef.current.sentences.length - 1;
-          if (isLast) {
+          // RF-02: Read pace config fresh — user may have changed pace mid-speech
+          const paceConfig = PACE_CONFIG[configRef.current.pace];
+
+          const isLastChunk = chunkIndex >= chunks.length - 1;
+          const isLastSentence =
+            sentenceIndex >= configRef.current.sentences.length - 1;
+
+          if (isLastChunk && isLastSentence) {
             setState('complete');
             return;
           }
 
           setState('waiting');
-          const pauseMs = getPauseDuration(indexRef.current);
-          pauseTimerRef.current = setTimeout(() => {
-            const nextIndex = indexRef.current + 1;
-            setCurrentIndex(nextIndex);
-            speakSentence(nextIndex);
-          }, pauseMs);
+
+          if (isLastChunk) {
+            // Sentence boundary — longer pause, advance to next sentence
+            const nextSentenceIndex = sentenceIndex + 1;
+            const action = () => {
+              setCurrentIndex(nextSentenceIndex);
+              speakChunk(nextSentenceIndex, 0);
+            };
+            nextActionRef.current = action;
+            pauseTimerRef.current = setTimeout(
+              action,
+              paceConfig.sentencePause
+            );
+          } else {
+            // Chunk boundary — writing pause proportional to chunk word count
+            const chunkWordCount = (chunks[chunkIndex] ?? '')
+              .split(/\s+/)
+              .filter(Boolean).length;
+            const chunkPause = chunkWordCount * paceConfig.chunkPausePerWord;
+            const nextChunkIndex = chunkIndex + 1;
+            const action = () => {
+              speakChunk(sentenceIndex, nextChunkIndex);
+            };
+            nextActionRef.current = action;
+            pauseTimerRef.current = setTimeout(action, chunkPause);
+          }
         },
       });
     },
@@ -124,10 +166,11 @@ export function useDictationPlayback(config: PlaybackConfig): PlaybackControls {
   const start = useCallback(() => {
     setState('countdown');
     setCurrentIndex(0);
+    chunkIndexRef.current = 0;
     pauseTimerRef.current = setTimeout(() => {
-      speakSentence(0);
+      speakChunk(0, 0);
     }, COUNTDOWN_MS);
-  }, [speakSentence]);
+  }, [speakChunk]);
 
   const pause = useCallback(() => {
     preStateRef.current = stateRef.current;
@@ -139,29 +182,23 @@ export function useDictationPlayback(config: PlaybackConfig): PlaybackControls {
   const resume = useCallback(() => {
     const prev = preStateRef.current;
     if (prev === 'speaking') {
-      speakSentence(indexRef.current);
+      // Re-speak the current chunk
+      speakChunk(indexRef.current, chunkIndexRef.current);
     } else if (prev === 'waiting') {
-      // Resume from waiting — replay full pause duration on resume (simplified)
-      setState('waiting');
-      const pauseMs = getPauseDuration(indexRef.current);
-      pauseTimerRef.current = setTimeout(() => {
-        const nextIndex = indexRef.current + 1;
-        setCurrentIndex(nextIndex);
-        speakSentence(nextIndex);
-      }, pauseMs);
+      // Child pressed resume — speak the next chunk/sentence immediately
+      nextActionRef.current();
     } else if (prev === 'countdown') {
-      speakSentence(indexRef.current);
+      speakChunk(indexRef.current, chunkIndexRef.current);
     } else {
       setState(prev);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [speakSentence]);
+  }, [speakChunk]);
 
   const repeat = useCallback(() => {
     clearPauseTimer();
     Speech.stop();
-    speakSentence(indexRef.current);
-  }, [speakSentence, clearPauseTimer]);
+    speakChunk(indexRef.current, chunkIndexRef.current);
+  }, [speakChunk, clearPauseTimer]);
 
   const skip = useCallback(() => {
     clearPauseTimer();
@@ -173,8 +210,9 @@ export function useDictationPlayback(config: PlaybackConfig): PlaybackControls {
     }
     const nextIndex = indexRef.current + 1;
     setCurrentIndex(nextIndex);
-    speakSentence(nextIndex);
-  }, [speakSentence, clearPauseTimer]);
+    chunkIndexRef.current = 0;
+    speakChunk(nextIndex, 0);
+  }, [speakChunk, clearPauseTimer]);
 
   // Cleanup on unmount
   useEffect(() => {

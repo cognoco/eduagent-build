@@ -48,6 +48,25 @@ describe('IntentCard', () => {
     expect(screen.getByText('6')).toBeTruthy();
   });
 
+  it('renders icon when provided', () => {
+    render(
+      <IntentCard
+        title="Learn"
+        onPress={jest.fn()}
+        icon="book-outline"
+        testID="card"
+      />
+    );
+
+    expect(screen.getByTestId('card-icon')).toBeTruthy();
+  });
+
+  it('does not render icon element when omitted', () => {
+    render(<IntentCard title="Learn" onPress={jest.fn()} testID="card" />);
+
+    expect(screen.queryByTestId('card-icon')).toBeNull();
+  });
+
   it('applies highlight styling when requested', () => {
     render(
       <IntentCard

@@ -25,11 +25,17 @@ export default function PlaybackScreen(): React.ReactElement {
 
   const prefs = useDictationPreferences(activeProfile?.id);
 
+  const ageYears = activeProfile?.birthYear
+    ? new Date().getFullYear() - activeProfile.birthYear
+    : 10;
+  const chunkSize = ageYears <= 8 ? 2 : ageYears <= 12 ? 3 : 4;
+
   const playback = useDictationPlayback({
     sentences: data?.sentences ?? [],
     pace: prefs.pace,
     punctuationReadAloud: prefs.punctuationReadAloud,
     language: data?.language ?? 'en',
+    chunkSize,
   });
 
   // RF-08: Guard prevents auto-start from re-triggering on re-renders
@@ -196,7 +202,7 @@ export default function PlaybackScreen(): React.ReactElement {
           className="bg-surface-elevated rounded-xl py-4 items-center"
           testID="playback-repeat"
           accessibilityRole="button"
-          accessibilityLabel="Repeat current sentence"
+          accessibilityLabel="Repeat last phrase"
         >
           <View className="flex-row items-center">
             <Ionicons name="refresh" size={20} color={colors.textPrimary} />

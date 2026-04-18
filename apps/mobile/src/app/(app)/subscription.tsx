@@ -901,9 +901,11 @@ export default function SubscriptionScreen() {
       );
     }
   }, [
+    client,
     offerings,
     offeringsLoading,
     offeringsError,
+    purchase,
     refetchOfferings,
     usage,
     queryClient,
@@ -1076,13 +1078,20 @@ export default function SubscriptionScreen() {
             {!isPaidTier && (
               <Pressable
                 onPress={() => {
-                  if (availablePackages.length > 0) {
-                    // BUG-403: Scroll to the offerings section
-                    scrollViewRef.current?.scrollTo({
-                      y: offeringsYRef.current,
-                      animated: true,
-                    });
-                  } else {
+                  // BUG-403: Scroll to the offerings section.
+                  // BUG-[NOTION-3468bce9]: Always scroll — the Plans section
+                  // renders a static tier comparison when RevenueCat offerings
+                  // are unavailable (e.g. Expo Web, store-publishing blocked),
+                  // so the ref target exists regardless of availablePackages.
+                  // Without this the button was a silent no-op on web.
+                  scrollViewRef.current?.scrollTo({
+                    y: offeringsYRef.current,
+                    animated: true,
+                  });
+                  // Background retry if offerings failed to load — the user
+                  // is now looking at the Plans section; a fresh fetch can
+                  // swap in real packages without a second button press.
+                  if (availablePackages.length === 0 && !offeringsLoading) {
                     void refetchOfferings();
                   }
                 }}

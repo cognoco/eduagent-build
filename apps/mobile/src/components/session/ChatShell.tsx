@@ -48,6 +48,7 @@ export interface ChatMessage {
 interface ChatShellProps {
   title: string;
   subtitle?: string;
+  headerBelow?: React.ReactNode;
   messages: ChatMessage[];
   onSend: (text: string) => void;
   isStreaming: boolean;
@@ -119,6 +120,7 @@ export function animateResponse(
 export function ChatShell({
   title,
   subtitle = "I'm here to help",
+  headerBelow,
   messages,
   onSend,
   isStreaming,
@@ -438,29 +440,35 @@ export function ChatShell({
     >
       {/* Header */}
       <View
-        className="flex-row items-center px-4 py-3 bg-surface border-b border-surface-elevated"
+        className="bg-surface border-b border-surface-elevated"
         style={{ paddingTop: insets.top + 8 }}
       >
-        <Pressable
-          onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
-          className="me-3 p-2 min-h-[44px] min-w-[44px] items-center justify-center"
-          accessibilityLabel="Go back"
-          accessibilityRole="button"
-        >
-          <Ionicons name="chevron-back" size={24} color={colors.primary} />
-        </Pressable>
-        <View className="flex-1 min-w-[60px]">
-          <Text
-            className="text-body font-semibold text-text-primary"
-            numberOfLines={1}
+        <View className="flex-row items-center px-4 py-3">
+          <Pressable
+            onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
+            className="me-3 p-2 min-h-[44px] min-w-[44px] items-center justify-center"
+            accessibilityLabel="Go back"
+            accessibilityRole="button"
           >
-            {title}
-          </Text>
-          <Text className="text-caption text-text-secondary" numberOfLines={1}>
-            {subtitle}
-          </Text>
+            <Ionicons name="chevron-back" size={24} color={colors.primary} />
+          </Pressable>
+          <View className="flex-1 min-w-[60px]">
+            <Text
+              className="text-body font-semibold text-text-primary"
+              numberOfLines={1}
+            >
+              {title}
+            </Text>
+            <Text
+              className="text-caption text-text-secondary"
+              numberOfLines={1}
+            >
+              {subtitle}
+            </Text>
+          </View>
+          {headerRightContent}
         </View>
-        {headerRightContent}
+        {headerBelow ? <View className="px-4 pb-3">{headerBelow}</View> : null}
       </View>
 
       {/* Messages */}

@@ -268,7 +268,7 @@ These labels are set via `tabBarAccessibilityLabel` in `(learner)/_layout.tsx` a
 | Coaching Card | `coaching-card-primary`, `coaching-card-secondary` | `BaseCoachingCard.tsx` |
 | Curriculum Review | `curriculum-topic-*`, `curriculum-start-button`, `curriculum-skip` | `onboarding/curriculum-review.tsx` |
 | Library | `library-topic-list`, `library-filter-tabs`, `subject-filter-tabs` | `(learner)/library.tsx` (flattened from `library/index.tsx` — directory routes break tab bar labels in dev-client) |
-| Topic Detail | `retention-card`, `start-learning-button`, `continue-learning-button`, `start-review-button`, `request-retest-button`, `relearn-button`, `topic-detail-back` | `(learner)/topic/[topicId].tsx` |
+| Topic Detail | `retention-card`, `primary-action-button`, `more-ways-toggle`, `secondary-recall-check`, `secondary-challenge`, `secondary-teach-back`, `topic-detail-back` | `(learner)/topic/[topicId].tsx` |
 | Relearn | `relearn-method-same`, `relearn-method-different`, `relearn-start`, `relearn-explain` | `(learner)/topic/relearn.tsx` |
 | Homework Camera | Multiple camera testIDs (24 total) | `(learner)/homework/camera.tsx` |
 | Parent Dashboard | `dashboard-children-list`, `dashboard-child-card`, `dashboard-summary` | `(parent)/dashboard.tsx` |

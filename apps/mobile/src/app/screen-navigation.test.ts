@@ -26,8 +26,6 @@ const EXIT_PATTERNS = [
 const EXEMPT_SCREENS: string[] = [
   // Root redirect — no UI, just redirects
   'index.tsx',
-  // Pure redirect to learn-new — no UI rendered
-  '(app)/learn.tsx',
   // Tab screens — bottom tab navigation provides navigation
   '(app)/home.tsx',
   '(app)/library.tsx',

@@ -1757,7 +1757,14 @@ describe('getProfileOverdueCount', () => {
     };
     (createScopedRepository as jest.Mock).mockReturnValue(mockRepo);
 
+    const selectChain = {
+      from: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockResolvedValue([]),
+    };
     const db = {
+      select: jest.fn().mockReturnValue(selectChain),
       query: {
         curriculumTopics: {
           findFirst: jest.fn().mockResolvedValue({
@@ -1795,7 +1802,15 @@ describe('getProfileOverdueCount', () => {
     };
     (createScopedRepository as jest.Mock).mockReturnValue(mockRepo);
 
-    const db = {} as unknown as Database;
+    const selectChain = {
+      from: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockResolvedValue([]),
+    };
+    const db = {
+      select: jest.fn().mockReturnValue(selectChain),
+    } as unknown as Database;
     const result = await getProfileOverdueCount(db, 'profile-1');
 
     expect(result.overdueCount).toBe(0);

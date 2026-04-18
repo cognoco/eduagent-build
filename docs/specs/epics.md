@@ -2762,19 +2762,19 @@ So that I can review my knowledge and resume learning on that topic seamlessly.
 
 **Given** a topic with `completionStatus` of `completed`, `verified`, or `stable`
 **When** the topic detail renders
-**Then** the primary button reads "Start Review Session" (existing behavior)
-**And** a secondary "Continue Learning" button is also available
+**Then** the primary button adapts to the topic state (for example "Review" when overdue)
+**And** secondary actions are grouped under "More ways to practice"
 
 **Given** a topic with `completionStatus` of `not_started`
 **When** the topic detail renders
-**Then** the primary button reads "Start Learning" (replaces "Start Review Session")
-**And** no secondary "Continue Learning" button is shown
+**Then** the primary button reads "Start learning"
+**And** no secondary actions are shown
 
-**And** a `testID="continue-learning-button"` is present on the new button
+**And** a `testID="primary-action-button"` is present on the primary CTA
 **And** the existing "Your summary" card (already implemented with `summaryExcerpt`) continues to display when present
 
 **Implementation notes:**
-- Modify `topic/[topicId].tsx` action buttons section — add adaptive labeling based on `completionStatus`
+- Modify `topic/[topicId].tsx` action buttons section — derive a smart primary CTA and expandable secondary actions from topic state
 - No new API needed — `summaryExcerpt` and `completionStatus` already in `TopicProgress` schema
 - Navigate to session with `mode: 'freeform'` for continued learning
 

@@ -123,12 +123,11 @@ describe('ParentGateway', () => {
     expect(mockPush).toHaveBeenCalledWith('/(app)/dashboard');
   });
 
-  it('navigates to /learn on "Learn something"', () => {
+  it('navigates to /create-subject on "Learn something"', () => {
     render(<ParentGateway {...defaultProps} />);
 
     fireEvent.press(screen.getByTestId('gateway-learn'));
-    expect(mockPush).toHaveBeenCalledWith('/learn');
-    expect(mockPush).not.toHaveBeenCalledWith('/learn-new');
+    expect(mockPush).toHaveBeenCalledWith('/create-subject');
   });
 
   it('shows error banner and calls refetch on press when dashboard fails', () => {

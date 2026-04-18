@@ -9,6 +9,19 @@ import { goBackOrReplace } from '../../lib/navigation';
 import { useReviewSummary } from '../../hooks/use-progress';
 import { useThemeColors } from '../../lib/theme';
 
+function formatTimeUntil(isoDate: string): string {
+  const diff = new Date(isoDate).getTime() - Date.now();
+
+  if (diff <= 0) return 'soon';
+
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  if (hours < 1) return 'less than an hour';
+  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'}`;
+
+  const days = Math.floor(hours / 24);
+  return `${days} day${days === 1 ? '' : 's'}`;
+}
+
 export default function PracticeScreen(): React.ReactElement {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -17,13 +30,14 @@ export default function PracticeScreen(): React.ReactElement {
   const { data: quizStats, isError: statsError } = useQuizStats();
 
   const reviewDueCount = reviewSummary?.totalOverdue ?? 0;
+  const hasOverdue = reviewDueCount > 0;
   const reviewSubtitle = reviewError
     ? 'Could not load review status'
-    : reviewDueCount > 0
+    : hasOverdue
     ? `${reviewDueCount} ${
         reviewDueCount === 1 ? 'topic' : 'topics'
       } ready for review`
-    : 'Keep your knowledge fresh';
+    : 'Nothing to review right now';
   const capitalsStats = quizStats?.find(
     (stat) => stat.activityType === 'capitals'
   );
@@ -36,7 +50,7 @@ export default function PracticeScreen(): React.ReactElement {
     : 'Test yourself with multiple choice questions';
 
   const handleBack = () => {
-    goBackOrReplace(router, '/(app)/learn-new');
+    goBackOrReplace(router, '/(app)/home');
   };
 
   return (
@@ -68,9 +82,8 @@ export default function PracticeScreen(): React.ReactElement {
         <IntentCard
           title="Review topics"
           subtitle={reviewSubtitle}
-          badge={
-            !reviewError && reviewDueCount > 0 ? reviewDueCount : undefined
-          }
+          icon="refresh-outline"
+          badge={!reviewError && hasOverdue ? reviewDueCount : undefined}
           onPress={() => {
             const nextReviewTopic = reviewSummary?.nextReviewTopic ?? null;
             if (nextReviewTopic) {
@@ -82,15 +95,45 @@ export default function PracticeScreen(): React.ReactElement {
                   topicName: nextReviewTopic.topicTitle,
                 },
               } as never);
-            } else {
-              router.push('/(app)/library' as never);
             }
           }}
           testID="practice-review"
         />
+        {!reviewError && !hasOverdue && reviewSummary ? (
+          <View
+            testID="review-empty-state"
+            className="bg-surface-elevated rounded-card px-4 py-4 -mt-1"
+          >
+            {reviewSummary.nextUpcomingReviewAt ? (
+              <>
+                <Text className="text-body font-semibold text-text-primary">
+                  All caught up
+                </Text>
+                <Text className="text-body-sm text-text-secondary mt-1">
+                  Your next review is in{' '}
+                  {formatTimeUntil(reviewSummary.nextUpcomingReviewAt)}
+                </Text>
+              </>
+            ) : (
+              <Text className="text-body text-text-secondary">
+                Complete some topics first to unlock review
+              </Text>
+            )}
+            <Pressable
+              testID="review-empty-browse"
+              className="mt-3"
+              onPress={() => router.push('/(app)/library' as never)}
+            >
+              <Text className="text-body-sm text-primary font-semibold">
+                Browse your topics
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
         <IntentCard
           title="Recite"
           subtitle="Recite a poem or text from memory"
+          icon="mic-outline"
           onPress={() =>
             router.push({
               pathname: '/(app)/session',
@@ -102,12 +145,14 @@ export default function PracticeScreen(): React.ReactElement {
         <IntentCard
           title="Dictation"
           subtitle="Practice writing what you hear"
+          icon="create-outline"
           onPress={() => router.push('/(app)/dictation' as never)}
           testID="practice-dictation"
         />
         <IntentCard
           title="Quiz"
           subtitle={quizSubtitle}
+          icon="help-circle-outline"
           onPress={() => router.push('/(app)/quiz' as never)}
           testID="practice-quiz"
         />

@@ -72,11 +72,10 @@ describe('CreateSubjectScreen', () => {
   it('renders starter chips and fills the input on tap', () => {
     render(<CreateSubjectScreen />);
 
-    // Chips container is visible
-    expect(screen.getByTestId('starter-chips')).toBeTruthy();
+    expect(screen.getByTestId('subject-options')).toBeTruthy();
 
-    // "Math" chip is present and tappable
-    const mathChip = screen.getByTestId('starter-chip-Math');
+    // "Math" starter row is present and tappable
+    const mathChip = screen.getByTestId('subject-start-math');
     expect(mathChip).toBeTruthy();
 
     // Tapping fills the name input
@@ -97,7 +96,7 @@ describe('CreateSubjectScreen', () => {
 
     render(<CreateSubjectScreen />);
 
-    fireEvent.press(screen.getByTestId('starter-chip-Math'));
+    fireEvent.press(screen.getByTestId('subject-start-math'));
 
     await waitFor(() => {
       expect(mockResolveSubjectMutateAsync).toHaveBeenCalledWith({
@@ -189,6 +188,8 @@ describe('CreateSubjectScreen', () => {
       params: {
         subjectId: 'subject-1',
         subjectName: 'leaf cutter ants',
+        step: '1',
+        totalSteps: '4',
       },
     });
   });
@@ -278,6 +279,8 @@ describe('CreateSubjectScreen', () => {
         subjectName: 'World History',
         bookId: 'book-easter',
         bookTitle: 'Easter',
+        step: '1',
+        totalSteps: '4',
       },
     });
   });
@@ -386,6 +389,8 @@ describe('CreateSubjectScreen', () => {
         subjectName: 'Botany',
         bookId: 'book-tea',
         bookTitle: 'tea',
+        step: '1',
+        totalSteps: '4',
       },
     });
   });
@@ -582,14 +587,14 @@ describe('CreateSubjectScreen', () => {
   it('hides starter chips when input has text', () => {
     render(<CreateSubjectScreen />);
 
-    expect(screen.getByTestId('starter-chips')).toBeTruthy();
+    expect(screen.getByTestId('subject-options')).toBeTruthy();
 
     fireEvent.changeText(screen.getByTestId('create-subject-name'), 'Bio');
 
-    expect(screen.queryByTestId('starter-chips')).toBeNull();
+    expect(screen.queryByTestId('subject-options')).toBeNull();
   });
 
-  it('shows "Your subjects" section when user has existing subjects', () => {
+  it('shows unified subject rows when the user has existing subjects', () => {
     mockExistingSubjects = [
       { id: 'sub-1', name: 'Math' },
       { id: 'sub-2', name: 'History' },
@@ -597,26 +602,29 @@ describe('CreateSubjectScreen', () => {
 
     render(<CreateSubjectScreen />);
 
-    expect(screen.getByTestId('your-subjects-section')).toBeTruthy();
-    expect(screen.getByText('Or continue with')).toBeTruthy();
-    expect(screen.getByTestId('your-subject-sub-1')).toBeTruthy();
-    expect(screen.getByTestId('your-subject-sub-2')).toBeTruthy();
+    expect(screen.getByTestId('subject-options')).toBeTruthy();
+    expect(screen.getByText('Continue Math')).toBeTruthy();
+    expect(screen.getByText('Continue History')).toBeTruthy();
+    expect(screen.queryByText('Or continue with')).toBeNull();
+    expect(screen.getByTestId('subject-continue-sub-1')).toBeTruthy();
+    expect(screen.getByTestId('subject-continue-sub-2')).toBeTruthy();
   });
 
-  it('hides "Your subjects" section for first-time users', () => {
+  it('shows only starter rows for first-time users', () => {
     mockExistingSubjects = [];
 
     render(<CreateSubjectScreen />);
 
-    expect(screen.queryByTestId('your-subjects-section')).toBeNull();
+    expect(screen.getByTestId('subject-options')).toBeTruthy();
+    expect(screen.queryByText(/^Continue /)).toBeNull();
   });
 
-  it('tapping a subject pill navigates to session with subject', () => {
+  it('tapping a continue row navigates to session with subject', () => {
     mockExistingSubjects = [{ id: 'sub-1', name: 'Math' }];
 
     render(<CreateSubjectScreen />);
 
-    fireEvent.press(screen.getByTestId('your-subject-sub-1'));
+    fireEvent.press(screen.getByTestId('subject-continue-sub-1'));
 
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/session',
@@ -624,16 +632,16 @@ describe('CreateSubjectScreen', () => {
     });
   });
 
-  it('hides "Your subjects" section when input has text', () => {
+  it('hides unified subject rows when input has text', () => {
     mockExistingSubjects = [{ id: 'sub-1', name: 'Math' }];
 
     render(<CreateSubjectScreen />);
 
-    expect(screen.getByTestId('your-subjects-section')).toBeTruthy();
+    expect(screen.getByTestId('subject-options')).toBeTruthy();
 
     fireEvent.changeText(screen.getByTestId('create-subject-name'), 'Science');
 
-    expect(screen.queryByTestId('your-subjects-section')).toBeNull();
+    expect(screen.queryByTestId('subject-options')).toBeNull();
   });
 
   it('shows "Not sure?" hint text when input is empty', () => {

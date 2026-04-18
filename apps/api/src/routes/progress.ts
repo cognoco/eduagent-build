@@ -59,11 +59,13 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
     const db = c.get('db');
     const profileId = requireProfileId(c.get('profileId'));
 
-    const { overdueCount, nextReviewTopic } = await getProfileOverdueCount(
-      db,
-      profileId
-    );
-    return c.json({ totalOverdue: overdueCount, nextReviewTopic });
+    const { overdueCount, nextReviewTopic, nextUpcomingReviewAt } =
+      await getProfileOverdueCount(db, profileId);
+    return c.json({
+      totalOverdue: overdueCount,
+      nextReviewTopic,
+      nextUpcomingReviewAt,
+    });
   })
 
   // Get active/paused session for a specific topic [F-4]

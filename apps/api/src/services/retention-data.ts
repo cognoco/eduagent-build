@@ -4,7 +4,7 @@
 // services/retention.ts (pure SM-2 logic).
 // ---------------------------------------------------------------------------
 
-import { eq, and, or, isNull, lt, inArray, sql } from 'drizzle-orm';
+import { asc, eq, and, gt, or, isNull, lt, inArray, sql } from 'drizzle-orm';
 import {
   subjects,
   curricula,
@@ -255,6 +255,7 @@ export async function getProfileOverdueCount(
   overdueCount: number;
   topTopicIds: string[];
   nextReviewTopic: NextReviewTopic | null;
+  nextUpcomingReviewAt: string | null;
 }> {
   const repo = createScopedRepository(db, profileId);
   const now = new Date();
@@ -299,10 +300,23 @@ export async function getProfileOverdueCount(
     }
   }
 
+  const [upcomingReview] = await db
+    .select({ nextReviewAt: retentionCards.nextReviewAt })
+    .from(retentionCards)
+    .where(
+      and(
+        eq(retentionCards.profileId, profileId),
+        gt(retentionCards.nextReviewAt, now)
+      )
+    )
+    .orderBy(asc(retentionCards.nextReviewAt))
+    .limit(1);
+
   return {
     overdueCount: sorted.length,
     topTopicIds: sorted.slice(0, 3).map((c) => c.topicId),
     nextReviewTopic,
+    nextUpcomingReviewAt: upcomingReview?.nextReviewAt?.toISOString() ?? null,
   };
 }
 

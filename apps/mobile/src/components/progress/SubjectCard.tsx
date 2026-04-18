@@ -45,16 +45,18 @@ function getTopicHeadline(subject: SubjectInventory): {
         subject.topics.mastered + subject.topics.explored
       } topics explored`,
       progressValue: subject.topics.mastered,
-      progressMax: subject.topics.total!,
+      progressMax: subject.topics.total ?? 0,
       footnote: `${subject.topics.mastered}/${subject.topics.total} planned topics mastered`,
       hideBar: false,
     };
   }
 
+  // BUG-[NOTION-3468bce9]: Label "mastered" explicitly so the Progress
+  // screen's count isn't confused with the Library's "completed" count.
   return {
-    headline: `${subject.topics.mastered}/${subject.topics.total} topics`,
+    headline: `${subject.topics.mastered}/${subject.topics.total} topics mastered`,
     progressValue: subject.topics.mastered,
-    progressMax: subject.topics.total!,
+    progressMax: subject.topics.total ?? 0,
     footnote: `${subject.activeMinutes} active min`,
     hideBar: false,
   };

@@ -6,6 +6,7 @@ import {
   LivingBook,
   type ChatMessage,
 } from '../../../components/session';
+import { OnboardingStepIndicator } from '../../../components/onboarding/OnboardingStepIndicator';
 import {
   useInterviewState,
   useStreamInterviewMessage,
@@ -17,13 +18,28 @@ const OPENING_MESSAGE =
   "Hi! I'm your learning mate. I'd like to get to know you a bit before we start. What made you interested in learning this subject?";
 
 export default function InterviewScreen() {
-  const { subjectId, subjectName, bookId, bookTitle } = useLocalSearchParams<{
+  const {
+    subjectId,
+    subjectName,
+    bookId,
+    bookTitle,
+    languageCode,
+    languageName,
+    step: stepParam,
+    totalSteps: totalStepsParam,
+  } = useLocalSearchParams<{
     subjectId?: string;
     subjectName?: string;
     bookId?: string;
     bookTitle?: string;
+    languageCode?: string;
+    languageName?: string;
+    step?: string;
+    totalSteps?: string;
   }>();
   const router = useRouter();
+  const step = Number(stepParam) || 1;
+  const totalSteps = Number(totalStepsParam) || 4;
 
   // BUG-316: Guard against empty/missing subjectId — hooks receive empty string
   // which triggers a 404 API call. Show error state instead.
@@ -39,15 +55,41 @@ export default function InterviewScreen() {
     ? `Hi! I'm your learning mate. Let's talk about ${bookTitle}! What do you already know about it, and what are you most curious to learn?`
     : OPENING_MESSAGE;
 
-  const goToCurriculum = useCallback(() => {
+  const goToNextStep = useCallback(() => {
+    if (!subjectId) return;
+
+    const baseParams = {
+      subjectId,
+      subjectName: subjectName ?? '',
+      step: String(Math.min(step + 1, totalSteps)),
+      totalSteps: String(totalSteps),
+    };
+
+    if (languageCode) {
+      router.replace({
+        pathname: '/(app)/onboarding/language-setup',
+        params: {
+          ...baseParams,
+          languageCode,
+          languageName: languageName ?? '',
+        },
+      } as never);
+      return;
+    }
+
     router.replace({
-      pathname: '/(app)/onboarding/curriculum-review',
-      params: {
-        subjectId,
-        ...(bookId ? { bookId } : {}),
-      },
+      pathname: '/(app)/onboarding/analogy-preference',
+      params: baseParams,
     } as never);
-  }, [bookId, router, subjectId]);
+  }, [
+    languageCode,
+    languageName,
+    router,
+    step,
+    subjectId,
+    subjectName,
+    totalSteps,
+  ]);
 
   const [messages, setMessages] = useState<ChatMessage[]>([
     { id: 'opening', role: 'assistant', content: openingMessage },
@@ -146,7 +188,7 @@ export default function InterviewScreen() {
     }
 
     seededDraftRef.current = true;
-  }, [interviewState.data, interviewState.isLoading]);
+  }, [interviewState.data, interviewState.isLoading, openingMessage]);
 
   const handleRestartInterview = useCallback(() => {
     try {
@@ -258,6 +300,9 @@ export default function InterviewScreen() {
           ? `Interview: ${bookTitle}`
           : `Interview: ${subjectName ?? 'New Subject'}`
       }
+      headerBelow={
+        <OnboardingStepIndicator step={step} totalSteps={totalSteps} />
+      }
       messages={messages}
       onSend={handleSend}
       isStreaming={isStreaming}
@@ -267,7 +312,7 @@ export default function InterviewScreen() {
           exchangeCount={exchangeCount}
           isComplete={interviewComplete}
           isExpressive
-          onPress={interviewComplete ? goToCurriculum : undefined}
+          onPress={interviewComplete ? goToNextStep : undefined}
         />
       }
       footer={
@@ -281,7 +326,7 @@ export default function InterviewScreen() {
               changes you want, and start learning.
             </Text>
             <Pressable
-              onPress={goToCurriculum}
+              onPress={goToNextStep}
               className="bg-primary rounded-button py-3 items-center"
               testID="view-curriculum-button"
               accessibilityLabel="Start learning"

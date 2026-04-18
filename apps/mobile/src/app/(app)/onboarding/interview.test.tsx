@@ -9,15 +9,18 @@ import React from 'react';
 const mockReplace = jest.fn();
 const mockStream = jest.fn();
 const mockAbort = jest.fn();
+let mockSearchParams: Record<string, string> = {
+  subjectId: 'subject-1',
+  subjectName: 'History',
+  step: '1',
+  totalSteps: '4',
+};
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({
     replace: mockReplace,
   }),
-  useLocalSearchParams: () => ({
-    subjectId: 'subject-1',
-    subjectName: 'History',
-  }),
+  useLocalSearchParams: () => mockSearchParams,
 }));
 
 jest.mock('react-native-safe-area-context', () => ({
@@ -30,17 +33,20 @@ jest.mock('../../../components/session', () => {
   return {
     ChatShell: ({
       title,
+      headerBelow,
       inputDisabled,
       onSend,
       footer,
     }: {
       title: string;
+      headerBelow?: React.ReactNode;
       inputDisabled?: boolean;
       onSend: (text: string) => Promise<void> | void;
       footer?: React.ReactNode;
     }) => (
       <View>
         <Text>{title}</Text>
+        {headerBelow}
         <Text testID="chat-shell-input-disabled">
           {inputDisabled ? 'true' : 'false'}
         </Text>
@@ -74,16 +80,27 @@ const InterviewScreen = require('./interview').default;
 describe('InterviewScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockSearchParams = {
+      subjectId: 'subject-1',
+      subjectName: 'History',
+      step: '1',
+      totalSteps: '4',
+    };
   });
 
-  it('strips [INTERVIEW_COMPLETE] marker and shows completion footer', async () => {
+  it('renders the onboarding step indicator', () => {
+    render(<InterviewScreen />);
+
+    expect(screen.getByText('Step 1 of 4')).toBeTruthy();
+  });
+
+  it('navigates to analogy-preference after interview completes', async () => {
     mockStream.mockImplementation(
       async (
         _msg: string,
         onChunk: (accumulated: string) => void,
         onDone: (result: { isComplete: boolean; exchangeCount: number }) => void
       ) => {
-        // Simulate chunks arriving with the marker
         onChunk('Great summary of your goals!\n[INTERVIEW_COMPLETE]');
         onDone({ isComplete: true, exchangeCount: 1 });
       }
@@ -93,27 +110,67 @@ describe('InterviewScreen', () => {
     fireEvent.press(screen.getByTestId('chat-shell-send'));
 
     await waitFor(() => {
-      // Footer should appear with the learning invitation
       expect(screen.getByText('Ready to start learning!')).toBeTruthy();
       expect(screen.getByText("Let's Go")).toBeTruthy();
-      // Input should be disabled
       expect(screen.getByTestId('chat-shell-input-disabled')).toHaveTextContent(
         'true'
       );
     });
 
-    // Tapping the CTA navigates straight to curriculum review
     fireEvent.press(screen.getByTestId('view-curriculum-button'));
-    expect(mockReplace).toHaveBeenCalledWith(
-      expect.objectContaining({
-        pathname: '/(app)/onboarding/curriculum-review',
-      })
+    expect(mockReplace).toHaveBeenCalledWith({
+      pathname: '/(app)/onboarding/analogy-preference',
+      params: {
+        subjectId: 'subject-1',
+        subjectName: 'History',
+        step: '2',
+        totalSteps: '4',
+      },
+    });
+  });
+
+  it('routes language subjects to language-setup after interview completes', async () => {
+    mockSearchParams = {
+      subjectId: 'subject-1',
+      subjectName: 'Spanish',
+      languageCode: 'es',
+      languageName: 'Spanish',
+      step: '1',
+      totalSteps: '4',
+    };
+    mockStream.mockImplementation(
+      async (
+        _msg: string,
+        onChunk: (accumulated: string) => void,
+        onDone: (result: { isComplete: boolean; exchangeCount: number }) => void
+      ) => {
+        onChunk('Ready!\n[INTERVIEW_COMPLETE]');
+        onDone({ isComplete: true, exchangeCount: 1 });
+      }
     );
+
+    render(<InterviewScreen />);
+    fireEvent.press(screen.getByTestId('chat-shell-send'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('view-curriculum-button')).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByTestId('view-curriculum-button'));
+    expect(mockReplace).toHaveBeenCalledWith({
+      pathname: '/(app)/onboarding/language-setup',
+      params: {
+        subjectId: 'subject-1',
+        subjectName: 'Spanish',
+        languageCode: 'es',
+        languageName: 'Spanish',
+        step: '2',
+        totalSteps: '4',
+      },
+    });
   });
 
   it('disables input after a stream error and lets the learner retry', async () => {
-    // BUG-317: Try Again now resends the failed message instead of just clearing
-    // the error. Mock the first call to fail and the retry to succeed.
     mockStream
       .mockRejectedValueOnce(new Error('Network request failed'))
       .mockImplementationOnce(
@@ -125,13 +182,11 @@ describe('InterviewScreen', () => {
             exchangeCount: number;
           }) => void
         ) => {
-          // Retry succeeds — call onDone to finalize the streaming message
           onDone({ isComplete: false, exchangeCount: 2 });
         }
       );
 
     render(<InterviewScreen />);
-
     fireEvent.press(screen.getByTestId('chat-shell-send'));
 
     await waitFor(() => {
@@ -149,15 +204,12 @@ describe('InterviewScreen', () => {
     fireEvent.press(screen.getByTestId('interview-try-again-button'));
 
     await waitFor(() => {
-      // Error panel should disappear after retry
       expect(screen.queryByTestId('interview-stream-error')).toBeNull();
-      // Input should be re-enabled since retry succeeded (no streamError)
       expect(screen.getByTestId('chat-shell-input-disabled')).toHaveTextContent(
         'false'
       );
     });
 
-    // Verify the retry actually called stream again
     expect(mockStream).toHaveBeenCalledTimes(2);
   });
 });

@@ -35,6 +35,7 @@ export interface NextReviewTopic {
 export interface ReviewSummary {
   totalOverdue: number;
   nextReviewTopic: NextReviewTopic | null;
+  nextUpcomingReviewAt: string | null;
 }
 
 export function useSubjectProgress(
@@ -127,7 +128,7 @@ export function useActiveSessionForTopic(topicId: string | undefined) {
       try {
         const res = await client.progress.topic[':topicId'][
           'active-session'
-        ].$get({ param: { topicId: topicId! } }, { init: { signal } });
+        ].$get({ param: { topicId: topicId ?? '' } }, { init: { signal } });
         await assertOk(res);
         return (await res.json()) as { sessionId: string } | null;
       } finally {
@@ -316,7 +317,7 @@ export function useChildInventory(
         const res = await client.dashboard.children[
           ':profileId'
         ].inventory.$get(
-          { param: { profileId: childProfileId! } },
+          { param: { profileId: childProfileId ?? '' } },
           { init: { signal } }
         );
         await assertOk(res);
@@ -349,7 +350,7 @@ export function useChildProgressHistory(
           'progress-history'
         ].$get(
           {
-            param: { profileId: childProfileId! },
+            param: { profileId: childProfileId ?? '' },
             query: {
               ...(query?.from ? { from: query.from } : {}),
               ...(query?.to ? { to: query.to } : {}),
@@ -382,7 +383,7 @@ export function useChildReports(
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
         const res = await client.dashboard.children[':profileId'].reports.$get(
-          { param: { profileId: childProfileId! } },
+          { param: { profileId: childProfileId ?? '' } },
           { init: { signal } }
         );
         await assertOk(res);
@@ -413,7 +414,10 @@ export function useChildReportDetail(
           ':reportId'
         ].$get(
           {
-            param: { profileId: childProfileId!, reportId: reportId! },
+            param: {
+              profileId: childProfileId ?? '',
+              reportId: reportId ?? '',
+            },
           },
           { init: { signal } }
         );

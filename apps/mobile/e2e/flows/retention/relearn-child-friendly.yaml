@@ -64,17 +64,23 @@ tags:
       id: "retention-card"
     timeout: 10000
 
-# 8. Tap relearn button
-- tapOn:
-    id: "relearn-button"
+# 8. Verify the smart primary action resolves to Relearn
+- assertVisible:
+    id: "primary-action-button"
+- assertVisible:
+    text: "Relearn"
 
-# 9. Verify relearn screen loads
+# 9. Tap the primary relearn action
+- tapOn:
+    id: "primary-action-button"
+
+# 10. Verify relearn screen loads
 - extendedWaitUntil:
     visible:
       text: "Relearn Topic"
     timeout: 10000
 
-# 10. Verify child-friendly phase 1 copy (learner persona).
+# 11. Verify child-friendly phase 1 copy (learner persona).
 #     "Try Something New" replaces "Different Method" for learner.
 - extendedWaitUntil:
     visible:
@@ -86,14 +92,14 @@ tags:
 - assertVisible:
     text: "Same Method"
 
-# 11. Screenshot of child-friendly choice phase
+# 12. Screenshot of child-friendly choice phase
 - takeScreenshot: relearn-child-friendly-choice
 
-# 12. Tap "Try Something New" to enter method picker
+# 13. Tap "Try Something New" to enter method picker
 - tapOn:
     id: "relearn-different-method"
 
-# 13. Verify child-friendly method labels are visible
+# 14. Verify child-friendly method labels are visible
 - extendedWaitUntil:
     visible:
       id: "relearn-method-visual_diagrams"
@@ -108,10 +114,10 @@ tags:
 - assertVisible:
     text: "Let Me Try It"
 
-# 14. Screenshot of child-friendly method picker
+# 15. Screenshot of child-friendly method picker
 - takeScreenshot: relearn-child-friendly-methods
 
-# 15. Go back to choice phase and verify labels persist
+# 16. Go back to choice phase and verify labels persist
 - tapOn:
     id: "relearn-back-to-choice"
 

@@ -1,6 +1,6 @@
 # Flow N10: Relearn Method Selection — Failed Recall Triggers Relearn
 # Validates: user with 3+ failed recalls can navigate to topic detail,
-# see the relearn button, choose a different teaching method, and start
+# see the smart primary relearn action, choose a different teaching method, and start
 # a relearn session.
 # Tags: nightly, retention
 #
@@ -10,8 +10,7 @@
 #               (scenario: failed-recall-3x)
 #
 # testID mapping (topic/[topicId].tsx):
-#   - relearn-button              -> visible after 3+ failures or needs_deepening
-#   - start-review-button         -> primary review action
+#   - primary-action-button       -> smart primary action ("Relearn" here)
 #   - retention-card              -> retention metrics card
 #
 # testID mapping (topic/relearn.tsx):
@@ -76,13 +75,15 @@ tags:
       id: "retention-card"
     timeout: 10000
 
-# 9. Verify relearn button is visible (only shows after 3+ failures)
+# 9. Verify the smart primary action resolves to Relearn
 - assertVisible:
-    id: "relearn-button"
+    id: "primary-action-button"
+- assertVisible:
+    text: "Relearn"
 
-# 10. Tap relearn button
+# 10. Tap the primary relearn action
 - tapOn:
-    id: "relearn-button"
+    id: "primary-action-button"
 
 # 11. Verify relearn screen loads with choice phase
 - extendedWaitUntil:

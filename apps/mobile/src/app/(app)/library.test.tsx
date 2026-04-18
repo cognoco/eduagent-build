@@ -163,7 +163,7 @@ describe('LibraryScreen', () => {
 
     expect(screen.getByTestId('subject-card-sub-1')).toBeTruthy();
     expect(screen.getByText('History')).toBeTruthy();
-    expect(screen.getByText('3/12 topics')).toBeTruthy();
+    expect(screen.getByText('3/12 topics completed')).toBeTruthy();
   });
 
   it('shows all topics view when the topics tab is pressed', () => {

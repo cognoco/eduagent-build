@@ -203,11 +203,21 @@ export default function MentorMemoryScreen() {
           <Text className="text-body font-semibold text-text-primary">
             Memory status
           </Text>
-          <Text className="text-body-sm text-text-secondary mt-1">
+          <Text
+            className="text-body-sm text-text-secondary mt-1"
+            testID="memory-status-text"
+          >
             {consentStatus === 'granted'
               ? 'Memory collection is enabled.'
               : consentStatus === 'declined'
               ? 'Memory collection is turned off.'
+              : // BUG-[NOTION-3468bce9]: role-aware pending copy.
+              // Adult/owner accounts (isOwner === true) control their own
+              // consent — don't tell them a guardian must act. Child
+              // profiles under a family link (isOwner === false) DO need
+              // a parent/guardian to enable memory collection.
+              activeProfile?.isOwner
+              ? "Memory collection hasn't been enabled yet."
               : 'A parent or guardian still needs to enable memory collection.'}
           </Text>
           <View className="flex-row items-center justify-between mt-4">

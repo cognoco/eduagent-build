@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { CefrLevel } from '@eduagent/schemas';
+import { OnboardingStepIndicator } from '../../../components/onboarding/OnboardingStepIndicator';
 import { useConfigureLanguageSubject } from '../../../hooks/use-subjects';
 import { formatApiError } from '../../../lib/format-api-error';
 import { useThemeColors } from '../../../lib/theme';
@@ -62,12 +63,25 @@ const LEVEL_OPTIONS: Array<{
 export default function LanguageSetup() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { subjectId, languageName } = useLocalSearchParams<{
+  const {
+    subjectId,
+    subjectName,
+    languageName,
+    languageCode,
+    step: stepParam,
+    totalSteps: totalStepsParam,
+  } = useLocalSearchParams<{
     subjectId?: string;
+    subjectName?: string;
     languageName?: string;
+    languageCode?: string;
+    step?: string;
+    totalSteps?: string;
   }>();
   const configureLanguageSubject = useConfigureLanguageSubject();
   const colors = useThemeColors(); // [BUG-118]
+  const step = Number(stepParam) || 2;
+  const totalSteps = Number(totalStepsParam) || 4;
   const [nativeLanguage, setNativeLanguage] = useState<string>('en');
   const [customLanguage, setCustomLanguage] = useState('');
   const [startingLevel, setStartingLevel] = useState<CefrLevel>('A1');
@@ -80,6 +94,20 @@ export default function LanguageSetup() {
 
   const effectiveNativeLanguage =
     nativeLanguage === 'other' ? customLanguage.trim() : nativeLanguage;
+
+  const handleBack = useCallback(() => {
+    goBackOrReplace(router, {
+      pathname: '/(app)/onboarding/interview',
+      params: {
+        subjectId: subjectId ?? '',
+        subjectName: subjectName ?? languageName ?? '',
+        languageCode: languageCode ?? '',
+        languageName: languageName ?? '',
+        step: '1',
+        totalSteps: String(totalSteps),
+      },
+    });
+  }, [languageCode, languageName, router, subjectId, subjectName, totalSteps]);
 
   const handleContinue = async () => {
     if (!subjectId) return;
@@ -95,8 +123,15 @@ export default function LanguageSetup() {
         startingLevel,
       });
       router.replace({
-        pathname: '/(app)/onboarding/curriculum-review',
-        params: { subjectId },
+        pathname: '/(app)/onboarding/accommodations',
+        params: {
+          subjectId,
+          subjectName: subjectName ?? languageName ?? '',
+          languageCode: languageCode ?? '',
+          languageName: languageName ?? '',
+          step: String(Math.min(step + 1, totalSteps)),
+          totalSteps: String(totalSteps),
+        },
       } as never);
     } catch (err: unknown) {
       setError(formatApiError(err));
@@ -132,13 +167,15 @@ export default function LanguageSetup() {
         showsVerticalScrollIndicator={false}
       >
         <Pressable
-          onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
+          onPress={handleBack}
           className="mb-3 min-w-[44px] min-h-[44px] justify-center self-start"
           accessibilityLabel="Go back"
           accessibilityRole="button"
+          testID="language-setup-back"
         >
           <Text className="text-primary text-body font-semibold">Back</Text>
         </Pressable>
+        <OnboardingStepIndicator step={step} totalSteps={totalSteps} />
 
         <Text className="text-h2 font-bold text-text-primary">
           Language setup

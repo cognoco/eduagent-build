@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -5,6 +6,7 @@ import {
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -174,10 +176,175 @@ export default function TopicDetailScreen() {
   const { data: noteData } = useGetTopicNote(subjectId, topicId);
   // F-4: Resume active/paused session instead of creating a new one
   const { data: activeSession } = useActiveSessionForTopic(topicId);
+  const [showSecondary, setShowSecondary] = useState(false);
 
   const isLoading = progressLoading || retentionLoading || parkingLotLoading;
   // Data-critical queries only — parking lot is secondary and should not suppress errors
   const isCriticalLoading = progressLoading || retentionLoading;
+  const retentionStatus = deriveRetentionStatus(retentionCard);
+  const nextReviewDate = retentionCard?.nextReviewAt
+    ? new Date(retentionCard.nextReviewAt).toLocaleDateString()
+    : null;
+  const masteryPercent = topicProgress?.masteryScore
+    ? Math.round(topicProgress.masteryScore * 100)
+    : null;
+  const failureCount = retentionCard?.failureCount ?? 0;
+  const topicName = topicProgress?.title ?? '';
+  const primaryAction = useMemo(() => {
+    if (!topicProgress) return null;
+
+    const isStruggling =
+      failureCount >= 3 || topicProgress.struggleStatus === 'needs_deepening';
+    if (isStruggling) {
+      return {
+        label: 'Relearn',
+        onPress: () =>
+          router.push({
+            pathname: '/(app)/topic/relearn',
+            params: { subjectId, topicId, topicName },
+          } as never),
+      };
+    }
+
+    if (topicProgress.completionStatus === 'not_started') {
+      return {
+        label: 'Start learning',
+        onPress: () =>
+          router.push({
+            pathname: '/(app)/session',
+            params: {
+              mode: 'freeform',
+              subjectId,
+              topicId,
+              topicName,
+            },
+          } as never),
+      };
+    }
+
+    const isOverdue =
+      !!retentionCard?.nextReviewAt &&
+      new Date(retentionCard.nextReviewAt).getTime() < Date.now();
+    if (
+      isOverdue &&
+      ['completed', 'verified', 'stable'].includes(
+        topicProgress.completionStatus
+      )
+    ) {
+      return {
+        label: 'Review',
+        onPress: () =>
+          router.push({
+            pathname: '/(app)/session',
+            params: {
+              mode: 'practice',
+              subjectId,
+              topicId,
+              topicName,
+            },
+          } as never),
+      };
+    }
+
+    return {
+      label: 'Continue learning',
+      onPress: () =>
+        router.push({
+          pathname: '/(app)/session',
+          params: {
+            mode: 'freeform',
+            subjectId,
+            topicId,
+            topicName,
+            ...(activeSession?.sessionId && {
+              sessionId: activeSession.sessionId,
+            }),
+          },
+        } as never),
+    };
+  }, [
+    activeSession?.sessionId,
+    failureCount,
+    retentionCard?.nextReviewAt,
+    router,
+    subjectId,
+    topicId,
+    topicName,
+    topicProgress,
+  ]);
+  const secondaryActions = useMemo(() => {
+    if (!topicProgress) return [];
+
+    const actions: Array<{
+      label: string;
+      explanation: string;
+      testID: string;
+      onPress: () => void;
+    }> = [];
+
+    if (topicProgress.completionStatus !== 'not_started') {
+      actions.push({
+        label: 'Recall Check',
+        explanation: 'Test your memory without hints',
+        testID: 'secondary-recall-check',
+        onPress: () =>
+          router.push({
+            pathname: '/(app)/topic/recall-test',
+            params: { subjectId, topicId, topicName },
+          } as never),
+      });
+    }
+
+    if (evaluateEligibility?.eligible) {
+      actions.push({
+        label: 'Challenge yourself',
+        explanation: 'Test yourself with tough questions',
+        testID: 'secondary-challenge',
+        onPress: () =>
+          router.push({
+            pathname: '/(app)/session',
+            params: {
+              subjectId,
+              topicId,
+              topicName,
+              verificationType: 'evaluate',
+            },
+          } as never),
+      });
+    }
+
+    if (
+      retentionCard &&
+      retentionCard.repetitions > 0 &&
+      Number(retentionCard.easeFactor) >= 2.3
+    ) {
+      actions.push({
+        label: 'Teach it back',
+        explanation: 'Explain this topic in your own words',
+        testID: 'secondary-teach-back',
+        onPress: () =>
+          router.push({
+            pathname: '/(app)/session',
+            params: {
+              subjectId,
+              topicId,
+              topicName,
+              verificationType: 'teach_back',
+            },
+          } as never),
+      });
+    }
+
+    return actions;
+  }, [
+    evaluateEligibility?.eligible,
+    retentionCard,
+    router,
+    subjectId,
+    topicId,
+    topicName,
+    topicProgress,
+  ]);
 
   if (!subjectId || !topicId) {
     return (
@@ -249,17 +416,6 @@ export default function TopicDetailScreen() {
       </View>
     );
   }
-
-  const retentionStatus = deriveRetentionStatus(retentionCard);
-  const nextReviewDate = retentionCard?.nextReviewAt
-    ? new Date(retentionCard.nextReviewAt).toLocaleDateString()
-    : null;
-  const masteryPercent = topicProgress?.masteryScore
-    ? Math.round(topicProgress.masteryScore * 100)
-    : null;
-  const failureCount = retentionCard?.failureCount ?? 0;
-  const showRelearn =
-    failureCount >= 3 || topicProgress?.struggleStatus === 'needs_deepening';
 
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
@@ -500,250 +656,69 @@ export default function TopicDetailScreen() {
       )}
 
       {/* Action buttons */}
-      {topicProgress && (
+      {topicProgress && primaryAction ? (
         <View
           className="px-5 pb-6"
           style={{ paddingBottom: Math.max(insets.bottom, 24) }}
         >
-          {topicProgress.completionStatus === 'not_started' ? (
-            /* not_started: primary "Start Learning", no secondary */
-            <Pressable
-              onPress={() =>
-                router.push({
-                  pathname: '/(app)/session',
-                  params: {
-                    mode: 'freeform',
-                    subjectId,
-                    topicId,
-                    topicName: topicProgress?.title,
-                  },
-                })
-              }
-              className="bg-primary rounded-button py-3.5 items-center mb-2"
-              testID="start-learning-button"
-              accessibilityLabel="Start learning"
-              accessibilityRole="button"
-            >
-              <Text className="text-text-inverse text-body font-semibold">
-                Start Learning
-              </Text>
-            </Pressable>
-          ) : topicProgress.completionStatus === 'in_progress' ? (
-            /* in_progress: primary "Continue Learning" + secondary "Start Review Session" */
-            <>
+          <Pressable
+            onPress={primaryAction.onPress}
+            className="bg-primary rounded-button py-3.5 items-center"
+            testID="primary-action-button"
+            accessibilityRole="button"
+          >
+            <Text className="text-text-inverse text-body font-semibold">
+              {primaryAction.label}
+            </Text>
+          </Pressable>
+          {secondaryActions.length > 0 ? (
+            <View className="mt-3">
               <Pressable
-                onPress={() =>
-                  router.push({
-                    pathname: '/(app)/session',
-                    params: {
-                      mode: 'freeform',
-                      subjectId,
-                      topicId,
-                      topicName: topicProgress?.title,
-                      ...(activeSession?.sessionId && {
-                        sessionId: activeSession.sessionId,
-                      }),
-                    },
-                  })
-                }
-                className="bg-primary rounded-button py-3.5 items-center mb-2"
-                testID="continue-learning-button"
-                accessibilityLabel="Continue learning"
+                testID="more-ways-toggle"
+                className="flex-row items-center justify-center py-2"
+                onPress={() => setShowSecondary((prev) => !prev)}
                 accessibilityRole="button"
               >
-                <Text className="text-text-inverse text-body font-semibold">
-                  Continue Learning
+                <Text className="text-body-sm text-text-secondary mr-1">
+                  More ways to practice
                 </Text>
+                <Ionicons
+                  name={showSecondary ? 'chevron-up' : 'chevron-down'}
+                  size={16}
+                  color={colors.muted}
+                />
               </Pressable>
-              <Pressable
-                onPress={() =>
-                  router.push({
-                    pathname: '/(app)/session',
-                    params: {
-                      mode: 'practice',
-                      subjectId,
-                      topicId,
-                      topicName: topicProgress?.title,
-                    },
-                  })
-                }
-                className="border border-border rounded-button py-3 items-center mb-2"
-                testID="start-review-button"
-                accessibilityLabel="Start review session"
-                accessibilityRole="button"
-              >
-                <Text className="text-body font-semibold text-primary">
-                  Start Review Session
-                </Text>
-              </Pressable>
-            </>
-          ) : (
-            /* completed / verified / stable: primary "Start Review Session" + secondary "Continue Learning" */
-            <>
-              <Pressable
-                onPress={() =>
-                  router.push({
-                    pathname: '/(app)/session',
-                    params: {
-                      mode: 'practice',
-                      subjectId,
-                      topicId,
-                      topicName: topicProgress?.title,
-                    },
-                  })
-                }
-                className="bg-primary rounded-button py-3.5 items-center mb-2"
-                testID="start-review-button"
-                accessibilityLabel="Start review session"
-                accessibilityRole="button"
-              >
-                <Text className="text-text-inverse text-body font-semibold">
-                  Start Review Session
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={() =>
-                  router.push({
-                    pathname: '/(app)/session',
-                    params: {
-                      mode: 'freeform',
-                      subjectId,
-                      topicId,
-                      topicName: topicProgress?.title,
-                      ...(activeSession?.sessionId && {
-                        sessionId: activeSession.sessionId,
-                      }),
-                    },
-                  })
-                }
-                className="border border-border rounded-button py-3 items-center mb-2"
-                testID="continue-learning-button"
-                accessibilityLabel="Continue learning"
-                accessibilityRole="button"
-              >
-                <Text className="text-body font-semibold text-primary">
-                  Continue Learning
-                </Text>
-              </Pressable>
-            </>
-          )}
-          <View className="flex-row">
-            <Pressable
-              onPress={() =>
-                router.push({
-                  pathname: '/(app)/topic/recall-test',
-                  params: {
-                    subjectId,
-                    topicId,
-                    topicName: topicProgress?.title,
-                  },
-                })
-              }
-              className="flex-1 bg-surface-elevated rounded-button py-3 items-center me-2"
-              testID="request-retest-button"
-              accessibilityLabel={
-                failureCount >= 3 ? 'Review and re-test' : 'Recall check'
-              }
-              accessibilityRole="button"
-            >
-              <Text className="text-body-sm font-medium text-text-primary">
-                {failureCount >= 3 ? 'Review and Re-test' : 'Recall Check'}
-              </Text>
-            </Pressable>
-            {showRelearn && (
-              <Pressable
-                onPress={() =>
-                  router.push({
-                    pathname: '/(app)/topic/relearn',
-                    params: {
-                      subjectId,
-                      topicId,
-                      topicName: topicProgress?.title,
-                    },
-                  })
-                }
-                className="flex-1 bg-surface-elevated rounded-button py-3 items-center"
-                testID="relearn-button"
-                accessibilityLabel="Relearn topic"
-                accessibilityRole="button"
-              >
-                <Text className="text-body-sm font-medium text-text-primary">
-                  Relearn Topic
-                </Text>
-              </Pressable>
-            )}
-          </View>
-
-          {/* 3E.2: Evaluate (Devil's Advocate) entry point — FR128 */}
-          {evaluateEligibility?.eligible && (
-            <Pressable
-              onPress={() =>
-                router.push({
-                  pathname: '/(app)/session',
-                  params: {
-                    subjectId,
-                    topicId,
-                    topicName: topicProgress?.title,
-                    verificationType: 'evaluate',
-                  },
-                })
-              }
-              className="bg-surface rounded-card py-3 px-4 mb-2 flex-row items-center justify-between"
-              testID="evaluate-challenge-button"
-              accessibilityRole="button"
-              accessibilityLabel="Challenge yourself on this topic"
-            >
-              <View className="flex-1 me-3">
-                <Text className="text-body-sm font-semibold text-text-primary">
-                  Challenge yourself
-                </Text>
-                <Text className="text-caption text-text-secondary mt-0.5">
-                  Test your understanding with tough questions (rung{' '}
-                  {evaluateEligibility.currentRung}/4)
-                </Text>
-              </View>
-              <Text className="text-primary text-body-sm font-medium">
-                Start &rarr;
-              </Text>
-            </Pressable>
-          )}
-
-          {/* 3E.1: Teach-back entry point — FR138 */}
-          {retentionCard &&
-            retentionCard.repetitions > 0 &&
-            Number(retentionCard.easeFactor) >= 2.3 && (
-              <Pressable
-                onPress={() =>
-                  router.push({
-                    pathname: '/(app)/session',
-                    params: {
-                      subjectId,
-                      topicId,
-                      topicName: topicProgress?.title,
-                      verificationType: 'teach_back',
-                    },
-                  })
-                }
-                className="bg-surface rounded-card py-3 px-4 mb-2 flex-row items-center justify-between"
-                testID="teach-back-button"
-                accessibilityRole="button"
-                accessibilityLabel="Teach this topic back"
-              >
-                <View className="flex-1 me-3">
-                  <Text className="text-body-sm font-semibold text-text-primary">
-                    Teach it back
-                  </Text>
-                  <Text className="text-caption text-text-secondary mt-0.5">
-                    Explain what you know in your own words
-                  </Text>
+              {showSecondary ? (
+                <View className="gap-2 mt-1">
+                  {secondaryActions.map((action) => (
+                    <Pressable
+                      key={action.testID}
+                      testID={action.testID}
+                      className="bg-surface-elevated rounded-card px-4 py-3 flex-row items-center"
+                      onPress={action.onPress}
+                      accessibilityRole="button"
+                    >
+                      <View className="flex-1">
+                        <Text className="text-body font-semibold text-text-primary">
+                          {action.label}
+                        </Text>
+                        <Text className="text-body-sm text-text-secondary">
+                          {action.explanation}
+                        </Text>
+                      </View>
+                      <Ionicons
+                        name="chevron-forward"
+                        size={18}
+                        color={colors.muted}
+                      />
+                    </Pressable>
+                  ))}
                 </View>
-                <Text className="text-primary text-body-sm font-medium">
-                  Start &rarr;
-                </Text>
-              </Pressable>
-            )}
+              ) : null}
+            </View>
+          ) : null}
         </View>
-      )}
+      ) : null}
     </View>
   );
 }

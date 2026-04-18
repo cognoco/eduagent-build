@@ -11,6 +11,7 @@ const mockReadSessionRecoveryMarker = jest.fn();
 const mockClearSessionRecoveryMarker = jest.fn();
 const mockIsRecoveryMarkerFresh = jest.fn();
 const mockUseContinueSuggestion = jest.fn();
+const mockUseReviewSummary = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
@@ -25,7 +26,7 @@ jest.mock('../common', () => ({
 }));
 
 jest.mock('../../lib/theme', () => ({
-  useThemeColors: () => ({ textPrimary: '#ffffff' }),
+  useThemeColors: () => ({ textPrimary: '#ffffff', primary: '#00b4d8' }),
 }));
 
 jest.mock('../../lib/greeting', () => ({
@@ -36,13 +37,22 @@ jest.mock('../../lib/greeting', () => ({
 }));
 
 let mockSubjects: Array<{ id: string; name: string; status: string }> = [];
+let mockSubjectsIsLoading = false;
+let mockSubjectsIsError = false;
+const mockRefetchSubjects = jest.fn();
 
 jest.mock('../../hooks/use-subjects', () => ({
-  useSubjects: () => ({ data: mockSubjects, isLoading: false }),
+  useSubjects: () => ({
+    data: mockSubjects,
+    isLoading: mockSubjectsIsLoading,
+    isError: mockSubjectsIsError,
+    refetch: mockRefetchSubjects,
+  }),
 }));
 
 jest.mock('../../hooks/use-progress', () => ({
   useContinueSuggestion: () => mockUseContinueSuggestion(),
+  useReviewSummary: () => mockUseReviewSummary(),
 }));
 
 jest.mock('../../lib/session-recovery', () => ({
@@ -66,9 +76,13 @@ describe('LearnerScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockSubjects = [];
+    mockSubjectsIsLoading = false;
+    mockSubjectsIsError = false;
     mockReadSessionRecoveryMarker.mockResolvedValue(null);
+    mockClearSessionRecoveryMarker.mockResolvedValue(undefined);
     mockIsRecoveryMarkerFresh.mockReturnValue(true);
-    mockUseContinueSuggestion.mockReturnValue({ data: undefined });
+    mockUseContinueSuggestion.mockReturnValue({ data: null });
+    mockUseReviewSummary.mockReturnValue({ data: null });
   });
 
   it('renders greeting with profile name', () => {
@@ -78,254 +92,202 @@ describe('LearnerScreen', () => {
     expect(screen.getByText('Fresh mind, fresh start')).toBeTruthy();
   });
 
-  describe('empty library', () => {
-    it('shows a clear first-step CTA and homework help', () => {
-      render(<LearnerScreen {...defaultProps} />);
+  it('shows the four always-visible intent cards in order when continue is hidden', () => {
+    render(<LearnerScreen {...defaultProps} />);
 
-      expect(screen.getByText('Start learning')).toBeTruthy();
-      expect(screen.getByText('Help with assignment?')).toBeTruthy();
-    });
+    const cardIds = within(screen.getByTestId('learner-intent-stack'))
+      .getAllByRole('button')
+      .map((card) => card.props.testID);
+
+    expect(cardIds).toEqual([
+      'intent-learn',
+      'intent-ask',
+      'intent-practice',
+      'intent-homework',
+    ]);
   });
 
-  describe('library with active subjects', () => {
-    beforeEach(() => {
-      mockSubjects = [{ id: 's1', name: 'Math', status: 'active' }];
-      mockUseContinueSuggestion.mockReturnValue({
-        data: {
-          subjectId: 's1',
-          subjectName: 'Math',
-          topicId: 't1',
-          topicTitle: 'Topic 1',
-        },
-      });
+  it('navigates to create-subject on the Learn card', () => {
+    render(<LearnerScreen {...defaultProps} />);
+
+    fireEvent.press(screen.getByTestId('intent-learn'));
+    expect(mockPush).toHaveBeenCalledWith('/create-subject');
+  });
+
+  it('navigates to freeform session on the Ask card', () => {
+    render(<LearnerScreen {...defaultProps} />);
+
+    fireEvent.press(screen.getByTestId('intent-ask'));
+    expect(mockPush).toHaveBeenCalledWith('/(app)/session?mode=freeform');
+  });
+
+  it('navigates to practice on the Practice card', () => {
+    render(<LearnerScreen {...defaultProps} />);
+
+    fireEvent.press(screen.getByTestId('intent-practice'));
+    expect(mockPush).toHaveBeenCalledWith('/(app)/practice');
+  });
+
+  it('navigates to homework camera on the Homework card', () => {
+    render(<LearnerScreen {...defaultProps} />);
+
+    fireEvent.press(screen.getByTestId('intent-homework'));
+    expect(mockPush).toHaveBeenCalledWith('/(app)/homework/camera');
+  });
+
+  it('shows continue card from continue suggestion when available', () => {
+    mockUseContinueSuggestion.mockReturnValue({
+      data: {
+        subjectId: 's1',
+        subjectName: 'Math',
+        topicId: 't1',
+        topicTitle: 'Fractions',
+        lastSessionId: 'session-1',
+      },
     });
 
-    it('shows continue card and core intent cards', () => {
-      render(<LearnerScreen {...defaultProps} />);
+    render(<LearnerScreen {...defaultProps} />);
 
-      expect(screen.getByText('Continue where you left off')).toBeTruthy();
-      expect(screen.getByText('Math')).toBeTruthy();
-      expect(screen.getByText('Start learning')).toBeTruthy();
-      expect(screen.getByText('Help with assignment?')).toBeTruthy();
-    });
+    expect(screen.getByTestId('intent-continue')).toBeTruthy();
+    expect(screen.getByText('Continue')).toBeTruthy();
+    expect(screen.getByText('Math · Fractions')).toBeTruthy();
 
-    it('places continue card before primary cards', () => {
-      render(<LearnerScreen {...defaultProps} />);
-
-      const cards = within(screen.getByTestId('learner-intent-stack'))
-        .getAllByRole('button')
-        .map((card) => card.props.testID);
-
-      expect(cards).toEqual([
-        'intent-resume-last',
-        'intent-learn-new',
-        'intent-homework',
-      ]);
-    });
-
-    it('shows a highlighted resume card first when a fresh recovery marker exists', async () => {
-      mockReadSessionRecoveryMarker.mockResolvedValue({
+    fireEvent.press(screen.getByTestId('intent-continue'));
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/session',
+      params: {
         sessionId: 'session-1',
         subjectId: 's1',
         subjectName: 'Math',
         topicId: 't1',
+        topicName: 'Fractions',
         mode: 'learning',
-        updatedAt: new Date().toISOString(),
-      });
-      render(<LearnerScreen {...defaultProps} />);
+      },
+    });
+  });
 
-      await waitFor(() => {
-        expect(screen.getByText('Continue where you left off')).toBeTruthy();
-      });
-
-      const cards = within(screen.getByTestId('learner-intent-stack'))
-        .getAllByRole('button')
-        .map((card) => card.props.testID);
-
-      expect(cards).toEqual([
-        'intent-resume',
-        'intent-learn-new',
-        'intent-homework',
-      ]);
-
-      fireEvent.press(screen.getByTestId('intent-resume'));
-      expect(mockPush).toHaveBeenCalledWith({
-        pathname: '/(app)/session',
-        params: {
-          sessionId: 'session-1',
+  it('shows continue card when overdue topics exist', () => {
+    mockUseReviewSummary.mockReturnValue({
+      data: {
+        totalOverdue: 3,
+        nextReviewTopic: {
+          topicId: 't1',
           subjectId: 's1',
           subjectName: 'Math',
-          mode: 'learning',
-          topicId: 't1',
+          topicTitle: 'Algebra',
         },
-      });
+        nextUpcomingReviewAt: null,
+      },
     });
 
-    it('silently clears stale markers without showing a notice', async () => {
-      mockReadSessionRecoveryMarker.mockResolvedValue({
+    render(<LearnerScreen {...defaultProps} />);
+
+    expect(screen.getByTestId('intent-continue')).toBeTruthy();
+    expect(screen.getByText('Math · 3 topics to review')).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('intent-continue'));
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/topic/relearn',
+      params: {
+        topicId: 't1',
+        subjectId: 's1',
+        topicName: 'Algebra',
+      },
+    });
+  });
+
+  it('shows recovery continue card first and clears the marker before resuming', async () => {
+    mockUseContinueSuggestion.mockReturnValue({
+      data: {
+        subjectId: 's1',
+        subjectName: 'Math',
+        topicId: 't1',
+        topicTitle: 'Fractions',
+      },
+    });
+    mockReadSessionRecoveryMarker.mockResolvedValue({
+      sessionId: 'session-1',
+      subjectId: 's1',
+      subjectName: 'Physics',
+      topicId: 't1',
+      mode: 'learning',
+      updatedAt: new Date().toISOString(),
+    });
+
+    render(<LearnerScreen {...defaultProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Physics · resume')).toBeTruthy();
+    });
+
+    const cardIds = within(screen.getByTestId('learner-intent-stack'))
+      .getAllByRole('button')
+      .map((card) => card.props.testID);
+
+    expect(cardIds).toEqual([
+      'intent-continue',
+      'intent-learn',
+      'intent-ask',
+      'intent-practice',
+      'intent-homework',
+    ]);
+
+    fireEvent.press(screen.getByTestId('intent-continue'));
+    expect(mockClearSessionRecoveryMarker).toHaveBeenCalledWith('p1');
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/session',
+      params: {
         sessionId: 'session-1',
-        updatedAt: new Date().toISOString(),
-      });
-      mockIsRecoveryMarkerFresh.mockReturnValue(false);
-
-      render(<LearnerScreen {...defaultProps} />);
-
-      await waitFor(() => {
-        expect(mockClearSessionRecoveryMarker).toHaveBeenCalledWith('p1');
-      });
-
-      expect(screen.queryByTestId('intent-resume')).toBeNull();
-      expect(screen.queryByTestId('recently-expired-banner')).toBeNull();
-    });
-  });
-
-  describe('navigation', () => {
-    it('navigates to learn-new on the primary learning CTA', () => {
-      render(<LearnerScreen {...defaultProps} />);
-
-      fireEvent.press(screen.getByTestId('intent-learn-new'));
-      expect(mockPush).toHaveBeenCalledWith('/learn-new');
-    });
-
-    it('navigates to homework camera on "Help with assignment?"', () => {
-      render(<LearnerScreen {...defaultProps} />);
-
-      fireEvent.press(screen.getByTestId('intent-homework'));
-      expect(mockPush).toHaveBeenCalledWith('/(app)/homework/camera');
-    });
-
-    it('navigates to session from continue card', () => {
-      mockUseContinueSuggestion.mockReturnValue({
-        data: {
-          subjectId: 's1',
-          subjectName: 'Math',
-          topicId: 't1',
-          topicTitle: 'Topic 1',
-        },
-      });
-
-      render(<LearnerScreen {...defaultProps} />);
-
-      fireEvent.press(screen.getByTestId('intent-resume-last'));
-      expect(mockPush).toHaveBeenCalledWith({
-        pathname: '/(app)/session',
-        params: {
-          subjectId: 's1',
-          subjectName: 'Math',
-          topicId: 't1',
-          topicName: 'Topic 1',
-          mode: 'learning',
-        },
-      });
-    });
-  });
-
-  describe('Start learning card has no subtitle [BUG-252]', () => {
-    it('does not render a subtitle on the primary card in empty library state', () => {
-      render(<LearnerScreen {...defaultProps} />);
-
-      expect(
-        screen.queryByText("We'll build a path and get you learning fast")
-      ).toBeNull();
-      expect(screen.queryByText('Start a fresh session')).toBeNull();
-    });
-
-    it('does not render a subtitle on the primary card when library has content', () => {
-      mockUseContinueSuggestion.mockReturnValue({
-        data: {
-          subjectId: 's1',
-          subjectName: 'Math',
-          topicId: 't1',
-          topicTitle: 'Fractions',
-        },
-      });
-
-      render(<LearnerScreen {...defaultProps} />);
-
-      expect(screen.queryByText('Start a fresh session')).toBeNull();
-    });
-  });
-
-  describe('activeProfile null [BUG-250]', () => {
-    it('renders fallback greeting when activeProfile is null', () => {
-      render(<LearnerScreen {...defaultProps} activeProfile={null} />);
-
-      // getGreeting('') produces fallback title/subtitle
-      expect(screen.getByText('Good morning, !')).toBeTruthy();
-    });
-
-    it('reads recovery marker with undefined profileId when activeProfile is null', async () => {
-      render(<LearnerScreen {...defaultProps} activeProfile={null} />);
-
-      await waitFor(() => {
-        expect(mockReadSessionRecoveryMarker).toHaveBeenCalledWith(undefined);
-      });
-    });
-  });
-
-  describe('back button', () => {
-    it('shows back button when onBack provided', () => {
-      const onBack = jest.fn();
-
-      render(<LearnerScreen {...defaultProps} onBack={onBack} />);
-
-      fireEvent.press(screen.getByTestId('learner-back'));
-      expect(onBack).toHaveBeenCalledTimes(1);
-    });
-
-    it('hides back button when onBack not provided', () => {
-      render(<LearnerScreen {...defaultProps} />);
-
-      expect(screen.queryByTestId('learner-back')).toBeNull();
-    });
-  });
-
-  describe('continue card behavior', () => {
-    it('shows "Continue where you left off" when continueSuggestion exists', () => {
-      mockUseContinueSuggestion.mockReturnValue({
-        data: {
-          subjectId: 's1',
-          subjectName: 'Math',
-          topicId: 't1',
-          topicTitle: 'Fractions',
-        },
-      });
-
-      render(<LearnerScreen {...defaultProps} />);
-
-      expect(screen.getByText('Continue where you left off')).toBeTruthy();
-      expect(screen.getByText('Math')).toBeTruthy();
-    });
-
-    it('hides continue card when continueSuggestion is null', () => {
-      mockUseContinueSuggestion.mockReturnValue({ data: null });
-
-      render(<LearnerScreen {...defaultProps} />);
-
-      expect(screen.queryByTestId('intent-resume-last')).toBeNull();
-    });
-
-    it('hides continue card when recovery marker is active', async () => {
-      mockUseContinueSuggestion.mockReturnValue({
-        data: {
-          subjectId: 's1',
-          subjectName: 'Math',
-          topicId: 't1',
-          topicTitle: 'Fractions',
-        },
-      });
-      mockReadSessionRecoveryMarker.mockResolvedValue({
-        sessionId: 'session-1',
+        subjectId: 's1',
         subjectName: 'Physics',
-        updatedAt: new Date().toISOString(),
-      });
-
-      render(<LearnerScreen {...defaultProps} />);
-
-      await waitFor(() => {
-        expect(screen.getByTestId('intent-resume')).toBeTruthy();
-      });
-      expect(screen.queryByTestId('intent-resume-last')).toBeNull();
+        mode: 'learning',
+        topicId: 't1',
+      },
     });
+  });
+
+  it('silently clears stale markers without showing the continue card', async () => {
+    mockReadSessionRecoveryMarker.mockResolvedValue({
+      sessionId: 'session-1',
+      updatedAt: new Date().toISOString(),
+    });
+    mockIsRecoveryMarkerFresh.mockReturnValue(false);
+
+    render(<LearnerScreen {...defaultProps} />);
+
+    await waitFor(() => {
+      expect(mockClearSessionRecoveryMarker).toHaveBeenCalledWith('p1');
+    });
+
+    expect(screen.queryByTestId('intent-continue')).toBeNull();
+  });
+
+  it('renders fallback greeting when activeProfile is null', () => {
+    render(<LearnerScreen {...defaultProps} activeProfile={null} />);
+
+    expect(screen.getByText('Good morning, !')).toBeTruthy();
+  });
+
+  it('reads recovery marker with undefined profileId when activeProfile is null', async () => {
+    render(<LearnerScreen {...defaultProps} activeProfile={null} />);
+
+    await waitFor(() => {
+      expect(mockReadSessionRecoveryMarker).toHaveBeenCalledWith(undefined);
+    });
+  });
+
+  it('shows back button when onBack is provided', () => {
+    const onBack = jest.fn();
+
+    render(<LearnerScreen {...defaultProps} onBack={onBack} />);
+
+    fireEvent.press(screen.getByTestId('learner-back'));
+    expect(onBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('hides back button when onBack is not provided', () => {
+    render(<LearnerScreen {...defaultProps} />);
+
+    expect(screen.queryByTestId('learner-back')).toBeNull();
   });
 });
