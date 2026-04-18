@@ -300,7 +300,7 @@ describe('TopicDetailScreen error / empty / missing-params states', () => {
 
   it('shows missing-params state when route params are absent', () => {
     mockUseLocalSearchParams.mockReturnValue(
-      {} as unknown as { subjectId: string; topicId: string }
+      {} as { subjectId: string; topicId: string }
     );
     mockTopicProgress.mockReturnValue({
       data: null,

@@ -1,11 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
@@ -55,10 +49,6 @@ export default function QuizPlayScreen(): React.ReactElement {
   const [shuffledOptions, setShuffledOptions] = useState<string[]>([]);
   const [elapsedMs, setElapsedMs] = useState(0);
   const [guessWhoCluesUsed, setGuessWhoCluesUsed] = useState(1);
-  const [freeTextAnswer, setFreeTextAnswer] = useState('');
-  const [showBanner, setShowBanner] = useState(
-    () => round?.difficultyBump === true
-  );
 
   const questionStartTimeRef = useRef(Date.now());
   const resultsRef = useRef<QuestionResult[]>([]);
@@ -93,7 +83,6 @@ export default function QuizPlayScreen(): React.ReactElement {
     setAnswerState('unanswered');
     setSelectedAnswer(null);
     setShowContinueHint(false);
-    setFreeTextAnswer('');
     questionStartTimeRef.current = Date.now();
     setElapsedMs(0);
 
@@ -138,18 +127,6 @@ export default function QuizPlayScreen(): React.ReactElement {
     };
   }, []);
 
-  useEffect(() => {
-    if (!showBanner) return;
-    const timer = setTimeout(() => setShowBanner(false), 3000);
-    return () => clearTimeout(timer);
-  }, [showBanner]);
-
-  useEffect(() => {
-    if (currentIndex > 0 && showBanner) {
-      setShowBanner(false);
-    }
-  }, [currentIndex, showBanner]);
-
   // [ASSUMP-F2] Confirmed exit — ensures mid-round users always have a way
   // out. Quitting routes back to the quiz home; the flow-context resets on
   // the next round launch. Declared BEFORE the early-return so React's
@@ -192,15 +169,12 @@ export default function QuizPlayScreen(): React.ReactElement {
   const activeRound = round;
 
   // [F-015] Malformed round guard: capitals/vocabulary questions REQUIRE a
-  // pre-shuffled `options` array from the server — UNLESS they are
-  // freeTextEligible, in which case no options are needed.
-  // If `options` is missing or empty on a non-freeText question (e.g. because
-  // a stale API version stripped the wrong fields), we must never silently
-  // render a dead-end with no choices — every state must have an action per
-  // the UX resilience rules.
+  // pre-shuffled `options` array from the server. If `options` is missing
+  // or empty (e.g. because a stale API version stripped the wrong fields),
+  // we must never silently render a dead-end with no choices — every state
+  // must have an action per the UX resilience rules.
   const isMalformedMcQuestion =
     (question.type === 'capitals' || question.type === 'vocabulary') &&
-    !question.freeTextEligible &&
     (!Array.isArray(question.options) || question.options.length < 2);
 
   if (isMalformedMcQuestion) {
@@ -275,10 +249,7 @@ export default function QuizPlayScreen(): React.ReactElement {
   // [CR-1] Answer checking is now async — the server validates via
   // POST /quiz/rounds/:id/check. A ref prevents double-submission during
   // the network round-trip.
-  async function handleAnswer(
-    answer: string,
-    answerMode?: 'free_text' | 'multiple_choice'
-  ) {
+  async function handleAnswer(answer: string) {
     if (answerState !== 'unanswered' || answerSubmittedRef.current) return;
     answerSubmittedRef.current = true;
 
@@ -304,7 +275,6 @@ export default function QuizPlayScreen(): React.ReactElement {
       correct,
       answerGiven: answer,
       timeMs,
-      ...(answerMode !== undefined ? { answerMode } : {}),
     };
 
     resultsRef.current = [...resultsRef.current, nextResult];
@@ -324,12 +294,6 @@ export default function QuizPlayScreen(): React.ReactElement {
         ? Haptics.NotificationFeedbackType.Success
         : Haptics.NotificationFeedbackType.Error
     );
-  }
-
-  function handleFreeTextSubmit() {
-    if (!freeTextAnswer.trim()) return;
-    void handleAnswer(freeTextAnswer.trim(), 'free_text');
-    setFreeTextAnswer('');
   }
 
   function handleContinue() {
@@ -423,20 +387,6 @@ export default function QuizPlayScreen(): React.ReactElement {
         </Text>
       </View>
 
-      {showBanner && (
-        <View
-          testID="quiz-challenge-banner"
-          className="bg-primary-soft mx-4 mb-4 rounded-xl p-4"
-          accessibilityRole="alert"
-          accessibilityLiveRegion="polite"
-          accessibilityLabel="Challenge round. This round is harder than usual."
-        >
-          <Text className="text-on-surface text-center text-lg font-semibold">
-            Challenge round — you&apos;re on a streak! This one is harder.
-          </Text>
-        </View>
-      )}
-
       <View className="mb-8 px-5">
         {currentQuestion.type === 'capitals' ? (
           <>
@@ -473,63 +423,33 @@ export default function QuizPlayScreen(): React.ReactElement {
       ) : null}
 
       {question.type !== 'guess_who' ? (
-        question.freeTextEligible && answerState === 'unanswered' ? (
-          <View className="px-5" testID="quiz-free-text-input">
-            <Text className="text-on-surface-muted mb-2 text-sm">
-              Type your answer
-            </Text>
-            <TextInput
-              testID="quiz-free-text-field"
-              className="bg-surface-elevated text-on-surface rounded-xl p-4"
-              placeholder="Type your answer..."
-              value={freeTextAnswer}
-              onChangeText={setFreeTextAnswer}
-              autoFocus
-              returnKeyType="done"
-              onSubmitEditing={() => handleFreeTextSubmit()}
-            />
+        <View className="gap-3 px-5">
+          {shuffledOptions.map((option, index) => (
             <Pressable
-              testID="quiz-free-text-submit"
-              className="bg-primary mt-3 rounded-xl px-6 py-3"
-              onPress={() => handleFreeTextSubmit()}
-              disabled={!freeTextAnswer.trim()}
+              key={`${index}-${option}`}
+              onPress={() => handleAnswer(option)}
+              disabled={answerState !== 'unanswered'}
+              className={`min-h-[64px] items-center justify-center rounded-card px-5 py-4 ${getOptionContainerClass(
+                option
+              )}`}
               accessibilityRole="button"
-              accessibilityLabel="Submit answer"
+              accessibilityLabel={option}
+              accessibilityState={{
+                selected: option === selectedAnswer,
+                disabled: answerState !== 'unanswered',
+              }}
+              testID={`quiz-option-${index}`}
             >
-              <Text className="text-on-primary text-center font-semibold">
-                Submit
-              </Text>
-            </Pressable>
-          </View>
-        ) : (
-          <View className="gap-3 px-5">
-            {shuffledOptions.map((option, index) => (
-              <Pressable
-                key={`${index}-${option}`}
-                onPress={() => handleAnswer(option, 'multiple_choice')}
-                disabled={answerState !== 'unanswered'}
-                className={`min-h-[64px] items-center justify-center rounded-card px-5 py-4 ${getOptionContainerClass(
+              <Text
+                className={`text-body font-semibold ${getOptionTextClass(
                   option
                 )}`}
-                accessibilityRole="button"
-                accessibilityLabel={option}
-                accessibilityState={{
-                  selected: option === selectedAnswer,
-                  disabled: answerState !== 'unanswered',
-                }}
-                testID={`quiz-option-${index}`}
               >
-                <Text
-                  className={`text-body font-semibold ${getOptionTextClass(
-                    option
-                  )}`}
-                >
-                  {option}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        )
+                {option}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
       ) : answerState === 'unanswered' ? (
         <View className="px-5">
           <GuessWhoQuestion

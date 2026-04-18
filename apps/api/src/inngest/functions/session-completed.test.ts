@@ -28,6 +28,15 @@ const mockSessionCompletedDb = createTransactionalMockDb({
     learningSessions: {
       findFirst: jest.fn().mockResolvedValue({ rawInput: null, topicId: null }),
     },
+    // generate-session-highlight reads summary row and profile
+    sessionSummaries: {
+      findFirst: jest
+        .fn()
+        .mockResolvedValue({ id: 'summary-1', sessionId: 'session-1' }),
+    },
+    profiles: {
+      findFirst: jest.fn().mockResolvedValue({ displayName: 'Emma' }),
+    },
     // Snapshot aggregation reads these directly — supply empty results
     // so production code can use db.query.progressSnapshots and
     // db.query.milestones without defensive guards.
@@ -48,6 +57,7 @@ const mockDatabaseModule = createDatabaseModuleMock({
       sessionId: col('sessionId'),
       profileId: col('profileId'),
       createdAt: col('createdAt'),
+      eventType: col('eventType'),
     },
     retentionCards: {
       profileId: col('profileId'),
@@ -58,6 +68,12 @@ const mockDatabaseModule = createDatabaseModuleMock({
     learningProfiles: { profileId: col('profileId') },
     learningSessions: { id: col('id'), profileId: col('profileId') },
     subjects: { id: col('id'), profileId: col('profileId') },
+    sessionSummaries: {
+      id: col('id'),
+      sessionId: col('sessionId'),
+      profileId: col('profileId'),
+    },
+    profiles: { id: col('id'), displayName: col('displayName') },
     streaks: { profileId: col('profileId') },
   },
 });
@@ -192,6 +208,20 @@ const mockRefreshProgressSnapshot = jest.fn().mockResolvedValue(undefined);
 jest.mock('../../services/snapshot-aggregation', () => ({
   refreshProgressSnapshot: (...args: unknown[]) =>
     mockRefreshProgressSnapshot(...args),
+}));
+
+const mockGenerateLlmHighlight = jest
+  .fn()
+  .mockResolvedValue({ valid: false, reason: 'parse_error' });
+const mockBuildBrowseHighlight = jest
+  .fn()
+  .mockReturnValue('Emma browsed a topic — 1 min');
+
+jest.mock('../../services/session-highlights', () => ({
+  generateLlmHighlight: (...args: unknown[]) =>
+    mockGenerateLlmHighlight(...args),
+  buildBrowseHighlight: (...args: unknown[]) =>
+    mockBuildBrowseHighlight(...args),
 }));
 
 const mockCaptureException = jest.fn();
@@ -334,6 +364,7 @@ describe('sessionCompleted', () => {
       'update-needs-deepening',
       'check-milestone-completion',
       'write-coaching-card',
+      'generate-session-highlight',
       'analyze-learner-profile',
       'update-dashboard',
       'generate-embeddings',
@@ -352,6 +383,7 @@ describe('sessionCompleted', () => {
       .filter((o: any) => o.status !== 'skipped')
       .map((o: any) => o.status);
     expect(statuses).toEqual([
+      'ok',
       'ok',
       'ok',
       'ok',

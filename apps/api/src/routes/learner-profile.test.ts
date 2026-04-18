@@ -335,6 +335,26 @@ describe('learner-profile routes', () => {
       expect(mockHasParentAccess).not.toHaveBeenCalled();
     });
 
+    it('persists self-consent on POST /learner-profile/consent', async () => {
+      const res = await app.request(
+        '/v1/learner-profile/consent',
+        {
+          method: 'POST',
+          headers: PARENT_HEADERS,
+          body: JSON.stringify({ consent: 'granted' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      expect(mockGrantMemoryConsent).toHaveBeenCalledWith(
+        undefined,
+        PARENT_PROFILE_ID,
+        'granted'
+      );
+      expect(mockHasParentAccess).not.toHaveBeenCalled();
+    });
+
     it('calls toggleMemoryEnabled on PATCH /learner-profile/memory-enabled', async () => {
       const res = await app.request(
         '/v1/learner-profile/memory-enabled',

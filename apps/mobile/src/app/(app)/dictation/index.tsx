@@ -1,10 +1,11 @@
-import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IntentCard } from '../../../components/home/IntentCard';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { useGenerateDictation } from '../../../hooks/use-dictation-api';
+import { platformAlert } from '../../../lib/platform-alert';
 import { useThemeColors } from '../../../lib/theme';
 import { useDictationData } from './_layout';
 import { formatApiError } from '../../../lib/format-api-error';
@@ -33,7 +34,7 @@ export default function DictationChoiceScreen(): React.ReactElement {
     } catch (err: unknown) {
       const message = formatApiError(err);
       setLastError(message);
-      Alert.alert("Couldn't create a dictation right now", message, [
+      platformAlert("Couldn't create a dictation right now", message, [
         { text: 'Try again', onPress: () => void handleSurpriseMe() },
         { text: 'Go back', style: 'cancel' },
       ]);

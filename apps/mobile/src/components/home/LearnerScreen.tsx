@@ -11,10 +11,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Profile } from '@eduagent/schemas';
 import { ProfileSwitcher } from '../common';
-import {
-  useMarkQuizDiscoverySurfaced,
-  useQuizDiscoveryCard,
-} from '../../hooks/use-coaching-card';
+import { useQuizDiscoveryCard } from '../../hooks/use-coaching-card';
 import {
   useContinueSuggestion,
   useReviewSummary,
@@ -55,7 +52,6 @@ export function LearnerScreen({
   const { data: continueSuggestion } = useContinueSuggestion();
   const { data: reviewSummary } = useReviewSummary();
   const { data: quizDiscovery } = useQuizDiscoveryCard();
-  const markSurfaced = useMarkQuizDiscoverySurfaced();
   const [recoveryMarker, setRecoveryMarker] =
     useState<SessionRecoveryMarker | null>(null);
 
@@ -196,13 +192,11 @@ export function LearnerScreen({
         subtitle: quizDiscovery.body,
         icon: 'sparkles-outline',
         variant: 'highlight',
-        onPress: () => {
-          markSurfaced.mutate(quizDiscovery.activityType);
+        onPress: () =>
           router.push({
             pathname: '/(app)/quiz',
             params: { activityType: quizDiscovery.activityType },
-          } as never);
-        },
+          } as never),
       });
     }
 
@@ -241,7 +235,6 @@ export function LearnerScreen({
   }, [
     activeProfile?.id,
     continueSuggestion,
-    markSurfaced,
     quizDiscovery,
     recoveryMarker,
     reviewSummary,

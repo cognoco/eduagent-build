@@ -594,6 +594,14 @@ export default function ChildDetailScreen() {
                   {session.displaySummary}
                 </Text>
               ) : null}
+              {session.highlight && (
+                <Text
+                  className="text-text-tertiary mt-0.5 text-xs"
+                  numberOfLines={2}
+                >
+                  {session.highlight}
+                </Text>
+              )}
               <View className="flex-row items-center">
                 <Text className="text-caption text-text-secondary me-4">
                   {session.exchangeCount} exchanges
@@ -607,9 +615,10 @@ export default function ChildDetailScreen() {
             </Pressable>
           ))
         ) : (
-          <View className="py-4 items-center">
-            <Text className="text-body text-text-secondary">
-              No sessions yet
+          <View className="mx-4 mt-4 rounded-xl bg-surface p-6">
+            <Text className="text-text-secondary text-center text-base">
+              No sessions yet. When {child?.displayName ?? 'your child'} starts
+              learning, you'll see what they work on here.
             </Text>
           </View>
         )}

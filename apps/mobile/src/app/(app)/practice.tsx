@@ -131,7 +131,7 @@ export default function PracticeScreen(): React.ReactElement {
           </View>
         ) : null}
         <IntentCard
-          title="Recite"
+          title="Recite (Beta)"
           subtitle="Recite a poem or text from memory"
           icon="mic-outline"
           onPress={() =>

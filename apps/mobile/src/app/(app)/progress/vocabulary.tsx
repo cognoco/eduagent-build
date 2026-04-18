@@ -90,6 +90,7 @@ export default function VocabularyBrowserScreen(): React.ReactElement {
     inventory?.subjects
       .filter((s) => s.pedagogyMode === 'four_strands')
       .map((s) => s.subjectName) ?? [];
+  const hasLanguageSubject = existingLanguageSubjects.length > 0;
   const emptyMessage =
     existingLanguageSubjects.length === 1
       ? `Practice ${existingLanguageSubjects[0]} to start building your word list.`
@@ -150,6 +151,26 @@ export default function VocabularyBrowserScreen(): React.ReactElement {
               }}
               testID="vocab-browser-error-fallback"
             />
+          </View>
+        ) : !isLoading && !isError && !hasLanguageSubject ? (
+          <View
+            className="flex-1 items-center justify-center px-6"
+            testID="vocab-browser-no-language"
+          >
+            <Text className="text-text-secondary text-center text-base">
+              Vocabulary tracking is available for language subjects.
+            </Text>
+            <Pressable
+              onPress={() =>
+                goBackOrReplace(router, '/(app)/progress' as const)
+              }
+              className="mt-4 rounded-lg bg-primary px-6 py-3"
+              accessibilityRole="button"
+              accessibilityLabel="Go back"
+              testID="vocab-browser-no-language-back"
+            >
+              <Text className="text-text-inverse font-medium">Go Back</Text>
+            </Pressable>
           </View>
         ) : isEmpty && newLearner ? (
           <View

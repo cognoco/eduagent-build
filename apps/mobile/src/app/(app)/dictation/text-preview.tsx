@@ -1,16 +1,10 @@
 import { useState } from 'react';
-import {
-  Alert,
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { goBackOrReplace } from '../../../lib/navigation';
+import { platformAlert } from '../../../lib/platform-alert';
 import { usePrepareHomework } from '../../../hooks/use-dictation-api';
 import { useThemeColors } from '../../../lib/theme';
 import { useDictationData } from './_layout';
@@ -26,7 +20,7 @@ export default function TextPreviewScreen(): React.ReactElement {
 
   const handleStartDictation = async () => {
     if (!text.trim()) {
-      Alert.alert('No text', 'Please enter or photograph some text first.');
+      platformAlert('No text', 'Please enter or photograph some text first.');
       return;
     }
 
@@ -39,7 +33,7 @@ export default function TextPreviewScreen(): React.ReactElement {
       });
       router.push('/(app)/dictation/playback' as never);
     } catch {
-      Alert.alert(
+      platformAlert(
         'Something went wrong',
         'Could not prepare your dictation. Try again?',
         [
@@ -76,7 +70,9 @@ export default function TextPreviewScreen(): React.ReactElement {
       </View>
 
       <Text className="text-body-sm text-text-secondary mb-3">
-        Edit any mistakes from the photo, then start your dictation.
+        {ocrText
+          ? 'Edit any mistakes from the photo, then start your dictation.'
+          : 'Review your text, then start your dictation.'}
       </Text>
 
       <TextInput

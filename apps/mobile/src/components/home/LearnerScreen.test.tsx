@@ -56,10 +56,8 @@ jest.mock('../../hooks/use-progress', () => ({
 }));
 
 const mockUseQuizDiscoveryCard = jest.fn();
-const mockMarkSurfacedMutate = jest.fn();
 jest.mock('../../hooks/use-coaching-card', () => ({
   useQuizDiscoveryCard: () => mockUseQuizDiscoveryCard(),
-  useMarkQuizDiscoverySurfaced: () => ({ mutate: mockMarkSurfacedMutate }),
 }));
 
 jest.mock('../../lib/session-recovery', () => ({
@@ -91,7 +89,6 @@ describe('LearnerScreen', () => {
     mockUseContinueSuggestion.mockReturnValue({ data: null });
     mockUseReviewSummary.mockReturnValue({ data: null });
     mockUseQuizDiscoveryCard.mockReturnValue({ data: undefined });
-    mockMarkSurfacedMutate.mockReset();
   });
 
   it('renders greeting with profile name', () => {
@@ -202,30 +199,6 @@ describe('LearnerScreen', () => {
         subjectId: 's1',
         topicName: 'Algebra',
       },
-    });
-  });
-
-  it('shows quiz discovery card and fires mark-surfaced mutation before navigating', () => {
-    mockUseQuizDiscoveryCard.mockReturnValue({
-      data: {
-        type: 'quiz_discovery',
-        activityType: 'capitals',
-        title: 'Discover: Capitals',
-        body: 'Test your knowledge of world capitals',
-      },
-    });
-
-    render(<LearnerScreen {...defaultProps} />);
-
-    expect(screen.getByTestId('intent-quiz-discovery')).toBeTruthy();
-    expect(screen.getByText('Discover: Capitals')).toBeTruthy();
-
-    fireEvent.press(screen.getByTestId('intent-quiz-discovery'));
-
-    expect(mockMarkSurfacedMutate).toHaveBeenCalledWith('capitals');
-    expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/(app)/quiz',
-      params: { activityType: 'capitals' },
     });
   });
 

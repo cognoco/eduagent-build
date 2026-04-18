@@ -2,6 +2,8 @@ import { View, Text, Pressable } from 'react-native';
 
 interface MemoryConsentPromptProps {
   childName?: string;
+  title?: string;
+  description?: string;
   isPending?: boolean;
   onGrant: () => void;
   onDecline: () => void;
@@ -9,6 +11,8 @@ interface MemoryConsentPromptProps {
 
 export function MemoryConsentPrompt({
   childName,
+  title,
+  description,
   isPending,
   onGrant,
   onDecline,
@@ -16,11 +20,11 @@ export function MemoryConsentPrompt({
   return (
     <View className="bg-surface rounded-card p-4 border border-border">
       <Text className="text-body font-semibold text-text-primary mb-1">
-        Help the mentor learn about {childName ?? 'your child'}
+        {title ?? `Help the mentor learn about ${childName ?? 'your child'}`}
       </Text>
       <Text className="text-body-sm text-text-secondary mb-4">
-        This lets the mentor remember what kinds of explanations work, what is
-        still tricky, and which examples feel relevant.
+        {description ??
+          'This lets the mentor remember what kinds of explanations work, what is still tricky, and which examples feel relevant.'}
       </Text>
       <View className="flex-row gap-2">
         <Pressable

@@ -79,6 +79,8 @@ export function useCelebration(options?: {
   const [activeEntry, setActiveEntry] = useState<QueueEntry | null>(null);
   const [pendingQueue, setPendingQueue] = useState<QueueEntry[]>([]);
   const seenQueueKeysRef = useRef<Set<string>>(new Set());
+  const shownFromCurrentBatchRef = useRef(0);
+  const lastBatchIdRef = useRef<string | null>(null);
 
   const flushNext = useCallback(() => {
     setPendingQueue((current) => {
@@ -94,6 +96,20 @@ export function useCelebration(options?: {
   useEffect(() => {
     if (!options?.queue || options.queue.length === 0) return;
 
+    // Batch identity: the max queuedAt across all entries. A fresh session
+    // completion produces newer timestamps than the previous batch.
+    const batchId =
+      options.queue
+        .map((e) => e.queuedAt)
+        .sort()
+        .slice(-1)[0] ?? null;
+
+    // New batch — reset the per-batch cap counter
+    if (batchId !== lastBatchIdRef.current) {
+      shownFromCurrentBatchRef.current = 0;
+      lastBatchIdRef.current = batchId;
+    }
+
     const unseen = options.queue.filter((entry) => {
       const key = `${entry.celebration}:${entry.reason}:${entry.detail ?? ''}:${
         entry.queuedAt
@@ -107,7 +123,16 @@ export function useCelebration(options?: {
 
     if (unseen.length === 0) return;
 
-    setPendingQueue((current) => [...current, ...unseen]);
+    // Throttle: at most 2 celebrations per batch
+    const MAX_TOASTS_PER_BATCH = 2;
+    const remaining = MAX_TOASTS_PER_BATCH - shownFromCurrentBatchRef.current;
+    const toShow = unseen.slice(0, Math.max(0, remaining));
+
+    if (toShow.length === 0) return;
+
+    shownFromCurrentBatchRef.current += toShow.length;
+
+    setPendingQueue((current) => [...current, ...toShow]);
   }, [celebrationLevel, options?.queue]);
 
   useEffect(() => {

@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
-import { Alert } from 'react-native';
+// Alert import removed — all calls migrated to platformAlert [F-029]
+import { platformAlert } from '../../../../lib/platform-alert';
 import type {
   InputMode,
   HomeworkProblem,
@@ -335,7 +336,10 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
     // frame cannot pass the guard.
     setIsClosing(true);
 
-    Alert.alert(
+    // [F-029] Use platformAlert instead of Alert.alert — on React Native Web,
+    // Alert.alert is a no-op that never invokes callbacks, leaving isClosing=true
+    // permanently and trapping the user in "Wrapping up..." state.
+    platformAlert(
       'End session?',
       '',
       [
@@ -424,7 +428,7 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
                 );
               }
             } catch (err: unknown) {
-              Alert.alert(
+              platformAlert(
                 'Could not end this session cleanly',
                 `${formatApiError(
                   err
@@ -493,7 +497,7 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
 
       if (chip === 'park') {
         if (!activeSessionId) {
-          Alert.alert(
+          platformAlert(
             'Start the conversation first',
             'Send one message so this session has somewhere to save your parking lot.'
           );
@@ -621,7 +625,7 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
           await handleSend(followUpPrompt);
         }
       } catch (err: unknown) {
-        Alert.alert('Could not save feedback', formatApiError(err));
+        platformAlert('Could not save feedback', formatApiError(err));
       }
     },
     [
@@ -638,7 +642,7 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
 
   const handleSaveParkingLot = useCallback(async () => {
     if (!activeSessionId) {
-      Alert.alert(
+      platformAlert(
         'Start the conversation first',
         'Send one message so this session has somewhere to save your parking lot.'
       );
@@ -652,7 +656,7 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
       setParkingLotDraft('');
       showConfirmation('Saved to your parking lot.');
     } catch (err: unknown) {
-      Alert.alert('Could not save parking lot item', formatApiError(err));
+      platformAlert('Could not save parking lot item', formatApiError(err));
     }
   }, [
     activeSessionId,
@@ -691,7 +695,7 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
         } as never);
       } catch (err: unknown) {
         setIsClosing(false);
-        Alert.alert('Could not switch topic', formatApiError(err));
+        platformAlert('Could not switch topic', formatApiError(err));
       }
     },
     [

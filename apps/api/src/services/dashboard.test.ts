@@ -61,6 +61,12 @@ const mockDatabaseModule = createDatabaseModuleMock({
       profileId: 'profile_id',
       amount: 'amount',
     },
+    sessionSummaries: {
+      id: 'id',
+      sessionId: 'session_id',
+      profileId: 'profile_id',
+      highlight: 'highlight',
+    },
   },
 });
 
@@ -293,6 +299,10 @@ function createMockDb() {
       },
       streaks: {
         findMany: mockStreaksFindMany,
+      },
+      sessionSummaries: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([]),
       },
     },
     select: mockXpSelect,

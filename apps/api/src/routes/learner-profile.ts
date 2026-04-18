@@ -197,6 +197,17 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
     }
   )
   .post(
+    '/learner-profile/consent',
+    zValidator('json', grantMemoryConsentSchema),
+    async (c) => {
+      const db = c.get('db');
+      const profileId = requireProfileId(c.get('profileId'));
+      const { consent } = c.req.valid('json');
+      await grantMemoryConsent(db, profileId, consent);
+      return c.json({ success: true });
+    }
+  )
+  .post(
     '/learner-profile/:profileId/consent',
     zValidator('json', grantMemoryConsentSchema),
     async (c) => {

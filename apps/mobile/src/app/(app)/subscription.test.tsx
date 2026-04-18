@@ -16,6 +16,16 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 const mockBack = jest.fn();
 const mockPush = jest.fn();
 
+// [F-029] Mock platformAlert to spy on it via Alert.alert, so existing
+// test assertions continue working after the Alert → platformAlert migration.
+const mockPlatformAlert = jest.fn((...args: Parameters<typeof Alert.alert>) =>
+  Alert.alert(...args)
+);
+jest.mock('../../lib/platform-alert', () => ({
+  platformAlert: (...args: unknown[]) =>
+    mockPlatformAlert(...(args as Parameters<typeof Alert.alert>)),
+}));
+
 jest.mock('expo-router', () => ({
   useRouter: () => ({
     back: mockBack,
@@ -341,6 +351,7 @@ describe('SubscriptionScreen', () => {
     };
     mockXpSummary = undefined;
     jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    mockPlatformAlert.mockClear();
     jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
   });
 

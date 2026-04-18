@@ -1,10 +1,11 @@
 import React from 'react';
-import { Alert, ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
+import { platformAlert } from '../../../lib/platform-alert';
 import { useThemeColors } from '../../../lib/theme';
 import { useDictationData } from './_layout';
 import {
@@ -85,9 +86,11 @@ export default function DictationCompleteScreen(): React.ReactElement {
       // only jpeg/png/webp, so normalize anything else to jpeg.
       assetMimeType = asset?.mimeType;
     } catch {
-      Alert.alert('Camera error', 'Could not open camera. Please try again.', [
-        { text: 'OK' },
-      ]);
+      platformAlert(
+        'Camera error',
+        'Could not open camera. Please try again.',
+        [{ text: 'OK' }]
+      );
       return;
     }
 
@@ -114,7 +117,7 @@ export default function DictationCompleteScreen(): React.ReactElement {
         imageMimeType = 'image/jpeg';
       }
     } catch {
-      Alert.alert(
+      platformAlert(
         'Photo error',
         'Could not read the photo. Please try again.',
         [{ text: 'OK' }]
@@ -142,7 +145,7 @@ export default function DictationCompleteScreen(): React.ReactElement {
     } catch (err) {
       const message =
         err instanceof Error ? err.message : 'Something went wrong.';
-      Alert.alert('Review failed', message, [
+      platformAlert('Review failed', message, [
         {
           text: 'Try again',
           onPress: () => void handleCheckWriting(),
@@ -175,7 +178,7 @@ export default function DictationCompleteScreen(): React.ReactElement {
         err instanceof Error && err.message
           ? err.message
           : 'We couldn\u2019t save your dictation result.';
-      Alert.alert('Couldn\u2019t save your result', message, [
+      platformAlert('Couldn\u2019t save your result', message, [
         {
           text: 'Retry',
           onPress: () => void handleDone(),

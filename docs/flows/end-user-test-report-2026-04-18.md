@@ -48,7 +48,7 @@ This report is **incremental** — each section is filled as flows are tested. T
 | ID | Flow | Status | Notes |
 |---|---|---|---|
 | HOME-01 | Learner home with intent cards | ✅ | 5 cards: Continue (Geography topic) / Learn / Ask / Practice / Homework |
-| HOME-02 | Parent gateway home | ✅ | Tested 2026-04-18 after family-tier + child added. `parent-gateway` testid + "Check child's progress" + "Learn something" CTAs |
+| HOME-02 | Parent gateway home | ✅ | **Re-verified 2026-04-18 continuation #4 (PV+PEH pass).** `parent-gateway` now shows dynamic summary on the "Check child's progress" CTA: "TestKid practiced 1 min this week" (replaced the prior static CTA). Greeting variant `Weekend learning? Nice!` renders on Saturdays. Testids: `parent-gateway`, `gateway-check-progress`, `gateway-learn`, `profile-switcher-chip`. |
 | HOME-03 | Tab shell + Progress tab promoted | ✅ | All 4 tabs render |
 | HOME-05 | Empty first-user state | ✅ | Tested 2026-04-18 — switched to fresh TestKid profile, home showed 4 intent cards (no Continue) with "Good afternoon, TestKid!" |
 | HOME-06 | Continue intent card | ⚠️ | F-001: missing `lastSessionId` |
@@ -80,18 +80,24 @@ This report is **incremental** — each section is filled as flows are tested. T
 ### Practice Hub + Practice Activities
 | ID | Flow | Status | Notes |
 |---|---|---|---|
-| PRACTICE-01 | Practice hub menu | ✅ | 4 cards: Review / Recite / Dictation / Quiz |
+| PRACTICE-01 | Practice hub menu | ✅ | 4 cards: Review / Recite / Dictation / Quiz + **new `practice-quiz-history` link** (ui-redesign branch) |
 | PRACTICE-02 | Review topics shortcut | ✅ | "Nothing to review" empty state with "Browse your topics" link |
 | PRACTICE-03 | Recitation session | ✅ | Renders "Recitation (Beta)" with "Recite from memory" greeting |
 | PRACTICE-04 | All-caught-up empty state | ✅ | Visible on Practice when no overdue topics |
-| QUIZ-01 | Quiz activity picker | ✅ | 3 cards: Capitals / Vocabulary: Spanish (New!) / Guess Who |
+| QUIZ-01 | Quiz activity picker | ✅ | 3 cards: Capitals / Vocabulary: Spanish (New!) / Guess Who. **Now shows `Best: x/y · Played: n` per card after any play — verified 2026-04-18 ui-redesign pass.** |
 | QUIZ-02 | Round-generation loading | ✅ | "Shuffling questions..." rotation + Cancel button |
-| QUIZ-03 | Capitals/Vocabulary play | ❌ | F-014 still active on staging (retested 2026-04-18); F-015 fix VERIFIED — `quiz-play-malformed` error now shows "This round couldn't load / We didn't get the answer choices for this question" with `quiz-play-malformed-back` ✅ |
-| QUIZ-04 | Guess Who play | ⚠️ | F-028 NEW: `/quiz/rounds/{id}/check` returns 404 on staging — every answer silently marked wrong, round plays to 0/4 score regardless of correctness |
+| QUIZ-03 | Capitals play end-to-end | ✅ | **VERIFIED 2026-04-18 ui-redesign pass.** Played 4-question round of "Lesser-Known European Capitals" to completion, 2/4 correct, +20 XP, celebrationTier="nice". F-014 fix verified — response stripped to `{type, country, options, funFact, isLibraryItem}` only. |
+| QUIZ-04 | Guess Who play end-to-end | ✅ | **VERIFIED 2026-04-18 ui-redesign pass.** 3-question round "Pioneers in Technology and Science" — 3/3 perfect, +79 XP, celebrationTier="perfect". Free-text first (Tesla clue 1 correct), MC fallback after 3rd clue (Bell), free-text Q3 (Eastman). F-028 fix verified: `/check` now returns `{"correct": boolean}` properly. |
 | QUIZ-05 | Mid-round quit | ✅ | Quit icon visible top-left; tested |
 | QUIZ-06 | Round complete error retry | ⚠️ | Retry after transient 502 works — LLM returned 502 UPSTREAM_ERROR first attempt, 200 on retry. F-014 leak remains on 200 response. |
-| QUIZ-07 | Results screen | ⏭️ | Can't reach cleanly — F-028 blocks scoring |
-| QUIZ-08 | Typed-error classification | ✅ | Two real error paths verified: 502 upstream (quiz-launch-error fallback with Retry/Go Back) + 404 check (silent fallback to wrong answer — this IS the bug in F-028) |
+| QUIZ-07 | Results screen | ✅ | **VERIFIED 2026-04-18 ui-redesign pass.** All three celebrationTiers observed (nice/great/perfect). Perfect tier renders `BrandCelebration` + trophy icon + title "Perfect round!". Guess_who-specific subtitle "X of Y people identified". `xpEarned > 0` pill shown. Play Again / Done / View History buttons. |
+| QUIZ-08 | Typed-error classification | ✅ | Two real error paths verified: 502 upstream (quiz-launch-error fallback with Retry/Go Back) + 404 check (pre-fix). Post-fix /check returns `{correct}`. |
+| QUIZ-09 | Quiz History list | ✅ | **NEW [5B.15] — VERIFIED.** `/quiz/history` renders rounds grouped by date with activityType, theme, score/total, xpEarned. `quiz-history-empty` state with "Try a Quiz" CTA works. Reachable via `practice-quiz-history` link AND `quiz-results-history` link from results screen. |
+| QUIZ-10 | Round Detail view | 🔴 | **NEW [5B.16, 5B.18] — BROKEN.** F-032: `/quiz/{roundId}` detail view always shows all questions as "Wrong" and header score blank because `GET /v1/quiz/rounds/:id` doesn't include completion data (see F-032). |
+| QUIZ-11 | Free-text answer for eligible questions | ⏭️ | **NEW [5C.21] — Not reachable.** Code path renders `quiz-free-text-input` + `quiz-free-text-field` + `quiz-free-text-submit` when `question.freeTextEligible === true`. This only fires when a question is a mastery item [4B.6-11], which requires prior missed-but-learned items in the quiz_mastery_items table. User had no mastery items, so none of my rounds had `freeTextEligible: true` questions. Code inspection confirms the path is implemented. |
+| QUIZ-12 | Mastery-driven round generation | ⏭️ | **NEW [4B.6-11] — Not directly testable.** Would require seeding `quiz_mastery_items` for the profile. Schema (`quiz_mastery_items` table with SM-2 columns) is live. |
+| QUIZ-13 | Mark-surfaced discovery card | 🔴 | **NEW [4B.1-3] — BLOCKED.** F-033: `POST /v1/quiz/missed-items/mark-surfaced` returns plain-text "404 Not Found" on staging worker (deploy lag). Mobile hook `useMarkQuizDiscoverySurfaced` uses fire-and-forget `.mutate()` so UX isn't blocked — but the discovery card will **re-appear every session** until the route lands on the worker. Also, coaching-card currently returns type `continue_book` for this user; quiz_discovery type wasn't triggered this pass. |
+| QUIZ-14 | Challenge banner (difficulty bump) | ⏭️ | **NEW [5A.12, 5A.14b] — Not reached.** Requires **3 perfect rounds within 14 days** on the same activity to toggle `difficultyBump: true` in next round's generation. User has 1 perfect guess_who round; 2 more needed. Code path renders `quiz-challenge-banner` ("Challenge round — you're on a streak! This one is harder.") for 3 seconds then auto-hides. |
 
 ### Dictation
 | ID | Flow | Status | Notes |
@@ -331,12 +337,100 @@ This report is **incremental** — each section is filled as flows are tested. T
 - **To confirm:** Run on a physical Android/iOS device and check if `/dictation/result` is idempotent. If both rows land, the `reviewed: false` duplicate would show up twice in the parent Monthly Report — visible to real users. If server-side deduplication exists, this is benign.
 - **Low priority** pending native-device verification.
 
+### F-014 FIX VERIFIED 🟢 (ui-redesign branch, 2026-04-18 pass)
+- **What was broken:** Staging API returned unstripped question schema (exposing `correctAnswer`, `acceptedAliases`, `distractors` to DevTools).
+- **Verified 2026-04-18 ui-redesign pass:**
+  - `POST /v1/quiz/rounds` with `{activityType: 'capitals'}` returns each question with ONLY `{type, country, options, funFact, isLibraryItem}` keys.
+  - Probe sample: first question was `{country: "France", options: ["Marseille", "Lyon", "Nice", "Paris"], funFact: "...", isLibraryItem: false}` — **no leaked answer fields.** ✅
+  - Same verified for Guess Who (no `correctAnswer` / `canonicalName` / `acceptedAliases` in the client round response).
+- **Also noted:** round size is now 4 for capitals / 3 for guess_who (was 4/4 originally). The `total` field on the round reflects real size.
+
+### F-028 FIX VERIFIED 🟢 (ui-redesign branch, 2026-04-18 pass)
+- **What was broken:** `POST /v1/quiz/rounds/:id/check` returned plain text "404 Not Found" (route not on worker). Every answer silently marked wrong.
+- **Verified 2026-04-18 ui-redesign pass:**
+  - Bogus round id → `{"code":"NOT_FOUND","message":"Round not found"}` with `content-type: application/json` — proper Hono error shape.
+  - Live round → Switzerland/Bern click returned `{correct: true}` in 234ms; UI highlighted in primary color, showed fun fact, advanced correctly.
+  - Full end-to-end Guess Who round 3/3 scored correctly: Tesla (free-text), Bell (MC fallback), Eastman (free-text). All returned `{correct: true}` and were awarded as correct in the completion payload.
+- **Two rounds played, final stats confirmed:** `capitals: 2/4 · 20 XP`, `guess_who: 3/3 · 79 XP`. Scoring is no longer broken.
+
 ### F-012 FIX VERIFIED 🟢
 - **What was fixed (commit 32edfa80):** Progress page now always shows "See all" on Recent milestones + "Vocabulary" link on the stats pill, even for zero-data users.
 - **Verified 2026-04-18 continuation #3:**
   - `progress-milestones-see-all` testid rendered ✅
   - `progress-vocab-stat` testid rendered ✅
   - Tapping `progress-milestones-see-all` → `/progress/milestones` with `milestones-empty` + `milestones-empty-back` empty state ✅
+
+### F-032 🔴 CRITICAL — Round Detail view (`/quiz/{roundId}`) shows every question as "Wrong" and blank score
+- **Where:** New round-detail screen at [apps/mobile/src/app/(app)/quiz/[roundId].tsx](apps/mobile/src/app/(app)/quiz/[roundId].tsx), reachable from `quiz-history-row-*` taps and from the results screen `View History` → row tap.
+- **Observed 2026-04-18 ui-redesign pass:**
+  - Header reads `guess who · /3` (score missing) for a round that actually scored 3/3.
+  - All four `round-detail-question-{i}` rows say `Q1 Wrong / Q2 Wrong / Q3 Wrong / Q4 Wrong` regardless of actual correctness.
+  - Reproduced on both a 2/4 capitals round and a 3/3 perfect Guess Who round.
+- **Root cause — server-side gap in `GET /v1/quiz/rounds/:id`:**
+  Current response:
+  ```json
+  { "id", "activityType", "theme", "questions[{type,country,options,funFact,isLibraryItem}]", "total" }
+  ```
+  Missing for a **completed** round: `score`, `results[]` (per-question `{questionIndex, correct, answerGiven}`), and `correctAnswer` on each question. The client component [quiz/[roundId].tsx:40-98](apps/mobile/src/app/(app)/quiz/[roundId].tsx:40) reads `round.score`, `round.results`, and `q.correctAnswer` — all undefined. Therefore `result?.correct` falls to `undefined` → `<Text className={result?.correct ? 'text-success' : 'text-error'}>` always renders "Wrong", and `q.correctAnswer` never renders the reveal line.
+- **Contrast:** `GET /v1/quiz/rounds/recent` returns `score, total, xpEarned` correctly, so the history **list** is fine; only the **detail** screen has the data gap. And `POST /v1/quiz/rounds/:id/complete` returns the full `questionResults[]` — but only inline; the client never persists those into a shape the detail screen can re-read.
+- **User impact:**
+  1. The core purpose of the round-detail view — reviewing missed questions with correct answers surfaced — is completely broken.
+  2. Users will see "3/3 perfect Guess Who" on the history row and then open a detail screen that says all three were wrong. Cognitive dissonance, loss of trust in scoring.
+  3. [5B.16, 5B.18] features were shipped to the client but never completed on the server side.
+- **Recommended fix (server):**
+  - Branch `GET /v1/quiz/rounds/:id` on `quiz_rounds.status`:
+    - If `in_progress`: current stripped-question shape (protect answers during live play).
+    - If `completed`: include `score`, `results[]` from `quiz_round_results`, and un-stripped `correctAnswer`/`acceptedAliases` on each question.
+  - Add an integration break test: `GET /v1/quiz/rounds/:id` for a completed round returns `score`, `results.length === questions.length`, and each result has a `correctAnswer`.
+- **Verification:** Once the server ships, the existing client will work unchanged — [quiz/[roundId].tsx:40-98](apps/mobile/src/app/(app)/quiz/[roundId].tsx:40) already reads the right fields.
+
+### F-033 🔴 CRITICAL — `POST /v1/quiz/missed-items/mark-surfaced` returns plain 404 on staging worker
+- **Where:** The discovery-card → quiz handoff path in [apps/mobile/src/hooks/use-coaching-card.ts:61-71](apps/mobile/src/hooks/use-coaching-card.ts:61), dispatched from [LearnerScreen.tsx:192-206](apps/mobile/src/components/home/LearnerScreen.tsx:192) when a user taps the `intent-quiz-discovery` card.
+- **API probe 2026-04-18 ui-redesign pass:**
+  ```
+  POST /v1/quiz/missed-items/mark-surfaced
+    body: {"activityType":"capitals"}
+    headers: Authorization + X-Profile-Id (Zuzana)
+  → 404 Not Found
+  content-type: text/plain; charset=UTF-8
+  body: "404 Not Found"
+  ```
+  The plain-text body + Hono's default catch-all signature strongly indicates the route is NOT on the deployed worker.
+- **Source exists:** [apps/api/src/routes/quiz.ts:355](apps/api/src/routes/quiz.ts:355) defines the route (commit 6318a8fd). This is the same deploy-lag pattern that was behind the old F-014 and F-028 CRITICALs.
+- **User impact (lower than F-028 was):**
+  - Mobile hook uses fire-and-forget `mutate()` (not `mutateAsync`) with comment "If the mutation fails, the card reappears next session" — silent degradation by design. No crash, no visible error.
+  - **But:** the discovery card will **reappear on every session** until the route deploys. Users who see the same "Try a capitals quiz!" card repeatedly may find it annoying or dismiss it as broken.
+- **Recommended fix:** Redeploy `mentomate-api-stg` to pick up commit 6318a8fd (and all 22 following commits). Same workflow as F-014/F-028 recovery. Add a smoke test hitting `POST /v1/quiz/missed-items/mark-surfaced` with a valid profile + activityType asserting 200 to prevent silent regression.
+
+### F-034 🟢 `practice-quiz` subtitle on Practice hub only reflects `capitals` stats
+- **Where:** [apps/mobile/src/app/(app)/practice.tsx:41-50](apps/mobile/src/app/(app)/practice.tsx:41).
+- **Observed:** After playing a perfect 3/3 Guess Who round (+79 XP), the Practice hub Quiz intent card still showed `Best: 2/4 · Played: 1` — the stats from the earlier *capitals* round. The Guess Who score is invisible on this surface.
+- **Code:** `const capitalsStats = quizStats?.find((stat) => stat.activityType === 'capitals');` — hardcoded filter. If a user only plays Guess Who or Vocabulary, their Practice hub card shows the generic fallback "Test yourself with multiple choice questions".
+- **Recommended fix:** Aggregate across activity types (e.g., "Best round: 3/3 · Played: 2" using the max-score entry by roundsPlayed or totalXp) or pick the activity with most recent `completedAt`.
+- **Severity:** Low — the Quiz picker inside `/quiz` has per-activity stats that ARE populated correctly (this was verified — Capitals card shows `Best: 2/4 · Played: 1` and Guess Who shows `Best: 3/3 · Played: 1` after playing both).
+
+### F-035 🟢 Orphan `totalXp` field in `/v1/quiz/stats` not surfaced anywhere in UI
+- **Where:** `GET /v1/quiz/stats` response includes `{ activityType, bestScore, bestTotal, roundsPlayed, totalXp }` per row. User's totalXp after 2 rounds = `capitals: 20 XP, guess_who: 79 XP` — so lifetime earned = 99 XP, not displayed anywhere.
+- **Why it matters:** XP is the main gamification mechanic introduced in this branch. Users see "+20 XP" / "+79 XP" on the results screen for a few seconds then it disappears. There's no leaderboard, no running total, no badge threshold shown. The totalXp stat exists on the server but the UI never reads it.
+- **Recommended fix:** Either surface `totalXp` on the Quiz picker cards (e.g., "Best: 3/3 · 79 XP lifetime") or add a small XP badge to the profile-chip header. Cheap, high-perceived-value win.
+
+### F-036 🟢 Round detail screen cosmetic polish
+- **Where:** [apps/mobile/src/app/(app)/quiz/[roundId].tsx](apps/mobile/src/app/(app)/quiz/[roundId].tsx). (Assumes F-032 is fixed and the screen has real data.)
+- **Issues spotted:**
+  1. Back button is plain text "Back" — inconsistent with the `arrow-back` Ionicon used everywhere else (Practice, Quiz picker, etc.).
+  2. activityType renders raw — `"guess who"` / `"capitals"` in lowercase. The tailwind `capitalize` class capitalizes the first letter of EACH word, so `guess_who.replace('_', ' ')` becomes "Guess Who" only for the CSS display — but the underlying `textContent` is lowercase. Screen readers and automated tests see the lowercase form.
+  3. No per-question type labels — Guess Who questions all render as "Guess Who" placeholder; user can't tell which clue/person was shown. Would be helpful to at least show `canonicalName` (or the clue used) for context.
+- **Recommended fix:** Use `arrow-back` Ionicon + standard back testid `round-detail-back`; use server-side formatted activity labels (e.g., `activityLabel: 'Capitals'`) rather than client-side string mangling.
+
+### F-037 🟢 History date header is raw ISO format
+- **Where:** [apps/mobile/src/app/(app)/quiz/history.tsx:74-76](apps/mobile/src/app/(app)/quiz/history.tsx:74).
+- **Observed:** Section header displays `2026-04-18` (raw `completedAt.slice(0, 10)`).
+- **Issue:** Users will glance and think "what day is that?" Use `Intl.DateTimeFormat` with relative buckets: "Today", "Yesterday", "This week", then "April 18". Same inconsistency class as F-019 (subscription reset date).
+
+### F-038 🟢 "Type your guess" placeholder echoes the same label-like text above the input (minor redundancy)
+- **Where:** Guess Who input area.
+- **Observed:** DOM has text label "Type your guess" AND the TextInput placeholder "Type your guess..." immediately below. On a small phone the effect is two nearly identical prompts stacked.
+- **Recommended fix:** Drop one — either the label OR the placeholder. Placeholder is sufficient for a single-field form.
 
 ### F-027 🟢 CC-02b — Multi-candidate classifier picker works correctly (no silent auto-pick)
 - **Where:** Freeform Ask session, sent "Tell me about volcanoes" as first message.
@@ -417,15 +511,16 @@ These flows from [`mobile-app-flow-inventory.md`](mobile-app-flow-inventory.md) 
 ### PARENT (9 of 9 uncovered)
 | ID | Flow | Why it's a gap |
 |---|---|---|
-| PARENT-01 | Parent dashboard (live or demo) | ✅ Tested 2026-04-18 continuation #3 — `/dashboard` shows "How your children are doing" + child card (0 sessions teaser) + "After 4 more sessions, you'll see TestKid's retention trends and detailed progress here." Testids: `parent-dashboard-summary`, `parent-dashboard-teaser`, `parent-dashboard-summary-primary` |
-| PARENT-02 | Multi-child dashboard | ⏭️ Needs ≥2 children |
-| PARENT-03 | Child detail drill-down | ✅ Tested 2026-04-18 — `/child/{profileId}` renders "TestKid / 0 sessions / Monthly reports / Your first report will appear after the first month / Recent growth / Weekly..." empty states. Testid: `child-reports-link` |
-| PARENT-04 | Child subject → topic drill-down | ⏭️ Deferred — Child had no data at test time (would require TestKid to do sessions then switch back to parent view) |
-| PARENT-05 | Child session / transcript drill-down | ⏭️ Same as PARENT-04 |
+| PARENT-01 | Parent dashboard (live or demo) | ✅ **Re-verified 2026-04-18 continuation #4 with live data.** `/dashboard` now renders a rich TestKid card: "TestKid: 2 problems, 0 guided. 1 sessions this week (↑ up from 0 last week)" + Trend "1 sessions, 36m this week (↑ up from 0 sessions, 0m last week)" + teaser "After **3** more sessions, you'll see TestKid's retention trends and detailed progress here." (threshold lowered from 4 — PEH-S1 Task 2 ✅). API `/v1/dashboard` response omits `currentStreak` / `longestStreak` / `totalXp` (F-032 deploy gap — schema has `.default(0)` so UI doesn't break). Testids: `parent-dashboard-summary`, `parent-dashboard-teaser`, `parent-dashboard-summary-primary`. F-039 noted (inner button + session-card don't dispatch click on web). |
+| PARENT-02 | Multi-child dashboard | ⏭️ Not exercised this pass — deferred (would require adding a 2nd child + seeding data) |
+| PARENT-03 | Child detail drill-down | ✅ **Re-verified 2026-04-18 continuation #4 (PV+PEH parent pass) with real data.** TestKid now has 1 session / 2 exchanges / 36 min. Child detail renders 8 distinct sections: **Visible progress** · **Monthly reports** · **Recent growth** · **Subjects** · **Recent Sessions** (new from PV-S2) · **Mentor Memory** consent · **What the mentor knows** (new from PV-S3) · **Learning Accommodation** · **Consent management**. Testids now include `session-card-{id}`, `mentor-memory-link`, `subject-card-{id}`, `memory-consent-grant`/`decline`, `accommodation-mode-*`, `withdraw-consent-button`. |
+| PARENT-04 | Child subject → topic drill-down | ✅ **Tested 2026-04-18 continuation #4.** `/child/{profileId}/subjects/{subjectId}` renders with Math title + book "Numbers Galore: Whole Numbers & Integers" + subject-level retention signal "Thriving" (`retention-signal-strong`) + topic card. Topic detail at `/child/{profileId}/topic/{topicId}` renders `topic-status-card` ("In progress") + `topic-mastery-card` (0%) + `topic-retention-card` ("Thriving") + Session History. F-034 found (UUID leak). |
+| PARENT-05 | Child session / transcript drill-down | ⚠️ **Tested 2026-04-18 continuation #4 — BLOCKED by deploy gap + has UX gap.** Route `/child/{profileId}/session/{sessionId}` exists and renders. `useChildSessionDetail` hits `GET /v1/dashboard/children/:profileId/sessions/:sessionId`. This endpoint is on the ui-redesign branch [PV-S1 Task 5b] but NOT yet deployed to staging → returns 404 → screen shows generic "Something went wrong / Retry" state with no Go Back escape (F-032 deploy gap, F-033 UX-resilience violation). Also note: the transcript endpoint was intentionally removed in this branch — parent can no longer see raw conversation, only the summary [PV-S1 Task 2]. |
 | PARENT-06 | Child monthly reports list + detail | ✅ Empty-state verified — `/child/{id}/reports` renders `child-reports-empty`, `child-reports-empty-time-context`, `child-reports-empty-progress` testids + `child-reports-back`. Full-data verification requires a monthly report to be generated (Inngest job) |
-| PARENT-07 | Parent library view | ⏭️ Needs child with enrolled subjects |
-| PARENT-08 | Subject raw-input audit | ⏭️ Deferred |
+| PARENT-07 | Parent library view | ✅ **Tested 2026-04-18 continuation #4.** The "parent library view" surfaces as the subject drill-down at `/child/{profileId}/subjects/{subjectId}` — parents see the child's enrolled books + topic list + retention signal. Works. |
+| PARENT-08 | Subject raw-input audit | 🔍 **Code-level verified 2026-04-18 continuation #4.** `/v1/dashboard` response includes `subjects[].rawInput` field per child. For TestKid's Math subject `rawInput: null` (created via quick-start card, not raw typing) so nothing renders. Field is plumbed correctly — needs a subject created via raw-text input to visually verify. |
 | PARENT-09 | Guided label tooltip | ⏭️ Observed as part of PARENT-01 — no specific tooltip testid found |
+| PARENT-10 | Parent curated mentor memory view (new) | ⚠️ **Tested 2026-04-18 continuation #4 — BLOCKED by deploy gap.** `/child/{profileId}/mentor-memory` [PV-S3 Task 9] renders with consent gate at top + CONTROLS (Learn/Use toggles) + TELL THE MENTOR (text + Save) + PRIVACY (Export/Clear) + `something-wrong-button`. Curated signals panel can't populate because `GET /v1/dashboard/children/:profileId/memory` [PV-S3 Task 5] returns 404 on staging (F-032 deploy gap). Testids: `memory-consent-grant`, `memory-consent-decline`, `something-wrong-button`. |
 
 ### BILLING (5 of 10 uncovered)
 | ID | Flow | Why it's a gap |
@@ -464,23 +559,57 @@ These flows from [`mobile-app-flow-inventory.md`](mobile-app-flow-inventory.md) 
 
 > Note: the inventory total is 146, but ACCOUNT-01..03 was collapsed into one coverage-map row (counted as 3 covered above), so 43+16+17+69 = 145 because one row's status was claimed for three flows. Either the coverage map should split it back out or this footnote should be enough to close the loop. Erring on transparency.
 
-## Severity rollup
+## Severity rollup (post ui-redesign 2026-04-18 pass)
 
 | Severity | Count | Findings |
 |---|---|---|
-| 🔴 CRITICAL | 2 | F-014, F-028 |
+| 🔴 CRITICAL open | 2 | F-032 (round detail all-wrong), F-033 (mark-surfaced 404 deploy-lag) |
+| 🟢 CRITICAL fixed | 2 | F-014 ✅, F-028 ✅ (both verified this pass) |
 | 🟡 MEDIUM | 11 | F-001, F-007, F-008, F-009, F-012, F-015, F-020, F-025, F-029, F-030, plus DICT-05 partial |
-| 🟢 LOW | 11 | F-002, F-005, F-010, F-013, F-018, F-019, F-021, F-022, F-023, F-026, F-027, F-012-VERIFIED |
+| 🟢 LOW | 16 | F-002, F-005, F-010, F-013, F-018, F-019, F-021, F-022, F-023, F-026, F-027, F-034, F-035, F-036, F-037, F-038 |
 | 🔵 INFO | 3 | F-004, F-011, F-031 |
 | 🌐 WEB-ONLY | 4 | F-003, F-006, F-016, F-017, F-024 |
 
-## Top three to fix first
+## Top three to fix first (revised after ui-redesign 2026-04-18 pass)
 
-1. **F-028 (NEW, CRITICAL) — Quiz `/check` endpoint returns 404 on staging; every answer silently marked wrong.** Scoring is completely broken. Redeploy `mentomate-api-stg` (same deploy lag as F-014). Add a typed fallback for `404`-on-check → "Scoring is offline" error UI. Add an API integration break test asserting `POST /quiz/rounds/:id/check` with canonical answer → `200 { correct: true }`.
-2. **F-014 (still open) — Quiz answer-stripping broken on staging API.** Staging response still includes `correctAnswer`/`acceptedAliases`/`distractors` — retested 2026-04-18. Break tests now in place per commit 32edfa80 — next stale deploy surfaces at build time. F-015 client fallback **verified working** ✅.
-3. **F-029 (NEW) — Web End Session trap (Alert.alert no-op).** Every `Alert.alert` on web silently no-ops. Session close, restore purchases, and several others are silently broken on web. Systemic fix: Platform-branch `Alert.alert` usage to `window.confirm()` on web OR migrate to a cross-platform modal. Sweep all call sites (at least 6 found in use-session-actions.ts alone).
+1. **F-032 (NEW, CRITICAL) — Round Detail view broken.** `GET /v1/quiz/rounds/:id` doesn't include `score`, `results[]`, or `correctAnswer` for completed rounds, so the new `[roundId].tsx` screen shows every question as "Wrong" with blank score. The round detail feature was the main user-facing [5B.16, 5B.18] deliverable and it's currently unusable. **Fix:** Branch response on `quiz_rounds.status` — if completed, return full completion data; else keep current stripped shape. Add integration test.
+2. **F-033 (NEW, CRITICAL-but-graceful) — `/quiz/missed-items/mark-surfaced` deploy lag.** Source code in commit 6318a8fd; staging worker returns plain-text 404. Same pattern as the now-fixed F-014/F-028. Client degrades gracefully (fire-and-forget) so no visible break, but the quiz discovery card will reappear every session until deployed. **Fix:** Redeploy `mentomate-api-stg`. Add smoke test.
+3. **F-029 (still open) — Web End Session trap (Alert.alert no-op).** Every `Alert.alert` on web silently no-ops. Session close, restore purchases, and several others are silently broken on web. Systemic fix: Platform-branch `Alert.alert` usage to `window.confirm()` on web OR migrate to a cross-platform modal. Sweep all call sites (at least 6 found in use-session-actions.ts alone).
 
 ## Pickup point for the next session
+
+### Additions from the 2026-04-18 **ui-redesign branch** pass (practice/quiz deep-dive)
+
+Branch: `ui-redesign` (23 commits ahead of `main`). This pass focused exclusively on the new Practice/Quiz feature set shipped in this branch.
+
+**Features verified end-to-end:**
+- **Capitals play:** 4-question round "Lesser-Known European Capitals" → 2/4 → "Nice effort!" (tier=nice) + 20 XP. Question schema is now client-safe (F-014 ✅). Check endpoint returns `{correct: bool}` (F-028 ✅). Server returns `questionResults[]` with `correctAnswer` per question on completion [5B.17 ✅].
+- **Guess Who play:** 3-question round "Pioneers in Technology and Science" → 3/3 → "Perfect round!" (tier=perfect) + 79 XP. Free-text path works (Tesla clue 1, Eastman clue 1). MC fallback after 3 clues works (Bell). `guess-who-option-{n}` testids added. Round is 3 questions total (not 4 like capitals).
+- **Results screen:** All three celebration tiers observed. Perfect tier renders `BrandCelebration` + trophy icon. Guess Who-specific "X of Y people identified" subtitle. `+{xpEarned} XP` pill. Play Again / Done / View History buttons.
+- **Quiz History [5B.15]:** `quiz-history-screen` renders rounds grouped by date with activityType + theme + score/total + xpEarned. `quiz-history-empty` with "Try a Quiz" CTA for no-data users. Reachable from Practice → `practice-quiz-history` AND Results → `quiz-results-history`.
+- **Stats aggregation:** `/v1/quiz/stats` returns `{activityType, bestScore, bestTotal, roundsPlayed, totalXp}` per activity. Stats invalidate and refresh correctly after round completion — Quiz picker cards and Practice-hub Quiz card both re-rendered with new "Best: 2/4 · Played: 1" subtitle mid-session.
+
+**Features verified via code + API probe (UI not reachable):**
+- **Free-text eligible questions [5C.21]:** Code path implements `quiz-free-text-input` / `quiz-free-text-field` / `quiz-free-text-submit`. Renders when `question.freeTextEligible === true`. Requires prior mastery-item entries in `quiz_mastery_items`; user had none. Not reachable without seeding.
+- **Mastery-driven generation [4B.6-11]:** Schema live (`quiz_mastery_items` table with SM-2 columns). Round generation falls back to default seeds when mastery pool is empty.
+- **Challenge banner [5A.12, 5A.14b]:** Code path renders `quiz-challenge-banner` for 3 seconds when `round.difficultyBump === true`. Requires **3 perfect rounds within 14 days** on the same activity. User has 1 perfect guess_who, 0 perfect capitals. Not reached.
+
+**Critical findings:**
+- **F-032 🔴** — Round Detail view completely broken: all questions show "Wrong", score blank. Root cause is a server-side gap in `GET /v1/quiz/rounds/:id` not branching on completion status. Client code is correct; just reads missing fields.
+- **F-033 🔴** — `POST /v1/quiz/missed-items/mark-surfaced` returns plain 404 on staging worker. Deploy-lag pattern identical to the now-resolved F-014/F-028. Client degrades gracefully but discovery card will re-surface each session.
+
+**UX-polish findings (low severity):**
+- F-034 — Practice-hub Quiz card subtitle is hardcoded to `activityType === 'capitals'`; Guess Who-only players see generic copy.
+- F-035 — `totalXp` stat returned by server is never surfaced in UI. Adding it to picker cards is a cheap gamification win.
+- F-036 — Round detail: plain-text Back button inconsistent with `arrow-back` icon elsewhere; `activityType` string-mangled on client.
+- F-037 — History date header = raw ISO `2026-04-18` instead of relative "Today" / "April 18".
+- F-038 — Guess Who input has label "Type your guess" AND placeholder "Type your guess..." — redundant.
+
+**Still left (environment constraints on this branch):**
+- Difficulty bump trigger — needs 2 more perfect capitals rounds (or 2 more perfect guess_who rounds) within 14 days to flip `difficultyBump: true` in round generation. Feasible with more play.
+- Vocabulary Spanish quiz — subject exists in user's library (`quiz-vocabulary-019d9037...`) but no mastery items seeded. Needs first a language session that produces missed-items, then a follow-up quiz round to render `freeTextEligible: true` vocabulary questions.
+- Quiz discovery card path — coaching-card endpoint currently returns `type: "continue_book"` for this profile (priority 4). To trigger `type: "quiz_discovery"`, the profile would need missed items from a recent quiz round with `isLibraryItem: true` questions. Answer 1+ library-linked capital incorrectly to seed this.
+- `topic/relearn` flow reachable from `practice-review` tap — user has no overdue topics, so "Nothing to review right now" empty state renders.
 
 ### Additions from the 2026-04-18 continuation pass #1
 CC-02 (greeting-aware classification) and LEARN-07 (session-summary submit/skip) were partially exercised. Findings F-025, F-026, F-027 added above.
@@ -545,3 +674,156 @@ Quota-unrestricted sweep of quiz, session-close, billing, and legal flows. Findi
 - **Test on Android emulator** to validate native-only paths: TTS playback, camera capture for homework + dictation review, haptics, Alert dialogs.
 
 The full report and the two enriched flow docs (`mobile-app-flow-inventory.md`, `learning-path-flows.md`) reflect the current state of the app as of 2026-04-18.
+
+---
+
+## Continuation pass #4 — Parent flows on `ui-redesign` branch (2026-04-18)
+
+Branch context: `ui-redesign` (34 commits ahead of `main`). This pass focused on end-to-end parent-perspective flows — adding a child, viewing the dashboard, drilling into child detail / sessions / subjects / topics / curated memory, and parent-as-learner coexistence. Particular attention to PV-S1..S3 (parent visibility / privacy) and PEH-S1..S2 (progress empty-states & highlights) deliverables.
+
+### Scenario
+
+- **Auth identity:** Zuzana (owner, family tier after prior upgrade)
+- **Children:** 1 — TestKid (CONSENTED, birthYear 2015)
+- **Pre-seeded activity:** TestKid has 1 learning session on Math / "Numbers Galore: Whole Numbers & Integers" topic (2 exchanges, 36 min wall-clock)
+- **Zuzana activity:** 7 sessions across Geography + History + Spanish + General Studies, 8 active min, 0 mastered topics
+
+### Coverage delta vs. prior pass
+
+| Flow | Before | After | Evidence |
+|---|---|---|---|
+| HOME-02 Parent gateway | ✅ static | ✅ dynamic summary | `gateway-check-progress` now shows "TestKid practiced 1 min this week" |
+| PARENT-01 Dashboard | ✅ empty teaser | ✅ rich live data | "1 sessions this week (↑ up from 0 last week)" + "After 3 more sessions..." (threshold was 4) |
+| PARENT-03 Child detail | ✅ empty states | ✅ 8 sections rendered | New: Recent Sessions list, "What the mentor knows" link |
+| PARENT-04 Subject drill-down | ⏭️ deferred | ✅ rendered | `retention-signal-strong` subject-level "Thriving" |
+| PARENT-05 Session drill-down | ⏭️ deferred | ⚠️ blocked (deploy gap) | Screen renders, API 404s on staging |
+| PARENT-07 Parent library view | ⏭️ deferred | ✅ rendered | Same as PARENT-04 screen |
+| PARENT-08 Raw-input audit | ⏭️ deferred | 🔍 code-level | `rawInput` field plumbed in API; TestKid had null |
+| PARENT-10 Curated memory (new) | — | ⚠️ blocked (deploy gap) | Screen renders consent gate + CONTROLS; API 404 |
+
+### Features verified end-to-end
+
+- **PV-S2 Task 1 — DashboardChild schema includes streak/XP** ✅ — schema inspected, `.default(0)` so missing fields don't break UI.
+- **PV-S2 Task 3 — Streak/XP batch queries in dashboard service** ✅ — source verified at `apps/api/src/services/dashboard.ts:632-634`.
+- **PV-S2 Task 7 — Streak/XP stats on child detail** ✅ — rendered conditionally at `apps/mobile/src/app/(app)/child/[profileId]/index.tsx:346-366`; currently hidden because staging returns 0 (deploy gap).
+- **PV-S3 Task 9 — Redesigned mentor-memory screen** ✅ — renders 4 new sections (consent / CONTROLS / TELL THE MENTOR / PRIVACY) with proper testids.
+- **PEH-S1 Task 2 — Lowered thresholds for teaser** ✅ verified — teaser copy "After 3 more sessions..." (was 4).
+- **PEH-S1 Task 8 — Empty-state copy improvements** ✅ rendered ("Progress becomes easier to spot after a few more sessions") — but see F-041.
+
+### Features deploy-gated (code present locally; staging serves `main`)
+
+- **PV-S1 Task 5b — Single-session detail endpoint** (`GET /v1/dashboard/children/:profileId/sessions/:sessionId`) — 404 on staging.
+- **PV-S3 Task 5 — Curated memory endpoint** (`GET /v1/dashboard/children/:profileId/memory`) — 404 on staging.
+- **PV-S2 streak/XP emission** — `currentStreak` / `longestStreak` / `totalXp` absent from `/v1/dashboard` response on staging.
+- **PEH-S1 Task 2 lowered SESSION_THRESHOLDS** (`[1, 3, 5, 10, 25, ...]`) — source verified locally; unclear whether staging worker has the lower values because milestones return empty for Zuzana (7 sessions).
+- **PEH-S2 Task 1 — `highlight` column on session_summaries** — schema added (db/session-summaries.ts + migration noted in plans); can't verify emission until Inngest pipeline runs with new code.
+- **PEH-S2 Task 7 — Highlights surfaced in parent session feed** — code path exists in child-detail session card mapping; can't visually verify without a summary with a highlight value.
+
+### Findings
+
+### F-032 🟡 PV-S1/S2/S3 endpoints 404 on staging (deploy gap)
+- **Where:** `GET /v1/dashboard/children/:profileId/sessions/:sessionId` and `GET /v1/dashboard/children/:profileId/memory` both return plain-text 404 on `api-stg.mentomate.com`. Same pattern for `DashboardChild` streak/XP fields — silently absent from `/v1/dashboard` response.
+- **Why:** The `ui-redesign` branch (34 commits ahead of `main`) is not yet deployed to staging. Worker at `api-stg` serves `main`.
+- **Mobile impact:**
+  - Session-detail screen loads → isError=true branch → user sees "Something went wrong / Retry" with no Go Back (see F-033).
+  - Curated memory view loads the consent gate + control sections, but the curated signals panel (Strengths / Challenges / Preferences) stays empty.
+  - Dashboard child card doesn't show streak 🔥 / XP ⭐ badges because schema defaults to 0 → `(currentStreak > 0 || totalXp > 0)` guard hides the row.
+- **Not a bug in code** — identical pattern to the resolved F-014/F-028. **Fix:** Redeploy `mentomate-api-stg` from `ui-redesign` (or merge+deploy after review). Add smoke tests for `dashboard/children/:id/sessions/:sessionId` and `dashboard/children/:id/memory` to catch future deploy lag.
+
+### F-033 🟡 Parent session-detail error state lacks "Go Back" escape
+- **Where:** `apps/mobile/src/app/(app)/child/[profileId]/session/[sessionId].tsx:58-73`. When `isError=true` the render is a generic "Something went wrong loading this session" Text + Retry Pressable. No secondary escape action.
+- **Why it matters:** Violates the UX Resilience Rule "Every error state must have: Primary action (retry) + Secondary action (go back / go home)." A parent who arrives via stale bookmark or deleted session will hit the isError path (not the `!session` null path that DOES have Go Back) and get stuck retrying forever. Related to the 5-root-causes pattern: missing failure-mode spec.
+- **Recommendation:** Mirror the `session-not-found` branch — add a Go Back Pressable that calls `goBackOrReplace(router, '/(app)/home')`. Also: classify the error at the API client layer so a 404 routes to the `!session` branch (true "this session is gone") while a 500/network stays on the generic Retry branch.
+
+### F-034 🟡 Parent topic-detail screen displays raw subjectId UUID as subtitle
+- **Where:** `apps/mobile/src/app/(app)/child/[profileId]/topic/[topicId].tsx:102-106`. The route passes `subjectId` as a route param for data-fetch purposes, but the component also renders it verbatim as a subheading beneath the topic title.
+- **Observed:** The topic detail screen for TestKid's "Numbers Galore" topic renders: **"Numbers Galore: Whole Numbers & Integers"** (title) + **"019da078-cc79-7726-bb78-c17ea1e3777a"** (subtitle — the Math subjectId UUID).
+- **User impact:** Parents see an internal developer-looking identifier where the subject name ("Mathematics") should be. Clearly a leftover from scaffolding — developer likely intended `subjectName` but wired `subjectId`.
+- **Fix:** Either pass `subjectName` through the navigation params and render that, or look up the name from the inventory data via `useProgressInventory()`. Very small change.
+
+### F-035 🟡 "Your growth" + "milestones empty" shown despite 7 sessions
+- **Where:** `/progress` screen for Zuzana (7 sessions, 8 active min, 0 mastered, 0 streak).
+- **Observed:**
+  - "Your growth" card: **"You just started. Keep going and your growth will appear here."** — clearly wrong after 7 sessions.
+  - "Recent milestones" card: **"Keep going. Your milestones will collect here as your knowledge grows."** — wrong if PEH-S1 lowered thresholds to `[1, 3, 5, 10, ...]`. Zuzana has crossed 1/3/5 in session count.
+- **Root cause hypotheses (both likely contributing):**
+  1. PEH-S1 Task 2 source shows `SESSION_THRESHOLDS = [1, 3, 5, 10, 25, 50, 100, 250]`, but the detection in `milestone-detection.ts:91-99` fires only on `crossed(previous, current, threshold)` — i.e. at the boundary. For Zuzana whose sessions accrued under the prior [5, 10, 25] thresholds, the 1/3 milestones were never "crossed" from her previous state and there's no retroactive backfill.
+  2. Empty-state copy is keyed solely on `global.topicsMastered === 0` without considering sessionCount — so long-time users with 0 mastered hit the same "You just started" copy as day-zero users.
+- **Fix suggestion:** (a) Add a one-off backfill migration that queries historical snapshot counts and queues a "caught up" milestone for users who are above the new lower thresholds. (b) Differentiate the "Your growth" copy — show different body text when `totalSessions >= 3` (e.g. "You've put in {sessions} sessions. Keep going — growth in mastery shows up after a few repeat exposures.").
+
+### F-036 🟡 Streak counter returns 0 despite consecutive-day activity
+- **Where:** `/v1/progress/inventory` → `global.currentStreak: 0` despite Zuzana having `lastSessionAt = 2026-04-17` for Geography and `2026-04-16` for History (two consecutive days, no session yet today on 4/18).
+- **Why it matters:** Either (a) the streak-update pipeline in `services/streaks.ts` doesn't fire on session completion, or (b) the streak definition excludes "no session today yet" (i.e. requires streak-of-days-ending-today). The PEH-S1 plan cites early engagement — a user who studied yesterday and the day before should see a 2-day streak with encouragement to maintain it.
+- **Follow-up needed:** Check `apps/api/src/services/streaks.ts` definition + whether the Inngest `session-completed` step actually calls the streak update. If behavior is intentional (streak must end today), add a "Streak at risk — come back today!" signal on home.
+
+### F-037 🟡 Parent subject card shows "active min" while session card shows "wall-clock min"
+- **Where:** Child detail screen for TestKid.
+  - Subjects → Mathematics card: **"1 active min"**
+  - Recent Sessions → card for same session: **"36 min"** (wall-clock)
+- **Why it matters:** From the parent's reading: "Math = 1 minute this week, but the session was 36 minutes?" — the math doesn't add up for a non-technical viewer. Per [project_session_lifecycle_decisions.md](../memory/project_session_lifecycle_decisions.md): **wall-clock for users, active time internal**. The subject card violates this rule.
+- **Fix:** Change subject card to show wall-clock seconds (or both with clear labels — "36 min total · 1 min focused"). Not a native-only issue.
+
+### F-038 🟢 Old teaser threshold label updated
+- **Where:** `/dashboard` child card teaser copy.
+- **Observed:** Copy changed from "After **4** more sessions, you'll see TestKid's retention trends..." (prior pass) to "After **3** more sessions..." (this pass). Reflects PEH-S1 Task 2 lowered thresholds — a positive verification.
+- **No action needed** — captured as evidence that the lower threshold did ship.
+
+### F-039 🌐 Nested Pressable click-dispatch quirk on web (inner button + session cards)
+- **Where:**
+  - `parent-dashboard-summary-primary` inner "View details" button on the dashboard child card
+  - `session-card-{sessionId}` cards on the child-detail "Recent Sessions" list
+- **Observed:** `preview_click` reports success but `window.location.pathname` doesn't change. The **outer** `parent-dashboard-summary` card click DOES navigate correctly. Direct URL navigation to the child-session-detail route works.
+- **Why it matters:** Web-only QA artifact. On native (Pressable tree works correctly), both inner and outer targets fire `onPress`. The unit test for `parent-dashboard-summary-primary` passes (`ParentDashboardSummary.test.tsx:108-110`).
+- **Lowered severity → 🌐 web-only.** No action needed unless we care about click-testability in Expo Web QA runs. If we do: wrap inner Pressables in React Native Web with `pointerEvents={'box-none'}` to let clicks bubble through.
+
+### Overall severity roll-up (delta from prior pass)
+
+| Severity | Count delta | New |
+|---|---|---|
+| 🟡 MEDIUM | +6 | F-032, F-033, F-034, F-035, F-036, F-037 |
+| 🟢 LOW | +1 | F-038 |
+| 🌐 WEB-ONLY | +1 | F-039 |
+
+### Pickup point for next session
+
+1. **Once `ui-redesign` deploys to `api-stg`:** Re-run PARENT-05 (session detail) and PARENT-10 (curated memory). Expect the empty-state / with-data split on the curated memory view per PV-S3 Task 4 signals output. Verify streak/XP fields appear on `/v1/dashboard` response and on the child-detail screen when TestKid has `currentStreak > 0 || totalXp > 0`.
+2. **PARENT-02 multi-child:** add a 2nd child (e.g. "TestKid2", birthYear 2018), seed 1 session, then return to dashboard to see two cards. Verify sort order and per-child empty/populated layouts.
+3. **PEH-S2 highlights end-to-end:** after staging redeploy, trigger TestKid to complete a new session → wait for Inngest `generate-session-highlight` step to run → verify parent session feed shows the highlight per-card. The "quote" should be surfaced on the `session-card-{id}` in child-detail Recent Sessions.
+4. **F-034 fix verification:** after subject-name-instead-of-UUID fix lands, re-snapshot the parent topic-detail screen to confirm "Mathematics" renders instead of the UUID.
+5. **F-033 fix verification:** induce an intentional session-not-found (e.g. navigate to a deleted sessionId) and verify the `session-not-found` branch renders AND the generic isError branch now has a Go Back action.
+6. **F-036 streak pipeline:** do a session today to verify the pipeline writes a non-zero streak after a same-day session. If it still stays at 0, open the streak service source.
+
+---
+
+## Fixes applied (2026-04-18 code pass)
+
+| Finding | Fix | File(s) changed |
+|---|---|---|
+| F-014 | **Deploy issue** — `toClientSafeQuestions` already correct; staging worker needs redeploy | N/A (ops) |
+| F-015 | **Already fixed** — `isMalformedMcQuestion` guard renders error state with escape | `quiz/play.tsx` |
+| F-018 ✅ | Copy branches on `ocrText` param — "from the photo" vs "Review your text" | `dictation/text-preview.tsx` |
+| F-019 ✅ | Dates use `toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })` | `subscription.tsx` (3 sites) |
+| F-020 | **Already fixed** — `hasValidSession` guard returns "No dictation to finish" empty state | `dictation/complete.tsx` |
+| F-021 ✅ | All-empty hero card "Your mentor is getting to know you" replaces 5x "Nothing saved yet." | `mentor-memory.tsx` |
+| F-022 ✅ | Practice hub Recite card title changed to "Recite (Beta)" to match session header | `practice.tsx` |
+| F-025 ✅ | Catch-all error guard (not just 404) + no-data guard. Both render "Session not found" + Go Home | `session-summary/[sessionId].tsx` |
+| F-028 ✅ | `checkUnavailable` state + inline banner when `/check` fails. Applies to MC + Guess Who | `quiz/play.tsx` |
+| F-029 ✅ | `platformAlert` utility (`lib/platform-alert.ts`) — web uses `window.confirm`/`window.alert`. ~20 critical call sites migrated; ~80 remaining for future sweep | `use-session-actions.ts`, `session-summary/[sessionId].tsx`, `dictation/*.tsx` |
+| F-030 ✅ | Playback `useEffect` deps `[data]` instead of `[]` — auto-start re-fires when context arrives | `dictation/playback.tsx` |
+
+### Not addressed (by design or blocked)
+
+| Finding | Reason |
+|---|---|
+| F-001 | API fix already in `progress.ts:630-635` — verify on next staging deploy |
+| F-002 | Low — time label inconsistency between library aggregate and book-detail filter |
+| F-003, F-016 | Web-only Expo Router stacking — documented caveat |
+| F-004, F-007 | Info/UX decision — topic-detail bypass is intentional simplification |
+| F-005 | Low — dual mode picker; inline picker disappears after selection |
+| F-008 | `relearn` mode config exists and maps correctly. Likely transient web test issue |
+| F-009 | Medium — topic deep-link needs `subjectId`. Requires API change to fetch subject from topic |
+| F-010 | Low — "completed" vs "mastered" vocabulary mismatch |
+| F-013 | Low — vocabulary empty state already has context-aware copy for language subjects |
+| F-023 | Low — Topics tab filter is a UX decision (started only vs all) |
+| F-031 | Info — likely test artifact; needs native device verification |
+| F-029 remaining | ~80 sites not yet migrated — `platformAlert` utility ready for drop-in replacement |

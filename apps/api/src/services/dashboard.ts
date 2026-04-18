@@ -12,6 +12,7 @@ import {
   subjects,
   curricula,
   curriculumTopics,
+  sessionSummaries,
   streaks,
   xpLedger,
   type Database,
@@ -704,6 +705,7 @@ export interface ChildSession {
   displayTitle: string;
   displaySummary: string | null;
   homeworkSummary: HomeworkSummary | null;
+  highlight: string | null;
 }
 
 /**
@@ -728,6 +730,18 @@ export async function getChildSessions(
     limit: 50,
   });
 
+  if (sessions.length === 0) return [];
+
+  // Batch-fetch highlights from session_summaries for all sessions
+  const sessionIds = sessions.map((s) => s.id);
+  const summaries = await db.query.sessionSummaries.findMany({
+    where: inArray(sessionSummaries.sessionId, sessionIds),
+    columns: { sessionId: true, highlight: true },
+  });
+  const highlightBySession = new Map(
+    summaries.map((s) => [s.sessionId, s.highlight ?? null])
+  );
+
   return sessions.map((s) => {
     const metadata = getSessionMetadata(s.metadata);
     const homeworkSummary = metadata.homeworkSummary ?? null;
@@ -746,6 +760,7 @@ export async function getChildSessions(
       displayTitle: formatSessionDisplayTitle(s.sessionType, homeworkSummary),
       displaySummary: homeworkSummary?.summary ?? null,
       homeworkSummary,
+      highlight: highlightBySession.get(s.id) ?? null,
     };
   });
 }
@@ -769,6 +784,12 @@ export async function getChildSessionDetail(
   const metadata = getSessionMetadata(session.metadata);
   const homeworkSummary = metadata.homeworkSummary ?? null;
 
+  // Fetch highlight for this single session
+  const summary = await db.query.sessionSummaries.findFirst({
+    where: eq(sessionSummaries.sessionId, sessionId),
+    columns: { highlight: true },
+  });
+
   return {
     sessionId: session.id,
     subjectId: session.subjectId,
@@ -786,6 +807,7 @@ export async function getChildSessionDetail(
     ),
     displaySummary: homeworkSummary?.summary ?? null,
     homeworkSummary,
+    highlight: summary?.highlight ?? null,
   };
 }
 
