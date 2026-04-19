@@ -599,6 +599,13 @@ export async function prepareExchangeContext(
     escalationRung: effectiveRung,
     exchangeHistory,
     birthYear: profile?.birthYear ?? null,
+    // BKT-C.1 — source the profile-level tutor language + pronouns here so
+    // every downstream call path (processExchange, streamExchange) receives
+    // the same personalization. Defaults: 'en' (DB NOT NULL) and null.
+    conversationLanguage: profile?.conversationLanguage as
+      | import('@eduagent/schemas').ConversationLanguage
+      | undefined,
+    pronouns: profile?.pronouns ?? null,
     workedExampleLevel: interleavedTopics ? undefined : workedExampleLevel,
     priorLearningContext: priorLearning.contextText || undefined,
     crossSubjectContext,

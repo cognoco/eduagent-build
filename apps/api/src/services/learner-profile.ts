@@ -5,6 +5,7 @@ import {
   type AccommodationMode,
   type ConfidenceLevel,
   type ExplanationStyle,
+  type InterestEntry,
   type LearningProfile,
   type LearningStyle,
   type MemoryConsentStatus,
@@ -734,7 +735,12 @@ function buildDeleteMemoryItemUpdates(
 
 export interface MemoryBlockProfile {
   learningStyle: LearningStyle;
-  interests: string[];
+  // BKT-C.2 — accepts both legacy string[] and the new InterestEntry[] shape.
+  // Production callers pass the parsed LearningProfile (already normalized
+  // via the Zod preprocessor), but tolerating bare strings keeps defense-
+  // in-depth against unparsed fixtures and any lingering legacy writes.
+  // buildMemoryBlock coerces internally before segmenting.
+  interests: Array<string | InterestEntry>;
   strengths: StrengthEntry[];
   struggles: StruggleEntry[];
   communicationNotes: string[];
@@ -918,9 +924,37 @@ export function buildMemoryBlock(
     }
   }
 
-  const topInterests = profile.interests.slice(-5).reverse();
-  if (topInterests.length > 0) {
-    const text = `- They're interested in: ${topInterests.join(', ')}.`;
+  // BKT-C.2 — split interests by context so the prompt can choose register:
+  //   * `school`     → curriculum-adjacent examples
+  //   * `free_time`  → motivation/lead-in examples
+  //   * `both`       → appears in BOTH lists (neutral default)
+  // Coerce legacy string[] entries to InterestEntry shape with context='both'
+  // as a defense-in-depth fallback. Production reads go through the Zod
+  // preprocessor which has already normalized, but fixtures and any untyped
+  // JSONB writes still hit this path cleanly.
+  const normalizedInterests: InterestEntry[] = profile.interests.map((i) =>
+    typeof i === 'string' ? { label: i, context: 'both' as const } : i
+  );
+  const topInterests = normalizedInterests.slice(-5).reverse();
+  const schoolInterests = topInterests.filter(
+    (i) => i.context === 'school' || i.context === 'both'
+  );
+  const freeTimeInterests = topInterests.filter(
+    (i) => i.context === 'free_time' || i.context === 'both'
+  );
+  if (schoolInterests.length > 0) {
+    const labels = schoolInterests.map((i) => i.label).join(', ');
+    const text = `- School interests: ${labels}.`;
+    addSection(text, {
+      kind: 'interest',
+      text,
+      sourceSessionId: null,
+      sourceEventId: null,
+    });
+  }
+  if (freeTimeInterests.length > 0) {
+    const labels = freeTimeInterests.map((i) => i.label).join(', ');
+    const text = `- Free-time interests: ${labels}.`;
     addSection(text, {
       kind: 'interest',
       text,

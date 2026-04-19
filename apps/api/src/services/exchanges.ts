@@ -109,6 +109,14 @@ export interface ExchangeContext {
   homeworkMode?: HomeworkMode;
   /** Subscription-derived LLM tier — controls model routing (flash/standard/premium) */
   llmTier?: LLMTier;
+  // BKT-C.1 — profile-level personalization surfaced to the router. Separate
+  // from the per-subject `nativeLanguage` (used for L1-aware grammar in
+  // language-learning flows). `conversationLanguage` applies universally; in
+  // a maths session only this matters. `pronouns` is learner-owned free text
+  // (max 32 chars, validated at Zod boundary). Never surfaced to other
+  // learners — the router includes it only in the active learner's preamble.
+  conversationLanguage?: import('@eduagent/schemas').ConversationLanguage;
+  pronouns?: string | null;
   /** Original free-text input the learner typed when starting this session (CFLF) */
   rawInput?: string | null;
   /** Input mode for this session — controls voice-optimized brevity in the system prompt */
@@ -609,7 +617,14 @@ export async function processExchange(
   const result: RouteResult = await routeAndCall(
     messages,
     context.escalationRung,
-    { llmTier: context.llmTier, ageBracket }
+    {
+      llmTier: context.llmTier,
+      ageBracket,
+      // BKT-C.1 — forward profile-level personalization to the router so the
+      // safety preamble carries it on every provider uniformly.
+      conversationLanguage: context.conversationLanguage,
+      pronouns: context.pronouns,
+    }
   );
 
   const isUnderstandingCheck = detectUnderstandingCheck(result.response);
@@ -676,7 +691,12 @@ export async function streamExchange(
   const result: StreamResult = await routeAndStream(
     messages,
     context.escalationRung,
-    { llmTier: context.llmTier, ageBracket }
+    {
+      llmTier: context.llmTier,
+      ageBracket,
+      conversationLanguage: context.conversationLanguage,
+      pronouns: context.pronouns,
+    }
   );
 
   return {
