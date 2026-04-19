@@ -1,7 +1,7 @@
 import {
   capitalsLlmOutputSchema,
   type CefrLevel,
-  computeAgeBracket,
+  computeAgeBracket as computeAgeBracketSchema,
   type CapitalsQuestion,
   guessWhoLlmOutputSchema,
   type QuizQuestion,
@@ -34,6 +34,18 @@ import {
 } from './guess-who-provider';
 import { describeAgeBracket, type AgeBracket } from './config';
 import { createLogger } from '../logger';
+
+/**
+ * Maps a birth year to the quiz-local AgeBracket (adolescent | adult).
+ * Product supports learners 11+. Ages 11–13 → adolescent; 14+ → adult.
+ * Wraps the schema's computeAgeBracket which still returns 'child' for <13 —
+ * that value is collapsed here to 'adolescent' for the quiz prompt layer.
+ */
+function computeQuizAgeBracket(birthYear: number): AgeBracket {
+  const bracket = computeAgeBracketSchema(birthYear);
+  if (bracket === 'child' || bracket === 'adolescent') return 'adolescent';
+  return 'adult';
+}
 
 const logger = createLogger();
 
@@ -271,7 +283,8 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
     recentAnswers,
     libraryItems,
   });
-  const ageBracket = birthYear == null ? 'adult' : computeAgeBracket(birthYear);
+  const ageBracket =
+    birthYear == null ? 'adult' : computeQuizAgeBracket(birthYear);
   let theme = '';
   let questions: QuizQuestion[] = [];
 

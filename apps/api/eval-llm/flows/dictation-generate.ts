@@ -23,19 +23,35 @@ export const dictationGenerateFlow: FlowDefinition<GenerateContext> = {
     return {
       nativeLanguage: profile.nativeLanguage,
       ageYears: profile.ageYears,
+      // Map profile interests to the GenerateContext shape.
+      // All profile interests are treated as 'free_time' context here —
+      // the fixture does not distinguish context, so we default to free_time
+      // which is the context that themes the literary passage.
+      interests: profile.interests.map((label) => ({
+        label,
+        context: 'free_time' as const,
+      })),
+      libraryTopics: profile.libraryTopics,
     };
   },
 
   buildPrompt(input: GenerateContext): PromptMessages {
     const system = buildGeneratePrompt(input);
+    const interestLabels = (input.interests ?? []).map((i) => i.label);
     return {
       system,
       user: 'Generate a dictation for me.',
       notes: [
-        `Uses fine-grained ageYears=${input.ageYears} — 4-bucket literary scaling (strongest age handling in the codebase).`,
+        `Uses fine-grained ageYears=${input.ageYears} — 2-bucket literary scaling (≤13 chapter-book, >13 literary).`,
         `Native language drives punctuation-name mapping.`,
-        `Interests NOT used (gap flagged in audit P0) — dinosaur kid gets same Dahl theme as horse kid.`,
-        `Library topics NOT used (gap flagged in audit P0) — WWII learner could get period-appropriate narrative passages.`,
+        interestLabels.length > 0
+          ? `Interests wired (audit P0.1): ${interestLabels.join(', ')}.`
+          : `No interests — default literary theme used.`,
+        (input.libraryTopics ?? []).length > 0
+          ? `Library topics wired (audit P0.1): ${(
+              input.libraryTopics ?? []
+            ).join(', ')}.`
+          : `No library topics — theme not constrained by curriculum.`,
       ],
     };
   },

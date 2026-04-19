@@ -15,9 +15,9 @@ import type { FlowDefinition, PromptMessages } from '../runner/types';
 
 type CapitalsBuilderInput = Parameters<typeof buildCapitalsPrompt>[0];
 
-// Local mirror of AgeBracket — avoids importing from a non-barrel file.
-function ageYearsToBracket(ageYears: number): 'child' | 'adolescent' | 'adult' {
-  if (ageYears <= 9) return 'child';
+// Local mirror of the quiz-local AgeBracket (adolescent | adult).
+// Product supports 11+ learners. Ages ≤13 → adolescent; 14+ → adult.
+function ageYearsToBracket(ageYears: number): 'adolescent' | 'adult' {
   if (ageYears <= 13) return 'adolescent';
   return 'adult';
 }

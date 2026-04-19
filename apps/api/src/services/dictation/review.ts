@@ -16,7 +16,70 @@ import { captureException } from '../sentry';
 // breakdown of mistakes.
 // ---------------------------------------------------------------------------
 
-export const SYSTEM_PROMPT = `You are a dictation review assistant. Your job is to compare a child's handwritten text (visible in the image) against the original dictation sentences.
+export interface BuildReviewSystemPromptParams {
+  /** Learner's age in years — calibrates explanation complexity. Optional. */
+  ageYears?: number;
+  /**
+   * Learner's preferred explanation styles — shapes the tone of mistake
+   * explanations. Optional. Recognized values: 'humor', 'step-by-step',
+   * 'stories', 'examples', 'analogies', 'diagrams'.
+   */
+  preferredExplanations?: string[];
+}
+
+function buildExplanationStyleGuidance(
+  params: BuildReviewSystemPromptParams
+): string {
+  const { ageYears, preferredExplanations = [] } = params;
+
+  const parts: string[] = [];
+
+  // Age-based register
+  if (ageYears !== undefined) {
+    if (ageYears <= 11) {
+      parts.push(
+        'Use very simple, encouraging language — short sentences, everyday words, no grammar jargon. ' +
+          'Say "you wrote X but it should be Y because…" not "this is a spelling error of type…".'
+      );
+    } else if (ageYears <= 14) {
+      parts.push(
+        'Use clear, direct explanations suitable for a middle-schooler. ' +
+          'You can name grammar concepts (e.g. "silent letter", "comma splice") but keep it brief.'
+      );
+    } else {
+      parts.push(
+        'You may use precise grammar and punctuation terminology. ' +
+          'Keep explanations concise — the learner can handle technical language.'
+      );
+    }
+  }
+
+  // Style preferences
+  if (preferredExplanations.includes('humor')) {
+    parts.push(
+      'Add a touch of gentle, age-appropriate humour to explanations where it fits naturally — a playful tone helps the mistake stick in memory without feeling like a scolding.'
+    );
+  }
+  if (preferredExplanations.includes('step-by-step')) {
+    parts.push(
+      'Structure each explanation as a numbered 1–2–3 breakdown: (1) what the mistake was, (2) the rule, (3) the correct version.'
+    );
+  }
+  if (preferredExplanations.includes('stories')) {
+    parts.push(
+      'Where it fits, frame the correction as a tiny memorable story or mnemonic rather than a dry rule.'
+    );
+  }
+
+  return parts.length > 0 ? '\n\nEXPLANATION STYLE:\n' + parts.join(' ') : '';
+}
+
+export function buildReviewSystemPrompt(
+  params: BuildReviewSystemPromptParams = {}
+): string {
+  const styleGuidance = buildExplanationStyleGuidance(params);
+
+  return `You are a dictation review assistant. Your job is to compare a child's handwritten text (visible in the image) against the original dictation sentences.
 
 TASK:
 Carefully examine the handwritten text in the image. Compare each sentence to the original provided below.
@@ -39,7 +102,15 @@ RESPOND WITH ONLY valid JSON in this exact format — no prose before or after:
 }
 
 If there are no mistakes, return an empty array for "mistakes".
-Generate explanations in the child's language as instructed.`;
+Generate explanations in the child's language as instructed.${styleGuidance}`;
+}
+
+/**
+ * Default system prompt — identical to the pre-refactor static constant.
+ * Kept as a named export so eval-harness adapters and any external callers
+ * that reference SYSTEM_PROMPT directly continue to compile without changes.
+ */
+export const SYSTEM_PROMPT = buildReviewSystemPrompt();
 
 export type { DictationReviewResult };
 
@@ -48,12 +119,23 @@ export interface ReviewDictationInput {
   imageBase64: string;
   imageMimeType: string;
   language: string;
+  /** Learner's age in years — used to calibrate explanation complexity. Optional. */
+  ageYears?: number;
+  /** Learner's preferred explanation styles — used to tune mistake explanations. Optional. */
+  preferredExplanations?: string[];
 }
 
 export async function reviewDictation(
   input: ReviewDictationInput
 ): Promise<DictationReviewResult> {
-  const { sentences, imageBase64, imageMimeType, language } = input;
+  const {
+    sentences,
+    imageBase64,
+    imageMimeType,
+    language,
+    ageYears,
+    preferredExplanations,
+  } = input;
 
   const originalText = sentences
     .map((s, i) => `${i + 1}. ${s.text}`)
@@ -67,8 +149,13 @@ export async function reviewDictation(
     },
   ];
 
+  const systemPrompt = buildReviewSystemPrompt({
+    ageYears,
+    preferredExplanations,
+  });
+
   const messages: ChatMessage[] = [
-    { role: 'system', content: SYSTEM_PROMPT },
+    { role: 'system', content: systemPrompt },
     { role: 'user', content: userContent },
   ];
 

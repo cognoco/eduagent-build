@@ -92,7 +92,7 @@ describe('buildVocabularyPrompt', () => {
   it('works without a theme preference', () => {
     const prompt = buildVocabularyPrompt({
       discoveryCount: 6,
-      ageBracket: 'child',
+      ageBracket: 'adolescent',
       recentAnswers: [],
       languageCode: 'fr',
       cefrCeiling: 'A1',

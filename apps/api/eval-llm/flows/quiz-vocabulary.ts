@@ -13,8 +13,9 @@ import type { FlowDefinition, PromptMessages } from '../runner/types';
 // from buildPromptInput otherwise, which the runner records as "skipped".
 // ---------------------------------------------------------------------------
 
-function ageYearsToBracket(ageYears: number): 'child' | 'adolescent' | 'adult' {
-  if (ageYears <= 9) return 'child';
+// Local mirror of the quiz-local AgeBracket (adolescent | adult).
+// Product supports 11+ learners. Ages ≤13 → adolescent; 14+ → adult.
+function ageYearsToBracket(ageYears: number): 'adolescent' | 'adult' {
   if (ageYears <= 13) return 'adolescent';
   return 'adult';
 }
