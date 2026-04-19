@@ -20,6 +20,8 @@ export interface SnapshotInputs {
   liveProvider?: string;
   liveModel?: string;
   liveError?: string; // error message if live call failed
+  /** Response failed expectedResponseSchema validation — message describes how. */
+  schemaViolation?: string;
 }
 
 const SNAPSHOTS_DIR = path.resolve(__dirname, '..', 'snapshots');
@@ -92,6 +94,20 @@ function renderSnapshot(inputs: SnapshotInputs): string {
     for (const note of messages.notes) {
       sections.push(`- ${note}`);
     }
+    sections.push(``);
+  }
+
+  const schemaViolation = inputs.schemaViolation;
+  if (schemaViolation) {
+    sections.push(`## ⚠️ Schema violation`);
+    sections.push(``);
+    sections.push(
+      `The live LLM response did not conform to the flow's \`expectedResponseSchema\`:`
+    );
+    sections.push(``);
+    sections.push('```');
+    sections.push(schemaViolation);
+    sections.push('```');
     sections.push(``);
   }
 

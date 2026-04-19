@@ -1,9 +1,79 @@
 # LLM Personalization Audit — All Flows
 
 **Date:** 2026-04-18
-**Status:** Phase 1 — Discovery (no code changes)
+**Status:** Phase 1 + Phase 2 complete, Phase 3 in progress
 **Owner:** Zuzana + Claude
-**Follow-up:** Phase 2 (eval harness) + Phase 3 (iterative tuning) gated on review of this spec
+**Follow-up:** Phase 3 tuning — four parallel agents dispatched for P0/P1 items
+**Companion:** [`2026-04-18-llm-reliability-ux-audit.md`](2026-04-18-llm-reliability-ux-audit.md) covers reliability/UX failures; this doc covers personalization gaps.
+
+---
+
+## Update log (2026-04-18)
+
+Corrections and additions since this audit was first written:
+
+### Product constraint confirmed — 11+ only
+
+The target audience is strictly 11+. This invalidates two earlier assumptions in this doc:
+
+- Examples referencing a "9-year-old dinosaur kid" or "6-year-old fairytale kid" are aspirational — those ages are below the product's minimum. Mentally substitute 11–17 when reading those examples; the eval harness fixture has already been corrected.
+- Two production age-scaling branches are **dead code** as a result — see the new "Dead-code finding" section below.
+
+### Onboarding dimensions committed (no longer "hard gaps")
+
+Three items that appeared in the original audit's "hard gaps" list are now committed product decisions (not yet implemented, but spec'd):
+
+- **`conversation_language`** — ISO 639-1 — the language the tutor speaks to the learner. Mandatory onboarding question. Separate from the per-subject `teaching_preferences.native_language` which stays for L1-aware grammar explanations in language-learning subjects.
+- **Interest context tag** — every `interests` entry becomes `{label, context: 'free_time' | 'school' | 'both'}`. Collected as a second tap per interest at onboarding.
+- **Pronouns** — optional, prompted for older learners. Free-text fallback for "other".
+
+These land in the `profiles` / `learning_profiles` schema and propagate to all LLM prompts. The eval harness fixture at `apps/api/eval-llm/fixtures/profiles.ts` already carries these fields in its 5 profiles (11–17yo).
+
+### Phase 2 deliverable: eval harness is live
+
+`apps/api/eval-llm/` with 8 wired flows and 37 snapshots:
+
+- quiz-capitals, quiz-vocabulary, quiz-guess-who
+- dictation-generate, dictation-prepare-homework, dictation-review
+- session-analysis, filing-pre-session
+
+Run via `pnpm eval:llm`. Tier 1 (snapshot-only) is the default; Tier 2 (`--live`) burns credits for real LLM responses.
+
+`FlowDefinition` has been extended with an optional `expectedResponseSchema` field so the structured-output envelope migration (reliability audit F1.1–F2.2) can validate responses directly in the harness.
+
+**Missing from harness coverage:** exchanges (the 700-line `buildSystemPrompt` with 13+ context inputs — needs its own session to adapt) and filing-post-session (a 30-line copy of filing-pre-session).
+
+---
+
+## Dead-code finding (production-side)
+
+The audit surfaced two production files with age-scaling branches that never fire in the 11+ product:
+
+### `apps/api/src/services/quiz/config.ts`
+
+```ts
+export type AgeBracket = 'child' | 'adolescent' | 'adult';
+// 'child' = 6-9, 'adolescent' = 10-13, 'adult' = 14+
+```
+
+The `'child'` branch is unreachable. `describeAgeBracket('child')` returns `"6-9"` which would never be fed to a prompt for a real learner. Clean-up: remove the `'child'` variant entirely, renumber `'adolescent'` to cover 11-13, `'adult'` to cover 14+. Every caller of `describeAgeBracket` needs to handle the reduced set.
+
+### `apps/api/src/services/dictation/generate.ts`
+
+```ts
+function getLiteraryTheme(ageYears: number): string {
+  if (ageYears <= 7) return `Draw from fairy tales, fables...`;   // dead
+  if (ageYears <= 10) return `Draw from classic children's stories...`; // dead
+  if (ageYears <= 13) return `Draw from children's novels...`;    // ← entry point
+  return `Draw from classic and contemporary literature...`;
+}
+```
+
+The `≤7` and `≤10` branches are unreachable for 11+ users. Clean-up: collapse to two branches — `≤13` → chapter-book register, `>13` → adult literary register.
+
+Both cleanups are assigned to Agent 2 (Phase 3 parallel dispatch).
+
+---
 
 ## Purpose
 

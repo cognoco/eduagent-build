@@ -98,11 +98,36 @@ export async function runHarness(
         let liveProvider: string | undefined;
         let liveModel: string | undefined;
         let liveError: string | undefined;
+        let schemaViolation: string | undefined;
 
         if (options.live && flow.runLive) {
           try {
             liveResponse = await flow.runLive(input, messages);
             summary.liveCallsOk++;
+
+            // If the flow declares an expectedResponseSchema, try to parse
+            // the raw response as JSON and validate — mismatches surface as
+            // a "Schema violation" section in the snapshot.
+            if (flow.expectedResponseSchema && liveResponse) {
+              try {
+                const jsonMatch = liveResponse.match(/\{[\s\S]*\}/);
+                const parsed = JSON.parse(
+                  jsonMatch ? jsonMatch[0] : liveResponse
+                );
+                const result = flow.expectedResponseSchema.safeParse(parsed);
+                if (!result.success) {
+                  schemaViolation =
+                    result.error instanceof Error
+                      ? result.error.message
+                      : JSON.stringify(result.error);
+                }
+              } catch (parseErr) {
+                schemaViolation =
+                  parseErr instanceof Error
+                    ? `JSON parse failed: ${parseErr.message}`
+                    : 'JSON parse failed';
+              }
+            }
           } catch (err) {
             liveError = err instanceof Error ? err.message : String(err);
             summary.liveCallsFailed++;
@@ -120,6 +145,7 @@ export async function runHarness(
           liveProvider,
           liveModel,
           liveError,
+          schemaViolation,
         });
 
         summary.snapshotsWritten++;

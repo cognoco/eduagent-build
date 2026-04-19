@@ -104,9 +104,15 @@ export function getRetentionAwareStartingRung(
  * Detects the [PARTIAL_PROGRESS] marker in an AI response.
  * The LLM self-reports when a student's answer shows partial understanding
  * — they have part of the concept right but are missing a key piece.
+ *
+ * MUST use the strict own-line regex — a permissive .includes() match would
+ * fire on mid-sentence occurrences, leaking the raw token to learners
+ * because the companion strip step in exchanges.ts:cleanMarkersFromResponse
+ * uses the same strict pattern. See docs/specs/2026-04-18-llm-reliability-ux-audit.md
+ * finding F1.2 for history.
  */
 export function detectPartialProgress(aiResponse: string): boolean {
-  return aiResponse.includes('[PARTIAL_PROGRESS]');
+  return /(?:^|\n)\[PARTIAL_PROGRESS\]\s*$/.test(aiResponse);
 }
 
 // ---------------------------------------------------------------------------
