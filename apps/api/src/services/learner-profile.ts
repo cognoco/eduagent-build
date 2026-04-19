@@ -1224,7 +1224,8 @@ export async function analyzeSessionTranscript(
   transcript: Array<{ eventType: string; content: string }>,
   subjectName: string | null,
   topicTitle: string | null,
-  rawInput?: string | null
+  rawInput?: string | null,
+  context: 'session' | 'interview' = 'session'
 ): Promise<SessionAnalysisOutput | null> {
   const conversationEvents = transcript
     .filter(
@@ -1233,7 +1234,11 @@ export async function analyzeSessionTranscript(
     )
     .slice(-MAX_TRANSCRIPT_EVENTS);
 
-  if (conversationEvents.length < 3) {
+  // Regular sessions require >=3 conversation events to produce useful analysis.
+  // Interviews are intentionally short (2-3 exchanges per F7 audit), so allow
+  // analysis to fire from 2 events onward in that context only.
+  const minEvents = context === 'interview' ? 2 : 3;
+  if (conversationEvents.length < minEvents) {
     return null;
   }
 

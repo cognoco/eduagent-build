@@ -146,10 +146,13 @@ describe('buildSystemPrompt', () => {
 
   it('uses teach-first role identity (not Socratic)', () => {
     const prompt = buildSystemPrompt(baseContext);
-    // New identity should be present
-    expect(prompt).toContain('teaches clearly and checks understanding');
+    // New identity should be present (F3 tone pass: "calm, clear tutor" replaces "learning mate")
+    expect(prompt).toContain('calm, clear tutor');
+    expect(prompt).toContain('Teach directly and check understanding');
     // Old Socratic identity should be gone
     expect(prompt).not.toContain('asks the right question at the right time');
+    // Old performative-warm phrasing should be gone (F3)
+    expect(prompt).not.toContain('personalised learning mate');
   });
 
   it('accepts exchangeCount in the context', () => {
