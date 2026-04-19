@@ -233,8 +233,12 @@ export async function getTopicProgress(
     (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
   )[0];
 
-  // Get session summary excerpt from the most recent session
-  const lastTopicSession = topicSessions[topicSessions.length - 1];
+  // Get session summary excerpt from the most recent session.
+  // findMany returns DB insertion order — sort by createdAt to get the true latest.
+  const sortedSessions = topicSessions.sort(
+    (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
+  );
+  const lastTopicSession = sortedSessions[0];
   const summaryRow =
     lastTopicSession != null
       ? await repo.sessionSummaries.findFirst(
@@ -558,12 +562,17 @@ export async function getTopicProgressBatch(
     xpByTopic.set(x.topicId, list);
   }
 
-  // Batch-fetch session summaries for the last session of each topic
+  // Batch-fetch session summaries for the most recent session of each topic.
+  // Sessions from findMany arrive in DB insertion order, so we must sort by
+  // createdAt to pick the genuinely most-recent session per topic.
   const lastSessionIds: string[] = [];
   const lastSessionByTopic = new Map<string, string>();
   for (const topic of topics) {
     const topicSessions = sessionsByTopic.get(topic.id) ?? [];
-    const last = topicSessions[topicSessions.length - 1];
+    const sorted = topicSessions.sort(
+      (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
+    );
+    const last = sorted[0];
     if (last) {
       lastSessionIds.push(last.id);
       lastSessionByTopic.set(topic.id, last.id);

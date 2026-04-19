@@ -443,7 +443,7 @@ export async function completeQuizRound(
     const questionResults: ValidatedQuestionResult[] = validatedResults.map(
       (result) => {
         const question = questions[result.questionIndex];
-        return {
+        const entry: ValidatedQuestionResult = {
           questionIndex: result.questionIndex,
           correct: result.correct,
           correctAnswer: question?.correctAnswer ?? '',
@@ -451,6 +451,12 @@ export async function completeQuizRound(
           // results screen can show "You said: X" on missed-question cards.
           answerGiven: result.answerGiven,
         };
+        // [BUG-469] Persist dispute flag so disputed answers can be reviewed
+        // in analytics. Only set when true to keep JSONB lean.
+        if (result.disputed) {
+          entry.disputed = true;
+        }
+        return entry;
       }
     );
 

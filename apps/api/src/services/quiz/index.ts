@@ -1,4 +1,4 @@
-export { QUIZ_CONFIG } from './config';
+export { QUIZ_CONFIG, formatActivityLabel } from './config';
 export { resolveRoundContent } from './content-resolver';
 export {
   validateCapitalsRound,

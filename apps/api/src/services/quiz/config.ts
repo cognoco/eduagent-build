@@ -43,6 +43,20 @@ export const QUIZ_CONFIG = {
 
 export type QuizActivityConfig = typeof QUIZ_CONFIG;
 
+/**
+ * [F-036b] Format an activity type enum for display:
+ * "capitals" → "Capitals", "guess_who" → "Guess Who".
+ *
+ * Centralized here so every client (mobile, future web) gets consistent
+ * casing. Otherwise each surface re-implements `.replace('_', ' ')` +
+ * title-case and they drift.
+ */
+export function formatActivityLabel(activityType: string): string {
+  return activityType
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 // Product targets 11+ only — 'child' bracket removed in Agent 2's dead-code
 // cleanup. See docs/specs/2026-04-18-llm-personalization-audit.md.
 export type AgeBracket = 'adolescent' | 'adult';

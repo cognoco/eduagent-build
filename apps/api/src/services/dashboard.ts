@@ -28,6 +28,7 @@ import type {
   SessionMetadata,
   TopicProgress,
 } from '@eduagent/schemas';
+import { engagementSignalSchema } from '@eduagent/schemas';
 import { getOverallProgress, getTopicProgressBatch } from './progress';
 import {
   buildKnowledgeInventory,
@@ -808,10 +809,17 @@ export async function getChildSessions(
       highlight: summary?.highlight ?? null,
       narrative: summary?.narrative ?? null,
       conversationPrompt: summary?.conversationPrompt ?? null,
-      engagementSignal:
-        (summary?.engagementSignal as ChildSession['engagementSignal']) ?? null,
+      engagementSignal: parseEngagementSignal(summary?.engagementSignal),
     };
   });
+}
+
+function parseEngagementSignal(
+  raw: string | null | undefined
+): EngagementSignal | null {
+  if (!raw) return null;
+  const parsed = engagementSignalSchema.safeParse(raw);
+  return parsed.success ? parsed.data : null;
 }
 
 export async function getChildSessionDetail(
@@ -864,8 +872,7 @@ export async function getChildSessionDetail(
     highlight: summary?.highlight ?? null,
     narrative: summary?.narrative ?? null,
     conversationPrompt: summary?.conversationPrompt ?? null,
-    engagementSignal:
-      (summary?.engagementSignal as ChildSession['engagementSignal']) ?? null,
+    engagementSignal: parseEngagementSignal(summary?.engagementSignal),
   };
 }
 

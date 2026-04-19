@@ -18,6 +18,7 @@ import { validationError, VocabularyContextError } from '../errors';
 import {
   checkQuizAnswer,
   completeQuizRound,
+  formatActivityLabel,
   getCelebrationTier,
   getVocabularyRoundContext,
   getGuessWhoRoundContext,
@@ -58,20 +59,6 @@ function shuffle<T>(arr: T[]): T[] {
     [result[i], result[j]] = [result[j]!, result[i]!];
   }
   return result;
-}
-
-/**
- * [F-036b] Format an activity type enum for display:
- * "capitals" → "Capitals", "guess_who" → "Guess Who".
- *
- * Centralized here so every client (mobile, future web) gets consistent
- * casing. Otherwise each surface re-implements `.replace('_', ' ')` +
- * title-case and they drift.
- */
-function formatActivityLabel(activityType: string): string {
-  return activityType
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 function toClientSafeQuestions(
@@ -376,14 +363,13 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
       const result = await completeQuizRound(db, profileId, roundId, results);
 
       // Record streak activity — quiz round counts as daily learning activity.
-      // [C2] Streak failure must not block the quiz completion response — scoring
-      // and mastery updates already succeeded, so the user should see their results.
-      try {
-        const today = new Date().toISOString().slice(0, 10);
-        await recordSessionActivity(db, profileId, today);
-      } catch (err) {
+      // [C2] Fire-and-forget: streak failure must not block the quiz completion
+      // response. Scoring and mastery updates already succeeded, so the user
+      // should see their results without waiting for the streak write round-trip.
+      const today = new Date().toISOString().slice(0, 10);
+      recordSessionActivity(db, profileId, today).catch((err) => {
         console.warn('[quiz] streak recording failed, non-blocking:', err);
-      }
+      });
 
       return c.json(result, 200);
     }

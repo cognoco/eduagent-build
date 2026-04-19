@@ -118,8 +118,8 @@ export const questionResultSchema = z.object({
   cluesUsed: z.number().int().min(0).max(5).optional(),
   answerMode: z.enum(['free_text', 'multiple_choice']).optional(),
   /** [BUG-469] User disputes the LLM's correctness judgment.
-   * TODO: Server-side handling — complete-round.ts should persist the dispute
-   * flag and surface it in analytics so disputed answers can be reviewed. */
+   * Persisted through to ValidatedQuestionResult in the JSONB results column
+   * so disputed answers can be reviewed in analytics. */
   disputed: z.boolean().optional(),
 });
 export type QuestionResult = z.infer<typeof questionResultSchema>;
@@ -184,7 +184,13 @@ export const validatedQuestionResultSchema = z.object({
   // [F-040] The user's submitted answer — surfaced to the results screen so
   // we can render "You said: X" on missed-question cards without a second
   // round-trip. Server-authoritative: copied from validatedResults.
-  answerGiven: z.string(),
+  // Optional for backward compat: rows stored before this field was added
+  // won't have it in the JSONB column.
+  answerGiven: z.string().optional(),
+  // [BUG-469] Persisted dispute flag — true when the user disputed the
+  // server's correctness judgment for this question. Enables analytics
+  // review of disputed answers.
+  disputed: z.boolean().optional(),
 });
 export type ValidatedQuestionResult = z.infer<
   typeof validatedQuestionResultSchema
