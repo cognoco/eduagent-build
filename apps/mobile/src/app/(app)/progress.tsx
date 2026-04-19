@@ -26,11 +26,25 @@ import {
   useRefreshProgressSnapshot,
 } from '../../hooks/use-progress';
 
-function heroCopy(input: { topicsMastered: number; vocabularyTotal: number }): {
+function heroCopy(input: {
+  topicsMastered: number;
+  vocabularyTotal: number;
+  totalSessions: number;
+}): {
   title: string;
   subtitle: string;
 } {
-  const { topicsMastered, vocabularyTotal } = input;
+  const { topicsMastered, vocabularyTotal, totalSessions } = input;
+
+  // [F-043] User has sessions but nothing mastered yet — show encouragement
+  if (topicsMastered === 0 && vocabularyTotal === 0 && totalSessions > 0) {
+    return {
+      title: `${totalSessions} session${
+        totalSessions === 1 ? '' : 's'
+      } completed`,
+      subtitle: 'Topics mastered and vocabulary will appear as you progress.',
+    };
+  }
 
   if (vocabularyTotal > 0 && topicsMastered === 0) {
     return vocabularyTotal < 20
@@ -128,6 +142,7 @@ export default function ProgressScreen(): React.ReactElement {
   const hero = heroCopy({
     topicsMastered: inventory?.global.topicsMastered ?? 0,
     vocabularyTotal: inventory?.global.vocabularyTotal ?? 0,
+    totalSessions: inventory?.global.totalSessions ?? 0,
   });
 
   const growthData = useMemo(
@@ -287,7 +302,9 @@ export default function ProgressScreen(): React.ReactElement {
                   </View>
                   <View className="bg-background rounded-full px-3 py-1.5">
                     <Text className="text-caption font-semibold text-text-primary">
-                      {inventory.global.totalActiveMinutes} active min
+                      {inventory.global.totalWallClockMinutes ||
+                        inventory.global.totalActiveMinutes}{' '}
+                      min
                     </Text>
                   </View>
                   <View className="bg-background rounded-full px-3 py-1.5">

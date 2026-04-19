@@ -189,10 +189,7 @@ export function GuessWhoQuestion({
       </View>
 
       <View className="rounded-card bg-surface p-4">
-        <Text className="text-caption font-semibold text-text-secondary">
-          Type your guess
-        </Text>
-        <View className="mt-3 rounded-input bg-surface-elevated px-3">
+        <View className="rounded-input bg-surface-elevated px-3">
           <TextInput
             value={guess}
             onChangeText={setGuess}

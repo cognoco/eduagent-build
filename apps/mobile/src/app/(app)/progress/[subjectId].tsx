@@ -199,8 +199,10 @@ export default function ProgressSubjectScreen(): React.ReactElement {
 
             <View className="flex-row gap-3 mt-3">
               <StatCard
-                label="Active minutes"
-                value={String(subject.activeMinutes)}
+                label="Minutes"
+                value={String(
+                  subject.wallClockMinutes || subject.activeMinutes
+                )}
               />
               <StatCard
                 label="Sessions"

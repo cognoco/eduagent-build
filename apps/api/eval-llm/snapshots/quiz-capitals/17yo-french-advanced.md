@@ -1,25 +1,27 @@
-# Quiz — Capitals × 14yo-football-gaming
+# Quiz — Capitals × 17yo-french-advanced
 
 > **Flow source:** `apps/api/src/services/quiz/generate-round.ts:buildCapitalsPrompt`
-> **Profile:** 14-year-old US teen, English native, into football and competitive gaming, low patience for formality
+> **Profile:** 17-year-old EU teen, Czech native but conversational French with tutor, advanced French (CEFR B2), literature and philosophy
 
 ## Profile summary
 
 | Field | Value |
 |---|---|
-| Age | 14 years (birth year 2012) |
-| Native language | en |
-| Location | US |
-| Interests | football, NFL, esports, competitive gaming, sports statistics |
-| Library topics | algebra equations, US history: Civil War, physics: forces and motion |
-| CEFR | — |
-| Target language | — |
-| Struggles | factoring polynomials (math); Reconstruction era (history) |
-| Strengths | mental arithmetic (math); Newton's laws (physics) |
-| Learning mode | casual |
-| Preferred explanations | examples, analogies |
-| Pace | quick |
-| Analogy domain | sports |
+| Age | 17 years (birth year 2009) |
+| Native language | cs |
+| Conversation language | fr |
+| Location | EU |
+| Pronouns | they/them |
+| Interests | French literature (both), philosophy (both), existentialism (free time), creative writing (free time) |
+| Library topics | Camus — L'Étranger, French subjunctive, essay structure, Enlightenment thinkers |
+| CEFR | B2 |
+| Target language | fr |
+| Struggles | subjonctif imparfait (French); nuanced connectors (French) |
+| Strengths | reading comprehension (French); essay argument structure (writing) |
+| Learning mode | serious |
+| Preferred explanations | step-by-step, analogies |
+| Pace | thorough |
+| Analogy domain | music |
 
 ## Builder input
 
@@ -28,8 +30,8 @@
   "discoveryCount": 6,
   "ageBracket": "adult",
   "recentAnswers": [
-    "Washington D.C.",
-    "London"
+    "Paris",
+    "Brussels"
   ]
 }
 ```
@@ -43,7 +45,7 @@ Activity: Capitals quiz
 Choose an age-appropriate theme (e.g. "Central European Capitals").
 Questions needed: exactly 6
 
-Do NOT include questions about these recently seen capitals: Washington D.C., London
+Do NOT include questions about these recently seen capitals: Paris, Brussels
 
 Rules:
 - Generate exactly 6 questions

@@ -1,36 +1,37 @@
-# Quiz — Capitals × 09yo-dinosaurs
+# Quiz — Capitals × 15yo-football-gaming
 
 > **Flow source:** `apps/api/src/services/quiz/generate-round.ts:buildCapitalsPrompt`
-> **Profile:** 9-year-old US child, English native, obsessed with dinosaurs and prehistoric life, quick pace, humor works
+> **Profile:** 15-year-old US teen, English native, into football and competitive gaming, low patience for formality
 
 ## Profile summary
 
 | Field | Value |
 |---|---|
-| Age | 9 years (birth year 2017) |
+| Age | 15 years (birth year 2011) |
 | Native language | en |
+| Conversation language | en |
 | Location | US |
-| Interests | dinosaurs, fossils, paleontology, extinction events, volcanoes |
-| Library topics | Mesozoic era, fossilization, plate tectonics, multiplication tables |
+| Pronouns | he/him |
+| Interests | football (free time), NFL (free time), esports (free time), competitive gaming (free time), sports statistics (both) |
+| Library topics | algebra equations, US history: Civil War, physics: forces and motion |
 | CEFR | — |
 | Target language | — |
-| Struggles | long multiplication (math); Austria vs Australia (geography) |
-| Strengths | dinosaur classification (science); reading comprehension (reading) |
+| Struggles | factoring polynomials (math); Reconstruction era (history) |
+| Strengths | mental arithmetic (math); Newton's laws (physics) |
 | Learning mode | casual |
-| Preferred explanations | humor, examples, stories |
+| Preferred explanations | examples, analogies |
 | Pace | quick |
-| Analogy domain | nature |
+| Analogy domain | sports |
 
 ## Builder input
 
 ```json
 {
   "discoveryCount": 6,
-  "ageBracket": "child",
+  "ageBracket": "adult",
   "recentAnswers": [
-    "Tokyo",
-    "Paris",
-    "Canberra"
+    "Washington D.C.",
+    "London"
   ]
 }
 ```
@@ -38,13 +39,13 @@
 ## Generated prompt — system
 
 ```
-You are generating a multiple-choice capitals quiz for a 6-9 learner.
+You are generating a multiple-choice capitals quiz for a 14+ learner.
 
 Activity: Capitals quiz
 Choose an age-appropriate theme (e.g. "Central European Capitals").
 Questions needed: exactly 6
 
-Do NOT include questions about these recently seen capitals: Tokyo, Paris, Canberra
+Do NOT include questions about these recently seen capitals: Washington D.C., London
 
 Rules:
 - Generate exactly 6 questions
@@ -75,6 +76,6 @@ Generate the quiz round.
 
 ## Builder notes
 
-- Coarse age bracket in use: child. Interests NOT passed (gap flagged in audit P0).
+- Coarse age bracket in use: adult. Interests NOT passed (gap flagged in audit P0).
 - Library topics NOT passed (gap flagged in audit P1).
 - Struggles NOT passed (gap flagged in audit P0).

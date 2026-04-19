@@ -44,6 +44,7 @@ jest.mock('../../../lib/navigation', () => ({
 jest.mock('../../../hooks/use-progress', () => ({
   useTopicProgress: () => mockTopicProgress(),
   useActiveSessionForTopic: () => mockActiveSession(),
+  useResolveTopicSubject: () => ({ data: undefined, isLoading: false }),
 }));
 
 jest.mock('../../../hooks/use-retention', () => ({

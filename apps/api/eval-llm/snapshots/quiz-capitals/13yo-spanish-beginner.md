@@ -1,35 +1,36 @@
-# Quiz — Capitals × 16yo-french-advanced
+# Quiz — Capitals × 13yo-spanish-beginner
 
 > **Flow source:** `apps/api/src/services/quiz/generate-round.ts:buildCapitalsPrompt`
-> **Profile:** 16-year-old EU teen, Czech native, advanced French (CEFR B2), into literature and philosophy
+> **Profile:** 13-year-old EU girl, English native, learning Spanish (CEFR A2), loves horses and equestrian sports
 
 ## Profile summary
 
 | Field | Value |
 |---|---|
-| Age | 16 years (birth year 2010) |
-| Native language | cs |
+| Age | 13 years (birth year 2013) |
+| Native language | en |
+| Conversation language | en |
 | Location | EU |
-| Interests | French literature, philosophy, existentialism, creative writing |
-| Library topics | Camus — L'Étranger, French subjunctive, essay structure, Enlightenment thinkers |
-| CEFR | B2 |
-| Target language | fr |
-| Struggles | subjonctif imparfait (French); nuanced connectors (French) |
-| Strengths | reading comprehension (French); essay argument structure (writing) |
+| Pronouns | she/her |
+| Interests | horses (free time), showjumping (free time), eventing (free time), nature photography (free time) |
+| Library topics | Spanish present tense verbs, Spanish family vocabulary, Spanish numbers 1-1000, Spain geography |
+| CEFR | A2 |
+| Target language | es |
+| Struggles | ser vs estar (Spanish); irregular verbs (Spanish) |
+| Strengths | Spanish pronunciation (Spanish) |
 | Learning mode | serious |
-| Preferred explanations | step-by-step, analogies |
+| Preferred explanations | step-by-step, examples |
 | Pace | thorough |
-| Analogy domain | music |
+| Analogy domain | nature |
 
 ## Builder input
 
 ```json
 {
   "discoveryCount": 6,
-  "ageBracket": "adult",
+  "ageBracket": "adolescent",
   "recentAnswers": [
-    "Paris",
-    "Brussels"
+    "Madrid"
   ]
 }
 ```
@@ -37,13 +38,13 @@
 ## Generated prompt — system
 
 ```
-You are generating a multiple-choice capitals quiz for a 14+ learner.
+You are generating a multiple-choice capitals quiz for a 10-13 learner.
 
 Activity: Capitals quiz
 Choose an age-appropriate theme (e.g. "Central European Capitals").
 Questions needed: exactly 6
 
-Do NOT include questions about these recently seen capitals: Paris, Brussels
+Do NOT include questions about these recently seen capitals: Madrid
 
 Rules:
 - Generate exactly 6 questions
@@ -74,6 +75,6 @@ Generate the quiz round.
 
 ## Builder notes
 
-- Coarse age bracket in use: adult. Interests NOT passed (gap flagged in audit P0).
+- Coarse age bracket in use: adolescent. Interests NOT passed (gap flagged in audit P0).
 - Library topics NOT passed (gap flagged in audit P1).
 - Struggles NOT passed (gap flagged in audit P0).

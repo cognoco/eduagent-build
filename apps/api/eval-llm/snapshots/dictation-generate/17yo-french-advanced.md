@@ -1,41 +1,43 @@
-# Dictation — Generate × 14yo-football-gaming
+# Dictation — Generate × 17yo-french-advanced
 
 > **Flow source:** `apps/api/src/services/dictation/generate.ts:buildGeneratePrompt`
-> **Profile:** 14-year-old US teen, English native, into football and competitive gaming, low patience for formality
+> **Profile:** 17-year-old EU teen, Czech native but conversational French with tutor, advanced French (CEFR B2), literature and philosophy
 
 ## Profile summary
 
 | Field | Value |
 |---|---|
-| Age | 14 years (birth year 2012) |
-| Native language | en |
-| Location | US |
-| Interests | football, NFL, esports, competitive gaming, sports statistics |
-| Library topics | algebra equations, US history: Civil War, physics: forces and motion |
-| CEFR | — |
-| Target language | — |
-| Struggles | factoring polynomials (math); Reconstruction era (history) |
-| Strengths | mental arithmetic (math); Newton's laws (physics) |
-| Learning mode | casual |
-| Preferred explanations | examples, analogies |
-| Pace | quick |
-| Analogy domain | sports |
+| Age | 17 years (birth year 2009) |
+| Native language | cs |
+| Conversation language | fr |
+| Location | EU |
+| Pronouns | they/them |
+| Interests | French literature (both), philosophy (both), existentialism (free time), creative writing (free time) |
+| Library topics | Camus — L'Étranger, French subjunctive, essay structure, Enlightenment thinkers |
+| CEFR | B2 |
+| Target language | fr |
+| Struggles | subjonctif imparfait (French); nuanced connectors (French) |
+| Strengths | reading comprehension (French); essay argument structure (writing) |
+| Learning mode | serious |
+| Preferred explanations | step-by-step, analogies |
+| Pace | thorough |
+| Analogy domain | music |
 
 ## Builder input
 
 ```json
 {
-  "nativeLanguage": "en",
-  "ageYears": 14
+  "nativeLanguage": "cs",
+  "ageYears": 17
 }
 ```
 
 ## Generated prompt — system
 
 ```
-You are a dictation content generator for a 14-year-old person.
+You are a dictation content generator for a 17-year-old person.
 
-LANGUAGE: Write the dictation in en (ISO 639-1 code).
+LANGUAGE: Write the dictation in cs (ISO 639-1 code).
 
 THEME: Write sentences inspired by age-appropriate literature and stories.
 Draw from classic and contemporary literature — novels, short stories, literary fiction. Think Hemingway, Kafka, Čapek, or contemporary bestsellers. Use adult-level vocabulary and sentence structure.
@@ -51,7 +53,7 @@ CONSTRAINTS:
 - Include 1-2 sentences that are slightly challenging (unusual spelling, tricky grammar)
 
 For each sentence, also create a "withPunctuation" variant where punctuation marks are replaced with spoken words in the dictation language:
-- In English: , → "comma", . → "period", ? → "question mark", ! → "exclamation mark"
+- In Czech: , → "čárka", . → "tečka", ? → "otazník", ! → "vykřičník"
 - For other languages, use the standard spoken name for each punctuation mark in that language.
 
 Count the words in each sentence (original text, not the punctuation variant).
@@ -79,7 +81,7 @@ RESPOND WITH ONLY valid JSON:
   ],
   "title": "Short title for this dictation",
   "topic": "The literary theme you chose",
-  "language": "en"
+  "language": "cs"
 }
 ```
 
@@ -91,7 +93,7 @@ Generate a dictation for me.
 
 ## Builder notes
 
-- Uses fine-grained ageYears=14 — 4-bucket literary scaling (strongest age handling in the codebase).
+- Uses fine-grained ageYears=17 — 4-bucket literary scaling (strongest age handling in the codebase).
 - Native language drives punctuation-name mapping.
 - Interests NOT used (gap flagged in audit P0) — dinosaur kid gets same Dahl theme as horse kid.
 - Library topics NOT used (gap flagged in audit P0) — WWII learner could get period-appropriate narrative passages.

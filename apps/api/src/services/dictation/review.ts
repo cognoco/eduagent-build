@@ -16,7 +16,7 @@ import { captureException } from '../sentry';
 // breakdown of mistakes.
 // ---------------------------------------------------------------------------
 
-const SYSTEM_PROMPT = `You are a dictation review assistant. Your job is to compare a child's handwritten text (visible in the image) against the original dictation sentences.
+export const SYSTEM_PROMPT = `You are a dictation review assistant. Your job is to compare a child's handwritten text (visible in the image) against the original dictation sentences.
 
 TASK:
 Carefully examine the handwritten text in the image. Compare each sentence to the original provided below.

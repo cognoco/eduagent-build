@@ -980,16 +980,27 @@ describe('sessionCompleted', () => {
       );
     });
 
-    it('does NOT call recordSessionActivity when no qualityRating (FR86)', async () => {
+    // [F-044] Sessions with user engagement now count toward streaks.
+    // The old gate (completionQualityRating >= 3) was a bug — most close paths
+    // never set qualityRating, so streaks were never updated.
+    it('calls recordSessionActivity when no qualityRating but user had exchanges (F-044)', async () => {
       await executeSteps(createEventData());
 
-      expect(mockRecordSessionActivity).not.toHaveBeenCalled();
+      expect(mockRecordSessionActivity).toHaveBeenCalledWith(
+        expect.anything(),
+        'profile-001',
+        '2026-02-17'
+      );
     });
 
-    it('does NOT call recordSessionActivity when quality < 3 (recall fail, FR86)', async () => {
+    it('calls recordSessionActivity when quality < 3 (user still engaged, F-044)', async () => {
       await executeSteps(createEventData({ qualityRating: 2 }));
 
-      expect(mockRecordSessionActivity).not.toHaveBeenCalled();
+      expect(mockRecordSessionActivity).toHaveBeenCalledWith(
+        expect.anything(),
+        'profile-001',
+        '2026-02-17'
+      );
     });
 
     it('uses current date when no timestamp provided', async () => {

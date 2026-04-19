@@ -124,8 +124,15 @@ function renderProfileTable(profile: EvalProfile): string {
   const rows: Array<[string, string]> = [
     ['Age', `${profile.ageYears} years (birth year ${profile.birthYear})`],
     ['Native language', profile.nativeLanguage],
+    ['Conversation language', profile.conversationLanguage],
     ['Location', profile.location],
-    ['Interests', profile.interests.join(', ') || '—'],
+    ['Pronouns', profile.pronouns ?? '— (not provided)'],
+    [
+      'Interests',
+      profile.interests
+        .map((i) => `${i.label} (${i.context.replace('_', ' ')})`)
+        .join(', ') || '—',
+    ],
     ['Library topics', profile.libraryTopics.join(', ') || '—'],
     ['CEFR', profile.cefrLevel ?? '—'],
     ['Target language', profile.targetLanguage ?? '—'],

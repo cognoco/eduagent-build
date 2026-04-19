@@ -5,6 +5,7 @@ import type {
   QuizActivityType,
   QuizRoundResponse,
 } from '@eduagent/schemas';
+import { useThemeColors } from '../../../lib/theme';
 
 interface QuizFlowState {
   activityType: QuizActivityType | null;
@@ -97,12 +98,14 @@ function QuizFlowProvider({
 }
 
 export default function QuizLayout(): React.ReactElement {
+  const colors = useThemeColors();
   return (
     <QuizFlowProvider>
       <Stack
         screenOptions={{
           headerShown: false,
           animation: 'slide_from_right',
+          contentStyle: { backgroundColor: colors.background },
         }}
       />
     </QuizFlowProvider>

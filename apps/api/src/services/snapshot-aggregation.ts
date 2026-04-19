@@ -334,6 +334,14 @@ function buildSubjectMetric(
       0
     ) / 60
   );
+  // [F-045] Wall-clock minutes per subject for user-facing display
+  const totalWallClockMinutes = Math.round(
+    subjectSessions.reduce(
+      (sum, session) =>
+        sum + (session.wallClockSeconds ?? session.durationSeconds ?? 0),
+      0
+    ) / 60
+  );
   const lastSessionAt = subjectSessions
     .map((session) => session.lastActivityAt)
     .sort((a, b) => b.getTime() - a.getTime())[0];
@@ -351,6 +359,7 @@ function buildSubjectMetric(
       .length,
     sessionsCount: subjectSessions.length,
     activeMinutes: totalActiveMinutes,
+    wallClockMinutes: totalWallClockMinutes,
     lastSessionAt: lastSessionAt?.toISOString() ?? null,
   };
 }
@@ -573,6 +582,7 @@ async function buildSubjectInventory(
     estimatedProficiencyLabel,
     lastSessionAt: subjectMetric.lastSessionAt,
     activeMinutes: subjectMetric.activeMinutes,
+    wallClockMinutes: subjectMetric.wallClockMinutes,
     sessionsCount: subjectMetric.sessionsCount,
   };
 }
@@ -599,6 +609,7 @@ export async function buildKnowledgeInventory(
       vocabularyMastered: metrics.vocabularyMastered,
       totalSessions: metrics.totalSessions,
       totalActiveMinutes: metrics.totalActiveMinutes,
+      totalWallClockMinutes: metrics.totalWallClockMinutes,
       currentStreak: metrics.currentStreak,
       longestStreak: metrics.longestStreak,
     },

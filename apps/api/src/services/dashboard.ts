@@ -39,31 +39,7 @@ import {
   listMonthlyReportsForParentChild,
   markMonthlyReportViewed,
 } from './monthly-report';
-import { ForbiddenError } from '../errors';
-
-/**
- * [EP15-I5] Central enforcement of parent→child access checks.
- *
- * Prior implementation scattered `if (!(await hasParentAccess(...))) return null`
- * across seven functions, and the routes blindly serialized the null result
- * as `{ inventory: null }` / `{ reports: [] }` with HTTP 200. That masked
- * authorization denials as empty states — an attacker iterating child IDs
- * could not tell a forbidden child apart from a genuinely empty one, and
- * legitimate users saw "no reports yet" instead of "you lost access to this
- * child". Both outcomes are wrong.
- *
- * `assertParentAccess` throws `ForbiddenError` on failure, and the global
- * `app.onError` handler in `index.ts` converts it to HTTP 403 once.
- */
-async function assertParentAccess(
-  db: Database,
-  parentProfileId: string,
-  childProfileId: string
-): Promise<void> {
-  if (!(await hasParentAccess(db, parentProfileId, childProfileId))) {
-    throw new ForbiddenError('You do not have access to this child profile.');
-  }
-}
+import { assertParentAccess } from './family-access';
 
 export interface DashboardInput {
   childProfileId: string;
@@ -285,21 +261,6 @@ function buildProgressGuidance(
   }
 
   return null;
-}
-
-async function hasParentAccess(
-  db: Database,
-  parentProfileId: string,
-  childProfileId: string
-): Promise<boolean> {
-  const link = await db.query.familyLinks.findFirst({
-    where: and(
-      eq(familyLinks.parentProfileId, parentProfileId),
-      eq(familyLinks.childProfileId, childProfileId)
-    ),
-  });
-
-  return !!link;
 }
 
 async function buildChildProgressSummary(
@@ -667,6 +628,15 @@ export async function getChildSubjectTopics(
 ): Promise<TopicProgress[]> {
   // [EP15-I5] See assertParentAccess comment — ForbiddenError → 403.
   await assertParentAccess(db, parentProfileId, childProfileId);
+
+  // Verify the subject belongs to the child before querying curriculum (IDOR guard).
+  const childSubject = await db.query.subjects.findFirst({
+    where: and(
+      eq(subjects.id, subjectId),
+      eq(subjects.profileId, childProfileId)
+    ),
+  });
+  if (!childSubject) return [];
 
   // Get curriculum for subject
   const curriculum = await db.query.curricula.findFirst({

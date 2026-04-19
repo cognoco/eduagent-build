@@ -1,21 +1,23 @@
-# Quiz — Capitals × 06yo-fairytales
+# Quiz — Capitals × 11yo-czech-animals
 
 > **Flow source:** `apps/api/src/services/quiz/generate-round.ts:buildCapitalsPrompt`
-> **Profile:** 6-year-old EU child, early reader, Czech native, loves fairy tales and animals, low cognitive load preferred
+> **Profile:** 11-year-old EU girl, Czech native, youngest in the target range, loves animals and nature, thorough pacer
 
 ## Profile summary
 
 | Field | Value |
 |---|---|
-| Age | 6 years (birth year 2020) |
+| Age | 11 years (birth year 2015) |
 | Native language | cs |
+| Conversation language | cs |
 | Location | EU |
-| Interests | fairy tales, horses, forest animals, drawing |
-| Library topics | alphabet, counting to 20, farm animals |
+| Pronouns | — (not provided) |
+| Interests | horses (free time), forest animals (free time), nature journaling (both), drawing (free time) |
+| Library topics | Czech reading comprehension, basic fractions, human body systems, water cycle |
 | CEFR | — |
 | Target language | — |
-| Struggles | letter b vs d; silent letters (reading) |
-| Strengths | rhyming words (reading) |
+| Struggles | fraction addition (math); long multi-clause sentences (reading) |
+| Strengths | vocabulary retention (Czech) |
 | Learning mode | casual |
 | Preferred explanations | stories, examples |
 | Pace | thorough |
@@ -26,7 +28,7 @@
 ```json
 {
   "discoveryCount": 6,
-  "ageBracket": "child",
+  "ageBracket": "adolescent",
   "recentAnswers": []
 }
 ```
@@ -34,7 +36,7 @@
 ## Generated prompt — system
 
 ```
-You are generating a multiple-choice capitals quiz for a 6-9 learner.
+You are generating a multiple-choice capitals quiz for a 10-13 learner.
 
 Activity: Capitals quiz
 Choose an age-appropriate theme (e.g. "Central European Capitals").
@@ -71,6 +73,6 @@ Generate the quiz round.
 
 ## Builder notes
 
-- Coarse age bracket in use: child. Interests NOT passed (gap flagged in audit P0).
+- Coarse age bracket in use: adolescent. Interests NOT passed (gap flagged in audit P0).
 - Library topics NOT passed (gap flagged in audit P1).
 - Struggles NOT passed (gap flagged in audit P0).

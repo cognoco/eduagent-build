@@ -207,12 +207,12 @@ export function ShelvesTab({
     item: ShelfItem;
   }): React.ReactElement => {
     const { subject, progress } = item;
-    // BUG-[NOTION-3468bce9]: Library shows `topicsCompleted` (learning content
-    // finished) while Progress shows `mastered` (retention-verified). Same
-    // "X/Y topics" string hid the semantic difference. Labelled explicitly.
+    // F-010 / BUG-[NOTION-3468bce9]: "completed" was confused with Progress's
+    // "mastered". topicsCompleted tracks content-coverage (started), not
+    // retention-verified mastery. Label now says "started" to avoid confusion.
     const progressLabel =
       progress && progress.topicsTotal > 0
-        ? `${progress.topicsCompleted}/${progress.topicsTotal} topics completed`
+        ? `${progress.topicsCompleted}/${progress.topicsTotal} topics started`
         : 'Shelf ready to explore';
     const reviewLabel =
       item.reviewDueCount && item.reviewDueCount > 0

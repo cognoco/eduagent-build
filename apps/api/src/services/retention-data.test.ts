@@ -210,7 +210,8 @@ beforeEach(() => {
 
 describe('getSubjectRetention', () => {
   it('returns empty when subject not found', async () => {
-    setupScopedRepo({ subjectFindFirst: undefined });
+    // Use null (not undefined) — undefined triggers JS destructuring defaults
+    setupScopedRepo({ subjectFindFirst: null as unknown });
     const db = createMockDb();
     const result = await getSubjectRetention(db, profileId, subjectId);
     expect(result.topics).toEqual([]);

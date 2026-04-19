@@ -1,11 +1,12 @@
 import { Redirect, Stack } from 'expo-router';
 import { View } from 'react-native';
 import { useAuth } from '@clerk/clerk-expo';
-import { useTokenVars } from '../../lib/theme';
+import { useThemeColors, useTokenVars } from '../../lib/theme';
 
 export default function AuthRoutesLayout() {
   const { isLoaded, isSignedIn } = useAuth();
   const tokenVars = useTokenVars();
+  const colors = useThemeColors();
 
   if (!isLoaded) return null;
   if (__DEV__)
@@ -18,7 +19,12 @@ export default function AuthRoutesLayout() {
 
   return (
     <View style={[{ flex: 1 }, tokenVars]}>
-      <Stack screenOptions={{ headerShown: false }} />
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: colors.background },
+        }}
+      />
     </View>
   );
 }

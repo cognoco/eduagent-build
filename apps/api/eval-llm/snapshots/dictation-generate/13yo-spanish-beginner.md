@@ -1,17 +1,19 @@
-# Dictation — Generate × 12yo-spanish-beginner
+# Dictation — Generate × 13yo-spanish-beginner
 
 > **Flow source:** `apps/api/src/services/dictation/generate.ts:buildGeneratePrompt`
-> **Profile:** 12-year-old EU girl, English native, learning Spanish (CEFR A2), loves horses and equestrian sports
+> **Profile:** 13-year-old EU girl, English native, learning Spanish (CEFR A2), loves horses and equestrian sports
 
 ## Profile summary
 
 | Field | Value |
 |---|---|
-| Age | 12 years (birth year 2014) |
+| Age | 13 years (birth year 2013) |
 | Native language | en |
+| Conversation language | en |
 | Location | EU |
-| Interests | horses, showjumping, eventing, nature photography |
-| Library topics | present tense verbs, family vocabulary, numbers 1-1000, Spain geography |
+| Pronouns | she/her |
+| Interests | horses (free time), showjumping (free time), eventing (free time), nature photography (free time) |
+| Library topics | Spanish present tense verbs, Spanish family vocabulary, Spanish numbers 1-1000, Spain geography |
 | CEFR | A2 |
 | Target language | es |
 | Struggles | ser vs estar (Spanish); irregular verbs (Spanish) |
@@ -26,14 +28,14 @@
 ```json
 {
   "nativeLanguage": "en",
-  "ageYears": 12
+  "ageYears": 13
 }
 ```
 
 ## Generated prompt — system
 
 ```
-You are a dictation content generator for a 12-year-old child.
+You are a dictation content generator for a 13-year-old child.
 
 LANGUAGE: Write the dictation in en (ISO 639-1 code).
 
@@ -44,7 +46,7 @@ Do NOT use geographical, scientific, or encyclopaedia-style factual content.
 
 CONSTRAINTS:
 - 6-10 sentences total
-- Sentence length: 5-10 words
+- Sentence length: 7-14 words
 - Target age-appropriate spelling patterns and vocabulary
 - Punctuation: commas and periods always. Question marks occasionally. Colons and semicolons sparingly.
 - Sentences must sound natural when read aloud — good rhythm, no awkward constructions
@@ -91,7 +93,7 @@ Generate a dictation for me.
 
 ## Builder notes
 
-- Uses fine-grained ageYears=12 — 4-bucket literary scaling (strongest age handling in the codebase).
+- Uses fine-grained ageYears=13 — 4-bucket literary scaling (strongest age handling in the codebase).
 - Native language drives punctuation-name mapping.
 - Interests NOT used (gap flagged in audit P0) — dinosaur kid gets same Dahl theme as horse kid.
 - Library topics NOT used (gap flagged in audit P0) — WWII learner could get period-appropriate narrative passages.

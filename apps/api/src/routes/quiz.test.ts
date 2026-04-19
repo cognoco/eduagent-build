@@ -81,6 +81,12 @@ jest.mock('../services/profile', () => ({
   }),
 }));
 
+jest.mock('../services/streaks', () => ({
+  recordSessionActivity: jest
+    .fn()
+    .mockResolvedValue({ currentStreak: 1, longestStreak: 1 }),
+}));
+
 jest.mock('../services/llm', () => ({
   routeAndCall: jest.fn().mockResolvedValue({
     response: JSON.stringify({

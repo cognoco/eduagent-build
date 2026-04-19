@@ -1,11 +1,19 @@
 import { View, Text, ScrollView, Pressable } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useRoundDetail } from '../../../hooks/use-quiz';
 import { goBackOrReplace } from '../../../lib/navigation';
+import { useThemeColors } from '../../../lib/theme';
+
+/** Title-case an activity type slug: "guess_who" → "Guess Who" */
+function formatActivityType(raw: string): string {
+  return raw.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
 export default function QuizRoundDetailScreen() {
   const { roundId } = useLocalSearchParams<{ roundId: string }>();
   const router = useRouter();
+  const colors = useThemeColors();
   const { data: round, isLoading, isError } = useRoundDetail(roundId);
 
   if (isLoading) {
@@ -50,14 +58,17 @@ export default function QuizRoundDetailScreen() {
         <Pressable
           testID="round-detail-back-btn"
           onPress={() => goBackOrReplace(router, '/(app)/quiz/history')}
+          className="min-h-[32px] min-w-[32px] items-center justify-center self-start"
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
         >
-          <Text className="text-primary">Back</Text>
+          <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
         </Pressable>
         <Text className="text-on-surface mt-4 text-xl font-bold">
           {(round as any).theme}
         </Text>
-        <Text className="text-on-surface-muted capitalize">
-          {(round as any).activityType?.replace('_', ' ')} ·{' '}
+        <Text className="text-on-surface-muted">
+          {formatActivityType((round as any).activityType ?? '')} ·{' '}
           {(round as any).score}/{(round as any).total}
         </Text>
       </View>

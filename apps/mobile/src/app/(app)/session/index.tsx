@@ -1138,8 +1138,6 @@ function SessionScreenInner() {
             upsertNote={upsertNote}
             colors={colors}
             userMessageCount={userMessageCount}
-            inputMode={inputMode}
-            handleInputModeChange={handleInputModeChange}
             showQuestionCount={modeConfig.showQuestionCount}
             showBookLink={showBookLink}
           />

@@ -507,6 +507,44 @@ export async function getActiveSessionForTopic(
   return { sessionId: sorted[0]!.id };
 }
 
+// [F-009] Resolve the subject that owns a given topic — used for deep-link
+// resolution when the client only has a topicId (no subjectId in the URL).
+export async function resolveTopicSubject(
+  db: Database,
+  profileId: string,
+  topicId: string
+): Promise<{
+  subjectId: string;
+  subjectName: string;
+  topicTitle: string;
+} | null> {
+  const repo = createScopedRepository(db, profileId);
+
+  const topic = await db.query.curriculumTopics.findFirst({
+    where: eq(curriculumTopics.id, topicId),
+    columns: { id: true, title: true, curriculumId: true },
+  });
+  if (!topic) return null;
+
+  const curriculum = await db.query.curricula.findFirst({
+    where: eq(curricula.id, topic.curriculumId),
+    columns: { subjectId: true },
+  });
+  if (!curriculum) return null;
+
+  // Verify the subject belongs to this profile via scoped repository
+  const subject = await repo.subjects.findFirst(
+    eq(subjects.id, curriculum.subjectId)
+  );
+  if (!subject) return null;
+
+  return {
+    subjectId: subject.id,
+    subjectName: subject.name,
+    topicTitle: topic.title,
+  };
+}
+
 export async function getContinueSuggestion(
   db: Database,
   profileId: string

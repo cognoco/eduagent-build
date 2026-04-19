@@ -777,7 +777,11 @@ export const sessionCompleted = inngest.createFunction(
           // The neon-http driver does not support multi-statement transactions;
           // wrapping these in db.transaction() would either fail outright or
           // fall back to non-atomic execution via the client.ts shim.
-          if (completionQualityRating != null && completionQualityRating >= 3) {
+          // [F-044] Use effectiveQuality (includes engagement fallback) instead
+          // of raw completionQualityRating. Most session-close paths don't set
+          // qualityRating in the event, so the raw value is null and the streak
+          // was never updated. Any session with user engagement should count.
+          if (effectiveQuality != null) {
             stepStreak = await recordSessionActivity(db, profileId, today);
           }
 

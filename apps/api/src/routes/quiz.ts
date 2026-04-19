@@ -343,11 +343,8 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
       const result = await completeQuizRound(db, profileId, roundId, results);
 
       // Record streak activity — quiz round counts as daily learning activity.
-      // Fire-and-forget: streak failure must not block the completion response.
       const today = new Date().toISOString().slice(0, 10);
-      recordSessionActivity(db, profileId, today).catch((err) =>
-        console.error('[quiz] recordSessionActivity failed:', err)
-      );
+      await recordSessionActivity(db, profileId, today);
 
       return c.json(result, 200);
     }

@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -44,7 +44,8 @@ export default function QuizResultsScreen(): React.ReactElement {
     return <View className="flex-1 bg-background" />;
   }
 
-  const { score, total, xpEarned, celebrationTier } = completionResult;
+  const { score, total, xpEarned, celebrationTier, questionResults } =
+    completionResult;
 
   const tierConfig = {
     perfect: {
@@ -65,6 +66,22 @@ export default function QuizResultsScreen(): React.ReactElement {
   };
 
   const config = tierConfig[celebrationTier];
+
+  // [F-040] Build missed-question list from completion data + round questions
+  const missed = questionResults.filter((qr) => !qr.correct);
+
+  function questionPrompt(questionIndex: number): string {
+    const q = round?.questions[questionIndex];
+    if (!q) return 'Question';
+    switch (q.type) {
+      case 'capitals':
+        return `Capital of ${q.country}`;
+      case 'vocabulary':
+        return q.term;
+      case 'guess_who':
+        return 'Guess Who';
+    }
+  }
 
   function handlePlayAgain() {
     setCompletionResult(null);
@@ -98,9 +115,16 @@ export default function QuizResultsScreen(): React.ReactElement {
   }
 
   return (
-    <View
-      className="flex-1 items-center justify-center bg-background px-6"
-      style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
+    <ScrollView
+      className="flex-1 bg-background"
+      contentContainerStyle={{
+        flexGrow: 1,
+        alignItems: 'center',
+        justifyContent: missed.length > 0 ? 'flex-start' : 'center',
+        paddingHorizontal: 24,
+        paddingTop: insets.top + 24,
+        paddingBottom: insets.bottom + 24,
+      }}
       testID="quiz-results-screen"
     >
       {(celebrationTier === 'perfect' || celebrationTier === 'great') && (
@@ -136,6 +160,29 @@ export default function QuizResultsScreen(): React.ReactElement {
         </View>
       ) : null}
 
+      {/* [F-040] Show missed questions with correct answers */}
+      {missed.length > 0 && (
+        <View className="mt-8 w-full" testID="quiz-results-missed-section">
+          <Text className="mb-3 text-body-sm font-semibold uppercase tracking-wide text-text-secondary">
+            What you missed
+          </Text>
+          {missed.map((qr) => (
+            <View
+              key={qr.questionIndex}
+              className="mb-2 rounded-card bg-surface p-3"
+              testID={`quiz-results-missed-item-${qr.questionIndex}`}
+            >
+              <Text className="text-body-sm text-text-secondary">
+                {questionPrompt(qr.questionIndex)}
+              </Text>
+              <Text className="mt-0.5 text-body font-semibold text-primary">
+                {qr.correctAnswer}
+              </Text>
+            </View>
+          ))}
+        </View>
+      )}
+
       <View className="mt-10 w-full gap-3">
         <Pressable
           onPress={handlePlayAgain}
@@ -164,6 +211,6 @@ export default function QuizResultsScreen(): React.ReactElement {
           <Text className="text-primary mt-2">View History</Text>
         </Pressable>
       </View>
-    </View>
+    </ScrollView>
   );
 }

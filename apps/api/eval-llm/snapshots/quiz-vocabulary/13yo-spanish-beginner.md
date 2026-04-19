@@ -1,17 +1,19 @@
-# Quiz — Vocabulary × 12yo-spanish-beginner
+# Quiz — Vocabulary × 13yo-spanish-beginner
 
 > **Flow source:** `apps/api/src/services/quiz/vocabulary-provider.ts:buildVocabularyPrompt`
-> **Profile:** 12-year-old EU girl, English native, learning Spanish (CEFR A2), loves horses and equestrian sports
+> **Profile:** 13-year-old EU girl, English native, learning Spanish (CEFR A2), loves horses and equestrian sports
 
 ## Profile summary
 
 | Field | Value |
 |---|---|
-| Age | 12 years (birth year 2014) |
+| Age | 13 years (birth year 2013) |
 | Native language | en |
+| Conversation language | en |
 | Location | EU |
-| Interests | horses, showjumping, eventing, nature photography |
-| Library topics | present tense verbs, family vocabulary, numbers 1-1000, Spain geography |
+| Pronouns | she/her |
+| Interests | horses (free time), showjumping (free time), eventing (free time), nature photography (free time) |
+| Library topics | Spanish present tense verbs, Spanish family vocabulary, Spanish numbers 1-1000, Spain geography |
 | CEFR | A2 |
 | Target language | es |
 | Struggles | ser vs estar (Spanish); irregular verbs (Spanish) |

@@ -10,6 +10,7 @@ const mockSessionsFindMany = jest.fn();
 const mockSessionsFindFirst = jest.fn();
 const mockSessionEventsFindMany = jest.fn();
 const mockSubjectsFindMany = jest.fn();
+const mockSubjectsFindFirst = jest.fn();
 const mockCurriculaFindFirst = jest.fn();
 const mockCurriculumTopicsFindMany = jest.fn();
 const mockProgressSnapshotsFindFirst = jest.fn();
@@ -280,6 +281,7 @@ function createMockDb() {
       },
       subjects: {
         findMany: mockSubjectsFindMany,
+        findFirst: mockSubjectsFindFirst,
       },
       curricula: {
         findFirst: mockCurriculaFindFirst,
@@ -585,6 +587,26 @@ describe('getChildSubjectTopics', () => {
     ).rejects.toBeInstanceOf(ForbiddenError);
   });
 
+  it('returns empty when subject does not belong to child', async () => {
+    const { getChildSubjectTopics } = await importDbFunctions();
+    const db = createMockDb();
+
+    mockFamilyLinksFindFirst.mockResolvedValue({
+      parentProfileId: PARENT_ID,
+      childProfileId: CHILD_ID,
+    });
+    mockSubjectsFindFirst.mockResolvedValue(null);
+
+    const result = await getChildSubjectTopics(
+      db as never,
+      PARENT_ID,
+      CHILD_ID,
+      SUBJECT_ID
+    );
+
+    expect(result).toEqual([]);
+  });
+
   it('returns empty when no curriculum exists for the subject', async () => {
     const { getChildSubjectTopics } = await importDbFunctions();
     const db = createMockDb();
@@ -592,6 +614,10 @@ describe('getChildSubjectTopics', () => {
     mockFamilyLinksFindFirst.mockResolvedValue({
       parentProfileId: PARENT_ID,
       childProfileId: CHILD_ID,
+    });
+    mockSubjectsFindFirst.mockResolvedValue({
+      id: SUBJECT_ID,
+      profileId: CHILD_ID,
     });
     mockCurriculaFindFirst.mockResolvedValue(null);
 
@@ -612,6 +638,10 @@ describe('getChildSubjectTopics', () => {
     mockFamilyLinksFindFirst.mockResolvedValue({
       parentProfileId: PARENT_ID,
       childProfileId: CHILD_ID,
+    });
+    mockSubjectsFindFirst.mockResolvedValue({
+      id: SUBJECT_ID,
+      profileId: CHILD_ID,
     });
     mockCurriculaFindFirst.mockResolvedValue({
       id: CURRICULUM_ID,

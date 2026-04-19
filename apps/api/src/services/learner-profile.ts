@@ -32,7 +32,7 @@ const CONFIDENCE_ORDER: Record<ConfidenceLevel, number> = {
   high: 2,
 };
 
-const SESSION_ANALYSIS_PROMPT = `You are analyzing a tutoring session transcript between an AI mentor and a young learner.
+export const SESSION_ANALYSIS_PROMPT = `You are analyzing a tutoring session transcript between an AI mentor and a young learner.
 
 Extract the following signals from the conversation. Be conservative and only include signals with real evidence.
 

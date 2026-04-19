@@ -27,6 +27,13 @@ export default function DictationCompleteScreen(): React.ReactElement {
 
   const isReviewing = reviewMutation.isPending;
 
+  // [F-031] Synchronous double-tap guard. `disabled={isPending}` relies on
+  // React state which batches asynchronously — a second pointer event can
+  // race through before isPending flips to true (especially on RN Web where
+  // pointer events bypass Pressable's disabled prop). A ref is set on the
+  // same tick, closing the gap.
+  const doneInFlightRef = React.useRef(false);
+
   // [F-020] If a user lands on /dictation/complete via a deep link, back
   // gesture, or browser refresh, `data` is null (context is stack-lifecycle
   // scoped). Tapping "I'm done" in that case would POST /dictation/results
@@ -156,6 +163,9 @@ export default function DictationCompleteScreen(): React.ReactElement {
   };
 
   const handleDone = async () => {
+    if (doneInFlightRef.current) return;
+    doneInFlightRef.current = true;
+
     const sentences = data?.sentences ?? [];
     const mode = data?.mode ?? 'homework';
     const localDate = new Date().toISOString().slice(0, 10);
@@ -173,6 +183,7 @@ export default function DictationCompleteScreen(): React.ReactElement {
       // Previously the Alert said "Your progress was saved" — a lie that
       // also violated the "silent recovery without escalation" rule. Now we
       // tell the user honestly and offer Retry / Continue.
+      doneInFlightRef.current = false;
       console.warn('[dictation] result recording failed:', err);
       const message =
         err instanceof Error && err.message

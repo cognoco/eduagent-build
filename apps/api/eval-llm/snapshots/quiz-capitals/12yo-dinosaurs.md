@@ -1,7 +1,7 @@
-# Quiz — Capitals × 12yo-spanish-beginner
+# Quiz — Capitals × 12yo-dinosaurs
 
 > **Flow source:** `apps/api/src/services/quiz/generate-round.ts:buildCapitalsPrompt`
-> **Profile:** 12-year-old EU girl, English native, learning Spanish (CEFR A2), loves horses and equestrian sports
+> **Profile:** 12-year-old US boy, English native, obsessed with dinosaurs and prehistoric life, quick pace, humor works
 
 ## Profile summary
 
@@ -9,16 +9,18 @@
 |---|---|
 | Age | 12 years (birth year 2014) |
 | Native language | en |
-| Location | EU |
-| Interests | horses, showjumping, eventing, nature photography |
-| Library topics | present tense verbs, family vocabulary, numbers 1-1000, Spain geography |
-| CEFR | A2 |
-| Target language | es |
-| Struggles | ser vs estar (Spanish); irregular verbs (Spanish) |
-| Strengths | Spanish pronunciation (Spanish) |
-| Learning mode | serious |
-| Preferred explanations | step-by-step, examples |
-| Pace | thorough |
+| Conversation language | en |
+| Location | US |
+| Pronouns | — (not provided) |
+| Interests | dinosaurs (both), fossils (both), paleontology (both), extinction events (free time), volcanoes (free time) |
+| Library topics | Mesozoic era, fossilization, plate tectonics, long division |
+| CEFR | — |
+| Target language | — |
+| Struggles | long division (math); Austria vs Australia (geography) |
+| Strengths | dinosaur classification (science); reading comprehension (reading) |
+| Learning mode | casual |
+| Preferred explanations | humor, examples, stories |
+| Pace | quick |
 | Analogy domain | nature |
 
 ## Builder input
@@ -28,7 +30,9 @@
   "discoveryCount": 6,
   "ageBracket": "adolescent",
   "recentAnswers": [
-    "Madrid"
+    "Tokyo",
+    "Paris",
+    "Canberra"
   ]
 }
 ```
@@ -42,7 +46,7 @@ Activity: Capitals quiz
 Choose an age-appropriate theme (e.g. "Central European Capitals").
 Questions needed: exactly 6
 
-Do NOT include questions about these recently seen capitals: Madrid
+Do NOT include questions about these recently seen capitals: Tokyo, Paris, Canberra
 
 Rules:
 - Generate exactly 6 questions

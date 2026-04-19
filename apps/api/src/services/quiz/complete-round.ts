@@ -340,6 +340,8 @@ export async function completeQuizRound(
               easeFactor: String(existing.easeFactor),
               interval: existing.interval,
               repetitions: existing.repetitions,
+              lastReviewedAt: existing.updatedAt,
+              nextReviewAt: existing.nextReviewAt,
             },
             quality
           );

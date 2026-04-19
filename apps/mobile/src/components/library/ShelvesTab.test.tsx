@@ -118,12 +118,12 @@ describe('ShelvesTab', () => {
 
   it('shows progress label for subjects with topics', () => {
     render(<ShelvesTab {...defaultProps} />);
-    expect(screen.getByText('10/20 topics completed')).toBeTruthy();
+    expect(screen.getByText('10/20 topics started')).toBeTruthy();
   });
 
-  it('shows "all done" label when all topics completed', () => {
+  it('shows "all done" label when all topics started', () => {
     render(<ShelvesTab {...defaultProps} />);
-    expect(screen.getByText('15/15 topics completed')).toBeTruthy();
+    expect(screen.getByText('15/15 topics started')).toBeTruthy();
   });
 
   it('shows status pill for paused/archived subjects but not for active', () => {

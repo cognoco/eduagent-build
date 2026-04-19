@@ -28,11 +28,16 @@ describe('mastery-provider', () => {
   });
 
   describe('applyQuizSm2', () => {
+    const baseInput = {
+      easeFactor: '2.5',
+      interval: 1,
+      repetitions: 0,
+      lastReviewedAt: new Date('2026-04-18T10:00:00Z'),
+      nextReviewAt: new Date('2026-04-19T10:00:00Z'),
+    };
+
     it('applies SM-2 for a new card with quality 3', () => {
-      const result = applyQuizSm2(
-        { easeFactor: '2.5', interval: 1, repetitions: 0 },
-        3
-      );
+      const result = applyQuizSm2(baseInput, 3);
       expect(result.interval).toBe(1);
       expect(result.repetitions).toBe(1);
       expect(Number(result.easeFactor)).toBeCloseTo(2.36, 1);
@@ -40,7 +45,7 @@ describe('mastery-provider', () => {
 
     it('resets on quality < 3', () => {
       const result = applyQuizSm2(
-        { easeFactor: '2.5', interval: 6, repetitions: 3 },
+        { ...baseInput, interval: 6, repetitions: 3 },
         1
       );
       expect(result.repetitions).toBe(0);
@@ -48,10 +53,7 @@ describe('mastery-provider', () => {
     });
 
     it('returns a valid Date for nextReviewAt', () => {
-      const result = applyQuizSm2(
-        { easeFactor: '2.5', interval: 1, repetitions: 0 },
-        4
-      );
+      const result = applyQuizSm2(baseInput, 4);
       expect(result.nextReviewAt).toBeInstanceOf(Date);
       expect(result.nextReviewAt.getTime()).toBeGreaterThan(Date.now());
     });

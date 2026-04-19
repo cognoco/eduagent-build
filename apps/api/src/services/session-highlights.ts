@@ -35,7 +35,9 @@ const ALLOWED_PREFIXES = [
   'Covered',
 ];
 
-const INJECTION_PATTERN = /ignore|previous|instruction|system|prompt/i;
+// Best-effort blocklist — the prefix + length + confidence gates are the primary defence.
+const INJECTION_PATTERN =
+  /ignore|previous|instruction|system|prompt|override|disregard|forget|directive|role|assistant|jailbreak|act as/i;
 
 export function validateHighlightResponse(raw: string): HighlightResult {
   let parsed: { highlight?: unknown; confidence?: unknown };
@@ -82,10 +84,16 @@ export function buildBrowseHighlight(
   topics: string[],
   durationSeconds: number
 ): string {
+  // Sanitize user-controlled display name: strip non-printable chars, truncate.
+  const safeName =
+    childDisplayName
+      .replace(/[^\p{L}\p{N}\s'-]/gu, '')
+      .trim()
+      .slice(0, 50) || 'Learner';
   const topicList = topics.slice(0, 3).join(', ');
   const suffix = topics.length > 3 ? ` and ${topics.length - 3} more` : '';
   const mins = Math.max(1, Math.round(durationSeconds / 60));
-  return `${childDisplayName} browsed ${topicList}${suffix} — ${mins} min`;
+  return `${safeName} browsed ${topicList}${suffix} — ${mins} min`;
 }
 
 // ---------------------------------------------------------------------------

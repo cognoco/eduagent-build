@@ -14,7 +14,7 @@ import { captureException } from '../sentry';
 // at the wrong boundary.
 // ---------------------------------------------------------------------------
 
-const SYSTEM_PROMPT = `You are a dictation preparation assistant. Your job is to take a text and prepare it for dictation practice.
+export const SYSTEM_PROMPT = `You are a dictation preparation assistant. Your job is to take a text and prepare it for dictation practice.
 
 TASK:
 1. Split the input text into individual sentences. Handle abbreviations (Mr., Dr., Prof., etc.), dialogue quotes, and numbers correctly — do not split mid-sentence. For example, "Mr. Smith said, 'Hello.' Then he left." is 2 sentences, not 4.

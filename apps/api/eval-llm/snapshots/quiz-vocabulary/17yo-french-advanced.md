@@ -1,16 +1,18 @@
-# Quiz — Vocabulary × 16yo-french-advanced
+# Quiz — Vocabulary × 17yo-french-advanced
 
 > **Flow source:** `apps/api/src/services/quiz/vocabulary-provider.ts:buildVocabularyPrompt`
-> **Profile:** 16-year-old EU teen, Czech native, advanced French (CEFR B2), into literature and philosophy
+> **Profile:** 17-year-old EU teen, Czech native but conversational French with tutor, advanced French (CEFR B2), literature and philosophy
 
 ## Profile summary
 
 | Field | Value |
 |---|---|
-| Age | 16 years (birth year 2010) |
+| Age | 17 years (birth year 2009) |
 | Native language | cs |
+| Conversation language | fr |
 | Location | EU |
-| Interests | French literature, philosophy, existentialism, creative writing |
+| Pronouns | they/them |
+| Interests | French literature (both), philosophy (both), existentialism (free time), creative writing (free time) |
 | Library topics | Camus — L'Étranger, French subjunctive, essay structure, Enlightenment thinkers |
 | CEFR | B2 |
 | Target language | fr |
