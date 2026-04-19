@@ -47,6 +47,12 @@ interface CapitalsPromptParams {
   interests?: Interest[];
   libraryTopics?: string[];
   ageYears?: number;
+  /**
+   * Struggle topics from the learner's profile. Used as a soft steering signal
+   * for theme selection — the LLM may lean toward regions/themes relevant to
+   * these weaker areas when it wouldn't feel forced. [P1-4]
+   */
+  recentStruggles?: string[];
 }
 
 export function buildCapitalsPrompt(params: CapitalsPromptParams): string {
@@ -58,6 +64,7 @@ export function buildCapitalsPrompt(params: CapitalsPromptParams): string {
     interests,
     libraryTopics,
     ageYears,
+    recentStruggles,
   } = params;
 
   // Prefer fine-grained ageYears when available; fall back to coarse bracket.
@@ -103,10 +110,21 @@ export function buildCapitalsPrompt(params: CapitalsPromptParams): string {
           )}. Where possible, prefer capitals of countries relevant to these topics.`
       : '';
 
+  // Struggle-aware steering (P1-4): soft preference toward regions/themes
+  // that help the learner revisit areas they find hard.
+  const struggleHint =
+    !themePreference && recentStruggles && recentStruggles.length > 0
+      ? `\nWeaker areas for this learner: ${recentStruggles
+          .slice(0, 10)
+          .join(
+            '; '
+          )}. If a capitals theme naturally connects to any of these, lean toward it — otherwise pick the best age-appropriate theme.`
+      : '';
+
   return `You are generating a multiple-choice capitals quiz for a ${ageLabel} learner.
 
 Activity: Capitals quiz
-${themeInstruction}${libraryHint}
+${themeInstruction}${libraryHint}${struggleHint}
 Questions needed: exactly ${discoveryCount}
 
 ${exclusions}
@@ -339,6 +357,7 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
   // context (e.g. vocabulary rounds via getVocabularyRoundContext) may pass it
   // via the nativeLanguage param; otherwise it remains undefined.
   let resolvedInterests = params.interests;
+  let resolvedStruggles: string[] = [];
   if (resolvedInterests === undefined) {
     // Learning-profile fetch is best-effort: if the DB or mock doesn't
     // expose it, fall back to an un-personalized prompt rather than failing
@@ -357,10 +376,26 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
           label,
           context: 'free_time' as const,
         }));
+
+        // [P1-4] Extract struggle topics from the profile — medium/high
+        // confidence only, capped to 10, for soft prompt-level reinforcement.
+        if (Array.isArray(profile.struggles)) {
+          resolvedStruggles = (profile.struggles as unknown[])
+            .filter(
+              (entry): entry is { topic: string; confidence?: string } =>
+                typeof entry === 'object' &&
+                entry !== null &&
+                typeof (entry as { topic?: unknown }).topic === 'string'
+            )
+            .filter((entry) => entry.confidence !== 'low')
+            .slice(0, 10)
+            .map((entry) => entry.topic);
+        }
       }
     } catch {
       // Graceful degradation — quiz proceeds without interest-driven theming.
       resolvedInterests = undefined;
+      resolvedStruggles = [];
     }
   }
   const resolvedNativeLanguage = nativeLanguage;
@@ -377,6 +412,7 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
       interests: resolvedInterests,
       libraryTopics: topicTitles,
       ageYears,
+      recentStruggles: resolvedStruggles,
     });
     if (difficultyBump) {
       prompt +=
@@ -463,6 +499,7 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
       libraryTopics: topicTitles,
       ageYears,
       learnerNativeLanguage: resolvedNativeLanguage,
+      recentStruggles: resolvedStruggles,
     });
 
     const messages: ChatMessage[] = [
@@ -525,6 +562,7 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
       interests: resolvedInterests,
       libraryTopics: topicTitles,
       ageYears,
+      recentStruggles: resolvedStruggles,
     });
     if (difficultyBump) {
       prompt +=

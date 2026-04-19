@@ -57,17 +57,25 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('Peer-adjacent and matter-of-fact');
   });
 
-  it('includes adult voice for adult learners', () => {
+  it('includes young-adult voice for 18-29 learners', () => {
     const prompt = buildSystemPrompt({
       ...baseContext,
       birthYear: currentYear - 25,
     });
-    expect(prompt).toContain('Sharp and collegial');
+    expect(prompt).toContain('Collegial and efficient');
+  });
+
+  it('includes mature-adult voice for 30+ learners', () => {
+    const prompt = buildSystemPrompt({
+      ...baseContext,
+      birthYear: currentYear - 35,
+    });
+    expect(prompt).toContain('Crisp, professional');
   });
 
   it('falls back to adult voice when birthYear is unavailable', () => {
     const prompt = buildSystemPrompt({ ...baseContext, birthYear: null });
-    expect(prompt).toContain('Sharp and collegial');
+    expect(prompt).toContain('Crisp, professional');
   });
 
   describe('first-exchange teaching opener', () => {

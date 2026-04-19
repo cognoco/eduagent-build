@@ -25,6 +25,12 @@ export interface VocabularyPromptParams {
   libraryTopics?: string[];
   ageYears?: number;
   learnerNativeLanguage?: string;
+  /**
+   * Struggle topics from the learner's profile. The prompt uses these as a
+   * soft preference for semantic fields worth reinforcing — not as a hard
+   * filter. [P1-4]
+   */
+  recentStruggles?: string[];
 }
 
 export interface ValidatedVocabularyQuestion {
@@ -216,6 +222,7 @@ export function buildVocabularyPrompt(params: VocabularyPromptParams): string {
     libraryTopics = [],
     ageYears,
     learnerNativeLanguage,
+    recentStruggles = [],
   } = params;
 
   const languageName = getLanguageDisplayName(languageCode);
@@ -263,6 +270,15 @@ export function buildVocabularyPrompt(params: VocabularyPromptParams): string {
           .join('; ')}.`
       : '';
 
+  const struggleHint =
+    recentStruggles.length > 0
+      ? `\nRecent weaker areas: ${recentStruggles
+          .slice(0, 10)
+          .join(
+            '; '
+          )}. Where it fits the theme, prefer vocabulary from these semantic fields so the learner gets extra reps on what they find hard — do not force it if the fit is weak.`
+      : '';
+
   const l1DistractorHint = buildL1DistractorHint(
     learnerNativeLanguage,
     languageCode
@@ -277,7 +293,7 @@ ${themeInstruction}
 Questions needed: exactly ${discoveryCount}
 
 ${recentExclusions}
-${bankExclusions}${libraryHint}
+${bankExclusions}${libraryHint}${struggleHint}
 
 Rules:
 - Generate exactly ${discoveryCount} questions.

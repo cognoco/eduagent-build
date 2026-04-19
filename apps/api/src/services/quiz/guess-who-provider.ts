@@ -11,6 +11,13 @@ export interface GuessWhoPromptParams {
   interests?: Interest[];
   libraryTopics?: string[];
   ageYears?: number;
+  /**
+   * Subject-scoped struggle topics from the learner's profile. When provided,
+   * the prompt nudges the LLM to prefer people/themes that reinforce these
+   * weaker areas, without forcing topical alignment when it would be awkward.
+   * [P1-4]
+   */
+  recentStruggles?: string[];
 }
 
 export interface ValidatedGuessWhoQuestion {
@@ -93,6 +100,7 @@ export function buildGuessWhoPrompt(params: GuessWhoPromptParams): string {
     interests = [],
     libraryTopics = [],
     ageYears,
+    recentStruggles = [],
   } = params;
   const ageLabel =
     ageYears !== undefined
@@ -134,6 +142,15 @@ export function buildGuessWhoPrompt(params: GuessWhoPromptParams): string {
       'Choose an age-appropriate theme (for example "Famous Scientists" or "Important World Leaders").';
   }
 
+  const struggleHint =
+    recentStruggles.length > 0
+      ? `\nRecent weaker areas for this learner: ${recentStruggles
+          .slice(0, 10)
+          .join(
+            '; '
+          )}. Where a naturally fitting figure exists, prefer people who help revisit these topics — but do not force a weak connection if none exists.`
+      : '';
+
   return `You are generating a clue-by-clue Guess Who quiz for a ${ageLabel} learner.
 
 Activity: Guess Who
@@ -141,7 +158,7 @@ ${themeInstruction}
 Questions needed: exactly ${discoveryCount}
 
 ${recentExclusions}
-${topicHintText}
+${topicHintText}${struggleHint}
 
 Rules:
 - Generate exactly ${discoveryCount} questions.

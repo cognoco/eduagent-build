@@ -719,11 +719,39 @@ export const sessionCompleted = inngest.createFunction(
               columns: { rawInput: true },
             });
 
+            // [P0-3] Feed existing struggles + suppressed topics into the
+            // analysis prompt so the LLM emits deltas (not duplicates) and
+            // never re-surfaces topics the parent has hidden.
+            const knownStruggles = Array.isArray(existingProfile.struggles)
+              ? (existingProfile.struggles as Array<unknown>)
+                  .filter(
+                    (
+                      entry
+                    ): entry is { topic: string; subject: string | null } =>
+                      typeof entry === 'object' &&
+                      entry !== null &&
+                      typeof (entry as { topic?: unknown }).topic === 'string'
+                  )
+                  .map((entry) => ({
+                    topic: entry.topic,
+                    subject: entry.subject ?? null,
+                  }))
+              : [];
+            const suppressedTopics = Array.isArray(
+              existingProfile.suppressedInferences
+            )
+              ? (existingProfile.suppressedInferences as unknown[]).filter(
+                  (value): value is string => typeof value === 'string'
+                )
+              : [];
+
             const analysis = await analyzeSessionTranscript(
               transcriptEvents,
               subjectRow?.name ?? null,
               topicTitle,
-              sessionRow?.rawInput
+              sessionRow?.rawInput,
+              'session',
+              { knownStruggles, suppressedTopics }
             );
 
             if (!analysis) {
@@ -790,6 +818,10 @@ export const sessionCompleted = inngest.createFunction(
           // of raw completionQualityRating. Most session-close paths don't set
           // qualityRating in the event, so the raw value is null and the streak
           // was never updated. Any session with user engagement should count.
+          // Note: effectiveQuality floors at 3 via the fallback above (line ~327),
+          // so the old `>= 3` threshold is redundant. The only case where
+          // effectiveQuality < 3 would be an explicit low rating (1-2) from the
+          // evaluator — these still represent real engagement and should count.
           if (effectiveQuality != null) {
             stepStreak = await recordSessionActivity(db, profileId, today);
           }
