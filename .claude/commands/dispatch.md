@@ -38,6 +38,10 @@ MANDATORY RULES — read before writing any code:
    - The error message
    - What you tried
 8. Follow all CLAUDE.md rules (strict TypeScript, named exports, co-located tests, etc.)
+9. Do NOT run git add, git commit, or git push. Do NOT use /commit.
+   The coordinator will commit your work after you report back.
+10. When reporting completion, list ALL files you created or modified
+    (one per line, relative paths from repo root).
 ```
 
 ### Post-Dispatch Validation
@@ -59,13 +63,11 @@ After ALL agents complete:
 
 4. **If E2E infrastructure is available**, run `/e2e` to verify the combined changes work end-to-end.
 
-5. **Commit everything in a single commit** with a summary of all tracks:
-   ```
-   feat: implement [epic/feature name]
-
-   - Track 1: [what was done]
-   - Track 2: [what was done]
-   ```
+5. **Commit using `/commit`** — the coordinator commits all agent work. Options:
+   - **Single commit** (default): use `/commit` once for all tracks combined.
+   - **Per-track commits**: stage each agent's reported file list separately and commit with a track-specific message. Use this when tracks are logically independent features.
+   
+   Either way, only the coordinator touches git. Agents never commit.
 
 ### Safety Limits
 

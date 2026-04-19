@@ -488,6 +488,175 @@ export async function getOverallProgress(
   };
 }
 
+/**
+ * [F-PV-06] Batched version of getTopicProgress — fetches all data for N topics
+ * using 6 inArray queries (constant subrequest count regardless of N) instead of
+ * 7 queries per topic. Drops subrequests from 5 + 7N to ~11 total, staying well
+ * within the Cloudflare Workers 50-subrequest limit.
+ *
+ * The caller (getChildSubjectTopics in dashboard.ts) has already verified the
+ * subject belongs to the child profile and fetched the topic list, so this
+ * function skips those lookups.
+ */
+export async function getTopicProgressBatch(
+  db: Database,
+  profileId: string,
+  topics: Array<{ id: string; title: string; description: string }>
+): Promise<TopicProgress[]> {
+  if (topics.length === 0) return [];
+
+  const repo = createScopedRepository(db, profileId);
+  const topicIds = topics.map((t) => t.id);
+
+  // 6 batch queries in parallel — constant count regardless of N topics
+  const [allCards, allAssessments, allSessions, allDeepening, allXp] =
+    await Promise.all([
+      repo.retentionCards.findMany(inArray(retentionCards.topicId, topicIds)),
+      repo.assessments.findMany(inArray(assessments.topicId, topicIds)),
+      repo.sessions.findMany(inArray(learningSessions.topicId, topicIds)),
+      repo.needsDeepeningTopics.findMany(
+        inArray(needsDeepeningTopics.topicId, topicIds)
+      ),
+      repo.xpLedger.findMany(inArray(xpLedger.topicId, topicIds)),
+    ]);
+
+  // Index by topicId for O(1) lookups
+  const cardsByTopic = new Map<string, typeof allCards>();
+  for (const c of allCards) {
+    const list = cardsByTopic.get(c.topicId) ?? [];
+    list.push(c);
+    cardsByTopic.set(c.topicId, list);
+  }
+
+  const assessmentsByTopic = new Map<string, typeof allAssessments>();
+  for (const a of allAssessments) {
+    const list = assessmentsByTopic.get(a.topicId) ?? [];
+    list.push(a);
+    assessmentsByTopic.set(a.topicId, list);
+  }
+
+  const sessionsByTopic = new Map<string, typeof allSessions>();
+  for (const s of allSessions) {
+    if (!s.topicId) continue;
+    const list = sessionsByTopic.get(s.topicId) ?? [];
+    list.push(s);
+    sessionsByTopic.set(s.topicId, list);
+  }
+
+  const deepeningByTopic = new Map<string, typeof allDeepening>();
+  for (const d of allDeepening) {
+    const list = deepeningByTopic.get(d.topicId) ?? [];
+    list.push(d);
+    deepeningByTopic.set(d.topicId, list);
+  }
+
+  const xpByTopic = new Map<string, typeof allXp>();
+  for (const x of allXp) {
+    if (!x.topicId) continue;
+    const list = xpByTopic.get(x.topicId) ?? [];
+    list.push(x);
+    xpByTopic.set(x.topicId, list);
+  }
+
+  // Batch-fetch session summaries for the last session of each topic
+  const lastSessionIds: string[] = [];
+  const lastSessionByTopic = new Map<string, string>();
+  for (const topic of topics) {
+    const topicSessions = sessionsByTopic.get(topic.id) ?? [];
+    const last = topicSessions[topicSessions.length - 1];
+    if (last) {
+      lastSessionIds.push(last.id);
+      lastSessionByTopic.set(topic.id, last.id);
+    }
+  }
+
+  const allSummaries =
+    lastSessionIds.length > 0
+      ? await repo.sessionSummaries.findMany(
+          inArray(sessionSummaries.sessionId, lastSessionIds)
+        )
+      : [];
+  const summaryBySessionId = new Map(allSummaries.map((s) => [s.sessionId, s]));
+
+  // Assemble per-topic progress in-memory
+  return topics.map((topic) => {
+    const topicCards = cardsByTopic.get(topic.id) ?? [];
+    const retentionCard = topicCards[0] ?? null;
+
+    const topicAssessments = (assessmentsByTopic.get(topic.id) ?? []).sort(
+      (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
+    );
+    const latestAssessment = topicAssessments[0];
+
+    const topicSessions = sessionsByTopic.get(topic.id) ?? [];
+
+    const deepeningTopics = deepeningByTopic.get(topic.id) ?? [];
+    const activeDeepening = deepeningTopics.find((d) => d.status === 'active');
+
+    const xpEntries = (xpByTopic.get(topic.id) ?? []).sort(
+      (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
+    );
+    const latestXp = xpEntries[0];
+
+    const lastSessionId = lastSessionByTopic.get(topic.id);
+    const summaryRow = lastSessionId
+      ? summaryBySessionId.get(lastSessionId)
+      : undefined;
+
+    const completionStatus = computeCompletionStatus(
+      topicSessions.length,
+      latestAssessment
+        ? {
+            status: latestAssessment.status,
+            masteryScore: latestAssessment.masteryScore,
+          }
+        : undefined,
+      retentionCard
+        ? {
+            xpStatus: retentionCard.xpStatus,
+            nextReviewAt: retentionCard.nextReviewAt,
+          }
+        : undefined
+    );
+
+    const retentionStatus = retentionCard
+      ? computeRetentionStatus(retentionCard.nextReviewAt)
+      : null;
+
+    const extendedRetentionStatus:
+      | 'strong'
+      | 'fading'
+      | 'weak'
+      | 'forgotten'
+      | null =
+      retentionCard && retentionCard.failureCount >= 3
+        ? 'forgotten'
+        : retentionStatus;
+
+    const struggleStatus: TopicProgress['struggleStatus'] = activeDeepening
+      ? retentionCard && retentionCard.failureCount >= 3
+        ? 'blocked'
+        : 'needs_deepening'
+      : 'normal';
+
+    return {
+      topicId: topic.id,
+      title: topic.title,
+      description: topic.description,
+      completionStatus,
+      retentionStatus: extendedRetentionStatus,
+      struggleStatus,
+      masteryScore: latestAssessment?.masteryScore
+        ? Number(latestAssessment.masteryScore)
+        : null,
+      summaryExcerpt: summaryRow?.content?.slice(0, 200) ?? null,
+      xpStatus:
+        (latestXp?.status as 'pending' | 'verified' | 'decayed') ?? null,
+      totalSessions: topicSessions.length,
+    };
+  });
+}
+
 export async function getActiveSessionForTopic(
   db: Database,
   profileId: string,
@@ -521,6 +690,11 @@ export async function resolveTopicSubject(
 } | null> {
   const repo = createScopedRepository(db, profileId);
 
+  // curriculumTopics and curricula are shared reference tables without a
+  // profileId column, so they cannot be queried through createScopedRepository.
+  // Profile-scoping is enforced by the final repo.subjects.findFirst gate
+  // below — if the resolved subject doesn't belong to this profile, we
+  // return null and no data leaks.
   const topic = await db.query.curriculumTopics.findFirst({
     where: eq(curriculumTopics.id, topicId),
     columns: { id: true, title: true, curriculumId: true },
@@ -533,7 +707,7 @@ export async function resolveTopicSubject(
   });
   if (!curriculum) return null;
 
-  // Verify the subject belongs to this profile via scoped repository
+  // Gate: verify the subject belongs to this profile via scoped repository
   const subject = await repo.subjects.findFirst(
     eq(subjects.id, curriculum.subjectId)
   );

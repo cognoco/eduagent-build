@@ -11,6 +11,7 @@ function makeLearningProfile(overrides: Record<string, unknown> = {}) {
     memoryEnabled: true,
     memoryCollectionEnabled: true,
     memoryInjectionEnabled: true,
+    memoryConsentStatus: 'granted',
     accommodationMode: 'none',
     ...overrides,
   };

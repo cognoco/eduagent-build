@@ -82,11 +82,12 @@ const mockDatabaseModule = createDatabaseModuleMock({
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
 const mockGetOverallProgress = jest.fn();
-const mockGetTopicProgress = jest.fn();
+const mockGetTopicProgressBatch = jest.fn();
 
 jest.mock('./progress', () => ({
   getOverallProgress: (...args: unknown[]) => mockGetOverallProgress(...args),
-  getTopicProgress: (...args: unknown[]) => mockGetTopicProgress(...args),
+  getTopicProgressBatch: (...args: unknown[]) =>
+    mockGetTopicProgressBatch(...args),
 }));
 
 import {
@@ -336,13 +337,17 @@ beforeEach(() => {
   mockStreaksFindMany.mockResolvedValue([]);
   mockSessionSummariesFindFirst.mockResolvedValue(null);
   mockSessionSummariesFindMany.mockResolvedValue([]);
-  // `dashboard.ts` uses db.select().from().where().groupBy() for both the
-  // child XP rollup and grouped topic session counts.
+  // `dashboard.ts` uses db.select().from().where().groupBy() for XP rollup
+  // and grouped topic session counts, plus a plain db.select().from().where()
+  // for the live session count [F-PV-07]. The mock needs to be both thenable
+  // (for the direct await) and have .groupBy() for chained queries.
   mockDbSelect.mockReturnValue({
     from: jest.fn().mockReturnValue({
-      where: jest.fn().mockReturnValue({
-        groupBy: jest.fn().mockResolvedValue([]),
-      }),
+      where: jest.fn().mockReturnValue(
+        Object.assign(Promise.resolve([{ count: 0 }]), {
+          groupBy: jest.fn().mockResolvedValue([]),
+        })
+      ),
     }),
   });
 });
@@ -673,8 +678,9 @@ describe('getChildSubjectTopics', () => {
       }),
     });
 
-    mockGetTopicProgress
-      .mockResolvedValueOnce({
+    // [F-PV-06] getTopicProgressBatch returns all topics in a single call
+    mockGetTopicProgressBatch.mockResolvedValueOnce([
+      {
         topicId: TOPIC_ID_1,
         title: 'Topic 1',
         description: 'Desc 1',
@@ -685,8 +691,20 @@ describe('getChildSubjectTopics', () => {
         summaryExcerpt: null,
         xpStatus: 'verified',
         totalSessions: 3,
-      })
-      .mockResolvedValueOnce(null); // Topic 2 returns null (filtered out)
+      },
+      {
+        topicId: TOPIC_ID_2,
+        title: 'Topic 2',
+        description: 'Desc 2',
+        completionStatus: 'not_started',
+        retentionStatus: null,
+        struggleStatus: 'normal',
+        masteryScore: null,
+        summaryExcerpt: null,
+        xpStatus: null,
+        totalSessions: 0,
+      },
+    ]);
 
     const result = await getChildSubjectTopics(
       db as never,
@@ -695,10 +713,12 @@ describe('getChildSubjectTopics', () => {
       SUBJECT_ID
     );
 
-    expect(result).toHaveLength(1);
-    expect(result[0].topicId).toBe(TOPIC_ID_1);
-    expect(result[0].completionStatus).toBe('completed');
-    expect(result[0].totalSessions).toBe(5);
+    expect(result).toHaveLength(2);
+    expect(result[0]!.topicId).toBe(TOPIC_ID_1);
+    expect(result[0]!.completionStatus).toBe('completed');
+    expect(result[0]!.totalSessions).toBe(5); // overridden by session count query
+    expect(result[1]!.topicId).toBe(TOPIC_ID_2);
+    expect(result[1]!.totalSessions).toBe(2);
   });
 });
 

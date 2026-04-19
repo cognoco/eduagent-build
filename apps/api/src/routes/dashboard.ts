@@ -140,6 +140,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     const profile = await getLearningProfile(db, childProfileId);
 
     if (!profile) {
+      // [F-PV-09] No profile = no consent. Both flags off.
       return c.json({
         memory: {
           categories: [],
@@ -147,7 +148,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
           settings: {
             memoryEnabled: true,
             collectionEnabled: false,
-            injectionEnabled: true,
+            injectionEnabled: false,
             accommodationMode: null,
           },
         },

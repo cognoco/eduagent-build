@@ -2,20 +2,13 @@
 // Session Insights — parent-facing recap generation for completed sessions
 // ---------------------------------------------------------------------------
 
+import { ENGAGEMENT_SIGNALS, type EngagementSignal } from '@eduagent/schemas';
 import { routeAndCall } from './llm/router';
 import { createLogger } from './logger';
 
 const logger = createLogger();
 
-export const ENGAGEMENT_SIGNALS = [
-  'curious',
-  'stuck',
-  'breezing',
-  'focused',
-  'scattered',
-] as const;
-
-export type EngagementSignal = (typeof ENGAGEMENT_SIGNALS)[number];
+export { ENGAGEMENT_SIGNALS, type EngagementSignal };
 
 export interface SessionInsights {
   highlight: string;

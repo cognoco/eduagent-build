@@ -10,6 +10,7 @@ import {
   getBookTitle,
   processInterviewExchange,
   streamInterviewExchange,
+  extractSignals,
   getOrCreateDraft,
   getDraftState,
   updateDraft,
@@ -54,7 +55,12 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
         ...(bookTitle ? { bookTitle } : {}),
       };
 
-      const result = await processInterviewExchange(context, message);
+      // [BUG-464] Pass exchange count so the service can enforce the hard cap
+      const exchangeCount =
+        draft.exchangeHistory.filter((e) => e.role === 'user').length + 1;
+      const result = await processInterviewExchange(context, message, {
+        exchangeCount,
+      });
 
       const updatedHistory = [
         ...draft.exchangeHistory,
@@ -125,12 +131,18 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
         ...(bookTitle ? { bookTitle } : {}),
       };
 
+      // [BUG-464] Pass exchange count so the service can enforce the hard cap
+      const exchangeCount =
+        draft.exchangeHistory.filter((e) => e.role === 'user').length + 1;
+
       let stream: AsyncIterable<string>;
       let onComplete: (
         fullResponse: string
       ) => Promise<import('@eduagent/schemas').InterviewResult>;
       try {
-        const streamResult = await streamInterviewExchange(context, message);
+        const streamResult = await streamInterviewExchange(context, message, {
+          exchangeCount,
+        });
         stream = streamResult.stream;
         onComplete = streamResult.onComplete;
       } catch (err) {
@@ -216,6 +228,57 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
       });
     }
   )
+  // [BUG-464] Force-complete: client escape button triggers this to skip ahead
+  .post('/subjects/:subjectId/interview/complete', async (c) => {
+    const db = c.get('db');
+    const profileId = requireProfileId(c.get('profileId'));
+    const subjectId = c.req.param('subjectId');
+    const bookId = c.req.query('bookId');
+
+    const subject = await getSubject(db, profileId, subjectId);
+    if (!subject) return notFound(c, 'Subject not found');
+
+    const draft = await getDraftState(db, profileId, subjectId);
+    if (!draft || draft.status !== 'in_progress') {
+      // Already completed or no draft — just return success
+      return c.json({
+        isComplete: true,
+        exchangeCount:
+          draft?.exchangeHistory.filter((e) => e.role === 'user').length ?? 0,
+      });
+    }
+
+    const bookTitle = bookId
+      ? await getBookTitle(db, profileId, bookId, subjectId)
+      : undefined;
+
+    // Extract whatever signals we have from the conversation so far
+    const signals = await extractSignals(draft.exchangeHistory);
+
+    await updateDraft(db, profileId, draft.id, {
+      extractedSignals: signals,
+    });
+
+    await persistCurriculum(
+      db,
+      profileId,
+      subjectId,
+      subject.name,
+      { ...draft, extractedSignals: signals },
+      bookId,
+      bookTitle
+    );
+
+    await updateDraft(db, profileId, draft.id, {
+      status: 'completed',
+    });
+
+    return c.json({
+      isComplete: true,
+      exchangeCount: draft.exchangeHistory.filter((e) => e.role === 'user')
+        .length,
+    });
+  })
   // Get current interview state
   .get('/subjects/:subjectId/interview', async (c) => {
     const db = c.get('db');

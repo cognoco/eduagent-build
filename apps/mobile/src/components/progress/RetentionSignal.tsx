@@ -1,6 +1,7 @@
 import { View, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeColors } from '../../lib/theme';
+import { getParentRetentionInfo } from '../../lib/parent-vocab';
 import type { RetentionStatus } from '@eduagent/schemas';
 export type { RetentionStatus };
 
@@ -56,13 +57,12 @@ export function RetentionSignal({
 }: RetentionSignalProps) {
   const { label, icon, colorKey, textColor } = CONFIG[status];
   const colors = useThemeColors();
-  const parentLabel =
-    status === 'strong'
-      ? 'Remembering well'
-      : status === 'fading'
-      ? 'A few things to refresh'
-      : 'Needs a review';
-  const displayLabel = parentFacing ? parentLabel : label;
+  // Use parent-vocab canonical labels when parent-facing to keep a single
+  // source of truth for parent-friendly retention terminology.
+  const parentInfo = parentFacing
+    ? getParentRetentionInfo(status, 1, 'in_progress')
+    : null;
+  const displayLabel = parentInfo?.label ?? label;
 
   return (
     <View

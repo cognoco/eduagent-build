@@ -34,6 +34,69 @@ function isGenericServerMessage(message: string): boolean {
   );
 }
 
+/**
+ * [BUG-465] Maps server-side technical messages to kid-friendly alternatives.
+ * Server validation strings use schema/DB vocabulary that reads like jargon
+ * to young users. This layer intercepts those before they reach the UI.
+ */
+const FRIENDLY_MESSAGE_MAP: Array<{
+  pattern: RegExp;
+  message: string;
+}> = [
+  {
+    pattern: /not configured for language learning/i,
+    message:
+      "This subject isn't set up for language learning. Try the standard learning path instead.",
+  },
+  {
+    pattern: /subject.*(paused|archived|inactive)/i,
+    message:
+      'This subject is on pause right now. You can resume it from your subjects list.',
+  },
+  {
+    pattern: /curriculum.*not.*found/i,
+    message:
+      "We haven't set up your learning path yet. Go back and start the interview first.",
+  },
+  {
+    pattern: /topic.*not.*found/i,
+    message:
+      "That topic isn't available right now. Try picking a different one.",
+  },
+  {
+    pattern: /draft.*not.*found/i,
+    message: 'Your progress was lost. Please start again.',
+  },
+  {
+    pattern: /profile.*not.*found/i,
+    message:
+      'We had trouble loading your profile. Please sign out and back in.',
+  },
+  {
+    pattern: /session.*not.*found/i,
+    message: "That session isn't available anymore. Start a new one.",
+  },
+  {
+    pattern: /already.*completed/i,
+    message: "You've already finished this. Head back and pick something new.",
+  },
+  {
+    pattern: /validation.*failed|invalid.*input|expected.*string/i,
+    message:
+      "Something didn't look right. Please check what you entered and try again.",
+  },
+];
+
+/** Returns a friendly version if the message matches known jargon patterns. */
+function friendlyMessage(raw: string): string | null {
+  for (const entry of FRIENDLY_MESSAGE_MAP) {
+    if (entry.pattern.test(raw)) {
+      return entry.message;
+    }
+  }
+  return null;
+}
+
 /** Checks if message contains network-related keywords. */
 function isNetworkRelated(msg: string): boolean {
   return (
@@ -124,9 +187,12 @@ export function formatApiError(error: unknown): string {
       return msg;
     }
 
-    // [EP15-I5] ForbiddenError — pass through the server's message
+    // [EP15-I5] ForbiddenError — translate or pass through the server's message
     if (error.name === 'ForbiddenError') {
-      return msg || 'You do not have permission to view this.';
+      return (
+        friendlyMessage(msg) ??
+        (msg || 'You do not have permission to view this.')
+      );
     }
 
     if (msgLower.includes('timed out while waiting for a reply')) {
@@ -156,7 +222,10 @@ export function formatApiError(error: unknown): string {
         return SERVER_MESSAGE;
       }
       if (parsedApiBody.apiMessage && parsedApiBody.apiMessage.length < 200) {
-        return parsedApiBody.apiMessage;
+        // [BUG-465] Translate DB-schema jargon to kid-friendly language
+        return (
+          friendlyMessage(parsedApiBody.apiMessage) ?? parsedApiBody.apiMessage
+        );
       }
       return "That didn't work. Please check your input and try again.";
     }
@@ -181,7 +250,8 @@ export function formatApiError(error: unknown): string {
       !looksLikeStack &&
       !msgLower.includes('undefined')
     ) {
-      return msg;
+      // [BUG-465] Translate jargon before passing through to the user
+      return friendlyMessage(msg) ?? msg;
     }
   }
 

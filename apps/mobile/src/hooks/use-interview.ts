@@ -72,6 +72,41 @@ export function useSendInterviewMessage(
 }
 
 // ---------------------------------------------------------------------------
+// [BUG-464] Force-complete mutation — client escape button
+// ---------------------------------------------------------------------------
+
+export function useForceCompleteInterview(
+  subjectId: string,
+  bookId?: string
+): UseMutationResult<
+  { isComplete: boolean; exchangeCount: number },
+  Error,
+  void
+> {
+  const client = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      const res = await client.subjects[':subjectId'].interview.complete.$post({
+        param: { subjectId },
+        ...(bookId ? { query: { bookId } } : {}),
+      });
+      await assertOk(res);
+      return (await res.json()) as {
+        isComplete: boolean;
+        exchangeCount: number;
+      };
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ['interview', subjectId],
+      });
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
 // SSE streaming hook for interview messages (FR14)
 // ---------------------------------------------------------------------------
 

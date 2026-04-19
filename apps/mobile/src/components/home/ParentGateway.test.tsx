@@ -92,7 +92,7 @@ describe('ParentGateway', () => {
 
     render(<ParentGateway {...defaultProps} />);
 
-    expect(screen.getByText('No activity this week')).toBeTruthy();
+    expect(screen.getByText("Emma hasn't practiced this week")).toBeTruthy();
   });
 
   it('shows fallback highlight when dashboard not loaded', () => {

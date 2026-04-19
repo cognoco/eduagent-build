@@ -118,7 +118,9 @@ export function SubjectCard({
           <Text className="text-caption text-text-secondary">
             {subject.vocabulary.total > 0
               ? `${subject.vocabulary.total} words`
-              : `${subject.sessionsCount} sessions`}
+              : `${subject.sessionsCount} ${
+                  subject.sessionsCount === 1 ? 'session' : 'sessions'
+                }`}
           </Text>
           {onAction ? (
             <Pressable

@@ -835,20 +835,13 @@ export async function listRecentMilestones(
   profileId: string,
   limit = 5
 ): Promise<MilestoneRecord[]> {
-  const existingCount = await db.query.milestones.findMany({
-    where: eq(milestones.profileId, profileId),
-    limit: 1,
-  });
-
-  // [F-043] If no milestones exist, check if sessions are above thresholds and
-  // backfill. This handles users who had sessions before milestone detection was
-  // introduced, or whose session-completed pipeline silently skipped detection.
-  if (existingCount.length === 0) {
-    const latestSnapshot = await getLatestSnapshot(db, profileId);
-    const totalSessions = latestSnapshot?.metrics.totalSessions ?? 0;
-    if (totalSessions > 0) {
-      await backfillSessionMilestones(db, profileId, totalSessions);
-    }
+  // [F-PV-10] Always attempt backfill — onConflictDoNothing in storeMilestones
+  // makes this idempotent. Previously the gate (existingCount === 0) skipped
+  // users who had OLD milestones but missed newly lowered thresholds [1, 3, 5].
+  const latestSnapshot = await getLatestSnapshot(db, profileId);
+  const totalSessions = latestSnapshot?.metrics.totalSessions ?? 0;
+  if (totalSessions > 0) {
+    await backfillSessionMilestones(db, profileId, totalSessions);
   }
 
   const rows = await db.query.milestones.findMany({

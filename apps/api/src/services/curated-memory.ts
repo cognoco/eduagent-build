@@ -143,6 +143,7 @@ export function buildCuratedMemoryView(profile: {
   memoryEnabled?: boolean;
   memoryCollectionEnabled?: boolean;
   memoryInjectionEnabled?: boolean;
+  memoryConsentStatus?: string | null;
   accommodationMode?: string | null;
 }): CuratedMemoryView {
   const categories: MemoryCategory[] = [];
@@ -199,7 +200,11 @@ export function buildCuratedMemoryView(profile: {
     settings: {
       memoryEnabled: profile.memoryEnabled ?? true,
       collectionEnabled: profile.memoryCollectionEnabled ?? false,
-      injectionEnabled: profile.memoryInjectionEnabled ?? true,
+      // [F-PV-09] Gate injection on consent — if consent is not granted,
+      // injection must be off regardless of the DB flag.
+      injectionEnabled:
+        profile.memoryConsentStatus === 'granted' &&
+        (profile.memoryInjectionEnabled ?? true),
       accommodationMode: profile.accommodationMode ?? null,
     },
   };

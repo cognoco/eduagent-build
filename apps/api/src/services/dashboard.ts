@@ -19,6 +19,7 @@ import {
 } from '@eduagent/database';
 import type {
   DashboardChild,
+  EngagementSignal,
   HomeworkSummary,
   KnowledgeInventory,
   MonthlyReportRecord,
@@ -27,7 +28,7 @@ import type {
   SessionMetadata,
   TopicProgress,
 } from '@eduagent/schemas';
-import { getOverallProgress, getTopicProgress } from './progress';
+import { getOverallProgress, getTopicProgressBatch } from './progress';
 import {
   buildKnowledgeInventory,
   buildProgressHistory,
@@ -108,16 +109,26 @@ export function generateChildSummary(input: DashboardInput): string {
   return `${input.displayName}: ${parts.join('. ')}.`;
 }
 
+/** Minimum completed sessions before trend signals carry meaning. [F-PV-03] */
+const MIN_TREND_SESSIONS = 3;
+
 /**
  * Calculates retention trend as a snapshot heuristic.
  * Compares strong count vs weak+fading count across all subjects.
+ * Returns 'stable' when totalSessions < MIN_TREND_SESSIONS — the signal is
+ * noise at low N.
  */
 export function calculateRetentionTrend(
   subjectRetentionData: Array<{
     status: 'strong' | 'fading' | 'weak' | 'forgotten';
-  }>
+  }>,
+  totalSessions?: number
 ): 'improving' | 'declining' | 'stable' {
-  if (subjectRetentionData.length === 0) return 'stable';
+  if (
+    subjectRetentionData.length === 0 ||
+    (totalSessions != null && totalSessions < MIN_TREND_SESSIONS)
+  )
+    return 'stable';
   const strongCount = subjectRetentionData.filter(
     (s) => s.status === 'strong'
   ).length;
@@ -272,9 +283,24 @@ async function buildChildProgressSummary(
   totalTimeThisWeekMinutes: number,
   subjectNames: string[]
 ): Promise<{ progress: DashboardChild['progress']; totalSessions: number }> {
-  const latestSnapshot = await getLatestSnapshot(db, childProfileId);
+  // [F-PV-07] Compute totalSessions live with the same filter as getChildSessions
+  // (exchangeCount >= 1) instead of reading the stale snapshot value. This
+  // prevents the dashboard aggregate from disagreeing with the sessions list.
+  const [latestSnapshot, liveCountRows] = await Promise.all([
+    getLatestSnapshot(db, childProfileId),
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(learningSessions)
+      .where(
+        and(
+          eq(learningSessions.profileId, childProfileId),
+          gte(learningSessions.exchangeCount, 1)
+        )
+      ),
+  ]);
+  const liveSessionCount = liveCountRows[0]?.count ?? 0;
   if (!latestSnapshot) {
-    return { progress: null, totalSessions: 0 };
+    return { progress: null, totalSessions: liveSessionCount };
   }
 
   const previousSnapshot = await getLatestSnapshotOnOrBefore(
@@ -314,7 +340,9 @@ async function buildChildProgressSummary(
           )
         : null,
       engagementTrend:
-        sessionsThisWeek === 0
+        liveSessionCount < MIN_TREND_SESSIONS
+          ? 'stable'
+          : sessionsThisWeek === 0
           ? 'declining'
           : sessionsThisWeek > sessionsLastWeek
           ? 'increasing'
@@ -326,7 +354,7 @@ async function buildChildProgressSummary(
         sessionsLastWeek
       ),
     },
-    totalSessions: currentMetrics.totalSessions,
+    totalSessions: liveSessionCount,
   };
 }
 
@@ -564,7 +592,8 @@ export async function getChildrenForParent(
     const summary = generateChildSummary(p.dashboardInput);
     const trend = calculateTrend(p.sessionsThisWeek, p.sessionsLastWeek);
     const retentionTrend = calculateRetentionTrend(
-      p.dashboardInput.subjectRetentionData
+      p.dashboardInput.subjectRetentionData,
+      totalSessions
     );
 
     return {
@@ -681,17 +710,15 @@ export async function getChildSubjectTopics(
       .map((row) => [row.topicId, row.totalSessions])
   );
 
-  // Get progress for each topic
-  const results = await Promise.all(
-    topics.map((t) => getTopicProgress(db, childProfileId, subjectId, t.id))
-  );
+  // [F-PV-06] Batch all per-topic queries into ~6 inArray queries (constant
+  // subrequest count) instead of 7 queries × N topics which blows past the
+  // Cloudflare Workers 50-subrequest limit for subjects with > 6 topics.
+  const results = await getTopicProgressBatch(db, childProfileId, topics);
 
-  return results
-    .filter((r): r is TopicProgress => r !== null)
-    .map((topic) => ({
-      ...topic,
-      totalSessions: totalSessionsByTopic.get(topic.topicId) ?? 0,
-    }));
+  return results.map((topic) => ({
+    ...topic,
+    totalSessions: totalSessionsByTopic.get(topic.topicId) ?? 0,
+  }));
 }
 
 // ---------------------------------------------------------------------------
@@ -715,13 +742,7 @@ export interface ChildSession {
   highlight: string | null;
   narrative: string | null;
   conversationPrompt: string | null;
-  engagementSignal:
-    | 'curious'
-    | 'stuck'
-    | 'breezing'
-    | 'focused'
-    | 'scattered'
-    | null;
+  engagementSignal: EngagementSignal | null;
 }
 
 /**

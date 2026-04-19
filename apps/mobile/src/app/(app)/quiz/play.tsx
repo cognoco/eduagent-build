@@ -44,6 +44,10 @@ export default function QuizPlayScreen(): React.ReactElement {
   // instead of silently fabricating a 0-XP "nice" result and navigating.
   // Users should always know when the server didn't accept their round.
   const [completeError, setCompleteError] = useState<string | null>(null);
+  // [BUG-469] Track which question indices the user has disputed
+  const [disputedIndices, setDisputedIndices] = useState<Set<number>>(
+    new Set()
+  );
 
   const questions = (round?.questions ?? []) as ClientQuizQuestion[];
   const totalQuestions = round?.total ?? 0;
@@ -229,6 +233,17 @@ export default function QuizPlayScreen(): React.ReactElement {
         </View>
       </View>
     );
+  }
+
+  // [BUG-469] Dispute a question — marks it so the round submission includes it
+  function handleDispute() {
+    if (answerState === 'unanswered' || answerState === 'checking') return;
+    setDisputedIndices((prev) => new Set(prev).add(currentIndex));
+    // Also update the stored result for this question
+    resultsRef.current = resultsRef.current.map((r) =>
+      r.questionIndex === currentIndex ? { ...r, disputed: true } : r
+    );
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   }
 
   // [ASSUMP-F10] Shared submit path so Retry re-uses the same success/error
@@ -579,9 +594,30 @@ export default function QuizPlayScreen(): React.ReactElement {
             {showContinueHint
               ? 'Tap anywhere to continue'
               : answerState === 'correct'
-              ? 'Nice work'
-              : 'Good try'}
+              ? 'Correct'
+              : 'Not quite'}
           </Text>
+          {/* [BUG-469] Dispute button — lets user flag LLM's judgment as wrong */}
+          {!disputedIndices.has(currentIndex) ? (
+            <Pressable
+              onPress={handleDispute}
+              className="mt-2 items-center py-1"
+              testID="quiz-dispute-button"
+              accessibilityRole="button"
+              accessibilityLabel="Dispute this answer"
+            >
+              <Text className="text-caption text-text-secondary underline">
+                Not quite right?
+              </Text>
+            </Pressable>
+          ) : (
+            <Text
+              className="mt-2 text-center text-caption text-text-secondary"
+              testID="quiz-dispute-noted"
+            >
+              Noted — we'll review this
+            </Text>
+          )}
         </View>
       ) : null}
 

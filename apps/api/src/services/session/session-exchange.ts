@@ -560,6 +560,7 @@ export async function prepareExchangeContext(
             : [],
           memoryEnabled: learningProfile.memoryEnabled,
           memoryInjectionEnabled: learningProfile.memoryInjectionEnabled,
+          memoryConsentStatus: learningProfile.memoryConsentStatus,
           effectivenessSessionCount:
             learningProfile.effectivenessSessionCount ?? 0,
           activeUrgency,

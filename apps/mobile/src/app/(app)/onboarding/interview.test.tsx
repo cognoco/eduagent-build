@@ -73,6 +73,10 @@ jest.mock('../../../hooks/use-interview', () => ({
     abort: mockAbort,
     isStreaming: false,
   })),
+  useForceCompleteInterview: jest.fn(() => ({
+    mutateAsync: jest.fn(),
+    isPending: false,
+  })),
 }));
 
 const InterviewScreen = require('./interview').default;

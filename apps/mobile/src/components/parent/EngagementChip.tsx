@@ -1,13 +1,9 @@
 import { View, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import type { EngagementSignal } from '@eduagent/schemas';
 import { useThemeColors } from '../../lib/theme';
 
-export type EngagementSignal =
-  | 'curious'
-  | 'stuck'
-  | 'breezing'
-  | 'focused'
-  | 'scattered';
+export type { EngagementSignal };
 
 interface EngagementChipProps {
   signal: EngagementSignal;
