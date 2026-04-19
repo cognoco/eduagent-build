@@ -16,7 +16,7 @@ import type { ProfileMeta } from '../middleware/profile-scope';
 import { requireProfileId } from '../middleware/profile-scope';
 import { validationError, VocabularyContextError } from '../errors';
 import {
-  checkQuizAnswer,
+  checkQuizAnswerWithCorrect,
   completeQuizRound,
   formatActivityLabel,
   getCelebrationTier,
@@ -341,14 +341,22 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
       const roundId = c.req.param('id');
       const { questionIndex, answerGiven } = c.req.valid('json');
 
-      const correct = await checkQuizAnswer(
+      const result = await checkQuizAnswerWithCorrect(
         db,
         profileId,
         roundId,
         questionIndex,
         answerGiven
       );
-      return c.json({ correct }, 200);
+      // [F-Q-02/F-Q-07] Reveal correctAnswer only on wrong submissions so the
+      // client can highlight the right option and show the person's name.
+      return c.json(
+        {
+          correct: result.correct,
+          ...(result.correct ? {} : { correctAnswer: result.correctAnswer }),
+        },
+        200
+      );
     }
   )
   .post(

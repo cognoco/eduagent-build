@@ -14,6 +14,7 @@ import {
   type Database,
 } from '@eduagent/database';
 import type {
+  ConversationLanguage,
   LearningSession,
   SessionMessageInput,
   LearningStyle,
@@ -603,7 +604,7 @@ export async function prepareExchangeContext(
     // every downstream call path (processExchange, streamExchange) receives
     // the same personalization. Defaults: 'en' (DB NOT NULL) and null.
     conversationLanguage: profile?.conversationLanguage as
-      | import('@eduagent/schemas').ConversationLanguage
+      | ConversationLanguage
       | undefined,
     pronouns: profile?.pronouns ?? null,
     workedExampleLevel: interleavedTopics ? undefined : workedExampleLevel,

@@ -40,3 +40,6 @@ export * from './dictation.ts';
 // Quiz Activities (Practice)
 export * from './quiz.ts';
 export * from './quiz-utils.ts';
+
+// LLM Response Envelope (shared contract for all structured-output LLM flows)
+export * from './llm-envelope.ts';

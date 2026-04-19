@@ -7,7 +7,13 @@ import {
   createScopedRepository,
   type Database,
 } from '@eduagent/database';
-import { routeAndCall, routeAndStream, type ChatMessage } from './llm';
+import {
+  routeAndCall,
+  routeAndStream,
+  parseEnvelope,
+  logParserDisagreement,
+  type ChatMessage,
+} from './llm';
 import {
   generateCurriculum,
   ensureCurriculum,
@@ -55,8 +61,14 @@ Keep questions conversational and brief. After 2-3 exchanges when you have enoug
 wrap up with a short summary of what you learned and a brief, natural transition to the first session.
 Keep the tone warm but calm — don't over-celebrate. Vary your acknowledgments: sometimes "yes", sometimes just move on. Silence after a correct answer is fine.
 NEVER use stock phrases like "Let's dive in!", "I've got a great picture", "Amazing!", "Fantastic!", "Awesome!". Just be direct.
-Then place the marker [INTERVIEW_COMPLETE] on its own line at the very end (after your message).
-The marker will be hidden from the learner, so your visible text should feel like a natural ending.`;
+
+Respond with ONLY valid JSON in this exact shape — no prose before or after:
+{
+  "reply": "<your message to the learner>",
+  "signals": { "ready_to_finish": <true only when you have wrapped up with a summary and transition; otherwise false> }
+}
+The "reply" field is what the learner sees — write it as a natural message, do not mention JSON or signals.
+Set "ready_to_finish" to true ONLY on the turn where your reply contains the wrap-up summary and transition to the first session.`;
 
 const DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -214,15 +226,65 @@ export async function extractSignals(exchangeHistory: ChatExchange[]): Promise<{
 
 /**
  * Server-side hard cap: force interview completion after this many user exchanges.
- * Prevents indefinite interviews when the LLM fails to emit the completion marker.
- * [BUG-464] [BUG-470]
+ * Belt + suspenders — the state machine fail-safes the "model never declares
+ * done" case even if the LLM returns ready_to_finish: false forever.
+ * [BUG-464] [BUG-470] [F-042]
  */
-const INTERVIEW_HARD_CAP_EXCHANGES = 3;
+const MAX_INTERVIEW_EXCHANGES = 6;
+
+/**
+ * Interpret an interview LLM response under the envelope contract.
+ *
+ * Shadow-parses the legacy [INTERVIEW_COMPLETE] marker and logs disagreements
+ * during the migration window (per envelope spec §"Rollout telemetry"). The
+ * visible reply and the `ready_to_finish` signal come from the envelope when
+ * it parses cleanly; otherwise falls back to the raw text minus the marker.
+ */
+function interpretInterviewResponse(params: {
+  rawResponse: string;
+  profileId: string | undefined;
+  flow: 'processInterviewExchange' | 'streamInterviewExchange';
+}): {
+  cleanResponse: string;
+  readyToFinish: boolean;
+} {
+  const { rawResponse, profileId, flow } = params;
+
+  // Legacy parser — shadow during rollout.
+  const legacyMarkerPresent = rawResponse.includes('[INTERVIEW_COMPLETE]');
+
+  const parse = parseEnvelope(rawResponse);
+  if (parse.ok) {
+    const readyToFinish = parse.envelope.signals?.ready_to_finish === true;
+    logParserDisagreement({
+      flow,
+      profileId: profileId ?? 'unknown',
+      oldResult: legacyMarkerPresent,
+      newResult: readyToFinish,
+    });
+    return { cleanResponse: parse.envelope.reply.trim(), readyToFinish };
+  }
+
+  // Envelope parse failed — degrade gracefully. Strip the legacy marker from
+  // the raw text so users never see it, and trust the legacy marker for this
+  // call (telemetry will surface if this path fires often in prod).
+  logParserDisagreement({
+    flow,
+    profileId: profileId ?? 'unknown',
+    oldResult: legacyMarkerPresent,
+    newResult: false,
+    parseFailureReason: parse.reason,
+  });
+  return {
+    cleanResponse: rawResponse.replace('[INTERVIEW_COMPLETE]', '').trim(),
+    readyToFinish: legacyMarkerPresent,
+  };
+}
 
 export async function processInterviewExchange(
   context: InterviewContext,
   userMessage: string,
-  options?: { exchangeCount?: number }
+  options?: { exchangeCount?: number; profileId?: string }
 ): Promise<InterviewResult> {
   const focusLine = context.bookTitle
     ? `\nFocus area: ${context.bookTitle}\nScope your questions to this specific focus area within the subject, not the entire subject.`
@@ -240,15 +302,19 @@ export async function processInterviewExchange(
   ];
 
   const result = await routeAndCall(messages, 1);
-  const markerPresent = result.response.includes('[INTERVIEW_COMPLETE]');
-  const cleanResponse = result.response
-    .replace('[INTERVIEW_COMPLETE]', '')
-    .trim();
+  const { cleanResponse, readyToFinish } = interpretInterviewResponse({
+    rawResponse: result.response,
+    profileId: options?.profileId,
+    flow: 'processInterviewExchange',
+  });
 
-  // [BUG-464] Server-side hard cap: force completion after N exchanges
+  // Server-side cap — force completion regardless of model signal.
+  // `exchangeCount` from the route is the 1-indexed number of the current
+  // user turn (including this one). [F-042] This is belt + suspenders: even
+  // if the LLM returns ready_to_finish: false forever, the interview ends.
   const currentExchangeCount = options?.exchangeCount ?? 0;
   const isComplete =
-    markerPresent || currentExchangeCount >= INTERVIEW_HARD_CAP_EXCHANGES;
+    readyToFinish || currentExchangeCount >= MAX_INTERVIEW_EXCHANGES;
 
   if (isComplete) {
     const signals = await extractSignals([
@@ -269,7 +335,7 @@ export async function processInterviewExchange(
 export async function streamInterviewExchange(
   context: InterviewContext,
   userMessage: string,
-  options?: { exchangeCount?: number }
+  options?: { exchangeCount?: number; profileId?: string }
 ): Promise<{
   stream: AsyncIterable<string>;
   onComplete: (fullResponse: string) => Promise<InterviewResult>;
@@ -293,14 +359,14 @@ export async function streamInterviewExchange(
   const currentExchangeCount = options?.exchangeCount ?? 0;
 
   const onComplete = async (fullResponse: string): Promise<InterviewResult> => {
-    const markerPresent = fullResponse.includes('[INTERVIEW_COMPLETE]');
-    const cleanResponse = fullResponse
-      .replace('[INTERVIEW_COMPLETE]', '')
-      .trim();
+    const { cleanResponse, readyToFinish } = interpretInterviewResponse({
+      rawResponse: fullResponse,
+      profileId: options?.profileId,
+      flow: 'streamInterviewExchange',
+    });
 
-    // [BUG-464] Server-side hard cap: force completion after N exchanges
     const isComplete =
-      markerPresent || currentExchangeCount >= INTERVIEW_HARD_CAP_EXCHANGES;
+      readyToFinish || currentExchangeCount >= MAX_INTERVIEW_EXCHANGES;
 
     if (isComplete) {
       const signals = await extractSignals([

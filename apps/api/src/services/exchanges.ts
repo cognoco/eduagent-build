@@ -18,6 +18,7 @@ import {
   type HomeworkMode,
   type InputMode,
   type SessionType,
+  type ConversationLanguage,
   type VerificationType,
 } from '@eduagent/schemas';
 import { buildFourStrandsPrompt } from './language-prompts';
@@ -115,7 +116,7 @@ export interface ExchangeContext {
   // a maths session only this matters. `pronouns` is learner-owned free text
   // (max 32 chars, validated at Zod boundary). Never surfaced to other
   // learners — the router includes it only in the active learner's preamble.
-  conversationLanguage?: import('@eduagent/schemas').ConversationLanguage;
+  conversationLanguage?: ConversationLanguage;
   pronouns?: string | null;
   /** Original free-text input the learner typed when starting this session (CFLF) */
   rawInput?: string | null;

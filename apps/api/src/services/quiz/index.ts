@@ -7,6 +7,7 @@ export {
 export { extractJsonObject, generateQuizRound } from './generate-round';
 export {
   checkQuizAnswer,
+  checkQuizAnswerWithCorrect,
   completeQuizRound,
   getCelebrationTier,
 } from './complete-round';

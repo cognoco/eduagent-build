@@ -7,6 +7,7 @@ import {
 } from '@tanstack/react-query';
 import type {
   CompleteRoundResponse,
+  QuestionCheckResponse,
   QuestionResult,
   QuizActivityType,
   QuizRoundResponse,
@@ -103,7 +104,7 @@ export function useFetchRound(
 }
 
 export function useCheckAnswer(): UseMutationResult<
-  { correct: boolean },
+  QuestionCheckResponse,
   Error,
   { roundId: string; questionIndex: number; answerGiven: string }
 > {
@@ -116,7 +117,7 @@ export function useCheckAnswer(): UseMutationResult<
         json: { questionIndex, answerGiven },
       });
       await assertOk(res);
-      return (await res.json()) as { correct: boolean };
+      return (await res.json()) as QuestionCheckResponse;
     },
   });
 }

@@ -4,14 +4,20 @@
 
 jest.mock('./llm', () => {
   const providers = new Map();
+  const actual = jest.requireActual('./llm');
   return {
     routeAndCall: jest.fn().mockResolvedValue({
-      response: 'Mock interview response echoing user input',
+      response:
+        '{"reply": "Mock interview response echoing user input", "signals": {"ready_to_finish": false}}',
       provider: 'gemini',
       model: 'gemini-2.5-flash',
       latencyMs: 50,
     }),
     routeAndStream: jest.fn(),
+    // Keep real envelope helpers — the service exercises parseEnvelope and
+    // logParserDisagreement against actual code.
+    parseEnvelope: actual.parseEnvelope,
+    logParserDisagreement: actual.logParserDisagreement,
     registerProvider: jest.fn((p: { name: string }) =>
       providers.set(p.name, p)
     ),
@@ -162,10 +168,11 @@ describe('processInterviewExchange', () => {
     expect(result.isComplete).toBe(false);
   });
 
-  it('marks exchange as complete when marker is present', async () => {
+  it('marks exchange as complete when envelope signals ready_to_finish', async () => {
     (routeAndCall as jest.Mock)
       .mockResolvedValueOnce({
-        response: 'Great session! [INTERVIEW_COMPLETE]',
+        response:
+          '{"reply": "Great session!", "signals": {"ready_to_finish": true}}',
         provider: 'gemini',
         model: 'gemini-2.5-flash',
         latencyMs: 50,
@@ -179,9 +186,80 @@ describe('processInterviewExchange', () => {
     const result = await processInterviewExchange(baseContext, 'Hello');
 
     expect(result.isComplete).toBe(true);
+    expect(result.response).toBe('Great session!');
     expect(result.response).not.toContain('[INTERVIEW_COMPLETE]');
     expect(result.extractedSignals).toBeDefined();
     expect(result.extractedSignals?.goals).toEqual(['learn TypeScript']);
+  });
+
+  it('falls back to [INTERVIEW_COMPLETE] marker when envelope parse fails', async () => {
+    // Legacy path: non-JSON prose with the old marker. The envelope parser
+    // fails cleanly; the service falls back to stripping the marker and
+    // honoring it for the terminal transition.
+    (routeAndCall as jest.Mock)
+      .mockResolvedValueOnce({
+        response: 'Great session! [INTERVIEW_COMPLETE]',
+        provider: 'gemini',
+        model: 'gemini-2.5-flash',
+        latencyMs: 50,
+      })
+      .mockResolvedValueOnce({
+        response:
+          '{"goals": ["legacy"], "experienceLevel": "beginner", "currentKnowledge": ""}',
+      });
+
+    const result = await processInterviewExchange(baseContext, 'Hello');
+
+    expect(result.isComplete).toBe(true);
+    expect(result.response).not.toContain('[INTERVIEW_COMPLETE]');
+    expect(result.response).toBe('Great session!');
+  });
+
+  // --- F-042 break test -----------------------------------------------------
+  // If the LLM returns ready_to_finish: false forever, the learner would be
+  // trapped in the interview. The server-side cap must force close anyway.
+  it('[F-042] force-closes at MAX_INTERVIEW_EXCHANGES regardless of signal', async () => {
+    // Return a valid envelope with ready_to_finish: false on turn 7.
+    (routeAndCall as jest.Mock)
+      .mockResolvedValueOnce({
+        response:
+          '{"reply": "Tell me more about that.", "signals": {"ready_to_finish": false}}',
+        provider: 'gemini',
+        model: 'gemini-2.5-flash',
+        latencyMs: 50,
+      })
+      // extractSignals call — triggered only because the cap fired.
+      .mockResolvedValueOnce({
+        response:
+          '{"goals": ["capped"], "experienceLevel": "beginner", "currentKnowledge": ""}',
+      });
+
+    const result = await processInterviewExchange(baseContext, 'Hello', {
+      exchangeCount: 7, // past the cap of 6
+    });
+
+    expect(result.isComplete).toBe(true);
+    expect(result.extractedSignals).toBeDefined();
+    expect(result.extractedSignals?.goals).toEqual(['capped']);
+    // Visible reply is the envelope's reply, not the marker form.
+    expect(result.response).toBe('Tell me more about that.');
+  });
+
+  it('[F-042] stays open below the cap when ready_to_finish is false', async () => {
+    (routeAndCall as jest.Mock).mockResolvedValueOnce({
+      response:
+        '{"reply": "What else interests you?", "signals": {"ready_to_finish": false}}',
+      provider: 'gemini',
+      model: 'gemini-2.5-flash',
+      latencyMs: 50,
+    });
+
+    const result = await processInterviewExchange(baseContext, 'Hello', {
+      exchangeCount: 2, // well below cap
+    });
+
+    expect(result.isComplete).toBe(false);
+    expect(result.extractedSignals).toBeUndefined();
   });
 
   it('passes exchange history to the LLM', async () => {
@@ -241,10 +319,10 @@ describe('streamInterviewExchange', () => {
     expect(typeof result.onComplete).toBe('function');
   });
 
-  it('onComplete returns non-complete result when marker absent', async () => {
+  it('onComplete returns non-complete result when envelope signals ready_to_finish false', async () => {
     (routeAndStream as jest.Mock).mockResolvedValueOnce({
       stream: (async function* () {
-        yield 'Tell me more.';
+        yield '{"reply": "Tell me more.", "signals": {"ready_to_finish": false}}';
       })(),
       provider: 'gemini',
       model: 'gemini-2.5-flash',
@@ -267,10 +345,10 @@ describe('streamInterviewExchange', () => {
     expect(result.extractedSignals).toBeUndefined();
   });
 
-  it('onComplete strips marker and extracts signals when complete', async () => {
+  it('onComplete extracts signals when envelope signals ready_to_finish true', async () => {
     (routeAndStream as jest.Mock).mockResolvedValueOnce({
       stream: (async function* () {
-        yield 'Great session! [INTERVIEW_COMPLETE]';
+        yield '{"reply": "Great session!", "signals": {"ready_to_finish": true}}';
       })(),
       provider: 'gemini',
       model: 'gemini-2.5-flash',
@@ -298,6 +376,34 @@ describe('streamInterviewExchange', () => {
     expect(result.response).toBe('Great session!');
     expect(result.extractedSignals).toBeDefined();
     expect(result.extractedSignals?.goals).toEqual(['learn TS']);
+  });
+
+  it('[F-042] streaming path force-closes at cap even when signal says false', async () => {
+    (routeAndStream as jest.Mock).mockResolvedValueOnce({
+      stream: (async function* () {
+        yield '{"reply": "And another question?", "signals": {"ready_to_finish": false}}';
+      })(),
+      provider: 'gemini',
+      model: 'gemini-2.5-flash',
+    });
+    (routeAndCall as jest.Mock).mockResolvedValueOnce({
+      response:
+        '{"goals": ["capped"], "experienceLevel": "beginner", "currentKnowledge": ""}',
+    });
+
+    const { stream, onComplete } = await streamInterviewExchange(
+      baseContext,
+      'Hi',
+      { exchangeCount: 7 }
+    );
+    let fullText = '';
+    for await (const chunk of stream) fullText += chunk;
+
+    const result = await onComplete(fullText);
+
+    expect(result.isComplete).toBe(true);
+    expect(result.response).toBe('And another question?');
+    expect(result.extractedSignals).toBeDefined();
   });
 
   it('calls routeAndStream at rung 1', async () => {

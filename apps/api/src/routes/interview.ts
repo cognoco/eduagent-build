@@ -1,7 +1,10 @@
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import { zValidator } from '@hono/zod-validator';
-import { interviewMessageSchema } from '@eduagent/schemas';
+import {
+  interviewMessageSchema,
+  type InterviewResult,
+} from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
@@ -60,6 +63,7 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
         draft.exchangeHistory.filter((e) => e.role === 'user').length + 1;
       const result = await processInterviewExchange(context, message, {
         exchangeCount,
+        profileId,
       });
 
       const updatedHistory = [
@@ -136,12 +140,11 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
         draft.exchangeHistory.filter((e) => e.role === 'user').length + 1;
 
       let stream: AsyncIterable<string>;
-      let onComplete: (
-        fullResponse: string
-      ) => Promise<import('@eduagent/schemas').InterviewResult>;
+      let onComplete: (fullResponse: string) => Promise<InterviewResult>;
       try {
         const streamResult = await streamInterviewExchange(context, message, {
           exchangeCount,
+          profileId,
         });
         stream = streamResult.stream;
         onComplete = streamResult.onComplete;

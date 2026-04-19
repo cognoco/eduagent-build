@@ -63,9 +63,26 @@ export const detectedTopicSchema = z.object({
 });
 export type DetectedTopic = z.infer<typeof detectedTopicSchema>;
 
+/**
+ * Structured reason-code for how the gate arrived at its decision.
+ * Analytics should read this, never the free-text `reason` field.
+ *  - heuristic_shallow: short session short-circuited to not-meaningful
+ *  - heuristic_deep: long session short-circuited to meaningful (topic-detection-only LLM call)
+ *  - llm_gate: 3-4 exchange middle ground, full LLM judgment
+ *  - fail_open: LLM timeout or unparseable response, defaulted to meaningful
+ */
+export const depthEvaluationMethodSchema = z.enum([
+  'heuristic_shallow',
+  'heuristic_deep',
+  'llm_gate',
+  'fail_open',
+]);
+export type DepthEvaluationMethod = z.infer<typeof depthEvaluationMethodSchema>;
+
 export const depthEvaluationSchema = z.object({
   meaningful: z.boolean(),
   reason: z.string(),
+  method: depthEvaluationMethodSchema,
   topics: z.array(detectedTopicSchema),
 });
 export type DepthEvaluation = z.infer<typeof depthEvaluationSchema>;
@@ -78,8 +95,10 @@ Add to `packages/schemas/src/index.ts`:
 ```ts
 export {
   detectedTopicSchema,
+  depthEvaluationMethodSchema,
   depthEvaluationSchema,
   type DetectedTopic,
+  type DepthEvaluationMethod,
   type DepthEvaluation,
 } from './depth-evaluation';
 ```
@@ -104,13 +123,23 @@ export const GATE_TIMEOUT_MS = 2000;
 /** Timeout for the topic-detection-only Flash call (ms) — used when heuristic says meaningful */
 export const TOPIC_DETECTION_TIMEOUT_MS = 1500;
 
-/** Confidence threshold for silent background classification (FR-ASK-2) */
-export const SILENT_CLASSIFY_CONFIDENCE_THRESHOLD = 0.6;
+/**
+ * Confidence threshold for silent background classification (FR-ASK-2).
+ * Matches the spec's "confidence ≥ 0.8" requirement — anything lower
+ * risks injecting a misaligned pedagogy hint that persists for the rest
+ * of the session. If calibration data later shows 0.8 is too strict,
+ * lower it here and add a rationale comment referencing the data.
+ */
+export const SILENT_CLASSIFY_CONFIDENCE_THRESHOLD = 0.8;
 
 /**
- * Language pre-classifier regex (AD-ASK-2). Matches common language-intent
- * patterns to inject Four Strands pedagogy from exchange 1 without waiting
- * for the full classification after exchange 2.
+ * Language pre-classifier regex (AD-ASK-2). Matches common ENGLISH
+ * language-intent patterns to inject Four Strands pedagogy from
+ * exchange 1 without waiting for the full classification after
+ * exchange 2. NOTE: non-English intents (a Czech kid asking in Czech
+ * "jak se řekne pes anglicky") will not match — those fall back to
+ * the post-exchange-2 classifier, which is language-agnostic because
+ * it uses embeddings + subject names.
  */
 export const LANGUAGE_REGEX =
   /\b(how do (you|I) say|translate|in (french|spanish|german|czech|italian|portuguese|japanese|chinese|korean|arabic|russian|hindi|dutch|polish|swedish|norwegian|danish|finnish|greek|turkish|hungarian|romanian|thai|vietnamese|indonesian|malay|tagalog|swahili|hebrew|ukrainian|croatian|serbian|slovak|slovenian|bulgarian|latvian|lithuanian|estonian)|what('s| is) .+ in \w+)\b/i;
@@ -183,6 +212,7 @@ describe('evaluateSessionDepth', () => {
       ]);
       const result = await evaluateSessionDepth(transcript);
       expect(result.meaningful).toBe(false);
+      expect(result.method).toBe('heuristic_shallow');
       expect(result.topics).toEqual([]);
     });
 
@@ -196,6 +226,7 @@ describe('evaluateSessionDepth', () => {
       ]);
       const result = await evaluateSessionDepth(transcript);
       expect(result.meaningful).toBe(true);
+      expect(result.method).toBe('heuristic_deep');
     });
 
     it('returns not meaningful for < 3 exchanges even with many words', async () => {
@@ -223,7 +254,8 @@ Expected: FAIL — `Cannot find module './session-depth'`
 ```ts
 // apps/api/src/services/session/session-depth.ts
 import type { DepthEvaluation, SessionTranscript } from '@eduagent/schemas';
-import { depthEvaluationSchema } from '@eduagent/schemas';
+import { z } from 'zod';
+import { detectedTopicSchema } from '@eduagent/schemas';
 import { routeAndCall } from '../llm';
 import type { ChatMessage } from '../llm';
 import { createLogger } from '../logger';
@@ -286,12 +318,25 @@ function formatTranscriptForPrompt(transcript: SessionTranscript): string {
     .join('\n\n');
 }
 
-function parseDepthResponse(raw: string): DepthEvaluation | null {
+/**
+ * Schema for what the LLM actually returns — no `method` field.
+ * The caller adds `method` after parsing based on which code path
+ * produced the response.
+ */
+const llmDepthResponseSchema = z.object({
+  meaningful: z.boolean(),
+  reason: z.string(),
+  topics: z.array(detectedTopicSchema),
+});
+
+function parseDepthResponse(
+  raw: string
+): Omit<DepthEvaluation, 'method'> | null {
   try {
     // Strip markdown fences if present
     const cleaned = raw.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
     const parsed = JSON.parse(cleaned);
-    const result = depthEvaluationSchema.safeParse(parsed);
+    const result = llmDepthResponseSchema.safeParse(parsed);
     return result.success ? result.data : null;
   } catch {
     return null;
@@ -321,6 +366,7 @@ export async function evaluateSessionDepth(
     return {
       meaningful: false,
       reason: `Quick Q&A: ${exchangeCount} exchanges, ${learnerWordCount} words`,
+      method: 'heuristic_shallow',
       topics: [],
     };
   }
@@ -335,6 +381,7 @@ export async function evaluateSessionDepth(
     return {
       meaningful: true,
       reason: `Deep session: ${exchangeCount} exchanges with follow-up engagement`,
+      method: 'heuristic_deep',
       topics,
     };
   }
@@ -394,7 +441,10 @@ async function evaluateWithLlm(
     const result = await Promise.race([llmPromise, timeoutPromise]);
     const parsed = parseDepthResponse(result.text);
 
-    if (parsed) return parsed;
+    if (parsed) {
+      // Parser sets method='llm_gate' to distinguish from heuristic paths.
+      return { ...parsed, method: 'llm_gate' };
+    }
 
     // LLM returned unparseable response — fail open
     logger.warn('[session-depth] unparseable LLM response, failing open', {
@@ -413,6 +463,7 @@ function failOpen(exchangeCount: number, learnerWordCount: number): DepthEvaluat
   return {
     meaningful: true,
     reason: `Gate timeout — fail open (${exchangeCount} exchanges, ${learnerWordCount} words)`,
+    method: 'fail_open',
     topics: [],
   };
 }
@@ -477,6 +528,7 @@ describe('LLM gate for ambiguous sessions', () => {
     ]);
     const result = await evaluateSessionDepth(transcript);
     expect(result.meaningful).toBe(true);
+    expect(result.method).toBe('llm_gate');
     expect(result.topics).toHaveLength(1);
     expect(result.topics[0].summary).toBe('How fish breathe');
     expect(mockRouteAndCall).toHaveBeenCalledTimes(1);
@@ -494,6 +546,7 @@ describe('LLM gate for ambiguous sessions', () => {
     ]);
     const result = await evaluateSessionDepth(transcript, { timeoutMs: 100 });
     expect(result.meaningful).toBe(true); // fail-open
+    expect(result.method).toBe('fail_open');
     expect(result.reason).toContain('timeout');
   });
 
@@ -509,6 +562,7 @@ describe('LLM gate for ambiguous sessions', () => {
     ]);
     const result = await evaluateSessionDepth(transcript, { timeoutMs: 5000 });
     expect(result.meaningful).toBe(true); // fail-open
+    expect(result.method).toBe('fail_open');
   });
 });
 ```
@@ -546,6 +600,7 @@ describe('multi-topic detection', () => {
     ]);
     const result = await evaluateSessionDepth(transcript);
     expect(result.meaningful).toBe(true);
+    expect(result.method).toBe('heuristic_deep'); // 5 exchanges = deep-session shortcut
     expect(result.topics).toHaveLength(3);
     // Only substantial + partial should be shown as chips (filtered by mobile)
     const fileable = result.topics.filter((t) => t.depth !== 'introduced');
@@ -628,15 +683,20 @@ feat(api): POST /sessions/:id/evaluate-depth endpoint [FR-ASK-3]
 
 ---
 
-## Task 4: Silent Background Classification
+## Task 4: Silent Background Classification (via Inngest)
 
-After exchange 2 in a freeform session, fire-and-forget `classifySubject()` and store the result in session metadata. Subsequent exchanges read the cached result to inject pedagogy hints. Language regex pre-classifier provides instant Four Strands injection for obvious language questions.
+After exchange 2 in a freeform session, emit an Inngest event `app/ask.classify_silently` so a background function can run `classifySubject()` and write the result to session metadata. Subsequent exchanges read the cached result to inject pedagogy hints. Language regex pre-classifier provides instant Four Strands injection for obvious language questions.
+
+**Why Inngest, not fire-and-forget:** On Cloudflare Workers, `void (async () => {...})()` dispatched during a request is killed when the response completes. Classification + DB write + observability events would fail silently most of the time. Using Inngest gives us durable execution with retries — matching `docs/project_context.md`'s "Durable async work goes through Inngest" rule.
 
 **Files:**
-- Modify: `apps/api/src/services/session/session-exchange.ts`
-- Create (or extend): `apps/api/src/services/session/session-exchange.test.ts` (add new tests)
+- Modify: `apps/api/src/services/session/session-exchange.ts` (emit event, read cached result)
+- Create: `apps/api/src/services/session/session-exchange.test.ts` (or extend existing — add new tests)
+- Create: `apps/api/src/inngest/functions/ask-silent-classify.ts` (NEW — handles the event)
+- Create: `apps/api/src/inngest/functions/ask-silent-classify.test.ts`
+- Modify: `apps/api/src/inngest/index.ts` (register new function)
 
-**Read first:** `apps/api/src/services/session/session-exchange.ts:148-645` (full `prepareExchangeContext`), `apps/api/src/services/subject-classify.ts` (classifySubject signature)
+**Read first:** `apps/api/src/services/session/session-exchange.ts` — the full `prepareExchangeContext` function. Use search for anchors like `// Build exchange history` and the context-assembly block rather than line numbers (they drift). `apps/api/src/services/subject-classify.ts` (classifySubject signature). `apps/api/src/inngest/functions/freeform-filing.ts` (pattern reference — how an existing function consumes a domain event and updates `learningSessions`).
 
 ### 4A: Language regex pre-classifier
 
@@ -678,141 +738,121 @@ Expected: PASS
 
 ### 4B: Silent classification + pedagogy injection
 
-- [ ] **Step 3: Add silent classification logic to prepareExchangeContext**
+- [ ] **Step 3: Add silent classification trigger + pedagogy-hint reader to prepareExchangeContext**
 
-In `apps/api/src/services/session/session-exchange.ts`, add the following imports at the top:
+In `apps/api/src/services/session/session-exchange.ts`, add these imports:
 
 ```ts
-import { classifySubject } from '../subject-classify';
-import {
-  SILENT_CLASSIFY_CONFIDENCE_THRESHOLD,
-  LANGUAGE_REGEX,
-} from './session-depth.config';
+import { inngest } from '../../inngest/client';
+import { LANGUAGE_REGEX } from './session-depth.config';
 ```
 
-Then, in `prepareExchangeContext`, after the exchange history is built (after line ~393 where `exchangeHistory` is constructed) and before the context object is assembled (before line ~590), add:
+Then, in `prepareExchangeContext`, locate the block that builds `exchangeHistory` (search for `exchangeHistory` assignment). **After** exchange history is built and **before** the final `ExchangeContext` object is assembled, insert:
 
 ```ts
   // ---------------------------------------------------------------------------
   // FR-ASK-2: Silent background classification for freeform sessions
   // ---------------------------------------------------------------------------
+  // This request handler only (a) reads the cached classification from
+  // session metadata, and (b) emits a durable Inngest event when it's time
+  // to classify. The actual classification + DB write lives in the
+  // `ask-silent-classify` Inngest function (Task 4C) so it survives
+  // Cloudflare Worker response termination. AD-ASK-1: the cached result
+  // is written to metadata.silentClassification, NEVER to session.subjectId.
   const isFreeform = !session.topicId && !session.subjectId;
   const sessionMeta = (session.metadata ?? {}) as Record<string, unknown>;
-  let silentClassification = sessionMeta.silentClassification as
-    | { subjectId: string; subjectName: string; confidence: number; pedagogyMode?: string }
+  const silentClassification = sessionMeta.silentClassification as
+    | {
+        subjectId: string;
+        subjectName: string;
+        confidence: number;
+        pedagogyMode?: string;
+      }
     | undefined;
 
-  // Language regex pre-classifier (AD-ASK-2): instant Four Strands for obvious language questions
+  // Language regex pre-classifier (AD-ASK-2): instant Four Strands for
+  // obvious language questions on exchange 1. English-only by design —
+  // see session-depth.config.ts for rationale.
   let likelyLanguage = false;
   if (isFreeform && session.exchangeCount === 0) {
     likelyLanguage = LANGUAGE_REGEX.test(userMessage);
+    if (likelyLanguage) {
+      // Fire observability event (still fire-and-forget — an ignored event
+      // is acceptable; analytics drift is recoverable, unlike losing the
+      // actual classification).
+      void inngest.send({
+        name: 'app/ask.language_preclassified',
+        data: {
+          sessionId,
+          matchedPattern: userMessage.match(LANGUAGE_REGEX)?.[0] ?? '',
+        },
+      });
+    }
   }
 
-  // Fire-and-forget classification after exchange 2 (one-shot, never re-runs)
+  // Trigger durable classification after exchange 2 (one-shot, idempotent
+  // via the handler's own metadata check). The handler is guarded against
+  // double-running if this fires twice due to an Inngest retry.
   if (
     isFreeform &&
-    session.exchangeCount === 1 && // Will become exchange 2 after this exchange
+    session.exchangeCount === 1 && // will become exchange 2 after this response
     !silentClassification
   ) {
-    // Concatenate first 2 user messages for better classification signal
     const priorUserMessages = exchangeHistory
       .filter((e) => e.role === 'user')
       .map((e) => e.content)
       .join('\n');
     const classifyInput = `${priorUserMessages}\n${userMessage}`;
 
-    // Fire-and-forget — do NOT await. Store result in session metadata.
-    void (async () => {
-      try {
-        const result = await classifySubject(db, profileId, classifyInput);
-        const topCandidate = result.candidates
-          .filter((c) => c.confidence >= SILENT_CLASSIFY_CONFIDENCE_THRESHOLD)
-          .sort((a, b) => b.confidence - a.confidence)[0];
-
-        if (topCandidate) {
-          // Store in session metadata (JSONB) — does NOT update learningSessions.subjectId
-          await db
-            .update(learningSessions)
-            .set({
-              metadata: sql`jsonb_set(
-                COALESCE(${learningSessions.metadata}, '{}'),
-                '{silentClassification}',
-                ${JSON.stringify({
-                  subjectId: topCandidate.subjectId,
-                  subjectName: topCandidate.subjectName,
-                  confidence: topCandidate.confidence,
-                })}::jsonb
-              )`,
-              updatedAt: new Date(),
-            })
-            .where(
-              and(
-                eq(learningSessions.id, sessionId),
-                eq(learningSessions.profileId, profileId)
-              )
-            );
-
-          await inngest.send({
-            name: 'app/ask.classification_completed',
-            data: {
-              sessionId,
-              subjectId: topCandidate.subjectId,
-              subjectName: topCandidate.subjectName,
-              confidence: topCandidate.confidence,
-              exchangeCount: session.exchangeCount + 1,
-            },
-          });
-        } else {
-          const topConfidence = result.candidates[0]?.confidence ?? 0;
-          await inngest.send({
-            name: 'app/ask.classification_skipped',
-            data: {
-              sessionId,
-              reason: result.candidates.length === 0 ? 'no_match' : 'below_threshold',
-              topConfidence,
-              exchangeCount: session.exchangeCount + 1,
-            },
-          });
-        }
-      } catch (err) {
-        logger.warn('[session-exchange] silent classification failed', {
-          sessionId,
-          error: err instanceof Error ? err.message : String(err),
-        });
-        void inngest.send({
-          name: 'app/ask.classification_failed',
-          data: {
-            sessionId,
-            error: err instanceof Error ? err.message : String(err),
-            exchangeCount: session.exchangeCount + 1,
-          },
-        });
-      }
-    })();
+    void inngest.send({
+      name: 'app/ask.classify_silently',
+      data: {
+        sessionId,
+        profileId,
+        classifyInput,
+        exchangeCount: session.exchangeCount + 1,
+      },
+    });
   }
 ```
 
-Add `inngest` import at the top of the file:
-
-```ts
-import { inngest } from '../../inngest/client';
-```
+Note: this step does NOT import `classifySubject` or any DB-write helpers — those live in the Inngest function (Task 4C).
 
 - [ ] **Step 4: Inject pedagogy hint from silent classification into ExchangeContext**
 
-In the context assembly block (around line ~590), modify the `pedagogyMode` and `subjectName` assignments to use silent classification when available:
+Immediately after the silent classification read in Step 3, look up the pedagogyMode for the cached subject if one was classified. The classifier payload only stores `{subjectId, subjectName, confidence}` (AD-ASK-1), so pedagogyMode has to be resolved each time from the `subjects` table:
 
 ```ts
-  // FR-ASK-2: Enrich context with silent classification if available
-  const effectiveSubjectName = silentClassification?.subjectName ?? subject?.name ?? 'Unknown';
-  const effectivePedagogyMode = likelyLanguage
-    ? 'four_strands' as const
-    : (silentClassification?.pedagogyMode as 'socratic' | 'four_strands' | undefined)
-      ?? subject?.pedagogyMode
-      ?? 'socratic';
+  // FR-ASK-2: Resolve pedagogyMode for the cached classification.
+  // Runs on exchange >= 3, where silentClassification is present in metadata.
+  let silentPedagogyMode: 'socratic' | 'four_strands' | undefined;
+  if (silentClassification && !subject) {
+    const [silentSubject] = await db
+      .select({ pedagogyMode: subjects.pedagogyMode })
+      .from(subjects)
+      .where(eq(subjects.id, silentClassification.subjectId))
+      .limit(1);
+    silentPedagogyMode = (silentSubject?.pedagogyMode as
+      | 'socratic'
+      | 'four_strands'
+      | undefined) ?? undefined;
+  }
 ```
 
-Then update the context object to use these:
+Then, in the context assembly block (search for the `const context: ExchangeContext = {` assignment), compute the enriched values and wire them in:
+
+```ts
+  // FR-ASK-2: Enrich context with silent classification if available.
+  // Language pre-classifier wins over silent classification for exchange 1-2,
+  // because the regex match is deterministic and the classifier hasn't run yet.
+  const effectiveSubjectName =
+    silentClassification?.subjectName ?? subject?.name ?? 'Unknown';
+  const effectivePedagogyMode: 'socratic' | 'four_strands' = likelyLanguage
+    ? 'four_strands'
+    : silentPedagogyMode ?? subject?.pedagogyMode ?? 'socratic';
+```
+
+Update the `ExchangeContext` object to use these:
 
 ```ts
   const context: ExchangeContext = {
@@ -823,59 +863,301 @@ Then update the context object to use these:
   };
 ```
 
-Also, if the silent classification found a language subject, load the relevant data:
-
-```ts
-  // FR-ASK-2: If silentClassification identified a subject, look up its pedagogyMode
-  // for the enrichment. This runs on exchange >= 3 where classification is cached.
-  if (silentClassification && !subject) {
-    const silentSubjectRows = await db
-      .select({ pedagogyMode: subjects.pedagogyMode, languageCode: subjects.languageCode })
-      .from(subjects)
-      .where(eq(subjects.id, silentClassification.subjectId))
-      .limit(1);
-    const silentSubject = silentSubjectRows[0];
-    if (silentSubject) {
-      silentClassification = {
-        ...silentClassification,
-        pedagogyMode: silentSubject.pedagogyMode ?? undefined,
-      };
-    }
-  }
-```
-
-Place this block after the `silentClassification` variable is read from metadata and before the context assembly.
-
-- [ ] **Step 5: Emit language pre-classifier event**
-
-After the `likelyLanguage` detection, emit the event:
-
-```ts
-  if (likelyLanguage) {
-    void inngest.send({
-      name: 'app/ask.language_preclassified',
-      data: {
-        sessionId,
-        matchedPattern: userMessage.match(LANGUAGE_REGEX)?.[0] ?? '',
-      },
-    });
-  }
-```
-
-- [ ] **Step 6: Run typecheck**
+- [ ] **Step 5: Run typecheck**
 
 Run: `pnpm exec nx run api:typecheck`
 Expected: PASS
 
-- [ ] **Step 7: Run existing exchange tests**
+- [ ] **Step 6: Run existing exchange tests**
 
 Run: `cd apps/api && pnpm exec jest session-exchange --no-coverage`
-Expected: PASS — existing tests still pass.
+Expected: PASS — existing tests still pass. (Silent classification event emission is async and doesn't change synchronous exchange behavior, so these tests shouldn't need changes.)
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 7: Commit**
 
 ```
-feat(api): silent background classification + language pre-classifier [FR-ASK-2][AD-ASK-2]
+feat(api): emit ask.classify_silently event + language pre-classifier [FR-ASK-2][AD-ASK-2]
+```
+
+### 4C: Inngest handler — `ask-silent-classify`
+
+The durable side of silent classification. Listens for `app/ask.classify_silently`, runs `classifySubject`, and writes the result to `learningSessions.metadata.silentClassification`. AD-ASK-1 invariant: **never** writes `learningSessions.subjectId`.
+
+- [ ] **Step 8: Write failing test — happy path writes metadata, not subjectId**
+
+```ts
+// apps/api/src/inngest/functions/ask-silent-classify.test.ts
+import { askSilentClassify } from './ask-silent-classify';
+import { createMockStep, createTestDb } from '../test-helpers';
+import { learningSessions } from '@eduagent/database';
+import { eq } from 'drizzle-orm';
+
+jest.mock('../../services/subject-classify', () => ({
+  classifySubject: jest.fn(),
+}));
+import { classifySubject } from '../../services/subject-classify';
+
+describe('ask-silent-classify', () => {
+  it('writes silentClassification to metadata without touching subjectId (AD-ASK-1)', async () => {
+    const { db, profileId, sessionId } = await createTestDb({
+      seedSession: { sessionType: 'learning', topicId: null, subjectId: null },
+    });
+
+    (classifySubject as jest.Mock).mockResolvedValue({
+      candidates: [
+        { subjectId: 'subj-science', subjectName: 'Science', confidence: 0.92 },
+      ],
+    });
+
+    const event = {
+      data: {
+        sessionId,
+        profileId,
+        classifyInput: 'How do fish breathe?\nWhy gills?',
+        exchangeCount: 2,
+      },
+    };
+    await askSilentClassify.run({ event, step: createMockStep(db) } as never);
+
+    const [row] = await db
+      .select()
+      .from(learningSessions)
+      .where(eq(learningSessions.id, sessionId));
+    expect(row.subjectId).toBeNull(); // AD-ASK-1: unchanged
+    expect(row.metadata).toMatchObject({
+      silentClassification: {
+        subjectId: 'subj-science',
+        subjectName: 'Science',
+        confidence: 0.92,
+      },
+    });
+  });
+
+  it('skips write when top confidence below threshold', async () => {
+    const { db, profileId, sessionId } = await createTestDb({
+      seedSession: { sessionType: 'learning', topicId: null, subjectId: null },
+    });
+
+    (classifySubject as jest.Mock).mockResolvedValue({
+      candidates: [
+        { subjectId: 'subj-weak', subjectName: 'Weak', confidence: 0.5 },
+      ],
+    });
+
+    await askSilentClassify.run({
+      event: { data: { sessionId, profileId, classifyInput: 'x', exchangeCount: 2 } },
+      step: createMockStep(db),
+    } as never);
+
+    const [row] = await db
+      .select()
+      .from(learningSessions)
+      .where(eq(learningSessions.id, sessionId));
+    expect(row.subjectId).toBeNull();
+    expect(row.metadata?.silentClassification).toBeUndefined();
+  });
+
+  it('is idempotent — second run does not overwrite existing metadata', async () => {
+    const { db, profileId, sessionId } = await createTestDb({
+      seedSession: {
+        sessionType: 'learning',
+        topicId: null,
+        subjectId: null,
+        metadata: {
+          silentClassification: {
+            subjectId: 'subj-existing',
+            subjectName: 'Existing',
+            confidence: 0.85,
+          },
+        },
+      },
+    });
+
+    (classifySubject as jest.Mock).mockResolvedValue({
+      candidates: [
+        { subjectId: 'subj-new', subjectName: 'New', confidence: 0.95 },
+      ],
+    });
+
+    await askSilentClassify.run({
+      event: { data: { sessionId, profileId, classifyInput: 'x', exchangeCount: 2 } },
+      step: createMockStep(db),
+    } as never);
+
+    const [row] = await db
+      .select()
+      .from(learningSessions)
+      .where(eq(learningSessions.id, sessionId));
+    // Idempotency: existing value preserved, classifySubject may or may not
+    // have been called but the write path short-circuited.
+    expect(row.metadata?.silentClassification.subjectId).toBe('subj-existing');
+  });
+});
+```
+
+- [ ] **Step 9: Run test to verify it fails**
+
+Run: `cd apps/api && pnpm exec jest ask-silent-classify --no-coverage`
+Expected: FAIL — module does not exist yet.
+
+- [ ] **Step 10: Implement the Inngest function**
+
+```ts
+// apps/api/src/inngest/functions/ask-silent-classify.ts
+import { inngest } from '../client';
+import { getStepDatabase } from '../helpers';
+import { learningSessions } from '@eduagent/database';
+import { and, eq, sql } from 'drizzle-orm';
+import { classifySubject } from '../../services/subject-classify';
+import { SILENT_CLASSIFY_CONFIDENCE_THRESHOLD } from '../../services/session/session-depth.config';
+import { createLogger } from '../../services/logger';
+
+const logger = createLogger();
+
+export const askSilentClassify = inngest.createFunction(
+  {
+    id: 'ask-silent-classify',
+    retries: 2,
+    // Concurrency bounded per session — guards against double-fire races.
+    concurrency: { key: 'event.data.sessionId', limit: 1 },
+  },
+  { event: 'app/ask.classify_silently' },
+  async ({ event, step }) => {
+    const { sessionId, profileId, classifyInput, exchangeCount } = event.data;
+    const db = getStepDatabase();
+
+    // Idempotency guard: if metadata already has a silentClassification,
+    // skip. Inngest may retry or re-deliver; the first success wins.
+    const existing = await step.run('check-existing', async () => {
+      const [row] = await db
+        .select({ metadata: learningSessions.metadata })
+        .from(learningSessions)
+        .where(
+          and(
+            eq(learningSessions.id, sessionId),
+            eq(learningSessions.profileId, profileId)
+          )
+        )
+        .limit(1);
+      const meta = (row?.metadata ?? {}) as Record<string, unknown>;
+      return Boolean(meta.silentClassification);
+    });
+    if (existing) {
+      return { skipped: true, reason: 'already_classified' };
+    }
+
+    // Classification — wrapped in step.run for durability + retry
+    const classification = await step.run('classify', () =>
+      classifySubject(db, profileId, classifyInput)
+    );
+
+    const topCandidate = classification.candidates
+      .filter((c) => c.confidence >= SILENT_CLASSIFY_CONFIDENCE_THRESHOLD)
+      .sort((a, b) => b.confidence - a.confidence)[0];
+
+    if (!topCandidate) {
+      const topConfidence = classification.candidates[0]?.confidence ?? 0;
+      await step.sendEvent('skip-event', {
+        name: 'app/ask.classification_skipped',
+        data: {
+          sessionId,
+          reason: classification.candidates.length === 0 ? 'no_match' : 'below_threshold',
+          topConfidence,
+          exchangeCount,
+        },
+      });
+      return { skipped: true, reason: 'no_match_above_threshold', topConfidence };
+    }
+
+    // Write to metadata. AD-ASK-1: never updates subjectId.
+    await step.run('write-metadata', async () => {
+      const payload = {
+        subjectId: topCandidate.subjectId,
+        subjectName: topCandidate.subjectName,
+        confidence: topCandidate.confidence,
+      };
+      await db
+        .update(learningSessions)
+        .set({
+          metadata: sql`jsonb_set(
+            COALESCE(${learningSessions.metadata}, '{}'::jsonb),
+            '{silentClassification}',
+            ${JSON.stringify(payload)}::jsonb,
+            true
+          )`,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(learningSessions.id, sessionId),
+            eq(learningSessions.profileId, profileId)
+          )
+        );
+    });
+
+    await step.sendEvent('completed-event', {
+      name: 'app/ask.classification_completed',
+      data: {
+        sessionId,
+        subjectId: topCandidate.subjectId,
+        subjectName: topCandidate.subjectName,
+        confidence: topCandidate.confidence,
+        exchangeCount,
+      },
+    });
+
+    return {
+      skipped: false,
+      subjectId: topCandidate.subjectId,
+      confidence: topCandidate.confidence,
+    };
+  }
+);
+```
+
+- [ ] **Step 11: Register the function in the Inngest barrel**
+
+In `apps/api/src/inngest/index.ts` (or wherever functions are exported for the serve endpoint), add:
+
+```ts
+export { askSilentClassify } from './functions/ask-silent-classify';
+```
+
+Confirm it's included in the `functions` array passed to `serve()` — follow the same pattern as `freeformFiling`.
+
+- [ ] **Step 12: Run tests**
+
+Run: `cd apps/api && pnpm exec jest ask-silent-classify --no-coverage`
+Expected: PASS — all 3 tests pass (including the AD-ASK-1 invariant).
+
+- [ ] **Step 13: Classification-failure handling**
+
+The function's `retries: 2` plus Inngest's built-in onFailure hook handle transient errors. For a terminal failure after retries, add a dead-letter event:
+
+```ts
+// At the bottom of ask-silent-classify.ts
+export const askSilentClassifyOnFailure = inngest.createFunction(
+  { id: 'ask-silent-classify-on-failure' },
+  { event: 'inngest/function.failed', if: 'event.data.function_id == "ask-silent-classify"' },
+  async ({ event, step }) => {
+    await step.sendEvent('classification-failed', {
+      name: 'app/ask.classification_failed',
+      data: {
+        sessionId: event.data.event?.data?.sessionId,
+        error: event.data.error?.message ?? 'unknown',
+        exchangeCount: event.data.event?.data?.exchangeCount,
+      },
+    });
+  }
+);
+```
+
+Register this alongside the main function in Step 11.
+
+- [ ] **Step 14: Commit**
+
+```
+feat(api): ask-silent-classify Inngest function — durable classification + AD-ASK-1 invariant [FR-ASK-2]
 ```
 
 ---
@@ -884,19 +1166,20 @@ feat(api): silent background classification + language pre-classifier [FR-ASK-2]
 
 Remove the `useSubjectClassification` hook from the freeform path so no disambiguation chips or "create subject?" prompts appear. The hook is still used by non-freeform modes.
 
+**Scope:** This task only removes visible classification. Depth-evaluation wiring, new SessionFooter state, and `shouldAutoFile` cleanup all live in **Task 6** so that every commit in this plan typechecks on its own.
+
 **Files:**
 - Modify: `apps/mobile/src/app/(app)/session/index.tsx`
-- Modify: `apps/mobile/src/app/(app)/session/_helpers/use-session-actions.ts`
 
-**Read first:** `apps/mobile/src/app/(app)/session/index.tsx:808-842` (useSubjectClassification call), `apps/mobile/src/app/(app)/session/_helpers/use-session-actions.ts:35-46` (shouldAutoFile), `apps/mobile/src/app/(app)/session/_helpers/use-session-actions.ts:332-470` (handleEndSession)
+**Read first:** The `useSubjectClassification` hook call site in `apps/mobile/src/app/(app)/session/index.tsx` — search for `useSubjectClassification(` rather than using line numbers (they drift). Also `apps/mobile/src/app/(app)/session/_helpers/use-subject-classification.ts` (hook shape).
 
 ### 5A: Bypass classification for freeform
 
 - [ ] **Step 1: Modify session/index.tsx — conditionally use classification**
 
-In `apps/mobile/src/app/(app)/session/index.tsx`, the `useSubjectClassification` hook is called at line ~808. Wrap it so that freeform mode gets a pass-through `handleSend` that skips classification:
+In `apps/mobile/src/app/(app)/session/index.tsx`, locate the `useSubjectClassification` hook call. Wrap it so that freeform mode gets a pass-through `handleSend` that skips classification:
 
-Replace the `useSubjectClassification` call block (lines ~808-842) with:
+Replace the `useSubjectClassification` call block (the hook invocation plus its destructuring) with:
 
 ```ts
   // FR-ASK-1: Freeform mode skips visible classification entirely.
@@ -953,99 +1236,37 @@ In the same file, ensure that `pendingClassification` is never set to `true` in 
 
 No code change needed — verify by reading the flow.
 
-### 5B: Replace shouldAutoFile with depth evaluation in handleEndSession
-
-- [ ] **Step 3: Add depth evaluation state to session screen**
-
-In `apps/mobile/src/app/(app)/session/index.tsx`, add state for the depth evaluation result:
-
-```ts
-  import type { DepthEvaluation } from '@eduagent/schemas';
-
-  // FR-ASK-3: Depth evaluation result for freeform filing gate
-  const [depthEvaluation, setDepthEvaluation] = useState<DepthEvaluation | null>(null);
-  const [depthEvaluating, setDepthEvaluating] = useState(false);
-```
-
-Pass these to `useSessionActions` and `SessionFooter`.
-
-- [ ] **Step 4: Modify handleEndSession in use-session-actions.ts**
-
-In `apps/mobile/src/app/(app)/session/_helpers/use-session-actions.ts`, modify the freeform branch of `handleEndSession` (lines ~378-422):
-
-Replace the `shouldAutoFile` / `setShowFilingPrompt` block with:
-
-```ts
-              // FR-ASK-3: Freeform sessions — evaluate depth before offering filing
-              if (effectiveMode === 'freeform') {
-                setDepthEvaluating(true);
-                setShowFilingPrompt(true); // Show footer (it will show skeleton)
-                try {
-                  const depthRes = await client.sessions[':sessionId']['evaluate-depth'].$post({
-                    param: { sessionId: activeSessionId },
-                  });
-                  await assertOk(depthRes);
-                  const evaluation = (await depthRes.json()) as DepthEvaluation;
-                  setDepthEvaluation(evaluation);
-                } catch {
-                  // Fail open — show standard filing prompt (same as current behavior)
-                  setDepthEvaluation({
-                    meaningful: true,
-                    reason: 'Gate failed — fail open',
-                    topics: [],
-                  });
-                } finally {
-                  setDepthEvaluating(false);
-                }
-              } else if (effectiveMode === 'homework') {
-                // Homework: always show filing prompt (unchanged)
-                setShowFilingPrompt(true);
-              } else {
-```
-
-Add the required imports and props to `useSessionActions`:
-- Add `setDepthEvaluation`, `setDepthEvaluating` to the hook's params interface
-- Add `client` (from `useApiClient()`) and `assertOk` import
-- Import `DepthEvaluation` from `@eduagent/schemas`
-
-- [ ] **Step 5: Remove shouldAutoFile for freeform**
-
-The `shouldAutoFile` function is still used — but only for the freeform auto-file path which is now replaced by depth evaluation. Keep the function (it's exported and tested) but the freeform branch of `handleEndSession` no longer calls it. The existing tests still pass.
-
-- [ ] **Step 6: Pass depth state to SessionFooter**
-
-In `session/index.tsx`, extend the `SessionFooter` props to include:
-
-```ts
-  <SessionFooter
-    // ... existing props ...
-    depthEvaluation={depthEvaluation}
-    depthEvaluating={depthEvaluating}
-  />
-```
-
-- [ ] **Step 7: Run typecheck**
+- [ ] **Step 3: Run mobile typecheck**
 
 Run: `cd apps/mobile && pnpm exec tsc --noEmit`
-Expected: There will be type errors because `SessionFooter` doesn't accept the new props yet — that's expected, handled in Task 6.
+Expected: PASS — classification bypass is purely local (inside the hook caller). No other types change.
 
-- [ ] **Step 8: Commit (may need to defer until Task 6 completes for typecheck)**
+- [ ] **Step 4: Run existing session tests**
+
+Run: `cd apps/mobile && pnpm exec jest session/index --no-coverage`
+Expected: PASS — freeform branch now skips the hook, but non-freeform paths are untouched.
+
+- [ ] **Step 5: Commit**
 
 ```
-feat(mobile): remove visible classification from freeform + depth evaluation gate [FR-ASK-1][FR-ASK-3]
+feat(mobile): remove visible classification from freeform "Ask" [FR-ASK-1]
 ```
 
 ---
 
-## Task 6: SessionFooter State Machine
+## Task 6: SessionFooter State Machine + Depth Evaluation Wiring
 
-Rebuild the SessionFooter component with the state machine from the spec: evaluating → meaningful (single/multi-topic) → not-meaningful → fail-open → filing states.
+Rewrite the SessionFooter component as a state machine driven by depth evaluation (evaluating → meaningful single/multi-topic → not-meaningful → fail-open). In the same task, wire the depth-evaluation state into `session/index.tsx` and `use-session-actions.ts`, and delete the now-orphaned `shouldAutoFile` path for freeform.
+
+**Why this is one task:** SessionFooter's new props (`depthEvaluation`, `depthEvaluating`, `onAskAnother`, `onFileTopic`) and the `session/index.tsx` state that feeds them have circular type dependencies. Splitting them into two commits means one or the other won't typecheck. Doing them together is the smallest shippable unit.
 
 **Files:**
 - Create: `apps/mobile/src/app/(app)/session/_helpers/SessionFooter.test.tsx`
 - Modify: `apps/mobile/src/app/(app)/session/_helpers/SessionFooter.tsx`
+- Modify: `apps/mobile/src/app/(app)/session/index.tsx` (add depth-evaluation state + pass to footer)
+- Modify: `apps/mobile/src/app/(app)/session/_helpers/use-session-actions.ts` (replace freeform auto-file with depth-evaluation call)
 
-**Read first:** `apps/mobile/src/app/(app)/session/_helpers/SessionFooter.tsx` (current full component)
+**Read first:** `apps/mobile/src/app/(app)/session/_helpers/SessionFooter.tsx` (current full component). `apps/mobile/src/app/(app)/session/_helpers/use-session-actions.ts` — look at the `handleEndSession` function and the `shouldAutoFile` helper. Check every call site of `shouldAutoFile` (grep for it) — if freeform is the only caller, Step 7 deletes it entirely; if not, Step 7 leaves it and adds a comment explaining why.
 
 ### 6A: Tests first
 
@@ -1102,6 +1323,7 @@ describe('SessionFooter', () => {
     const evaluation: DepthEvaluation = {
       meaningful: true,
       reason: 'Deep session',
+      method: 'heuristic_deep',
       topics: [{ summary: 'How fish breathe', depth: 'substantial' }],
     };
     const { getByText, getByTestId } = render(
@@ -1116,6 +1338,7 @@ describe('SessionFooter', () => {
     const evaluation: DepthEvaluation = {
       meaningful: true,
       reason: 'Multiple topics',
+      method: 'llm_gate',
       topics: [
         { summary: 'Fish breathing', depth: 'substantial' },
         { summary: 'Ocean pollution', depth: 'partial' },
@@ -1135,6 +1358,7 @@ describe('SessionFooter', () => {
     const evaluation: DepthEvaluation = {
       meaningful: false,
       reason: 'Quick Q&A',
+      method: 'heuristic_shallow',
       topics: [],
     };
     const { getByText, getByTestId } = render(
@@ -1149,6 +1373,7 @@ describe('SessionFooter', () => {
     const evaluation: DepthEvaluation = {
       meaningful: true,
       reason: 'Gate timeout — fail open',
+      method: 'fail_open',
       topics: [],
     };
     const { getByTestId } = render(
@@ -1759,20 +1984,118 @@ function StandardFilingPrompt({
 }
 ```
 
-- [ ] **Step 4: Run tests**
+- [ ] **Step 4: Run footer tests**
 
 Run: `cd apps/mobile && pnpm exec jest SessionFooter.test --no-coverage`
 Expected: PASS — all 5 tests pass.
 
-- [ ] **Step 5: Run typecheck (both mobile + API)**
+### 6C: Wire depth evaluation into session/index.tsx
+
+- [ ] **Step 5: Add depth-evaluation state to session screen**
+
+In `apps/mobile/src/app/(app)/session/index.tsx`, add the imports and state:
+
+```ts
+  import type { DepthEvaluation } from '@eduagent/schemas';
+
+  // FR-ASK-3: Depth evaluation result for freeform filing gate
+  const [depthEvaluation, setDepthEvaluation] = useState<DepthEvaluation | null>(null);
+  const [depthEvaluating, setDepthEvaluating] = useState(false);
+```
+
+Pass both setters to `useSessionActions` (see Step 6) and pass both values to `SessionFooter`:
+
+```tsx
+  <SessionFooter
+    /* ...existing props... */
+    depthEvaluation={depthEvaluation}
+    depthEvaluating={depthEvaluating}
+    onAskAnother={() => {
+      // Just clear the filing prompt; session is still open
+      setShowFilingPrompt(false);
+      setDepthEvaluation(null);
+    }}
+  />
+```
+
+- [ ] **Step 6: Replace freeform auto-file with depth-evaluation call**
+
+In `apps/mobile/src/app/(app)/session/_helpers/use-session-actions.ts`, extend the hook's params interface with:
+
+```ts
+  setDepthEvaluation: React.Dispatch<React.SetStateAction<DepthEvaluation | null>>;
+  setDepthEvaluating: React.Dispatch<React.SetStateAction<boolean>>;
+```
+
+Add the required imports at the top:
+
+```ts
+import type { DepthEvaluation } from '@eduagent/schemas';
+import { useApiClient } from '../../../../lib/api-client';
+import { assertOk } from '../../../../lib/assert-ok';
+```
+
+Then in `handleEndSession`, locate the freeform branch (search for `effectiveMode === 'freeform'`). Replace the existing `shouldAutoFile` / `setShowFilingPrompt` block with:
+
+```ts
+              // FR-ASK-3: Freeform sessions — evaluate depth before offering filing
+              if (effectiveMode === 'freeform') {
+                setDepthEvaluating(true);
+                setShowFilingPrompt(true); // Show footer (it will show skeleton)
+                try {
+                  const depthRes = await client.sessions[':sessionId']['evaluate-depth'].$post({
+                    param: { sessionId: activeSessionId },
+                  });
+                  await assertOk(depthRes);
+                  const evaluation = (await depthRes.json()) as DepthEvaluation;
+                  setDepthEvaluation(evaluation);
+                } catch {
+                  // Fail open — show standard filing prompt (same as current behavior).
+                  // method='fail_open' so analytics can distinguish from a real LLM decision.
+                  setDepthEvaluation({
+                    meaningful: true,
+                    reason: 'Gate failed — client-side fail open',
+                    method: 'fail_open',
+                    topics: [],
+                  });
+                } finally {
+                  setDepthEvaluating(false);
+                }
+              } else if (effectiveMode === 'homework') {
+                // Homework: always show filing prompt (unchanged)
+                setShowFilingPrompt(true);
+              } else {
+```
+
+Inside the hook body, get the client: `const client = useApiClient();` (add alongside existing hook state).
+
+- [ ] **Step 7: Clean up `shouldAutoFile` if orphaned**
+
+Grep for `shouldAutoFile` across `apps/mobile/src`:
+
+```bash
+cd apps/mobile && grep -rn "shouldAutoFile" src/
+```
+
+- If the only remaining references are the definition in `use-session-actions.ts` and its tests → **delete** the function, its tests, and its import sites. Orphan code creates false confidence (per `~/.claude/CLAUDE.md` "Clean Up All Artifacts When Removing a Feature").
+- If other modes still call it → leave it, and add a one-line comment above the definition: `// Used by homework/learning modes. Freeform uses depth evaluation (FR-ASK-3).`
+
+Report which path you took in the commit body.
+
+- [ ] **Step 8: Run typecheck**
 
 Run: `cd apps/mobile && pnpm exec tsc --noEmit`
-Expected: There may be type errors in `session/index.tsx` if prop wiring is incomplete. Fix any remaining type mismatches by ensuring all new props are passed through.
+Expected: PASS — all new props wired, no type errors.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 9: Run related tests**
+
+Run: `cd apps/mobile && pnpm exec jest SessionFooter.test session/index use-session-actions --no-coverage`
+Expected: PASS.
+
+- [ ] **Step 10: Commit**
 
 ```
-feat(mobile): SessionFooter state machine — depth evaluation, multi-topic chips [FR-ASK-3][FR-ASK-4]
+feat(mobile): SessionFooter state machine + depth evaluation wiring [FR-ASK-3][FR-ASK-4]
 ```
 
 ---
@@ -1817,6 +2140,10 @@ export function useDepthEvaluation() {
 
 ### 7B: Multi-topic filing
 
+> **Spec divergence note (AD-ASK-4):** The spec says "each topic gets its own `fileToLibrary` call with the relevant portion of the transcript." This plan does sequential filing calls (satisfies the library-state-consistency half of AD-ASK-4) but passes only the topic *summary* as `selectedSuggestion`. The server still sees the full transcript. That means Topic A's placement may be influenced by Topic B's content in the transcript.
+>
+> Accepted trade-off: server-side transcript segmentation would require a new schema field on the filing endpoint (e.g., `transcriptRange: { startExchange, endExchange }`) plus LLM-based range detection — roughly a task of its own. The `selectedSuggestion` hint is strong enough in practice that the filing LLM routes to the right shelf. If library placement drift shows up in analytics, follow up with a `filing-topic-segment` spec.
+
 - [ ] **Step 2: Add useMultiTopicFiling to use-filing.ts**
 
 Add to `apps/mobile/src/hooks/use-filing.ts`:
@@ -1828,7 +2155,10 @@ import type { DetectedTopic } from '@eduagent/schemas';
 
 /**
  * Files multiple topics sequentially. Each topic gets its own
- * fileToLibrary call so library state stays consistent (AD-ASK-4).
+ * fileToLibrary call so library state stays consistent (AD-ASK-4,
+ * first half). Note: this passes the topic summary as
+ * selectedSuggestion — full transcript is still sent per call. See
+ * the spec divergence note in the plan for rationale.
  */
 export function useMultiTopicFiling() {
   const client = useApiClient();
@@ -1887,13 +2217,18 @@ Modify the Inngest `session-completed` function to gate the filing wait on depth
 
 - [ ] **Step 1: Add depth evaluation to freeform filing gate**
 
-In `apps/api/src/inngest/functions/session-completed.ts`, modify the filing wait logic (lines ~127-133). The current code waits for filing for all sessions without a topicId. In the new flow, abandoned sessions (auto-closed) should skip filing entirely.
+In `apps/api/src/inngest/functions/session-completed.ts`, modify the filing wait logic. The current code waits for filing for all sessions without a topicId. In the new flow, abandoned sessions (auto-closed) should skip filing entirely.
 
-After the existing `sessionType`/`topicId` check and before the `waitForEvent`:
+**Locate `summaryStatus`:** open the file and verify the destructuring of `event.data`. If `summaryStatus` is not already pulled out of `event.data`, add it alongside the existing fields. If the `session-stale-cleanup` function is the emitter of auto-closed sessions, check which event field it sets — it may be `status: 'auto_closed'` or `summaryStatus: 'auto_closed'`. Use whichever field actually carries the auto-closed signal.
+
+After the existing `sessionType`/`topicId` check and before the `waitForEvent`, add the abandoned-session guard:
 
 ```ts
     // FR-ASK-5: Abandoned sessions (auto-closed) skip filing entirely.
-    // The summaryStatus from the event tells us how the session ended.
+    // The user never tapped "I'm Done" — no consent to file. The
+    // source field is whatever session-stale-cleanup.ts emits; typically
+    // event.data.summaryStatus or event.data.status. Confirm before
+    // committing.
     const isAbandoned = summaryStatus === 'auto_closed';
 
     if ((sessionType === 'homework' || !topicId) && !isAbandoned) {
@@ -1942,7 +2277,10 @@ Add to `apps/api/src/routes/sessions.ts`:
     const db = c.get('db');
     const profileId = requireProfileId(c.get('profileId'));
 
-    // Find the most recent auto-closed freeform session with >= 5 exchanges
+    // Find the most recent auto-closed freeform session with >= 5 exchanges.
+    // Freeform sessions have sessionType='learning' AND topicId=NULL (per the
+    // session schema — there is no dedicated 'freeform' sessionType enum
+    // value; see packages/database/src/schema/sessions.ts sessionTypeEnum).
     const [candidate] = await db
       .select({
         id: learningSessions.id,
@@ -1954,16 +2292,10 @@ Add to `apps/api/src/routes/sessions.ts`:
       .where(
         and(
           eq(learningSessions.profileId, profileId),
-          eq(learningSessions.status, 'closed'),
-          sql`${learningSessions.metadata}->>'effectiveMode' = 'freeform'
-              OR ${learningSessions.topicId} IS NULL`,
+          eq(learningSessions.status, 'auto_closed'),
+          eq(learningSessions.sessionType, 'learning'),
+          isNull(learningSessions.topicId),
           gte(learningSessions.exchangeCount, 5),
-          // Must have been auto-closed
-          sql`EXISTS (
-            SELECT 1 FROM ${sessionSummaries}
-            WHERE ${sessionSummaries.sessionId} = ${learningSessions.id}
-              AND ${sessionSummaries.status} = 'auto_closed'
-          )`,
           // Only within last 7 days
           gte(learningSessions.createdAt, sql`NOW() - INTERVAL '7 days'`),
         )
@@ -2003,11 +2335,10 @@ Add to `apps/api/src/routes/sessions.ts`:
 Add the required DB imports at the top of the file:
 
 ```ts
-import { sessionSummaries } from '@eduagent/database';
-import { gte } from 'drizzle-orm';
+import { gte, isNull } from 'drizzle-orm';
 ```
 
-Note: This endpoint uses `learningSessions` which must also be imported from `@eduagent/database`. Check that the import exists or add it.
+Note: `learningSessions` and `sessionEvents` must be imported from `@eduagent/database` — check that they already are, add if not. `sessionSummaries` is no longer needed (we use the `status='auto_closed'` column on `learningSessions` directly).
 
 - [ ] **Step 2: Verify typecheck**
 
@@ -2091,16 +2422,105 @@ Then, inside the cards builder `useMemo`, after the `recoveryMarker` and `contin
 
 Add `resumeNudge` and `dismissedNudgeSessionId` to the `useMemo` dependency array.
 
-- [ ] **Step 5: Write test**
+- [ ] **Step 5: Write tests**
+
+Add to `apps/mobile/src/components/home/LearnerScreen.test.tsx`:
 
 ```tsx
-// In LearnerScreen.test.tsx (add to existing test file)
-it('shows resume nudge for abandoned meaningful session', () => {
-  // Mock useResumeNudge to return a nudge
-  // Verify the nudge card renders with correct text
-  // Verify dismiss works
+import { useResumeNudge } from '../../hooks/use-progress';
+
+jest.mock('../../hooks/use-progress', () => {
+  const actual = jest.requireActual('../../hooks/use-progress');
+  return {
+    ...actual,
+    useResumeNudge: jest.fn(),
+  };
+});
+const mockUseResumeNudge = useResumeNudge as jest.MockedFunction<
+  typeof useResumeNudge
+>;
+
+describe('LearnerScreen — resume nudge (FR-ASK-5)', () => {
+  beforeEach(() => {
+    mockUseResumeNudge.mockReset();
+  });
+
+  it('renders a resume nudge card when the API returns a qualifying nudge', () => {
+    mockUseResumeNudge.mockReturnValue({
+      data: {
+        nudge: {
+          sessionId: 'sess-1',
+          topicHint: 'How fish breathe underwater',
+          exchangeCount: 7,
+          createdAt: new Date().toISOString(),
+        },
+      },
+      isLoading: false,
+    } as never);
+
+    const { getByTestId, getByText } = render(<LearnerScreen />);
+    expect(getByTestId('intent-resume-nudge')).toBeTruthy();
+    expect(
+      getByText(/Pick up where you left off/i)
+    ).toBeTruthy();
+    expect(
+      getByText(/How fish breathe underwater/)
+    ).toBeTruthy();
+  });
+
+  it('does not render the nudge when the API returns null', () => {
+    mockUseResumeNudge.mockReturnValue({
+      data: { nudge: null },
+      isLoading: false,
+    } as never);
+
+    const { queryByTestId } = render(<LearnerScreen />);
+    expect(queryByTestId('intent-resume-nudge')).toBeNull();
+  });
+
+  it('hides the nudge after dismiss is tapped', () => {
+    mockUseResumeNudge.mockReturnValue({
+      data: {
+        nudge: {
+          sessionId: 'sess-2',
+          topicHint: 'Volcanoes',
+          exchangeCount: 6,
+          createdAt: new Date().toISOString(),
+        },
+      },
+      isLoading: false,
+    } as never);
+
+    const { getByTestId, queryByTestId } = render(<LearnerScreen />);
+    const dismiss = getByTestId('intent-resume-nudge-dismiss');
+    fireEvent.press(dismiss);
+    expect(queryByTestId('intent-resume-nudge')).toBeNull();
+  });
+
+  it('hides the nudge when recoveryMarker is also present (recoveryMarker wins)', () => {
+    mockUseResumeNudge.mockReturnValue({
+      data: {
+        nudge: {
+          sessionId: 'sess-3',
+          topicHint: 'Photosynthesis',
+          exchangeCount: 5,
+          createdAt: new Date().toISOString(),
+        },
+      },
+      isLoading: false,
+    } as never);
+
+    // Seed the recovery marker (see apps/mobile/src/lib/session-recovery.ts).
+    // If the file uses SecureStore, mock the marker getter instead.
+    const { queryByTestId } = render(
+      <LearnerScreen initialRecoveryMarker={{ sessionId: 'sess-other' }} />
+    );
+    expect(queryByTestId('intent-resume-nudge')).toBeNull();
+  });
 });
 ```
+
+Note: the dismiss test requires the nudge card to expose a dedicated testID on the dismiss control (`intent-resume-nudge-dismiss`). Make sure the card rendering in Step 4 wires up `onDismiss` to a `Pressable` with that testID. If `LearnerScreen` doesn't take `initialRecoveryMarker` as a prop, mock the recovery-marker hook instead.
 
 - [ ] **Step 6: Run tests**
 
@@ -2125,45 +2545,30 @@ Add remaining Inngest event emissions for depth gate monitoring. Most classifica
 
 - [ ] **Step 1: Emit gate decision event from evaluate-depth endpoint**
 
-In `apps/api/src/routes/sessions.ts`, in the evaluate-depth handler, after calling `evaluateSessionDepth`, emit the event:
+In `apps/api/src/routes/sessions.ts`, in the evaluate-depth handler, after calling `evaluateSessionDepth`, emit the event. The `method` field is now a structured enum on `DepthEvaluation` (Task 1), so analytics can filter on it directly without parsing free-text `reason`.
 
 ```ts
     // Observability: emit gate decision event
+    const learnerWordCount = transcript.exchanges.reduce(
+      (sum, e) => sum + e.userMessage.split(/\s+/).filter(Boolean).length,
+      0
+    );
     void inngest.send({
       name: 'app/ask.gate_decision',
       data: {
         sessionId,
         meaningful: result.meaningful,
         reason: result.reason,
+        method: result.method, // heuristic_shallow | heuristic_deep | llm_gate | fail_open
         exchangeCount: transcript.exchanges.length,
-        learnerWordCount: transcript.exchanges.reduce(
-          (sum, e) => sum + e.userMessage.split(/\s+/).filter(Boolean).length,
-          0
-        ),
+        learnerWordCount,
         topicCount: result.topics.length,
-        method: result.reason.includes('timeout') ? 'heuristic' : (
-          transcript.exchanges.length < 3 ? 'heuristic' :
-          transcript.exchanges.length >= 5 ? 'heuristic' : 'llm'
-        ),
       },
     });
-```
 
-Import `inngest` if not already imported:
-
-```ts
-import { inngest } from '../inngest/client';
-```
-
-- [ ] **Step 2: Add gate timeout event to session-depth.ts**
-
-In the `failOpen` function in `session-depth.ts`, the timeout event should be emitted by the caller (the route handler), not the service itself (to keep the service pure). Add the event emission in the route handler's catch block instead.
-
-Update the evaluate-depth route handler to detect fail-open:
-
-```ts
-    const isFailOpen = result.reason.includes('timeout') || result.reason.includes('fail open');
-    if (isFailOpen) {
+    // Dedicated fail-open event — makes "how often did the gate fail open in
+    // the last 24h?" a single-filter query in analytics.
+    if (result.method === 'fail_open') {
       void inngest.send({
         name: 'app/ask.gate_timeout',
         data: {
@@ -2173,6 +2578,16 @@ Update the evaluate-depth route handler to detect fail-open:
       });
     }
 ```
+
+Import `inngest` if not already imported:
+
+```ts
+import { inngest } from '../inngest/client';
+```
+
+- [ ] **Step 2: (removed — method is now structured on the service return value)**
+
+The previous version of this task inspected `result.reason.includes('timeout')` to tell fail-open from real decisions. That was fragile because any change to the reason text silently broke analytics. With `result.method` as a typed enum (Task 1 changes), the guard in Step 1 is a single field read. No second edit site needed.
 
 - [ ] **Step 3: Verify typecheck**
 
@@ -2226,15 +2641,24 @@ chore: integration fixes for ask flow redesign
 | Spec Requirement | Task |
 |---|---|
 | FR-ASK-1: No visible classification in freeform | Task 5 |
-| FR-ASK-2: Silent background classification after exchange 2 | Task 4 |
+| FR-ASK-2: Silent background classification after exchange 2 | Task 4B (event emission) + Task 4C (Inngest handler) |
 | FR-ASK-3: Meaningful-exchange gate (heuristics + LLM, 2s cap) | Task 2 + Task 3 |
-| FR-ASK-4: Post-session filing with topic selection | Task 6 + Task 7 |
+| FR-ASK-4: Post-session filing with topic selection | Task 6 + Task 7 (see spec-divergence note in Task 7B on transcript segmentation) |
 | FR-ASK-5: Abandoned session handling + resume nudge | Task 8 + Task 9 |
-| AD-ASK-1: Classification enriches prompts, not DB records | Task 4 (metadata JSONB, not subjectId) |
-| AD-ASK-2: Pedagogy adaptation via pedagogy hint | Task 4 (language regex + enrichment) |
+| AD-ASK-1: Classification enriches prompts, not DB records | Task 4C (durable handler; break-test "writes metadata, not subjectId" in `ask-silent-classify.test.ts`) |
+| AD-ASK-2: Pedagogy adaptation via pedagogy hint | Task 4A (language regex, English-only by design) + Task 4B (enrichment from cached subject) |
 | AD-ASK-3: Heuristics first, LLM second | Task 2 |
-| AD-ASK-4: Multi-topic filing as independent calls | Task 7 |
-| SessionFooter state machine (all 7 states) | Task 6 |
-| Resume nudge stacking policy | Task 9 (most recent only, dismissable) |
-| Observability events (6 event types) | Task 4 + Task 10 |
-| Failure modes table | Task 2 (fail-open), Task 6 (filing-failed state), Task 8 (abandoned skip) |
+| AD-ASK-4: Multi-topic filing as independent calls | Task 7B (sequential calls; transcript-segment limitation noted) |
+| SessionFooter state machine (all states) | Task 6 (6A tests + 6B implementation + 6C wiring) |
+| Resume nudge stacking policy | Task 9 (most recent only, dismissable, 7-day window) |
+| Observability events (6 event types) | Task 4B (language_preclassified) + Task 4C (classify_silently, classification_completed, classification_skipped, classification_failed via on-failure hook) + Task 10 (gate_decision, gate_timeout) |
+| Failure modes table | Task 2 (fail-open with `method='fail_open'`), Task 6 (filing-failed per-chip state), Task 8 (abandoned skip), Task 4C (Inngest retries handle transient classification errors) |
+
+## Structural decisions baked into this plan
+
+- **Confidence threshold 0.8** (matches spec FR-ASK-2) — see `session-depth.config.ts` comment
+- **Silent classification runs in Inngest, not fire-and-forget** — survives CF Worker response termination, with retries + idempotency guard
+- **`DepthEvaluation.method` is a structured enum**, not a string — analytics read this directly; `reason` is human-only
+- **Task 5 and Task 6 split by "what typechecks cleanly"**, not "what changes which file" — each commit in this plan stands on its own
+- **AD-ASK-1 is a break-tested invariant** — `ask-silent-classify.test.ts` asserts `subjectId` stays NULL after classification
+- **Language pre-classifier is English-only** — documented in config; non-English intents fall back to the full classifier
