@@ -34,6 +34,8 @@ export interface ParentGatewayProps {
   switchProfile: (
     profileId: string
   ) => Promise<{ success: boolean; error?: string }>;
+  /** Called when the parent taps "Learn something" — host should show the learner view. */
+  onLearn?: () => void;
   /** Injectable clock for deterministic testing of time-based greeting. */
   now?: Date;
 }
@@ -42,6 +44,7 @@ export function ParentGateway({
   profiles,
   activeProfile,
   switchProfile,
+  onLearn,
   now,
 }: ParentGatewayProps): React.ReactElement {
   const router = useRouter();
@@ -108,7 +111,9 @@ export function ParentGateway({
           />
           <IntentCard
             title="Learn something"
-            onPress={() => router.push('/create-subject' as never)}
+            onPress={() =>
+              onLearn ? onLearn() : router.push('/create-subject' as never)
+            }
             testID="gateway-learn"
           />
         </View>

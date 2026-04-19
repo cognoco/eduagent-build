@@ -18,7 +18,6 @@ import {
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type {
-  DepthEvaluation,
   HomeworkCaptureSource,
   HomeworkProblem,
   InputMode,
@@ -94,6 +93,7 @@ import {
 } from './_helpers/SessionAccessories';
 import { ParkingLotModal, TopicSwitcherModal } from './_helpers/SessionModals';
 import { SessionFooter } from './_helpers/SessionFooter';
+import { getResumeBannerCopy } from './_helpers/resume-banner-copy';
 import { Sentry } from '../../../lib/sentry';
 
 /**
@@ -394,9 +394,6 @@ function SessionScreenInner() {
   );
   const [showFilingPrompt, setShowFilingPrompt] = useState(false);
   const [filingDismissed, setFilingDismissed] = useState(false);
-  const [depthEvaluation, setDepthEvaluation] =
-    useState<DepthEvaluation | null>(null);
-  const [depthEvaluating, setDepthEvaluating] = useState(false);
   const [quotaError, setQuotaError] = useState<QuotaExceededDetails | null>(
     null
   );
@@ -484,8 +481,6 @@ function SessionScreenInner() {
       setShowNoteInput(false);
       setShowFilingPrompt(false);
       setFilingDismissed(false);
-      setDepthEvaluation(null);
-      setDepthEvaluating(false);
       setQuotaError(null);
       closedSessionRef.current = null;
       sessionNoteSavedRef.current = false;
@@ -523,19 +518,8 @@ function SessionScreenInner() {
     return () => clearTimeout(timer);
   }, [confirmationToast]);
 
-  const freeformAnchorSubject =
-    effectiveMode === 'freeform' && !classifiedSubject?.subjectId && !subjectId
-      ? availableSubjects[0]
-      : undefined;
-  const effectiveSubjectId =
-    classifiedSubject?.subjectId ??
-    subjectId ??
-    freeformAnchorSubject?.id ??
-    '';
-  const effectiveSubjectName =
-    classifiedSubject?.subjectName ??
-    subjectName ??
-    (effectiveMode === 'freeform' ? undefined : freeformAnchorSubject?.name);
+  const effectiveSubjectId = classifiedSubject?.subjectId ?? subjectId ?? '';
+  const effectiveSubjectName = classifiedSubject?.subjectName ?? subjectName;
   const activeSubject = availableSubjects.find(
     (availableSubject) => availableSubject.id === effectiveSubjectId
   );
@@ -940,8 +924,6 @@ function SessionScreenInner() {
     syncHomeworkMetadata,
     fetchFastCelebrations,
     showConfirmation,
-    setDepthEvaluation,
-    setDepthEvaluating,
     router,
   });
 
@@ -1012,7 +994,7 @@ function SessionScreenInner() {
     : sessionExpired
     ? 'Session expired - start a new one.'
     : resumedBanner
-    ? 'Welcome back - your session is ready.'
+    ? getResumeBannerCopy(topicName)
     : apiChecked && !isApiReachable
     ? 'Server unreachable - messages may fail'
     : modeConfig.subtitle;
@@ -1138,15 +1120,6 @@ function SessionScreenInner() {
             setFilingDismissed={setFilingDismissed}
             navigateToSessionSummary={navigateToSessionSummary}
             router={router}
-            depthEvaluation={depthEvaluation}
-            depthEvaluating={depthEvaluating}
-            onAskAnother={() => {
-              setShowFilingPrompt(false);
-              setFilingDismissed(false);
-              setDepthEvaluation(null);
-              setDepthEvaluating(false);
-              router.replace('/(app)/session?mode=freeform' as never);
-            }}
             sessionExpired={sessionExpired}
             notePromptOffered={notePromptOffered}
             showNoteInput={showNoteInput}

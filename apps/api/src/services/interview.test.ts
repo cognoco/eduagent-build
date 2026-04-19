@@ -517,6 +517,123 @@ describe('extractSignals', () => {
       2
     );
   });
+
+  // -------------------------------------------------------------------------
+  // BKT-C.2 — interests extraction from interview transcripts
+  // -------------------------------------------------------------------------
+
+  it('[BKT-C.2] extracts interests from LLM response', async () => {
+    (routeAndCall as jest.Mock).mockResolvedValueOnce({
+      response:
+        '{"goals": ["learn"], "experienceLevel": "beginner", "currentKnowledge": "", "interests": ["chess club", "anime", "football"]}',
+    });
+
+    const result = await extractSignals([
+      {
+        role: 'user',
+        content: "I'm in chess club and I love anime and football",
+      },
+    ]);
+
+    expect(result.interests).toEqual(['chess club', 'anime', 'football']);
+  });
+
+  it('[BKT-C.2] returns empty interests array when field missing', async () => {
+    // Backward compat: prompt asks for interests but a legacy cached response
+    // or off-schema reply omits them. Consumers must tolerate [].
+    (routeAndCall as jest.Mock).mockResolvedValueOnce({
+      response:
+        '{"goals": ["learn"], "experienceLevel": "beginner", "currentKnowledge": ""}',
+    });
+
+    const result = await extractSignals([{ role: 'user', content: 'hi' }]);
+
+    expect(result.interests).toEqual([]);
+  });
+
+  it('[BKT-C.2] returns empty interests when no JSON object found in response', async () => {
+    (routeAndCall as jest.Mock).mockResolvedValueOnce({
+      response: 'not json at all',
+    });
+
+    const result = await extractSignals([{ role: 'user', content: 'hi' }]);
+
+    expect(result.interests).toEqual([]);
+  });
+
+  it('[BKT-C.2] returns empty interests when JSON.parse throws on partial JSON', async () => {
+    // The regex matches `{...}` but the content is not valid JSON —
+    // exercises the catch block rather than the regex-miss path above.
+    (routeAndCall as jest.Mock).mockResolvedValueOnce({
+      response: '{invalid json content}',
+    });
+
+    const result = await extractSignals([{ role: 'user', content: 'hi' }]);
+
+    expect(result.interests).toEqual([]);
+  });
+
+  it('[BKT-C.2] dedupes interests case-insensitively', async () => {
+    (routeAndCall as jest.Mock).mockResolvedValueOnce({
+      response:
+        '{"goals": [], "experienceLevel": "beginner", "currentKnowledge": "", "interests": ["Chess", "chess", "CHESS", "football"]}',
+    });
+
+    const result = await extractSignals([{ role: 'user', content: 'hi' }]);
+
+    // First-seen-wins for the canonical casing — matches the Set-based dedupe.
+    expect(result.interests).toEqual(['Chess', 'football']);
+  });
+
+  it('[BKT-C.2] caps interests at MAX_EXTRACTED_INTERESTS (8)', async () => {
+    // A chatty LLM could return more than the prompt's max. The service must
+    // hard-cap to protect the mobile picker's rendering budget.
+    // Asserts both the length cap AND first-N-in-order preservation.
+    const tenInterests = Array.from({ length: 10 }, (_, i) => `hobby-${i}`);
+    (routeAndCall as jest.Mock).mockResolvedValueOnce({
+      response: JSON.stringify({
+        goals: [],
+        experienceLevel: 'beginner',
+        currentKnowledge: '',
+        interests: tenInterests,
+      }),
+    });
+
+    const result = await extractSignals([{ role: 'user', content: 'hi' }]);
+
+    expect(result.interests).toHaveLength(8);
+    expect(result.interests).toEqual(tenInterests.slice(0, 8));
+  });
+
+  it('[BKT-C.2] strips empty and over-long interests defensively', async () => {
+    const atBoundary = 'x'.repeat(60); // exactly at the 60-char limit — kept
+    const tooLong = 'x'.repeat(61); // one over — stripped
+    (routeAndCall as jest.Mock).mockResolvedValueOnce({
+      response: JSON.stringify({
+        goals: [],
+        experienceLevel: 'beginner',
+        currentKnowledge: '',
+        interests: ['chess', '', '   ', atBoundary, tooLong, 'football'],
+      }),
+    });
+
+    const result = await extractSignals([{ role: 'user', content: 'hi' }]);
+
+    expect(result.interests).toEqual(['chess', atBoundary, 'football']);
+  });
+
+  it('[BKT-C.2] coerces non-array interests to empty array', async () => {
+    // A broken LLM could return a string where an array is expected. The
+    // service must not crash or leak the raw value into a typed array.
+    (routeAndCall as jest.Mock).mockResolvedValueOnce({
+      response:
+        '{"goals": [], "experienceLevel": "beginner", "currentKnowledge": "", "interests": "chess, football"}',
+    });
+
+    const result = await extractSignals([{ role: 'user', content: 'hi' }]);
+
+    expect(result.interests).toEqual([]);
+  });
 });
 
 // ---------------------------------------------------------------------------

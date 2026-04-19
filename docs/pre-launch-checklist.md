@@ -102,9 +102,9 @@ Ref: `docs/plans/order.md` Tier 3 — explicitly marked "before launch"
 
 ## Code Quality & Test Debt
 
-- [ ] **EP15-C2: Epic 15 test coverage** — 8 missing test files
-- [ ] **EP15-C3: Step ordering decision** — code does snapshot → coaching cards → memory, plan says memory → snapshot → coaching cards. Decide which is correct.
-- [ ] **EP15-C4: Session-complete debounce** (AR-13) — `refreshProgressSnapshot` needs `sessionEndedAt` param
+- [ ] **EP15-C2: Epic 15 test coverage** — 2 of 8 original gaps filled (milestone-detection, progress.tsx). Additional tests added (reports, use-progress, vocabulary, milestones, schemas, dashboard). Remaining: snapshot-aggregation.ts (1,087-line core engine — highest risk), monthly-report.ts, daily-snapshot.ts, weekly-progress-push.ts, monthly-report-cron.ts, progress/[subjectId].tsx
+- [x] **EP15-C3: Step ordering decision** — RESOLVED 2026-04-19. Pipelines are independent (computeProgressMetrics never reads learning_profiles). Latency-first order confirmed correct; plan AD6 amended. See `session-completed.ts:515-518`.
+- [x] **EP15-C4: Session-complete debounce** (AR-13) — RESOLVED 2026-04-19. `RefreshProgressSnapshotOptions.sessionEndedAt` implemented in `snapshot-aggregation.ts:965-1000`. `getLatestSnapshot` returns `updatedAt`. `session-completed.ts:531` passes timestamp.
 - [ ] **Progressive disclosure** — plan written 2026-04-14, zero code changes (~1 day)
 - [ ] **Freeform-filing retry** — one missing Inngest function; failed freeform filing silently drops session
 - [ ] **Epic 16 test gaps** — ~90% of planned tests missing (cap eviction, stale demotion, struggle resolution)
@@ -137,9 +137,9 @@ Ref: `docs/plans/order.md` Tier 3 — explicitly marked "before launch"
 
 ## Nice-to-Have (Post-Launch OK)
 
-- [ ] EP15-I1: Weekly push fan-out
-- [ ] EP15-I2: `vocabularyLearned` rename
-- [ ] EP15-I5: Parent-access denial returns null instead of 403
+- [x] EP15-I1: Weekly push fan-out — RESOLVED. Fan-out pattern implemented in `weekly-progress-push.ts` (see `[EP15-I1 AR-9]` comment, lines 53-69). Timezone-aware delivery via `isLocalHour9`.
+- [x] EP15-I2: `vocabularyLearned` rename — RESOLVED 2026-04-19. Schema fully uses `vocabularyTotal`. Mobile label changed to "Total words". Monthly report delta computed correctly.
+- [x] EP15-I5: Parent-access denial returns null instead of 403 — RESOLVED 2026-04-19. `assertParentAccess` throws `ForbiddenError` → global handler returns HTTP 403. All 10 dashboard child-scoped endpoints protected.
 - [ ] Missing mobile screens (3E.1-3E.4): teach-back, evaluate-challenge, word summaries, decay viz
 - [ ] Epic 17: Voice Input (~2-3 weeks, stores blocked anyway)
 - [ ] Custom domain for production API (instead of `.workers.dev`)

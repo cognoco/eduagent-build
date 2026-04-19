@@ -20,19 +20,39 @@
 --   * pronouns starts NULL for every row. Child profiles below age 13 will
 --     never be prompted (PRONOUNS_PROMPT_MIN_AGE in schemas).
 
--- 1. profiles: new columns
+-- Idempotency note:
+--   All three steps are idempotent so this migration is safe to run against a
+--   database that was provisioned via `db:push` before the SQL was generated.
+--   Reason: during the BKT-C.1 rollout the schema was pushed directly to dev
+--   and staging before the migration file was committed, which means a plain
+--   `drizzle-kit migrate` would fail on "column already exists" / "constraint
+--   already exists". Reconciliation path per ~/.claude/CLAUDE.md Fix
+--   Verification Rules: idempotent rewrite rather than a manual
+--   __drizzle_migrations insert.
+
+-- 1. profiles: new columns (idempotent)
 ALTER TABLE "profiles"
-  ADD COLUMN "conversation_language" text NOT NULL DEFAULT 'en';
+  ADD COLUMN IF NOT EXISTS "conversation_language" text NOT NULL DEFAULT 'en';
 
 ALTER TABLE "profiles"
-  ADD COLUMN "pronouns" text;
+  ADD COLUMN IF NOT EXISTS "pronouns" text;
 
--- 2. profiles: CHECK constraint for conversation_language
+-- 2. profiles: CHECK constraint for conversation_language (idempotent)
 -- Matches the pgEnum-style whitelist in the Drizzle schema. If this list
 -- expands, both the CHECK and the Zod conversationLanguageSchema must update.
-ALTER TABLE "profiles"
-  ADD CONSTRAINT "profiles_conversation_language_check"
-  CHECK ("conversation_language" IN ('en','cs','es','fr','de','it','pt','pl'));
+-- Postgres has no ADD CONSTRAINT IF NOT EXISTS, so we guard via pg_constraint.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'profiles_conversation_language_check'
+      AND conrelid = '"profiles"'::regclass
+  ) THEN
+    ALTER TABLE "profiles"
+      ADD CONSTRAINT "profiles_conversation_language_check"
+      CHECK ("conversation_language" IN ('en','cs','es','fr','de','it','pt','pl'));
+  END IF;
+END$$;
 
 -- 3. learning_profiles.interests: shape rewrite (idempotent)
 -- Only touches rows where at least one entry is still a bare string. Rows that

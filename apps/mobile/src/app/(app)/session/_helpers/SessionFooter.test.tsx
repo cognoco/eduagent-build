@@ -6,6 +6,15 @@ import {
 } from '@testing-library/react-native';
 import { SessionFooter } from './SessionFooter';
 
+jest.mock('../../../../components/session', () => ({
+  QuestionCounter: () => null,
+  LibraryPrompt: () => null,
+}));
+
+jest.mock('../../../../lib/format-api-error', () => ({
+  formatApiError: (e: unknown) => String(e),
+}));
+
 function createProps(overrides: Record<string, unknown> = {}) {
   return {
     showFilingPrompt: true,
@@ -24,10 +33,6 @@ function createProps(overrides: Record<string, unknown> = {}) {
     setFilingDismissed: jest.fn(),
     navigateToSessionSummary: jest.fn(),
     router: { replace: jest.fn() },
-    depthEvaluation: null,
-    depthEvaluating: false,
-    onAskAnother: jest.fn(),
-    onFileTopic: undefined,
     sessionExpired: false,
     notePromptOffered: false,
     showNoteInput: false,
@@ -48,81 +53,41 @@ describe('SessionFooter', () => {
     jest.clearAllMocks();
   });
 
-  it('shows the evaluating skeleton while freeform depth is loading', () => {
-    render(
-      <SessionFooter
-        {...(createProps({
-          depthEvaluating: true,
-        }) as any)}
-      />
-    );
+  it('shows filing prompt with accept/dismiss for freeform sessions', () => {
+    render(<SessionFooter {...(createProps() as any)} />);
 
-    expect(screen.getByTestId('depth-evaluating-skeleton')).toBeTruthy();
+    expect(screen.getByTestId('filing-prompt')).toBeTruthy();
+    expect(screen.getByTestId('filing-prompt-accept')).toBeTruthy();
+    expect(screen.getByTestId('filing-prompt-dismiss')).toBeTruthy();
   });
 
-  it('shows the not-meaningful close state and supports ask another', () => {
-    const props = createProps({
-      depthEvaluation: {
-        meaningful: false,
-        reason: 'Quick Q&A',
-        method: 'heuristic_shallow',
-        topics: [],
-      },
-    });
-
+  it('accept button calls filing mutateAsync and navigates to book', async () => {
+    const props = createProps();
     render(<SessionFooter {...(props as any)} />);
 
-    expect(screen.getByTestId('not-meaningful-close')).toBeTruthy();
-
-    fireEvent.press(screen.getByTestId('ask-another-button'));
-
-    expect(props.setShowFilingPrompt).toHaveBeenCalledWith(false);
-    expect(props.onAskAnother).toHaveBeenCalledTimes(1);
-  });
-
-  it('supports multi-topic filing for meaningful freeform sessions', async () => {
-    const filing = {
-      mutateAsync: jest
-        .fn()
-        .mockResolvedValueOnce({ shelfId: 'shelf-1', bookId: 'book-1' })
-        .mockResolvedValueOnce({ shelfId: 'shelf-1', bookId: 'book-2' }),
-      isPending: false,
-    };
-    const props = createProps({
-      filing,
-      depthEvaluation: {
-        meaningful: true,
-        reason: 'Deep session',
-        method: 'heuristic_deep',
-        topics: [
-          { summary: 'Plant cells', depth: 'substantial' },
-          { summary: 'Chlorophyll', depth: 'partial' },
-        ],
-      },
-    });
-
-    render(<SessionFooter {...(props as any)} />);
-
-    expect(screen.getByTestId('multi-topic-filing')).toBeTruthy();
-
-    fireEvent.press(screen.getByTestId('topic-chip-plant-cells'));
-    fireEvent.press(screen.getByTestId('topic-chip-chlorophyll'));
-    fireEvent.press(screen.getByTestId('file-selected-topics'));
+    fireEvent.press(screen.getByTestId('filing-prompt-accept'));
 
     await waitFor(() => {
-      expect(filing.mutateAsync).toHaveBeenCalledTimes(2);
+      expect(props.filing.mutateAsync).toHaveBeenCalledWith({
+        sessionId: 'session-1',
+        sessionMode: 'freeform',
+      });
+      expect(props.router.replace).toHaveBeenCalledWith(
+        expect.objectContaining({
+          pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
+          params: { subjectId: 'shelf-1', bookId: 'book-1' },
+        })
+      );
     });
+  });
 
-    expect(filing.mutateAsync).toHaveBeenNthCalledWith(1, {
-      sessionId: 'session-1',
-      sessionMode: 'freeform',
-      selectedSuggestion: 'Plant cells',
-    });
-    expect(filing.mutateAsync).toHaveBeenNthCalledWith(2, {
-      sessionId: 'session-1',
-      sessionMode: 'freeform',
-      selectedSuggestion: 'Chlorophyll',
-    });
+  it('dismiss button navigates to session summary', () => {
+    const props = createProps();
+    render(<SessionFooter {...(props as any)} />);
+
+    fireEvent.press(screen.getByTestId('filing-prompt-dismiss'));
+
+    expect(props.setFilingDismissed).toHaveBeenCalledWith(true);
     expect(props.navigateToSessionSummary).toHaveBeenCalledTimes(1);
   });
 });

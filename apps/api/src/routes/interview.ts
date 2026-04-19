@@ -254,7 +254,10 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
         typeof draft.extractedSignals === 'object' &&
         Object.keys(draft.extractedSignals as Record<string, unknown>).length >
           0
-          ? { extractedSignals: draft.extractedSignals }
+          ? {
+              extractedSignals:
+                draft.extractedSignals as unknown as ExtractedInterviewSignals,
+            }
           : {}),
       });
     }

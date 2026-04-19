@@ -91,6 +91,9 @@ export default function HomeScreen(): React.ReactElement {
 
   // BUG-306: Add timeout so the loading spinner doesn't hang forever
   const [loadingTimedOut, setLoadingTimedOut] = useState(false);
+  const isParentGatewayEligible = hasLinkedChildren(activeProfile, profiles);
+  const [showLearnerView, setShowLearnerView] = useState(false);
+
   useEffect(() => {
     if (!isLoading) {
       setLoadingTimedOut(false);
@@ -99,6 +102,11 @@ export default function HomeScreen(): React.ReactElement {
     const timer = setTimeout(() => setLoadingTimedOut(true), 10_000);
     return () => clearTimeout(timer);
   }, [isLoading]);
+
+  // Reset learner view when profile changes (parent switches back to their own profile)
+  useEffect(() => {
+    setShowLearnerView(false);
+  }, [activeProfile?.id]);
 
   // Neutral placeholder while profiles load — prevents flash of wrong content
   // (e.g. parent briefly seeing LearnerScreen before ParentGateway renders).
@@ -158,7 +166,7 @@ export default function HomeScreen(): React.ReactElement {
     );
   }
 
-  const showParentGateway = hasLinkedChildren(activeProfile, profiles);
+  const showParentGateway = isParentGatewayEligible && !showLearnerView;
   // Guard against subscription still loading (undefined) — treat as
   // indeterminate so family/pro owners don't flash LearnerScreen. [CR-fix-6]
   const supportsMultipleProfiles =
@@ -181,6 +189,7 @@ export default function HomeScreen(): React.ReactElement {
           profiles={profiles}
           activeProfile={activeProfile}
           switchProfile={switchProfile}
+          onLearn={() => setShowLearnerView(true)}
         />
       ) : isParentWithNoChildren ? (
         <AddFirstChildScreen />
@@ -189,6 +198,11 @@ export default function HomeScreen(): React.ReactElement {
           profiles={profiles}
           activeProfile={activeProfile}
           switchProfile={switchProfile}
+          onBack={
+            isParentGatewayEligible
+              ? () => setShowLearnerView(false)
+              : undefined
+          }
         />
       )}
       {CelebrationOverlay}

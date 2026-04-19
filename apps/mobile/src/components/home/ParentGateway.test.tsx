@@ -123,7 +123,16 @@ describe('ParentGateway', () => {
     expect(mockPush).toHaveBeenCalledWith('/(app)/dashboard');
   });
 
-  it('navigates to /create-subject on "Learn something"', () => {
+  it('calls onLearn when "Learn something" is pressed', () => {
+    const onLearn = jest.fn();
+    render(<ParentGateway {...defaultProps} onLearn={onLearn} />);
+
+    fireEvent.press(screen.getByTestId('gateway-learn'));
+    expect(onLearn).toHaveBeenCalledTimes(1);
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('falls back to /create-subject when onLearn is not provided', () => {
     render(<ParentGateway {...defaultProps} />);
 
     fireEvent.press(screen.getByTestId('gateway-learn'));

@@ -555,7 +555,7 @@ export default function CameraScreen(): React.ReactNode {
         <Text className="text-body text-text-secondary text-center mb-8">
           {denied
             ? 'Camera access was denied. You can enable it in your device settings to photograph homework problems.'
-            : 'We need your camera to photograph homework problems so your AI tutor can help you work through them step by step.'}
+            : "Snap a picture of your homework and I'll help you solve it step by step."}
         </Text>
         {denied ? (
           <Pressable

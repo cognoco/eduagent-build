@@ -2,7 +2,6 @@ import { useCallback } from 'react';
 // Alert import removed — all calls migrated to platformAlert [F-029]
 import { platformAlert } from '../../../../lib/platform-alert';
 import type {
-  DepthEvaluation,
   InputMode,
   HomeworkProblem,
   PendingCelebration,
@@ -21,8 +20,6 @@ import type {
 import { clearSessionRecoveryMarker } from '../../../../lib/session-recovery';
 import * as SecureStore from '../../../../lib/secure-storage';
 import { formatApiError } from '../../../../lib/format-api-error';
-import { useApiClient } from '../../../../lib/api-client';
-import { assertOk } from '../../../../lib/assert-ok';
 import { withProblemMode } from '../../homework/_helpers/problem-cards';
 import {
   getInputModeKey,
@@ -53,10 +50,6 @@ export interface UseSessionActionsOptions {
   setShowTopicSwitcher: React.Dispatch<React.SetStateAction<boolean>>;
   setShowParkingLot: React.Dispatch<React.SetStateAction<boolean>>;
   setShowFilingPrompt: React.Dispatch<React.SetStateAction<boolean>>;
-  setDepthEvaluation: React.Dispatch<
-    React.SetStateAction<DepthEvaluation | null>
-  >;
-  setDepthEvaluating: React.Dispatch<React.SetStateAction<boolean>>;
   setConsumedQuickChipMessageId: React.Dispatch<
     React.SetStateAction<string | null>
   >;
@@ -111,7 +104,6 @@ export interface UseSessionActionsOptions {
 const CLOSE_TIMEOUT_MS = 15_000;
 
 export function useSessionActions(opts: UseSessionActionsOptions) {
-  const client = useApiClient();
   const {
     activeSessionId,
     isStreaming,
@@ -130,8 +122,6 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
     setShowTopicSwitcher,
     setShowParkingLot,
     setShowFilingPrompt,
-    setDepthEvaluation,
-    setDepthEvaluating,
     setConsumedQuickChipMessageId,
     setMessageFeedback,
     homeworkProblemsState,
@@ -354,38 +344,12 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
                 fastCelebrations,
               };
 
-              if (effectiveMode === 'freeform') {
-                setDepthEvaluation(null);
-                setDepthEvaluating(true);
-                setShowFilingPrompt(true);
-
-                try {
-                  const response = await client.sessions[':sessionId'][
-                    'evaluate-depth'
-                  ].$post({
-                    param: { sessionId: activeSessionId },
-                  });
-                  await assertOk(response);
-                  setDepthEvaluation(
-                    (await response.json()) as DepthEvaluation
-                  );
-                } catch {
-                  setDepthEvaluation({
-                    meaningful: true,
-                    reason: 'Gate failed - client-side fail open',
-                    method: 'fail_open',
-                    topics: [],
-                  });
-                } finally {
-                  setDepthEvaluating(false);
-                }
-              } else if (effectiveMode === 'homework') {
-                setDepthEvaluation(null);
-                setDepthEvaluating(false);
+              if (
+                effectiveMode === 'freeform' ||
+                effectiveMode === 'homework'
+              ) {
                 setShowFilingPrompt(true);
               } else {
-                setDepthEvaluation(null);
-                setDepthEvaluating(false);
                 navigateToSummary(
                   activeSessionId,
                   result.wallClockSeconds,
@@ -430,9 +394,6 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
     effectiveSubjectName,
     exchangeCount,
     topicId,
-    client,
-    setDepthEvaluation,
-    setDepthEvaluating,
     navigateToSummary,
     setIsClosing,
     setShowFilingPrompt,

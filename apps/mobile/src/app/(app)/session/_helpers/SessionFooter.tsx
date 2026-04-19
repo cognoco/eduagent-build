@@ -1,5 +1,4 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
 import { QuestionCounter, LibraryPrompt } from '../../../../components/session';
 import { NoteInput } from '../../../../components/library/NoteInput';
@@ -8,7 +7,6 @@ import type { useUpsertNote } from '../../../../hooks/use-notes';
 import { formatApiError } from '../../../../lib/format-api-error';
 import type { Router } from 'expo-router';
 import type { useThemeColors } from '../../../../lib/theme';
-import type { DepthEvaluation, DetectedTopic } from '@eduagent/schemas';
 
 export interface SessionFooterProps {
   showFilingPrompt: boolean;
@@ -21,10 +19,6 @@ export interface SessionFooterProps {
   setFilingDismissed: React.Dispatch<React.SetStateAction<boolean>>;
   navigateToSessionSummary: () => void;
   router: Router;
-  depthEvaluation: DepthEvaluation | null;
-  depthEvaluating: boolean;
-  onAskAnother?: () => void;
-  onFileTopic?: (topic: DetectedTopic) => Promise<void>;
   sessionExpired: boolean;
   notePromptOffered: boolean;
   showNoteInput: boolean;
@@ -49,10 +43,6 @@ export function SessionFooter({
   setFilingDismissed,
   navigateToSessionSummary,
   router,
-  depthEvaluation,
-  depthEvaluating,
-  onAskAnother,
-  onFileTopic,
   sessionExpired,
   notePromptOffered,
   showNoteInput,
@@ -65,37 +55,19 @@ export function SessionFooter({
   showQuestionCount,
   showBookLink,
 }: SessionFooterProps) {
-  const isFreeform = effectiveMode === 'freeform';
-
   return (
     <>
       {showFilingPrompt && !filingDismissed ? (
-        isFreeform ? (
-          <FreeformFilingArea
-            depthEvaluating={depthEvaluating}
-            depthEvaluation={depthEvaluation}
-            filing={filing}
-            activeSessionId={activeSessionId}
-            filingTopicHint={filingTopicHint}
-            setShowFilingPrompt={setShowFilingPrompt}
-            setFilingDismissed={setFilingDismissed}
-            navigateToSessionSummary={navigateToSessionSummary}
-            router={router}
-            onAskAnother={onAskAnother}
-            onFileTopic={onFileTopic}
-          />
-        ) : (
-          <StandardFilingPrompt
-            filing={filing}
-            activeSessionId={activeSessionId}
-            effectiveMode={effectiveMode}
-            filingTopicHint={filingTopicHint}
-            setShowFilingPrompt={setShowFilingPrompt}
-            setFilingDismissed={setFilingDismissed}
-            navigateToSessionSummary={navigateToSessionSummary}
-            router={router}
-          />
-        )
+        <StandardFilingPrompt
+          filing={filing}
+          activeSessionId={activeSessionId}
+          effectiveMode={effectiveMode}
+          filingTopicHint={filingTopicHint}
+          setShowFilingPrompt={setShowFilingPrompt}
+          setFilingDismissed={setFilingDismissed}
+          navigateToSessionSummary={navigateToSessionSummary}
+          router={router}
+        />
       ) : null}
       {sessionExpired ? (
         <View className="bg-surface rounded-card p-4 mt-2 mb-4">
@@ -182,296 +154,6 @@ export function SessionFooter({
       {showQuestionCount ? <QuestionCounter count={userMessageCount} /> : null}
       {showBookLink ? <LibraryPrompt /> : null}
     </>
-  );
-}
-
-function FreeformFilingArea({
-  depthEvaluating,
-  depthEvaluation,
-  filing,
-  activeSessionId,
-  filingTopicHint,
-  setShowFilingPrompt,
-  setFilingDismissed,
-  navigateToSessionSummary,
-  router,
-  onAskAnother,
-  onFileTopic,
-}: {
-  depthEvaluating: boolean;
-  depthEvaluation: DepthEvaluation | null;
-  filing: ReturnType<typeof useFiling>;
-  activeSessionId: string | null;
-  filingTopicHint?: string;
-  setShowFilingPrompt: React.Dispatch<React.SetStateAction<boolean>>;
-  setFilingDismissed: React.Dispatch<React.SetStateAction<boolean>>;
-  navigateToSessionSummary: () => void;
-  router: Router;
-  onAskAnother?: () => void;
-  onFileTopic?: (topic: DetectedTopic) => Promise<void>;
-}) {
-  if (depthEvaluating || !depthEvaluation) {
-    return (
-      <View
-        className="px-4 py-6 bg-surface-elevated rounded-t-2xl"
-        testID="depth-evaluating-skeleton"
-      >
-        <View className="h-5 w-48 bg-surface rounded mb-3" />
-        <View className="h-4 w-64 bg-surface rounded mb-4" />
-        <View className="flex-row gap-3">
-          <View className="flex-1 h-11 bg-surface rounded-xl" />
-          <View className="w-24 h-11 bg-surface rounded-xl" />
-        </View>
-      </View>
-    );
-  }
-
-  if (!depthEvaluation.meaningful) {
-    return (
-      <View
-        className="px-4 py-6 bg-surface-elevated rounded-t-2xl"
-        testID="not-meaningful-close"
-      >
-        <Text className="text-lg font-semibold text-text-primary mb-2">
-          Got it!
-        </Text>
-        <Text className="text-body-sm text-text-secondary mb-4">
-          Anything else on your mind?
-        </Text>
-        <View className="flex-row gap-3">
-          <Pressable
-            onPress={() => {
-              setShowFilingPrompt(false);
-              onAskAnother?.();
-            }}
-            className="flex-1 bg-primary rounded-xl py-3 items-center min-h-[44px] justify-center"
-            testID="ask-another-button"
-            accessibilityRole="button"
-            accessibilityLabel="Ask another question"
-          >
-            <Text className="text-text-inverse font-semibold">
-              Ask another question
-            </Text>
-          </Pressable>
-          <Pressable
-            onPress={() => {
-              setFilingDismissed(true);
-              navigateToSessionSummary();
-            }}
-            className="px-4 py-3 min-h-[44px] justify-center"
-            testID="done-button"
-            accessibilityRole="button"
-            accessibilityLabel="I'm done"
-          >
-            <Text className="text-text-secondary">I'm done</Text>
-          </Pressable>
-        </View>
-      </View>
-    );
-  }
-
-  const fileableTopics = depthEvaluation.topics.filter(
-    (topic) => topic.depth === 'substantial' || topic.depth === 'partial'
-  );
-
-  if (fileableTopics.length >= 2) {
-    return (
-      <MultiTopicFiling
-        topics={fileableTopics}
-        filing={filing}
-        activeSessionId={activeSessionId}
-        setFilingDismissed={setFilingDismissed}
-        navigateToSessionSummary={navigateToSessionSummary}
-        onFileTopic={onFileTopic}
-      />
-    );
-  }
-
-  const topicSummary = fileableTopics[0]?.summary ?? filingTopicHint;
-  return (
-    <StandardFilingPrompt
-      filing={filing}
-      activeSessionId={activeSessionId}
-      effectiveMode="freeform"
-      filingTopicHint={topicSummary}
-      setShowFilingPrompt={setShowFilingPrompt}
-      setFilingDismissed={setFilingDismissed}
-      navigateToSessionSummary={navigateToSessionSummary}
-      router={router}
-    />
-  );
-}
-
-function MultiTopicFiling({
-  topics,
-  filing,
-  activeSessionId,
-  setFilingDismissed,
-  navigateToSessionSummary,
-  onFileTopic,
-}: {
-  topics: DetectedTopic[];
-  filing: ReturnType<typeof useFiling>;
-  activeSessionId: string | null;
-  setFilingDismissed: React.Dispatch<React.SetStateAction<boolean>>;
-  navigateToSessionSummary: () => void;
-  onFileTopic?: (topic: DetectedTopic) => Promise<void>;
-}) {
-  const [selectedTopics, setSelectedTopics] = useState<Set<string>>(new Set());
-  const [filingTopics, setFilingTopics] = useState<Set<string>>(new Set());
-  const [failedTopics, setFailedTopics] = useState<Set<string>>(new Set());
-  const [filedTopics, setFiledTopics] = useState<Set<string>>(new Set());
-
-  const toggleTopic = (summary: string) => {
-    setSelectedTopics((current) => {
-      const next = new Set(current);
-      if (next.has(summary)) {
-        next.delete(summary);
-      } else {
-        next.add(summary);
-      }
-      return next;
-    });
-  };
-
-  const handleFileSelected = async () => {
-    const topicsToFile = topics.filter((topic) =>
-      selectedTopics.has(topic.summary)
-    );
-
-    for (const topic of topicsToFile) {
-      setFilingTopics((current) => new Set(current).add(topic.summary));
-      try {
-        if (onFileTopic) {
-          await onFileTopic(topic);
-        } else {
-          await filing.mutateAsync({
-            sessionId: activeSessionId ?? undefined,
-            sessionMode: 'freeform',
-            selectedSuggestion: topic.summary,
-          });
-        }
-        setFiledTopics((current) => new Set(current).add(topic.summary));
-      } catch {
-        setFailedTopics((current) => new Set(current).add(topic.summary));
-      } finally {
-        setFilingTopics((current) => {
-          const next = new Set(current);
-          next.delete(topic.summary);
-          return next;
-        });
-      }
-    }
-
-    navigateToSessionSummary();
-  };
-
-  return (
-    <View
-      className="px-4 py-6 bg-surface-elevated rounded-t-2xl"
-      testID="multi-topic-filing"
-    >
-      <Text className="text-lg font-semibold text-text-primary mb-2">
-        You touched on a few things today!
-      </Text>
-      <Text className="text-body-sm text-text-secondary mb-4">
-        Any of these you'd want to explore more?
-      </Text>
-      <View className="flex-row flex-wrap gap-2 mb-4">
-        {topics.map((topic) => {
-          const isSelected = selectedTopics.has(topic.summary);
-          const isFiling = filingTopics.has(topic.summary);
-          const isFailed = failedTopics.has(topic.summary);
-          const isFiled = filedTopics.has(topic.summary);
-
-          return (
-            <Pressable
-              key={topic.summary}
-              onPress={() => {
-                if (isFailed) {
-                  setFailedTopics((current) => {
-                    const next = new Set(current);
-                    next.delete(topic.summary);
-                    return next;
-                  });
-                }
-                if (!isFiling && !isFiled) {
-                  toggleTopic(topic.summary);
-                }
-              }}
-              disabled={isFiling || isFiled}
-              className={`px-3 py-2 rounded-full border min-h-[36px] justify-center ${
-                isFiled
-                  ? 'bg-primary/10 border-primary'
-                  : isFailed
-                  ? 'bg-danger/10 border-danger'
-                  : isSelected
-                  ? 'bg-primary/20 border-primary'
-                  : 'bg-surface border-surface-elevated'
-              }`}
-              testID={`topic-chip-${topic.summary
-                .replace(/\s+/g, '-')
-                .toLowerCase()}`}
-              accessibilityRole="checkbox"
-              accessibilityState={{ checked: isSelected || isFiled }}
-            >
-              <View className="flex-row items-center gap-1">
-                {isFiling ? <ActivityIndicator size="small" /> : null}
-                {isFiled ? (
-                  <Ionicons name="checkmark-circle" size={14} color="#00BFA5" />
-                ) : null}
-                {isFailed ? (
-                  <Ionicons name="alert-circle" size={14} color="#FF5252" />
-                ) : null}
-                <Text
-                  className={`text-body-sm ${
-                    isSelected || isFiled
-                      ? 'text-primary font-semibold'
-                      : 'text-text-primary'
-                  }`}
-                >
-                  {topic.summary}
-                </Text>
-              </View>
-            </Pressable>
-          );
-        })}
-      </View>
-      <View className="flex-row gap-3">
-        {selectedTopics.size > 0 ? (
-          <Pressable
-            onPress={handleFileSelected}
-            disabled={filing.isPending}
-            className="flex-1 bg-primary rounded-xl py-3 items-center min-h-[44px] justify-center"
-            testID="file-selected-topics"
-            accessibilityRole="button"
-            accessibilityLabel={`Add ${selectedTopics.size} topic${
-              selectedTopics.size > 1 ? 's' : ''
-            } to library`}
-          >
-            {filing.isPending ? (
-              <ActivityIndicator color="white" />
-            ) : (
-              <Text className="text-text-inverse font-semibold">
-                Add to library
-              </Text>
-            )}
-          </Pressable>
-        ) : null}
-        <Pressable
-          onPress={() => {
-            setFilingDismissed(true);
-            navigateToSessionSummary();
-          }}
-          className="px-4 py-3 min-h-[44px] justify-center"
-          testID="filing-dismiss-all"
-          accessibilityRole="button"
-          accessibilityLabel="I'm good, skip filing"
-        >
-          <Text className="text-text-secondary">I'm good</Text>
-        </Pressable>
-      </View>
-    </View>
   );
 }
 
