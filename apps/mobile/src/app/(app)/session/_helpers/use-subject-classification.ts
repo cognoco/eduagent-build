@@ -312,26 +312,13 @@ export function useSubjectClassification(
       ) {
         const greetingResponse =
           sessionExperience === 0
-            ? 'Hey! What would you like to learn about? You can ask me anything.'
-            : "Hey! What's on your mind today?";
+            ? 'Hi! Ask me anything.'
+            : 'Hey again — what are you curious about?';
         animationCleanupRef.current = animateResponse(
           greetingResponse,
           setMessages,
           setIsStreaming
         );
-        return;
-      }
-
-      // Ask mode should answer first. When the learner already has at least one
-      // enrolled subject, the screen uses a hidden anchor subject to create the
-      // session and the API silently classifies in the background later.
-      if (
-        effectiveMode === 'freeform' &&
-        !subjectId &&
-        !classifiedSubject &&
-        availableSubjects[0]
-      ) {
-        await continueWithMessage(text);
         return;
       }
 
@@ -374,14 +361,11 @@ export function useSubjectClassification(
               {
                 id: createLocalMessageId('ai'),
                 role: 'assistant',
-                content: `Got it, this sounds like ${candidate.subjectName}.`,
+                content: `Looks like ${candidate.subjectName}.`,
                 isSystemPrompt: true,
               },
             ]);
-          } else if (
-            effectiveMode === 'freeform' &&
-            availableSubjects.length > 0
-          ) {
+          } else if (effectiveMode === 'freeform') {
             // BUG-31 / F-1: When multiple candidates exist, ask the user which subject
             // they meant. Single candidate auto-picks. Zero candidates proceed without
             // subject — continueWithMessage handles the no-subject case.
@@ -491,7 +475,7 @@ export function useSubjectClassification(
             return;
           }
         } catch {
-          if (effectiveMode === 'freeform' && availableSubjects.length > 0) {
+          if (effectiveMode === 'freeform') {
             const fallbackCandidates = availableSubjects.map((candidate) => ({
               subjectId: candidate.id,
               subjectName: candidate.name,
