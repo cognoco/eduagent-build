@@ -1,22 +1,29 @@
 export function formatRelativeDate(isoDate: string): string {
-  const now = Date.now();
-  const then = new Date(isoDate).getTime();
-  if (isNaN(then)) return '';
-  const diffMs = now - then;
-  if (diffMs < 0) return 'just now';
+  const then = new Date(isoDate);
+  if (isNaN(then.getTime())) return '';
+  const now = new Date();
+  if (then.getTime() > now.getTime()) return 'just now';
 
-  const seconds = Math.floor(diffMs / 1000);
-  if (seconds < 60) return 'just now';
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h`;
-  const days = Math.floor(hours / 24);
-  // days is always >= 1 here because `hours < 24` already returned above.
-  if (days === 1) return 'Yesterday';
-  if (days < 7) return `${days} days ago`;
-  if (days < 30) return `${days}d`;
-  const months = Math.floor(days / 30);
+  // Use calendar-day diff to align with formatLastPracticed (F-002)
+  const startOfToday = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate()
+  );
+  const startOfThen = new Date(
+    then.getFullYear(),
+    then.getMonth(),
+    then.getDate()
+  );
+  const diffDays = Math.round(
+    (startOfToday.getTime() - startOfThen.getTime()) / (1000 * 60 * 60 * 24)
+  );
+
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 7) return `${diffDays} days ago`;
+  if (diffDays < 30) return `${diffDays}d`;
+  const months = Math.floor(diffDays / 30);
   if (months < 12) return `${months}mo`;
   const years = Math.floor(months / 12);
   return `${years}y`;
