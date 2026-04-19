@@ -65,8 +65,8 @@ export const SESSION_MODE_CONFIGS: Record<string, SessionModeConfig> = {
   freeform: {
     title: 'Chat',
     subtitle: 'Ask anything',
-    placeholder: "What's on your mind?",
-    openingMessage: "What's on your mind? I'm ready when you are.",
+    placeholder: 'Ask me something',
+    openingMessage: 'Hi! Ask me anything.',
     showTimer: false,
     showQuestionCount: false,
   },
@@ -95,21 +95,21 @@ const FIRST_SESSION: Record<string, string> = {
     "Hi! I'm your learning mate. Feel free to ask me anything — I'm here to help.",
 };
 
-const EARLY_SESSIONS: Record<string, string> = {
+export const EARLY_SESSIONS: Record<string, string> = {
   homework: 'Good to see you again! What homework are we tackling today?',
   learning: 'Back for more learning — awesome! What shall we dive into?',
   practice: "Ready for another round? Let's test your knowledge.",
   recitation:
     'Ready for another recitation? What would you like to recite today?',
-  freeform: "Hey again! What's on your mind today?",
+  freeform: 'Hey again — what are you curious about?',
 };
 
-const FAMILIAR_SESSIONS: Record<string, string> = {
+export const FAMILIAR_SESSIONS: Record<string, string> = {
   homework: "Let's get this homework done. What do you need help with?",
   learning: 'What do you remember from our last session?',
   practice: "Quick: what's the key concept we covered?",
   recitation: 'What are we reciting today?',
-  freeform: "What's on your mind? I'm ready when you are.",
+  freeform: 'Hey again — what are you curious about?',
 };
 
 /**

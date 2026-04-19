@@ -1,4 +1,10 @@
-import { getOpeningMessage, getModeConfig } from './sessionModeConfig';
+import {
+  getOpeningMessage,
+  getModeConfig,
+  SESSION_MODE_CONFIGS,
+  EARLY_SESSIONS,
+  FAMILIAR_SESSIONS,
+} from './sessionModeConfig';
 
 describe('getOpeningMessage', () => {
   const modes = ['homework', 'learning', 'practice', 'freeform'];
@@ -221,5 +227,41 @@ describe('getOpeningMessage', () => {
       // At least 3 distinct messages per mode (familiar and experienced may overlap for freeform)
       expect(unique.size).toBeGreaterThanOrEqual(3);
     }
+  });
+});
+
+describe('freeform greeting revert guards (copy sweep 2026-04-19)', () => {
+  it('C1: freeform placeholder is the short action-verb invitation', () => {
+    expect(SESSION_MODE_CONFIGS.freeform?.placeholder).toBe('Ask me something');
+  });
+
+  it('C2: freeform base openingMessage leverages entry-card context', () => {
+    expect(SESSION_MODE_CONFIGS.freeform?.openingMessage).toBe(
+      'Hi! Ask me anything.'
+    );
+  });
+
+  it('C3: EARLY_SESSIONS freeform greeting is the curiosity phrasing', () => {
+    expect(EARLY_SESSIONS.freeform).toBe(
+      'Hey again — what are you curious about?'
+    );
+  });
+
+  it('C4: FAMILIAR_SESSIONS freeform greeting matches C3 (consolidated)', () => {
+    expect(FAMILIAR_SESSIONS.freeform).toBe(
+      'Hey again — what are you curious about?'
+    );
+  });
+
+  it('does not fall back to the old passive phrasings', () => {
+    expect(SESSION_MODE_CONFIGS.freeform?.placeholder).not.toBe(
+      "What's on your mind?"
+    );
+    expect(EARLY_SESSIONS.freeform).not.toBe(
+      "Hey again! What's on your mind today?"
+    );
+    expect(FAMILIAR_SESSIONS.freeform).not.toBe(
+      "What's on your mind? I'm ready when you are."
+    );
   });
 });
