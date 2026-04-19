@@ -737,6 +737,38 @@ export interface MemoryBlockProfile {
   memoryEnabled?: boolean;
   memoryInjectionEnabled?: boolean;
   effectivenessSessionCount?: number;
+  /** Active urgency boost for the current subject — optional, F8/P1.4 */
+  activeUrgency?: {
+    reason: string;
+    boostUntil: Date;
+  } | null;
+}
+
+// ---------------------------------------------------------------------------
+// MemoryBlock — structured return shape for F8 source traceability (P1.3/P1.4)
+// ---------------------------------------------------------------------------
+
+export interface MemoryBlockEntry {
+  kind:
+    | 'struggle'
+    | 'strength'
+    | 'interest'
+    | 'communication_note'
+    | 'urgency'
+    | 'learning_style';
+  /** The sentence as rendered in MemoryBlock.text */
+  text: string;
+  /** Session ID that produced this memory signal, if known */
+  sourceSessionId?: string | null;
+  /** Event ID that produced this memory signal, if known */
+  sourceEventId?: string | null;
+}
+
+export interface MemoryBlock {
+  /** The full memory block text to interpolate into an LLM prompt */
+  text: string;
+  /** Structured entries — every visible line in .text has a matching entry here */
+  entries: MemoryBlockEntry[];
 }
 
 export function buildMemoryBlock(
@@ -745,10 +777,10 @@ export function buildMemoryBlock(
   currentTopic: string | null,
   retentionContext?: MemoryRetentionContext | null,
   recentlyResolved?: Array<string | { topic: string; subject: string | null }>
-): string {
+): MemoryBlock {
   const injectionEnabled =
     profile?.memoryInjectionEnabled ?? profile?.memoryEnabled ?? true;
-  if (!profile || !injectionEnabled) return '';
+  if (!profile || !injectionEnabled) return { text: '', entries: [] };
 
   const sections: string[] = [];
   const strongTopicSet = new Set(
@@ -772,14 +804,17 @@ export function buildMemoryBlock(
     );
   });
 
+  // Each entry tracks the rendered sentence + source metadata for F8 traceability
+  const entries: MemoryBlockEntry[] = [];
+
   if (relevantStruggles.length > 0) {
     const struggleTopics = relevantStruggles
       .slice(0, 4)
       .map((entry) => entry.topic)
       .join(', ');
-    sections.push(
-      `- They've been working hard on: ${struggleTopics}. Be patient and try a different angle before escalating.`
-    );
+    const text = `- They've been working hard on: ${struggleTopics}. Be patient and try a different angle before escalating.`;
+    sections.push(text);
+    entries.push({ kind: 'struggle', text, sourceSessionId: null, sourceEventId: null });
   }
 
   if (recentlyResolved && recentlyResolved.length > 0) {
@@ -791,9 +826,23 @@ export function buildMemoryBlock(
           : entry.topic;
       })
       .join(', ');
-    sections.push(
-      `- They recently overcame difficulties with: ${resolvedList}. Celebrate their growth!`
-    );
+    const text = `- They recently overcame difficulties with: ${resolvedList}. Celebrate their growth!`;
+    sections.push(text);
+    entries.push({ kind: 'struggle', text, sourceSessionId: null, sourceEventId: null });
+  }
+
+  // P1.3: Inject strengths — top 3 entries by number of topics (confidence proxy)
+  const sortedStrengths = [...profile.strengths].sort(
+    (a, b) => b.topics.length - a.topics.length
+  );
+  const topStrengths = sortedStrengths.slice(0, 3);
+  if (topStrengths.length > 0) {
+    const strengthLabels = topStrengths
+      .map((entry) => `${entry.topics.slice(0, 3).join(', ')} (${entry.subject})`)
+      .join('; ');
+    const text = `- Confident with: ${strengthLabels}.`;
+    sections.push(text);
+    entries.push({ kind: 'strength', text, sourceSessionId: null, sourceEventId: null });
   }
 
   if (profile.learningStyle) {
@@ -820,25 +869,31 @@ export function buildMemoryBlock(
       );
     }
     if (styleParts.length > 0) {
-      sections.push(`- They learn best with ${styleParts.join(', ')}.`);
+      const text = `- They learn best with ${styleParts.join(', ')}.`;
+      sections.push(text);
+      entries.push({ kind: 'learning_style', text, sourceSessionId: null, sourceEventId: null });
     }
   }
 
   const topInterests = profile.interests.slice(-5).reverse();
   if (topInterests.length > 0) {
-    sections.push(`- They're interested in: ${topInterests.join(', ')}.`);
+    const text = `- They're interested in: ${topInterests.join(', ')}.`;
+    sections.push(text);
+    entries.push({ kind: 'interest', text, sourceSessionId: null, sourceEventId: null });
   }
 
   const recentNotes = profile.communicationNotes.slice(-2);
   if (recentNotes.length > 0) {
-    sections.push(`- ${recentNotes.join('. ')}.`);
+    const text = `- ${recentNotes.join('. ')}.`;
+    sections.push(text);
+    entries.push({ kind: 'communication_note', text, sourceSessionId: null, sourceEventId: null });
   }
 
   const signalCount = totalProfileSignalCount(profile);
   if (!profile.learningStyle && signalCount > 0) {
-    sections.push(
-      '- Their preferred explanation style is still emerging. Vary your approach and notice what seems to click.'
-    );
+    const text = '- Their preferred explanation style is still emerging. Vary your approach and notice what seems to click.';
+    sections.push(text);
+    entries.push({ kind: 'learning_style', text, sourceSessionId: null, sourceEventId: null });
   }
 
   const effectivenessCount = profile.effectivenessSessionCount ?? 0;
@@ -846,9 +901,25 @@ export function buildMemoryBlock(
     sections.push(
       "- If it fits naturally, ask one gentle check-in question such as 'Did that help?' or 'Want another kind of example?' — no more than once per session."
     );
+    // No entry for this meta-instruction — it's prompt guidance, not a learner memory signal
   }
 
-  if (sections.length === 0) return '';
+  // P1.4: Inject urgency_boost_reason — most urgent active subject deadline
+  if (profile.activeUrgency) {
+    const { reason, boostUntil } = profile.activeUrgency;
+    const now = new Date();
+    if (boostUntil > now) {
+      const daysAway = Math.max(
+        1,
+        Math.round((boostUntil.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+      );
+      const text = `- Upcoming: ${reason}, ${daysAway} day${daysAway === 1 ? '' : 's'} away.`;
+      sections.push(text);
+      entries.push({ kind: 'urgency', text, sourceSessionId: null, sourceEventId: null });
+    }
+  }
+
+  if (sections.length === 0) return { text: '', entries: [] };
 
   const metaInstruction =
     'Use the learner memory naturally. Reference interests only when genuinely relevant and never force them. ' +
@@ -861,6 +932,7 @@ export function buildMemoryBlock(
   const originalSectionCount = sections.length;
   while (block.length > MEMORY_BLOCK_CHAR_BUDGET && sections.length > 0) {
     sections.pop();
+    entries.pop();
     block = `About this learner:\n${sections.join('\n')}\n\n${metaInstruction}`;
   }
   if (sections.length < originalSectionCount) {
@@ -871,7 +943,7 @@ export function buildMemoryBlock(
     });
   }
 
-  return block;
+  return { text: block, entries };
 }
 
 export async function getLearningProfile(
