@@ -211,6 +211,173 @@ describe('generateDictation', () => {
     expect(systemContent).toContain('utropstegn');
   });
 
+  it('weaves free_time / both interests into the literary theme when provided', async () => {
+    mockRouteAndCall.mockResolvedValueOnce({
+      response: JSON.stringify({
+        sentences: [
+          {
+            text: 'The young paleontologist brushed dust off the fossil.',
+            withPunctuation:
+              'The young paleontologist brushed dust off the fossil period',
+            wordCount: 8,
+          },
+        ],
+        title: 'Discovery',
+        topic: 'a young fossil hunter',
+        language: 'en',
+      }),
+      provider: 'gemini',
+      model: 'gemini-2.5-flash',
+      latencyMs: 80,
+    });
+
+    await generateDictation({
+      nativeLanguage: 'en',
+      ageYears: 12,
+      interests: [
+        { label: 'dinosaurs', context: 'both' },
+        { label: 'fossils', context: 'both' },
+        { label: 'paleontology', context: 'both' },
+      ],
+    });
+
+    const callArgs = mockRouteAndCall.mock.calls[0];
+    const systemContent = callArgs[0][0].content as string;
+    expect(systemContent).toContain('PERSONALIZATION:');
+    expect(systemContent).toContain('dinosaurs');
+    expect(systemContent).toContain('fossils');
+    expect(systemContent).toContain('paleontology');
+  });
+
+  it('excludes school-only interests from the thematic block', async () => {
+    mockRouteAndCall.mockResolvedValueOnce({
+      response: JSON.stringify({
+        sentences: [
+          {
+            text: 'The horse galloped across the meadow.',
+            withPunctuation: 'The horse galloped across the meadow period',
+            wordCount: 6,
+          },
+        ],
+        title: 'Meadow',
+        topic: 'horses',
+        language: 'en',
+      }),
+      provider: 'gemini',
+      model: 'gemini-2.5-flash',
+      latencyMs: 80,
+    });
+
+    await generateDictation({
+      nativeLanguage: 'en',
+      ageYears: 11,
+      interests: [
+        { label: 'horses', context: 'free_time' },
+        { label: 'algebra drills', context: 'school' }, // must be excluded
+      ],
+    });
+
+    const systemContent = mockRouteAndCall.mock.calls[0][0][0]
+      .content as string;
+    expect(systemContent).toContain('horses');
+    expect(systemContent).not.toContain('algebra drills');
+  });
+
+  it('includes library topics as setting backdrop when provided', async () => {
+    mockRouteAndCall.mockResolvedValueOnce({
+      response: JSON.stringify({
+        sentences: [
+          {
+            text: 'The soldier wrote a letter home from the trench.',
+            withPunctuation:
+              'The soldier wrote a letter home from the trench period',
+            wordCount: 9,
+          },
+        ],
+        title: 'A Letter',
+        topic: 'wartime narrative',
+        language: 'en',
+      }),
+      provider: 'gemini',
+      model: 'gemini-2.5-flash',
+      latencyMs: 80,
+    });
+
+    await generateDictation({
+      nativeLanguage: 'en',
+      ageYears: 15,
+      libraryTopics: ['WWII Pacific theater', 'Cold War origins'],
+    });
+
+    const systemContent = mockRouteAndCall.mock.calls[0][0][0]
+      .content as string;
+    expect(systemContent).toContain('LIBRARY TOPICS');
+    expect(systemContent).toContain('WWII Pacific theater');
+  });
+
+  it('omits INTERESTS and LIBRARY TOPICS blocks when not provided (backward compat)', async () => {
+    mockRouteAndCall.mockResolvedValueOnce({
+      response: JSON.stringify({
+        sentences: [
+          {
+            text: 'A quiet morning in the forest.',
+            withPunctuation: 'A quiet morning in the forest period',
+            wordCount: 6,
+          },
+        ],
+        title: 'Forest',
+        topic: 'nature',
+        language: 'en',
+      }),
+      provider: 'gemini',
+      model: 'gemini-2.5-flash',
+      latencyMs: 80,
+    });
+
+    await generateDictation({
+      nativeLanguage: 'en',
+      ageYears: 12,
+    });
+
+    const systemContent = mockRouteAndCall.mock.calls[0][0][0]
+      .content as string;
+    expect(systemContent).not.toContain('PERSONALIZATION:');
+    expect(systemContent).not.toContain('LIBRARY TOPICS');
+  });
+
+  it('removed dead <11 literary theme branches — ageYears=12 resolves to chapter-book theme', async () => {
+    // Product ships to 11+ only. The old ≤7 (fairy tales) and ≤10 (Narnia)
+    // branches were dead; confirm ageYears=12 now picks the chapter-book
+    // branch and never surfaces fairy-tale or Narnia language.
+    mockRouteAndCall.mockResolvedValueOnce({
+      response: JSON.stringify({
+        sentences: [
+          {
+            text: 'Harry spotted something moving in the shadows.',
+            withPunctuation:
+              'Harry spotted something moving in the shadows period',
+            wordCount: 7,
+          },
+        ],
+        title: 'Shadows',
+        topic: 'adventure',
+        language: 'en',
+      }),
+      provider: 'gemini',
+      model: 'gemini-2.5-flash',
+      latencyMs: 80,
+    });
+
+    await generateDictation({ nativeLanguage: 'en', ageYears: 12 });
+
+    const systemContent = mockRouteAndCall.mock.calls[0][0][0]
+      .content as string;
+    expect(systemContent).toContain("children's novels and chapter books");
+    expect(systemContent).not.toContain('fairy tales');
+    expect(systemContent).not.toContain('Narnia');
+    expect(systemContent).not.toContain('Roald Dahl');
+  });
+
   it('includes French punctuation names in the prompt for fr language [RF-06]', async () => {
     mockRouteAndCall.mockResolvedValueOnce({
       response: JSON.stringify({
