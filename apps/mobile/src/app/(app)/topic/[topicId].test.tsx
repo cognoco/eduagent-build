@@ -12,7 +12,15 @@ const mockTopicRetention = jest.fn();
 const mockEvaluateEligibility = jest.fn();
 const mockParkingLot = jest.fn();
 const mockTopicNote = jest.fn();
-const mockResolveTopicSubject = jest.fn(() => ({
+const mockResolveTopicSubject = jest.fn<
+  {
+    data:
+      | { subjectId: string; subjectName: string; topicTitle: string }
+      | undefined;
+    isLoading: boolean;
+  },
+  []
+>(() => ({
   data: undefined,
   isLoading: false,
 }));
@@ -437,7 +445,7 @@ describe('TopicDetailScreen error / empty / missing-params states', () => {
         subjectId: 's1',
         subjectName: 'Mathematics',
         topicTitle: 'Algebra',
-      } as unknown,
+      },
       isLoading: false,
     });
 
