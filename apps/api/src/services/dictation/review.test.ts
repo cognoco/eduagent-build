@@ -7,7 +7,7 @@ jest.mock('../llm', () => ({
 }));
 
 import { routeAndCall } from '../llm';
-import { reviewDictation } from './review';
+import { reviewDictation, buildReviewSystemPrompt } from './review';
 import type { DictationSentence } from '@eduagent/schemas';
 
 const mockRouteAndCall = routeAndCall as jest.Mock;
@@ -129,6 +129,62 @@ describe('reviewDictation', () => {
     expect(mockRouteAndCall).toHaveBeenCalledWith(expect.any(Array), 2);
   });
 
+  it('passes age and explanation style through to the system prompt when provided', async () => {
+    mockRouteAndCall.mockResolvedValueOnce({
+      response: JSON.stringify({
+        totalSentences: 2,
+        correctCount: 2,
+        mistakes: [],
+      }),
+      provider: 'gemini',
+      model: 'gemini-2.5-flash',
+      latencyMs: 100,
+    });
+
+    await reviewDictation({
+      ...BASE_INPUT,
+      ageYears: 17,
+      preferredExplanations: ['step-by-step', 'examples'],
+    });
+
+    const [messages] = mockRouteAndCall.mock.calls[0] as [
+      Array<{ role: string; content: unknown }>
+    ];
+    const systemContent = messages.find((m) => m.role === 'system')
+      ?.content as string;
+    expect(systemContent).toContain('EXPLANATION STYLE');
+    // 15+ register — precise terminology
+    expect(systemContent).toContain(
+      'precise grammar and punctuation terminology'
+    );
+    // step-by-step preference included
+    expect(systemContent).toContain('numbered 1');
+  });
+
+  it('uses child-friendly register for ageYears ≤ 13', async () => {
+    mockRouteAndCall.mockResolvedValueOnce({
+      response: JSON.stringify({
+        totalSentences: 2,
+        correctCount: 2,
+        mistakes: [],
+      }),
+      provider: 'gemini',
+      model: 'gemini-2.5-flash',
+      latencyMs: 100,
+    });
+
+    await reviewDictation({ ...BASE_INPUT, ageYears: 11 });
+
+    const [messages] = mockRouteAndCall.mock.calls[0] as [
+      Array<{ role: string; content: unknown }>
+    ];
+    const systemContent = messages.find((m) => m.role === 'system')
+      ?.content as string;
+    // ≤11 register — simple, encouraging language
+    expect(systemContent).toContain('simple, encouraging language');
+    expect(systemContent).not.toContain('precise grammar');
+  });
+
   it('includes image inline_data part in the user message', async () => {
     mockRouteAndCall.mockResolvedValueOnce({
       response: JSON.stringify({
@@ -151,5 +207,62 @@ describe('reviewDictation', () => {
     const parts = userMsg?.content as Array<{ type: string }>;
     expect(parts.some((p) => p.type === 'inline_data')).toBe(true);
     expect(parts.some((p) => p.type === 'text')).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildReviewSystemPrompt
+// ---------------------------------------------------------------------------
+
+describe('buildReviewSystemPrompt', () => {
+  it('returns the baseline static prompt unchanged when called with no options (backward compat)', () => {
+    const promptA = buildReviewSystemPrompt();
+    const promptB = buildReviewSystemPrompt({});
+    // Both no-arg and empty-object calls must produce identical output, and
+    // that output must match the original static SYSTEM_PROMPT shape —
+    // we assert on key landmarks rather than the full string to stay robust
+    // to trailing whitespace changes.
+    expect(promptA).toBe(promptB);
+    expect(promptA).toContain('You are a dictation review assistant.');
+    expect(promptA).toContain('RESPOND WITH ONLY valid JSON');
+    expect(promptA).toContain("child's language as instructed.");
+    // No personalization sections appended when options absent
+    expect(promptA).not.toContain('EXPLANATION STYLE');
+  });
+
+  it('adds an EXPLANATION STYLE section when ageYears is provided', () => {
+    const prompt = buildReviewSystemPrompt({ ageYears: 11 });
+    expect(prompt).toContain('EXPLANATION STYLE');
+    // ≤11 register uses simple, encouraging language
+    expect(prompt).toContain('simple, encouraging language');
+  });
+
+  it('uses precise terminology register for 15+ learners', () => {
+    const prompt = buildReviewSystemPrompt({ ageYears: 16 });
+    expect(prompt).toContain('precise grammar and punctuation terminology');
+    // Confirm the child register text is absent from the EXPLANATION STYLE
+    // section (the 15+ register uses technical language, not simplified).
+    const styleSection = prompt.split('EXPLANATION STYLE:')[1] ?? '';
+    expect(styleSection).not.toContain('simple, encouraging');
+  });
+
+  it('adds humor guidance when preferredExplanations includes humor', () => {
+    const prompt = buildReviewSystemPrompt({
+      ageYears: 12,
+      preferredExplanations: ['humor', 'stories'],
+    });
+    expect(prompt).toContain('humour');
+    expect(prompt).toContain('memorable story');
+  });
+
+  it('silently ignores the diagrams style (no text representation)', () => {
+    const prompt = buildReviewSystemPrompt({
+      ageYears: 13,
+      preferredExplanations: ['diagrams'],
+    });
+    // diagrams alone produces no style line but ageYears block is still present
+    // ageYears=13 → middle-school register
+    expect(prompt).toContain('middle-schooler');
+    expect(prompt).not.toContain('diagram');
   });
 });

@@ -222,7 +222,7 @@ Arts & Music, Technology, Literature, Life Skills
 
 Only create custom shelves when none of these fit.`;
 
-function buildPreSessionPrompt(
+export function buildPreSessionPrompt(
   rawInput: string,
   selectedSuggestion: string | null | undefined,
   libraryText: string,
@@ -259,7 +259,7 @@ Return ONLY valid JSON:
 }`;
 }
 
-function buildPostSessionPrompt(
+export function buildPostSessionPrompt(
   sessionTranscript: string,
   libraryText: string,
   isSparse: boolean

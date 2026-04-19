@@ -22,6 +22,11 @@ import { formatApiError } from '../lib/format-api-error';
 import { goBackOrReplace } from '../lib/navigation';
 import type { SubjectResolveResult } from '@eduagent/schemas';
 
+/** Strip markdown bold markers so `**Science**` renders as plain "Science". */
+function stripBold(text: string): string {
+  return text.replace(/\*\*(.+?)\*\*/g, '$1');
+}
+
 // Captured at module load — safe because these screens are portrait-locked.
 // On web, cap at a mobile-like height to avoid massive whitespace.
 const SCREEN_HEIGHT =
@@ -546,7 +551,7 @@ export default function CreateSubjectScreen() {
                 className="text-body text-text-primary flex-1"
                 testID="subject-suggestion-message"
               >
-                {resolveState.result.displayMessage}
+                {stripBold(resolveState.result.displayMessage ?? '')}
               </Text>
             </View>
             {resolveState.result.suggestions.map((suggestion, index) => (
@@ -643,7 +648,7 @@ export default function CreateSubjectScreen() {
               className="text-body text-text-primary mb-3"
               testID="subject-suggestion-message"
             >
-              {resolveState.result.displayMessage ||
+              {stripBold(resolveState.result.displayMessage ?? '') ||
                 "I couldn't match that cleanly, but we can still use your exact words."}
             </Text>
             {exactWords !== '' && (
@@ -690,7 +695,7 @@ export default function CreateSubjectScreen() {
                   className="text-body text-text-primary flex-1"
                   testID="subject-suggestion-message"
                 >
-                  {resolveState.result.displayMessage}
+                  {stripBold(resolveState.result.displayMessage ?? '')}
                 </Text>
               </View>
               <View className="flex-row gap-3">

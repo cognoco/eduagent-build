@@ -340,6 +340,8 @@ export async function completeQuizRound(
               easeFactor: String(existing.easeFactor),
               interval: existing.interval,
               repetitions: existing.repetitions,
+              lastReviewedAt: existing.updatedAt,
+              nextReviewAt: existing.nextReviewAt,
             },
             quality
           );
@@ -445,6 +447,9 @@ export async function completeQuizRound(
           questionIndex: result.questionIndex,
           correct: result.correct,
           correctAnswer: question?.correctAnswer ?? '',
+          // [F-040] Copy the user's submitted answer into the response so the
+          // results screen can show "You said: X" on missed-question cards.
+          answerGiven: result.answerGiven,
         };
       }
     );

@@ -227,11 +227,34 @@ export async function getSubjectRetention(
     (c) => c.nextReviewAt && c.nextReviewAt.getTime() <= now.getTime()
   ).length;
 
+  // F-023: Include not-started topics (those with no retention card) so the
+  // Library Topics tab shows the full curriculum, not just started topics.
+  const cardByTopicId = new Map(subjectCards.map((c) => [c.topicId, c]));
+  const allTopics = topicIds.map((tid) => {
+    const card = cardByTopicId.get(tid);
+    if (card) {
+      return {
+        ...mapRetentionCardRow(card),
+        topicTitle: topicTitleMap.get(tid) ?? tid,
+      };
+    }
+    // Synthesize a zero-state entry for topics never started
+    return {
+      topicId: tid,
+      easeFactor: 2.5,
+      intervalDays: 0,
+      repetitions: 0,
+      nextReviewAt: null,
+      lastReviewedAt: null,
+      xpStatus: 'pending' as const,
+      failureCount: 0,
+      evaluateDifficultyRung: null,
+      topicTitle: topicTitleMap.get(tid) ?? tid,
+    };
+  });
+
   return {
-    topics: subjectCards.map((card) => ({
-      ...mapRetentionCardRow(card),
-      topicTitle: topicTitleMap.get(card.topicId) ?? card.topicId,
-    })),
+    topics: allTopics,
     reviewDueCount,
   };
 }

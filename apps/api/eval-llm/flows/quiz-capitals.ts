@@ -1,4 +1,5 @@
 import { buildCapitalsPrompt } from '../../src/services/quiz/generate-round';
+import type { Interest } from '../../src/services/quiz/config';
 import type { EvalProfile } from '../fixtures/profiles';
 import type { FlowDefinition, PromptMessages } from '../runner/types';
 
@@ -7,10 +8,7 @@ import type { FlowDefinition, PromptMessages } from '../runner/types';
 //
 // Wraps the production buildCapitalsPrompt so the eval harness sees the
 // same output the live code path would produce. Inputs are derived from the
-// EvalProfile via simple mappings — NO personalization extension here.
-// The whole point of the harness is to show what the current prompt builder
-// does and does not use; gaps become visible when we diff snapshots after
-// making the builder richer.
+// EvalProfile, including personalization fields added in audit P0.1 / P1.2.
 // ---------------------------------------------------------------------------
 
 type CapitalsBuilderInput = Parameters<typeof buildCapitalsPrompt>[0];
@@ -20,6 +18,10 @@ function ageYearsToBracket(ageYears: number): 'child' | 'adolescent' | 'adult' {
   if (ageYears <= 9) return 'child';
   if (ageYears <= 13) return 'adolescent';
   return 'adult';
+}
+
+function toInterests(labels: string[]): Interest[] {
+  return labels.map((label) => ({ label, context: 'free_time' as const }));
 }
 
 export const capitalsFlow: FlowDefinition<CapitalsBuilderInput> = {
@@ -34,6 +36,9 @@ export const capitalsFlow: FlowDefinition<CapitalsBuilderInput> = {
       ageBracket: ageYearsToBracket(profile.ageYears),
       recentAnswers: profile.recentQuizAnswers.capitals,
       themePreference: undefined,
+      interests: toInterests(profile.interests),
+      libraryTopics: profile.libraryTopics,
+      ageYears: profile.ageYears,
     };
   },
 
@@ -43,9 +48,14 @@ export const capitalsFlow: FlowDefinition<CapitalsBuilderInput> = {
       system,
       user: 'Generate the quiz round.',
       notes: [
-        `Coarse age bracket in use: ${input.ageBracket}. Interests NOT passed (gap flagged in audit P0).`,
-        `Library topics NOT passed (gap flagged in audit P1).`,
-        `Struggles NOT passed (gap flagged in audit P0).`,
+        `Fine-grained age: ${
+          input.ageYears ?? input.ageBracket
+        }. Interests passed: ${
+          (input.interests ?? []).map((i) => i.label).join(', ') || 'none'
+        }.`,
+        `Library topics passed: ${
+          (input.libraryTopics ?? []).join('; ') || 'none'
+        }.`,
       ],
     };
   },

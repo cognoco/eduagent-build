@@ -117,6 +117,10 @@ export const questionResultSchema = z.object({
   timeMs: z.number().int().min(0),
   cluesUsed: z.number().int().min(0).max(5).optional(),
   answerMode: z.enum(['free_text', 'multiple_choice']).optional(),
+  /** [BUG-469] User disputes the LLM's correctness judgment.
+   * TODO: Server-side handling — complete-round.ts should persist the dispute
+   * flag and surface it in analytics so disputed answers can be reviewed. */
+  disputed: z.boolean().optional(),
 });
 export type QuestionResult = z.infer<typeof questionResultSchema>;
 
@@ -177,6 +181,10 @@ export const validatedQuestionResultSchema = z.object({
   questionIndex: z.number().int().min(0),
   correct: z.boolean(),
   correctAnswer: z.string(),
+  // [F-040] The user's submitted answer — surfaced to the results screen so
+  // we can render "You said: X" on missed-question cards without a second
+  // round-trip. Server-authoritative: copied from validatedResults.
+  answerGiven: z.string(),
 });
 export type ValidatedQuestionResult = z.infer<
   typeof validatedQuestionResultSchema

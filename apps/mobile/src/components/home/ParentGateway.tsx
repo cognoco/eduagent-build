@@ -25,7 +25,7 @@ function getChildHighlight(dashboard: DashboardData | undefined): string {
     return `${child.displayName} practiced ${minutes} min this week`;
   }
 
-  return 'No activity this week';
+  return `${child.displayName} hasn't practiced this week`;
 }
 
 export interface ParentGatewayProps {

@@ -1,0 +1,1194 @@
+diff --git a/apps/api/eval-llm/flows/dictation-generate.ts b/apps/api/eval-llm/flows/dictation-generate.ts
+index e5db487e..41dd7bde 100644
+--- a/apps/api/eval-llm/flows/dictation-generate.ts
++++ b/apps/api/eval-llm/flows/dictation-generate.ts
+@@ -23,19 +23,29 @@ export const dictationGenerateFlow: FlowDefinition<GenerateContext> = {
+     return {
+       nativeLanguage: profile.nativeLanguage,
+       ageYears: profile.ageYears,
++      interests: profile.interests,
++      libraryTopics: profile.libraryTopics,
+     };
+   },
+ 
+   buildPrompt(input: GenerateContext): PromptMessages {
+     const system = buildGeneratePrompt(input);
++    const thematicInterests = (input.interests ?? [])
++      .filter((i) => i.context === 'free_time' || i.context === 'both')
++      .slice(0, 3)
++      .map((i) => i.label);
+     return {
+       system,
+       user: 'Generate a dictation for me.',
+       notes: [
+-        `Uses fine-grained ageYears=${input.ageYears} — 4-bucket literary scaling (strongest age handling in the codebase).`,
++        `Uses fine-grained ageYears=${input.ageYears} — 2-bucket literary scaling (≤13 chapter books, >13 classic/contemporary). Dead <11 branches removed.`,
+         `Native language drives punctuation-name mapping.`,
+-        `Interests NOT used (gap flagged in audit P0) — dinosaur kid gets same Dahl theme as horse kid.`,
+-        `Library topics NOT used (gap flagged in audit P0) — WWII learner could get period-appropriate narrative passages.`,
++        thematicInterests.length > 0
++          ? `Interests woven into theme: ${thematicInterests.join(', ')} (school-only interests excluded to avoid textbook prose).`
++          : `No free_time/both interests on this profile — passage uses the default literary theme.`,
++        (input.libraryTopics?.length ?? 0) > 0
++          ? `Library topics available as setting backdrop: ${(input.libraryTopics ?? []).slice(0, 4).join(', ')}.`
++          : `No library topics on this profile.`,
+       ],
+     };
+   },
+diff --git a/apps/api/eval-llm/flows/dictation-review.ts b/apps/api/eval-llm/flows/dictation-review.ts
+index c7d161a0..58e527ec 100644
+--- a/apps/api/eval-llm/flows/dictation-review.ts
++++ b/apps/api/eval-llm/flows/dictation-review.ts
+@@ -1,4 +1,7 @@
+-import { SYSTEM_PROMPT } from '../../src/services/dictation/review';
++import {
++  buildReviewSystemPrompt,
++  type ExplanationStyle,
++} from '../../src/services/dictation/review';
+ import type { EvalProfile } from '../fixtures/profiles';
+ import type { FlowDefinition, PromptMessages } from '../runner/types';
+ 
+@@ -8,13 +11,13 @@ import type { FlowDefinition, PromptMessages } from '../runner/types';
+ // Multimodal flow — the production code sends a system prompt, a base64
+ // handwriting image, and a text user-part with the original sentences and
+ // the explanation language. In the eval harness we can't render the image,
+-// but we CAN snapshot: (1) the static system prompt and (2) the text-part
+-// of the user message, which is the only place any personalization lives
+-// ("Please generate all explanations in {language}").
++// but we CAN snapshot: (1) the system prompt and (2) the text-part of the
++// user message.
+ //
+-// Audit finding: the only personalization is language — no age, no learning
+-// style, no struggle history. Snapshots will show that every profile gets
+-// the same mistake-feedback register regardless of whether they're 11 or 17.
++// After the personalization pass, the system prompt now takes ageYears
++// and preferredExplanations — snapshots will show different feedback
++// registers per profile (concise-rule-naming for 17yo vs child-friendly
++// for 11yo).
+ // ---------------------------------------------------------------------------
+ 
+ interface DictationReviewInput {
+@@ -22,6 +25,10 @@ interface DictationReviewInput {
+   language: string;
+   /** Sample original sentences (what the child was supposed to write). */
+   originalSentences: string[];
++  /** Learner age — drives the feedback-complexity register. */
++  ageYears: number;
++  /** Preferred explanation styles — nudges the register. */
++  preferredExplanations: ExplanationStyle[];
+ }
+ 
+ function sampleSentencesFor(profile: EvalProfile): string[] {
+@@ -49,6 +56,8 @@ export const dictationReviewFlow: FlowDefinition<DictationReviewInput> = {
+     return {
+       language: profile.conversationLanguage,
+       originalSentences: sampleSentencesFor(profile),
++      ageYears: profile.ageYears,
++      preferredExplanations: profile.preferredExplanations,
+     };
+   },
+ 
+@@ -62,13 +71,18 @@ export const dictationReviewFlow: FlowDefinition<DictationReviewInput> = {
+     // which we cannot synthesize meaningfully in tier 1.
+     const userText = `Original sentences:\n${originalText}\n\nPlease generate all explanations in ${input.language}.`;
+ 
++    const system = buildReviewSystemPrompt({
++      ageYears: input.ageYears,
++      preferredExplanations: input.preferredExplanations,
++    });
++
+     return {
+-      system: SYSTEM_PROMPT,
++      system,
+       user: `[image part omitted]\n\n${userText}`,
+       notes: [
+-        `System prompt is static — zero personalization.`,
+-        `The ONLY personalized parameter is the explanation language.`,
+-        `Missing: age (explanation complexity calibration), learning style (humor/step-by-step register), struggle history (recurring-pattern-aware feedback).`,
++        `System prompt now personalized with ageYears=${input.ageYears} and preferredExplanations=[${input.preferredExplanations.join(', ')}].`,
++        `Explanation register: ${input.ageYears <= 13 ? 'brief child-friendly' : 'concise rule-naming'}.`,
++        `Language (${input.language}) still carried in the user text-part.`,
+         `Tier 2 (--live) requires a real handwriting image; not synthesized by this harness.`,
+       ],
+     };
+diff --git a/apps/api/eval-llm/snapshots/dictation-generate/11yo-czech-animals.md b/apps/api/eval-llm/snapshots/dictation-generate/11yo-czech-animals.md
+index 16773ff0..f7d5e572 100644
+--- a/apps/api/eval-llm/snapshots/dictation-generate/11yo-czech-animals.md
++++ b/apps/api/eval-llm/snapshots/dictation-generate/11yo-czech-animals.md
+@@ -28,7 +28,31 @@
+ ```json
+ {
+   "nativeLanguage": "cs",
+-  "ageYears": 11
++  "ageYears": 11,
++  "interests": [
++    {
++      "label": "horses",
++      "context": "free_time"
++    },
++    {
++      "label": "forest animals",
++      "context": "free_time"
++    },
++    {
++      "label": "nature journaling",
++      "context": "both"
++    },
++    {
++      "label": "drawing",
++      "context": "free_time"
++    }
++  ],
++  "libraryTopics": [
++    "Czech reading comprehension",
++    "basic fractions",
++    "human body systems",
++    "water cycle"
++  ]
+ }
+ ```
+ 
+@@ -44,6 +68,12 @@ Draw from children's novels and chapter books — school adventures, fantasy que
+ Write sentences that feel like they come from a story — natural prose with vivid imagery.
+ Do NOT use geographical, scientific, or encyclopaedia-style factual content.
+ 
++INTERESTS: The learner is particularly drawn to: horses, forest animals, nature journaling.
++Weave one or two of these into the narrative theme if it fits naturally — e.g. a paleontology-lover might get a chapter-book passage about a young fossil hunter, not a fact list. Keep the age-appropriate literary register from THEME above; do NOT simplify sentence structure to accommodate an interest.
++
++LIBRARY TOPICS (currently studying): Czech reading comprehension, basic fractions, human body systems, water cycle.
++If one of these lends itself to a period or setting (e.g. "Mesozoic era" → prehistoric setting; "US history: Civil War" → 1860s setting), the passage MAY use it as backdrop. Keep it literary narrative — do not lecture, do not insert exposition.
++
+ CONSTRAINTS:
+ - 6-10 sentences total
+ - Sentence length: 5-10 words
+@@ -93,7 +123,7 @@ Generate a dictation for me.
+ 
+ ## Builder notes
+ 
+-- Uses fine-grained ageYears=11 — 4-bucket literary scaling (strongest age handling in the codebase).
++- Uses fine-grained ageYears=11 — 2-bucket literary scaling (≤13 chapter books, >13 classic/contemporary). Dead <11 branches removed.
+ - Native language drives punctuation-name mapping.
+-- Interests NOT used (gap flagged in audit P0) — dinosaur kid gets same Dahl theme as horse kid.
+-- Library topics NOT used (gap flagged in audit P0) — WWII learner could get period-appropriate narrative passages.
++- Interests woven into theme: horses, forest animals, nature journaling (school-only interests excluded to avoid textbook prose).
++- Library topics available as setting backdrop: Czech reading comprehension, basic fractions, human body systems, water cycle.
+diff --git a/apps/api/eval-llm/snapshots/dictation-generate/12yo-dinosaurs.md b/apps/api/eval-llm/snapshots/dictation-generate/12yo-dinosaurs.md
+index e62dc870..1064e6d3 100644
+--- a/apps/api/eval-llm/snapshots/dictation-generate/12yo-dinosaurs.md
++++ b/apps/api/eval-llm/snapshots/dictation-generate/12yo-dinosaurs.md
+@@ -28,7 +28,35 @@
+ ```json
+ {
+   "nativeLanguage": "en",
+-  "ageYears": 12
++  "ageYears": 12,
++  "interests": [
++    {
++      "label": "dinosaurs",
++      "context": "both"
++    },
++    {
++      "label": "fossils",
++      "context": "both"
++    },
++    {
++      "label": "paleontology",
++      "context": "both"
++    },
++    {
++      "label": "extinction events",
++      "context": "free_time"
++    },
++    {
++      "label": "volcanoes",
++      "context": "free_time"
++    }
++  ],
++  "libraryTopics": [
++    "Mesozoic era",
++    "fossilization",
++    "plate tectonics",
++    "long division"
++  ]
+ }
+ ```
+ 
+@@ -44,6 +72,12 @@ Draw from children's novels and chapter books — school adventures, fantasy que
+ Write sentences that feel like they come from a story — natural prose with vivid imagery.
+ Do NOT use geographical, scientific, or encyclopaedia-style factual content.
+ 
++INTERESTS: The learner is particularly drawn to: dinosaurs, fossils, paleontology.
++Weave one or two of these into the narrative theme if it fits naturally — e.g. a paleontology-lover might get a chapter-book passage about a young fossil hunter, not a fact list. Keep the age-appropriate literary register from THEME above; do NOT simplify sentence structure to accommodate an interest.
++
++LIBRARY TOPICS (currently studying): Mesozoic era, fossilization, plate tectonics, long division.
++If one of these lends itself to a period or setting (e.g. "Mesozoic era" → prehistoric setting; "US history: Civil War" → 1860s setting), the passage MAY use it as backdrop. Keep it literary narrative — do not lecture, do not insert exposition.
++
+ CONSTRAINTS:
+ - 6-10 sentences total
+ - Sentence length: 5-10 words
+@@ -93,7 +127,7 @@ Generate a dictation for me.
+ 
+ ## Builder notes
+ 
+-- Uses fine-grained ageYears=12 — 4-bucket literary scaling (strongest age handling in the codebase).
++- Uses fine-grained ageYears=12 — 2-bucket literary scaling (≤13 chapter books, >13 classic/contemporary). Dead <11 branches removed.
+ - Native language drives punctuation-name mapping.
+-- Interests NOT used (gap flagged in audit P0) — dinosaur kid gets same Dahl theme as horse kid.
+-- Library topics NOT used (gap flagged in audit P0) — WWII learner could get period-appropriate narrative passages.
++- Interests woven into theme: dinosaurs, fossils, paleontology (school-only interests excluded to avoid textbook prose).
++- Library topics available as setting backdrop: Mesozoic era, fossilization, plate tectonics, long division.
+diff --git a/apps/api/eval-llm/snapshots/dictation-generate/13yo-spanish-beginner.md b/apps/api/eval-llm/snapshots/dictation-generate/13yo-spanish-beginner.md
+index bbdb002e..6add3f04 100644
+--- a/apps/api/eval-llm/snapshots/dictation-generate/13yo-spanish-beginner.md
++++ b/apps/api/eval-llm/snapshots/dictation-generate/13yo-spanish-beginner.md
+@@ -28,7 +28,31 @@
+ ```json
+ {
+   "nativeLanguage": "en",
+-  "ageYears": 13
++  "ageYears": 13,
++  "interests": [
++    {
++      "label": "horses",
++      "context": "free_time"
++    },
++    {
++      "label": "showjumping",
++      "context": "free_time"
++    },
++    {
++      "label": "eventing",
++      "context": "free_time"
++    },
++    {
++      "label": "nature photography",
++      "context": "free_time"
++    }
++  ],
++  "libraryTopics": [
++    "Spanish present tense verbs",
++    "Spanish family vocabulary",
++    "Spanish numbers 1-1000",
++    "Spain geography"
++  ]
+ }
+ ```
+ 
+@@ -44,6 +68,12 @@ Draw from children's novels and chapter books — school adventures, fantasy que
+ Write sentences that feel like they come from a story — natural prose with vivid imagery.
+ Do NOT use geographical, scientific, or encyclopaedia-style factual content.
+ 
++INTERESTS: The learner is particularly drawn to: horses, showjumping, eventing.
++Weave one or two of these into the narrative theme if it fits naturally — e.g. a paleontology-lover might get a chapter-book passage about a young fossil hunter, not a fact list. Keep the age-appropriate literary register from THEME above; do NOT simplify sentence structure to accommodate an interest.
++
++LIBRARY TOPICS (currently studying): Spanish present tense verbs, Spanish family vocabulary, Spanish numbers 1-1000, Spain geography.
++If one of these lends itself to a period or setting (e.g. "Mesozoic era" → prehistoric setting; "US history: Civil War" → 1860s setting), the passage MAY use it as backdrop. Keep it literary narrative — do not lecture, do not insert exposition.
++
+ CONSTRAINTS:
+ - 6-10 sentences total
+ - Sentence length: 7-14 words
+@@ -93,7 +123,7 @@ Generate a dictation for me.
+ 
+ ## Builder notes
+ 
+-- Uses fine-grained ageYears=13 — 4-bucket literary scaling (strongest age handling in the codebase).
++- Uses fine-grained ageYears=13 — 2-bucket literary scaling (≤13 chapter books, >13 classic/contemporary). Dead <11 branches removed.
+ - Native language drives punctuation-name mapping.
+-- Interests NOT used (gap flagged in audit P0) — dinosaur kid gets same Dahl theme as horse kid.
+-- Library topics NOT used (gap flagged in audit P0) — WWII learner could get period-appropriate narrative passages.
++- Interests woven into theme: horses, showjumping, eventing (school-only interests excluded to avoid textbook prose).
++- Library topics available as setting backdrop: Spanish present tense verbs, Spanish family vocabulary, Spanish numbers 1-1000, Spain geography.
+diff --git a/apps/api/eval-llm/snapshots/dictation-generate/15yo-football-gaming.md b/apps/api/eval-llm/snapshots/dictation-generate/15yo-football-gaming.md
+index aa8c6c6f..c2fc0eef 100644
+--- a/apps/api/eval-llm/snapshots/dictation-generate/15yo-football-gaming.md
++++ b/apps/api/eval-llm/snapshots/dictation-generate/15yo-football-gaming.md
+@@ -28,7 +28,34 @@
+ ```json
+ {
+   "nativeLanguage": "en",
+-  "ageYears": 15
++  "ageYears": 15,
++  "interests": [
++    {
++      "label": "football",
++      "context": "free_time"
++    },
++    {
++      "label": "NFL",
++      "context": "free_time"
++    },
++    {
++      "label": "esports",
++      "context": "free_time"
++    },
++    {
++      "label": "competitive gaming",
++      "context": "free_time"
++    },
++    {
++      "label": "sports statistics",
++      "context": "both"
++    }
++  ],
++  "libraryTopics": [
++    "algebra equations",
++    "US history: Civil War",
++    "physics: forces and motion"
++  ]
+ }
+ ```
+ 
+@@ -44,6 +71,12 @@ Draw from classic and contemporary literature — novels, short stories, literar
+ Write sentences that feel like they come from a story — natural prose with vivid imagery.
+ Do NOT use geographical, scientific, or encyclopaedia-style factual content.
+ 
++INTERESTS: The learner is particularly drawn to: football, NFL, esports.
++Weave one or two of these into the narrative theme if it fits naturally — e.g. a paleontology-lover might get a chapter-book passage about a young fossil hunter, not a fact list. Keep the age-appropriate literary register from THEME above; do NOT simplify sentence structure to accommodate an interest.
++
++LIBRARY TOPICS (currently studying): algebra equations, US history: Civil War, physics: forces and motion.
++If one of these lends itself to a period or setting (e.g. "Mesozoic era" → prehistoric setting; "US history: Civil War" → 1860s setting), the passage MAY use it as backdrop. Keep it literary narrative — do not lecture, do not insert exposition.
++
+ CONSTRAINTS:
+ - 6-10 sentences total
+ - Sentence length: 7-14 words
+@@ -93,7 +126,7 @@ Generate a dictation for me.
+ 
+ ## Builder notes
+ 
+-- Uses fine-grained ageYears=15 — 4-bucket literary scaling (strongest age handling in the codebase).
++- Uses fine-grained ageYears=15 — 2-bucket literary scaling (≤13 chapter books, >13 classic/contemporary). Dead <11 branches removed.
+ - Native language drives punctuation-name mapping.
+-- Interests NOT used (gap flagged in audit P0) — dinosaur kid gets same Dahl theme as horse kid.
+-- Library topics NOT used (gap flagged in audit P0) — WWII learner could get period-appropriate narrative passages.
++- Interests woven into theme: football, NFL, esports (school-only interests excluded to avoid textbook prose).
++- Library topics available as setting backdrop: algebra equations, US history: Civil War, physics: forces and motion.
+diff --git a/apps/api/eval-llm/snapshots/dictation-generate/17yo-french-advanced.md b/apps/api/eval-llm/snapshots/dictation-generate/17yo-french-advanced.md
+index 7354d833..e497be44 100644
+--- a/apps/api/eval-llm/snapshots/dictation-generate/17yo-french-advanced.md
++++ b/apps/api/eval-llm/snapshots/dictation-generate/17yo-french-advanced.md
+@@ -28,7 +28,31 @@
+ ```json
+ {
+   "nativeLanguage": "cs",
+-  "ageYears": 17
++  "ageYears": 17,
++  "interests": [
++    {
++      "label": "French literature",
++      "context": "both"
++    },
++    {
++      "label": "philosophy",
++      "context": "both"
++    },
++    {
++      "label": "existentialism",
++      "context": "free_time"
++    },
++    {
++      "label": "creative writing",
++      "context": "free_time"
++    }
++  ],
++  "libraryTopics": [
++    "Camus — L'Étranger",
++    "French subjunctive",
++    "essay structure",
++    "Enlightenment thinkers"
++  ]
+ }
+ ```
+ 
+@@ -44,6 +68,12 @@ Draw from classic and contemporary literature — novels, short stories, literar
+ Write sentences that feel like they come from a story — natural prose with vivid imagery.
+ Do NOT use geographical, scientific, or encyclopaedia-style factual content.
+ 
++INTERESTS: The learner is particularly drawn to: French literature, philosophy, existentialism.
++Weave one or two of these into the narrative theme if it fits naturally — e.g. a paleontology-lover might get a chapter-book passage about a young fossil hunter, not a fact list. Keep the age-appropriate literary register from THEME above; do NOT simplify sentence structure to accommodate an interest.
++
++LIBRARY TOPICS (currently studying): Camus — L'Étranger, French subjunctive, essay structure, Enlightenment thinkers.
++If one of these lends itself to a period or setting (e.g. "Mesozoic era" → prehistoric setting; "US history: Civil War" → 1860s setting), the passage MAY use it as backdrop. Keep it literary narrative — do not lecture, do not insert exposition.
++
+ CONSTRAINTS:
+ - 6-10 sentences total
+ - Sentence length: 7-14 words
+@@ -93,7 +123,7 @@ Generate a dictation for me.
+ 
+ ## Builder notes
+ 
+-- Uses fine-grained ageYears=17 — 4-bucket literary scaling (strongest age handling in the codebase).
++- Uses fine-grained ageYears=17 — 2-bucket literary scaling (≤13 chapter books, >13 classic/contemporary). Dead <11 branches removed.
+ - Native language drives punctuation-name mapping.
+-- Interests NOT used (gap flagged in audit P0) — dinosaur kid gets same Dahl theme as horse kid.
+-- Library topics NOT used (gap flagged in audit P0) — WWII learner could get period-appropriate narrative passages.
++- Interests woven into theme: French literature, philosophy, existentialism (school-only interests excluded to avoid textbook prose).
++- Library topics available as setting backdrop: Camus — L'Étranger, French subjunctive, essay structure, Enlightenment thinkers.
+diff --git a/apps/api/eval-llm/snapshots/dictation-review/11yo-czech-animals.md b/apps/api/eval-llm/snapshots/dictation-review/11yo-czech-animals.md
+index c192e89b..2027b68d 100644
+--- a/apps/api/eval-llm/snapshots/dictation-review/11yo-czech-animals.md
++++ b/apps/api/eval-llm/snapshots/dictation-review/11yo-czech-animals.md
+@@ -31,6 +31,11 @@
+   "originalSentences": [
+     "Kočka běžela zahradou.",
+     "Za chvíli začalo pršet."
++  ],
++  "ageYears": 11,
++  "preferredExplanations": [
++    "stories",
++    "examples"
+   ]
+ }
+ ```
+@@ -62,6 +67,10 @@ RESPOND WITH ONLY valid JSON in this exact format — no prose before or after:
+ 
+ If there are no mistakes, return an empty array for "mistakes".
+ Generate explanations in the child's language as instructed.
++
++EXPLANATION STYLE:
++The learner is 11 years old. Keep explanations brief (1 short sentence) and child-friendly — name the sound or letter pattern without jargon.
++Explanation style preferences: tiny narrative framings are fine ("the two n's in sunny keep each other company"); anchor the rule with one related example word when helpful.
+ ```
+ 
+ ## Generated prompt — user
+@@ -78,7 +87,7 @@ Please generate all explanations in cs.
+ 
+ ## Builder notes
+ 
+-- System prompt is static — zero personalization.
+-- The ONLY personalized parameter is the explanation language.
+-- Missing: age (explanation complexity calibration), learning style (humor/step-by-step register), struggle history (recurring-pattern-aware feedback).
++- System prompt now personalized with ageYears=11 and preferredExplanations=[stories, examples].
++- Explanation register: brief child-friendly.
++- Language (cs) still carried in the user text-part.
+ - Tier 2 (--live) requires a real handwriting image; not synthesized by this harness.
+diff --git a/apps/api/eval-llm/snapshots/dictation-review/12yo-dinosaurs.md b/apps/api/eval-llm/snapshots/dictation-review/12yo-dinosaurs.md
+index 234e4547..f89436ce 100644
+--- a/apps/api/eval-llm/snapshots/dictation-review/12yo-dinosaurs.md
++++ b/apps/api/eval-llm/snapshots/dictation-review/12yo-dinosaurs.md
+@@ -31,6 +31,12 @@
+   "originalSentences": [
+     "The cat ran through the garden.",
+     "After a while it began to rain."
++  ],
++  "ageYears": 12,
++  "preferredExplanations": [
++    "humor",
++    "examples",
++    "stories"
+   ]
+ }
+ ```
+@@ -62,6 +68,10 @@ RESPOND WITH ONLY valid JSON in this exact format — no prose before or after:
+ 
+ If there are no mistakes, return an empty array for "mistakes".
+ Generate explanations in the child's language as instructed.
++
++EXPLANATION STYLE:
++The learner is 12 years old. Keep explanations brief (1 short sentence) and child-friendly — name the sound or letter pattern without jargon.
++Explanation style preferences: gentle, light humor is welcome when it helps the correction stick — never mocking; tiny narrative framings are fine ("the two n's in sunny keep each other company"); anchor the rule with one related example word when helpful.
+ ```
+ 
+ ## Generated prompt — user
+@@ -78,7 +88,7 @@ Please generate all explanations in en.
+ 
+ ## Builder notes
+ 
+-- System prompt is static — zero personalization.
+-- The ONLY personalized parameter is the explanation language.
+-- Missing: age (explanation complexity calibration), learning style (humor/step-by-step register), struggle history (recurring-pattern-aware feedback).
++- System prompt now personalized with ageYears=12 and preferredExplanations=[humor, examples, stories].
++- Explanation register: brief child-friendly.
++- Language (en) still carried in the user text-part.
+ - Tier 2 (--live) requires a real handwriting image; not synthesized by this harness.
+diff --git a/apps/api/eval-llm/snapshots/dictation-review/13yo-spanish-beginner.md b/apps/api/eval-llm/snapshots/dictation-review/13yo-spanish-beginner.md
+index 0fa4c7e7..d7aded7c 100644
+--- a/apps/api/eval-llm/snapshots/dictation-review/13yo-spanish-beginner.md
++++ b/apps/api/eval-llm/snapshots/dictation-review/13yo-spanish-beginner.md
+@@ -31,6 +31,11 @@
+   "originalSentences": [
+     "The cat ran through the garden.",
+     "After a while it began to rain."
++  ],
++  "ageYears": 13,
++  "preferredExplanations": [
++    "step-by-step",
++    "examples"
+   ]
+ }
+ ```
+@@ -62,6 +67,10 @@ RESPOND WITH ONLY valid JSON in this exact format — no prose before or after:
+ 
+ If there are no mistakes, return an empty array for "mistakes".
+ Generate explanations in the child's language as instructed.
++
++EXPLANATION STYLE:
++The learner is 13 years old. Keep explanations brief (1 short sentence) and child-friendly — name the sound or letter pattern without jargon.
++Explanation style preferences: for tricky mistakes, walk through the correction step by step: what they wrote → what changes → why; anchor the rule with one related example word when helpful.
+ ```
+ 
+ ## Generated prompt — user
+@@ -78,7 +87,7 @@ Please generate all explanations in en.
+ 
+ ## Builder notes
+ 
+-- System prompt is static — zero personalization.
+-- The ONLY personalized parameter is the explanation language.
+-- Missing: age (explanation complexity calibration), learning style (humor/step-by-step register), struggle history (recurring-pattern-aware feedback).
++- System prompt now personalized with ageYears=13 and preferredExplanations=[step-by-step, examples].
++- Explanation register: brief child-friendly.
++- Language (en) still carried in the user text-part.
+ - Tier 2 (--live) requires a real handwriting image; not synthesized by this harness.
+diff --git a/apps/api/eval-llm/snapshots/dictation-review/15yo-football-gaming.md b/apps/api/eval-llm/snapshots/dictation-review/15yo-football-gaming.md
+index 5c50edfd..c1bdf74f 100644
+--- a/apps/api/eval-llm/snapshots/dictation-review/15yo-football-gaming.md
++++ b/apps/api/eval-llm/snapshots/dictation-review/15yo-football-gaming.md
+@@ -31,6 +31,11 @@
+   "originalSentences": [
+     "The cat ran through the garden.",
+     "After a while it began to rain."
++  ],
++  "ageYears": 15,
++  "preferredExplanations": [
++    "examples",
++    "analogies"
+   ]
+ }
+ ```
+@@ -62,6 +67,10 @@ RESPOND WITH ONLY valid JSON in this exact format — no prose before or after:
+ 
+ If there are no mistakes, return an empty array for "mistakes".
+ Generate explanations in the child's language as instructed.
++
++EXPLANATION STYLE:
++The learner is 15 years old. Explanations may be 1-2 sentences and can name the underlying spelling or grammar rule concisely (e.g. "double consonant after a short vowel") — avoid baby-talk but stay focused on the mistake.
++Explanation style preferences: anchor the rule with one related example word when helpful; short analogies to familiar patterns are welcome when they clarify.
+ ```
+ 
+ ## Generated prompt — user
+@@ -78,7 +87,7 @@ Please generate all explanations in en.
+ 
+ ## Builder notes
+ 
+-- System prompt is static — zero personalization.
+-- The ONLY personalized parameter is the explanation language.
+-- Missing: age (explanation complexity calibration), learning style (humor/step-by-step register), struggle history (recurring-pattern-aware feedback).
++- System prompt now personalized with ageYears=15 and preferredExplanations=[examples, analogies].
++- Explanation register: concise rule-naming.
++- Language (en) still carried in the user text-part.
+ - Tier 2 (--live) requires a real handwriting image; not synthesized by this harness.
+diff --git a/apps/api/eval-llm/snapshots/dictation-review/17yo-french-advanced.md b/apps/api/eval-llm/snapshots/dictation-review/17yo-french-advanced.md
+index cfcc085e..f3242ab3 100644
+--- a/apps/api/eval-llm/snapshots/dictation-review/17yo-french-advanced.md
++++ b/apps/api/eval-llm/snapshots/dictation-review/17yo-french-advanced.md
+@@ -31,6 +31,11 @@
+   "originalSentences": [
+     "Le soleil se couche tôt.",
+     "Elle marchait sans parler."
++  ],
++  "ageYears": 17,
++  "preferredExplanations": [
++    "step-by-step",
++    "analogies"
+   ]
+ }
+ ```
+@@ -62,6 +67,10 @@ RESPOND WITH ONLY valid JSON in this exact format — no prose before or after:
+ 
+ If there are no mistakes, return an empty array for "mistakes".
+ Generate explanations in the child's language as instructed.
++
++EXPLANATION STYLE:
++The learner is 17 years old. Explanations may be 1-2 sentences and can name the underlying spelling or grammar rule concisely (e.g. "double consonant after a short vowel") — avoid baby-talk but stay focused on the mistake.
++Explanation style preferences: for tricky mistakes, walk through the correction step by step: what they wrote → what changes → why; short analogies to familiar patterns are welcome when they clarify.
+ ```
+ 
+ ## Generated prompt — user
+@@ -78,7 +87,7 @@ Please generate all explanations in fr.
+ 
+ ## Builder notes
+ 
+-- System prompt is static — zero personalization.
+-- The ONLY personalized parameter is the explanation language.
+-- Missing: age (explanation complexity calibration), learning style (humor/step-by-step register), struggle history (recurring-pattern-aware feedback).
++- System prompt now personalized with ageYears=17 and preferredExplanations=[step-by-step, analogies].
++- Explanation register: concise rule-naming.
++- Language (fr) still carried in the user text-part.
+ - Tier 2 (--live) requires a real handwriting image; not synthesized by this harness.
+diff --git a/apps/api/src/services/dictation/generate.test.ts b/apps/api/src/services/dictation/generate.test.ts
+index 04157674..07434081 100644
+--- a/apps/api/src/services/dictation/generate.test.ts
++++ b/apps/api/src/services/dictation/generate.test.ts
+@@ -211,6 +211,172 @@ describe('generateDictation', () => {
+     expect(systemContent).toContain('utropstegn');
+   });
+ 
++  it('weaves free_time / both interests into the literary theme when provided', async () => {
++    mockRouteAndCall.mockResolvedValueOnce({
++      response: JSON.stringify({
++        sentences: [
++          {
++            text: 'The young paleontologist brushed dust off the fossil.',
++            withPunctuation:
++              'The young paleontologist brushed dust off the fossil period',
++            wordCount: 8,
++          },
++        ],
++        title: 'Discovery',
++        topic: 'a young fossil hunter',
++        language: 'en',
++      }),
++      provider: 'gemini',
++      model: 'gemini-2.5-flash',
++      latencyMs: 80,
++    });
++
++    await generateDictation({
++      nativeLanguage: 'en',
++      ageYears: 12,
++      interests: [
++        { label: 'dinosaurs', context: 'both' },
++        { label: 'fossils', context: 'both' },
++        { label: 'paleontology', context: 'both' },
++      ],
++    });
++
++    const callArgs = mockRouteAndCall.mock.calls[0];
++    const systemContent = callArgs[0][0].content as string;
++    expect(systemContent).toContain('INTERESTS:');
++    expect(systemContent).toContain('dinosaurs');
++    expect(systemContent).toContain('fossils');
++    expect(systemContent).toContain('paleontology');
++    // Age-appropriate register directive still present
++    expect(systemContent).toContain('do NOT simplify sentence structure');
++  });
++
++  it('excludes school-only interests from the thematic block', async () => {
++    mockRouteAndCall.mockResolvedValueOnce({
++      response: JSON.stringify({
++        sentences: [
++          {
++            text: 'The horse galloped across the meadow.',
++            withPunctuation: 'The horse galloped across the meadow period',
++            wordCount: 6,
++          },
++        ],
++        title: 'Meadow',
++        topic: 'horses',
++        language: 'en',
++      }),
++      provider: 'gemini',
++      model: 'gemini-2.5-flash',
++      latencyMs: 80,
++    });
++
++    await generateDictation({
++      nativeLanguage: 'en',
++      ageYears: 11,
++      interests: [
++        { label: 'horses', context: 'free_time' },
++        { label: 'algebra drills', context: 'school' }, // must be excluded
++      ],
++    });
++
++    const systemContent = mockRouteAndCall.mock.calls[0][0][0].content as string;
++    expect(systemContent).toContain('horses');
++    expect(systemContent).not.toContain('algebra drills');
++  });
++
++  it('includes library topics as setting backdrop when provided', async () => {
++    mockRouteAndCall.mockResolvedValueOnce({
++      response: JSON.stringify({
++        sentences: [
++          {
++            text: 'The soldier wrote a letter home from the trench.',
++            withPunctuation:
++              'The soldier wrote a letter home from the trench period',
++            wordCount: 9,
++          },
++        ],
++        title: 'A Letter',
++        topic: 'wartime narrative',
++        language: 'en',
++      }),
++      provider: 'gemini',
++      model: 'gemini-2.5-flash',
++      latencyMs: 80,
++    });
++
++    await generateDictation({
++      nativeLanguage: 'en',
++      ageYears: 15,
++      libraryTopics: ['WWII Pacific theater', 'Cold War origins'],
++    });
++
++    const systemContent = mockRouteAndCall.mock.calls[0][0][0].content as string;
++    expect(systemContent).toContain('LIBRARY TOPICS');
++    expect(systemContent).toContain('WWII Pacific theater');
++    expect(systemContent).toContain('do not lecture');
++  });
++
++  it('omits INTERESTS and LIBRARY TOPICS blocks when not provided (backward compat)', async () => {
++    mockRouteAndCall.mockResolvedValueOnce({
++      response: JSON.stringify({
++        sentences: [
++          {
++            text: 'A quiet morning in the forest.',
++            withPunctuation: 'A quiet morning in the forest period',
++            wordCount: 6,
++          },
++        ],
++        title: 'Forest',
++        topic: 'nature',
++        language: 'en',
++      }),
++      provider: 'gemini',
++      model: 'gemini-2.5-flash',
++      latencyMs: 80,
++    });
++
++    await generateDictation({
++      nativeLanguage: 'en',
++      ageYears: 12,
++    });
++
++    const systemContent = mockRouteAndCall.mock.calls[0][0][0].content as string;
++    expect(systemContent).not.toContain('INTERESTS:');
++    expect(systemContent).not.toContain('LIBRARY TOPICS');
++  });
++
++  it('removed dead <11 literary theme branches — ageYears=12 resolves to chapter-book theme', async () => {
++    // Product ships to 11+ only. The old ≤7 (fairy tales) and ≤10 (Narnia)
++    // branches were dead; confirm ageYears=12 now picks the chapter-book
++    // branch and never surfaces fairy-tale or Narnia language.
++    mockRouteAndCall.mockResolvedValueOnce({
++      response: JSON.stringify({
++        sentences: [
++          {
++            text: 'Harry spotted something moving in the shadows.',
++            withPunctuation:
++              'Harry spotted something moving in the shadows period',
++            wordCount: 7,
++          },
++        ],
++        title: 'Shadows',
++        topic: 'adventure',
++        language: 'en',
++      }),
++      provider: 'gemini',
++      model: 'gemini-2.5-flash',
++      latencyMs: 80,
++    });
++
++    await generateDictation({ nativeLanguage: 'en', ageYears: 12 });
++
++    const systemContent = mockRouteAndCall.mock.calls[0][0][0].content as string;
++    expect(systemContent).toContain("children's novels and chapter books");
++    expect(systemContent).not.toContain('fairy tales');
++    expect(systemContent).not.toContain('Narnia');
++    expect(systemContent).not.toContain('Roald Dahl');
++  });
++
+   it('includes French punctuation names in the prompt for fr language [RF-06]', async () => {
+     mockRouteAndCall.mockResolvedValueOnce({
+       response: JSON.stringify({
+diff --git a/apps/api/src/services/dictation/generate.ts b/apps/api/src/services/dictation/generate.ts
+index 5b66373a..bb0bf600 100644
+--- a/apps/api/src/services/dictation/generate.ts
++++ b/apps/api/src/services/dictation/generate.ts
+@@ -14,29 +14,81 @@ import { extractJsonObject } from '../quiz';
+ // punctuation spoken-word variants, title, and topic.
+ // ---------------------------------------------------------------------------
+ 
++/** Context tagging for an interest — matches the eval fixture shape. */
++export type InterestContext = 'free_time' | 'school' | 'both';
++
++export interface InterestEntry {
++  label: string;
++  context: InterestContext;
++}
++
+ export interface GenerateContext {
+   /** ISO 639-1 language code — the language to write the dictation in. */
+   nativeLanguage: string;
+   /** Learner's age in years — used to calibrate sentence length, vocabulary, and literary themes. */
+   ageYears: number;
++  /**
++   * Ordered by salience — most prominent first. Optional; when provided,
++   * interests tagged `free_time` or `both` are woven into the literary
++   * theme so a dinosaur-obsessed 12yo gets a prehistoric-themed narrative
++   * instead of the generic chapter-book default.
++   */
++  interests?: InterestEntry[];
++  /**
++   * Raw topic titles from the learner's library (what they're currently
++   * studying). Optional; used as soft setting hints — e.g. a learner on
++   * "Mesozoic era" might get a narrative set in that period — without
++   * turning the passage into textbook prose.
++   */
++  libraryTopics?: string[];
+ }
+ 
++// Product ships to learners 11+ only. Younger buckets (≤7 fairy tales, ≤10
++// Narnia) were dead branches — removed to avoid misleading dev intuition
++// about what the prompt actually produces. See
++// docs/specs/2026-04-18-llm-personalization-audit.md.
+ function getLiteraryTheme(ageYears: number): string {
+-  if (ageYears <= 7) {
+-    return `Draw from fairy tales, fables, and simple picture book stories — animals talking, magical adventures, friendship and kindness. Think Brothers Grimm, Aesop, or classic picture books.`;
+-  }
+-  if (ageYears <= 10) {
+-    return `Draw from classic children's stories and adventure tales — exploring forests, brave young heroes, mysteries to solve, magical worlds. Think Narnia, Roald Dahl, or Astrid Lindgren.`;
+-  }
+   if (ageYears <= 13) {
+     return `Draw from children's novels and chapter books — school adventures, fantasy quests, historical stories, nature and discovery. Think Harry Potter, Percy Jackson, or Jules Verne.`;
+   }
+   return `Draw from classic and contemporary literature — novels, short stories, literary fiction. Think Hemingway, Kafka, Čapek, or contemporary bestsellers. Use adult-level vocabulary and sentence structure.`;
+ }
+ 
++/**
++ * Selects up to 3 personally-meaningful interests for theming the passage.
++ * `school`-only interests are excluded because they tend to be curricular
++ * labels ("Czech reading comprehension") that would push the prompt toward
++ * textbook prose — the opposite of the "literary narrative" directive.
++ */
++function selectThematicInterests(
++  interests: InterestEntry[] | undefined
++): string[] {
++  if (!interests || interests.length === 0) return [];
++  return interests
++    .filter((i) => i.context === 'free_time' || i.context === 'both')
++    .map((i) => i.label)
++    .slice(0, 3);
++}
++
++function buildInterestsBlock(interests: InterestEntry[] | undefined): string {
++  const selected = selectThematicInterests(interests);
++  if (selected.length === 0) return '';
++  return `\nINTERESTS: The learner is particularly drawn to: ${selected.join(', ')}.
++Weave one or two of these into the narrative theme if it fits naturally — e.g. a paleontology-lover might get a chapter-book passage about a young fossil hunter, not a fact list. Keep the age-appropriate literary register from THEME above; do NOT simplify sentence structure to accommodate an interest.\n`;
++}
++
++function buildLibraryTopicsBlock(libraryTopics: string[] | undefined): string {
++  if (!libraryTopics || libraryTopics.length === 0) return '';
++  const topics = libraryTopics.slice(0, 4).join(', ');
++  return `\nLIBRARY TOPICS (currently studying): ${topics}.
++If one of these lends itself to a period or setting (e.g. "Mesozoic era" → prehistoric setting; "US history: Civil War" → 1860s setting), the passage MAY use it as backdrop. Keep it literary narrative — do not lecture, do not insert exposition.\n`;
++}
++
+ export function buildGeneratePrompt(ctx: GenerateContext): string {
+   const punctuationNames = getPunctuationNames(ctx.nativeLanguage);
+   const literaryTheme = getLiteraryTheme(ctx.ageYears);
++  const interestsBlock = buildInterestsBlock(ctx.interests);
++  const libraryTopicsBlock = buildLibraryTopicsBlock(ctx.libraryTopics);
+ 
+   return `You are a dictation content generator for a ${ctx.ageYears}-year-old${
+     ctx.ageYears >= 14 ? ' person' : ' child'
+@@ -48,7 +100,7 @@ THEME: Write sentences inspired by age-appropriate literature and stories.
+ ${literaryTheme}
+ Write sentences that feel like they come from a story — natural prose with vivid imagery.
+ Do NOT use geographical, scientific, or encyclopaedia-style factual content.
+-
++${interestsBlock}${libraryTopicsBlock}
+ CONSTRAINTS:
+ - 6-10 sentences total
+ - Sentence length: ${
+diff --git a/apps/api/src/services/dictation/review.test.ts b/apps/api/src/services/dictation/review.test.ts
+index 7eeaad16..46fd38d4 100644
+--- a/apps/api/src/services/dictation/review.test.ts
++++ b/apps/api/src/services/dictation/review.test.ts
+@@ -7,7 +7,7 @@ jest.mock('../llm', () => ({
+ }));
+ 
+ import { routeAndCall } from '../llm';
+-import { reviewDictation } from './review';
++import { reviewDictation, buildReviewSystemPrompt } from './review';
+ import type { DictationSentence } from '@eduagent/schemas';
+ 
+ const mockRouteAndCall = routeAndCall as jest.Mock;
+@@ -129,6 +129,61 @@ describe('reviewDictation', () => {
+     expect(mockRouteAndCall).toHaveBeenCalledWith(expect.any(Array), 2);
+   });
+ 
++  it('passes age and explanation style through to the system prompt when provided', async () => {
++    mockRouteAndCall.mockResolvedValueOnce({
++      response: JSON.stringify({
++        totalSentences: 2,
++        correctCount: 2,
++        mistakes: [],
++      }),
++      provider: 'gemini',
++      model: 'gemini-2.5-flash',
++      latencyMs: 100,
++    });
++
++    await reviewDictation({
++      ...BASE_INPUT,
++      ageYears: 17,
++      preferredExplanations: ['step-by-step', 'examples'],
++    });
++
++    const [messages] = mockRouteAndCall.mock.calls[0] as [
++      Array<{ role: string; content: unknown }>
++    ];
++    const systemContent = messages.find((m) => m.role === 'system')
++      ?.content as string;
++    expect(systemContent).toContain('EXPLANATION STYLE');
++    expect(systemContent).toContain('17 years old');
++    // 14+ register — rule-naming, not baby-talk
++    expect(systemContent).toContain('name the underlying spelling');
++    expect(systemContent).toContain('step');
++    expect(systemContent).toContain('related example');
++  });
++
++  it('uses child-friendly register for ageYears ≤ 13', async () => {
++    mockRouteAndCall.mockResolvedValueOnce({
++      response: JSON.stringify({
++        totalSentences: 2,
++        correctCount: 2,
++        mistakes: [],
++      }),
++      provider: 'gemini',
++      model: 'gemini-2.5-flash',
++      latencyMs: 100,
++    });
++
++    await reviewDictation({ ...BASE_INPUT, ageYears: 11 });
++
++    const [messages] = mockRouteAndCall.mock.calls[0] as [
++      Array<{ role: string; content: unknown }>
++    ];
++    const systemContent = messages.find((m) => m.role === 'system')
++      ?.content as string;
++    expect(systemContent).toContain('11 years old');
++    expect(systemContent).toContain('child-friendly');
++    expect(systemContent).not.toContain('name the underlying spelling');
++  });
++
+   it('includes image inline_data part in the user message', async () => {
+     mockRouteAndCall.mockResolvedValueOnce({
+       response: JSON.stringify({
+@@ -153,3 +208,65 @@ describe('reviewDictation', () => {
+     expect(parts.some((p) => p.type === 'text')).toBe(true);
+   });
+ });
++
++// ---------------------------------------------------------------------------
++// buildReviewSystemPrompt
++// ---------------------------------------------------------------------------
++
++describe('buildReviewSystemPrompt', () => {
++  it('returns the baseline static prompt unchanged when called with no options (backward compat)', () => {
++    const promptA = buildReviewSystemPrompt();
++    const promptB = buildReviewSystemPrompt({});
++    // Both no-arg and empty-object calls must produce identical output, and
++    // that output must match the original static SYSTEM_PROMPT shape —
++    // we assert on key landmarks rather than the full string to stay robust
++    // to trailing whitespace changes.
++    expect(promptA).toBe(promptB);
++    expect(promptA).toContain('You are a dictation review assistant.');
++    expect(promptA).toContain('RESPOND WITH ONLY valid JSON');
++    expect(promptA).toContain("child's language as instructed.");
++    // No personalization sections appended when options absent
++    expect(promptA).not.toContain('EXPLANATION STYLE');
++  });
++
++  it('adds an EXPLANATION STYLE section when ageYears is provided', () => {
++    const prompt = buildReviewSystemPrompt({ ageYears: 11 });
++    expect(prompt).toContain('EXPLANATION STYLE');
++    expect(prompt).toContain('11 years old');
++    expect(prompt).toContain('child-friendly');
++  });
++
++  it('uses rule-naming register for 14+ learners', () => {
++    const prompt = buildReviewSystemPrompt({ ageYears: 16 });
++    expect(prompt).toContain('16 years old');
++    expect(prompt).toContain('name the underlying spelling');
++    // The 14+ register avoids baby-talk — assert via the rule-naming phrase
++    // we just added (NOT "child-friendly", which literally appears once in
++    // the JSON schema example placeholder and is not part of the style block).
++    expect(prompt).toContain('avoid baby-talk');
++    // Confirm the child register text is absent from the EXPLANATION STYLE
++    // section specifically.
++    const styleSection = prompt.split('EXPLANATION STYLE:')[1] ?? '';
++    expect(styleSection).not.toContain('brief (1 short sentence)');
++  });
++
++  it('adds humor guidance when preferredExplanations includes humor', () => {
++    const prompt = buildReviewSystemPrompt({
++      ageYears: 12,
++      preferredExplanations: ['humor', 'stories'],
++    });
++    expect(prompt).toContain('gentle, light humor');
++    expect(prompt).toContain('tiny narrative framings');
++    expect(prompt).toContain('never mocking');
++  });
++
++  it('silently ignores the diagrams style (no text representation)', () => {
++    const prompt = buildReviewSystemPrompt({
++      ageYears: 13,
++      preferredExplanations: ['diagrams'],
++    });
++    // diagrams alone produces no style line but ageYears block is still present
++    expect(prompt).toContain('13 years old');
++    expect(prompt).not.toContain('diagram');
++  });
++});
+diff --git a/apps/api/src/services/dictation/review.ts b/apps/api/src/services/dictation/review.ts
+index bc0105b1..b5b94966 100644
+--- a/apps/api/src/services/dictation/review.ts
++++ b/apps/api/src/services/dictation/review.ts
+@@ -16,7 +16,34 @@ import { captureException } from '../sentry';
+ // breakdown of mistakes.
+ // ---------------------------------------------------------------------------
+ 
+-export const SYSTEM_PROMPT = `You are a dictation review assistant. Your job is to compare a child's handwritten text (visible in the image) against the original dictation sentences.
++export type ExplanationStyle =
++  | 'stories'
++  | 'examples'
++  | 'diagrams'
++  | 'analogies'
++  | 'step-by-step'
++  | 'humor';
++
++export interface ReviewPromptOptions {
++  /**
++   * Learner's age in years. When provided, the feedback-complexity register
++   * is calibrated: ≤13 gets brief child-friendly notes, 14+ gets more
++   * substantive explanations that can name the underlying spelling rule.
++   */
++  ageYears?: number;
++  /**
++   * Preferred explanation styles (ordered by salience). When provided,
++   * nudges the register — e.g. `humor` lets the model use gentle playful
++   * framing, `step-by-step` asks it to name the rule the learner broke.
++   */
++  preferredExplanations?: ExplanationStyle[];
++}
++
++// Preserved as the canonical "no personalization" baseline. When
++// buildReviewSystemPrompt is called with no options it must return this
++// string verbatim so existing callers (and prompt hashes, caches, evals)
++// see zero behavioral drift.
++const BASE_SYSTEM_PROMPT = `You are a dictation review assistant. Your job is to compare a child's handwritten text (visible in the image) against the original dictation sentences.
+ 
+ TASK:
+ Carefully examine the handwritten text in the image. Compare each sentence to the original provided below.
+@@ -41,6 +68,78 @@ RESPOND WITH ONLY valid JSON in this exact format — no prose before or after:
+ If there are no mistakes, return an empty array for "mistakes".
+ Generate explanations in the child's language as instructed.`;
+ 
++function buildExplanationGuidance(
++  ageYears: number | undefined,
++  styles: ExplanationStyle[] | undefined
++): string {
++  if (ageYears === undefined && (!styles || styles.length === 0)) return '';
++
++  const parts: string[] = [];
++
++  if (ageYears !== undefined) {
++    if (ageYears <= 13) {
++      parts.push(
++        `The learner is ${ageYears} years old. Keep explanations brief (1 short sentence) and child-friendly — name the sound or letter pattern without jargon.`
++      );
++    } else {
++      parts.push(
++        `The learner is ${ageYears} years old. Explanations may be 1-2 sentences and can name the underlying spelling or grammar rule concisely (e.g. "double consonant after a short vowel") — avoid baby-talk but stay focused on the mistake.`
++      );
++    }
++  }
++
++  if (styles && styles.length > 0) {
++    const styleNotes: string[] = [];
++    if (styles.includes('humor')) {
++      styleNotes.push(
++        'gentle, light humor is welcome when it helps the correction stick — never mocking'
++      );
++    }
++    if (styles.includes('stories')) {
++      styleNotes.push(
++        'tiny narrative framings are fine ("the two n\'s in sunny keep each other company")'
++      );
++    }
++    if (styles.includes('step-by-step')) {
++      styleNotes.push(
++        'for tricky mistakes, walk through the correction step by step: what they wrote → what changes → why'
++      );
++    }
++    if (styles.includes('examples')) {
++      styleNotes.push(
++        'anchor the rule with one related example word when helpful'
++      );
++    }
++    if (styles.includes('analogies')) {
++      styleNotes.push(
++        'short analogies to familiar patterns are welcome when they clarify'
++      );
++    }
++    if (styles.includes('diagrams')) {
++      // No diagrams possible in text — ignored intentionally.
++    }
++    if (styleNotes.length > 0) {
++      parts.push(`Explanation style preferences: ${styleNotes.join('; ')}.`);
++    }
++  }
++
++  return `\n\nEXPLANATION STYLE:\n${parts.join('\n')}`;
++}
++
++/**
++ * Builds the system prompt for dictation review. Backward compat: called
++ * with no arguments, returns the original static prompt text verbatim.
++ */
++export function buildReviewSystemPrompt(
++  opts: ReviewPromptOptions = {}
++): string {
++  const guidance = buildExplanationGuidance(
++    opts.ageYears,
++    opts.preferredExplanations
++  );
++  return BASE_SYSTEM_PROMPT + guidance;
++}
++
+ export type { DictationReviewResult };
+ 
+ export interface ReviewDictationInput {
+@@ -48,12 +147,23 @@ export interface ReviewDictationInput {
+   imageBase64: string;
+   imageMimeType: string;
+   language: string;
++  /** Learner age in years — calibrates feedback-complexity register. */
++  ageYears?: number;
++  /** Preferred explanation styles — nudges the register. */
++  preferredExplanations?: ExplanationStyle[];
+ }
+ 
+ export async function reviewDictation(
+   input: ReviewDictationInput
+ ): Promise<DictationReviewResult> {
+-  const { sentences, imageBase64, imageMimeType, language } = input;
++  const {
++    sentences,
++    imageBase64,
++    imageMimeType,
++    language,
++    ageYears,
++    preferredExplanations,
++  } = input;
+ 
+   const originalText = sentences
+     .map((s, i) => `${i + 1}. ${s.text}`)
+@@ -67,8 +177,13 @@ export async function reviewDictation(
+     },
+   ];
+ 
++  const systemPrompt = buildReviewSystemPrompt({
++    ageYears,
++    preferredExplanations,
++  });
++
+   const messages: ChatMessage[] = [
+-    { role: 'system', content: SYSTEM_PROMPT },
++    { role: 'system', content: systemPrompt },
+     { role: 'user', content: userContent },
+   ];
+ 

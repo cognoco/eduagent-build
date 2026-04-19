@@ -10,6 +10,8 @@ export interface MasterySm2Input {
   easeFactor: string;
   interval: number;
   repetitions: number;
+  lastReviewedAt: Date;
+  nextReviewAt: Date;
 }
 
 export interface MasterySm2Result {
@@ -49,8 +51,8 @@ export function applyQuizSm2(
       easeFactor: Number(current.easeFactor),
       interval: Math.max(1, current.interval),
       repetitions: current.repetitions,
-      lastReviewedAt: new Date().toISOString(),
-      nextReviewAt: new Date().toISOString(),
+      lastReviewedAt: current.lastReviewedAt.toISOString(),
+      nextReviewAt: current.nextReviewAt.toISOString(),
     },
   });
 

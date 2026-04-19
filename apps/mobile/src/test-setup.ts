@@ -189,6 +189,10 @@ jest.mock('expo-linking', () => ({
   createURL: jest.fn().mockReturnValue('mentomate://sso-callback'),
 }));
 
+jest.mock('expo-clipboard', () => ({
+  setStringAsync: jest.fn().mockResolvedValue(undefined),
+}));
+
 jest.mock('expo-notifications', () => ({
   getPermissionsAsync: jest
     .fn()

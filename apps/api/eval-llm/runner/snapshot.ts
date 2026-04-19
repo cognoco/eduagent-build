@@ -20,6 +20,8 @@ export interface SnapshotInputs {
   liveProvider?: string;
   liveModel?: string;
   liveError?: string; // error message if live call failed
+  /** Response failed expectedResponseSchema validation — message describes how. */
+  schemaViolation?: string;
 }
 
 const SNAPSHOTS_DIR = path.resolve(__dirname, '..', 'snapshots');
@@ -95,6 +97,20 @@ function renderSnapshot(inputs: SnapshotInputs): string {
     sections.push(``);
   }
 
+  const schemaViolation = inputs.schemaViolation;
+  if (schemaViolation) {
+    sections.push(`## ⚠️ Schema violation`);
+    sections.push(``);
+    sections.push(
+      `The live LLM response did not conform to the flow's \`expectedResponseSchema\`:`
+    );
+    sections.push(``);
+    sections.push('```');
+    sections.push(schemaViolation);
+    sections.push('```');
+    sections.push(``);
+  }
+
   if (liveError) {
     sections.push(`## Live LLM response`);
     sections.push(``);
@@ -124,8 +140,15 @@ function renderProfileTable(profile: EvalProfile): string {
   const rows: Array<[string, string]> = [
     ['Age', `${profile.ageYears} years (birth year ${profile.birthYear})`],
     ['Native language', profile.nativeLanguage],
+    ['Conversation language', profile.conversationLanguage],
     ['Location', profile.location],
-    ['Interests', profile.interests.join(', ') || '—'],
+    ['Pronouns', profile.pronouns ?? '— (not provided)'],
+    [
+      'Interests',
+      profile.interests
+        .map((i) => `${i.label} (${i.context.replace('_', ' ')})`)
+        .join(', ') || '—',
+    ],
     ['Library topics', profile.libraryTopics.join(', ') || '—'],
     ['CEFR', profile.cefrLevel ?? '—'],
     ['Target language', profile.targetLanguage ?? '—'],

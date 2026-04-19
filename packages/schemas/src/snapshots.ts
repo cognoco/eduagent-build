@@ -18,6 +18,8 @@ export const subjectProgressMetricsSchema = z.object({
   vocabularyMastered: z.number().int(),
   sessionsCount: z.number().int(),
   activeMinutes: z.number().int(),
+  // [F-045] Wall-clock minutes per subject — default(0) for pre-existing snapshots
+  wallClockMinutes: z.number().int().default(0),
   lastSessionAt: z.string().datetime().nullable(),
 });
 export type SubjectProgressMetrics = z.infer<
@@ -27,7 +29,8 @@ export type SubjectProgressMetrics = z.infer<
 export const progressMetricsSchema = z.object({
   totalSessions: z.number().int(),
   totalActiveMinutes: z.number().int(),
-  totalWallClockMinutes: z.number().int(),
+  // [F-045] Wall-clock minutes — default(0) for backward compat with pre-existing snapshots
+  totalWallClockMinutes: z.number().int().default(0),
   totalExchanges: z.number().int(),
   topicsAttempted: z.number().int(),
   topicsMastered: z.number().int(),
@@ -67,6 +70,9 @@ export const subjectInventorySchema = z.object({
   estimatedProficiencyLabel: z.string().nullable(),
   lastSessionAt: z.string().datetime().nullable(),
   activeMinutes: z.number().int(),
+  // [F-045] Wall-clock minutes for user-facing display (parent/child surfaces).
+  // Defaults to 0 for backward compat with snapshots computed before this field.
+  wallClockMinutes: z.number().int().default(0),
   sessionsCount: z.number().int(),
 });
 export type SubjectInventory = z.infer<typeof subjectInventorySchema>;
@@ -81,6 +87,8 @@ export const knowledgeInventorySchema = z.object({
     vocabularyMastered: z.number().int(),
     totalSessions: z.number().int(),
     totalActiveMinutes: z.number().int(),
+    // [F-045] Wall-clock minutes for user-facing display
+    totalWallClockMinutes: z.number().int().default(0),
     currentStreak: z.number().int(),
     longestStreak: z.number().int(),
   }),

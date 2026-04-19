@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useState } from 'react';
 import { Stack } from 'expo-router';
 import type { DictationSentence, DictationMode } from '@eduagent/schemas';
 import type { DictationReviewResult } from '../../../hooks/use-dictation-api';
+import { useThemeColors } from '../../../lib/theme';
 
 // ---------------------------------------------------------------------------
 // DictationData context — RF-03: data flows through context, not route params
@@ -55,12 +56,14 @@ function DictationDataProvider({
 }
 
 export default function DictationLayout(): React.ReactElement {
+  const colors = useThemeColors();
   return (
     <DictationDataProvider>
       <Stack
         screenOptions={{
           headerShown: false,
           animation: 'slide_from_right',
+          contentStyle: { backgroundColor: colors.background },
         }}
       />
     </DictationDataProvider>

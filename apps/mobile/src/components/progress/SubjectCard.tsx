@@ -34,7 +34,9 @@ function getTopicHeadline(subject: SubjectInventory): {
       headline: `${exploredCount} topics explored`,
       progressValue: exploredCount,
       progressMax: Math.max(1, exploredCount),
-      footnote: `${subject.activeMinutes} active min`,
+      // [M5] || is intentional: wallClockMinutes defaults to 0 for pre-F-045
+      // snapshots, so falsy-fallback correctly shows activeMinutes instead of 0.
+      footnote: `${subject.wallClockMinutes || subject.activeMinutes} min`,
       hideBar: true,
     };
   }
@@ -57,7 +59,8 @@ function getTopicHeadline(subject: SubjectInventory): {
     headline: `${subject.topics.mastered}/${subject.topics.total} topics mastered`,
     progressValue: subject.topics.mastered,
     progressMax: subject.topics.total ?? 0,
-    footnote: `${subject.activeMinutes} active min`,
+    // [M5] || intentional — see open-curriculum branch comment above.
+    footnote: `${subject.wallClockMinutes || subject.activeMinutes} min`,
     hideBar: false,
   };
 }
@@ -115,7 +118,9 @@ export function SubjectCard({
           <Text className="text-caption text-text-secondary">
             {subject.vocabulary.total > 0
               ? `${subject.vocabulary.total} words`
-              : `${subject.sessionsCount} sessions`}
+              : `${subject.sessionsCount} ${
+                  subject.sessionsCount === 1 ? 'session' : 'sessions'
+                }`}
           </Text>
           {onAction ? (
             <Pressable

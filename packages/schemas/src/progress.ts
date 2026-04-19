@@ -118,6 +118,7 @@ export const topicProgressSchema = z.object({
   masteryScore: z.number().min(0).max(1).nullable(),
   summaryExcerpt: z.string().nullable(),
   xpStatus: z.enum(['pending', 'verified', 'decayed']).nullable(),
+  totalSessions: z.number().int().min(0),
 });
 export type TopicProgress = z.infer<typeof topicProgressSchema>;
 

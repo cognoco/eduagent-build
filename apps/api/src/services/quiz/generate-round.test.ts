@@ -22,13 +22,13 @@ describe('buildCapitalsPrompt', () => {
     expect(prompt).toContain('Paris');
     expect(prompt).toContain('Berlin');
     expect(prompt).toContain('Central Europe');
-    expect(prompt).toContain('10-13');
+    expect(prompt).toContain('11-13');
   });
 
   it('works without a theme preference', () => {
     const prompt = buildCapitalsPrompt({
       discoveryCount: 8,
-      ageBracket: 'child',
+      ageBracket: 'adolescent',
       recentAnswers: [],
     });
 

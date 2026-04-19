@@ -143,6 +143,11 @@ jest.mock('../services/interview', () => ({
       isComplete: false,
     }),
   }),
+  extractSignals: jest.fn().mockResolvedValue({
+    goals: ['learn calculus'],
+    experienceLevel: 'beginner',
+    currentKnowledge: 'basic algebra',
+  }),
   getOrCreateDraft: jest.fn().mockResolvedValue({
     id: 'draft-1',
     profileId: 'test-profile-id',
@@ -165,6 +170,7 @@ import { getSubject } from '../services/subject';
 import {
   processInterviewExchange,
   streamInterviewExchange,
+  extractSignals,
   getOrCreateDraft,
   getDraftState,
   updateDraft,
@@ -284,7 +290,8 @@ describe('interview routes', () => {
           subjectName: 'Mathematics',
           exchangeHistory: [],
         }),
-        'I want to learn calculus'
+        'I want to learn calculus',
+        { exchangeCount: 1 }
       );
     });
 
@@ -457,7 +464,8 @@ describe('interview routes', () => {
           subjectName: 'Mathematics',
           exchangeHistory: [],
         }),
-        'Hello'
+        'Hello',
+        { exchangeCount: 1 }
       );
       // The non-streaming variant should not be called
       expect(processInterviewExchange).not.toHaveBeenCalled();
@@ -671,6 +679,111 @@ describe('interview routes', () => {
       );
 
       expect(res.status).toBe(401);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // POST /v1/subjects/:subjectId/interview/complete  [BUG-464]
+  // -------------------------------------------------------------------------
+
+  describe('POST /v1/subjects/:subjectId/interview/complete', () => {
+    it('extracts signals, persists curriculum, and marks draft completed', async () => {
+      (getDraftState as jest.Mock).mockResolvedValue({
+        id: 'draft-1',
+        profileId: 'test-profile-id',
+        subjectId: SUBJECT_ID,
+        exchangeHistory: [
+          { role: 'user', content: 'I want to learn calculus' },
+          { role: 'assistant', content: 'Tell me more.' },
+        ],
+        extractedSignals: {},
+        status: 'in_progress',
+        expiresAt: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/interview/complete`,
+        { method: 'POST', headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.isComplete).toBe(true);
+      expect(body.exchangeCount).toBe(1);
+
+      // Should extract signals from whatever conversation exists
+      expect(extractSignals).toHaveBeenCalled();
+
+      // Should persist curriculum with the extracted signals
+      expect(persistCurriculum).toHaveBeenCalledWith(
+        undefined,
+        'test-profile-id',
+        SUBJECT_ID,
+        'Mathematics',
+        expect.objectContaining({
+          extractedSignals: {
+            goals: ['learn calculus'],
+            experienceLevel: 'beginner',
+            currentKnowledge: 'basic algebra',
+          },
+        }),
+        undefined,
+        undefined
+      );
+
+      // Should mark draft as completed
+      expect(updateDraft).toHaveBeenCalledWith(
+        undefined,
+        'test-profile-id',
+        'draft-1',
+        expect.objectContaining({ status: 'completed' })
+      );
+    });
+
+    it('returns success immediately when draft is already completed', async () => {
+      (getDraftState as jest.Mock).mockResolvedValue({
+        id: 'draft-1',
+        profileId: 'test-profile-id',
+        subjectId: SUBJECT_ID,
+        exchangeHistory: [
+          { role: 'user', content: 'Hello' },
+          { role: 'assistant', content: 'Hi!' },
+        ],
+        extractedSignals: {},
+        status: 'completed',
+        expiresAt: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/interview/complete`,
+        { method: 'POST', headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.isComplete).toBe(true);
+
+      // Should not re-extract or re-persist when already completed
+      expect(extractSignals).not.toHaveBeenCalled();
+      expect(persistCurriculum).not.toHaveBeenCalled();
+    });
+
+    it('returns 404 when subject not found', async () => {
+      (getSubject as jest.Mock).mockResolvedValue(null);
+
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/interview/complete`,
+        { method: 'POST', headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(404);
     });
   });
 });

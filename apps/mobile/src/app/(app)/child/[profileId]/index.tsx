@@ -33,11 +33,9 @@ import {
 } from '../../../../hooks/use-consent';
 import {
   useChildLearnerProfile,
-  useGrantMemoryConsent,
   useUpdateAccommodationMode,
 } from '../../../../hooks/use-learner-profile';
 import { ACCOMMODATION_OPTIONS } from '../../../../lib/accommodation-options';
-import { MemoryConsentPrompt } from '../../../../components/memory-consent-prompt';
 import { goBackOrReplace } from '../../../../lib/navigation';
 
 function SubjectSkeleton(): React.ReactNode {
@@ -54,6 +52,11 @@ function formatDuration(seconds: number | null): string {
   const mins = Math.round(seconds / 60);
   if (mins < 1) return '<1 min';
   return `${mins} min`;
+}
+
+function formatTimeOnApp(seconds: number | null): string {
+  const duration = formatDuration(seconds);
+  return duration === '--' ? 'Time on app unavailable' : `${duration} on app`;
 }
 
 function formatSessionDate(iso: string): string {
@@ -162,7 +165,6 @@ export default function ChildDetailScreen() {
   const { data: learnerProfile } = useChildLearnerProfile(profileId);
   const revokeConsent = useRevokeConsent(profileId);
   const restoreConsent = useRestoreConsent(profileId);
-  const grantMemoryConsent = useGrantMemoryConsent();
   const updateAccommodation = useUpdateAccommodationMode();
   const { CelebrationOverlay } = useCelebration({
     // Celebrations are best-effort — empty on error is acceptable [SQ-4]
@@ -343,7 +345,7 @@ export default function ChildDetailScreen() {
         </View>
       </View>
 
-      {/* Streak & XP stats */}
+      {/* Streak & XP stats — show as cohesive row when either is nonzero [F-PV-04] */}
       {child && (child.currentStreak > 0 || child.totalXp > 0) && (
         <View
           testID="streak-xp-stats"
@@ -357,14 +359,12 @@ export default function ChildDetailScreen() {
               </Text>
             </View>
           )}
-          {child.totalXp > 0 && (
-            <View className="flex-row items-center gap-1">
-              <Ionicons name="star-outline" size={16} color="#eab308" />
-              <Text className="text-text-secondary text-sm">
-                {child.totalXp} XP
-              </Text>
-            </View>
-          )}
+          <View className="flex-row items-center gap-1">
+            <Ionicons name="star-outline" size={16} color="#eab308" />
+            <Text className="text-text-secondary text-sm">
+              {child.totalXp} XP
+            </Text>
+          </View>
         </View>
       )}
 
@@ -520,6 +520,7 @@ export default function ChildDetailScreen() {
                 </View>
                 <RetentionSignal
                   status={subject.retentionStatus as RetentionStatus}
+                  parentFacing
                 />
               </Pressable>
             ))}
@@ -603,16 +604,11 @@ export default function ChildDetailScreen() {
                   {session.highlight}
                 </Text>
               )}
-              <View className="flex-row items-center">
-                <Text className="text-caption text-text-secondary me-4">
-                  {session.exchangeCount} exchanges
-                </Text>
-                <Text className="text-caption text-text-secondary">
-                  {formatDuration(
-                    session.wallClockSeconds ?? session.durationSeconds
-                  )}
-                </Text>
-              </View>
+              <Text className="text-caption text-text-secondary">
+                {formatTimeOnApp(
+                  session.wallClockSeconds ?? session.durationSeconds
+                )}
+              </Text>
             </Pressable>
           ))
         ) : (
@@ -627,43 +623,28 @@ export default function ChildDetailScreen() {
         <Text className="text-h3 font-semibold text-text-primary mt-6 mb-2">
           Mentor Memory
         </Text>
+        {/* [F-PV-08] Consent prompt lives on mentor-memory only; show CTA here */}
         {learnerProfile?.memoryConsentStatus === 'pending' && profileId ? (
-          <View className="mb-3">
-            <MemoryConsentPrompt
-              childName={child?.displayName}
-              isPending={grantMemoryConsent.isPending}
-              onGrant={() =>
-                void (async () => {
-                  try {
-                    await grantMemoryConsent.mutateAsync({
-                      childProfileId: profileId,
-                      consent: 'granted',
-                    });
-                  } catch {
-                    platformAlert(
-                      'Could not enable memory',
-                      'Please try again.'
-                    );
-                  }
-                })()
-              }
-              onDecline={() =>
-                void (async () => {
-                  try {
-                    await grantMemoryConsent.mutateAsync({
-                      childProfileId: profileId,
-                      consent: 'declined',
-                    });
-                  } catch {
-                    platformAlert(
-                      'Could not save preference',
-                      'Please try again.'
-                    );
-                  }
-                })()
-              }
-            />
-          </View>
+          <Pressable
+            onPress={() =>
+              router.push({
+                pathname: '/(app)/child/[profileId]/mentor-memory',
+                params: { profileId },
+              } as never)
+            }
+            className="bg-primary/10 rounded-card p-4 mb-3"
+            accessibilityRole="button"
+            accessibilityLabel="Set up mentor memory"
+            testID="memory-consent-cta"
+          >
+            <Text className="text-body font-semibold text-primary">
+              Set up mentor memory
+            </Text>
+            <Text className="text-body-sm text-text-secondary mt-1">
+              Choose what the mentor remembers about{' '}
+              {child?.displayName ?? 'your child'}.
+            </Text>
+          </Pressable>
         ) : null}
         <Pressable
           onPress={() => {

@@ -9,6 +9,7 @@ import {
   curriculumTopics,
   retentionCards,
   vocabulary,
+  subjects,
   createScopedRepository,
   type Database,
 } from '@eduagent/database';
@@ -510,7 +511,37 @@ export async function prepareExchangeContext(
     }
   }
 
-  const learnerMemoryContext = learningProfile
+  // P1.4: Load urgency boost for the current session's subject (if any)
+  let activeUrgency: { reason: string; boostUntil: Date } | null = null;
+  if (session.subjectId) {
+    const urgencyRows = await db
+      .select({
+        urgencyBoostReason: subjects.urgencyBoostReason,
+        urgencyBoostUntil: subjects.urgencyBoostUntil,
+      })
+      .from(subjects)
+      .where(
+        and(
+          eq(subjects.id, session.subjectId),
+          eq(subjects.profileId, profileId),
+          eq(subjects.status, 'active')
+        )
+      )
+      .limit(1);
+    const urgencyRow = urgencyRows[0];
+    if (
+      urgencyRow?.urgencyBoostReason &&
+      urgencyRow.urgencyBoostUntil &&
+      urgencyRow.urgencyBoostUntil > new Date()
+    ) {
+      activeUrgency = {
+        reason: urgencyRow.urgencyBoostReason,
+        boostUntil: urgencyRow.urgencyBoostUntil,
+      };
+    }
+  }
+
+  const memoryBlock = learningProfile
     ? buildMemoryBlock(
         {
           learningStyle:
@@ -529,8 +560,10 @@ export async function prepareExchangeContext(
             : [],
           memoryEnabled: learningProfile.memoryEnabled,
           memoryInjectionEnabled: learningProfile.memoryInjectionEnabled,
+          memoryConsentStatus: learningProfile.memoryConsentStatus,
           effectivenessSessionCount:
             learningProfile.effectivenessSessionCount ?? 0,
+          activeUrgency,
         },
         subject?.name ?? null,
         topic?.title ?? null,
@@ -543,8 +576,9 @@ export async function prepareExchangeContext(
               string | { topic: string; subject: string | null }
             >)
           : []
-      ) || undefined
-    : undefined;
+      )
+    : null;
+  const learnerMemoryContext = memoryBlock?.text || undefined;
 
   // FR254: Build accommodation block — independent of memory injection toggle
   const accommodationContext = learningProfile

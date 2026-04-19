@@ -574,11 +574,15 @@ describe('shouldUpdateLearningStyle', () => {
 // ---------------------------------------------------------------------------
 
 describe('buildMemoryBlock', () => {
-  it('returns empty string for null profile', () => {
-    expect(buildMemoryBlock(null, null, null)).toBe('');
+  it('returns empty text for null profile', () => {
+    expect(buildMemoryBlock(null, null, null).text).toBe('');
   });
 
-  it('returns empty string when memoryInjectionEnabled is false', () => {
+  it('returns empty entries for null profile', () => {
+    expect(buildMemoryBlock(null, null, null).entries).toHaveLength(0);
+  });
+
+  it('returns empty text when memoryInjectionEnabled is false', () => {
     const profile: MemoryBlockProfile = {
       learningStyle: null,
       interests: ['space'],
@@ -587,11 +591,12 @@ describe('buildMemoryBlock', () => {
       communicationNotes: [],
       memoryEnabled: true,
       memoryInjectionEnabled: false,
+      memoryConsentStatus: 'granted',
     };
-    expect(buildMemoryBlock(profile, null, null)).toBe('');
+    expect(buildMemoryBlock(profile, null, null).text).toBe('');
   });
 
-  it('returns empty string when memoryEnabled is false and injection not set', () => {
+  it('returns empty text when memoryEnabled is false and injection not set', () => {
     const profile: MemoryBlockProfile = {
       learningStyle: null,
       interests: ['space'],
@@ -599,8 +604,25 @@ describe('buildMemoryBlock', () => {
       struggles: [],
       communicationNotes: [],
       memoryEnabled: false,
+      memoryConsentStatus: 'granted',
     };
-    expect(buildMemoryBlock(profile, null, null)).toBe('');
+    expect(buildMemoryBlock(profile, null, null).text).toBe('');
+  });
+
+  it('returns empty text when memoryConsentStatus is pending', () => {
+    const profile: MemoryBlockProfile = {
+      learningStyle: null,
+      interests: ['space'],
+      strengths: [
+        { subject: 'Math', topics: ['fractions'], confidence: 'high' },
+      ],
+      struggles: [],
+      communicationNotes: [],
+      memoryEnabled: true,
+      memoryInjectionEnabled: true,
+      memoryConsentStatus: 'pending',
+    };
+    expect(buildMemoryBlock(profile, null, null).text).toBe('');
   });
 
   it('includes struggles relevant to current subject', () => {
@@ -620,8 +642,9 @@ describe('buildMemoryBlock', () => {
       communicationNotes: [],
       memoryEnabled: true,
       memoryInjectionEnabled: true,
+      memoryConsentStatus: 'granted',
     };
-    const block = buildMemoryBlock(profile, 'Math', null);
+    const block = buildMemoryBlock(profile, 'Math', null).text;
     expect(block).toContain('fractions');
     expect(block).toContain('About this learner');
   });
@@ -643,8 +666,9 @@ describe('buildMemoryBlock', () => {
       communicationNotes: [],
       memoryEnabled: true,
       memoryInjectionEnabled: true,
+      memoryConsentStatus: 'granted',
     };
-    const block = buildMemoryBlock(profile, 'Math', null);
+    const block = buildMemoryBlock(profile, 'Math', null).text;
     expect(block).not.toContain('algebra');
   });
 
@@ -672,11 +696,12 @@ describe('buildMemoryBlock', () => {
       communicationNotes: [],
       memoryEnabled: true,
       memoryInjectionEnabled: true,
+      memoryConsentStatus: 'granted',
     };
     const block = buildMemoryBlock(profile, 'Math', 'fractions', {
       status: 'strong',
       strongTopics: ['fractions'],
-    });
+    }).text;
     expect(block).not.toContain('fractions');
     expect(block).toContain('reading directions carefully');
   });
@@ -690,8 +715,9 @@ describe('buildMemoryBlock', () => {
       communicationNotes: [],
       memoryEnabled: true,
       memoryInjectionEnabled: true,
+      memoryConsentStatus: 'granted',
     };
-    const block = buildMemoryBlock(profile, null, null);
+    const block = buildMemoryBlock(profile, null, null).text;
     expect(block).toContain('Use the learner memory naturally');
     expect(block).toContain('Reference interests only when genuinely relevant');
   });
@@ -705,8 +731,9 @@ describe('buildMemoryBlock', () => {
       communicationNotes: [],
       memoryEnabled: true,
       memoryInjectionEnabled: true,
+      memoryConsentStatus: 'granted',
     };
-    const block = buildMemoryBlock(profile, null, null);
+    const block = buildMemoryBlock(profile, null, null).text;
     expect(block).toContain('check-in');
   });
 
@@ -723,8 +750,9 @@ describe('buildMemoryBlock', () => {
       communicationNotes: [],
       memoryEnabled: true,
       memoryInjectionEnabled: true,
+      memoryConsentStatus: 'granted',
     };
-    const block = buildMemoryBlock(profile, null, null);
+    const block = buildMemoryBlock(profile, null, null).text;
     expect(block).toContain('stories and humor');
     expect(block).toContain('step-by-step pace');
     expect(block).toContain('challenge as motivation');
@@ -739,8 +767,9 @@ describe('buildMemoryBlock', () => {
       communicationNotes: ['responds well to humor', 'prefers short answers'],
       memoryEnabled: true,
       memoryInjectionEnabled: true,
+      memoryConsentStatus: 'granted',
     };
-    const block = buildMemoryBlock(profile, null, null);
+    const block = buildMemoryBlock(profile, null, null).text;
     expect(block).toContain('responds well to humor');
   });
 
@@ -753,12 +782,13 @@ describe('buildMemoryBlock', () => {
       communicationNotes: [],
       memoryEnabled: true,
       memoryInjectionEnabled: true,
+      memoryConsentStatus: 'granted',
     };
-    const block = buildMemoryBlock(profile, null, null);
+    const block = buildMemoryBlock(profile, null, null).text;
     expect(block).toContain('preferred explanation style is still emerging');
   });
 
-  it('returns empty string when profile has no signals at all', () => {
+  it('returns empty text when profile has no signals at all', () => {
     const profile: MemoryBlockProfile = {
       learningStyle: null,
       interests: [],
@@ -767,8 +797,9 @@ describe('buildMemoryBlock', () => {
       communicationNotes: [],
       memoryEnabled: true,
       memoryInjectionEnabled: true,
+      memoryConsentStatus: 'granted',
     };
-    const block = buildMemoryBlock(profile, null, null);
+    const block = buildMemoryBlock(profile, null, null).text;
     expect(block).toBe('');
   });
 
@@ -789,8 +820,9 @@ describe('buildMemoryBlock', () => {
       communicationNotes: [],
       memoryEnabled: true,
       memoryInjectionEnabled: true,
+      memoryConsentStatus: 'granted',
     };
-    const block = buildMemoryBlock(profile, 'Math', null);
+    const block = buildMemoryBlock(profile, 'Math', null).text;
     // English grammar should not appear when current subject is Math
     expect(block).not.toContain('grammar');
   });
@@ -812,8 +844,9 @@ describe('buildMemoryBlock', () => {
       communicationNotes: [],
       memoryEnabled: true,
       memoryInjectionEnabled: true,
+      memoryConsentStatus: 'granted',
     };
-    const block = buildMemoryBlock(profile, 'Math', null);
+    const block = buildMemoryBlock(profile, 'Math', null).text;
     expect(block).toContain('reading directions');
   });
 
@@ -826,11 +859,12 @@ describe('buildMemoryBlock', () => {
       communicationNotes: [],
       memoryEnabled: true,
       memoryInjectionEnabled: true,
+      memoryConsentStatus: 'granted',
     };
     const block = buildMemoryBlock(profile, 'Math', null, null, [
       'fractions',
       'long division',
-    ]);
+    ]).text;
     expect(block).toContain('fractions');
     expect(block).toContain('long division');
     expect(block).toMatch(/overcame|growth|celebrate|proud/i);
@@ -845,12 +879,13 @@ describe('buildMemoryBlock', () => {
       communicationNotes: [],
       memoryEnabled: true,
       memoryInjectionEnabled: true,
+      memoryConsentStatus: 'granted',
     };
     const block = buildMemoryBlock(profile, 'Math', null, null, [
       { topic: 'fractions', subject: 'Math' },
       { topic: 'wave theory', subject: 'Physics' },
       { topic: 'derivatives', subject: null },
-    ]);
+    ]).text;
     expect(block).toContain('fractions (Math)');
     expect(block).toContain('wave theory (Physics)');
     expect(block).toContain('derivatives');
@@ -866,9 +901,10 @@ describe('buildMemoryBlock', () => {
       communicationNotes: [],
       memoryEnabled: true,
       memoryInjectionEnabled: true,
+      memoryConsentStatus: 'granted',
     };
-    const blockEmpty = buildMemoryBlock(profile, 'Math', null, null, []);
-    const blockUndefined = buildMemoryBlock(profile, 'Math', null, null);
+    const blockEmpty = buildMemoryBlock(profile, 'Math', null, null, []).text;
+    const blockUndefined = buildMemoryBlock(profile, 'Math', null, null).text;
     // Both should produce the same output — no resolved section
     expect(blockEmpty).toBe(blockUndefined);
   });
@@ -882,9 +918,10 @@ describe('buildMemoryBlock', () => {
       communicationNotes: [],
       memoryEnabled: true,
       memoryInjectionEnabled: true,
+      memoryConsentStatus: 'granted',
       effectivenessSessionCount: 2,
     };
-    const block = buildMemoryBlock(profile, null, null);
+    const block = buildMemoryBlock(profile, null, null).text;
     expect(block).toContain('check-in');
   });
 
@@ -897,10 +934,224 @@ describe('buildMemoryBlock', () => {
       communicationNotes: [],
       memoryEnabled: true,
       memoryInjectionEnabled: true,
+      memoryConsentStatus: 'granted',
       effectivenessSessionCount: 5,
     };
-    const block = buildMemoryBlock(profile, null, null);
+    const block = buildMemoryBlock(profile, null, null).text;
     expect(block).not.toContain('check-in');
+  });
+
+  // P1.3: strengths injection
+  it('includes strengths line when strengths entries exist', () => {
+    const profile: MemoryBlockProfile = {
+      learningStyle: null,
+      interests: [],
+      strengths: [
+        {
+          subject: 'Math',
+          topics: ['fractions', 'decimals', 'percentages'],
+          confidence: 'high',
+        },
+        {
+          subject: 'Science',
+          topics: ['photosynthesis'],
+          confidence: 'medium',
+        },
+      ],
+      struggles: [],
+      communicationNotes: [],
+      memoryEnabled: true,
+      memoryInjectionEnabled: true,
+      memoryConsentStatus: 'granted',
+    };
+    const block = buildMemoryBlock(profile, null, null).text;
+    expect(block).toContain('Confident with:');
+    expect(block).toContain('fractions');
+    expect(block).toContain('Math');
+  });
+
+  it('omits strengths line when strengths array is empty', () => {
+    const profile: MemoryBlockProfile = {
+      learningStyle: null,
+      interests: ['space'],
+      strengths: [],
+      struggles: [],
+      communicationNotes: [],
+      memoryEnabled: true,
+      memoryInjectionEnabled: true,
+      memoryConsentStatus: 'granted',
+    };
+    const block = buildMemoryBlock(profile, null, null).text;
+    expect(block).not.toContain('Confident with:');
+  });
+
+  it('limits strengths to top 3 by topic count', () => {
+    const profile: MemoryBlockProfile = {
+      learningStyle: null,
+      interests: [],
+      strengths: [
+        {
+          subject: 'Math',
+          topics: ['fractions', 'decimals', 'percentages', 'algebra'],
+          confidence: 'high',
+        },
+        {
+          subject: 'Science',
+          topics: ['photosynthesis', 'cells', 'genetics'],
+          confidence: 'high',
+        },
+        {
+          subject: 'History',
+          topics: ['WWII', 'Roman Empire'],
+          confidence: 'medium',
+        },
+        { subject: 'English', topics: ['grammar'], confidence: 'low' },
+      ],
+      struggles: [],
+      communicationNotes: [],
+      memoryEnabled: true,
+      memoryInjectionEnabled: true,
+      memoryConsentStatus: 'granted',
+    };
+    const block = buildMemoryBlock(profile, null, null).text;
+    // Top 3 by topic count: Math (4), Science (3), History (2) — English (1) should be omitted
+    expect(block).toContain('Math');
+    expect(block).toContain('Science');
+    expect(block).toContain('History');
+    expect(block).not.toContain('English');
+  });
+
+  it('populates entries array with a strength entry that matches text', () => {
+    const profile: MemoryBlockProfile = {
+      learningStyle: null,
+      interests: [],
+      strengths: [
+        { subject: 'Math', topics: ['fractions'], confidence: 'high' },
+      ],
+      struggles: [],
+      communicationNotes: [],
+      memoryEnabled: true,
+      memoryInjectionEnabled: true,
+      memoryConsentStatus: 'granted',
+    };
+    const result = buildMemoryBlock(profile, null, null);
+    const strengthEntry = result.entries.find((e) => e.kind === 'strength');
+    expect(strengthEntry).toBeDefined();
+    expect(strengthEntry!.text).toContain('fractions');
+    // Entry text must appear as substring in the full .text
+    expect(result.text).toContain(strengthEntry!.text);
+  });
+
+  // P1.4: urgency injection
+  it('includes urgency line when activeUrgency is set and boost is in the future', () => {
+    const boostUntil = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000); // 5 days from now
+    const profile: MemoryBlockProfile = {
+      learningStyle: null,
+      interests: ['space'],
+      strengths: [],
+      struggles: [],
+      communicationNotes: [],
+      memoryEnabled: true,
+      memoryInjectionEnabled: true,
+      memoryConsentStatus: 'granted',
+      activeUrgency: { reason: 'Maths exam next week', boostUntil },
+    };
+    const block = buildMemoryBlock(profile, null, null).text;
+    expect(block).toContain('Upcoming:');
+    expect(block).toContain('Maths exam next week');
+    expect(block).toContain('days away');
+  });
+
+  it('omits urgency line when activeUrgency is null', () => {
+    const profile: MemoryBlockProfile = {
+      learningStyle: null,
+      interests: ['space'],
+      strengths: [],
+      struggles: [],
+      communicationNotes: [],
+      memoryEnabled: true,
+      memoryInjectionEnabled: true,
+      memoryConsentStatus: 'granted',
+      activeUrgency: null,
+    };
+    const block = buildMemoryBlock(profile, null, null).text;
+    expect(block).not.toContain('Upcoming:');
+  });
+
+  it('omits urgency line when boostUntil is in the past', () => {
+    const boostUntil = new Date(Date.now() - 1 * 24 * 60 * 60 * 1000); // yesterday
+    const profile: MemoryBlockProfile = {
+      learningStyle: null,
+      interests: ['space'],
+      strengths: [],
+      struggles: [],
+      communicationNotes: [],
+      memoryEnabled: true,
+      memoryInjectionEnabled: true,
+      memoryConsentStatus: 'granted',
+      activeUrgency: { reason: 'Past exam', boostUntil },
+    };
+    const block = buildMemoryBlock(profile, null, null).text;
+    expect(block).not.toContain('Upcoming:');
+  });
+
+  it('populates entries array with an urgency entry that matches text', () => {
+    const boostUntil = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+    const profile: MemoryBlockProfile = {
+      learningStyle: null,
+      interests: ['space'],
+      strengths: [],
+      struggles: [],
+      communicationNotes: [],
+      memoryEnabled: true,
+      memoryInjectionEnabled: true,
+      memoryConsentStatus: 'granted',
+      activeUrgency: { reason: 'Science test', boostUntil },
+    };
+    const result = buildMemoryBlock(profile, null, null);
+    const urgencyEntry = result.entries.find((e) => e.kind === 'urgency');
+    expect(urgencyEntry).toBeDefined();
+    expect(urgencyEntry!.text).toContain('Science test');
+    // Entry text must appear as substring in the full .text
+    expect(result.text).toContain(urgencyEntry!.text);
+  });
+
+  // F8: entries array completeness
+  it('every visible line in text has at least one matching entry', () => {
+    const boostUntil = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    const profile: MemoryBlockProfile = {
+      learningStyle: { preferredExplanations: ['stories'] },
+      interests: ['dinosaurs'],
+      strengths: [
+        { subject: 'Math', topics: ['fractions'], confidence: 'high' },
+      ],
+      struggles: [
+        {
+          subject: 'Science',
+          topic: 'photosynthesis',
+          attempts: 3,
+          confidence: 'medium',
+          lastSeen: '2026-04-01T00:00:00Z',
+        },
+      ],
+      communicationNotes: ['prefers short answers'],
+      memoryEnabled: true,
+      memoryInjectionEnabled: true,
+      memoryConsentStatus: 'granted',
+      activeUrgency: { reason: 'Test tomorrow', boostUntil },
+    };
+    const result = buildMemoryBlock(profile, 'Science', null);
+    // Each entry text must be a substring of the full block text
+    for (const entry of result.entries) {
+      expect(result.text).toContain(entry.text);
+    }
+    // At least one entry per expected kind in this fixture
+    const kinds = result.entries.map((e) => e.kind);
+    expect(kinds).toContain('struggle');
+    expect(kinds).toContain('strength');
+    expect(kinds).toContain('interest');
+    expect(kinds).toContain('communication_note');
+    expect(kinds).toContain('urgency');
   });
 });
 

@@ -1,10 +1,22 @@
 # Quiz UI-Redesign Branch — Finding Fixes Spec
 
 **Date:** 2026-04-18
-**Status:** Draft
+**Status:** Draft (adversarial review applied 2026-04-19)
 **Branch:** `ui-redesign`
 **Source:** [end-user-test-report-2026-04-18.md](../flows/end-user-test-report-2026-04-18.md) findings F-032 through F-040 (quiz series).
 **Author context:** End-user test pass on Expo Web preview against `api-stg.mentomate.com`, Zuzana profile, clean quiz history.
+
+### Adversarial Review Changelog (2026-04-19)
+
+1. **F-032:** Fixed phantom file reference (`services/quiz/round.ts` → `services/quiz/queries.ts`). Corrected handler line number (260 → 273). Changed data-integrity fallback from "log warning" to "emit structured metric/Inngest event" per project silent-recovery ban.
+2. **F-034:** Removed from Group 3 — already fixed in codebase (`practice.tsx:41–64` dynamically computes subtitle from aggregated `quizStats`).
+3. **F-036b:** Extracted from Group 3 into its own sub-group (3b) — it's a cross-package API+schema+client change, not a one-file mobile tweak. Sequenced after F-032 since both touch the same endpoint.
+4. **F-037-adjacent:** Fixed line number reference for history Back button (`59-64` → `79-84`).
+5. **F-038:** Corrected description from "duplicate label + placeholder" to "redundant label" — the label ("Type your guess") and placeholder ("Type a name") are different strings but serve the same purpose.
+6. **F-040:** Fixed `text-danger-soft` token reference (does not exist) → `text-danger` with `opacity-70`. Fixed `lib/theme` directory reference → actual files (`tailwind.config.js`, `design-tokens.ts`). Fixed `play.tsx` line reference (261 → 243). Added explicit note that `results.tsx` must destructure `questionResults` (currently unused). Added small-screen performance note for 8-question worst case. Made F-032 dependency explicit in scope section.
+7. **F-041:** Added missing failure modes table, verified-by section, and implementation notes (normalization matching, empty alias handling, self-filtering). Added deferral recommendation — revisit after F-040 usage validates the need.
+8. **F-033:** Upgraded deploy smoke-test from "scope creep — optional" to "recommended" given three recurrences of the same deploy-lag class.
+9. **Spec-level:** Added Success Criteria section. Updated priority ordering to reflect structural changes.
 
 ## Problem
 
@@ -42,8 +54,8 @@ Fixes are grouped by priority. Each group is an independent PR-sized unit.
 **Scope:** API only. Client code in [apps/mobile/src/app/(app)/quiz/[roundId].tsx](../../apps/mobile/src/app/(app)/quiz/[roundId].tsx) already reads these fields (`round.score`, `round.results`, `q.correctAnswer`) — no mobile changes needed.
 
 **Files:**
-- [apps/api/src/routes/quiz.ts:260](../../apps/api/src/routes/quiz.ts) — `GET /quiz/rounds/:id` handler. Replace unconditional `toClientSafeQuestions()` with a conditional.
-- [apps/api/src/services/quiz/round.ts](../../apps/api/src/services/quiz/round.ts) — if business logic lives in a service, add `getCompletedRoundForProfile(profileId, roundId)` that joins `quiz_rounds` + `quiz_round_results`.
+- [apps/api/src/routes/quiz.ts:273](../../apps/api/src/routes/quiz.ts) — `GET /quiz/rounds/:id` handler (line 273). `toClientSafeQuestions()` is defined at line 62 and called at lines 295 (completed) and 309 (active). Replace unconditional stripping with a status-based conditional.
+- [apps/api/src/services/quiz/queries.ts](../../apps/api/src/services/quiz/queries.ts) — round query logic lives here (not `round.ts`, which does not exist). Add `getCompletedRoundForProfile(profileId, roundId)` that joins `quiz_rounds` + `quiz_round_results`.
 - [packages/schemas/src/quiz.ts](../../packages/schemas/src/quiz.ts) — add `completedQuizRoundSchema` distinct from `activeQuizRoundSchema`. Union the two for the response shape; discriminate on `status`.
 
 **Implementation notes:**
@@ -58,7 +70,7 @@ Fixes are grouped by priority. Each group is an independent PR-sized unit.
 | Completed round, other profile | Cross-profile access attempt | 404 NotFound | Scoped repo blocks access |
 | Round deleted mid-fetch | race condition | 404 NotFound | Client falls through to existing `round-detail-error` state |
 | DB transient error | connection drop | 500 with typed error | Client falls through to `round-detail-error` (existing) |
-| `quiz_round_results` missing for completed round | data-integrity bug | empty `results: []` + score from round row | **Log warning**; detail view renders "No per-question data for this round" inline rather than "all wrong" |
+| `quiz_round_results` missing for completed round | data-integrity bug | empty `results: []` + score from round row | **Emit structured metric/Inngest event** (not just `console.warn` — per project rules, silent recovery without escalation is banned); detail view renders "No per-question data for this round" inline rather than "all wrong" |
 
 **Verified By:**
 - `test: apps/api/src/routes/quiz.test.ts:"GET /quiz/rounds/:id returns stripped shape for in-progress round"`
@@ -84,7 +96,7 @@ Fixes are grouped by priority. Each group is an independent PR-sized unit.
 - `manual: curl -XPOST https://api-stg.mentomate.com/v1/quiz/missed-items/mark-surfaced -d '{"activityType":"capitals"}' → 200 { markedCount: n }`
 - `test: apps/api/src/routes/quiz.test.ts:"POST /quiz/missed-items/mark-surfaced marks items for activityType"` — add this test so future stale deploys surface as test failures before landing.
 
-**Preventive work (scope creep — optional):** Add a smoke-test step to the deploy workflow that hits one endpoint per quiz route group (`/stats`, `/rounds`, `/rounds/:id/check`, `/missed-items/mark-surfaced`) and fails the deploy if any returns 404 with plain-text body. This would have caught F-014, F-028, and F-033 automatically.
+**Preventive work (recommended — this is the third deploy-lag regression after F-014 and F-028):** Add a smoke-test step to the deploy workflow that hits one endpoint per quiz route group (`/stats`, `/rounds`, `/rounds/:id/check`, `/missed-items/mark-surfaced`) and fails the deploy if any returns 404 with plain-text body. This would have caught F-014, F-028, and F-033 automatically. Three recurrences of the same class of bug elevates this from "nice to have" to "fix the systemic cause."
 
 **Commit tag:** `chore(api): redeploy staging to land mark-surfaced route [F-033]`
 
@@ -113,7 +125,9 @@ For perfect rounds (`questionResults.every(r => r.correct)`): skip this section 
 - Confetti, more XP, streak counters, celebratory animations on wrong answers — this is a teaching surface, not a gamification one.
 - A "Review these" button linking to a new re-teach session flow. (Deferred — see Deferred section. Keep this spec scoped to a single-file change.)
 
-**Scope:** Mobile only. All data is already in `completionResult.questionResults` — see F-040 report entry and [quiz/play.tsx:261](../../apps/mobile/src/app/(app)/quiz/play.tsx) `setCompletionResult(result)`.
+**Scope:** Mobile only. The `completionResult` object (from `useQuizFlow()`) already contains `questionResults` at the type level (`CompleteRoundResponse` in `packages/schemas/src/quiz.ts`), but `results.tsx` currently only destructures `{ score, total, xpEarned, celebrationTier }` — this fix must also destructure `questionResults` from `completionResult`. See [quiz/play.tsx:243](../../apps/mobile/src/app/(app)/quiz/play.tsx) for where `setCompletionResult(result)` is called.
+
+**Dependency:** F-040 reads `correctAnswer` from `round.questions[i]`, which is only populated for completed rounds after F-032 ships. F-032 must be deployed before F-040 can show correct answers in round-detail review. The `completionResult.questionResults[i].correctAnswer` field (returned inline from the `/check` endpoint) is available immediately for the results screen — but if the user navigates away and returns via history, F-032 is required.
 
 **Files:**
 - [apps/mobile/src/app/(app)/quiz/results.tsx](../../apps/mobile/src/app/(app)/quiz/results.tsx) — add `MissedQuestionsReview` section.
@@ -121,9 +135,9 @@ For perfect rounds (`questionResults.every(r => r.correct)`): skip this section 
 
 **Implementation notes:**
 - The results screen currently reads from `useQuizFlow()`. Both `completionResult` AND `round` are in that context. The `round.questions[i]` array gives prompts; `completionResult.questionResults[i]` gives correctness + `correctAnswer`.
-- Use existing `bg-surface` / `bg-surface-elevated` tokens. Muted red = `text-danger-soft` or equivalent; muted green = `text-success`. Check [apps/mobile/src/lib/theme](../../apps/mobile/src/lib/theme) for token names.
+- Use existing `bg-surface` / `bg-surface-elevated` tokens. Muted red = `text-danger` with `opacity-70` (there is no `danger-soft` token in the design system); muted green = `text-success`. Token definitions are in [apps/mobile/tailwind.config.js](../../apps/mobile/tailwind.config.js) (lines 18/20) and [apps/mobile/src/lib/design-tokens.ts](../../apps/mobile/src/lib/design-tokens.ts).
 - Accessibility: group each missed-question card in a `View` with `accessibilityRole="text"` and a full narration label like `"Question 3: Capital of Slovenia. Your answer Maribor. Correct answer Ljubljana."`
-- For long answer lists (4+ missed), the results screen should scroll — wrap the whole screen in `ScrollView`.
+- For long answer lists (4+ missed), the results screen should scroll — wrap the whole screen in `ScrollView`. Note: rounds can have up to 8 questions; on a worst-case all-wrong round on a small screen (Galaxy S10e, 5.8"), 8 cards with prompts + answers + fun facts could produce a long list. Consider collapsing fun facts behind a "Show more" tap if the card count exceeds 4, or use `FlatList` for virtualization if performance becomes an issue.
 
 | State | Trigger | User sees | Recovery |
 |---|---|---|---|
@@ -147,6 +161,8 @@ For perfect rounds (`questionResults.every(r => r.correct)`): skip this section 
 
 **Not part of F-040's PR — spec'd here to keep F-040 focused.**
 
+> **Adversarial review note (2026-04-19):** Consider deferring F-041 entirely until after F-040 ships and real usage data shows whether users are confused by loose matches. This is a nice-to-have polish item with a non-trivial matching condition that could produce false positives. Revisit after F-040 has been in staging for at least one test cycle.
+
 **Current behavior:** User types "Nikola Tesla", server accepts it, returns `{correct: true}`. User sees "You got it in 1 clue!" — no indication that "Tesla" or "Nicola Tesla" would also have worked.
 
 **Desired behavior:** When a user's `answerGiven` differs from `correctAnswer` but `correct: true` (because aliases matched), render a caption: `"Nice — we also accept Tesla, Nicola Tesla."` Small, muted, doesn't steal the moment.
@@ -155,24 +171,54 @@ For perfect rounds (`questionResults.every(r => r.correct)`): skip this section 
 
 **Files:** same `results.tsx`.
 
+**Implementation notes:**
+- The matching condition (`answerGiven !== correctAnswer && correct === true`) must use the **same normalization** the server uses for comparison. If the server lowercases + trims before matching, the client comparison must also lowercase + trim — otherwise a user who typed `"paris"` when `correctAnswer` is `"Paris"` would falsely trigger the alias hint for a simple case difference, not an actual alias match.
+- If `acceptedAliases` is `null`, `undefined`, or an empty array, do not render the alias hint — there is nothing useful to show.
+- Filter the displayed aliases: exclude the `answerGiven` value itself (case-insensitive) from the alias list so the hint doesn't say "we also accept X" when X is exactly what the user typed.
+
+| State | Trigger | User sees | Recovery |
+|---|---|---|---|
+| `acceptedAliases` is null/empty | F-032 didn't populate aliases for this question type | No alias hint rendered (graceful skip) | N/A — correct behavior |
+| `answerGiven` equals `correctAnswer` (exact match) | Common case — user typed the canonical answer | No alias hint (condition not met) | N/A |
+| `answerGiven` differs only by case/whitespace, not by alias | Case normalization mismatch between client check and server validation | False-positive alias hint: "Nice — we also accept Paris" when user typed "paris" | Client must normalize both sides identically before comparing |
+| `acceptedAliases` contains only the `answerGiven` value | User typed the only alias | Empty alias list after filtering → skip hint | N/A |
+
+**Verified By:**
+- `test: apps/mobile/src/app/(app)/quiz/results.test.tsx:"renders alias hint when answerGiven differs from correctAnswer but correct"`
+- `test: apps/mobile/src/app/(app)/quiz/results.test.tsx:"does not render alias hint on exact match"`
+- `test: apps/mobile/src/app/(app)/quiz/results.test.tsx:"does not render alias hint when acceptedAliases is empty"`
+- `test: apps/mobile/src/app/(app)/quiz/results.test.tsx:"filters answerGiven from displayed alias list"`
+
 **Commit tag:** `feat(mobile): show accepted aliases hint on loose-match answers [F-041]`
 
 ---
 
-### Group 3 — POLISH SWEEP (one PR, low risk)
+### Group 3 — POLISH SWEEP
 
-Bundle these into a single commit — they're all one-file changes and don't warrant separate PRs.
+Two sub-groups: a mobile-only commit (one-file changes, low risk) and a cross-package fix (F-036b) that touches API + schema + client.
+
+#### Group 3a — Mobile-only polish (one commit)
 
 | Finding | Fix | File | Verified By |
 |---|---|---|---|
-| F-034 — Practice hub Quiz card subtitle hardcoded to `capitals` | Aggregate: pick the `quizStats` entry with most recent implicit `completedAt`, or fall back to most-played. If none, keep current generic copy. | [apps/mobile/src/app/(app)/practice.tsx:41-50](../../apps/mobile/src/app/(app)/practice.tsx) | `test: apps/mobile/src/app/(app)/practice.test.tsx:"subtitle surfaces latest-activity stats for non-capitals player"` |
 | F-036a — Round detail Back button is plain text | Replace `<Text className="text-primary">Back</Text>` with `arrow-back` Ionicon + accessibility label `"Go back"`. Align with `practice-back` pattern. | [apps/mobile/src/app/(app)/quiz/[roundId].tsx:50](../../apps/mobile/src/app/(app)/quiz/[roundId].tsx) | `manual: nav to round detail, confirm icon + label` |
-| F-036b — `activityType` renders lowercase | Server-side: add formatted `activityLabel` to `GET /quiz/rounds/:id` response (`"Capitals"`, `"Guess Who"`, `"Vocabulary: Spanish"`). Client reads `activityLabel` instead of string-mangling `activityType.replace('_', ' ')`. | API + client | `test: schema test asserts `activityLabel` populated for all activity types` |
 | F-037 — History date header is raw ISO | Use `Intl.DateTimeFormat` with relative buckets: "Today", "Yesterday", else formatted date (`"Apr 18"`). | [apps/mobile/src/app/(app)/quiz/history.tsx:74](../../apps/mobile/src/app/(app)/quiz/history.tsx) | `test: apps/mobile/src/app/(app)/quiz/history.test.tsx:"groups rounds under Today / Yesterday / formatted-date headers"` |
-| F-038 — Guess Who duplicate label + placeholder | Drop the separate `"Type your guess"` label above the TextInput; keep the placeholder only. | [apps/mobile/src/app/(app)/quiz/_components/GuessWhoQuestion.tsx](../../apps/mobile/src/app/(app)/quiz/_components/GuessWhoQuestion.tsx) | `manual: confirm no redundant label` |
-| F-037-adjacent — History screen "Back" button also plain text | Apply the same Ionicon treatment as F-036a. | [apps/mobile/src/app/(app)/quiz/history.tsx:59-64](../../apps/mobile/src/app/(app)/quiz/history.tsx) | `manual: confirm icon + testid consistency` |
+| F-038 — Guess Who redundant label above TextInput | The TextInput has a visible label ("Type your guess", line 192) AND a placeholder ("Type a name"). These are different strings, but both serve the same purpose — instructing the user to type. Remove the standalone `<Text>` label; the placeholder + `accessibilityLabel` on the TextInput are sufficient. | [apps/mobile/src/app/(app)/quiz/_components/GuessWhoQuestion.tsx:192](../../apps/mobile/src/app/(app)/quiz/_components/GuessWhoQuestion.tsx) | `manual: confirm no redundant label; verify accessibilityLabel still reads "Guess who answer"` |
+| F-037-adjacent — History screen "Back" button also plain text | Apply the same Ionicon treatment as F-036a. | [apps/mobile/src/app/(app)/quiz/history.tsx:79-84](../../apps/mobile/src/app/(app)/quiz/history.tsx) | `manual: confirm icon + testid consistency` |
 
-**Commit tag:** `style(mobile): quiz UI polish sweep [F-034, F-036, F-037, F-038]`
+> **Note (adversarial review):** F-034 (practice hub subtitle hardcoded to `capitals`) was already fixed — `practice.tsx` lines 41–64 now dynamically compute `quizSubtitle` from aggregated `quizStats` across all activity types. No work needed.
+
+**Commit tag:** `style(mobile): quiz UI polish sweep [F-036a, F-037, F-038]`
+
+#### Group 3b — Activity type label formatting (F-036b) — separate commit
+
+**Why separate:** This is a cross-package change (API route + schema + client), not a one-file mobile tweak. It also modifies `GET /quiz/rounds/:id` — the same endpoint as F-032 — so it should be sequenced after F-032, not developed in parallel.
+
+| Finding | Fix | Files | Verified By |
+|---|---|---|---|
+| F-036b — `activityType` renders as raw lowercase enum | Server-side: add computed `activityLabel` to `GET /quiz/rounds/:id` response (`"Capitals"`, `"Guess Who"`, `"Vocabulary: Spanish"`). Client reads `activityLabel` instead of string-mangling `activityType.replace('_', ' ')`. | [apps/api/src/routes/quiz.ts](../../apps/api/src/routes/quiz.ts), [packages/schemas/src/quiz.ts](../../packages/schemas/src/quiz.ts), client display component | `test: schema test asserts activityLabel populated for all activity types` |
+
+**Commit tag:** `feat(api,mobile): add formatted activityLabel to round response [F-036b]`
 
 ---
 
@@ -217,11 +263,18 @@ Per user feedback ("don't want this to be yet another gamification app — tunin
 The fixes have a natural ordering:
 
 1. **F-033 deploy** (a few minutes of ops work; unblocks the discovery card on staging).
-2. **F-032 server fix** (unblocks round detail view; unblocks F-041 spec).
+2. **F-032 server fix** (unblocks round detail view; unblocks F-036b and F-041).
 3. **F-040 results-screen fix** (the primary user-facing pedagogical win).
-4. **F-041** (after F-032 exposes `acceptedAliases`).
-5. **Polish sweep (Group 3)** (parallel to any of the above).
-6. **Group 4 product discussion** (scheduled separately).
+4. **Group 3a mobile polish** (parallel to F-040; no API dependencies).
+5. **F-036b activity label** (after F-032, since both touch `GET /quiz/rounds/:id`).
+6. **F-041** (deferred — revisit after F-040 has been in staging for one test cycle).
+7. **Group 4 product discussion** (scheduled separately).
+
+## Success Criteria
+
+After Groups 1–3 ship, the following end-to-end scenario must work:
+
+> A user plays a 4-question capitals round, intentionally gets 2 wrong, and sees — on the results screen within 3 seconds of completion — exactly which questions they missed, what they answered, and what the correct answers were. They tap "View History", select the round, and see the same correct answers + their per-question results on the detail screen. A perfect round shows the celebration UI with no missed-questions section.
 
 ## Failure Modes (spec-level)
 
@@ -248,6 +301,7 @@ Each group above has its own Verified By rows. Before shipping the full spec, al
 - ✅ Manual verification: play a mixed-score round, see missed questions on results; tap View History, see scores + correct answers on detail
 - ✅ Manual verification: play a perfect round, no missed-questions section renders on results; detail shows all green
 - ✅ Schema test: `activityLabel` populated for all `activityType` values
+- ⏸️ F-041 alias hint tests — deferred until F-040 usage validates the need
 
 ## Out of Scope
 

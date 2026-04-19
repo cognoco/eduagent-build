@@ -232,6 +232,20 @@
       "when": 1776663600000,
       "tag": "0032_rls_quiz_mastery_items",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1776750000000,
+      "tag": "0033_backfill_quiz_missed_items_surfaced",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1776600000000,
+      "tag": "0034_parent_session_recap",
+      "breakpoints": true
     }
   ]
 }

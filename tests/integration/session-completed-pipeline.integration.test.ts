@@ -27,6 +27,7 @@
 import { eq, and } from 'drizzle-orm';
 import {
   accounts,
+  familyLinks,
   profiles,
   subjects,
   curricula,
@@ -37,6 +38,11 @@ import {
   retentionCards,
   sessionSummaries,
 } from '@eduagent/database';
+import {
+  registerProvider,
+  createMockProvider,
+} from '../../apps/api/src/services/llm';
+import { getChildSessionDetail } from '../../apps/api/src/services/dashboard';
 
 import { cleanupAccounts, createIntegrationDb } from './helpers';
 
@@ -77,6 +83,8 @@ import { sessionCompleted } from '../../apps/api/src/inngest/functions/session-c
 
 const AUTH_USER_ID = 'stab-session-pipeline-integration-user';
 const AUTH_EMAIL = 'stab-session-pipeline-integration@test.invalid';
+const PARENT_AUTH_USER_ID = 'stab-session-pipeline-integration-parent';
+const PARENT_AUTH_EMAIL = 'stab-session-pipeline-parent@test.invalid';
 const SESSION_TIMESTAMP = '2026-02-24T10:00:00.000Z';
 
 // ---------------------------------------------------------------------------
@@ -259,6 +267,35 @@ async function seedScenario(options?: {
   };
 }
 
+async function seedParentLink(childProfileId: string) {
+  const db = createIntegrationDb();
+
+  const [account] = await db
+    .insert(accounts)
+    .values({
+      clerkUserId: PARENT_AUTH_USER_ID,
+      email: PARENT_AUTH_EMAIL,
+    })
+    .returning();
+
+  const [profile] = await db
+    .insert(profiles)
+    .values({
+      accountId: account!.id,
+      displayName: 'STAB Pipeline Parent',
+      birthYear: 1985,
+      isOwner: true,
+    })
+    .returning();
+
+  await db.insert(familyLinks).values({
+    parentProfileId: profile!.id,
+    childProfileId,
+  });
+
+  return profile!.id;
+}
+
 // ---------------------------------------------------------------------------
 // Loader helpers
 // ---------------------------------------------------------------------------
@@ -285,6 +322,7 @@ async function loadSessionSummary(sessionId: string) {
 // ---------------------------------------------------------------------------
 
 beforeEach(async () => {
+  registerProvider(createMockProvider('gemini'));
   mockStoreSessionEmbedding.mockReset();
   mockStoreSessionEmbedding.mockResolvedValue(undefined);
   mockExtractSessionContent.mockReset();
@@ -297,23 +335,23 @@ beforeEach(async () => {
 
   // Clean up any data left from a previous run of this suite
   await cleanupAccounts({
-    emails: [AUTH_EMAIL],
-    clerkUserIds: [AUTH_USER_ID],
+    emails: [AUTH_EMAIL, PARENT_AUTH_EMAIL],
+    clerkUserIds: [AUTH_USER_ID, PARENT_AUTH_USER_ID],
   });
 });
 
 afterEach(async () => {
   delete process.env['VOYAGE_API_KEY'];
   await cleanupAccounts({
-    emails: [AUTH_EMAIL],
-    clerkUserIds: [AUTH_USER_ID],
+    emails: [AUTH_EMAIL, PARENT_AUTH_EMAIL],
+    clerkUserIds: [AUTH_USER_ID, PARENT_AUTH_USER_ID],
   });
 });
 
 afterAll(async () => {
   await cleanupAccounts({
-    emails: [AUTH_EMAIL],
-    clerkUserIds: [AUTH_USER_ID],
+    emails: [AUTH_EMAIL, PARENT_AUTH_EMAIL],
+    clerkUserIds: [AUTH_USER_ID, PARENT_AUTH_USER_ID],
   });
 });
 
@@ -474,5 +512,130 @@ describe('session-completed Inngest pipeline (integration)', () => {
     const summary = await loadSessionSummary(scenario.sessionId);
     expect(summary).not.toBeNull();
     expect(summary!.sessionId).toBe(scenario.sessionId);
+  });
+
+  it('stores narrative recap fields and exposes them through dashboard session detail', async () => {
+    registerProvider({
+      id: 'gemini',
+      async chat() {
+        return JSON.stringify({
+          highlight: 'Practiced equivalent fractions',
+          narrative:
+            'They compared fraction sizes and fixed one shaky step after a hint.',
+          conversationPrompt: 'Which fraction felt easiest to compare today?',
+          engagementSignal: 'curious',
+          confidence: 'high',
+        });
+      },
+      async *chatStream() {
+        yield JSON.stringify({
+          highlight: 'Practiced equivalent fractions',
+          narrative:
+            'They compared fraction sizes and fixed one shaky step after a hint.',
+          conversationPrompt: 'Which fraction felt easiest to compare today?',
+          engagementSignal: 'curious',
+          confidence: 'high',
+        });
+      },
+    });
+
+    const scenario = await seedScenario({
+      includePreExistingRetentionCard: false,
+      sessionExchanges: [
+        {
+          eventType: 'user_message',
+          content:
+            'Do I need a common denominator for one half plus one quarter?',
+          offsetSeconds: 0,
+        },
+        {
+          eventType: 'ai_response',
+          content: 'Yes. Try rewriting one half in quarters.',
+          offsetSeconds: 8,
+        },
+        {
+          eventType: 'user_message',
+          content:
+            'That makes it two quarters plus one quarter equals three quarters.',
+          offsetSeconds: 16,
+        },
+      ],
+    });
+    const parentProfileId = await seedParentLink(scenario.profileId);
+
+    await executeChain({
+      profileId: scenario.profileId,
+      sessionId: scenario.sessionId,
+      topicId: scenario.topicId,
+      subjectId: scenario.subjectId,
+      summaryStatus: 'pending',
+      sessionType: 'learning',
+      qualityRating: 4,
+      timestamp: SESSION_TIMESTAMP,
+    });
+
+    const summary = await loadSessionSummary(scenario.sessionId);
+    expect(summary).not.toBeNull();
+    expect(summary!.highlight).toBe('Practiced equivalent fractions');
+    expect(summary!.narrative).toBe(
+      'They compared fraction sizes and fixed one shaky step after a hint.'
+    );
+    expect(summary!.conversationPrompt).toBe(
+      'Which fraction felt easiest to compare today?'
+    );
+    expect(summary!.engagementSignal).toBe('curious');
+
+    const sessionDetail = await getChildSessionDetail(
+      createIntegrationDb(),
+      parentProfileId,
+      scenario.profileId,
+      scenario.sessionId
+    );
+
+    expect(sessionDetail).toEqual(
+      expect.objectContaining({
+        highlight: 'Practiced equivalent fractions',
+        narrative:
+          'They compared fraction sizes and fixed one shaky step after a hint.',
+        conversationPrompt: 'Which fraction felt easiest to compare today?',
+        engagementSignal: 'curious',
+      })
+    );
+  });
+
+  it('falls back to the short-session highlight without narrative fields', async () => {
+    const scenario = await seedScenario({
+      includePreExistingRetentionCard: false,
+      sessionExchanges: [
+        {
+          eventType: 'user_message',
+          content: 'Hi!',
+          offsetSeconds: 0,
+        },
+        {
+          eventType: 'ai_response',
+          content: 'Hi there.',
+          offsetSeconds: 5,
+        },
+      ],
+    });
+
+    await executeChain({
+      profileId: scenario.profileId,
+      sessionId: scenario.sessionId,
+      topicId: scenario.topicId,
+      subjectId: scenario.subjectId,
+      summaryStatus: 'pending',
+      sessionType: 'learning',
+      qualityRating: 4,
+      timestamp: SESSION_TIMESTAMP,
+    });
+
+    const summary = await loadSessionSummary(scenario.sessionId);
+    expect(summary).not.toBeNull();
+    expect(summary!.highlight).toBeTruthy();
+    expect(summary!.narrative).toBeNull();
+    expect(summary!.conversationPrompt).toBeNull();
+    expect(summary!.engagementSignal).toBeNull();
   });
 });

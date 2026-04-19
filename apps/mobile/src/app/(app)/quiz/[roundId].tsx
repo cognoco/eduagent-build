@@ -1,11 +1,44 @@
 import { View, Text, ScrollView, Pressable } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import type {
+  ClientQuizQuestion,
+  ValidatedQuestionResult,
+} from '@eduagent/schemas';
 import { useRoundDetail } from '../../../hooks/use-quiz';
 import { goBackOrReplace } from '../../../lib/navigation';
+import { useThemeColors } from '../../../lib/theme';
+
+/** The completed-round shape returned by GET /quiz/rounds/:id (status=completed).
+ *  Extends the base QuizRoundResponse with grading context the client needs
+ *  for the history detail screen. */
+interface CompletedRoundDetail {
+  id: string;
+  activityType: string;
+  activityLabel?: string;
+  theme: string;
+  status: 'completed';
+  score: number;
+  total: number;
+  xpEarned: number;
+  celebrationTier?: string;
+  completedAt?: string;
+  questions: (ClientQuizQuestion & {
+    correctAnswer?: string;
+    acceptedAliases?: string[];
+  })[];
+  results: ValidatedQuestionResult[];
+}
+
+/** Title-case an activity type slug: "guess_who" → "Guess Who" */
+function formatActivityType(raw: string): string {
+  return raw.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
 export default function QuizRoundDetailScreen() {
   const { roundId } = useLocalSearchParams<{ roundId: string }>();
   const router = useRouter();
+  const colors = useThemeColors();
   const { data: round, isLoading, isError } = useRoundDetail(roundId);
 
   if (isLoading) {
@@ -28,21 +61,22 @@ export default function QuizRoundDetailScreen() {
         <Text className="text-on-surface">Could not load round details</Text>
         <Pressable
           testID="round-detail-back"
-          className="mt-4"
+          className="mt-4 min-h-[32px] min-w-[32px] items-center justify-center"
           onPress={() => goBackOrReplace(router, '/(app)/quiz/history')}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
         >
-          <Text className="text-primary">Go Back</Text>
+          <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
         </Pressable>
       </View>
     );
   }
 
-  const questions = (round as any).questions ?? [];
-  const results = ((round as any).results ?? []) as Array<{
-    questionIndex: number;
-    correct: boolean;
-    answerGiven: string;
-  }>;
+  // [I4] Cast to the completed-round shape — useRoundDetail returns
+  // QuizRoundResponse (the in-progress type), but this screen only renders
+  // completed rounds whose API shape includes grading context.
+  const detail = round as unknown as CompletedRoundDetail;
+  const { questions, results } = detail;
 
   return (
     <ScrollView testID="round-detail-screen" className="flex-1">
@@ -50,18 +84,25 @@ export default function QuizRoundDetailScreen() {
         <Pressable
           testID="round-detail-back-btn"
           onPress={() => goBackOrReplace(router, '/(app)/quiz/history')}
+          className="min-h-[32px] min-w-[32px] items-center justify-center self-start"
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
         >
-          <Text className="text-primary">Back</Text>
+          <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
         </Pressable>
         <Text className="text-on-surface mt-4 text-xl font-bold">
-          {(round as any).theme}
+          {detail.theme}
         </Text>
-        <Text className="text-on-surface-muted capitalize">
-          {(round as any).activityType?.replace('_', ' ')} ·{' '}
-          {(round as any).score}/{(round as any).total}
+        <Text className="text-on-surface-muted">
+          {/* [F-036b] Prefer server-formatted activityLabel; local
+              formatActivityType stays as a fallback for older cached rounds
+              that predate the field. */}
+          {detail.activityLabel ??
+            formatActivityType(detail.activityType ?? '')}{' '}
+          · {detail.score}/{detail.total}
         </Text>
       </View>
-      {questions.map((q: any, i: number) => {
+      {questions.map((q, i: number) => {
         const result = results.find((r) => r.questionIndex === i);
         return (
           <View

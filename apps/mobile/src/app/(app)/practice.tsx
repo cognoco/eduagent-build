@@ -51,12 +51,15 @@ export default function PracticeScreen(): React.ReactElement {
     )[0];
   const totalRoundsPlayed =
     quizStats?.reduce((sum, s) => sum + (s.roundsPlayed ?? 0), 0) ?? 0;
+  // [F-035] Surface totalXp — the main gamification metric is earned but never shown.
+  const totalXp = quizStats?.reduce((sum, s) => sum + (s.totalXp ?? 0), 0) ?? 0;
+  const xpSuffix = totalXp > 0 ? ` · ${totalXp} XP` : '';
   const quizSubtitle = statsError
     ? 'Could not load quiz stats'
     : bestActivity && bestActivity.bestScore != null
-    ? `Best: ${bestActivity.bestScore}/${bestActivity.bestTotal} · Played: ${totalRoundsPlayed}`
+    ? `Best: ${bestActivity.bestScore}/${bestActivity.bestTotal} · Played: ${totalRoundsPlayed}${xpSuffix}`
     : totalRoundsPlayed > 0
-    ? `Played: ${totalRoundsPlayed}`
+    ? `Played: ${totalRoundsPlayed}${xpSuffix}`
     : 'Test yourself with multiple choice questions';
 
   const handleBack = () => {
@@ -166,12 +169,13 @@ export default function PracticeScreen(): React.ReactElement {
           onPress={() => router.push('/(app)/quiz' as never)}
           testID="practice-quiz"
         />
-        <Pressable
-          testID="practice-quiz-history"
+        <IntentCard
+          title="History"
+          subtitle="View past quiz rounds"
+          icon="time-outline"
           onPress={() => router.push('/(app)/quiz/history' as never)}
-        >
-          <Text className="text-primary text-sm">History</Text>
-        </Pressable>
+          testID="practice-quiz-history"
+        />
       </View>
     </ScrollView>
   );

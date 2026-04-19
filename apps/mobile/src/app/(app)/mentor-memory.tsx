@@ -20,6 +20,7 @@ import {
 } from '../../components/mentor-memory-sections';
 import { TellMentorInput } from '../../components/tell-mentor-input';
 import { goBackOrReplace } from '../../lib/navigation';
+import { formatRelativeDate } from '../../lib/format-relative-date';
 import {
   useDeleteAllMemory,
   useDeleteMemoryItem,
@@ -350,23 +351,34 @@ export default function MentorMemoryScreen() {
 
         <MemorySection title="Interests">
           {(profile?.interests ?? []).length > 0 ? (
-            profile?.interests.map((interest) => (
-              <MemoryRow
-                key={interest}
-                label={interest}
-                onRemove={async () => {
-                  try {
-                    await deleteItem.mutateAsync({
-                      category: 'interests',
-                      value: interest,
-                      suppress: true,
-                    });
-                  } catch {
-                    platformAlert('Could not delete item', 'Please try again.');
-                  }
-                }}
-              />
-            ))
+            profile?.interests.map((interest) => {
+              // [BUG-471] Surface timestamp if available
+              const ts = profile?.interestTimestamps?.[interest];
+              const detail = ts
+                ? `Noticed ${formatRelativeDate(ts)}`
+                : undefined;
+              return (
+                <MemoryRow
+                  key={interest}
+                  label={interest}
+                  detail={detail}
+                  onRemove={async () => {
+                    try {
+                      await deleteItem.mutateAsync({
+                        category: 'interests',
+                        value: interest,
+                        suppress: true,
+                      });
+                    } catch {
+                      platformAlert(
+                        'Could not delete item',
+                        'Please try again.'
+                      );
+                    }
+                  }}
+                />
+              );
+            })
           ) : (
             <MemoryRow label="Nothing saved yet." />
           )}
@@ -410,6 +422,11 @@ export default function MentorMemoryScreen() {
                   label={`${entry.subject ? `${entry.subject}: ` : ''}${
                     entry.topic
                   }`}
+                  detail={
+                    entry.lastSeen
+                      ? `Last seen ${formatRelativeDate(entry.lastSeen)}`
+                      : undefined
+                  }
                   source={entry.source}
                   progressLabel={progress.progressLabel}
                   progressValue={progress.progressValue}

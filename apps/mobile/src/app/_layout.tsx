@@ -28,7 +28,7 @@ import {
   QueryClientProvider,
 } from '@tanstack/react-query';
 import { useAuth } from '@clerk/clerk-expo';
-import { ThemeContext, useTokenVars } from '../lib/theme';
+import { ThemeContext, useThemeColors, useTokenVars } from '../lib/theme';
 import type { ColorScheme } from '../lib/design-tokens';
 import { ProfileProvider, useProfile } from '../lib/profile';
 import { setOnAuthExpired, clearOnAuthExpired } from '../lib/api-client';
@@ -191,6 +191,7 @@ function ThemedApp() {
 /** Inner component that reads ThemeContext to inject CSS variables via vars() */
 function ThemedContent({ colorScheme }: { colorScheme: ColorScheme }) {
   const tokenVars = useTokenVars();
+  const colors = useThemeColors();
   const { isOffline } = useNetworkStatus();
 
   // Keep the authenticated app shell fully opaque. A release-only persona fade
@@ -200,7 +201,15 @@ function ThemedContent({ colorScheme }: { colorScheme: ColorScheme }) {
     <View style={[{ flex: 1 }, tokenVars]}>
       <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
       {isOffline && <OfflineBanner />}
-      <Stack screenOptions={{ headerShown: false }}>
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          // F-003/F-016/F-055: on web, stack screens are DOM layers without
+          // native opaque backing. Give every screen a solid background so
+          // the underlying tab/screen content doesn't bleed through.
+          contentStyle: { backgroundColor: colors.background },
+        }}
+      >
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(app)" />
         <Stack.Screen name="sso-callback" />

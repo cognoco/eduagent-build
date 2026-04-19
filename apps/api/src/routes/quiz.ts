@@ -18,6 +18,7 @@ import { validationError, VocabularyContextError } from '../errors';
 import {
   checkQuizAnswer,
   completeQuizRound,
+  getCelebrationTier,
   getVocabularyRoundContext,
   getGuessWhoRoundContext,
   computeRoundStats,
@@ -57,6 +58,20 @@ function shuffle<T>(arr: T[]): T[] {
     [result[i], result[j]] = [result[j]!, result[i]!];
   }
   return result;
+}
+
+/**
+ * [F-036b] Format an activity type enum for display:
+ * "capitals" → "Capitals", "guess_who" → "Guess Who".
+ *
+ * Centralized here so every client (mobile, future web) gets consistent
+ * casing. Otherwise each surface re-implements `.replace('_', ' ')` +
+ * title-case and they drift.
+ */
+function formatActivityLabel(activityType: string): string {
+  return activityType
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 function toClientSafeQuestions(
@@ -260,6 +275,7 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
       rounds.map((round) => ({
         id: round.id,
         activityType: round.activityType,
+        activityLabel: formatActivityLabel(round.activityType),
         theme: round.theme,
         score: round.score ?? 0,
         total: round.total,
@@ -281,20 +297,36 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
     const questions = round.questions as QuizQuestion[];
 
     if (round.status === 'completed') {
+      // [F-032] Completed rounds surface the grading context the client
+      // needs to render a history detail screen: correctAnswer and
+      // acceptedAliases per question (safe to expose — grading is final),
+      // plus a celebrationTier and human-readable activityLabel. Distractors
+      // remain stripped — the round is over, there's no reason to leak them.
       return c.json(
         {
           id: round.id,
           activityType: round.activityType,
+          activityLabel: formatActivityLabel(round.activityType),
           theme: round.theme,
           status: round.status,
           score: round.score,
           total: round.total,
           xpEarned: round.xpEarned,
+          celebrationTier: getCelebrationTier(round.score ?? 0, round.total),
           completedAt: round.completedAt?.toISOString(),
-          questions: questions.map((q) => ({
-            ...toClientSafeQuestions([q])[0],
-            correctAnswer: q.correctAnswer,
-          })),
+          questions: questions.map((q) => {
+            const base = toClientSafeQuestions([q])[0]!;
+            return {
+              ...base,
+              correctAnswer: q.correctAnswer,
+              acceptedAliases:
+                q.type === 'vocabulary'
+                  ? q.acceptedAnswers
+                  : 'acceptedAliases' in q
+                  ? q.acceptedAliases
+                  : undefined,
+            };
+          }),
           results: round.results,
         },
         200
@@ -305,6 +337,7 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
       {
         id: round.id,
         activityType: round.activityType,
+        activityLabel: formatActivityLabel(round.activityType),
         theme: round.theme,
         questions: toClientSafeQuestions(questions),
         total: round.total,
@@ -343,11 +376,14 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
       const result = await completeQuizRound(db, profileId, roundId, results);
 
       // Record streak activity — quiz round counts as daily learning activity.
-      // Fire-and-forget: streak failure must not block the completion response.
-      const today = new Date().toISOString().slice(0, 10);
-      recordSessionActivity(db, profileId, today).catch((err) =>
-        console.error('[quiz] recordSessionActivity failed:', err)
-      );
+      // [C2] Streak failure must not block the quiz completion response — scoring
+      // and mastery updates already succeeded, so the user should see their results.
+      try {
+        const today = new Date().toISOString().slice(0, 10);
+        await recordSessionActivity(db, profileId, today);
+      } catch (err) {
+        console.warn('[quiz] streak recording failed, non-blocking:', err);
+      }
 
       return c.json(result, 200);
     }

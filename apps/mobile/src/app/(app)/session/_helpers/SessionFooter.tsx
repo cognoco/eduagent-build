@@ -1,11 +1,6 @@
 import { View, Text, Pressable, Alert, ActivityIndicator } from 'react-native';
-import type { InputMode } from '@eduagent/schemas';
 import { Ionicons } from '@expo/vector-icons';
-import {
-  SessionInputModeToggle,
-  QuestionCounter,
-  LibraryPrompt,
-} from '../../../../components/session';
+import { QuestionCounter, LibraryPrompt } from '../../../../components/session';
 import { NoteInput } from '../../../../components/library/NoteInput';
 import type { useFiling } from '../../../../hooks/use-filing';
 import type { useUpsertNote } from '../../../../hooks/use-notes';
@@ -38,12 +33,8 @@ export interface SessionFooterProps {
   upsertNote: ReturnType<typeof useUpsertNote>;
   colors: ReturnType<typeof useThemeColors>;
 
-  // Input mode toggle
-  userMessageCount: number;
-  inputMode: InputMode;
-  handleInputModeChange: (nextInputMode: InputMode) => void;
-
   // Question count and book link
+  userMessageCount: number;
   showQuestionCount: boolean;
   showBookLink: boolean;
 }
@@ -68,8 +59,6 @@ export function SessionFooter({
   upsertNote,
   colors,
   userMessageCount,
-  inputMode,
-  handleInputModeChange,
   showQuestionCount,
   showBookLink,
 }: SessionFooterProps) {
@@ -231,15 +220,9 @@ export function SessionFooter({
           />
         </View>
       )}
-      {/* BUG-356: Use userMessageCount instead of exchangeCount — the server
-          counts system messages (quick chips, auto-sent text) in exchangeCount,
-          which hides the mode toggle before the user has deliberately typed. */}
-      {userMessageCount === 0 && (
-        <SessionInputModeToggle
-          mode={inputMode}
-          onModeChange={handleInputModeChange}
-        />
-      )}
+      {/* F-005: Removed inline SessionInputModeToggle — ChatShell's permanent
+          input-mode-toggle in the input bar serves the same purpose and avoids
+          the confusing dual-picker on fresh sessions. */}
       {showQuestionCount && <QuestionCounter count={userMessageCount} />}
       {showBookLink && <LibraryPrompt />}
     </>

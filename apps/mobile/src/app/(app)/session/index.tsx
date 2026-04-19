@@ -936,10 +936,10 @@ function SessionScreenInner() {
     router,
   });
 
-  // BUG-358: Show End Session immediately for resumed sessions — the session
-  // already exists, so the button should be available even before the transcript
-  // loads and sets exchangeCount > 0.
-  const showEndSession = exchangeCount > 0 || !!routeSessionId;
+  // BUG-358 + BUG-468: Show End Session as soon as the session exists.
+  // Previously required exchangeCount > 0 for new sessions, but per the
+  // human-override rule, users must always have an escape from AI-driven screens.
+  const showEndSession = !!activeSessionId;
 
   const latestAiMessageId = useMemo(
     () =>
@@ -1138,8 +1138,6 @@ function SessionScreenInner() {
             upsertNote={upsertNote}
             colors={colors}
             userMessageCount={userMessageCount}
-            inputMode={inputMode}
-            handleInputModeChange={handleInputModeChange}
             showQuestionCount={modeConfig.showQuestionCount}
             showBookLink={showBookLink}
           />

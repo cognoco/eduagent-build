@@ -32,7 +32,7 @@ const CONFIDENCE_ORDER: Record<ConfidenceLevel, number> = {
   high: 2,
 };
 
-const SESSION_ANALYSIS_PROMPT = `You are analyzing a tutoring session transcript between an AI mentor and a young learner.
+export const SESSION_ANALYSIS_PROMPT = `You are analyzing a tutoring session transcript between an AI mentor and a young learner.
 
 Extract the following signals from the conversation. Be conservative and only include signals with real evidence.
 
@@ -56,14 +56,18 @@ Rules:
 - "interests": only include explicit enthusiasm, repeated curiosity, or strong engagement.
 - "strengths": only include clear mastery.
 - "struggles": only include repeated confusion on the same concept.
-- "resolvedTopics": include concepts that started shaky and ended with understanding.
+- "resolvedTopics": include concepts that started shaky and ended with understanding. Use this field when one of the {knownStruggles} below visibly clicks during this session.
 - "communicationNotes": short notes like "prefers short explanations" or "responds well to examples".
 - "urgencyDeadline": if the learner mentions an upcoming test, exam, quiz, or deadline, extract the reason and estimate how many days away it is (1-30). Return null if no deadline is mentioned.
 - Return null for any field without signal.
 - If the subject is freeform or unknown, use null for subject when needed.
+- Do NOT include any of {suppressedTopics} in "interests", "strengths", or "struggles" — the parent or learner has explicitly asked to hide these.
+- When emitting "struggles", avoid duplicating topics already listed in {knownStruggles} unless evidence in this session escalates confidence — this is a delta, not a full snapshot.
 
 Subject: {subject}
 Topic: {topic}
+Known existing struggles for this learner (for context — do not re-emit unless evidence warrants): {knownStruggles}
+Suppressed topics (do NOT surface in any output field): {suppressedTopics}
 
 <learner_raw_input>
 {rawInput}
@@ -736,7 +740,40 @@ export interface MemoryBlockProfile {
   communicationNotes: string[];
   memoryEnabled?: boolean;
   memoryInjectionEnabled?: boolean;
+  memoryConsentStatus?: string | null;
   effectivenessSessionCount?: number;
+  /** Active urgency boost for the current subject — optional, F8/P1.4 */
+  activeUrgency?: {
+    reason: string;
+    boostUntil: Date;
+  } | null;
+}
+
+// ---------------------------------------------------------------------------
+// MemoryBlock — structured return shape for F8 source traceability (P1.3/P1.4)
+// ---------------------------------------------------------------------------
+
+export interface MemoryBlockEntry {
+  kind:
+    | 'struggle'
+    | 'strength'
+    | 'interest'
+    | 'communication_note'
+    | 'urgency'
+    | 'learning_style';
+  /** The sentence as rendered in MemoryBlock.text */
+  text: string;
+  /** Session ID that produced this memory signal, if known */
+  sourceSessionId?: string | null;
+  /** Event ID that produced this memory signal, if known */
+  sourceEventId?: string | null;
+}
+
+export interface MemoryBlock {
+  /** The full memory block text to interpolate into an LLM prompt */
+  text: string;
+  /** Structured entries — every visible line in .text has a matching entry here */
+  entries: MemoryBlockEntry[];
 }
 
 export function buildMemoryBlock(
@@ -745,12 +782,20 @@ export function buildMemoryBlock(
   currentTopic: string | null,
   retentionContext?: MemoryRetentionContext | null,
   recentlyResolved?: Array<string | { topic: string; subject: string | null }>
-): string {
+): MemoryBlock {
+  // [F-PV-09] Gate injection on consent status — if consent is not granted,
+  // no memory should be injected into LLM prompts.
+  const consentGranted = profile?.memoryConsentStatus === 'granted';
   const injectionEnabled =
-    profile?.memoryInjectionEnabled ?? profile?.memoryEnabled ?? true;
-  if (!profile || !injectionEnabled) return '';
+    consentGranted &&
+    (profile?.memoryInjectionEnabled ?? profile?.memoryEnabled ?? true);
+  if (!profile || !injectionEnabled) return { text: '', entries: [] };
 
   const sections: string[] = [];
+  // Tracks whether each section has a corresponding entry in `entries`.
+  // Meta-instruction sections don't push entries, so we need this to keep
+  // the truncation loop from popping the wrong entry.
+  const sectionHasEntry: boolean[] = [];
   const strongTopicSet = new Set(
     (retentionContext?.strongTopics ?? []).map(normalizeMemoryValue)
   );
@@ -772,14 +817,33 @@ export function buildMemoryBlock(
     );
   });
 
+  // Each entry tracks the rendered sentence + source metadata for F8 traceability
+  const entries: MemoryBlockEntry[] = [];
+
+  /** Push a section with its paired entry. Keeps sections, entries, and
+   *  sectionHasEntry arrays in sync for safe truncation. */
+  function addSection(text: string, entry: MemoryBlockEntry | null): void {
+    sections.push(text);
+    if (entry) {
+      entries.push(entry);
+      sectionHasEntry.push(true);
+    } else {
+      sectionHasEntry.push(false);
+    }
+  }
+
   if (relevantStruggles.length > 0) {
     const struggleTopics = relevantStruggles
       .slice(0, 4)
       .map((entry) => entry.topic)
       .join(', ');
-    sections.push(
-      `- They've been working hard on: ${struggleTopics}. Be patient and try a different angle before escalating.`
-    );
+    const text = `- They've been working hard on: ${struggleTopics}. Be patient and try a different angle before escalating.`;
+    addSection(text, {
+      kind: 'struggle',
+      text,
+      sourceSessionId: null,
+      sourceEventId: null,
+    });
   }
 
   if (recentlyResolved && recentlyResolved.length > 0) {
@@ -791,9 +855,33 @@ export function buildMemoryBlock(
           : entry.topic;
       })
       .join(', ');
-    sections.push(
-      `- They recently overcame difficulties with: ${resolvedList}. Celebrate their growth!`
-    );
+    const text = `- They recently overcame difficulties with: ${resolvedList}. Celebrate their growth!`;
+    addSection(text, {
+      kind: 'struggle',
+      text,
+      sourceSessionId: null,
+      sourceEventId: null,
+    });
+  }
+
+  // P1.3: Inject strengths — top 3 entries by number of topics (confidence proxy)
+  const sortedStrengths = [...profile.strengths].sort(
+    (a, b) => b.topics.length - a.topics.length
+  );
+  const topStrengths = sortedStrengths.slice(0, 3);
+  if (topStrengths.length > 0) {
+    const strengthLabels = topStrengths
+      .map(
+        (entry) => `${entry.topics.slice(0, 3).join(', ')} (${entry.subject})`
+      )
+      .join('; ');
+    const text = `- Confident with: ${strengthLabels}.`;
+    addSection(text, {
+      kind: 'strength',
+      text,
+      sourceSessionId: null,
+      sourceEventId: null,
+    });
   }
 
   if (profile.learningStyle) {
@@ -820,35 +908,84 @@ export function buildMemoryBlock(
       );
     }
     if (styleParts.length > 0) {
-      sections.push(`- They learn best with ${styleParts.join(', ')}.`);
+      const text = `- They learn best with ${styleParts.join(', ')}.`;
+      addSection(text, {
+        kind: 'learning_style',
+        text,
+        sourceSessionId: null,
+        sourceEventId: null,
+      });
     }
   }
 
   const topInterests = profile.interests.slice(-5).reverse();
   if (topInterests.length > 0) {
-    sections.push(`- They're interested in: ${topInterests.join(', ')}.`);
+    const text = `- They're interested in: ${topInterests.join(', ')}.`;
+    addSection(text, {
+      kind: 'interest',
+      text,
+      sourceSessionId: null,
+      sourceEventId: null,
+    });
   }
 
   const recentNotes = profile.communicationNotes.slice(-2);
   if (recentNotes.length > 0) {
-    sections.push(`- ${recentNotes.join('. ')}.`);
+    const text = `- ${recentNotes.join('. ')}.`;
+    addSection(text, {
+      kind: 'communication_note',
+      text,
+      sourceSessionId: null,
+      sourceEventId: null,
+    });
   }
 
   const signalCount = totalProfileSignalCount(profile);
   if (!profile.learningStyle && signalCount > 0) {
-    sections.push(
-      '- Their preferred explanation style is still emerging. Vary your approach and notice what seems to click.'
-    );
+    const text =
+      '- Their preferred explanation style is still emerging. Vary your approach and notice what seems to click.';
+    addSection(text, {
+      kind: 'learning_style',
+      text,
+      sourceSessionId: null,
+      sourceEventId: null,
+    });
   }
 
   const effectivenessCount = profile.effectivenessSessionCount ?? 0;
   if (effectivenessCount < 5 && signalCount > 0) {
-    sections.push(
-      "- If it fits naturally, ask one gentle check-in question such as 'Did that help?' or 'Want another kind of example?' — no more than once per session."
+    // No entry for this meta-instruction — it's prompt guidance, not a learner
+    // memory signal. Passing null ensures truncation doesn't pop the wrong entry.
+    addSection(
+      "- If it fits naturally, ask one gentle check-in question such as 'Did that help?' or 'Want another kind of example?' — no more than once per session.",
+      null
     );
   }
 
-  if (sections.length === 0) return '';
+  // P1.4: Inject urgency_boost_reason — most urgent active subject deadline
+  if (profile.activeUrgency) {
+    const { reason, boostUntil } = profile.activeUrgency;
+    const now = new Date();
+    if (boostUntil > now) {
+      const daysAway = Math.max(
+        1,
+        Math.round(
+          (boostUntil.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+        )
+      );
+      const text = `- Upcoming: ${reason}, ${daysAway} day${
+        daysAway === 1 ? '' : 's'
+      } away.`;
+      addSection(text, {
+        kind: 'urgency',
+        text,
+        sourceSessionId: null,
+        sourceEventId: null,
+      });
+    }
+  }
+
+  if (sections.length === 0) return { text: '', entries: [] };
 
   const metaInstruction =
     'Use the learner memory naturally. Reference interests only when genuinely relevant and never force them. ' +
@@ -861,6 +998,8 @@ export function buildMemoryBlock(
   const originalSectionCount = sections.length;
   while (block.length > MEMORY_BLOCK_CHAR_BUDGET && sections.length > 0) {
     sections.pop();
+    const hadEntry = sectionHasEntry.pop();
+    if (hadEntry) entries.pop();
     block = `About this learner:\n${sections.join('\n')}\n\n${metaInstruction}`;
   }
   if (sections.length < originalSectionCount) {
@@ -871,7 +1010,7 @@ export function buildMemoryBlock(
     });
   }
 
-  return block;
+  return { text: block, entries };
 }
 
 export async function getLearningProfile(
@@ -1169,6 +1308,11 @@ export async function toggleMemoryInjection(
 ): Promise<void> {
   const profile = await getOrCreateLearningProfile(db, profileId);
 
+  // [F-PV-09] Refuse to enable injection when consent is not granted.
+  if (enabled && profile.memoryConsentStatus !== 'granted') {
+    return;
+  }
+
   await db
     .update(learningProfiles)
     .set({
@@ -1224,7 +1368,17 @@ export async function analyzeSessionTranscript(
   transcript: Array<{ eventType: string; content: string }>,
   subjectName: string | null,
   topicTitle: string | null,
-  rawInput?: string | null
+  rawInput?: string | null,
+  context: 'session' | 'interview' = 'session',
+  /**
+   * Optional profile context so the LLM knows which struggles are already tracked
+   * (so it emits deltas, not snapshots) and which topics the parent has hidden
+   * (so it doesn't re-surface them). [P0-3]
+   */
+  profileContext?: {
+    knownStruggles?: Array<{ topic: string; subject: string | null }>;
+    suppressedTopics?: string[];
+  }
 ): Promise<SessionAnalysisOutput | null> {
   const conversationEvents = transcript
     .filter(
@@ -1233,7 +1387,11 @@ export async function analyzeSessionTranscript(
     )
     .slice(-MAX_TRANSCRIPT_EVENTS);
 
-  if (conversationEvents.length < 3) {
+  // Regular sessions require >=3 conversation events to produce useful analysis.
+  // Interviews are intentionally short (2-3 exchanges per F7 audit), so allow
+  // analysis to fire from 2 events onward in that context only.
+  const minEvents = context === 'interview' ? 2 : 3;
+  if (conversationEvents.length < minEvents) {
     return null;
   }
 
@@ -1246,12 +1404,30 @@ export async function analyzeSessionTranscript(
     )
     .join('\n\n');
 
+  const knownStrugglesLabel =
+    profileContext?.knownStruggles && profileContext.knownStruggles.length > 0
+      ? profileContext.knownStruggles
+          .slice(0, 20)
+          .map((entry) =>
+            entry.subject ? `${entry.topic} (${entry.subject})` : entry.topic
+          )
+          .join(', ')
+      : '(none)';
+
+  const suppressedLabel =
+    profileContext?.suppressedTopics &&
+    profileContext.suppressedTopics.length > 0
+      ? profileContext.suppressedTopics.slice(0, 20).join(', ')
+      : '(none)';
+
   const systemPrompt = SESSION_ANALYSIS_PROMPT.replace(
     '{subject}',
     subjectName ?? 'Freeform'
   )
     .replace('{topic}', topicTitle ?? 'General')
-    .replace('{rawInput}', rawInput ?? '(none)');
+    .replace('{rawInput}', rawInput ?? '(none)')
+    .replaceAll('{knownStruggles}', knownStrugglesLabel)
+    .replaceAll('{suppressedTopics}', suppressedLabel);
 
   const messages: ChatMessage[] = [
     { role: 'system', content: systemPrompt },

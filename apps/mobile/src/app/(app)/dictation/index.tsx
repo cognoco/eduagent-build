@@ -30,7 +30,10 @@ export default function DictationChoiceScreen(): React.ReactElement {
         topic: result.topic,
         mode: 'surprise',
       });
-      router.push('/(app)/dictation/playback' as never);
+      // [F-030] Yield to React render cycle so context state commits before
+      // playback screen mounts. Without this, useState setter hasn't flushed
+      // and playback sees data=null on first attempt.
+      setTimeout(() => router.push('/(app)/dictation/playback' as never), 0);
     } catch (err: unknown) {
       const message = formatApiError(err);
       setLastError(message);

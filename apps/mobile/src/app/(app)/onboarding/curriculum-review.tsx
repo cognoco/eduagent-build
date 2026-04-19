@@ -518,7 +518,24 @@ export default function CurriculumScreen() {
             </Text>
           </Pressable>
         </View>
-      ) : null}
+      ) : (
+        <View
+          className="px-5 pb-6"
+          style={{ paddingBottom: Math.max(insets.bottom, 24) }}
+        >
+          <Pressable
+            onPress={() => router.replace('/(app)/home')}
+            className="bg-primary rounded-button py-3.5 items-center"
+            testID="continue-to-home-button"
+            accessibilityLabel="Continue to home"
+            accessibilityRole="button"
+          >
+            <Text className="text-text-inverse text-body font-semibold">
+              Continue to home
+            </Text>
+          </Pressable>
+        </View>
+      )}
 
       {/* Challenge modal */}
       <Modal visible={showChallengeModal} animationType="slide" transparent>

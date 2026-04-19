@@ -32,8 +32,8 @@ import {
 import { captureException } from '../../services/sentry';
 import { queueCelebration } from '../../services/celebrations';
 import {
-  generateLlmHighlight,
   buildBrowseHighlight,
+  generateSessionInsights,
 } from '../../services/session-highlights';
 import {
   curriculumTopics,
@@ -545,10 +545,10 @@ export const sessionCompleted = inngest.createFunction(
       )
     );
 
-    // Step 2b: Generate session highlight for parent session feed [PEH-S2]
+    // Step 2b: Generate parent-facing session recap fields [PEH-S2]
     outcomes.push(
-      await step.run('generate-session-highlight', async () =>
-        runIsolated('generate-session-highlight', profileId, async () => {
+      await step.run('generate-session-insights', async () =>
+        runIsolated('generate-session-insights', profileId, async () => {
           const db = getStepDatabase();
 
           // Find the session_summaries row created by write-coaching-card
@@ -565,16 +565,17 @@ export const sessionCompleted = inngest.createFunction(
 
           if (!summaryRow) {
             console.warn(
-              `[session-completed] generate-session-highlight: no session_summaries row for session=${sessionId}, profile=${profileId} — highlight skipped`
+              `[session-completed] generate-session-insights: no session_summaries row for session=${sessionId}, profile=${profileId} — recap skipped`
             );
             return;
           }
 
-          // Determine highlight based on exchange count
           let highlight: string | null = null;
+          let narrative: string | null = null;
+          let conversationPrompt: string | null = null;
+          let engagementSignal: string | null = null;
 
           if ((exchangeCount ?? 0) >= 3) {
-            // LLM-generated highlight for substantive sessions
             const transcriptEvents = await db.query.sessionEvents.findMany({
               where: and(
                 eq(sessionEvents.sessionId, sessionId),
@@ -597,18 +598,20 @@ export const sessionCompleted = inngest.createFunction(
               )
               .join('\n\n');
 
-            const result = await generateLlmHighlight(transcriptText);
+            const result = await generateSessionInsights(transcriptText);
 
             if (result.valid) {
-              highlight = result.highlight;
+              highlight = result.insights.highlight;
+              narrative = result.insights.narrative;
+              conversationPrompt = result.insights.conversationPrompt;
+              engagementSignal = result.insights.engagementSignal;
             } else {
               console.warn(
-                `[session-completed] generate-session-highlight: LLM validation failed (${result.reason}) for session=${sessionId}, falling back to template`
+                `[session-completed] generate-session-insights: LLM validation failed (${result.reason}) for session=${sessionId}, falling back to template highlight`
               );
             }
           }
 
-          // Template fallback: if LLM failed or < 3 exchanges
           if (!highlight) {
             const [profile] = await db
               .select({ displayName: profiles.displayName })
@@ -641,7 +644,13 @@ export const sessionCompleted = inngest.createFunction(
           // Write the highlight to session_summaries
           await db
             .update(sessionSummaries)
-            .set({ highlight })
+            .set({
+              highlight,
+              narrative,
+              conversationPrompt,
+              engagementSignal,
+              updatedAt: new Date(),
+            })
             .where(eq(sessionSummaries.id, summaryRow.id));
         })
       )
@@ -710,11 +719,39 @@ export const sessionCompleted = inngest.createFunction(
               columns: { rawInput: true },
             });
 
+            // [P0-3] Feed existing struggles + suppressed topics into the
+            // analysis prompt so the LLM emits deltas (not duplicates) and
+            // never re-surfaces topics the parent has hidden.
+            const knownStruggles = Array.isArray(existingProfile.struggles)
+              ? (existingProfile.struggles as Array<unknown>)
+                  .filter(
+                    (
+                      entry
+                    ): entry is { topic: string; subject: string | null } =>
+                      typeof entry === 'object' &&
+                      entry !== null &&
+                      typeof (entry as { topic?: unknown }).topic === 'string'
+                  )
+                  .map((entry) => ({
+                    topic: entry.topic,
+                    subject: entry.subject ?? null,
+                  }))
+              : [];
+            const suppressedTopics = Array.isArray(
+              existingProfile.suppressedInferences
+            )
+              ? (existingProfile.suppressedInferences as unknown[]).filter(
+                  (value): value is string => typeof value === 'string'
+                )
+              : [];
+
             const analysis = await analyzeSessionTranscript(
               transcriptEvents,
               subjectRow?.name ?? null,
               topicTitle,
-              sessionRow?.rawInput
+              sessionRow?.rawInput,
+              'session',
+              { knownStruggles, suppressedTopics }
             );
 
             if (!analysis) {
@@ -777,7 +814,15 @@ export const sessionCompleted = inngest.createFunction(
           // The neon-http driver does not support multi-statement transactions;
           // wrapping these in db.transaction() would either fail outright or
           // fall back to non-atomic execution via the client.ts shim.
-          if (completionQualityRating != null && completionQualityRating >= 3) {
+          // [F-044] Use effectiveQuality (includes engagement fallback) instead
+          // of raw completionQualityRating. Most session-close paths don't set
+          // qualityRating in the event, so the raw value is null and the streak
+          // was never updated. Any session with user engagement should count.
+          // Note: effectiveQuality floors at 3 via the fallback above (line ~327),
+          // so the old `>= 3` threshold is redundant. The only case where
+          // effectiveQuality < 3 would be an explicit low rating (1-2) from the
+          // evaluator — these still represent real engagement and should count.
+          if (effectiveQuality != null) {
             stepStreak = await recordSessionActivity(db, profileId, today);
           }
 

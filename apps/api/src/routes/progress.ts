@@ -8,6 +8,7 @@ import {
   getOverallProgress,
   getContinueSuggestion,
   getActiveSessionForTopic,
+  resolveTopicSubject,
 } from '../services/progress';
 import { getProfileOverdueCount } from '../services/retention-data';
 import { notFound } from '../errors';
@@ -75,6 +76,17 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
     const topicId = c.req.param('topicId');
 
     const result = await getActiveSessionForTopic(db, profileId, topicId);
+    return c.json(result);
+  })
+
+  // [F-009] Resolve a topic's parent subject — enables deep-links with topicId only
+  .get('/topics/:topicId/resolve', async (c) => {
+    const db = c.get('db');
+    const profileId = requireProfileId(c.get('profileId'));
+    const topicId = c.req.param('topicId');
+
+    const result = await resolveTopicSubject(db, profileId, topicId);
+    if (!result) return notFound(c, 'Topic not found');
     return c.json(result);
   })
 

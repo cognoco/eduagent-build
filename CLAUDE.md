@@ -23,6 +23,7 @@
 - Shared mobile components stay persona-unaware. Use semantic tokens and CSS variables, not persona checks or hardcoded hex colors.
 - Durable async work goes through Inngest. Do not fire-and-forget background work from route handlers.
 - LLM calls go through `services/llm/router.ts` (or its barrel), not direct provider SDK calls.
+- Subagents (agents spawned via the Agent tool) must NEVER run `git add`, `git commit`, or `git push`. Only the coordinator (main conversation) commits. Subagents write code, run tests, and report which files they changed — the coordinator commits their work sequentially using `/commit`.
 
 ## Schema And Deploy Safety
 

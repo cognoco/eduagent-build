@@ -16,6 +16,7 @@ import {
 import {
   useTopicProgress,
   useActiveSessionForTopic,
+  useResolveTopicSubject,
 } from '../../../hooks/use-progress';
 import {
   useTopicRetention,
@@ -151,10 +152,17 @@ export default function TopicDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
-  const { subjectId, topicId } = useLocalSearchParams<{
+  const { subjectId: paramSubjectId, topicId } = useLocalSearchParams<{
     subjectId: string;
     topicId: string;
   }>();
+
+  // [F-009] Resolve subjectId when deep-linked with topicId only
+  const needsResolve = !paramSubjectId && !!topicId;
+  const { data: resolved, isLoading: resolveLoading } = useResolveTopicSubject(
+    needsResolve ? topicId : undefined
+  );
+  const subjectId = paramSubjectId || resolved?.subjectId;
 
   const {
     data: topicProgress,
@@ -345,6 +353,15 @@ export default function TopicDetailScreen() {
     topicName,
     topicProgress,
   ]);
+
+  // [F-009] Show loading while resolving subjectId from deep-link
+  if (needsResolve && resolveLoading) {
+    return (
+      <View className="flex-1 bg-background items-center justify-center">
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
 
   if (!subjectId || !topicId) {
     return (

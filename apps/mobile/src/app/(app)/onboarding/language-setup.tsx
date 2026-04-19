@@ -7,6 +7,7 @@ import {
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { CefrLevel } from '@eduagent/schemas';
@@ -37,26 +38,31 @@ const LEVEL_OPTIONS: Array<{
   label: string;
   level: CefrLevel;
   description: string;
+  testId: string;
 }> = [
   {
     label: 'Complete beginner',
     level: 'A1',
     description: 'Start from the foundations and build everyday basics.',
+    testId: 'level-beginner',
   },
   {
     label: 'I know some basics',
     level: 'A2',
     description: 'You can handle simple situations and want to grow range.',
+    testId: 'level-some-basics',
   },
   {
     label: 'Conversational',
     level: 'B1',
     description: 'You can get by and want stronger fluency and precision.',
+    testId: 'level-conversational',
   },
   {
     label: 'Advanced',
     level: 'B2',
     description: 'You want more nuance, confidence, and flexible expression.',
+    testId: 'level-advanced',
   },
 ];
 
@@ -173,7 +179,7 @@ export default function LanguageSetup() {
           accessibilityRole="button"
           testID="language-setup-back"
         >
-          <Text className="text-primary text-body font-semibold">Back</Text>
+          <Ionicons name="arrow-back" size={24} color={colors.primary} />
         </Pressable>
         <OnboardingStepIndicator step={step} totalSteps={totalSteps} />
 
@@ -257,6 +263,7 @@ export default function LanguageSetup() {
                 }
                 accessibilityRole="button"
                 accessibilityState={{ selected }}
+                testID={option.testId}
               >
                 <Text className="text-body font-semibold text-text-primary">
                   {option.label}

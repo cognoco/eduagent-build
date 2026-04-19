@@ -320,6 +320,21 @@ describe('partial progress detection', () => {
     expect(detectPartialProgress('Good attempt! Keep trying.')).toBe(false);
   });
 
+  // Regression: audit F1.2 — the previous permissive .includes() matcher
+  // fired on mid-sentence occurrences, diverging from the strict strip step
+  // in exchanges.ts and leaking the raw token to learners. The strict regex
+  // must refuse to match anywhere except on its own trailing line.
+  it('detectPartialProgress refuses mid-sentence occurrences (F1.2 regression)', () => {
+    expect(
+      detectPartialProgress(
+        'The marker [PARTIAL_PROGRESS] lives here mid-sentence.'
+      )
+    ).toBe(false);
+    expect(
+      detectPartialProgress('[PARTIAL_PROGRESS] at start no newline')
+    ).toBe(false);
+  });
+
   it('escalates after MAX_PARTIAL_PROGRESS_HOLDS consecutive holds (cap)', () => {
     const state: EscalationState = {
       ...baseState,

@@ -12,7 +12,12 @@
 
 import { capitalsFlow } from './flows/quiz-capitals';
 import { vocabularyFlow } from './flows/quiz-vocabulary';
+import { guessWhoFlow } from './flows/quiz-guess-who';
 import { dictationGenerateFlow } from './flows/dictation-generate';
+import { prepareHomeworkFlow } from './flows/dictation-prepare-homework';
+import { dictationReviewFlow } from './flows/dictation-review';
+import { sessionAnalysisFlow } from './flows/session-analysis';
+import { filingPreSessionFlow } from './flows/filing-pre-session';
 import {
   listFlows,
   parseCliArgs,
@@ -24,7 +29,12 @@ import type { FlowDefinition } from './runner/types';
 const FLOWS: FlowDefinition[] = [
   capitalsFlow as FlowDefinition,
   vocabularyFlow as FlowDefinition,
+  guessWhoFlow as FlowDefinition,
   dictationGenerateFlow as FlowDefinition,
+  prepareHomeworkFlow as FlowDefinition,
+  dictationReviewFlow as FlowDefinition,
+  sessionAnalysisFlow as FlowDefinition,
+  filingPreSessionFlow as FlowDefinition,
 ];
 
 async function main(): Promise<void> {

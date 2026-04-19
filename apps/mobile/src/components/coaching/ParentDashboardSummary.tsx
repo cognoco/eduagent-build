@@ -192,10 +192,10 @@ export function ParentDashboardSummary({
           <View
             className="flex-row items-center mt-1.5"
             testID="retention-trend-badge"
-            accessibilityLabel={`Retention: ${retentionTrend}`}
+            accessibilityLabel={`Review health: ${retentionTrend}`}
           >
             <Text className="text-caption text-text-secondary">
-              Retention:{' '}
+              Review health:{' '}
             </Text>
             <Text
               className={`text-caption font-semibold ${RETENTION_TREND_CONFIG[retentionTrend].className}`}
@@ -260,7 +260,7 @@ export function ParentDashboardSummary({
               <Text className="text-caption text-text-primary me-2">
                 {subject.name}
               </Text>
-              <RetentionSignal status={subject.retentionStatus} />
+              <RetentionSignal status={subject.retentionStatus} parentFacing />
             </View>
           ))}
         </View>

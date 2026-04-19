@@ -16,7 +16,8 @@ describe('buildGuessWhoPrompt', () => {
     });
 
     expect(prompt).toContain('4');
-    expect(prompt).toContain('10-13');
+    // AgeBracket 'adolescent' now describes 11-13 after the <11 dead-code cleanup.
+    expect(prompt).toContain('11-13');
     expect(prompt).toContain('Isaac Newton');
     expect(prompt).toContain('Classical mechanics');
     expect(prompt).toContain('History and science');
@@ -50,7 +51,7 @@ describe('buildGuessWhoPrompt', () => {
   it('includes theme preference when provided', () => {
     const prompt = buildGuessWhoPrompt({
       discoveryCount: 4,
-      ageBracket: 'child',
+      ageBracket: 'adolescent',
       recentAnswers: [],
       topicTitles: [],
       themePreference: 'Famous Artists',

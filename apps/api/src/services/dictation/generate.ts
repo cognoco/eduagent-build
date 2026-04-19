@@ -19,24 +19,67 @@ export interface GenerateContext {
   nativeLanguage: string;
   /** Learner's age in years — used to calibrate sentence length, vocabulary, and literary themes. */
   ageYears: number;
+  /**
+   * Learner's interests with context tags. Optional — backward-compatible.
+   * 'free_time' and 'both' interests are used to theme the literary passage.
+   * 'school' interests are ignored here (they are handled by library topics).
+   */
+  interests?: Array<{
+    label: string;
+    context: 'free_time' | 'school' | 'both';
+  }>;
+  /**
+   * Titles of library topics the learner is actively studying. Optional.
+   * When present, the passage will prefer themes that intersect with these topics.
+   */
+  libraryTopics?: string[];
 }
 
 function getLiteraryTheme(ageYears: number): string {
-  if (ageYears <= 7) {
-    return `Draw from fairy tales, fables, and simple picture book stories — animals talking, magical adventures, friendship and kindness. Think Brothers Grimm, Aesop, or classic picture books.`;
-  }
-  if (ageYears <= 10) {
-    return `Draw from classic children's stories and adventure tales — exploring forests, brave young heroes, mysteries to solve, magical worlds. Think Narnia, Roald Dahl, or Astrid Lindgren.`;
-  }
   if (ageYears <= 13) {
     return `Draw from children's novels and chapter books — school adventures, fantasy quests, historical stories, nature and discovery. Think Harry Potter, Percy Jackson, or Jules Verne.`;
   }
   return `Draw from classic and contemporary literature — novels, short stories, literary fiction. Think Hemingway, Kafka, Čapek, or contemporary bestsellers. Use adult-level vocabulary and sentence structure.`;
 }
 
+function buildInterestThemeBlock(ctx: GenerateContext): string {
+  // Only 'free_time' and 'both' interests theme the passage.
+  const relevantInterests = (ctx.interests ?? [])
+    .filter((i) => i.context === 'free_time' || i.context === 'both')
+    .map((i) => i.label);
+
+  const libraryTopics = ctx.libraryTopics ?? [];
+
+  if (relevantInterests.length === 0 && libraryTopics.length === 0) {
+    return '';
+  }
+
+  const parts: string[] = [];
+  if (relevantInterests.length > 0) {
+    parts.push(
+      `PERSONALIZATION: This learner loves: ${relevantInterests.join(', ')}. ` +
+        `Where it fits naturally within the age-appropriate literary register, theme the passage around these interests ` +
+        `(e.g. a dinosaur-loving child should get a narrative set in prehistoric times, not a generic fantasy forest). ` +
+        `Do NOT sacrifice sentence quality, complexity, or literary style to chase the interest theme.`
+    );
+  }
+  if (libraryTopics.length > 0) {
+    parts.push(
+      `LIBRARY TOPICS: The learner is currently studying: ${libraryTopics.join(
+        ', '
+      )}. ` +
+        `Prefer narrative themes that intersect with these topics where the literary register allows ` +
+        `(e.g. a learner studying the Mesozoic era could get a passage set in prehistoric times).`
+    );
+  }
+
+  return '\n' + parts.join('\n') + '\n';
+}
+
 export function buildGeneratePrompt(ctx: GenerateContext): string {
   const punctuationNames = getPunctuationNames(ctx.nativeLanguage);
   const literaryTheme = getLiteraryTheme(ctx.ageYears);
+  const interestThemeBlock = buildInterestThemeBlock(ctx);
 
   return `You are a dictation content generator for a ${ctx.ageYears}-year-old${
     ctx.ageYears >= 14 ? ' person' : ' child'
@@ -47,7 +90,7 @@ LANGUAGE: Write the dictation in ${ctx.nativeLanguage} (ISO 639-1 code).
 THEME: Write sentences inspired by age-appropriate literature and stories.
 ${literaryTheme}
 Write sentences that feel like they come from a story — natural prose with vivid imagery.
-Do NOT use geographical, scientific, or encyclopaedia-style factual content.
+Do NOT use geographical, scientific, or encyclopaedia-style factual content.${interestThemeBlock}
 
 CONSTRAINTS:
 - 6-10 sentences total

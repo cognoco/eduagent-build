@@ -5,11 +5,14 @@ import {
   Pressable,
   ActivityIndicator,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useEffect, useState } from 'react';
 import { useChildSessionDetail } from '../../../../../hooks/use-dashboard';
 import { goBackOrReplace } from '../../../../../lib/navigation';
+import { EngagementChip } from '../../../../../components/parent/EngagementChip';
 
 function formatDate(iso: string): string {
   const d = new Date(iso);
@@ -29,6 +32,9 @@ function formatDuration(seconds: number | null): string {
 export default function SessionDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>(
+    'idle'
+  );
   const params = useLocalSearchParams<{
     profileId: string;
     sessionId: string;
@@ -46,6 +52,24 @@ export default function SessionDetailScreen() {
     isError,
     refetch,
   } = useChildSessionDetail(profileId, sessionId);
+
+  useEffect(() => {
+    if (copyState === 'idle') return undefined;
+
+    const timeout = setTimeout(() => setCopyState('idle'), 2000);
+    return () => clearTimeout(timeout);
+  }, [copyState]);
+
+  async function handleCopyPrompt() {
+    if (!session?.conversationPrompt) return;
+
+    try {
+      await Clipboard.setStringAsync(session.conversationPrompt);
+      setCopyState('copied');
+    } catch {
+      setCopyState('failed');
+    }
+  }
 
   if (isLoading) {
     return (
@@ -106,6 +130,12 @@ export default function SessionDetailScreen() {
   const duration = formatDuration(
     session.wallClockSeconds ?? session.durationSeconds
   );
+  const hasRecap = Boolean(
+    session.narrative ||
+      session.highlight ||
+      session.conversationPrompt ||
+      session.engagementSignal
+  );
 
   return (
     <ScrollView
@@ -144,12 +174,6 @@ export default function SessionDetailScreen() {
             </Text>
           </View>
           <View>
-            <Text className="text-text-secondary text-xs">Exchanges</Text>
-            <Text className="text-text-primary text-base font-medium">
-              {session.exchangeCount}
-            </Text>
-          </View>
-          <View>
             <Text className="text-text-secondary text-xs">Type</Text>
             <Text className="text-text-primary text-base font-medium capitalize">
               {session.sessionType}
@@ -157,6 +181,93 @@ export default function SessionDetailScreen() {
           </View>
         </View>
       </View>
+
+      {hasRecap ? (
+        <>
+          {session.narrative ? (
+            <View className="mx-4 mt-4 rounded-xl bg-surface p-4">
+              <Text className="text-text-secondary mb-2 text-xs font-medium uppercase">
+                Session recap
+              </Text>
+              <Text className="text-text-primary text-base leading-relaxed">
+                {session.narrative}
+              </Text>
+            </View>
+          ) : null}
+
+          {session.highlight ? (
+            <View className="mx-4 mt-4 rounded-xl bg-surface p-4">
+              <Text className="text-text-secondary mb-2 text-xs font-medium uppercase">
+                Highlight
+              </Text>
+              <Text className="text-text-primary text-base italic leading-relaxed">
+                {session.highlight}
+              </Text>
+            </View>
+          ) : null}
+
+          {session.engagementSignal ? (
+            <View className="mx-4 mt-4 rounded-xl bg-surface p-4">
+              <Text className="text-text-secondary mb-2 text-xs font-medium uppercase">
+                Engagement
+              </Text>
+              <EngagementChip signal={session.engagementSignal} />
+            </View>
+          ) : null}
+
+          {session.conversationPrompt ? (
+            <View className="mx-4 mt-4 rounded-xl bg-surface p-4">
+              <View className="flex-row items-start justify-between gap-3">
+                <View className="flex-1">
+                  <Text className="text-text-secondary mb-2 text-xs font-medium uppercase">
+                    Try asking
+                  </Text>
+                  <Text className="text-text-primary text-base leading-relaxed">
+                    {session.conversationPrompt}
+                  </Text>
+                </View>
+                <Pressable
+                  onPress={() => void handleCopyPrompt()}
+                  className="rounded-full bg-background px-3 py-2"
+                  accessibilityRole="button"
+                  accessibilityLabel="Copy conversation prompt"
+                  testID="copy-conversation-prompt"
+                >
+                  <Text className="text-body-sm font-semibold text-primary">
+                    {copyState === 'copied'
+                      ? 'Copied ✓'
+                      : copyState === 'failed'
+                      ? 'Copy failed'
+                      : 'Copy'}
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+          ) : null}
+        </>
+      ) : (
+        <View
+          className="mx-4 mt-4 rounded-xl bg-surface p-4"
+          testID="narrative-unavailable"
+        >
+          <Text className="text-text-primary text-base font-semibold">
+            No recap was generated
+          </Text>
+          <Text className="text-text-secondary mt-2 text-sm leading-relaxed">
+            This older session does not have a parent recap yet. You can go back
+            and open a newer session instead.
+          </Text>
+          <Pressable
+            onPress={() => goBackOrReplace(router, '/(app)/home')}
+            className="mt-4 self-start rounded-lg bg-primary px-4 py-3"
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+            testID="narrative-unavailable-back"
+          >
+            <Text className="text-text-inverse font-medium">Go Back</Text>
+          </Pressable>
+        </View>
+      )}
 
       {/* Summary */}
       <View className="mx-4 mt-4 rounded-xl bg-surface p-4">

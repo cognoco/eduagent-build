@@ -17,6 +17,7 @@ import {
   getOverallProgress,
   getContinueSuggestion,
   getActiveSessionForTopic,
+  resolveTopicSubject,
 } from './progress';
 
 const NOW = new Date('2026-02-15T10:00:00.000Z');
@@ -142,6 +143,9 @@ function createMockDb({
     version: number;
   }>,
   topicsFindMany = [] as ReturnType<typeof mockTopicRow>[],
+  topicFindFirst = undefined as
+    | { id: string; title: string; curriculumId: string }
+    | undefined,
 } = {}): Database {
   return {
     select: jest.fn().mockReturnValue({
@@ -158,6 +162,7 @@ function createMockDb({
       },
       curriculumTopics: {
         findMany: jest.fn().mockResolvedValue(topicsFindMany),
+        findFirst: jest.fn().mockResolvedValue(topicFindFirst),
       },
     },
   } as unknown as Database;
@@ -449,6 +454,7 @@ describe('getTopicProgress', () => {
     expect(result!.completionStatus).toBe('completed');
     expect(result!.masteryScore).toBe(0.85);
     expect(result!.xpStatus).toBe('pending');
+    expect(result!.totalSessions).toBe(1);
   });
 
   it('marks struggle status as needs_deepening when active', async () => {
@@ -931,5 +937,71 @@ describe('getActiveSessionForTopic', () => {
     const result = await getActiveSessionForTopic(db, profileId, topicId);
 
     expect(result).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// resolveTopicSubject [I2]
+// ---------------------------------------------------------------------------
+
+describe('resolveTopicSubject', () => {
+  it('returns null when topic does not exist', async () => {
+    setupScopedRepo();
+    const db = createMockDb({ topicFindFirst: undefined });
+
+    const result = await resolveTopicSubject(db, profileId, topicId);
+    expect(result).toBeNull();
+  });
+
+  it('returns null when curriculum does not exist', async () => {
+    setupScopedRepo();
+    const db = createMockDb({
+      topicFindFirst: {
+        id: topicId,
+        title: 'Algebra Basics',
+        curriculumId,
+      },
+      curriculumFindFirst: undefined,
+    });
+
+    const result = await resolveTopicSubject(db, profileId, topicId);
+    expect(result).toBeNull();
+  });
+
+  it('returns null when subject belongs to a different profile', async () => {
+    setupScopedRepo({ subjectFindFirst: undefined });
+    const db = createMockDb({
+      topicFindFirst: {
+        id: topicId,
+        title: 'Algebra Basics',
+        curriculumId,
+      },
+      curriculumFindFirst: { id: curriculumId, subjectId },
+    });
+
+    const result = await resolveTopicSubject(db, profileId, topicId);
+    expect(result).toBeNull();
+  });
+
+  it('returns subjectId, subjectName, and topicTitle on success', async () => {
+    setupScopedRepo({
+      subjectFindFirst: mockSubjectRow({ name: 'Mathematics' }),
+    });
+    const db = createMockDb({
+      topicFindFirst: {
+        id: topicId,
+        title: 'Algebra Basics',
+        curriculumId,
+      },
+      curriculumFindFirst: { id: curriculumId, subjectId },
+    });
+
+    const result = await resolveTopicSubject(db, profileId, topicId);
+
+    expect(result).toEqual({
+      subjectId,
+      subjectName: 'Mathematics',
+      topicTitle: 'Algebra Basics',
+    });
   });
 });

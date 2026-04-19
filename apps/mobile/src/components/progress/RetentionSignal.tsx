@@ -1,12 +1,14 @@
 import { View, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeColors } from '../../lib/theme';
+import { getParentRetentionInfo } from '../../lib/parent-vocab';
 import type { RetentionStatus } from '@eduagent/schemas';
 export type { RetentionStatus };
 
 interface RetentionSignalProps {
   status: RetentionStatus;
   compact?: boolean;
+  parentFacing?: boolean;
 }
 
 const CONFIG: Record<
@@ -48,15 +50,25 @@ const CONFIG: Record<
   },
 };
 
-export function RetentionSignal({ status, compact }: RetentionSignalProps) {
+export function RetentionSignal({
+  status,
+  compact,
+  parentFacing,
+}: RetentionSignalProps) {
   const { label, icon, colorKey, textColor } = CONFIG[status];
   const colors = useThemeColors();
+  // Use parent-vocab canonical labels when parent-facing to keep a single
+  // source of truth for parent-friendly retention terminology.
+  const parentInfo = parentFacing
+    ? getParentRetentionInfo(status, 1, 'in_progress')
+    : null;
+  const displayLabel = parentInfo?.label ?? label;
 
   return (
     <View
       className="flex-row items-center"
       testID={`retention-signal-${status}`}
-      accessibilityLabel={`Retention: ${label}`}
+      accessibilityLabel={`Retention: ${displayLabel}`}
       accessibilityRole="text"
     >
       <Ionicons
@@ -66,7 +78,9 @@ export function RetentionSignal({ status, compact }: RetentionSignalProps) {
         style={compact ? undefined : { marginRight: 6 }}
       />
       {!compact && (
-        <Text className={`text-body-sm font-medium ${textColor}`}>{label}</Text>
+        <Text className={`text-body-sm font-medium ${textColor}`}>
+          {displayLabel}
+        </Text>
       )}
     </View>
   );

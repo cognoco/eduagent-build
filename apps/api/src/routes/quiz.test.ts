@@ -81,6 +81,12 @@ jest.mock('../services/profile', () => ({
   }),
 }));
 
+jest.mock('../services/streaks', () => ({
+  recordSessionActivity: jest
+    .fn()
+    .mockResolvedValue({ currentStreak: 1, longestStreak: 1 }),
+}));
+
 jest.mock('../services/llm', () => ({
   routeAndCall: jest.fn().mockResolvedValue({
     response: JSON.stringify({
@@ -185,7 +191,7 @@ const ACTIVE_ROUND = {
       type: 'capitals',
       country: 'Austria',
       correctAnswer: 'Vienna',
-      acceptedAliases: ['Vienna'],
+      acceptedAliases: ['Vienna', 'Wien'],
       distractors: ['Salzburg', 'Graz', 'Innsbruck'],
       funFact: 'Fact',
       isLibraryItem: false,
@@ -202,6 +208,22 @@ const ACTIVE_ROUND = {
   ],
   total: 2,
   status: 'active' as const,
+};
+
+// [F-032] Fixture for a completed round — same shape as ACTIVE_ROUND plus
+// the grading fields the completed-branch reads. Mirrors what
+// getRoundByIdOrThrow returns after completeQuizRound has persisted.
+const COMPLETED_ROUND = {
+  ...ACTIVE_ROUND,
+  id: 'round-completed',
+  status: 'completed' as const,
+  score: 1,
+  xpEarned: 15,
+  completedAt: new Date('2026-04-18T10:00:00Z'),
+  results: [
+    { questionIndex: 0, correct: true, answerGiven: 'Vienna', timeMs: 3000 },
+    { questionIndex: 1, correct: false, answerGiven: 'Munich', timeMs: 5000 },
+  ],
 };
 
 beforeEach(() => {
@@ -616,6 +638,83 @@ describe('Quiz routes', () => {
       expect(body.id).toBe('round-1');
     });
 
+    it('returns correctAnswer + acceptedAliases + celebrationTier for completed rounds [F-032]', async () => {
+      (mockDb as any).query.quizRounds.findFirst = jest
+        .fn()
+        .mockResolvedValue(COMPLETED_ROUND);
+
+      const res = await app.request(
+        '/v1/quiz/rounds/round-completed',
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.status).toBe('completed');
+      expect(body.score).toBe(1);
+      expect(body.total).toBe(2);
+      expect(body.xpEarned).toBe(15);
+      expect(body.celebrationTier).toBe('nice');
+      expect(body.completedAt).toBeDefined();
+      expect(body.results).toHaveLength(2);
+      // Completed rounds expose the grading context
+      expect(body.questions[0].correctAnswer).toBe('Vienna');
+      expect(body.questions[0].acceptedAliases).toEqual(['Vienna', 'Wien']);
+      expect(body.questions[1].correctAnswer).toBe('Berlin');
+      // [F-032 break test] Distractors stay stripped — round is graded, no
+      // reason to leak them. The only answer fields exposed are the
+      // correct answer + its aliases.
+      expect(body.questions[0].distractors).toBeUndefined();
+    });
+
+    it('does NOT expose correctAnswer or acceptedAliases for in-progress rounds [F-032 break test]', async () => {
+      (mockDb as any).query.quizRounds.findFirst = jest
+        .fn()
+        .mockResolvedValue(ACTIVE_ROUND);
+
+      const res = await app.request(
+        '/v1/quiz/rounds/round-1',
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      // Active rounds have no status field on the response
+      expect(body.status).toBeUndefined();
+      for (const q of body.questions) {
+        expect(q.correctAnswer).toBeUndefined();
+        expect(q.acceptedAliases).toBeUndefined();
+      }
+    });
+
+    it('includes activityLabel for both completed and in-progress rounds [F-036b]', async () => {
+      (mockDb as any).query.quizRounds.findFirst = jest
+        .fn()
+        .mockResolvedValue(COMPLETED_ROUND);
+
+      const completedRes = await app.request(
+        '/v1/quiz/rounds/round-completed',
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+      const completedBody = await completedRes.json();
+      expect(completedBody.activityLabel).toBe('Capitals');
+
+      (mockDb as any).query.quizRounds.findFirst = jest
+        .fn()
+        .mockResolvedValue(ACTIVE_ROUND);
+
+      const activeRes = await app.request(
+        '/v1/quiz/rounds/round-1',
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+      const activeBody = await activeRes.json();
+      expect(activeBody.activityLabel).toBe('Capitals');
+    });
+
     it('strips answer fields and returns pre-shuffled options (GET endpoint)', async () => {
       // [F-014 break test] The POST endpoint already has stripping tests,
       // but the GET endpoint was untested. Observed 2026-04-18: staging
@@ -685,6 +784,12 @@ describe('Quiz routes', () => {
       expect(body.score).toBe(1);
       expect(body.xpEarned).toBeGreaterThan(0);
       expect(['perfect', 'great', 'nice']).toContain(body.celebrationTier);
+      // [F-040] Results must include the user's submitted answer so the
+      // mobile results screen can render "You said: X" on missed-question
+      // cards without refetching the round.
+      expect(body.questionResults[0]).toHaveProperty('answerGiven');
+      expect(body.questionResults[0].answerGiven).toBe('Vienna');
+      expect(body.questionResults[1].answerGiven).toBe('Munich');
     });
 
     it('returns 400 for empty results', async () => {
@@ -813,6 +918,42 @@ describe('Quiz routes', () => {
       const body = await res.json();
       expect(body.length).toBeGreaterThanOrEqual(1);
       expect(body[0].score).toBe(7);
+    });
+  });
+
+  describe('POST /v1/quiz/missed-items/mark-surfaced', () => {
+    it('marks items for an activityType and returns markedCount [F-033]', async () => {
+      // The default beforeEach setUpdateReturning() returns one row from
+      // the UPDATE — so markSurfaced resolves to 1.
+      const res = await app.request(
+        '/v1/quiz/missed-items/mark-surfaced',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ activityType: 'capitals' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body).toHaveProperty('markedCount');
+      expect(typeof body.markedCount).toBe('number');
+      expect(body.markedCount).toBe(1);
+    });
+
+    it('returns 400 for an invalid activityType [F-033 negative]', async () => {
+      const res = await app.request(
+        '/v1/quiz/missed-items/mark-surfaced',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ activityType: 'not_a_real_activity' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(400);
     });
   });
 

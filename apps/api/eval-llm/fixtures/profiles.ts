@@ -5,9 +5,27 @@
 // eval harness. Each flow adapter maps a subset of this full profile into
 // the specific inputs that flow's prompt builder expects.
 //
+// Product constraint: the app targets learners 11+. Profiles below 11 are
+// invalid and must never be added. Note that dictation/generate.ts and
+// quiz/config.ts contain age branches for <11 which are dead in production;
+// see docs/specs/2026-04-18-llm-personalization-audit.md for the finding.
+//
 // Keep this set small. 6–10 profiles is the working ceiling — more than that
 // and snapshot review becomes impractical during tuning sessions.
 // ---------------------------------------------------------------------------
+
+export type InterestContext = 'free_time' | 'school' | 'both';
+
+export interface InterestEntry {
+  label: string;
+  /**
+   * Where the interest lives in the learner's life:
+   * - `free_time`: hobby only, don't force into school-subject prompts
+   * - `school`: curricular interest, safe to use across subject prompts
+   * - `both`: passion that overlaps school & personal
+   */
+  context: InterestContext;
+}
 
 export interface EvalProfile {
   /** Stable kebab-case key used as the snapshot filename and CLI filter. */
@@ -18,12 +36,27 @@ export interface EvalProfile {
   // Demographics ----------------------------------------------------------
   ageYears: number;
   birthYear: number;
-  nativeLanguage: string; // ISO 639-1
+  /** The learner's native / L1 language. ISO 639-1. */
+  nativeLanguage: string;
+  /**
+   * The language the learner wants the tutor to speak to them in during
+   * exchanges. Planned onboarding dimension — defaults to nativeLanguage
+   * unless the learner prefers otherwise (e.g. bilingual learners).
+   * ISO 639-1.
+   */
+  conversationLanguage: string;
   location: 'EU' | 'US' | 'OTHER';
+  /**
+   * Optional — not collected by default at onboarding. Only older learners
+   * are prompted. Free-form for "other"; empty string means "not provided".
+   */
+  pronouns?: string;
 
   // Interests & library -------------------------------------------------
-  interests: string[]; // free-text interest labels, ordered by salience
-  libraryTopics: string[]; // currently studying — raw topic titles
+  /** Ordered by salience — most prominent first. */
+  interests: InterestEntry[];
+  /** Currently studying — raw topic titles from the learner's library. */
+  libraryTopics: string[];
 
   // Learning level ------------------------------------------------------
   cefrLevel?: string; // A1 / A2 / B1 / B2 / C1 / C2
@@ -56,31 +89,43 @@ export interface EvalProfile {
 }
 
 // ---------------------------------------------------------------------------
-// The baseline fixture set.
+// The baseline fixture set (all profiles ≥11 per product constraint).
 //
-// Spans: child/teen/adult × low/mid/high proficiency × EU/US locale ×
-// stories/step-by-step/gaming styles. Interests picked to be vivid enough
-// to obviously steer prompt output when they're wired in.
+// Spans: ages 11–17 × EU/US × Czech/English native × language-learner vs not
+// × serious/casual × diverse interest contexts. Pronouns sprinkled sparingly
+// to exercise the optional path without making every snapshot verbose.
 // ---------------------------------------------------------------------------
 
 export const PROFILES: EvalProfile[] = [
   {
-    id: '06yo-fairytales',
+    id: '11yo-czech-animals',
     description:
-      '6-year-old EU child, early reader, Czech native, loves fairy tales and animals, low cognitive load preferred',
-    ageYears: 6,
-    birthYear: 2020,
+      '11-year-old EU girl, Czech native, youngest in the target range, loves animals and nature, thorough pacer',
+    ageYears: 11,
+    birthYear: 2015,
     nativeLanguage: 'cs',
+    conversationLanguage: 'cs',
     location: 'EU',
-    interests: ['fairy tales', 'horses', 'forest animals', 'drawing'],
-    libraryTopics: ['alphabet', 'counting to 20', 'farm animals'],
+    pronouns: undefined,
+    interests: [
+      { label: 'horses', context: 'free_time' },
+      { label: 'forest animals', context: 'free_time' },
+      { label: 'nature journaling', context: 'both' },
+      { label: 'drawing', context: 'free_time' },
+    ],
+    libraryTopics: [
+      'Czech reading comprehension',
+      'basic fractions',
+      'human body systems',
+      'water cycle',
+    ],
     cefrLevel: undefined,
     targetLanguage: undefined,
     struggles: [
-      { topic: 'letter b vs d', subject: null },
-      { topic: 'silent letters', subject: 'reading' },
+      { topic: 'fraction addition', subject: 'math' },
+      { topic: 'long multi-clause sentences', subject: 'reading' },
     ],
-    strengths: [{ topic: 'rhyming words', subject: 'reading' }],
+    strengths: [{ topic: 'vocabulary retention', subject: 'Czech' }],
     recentQuizAnswers: { capitals: [], vocabulary: [], guessWho: [] },
     learningMode: 'casual',
     preferredExplanations: ['stories', 'examples'],
@@ -88,30 +133,32 @@ export const PROFILES: EvalProfile[] = [
     analogyDomain: 'nature',
   },
   {
-    id: '09yo-dinosaurs',
+    id: '12yo-dinosaurs',
     description:
-      '9-year-old US child, English native, obsessed with dinosaurs and prehistoric life, quick pace, humor works',
-    ageYears: 9,
-    birthYear: 2017,
+      '12-year-old US boy, English native, obsessed with dinosaurs and prehistoric life, quick pace, humor works',
+    ageYears: 12,
+    birthYear: 2014,
     nativeLanguage: 'en',
+    conversationLanguage: 'en',
     location: 'US',
+    pronouns: undefined,
     interests: [
-      'dinosaurs',
-      'fossils',
-      'paleontology',
-      'extinction events',
-      'volcanoes',
+      { label: 'dinosaurs', context: 'both' },
+      { label: 'fossils', context: 'both' },
+      { label: 'paleontology', context: 'both' },
+      { label: 'extinction events', context: 'free_time' },
+      { label: 'volcanoes', context: 'free_time' },
     ],
     libraryTopics: [
       'Mesozoic era',
       'fossilization',
       'plate tectonics',
-      'multiplication tables',
+      'long division',
     ],
     cefrLevel: undefined,
     targetLanguage: undefined,
     struggles: [
-      { topic: 'long multiplication', subject: 'math' },
+      { topic: 'long division', subject: 'math' },
       { topic: 'Austria vs Australia', subject: 'geography' },
     ],
     strengths: [
@@ -129,18 +176,25 @@ export const PROFILES: EvalProfile[] = [
     analogyDomain: 'nature',
   },
   {
-    id: '12yo-spanish-beginner',
+    id: '13yo-spanish-beginner',
     description:
-      '12-year-old EU girl, English native, learning Spanish (CEFR A2), loves horses and equestrian sports',
-    ageYears: 12,
-    birthYear: 2014,
+      '13-year-old EU girl, English native, learning Spanish (CEFR A2), loves horses and equestrian sports',
+    ageYears: 13,
+    birthYear: 2013,
     nativeLanguage: 'en',
+    conversationLanguage: 'en',
     location: 'EU',
-    interests: ['horses', 'showjumping', 'eventing', 'nature photography'],
+    pronouns: 'she/her',
+    interests: [
+      { label: 'horses', context: 'free_time' },
+      { label: 'showjumping', context: 'free_time' },
+      { label: 'eventing', context: 'free_time' },
+      { label: 'nature photography', context: 'free_time' },
+    ],
     libraryTopics: [
-      'present tense verbs',
-      'family vocabulary',
-      'numbers 1-1000',
+      'Spanish present tense verbs',
+      'Spanish family vocabulary',
+      'Spanish numbers 1-1000',
       'Spain geography',
     ],
     cefrLevel: 'A2',
@@ -161,19 +215,21 @@ export const PROFILES: EvalProfile[] = [
     analogyDomain: 'nature',
   },
   {
-    id: '14yo-football-gaming',
+    id: '15yo-football-gaming',
     description:
-      '14-year-old US teen, English native, into football and competitive gaming, low patience for formality',
-    ageYears: 14,
-    birthYear: 2012,
+      '15-year-old US teen, English native, into football and competitive gaming, low patience for formality',
+    ageYears: 15,
+    birthYear: 2011,
     nativeLanguage: 'en',
+    conversationLanguage: 'en',
     location: 'US',
+    pronouns: 'he/him',
     interests: [
-      'football',
-      'NFL',
-      'esports',
-      'competitive gaming',
-      'sports statistics',
+      { label: 'football', context: 'free_time' },
+      { label: 'NFL', context: 'free_time' },
+      { label: 'esports', context: 'free_time' },
+      { label: 'competitive gaming', context: 'free_time' },
+      { label: 'sports statistics', context: 'both' },
     ],
     libraryTopics: [
       'algebra equations',
@@ -201,18 +257,22 @@ export const PROFILES: EvalProfile[] = [
     analogyDomain: 'sports',
   },
   {
-    id: '16yo-french-advanced',
+    id: '17yo-french-advanced',
     description:
-      '16-year-old EU teen, Czech native, advanced French (CEFR B2), into literature and philosophy',
-    ageYears: 16,
-    birthYear: 2010,
+      '17-year-old EU teen, Czech native but conversational French with tutor, advanced French (CEFR B2), literature and philosophy',
+    ageYears: 17,
+    birthYear: 2009,
     nativeLanguage: 'cs',
+    // Advanced learner prefers the tutor speaks French — tests the split
+    // between nativeLanguage and conversationLanguage.
+    conversationLanguage: 'fr',
     location: 'EU',
+    pronouns: 'they/them',
     interests: [
-      'French literature',
-      'philosophy',
-      'existentialism',
-      'creative writing',
+      { label: 'French literature', context: 'both' },
+      { label: 'philosophy', context: 'both' },
+      { label: 'existentialism', context: 'free_time' },
+      { label: 'creative writing', context: 'free_time' },
     ],
     libraryTopics: [
       "Camus — L'Étranger",

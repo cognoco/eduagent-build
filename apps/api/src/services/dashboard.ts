@@ -3,7 +3,7 @@
 // Pure business logic + DB-aware query functions, no Hono imports
 // ---------------------------------------------------------------------------
 
-import { eq, and, gte, inArray, desc, sum } from 'drizzle-orm';
+import { eq, and, gte, inArray, desc, sum, sql } from 'drizzle-orm';
 import {
   familyLinks,
   profiles,
@@ -19,6 +19,7 @@ import {
 } from '@eduagent/database';
 import type {
   DashboardChild,
+  EngagementSignal,
   HomeworkSummary,
   KnowledgeInventory,
   MonthlyReportRecord,
@@ -27,7 +28,7 @@ import type {
   SessionMetadata,
   TopicProgress,
 } from '@eduagent/schemas';
-import { getOverallProgress, getTopicProgress } from './progress';
+import { getOverallProgress, getTopicProgressBatch } from './progress';
 import {
   buildKnowledgeInventory,
   buildProgressHistory,
@@ -39,31 +40,7 @@ import {
   listMonthlyReportsForParentChild,
   markMonthlyReportViewed,
 } from './monthly-report';
-import { ForbiddenError } from '../errors';
-
-/**
- * [EP15-I5] Central enforcement of parent→child access checks.
- *
- * Prior implementation scattered `if (!(await hasParentAccess(...))) return null`
- * across seven functions, and the routes blindly serialized the null result
- * as `{ inventory: null }` / `{ reports: [] }` with HTTP 200. That masked
- * authorization denials as empty states — an attacker iterating child IDs
- * could not tell a forbidden child apart from a genuinely empty one, and
- * legitimate users saw "no reports yet" instead of "you lost access to this
- * child". Both outcomes are wrong.
- *
- * `assertParentAccess` throws `ForbiddenError` on failure, and the global
- * `app.onError` handler in `index.ts` converts it to HTTP 403 once.
- */
-async function assertParentAccess(
-  db: Database,
-  parentProfileId: string,
-  childProfileId: string
-): Promise<void> {
-  if (!(await hasParentAccess(db, parentProfileId, childProfileId))) {
-    throw new ForbiddenError('You do not have access to this child profile.');
-  }
-}
+import { assertParentAccess } from './family-access';
 
 export interface DashboardInput {
   childProfileId: string;
@@ -132,16 +109,26 @@ export function generateChildSummary(input: DashboardInput): string {
   return `${input.displayName}: ${parts.join('. ')}.`;
 }
 
+/** Minimum completed sessions before trend signals carry meaning. [F-PV-03] */
+const MIN_TREND_SESSIONS = 3;
+
 /**
  * Calculates retention trend as a snapshot heuristic.
  * Compares strong count vs weak+fading count across all subjects.
+ * Returns 'stable' when totalSessions < MIN_TREND_SESSIONS — the signal is
+ * noise at low N.
  */
 export function calculateRetentionTrend(
   subjectRetentionData: Array<{
     status: 'strong' | 'fading' | 'weak' | 'forgotten';
-  }>
+  }>,
+  totalSessions?: number
 ): 'improving' | 'declining' | 'stable' {
-  if (subjectRetentionData.length === 0) return 'stable';
+  if (
+    subjectRetentionData.length === 0 ||
+    (totalSessions != null && totalSessions < MIN_TREND_SESSIONS)
+  )
+    return 'stable';
   const strongCount = subjectRetentionData.filter(
     (s) => s.status === 'strong'
   ).length;
@@ -287,21 +274,6 @@ function buildProgressGuidance(
   return null;
 }
 
-async function hasParentAccess(
-  db: Database,
-  parentProfileId: string,
-  childProfileId: string
-): Promise<boolean> {
-  const link = await db.query.familyLinks.findFirst({
-    where: and(
-      eq(familyLinks.parentProfileId, parentProfileId),
-      eq(familyLinks.childProfileId, childProfileId)
-    ),
-  });
-
-  return !!link;
-}
-
 async function buildChildProgressSummary(
   db: Database,
   childProfileId: string,
@@ -311,9 +283,24 @@ async function buildChildProgressSummary(
   totalTimeThisWeekMinutes: number,
   subjectNames: string[]
 ): Promise<{ progress: DashboardChild['progress']; totalSessions: number }> {
-  const latestSnapshot = await getLatestSnapshot(db, childProfileId);
+  // [F-PV-07] Compute totalSessions live with the same filter as getChildSessions
+  // (exchangeCount >= 1) instead of reading the stale snapshot value. This
+  // prevents the dashboard aggregate from disagreeing with the sessions list.
+  const [latestSnapshot, liveCountRows] = await Promise.all([
+    getLatestSnapshot(db, childProfileId),
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(learningSessions)
+      .where(
+        and(
+          eq(learningSessions.profileId, childProfileId),
+          gte(learningSessions.exchangeCount, 1)
+        )
+      ),
+  ]);
+  const liveSessionCount = liveCountRows[0]?.count ?? 0;
   if (!latestSnapshot) {
-    return { progress: null, totalSessions: 0 };
+    return { progress: null, totalSessions: liveSessionCount };
   }
 
   const previousSnapshot = await getLatestSnapshotOnOrBefore(
@@ -353,7 +340,9 @@ async function buildChildProgressSummary(
           )
         : null,
       engagementTrend:
-        sessionsThisWeek === 0
+        liveSessionCount < MIN_TREND_SESSIONS
+          ? 'stable'
+          : sessionsThisWeek === 0
           ? 'declining'
           : sessionsThisWeek > sessionsLastWeek
           ? 'increasing'
@@ -365,7 +354,7 @@ async function buildChildProgressSummary(
         sessionsLastWeek
       ),
     },
-    totalSessions: currentMetrics.totalSessions,
+    totalSessions: liveSessionCount,
   };
 }
 
@@ -603,7 +592,8 @@ export async function getChildrenForParent(
     const summary = generateChildSummary(p.dashboardInput);
     const trend = calculateTrend(p.sessionsThisWeek, p.sessionsLastWeek);
     const retentionTrend = calculateRetentionTrend(
-      p.dashboardInput.subjectRetentionData
+      p.dashboardInput.subjectRetentionData,
+      totalSessions
     );
 
     return {
@@ -668,6 +658,15 @@ export async function getChildSubjectTopics(
   // [EP15-I5] See assertParentAccess comment — ForbiddenError → 403.
   await assertParentAccess(db, parentProfileId, childProfileId);
 
+  // Verify the subject belongs to the child before querying curriculum (IDOR guard).
+  const childSubject = await db.query.subjects.findFirst({
+    where: and(
+      eq(subjects.id, subjectId),
+      eq(subjects.profileId, childProfileId)
+    ),
+  });
+  if (!childSubject) return [];
+
   // Get curriculum for subject
   const curriculum = await db.query.curricula.findFirst({
     where: eq(curricula.subjectId, subjectId),
@@ -679,12 +678,47 @@ export async function getChildSubjectTopics(
     where: eq(curriculumTopics.curriculumId, curriculum.id),
   });
 
-  // Get progress for each topic
-  const results = await Promise.all(
-    topics.map((t) => getTopicProgress(db, childProfileId, subjectId, t.id))
+  const topicIds = topics.map((topic) => topic.id);
+  const topicSessionCounts =
+    topicIds.length > 0
+      ? await db
+          .select({
+            topicId: learningSessions.topicId,
+            totalSessions: sql<number>`count(*)::int`,
+          })
+          .from(learningSessions)
+          .where(
+            and(
+              eq(learningSessions.profileId, childProfileId),
+              eq(learningSessions.subjectId, subjectId),
+              inArray(learningSessions.topicId, topicIds),
+              gte(learningSessions.exchangeCount, 1)
+            )
+          )
+          .groupBy(learningSessions.topicId)
+      : [];
+  const totalSessionsByTopic = new Map(
+    topicSessionCounts
+      .filter(
+        (
+          row
+        ): row is {
+          topicId: string;
+          totalSessions: number;
+        } => typeof row.topicId === 'string'
+      )
+      .map((row) => [row.topicId, row.totalSessions])
   );
 
-  return results.filter((r): r is TopicProgress => r !== null);
+  // [F-PV-06] Batch all per-topic queries into ~6 inArray queries (constant
+  // subrequest count) instead of 7 queries × N topics which blows past the
+  // Cloudflare Workers 50-subrequest limit for subjects with > 6 topics.
+  const results = await getTopicProgressBatch(db, childProfileId, topics);
+
+  return results.map((topic) => ({
+    ...topic,
+    totalSessions: totalSessionsByTopic.get(topic.topicId) ?? 0,
+  }));
 }
 
 // ---------------------------------------------------------------------------
@@ -706,6 +740,9 @@ export interface ChildSession {
   displaySummary: string | null;
   homeworkSummary: HomeworkSummary | null;
   highlight: string | null;
+  narrative: string | null;
+  conversationPrompt: string | null;
+  engagementSignal: EngagementSignal | null;
 }
 
 /**
@@ -736,15 +773,23 @@ export async function getChildSessions(
   const sessionIds = sessions.map((s) => s.id);
   const summaries = await db.query.sessionSummaries.findMany({
     where: inArray(sessionSummaries.sessionId, sessionIds),
-    columns: { sessionId: true, highlight: true },
+    columns: {
+      sessionId: true,
+      highlight: true,
+      narrative: true,
+      conversationPrompt: true,
+      engagementSignal: true,
+    },
   });
-  const highlightBySession = new Map(
-    summaries.map((s) => [s.sessionId, s.highlight ?? null])
+  const summaryBySession = new Map(
+    summaries.map((summary) => [summary.sessionId, summary])
   );
 
   return sessions.map((s) => {
     const metadata = getSessionMetadata(s.metadata);
     const homeworkSummary = metadata.homeworkSummary ?? null;
+
+    const summary = summaryBySession.get(s.id);
 
     return {
       sessionId: s.id,
@@ -760,7 +805,11 @@ export async function getChildSessions(
       displayTitle: formatSessionDisplayTitle(s.sessionType, homeworkSummary),
       displaySummary: homeworkSummary?.summary ?? null,
       homeworkSummary,
-      highlight: highlightBySession.get(s.id) ?? null,
+      highlight: summary?.highlight ?? null,
+      narrative: summary?.narrative ?? null,
+      conversationPrompt: summary?.conversationPrompt ?? null,
+      engagementSignal:
+        (summary?.engagementSignal as ChildSession['engagementSignal']) ?? null,
     };
   });
 }
@@ -787,7 +836,12 @@ export async function getChildSessionDetail(
   // Fetch highlight for this single session
   const summary = await db.query.sessionSummaries.findFirst({
     where: eq(sessionSummaries.sessionId, sessionId),
-    columns: { highlight: true },
+    columns: {
+      highlight: true,
+      narrative: true,
+      conversationPrompt: true,
+      engagementSignal: true,
+    },
   });
 
   return {
@@ -808,6 +862,10 @@ export async function getChildSessionDetail(
     displaySummary: homeworkSummary?.summary ?? null,
     homeworkSummary,
     highlight: summary?.highlight ?? null,
+    narrative: summary?.narrative ?? null,
+    conversationPrompt: summary?.conversationPrompt ?? null,
+    engagementSignal:
+      (summary?.engagementSignal as ChildSession['engagementSignal']) ?? null,
   };
 }
 

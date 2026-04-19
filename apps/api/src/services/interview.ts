@@ -49,11 +49,12 @@ export async function getBookTitle(
   return row?.title;
 }
 
-const INTERVIEW_SYSTEM_PROMPT = `You are MentoMate, an AI learning mate conducting a brief assessment interview.
+const INTERVIEW_SYSTEM_PROMPT = `You are MentoMate, a calm, clear tutor conducting a brief assessment interview.
 Ask about the learner's goals, prior experience, and current knowledge level for the given subject.
-Keep questions conversational and brief. After 3-5 exchanges when you have enough signal,
-wrap up with a short, encouraging summary of what you learned and an enthusiastic invitation
-to start learning together — for example "I've got a great picture of where you are — let's dive in!"
+Keep questions conversational and brief. After 2-3 exchanges when you have enough signal,
+wrap up with a short summary of what you learned and a brief, natural transition to the first session.
+Keep the tone warm but calm — don't over-celebrate. Vary your acknowledgments: sometimes "yes", sometimes just move on. Silence after a correct answer is fine.
+NEVER use stock phrases like "Let's dive in!", "I've got a great picture", "Amazing!", "Fantastic!", "Awesome!". Just be direct.
 Then place the marker [INTERVIEW_COMPLETE] on its own line at the very end (after your message).
 The marker will be hidden from the learner, so your visible text should feel like a natural ending.`;
 
@@ -211,9 +212,17 @@ export async function extractSignals(exchangeHistory: ChatExchange[]): Promise<{
 // LLM interview exchange
 // ---------------------------------------------------------------------------
 
+/**
+ * Server-side hard cap: force interview completion after this many user exchanges.
+ * Prevents indefinite interviews when the LLM fails to emit the completion marker.
+ * [BUG-464] [BUG-470]
+ */
+const INTERVIEW_HARD_CAP_EXCHANGES = 3;
+
 export async function processInterviewExchange(
   context: InterviewContext,
-  userMessage: string
+  userMessage: string,
+  options?: { exchangeCount?: number }
 ): Promise<InterviewResult> {
   const focusLine = context.bookTitle
     ? `\nFocus area: ${context.bookTitle}\nScope your questions to this specific focus area within the subject, not the entire subject.`
@@ -231,10 +240,15 @@ export async function processInterviewExchange(
   ];
 
   const result = await routeAndCall(messages, 1);
-  const isComplete = result.response.includes('[INTERVIEW_COMPLETE]');
+  const markerPresent = result.response.includes('[INTERVIEW_COMPLETE]');
   const cleanResponse = result.response
     .replace('[INTERVIEW_COMPLETE]', '')
     .trim();
+
+  // [BUG-464] Server-side hard cap: force completion after N exchanges
+  const currentExchangeCount = options?.exchangeCount ?? 0;
+  const isComplete =
+    markerPresent || currentExchangeCount >= INTERVIEW_HARD_CAP_EXCHANGES;
 
   if (isComplete) {
     const signals = await extractSignals([
@@ -254,7 +268,8 @@ export async function processInterviewExchange(
 
 export async function streamInterviewExchange(
   context: InterviewContext,
-  userMessage: string
+  userMessage: string,
+  options?: { exchangeCount?: number }
 ): Promise<{
   stream: AsyncIterable<string>;
   onComplete: (fullResponse: string) => Promise<InterviewResult>;
@@ -275,12 +290,17 @@ export async function streamInterviewExchange(
   ];
 
   const streamResult = await routeAndStream(messages, 1);
+  const currentExchangeCount = options?.exchangeCount ?? 0;
 
   const onComplete = async (fullResponse: string): Promise<InterviewResult> => {
-    const isComplete = fullResponse.includes('[INTERVIEW_COMPLETE]');
+    const markerPresent = fullResponse.includes('[INTERVIEW_COMPLETE]');
     const cleanResponse = fullResponse
       .replace('[INTERVIEW_COMPLETE]', '')
       .trim();
+
+    // [BUG-464] Server-side hard cap: force completion after N exchanges
+    const isComplete =
+      markerPresent || currentExchangeCount >= INTERVIEW_HARD_CAP_EXCHANGES;
 
     if (isComplete) {
       const signals = await extractSignals([

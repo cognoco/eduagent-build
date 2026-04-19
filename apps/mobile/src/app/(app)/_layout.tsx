@@ -1128,6 +1128,10 @@ export default function AppLayout() {
           const isFullScreen = FULL_SCREEN_ROUTES.has(route.name);
           return {
             headerShown: false,
+            // F-003/F-016/F-055: on web, inactive tab scenes stay in the DOM.
+            // An opaque sceneStyle prevents the previous tab from bleeding
+            // through when switching to a full-screen route (session, quiz, etc.).
+            sceneStyle: { backgroundColor: colors.background },
             tabBarStyle: isFullScreen
               ? { display: 'none' }
               : {

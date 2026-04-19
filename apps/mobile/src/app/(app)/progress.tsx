@@ -26,11 +26,25 @@ import {
   useRefreshProgressSnapshot,
 } from '../../hooks/use-progress';
 
-function heroCopy(input: { topicsMastered: number; vocabularyTotal: number }): {
+function heroCopy(input: {
+  topicsMastered: number;
+  vocabularyTotal: number;
+  totalSessions: number;
+}): {
   title: string;
   subtitle: string;
 } {
-  const { topicsMastered, vocabularyTotal } = input;
+  const { topicsMastered, vocabularyTotal, totalSessions } = input;
+
+  // [F-043] User has sessions but nothing mastered yet — show encouragement
+  if (topicsMastered === 0 && vocabularyTotal === 0 && totalSessions > 0) {
+    return {
+      title: `${totalSessions} session${
+        totalSessions === 1 ? '' : 's'
+      } completed`,
+      subtitle: 'Topics mastered and vocabulary will appear as you progress.',
+    };
+  }
 
   if (vocabularyTotal > 0 && topicsMastered === 0) {
     return vocabularyTotal < 20
@@ -128,6 +142,7 @@ export default function ProgressScreen(): React.ReactElement {
   const hero = heroCopy({
     topicsMastered: inventory?.global.topicsMastered ?? 0,
     vocabularyTotal: inventory?.global.vocabularyTotal ?? 0,
+    totalSessions: inventory?.global.totalSessions ?? 0,
   });
 
   const growthData = useMemo(
@@ -287,7 +302,11 @@ export default function ProgressScreen(): React.ReactElement {
                   </View>
                   <View className="bg-background rounded-full px-3 py-1.5">
                     <Text className="text-caption font-semibold text-text-primary">
-                      {inventory.global.totalActiveMinutes} active min
+                      {/* [M5] || intentional: totalWallClockMinutes defaults to 0 for
+                          pre-F-045 snapshots; falsy-fallback shows activeMinutes. */}
+                      {inventory.global.totalWallClockMinutes ||
+                        inventory.global.totalActiveMinutes}{' '}
+                      min
                     </Text>
                   </View>
                   <View className="bg-background rounded-full px-3 py-1.5">
@@ -352,7 +371,17 @@ export default function ProgressScreen(): React.ReactElement {
                 title="Your growth"
                 subtitle="Weekly changes in topics mastered and vocabulary"
                 data={growthData}
-                emptyMessage="You just started. Keep going and your growth will appear here."
+                emptyMessage={
+                  // [F-043] Distinguish brand-new users from users who have
+                  // sessions but no mastery data yet (mastery takes repeat exposures).
+                  (inventory?.global.totalSessions ?? 0) > 0
+                    ? `You've put in ${
+                        inventory?.global.totalSessions ?? 0
+                      } session${
+                        (inventory?.global.totalSessions ?? 0) === 1 ? '' : 's'
+                      }. Keep going — mastery shows up after repeat exposures.`
+                    : 'You just started. Keep going and your growth will appear here.'
+                }
               />
             </View>
 
@@ -388,7 +417,12 @@ export default function ProgressScreen(): React.ReactElement {
             ) : (
               <View className="bg-surface rounded-card p-4">
                 <Text className="text-body-sm text-text-secondary">
-                  Complete your first session to earn your first milestone
+                  {/* [F-043] Distinguish users who have sessions from true newcomers.
+                      Milestones backfill on the next progress refresh — if none appear
+                      yet, encourage the user without implying they haven't started. */}
+                  {(inventory?.global.totalSessions ?? 0) > 0
+                    ? 'Milestones will collect here as you grow. Pull down to refresh.'
+                    : 'Complete your first session to earn your first milestone'}
                 </Text>
               </View>
             )}

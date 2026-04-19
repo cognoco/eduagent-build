@@ -70,6 +70,21 @@ export const onboardingDraftSchema = z.object({
 });
 export type OnboardingDraft = z.infer<typeof onboardingDraftSchema>;
 
+// Engagement signal — parent-facing session recap classification
+// Canonical source for all engagement signal values used by API (session-highlights)
+// and mobile (EngagementChip). Do not redefine these locally.
+
+export const ENGAGEMENT_SIGNALS = [
+  'curious',
+  'stuck',
+  'breezing',
+  'focused',
+  'scattered',
+] as const;
+
+export const engagementSignalSchema = z.enum(ENGAGEMENT_SIGNALS);
+export type EngagementSignal = z.infer<typeof engagementSignalSchema>;
+
 // Session schemas
 
 export const sessionTypeSchema = z.enum([

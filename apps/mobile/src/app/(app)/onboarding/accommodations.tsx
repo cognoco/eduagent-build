@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,6 +8,7 @@ import { OnboardingStepIndicator } from '../../../components/onboarding/Onboardi
 import { useUpdateAccommodationMode } from '../../../hooks/use-learner-profile';
 import { ACCOMMODATION_OPTIONS } from '../../../lib/accommodation-options';
 import { goBackOrReplace } from '../../../lib/navigation';
+import { platformAlert } from '../../../lib/platform-alert';
 import { useThemeColors } from '../../../lib/theme';
 
 export default function AccommodationsScreen(): React.ReactElement {
@@ -83,7 +84,7 @@ export default function AccommodationsScreen(): React.ReactElement {
       {
         onSuccess: navigateToCurriculum,
         onError: () => {
-          Alert.alert('Could not save setting', 'Please try again.');
+          platformAlert('Could not save setting', 'Please try again.');
         },
       }
     );

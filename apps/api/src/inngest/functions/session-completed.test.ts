@@ -28,7 +28,7 @@ const mockSessionCompletedDb = createTransactionalMockDb({
     learningSessions: {
       findFirst: jest.fn().mockResolvedValue({ rawInput: null, topicId: null }),
     },
-    // generate-session-highlight reads summary row and profile
+    // generate-session-insights reads summary row and profile
     sessionSummaries: {
       findFirst: jest
         .fn()
@@ -210,7 +210,7 @@ jest.mock('../../services/snapshot-aggregation', () => ({
     mockRefreshProgressSnapshot(...args),
 }));
 
-const mockGenerateLlmHighlight = jest
+const mockGenerateSessionInsights = jest
   .fn()
   .mockResolvedValue({ valid: false, reason: 'parse_error' });
 const mockBuildBrowseHighlight = jest
@@ -218,8 +218,8 @@ const mockBuildBrowseHighlight = jest
   .mockReturnValue('Emma browsed a topic — 1 min');
 
 jest.mock('../../services/session-highlights', () => ({
-  generateLlmHighlight: (...args: unknown[]) =>
-    mockGenerateLlmHighlight(...args),
+  generateSessionInsights: (...args: unknown[]) =>
+    mockGenerateSessionInsights(...args),
   buildBrowseHighlight: (...args: unknown[]) =>
     mockBuildBrowseHighlight(...args),
 }));
@@ -364,7 +364,7 @@ describe('sessionCompleted', () => {
       'update-needs-deepening',
       'check-milestone-completion',
       'write-coaching-card',
-      'generate-session-highlight',
+      'generate-session-insights',
       'analyze-learner-profile',
       'update-dashboard',
       'generate-embeddings',
@@ -980,16 +980,27 @@ describe('sessionCompleted', () => {
       );
     });
 
-    it('does NOT call recordSessionActivity when no qualityRating (FR86)', async () => {
+    // [F-044] Sessions with user engagement now count toward streaks.
+    // The old gate (completionQualityRating >= 3) was a bug — most close paths
+    // never set qualityRating, so streaks were never updated.
+    it('calls recordSessionActivity when no qualityRating but user had exchanges (F-044)', async () => {
       await executeSteps(createEventData());
 
-      expect(mockRecordSessionActivity).not.toHaveBeenCalled();
+      expect(mockRecordSessionActivity).toHaveBeenCalledWith(
+        expect.anything(),
+        'profile-001',
+        '2026-02-17'
+      );
     });
 
-    it('does NOT call recordSessionActivity when quality < 3 (recall fail, FR86)', async () => {
+    it('calls recordSessionActivity when quality < 3 (user still engaged, F-044)', async () => {
       await executeSteps(createEventData({ qualityRating: 2 }));
 
-      expect(mockRecordSessionActivity).not.toHaveBeenCalled();
+      expect(mockRecordSessionActivity).toHaveBeenCalledWith(
+        expect.anything(),
+        'profile-001',
+        '2026-02-17'
+      );
     });
 
     it('uses current date when no timestamp provided', async () => {

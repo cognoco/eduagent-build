@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { View, Text, Pressable, Alert } from 'react-native';
+import { View, Text, Pressable } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
   ChatShell,
@@ -10,9 +10,11 @@ import { OnboardingStepIndicator } from '../../../components/onboarding/Onboardi
 import {
   useInterviewState,
   useStreamInterviewMessage,
+  useForceCompleteInterview,
 } from '../../../hooks/use-interview';
 import { formatApiError } from '../../../lib/format-api-error';
 import { goBackOrReplace } from '../../../lib/navigation';
+import { platformAlert } from '../../../lib/platform-alert';
 
 const OPENING_MESSAGE =
   "Hi! I'm your learning mate. I'd like to get to know you a bit before we start. What made you interested in learning this subject?";
@@ -50,6 +52,7 @@ export default function InterviewScreen() {
     abort: abortStream,
     isStreaming: isStreamingSSE,
   } = useStreamInterviewMessage(safeSubjectId ?? '', bookId);
+  const forceComplete = useForceCompleteInterview(safeSubjectId ?? '', bookId);
 
   const openingMessage = bookTitle
     ? `Hi! I'm your learning mate. Let's talk about ${bookTitle}! What do you already know about it, and what are you most curious to learn?`
@@ -201,9 +204,21 @@ export default function InterviewScreen() {
       setStreamError(null);
       seededDraftRef.current = true;
     } catch (err: unknown) {
-      Alert.alert('Could not restart interview', formatApiError(err));
+      platformAlert('Could not restart interview', formatApiError(err));
     }
   }, [abortStream, openingMessage]);
+
+  // [BUG-464] Client escape: let user skip ahead after 2+ exchanges
+  const handleSkipInterview = useCallback(async () => {
+    if (interviewComplete || forceComplete.isPending) return;
+    try {
+      abortStream();
+      await forceComplete.mutateAsync();
+      setInterviewComplete(true);
+    } catch (err: unknown) {
+      platformAlert('Could not skip ahead', formatApiError(err));
+    }
+  }, [interviewComplete, forceComplete, abortStream]);
 
   const handleSend = useCallback(
     async (text: string, { isRetry = false } = {}) => {
@@ -379,6 +394,26 @@ export default function InterviewScreen() {
             >
               <Text className="text-text-inverse text-body font-semibold">
                 Try Again
+              </Text>
+            </Pressable>
+          </View>
+        ) : !interviewComplete &&
+          !streamError &&
+          !restartRequired &&
+          exchangeCount >= 2 ? (
+          <View className="px-2 mt-1 mb-2">
+            <Pressable
+              onPress={() => void handleSkipInterview()}
+              disabled={isStreaming || forceComplete.isPending}
+              className="py-2.5 items-center rounded-button"
+              testID="skip-interview-button"
+              accessibilityLabel="Ready to start learning"
+              accessibilityRole="button"
+            >
+              <Text className="text-body-sm text-primary font-medium">
+                {forceComplete.isPending
+                  ? 'Setting up your curriculum...'
+                  : "I'm ready to start learning"}
               </Text>
             </Pressable>
           </View>

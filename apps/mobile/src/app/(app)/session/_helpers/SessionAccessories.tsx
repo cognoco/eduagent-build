@@ -278,31 +278,47 @@ export function HomeworkModeChips({
               {activeHomeworkProblem?.text.slice(0, 70) ?? ''}
             </Text>
           </View>
-          {currentProblemIndex < homeworkProblemsState.length - 1 ? (
-            <Pressable
-              onPress={handleNextProblem}
-              className="rounded-full bg-primary/10 px-3 py-2"
-              testID="next-problem-chip"
-              accessibilityRole="button"
-              accessibilityLabel="Move to the next homework problem"
-            >
-              <Text className="text-body-sm font-semibold text-primary">
-                Next problem
-              </Text>
-            </Pressable>
-          ) : (
-            <Pressable
-              onPress={handleEndSession}
-              className="rounded-full bg-success/15 px-3 py-2"
-              testID="finish-homework-chip"
-              accessibilityRole="button"
-              accessibilityLabel="Finish homework session"
-            >
-              <Text className="text-body-sm font-semibold text-success">
-                Finish homework
-              </Text>
-            </Pressable>
-          )}
+          <View className="flex-row items-center gap-2">
+            {currentProblemIndex < homeworkProblemsState.length - 1 ? (
+              <>
+                {/* [BUG-468] Human override: let user finish early from any problem */}
+                <Pressable
+                  onPress={handleEndSession}
+                  className="rounded-full bg-surface-elevated px-3 py-2"
+                  testID="finish-homework-early-chip"
+                  accessibilityRole="button"
+                  accessibilityLabel="Finish homework early"
+                >
+                  <Text className="text-body-sm font-semibold text-text-secondary">
+                    I'm done
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={handleNextProblem}
+                  className="rounded-full bg-primary/10 px-3 py-2"
+                  testID="next-problem-chip"
+                  accessibilityRole="button"
+                  accessibilityLabel="Move to the next homework problem"
+                >
+                  <Text className="text-body-sm font-semibold text-primary">
+                    Next problem
+                  </Text>
+                </Pressable>
+              </>
+            ) : (
+              <Pressable
+                onPress={handleEndSession}
+                className="rounded-full bg-success/15 px-3 py-2"
+                testID="finish-homework-chip"
+                accessibilityRole="button"
+                accessibilityLabel="Finish homework session"
+              >
+                <Text className="text-body-sm font-semibold text-success">
+                  Finish homework
+                </Text>
+              </Pressable>
+            )}
+          </View>
         </View>
       )}
       {homeworkProblemsState.length > 0 ? (

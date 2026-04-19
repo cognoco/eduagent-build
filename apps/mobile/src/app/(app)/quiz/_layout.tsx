@@ -5,6 +5,7 @@ import type {
   QuizActivityType,
   QuizRoundResponse,
 } from '@eduagent/schemas';
+import { useThemeColors } from '../../../lib/theme';
 
 interface QuizFlowState {
   activityType: QuizActivityType | null;
@@ -44,7 +45,9 @@ export function useQuizFlow(): QuizFlowContextType {
   return context;
 }
 
-function QuizFlowProvider({
+// Exported so tests can mount real descendants inside the real provider
+// without re-implementing (and drifting from) the context state machine.
+export function QuizFlowProvider({
   children,
 }: {
   children: React.ReactNode;
@@ -97,12 +100,14 @@ function QuizFlowProvider({
 }
 
 export default function QuizLayout(): React.ReactElement {
+  const colors = useThemeColors();
   return (
     <QuizFlowProvider>
       <Stack
         screenOptions={{
           headerShown: false,
           animation: 'slide_from_right',
+          contentStyle: { backgroundColor: colors.background },
         }}
       />
     </QuizFlowProvider>
