@@ -23,6 +23,7 @@ module.exports = {
   testMatch: [
     '<rootDir>/apps/api/src/**/*.test.ts',
     '<rootDir>/apps/api/src/**/*.integration.test.ts',
+    '<rootDir>/apps/api/eval-llm/**/*.test.ts',
   ],
   coverageDirectory: '<rootDir>/coverage/apps/api',
 };

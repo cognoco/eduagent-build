@@ -29,6 +29,21 @@ export interface ResponseValidator {
   safeParse(value: unknown): { success: boolean; error?: unknown };
 }
 
+/**
+ * A scenario groups a scenarioId with the Input it generates. Used by flows
+ * that exercise the same prompt builder across multiple branches — e.g. the
+ * main tutoring loop fanned out across escalation rungs / session types.
+ *
+ * See `apps/api/eval-llm/flows/exchanges.ts` for the reference implementation
+ * and `docs/plans/2026-04-19-exchanges-harness-wiring.md` for the matrix.
+ */
+export interface Scenario<Input = unknown> {
+  /** Stable id included in the snapshot filename, e.g. "S1-rung1-teach-new". */
+  scenarioId: string;
+  /** The input shape the prompt builder consumes. */
+  input: Input;
+}
+
 export interface FlowDefinition<Input = unknown> {
   /** Stable kebab-case id — becomes the directory name under snapshots/. */
   id: string;
@@ -41,8 +56,20 @@ export interface FlowDefinition<Input = unknown> {
    * Map a full EvalProfile into the narrow input shape the real prompt
    * builder expects. Return null to skip this profile for this flow
    * (e.g. vocabulary flow only applies to profiles with a target language).
+   *
+   * Flows that use `enumerateScenarios` instead may ignore this method — the
+   * runner prefers enumeration when both are present.
    */
   buildPromptInput(profile: EvalProfile): Input | null;
+
+  /**
+   * Optional: fan the profile out into multiple scenarios, each producing its
+   * own snapshot. Used by flows where a single profile exercises several
+   * branches of the prompt builder. Return empty array or null to skip the
+   * profile. If present, the runner uses this method and ignores
+   * `buildPromptInput` for this flow.
+   */
+  enumerateScenarios?(profile: EvalProfile): Array<Scenario<Input>> | null;
 
   /** Invoke the real production prompt builder. */
   buildPrompt(input: Input): PromptMessages;
