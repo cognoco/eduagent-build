@@ -1,4 +1,4 @@
-import type { FlowDefinition } from './types';
+import type { FlowDefinition, Scenario } from './types';
 import { PROFILES, type EvalProfile } from '../fixtures/profiles';
 import { writeSnapshot } from './snapshot';
 
@@ -6,16 +6,29 @@ import { writeSnapshot } from './snapshot';
 // Runner — orchestrates the flow × profile matrix.
 //
 // CLI flags:
-//   --live            hit the real LLM providers (opt-in, costs credits)
-//   --flow <id>       only run this flow (repeatable)
-//   --profile <id>    only run this profile (repeatable)
-//   --list            list registered flows and fixtures and exit
+//   --live                 hit the real LLM providers (opt-in, costs credits)
+//   --flow <id>            only run this flow (repeatable)
+//   --profile <id>         only run this profile (repeatable)
+//   --scenarios core|full|<csv>  restrict which scenarios run (exchanges flow)
+//   --max-live-calls N     hard cap on live LLM calls (default 20)
+//   --list                 list registered flows and fixtures and exit
 // ---------------------------------------------------------------------------
 
 export interface RunOptions {
   live: boolean;
   flowFilter?: Set<string>;
   profileFilter?: Set<string>;
+  /**
+   * Restrict which scenarios run for flows that use `enumerateScenarios`.
+   * Set of scenarioId strings. If empty/undefined, all scenarios run.
+   */
+  scenarioFilter?: Set<string>;
+  /**
+   * Hard cap on total live LLM calls across all flows × profiles × scenarios.
+   * When hit, the runner aborts the remaining items with a "budget exceeded"
+   * skip reason so tier-2 runs don't surprise with large bills. Default = 20.
+   */
+  maxLiveCalls?: number;
 }
 
 export interface RunSummary {
@@ -35,6 +48,7 @@ export function parseCliArgs(argv: string[]): {
   let listOnly = false;
   const flowFilter = new Set<string>();
   const profileFilter = new Set<string>();
+  const scenarioFilter = new Set<string>();
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -48,14 +62,40 @@ export function parseCliArgs(argv: string[]): {
     } else if (arg === '--profile') {
       const next = argv[++i];
       if (next) profileFilter.add(next);
+    } else if (arg === '--scenarios') {
+      // `--scenarios core|full|S1,S3` — "core" and "full" are sugar.
+      // `core` expands to S1,S3,S5 (highest-signal default).
+      const next = argv[++i];
+      if (next) {
+        if (next === 'full') {
+          // no filter — all scenarios run
+        } else if (next === 'core') {
+          scenarioFilter.add('S1-rung1-teach-new');
+          scenarioFilter.add('S3-rung3-evaluate');
+          scenarioFilter.add('S5-rung5-exit');
+        } else {
+          for (const s of next.split(',')) {
+            if (s.trim()) scenarioFilter.add(s.trim());
+          }
+        }
+      }
+    } else if (arg === '--max-live-calls') {
+      const next = argv[++i];
+      const parsed = next ? Number.parseInt(next, 10) : NaN;
+      if (Number.isFinite(parsed) && parsed >= 0) {
+        options.maxLiveCalls = parsed;
+      }
     }
   }
 
   if (flowFilter.size > 0) options.flowFilter = flowFilter;
   if (profileFilter.size > 0) options.profileFilter = profileFilter;
+  if (scenarioFilter.size > 0) options.scenarioFilter = scenarioFilter;
 
   return { options, listOnly };
 }
+
+const DEFAULT_MAX_LIVE_CALLS = 20;
 
 export async function runHarness(
   flows: FlowDefinition[],
@@ -77,11 +117,45 @@ export async function runHarness(
     (p) => !options.profileFilter || options.profileFilter.has(p.id)
   );
 
+  const maxLiveCalls = options.maxLiveCalls ?? DEFAULT_MAX_LIVE_CALLS;
+  let liveCallsMade = 0;
+
   for (const flow of activeFlows) {
     summary.flowsRun++;
-    let seenProfileForFlow = false;
     for (const profile of activeProfiles) {
-      try {
+      // Fan the profile out into one-or-more items. Flows without
+      // enumerateScenarios produce a single anonymous item; flows with it
+      // produce one item per scenario. `scenarioId` is undefined in the
+      // anonymous case so snapshot paths stay backwards-compatible.
+      const items: Array<{ scenarioId?: string; input: unknown }> = [];
+      if (flow.enumerateScenarios) {
+        const scenarios = flow.enumerateScenarios(profile);
+        if (!scenarios || scenarios.length === 0) {
+          summary.skipped.push({
+            flowId: flow.id,
+            profileId: profile.id,
+            reason: 'flow does not apply to this profile',
+          });
+          continue;
+        }
+        for (const s of scenarios as Array<Scenario<unknown>>) {
+          if (
+            options.scenarioFilter &&
+            !options.scenarioFilter.has(s.scenarioId)
+          ) {
+            continue; // silently drop filtered scenarios
+          }
+          items.push({ scenarioId: s.scenarioId, input: s.input });
+        }
+        if (items.length === 0) {
+          summary.skipped.push({
+            flowId: flow.id,
+            profileId: profile.id,
+            reason: 'all scenarios filtered out',
+          });
+          continue;
+        }
+      } else {
         const input = flow.buildPromptInput(profile);
         if (input === null) {
           summary.skipped.push({
@@ -91,77 +165,94 @@ export async function runHarness(
           });
           continue;
         }
+        items.push({ input });
+      }
 
-        const messages = flow.buildPrompt(input);
+      for (const item of items) {
+        try {
+          const messages = flow.buildPrompt(item.input);
 
-        let liveResponse: string | undefined;
-        let liveProvider: string | undefined;
-        let liveModel: string | undefined;
-        let liveError: string | undefined;
-        let schemaViolation: string | undefined;
+          let liveResponse: string | undefined;
+          let liveProvider: string | undefined;
+          let liveModel: string | undefined;
+          let liveError: string | undefined;
+          let schemaViolation: string | undefined;
 
-        if (options.live && flow.runLive) {
-          try {
-            liveResponse = await flow.runLive(input, messages);
-            summary.liveCallsOk++;
-
-            // If the flow declares an expectedResponseSchema, try to parse
-            // the raw response as JSON and validate — mismatches surface as
-            // a "Schema violation" section in the snapshot.
-            if (flow.expectedResponseSchema && liveResponse) {
+          if (options.live && flow.runLive) {
+            if (liveCallsMade >= maxLiveCalls) {
+              liveError = `live budget exceeded (${maxLiveCalls} calls); re-run with --max-live-calls to raise`;
+              summary.skipped.push({
+                flowId: flow.id,
+                profileId: profile.id,
+                reason: liveError,
+              });
+            } else {
+              liveCallsMade++;
               try {
-                const jsonMatch = liveResponse.match(/\{[\s\S]*\}/);
-                const parsed = JSON.parse(
-                  jsonMatch ? jsonMatch[0] : liveResponse
-                );
-                const result = flow.expectedResponseSchema.safeParse(parsed);
-                if (!result.success) {
-                  schemaViolation =
-                    result.error instanceof Error
-                      ? result.error.message
-                      : JSON.stringify(result.error);
+                liveResponse = await flow.runLive(item.input, messages);
+                summary.liveCallsOk++;
+
+                if (flow.expectedResponseSchema && liveResponse) {
+                  try {
+                    const jsonMatch = liveResponse.match(/\{[\s\S]*\}/);
+                    const parsed = JSON.parse(
+                      jsonMatch ? jsonMatch[0] : liveResponse
+                    );
+                    const result =
+                      flow.expectedResponseSchema.safeParse(parsed);
+                    if (!result.success) {
+                      schemaViolation =
+                        result.error instanceof Error
+                          ? result.error.message
+                          : JSON.stringify(result.error);
+                    }
+                  } catch (parseErr) {
+                    schemaViolation =
+                      parseErr instanceof Error
+                        ? `JSON parse failed: ${parseErr.message}`
+                        : 'JSON parse failed';
+                  }
                 }
-              } catch (parseErr) {
-                schemaViolation =
-                  parseErr instanceof Error
-                    ? `JSON parse failed: ${parseErr.message}`
-                    : 'JSON parse failed';
+              } catch (err) {
+                liveError = err instanceof Error ? err.message : String(err);
+                summary.liveCallsFailed++;
               }
             }
-          } catch (err) {
-            liveError = err instanceof Error ? err.message : String(err);
-            summary.liveCallsFailed++;
+          } else if (options.live && !flow.runLive) {
+            liveError = 'runLive not implemented for this flow';
           }
-        } else if (options.live && !flow.runLive) {
-          liveError = 'runLive not implemented for this flow';
+
+          const snapshotPath = await writeSnapshot({
+            flow,
+            profile,
+            scenarioId: item.scenarioId,
+            builderInput: item.input,
+            messages,
+            liveResponse,
+            liveProvider,
+            liveModel,
+            liveError,
+            schemaViolation,
+          });
+
+          summary.snapshotsWritten++;
+          summary.profilesRun++;
+          const tag = item.scenarioId
+            ? `${profile.id} · ${item.scenarioId}`
+            : profile.id;
+          console.log(`  [${flow.id}] ${tag} → ${relativize(snapshotPath)}`);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          const tag = item.scenarioId
+            ? `${profile.id} · ${item.scenarioId}`
+            : profile.id;
+          console.error(`  [${flow.id}] ${tag} FAILED: ${msg}`);
+          summary.skipped.push({
+            flowId: flow.id,
+            profileId: profile.id,
+            reason: `error: ${msg}`,
+          });
         }
-
-        const snapshotPath = await writeSnapshot({
-          flow,
-          profile,
-          builderInput: input,
-          messages,
-          liveResponse,
-          liveProvider,
-          liveModel,
-          liveError,
-          schemaViolation,
-        });
-
-        summary.snapshotsWritten++;
-        if (!seenProfileForFlow) seenProfileForFlow = true;
-        summary.profilesRun++;
-        console.log(
-          `  [${flow.id}] ${profile.id} → ${relativize(snapshotPath)}`
-        );
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        console.error(`  [${flow.id}] ${profile.id} FAILED: ${msg}`);
-        summary.skipped.push({
-          flowId: flow.id,
-          profileId: profile.id,
-          reason: `error: ${msg}`,
-        });
       }
     }
   }

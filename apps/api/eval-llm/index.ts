@@ -6,7 +6,10 @@
 //   pnpm eval:llm                              # tier 1 (prompts only, free)
 //   pnpm eval:llm -- --list                    # list flows and profiles
 //   pnpm eval:llm -- --flow quiz-capitals       # one flow
-//   pnpm eval:llm -- --profile 09yo-dinosaurs   # one profile
+//   pnpm eval:llm -- --profile 12yo-dinosaurs   # one profile
+//   pnpm eval:llm -- --flow exchanges --scenarios core   # 3 highest-signal scenarios
+//   pnpm eval:llm -- --flow exchanges --scenarios S1,S3  # specific scenarios
+//   pnpm eval:llm -- --max-live-calls 5         # cap live LLM calls (default 20)
 //   doppler run -- pnpm eval:llm -- --live      # tier 2 (real LLM calls)
 // ---------------------------------------------------------------------------
 
@@ -18,6 +21,7 @@ import { prepareHomeworkFlow } from './flows/dictation-prepare-homework';
 import { dictationReviewFlow } from './flows/dictation-review';
 import { sessionAnalysisFlow } from './flows/session-analysis';
 import { filingPreSessionFlow } from './flows/filing-pre-session';
+import { exchangesFlow } from './flows/exchanges';
 import {
   listFlows,
   parseCliArgs,
@@ -35,6 +39,7 @@ const FLOWS: FlowDefinition[] = [
   dictationReviewFlow as FlowDefinition,
   sessionAnalysisFlow as FlowDefinition,
   filingPreSessionFlow as FlowDefinition,
+  exchangesFlow as FlowDefinition,
 ];
 
 async function main(): Promise<void> {
