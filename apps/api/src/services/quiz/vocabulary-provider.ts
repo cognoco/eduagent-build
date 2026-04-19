@@ -6,7 +6,7 @@ import {
 } from '@eduagent/schemas';
 import { createLogger } from '../logger';
 import type { LibraryItem } from './content-resolver';
-import { describeAgeBracket, type AgeBracket } from './config';
+import { describeAgeBracket, type AgeBracket, type Interest } from './config';
 import { shuffle } from './shuffle';
 
 const logger = createLogger();
@@ -21,6 +21,10 @@ export interface VocabularyPromptParams {
   languageCode: string;
   cefrCeiling: CefrLevel;
   themePreference?: string;
+  interests?: Interest[];
+  libraryTopics?: string[];
+  ageYears?: number;
+  learnerNativeLanguage?: string;
 }
 
 export interface ValidatedVocabularyQuestion {
@@ -158,6 +162,47 @@ export function getLanguageDisplayName(code: string): string {
   return name;
 }
 
+// Language pairs where L1 false-cognate distractors are especially valuable.
+// Format: `${learnerNativeLanguage}-${targetLanguage}` (both lower-cased BCP-47).
+const L1_AWARE_PAIRS: ReadonlySet<string> = new Set([
+  'en-es',
+  'es-en',
+  'en-fr',
+  'fr-en',
+  'cs-de',
+  'de-cs',
+  'en-de',
+  'de-en',
+]);
+
+function buildL1DistractorHint(
+  learnerNativeLanguage: string | undefined,
+  languageCode: string
+): string {
+  if (!learnerNativeLanguage) return '';
+  const pairKey = `${learnerNativeLanguage.trim().toLowerCase()}-${languageCode
+    .trim()
+    .toLowerCase()}`;
+  if (!L1_AWARE_PAIRS.has(pairKey)) return '';
+
+  let nativeName: string;
+  try {
+    nativeName = new Intl.DisplayNames(['en'], { type: 'language' }).of(
+      learnerNativeLanguage.trim().toLowerCase()
+    ) as string;
+    if (
+      !nativeName ||
+      nativeName.toLowerCase() === learnerNativeLanguage.trim().toLowerCase()
+    ) {
+      nativeName = learnerNativeLanguage;
+    }
+  } catch {
+    nativeName = learnerNativeLanguage;
+  }
+
+  return `\n- Distractors that exploit false cognates with ${nativeName} are especially valuable — the learner's native language is ${nativeName}.`;
+}
+
 export function buildVocabularyPrompt(params: VocabularyPromptParams): string {
   const {
     discoveryCount,
@@ -167,10 +212,17 @@ export function buildVocabularyPrompt(params: VocabularyPromptParams): string {
     languageCode,
     cefrCeiling,
     themePreference,
+    interests = [],
+    libraryTopics = [],
+    ageYears,
+    learnerNativeLanguage,
   } = params;
 
   const languageName = getLanguageDisplayName(languageCode);
-  const ageLabel = describeAgeBracket(ageBracket);
+  const ageLabel =
+    ageYears !== undefined
+      ? `${ageYears}-year-old`
+      : describeAgeBracket(ageBracket);
   const recentExclusions =
     recentAnswers.length > 0
       ? `Do NOT repeat these recently seen English answers: ${recentAnswers.join(
@@ -184,9 +236,37 @@ export function buildVocabularyPrompt(params: VocabularyPromptParams): string {
           .map((entry) => `${entry.term} = ${entry.translation}`)
           .join('; ')}`
       : 'No existing bank-entry exclusions.';
-  const themeInstruction = themePreference
-    ? `Theme: "${themePreference}"`
-    : `Choose an age-appropriate theme (e.g. "${languageName} Animals", "${languageName} Food", "${languageName} at School").`;
+
+  // Interest-driven theme: prefer explicit themePreference, then build from interests
+  let themeInstruction: string;
+  if (themePreference) {
+    themeInstruction = `Theme: "${themePreference}"`;
+  } else if (interests.length > 0) {
+    const interestLabels = interests
+      .filter((i) => i.context === 'free_time' || i.context === 'both')
+      .map((i) => i.label);
+    const allLabels =
+      interestLabels.length > 0
+        ? interestLabels
+        : interests.map((i) => i.label);
+    themeInstruction = `Choose a vocabulary theme that connects to the learner's interests: ${allLabels
+      .slice(0, 5)
+      .join(', ')}. (e.g. "${languageName} ${allLabels[0] ?? 'Animals'}")`;
+  } else {
+    themeInstruction = `Choose an age-appropriate theme (e.g. "${languageName} Animals", "${languageName} Food", "${languageName} at School").`;
+  }
+
+  const libraryHint =
+    libraryTopics.length > 0
+      ? `\nThe learner is also studying these curriculum topics — you may draw vocabulary from them: ${libraryTopics
+          .slice(0, 20)
+          .join('; ')}.`
+      : '';
+
+  const l1DistractorHint = buildL1DistractorHint(
+    learnerNativeLanguage,
+    languageCode
+  );
 
   return `You are generating a multiple-choice vocabulary quiz for a ${ageLabel} learner studying ${languageName}.
 
@@ -197,7 +277,7 @@ ${themeInstruction}
 Questions needed: exactly ${discoveryCount}
 
 ${recentExclusions}
-${bankExclusions}
+${bankExclusions}${libraryHint}
 
 Rules:
 - Generate exactly ${discoveryCount} questions.
@@ -206,7 +286,7 @@ Rules:
 - acceptedAnswers must include the main translation plus any common equivalent phrasing.
 - Distractors must be plausible English translations but still clearly wrong.
 - Fun facts should be one sentence maximum.
-- Keep every question at or below CEFR ${cefrCeiling}.
+- Keep every question at or below CEFR ${cefrCeiling}.${l1DistractorHint}
 
 Respond with ONLY valid JSON in this shape:
 {

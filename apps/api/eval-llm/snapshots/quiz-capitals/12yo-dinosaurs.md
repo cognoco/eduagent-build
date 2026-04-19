@@ -33,17 +33,62 @@
     "Tokyo",
     "Paris",
     "Canberra"
-  ]
+  ],
+  "interests": [
+    {
+      "label": {
+        "label": "dinosaurs",
+        "context": "both"
+      },
+      "context": "free_time"
+    },
+    {
+      "label": {
+        "label": "fossils",
+        "context": "both"
+      },
+      "context": "free_time"
+    },
+    {
+      "label": {
+        "label": "paleontology",
+        "context": "both"
+      },
+      "context": "free_time"
+    },
+    {
+      "label": {
+        "label": "extinction events",
+        "context": "free_time"
+      },
+      "context": "free_time"
+    },
+    {
+      "label": {
+        "label": "volcanoes",
+        "context": "free_time"
+      },
+      "context": "free_time"
+    }
+  ],
+  "libraryTopics": [
+    "Mesozoic era",
+    "fossilization",
+    "plate tectonics",
+    "long division"
+  ],
+  "ageYears": 12
 }
 ```
 
 ## Generated prompt — system
 
 ```
-You are generating a multiple-choice capitals quiz for a 10-13 learner.
+You are generating a multiple-choice capitals quiz for a 12-year-old learner.
 
 Activity: Capitals quiz
-Choose an age-appropriate theme (e.g. "Central European Capitals").
+Choose a capitals theme that relates to the learner's interests: [object Object], [object Object], [object Object]. For example, if they love dinosaurs, pick "Capitals of countries with famous dinosaur fossil sites". Be creative — make the theme vivid and specific to these interests.
+Library context: The learner is currently studying: Mesozoic era; fossilization; plate tectonics; long division. Where possible, prefer capitals of countries relevant to these topics.
 Questions needed: exactly 6
 
 Do NOT include questions about these recently seen capitals: Tokyo, Paris, Canberra
@@ -77,6 +122,5 @@ Generate the quiz round.
 
 ## Builder notes
 
-- Coarse age bracket in use: adolescent. Interests NOT passed (gap flagged in audit P0).
-- Library topics NOT passed (gap flagged in audit P1).
-- Struggles NOT passed (gap flagged in audit P0).
+- Fine-grained age: 12. Interests passed: [object Object], [object Object], [object Object], [object Object], [object Object].
+- Library topics passed: Mesozoic era; fossilization; plate tectonics; long division.

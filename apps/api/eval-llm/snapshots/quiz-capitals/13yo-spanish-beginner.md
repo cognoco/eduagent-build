@@ -31,17 +31,55 @@
   "ageBracket": "adolescent",
   "recentAnswers": [
     "Madrid"
-  ]
+  ],
+  "interests": [
+    {
+      "label": {
+        "label": "horses",
+        "context": "free_time"
+      },
+      "context": "free_time"
+    },
+    {
+      "label": {
+        "label": "showjumping",
+        "context": "free_time"
+      },
+      "context": "free_time"
+    },
+    {
+      "label": {
+        "label": "eventing",
+        "context": "free_time"
+      },
+      "context": "free_time"
+    },
+    {
+      "label": {
+        "label": "nature photography",
+        "context": "free_time"
+      },
+      "context": "free_time"
+    }
+  ],
+  "libraryTopics": [
+    "Spanish present tense verbs",
+    "Spanish family vocabulary",
+    "Spanish numbers 1-1000",
+    "Spain geography"
+  ],
+  "ageYears": 13
 }
 ```
 
 ## Generated prompt — system
 
 ```
-You are generating a multiple-choice capitals quiz for a 10-13 learner.
+You are generating a multiple-choice capitals quiz for a 13-year-old learner.
 
 Activity: Capitals quiz
-Choose an age-appropriate theme (e.g. "Central European Capitals").
+Choose a capitals theme that relates to the learner's interests: [object Object], [object Object], [object Object]. For example, if they love dinosaurs, pick "Capitals of countries with famous dinosaur fossil sites". Be creative — make the theme vivid and specific to these interests.
+Library context: The learner is currently studying: Spanish present tense verbs; Spanish family vocabulary; Spanish numbers 1-1000; Spain geography. Where possible, prefer capitals of countries relevant to these topics.
 Questions needed: exactly 6
 
 Do NOT include questions about these recently seen capitals: Madrid
@@ -75,6 +113,5 @@ Generate the quiz round.
 
 ## Builder notes
 
-- Coarse age bracket in use: adolescent. Interests NOT passed (gap flagged in audit P0).
-- Library topics NOT passed (gap flagged in audit P1).
-- Struggles NOT passed (gap flagged in audit P0).
+- Fine-grained age: 13. Interests passed: [object Object], [object Object], [object Object], [object Object].
+- Library topics passed: Spanish present tense verbs; Spanish family vocabulary; Spanish numbers 1-1000; Spain geography.

@@ -2,6 +2,7 @@ import {
   buildVocabularyPrompt,
   type VocabularyPromptParams,
 } from '../../src/services/quiz/vocabulary-provider';
+import type { Interest } from '../../src/services/quiz/config';
 import type { CefrLevel } from '@eduagent/schemas';
 import type { EvalProfile } from '../fixtures/profiles';
 import type { FlowDefinition, PromptMessages } from '../runner/types';
@@ -11,11 +12,12 @@ import type { FlowDefinition, PromptMessages } from '../runner/types';
 //
 // Only applies to profiles with a targetLanguage (non-null). Returns null
 // from buildPromptInput otherwise, which the runner records as "skipped".
+// Personalization fields (interests, libraryTopics, ageYears, nativeLanguage)
+// are now wired in per audit P0.1 / P1.2.
 // ---------------------------------------------------------------------------
 
-// Local mirror of the quiz-local AgeBracket (adolescent | adult).
-// Product supports 11+ learners. Ages ≤13 → adolescent; 14+ → adult.
-function ageYearsToBracket(ageYears: number): 'adolescent' | 'adult' {
+function ageYearsToBracket(ageYears: number): 'child' | 'adolescent' | 'adult' {
+  if (ageYears <= 9) return 'child';
   if (ageYears <= 13) return 'adolescent';
   return 'adult';
 }
@@ -25,6 +27,10 @@ function toCefrLevel(raw: string | undefined): CefrLevel | null {
   if (['A1', 'A2', 'B1', 'B2', 'C1', 'C2'].includes(raw))
     return raw as CefrLevel;
   return null;
+}
+
+function toInterests(labels: string[]): Interest[] {
+  return labels.map((label) => ({ label, context: 'free_time' as const }));
 }
 
 export const vocabularyFlow: FlowDefinition<VocabularyPromptParams> = {
@@ -44,6 +50,10 @@ export const vocabularyFlow: FlowDefinition<VocabularyPromptParams> = {
       languageCode: profile.targetLanguage,
       cefrCeiling: cefr,
       themePreference: undefined,
+      interests: toInterests(profile.interests),
+      libraryTopics: profile.libraryTopics,
+      ageYears: profile.ageYears,
+      learnerNativeLanguage: profile.nativeLanguage,
     };
   },
 
@@ -54,9 +64,17 @@ export const vocabularyFlow: FlowDefinition<VocabularyPromptParams> = {
       user: 'Generate the quiz round.',
       notes: [
         `Uses languageCode=${input.languageCode} and cefrCeiling=${input.cefrCeiling}.`,
-        `Interests NOT passed (gap flagged in audit P0) — theme picked blindly.`,
-        `Native language NOT passed — distractors won't be L1-aware.`,
-        `Struggles + missed-items NOT passed (gap flagged in audit P1).`,
+        `Fine-grained age: ${
+          input.ageYears ?? input.ageBracket
+        }. Interests passed: ${
+          (input.interests ?? []).map((i) => i.label).join(', ') || 'none'
+        }.`,
+        `Native language passed: ${
+          input.learnerNativeLanguage ?? 'none'
+        } — L1-aware distractors active for supported pairs.`,
+        `Library topics passed: ${
+          (input.libraryTopics ?? []).join('; ') || 'none'
+        }.`,
       ],
     };
   },

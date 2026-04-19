@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { GuessWhoLlmOutput, GuessWhoQuestion } from '@eduagent/schemas';
-import { describeAgeBracket, type AgeBracket } from './config';
+import { describeAgeBracket, type AgeBracket, type Interest } from './config';
 
 export interface GuessWhoPromptParams {
   discoveryCount: number;
@@ -8,6 +8,9 @@ export interface GuessWhoPromptParams {
   recentAnswers: string[];
   topicTitles?: string[];
   themePreference?: string;
+  interests?: Interest[];
+  libraryTopics?: string[];
+  ageYears?: number;
 }
 
 export interface ValidatedGuessWhoQuestion {
@@ -87,24 +90,49 @@ export function buildGuessWhoPrompt(params: GuessWhoPromptParams): string {
     recentAnswers,
     topicTitles = [],
     themePreference,
+    interests = [],
+    libraryTopics = [],
+    ageYears,
   } = params;
-  const ageLabel = describeAgeBracket(ageBracket);
+  const ageLabel =
+    ageYears !== undefined
+      ? `${ageYears}-year-old`
+      : describeAgeBracket(ageBracket);
   const recentExclusions =
     recentAnswers.length > 0
       ? `Do NOT repeat these recently seen people: ${recentAnswers.join(', ')}`
       : 'No recent-person exclusions.';
+
+  // Merge topicTitles + libraryTopics (dedup, library topics appended)
+  const allTopics = Array.from(new Set([...topicTitles, ...libraryTopics]));
   const topicHintText =
-    topicTitles.length > 0
-      ? `Topic hints from the learner's active curriculum: ${topicTitles
+    allTopics.length > 0
+      ? `Topic hints from the learner's active curriculum: ${allTopics
           .slice(0, 30)
           .join('; ')}. At least ${Math.min(
           2,
           discoveryCount
         )} of the ${discoveryCount} people MUST relate clearly to one or more of those topics.`
       : 'No topic hints are available. Choose an age-appropriate mix of widely recognizable people.';
-  const themeInstruction = themePreference
-    ? `Theme: "${themePreference}"`
-    : 'Choose an age-appropriate theme (for example "Famous Scientists" or "Important World Leaders").';
+
+  let themeInstruction: string;
+  if (themePreference) {
+    themeInstruction = `Theme: "${themePreference}"`;
+  } else if (interests.length > 0) {
+    const interestLabels = interests
+      .filter((i) => i.context === 'free_time' || i.context === 'both')
+      .map((i) => i.label);
+    const allLabels =
+      interestLabels.length > 0
+        ? interestLabels
+        : interests.map((i) => i.label);
+    themeInstruction = `Choose a theme of famous people connected to the learner's interests: ${allLabels
+      .slice(0, 5)
+      .join(', ')}.`;
+  } else {
+    themeInstruction =
+      'Choose an age-appropriate theme (for example "Famous Scientists" or "Important World Leaders").';
+  }
 
   return `You are generating a clue-by-clue Guess Who quiz for a ${ageLabel} learner.
 

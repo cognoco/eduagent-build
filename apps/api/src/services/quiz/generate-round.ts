@@ -1,7 +1,7 @@
 import {
   capitalsLlmOutputSchema,
   type CefrLevel,
-  computeAgeBracket as computeAgeBracketSchema,
+  computeAgeBracket,
   type CapitalsQuestion,
   guessWhoLlmOutputSchema,
   type QuizQuestion,
@@ -15,6 +15,7 @@ import type { ChatMessage } from '../llm';
 import { routeAndCall } from '../llm';
 import { captureException } from '../sentry';
 import { UpstreamLlmError } from '../../errors';
+import { getLearningProfile } from '../learner-profile';
 import { CAPITALS_BY_COUNTRY, CAPITALS_DATA } from './capitals-data';
 import { resolveRoundContent, type LibraryItem } from './content-resolver';
 import { validateCapitalsRound } from './capitals-validation';
@@ -32,20 +33,8 @@ import {
   guessWhoMasteryClueSchema,
   validateGuessWhoRound,
 } from './guess-who-provider';
-import { describeAgeBracket, type AgeBracket } from './config';
+import { describeAgeBracket, type AgeBracket, type Interest } from './config';
 import { createLogger } from '../logger';
-
-/**
- * Maps a birth year to the quiz-local AgeBracket (adolescent | adult).
- * Product supports learners 11+. Ages 11–13 → adolescent; 14+ → adult.
- * Wraps the schema's computeAgeBracket which still returns 'child' for <13 —
- * that value is collapsed here to 'adolescent' for the quiz prompt layer.
- */
-function computeQuizAgeBracket(birthYear: number): AgeBracket {
-  const bracket = computeAgeBracketSchema(birthYear);
-  if (bracket === 'child' || bracket === 'adolescent') return 'adolescent';
-  return 'adult';
-}
 
 const logger = createLogger();
 
@@ -54,25 +43,70 @@ interface CapitalsPromptParams {
   ageBracket: AgeBracket;
   recentAnswers: string[];
   themePreference?: string;
+  // Personalization (P0.1 + P1.2) — all optional for backward compatibility
+  interests?: Interest[];
+  libraryTopics?: string[];
+  ageYears?: number;
 }
 
 export function buildCapitalsPrompt(params: CapitalsPromptParams): string {
-  const { discoveryCount, ageBracket, recentAnswers, themePreference } = params;
-  const ageLabel = describeAgeBracket(ageBracket);
+  const {
+    discoveryCount,
+    ageBracket,
+    recentAnswers,
+    themePreference,
+    interests,
+    libraryTopics,
+    ageYears,
+  } = params;
+
+  // Prefer fine-grained ageYears when available; fall back to coarse bracket.
+  const ageLabel =
+    ageYears != null ? `${ageYears}-year-old` : describeAgeBracket(ageBracket);
+
   const exclusions =
     recentAnswers.length > 0
       ? `Do NOT include questions about these recently seen capitals: ${recentAnswers.join(
           ', '
         )}`
       : 'No exclusions.';
-  const themeInstruction = themePreference
-    ? `Theme: "${themePreference}"`
-    : 'Choose an age-appropriate theme (e.g. "Central European Capitals").';
+
+  // Build interest-driven theme instruction (P0.1).
+  // Use free_time and both-tagged interests to suggest a vivid theme.
+  const relevantInterests = (interests ?? [])
+    .filter((i) => i.context === 'free_time' || i.context === 'both')
+    .slice(0, 3)
+    .map((i) => i.label);
+
+  let themeInstruction: string;
+  if (themePreference) {
+    themeInstruction = `Theme: "${themePreference}"`;
+  } else if (relevantInterests.length > 0) {
+    themeInstruction =
+      `Choose a capitals theme that relates to the learner's interests: ${relevantInterests.join(
+        ', '
+      )}. ` +
+      `For example, if they love dinosaurs, pick "Capitals of countries with famous dinosaur fossil sites". ` +
+      `Be creative — make the theme vivid and specific to these interests.`;
+  } else {
+    themeInstruction =
+      'Choose an age-appropriate theme (e.g. "Central European Capitals").';
+  }
+
+  // Library-topic hint (P1.2): steer country selection toward topics being studied.
+  const libraryHint =
+    !themePreference && libraryTopics && libraryTopics.length > 0
+      ? `\nLibrary context: The learner is currently studying: ${libraryTopics
+          .slice(0, 10)
+          .join(
+            '; '
+          )}. Where possible, prefer capitals of countries relevant to these topics.`
+      : '';
 
   return `You are generating a multiple-choice capitals quiz for a ${ageLabel} learner.
 
 Activity: Capitals quiz
-${themeInstruction}
+${themeInstruction}${libraryHint}
 Questions needed: exactly ${discoveryCount}
 
 ${exclusions}
@@ -253,6 +287,10 @@ interface GenerateParams {
   allVocabulary?: Array<{ term: string; translation: string }>;
   topicTitles?: string[];
   difficultyBump?: boolean;
+  // Caller may pre-supply these to avoid an extra DB round-trip; if absent
+  // generateQuizRound will fetch them from the learning profile.
+  interests?: Interest[];
+  nativeLanguage?: string;
 }
 
 export async function generateQuizRound(params: GenerateParams): Promise<{
@@ -275,6 +313,7 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
     allVocabulary,
     topicTitles,
     difficultyBump = false,
+    nativeLanguage,
   } = params;
 
   const plan = resolveRoundContent({
@@ -283,8 +322,49 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
     recentAnswers,
     libraryItems,
   });
-  const ageBracket =
-    birthYear == null ? 'adult' : computeQuizAgeBracket(birthYear);
+  // Map the shared schemas AgeBracket (which has 'child' for COPPA consent
+  // gating at <13) into the quiz-local AgeBracket (product is 11+, so 'child'
+  // is unreachable in practice — any such value is treated as 'adolescent').
+  const rawBracket = birthYear == null ? 'adult' : computeAgeBracket(birthYear);
+  const ageBracket: AgeBracket =
+    rawBracket === 'child' ? 'adolescent' : rawBracket;
+
+  // Compute fine-grained ageYears from birthYear when available.
+  const currentYear = new Date().getFullYear();
+  const ageYears = birthYear != null ? currentYear - birthYear : undefined;
+
+  // Fetch the learner's profile to source personalization signals (P0.1 + P1.2).
+  // Use caller-supplied interests when pre-fetched to avoid an extra round-trip.
+  // nativeLanguage is NOT on learning_profiles — callers that have language
+  // context (e.g. vocabulary rounds via getVocabularyRoundContext) may pass it
+  // via the nativeLanguage param; otherwise it remains undefined.
+  let resolvedInterests = params.interests;
+  if (resolvedInterests === undefined) {
+    // Learning-profile fetch is best-effort: if the DB or mock doesn't
+    // expose it, fall back to an un-personalized prompt rather than failing
+    // the whole quiz-generation request.
+    try {
+      const profile = await getLearningProfile(db, profileId);
+      if (profile) {
+        // DB stores interests as plain string[]. Map to {label, context} shape;
+        // all DB interests are treated as 'free_time' unless the caller annotates them.
+        const rawInterests = Array.isArray(profile.interests)
+          ? (profile.interests as unknown[]).filter(
+              (i): i is string => typeof i === 'string'
+            )
+          : [];
+        resolvedInterests = rawInterests.map((label) => ({
+          label,
+          context: 'free_time' as const,
+        }));
+      }
+    } catch {
+      // Graceful degradation — quiz proceeds without interest-driven theming.
+      resolvedInterests = undefined;
+    }
+  }
+  const resolvedNativeLanguage = nativeLanguage;
+
   let theme = '';
   let questions: QuizQuestion[] = [];
 
@@ -294,6 +374,9 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
       ageBracket,
       recentAnswers,
       themePreference,
+      interests: resolvedInterests,
+      libraryTopics: topicTitles,
+      ageYears,
     });
     if (difficultyBump) {
       prompt +=
@@ -376,6 +459,10 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
       languageCode,
       cefrCeiling: effectiveCefrCeiling,
       themePreference,
+      interests: resolvedInterests,
+      libraryTopics: topicTitles,
+      ageYears,
+      learnerNativeLanguage: resolvedNativeLanguage,
     });
 
     const messages: ChatMessage[] = [
@@ -435,6 +522,9 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
       recentAnswers,
       topicTitles,
       themePreference,
+      interests: resolvedInterests,
+      libraryTopics: topicTitles,
+      ageYears,
     });
     if (difficultyBump) {
       prompt +=

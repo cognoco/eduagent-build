@@ -37,17 +37,61 @@
     "fossilization",
     "plate tectonics",
     "long division"
-  ]
+  ],
+  "interests": [
+    {
+      "label": {
+        "label": "dinosaurs",
+        "context": "both"
+      },
+      "context": "free_time"
+    },
+    {
+      "label": {
+        "label": "fossils",
+        "context": "both"
+      },
+      "context": "free_time"
+    },
+    {
+      "label": {
+        "label": "paleontology",
+        "context": "both"
+      },
+      "context": "free_time"
+    },
+    {
+      "label": {
+        "label": "extinction events",
+        "context": "free_time"
+      },
+      "context": "free_time"
+    },
+    {
+      "label": {
+        "label": "volcanoes",
+        "context": "free_time"
+      },
+      "context": "free_time"
+    }
+  ],
+  "libraryTopics": [
+    "Mesozoic era",
+    "fossilization",
+    "plate tectonics",
+    "long division"
+  ],
+  "ageYears": 12
 }
 ```
 
 ## Generated prompt — system
 
 ```
-You are generating a clue-by-clue Guess Who quiz for a 10-13 learner.
+You are generating a clue-by-clue Guess Who quiz for a 12-year-old learner.
 
 Activity: Guess Who
-Choose an age-appropriate theme (for example "Famous Scientists" or "Important World Leaders").
+Choose a theme of famous people connected to the learner's interests: [object Object], [object Object], [object Object], [object Object], [object Object].
 Questions needed: exactly 4
 
 Do NOT repeat these recently seen people: Mary Anning
@@ -88,7 +132,6 @@ Generate the quiz round.
 
 ## Builder notes
 
-- Uses topicTitles — the one existing library-topic integration.
-- Interests NOT passed — wouldn't know a football fan should see more athletes.
-- Cultural context (location, nativeLanguage, conversationLanguage) NOT passed — can't weight locally-recognizable figures.
-- Struggles NOT passed — can't reinforce previously-missed historical figures.
+- Fine-grained age: 12. Interests passed: [object Object], [object Object], [object Object], [object Object], [object Object].
+- Library topics passed: Mesozoic era; fossilization; plate tectonics; long division.
+- Topic titles passed: Mesozoic era; fossilization; plate tectonics; long division.

@@ -38,17 +38,54 @@
     "French subjunctive",
     "essay structure",
     "Enlightenment thinkers"
-  ]
+  ],
+  "interests": [
+    {
+      "label": {
+        "label": "French literature",
+        "context": "both"
+      },
+      "context": "free_time"
+    },
+    {
+      "label": {
+        "label": "philosophy",
+        "context": "both"
+      },
+      "context": "free_time"
+    },
+    {
+      "label": {
+        "label": "existentialism",
+        "context": "free_time"
+      },
+      "context": "free_time"
+    },
+    {
+      "label": {
+        "label": "creative writing",
+        "context": "free_time"
+      },
+      "context": "free_time"
+    }
+  ],
+  "libraryTopics": [
+    "Camus — L'Étranger",
+    "French subjunctive",
+    "essay structure",
+    "Enlightenment thinkers"
+  ],
+  "ageYears": 17
 }
 ```
 
 ## Generated prompt — system
 
 ```
-You are generating a clue-by-clue Guess Who quiz for a 14+ learner.
+You are generating a clue-by-clue Guess Who quiz for a 17-year-old learner.
 
 Activity: Guess Who
-Choose an age-appropriate theme (for example "Famous Scientists" or "Important World Leaders").
+Choose a theme of famous people connected to the learner's interests: [object Object], [object Object], [object Object], [object Object].
 Questions needed: exactly 4
 
 Do NOT repeat these recently seen people: Jean-Paul Sartre, Albert Camus
@@ -89,7 +126,6 @@ Generate the quiz round.
 
 ## Builder notes
 
-- Uses topicTitles — the one existing library-topic integration.
-- Interests NOT passed — wouldn't know a football fan should see more athletes.
-- Cultural context (location, nativeLanguage, conversationLanguage) NOT passed — can't weight locally-recognizable figures.
-- Struggles NOT passed — can't reinforce previously-missed historical figures.
+- Fine-grained age: 17. Interests passed: [object Object], [object Object], [object Object], [object Object].
+- Library topics passed: Camus — L'Étranger; French subjunctive; essay structure; Enlightenment thinkers.
+- Topic titles passed: Camus — L'Étranger; French subjunctive; essay structure; Enlightenment thinkers.

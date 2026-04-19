@@ -35,17 +35,54 @@
     "Spanish family vocabulary",
     "Spanish numbers 1-1000",
     "Spain geography"
-  ]
+  ],
+  "interests": [
+    {
+      "label": {
+        "label": "horses",
+        "context": "free_time"
+      },
+      "context": "free_time"
+    },
+    {
+      "label": {
+        "label": "showjumping",
+        "context": "free_time"
+      },
+      "context": "free_time"
+    },
+    {
+      "label": {
+        "label": "eventing",
+        "context": "free_time"
+      },
+      "context": "free_time"
+    },
+    {
+      "label": {
+        "label": "nature photography",
+        "context": "free_time"
+      },
+      "context": "free_time"
+    }
+  ],
+  "libraryTopics": [
+    "Spanish present tense verbs",
+    "Spanish family vocabulary",
+    "Spanish numbers 1-1000",
+    "Spain geography"
+  ],
+  "ageYears": 13
 }
 ```
 
 ## Generated prompt — system
 
 ```
-You are generating a clue-by-clue Guess Who quiz for a 10-13 learner.
+You are generating a clue-by-clue Guess Who quiz for a 13-year-old learner.
 
 Activity: Guess Who
-Choose an age-appropriate theme (for example "Famous Scientists" or "Important World Leaders").
+Choose a theme of famous people connected to the learner's interests: [object Object], [object Object], [object Object], [object Object].
 Questions needed: exactly 4
 
 No recent-person exclusions.
@@ -86,7 +123,6 @@ Generate the quiz round.
 
 ## Builder notes
 
-- Uses topicTitles — the one existing library-topic integration.
-- Interests NOT passed — wouldn't know a football fan should see more athletes.
-- Cultural context (location, nativeLanguage, conversationLanguage) NOT passed — can't weight locally-recognizable figures.
-- Struggles NOT passed — can't reinforce previously-missed historical figures.
+- Fine-grained age: 13. Interests passed: [object Object], [object Object], [object Object], [object Object].
+- Library topics passed: Spanish present tense verbs; Spanish family vocabulary; Spanish numbers 1-1000; Spain geography.
+- Topic titles passed: Spanish present tense verbs; Spanish family vocabulary; Spanish numbers 1-1000; Spain geography.

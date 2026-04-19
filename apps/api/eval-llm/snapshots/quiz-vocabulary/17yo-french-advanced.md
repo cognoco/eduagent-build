@@ -36,23 +36,62 @@
   ],
   "bankEntries": [],
   "languageCode": "fr",
-  "cefrCeiling": "B2"
+  "cefrCeiling": "B2",
+  "interests": [
+    {
+      "label": {
+        "label": "French literature",
+        "context": "both"
+      },
+      "context": "free_time"
+    },
+    {
+      "label": {
+        "label": "philosophy",
+        "context": "both"
+      },
+      "context": "free_time"
+    },
+    {
+      "label": {
+        "label": "existentialism",
+        "context": "free_time"
+      },
+      "context": "free_time"
+    },
+    {
+      "label": {
+        "label": "creative writing",
+        "context": "free_time"
+      },
+      "context": "free_time"
+    }
+  ],
+  "libraryTopics": [
+    "Camus — L'Étranger",
+    "French subjunctive",
+    "essay structure",
+    "Enlightenment thinkers"
+  ],
+  "ageYears": 17,
+  "learnerNativeLanguage": "cs"
 }
 ```
 
 ## Generated prompt — system
 
 ```
-You are generating a multiple-choice vocabulary quiz for a 14+ learner studying French.
+You are generating a multiple-choice vocabulary quiz for a 17-year-old learner studying French.
 
 Activity: Vocabulary quiz
 Target language: French
 Maximum CEFR level: B2
-Choose an age-appropriate theme (e.g. "French Animals", "French Food", "French at School").
+Choose a vocabulary theme that connects to the learner's interests: [object Object], [object Object], [object Object], [object Object]. (e.g. "French [object Object]")
 Questions needed: exactly 6
 
 Do NOT repeat these recently seen English answers: l'angoisse, le fardeau, éphémère
 No existing bank-entry exclusions.
+The learner is also studying these curriculum topics — you may draw vocabulary from them: Camus — L'Étranger; French subjunctive; essay structure; Enlightenment thinkers.
 
 Rules:
 - Generate exactly 6 questions.
@@ -89,6 +128,6 @@ Generate the quiz round.
 ## Builder notes
 
 - Uses languageCode=fr and cefrCeiling=B2.
-- Interests NOT passed (gap flagged in audit P0) — theme picked blindly.
-- Native language NOT passed — distractors won't be L1-aware.
-- Struggles + missed-items NOT passed (gap flagged in audit P1).
+- Fine-grained age: 17. Interests passed: [object Object], [object Object], [object Object], [object Object].
+- Native language passed: cs — L1-aware distractors active for supported pairs.
+- Library topics passed: Camus — L'Étranger; French subjunctive; essay structure; Enlightenment thinkers.

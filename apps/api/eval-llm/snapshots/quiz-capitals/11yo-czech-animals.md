@@ -29,17 +29,55 @@
 {
   "discoveryCount": 6,
   "ageBracket": "adolescent",
-  "recentAnswers": []
+  "recentAnswers": [],
+  "interests": [
+    {
+      "label": {
+        "label": "horses",
+        "context": "free_time"
+      },
+      "context": "free_time"
+    },
+    {
+      "label": {
+        "label": "forest animals",
+        "context": "free_time"
+      },
+      "context": "free_time"
+    },
+    {
+      "label": {
+        "label": "nature journaling",
+        "context": "both"
+      },
+      "context": "free_time"
+    },
+    {
+      "label": {
+        "label": "drawing",
+        "context": "free_time"
+      },
+      "context": "free_time"
+    }
+  ],
+  "libraryTopics": [
+    "Czech reading comprehension",
+    "basic fractions",
+    "human body systems",
+    "water cycle"
+  ],
+  "ageYears": 11
 }
 ```
 
 ## Generated prompt — system
 
 ```
-You are generating a multiple-choice capitals quiz for a 10-13 learner.
+You are generating a multiple-choice capitals quiz for a 11-year-old learner.
 
 Activity: Capitals quiz
-Choose an age-appropriate theme (e.g. "Central European Capitals").
+Choose a capitals theme that relates to the learner's interests: [object Object], [object Object], [object Object]. For example, if they love dinosaurs, pick "Capitals of countries with famous dinosaur fossil sites". Be creative — make the theme vivid and specific to these interests.
+Library context: The learner is currently studying: Czech reading comprehension; basic fractions; human body systems; water cycle. Where possible, prefer capitals of countries relevant to these topics.
 Questions needed: exactly 6
 
 No exclusions.
@@ -73,6 +111,5 @@ Generate the quiz round.
 
 ## Builder notes
 
-- Coarse age bracket in use: adolescent. Interests NOT passed (gap flagged in audit P0).
-- Library topics NOT passed (gap flagged in audit P1).
-- Struggles NOT passed (gap flagged in audit P0).
+- Fine-grained age: 11. Interests passed: [object Object], [object Object], [object Object], [object Object].
+- Library topics passed: Czech reading comprehension; basic fractions; human body systems; water cycle.

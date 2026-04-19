@@ -32,17 +32,61 @@
   "recentAnswers": [
     "Washington D.C.",
     "London"
-  ]
+  ],
+  "interests": [
+    {
+      "label": {
+        "label": "football",
+        "context": "free_time"
+      },
+      "context": "free_time"
+    },
+    {
+      "label": {
+        "label": "NFL",
+        "context": "free_time"
+      },
+      "context": "free_time"
+    },
+    {
+      "label": {
+        "label": "esports",
+        "context": "free_time"
+      },
+      "context": "free_time"
+    },
+    {
+      "label": {
+        "label": "competitive gaming",
+        "context": "free_time"
+      },
+      "context": "free_time"
+    },
+    {
+      "label": {
+        "label": "sports statistics",
+        "context": "both"
+      },
+      "context": "free_time"
+    }
+  ],
+  "libraryTopics": [
+    "algebra equations",
+    "US history: Civil War",
+    "physics: forces and motion"
+  ],
+  "ageYears": 15
 }
 ```
 
 ## Generated prompt — system
 
 ```
-You are generating a multiple-choice capitals quiz for a 14+ learner.
+You are generating a multiple-choice capitals quiz for a 15-year-old learner.
 
 Activity: Capitals quiz
-Choose an age-appropriate theme (e.g. "Central European Capitals").
+Choose a capitals theme that relates to the learner's interests: [object Object], [object Object], [object Object]. For example, if they love dinosaurs, pick "Capitals of countries with famous dinosaur fossil sites". Be creative — make the theme vivid and specific to these interests.
+Library context: The learner is currently studying: algebra equations; US history: Civil War; physics: forces and motion. Where possible, prefer capitals of countries relevant to these topics.
 Questions needed: exactly 6
 
 Do NOT include questions about these recently seen capitals: Washington D.C., London
@@ -76,6 +120,5 @@ Generate the quiz round.
 
 ## Builder notes
 
-- Coarse age bracket in use: adult. Interests NOT passed (gap flagged in audit P0).
-- Library topics NOT passed (gap flagged in audit P1).
-- Struggles NOT passed (gap flagged in audit P0).
+- Fine-grained age: 15. Interests passed: [object Object], [object Object], [object Object], [object Object], [object Object].
+- Library topics passed: algebra equations; US history: Civil War; physics: forces and motion.
