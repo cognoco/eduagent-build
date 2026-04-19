@@ -1,15 +1,19 @@
-import { Alert, View, Text, Pressable, ScrollView } from 'react-native';
+import { View, Text, Pressable, ScrollView } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AnalogyDomainPicker } from '../../../components/common';
 import { OnboardingStepIndicator } from '../../../components/onboarding/OnboardingStepIndicator';
 import { useUpdateAnalogyDomain } from '../../../hooks/use-settings';
+import { platformAlert } from '../../../lib/platform-alert';
+import { useThemeColors } from '../../../lib/theme';
 import type { AnalogyDomain } from '@eduagent/schemas';
 import { useCallback, useState } from 'react';
 
 export default function AnalogyPreferenceScreen() {
   const router = useRouter();
+  const colors = useThemeColors();
   const {
     subjectId,
     subjectName,
@@ -38,12 +42,11 @@ export default function AnalogyPreferenceScreen() {
           navigateToAccommodations();
         },
         onError: (err) => {
-          Alert.alert(
+          platformAlert(
             'Could not save preference',
             err instanceof Error
               ? err.message
-              : 'Something went wrong. Please try again.',
-            [{ text: 'OK' }]
+              : 'Something went wrong. Please try again.'
           );
         },
       });
@@ -110,7 +113,7 @@ export default function AnalogyPreferenceScreen() {
           accessibilityRole="button"
           testID="analogy-back-button"
         >
-          <Text className="text-primary text-body font-semibold">Back</Text>
+          <Ionicons name="arrow-back" size={24} color={colors.primary} />
         </Pressable>
         <OnboardingStepIndicator step={step} totalSteps={totalSteps} />
         <Text
@@ -148,7 +151,7 @@ export default function AnalogyPreferenceScreen() {
           disabled={isPending}
           className="bg-primary rounded-button py-3.5 items-center mb-2"
           testID="analogy-continue-button"
-          accessibilityLabel="Continue to curriculum"
+          accessibilityLabel="Continue"
           accessibilityRole="button"
         >
           <Text className="text-text-inverse text-body font-semibold">

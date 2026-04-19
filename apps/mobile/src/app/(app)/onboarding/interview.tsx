@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { View, Text, Pressable, Alert } from 'react-native';
+import { View, Text, Pressable } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
   ChatShell,
@@ -13,6 +13,7 @@ import {
 } from '../../../hooks/use-interview';
 import { formatApiError } from '../../../lib/format-api-error';
 import { goBackOrReplace } from '../../../lib/navigation';
+import { platformAlert } from '../../../lib/platform-alert';
 
 const OPENING_MESSAGE =
   "Hi! I'm your learning mate. I'd like to get to know you a bit before we start. What made you interested in learning this subject?";
@@ -201,7 +202,7 @@ export default function InterviewScreen() {
       setStreamError(null);
       seededDraftRef.current = true;
     } catch (err: unknown) {
-      Alert.alert('Could not restart interview', formatApiError(err));
+      platformAlert('Could not restart interview', formatApiError(err));
     }
   }, [abortStream, openingMessage]);
 

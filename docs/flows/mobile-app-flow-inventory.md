@@ -1,6 +1,6 @@
 # Mobile App Flow Inventory
 
-Current-state flow map for the Expo mobile app as of 2026-04-18.
+Current-state flow map for the Expo mobile app as of 2026-04-19.
 
 Source of truth used for this inventory:
 - `apps/mobile/src/app/**`
@@ -24,6 +24,21 @@ Two large changes reshape the inventory:
 2. **Quiz, dictation, vision, animation feature drop (commit f6631f4a, 2026-04-16).** New top-level practice activities and the photo-review path that depends on multimodal LLM input.
 
 E2E flows that scripted taps on `/learn-new` are stale — they should be retargeted to the new IntentCard testIDs (`intent-learn`, `intent-ask`, `intent-practice`, `intent-homework`, `intent-continue`).
+
+## What changed since 2026-04-18 (the `improvements` branch)
+
+Three more changes reshape the inventory since the last snapshot:
+
+3. **Quiz history + round detail screens (PR #121 / commit 1e50b6ea, 2026-04-19).** Two new routes were added under `/(app)/quiz` so that completed rounds become discoverable after the results screen is dismissed:
+   - `/(app)/quiz/history` — a list of completed rounds grouped by date (Today / Yesterday / locale long date) with an empty state that deep-links back to the quiz index.
+   - `/(app)/quiz/[roundId]` — a per-round detail view showing each question's correct answer and accepted aliases, reached from the history list (and useful as a share-link target).
+4. **Parent Narrative Phase 1 (commit 68a2288c, 2026-04-19).** Parent-facing screens shift from raw metric dumps toward plain-English narratives. Three surfaces change:
+   - Parent child-topic detail replaces the "Mastery" card with an "Understanding" card that maps mastery percent to plain labels ("Just starting" → "Mastered"). Retention is now gated on data presence and uses parent-facing retention phrasing.
+   - Parent child-session detail gains a **Session recap** block (narrative + highlight + conversation prompt with copy-to-clipboard + `EngagementChip`). The recap block renders only when at least one of the four fields is populated, so pre-backfill sessions render the old metric strip alone.
+   - Parent child-subject detail gates retention badges on data presence so empty/unknown subjects no longer show misleading "At risk" chips.
+5. **Quiz completion hardening + web stack stacking (commits 68a2288c + 1316619e, 2026-04-19).**
+   - Quiz results now wraps the streak-recording API call in try/catch so a streak failure cannot block the celebration screen (code-review finding C2).
+   - All 14 `Stack`/`Tabs` `_layout.tsx` files were given opaque `contentStyle`/`sceneStyle` backgrounds to fix web-only screen bleed-through (F-003/F-006/F-016/F-017/F-055). This is a cross-cutting polish rather than a user-visible flow.
 
 ## Auth and Access
 
@@ -151,8 +166,10 @@ Quiz flow uses a React context (`useQuizFlow` from `(app)/quiz/_layout`) to pass
 | QUIZ-04 | Round play screen — Guess Who clue reveal | `/(app)/quiz/play` with `currentQuestion.type === 'guess_who'` (clues unlock progressively, score scaled by `cluesUsed`) | Code-only |
 | QUIZ-05 | Mid-round quit with confirm-style escape (close icon top-left) | `/(app)/quiz/play` -> `goBackOrReplace('/(app)/quiz')` | Code-only |
 | QUIZ-06 | Round complete error retry | `/(app)/quiz/play` `completeError` inline card with Retry / Exit | Code-only — testIDs `quiz-play-error`, `quiz-play-retry`, `quiz-play-exit` |
-| QUIZ-07 | Results screen with celebration tier (perfect / great / nice), score, theme, XP earned, Play Again, Done | `/(app)/quiz/results` | Code-only — `BrandCelebration` only on perfect/great |
+| QUIZ-07 | Results screen with celebration tier (perfect / great / nice), score, theme, XP earned, Play Again, Done. Streak recording is soft-failed via try/catch so API errors cannot block the celebration screen | `/(app)/quiz/results` | Code-only — `BrandCelebration` only on perfect/great; results hardening verified by `apps/mobile/src/app/(app)/quiz/results.test.tsx` |
 | QUIZ-08 | Quiz quota / consent / forbidden errors render typed-error message + suppress Retry | `/(app)/quiz/launch` (classifies `QUOTA_EXCEEDED`, `FORBIDDEN`, `CONSENT_*` from `apiClient`'s typed `ApiResponseError.code`) | Code-only |
+| QUIZ-09 | Quiz history: list of completed rounds grouped by Today / Yesterday / locale date, with empty state that deep-links back to the quiz index | `/(app)/quiz/history` reached from the quiz index | Code-only — testIDs `quiz-history-loading`, `quiz-history-empty`, `quiz-history-try-quiz`, `quiz-history-screen` |
+| QUIZ-10 | Quiz round detail: drill into a completed round and see each question with correct answer + accepted aliases | `/(app)/quiz/[roundId]` reached from the history list | Code-only — testIDs `round-detail-loading`, `round-detail-error`; data via `GET /quiz/rounds/:id` typed as `CompletedRoundDetail` |
 
 ### Dictation
 
@@ -190,6 +207,9 @@ Dictation is a five-screen flow under `/(app)/dictation` with its own React cont
 | PARENT-07 | Parent library view | `/(app)/library` while parent profile is active | `e2e/flows/parent/parent-library.yaml` |
 | PARENT-08 | Subject raw-input audit for parents | parent drill-down / raw input review surfaces | `e2e/flows/parent/subject-raw-input-audit.yaml` |
 | PARENT-09 | Guided label tooltip | parent dashboard or parent report surfaces | `e2e/flows/parent/guided-label-tooltip.yaml` |
+| PARENT-10 | Parent child-topic "Understanding" card (plain-English mastery label) with data-gated Retention card | `/(app)/child/[profileId]/topic/[topicId]` | Code-only — testIDs `topic-understanding-card` (replaces `topic-mastery-card`), `topic-retention-card`; labels from `getUnderstandingLabel` and `getParentRetentionInfo` in `apps/mobile/src/lib/parent-vocab.ts` |
+| PARENT-11 | Parent child-session recap: narrative block, highlight block, Conversation prompt with copy-to-clipboard (Copied! / Copy failed states), and `EngagementChip` (curious / stuck / breezing / focused / scattered) | `/(app)/child/[profileId]/session/[sessionId]` | Code-only — block renders only when `narrative \|\| highlight \|\| conversationPrompt \|\| engagementSignal` is populated; pre-backfill sessions render metrics only |
+| PARENT-12 | Parent child-subject detail retention badges gated on data presence | `/(app)/child/[profileId]/subjects/[subjectId]` | Code-only — uses `RetentionSignal parentFacing` labels; unknown retention no longer surfaces as "At risk" |
 
 ## Billing and Monetization
 
@@ -235,6 +255,9 @@ These are not single-screen flows, but they shape user experience across multipl
 | CC-05 | Continue-where-you-left-off card | Driven by `useContinueSuggestion` API + a SecureStore session-recovery marker. The marker takes priority when fresh; otherwise the API suggestion is used; otherwise the next overdue review topic is offered. |
 | CC-06 | Top-up purchase confidence | Two-stage polling progress message in the top-up flow with a confident timeout copy. See `2026-04-10-topup-purchase-confidence-design.md`. |
 | CC-07 | Accommodation badge surfaces | Non-deletable accommodation badge on child mentor-memory; accommodation mode selector on parent child detail and self-managed learner settings (FR255). |
+| CC-08 | Parent-facing metric vocabulary canon | `apps/mobile/src/lib/parent-vocab.ts` centralises understanding labels, parent retention mapping, and tooltip copy. Shared by PARENT-10, PARENT-11, PARENT-12 so wording stays consistent across parent surfaces. |
+| CC-09 | Opaque web layout backgrounds to prevent screen bleed-through | All 14 `Stack`/`Tabs` `_layout.tsx` files declare `contentStyle`/`sceneStyle` with a solid background. Fixes web-only visual regressions when navigators nest (e.g. `(app)` tabs containing a `quiz/` stack). Non-visible on native, so Maestro flows are unaffected — dedicated web visual coverage is the outstanding gap. |
+| CC-10 | Soft-fail side effects on completion screens | Quiz results wraps streak recording in try/catch so the celebration screen is never blocked by an API failure. Pattern candidate for dictation/homework/session completion surfaces. |
 
 ## Best Next Candidates for Dedicated Flow Docs or E2E Coverage
 
@@ -260,6 +283,11 @@ These flows are clearly present in the code and worth documenting or automating 
 - Practice hub navigation (PRACTICE-01..04)
 - Quiz happy path: index -> launch -> play -> results, including Play Again with prefetched round (QUIZ-01..07)
 - Quiz error classification: quota exceeded, consent required, forbidden suppress Retry (QUIZ-08)
+- Quiz history list: grouping, empty state, deep-link back to index (QUIZ-09)
+- Quiz round detail: per-question review with correct answers and aliases (QUIZ-10)
+- Parent child-topic "Understanding" card + gated retention (PARENT-10)
+- Parent session recap block: narrative, conversation prompt copy-to-clipboard, engagement chip (PARENT-11) — needs both the populated and empty-recap variant
+- Parent subject detail gated retention badges (PARENT-12)
 - Dictation "Surprise me" path end-to-end including TTS playback controls (DICT-01..06)
 - Dictation photo-review remediation loop (DICT-07..10)
 - Recitation session mode (PRACTICE-03)
