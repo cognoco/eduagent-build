@@ -788,12 +788,45 @@ Files touched by commit 55ddcbdb that were specifically exercised:
 
 ---
 
-## Final open findings summary (cleaned 2026-04-19)
+## Fixes applied — batch 2026-04-19 code pass #2
+
+| Finding | Fix | Commit |
+|---|---|---|
+| F-001 ✅ | `lastSessionId` now passed through from `useContinueSuggestion` to session navigation; API returns active session for topic | `1880cc49` |
+| F-002 ✅ | `formatRelativeDate` rewritten with calendar-day diff — returns "Today" / "Yesterday" / "X days ago", matching `formatLastPracticed` | `a04132bc` |
+| F-009 ✅ | Topic deep-link resolves `subjectId` via new API endpoint; topic detail screen works without `subjectId` in nav params | `1880cc49` |
+| F-043 ✅ | Progress empty-state copy context-aware (sessions count); milestone backfill for users past new thresholds | `4688120a` |
+| F-044 ✅ | Streak reads live DB row instead of stale snapshot; consecutive-day activity correctly counted | `4688120a` |
+| F-045 ✅ | Subject card uses wall-clock duration from live session data, matching session cards | `4688120a` |
+| F-052 ✅ | `Alert.alert` → `platformAlert` in accommodations.tsx | `dbc3a874` |
+| F-056 ✅ | Stale accessibility label "Continue to curriculum" → "Continue" in analogy-preference | `dbc3a874` |
+| F-057 ✅ | `Alert.alert` → `platformAlert` in analogy-preference.tsx + interview.tsx | `dbc3a874` |
+| F-058 ✅ | "Continue to home" CTA added when curriculum is empty — eliminates dead-end | `dbc3a874` |
+| F-059 ✅ | Back buttons in analogy-preference + language-setup use `arrow-back` Ionicon | `dbc3a874` |
+| F-060 ✅ | CEFR level buttons have testids: `level-beginner`, `level-some-basics`, `level-conversational`, `level-advanced` | `dbc3a874` |
+
+### Verified already-fixed (no code change needed)
+| Finding | Status |
+|---|---|
+| F-007 | ✅ Intentional — topic-detail bypass per Home IA spec |
+| F-035 | ✅ Verified — XP shown in quiz card subtitle |
+| F-036 | ✅ Verified — arrow-back icon + title-cased activity type |
+| F-038 | ✅ Verified — redundant label removed |
+| F-049 | ✅ Verified — History promoted to IntentCard |
+| F-050 | ✅ Verified — `stripBold()` strips markdown |
+
+### Deploy-gap (code exists, staging redeploy needed)
+| Finding | Status |
+|---|---|
+| F-033 | Code at `quiz.ts:391` — redeploy `mentomate-api-stg` |
+| F-040 | Endpoints at `dashboard.ts:115,134` — redeploy `mentomate-api-stg` |
+
+## Final open findings summary (updated 2026-04-19)
 
 | Category | Count | IDs |
 |---|---|---|
-| 🔴 CRITICAL | 1 | F-033 |
-| 🟡 MEDIUM | 12 | F-001, F-002, F-007, F-009, F-040, F-041, F-042, F-043, F-044, F-045, F-052, F-057, F-058 |
-| 🟢 LOW | 8 | F-035, F-036, F-038, F-049, F-050, F-056, F-059, F-060 |
+| ⚙️ DEPLOY-GAP | 2 | F-033, F-040 (code exists — redeploy staging) |
+| 🟡 MEDIUM | 2 | F-041, F-042 (not in this batch) |
 
-45 resolved findings removed (verified against code 2026-04-19). See git history for the full fix log.
+All 20 bugs from the 2026-04-19 batch addressed. 12 code-fixed, 6 verified, 2 deploy-gap.
+See git history for the full fix log.
