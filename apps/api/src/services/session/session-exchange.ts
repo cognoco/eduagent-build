@@ -56,6 +56,7 @@ import { shouldTriggerTeachBack } from '../teach-back';
 import { getRetentionStatus, type RetentionState } from '../retention';
 import { getLearningMode } from '../settings';
 import type { EscalationRung } from '../llm';
+import { inngest } from '../../inngest/client';
 import {
   getSessionStaticContext,
   getSessionStaticContextCacheKey,
@@ -69,6 +70,7 @@ import {
   SessionExchangeLimitError,
 } from './session-crud';
 import { createLogger } from '../logger';
+import { LANGUAGE_REGEX } from './session-depth.config';
 
 const logger = createLogger();
 
@@ -163,6 +165,13 @@ export async function prepareExchangeContext(
     throw new Error('Session not found');
   }
 
+  const sessionMeta = ((session.metadata as
+    | Record<string, unknown>
+    | undefined) ?? {}) as Record<string, unknown>;
+  const isFreeform =
+    session.sessionType === 'learning' &&
+    !session.topicId &&
+    sessionMeta['effectiveMode'] === 'freeform';
   const isInterleaved = session.sessionType === 'interleaved';
   const staticContext = await getSessionStaticContext(
     db,
@@ -174,7 +183,7 @@ export async function prepareExchangeContext(
   // 2. Load all supplementary data in parallel (all independent after session load)
   // CFLF-23: For freeform sessions with rawInput, also scan prior sessions
   // by the learner's original intent so the very first exchange has rich context.
-  const isFreeformWithRawInput = !session.topicId && !!session.rawInput;
+  const isFreeformWithRawInput = isFreeform && !!session.rawInput;
 
   // BUG-70: Use cached supplementary data for lookups that are static within
   // a session (priorTopics, teachingPref, learningMode, learningProfile,
@@ -226,11 +235,15 @@ export async function prepareExchangeContext(
     }),
     cachedSupp
       ? Promise.resolve(cachedSupp.priorTopics)
+      : isFreeform
+      ? Promise.resolve([])
       : fetchPriorTopics(db, profileId, session.subjectId),
     retrieveRelevantMemory(db, profileId, userMessage, options?.voyageApiKey),
     // FR58: Load teaching method preference for adaptive teaching
     cachedSupp
       ? Promise.resolve(cachedSupp.teachingPref)
+      : isFreeform
+      ? Promise.resolve(null)
       : getTeachingPreference(db, profileId, session.subjectId),
     // FR92: Load session metadata for interleaved topic list
     isInterleaved
@@ -252,6 +265,8 @@ export async function prepareExchangeContext(
     // Story 16.0: Cross-subject learning highlights for broader context
     cachedSupp
       ? Promise.resolve(cachedSupp.crossSubjectHighlights)
+      : isFreeform
+      ? Promise.resolve([])
       : fetchCrossSubjectHighlights(db, profileId, session.subjectId),
     // CFLF-23: Pre-session similarity scan — uses rawInput for freeform sessions
     // Graceful degradation: if Voyage API is down, returns empty (never breaks session)
@@ -293,21 +308,6 @@ export async function prepareExchangeContext(
     );
   }
   const retentionCard = retentionRows[0];
-  const knownVocabularyRows =
-    subject?.pedagogyMode === 'four_strands'
-      ? await db
-          .select({ term: vocabulary.term })
-          .from(vocabulary)
-          .where(
-            and(
-              eq(vocabulary.profileId, profileId),
-              eq(vocabulary.subjectId, session.subjectId),
-              eq(vocabulary.mastered, true)
-            )
-          )
-          .orderBy(desc(vocabulary.updatedAt))
-          .limit(60)
-      : [];
 
   // Determine verification type: explicit from session, or auto-select from retention card
   let verificationType: VerificationType | undefined;
@@ -392,6 +392,118 @@ export async function prepareExchangeContext(
           : ('assistant' as const),
       content: e.content,
     }));
+
+  const rawSilentClassification = sessionMeta['silentClassification'];
+  const silentClassification =
+    rawSilentClassification &&
+    typeof rawSilentClassification === 'object' &&
+    !Array.isArray(rawSilentClassification) &&
+    typeof (rawSilentClassification as { subjectId?: unknown }).subjectId ===
+      'string' &&
+    typeof (rawSilentClassification as { subjectName?: unknown })
+      .subjectName === 'string' &&
+    typeof (rawSilentClassification as { confidence?: unknown }).confidence ===
+      'number'
+      ? {
+          subjectId: (rawSilentClassification as { subjectId: string })
+            .subjectId,
+          subjectName: (rawSilentClassification as { subjectName: string })
+            .subjectName,
+          confidence: (rawSilentClassification as { confidence: number })
+            .confidence,
+        }
+      : undefined;
+
+  let likelyLanguage = false;
+  if (isFreeform && session.exchangeCount === 0) {
+    likelyLanguage = LANGUAGE_REGEX.test(userMessage);
+    if (likelyLanguage) {
+      void inngest.send({
+        name: 'app/ask.language_preclassified',
+        data: {
+          sessionId,
+          matchedPattern: userMessage.match(LANGUAGE_REGEX)?.[0] ?? '',
+        },
+      });
+    }
+  }
+
+  if (isFreeform && session.exchangeCount === 1 && !silentClassification) {
+    const priorUserMessages = exchangeHistory
+      .filter((entry) => entry.role === 'user')
+      .map((entry) => entry.content)
+      .join('\n');
+
+    void inngest.send({
+      name: 'app/ask.classify_silently',
+      data: {
+        sessionId,
+        profileId,
+        classifyInput: [priorUserMessages, userMessage]
+          .filter(Boolean)
+          .join('\n'),
+        exchangeCount: session.exchangeCount + 1,
+      },
+    });
+  }
+
+  const [silentSubjectRows, silentTeachingPref] =
+    silentClassification?.subjectId
+      ? await Promise.all([
+          db
+            .select({
+              id: subjects.id,
+              name: subjects.name,
+              pedagogyMode: subjects.pedagogyMode,
+              languageCode: subjects.languageCode,
+            })
+            .from(subjects)
+            .where(
+              and(
+                eq(subjects.id, silentClassification.subjectId),
+                eq(subjects.profileId, profileId),
+                eq(subjects.status, 'active')
+              )
+            )
+            .limit(1),
+          getTeachingPreference(db, profileId, silentClassification.subjectId),
+        ])
+      : [[], null];
+  const silentSubject = silentSubjectRows[0];
+  const effectiveSubjectName = isFreeform
+    ? silentClassification?.subjectName ?? 'Unknown'
+    : subject?.name ?? 'Unknown';
+  const effectivePedagogyMode: 'socratic' | 'four_strands' = likelyLanguage
+    ? 'four_strands'
+    : isFreeform
+    ? (silentSubject?.pedagogyMode as
+        | 'socratic'
+        | 'four_strands'
+        | undefined) ?? 'socratic'
+    : (subject?.pedagogyMode as 'socratic' | 'four_strands' | undefined) ??
+      'socratic';
+  const effectiveLanguageCode = isFreeform
+    ? silentSubject?.languageCode ?? undefined
+    : subject?.languageCode ?? undefined;
+  const effectiveTeachingPref = isFreeform ? silentTeachingPref : teachingPref;
+  const effectiveVocabularySubjectId = isFreeform
+    ? silentClassification?.subjectId
+    : session.subjectId;
+  const knownVocabularyRows =
+    effectivePedagogyMode === 'four_strands' && effectiveVocabularySubjectId
+      ? await db
+          .select({ term: vocabulary.term })
+          .from(vocabulary)
+          .where(
+            and(
+              eq(vocabulary.profileId, profileId),
+              eq(vocabulary.subjectId, effectiveVocabularySubjectId),
+              eq(vocabulary.mastered, true)
+            )
+          )
+          .orderBy(desc(vocabulary.updatedAt))
+          .limit(60)
+      : [];
 
   // 3b. Compute SM-2 retention status from retention card (Gap 4)
   let retentionStatusValue:
@@ -514,7 +626,7 @@ export async function prepareExchangeContext(
 
   // P1.4: Load urgency boost for the current session's subject (if any)
   let activeUrgency: { reason: string; boostUntil: Date } | null = null;
-  if (session.subjectId) {
+  if (session.subjectId && !isFreeform) {
     const urgencyRows = await db
       .select({
         urgencyBoostReason: subjects.urgencyBoostReason,
@@ -566,7 +678,9 @@ export async function prepareExchangeContext(
             learningProfile.effectivenessSessionCount ?? 0,
           activeUrgency,
         },
-        subject?.name ?? null,
+        isFreeform
+          ? silentClassification?.subjectName ?? null
+          : subject?.name ?? null,
         topic?.title ?? null,
         {
           status: retentionStatusValue,
@@ -593,7 +707,7 @@ export async function prepareExchangeContext(
   const context: ExchangeContext = {
     sessionId,
     profileId,
-    subjectName: subject?.name ?? 'Unknown',
+    subjectName: effectiveSubjectName,
     topicTitle: interleavedTopics ? undefined : topic?.title,
     topicDescription: interleavedTopics ? undefined : topic?.description,
     sessionType: session.sessionType,
@@ -616,12 +730,12 @@ export async function prepareExchangeContext(
     // CFLF-23: Merge per-message memory with rawInput-based pre-session memory
     embeddingMemoryContext:
       mergeMemoryContexts(memory.context, rawInputMemory.context) || undefined,
-    pedagogyMode: subject?.pedagogyMode ?? 'socratic',
-    nativeLanguage: teachingPref?.nativeLanguage ?? undefined,
-    languageCode: subject?.languageCode ?? undefined,
+    pedagogyMode: effectivePedagogyMode,
+    nativeLanguage: effectiveTeachingPref?.nativeLanguage ?? undefined,
+    languageCode: effectiveLanguageCode,
     knownVocabulary: knownVocabularyRows.map((row) => row.term).slice(0, 60),
-    teachingPreference: teachingPref?.method,
-    analogyDomain: teachingPref?.analogyDomain ?? undefined,
+    teachingPreference: effectiveTeachingPref?.method,
+    analogyDomain: effectiveTeachingPref?.analogyDomain ?? undefined,
     interleavedTopics,
     verificationType,
     evaluateDifficultyRung,

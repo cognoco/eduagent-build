@@ -4,6 +4,7 @@ import { zValidator } from '@hono/zod-validator';
 import {
   interviewMessageSchema,
   type InterviewResult,
+  type ExtractedInterviewSignals,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
@@ -243,11 +244,18 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
 
     const draft = await getDraftState(db, profileId, subjectId);
     if (!draft || draft.status !== 'in_progress') {
-      // Already completed or no draft — just return success
+      // Already completed or no draft — return signals from the persisted
+      // draft if present, so a second /complete call is still navigable.
       return c.json({
         isComplete: true,
         exchangeCount:
           draft?.exchangeHistory.filter((e) => e.role === 'user').length ?? 0,
+        ...(draft?.extractedSignals &&
+        typeof draft.extractedSignals === 'object' &&
+        Object.keys(draft.extractedSignals as Record<string, unknown>).length >
+          0
+          ? { extractedSignals: draft.extractedSignals }
+          : {}),
       });
     }
 
@@ -276,10 +284,14 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
       status: 'completed',
     });
 
+    // Return extracted signals alongside completion so the mobile force-complete
+    // mutation can route into interests-context without waiting for a state
+    // refetch round-trip. The shape matches extractedInterviewSignalsSchema.
     return c.json({
       isComplete: true,
       exchangeCount: draft.exchangeHistory.filter((e) => e.role === 'user')
         .length,
+      extractedSignals: signals,
     });
   })
   // Get current interview state
@@ -292,6 +304,16 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
     if (!draft) return c.json({ state: null });
 
     const subject = await getSubject(db, profileId, subjectId);
+
+    // Surface extractedSignals on completed drafts so the mobile client can
+    // read extracted interests and route through the interests-context picker
+    // before the downstream onboarding fork. The shape is validated by
+    // @eduagent/schemas/extractedInterviewSignalsSchema.
+    const hasExtractedSignals =
+      draft.status === 'completed' &&
+      draft.extractedSignals &&
+      typeof draft.extractedSignals === 'object' &&
+      Object.keys(draft.extractedSignals as Record<string, unknown>).length > 0;
 
     return c.json({
       state: {
@@ -307,6 +329,12 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
             }
           : {}),
         ...(draft.expiresAt ? { expiresAt: draft.expiresAt } : {}),
+        ...(hasExtractedSignals
+          ? {
+              extractedSignals:
+                draft.extractedSignals as unknown as ExtractedInterviewSignals,
+            }
+          : {}),
       },
     });
   });

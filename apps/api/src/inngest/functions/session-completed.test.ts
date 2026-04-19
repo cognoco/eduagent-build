@@ -343,6 +343,14 @@ describe('sessionCompleted', () => {
     );
   });
 
+  it('does not wait for filing when the session was auto-closed', async () => {
+    const { mockStep } = (await executeSteps(
+      createEventData({ topicId: null, summaryStatus: 'auto_closed' })
+    )) as any;
+
+    expect(mockStep.waitForEvent).not.toHaveBeenCalled();
+  });
+
   it('returns completed status with sessionId and outcomes', async () => {
     const { result } = await executeSteps(createEventData());
     expect(result).toEqual(

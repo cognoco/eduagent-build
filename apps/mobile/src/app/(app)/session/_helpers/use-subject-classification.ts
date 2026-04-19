@@ -322,6 +322,19 @@ export function useSubjectClassification(
         return;
       }
 
+      // Ask mode should answer first. When the learner already has at least one
+      // enrolled subject, the screen uses a hidden anchor subject to create the
+      // session and the API silently classifies in the background later.
+      if (
+        effectiveMode === 'freeform' &&
+        !subjectId &&
+        !classifiedSubject &&
+        availableSubjects[0]
+      ) {
+        await continueWithMessage(text);
+        return;
+      }
+
       // Classify subject from first message when none was provided.
       // Freeform sessions auto-pick the best match silently (no picker).
       let sessionSubjectId: string | undefined;
@@ -365,7 +378,10 @@ export function useSubjectClassification(
                 isSystemPrompt: true,
               },
             ]);
-          } else if (effectiveMode === 'freeform') {
+          } else if (
+            effectiveMode === 'freeform' &&
+            availableSubjects.length > 0
+          ) {
             // BUG-31 / F-1: When multiple candidates exist, ask the user which subject
             // they meant. Single candidate auto-picks. Zero candidates proceed without
             // subject — continueWithMessage handles the no-subject case.
@@ -475,7 +491,7 @@ export function useSubjectClassification(
             return;
           }
         } catch {
-          if (effectiveMode === 'freeform') {
+          if (effectiveMode === 'freeform' && availableSubjects.length > 0) {
             const fallbackCandidates = availableSubjects.map((candidate) => ({
               subjectId: candidate.id,
               subjectName: candidate.name,

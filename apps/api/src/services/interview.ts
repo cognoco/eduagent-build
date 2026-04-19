@@ -173,8 +173,15 @@ Return a JSON object with this exact structure:
 {
   "goals": ["goal1", "goal2"],
   "experienceLevel": "beginner|intermediate|advanced",
-  "currentKnowledge": "Brief description of what the learner already knows"
+  "currentKnowledge": "Brief description of what the learner already knows",
+  "interests": ["short label 1", "short label 2"]
 }
+
+Rules for "interests":
+- Short noun phrases (1-3 words) for hobbies, games, media, sports, or subjects the learner mentions with positive affect ("I love", "I'm into", "my favourite is").
+- Do NOT include things they dislike, are scared of, or were forced to do.
+- Do NOT include generic words like "learning", "school", "math" unless paired with specific context ("chess club", "football team").
+- Max 8 items. Return [] if none are clearly stated.
 
 Be concise. Extract only what's clearly stated or strongly implied.`;
 
@@ -182,10 +189,15 @@ Be concise. Extract only what's clearly stated or strongly implied.`;
 // Signal extraction — extracts structured learner data from interview
 // ---------------------------------------------------------------------------
 
+// Hard cap on extracted interests. Matches the prompt's "max 8" rule so a
+// verbose LLM response can't overflow what the mobile picker can render.
+const MAX_EXTRACTED_INTERESTS = 8;
+
 export async function extractSignals(exchangeHistory: ChatExchange[]): Promise<{
   goals: string[];
   experienceLevel: string;
   currentKnowledge: string;
+  interests: string[];
 }> {
   const conversationText = exchangeHistory
     .map((e) => `${e.role}: ${e.content}`)
@@ -205,19 +217,41 @@ export async function extractSignals(exchangeHistory: ChatExchange[]): Promise<{
     const jsonMatch = result.response.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0]) as Record<string, unknown>;
+      // Coerce and dedupe interests defensively — the LLM occasionally emits
+      // duplicates with different capitalization. Per-label length-cap at 60.
+      const rawInterests = Array.isArray(parsed.interests)
+        ? (parsed.interests as unknown[])
+            .map((v) => String(v).trim())
+            .filter((v) => v.length > 0 && v.length <= 60)
+        : [];
+      const seen = new Set<string>();
+      const interests: string[] = [];
+      for (const label of rawInterests) {
+        const key = label.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        interests.push(label);
+        if (interests.length >= MAX_EXTRACTED_INTERESTS) break;
+      }
       return {
         goals: Array.isArray(parsed.goals)
           ? (parsed.goals as unknown[]).map(String)
           : [],
         experienceLevel: String(parsed.experienceLevel ?? 'beginner'),
         currentKnowledge: String(parsed.currentKnowledge ?? ''),
+        interests,
       };
     }
   } catch {
     // Fall through to default
   }
 
-  return { goals: [], experienceLevel: 'beginner', currentKnowledge: '' };
+  return {
+    goals: [],
+    experienceLevel: 'beginner',
+    currentKnowledge: '',
+    interests: [],
+  };
 }
 
 // ---------------------------------------------------------------------------

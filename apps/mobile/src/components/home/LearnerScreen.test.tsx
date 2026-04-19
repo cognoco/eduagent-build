@@ -11,6 +11,7 @@ const mockReadSessionRecoveryMarker = jest.fn();
 const mockClearSessionRecoveryMarker = jest.fn();
 const mockIsRecoveryMarkerFresh = jest.fn();
 const mockUseContinueSuggestion = jest.fn();
+const mockUseResumeNudge = jest.fn();
 const mockUseReviewSummary = jest.fn();
 const mockMarkQuizDiscoverySurfaced = jest.fn();
 
@@ -53,6 +54,7 @@ jest.mock('../../hooks/use-subjects', () => ({
 
 jest.mock('../../hooks/use-progress', () => ({
   useContinueSuggestion: () => mockUseContinueSuggestion(),
+  useResumeNudge: () => mockUseResumeNudge(),
   useReviewSummary: () => mockUseReviewSummary(),
 }));
 
@@ -90,6 +92,7 @@ describe('LearnerScreen', () => {
     mockClearSessionRecoveryMarker.mockResolvedValue(undefined);
     mockIsRecoveryMarkerFresh.mockReturnValue(true);
     mockUseContinueSuggestion.mockReturnValue({ data: null });
+    mockUseResumeNudge.mockReturnValue({ data: { nudge: null } });
     mockUseReviewSummary.mockReturnValue({ data: null });
     mockUseQuizDiscoveryCard.mockReturnValue({ data: undefined });
     mockUseMarkQuizDiscoverySurfaced.mockReturnValue({
@@ -205,6 +208,65 @@ describe('LearnerScreen', () => {
         subjectId: 's1',
         topicName: 'Algebra',
       },
+    });
+  });
+
+  it('shows resume nudge when available and no higher-priority continue card exists', () => {
+    mockUseResumeNudge.mockReturnValue({
+      data: {
+        nudge: {
+          sessionId: 'session-nudge-1',
+          topicHint: 'How fish breathe underwater',
+          exchangeCount: 7,
+          createdAt: new Date().toISOString(),
+        },
+      },
+    });
+
+    render(<LearnerScreen {...defaultProps} />);
+
+    expect(screen.getByTestId('intent-resume-nudge')).toBeTruthy();
+    expect(screen.getByText('Pick up where you left off?')).toBeTruthy();
+    expect(
+      screen.getByText('You were exploring "How fish breathe underwater"')
+    ).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('intent-resume-nudge'));
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/session',
+      params: {
+        mode: 'freeform',
+        rawInput: 'How fish breathe underwater',
+      },
+    });
+  });
+
+  it('does not show resume nudge when the API returns null', () => {
+    mockUseResumeNudge.mockReturnValue({ data: { nudge: null } });
+
+    render(<LearnerScreen {...defaultProps} />);
+
+    expect(screen.queryByTestId('intent-resume-nudge')).toBeNull();
+  });
+
+  it('dismisses the resume nudge card', async () => {
+    mockUseResumeNudge.mockReturnValue({
+      data: {
+        nudge: {
+          sessionId: 'session-nudge-2',
+          topicHint: 'Volcanoes',
+          exchangeCount: 6,
+          createdAt: new Date().toISOString(),
+        },
+      },
+    });
+
+    render(<LearnerScreen {...defaultProps} />);
+
+    fireEvent.press(screen.getByTestId('intent-resume-nudge-dismiss'));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('intent-resume-nudge')).toBeNull();
     });
   });
 

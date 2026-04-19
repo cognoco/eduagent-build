@@ -13,7 +13,12 @@ import {
   systemPromptBodySchema,
   ERROR_CODES,
 } from '@eduagent/schemas';
-import type { Database } from '@eduagent/database';
+import {
+  learningSessions,
+  sessionEvents,
+  type Database,
+} from '@eduagent/database';
+import { and, asc, desc, eq, gte, isNull, sql } from 'drizzle-orm';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
 import { streamSSE } from 'hono/streaming';
@@ -37,6 +42,7 @@ import {
   submitSummary,
   syncHomeworkState,
   setSessionInputMode,
+  evaluateSessionDepth,
 } from '../services/session';
 import type { LLMTier } from '../services/subscription';
 import { notFound, apiError } from '../errors';
@@ -67,6 +73,61 @@ type SessionRouteEnv = {
 };
 
 export const sessionRoutes = new Hono<SessionRouteEnv>()
+  .get('/sessions/resume-nudge', async (c) => {
+    const db = c.get('db');
+    const profileId = requireProfileId(c.get('profileId'));
+
+    const [candidate] = await db
+      .select({
+        id: learningSessions.id,
+        rawInput: learningSessions.rawInput,
+        exchangeCount: learningSessions.exchangeCount,
+        createdAt: learningSessions.createdAt,
+      })
+      .from(learningSessions)
+      .where(
+        and(
+          eq(learningSessions.profileId, profileId),
+          eq(learningSessions.status, 'auto_closed'),
+          eq(learningSessions.sessionType, 'learning'),
+          isNull(learningSessions.topicId),
+          gte(learningSessions.exchangeCount, 5),
+          sql`${learningSessions.metadata} ->> 'effectiveMode' = 'freeform'`,
+          gte(learningSessions.createdAt, sql`NOW() - INTERVAL '7 days'`)
+        )
+      )
+      .orderBy(desc(learningSessions.createdAt))
+      .limit(1);
+
+    if (!candidate) {
+      return c.json({ nudge: null });
+    }
+
+    const [firstMessage] = await db
+      .select({ content: sessionEvents.content })
+      .from(sessionEvents)
+      .where(
+        and(
+          eq(sessionEvents.sessionId, candidate.id),
+          eq(sessionEvents.profileId, profileId),
+          eq(sessionEvents.eventType, 'user_message')
+        )
+      )
+      .orderBy(asc(sessionEvents.createdAt))
+      .limit(1);
+
+    return c.json({
+      nudge: {
+        sessionId: candidate.id,
+        topicHint:
+          candidate.rawInput ??
+          firstMessage?.content?.slice(0, 80) ??
+          'your last session',
+        exchangeCount: candidate.exchangeCount,
+        createdAt: candidate.createdAt.toISOString(),
+      },
+    });
+  })
   // Start a new learning session for a subject
   .post(
     '/subjects/:subjectId/sessions',
@@ -145,6 +206,45 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     );
     if (!transcript) return notFound(c, 'Session not found');
     return c.json(transcript);
+  })
+
+  .post('/sessions/:sessionId/evaluate-depth', async (c) => {
+    const db = c.get('db');
+    const profileId = requireProfileId(c.get('profileId'));
+    const sessionId = c.req.param('sessionId');
+    const transcript = await getSessionTranscript(db, profileId, sessionId);
+    if (!transcript) return notFound(c, 'Session not found');
+
+    const result = await evaluateSessionDepth(transcript);
+    const learnerWordCount = transcript.exchanges.reduce((sum, exchange) => {
+      if (exchange.role !== 'user') return sum;
+      return sum + exchange.content.split(/\s+/).filter(Boolean).length;
+    }, 0);
+
+    void inngest.send({
+      name: 'app/ask.gate_decision',
+      data: {
+        sessionId,
+        meaningful: result.meaningful,
+        reason: result.reason,
+        method: result.method,
+        exchangeCount: transcript.session.exchangeCount,
+        learnerWordCount,
+        topicCount: result.topics.length,
+      },
+    });
+
+    if (result.method === 'fail_open') {
+      void inngest.send({
+        name: 'app/ask.gate_timeout',
+        data: {
+          sessionId,
+          exchangeCount: transcript.session.exchangeCount,
+        },
+      });
+    }
+
+    return c.json(result);
   })
 
   // Stream a message response via SSE

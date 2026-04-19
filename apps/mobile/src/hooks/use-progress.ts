@@ -111,6 +111,37 @@ export function useContinueSuggestion() {
   });
 }
 
+export function useResumeNudge() {
+  const client = useApiClient();
+  const { activeProfile } = useProfile();
+
+  return useQuery({
+    queryKey: ['resume-nudge', activeProfile?.id],
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const res = await client.sessions['resume-nudge'].$get(
+          {},
+          { init: { signal } }
+        );
+        await assertOk(res);
+        return (await res.json()) as {
+          nudge: {
+            sessionId: string;
+            topicHint: string;
+            exchangeCount: number;
+            createdAt: string;
+          } | null;
+        };
+      } finally {
+        cleanup();
+      }
+    },
+    enabled: !!activeProfile,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
 export function useActiveSessionForTopic(topicId: string | undefined) {
   const client = useApiClient();
   const { activeProfile } = useProfile();

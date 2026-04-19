@@ -7,7 +7,10 @@ import {
   type UseMutationResult,
 } from '@tanstack/react-query';
 import { useAuth } from '@clerk/clerk-expo';
-import type { InterviewState } from '@eduagent/schemas';
+import type {
+  ExtractedInterviewSignals,
+  InterviewState,
+} from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
@@ -75,14 +78,20 @@ export function useSendInterviewMessage(
 // [BUG-464] Force-complete mutation — client escape button
 // ---------------------------------------------------------------------------
 
+// Force-complete returns the extracted signals alongside completion so the
+// caller can route into the interests-context picker without an extra round
+// trip. `extractedSignals` is optional — absent when the draft was already
+// completed without persisted signals (legacy drafts predating BKT-C.2).
+export interface ForceCompleteInterviewResponse {
+  isComplete: boolean;
+  exchangeCount: number;
+  extractedSignals?: ExtractedInterviewSignals;
+}
+
 export function useForceCompleteInterview(
   subjectId: string,
   bookId?: string
-): UseMutationResult<
-  { isComplete: boolean; exchangeCount: number },
-  Error,
-  void
-> {
+): UseMutationResult<ForceCompleteInterviewResponse, Error, void> {
   const client = useApiClient();
   const queryClient = useQueryClient();
 
@@ -93,10 +102,7 @@ export function useForceCompleteInterview(
         ...(bookId ? { query: { bookId } } : {}),
       });
       await assertOk(res);
-      return (await res.json()) as {
-        isComplete: boolean;
-        exchangeCount: number;
-      };
+      return (await res.json()) as ForceCompleteInterviewResponse;
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({

@@ -76,7 +76,7 @@ export default function PronounsScreen(): React.ReactElement {
 
   const navigateForward = useCallback(() => {
     if (returnTo === 'settings') {
-      goBackOrReplace(router, '/(app)/settings' as never);
+      goBackOrReplace(router, '/(app)/more' as never);
       return;
     }
     // Forward path in first-time onboarding: into the subject interview.

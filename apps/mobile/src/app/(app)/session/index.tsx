@@ -18,6 +18,7 @@ import {
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type {
+  DepthEvaluation,
   HomeworkCaptureSource,
   HomeworkProblem,
   InputMode,
@@ -393,6 +394,9 @@ function SessionScreenInner() {
   );
   const [showFilingPrompt, setShowFilingPrompt] = useState(false);
   const [filingDismissed, setFilingDismissed] = useState(false);
+  const [depthEvaluation, setDepthEvaluation] =
+    useState<DepthEvaluation | null>(null);
+  const [depthEvaluating, setDepthEvaluating] = useState(false);
   const [quotaError, setQuotaError] = useState<QuotaExceededDetails | null>(
     null
   );
@@ -480,6 +484,8 @@ function SessionScreenInner() {
       setShowNoteInput(false);
       setShowFilingPrompt(false);
       setFilingDismissed(false);
+      setDepthEvaluation(null);
+      setDepthEvaluating(false);
       setQuotaError(null);
       closedSessionRef.current = null;
       sessionNoteSavedRef.current = false;
@@ -517,8 +523,19 @@ function SessionScreenInner() {
     return () => clearTimeout(timer);
   }, [confirmationToast]);
 
-  const effectiveSubjectId = classifiedSubject?.subjectId ?? subjectId ?? '';
-  const effectiveSubjectName = classifiedSubject?.subjectName ?? subjectName;
+  const freeformAnchorSubject =
+    effectiveMode === 'freeform' && !classifiedSubject?.subjectId && !subjectId
+      ? availableSubjects[0]
+      : undefined;
+  const effectiveSubjectId =
+    classifiedSubject?.subjectId ??
+    subjectId ??
+    freeformAnchorSubject?.id ??
+    '';
+  const effectiveSubjectName =
+    classifiedSubject?.subjectName ??
+    subjectName ??
+    (effectiveMode === 'freeform' ? undefined : freeformAnchorSubject?.name);
   const activeSubject = availableSubjects.find(
     (availableSubject) => availableSubject.id === effectiveSubjectId
   );
@@ -923,16 +940,8 @@ function SessionScreenInner() {
     syncHomeworkMetadata,
     fetchFastCelebrations,
     showConfirmation,
-    filing,
-    retryFiling: async (input: {
-      sessionId: string;
-      sessionMode: 'freeform' | 'homework';
-    }) => {
-      const res = await apiClient.filing['request-retry'].$post({
-        json: input,
-      });
-      if (!res.ok) throw new Error(`retry-filing failed: ${res.status}`);
-    },
+    setDepthEvaluation,
+    setDepthEvaluating,
     router,
   });
 
@@ -1129,6 +1138,15 @@ function SessionScreenInner() {
             setFilingDismissed={setFilingDismissed}
             navigateToSessionSummary={navigateToSessionSummary}
             router={router}
+            depthEvaluation={depthEvaluation}
+            depthEvaluating={depthEvaluating}
+            onAskAnother={() => {
+              setShowFilingPrompt(false);
+              setFilingDismissed(false);
+              setDepthEvaluation(null);
+              setDepthEvaluating(false);
+              router.replace('/(app)/session?mode=freeform' as never);
+            }}
             sessionExpired={sessionExpired}
             notePromptOffered={notePromptOffered}
             showNoteInput={showNoteInput}

@@ -18,6 +18,10 @@ import { reviewDueSend } from './functions/review-due-send';
 import { dailyReminderScan } from './functions/daily-reminder-scan';
 import { dailyReminderSend } from './functions/daily-reminder-send';
 import {
+  askSilentClassify,
+  askSilentClassifyOnFailure,
+} from './functions/ask-silent-classify';
+import {
   dailySnapshotCron,
   dailySnapshotRefresh,
 } from './functions/daily-snapshot';
@@ -62,6 +66,8 @@ export {
   reviewDueSend,
   dailyReminderScan,
   dailyReminderSend,
+  askSilentClassify,
+  askSilentClassifyOnFailure,
 };
 
 // All Inngest functions to register with the serve handler
@@ -93,4 +99,6 @@ export const functions = [
   reviewDueSend,
   dailyReminderScan,
   dailyReminderSend,
+  askSilentClassify,
+  askSilentClassifyOnFailure,
 ];

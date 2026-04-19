@@ -81,3 +81,6 @@ export {
 // Book sessions
 export { getBookSessions, backfillSessionTopicId } from './session-book';
 export type { BookSession } from './session-book';
+
+// Depth evaluation
+export { evaluateSessionDepth } from './session-depth';

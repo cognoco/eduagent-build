@@ -58,6 +58,14 @@ export default function InterviewScreen() {
     ? `Hi! I'm your learning mate. Let's talk about ${bookTitle}! What do you already know about it, and what are you most curious to learn?`
     : OPENING_MESSAGE;
 
+  // BKT-C.2: Captured interest labels extracted from the interview transcript.
+  // Populated by either handleSkipInterview (force-complete mutation response)
+  // or the state-seeding effect below when the draft arrives already-completed.
+  // goToNextStep reads this + falls back to the state query as a safety net.
+  const [extractedInterests, setExtractedInterests] = useState<string[] | null>(
+    null
+  );
+
   const goToNextStep = useCallback(() => {
     if (!subjectId) return;
 
@@ -67,6 +75,30 @@ export default function InterviewScreen() {
       step: String(Math.min(step + 1, totalSteps)),
       totalSteps: String(totalSteps),
     };
+
+    // BKT-C.2: If the interview yielded interest labels, route through the
+    // interests-context picker before the language/analogy fork. The picker
+    // owns the downstream routing to language-setup or analogy-preference,
+    // so we only need to forward the fork inputs + extracted labels.
+    const interests =
+      extractedInterests ??
+      interviewState.data?.extractedSignals?.interests ??
+      [];
+    if (interests.length > 0) {
+      router.replace({
+        pathname: '/(app)/onboarding/interests-context',
+        params: {
+          ...baseParams,
+          // Comma-separated list is the contract expected by interests-context.
+          // Commas inside a label are unlikely (prompt constrains to 1-3 words)
+          // but would be lossy — guard by stripping commas from each label.
+          interests: interests.map((l) => l.replace(/,/g, '')).join(','),
+          languageCode: languageCode ?? '',
+          languageName: languageName ?? '',
+        },
+      } as never);
+      return;
+    }
 
     if (languageCode) {
       router.replace({
@@ -85,6 +117,8 @@ export default function InterviewScreen() {
       params: baseParams,
     } as never);
   }, [
+    extractedInterests,
+    interviewState.data?.extractedSignals?.interests,
     languageCode,
     languageName,
     router,
@@ -120,6 +154,7 @@ export default function InterviewScreen() {
     setInterviewComplete(false);
     setRestartRequired(false);
     setStreamError(null);
+    setExtractedInterests(null);
   }, [subjectId, openingMessage]);
 
   useEffect(() => {
@@ -157,6 +192,17 @@ export default function InterviewScreen() {
           : [{ id: 'opening', role: 'assistant', content: openingMessage }]
       );
       setInterviewComplete(true);
+      // BKT-C.2: If the completed draft already has extracted interests, lift
+      // them into local state so goToNextStep can read them synchronously.
+      // Functional setter keeps a once-only semantic without introducing a
+      // `extractedInterests` dep that would re-run this effect mid-seeding.
+      if (
+        state.extractedSignals?.interests &&
+        state.extractedSignals.interests.length > 0
+      ) {
+        const seeded = state.extractedSignals.interests;
+        setExtractedInterests((prev) => prev ?? seeded);
+      }
       seededDraftRef.current = true;
       return;
     }
@@ -213,8 +259,17 @@ export default function InterviewScreen() {
     if (interviewComplete || forceComplete.isPending) return;
     try {
       abortStream();
-      await forceComplete.mutateAsync();
+      const result = await forceComplete.mutateAsync();
       setInterviewComplete(true);
+      // BKT-C.2: Capture freshly-extracted interests from the mutation
+      // response so goToNextStep can route into the interests-context picker
+      // without waiting for the invalidated state query to refetch.
+      if (
+        result.extractedSignals?.interests &&
+        result.extractedSignals.interests.length > 0
+      ) {
+        setExtractedInterests(result.extractedSignals.interests);
+      }
     } catch (err: unknown) {
       platformAlert('Could not skip ahead', formatApiError(err));
     }

@@ -17,6 +17,7 @@ import { useRouter } from 'expo-router';
 import { useAuth, useUser } from '@clerk/clerk-expo';
 import type {
   AccommodationMode,
+  ConversationLanguage,
   KnowledgeInventory,
   LearningMode,
 } from '@eduagent/schemas';
@@ -94,6 +95,21 @@ function ToggleRow({
     </View>
   );
 }
+
+// BKT-C.1 — Settings display names for the 8 supported tutor languages. Kept
+// inline (rather than imported from onboarding/language-picker.tsx) to avoid
+// Expo Router treating a shared helper under app/(app)/ as a route. The source
+// of truth for the allowed codes is packages/schemas/src/profiles.ts.
+const TUTOR_LANGUAGE_LABELS: Record<ConversationLanguage, string> = {
+  en: 'English',
+  cs: 'Czech',
+  de: 'German',
+  es: 'Spanish',
+  fr: 'French',
+  it: 'Italian',
+  pl: 'Polish',
+  pt: 'Portuguese',
+};
 
 const LEARNING_MODE_OPTIONS: {
   mode: LearningMode;
@@ -506,6 +522,23 @@ export default function MoreScreen() {
           label="Profile"
           value={displayName}
           onPress={() => router.push('/profiles')}
+        />
+        {/* BKT-C.1 — Tutor language edit path. Launches the same picker the */}
+        {/* interview onboarding uses, with returnTo=settings so the picker's */}
+        {/* onSave returns here instead of forward-routing into language-setup. */}
+        <SettingsRow
+          label="Tutor language"
+          value={
+            activeProfile?.conversationLanguage
+              ? TUTOR_LANGUAGE_LABELS[activeProfile.conversationLanguage]
+              : undefined
+          }
+          onPress={() =>
+            router.push({
+              pathname: '/(app)/onboarding/language-picker',
+              params: { returnTo: 'settings' },
+            })
+          }
         />
         {!hideMentorMemory ? (
           <SettingsRow

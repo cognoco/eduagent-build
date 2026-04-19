@@ -74,7 +74,7 @@ export default function LanguagePickerScreen(): React.ReactElement {
 
   const navigateForward = useCallback(() => {
     if (returnTo === 'settings') {
-      goBackOrReplace(router, '/(app)/settings' as never);
+      goBackOrReplace(router, '/(app)/more' as never);
       return;
     }
     // Default forward path during first-time onboarding: pronouns picker
@@ -96,7 +96,7 @@ export default function LanguagePickerScreen(): React.ReactElement {
     goBackOrReplace(
       router,
       returnTo === 'settings'
-        ? ('/(app)/settings' as never)
+        ? ('/(app)/more' as never)
         : ('/(app)/home' as never)
     );
   }, [returnTo, router]);

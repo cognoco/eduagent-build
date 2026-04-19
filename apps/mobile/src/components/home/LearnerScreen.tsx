@@ -17,6 +17,7 @@ import {
 } from '../../hooks/use-coaching-card';
 import {
   useContinueSuggestion,
+  useResumeNudge,
   useReviewSummary,
 } from '../../hooks/use-progress';
 import { useSubjects } from '../../hooks/use-subjects';
@@ -53,12 +54,16 @@ export function LearnerScreen({
   const colors = useThemeColors();
   const { data: subjects, isLoading, isError, refetch } = useSubjects();
   const { data: continueSuggestion } = useContinueSuggestion();
+  const { data: resumeNudge } = useResumeNudge();
   const { data: reviewSummary } = useReviewSummary();
   const { data: quizDiscovery } = useQuizDiscoveryCard();
   const markQuizDiscoverySurfaced = useMarkQuizDiscoverySurfaced();
   const [recoveryMarker, setRecoveryMarker] =
     useState<SessionRecoveryMarker | null>(null);
   const [dismissedQuizDiscoveryId, setDismissedQuizDiscoveryId] = useState<
+    string | null
+  >(null);
+  const [dismissedNudgeSessionId, setDismissedNudgeSessionId] = useState<
     string | null
   >(null);
 
@@ -104,6 +109,7 @@ export function LearnerScreen({
 
   useEffect(() => {
     setDismissedQuizDiscoveryId(null);
+    setDismissedNudgeSessionId(null);
   }, [activeProfile?.id, quizDiscovery?.id]);
 
   const { title, subtitle } = getGreeting(
@@ -208,6 +214,32 @@ export function LearnerScreen({
       });
     }
 
+    if (
+      resumeNudge?.nudge &&
+      resumeNudge.nudge.sessionId !== dismissedNudgeSessionId &&
+      !recoveryMarker &&
+      !continueSuggestion
+    ) {
+      cards.push({
+        testID: 'intent-resume-nudge',
+        title: 'Pick up where you left off?',
+        subtitle: `You were exploring "${resumeNudge.nudge.topicHint}"`,
+        icon: 'refresh-outline',
+        variant: 'highlight',
+        onPress: () =>
+          router.push({
+            pathname: '/(app)/session',
+            params: {
+              mode: 'freeform',
+              rawInput: resumeNudge.nudge!.topicHint,
+            },
+          } as never),
+        onDismiss: () => {
+          setDismissedNudgeSessionId(resumeNudge.nudge!.sessionId);
+        },
+      });
+    }
+
     if (quizDiscovery && dismissedQuizDiscoveryId !== quizDiscovery.id) {
       cards.push({
         testID: 'intent-quiz-discovery',
@@ -263,10 +295,12 @@ export function LearnerScreen({
   }, [
     activeProfile?.id,
     continueSuggestion,
+    dismissedNudgeSessionId,
     dismissedQuizDiscoveryId,
     markQuizDiscoveryHandled,
     quizDiscovery,
     recoveryMarker,
+    resumeNudge,
     reviewSummary,
     router,
   ]);

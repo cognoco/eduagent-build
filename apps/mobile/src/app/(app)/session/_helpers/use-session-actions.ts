@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 // Alert import removed — all calls migrated to platformAlert [F-029]
 import { platformAlert } from '../../../../lib/platform-alert';
 import type {
+  DepthEvaluation,
   InputMode,
   HomeworkProblem,
   PendingCelebration,
@@ -20,6 +21,8 @@ import type {
 import { clearSessionRecoveryMarker } from '../../../../lib/session-recovery';
 import * as SecureStore from '../../../../lib/secure-storage';
 import { formatApiError } from '../../../../lib/format-api-error';
+import { useApiClient } from '../../../../lib/api-client';
+import { assertOk } from '../../../../lib/assert-ok';
 import { withProblemMode } from '../../homework/_helpers/problem-cards';
 import {
   getInputModeKey,
@@ -30,21 +33,6 @@ import {
   type QuickChipId,
   type MessageFeedbackState,
 } from './session-types';
-
-/** Conditions for silent auto-filing of freeform sessions at close */
-export function shouldAutoFile(params: {
-  effectiveMode: string;
-  effectiveSubjectId: string | null | undefined;
-  exchangeCount: number;
-  topicId: string | undefined;
-}): boolean {
-  return (
-    params.effectiveMode === 'freeform' &&
-    !!params.effectiveSubjectId &&
-    params.exchangeCount >= 5 &&
-    !params.topicId
-  );
-}
 
 export interface UseSessionActionsOptions {
   // State
@@ -65,6 +53,10 @@ export interface UseSessionActionsOptions {
   setShowTopicSwitcher: React.Dispatch<React.SetStateAction<boolean>>;
   setShowParkingLot: React.Dispatch<React.SetStateAction<boolean>>;
   setShowFilingPrompt: React.Dispatch<React.SetStateAction<boolean>>;
+  setDepthEvaluation: React.Dispatch<
+    React.SetStateAction<DepthEvaluation | null>
+  >;
+  setDepthEvaluating: React.Dispatch<React.SetStateAction<boolean>>;
   setConsumedQuickChipMessageId: React.Dispatch<
     React.SetStateAction<string | null>
   >;
@@ -113,26 +105,13 @@ export interface UseSessionActionsOptions {
   ) => Promise<void>;
   fetchFastCelebrations: () => Promise<PendingCelebration[]>;
   showConfirmation: (message: string) => void;
-  /** Filing mutation for auto-filing freeform sessions */
-  filing?: {
-    mutateAsync: (input: {
-      sessionId: string;
-      sessionMode: 'freeform';
-    }) => Promise<{ shelfId: string; bookId: string }>;
-  };
-
-  /** Best-effort retry: POST /filing/request-retry to queue via Inngest */
-  retryFiling?: (input: {
-    sessionId: string;
-    sessionMode: 'freeform' | 'homework';
-  }) => Promise<void>;
-
   router: Router;
 }
 
 const CLOSE_TIMEOUT_MS = 15_000;
 
 export function useSessionActions(opts: UseSessionActionsOptions) {
+  const client = useApiClient();
   const {
     activeSessionId,
     isStreaming,
@@ -151,6 +130,8 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
     setShowTopicSwitcher,
     setShowParkingLot,
     setShowFilingPrompt,
+    setDepthEvaluation,
+    setDepthEvaluating,
     setConsumedQuickChipMessageId,
     setMessageFeedback,
     homeworkProblemsState,
@@ -175,8 +156,6 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
     syncHomeworkMetadata,
     fetchFastCelebrations,
     showConfirmation,
-    filing,
-    retryFiling,
     router,
   } = opts;
 
@@ -375,52 +354,38 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
                 fastCelebrations,
               };
 
-              // Freeform: auto-file silently if conditions met, else show prompt
-              // Homework: always show filing prompt
-              if (
-                effectiveMode === 'freeform' ||
-                effectiveMode === 'homework'
-              ) {
-                if (
-                  shouldAutoFile({
-                    effectiveMode,
-                    effectiveSubjectId,
-                    exchangeCount,
-                    topicId,
-                  }) &&
-                  filing
-                ) {
-                  // Auto-file silently — no modal, no decision for the kid
-                  try {
-                    await filing.mutateAsync({
-                      sessionId: activeSessionId,
-                      sessionMode: 'freeform',
-                    });
-                    showConfirmation(
-                      `Saved to your ${effectiveSubjectName ?? 'library'} shelf`
-                    );
-                  } catch {
-                    try {
-                      await retryFiling?.({
-                        sessionId: activeSessionId,
-                        sessionMode: 'freeform',
-                      });
-                    } catch {
-                      // Best-effort — session data is safe
-                    }
-                    showConfirmation?.(
-                      "Couldn't save to library — retrying in the background"
-                    );
-                  }
-                  navigateToSummary(
-                    activeSessionId,
-                    result.wallClockSeconds,
-                    fastCelebrations
+              if (effectiveMode === 'freeform') {
+                setDepthEvaluation(null);
+                setDepthEvaluating(true);
+                setShowFilingPrompt(true);
+
+                try {
+                  const response = await client.sessions[':sessionId'][
+                    'evaluate-depth'
+                  ].$post({
+                    param: { sessionId: activeSessionId },
+                  });
+                  await assertOk(response);
+                  setDepthEvaluation(
+                    (await response.json()) as DepthEvaluation
                   );
-                } else {
-                  setShowFilingPrompt(true);
+                } catch {
+                  setDepthEvaluation({
+                    meaningful: true,
+                    reason: 'Gate failed - client-side fail open',
+                    method: 'fail_open',
+                    topics: [],
+                  });
+                } finally {
+                  setDepthEvaluating(false);
                 }
+              } else if (effectiveMode === 'homework') {
+                setDepthEvaluation(null);
+                setDepthEvaluating(false);
+                setShowFilingPrompt(true);
               } else {
+                setDepthEvaluation(null);
+                setDepthEvaluating(false);
                 navigateToSummary(
                   activeSessionId,
                   result.wallClockSeconds,
@@ -465,9 +430,9 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
     effectiveSubjectName,
     exchangeCount,
     topicId,
-    filing,
-    retryFiling,
-    showConfirmation,
+    client,
+    setDepthEvaluation,
+    setDepthEvaluating,
     navigateToSummary,
     setIsClosing,
     setShowFilingPrompt,

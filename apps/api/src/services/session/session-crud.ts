@@ -14,15 +14,15 @@ import {
 } from '@eduagent/database';
 import { z } from 'zod';
 import type {
+  CelebrationReason,
   LearningSession,
   SessionStartInput,
   SessionCloseInput,
   SessionAnalyticsEventInput,
   ContentFlagInput,
-  SessionType,
-  InputMode,
-  VerificationType,
+  SessionTranscript,
 } from '@eduagent/schemas';
+import { celebrationReasonSchema } from '@eduagent/schemas';
 import { insertSessionEvent } from './session-events';
 import { getSubject } from '../subject';
 import { createPendingSessionSummary } from '../summaries';
@@ -454,28 +454,7 @@ export async function getSessionTranscript(
   db: Database,
   profileId: string,
   sessionId: string
-): Promise<{
-  session: {
-    sessionId: string;
-    subjectId: string;
-    topicId: string | null;
-    sessionType: SessionType;
-    inputMode: InputMode;
-    verificationType?: VerificationType | null;
-    startedAt: string;
-    exchangeCount: number;
-    milestonesReached: string[];
-    wallClockSeconds: number | null;
-  };
-  exchanges: Array<{
-    eventId?: string;
-    role: 'user' | 'assistant';
-    content: string;
-    timestamp: string;
-    escalationRung?: number;
-    isSystemPrompt?: boolean;
-  }>;
-} | null> {
+): Promise<SessionTranscript | null> {
   const session = await getSession(db, profileId, sessionId);
   if (!session) return null;
 
@@ -520,9 +499,13 @@ export async function getSessionTranscript(
   const metadata =
     (rawSession?.metadata as Record<string, unknown> | null) ?? {};
   const milestonesReached = Array.isArray(metadata['milestonesReached'])
-    ? metadata['milestonesReached'].filter(
-        (value): value is string => typeof value === 'string'
-      )
+    ? metadata['milestonesReached']
+        .map((value) => celebrationReasonSchema.safeParse(value))
+        .filter(
+          (result): result is { success: true; data: CelebrationReason } =>
+            result.success
+        )
+        .map((result) => result.data)
     : [];
 
   return {
