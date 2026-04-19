@@ -60,6 +60,14 @@ export const profiles = pgTable(
     location: locationTypeEnum('location'),
     isOwner: boolean('is_owner').notNull().default(false),
     hasPremiumLlm: boolean('has_premium_llm').notNull().default(false),
+    // BKT-C.1 — tutor's speaking language. NOT NULL default 'en' so existing
+    // rows backfill to English without a behavioral change. CHECK enforces the
+    // supported language list at the DB layer.
+    conversationLanguage: text('conversation_language').notNull().default('en'),
+    // BKT-C.1 — optional, learner-owned free text up to 32 chars (enforced in
+    // Zod). No SQL length check: the field is nullable and the schema boundary
+    // is where we enforce formatting.
+    pronouns: text('pronouns'),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -73,6 +81,10 @@ export const profiles = pgTable(
       columns: [table.birthYearSetBy],
       foreignColumns: [table.id],
     }).onDelete('set null'),
+    check(
+      'profiles_conversation_language_check',
+      sql`${table.conversationLanguage} IN ('en','cs','es','fr','de','it','pt','pl')`
+    ),
   ]
 );
 

@@ -4,6 +4,29 @@ import { consentStatusSchema } from './consent.ts';
 export const locationSchema = z.enum(['EU', 'US', 'OTHER']);
 export type LocationType = z.infer<typeof locationSchema>;
 
+// BKT-C.1 — the tutor's speaking language. ISO 639-1. Initial list: 8
+// languages. Expanding this list requires a separate PR with L1-grammar QA.
+export const conversationLanguageSchema = z.enum([
+  'en',
+  'cs',
+  'es',
+  'fr',
+  'de',
+  'it',
+  'pt',
+  'pl',
+]);
+export type ConversationLanguage = z.infer<typeof conversationLanguageSchema>;
+
+// BKT-C.1 — optional, learner-owned free text. Max 32 chars enforced here,
+// not at the DB layer. Stored as-is (no LLM validation).
+export const pronounsSchema = z.string().min(1).max(32);
+export type Pronouns = z.infer<typeof pronounsSchema>;
+
+// BKT-C.1 — age cutoff for pronouns prompt during onboarding (COPPA-transition
+// age; below this, the field is never prompted and stays null).
+export const PRONOUNS_PROMPT_MIN_AGE = 13;
+
 export const birthYearSchema = z
   .number()
   .int()
@@ -19,6 +42,8 @@ export const profileCreateSchema = z.object({
   birthYear: birthYearSchema,
   avatarUrl: z.string().url().optional(),
   location: locationSchema.optional(),
+  conversationLanguage: conversationLanguageSchema.optional(),
+  pronouns: pronounsSchema.nullable().optional(),
 });
 
 export type ProfileCreateInput = z.infer<typeof profileCreateSchema>;
@@ -28,6 +53,24 @@ export const profileUpdateSchema = profileCreateSchema
   .omit({ birthYear: true, location: true })
   .strict();
 export type ProfileUpdateInput = z.infer<typeof profileUpdateSchema>;
+
+// BKT-C.1 — onboarding endpoint bodies. Each is a single-field PATCH so the
+// wire contract is clear and each step can be retried independently without
+// risking a merged write.
+export const onboardingLanguagePatchSchema = z.object({
+  conversationLanguage: conversationLanguageSchema,
+});
+export type OnboardingLanguagePatch = z.infer<
+  typeof onboardingLanguagePatchSchema
+>;
+
+// null clears the field; a string must be 1..32 chars.
+export const onboardingPronounsPatchSchema = z.object({
+  pronouns: pronounsSchema.nullable(),
+});
+export type OnboardingPronounsPatch = z.infer<
+  typeof onboardingPronounsPatchSchema
+>;
 
 export const profileSwitchSchema = z.object({
   profileId: z.string().uuid(),
@@ -44,6 +87,10 @@ export const profileSchema = z.object({
   location: locationSchema.nullable(),
   isOwner: z.boolean(),
   hasPremiumLlm: z.boolean().default(false),
+  // BKT-C.1 — default 'en' so legacy profiles parse cleanly before the backfill
+  // migration runs. After 0035 migrates, every row has a real value.
+  conversationLanguage: conversationLanguageSchema.default('en'),
+  pronouns: pronounsSchema.nullable().default(null),
   consentStatus: consentStatusSchema.nullable(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),

@@ -352,21 +352,26 @@ export default function MentorMemoryScreen() {
         <MemorySection title="Interests">
           {(profile?.interests ?? []).length > 0 ? (
             profile?.interests.map((interest) => {
+              // BKT-C.2 — interests are now InterestEntry { label, context };
+              // read .label for display and keying. Context-aware rendering
+              // (school vs free-time chips) lands in the mobile context-picker
+              // commit.
+              const label = interest.label;
               // [BUG-471] Surface timestamp if available
-              const ts = profile?.interestTimestamps?.[interest];
+              const ts = profile?.interestTimestamps?.[label];
               const detail = ts
                 ? `Noticed ${formatRelativeDate(ts)}`
                 : undefined;
               return (
                 <MemoryRow
-                  key={interest}
-                  label={interest}
+                  key={label}
+                  label={label}
                   detail={detail}
                   onRemove={async () => {
                     try {
                       await deleteItem.mutateAsync({
                         category: 'interests',
-                        value: interest,
+                        value: label,
                         suppress: true,
                       });
                     } catch {
