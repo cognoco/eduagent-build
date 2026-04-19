@@ -550,6 +550,27 @@ async function buildSubjectInventory(
 
   const topicsTotal = preGeneratedLatestTopicIds.size;
 
+  // [F-045] Recompute time values from live session data rather than from the
+  // potentially-stale snapshot metrics. Pre-F-045 snapshots have wallClockMinutes=0,
+  // which causes the SubjectCard to fall back to activeMinutes and show a much
+  // smaller number than what the session card (which reads wallClockSeconds live)
+  // displays. Reading from state.sessions here keeps both surfaces consistent.
+  const subjectSessions = state.sessions.filter(
+    (s) => s.subjectId === subject.id
+  );
+  const liveActiveMinutes = Math.round(
+    subjectSessions.reduce((sum, s) => sum + (s.durationSeconds ?? 0), 0) / 60
+  );
+  const liveWallClockMinutes = Math.round(
+    subjectSessions.reduce(
+      (sum, s) => sum + (s.wallClockSeconds ?? s.durationSeconds ?? 0),
+      0
+    ) / 60
+  );
+  const liveLastSessionAt = subjectSessions
+    .map((s) => s.lastActivityAt)
+    .sort((a, b) => b.getTime() - a.getTime())[0];
+
   return {
     subjectId: subject.id,
     subjectName: subject.name,
@@ -580,10 +601,10 @@ async function buildSubjectInventory(
     },
     estimatedProficiency,
     estimatedProficiencyLabel,
-    lastSessionAt: subjectMetric.lastSessionAt,
-    activeMinutes: subjectMetric.activeMinutes,
-    wallClockMinutes: subjectMetric.wallClockMinutes,
-    sessionsCount: subjectMetric.sessionsCount,
+    lastSessionAt: liveLastSessionAt?.toISOString() ?? null,
+    activeMinutes: liveActiveMinutes,
+    wallClockMinutes: liveWallClockMinutes,
+    sessionsCount: subjectSessions.length,
   };
 }
 
@@ -599,6 +620,16 @@ export async function buildKnowledgeInventory(
     metrics.subjects.map((subject) => buildSubjectInventory(db, state, subject))
   );
 
+  // [F-044] Always read streak from the live DB row rather than the snapshot.
+  // Progress snapshots are written asynchronously by the session-completed
+  // Inngest pipeline — if the streak row was updated AFTER the snapshot was
+  // persisted (or on an earlier day's snapshot), `metrics.currentStreak` is
+  // stale and returns 0 even when the user has consecutive-day activity.
+  // `state.streak` is loaded live inside loadProgressState(), so it always
+  // reflects the most recent recordSessionActivity() call.
+  const liveCurrentStreak = state.streak?.currentStreak ?? 0;
+  const liveLongestStreak = state.streak?.longestStreak ?? 0;
+
   return knowledgeInventorySchema.parse({
     profileId,
     snapshotDate: latestSnapshot?.snapshotDate ?? isoDate(new Date()),
@@ -610,8 +641,8 @@ export async function buildKnowledgeInventory(
       totalSessions: metrics.totalSessions,
       totalActiveMinutes: metrics.totalActiveMinutes,
       totalWallClockMinutes: metrics.totalWallClockMinutes,
-      currentStreak: metrics.currentStreak,
-      longestStreak: metrics.longestStreak,
+      currentStreak: liveCurrentStreak,
+      longestStreak: liveLongestStreak,
     },
     subjects: subjectInventories,
   });
@@ -763,11 +794,63 @@ export async function upsertProgressSnapshot(
     });
 }
 
+// [F-043] Session thresholds that should have fired a milestone on session
+// completion. Must stay in sync with SESSION_THRESHOLDS in milestone-detection.ts.
+const SESSION_BACKFILL_THRESHOLDS = [1, 3, 5, 10, 25, 50, 100, 250];
+
+/**
+ * [F-043] Backfills missed session_count milestones for users who had sessions
+ * before lower thresholds were introduced, or whose session-completed Inngest
+ * function silently skipped milestone detection.
+ *
+ * Only runs when 0 milestones exist and totalSessions is above at least one
+ * threshold — avoids DB writes for users who genuinely have no activity.
+ */
+async function backfillSessionMilestones(
+  db: Database,
+  profileId: string,
+  totalSessions: number
+): Promise<void> {
+  const thresholdsMissed = SESSION_BACKFILL_THRESHOLDS.filter(
+    (t) => totalSessions >= t
+  );
+  if (thresholdsMissed.length === 0) return;
+
+  const toInsert = thresholdsMissed.map((threshold) => ({
+    profileId,
+    milestoneType: 'session_count' as const,
+    threshold,
+    subjectId: null as string | null,
+    bookId: null as string | null,
+    metadata: { backfilled: true } as Record<string, unknown>,
+  }));
+
+  // onConflictDoNothing is safe — unique constraint on (profileId, milestoneType, threshold)
+  // prevents duplicates if this runs concurrently or twice.
+  await storeMilestones(db, profileId, toInsert);
+}
+
 export async function listRecentMilestones(
   db: Database,
   profileId: string,
   limit = 5
 ): Promise<MilestoneRecord[]> {
+  const existingCount = await db.query.milestones.findMany({
+    where: eq(milestones.profileId, profileId),
+    limit: 1,
+  });
+
+  // [F-043] If no milestones exist, check if sessions are above thresholds and
+  // backfill. This handles users who had sessions before milestone detection was
+  // introduced, or whose session-completed pipeline silently skipped detection.
+  if (existingCount.length === 0) {
+    const latestSnapshot = await getLatestSnapshot(db, profileId);
+    const totalSessions = latestSnapshot?.metrics.totalSessions ?? 0;
+    if (totalSessions > 0) {
+      await backfillSessionMilestones(db, profileId, totalSessions);
+    }
+  }
+
   const rows = await db.query.milestones.findMany({
     where: eq(milestones.profileId, profileId),
     orderBy: desc(milestones.createdAt),

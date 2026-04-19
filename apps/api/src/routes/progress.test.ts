@@ -45,6 +45,8 @@ jest.mock('../services/progress', () => ({
   getTopicProgress: jest.fn(),
   getOverallProgress: jest.fn(),
   getContinueSuggestion: jest.fn(),
+  getActiveSessionForTopic: jest.fn(),
+  resolveTopicSubject: jest.fn(),
 }));
 
 jest.mock('../services/retention-data', () => ({
@@ -57,6 +59,8 @@ import {
   getTopicProgress,
   getOverallProgress,
   getContinueSuggestion,
+  getActiveSessionForTopic,
+  resolveTopicSubject,
 } from '../services/progress';
 import { getProfileOverdueCount } from '../services/retention-data';
 
@@ -362,6 +366,145 @@ describe('progress routes', () => {
 
     it('returns 401 without auth header', async () => {
       const res = await app.request('/v1/progress/continue', {}, TEST_ENV);
+
+      expect(res.status).toBe(401);
+    });
+
+    it('[F-001] returns lastSessionId in continue suggestion when active session on the suggested topic', async () => {
+      (getContinueSuggestion as jest.Mock).mockResolvedValue({
+        subjectId: SUBJECT_ID,
+        subjectName: 'Mathematics',
+        topicId: TOPIC_ID,
+        topicTitle: 'Algebra Basics',
+        lastSessionId: 'session-abc',
+      });
+
+      const res = await app.request(
+        '/v1/progress/continue',
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.suggestion.lastSessionId).toBe('session-abc');
+    });
+
+    it('[F-001] returns null lastSessionId when no resumable session matches the suggested topic', async () => {
+      (getContinueSuggestion as jest.Mock).mockResolvedValue({
+        subjectId: SUBJECT_ID,
+        subjectName: 'Mathematics',
+        topicId: TOPIC_ID,
+        topicTitle: 'Algebra Basics',
+        lastSessionId: null,
+      });
+
+      const res = await app.request(
+        '/v1/progress/continue',
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.suggestion.lastSessionId).toBeNull();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // GET /v1/progress/topic/:topicId/active-session [F-4]
+  // -------------------------------------------------------------------------
+
+  describe('GET /v1/progress/topic/:topicId/active-session', () => {
+    it('returns 200 with sessionId when an active session exists', async () => {
+      (getActiveSessionForTopic as jest.Mock).mockResolvedValue({
+        sessionId: 'active-session-xyz',
+      });
+
+      const res = await app.request(
+        `/v1/progress/topic/${TOPIC_ID}/active-session`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.sessionId).toBe('active-session-xyz');
+    });
+
+    it('returns 200 with null when no active session exists', async () => {
+      (getActiveSessionForTopic as jest.Mock).mockResolvedValue(null);
+
+      const res = await app.request(
+        `/v1/progress/topic/${TOPIC_ID}/active-session`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body).toBeNull();
+    });
+
+    it('returns 401 without auth header', async () => {
+      const res = await app.request(
+        `/v1/progress/topic/${TOPIC_ID}/active-session`,
+        {},
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(401);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // GET /v1/topics/:topicId/resolve [F-009]
+  // -------------------------------------------------------------------------
+
+  describe('GET /v1/topics/:topicId/resolve', () => {
+    it('[F-009] returns 200 with subjectId when topic exists and belongs to profile', async () => {
+      (resolveTopicSubject as jest.Mock).mockResolvedValue({
+        subjectId: SUBJECT_ID,
+        subjectName: 'Mathematics',
+        topicTitle: 'Algebra Basics',
+      });
+
+      const res = await app.request(
+        `/v1/topics/${TOPIC_ID}/resolve`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.subjectId).toBe(SUBJECT_ID);
+      expect(body.subjectName).toBe('Mathematics');
+      expect(body.topicTitle).toBe('Algebra Basics');
+    });
+
+    it('[F-009] returns 404 when topic not found or belongs to another profile', async () => {
+      (resolveTopicSubject as jest.Mock).mockResolvedValue(null);
+
+      const res = await app.request(
+        `/v1/topics/${TOPIC_ID}/resolve`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(404);
+    });
+
+    it('returns 401 without auth header', async () => {
+      const res = await app.request(
+        `/v1/topics/${TOPIC_ID}/resolve`,
+        {},
+        TEST_ENV
+      );
 
       expect(res.status).toBe(401);
     });

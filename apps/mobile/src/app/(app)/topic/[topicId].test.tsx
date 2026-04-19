@@ -12,6 +12,10 @@ const mockTopicRetention = jest.fn();
 const mockEvaluateEligibility = jest.fn();
 const mockParkingLot = jest.fn();
 const mockTopicNote = jest.fn();
+const mockResolveTopicSubject = jest.fn(() => ({
+  data: undefined,
+  isLoading: false,
+}));
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({
@@ -44,7 +48,7 @@ jest.mock('../../../lib/navigation', () => ({
 jest.mock('../../../hooks/use-progress', () => ({
   useTopicProgress: () => mockTopicProgress(),
   useActiveSessionForTopic: () => mockActiveSession(),
-  useResolveTopicSubject: () => ({ data: undefined, isLoading: false }),
+  useResolveTopicSubject: () => mockResolveTopicSubject(),
 }));
 
 jest.mock('../../../hooks/use-retention', () => ({
@@ -388,6 +392,61 @@ describe('TopicDetailScreen error / empty / missing-params states', () => {
 
     fireEvent.press(screen.getByTestId('topic-detail-go-back'));
     expect(mockGoBackOrReplace).toHaveBeenCalled();
+  });
+
+  it('[F-009] shows loading spinner while resolving subjectId from a deep-link (no subjectId param)', () => {
+    // Simulate a deep-link: topicId present but no subjectId in route params
+    mockUseLocalSearchParams.mockReturnValue({
+      topicId: 't1',
+    } as { subjectId: string; topicId: string });
+    mockResolveTopicSubject.mockReturnValue({
+      data: undefined,
+      isLoading: true,
+    });
+
+    mockTopicProgress.mockReturnValue({
+      data: null,
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+    mockTopicRetention.mockReturnValue({
+      data: null,
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+    mockEvaluateEligibility.mockReturnValue({ data: undefined });
+    mockActiveSession.mockReturnValue({ data: null });
+    mockParkingLot.mockReturnValue({ data: [], isLoading: false });
+    mockTopicNote.mockReturnValue({ data: null });
+
+    render(<TopicDetailScreen />);
+
+    // While resolve is loading, the screen shows a spinner, not "Topic not found"
+    expect(screen.queryByText('Topic not found')).toBeNull();
+  });
+
+  it('[F-009] renders topic content after resolving subjectId from deep-link', () => {
+    // Simulate a deep-link that resolved successfully
+    mockUseLocalSearchParams.mockReturnValue({
+      topicId: 't1',
+    } as { subjectId: string; topicId: string });
+    mockResolveTopicSubject.mockReturnValue({
+      data: {
+        subjectId: 's1',
+        subjectName: 'Mathematics',
+        topicTitle: 'Algebra',
+      } as unknown,
+      isLoading: false,
+    });
+
+    setupDefaults({ completionStatus: 'in_progress' });
+
+    render(<TopicDetailScreen />);
+
+    expect(screen.getByTestId('primary-action-button')).toBeTruthy();
+    expect(screen.getByText('Continue learning')).toBeTruthy();
   });
 });
 

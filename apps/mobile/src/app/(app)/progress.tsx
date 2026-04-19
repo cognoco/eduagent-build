@@ -371,7 +371,17 @@ export default function ProgressScreen(): React.ReactElement {
                 title="Your growth"
                 subtitle="Weekly changes in topics mastered and vocabulary"
                 data={growthData}
-                emptyMessage="You just started. Keep going and your growth will appear here."
+                emptyMessage={
+                  // [F-043] Distinguish brand-new users from users who have
+                  // sessions but no mastery data yet (mastery takes repeat exposures).
+                  (inventory?.global.totalSessions ?? 0) > 0
+                    ? `You've put in ${
+                        inventory?.global.totalSessions ?? 0
+                      } session${
+                        (inventory?.global.totalSessions ?? 0) === 1 ? '' : 's'
+                      }. Keep going — mastery shows up after repeat exposures.`
+                    : 'You just started. Keep going and your growth will appear here.'
+                }
               />
             </View>
 
@@ -407,7 +417,12 @@ export default function ProgressScreen(): React.ReactElement {
             ) : (
               <View className="bg-surface rounded-card p-4">
                 <Text className="text-body-sm text-text-secondary">
-                  Complete your first session to earn your first milestone
+                  {/* [F-043] Distinguish users who have sessions from true newcomers.
+                      Milestones backfill on the next progress refresh — if none appear
+                      yet, encourage the user without implying they haven't started. */}
+                  {(inventory?.global.totalSessions ?? 0) > 0
+                    ? 'Milestones will collect here as you grow. Pull down to refresh.'
+                    : 'Complete your first session to earn your first milestone'}
                 </Text>
               </View>
             )}
