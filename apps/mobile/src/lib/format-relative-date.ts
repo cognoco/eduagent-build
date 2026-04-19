@@ -12,7 +12,7 @@ export function formatRelativeDate(isoDate: string): string {
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours}h`;
   const days = Math.floor(hours / 24);
-  if (days === 0) return 'Today';
+  // days is always >= 1 here because `hours < 24` already returned above.
   if (days === 1) return 'Yesterday';
   if (days < 7) return `${days} days ago`;
   if (days < 30) return `${days}d`;

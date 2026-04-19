@@ -1,7 +1,9 @@
 import { View, Text, Pressable, FlatList } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useRecentRounds } from '../../../hooks/use-quiz';
 import { goBackOrReplace } from '../../../lib/navigation';
+import { useThemeColors } from '../../../lib/theme';
 
 // [F-037] Friendly date label — "Today" / "Yesterday" / locale long date.
 function formatDateHeader(isoDate: string): string {
@@ -24,6 +26,7 @@ function formatDateHeader(isoDate: string): string {
 
 export default function QuizHistoryScreen() {
   const router = useRouter();
+  const colors = useThemeColors();
   const { data: rounds, isLoading } = useRecentRounds();
 
   if (isLoading) {
@@ -79,8 +82,11 @@ export default function QuizHistoryScreen() {
         <Pressable
           testID="quiz-history-back"
           onPress={() => goBackOrReplace(router, '/(app)/practice')}
+          className="min-h-[32px] min-w-[32px] items-center justify-center"
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
         >
-          <Text className="text-primary">Back</Text>
+          <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
         </Pressable>
         <Text className="text-on-surface ml-4 text-xl font-bold">
           Quiz History
@@ -101,8 +107,13 @@ export default function QuizHistoryScreen() {
                 className="bg-surface-elevated mx-4 mb-2 rounded-xl p-4"
                 onPress={() => router.push(`/(app)/quiz/${round.id}`)}
               >
-                <Text className="text-on-surface font-semibold capitalize">
-                  {round.activityType.replace('_', ' ')}
+                <Text className="text-on-surface font-semibold">
+                  {/* [F-036b] Server provides pre-formatted activityLabel
+                      ("Capitals", "Guess Who"). Fall back to the raw slug
+                      only for older cached responses that predate the
+                      field. */}
+                  {(round as { activityLabel?: string }).activityLabel ??
+                    round.activityType.replace('_', ' ')}
                 </Text>
                 <Text className="text-on-surface-muted text-sm">
                   {round.theme}

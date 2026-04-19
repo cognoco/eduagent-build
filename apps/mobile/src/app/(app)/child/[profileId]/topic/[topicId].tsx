@@ -7,12 +7,14 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import {
-  RetentionSignal,
-  type RetentionStatus,
-} from '../../../../../components/progress';
 import { useChildSessions } from '../../../../../hooks/use-dashboard';
 import { goBackOrReplace } from '../../../../../lib/navigation';
+import {
+  getParentRetentionInfo,
+  getReconciliationLine,
+  getUnderstandingLabel,
+} from '../../../../../lib/parent-vocab';
+import { useThemeColors } from '../../../../../lib/theme';
 
 const COMPLETION_LABELS: Record<string, string> = {
   not_started: 'Not started',
@@ -39,9 +41,15 @@ function formatDuration(seconds: number | null): string {
   return `${mins} min`;
 }
 
+function formatTimeOnApp(seconds: number | null): string {
+  const duration = formatDuration(seconds);
+  return duration === '--' ? 'Time on app unavailable' : `${duration} on app`;
+}
+
 export default function TopicDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const colors = useThemeColors();
   const {
     topicId: rawTopicId,
     profileId: rawProfileId,
@@ -49,6 +57,7 @@ export default function TopicDetailScreen() {
     completionStatus,
     masteryScore,
     retentionStatus,
+    totalSessions: rawTotalSessions,
     subjectId: rawSubjectId,
     subjectName: rawSubjectName,
   } = useLocalSearchParams<{
@@ -58,6 +67,7 @@ export default function TopicDetailScreen() {
     completionStatus: string;
     masteryScore: string;
     retentionStatus: string;
+    totalSessions: string;
     subjectId: string;
     subjectName: string;
   }>();
@@ -71,6 +81,9 @@ export default function TopicDetailScreen() {
   const subjectName = Array.isArray(rawSubjectName)
     ? rawSubjectName[0]
     : rawSubjectName;
+  const totalSessions = Array.isArray(rawTotalSessions)
+    ? Number(rawTotalSessions[0] ?? 0)
+    : Number(rawTotalSessions ?? 0);
 
   const mastery =
     masteryScore !== undefined && masteryScore !== ''
@@ -132,18 +145,18 @@ export default function TopicDetailScreen() {
             </Text>
           </View>
 
-          {/* Mastery card */}
+          {/* Understanding card */}
           {masteryPercent !== null && (
             <View
               className="bg-surface rounded-card p-4 mt-3"
-              testID="topic-mastery-card"
+              testID="topic-understanding-card"
             >
               <View className="flex-row items-center justify-between mb-2">
                 <Text className="text-body-sm font-medium text-text-secondary">
-                  Mastery
+                  Understanding
                 </Text>
                 <Text className="text-body font-semibold text-text-primary">
-                  {masteryPercent}%
+                  {getUnderstandingLabel(masteryPercent)}
                 </Text>
               </View>
               <View className="h-2.5 bg-border rounded-full overflow-hidden">
@@ -152,21 +165,51 @@ export default function TopicDetailScreen() {
                   style={{ width: `${masteryPercent}%` }}
                 />
               </View>
+              <Text className="text-caption text-text-tertiary mt-1">
+                {masteryPercent}%
+              </Text>
             </View>
           )}
 
-          {/* Retention card */}
-          {retentionStatus ? (
-            <View
-              className="bg-surface rounded-card p-4 mt-3"
-              testID="topic-retention-card"
-            >
-              <Text className="text-body-sm font-medium text-text-secondary mb-2">
-                Retention
-              </Text>
-              <RetentionSignal status={retentionStatus as RetentionStatus} />
-            </View>
-          ) : null}
+          {/* Review status card */}
+          {(() => {
+            const retentionInfo = getParentRetentionInfo(
+              retentionStatus,
+              totalSessions,
+              completionStatus ?? ''
+            );
+            if (!retentionInfo) return null;
+
+            const reconciliation = getReconciliationLine(
+              masteryPercent ?? 0,
+              retentionInfo
+            );
+
+            return (
+              <View
+                className="bg-surface rounded-card p-4 mt-3"
+                testID="topic-retention-card"
+              >
+                <Text className="text-body-sm font-medium text-text-secondary mb-2">
+                  Review status
+                </Text>
+                <View className="flex-row items-center">
+                  <View
+                    className="w-2.5 h-2.5 rounded-full mr-2"
+                    style={{ backgroundColor: colors[retentionInfo.colorKey] }}
+                  />
+                  <Text className="text-body font-medium text-text-primary">
+                    {retentionInfo.label}
+                  </Text>
+                </View>
+                {reconciliation ? (
+                  <Text className="text-caption text-text-secondary mt-2">
+                    {reconciliation}
+                  </Text>
+                ) : null}
+              </View>
+            );
+          })()}
         </View>
 
         {/* Session History */}
@@ -205,16 +248,11 @@ export default function TopicDetailScreen() {
                   {session.sessionType}
                 </Text>
               </View>
-              <View className="flex-row items-center">
-                <Text className="text-caption text-text-secondary me-4">
-                  {session.exchangeCount} exchanges
-                </Text>
-                <Text className="text-caption text-text-secondary">
-                  {formatDuration(
-                    session.wallClockSeconds ?? session.durationSeconds
-                  )}
-                </Text>
-              </View>
+              <Text className="text-caption text-text-secondary">
+                {formatTimeOnApp(
+                  session.wallClockSeconds ?? session.durationSeconds
+                )}
+              </Text>
             </Pressable>
           ))
         ) : (

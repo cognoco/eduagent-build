@@ -3,7 +3,7 @@
 // Pure business logic + DB-aware query functions, no Hono imports
 // ---------------------------------------------------------------------------
 
-import { eq, and, gte, inArray, desc, sum } from 'drizzle-orm';
+import { eq, and, gte, inArray, desc, sum, sql } from 'drizzle-orm';
 import {
   familyLinks,
   profiles,
@@ -649,12 +649,49 @@ export async function getChildSubjectTopics(
     where: eq(curriculumTopics.curriculumId, curriculum.id),
   });
 
+  const topicIds = topics.map((topic) => topic.id);
+  const topicSessionCounts =
+    topicIds.length > 0
+      ? await db
+          .select({
+            topicId: learningSessions.topicId,
+            totalSessions: sql<number>`count(*)::int`,
+          })
+          .from(learningSessions)
+          .where(
+            and(
+              eq(learningSessions.profileId, childProfileId),
+              eq(learningSessions.subjectId, subjectId),
+              inArray(learningSessions.topicId, topicIds),
+              gte(learningSessions.exchangeCount, 1)
+            )
+          )
+          .groupBy(learningSessions.topicId)
+      : [];
+  const totalSessionsByTopic = new Map(
+    topicSessionCounts
+      .filter(
+        (
+          row
+        ): row is {
+          topicId: string;
+          totalSessions: number;
+        } => typeof row.topicId === 'string'
+      )
+      .map((row) => [row.topicId, row.totalSessions])
+  );
+
   // Get progress for each topic
   const results = await Promise.all(
     topics.map((t) => getTopicProgress(db, childProfileId, subjectId, t.id))
   );
 
-  return results.filter((r): r is TopicProgress => r !== null);
+  return results
+    .filter((r): r is TopicProgress => r !== null)
+    .map((topic) => ({
+      ...topic,
+      totalSessions: totalSessionsByTopic.get(topic.topicId) ?? 0,
+    }));
 }
 
 // ---------------------------------------------------------------------------
@@ -676,6 +713,15 @@ export interface ChildSession {
   displaySummary: string | null;
   homeworkSummary: HomeworkSummary | null;
   highlight: string | null;
+  narrative: string | null;
+  conversationPrompt: string | null;
+  engagementSignal:
+    | 'curious'
+    | 'stuck'
+    | 'breezing'
+    | 'focused'
+    | 'scattered'
+    | null;
 }
 
 /**
@@ -706,15 +752,23 @@ export async function getChildSessions(
   const sessionIds = sessions.map((s) => s.id);
   const summaries = await db.query.sessionSummaries.findMany({
     where: inArray(sessionSummaries.sessionId, sessionIds),
-    columns: { sessionId: true, highlight: true },
+    columns: {
+      sessionId: true,
+      highlight: true,
+      narrative: true,
+      conversationPrompt: true,
+      engagementSignal: true,
+    },
   });
-  const highlightBySession = new Map(
-    summaries.map((s) => [s.sessionId, s.highlight ?? null])
+  const summaryBySession = new Map(
+    summaries.map((summary) => [summary.sessionId, summary])
   );
 
   return sessions.map((s) => {
     const metadata = getSessionMetadata(s.metadata);
     const homeworkSummary = metadata.homeworkSummary ?? null;
+
+    const summary = summaryBySession.get(s.id);
 
     return {
       sessionId: s.id,
@@ -730,7 +784,11 @@ export async function getChildSessions(
       displayTitle: formatSessionDisplayTitle(s.sessionType, homeworkSummary),
       displaySummary: homeworkSummary?.summary ?? null,
       homeworkSummary,
-      highlight: highlightBySession.get(s.id) ?? null,
+      highlight: summary?.highlight ?? null,
+      narrative: summary?.narrative ?? null,
+      conversationPrompt: summary?.conversationPrompt ?? null,
+      engagementSignal:
+        (summary?.engagementSignal as ChildSession['engagementSignal']) ?? null,
     };
   });
 }
@@ -757,7 +815,12 @@ export async function getChildSessionDetail(
   // Fetch highlight for this single session
   const summary = await db.query.sessionSummaries.findFirst({
     where: eq(sessionSummaries.sessionId, sessionId),
-    columns: { highlight: true },
+    columns: {
+      highlight: true,
+      narrative: true,
+      conversationPrompt: true,
+      engagementSignal: true,
+    },
   });
 
   return {
@@ -778,6 +841,10 @@ export async function getChildSessionDetail(
     displaySummary: homeworkSummary?.summary ?? null,
     homeworkSummary,
     highlight: summary?.highlight ?? null,
+    narrative: summary?.narrative ?? null,
+    conversationPrompt: summary?.conversationPrompt ?? null,
+    engagementSignal:
+      (summary?.engagementSignal as ChildSession['engagementSignal']) ?? null,
   };
 }
 

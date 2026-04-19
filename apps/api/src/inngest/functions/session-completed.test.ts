@@ -28,7 +28,7 @@ const mockSessionCompletedDb = createTransactionalMockDb({
     learningSessions: {
       findFirst: jest.fn().mockResolvedValue({ rawInput: null, topicId: null }),
     },
-    // generate-session-highlight reads summary row and profile
+    // generate-session-insights reads summary row and profile
     sessionSummaries: {
       findFirst: jest
         .fn()
@@ -210,7 +210,7 @@ jest.mock('../../services/snapshot-aggregation', () => ({
     mockRefreshProgressSnapshot(...args),
 }));
 
-const mockGenerateLlmHighlight = jest
+const mockGenerateSessionInsights = jest
   .fn()
   .mockResolvedValue({ valid: false, reason: 'parse_error' });
 const mockBuildBrowseHighlight = jest
@@ -218,8 +218,8 @@ const mockBuildBrowseHighlight = jest
   .mockReturnValue('Emma browsed a topic — 1 min');
 
 jest.mock('../../services/session-highlights', () => ({
-  generateLlmHighlight: (...args: unknown[]) =>
-    mockGenerateLlmHighlight(...args),
+  generateSessionInsights: (...args: unknown[]) =>
+    mockGenerateSessionInsights(...args),
   buildBrowseHighlight: (...args: unknown[]) =>
     mockBuildBrowseHighlight(...args),
 }));
@@ -364,7 +364,7 @@ describe('sessionCompleted', () => {
       'update-needs-deepening',
       'check-milestone-completion',
       'write-coaching-card',
-      'generate-session-highlight',
+      'generate-session-insights',
       'analyze-learner-profile',
       'update-dashboard',
       'generate-embeddings',

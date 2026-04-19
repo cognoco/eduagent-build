@@ -7,6 +7,7 @@ export type { RetentionStatus };
 interface RetentionSignalProps {
   status: RetentionStatus;
   compact?: boolean;
+  parentFacing?: boolean;
 }
 
 const CONFIG: Record<
@@ -48,15 +49,26 @@ const CONFIG: Record<
   },
 };
 
-export function RetentionSignal({ status, compact }: RetentionSignalProps) {
+export function RetentionSignal({
+  status,
+  compact,
+  parentFacing,
+}: RetentionSignalProps) {
   const { label, icon, colorKey, textColor } = CONFIG[status];
   const colors = useThemeColors();
+  const parentLabel =
+    status === 'strong'
+      ? 'Remembering well'
+      : status === 'fading'
+      ? 'A few things to refresh'
+      : 'Needs a review';
+  const displayLabel = parentFacing ? parentLabel : label;
 
   return (
     <View
       className="flex-row items-center"
       testID={`retention-signal-${status}`}
-      accessibilityLabel={`Retention: ${label}`}
+      accessibilityLabel={`Retention: ${displayLabel}`}
       accessibilityRole="text"
     >
       <Ionicons
@@ -66,7 +78,9 @@ export function RetentionSignal({ status, compact }: RetentionSignalProps) {
         style={compact ? undefined : { marginRight: 6 }}
       />
       {!compact && (
-        <Text className={`text-body-sm font-medium ${textColor}`}>{label}</Text>
+        <Text className={`text-body-sm font-medium ${textColor}`}>
+          {displayLabel}
+        </Text>
       )}
     </View>
   );

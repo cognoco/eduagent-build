@@ -29,7 +29,8 @@ export type SubjectProgressMetrics = z.infer<
 export const progressMetricsSchema = z.object({
   totalSessions: z.number().int(),
   totalActiveMinutes: z.number().int(),
-  totalWallClockMinutes: z.number().int(),
+  // [F-045] Wall-clock minutes — default(0) for backward compat with pre-existing snapshots
+  totalWallClockMinutes: z.number().int().default(0),
   totalExchanges: z.number().int(),
   topicsAttempted: z.number().int(),
   topicsMastered: z.number().int(),

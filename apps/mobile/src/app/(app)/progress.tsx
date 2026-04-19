@@ -302,6 +302,8 @@ export default function ProgressScreen(): React.ReactElement {
                   </View>
                   <View className="bg-background rounded-full px-3 py-1.5">
                     <Text className="text-caption font-semibold text-text-primary">
+                      {/* [M5] || intentional: totalWallClockMinutes defaults to 0 for
+                          pre-F-045 snapshots; falsy-fallback shows activeMinutes. */}
                       {inventory.global.totalWallClockMinutes ||
                         inventory.global.totalActiveMinutes}{' '}
                       min

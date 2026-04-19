@@ -177,6 +177,10 @@ export const validatedQuestionResultSchema = z.object({
   questionIndex: z.number().int().min(0),
   correct: z.boolean(),
   correctAnswer: z.string(),
+  // [F-040] The user's submitted answer — surfaced to the results screen so
+  // we can render "You said: X" on missed-question cards without a second
+  // round-trip. Server-authoritative: copied from validatedResults.
+  answerGiven: z.string(),
 });
 export type ValidatedQuestionResult = z.infer<
   typeof validatedQuestionResultSchema

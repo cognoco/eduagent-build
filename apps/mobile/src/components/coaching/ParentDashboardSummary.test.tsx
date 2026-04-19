@@ -90,9 +90,8 @@ describe('ParentDashboardSummary', () => {
 
     expect(screen.getByText('Mathematics')).toBeTruthy();
     expect(screen.getByText('Science')).toBeTruthy();
-    // RetentionSignal renders organic labels
-    expect(screen.getByText('Thriving')).toBeTruthy();
-    expect(screen.getByText('Warming up')).toBeTruthy();
+    expect(screen.getByText('Remembering well')).toBeTruthy();
+    expect(screen.getByText('A few things to refresh')).toBeTruthy();
   });
 
   it('calls onDrillDown when card pressed', () => {
@@ -130,6 +129,7 @@ describe('ParentDashboardSummary', () => {
     );
 
     expect(screen.getByTestId('retention-trend-badge')).toBeTruthy();
+    expect(screen.getByText(/Review health:/)).toBeTruthy();
     expect(screen.getByText(/Improving/)).toBeTruthy();
   });
 

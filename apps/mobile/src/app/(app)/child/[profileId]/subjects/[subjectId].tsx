@@ -163,8 +163,13 @@ export default function SubjectTopicsScreen() {
                     topicId: topic.topicId,
                     title: topic.title,
                     completionStatus: topic.completionStatus,
-                    masteryScore: String(topic.masteryScore ?? 0),
+                    masteryScore:
+                      topic.masteryScore !== null &&
+                      topic.masteryScore !== undefined
+                        ? String(topic.masteryScore)
+                        : '',
                     retentionStatus: topic.retentionStatus ?? '',
+                    totalSessions: String(topic.totalSessions ?? 0),
                     subjectId: subjectId ?? '',
                     subjectName: subjectName ?? '',
                   },
@@ -179,11 +184,15 @@ export default function SubjectTopicsScreen() {
                 <Text className="text-body font-medium text-text-primary flex-1 me-2">
                   {topic.title}
                 </Text>
-                {topic.retentionStatus && (
+                {topic.retentionStatus &&
+                topic.totalSessions >= 1 &&
+                topic.completionStatus !== 'not_started' ? (
                   <RetentionSignal
                     status={topic.retentionStatus as RetentionStatus}
+                    compact
+                    parentFacing
                   />
-                )}
+                ) : null}
               </View>
               <Text className="text-caption text-text-secondary mb-2">
                 {COMPLETION_LABELS[topic.completionStatus] ??

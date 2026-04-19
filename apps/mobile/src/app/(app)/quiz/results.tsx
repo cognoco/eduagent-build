@@ -160,26 +160,47 @@ export default function QuizResultsScreen(): React.ReactElement {
         </View>
       ) : null}
 
-      {/* [F-040] Show missed questions with correct answers */}
+      {/* [F-040] Show missed questions with the user's wrong answer, the
+          correct answer, and the fun fact (if any). Red-muted for the
+          wrong answer, green for the correct one — reinforces the
+          correction without shaming. */}
       {missed.length > 0 && (
         <View className="mt-8 w-full" testID="quiz-results-missed-section">
           <Text className="mb-3 text-body-sm font-semibold uppercase tracking-wide text-text-secondary">
             What you missed
           </Text>
-          {missed.map((qr) => (
-            <View
-              key={qr.questionIndex}
-              className="mb-2 rounded-card bg-surface p-3"
-              testID={`quiz-results-missed-item-${qr.questionIndex}`}
-            >
-              <Text className="text-body-sm text-text-secondary">
-                {questionPrompt(qr.questionIndex)}
-              </Text>
-              <Text className="mt-0.5 text-body font-semibold text-primary">
-                {qr.correctAnswer}
-              </Text>
-            </View>
-          ))}
+          {missed.map((qr) => {
+            // Defensive: skip cards where the server didn't send a
+            // correctAnswer (shouldn't happen post-Task 1, but keeps the
+            // screen from rendering a meaningless blank row).
+            if (!qr.correctAnswer) return null;
+            const prompt = questionPrompt(qr.questionIndex);
+            const question = round?.questions[qr.questionIndex];
+            return (
+              <View
+                key={qr.questionIndex}
+                className="mb-2 rounded-card bg-surface p-3"
+                testID={`quiz-results-missed-item-${qr.questionIndex}`}
+                accessibilityRole="text"
+                accessibilityLabel={`${prompt}. You said ${qr.answerGiven}. Correct answer ${qr.correctAnswer}.`}
+              >
+                <Text className="text-body-sm text-text-secondary">
+                  {prompt}
+                </Text>
+                <Text className="mt-1 text-body text-danger opacity-70">
+                  You said: {qr.answerGiven}
+                </Text>
+                <Text className="mt-0.5 text-body font-semibold text-success">
+                  {qr.correctAnswer}
+                </Text>
+                {question?.funFact ? (
+                  <Text className="mt-1 text-caption text-text-secondary opacity-70">
+                    {question.funFact}
+                  </Text>
+                ) : null}
+              </View>
+            );
+          })}
         </View>
       )}
 

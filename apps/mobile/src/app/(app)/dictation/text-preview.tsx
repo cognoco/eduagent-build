@@ -34,7 +34,8 @@ export default function TextPreviewScreen(): React.ReactElement {
       // [F-030] Yield to React render cycle so context state commits before
       // playback screen mounts (same race as dictation/index.tsx).
       setTimeout(() => router.push('/(app)/dictation/playback' as never), 0);
-    } catch {
+    } catch (err) {
+      console.warn('[dictation] homework preparation failed:', err);
       platformAlert(
         'Something went wrong',
         'Could not prepare your dictation. Try again?',

@@ -45,7 +45,9 @@ export function useQuizFlow(): QuizFlowContextType {
   return context;
 }
 
-function QuizFlowProvider({
+// Exported so tests can mount real descendants inside the real provider
+// without re-implementing (and drifting from) the context state machine.
+export function QuizFlowProvider({
   children,
 }: {
   children: React.ReactNode;

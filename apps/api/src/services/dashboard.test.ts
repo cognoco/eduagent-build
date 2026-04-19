@@ -17,7 +17,9 @@ const mockProgressSnapshotsFindFirst = jest.fn();
 const mockProgressSnapshotsFindMany = jest.fn();
 const mockMilestonesFindMany = jest.fn();
 const mockStreaksFindMany = jest.fn();
-const mockXpSelect = jest.fn();
+const mockDbSelect = jest.fn();
+const mockSessionSummariesFindFirst = jest.fn();
+const mockSessionSummariesFindMany = jest.fn();
 
 import { createDatabaseModuleMock } from '../test-utils/database-module';
 
@@ -31,6 +33,9 @@ const mockDatabaseModule = createDatabaseModuleMock({
     learningSessions: {
       id: 'id',
       profileId: 'profile_id',
+      subjectId: 'subject_id',
+      topicId: 'topic_id',
+      exchangeCount: 'exchange_count',
       startedAt: 'started_at',
     },
     sessionEvents: {
@@ -67,6 +72,9 @@ const mockDatabaseModule = createDatabaseModuleMock({
       sessionId: 'session_id',
       profileId: 'profile_id',
       highlight: 'highlight',
+      narrative: 'narrative',
+      conversationPrompt: 'conversation_prompt',
+      engagementSignal: 'engagement_signal',
     },
   },
 });
@@ -303,11 +311,11 @@ function createMockDb() {
         findMany: mockStreaksFindMany,
       },
       sessionSummaries: {
-        findFirst: jest.fn().mockResolvedValue(null),
-        findMany: jest.fn().mockResolvedValue([]),
+        findFirst: mockSessionSummariesFindFirst,
+        findMany: mockSessionSummariesFindMany,
       },
     },
-    select: mockXpSelect,
+    select: mockDbSelect,
   } as unknown;
 }
 
@@ -326,8 +334,11 @@ beforeEach(() => {
   mockProgressSnapshotsFindMany.mockResolvedValue([]);
   mockMilestonesFindMany.mockResolvedValue([]);
   mockStreaksFindMany.mockResolvedValue([]);
-  // XP query uses db.select().from().where().groupBy() chain
-  mockXpSelect.mockReturnValue({
+  mockSessionSummariesFindFirst.mockResolvedValue(null);
+  mockSessionSummariesFindMany.mockResolvedValue([]);
+  // `dashboard.ts` uses db.select().from().where().groupBy() for both the
+  // child XP rollup and grouped topic session counts.
+  mockDbSelect.mockReturnValue({
     from: jest.fn().mockReturnValue({
       where: jest.fn().mockReturnValue({
         groupBy: jest.fn().mockResolvedValue([]),
@@ -651,6 +662,16 @@ describe('getChildSubjectTopics', () => {
       { id: TOPIC_ID_1, curriculumId: CURRICULUM_ID, title: 'Topic 1' },
       { id: TOPIC_ID_2, curriculumId: CURRICULUM_ID, title: 'Topic 2' },
     ]);
+    mockDbSelect.mockReturnValueOnce({
+      from: jest.fn().mockReturnValue({
+        where: jest.fn().mockReturnValue({
+          groupBy: jest.fn().mockResolvedValue([
+            { topicId: TOPIC_ID_1, totalSessions: 5 },
+            { topicId: TOPIC_ID_2, totalSessions: 2 },
+          ]),
+        }),
+      }),
+    });
 
     mockGetTopicProgress
       .mockResolvedValueOnce({
@@ -663,6 +684,7 @@ describe('getChildSubjectTopics', () => {
         masteryScore: 0.9,
         summaryExcerpt: null,
         xpStatus: 'verified',
+        totalSessions: 3,
       })
       .mockResolvedValueOnce(null); // Topic 2 returns null (filtered out)
 
@@ -676,6 +698,7 @@ describe('getChildSubjectTopics', () => {
     expect(result).toHaveLength(1);
     expect(result[0].topicId).toBe(TOPIC_ID_1);
     expect(result[0].completionStatus).toBe('completed');
+    expect(result[0].totalSessions).toBe(5);
   });
 });
 
@@ -712,6 +735,15 @@ describe('getChildSessions', () => {
       parentProfileId: PARENT_ID,
       childProfileId: CHILD_ID,
     });
+    mockSessionSummariesFindMany.mockResolvedValue([
+      {
+        sessionId: SESSION_ID_1,
+        highlight: 'Practiced plant cells',
+        narrative: 'They sorted out the main parts of a plant cell.',
+        conversationPrompt: 'Can you point to the cell wall on a diagram?',
+        engagementSignal: 'focused',
+      },
+    ]);
 
     const now = new Date();
     const earlier = new Date(now.getTime() - 3600_000);
@@ -765,12 +797,73 @@ describe('getChildSessions', () => {
     expect(result[0].durationSeconds).toBe(600);
     expect(result[0].wallClockSeconds).toBe(720);
     expect(result[0].startedAt).toBe(now.toISOString());
+    expect(result[0].highlight).toBe('Practiced plant cells');
+    expect(result[0].narrative).toBe(
+      'They sorted out the main parts of a plant cell.'
+    );
+    expect(result[0].conversationPrompt).toBe(
+      'Can you point to the cell wall on a diagram?'
+    );
+    expect(result[0].engagementSignal).toBe('focused');
     expect(result[1].endedAt).toBeNull();
     expect(result[1].durationSeconds).toBeNull();
     expect(result[1].wallClockSeconds).toBeNull();
     expect(result[1].displayTitle).toBe('Math Homework');
     expect(result[1].displaySummary).toBe(
       '5 problems, practiced linear equations.'
+    );
+    expect(result[1].narrative).toBeNull();
+  });
+});
+
+describe('getChildSessionDetail', () => {
+  it('returns recap fields for a single session', async () => {
+    const { getChildSessionDetail } = await importDbFunctions();
+    const db = createMockDb();
+    const startedAt = new Date('2026-03-20T10:00:00.000Z');
+    const endedAt = new Date('2026-03-20T10:08:00.000Z');
+
+    mockFamilyLinksFindFirst.mockResolvedValue({
+      parentProfileId: PARENT_ID,
+      childProfileId: CHILD_ID,
+    });
+    mockSessionsFindFirst.mockResolvedValue({
+      id: SESSION_ID_1,
+      subjectId: SUBJECT_ID,
+      topicId: TOPIC_ID_1,
+      sessionType: 'learning',
+      startedAt,
+      endedAt,
+      exchangeCount: 6,
+      escalationRung: 2,
+      durationSeconds: 480,
+      wallClockSeconds: 500,
+      metadata: {},
+    });
+    mockSessionSummariesFindFirst.mockResolvedValue({
+      highlight: 'Practiced equivalent fractions',
+      narrative:
+        'They compared fraction sizes and corrected one shaky step with a hint.',
+      conversationPrompt: 'Which fraction felt easiest to compare today?',
+      engagementSignal: 'curious',
+    });
+
+    const result = await getChildSessionDetail(
+      db as never,
+      PARENT_ID,
+      CHILD_ID,
+      SESSION_ID_1
+    );
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        sessionId: SESSION_ID_1,
+        highlight: 'Practiced equivalent fractions',
+        narrative:
+          'They compared fraction sizes and corrected one shaky step with a hint.',
+        conversationPrompt: 'Which fraction felt easiest to compare today?',
+        engagementSignal: 'curious',
+      })
     );
   });
 });

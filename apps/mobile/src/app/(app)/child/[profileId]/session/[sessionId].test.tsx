@@ -1,4 +1,10 @@
-import { render, screen } from '@testing-library/react-native';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react-native';
+import * as Clipboard from 'expo-clipboard';
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ back: jest.fn(), canGoBack: jest.fn(() => true) }),
@@ -28,6 +34,10 @@ jest.mock('../../../../../hooks/use-dashboard', () => ({
     mockUseChildSessionDetail(...args),
 }));
 
+jest.mock('expo-clipboard', () => ({
+  setStringAsync: jest.fn().mockResolvedValue(undefined),
+}));
+
 const SessionDetailScreen = require('./[sessionId]').default;
 
 function makeSession(overrides: Record<string, unknown> = {}) {
@@ -45,6 +55,10 @@ function makeSession(overrides: Record<string, unknown> = {}) {
     displayTitle: 'Learning',
     displaySummary: null,
     homeworkSummary: null,
+    highlight: null,
+    narrative: null,
+    conversationPrompt: null,
+    engagementSignal: null,
     ...overrides,
   };
 }
@@ -54,7 +68,10 @@ describe('SessionDetailScreen (summary-only)', () => {
 
   it('shows session metadata when displaySummary is present', () => {
     mockUseChildSessionDetail.mockReturnValue({
-      data: makeSession({ displaySummary: 'Practiced light reactions' }),
+      data: makeSession({
+        displaySummary: 'Practiced light reactions',
+        narrative: 'They linked sunlight to the way plants make food.',
+      }),
       isLoading: false,
     });
 
@@ -64,7 +81,33 @@ describe('SessionDetailScreen (summary-only)', () => {
     expect(screen.getByTestId('session-metadata')).toBeTruthy();
   });
 
-  it('shows fallback text when displaySummary is null', () => {
+  it('shows recap content when the new narrative fields are present', () => {
+    mockUseChildSessionDetail.mockReturnValue({
+      data: makeSession({
+        narrative:
+          'They compared equivalent fractions and fixed one shaky step.',
+        highlight: 'Practiced equivalent fractions',
+        conversationPrompt: 'Which fraction felt easiest to compare today?',
+        engagementSignal: 'focused',
+      }),
+      isLoading: false,
+    });
+
+    render(<SessionDetailScreen />);
+
+    expect(
+      screen.getByText(
+        'They compared equivalent fractions and fixed one shaky step.'
+      )
+    ).toBeTruthy();
+    expect(screen.getByText('Practiced equivalent fractions')).toBeTruthy();
+    expect(screen.getByText('Focused')).toBeTruthy();
+    expect(
+      screen.getByText('Which fraction felt easiest to compare today?')
+    ).toBeTruthy();
+  });
+
+  it('shows recap unavailable fallback when older sessions have no recap fields', () => {
     mockUseChildSessionDetail.mockReturnValue({
       data: makeSession({ displaySummary: null }),
       isLoading: false,
@@ -72,6 +115,7 @@ describe('SessionDetailScreen (summary-only)', () => {
 
     render(<SessionDetailScreen />);
 
+    expect(screen.getByTestId('narrative-unavailable')).toBeTruthy();
     expect(
       screen.getByText('Session summary not available for older sessions')
     ).toBeTruthy();
@@ -118,5 +162,24 @@ describe('SessionDetailScreen (summary-only)', () => {
     render(<SessionDetailScreen />);
 
     expect(screen.queryByTestId('transcript-exchange')).toBeNull();
+  });
+
+  it('shows copy feedback when the conversation prompt is copied', async () => {
+    mockUseChildSessionDetail.mockReturnValue({
+      data: makeSession({
+        narrative: 'They worked through a short recap.',
+        conversationPrompt: 'Can you teach this back to me?',
+      }),
+      isLoading: false,
+    });
+
+    render(<SessionDetailScreen />);
+
+    fireEvent.press(screen.getByTestId('copy-conversation-prompt'));
+
+    await waitFor(() => expect(screen.getByText('Copied ✓')).toBeTruthy());
+    expect(Clipboard.setStringAsync).toHaveBeenCalledWith(
+      'Can you teach this back to me?'
+    );
   });
 });

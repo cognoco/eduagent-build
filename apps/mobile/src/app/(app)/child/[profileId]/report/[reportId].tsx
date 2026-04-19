@@ -177,7 +177,7 @@ export default function ChildReportDetailScreen(): React.ReactElement {
                     <Text className="text-body-sm text-text-secondary mt-1">
                       {subject.topicsMastered} topics mastered •{' '}
                       {subject.vocabularyTotal} words known •{' '}
-                      {subject.activeMinutes} active min
+                      {subject.activeMinutes} min on app
                     </Text>
                   </View>
                 ))}

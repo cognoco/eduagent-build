@@ -290,6 +290,7 @@ export async function getTopicProgress(
       : null,
     summaryExcerpt: summaryRow?.content?.slice(0, 200) ?? null,
     xpStatus: (latestXp?.status as 'pending' | 'verified' | 'decayed') ?? null,
+    totalSessions: topicSessions.length,
   };
 }
 

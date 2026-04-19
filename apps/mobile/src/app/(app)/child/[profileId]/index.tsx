@@ -56,6 +56,11 @@ function formatDuration(seconds: number | null): string {
   return `${mins} min`;
 }
 
+function formatTimeOnApp(seconds: number | null): string {
+  const duration = formatDuration(seconds);
+  return duration === '--' ? 'Time on app unavailable' : `${duration} on app`;
+}
+
 function formatSessionDate(iso: string): string {
   const d = new Date(iso);
   return d.toLocaleDateString(undefined, {
@@ -520,6 +525,7 @@ export default function ChildDetailScreen() {
                 </View>
                 <RetentionSignal
                   status={subject.retentionStatus as RetentionStatus}
+                  parentFacing
                 />
               </Pressable>
             ))}
@@ -603,16 +609,11 @@ export default function ChildDetailScreen() {
                   {session.highlight}
                 </Text>
               )}
-              <View className="flex-row items-center">
-                <Text className="text-caption text-text-secondary me-4">
-                  {session.exchangeCount} exchanges
-                </Text>
-                <Text className="text-caption text-text-secondary">
-                  {formatDuration(
-                    session.wallClockSeconds ?? session.durationSeconds
-                  )}
-                </Text>
-              </View>
+              <Text className="text-caption text-text-secondary">
+                {formatTimeOnApp(
+                  session.wallClockSeconds ?? session.durationSeconds
+                )}
+              </Text>
             </Pressable>
           ))
         ) : (
