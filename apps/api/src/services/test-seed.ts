@@ -21,6 +21,7 @@ import {
   curriculumBooks,
   learningSessions,
   sessionEvents,
+  sessionSummaries,
   retentionCards,
   assessments,
   subscriptions,
@@ -809,21 +810,40 @@ async function seedParentMultiChild(
     respondedAt: new Date(),
   });
 
-  const { subjectId: subject1Id } = await createSubjectWithCurriculum(
-    db,
-    child1ProfileId,
-    'Mathematics'
-  );
+  const { subjectId: subject1Id, topicIds: child1TopicIds } =
+    await createSubjectWithCurriculum(db, child1ProfileId, 'Mathematics');
+  const child1TopicId = child1TopicIds[0];
+  if (!child1TopicId) {
+    throw new Error('Mathematics seed subject is missing a topic');
+  }
 
   const session1Id = generateUUIDv7();
   await db.insert(learningSessions).values({
     id: session1Id,
     profileId: child1ProfileId,
     subjectId: subject1Id,
+    topicId: child1TopicId,
     sessionType: 'learning',
     status: 'completed',
     exchangeCount: 10,
     endedAt: pastDate(1),
+    wallClockSeconds: 1080,
+  });
+  await db.insert(sessionSummaries).values({
+    id: generateUUIDv7(),
+    sessionId: session1Id,
+    profileId: child1ProfileId,
+    topicId: child1TopicId,
+    content:
+      'We compared fractions and practiced explaining why 3/4 is bigger than 2/3.',
+    aiFeedback:
+      'Nice job spotting the denominator trap and checking the actual values.',
+    highlight: 'Emma used a number line to explain her thinking.',
+    narrative:
+      'Emma compared fractions with growing confidence and explained why the larger denominator did not always mean the larger value.',
+    conversationPrompt: 'Which fraction felt easiest to compare today?',
+    engagementSignal: 'engaged',
+    status: 'accepted',
   });
 
   // Child 2 — learner with different subject
@@ -848,21 +868,40 @@ async function seedParentMultiChild(
     respondedAt: new Date(),
   });
 
-  const { subjectId: subject2Id } = await createSubjectWithCurriculum(
-    db,
-    child2ProfileId,
-    'Science'
-  );
+  const { subjectId: subject2Id, topicIds: child2TopicIds } =
+    await createSubjectWithCurriculum(db, child2ProfileId, 'Science');
+  const child2TopicId = child2TopicIds[0];
+  if (!child2TopicId) {
+    throw new Error('Science seed subject is missing a topic');
+  }
 
   const session2Id = generateUUIDv7();
   await db.insert(learningSessions).values({
     id: session2Id,
     profileId: child2ProfileId,
     subjectId: subject2Id,
+    topicId: child2TopicId,
     sessionType: 'learning',
     status: 'completed',
     exchangeCount: 5,
     endedAt: pastDate(2),
+    wallClockSeconds: 780,
+  });
+  await db.insert(sessionSummaries).values({
+    id: generateUUIDv7(),
+    sessionId: session2Id,
+    profileId: child2ProfileId,
+    topicId: child2TopicId,
+    content:
+      'We linked sunlight, water, and carbon dioxide to how plants make food.',
+    aiFeedback: 'Great recall of the ingredients and what the plant produces.',
+    highlight: 'Lucas connected the process back to why leaves need sunlight.',
+    narrative:
+      'Lucas worked through photosynthesis step by step and linked each ingredient to what the plant needs to survive.',
+    conversationPrompt:
+      'Can you point out where the plant gets its energy from?',
+    engagementSignal: 'steady',
+    status: 'accepted',
   });
 
   // Child 3 — teen with no sessions yet (fresh onboarding)
@@ -887,11 +926,12 @@ async function seedParentMultiChild(
     respondedAt: new Date(),
   });
 
-  const { subjectId: subject3Id } = await createSubjectWithCurriculum(
-    db,
-    child3ProfileId,
-    'History'
-  );
+  const { subjectId: subject3Id, topicIds: child3TopicIds } =
+    await createSubjectWithCurriculum(db, child3ProfileId, 'History');
+  const child3TopicId = child3TopicIds[0];
+  if (!child3TopicId) {
+    throw new Error('History seed subject is missing a topic');
+  }
 
   return {
     scenario: 'parent-multi-child',
@@ -907,6 +947,9 @@ async function seedParentMultiChild(
       subject1Id,
       subject2Id,
       subject3Id,
+      child1TopicId,
+      child2TopicId,
+      child3TopicId,
       session1Id,
       session2Id,
     },
@@ -1334,13 +1377,31 @@ async function seedParentSolo(
     respondedAt: new Date(),
   });
 
+  const subscriptionId = generateUUIDv7();
+  await db.insert(subscriptions).values({
+    id: subscriptionId,
+    accountId,
+    tier: 'family',
+    status: 'active',
+    currentPeriodStart: new Date(),
+    currentPeriodEnd: futureDate(30),
+  });
+
+  await db.insert(quotaPools).values({
+    id: generateUUIDv7(),
+    subscriptionId,
+    monthlyLimit: 2_000,
+    usedThisMonth: 12,
+    cycleResetAt: futureDate(30),
+  });
+
   return {
     scenario: 'parent-solo',
     accountId,
     profileId: parentProfileId,
     email,
     password,
-    ids: { parentProfileId },
+    ids: { parentProfileId, subscriptionId },
   };
 }
 
@@ -1383,6 +1444,7 @@ async function seedConsentPending(
     displayName: 'Pending Learner',
     birthYear: 2014,
   });
+  const consentToken = `seed-consent-${generateUUIDv7()}`;
 
   await db.insert(consentStates).values({
     id: generateUUIDv7(),
@@ -1390,6 +1452,8 @@ async function seedConsentPending(
     consentType: 'GDPR',
     status: 'PARENTAL_CONSENT_REQUESTED',
     parentEmail: 'parent-e2e-test@example.com',
+    consentToken,
+    expiresAt: futureDate(7),
   });
 
   return {
@@ -1398,7 +1462,7 @@ async function seedConsentPending(
     profileId,
     email,
     password,
-    ids: {},
+    ids: { consentToken },
   };
 }
 

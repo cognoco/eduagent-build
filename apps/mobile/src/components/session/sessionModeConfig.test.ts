@@ -61,8 +61,10 @@ describe('getOpeningMessage', () => {
       const msg3 = getOpeningMessage(mode, 3);
       const msg4 = getOpeningMessage(mode, 4);
       expect(msg3).toBe(msg4);
-      // Should differ from early tier
-      expect(msg3).not.toBe(getOpeningMessage(mode, 1));
+      // Should differ from early tier (except freeform — intentionally consolidated)
+      if (mode !== 'freeform') {
+        expect(msg3).not.toBe(getOpeningMessage(mode, 1));
+      }
     });
   });
 

@@ -69,7 +69,7 @@ export default defineConfig({
     },
     {
       name: 'smoke-auth',
-      testMatch: /flows[\\/]auth[\\/].*\.spec\.ts/,
+      testMatch: /flows[\\/]auth[\\/]auth-navigation\.spec\.ts/,
     },
     {
       name: 'smoke-learner',
@@ -94,6 +94,12 @@ export default defineConfig({
       use: {
         storageState: path.join(e2eWebDir, '.auth', 'owner-with-children.json'),
       },
+    },
+    {
+      name: 'later-phases',
+      dependencies: ['setup'],
+      testMatch:
+        /flows[\\/](journeys[\\/](j0[89]|j1[0-8])-.*|auth[\\/]w03-.*|navigation[\\/]w0[1-5]-.*)\.spec\.ts/,
     },
   ],
 });

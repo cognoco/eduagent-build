@@ -1,6 +1,8 @@
 import { render, screen } from '@testing-library/react-native';
 import { useAuth } from '@clerk/clerk-expo';
 
+const mockUseLocalSearchParams = jest.fn();
+
 jest.mock('expo-router', () => ({
   Redirect: ({ href }: { href: string }) => {
     const { Text } = require('react-native');
@@ -10,6 +12,7 @@ jest.mock('expo-router', () => ({
     const { View } = require('react-native');
     return <View testID="stack">{children}</View>;
   },
+  useLocalSearchParams: () => mockUseLocalSearchParams(),
 }));
 
 const AuthLayout = require('./_layout').default;
@@ -17,6 +20,7 @@ const AuthLayout = require('./_layout').default;
 describe('AuthRoutesLayout', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockUseLocalSearchParams.mockReturnValue({});
   });
 
   it('redirects to (app)/home when user is signed in', () => {
@@ -29,6 +33,19 @@ describe('AuthRoutesLayout', () => {
 
     const redirect = screen.getByTestId('redirect');
     expect(redirect.props.children).toBe('/(app)/home');
+  });
+
+  it('redirects signed-in users to the requested route when redirectTo is set', () => {
+    mockUseLocalSearchParams.mockReturnValue({ redirectTo: '/quiz' });
+    (useAuth as jest.Mock).mockReturnValue({
+      isLoaded: true,
+      isSignedIn: true,
+    });
+
+    render(<AuthLayout />);
+
+    const redirect = screen.getByTestId('redirect');
+    expect(redirect.props.children).toBe('/quiz');
   });
 
   it('renders Stack when user is not signed in', () => {
@@ -76,6 +93,21 @@ describe('AuthRoutesLayout', () => {
     const redirect = screen.getByTestId('redirect');
     expect(redirect.props.children).toBe('/(app)/home');
     expect(screen.queryByTestId('stack')).toBeNull();
+  });
+
+  it('ignores unsafe redirect targets and falls back to home', () => {
+    mockUseLocalSearchParams.mockReturnValue({
+      redirectTo: 'https://example.com/steal-session',
+    });
+    (useAuth as jest.Mock).mockReturnValue({
+      isLoaded: true,
+      isSignedIn: true,
+    });
+
+    render(<AuthLayout />);
+
+    const redirect = screen.getByTestId('redirect');
+    expect(redirect.props.children).toBe('/(app)/home');
   });
 
   it('renders nothing when isLoaded is false (Clerk still initializing)', () => {

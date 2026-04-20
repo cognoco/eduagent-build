@@ -19,6 +19,7 @@ module.exports = {
     '^@eduagent/test-utils$': '<rootDir>/packages/test-utils/src/index.ts',
     '^(\\.{1,2}/.*)\\.[jt]s$': '$1',
   },
+  modulePathIgnorePatterns: ['\\.claude/worktrees'],
   moduleFileExtensions: ['ts', 'js'],
   testMatch: [
     '<rootDir>/apps/api/src/**/*.test.ts',

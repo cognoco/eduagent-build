@@ -5,9 +5,12 @@ import { expect, type Page } from '@playwright/test';
 export interface SignInOptions {
   email: string;
   password: string;
-  storageStatePath: string;
   landingTestId: string;
   landingPath?: string;
+}
+
+export interface PersistedSignInOptions extends SignInOptions {
+  storageStatePath: string;
 }
 
 /**
@@ -23,7 +26,7 @@ async function injectClerkTestingToken(page: Page): Promise<void> {
   }, token);
 }
 
-export async function signInAndPersistStorageState(
+export async function signIn(
   page: Page,
   options: SignInOptions
 ): Promise<void> {
@@ -58,6 +61,13 @@ export async function signInAndPersistStorageState(
       timeout: 60_000,
     });
   }
+}
+
+export async function signInAndPersistStorageState(
+  page: Page,
+  options: PersistedSignInOptions
+): Promise<void> {
+  await signIn(page, options);
 
   await mkdir(path.dirname(options.storageStatePath), { recursive: true });
   await page.context().storageState({ path: options.storageStatePath });
