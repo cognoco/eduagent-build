@@ -158,10 +158,7 @@ describe('AppLayout', () => {
     render(<AppLayout />);
 
     const redirect = screen.getByTestId('redirect');
-    expect(redirect.props.href).toEqual({
-      pathname: '/(auth)/sign-in',
-      params: { redirectTo: '/home' },
-    });
+    expect(redirect.props.href).toBe('/sign-in?redirectTo=%2Fhome');
     expect(screen.queryByTestId('tabs')).toBeNull();
   });
 
@@ -175,10 +172,7 @@ describe('AppLayout', () => {
     render(<AppLayout />);
 
     const redirect = screen.getByTestId('redirect');
-    expect(redirect.props.href).toEqual({
-      pathname: '/(auth)/sign-in',
-      params: { redirectTo: '/quiz' },
-    });
+    expect(redirect.props.href).toBe('/sign-in?redirectTo=%2Fquiz');
   });
 
   it('strips route-group segments from redirect targets for unauthenticated users', () => {
@@ -191,10 +185,7 @@ describe('AppLayout', () => {
     render(<AppLayout />);
 
     const redirect = screen.getByTestId('redirect');
-    expect(redirect.props.href).toEqual({
-      pathname: '/(auth)/sign-in',
-      params: { redirectTo: '/quiz' },
-    });
+    expect(redirect.props.href).toBe('/sign-in?redirectTo=%2Fquiz');
   });
 
   it('renders nothing while Clerk auth is still loading', () => {

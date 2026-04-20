@@ -1069,14 +1069,8 @@ export default function AppLayout() {
       console.warn(
         '[AUTH-DEBUG] (app) layout → NOT signed in, bouncing to sign-in'
       );
-    return (
-      <Redirect
-        href={{
-          pathname: '/(auth)/sign-in',
-          params: { redirectTo: normalizeRedirectPath(pathname) },
-        }}
-      />
-    );
+    const redirectTo = encodeURIComponent(normalizeRedirectPath(pathname));
+    return <Redirect href={`/sign-in?redirectTo=${redirectTo}` as const} />;
   }
 
   // Show a centered spinner while profiles load — never return null (blank

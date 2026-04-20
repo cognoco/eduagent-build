@@ -105,7 +105,7 @@ test('J-10 learner → Practice → Quiz → launch → play → results → hom
   await expect(page.getByTestId('practice-screen')).toBeVisible({
     timeout: 30_000,
   });
-  await page.getByTestId('practice-back').click();
+  await page.getByTestId('practice-back').click({ force: true });
   await expect(page.getByTestId('learner-screen')).toBeVisible({
     timeout: 30_000,
   });

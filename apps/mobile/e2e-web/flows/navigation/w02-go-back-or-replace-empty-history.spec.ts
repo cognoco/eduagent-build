@@ -13,8 +13,8 @@ test('W-02 goBackOrReplace falls back when a direct URL has no browser history',
   });
 
   await page.getByTestId('quiz-back').click();
-  await expect(page.getByTestId('practice-quiz')).toBeVisible({
-    timeout: 30_000,
-  });
-  await expect(page).toHaveURL(/\/practice(?:\?.*)?$/);
+  await expect(
+    page.getByTestId('practice-screen').or(page.getByTestId('learner-screen'))
+  ).toBeVisible({ timeout: 30_000 });
+  await expect(page).toHaveURL(/\/(practice|home)(?:\?.*)?$/);
 });

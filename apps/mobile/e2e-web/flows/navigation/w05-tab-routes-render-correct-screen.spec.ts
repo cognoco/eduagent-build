@@ -25,7 +25,9 @@ test('W-05 tab URLs render the correct screen on web', async ({ page }) => {
   });
 
   await page.goto('/more', { waitUntil: 'commit' });
-  await expect(page.getByRole('button', { name: 'Profile' })).toBeVisible({
+  await expect(
+    page.getByRole('button', { name: 'Profile', exact: true })
+  ).toBeVisible({
     timeout: 30_000,
   });
 });
