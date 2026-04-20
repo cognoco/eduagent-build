@@ -99,10 +99,14 @@ test('J-09 learner → Learn → create subject → interview → curriculum →
   await seedAndSignIn(page, {
     scenario: 'onboarding-no-subject',
     alias: 'j09',
-    landingTestId: 'create-subject-name',
-    landingPath: '/create-subject',
+    landingTestId: 'learner-screen',
+    landingPath: '/home',
   });
 
+  await page.getByTestId('intent-learn').click();
+  await expect(page.getByTestId('create-subject-name')).toBeVisible({
+    timeout: 30_000,
+  });
   await page.getByTestId('create-subject-name').fill('Astronomy');
   await page.getByTestId('create-subject-submit').click();
 

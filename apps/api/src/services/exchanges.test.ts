@@ -82,6 +82,23 @@ describe('buildSystemPrompt', () => {
     expect(prompt).not.toContain('Crisp, professional');
   });
 
+  // [B.5] Age-calibration anchors rephrased for the strict 11+ product.
+  describe('age-calibration anchors (B.5)', () => {
+    it('uses 12/15/17 anchors, not 9/16/adult', () => {
+      const prompt = buildSystemPrompt(baseContext);
+      expect(prompt).toContain('12-year-old');
+      expect(prompt).toContain('15-year-old');
+      expect(prompt).toContain('17-year-old');
+    });
+
+    it('does NOT use out-of-range anchors (9/10/adult) as learner types', () => {
+      const prompt = buildSystemPrompt(baseContext);
+      expect(prompt).not.toContain('9-year-old');
+      expect(prompt).not.toContain('10-year-old');
+      expect(prompt).not.toContain('An adult needs');
+    });
+  });
+
   describe('first-exchange teaching opener', () => {
     it('injects "begin teaching immediately" when exchangeCount=0 and topicTitle present', () => {
       const prompt = buildSystemPrompt({
@@ -537,6 +554,39 @@ describe('buildSystemPrompt', () => {
   it('does not include voice-mode constraint when inputMode is undefined', () => {
     const prompt = buildSystemPrompt(baseContext);
     expect(prompt).not.toContain('VOICE MODE');
+  });
+
+  // [B.2] Symmetric TEXT MODE block — forbids phonetic pronunciation guides
+  // in text mode, except for language-learning (four_strands) sessions where
+  // pronunciation IS the teaching content.
+  describe('text-mode pronunciation block (B.2)', () => {
+    it('injects TEXT MODE block when inputMode is text and pedagogy is not four_strands', () => {
+      const prompt = buildSystemPrompt({
+        ...baseContext,
+        inputMode: 'text',
+      });
+      expect(prompt).toContain('TEXT MODE');
+      expect(prompt).toContain('phonetic pronunciation guides');
+    });
+
+    it('injects TEXT MODE block when inputMode is undefined (text is the default) and pedagogy is not four_strands', () => {
+      const prompt = buildSystemPrompt(baseContext);
+      expect(prompt).toContain('TEXT MODE');
+    });
+
+    it('does NOT inject TEXT MODE block when inputMode is voice', () => {
+      const prompt = buildSystemPrompt({ ...baseContext, inputMode: 'voice' });
+      expect(prompt).not.toContain('TEXT MODE');
+    });
+
+    it('does NOT inject TEXT MODE block when pedagogyMode is four_strands (language learning)', () => {
+      const prompt = buildSystemPrompt({
+        ...baseContext,
+        inputMode: 'text',
+        pedagogyMode: 'four_strands',
+      });
+      expect(prompt).not.toContain('TEXT MODE');
+    });
   });
 });
 

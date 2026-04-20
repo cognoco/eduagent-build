@@ -1,6 +1,7 @@
 import { Pressable, Text, View } from 'react-native';
 import type { SubjectInventory } from '@eduagent/schemas';
 import { ProgressBar } from './ProgressBar';
+import { formatMinutes } from '../../lib/format-relative-date';
 
 type SubjectCardAction = 'review' | 'continue' | 'explore';
 
@@ -36,7 +37,9 @@ function getTopicHeadline(subject: SubjectInventory): {
       progressMax: Math.max(1, exploredCount),
       // [M5] || is intentional: wallClockMinutes defaults to 0 for pre-F-045
       // snapshots, so falsy-fallback correctly shows activeMinutes instead of 0.
-      footnote: `${subject.wallClockMinutes || subject.activeMinutes} min`,
+      footnote: formatMinutes(
+        subject.wallClockMinutes || subject.activeMinutes
+      ),
       hideBar: true,
     };
   }
@@ -60,7 +63,7 @@ function getTopicHeadline(subject: SubjectInventory): {
     progressValue: subject.topics.mastered,
     progressMax: subject.topics.total ?? 0,
     // [M5] || intentional — see open-curriculum branch comment above.
-    footnote: `${subject.wallClockMinutes || subject.activeMinutes} min`,
+    footnote: formatMinutes(subject.wallClockMinutes || subject.activeMinutes),
     hideBar: false,
   };
 }

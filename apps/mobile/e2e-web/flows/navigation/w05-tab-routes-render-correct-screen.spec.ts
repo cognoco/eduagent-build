@@ -25,7 +25,7 @@ test('W-05 tab URLs render the correct screen on web', async ({ page }) => {
   });
 
   await page.goto('/more', { waitUntil: 'commit' });
-  await expect(page.getByText('Account')).toBeVisible({
+  await expect(page.getByText('More')).toBeVisible({
     timeout: 30_000,
   });
 });

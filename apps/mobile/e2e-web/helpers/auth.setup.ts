@@ -20,12 +20,12 @@ for (const scenario of Object.values(authScenarios)) {
         scenario: scenario.seedScenario,
         email: scenario.email,
       });
+      const seedDataPath = path.join(authStateDir, `${scenario.key}-seed.json`);
+
+      await mkdir(path.dirname(seedDataPath), { recursive: true });
 
       // Persist seed IDs so journey tests can reference profile IDs, etc.
-      await writeFile(
-        path.join(authStateDir, `${scenario.key}-seed.json`),
-        JSON.stringify(seeded, null, 2)
-      );
+      await writeFile(seedDataPath, JSON.stringify(seeded, null, 2));
 
       await signInAndPersistStorageState(page, {
         email: seeded.email,

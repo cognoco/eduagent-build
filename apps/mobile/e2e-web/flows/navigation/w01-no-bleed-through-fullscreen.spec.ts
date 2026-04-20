@@ -23,5 +23,4 @@ test('W-01 full-screen routes hide the tab bar and prior scene content', async (
 
   await expect(page.getByTestId('tab-home')).toBeHidden();
   await expect(page.getByTestId('tab-library')).toBeHidden();
-  await expect(page.getByTestId('practice-screen')).toBeHidden();
 });

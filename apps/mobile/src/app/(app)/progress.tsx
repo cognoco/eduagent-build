@@ -14,6 +14,7 @@ import {
   isNewLearner,
   sessionsUntilFullProgress,
 } from '../../lib/progressive-disclosure';
+import { formatMinutes } from '../../lib/format-relative-date';
 import {
   GrowthChart,
   MilestoneCard,
@@ -304,9 +305,10 @@ export default function ProgressScreen(): React.ReactElement {
                     <Text className="text-caption font-semibold text-text-primary">
                       {/* [M5] || intentional: totalWallClockMinutes defaults to 0 for
                           pre-F-045 snapshots; falsy-fallback shows activeMinutes. */}
-                      {inventory.global.totalWallClockMinutes ||
-                        inventory.global.totalActiveMinutes}{' '}
-                      min
+                      {formatMinutes(
+                        inventory.global.totalWallClockMinutes ||
+                          inventory.global.totalActiveMinutes
+                      )}
                     </Text>
                   </View>
                   <View className="bg-background rounded-full px-3 py-1.5">
@@ -345,26 +347,28 @@ export default function ProgressScreen(): React.ReactElement {
             <Text className="text-h3 font-semibold text-text-primary mt-6 mb-2">
               Your subjects
             </Text>
-            {inventory?.subjects.map((subject) => (
-              <View key={subject.subjectId} className="mt-3">
-                <SubjectCard
-                  subject={subject}
-                  onPress={() => {
-                    router.push({
-                      pathname: '/(app)/progress/[subjectId]',
-                      params: { subjectId: subject.subjectId },
-                    } as never);
-                  }}
-                  onAction={(action) => {
-                    const mode = action === 'review' ? 'review' : 'freeform';
-                    router.push(
-                      `/(app)/session?mode=${mode}&subjectId=${subject.subjectId}` as never
-                    );
-                  }}
-                  testID={`journey-subject-${subject.subjectId}`}
-                />
-              </View>
-            ))}
+            {inventory?.subjects
+              .filter((s) => !!s.subjectId)
+              .map((subject) => (
+                <View key={subject.subjectId} className="mt-3">
+                  <SubjectCard
+                    subject={subject}
+                    onPress={() => {
+                      router.push({
+                        pathname: '/(app)/progress/[subjectId]',
+                        params: { subjectId: subject.subjectId },
+                      } as never);
+                    }}
+                    onAction={(action) => {
+                      const mode = action === 'review' ? 'review' : 'freeform';
+                      router.push(
+                        `/(app)/session?mode=${mode}&subjectId=${subject.subjectId}` as never
+                      );
+                    }}
+                    testID={`journey-subject-${subject.subjectId}`}
+                  />
+                </View>
+              ))}
 
             <View className="mt-6">
               <GrowthChart

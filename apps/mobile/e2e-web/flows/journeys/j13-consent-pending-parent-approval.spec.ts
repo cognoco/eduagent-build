@@ -39,7 +39,7 @@ test('J-13 pending consent blocks app until parent approval completes', async ({
       await postApproval.click();
     }
 
-    await expect(page.getByTestId('learner-screen')).toBeVisible({
+    await expect(page.getByTestId('create-subject-name')).toBeVisible({
       timeout: 30_000,
     });
   } finally {

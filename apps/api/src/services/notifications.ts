@@ -215,7 +215,8 @@ export interface EmailPayload {
     | 'consent_reminder'
     | 'consent_warning'
     | 'consent_expired'
-    | 'subscribe_request';
+    | 'subscribe_request'
+    | 'feedback';
 }
 
 export interface EmailOptions {

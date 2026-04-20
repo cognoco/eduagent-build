@@ -93,9 +93,11 @@ test('J-10 learner → Practice → Quiz → launch → play → results → hom
     timeout: 30_000,
   });
 
-  await page.getByTestId('quiz-option-0').click();
+  const quizScreen = page.getByTestId('quiz-play-screen');
+  await quizScreen.getByTestId('quiz-option-0').click();
+  await expect(page.getByText('Correct')).toBeVisible({ timeout: 30_000 });
   await page.waitForTimeout(300);
-  await page.getByTestId('quiz-play-screen').click({
+  await quizScreen.click({
     position: { x: 200, y: 300 },
   });
 

@@ -23,11 +23,14 @@ test('J-17 parent opens a session recap and copies the conversation prompt', asy
   await page.getByTestId(`dashboard-child-${childProfileId}`).click();
   await page.getByTestId(`subject-card-${subjectId}`).click();
   await page.getByTestId(`topic-card-${topicId}`).click();
-  await expect(page.getByTestId(`session-card-${sessionId}`)).toBeVisible({
+  const topicDetail = page.getByTestId('topic-detail-screen');
+  await expect(
+    topicDetail.getByTestId(`session-card-${sessionId}`)
+  ).toBeVisible({
     timeout: 30_000,
   });
 
-  await page.getByTestId(`session-card-${sessionId}`).click();
+  await topicDetail.getByTestId(`session-card-${sessionId}`).click();
   await expect(page.getByTestId('copy-conversation-prompt')).toBeVisible({
     timeout: 30_000,
   });

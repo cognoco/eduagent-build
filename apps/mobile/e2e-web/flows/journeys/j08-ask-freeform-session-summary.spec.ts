@@ -180,6 +180,10 @@ test('J-08 learner → Ask → freeform chat → end session → summary → hom
     await dialog.accept();
   });
   await page.getByTestId('end-session-button').click();
+  await expect(page.getByTestId('filing-prompt-dismiss')).toBeVisible({
+    timeout: 30_000,
+  });
+  await page.getByTestId('filing-prompt-dismiss').click();
 
   await expect(page.getByTestId('summary-input')).toBeVisible({
     timeout: 30_000,

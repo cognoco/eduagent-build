@@ -50,7 +50,7 @@ test('J-16 parent drill-down reaches topic detail and unwinds cleanly', async ({
   await expect(page.getByTestId('dashboard-scroll')).toBeVisible({
     timeout: 30_000,
   });
-  await page.goBack();
+  await page.getByTestId('dashboard-back').click();
   await expect(page.getByTestId('parent-gateway')).toBeVisible({
     timeout: 30_000,
   });

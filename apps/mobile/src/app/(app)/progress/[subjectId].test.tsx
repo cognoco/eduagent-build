@@ -254,20 +254,20 @@ describe('ProgressSubjectScreen', () => {
       expect(screen.getByText('5 sessions completed')).toBeTruthy();
     });
 
-    it('shows stat cards — In progress, Not started, Minutes, Sessions', () => {
+    it('shows stat cards — In progress, Not started, Time spent, Sessions', () => {
       mockHooks();
       render(<ProgressSubjectScreen />);
       expect(screen.getByText('In progress')).toBeTruthy();
       expect(screen.getByText('Not started')).toBeTruthy();
-      expect(screen.getByText('Minutes')).toBeTruthy();
+      expect(screen.getByText('Time spent')).toBeTruthy();
       expect(screen.getByText('Sessions')).toBeTruthy();
     });
 
-    it('shows wallClockMinutes in the Minutes stat card (priority over activeMinutes)', () => {
+    it('shows formatted wallClockMinutes in Time spent stat card (priority over activeMinutes)', () => {
       mockHooks();
       render(<ProgressSubjectScreen />);
-      // wallClockMinutes=45 takes priority over activeMinutes=30
-      expect(screen.getByText('45')).toBeTruthy();
+      // wallClockMinutes=45 takes priority over activeMinutes=30; formatMinutes(45) → "45 min"
+      expect(screen.getByText('45 min')).toBeTruthy();
     });
 
     it('shows "Keep learning" and "Open shelf" buttons', () => {

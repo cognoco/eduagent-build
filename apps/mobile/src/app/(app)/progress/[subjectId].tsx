@@ -9,6 +9,7 @@ import {
   useSubjectProgress,
 } from '../../../hooks/use-progress';
 import { useLanguageProgress } from '../../../hooks/use-language-progress';
+import { formatMinutes } from '../../../lib/format-relative-date';
 
 function StatCard({
   label,
@@ -163,8 +164,10 @@ export default function ProgressSubjectScreen(): React.ReactElement {
           <>
             <View className="bg-coaching-card rounded-card p-5 mt-4">
               <Text className="text-h3 font-semibold text-text-primary">
-                {subject.topics.total != null
+                {subject.topics.total != null && subject.topics.total > 0
                   ? `${subject.topics.mastered}/${subject.topics.total} planned topics mastered`
+                  : subject.topics.total === 0
+                  ? 'No topics planned yet'
                   : `${Math.max(
                       subject.topics.explored,
                       subject.topics.mastered + subject.topics.inProgress
@@ -175,11 +178,11 @@ export default function ProgressSubjectScreen(): React.ReactElement {
                   ? `${subject.vocabulary.total} words tracked in this subject`
                   : `${subject.sessionsCount} sessions completed`}
               </Text>
-              {subject.topics.total != null ? (
+              {subject.topics.total != null && subject.topics.total > 0 ? (
                 <View className="mt-4">
                   <ProgressBar
                     value={subject.topics.mastered}
-                    max={Math.max(1, subject.topics.total)}
+                    max={subject.topics.total}
                     testID="progress-subject-bar"
                   />
                 </View>
@@ -199,8 +202,8 @@ export default function ProgressSubjectScreen(): React.ReactElement {
 
             <View className="flex-row gap-3 mt-3">
               <StatCard
-                label="Minutes"
-                value={String(
+                label="Time spent"
+                value={formatMinutes(
                   subject.wallClockMinutes || subject.activeMinutes
                 )}
               />
@@ -356,7 +359,7 @@ export default function ProgressSubjectScreen(): React.ReactElement {
                   </Text>
                 </Pressable>
               </View>
-            ) : legacyProgress ? (
+            ) : legacyProgress && subject.sessionsCount > 0 ? (
               <View className="bg-surface rounded-card p-4 mt-4">
                 <Text className="text-h3 font-semibold text-text-primary">
                   Current retention

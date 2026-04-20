@@ -270,6 +270,8 @@ export function useProgressInventory(): UseQueryResult<KnowledgeInventory> {
       }
     },
     enabled: !!activeProfile,
+    // [BUG-503] Prevent refetch storm: inventory doesn't change within a visit.
+    staleTime: 2 * 60 * 1000,
   });
 }
 
@@ -301,6 +303,8 @@ export function useProgressHistory(
       }
     },
     enabled: !!activeProfile,
+    // [BUG-503] History data is weekly; no need to refetch within the same visit.
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -327,6 +331,8 @@ export function useProgressMilestones(
       }
     },
     enabled: !!activeProfile,
+    // [BUG-503] Milestones don't change mid-session.
+    staleTime: 2 * 60 * 1000,
   });
 }
 

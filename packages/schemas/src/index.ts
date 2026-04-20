@@ -44,3 +44,6 @@ export * from './quiz-utils.ts';
 
 // LLM Response Envelope (shared contract for all structured-output LLM flows)
 export * from './llm-envelope.ts';
+
+// Feedback (in-app feedback + shake-to-report)
+export * from './feedback.ts';
