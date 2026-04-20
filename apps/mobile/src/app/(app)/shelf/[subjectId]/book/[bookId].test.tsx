@@ -837,7 +837,7 @@ describe('BookScreen', () => {
 
     const { getByTestId, getByText } = render(<BookScreen />);
     expect(getByTestId('book-empty-topics')).toBeTruthy();
-    expect(getByText('No topics in this book yet.')).toBeTruthy();
+    expect(getByText(/doesn't have any topics yet/)).toBeTruthy();
   });
 
   it('hides start learning button when no topics exist', () => {

@@ -303,7 +303,7 @@ describe('LibraryScreen', () => {
     expect(screen.getByTestId('library-tab-topics')).toBeTruthy();
     expect(screen.getByText('Shelves (2)')).toBeTruthy();
     expect(screen.getByText('Books (1)')).toBeTruthy();
-    expect(screen.getByText('Topics')).toBeTruthy();
+    expect(screen.getByText('Topics (1)')).toBeTruthy();
   });
 
   it('shows review urgency on the topics tab and matching shelf card', () => {

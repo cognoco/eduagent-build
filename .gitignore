@@ -93,6 +93,9 @@ temp/*
 .worktrees/
 .claude/worktrees/
 
+# Local Claude Code settings (personal tool permissions, output style)
+.claude/settings.local.json
+
 # TestSprite AI Testing (generated tests, ephemeral results)
 testsprite_tests/
 

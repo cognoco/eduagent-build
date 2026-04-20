@@ -26,7 +26,7 @@ export function LibraryTabs({
       {TAB_CONFIG.map(({ key, label }) => {
         const isActive = activeTab === key;
         const showReviewBadge = key === 'topics' && (reviewBadge ?? 0) > 0;
-        const tabLabel = key === 'topics' ? label : `${label} (${counts[key]})`;
+        const tabLabel = `${label} (${counts[key]})`;
         return (
           <Pressable
             key={key}

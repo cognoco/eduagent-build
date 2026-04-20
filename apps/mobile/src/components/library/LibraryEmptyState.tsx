@@ -24,7 +24,7 @@ export function LibraryEmptyState(
         testID="library-no-results"
       >
         <Text className="text-body text-text-secondary text-center mb-4">
-          {props.message ?? }
+          {props.message ?? `No ${props.entityName} match your search`}
         </Text>
         <Pressable
           onPress={props.onClear}

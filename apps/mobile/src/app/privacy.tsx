@@ -67,8 +67,8 @@ export default function PrivacyPolicyScreen() {
             MentoMate is an AI-powered tutoring platform operated by Zwizzly
             (&quot;we&quot;, &quot;us&quot;, &quot;our&quot;). We are committed
             to protecting the privacy of all our users, especially children aged
-            11-15. We process personal data in accordance with the EU General
-            Data Protection Regulation (GDPR).
+            11{'\u2013'}17. We process personal data in accordance with the EU
+            General Data Protection Regulation (GDPR).
           </Paragraph>
         </Section>
 

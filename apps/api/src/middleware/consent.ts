@@ -27,6 +27,7 @@ const EXEMPT_PREFIXES = [
   '/v1/auth/',
   '/v1/consent/',
   '/v1/profiles',
+  '/v1/onboarding/',
   '/v1/billing/',
   '/v1/stripe/',
   '/v1/revenuecat/webhook',

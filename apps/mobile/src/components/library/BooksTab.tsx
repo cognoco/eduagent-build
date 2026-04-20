@@ -303,6 +303,7 @@ export function BooksTab({
           entityName="books"
           onClear={clearAction.handler}
           clearLabel={clearAction.label}
+          message={hasSearch ? undefined : `No books match your filters`}
         />
       ) : (
         <FlatList

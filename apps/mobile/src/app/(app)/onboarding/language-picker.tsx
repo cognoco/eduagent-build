@@ -189,6 +189,14 @@ export default function LanguagePickerScreen(): React.ReactElement {
             );
           })}
         </View>
+
+        <Text
+          className="text-body-sm text-text-secondary mt-4 text-center"
+          testID="language-picker-other-hint"
+        >
+          Don't see your language? Pick the closest one for now — your tutor can
+          switch languages mid-conversation if you ask.
+        </Text>
       </ScrollView>
 
       <View className="px-5 py-4">

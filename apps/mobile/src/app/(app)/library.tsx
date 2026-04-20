@@ -51,6 +51,7 @@ import { formatApiError } from '../../lib/format-api-error';
 interface SubjectRetentionTopic {
   topicId: string;
   topicTitle?: string;
+  bookId?: string | null;
   easeFactor: number;
   repetitions: number;
   nextReviewAt?: string | null;
@@ -162,8 +163,7 @@ export default function LibraryScreen() {
 
   // BUG-486: Build bookId→title lookup from already-fetched books data
   const bookTitleMap = useMemo(
-    () =>
-      new Map(allBooksQuery.books.map((b) => [b.book.id, b.book.title])),
+    () => new Map(allBooksQuery.books.map((b) => [b.book.id, b.book.title])),
     [allBooksQuery.books]
   );
 
@@ -179,9 +179,7 @@ export default function LibraryScreen() {
         subjectName: subject.name,
         subjectStatus: subject.status,
         bookId: topic.bookId ?? null,
-        bookTitle: topic.bookId
-          ? (bookTitleMap.get(topic.bookId) ?? null)
-          : null,
+        bookTitle: topic.bookId ? bookTitleMap.get(topic.bookId) ?? null : null,
         chapter: null,
         retention: getTopicRetention(topic),
         lastReviewedAt: topic.lastReviewedAt,
