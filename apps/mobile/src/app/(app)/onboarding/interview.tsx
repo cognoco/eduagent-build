@@ -93,8 +93,9 @@ export default function InterviewScreen() {
           // Commas inside a label are unlikely (prompt constrains to 1-3 words)
           // but would be lossy — guard by stripping commas from each label.
           interests: interests.map((l) => l.replace(/,/g, '')).join(','),
-          languageCode: languageCode ?? '',
-          languageName: languageName ?? '',
+          ...(languageCode
+            ? { languageCode, languageName: languageName ?? '' }
+            : {}),
         },
       } as never);
       return;
