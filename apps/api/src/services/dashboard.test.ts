@@ -17,6 +17,7 @@ const mockProgressSnapshotsFindFirst = jest.fn();
 const mockProgressSnapshotsFindMany = jest.fn();
 const mockMilestonesFindMany = jest.fn();
 const mockStreaksFindMany = jest.fn();
+const mockStreaksFindFirst = jest.fn();
 const mockDbSelect = jest.fn();
 const mockSessionSummariesFindFirst = jest.fn();
 const mockSessionSummariesFindMany = jest.fn();
@@ -310,6 +311,7 @@ function createMockDb() {
       },
       streaks: {
         findMany: mockStreaksFindMany,
+        findFirst: mockStreaksFindFirst,
       },
       sessionSummaries: {
         findFirst: mockSessionSummariesFindFirst,
@@ -335,6 +337,7 @@ beforeEach(() => {
   mockProgressSnapshotsFindMany.mockResolvedValue([]);
   mockMilestonesFindMany.mockResolvedValue([]);
   mockStreaksFindMany.mockResolvedValue([]);
+  mockStreaksFindFirst.mockResolvedValue(undefined);
   mockSessionSummariesFindFirst.mockResolvedValue(null);
   mockSessionSummariesFindMany.mockResolvedValue([]);
   // `dashboard.ts` uses db.select().from().where().groupBy() for XP rollup
@@ -556,13 +559,7 @@ describe('getChildDetail', () => {
       childProfileId: CHILD_ID,
     });
 
-    // getChildDetail delegates to getChildrenForParent internally
-    mockFamilyLinksFindMany.mockResolvedValue([
-      { parentProfileId: PARENT_ID, childProfileId: CHILD_ID },
-    ]);
-    mockProfilesFindMany.mockResolvedValue([
-      { id: CHILD_ID, displayName: 'Alex' },
-    ]);
+    // getChildDetail queries the requested child directly (single-child path)
     mockProfilesFindFirst.mockResolvedValue({
       id: CHILD_ID,
       displayName: 'Alex',
