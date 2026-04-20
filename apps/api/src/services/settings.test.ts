@@ -28,9 +28,11 @@ const profileId = 'test-profile-id';
 // Mock DB helpers
 // ---------------------------------------------------------------------------
 
+const TEST_ACCOUNT_ID = 'test-account-id';
+
 function createMockDb({
   findFirstResult = undefined as Record<string, unknown> | undefined,
-  selectResult = [] as Record<string, unknown>[],
+  selectResult = [{ id: profileId }] as Record<string, unknown>[],
 } = {}): Database {
   return {
     query: {
@@ -98,12 +100,17 @@ describe('getNotificationPrefs', () => {
 describe('upsertNotificationPrefs', () => {
   it('inserts when no existing row', async () => {
     const db = createMockDb({ findFirstResult: undefined });
-    const result = await upsertNotificationPrefs(db, profileId, {
-      reviewReminders: true,
-      dailyReminders: false,
-      pushEnabled: true,
-      maxDailyPush: 7,
-    });
+    const result = await upsertNotificationPrefs(
+      db,
+      profileId,
+      TEST_ACCOUNT_ID,
+      {
+        reviewReminders: true,
+        dailyReminders: false,
+        pushEnabled: true,
+        maxDailyPush: 7,
+      }
+    );
 
     expect(result).toEqual({
       reviewReminders: true,
@@ -125,11 +132,16 @@ describe('upsertNotificationPrefs', () => {
         maxDailyPush: 3,
       },
     });
-    const result = await upsertNotificationPrefs(db, profileId, {
-      reviewReminders: true,
-      dailyReminders: true,
-      pushEnabled: true,
-    });
+    const result = await upsertNotificationPrefs(
+      db,
+      profileId,
+      TEST_ACCOUNT_ID,
+      {
+        reviewReminders: true,
+        dailyReminders: true,
+        pushEnabled: true,
+      }
+    );
 
     expect(result).toEqual({
       reviewReminders: true,
@@ -144,11 +156,16 @@ describe('upsertNotificationPrefs', () => {
 
   it('defaults maxDailyPush to 3 when not provided', async () => {
     const db = createMockDb({ findFirstResult: undefined });
-    const result = await upsertNotificationPrefs(db, profileId, {
-      reviewReminders: false,
-      dailyReminders: false,
-      pushEnabled: false,
-    });
+    const result = await upsertNotificationPrefs(
+      db,
+      profileId,
+      TEST_ACCOUNT_ID,
+      {
+        reviewReminders: false,
+        dailyReminders: false,
+        pushEnabled: false,
+      }
+    );
 
     expect(result.maxDailyPush).toBe(3);
   });
@@ -191,7 +208,12 @@ describe('getLearningMode', () => {
 describe('upsertLearningMode', () => {
   it('inserts when no existing row', async () => {
     const db = createMockDb({ findFirstResult: undefined });
-    const result = await upsertLearningMode(db, profileId, 'casual');
+    const result = await upsertLearningMode(
+      db,
+      profileId,
+      TEST_ACCOUNT_ID,
+      'casual'
+    );
 
     expect(result).toEqual({ mode: 'casual' });
     expect(db.insert).toHaveBeenCalled();
@@ -202,7 +224,12 @@ describe('upsertLearningMode', () => {
     const db = createMockDb({
       findFirstResult: { mode: 'serious' },
     });
-    const result = await upsertLearningMode(db, profileId, 'casual');
+    const result = await upsertLearningMode(
+      db,
+      profileId,
+      TEST_ACCOUNT_ID,
+      'casual'
+    );
 
     expect(result).toEqual({ mode: 'casual' });
     expect(db.update).toHaveBeenCalled();
@@ -227,9 +254,9 @@ describe('getCelebrationLevel', () => {
 describe('upsertCelebrationLevel', () => {
   it('inserts when no row exists', async () => {
     const db = createMockDb({ findFirstResult: undefined });
-    await expect(upsertCelebrationLevel(db, profileId, 'off')).resolves.toEqual(
-      { celebrationLevel: 'off' }
-    );
+    await expect(
+      upsertCelebrationLevel(db, profileId, TEST_ACCOUNT_ID, 'off')
+    ).resolves.toEqual({ celebrationLevel: 'off' });
     expect(db.insert).toHaveBeenCalled();
   });
 
@@ -238,7 +265,7 @@ describe('upsertCelebrationLevel', () => {
       findFirstResult: { celebrationLevel: 'all' },
     });
     await expect(
-      upsertCelebrationLevel(db, profileId, 'big_only')
+      upsertCelebrationLevel(db, profileId, TEST_ACCOUNT_ID, 'big_only')
     ).resolves.toEqual({ celebrationLevel: 'big_only' });
     expect(db.update).toHaveBeenCalled();
   });
@@ -506,7 +533,12 @@ describe('shouldWarnSummarySkip', () => {
 describe('registerPushToken', () => {
   it('inserts token when no existing preferences row', async () => {
     const db = createMockDb({ findFirstResult: undefined });
-    await registerPushToken(db, profileId, 'ExponentPushToken[abc]');
+    await registerPushToken(
+      db,
+      profileId,
+      TEST_ACCOUNT_ID,
+      'ExponentPushToken[abc]'
+    );
 
     expect(db.insert).toHaveBeenCalled();
     expect(db.update).not.toHaveBeenCalled();
@@ -516,7 +548,12 @@ describe('registerPushToken', () => {
     const db = createMockDb({
       findFirstResult: { expoPushToken: 'old-token' },
     });
-    await registerPushToken(db, profileId, 'ExponentPushToken[new]');
+    await registerPushToken(
+      db,
+      profileId,
+      TEST_ACCOUNT_ID,
+      'ExponentPushToken[new]'
+    );
 
     expect(db.update).toHaveBeenCalled();
     expect(db.insert).not.toHaveBeenCalled();

@@ -7,6 +7,7 @@ import {
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
+import type { Account } from '../services/account';
 import type { ProfileMeta } from '../middleware/profile-scope';
 import { requireProfileId } from '../middleware/profile-scope';
 import { apiError, validationError } from '../errors';
@@ -44,6 +45,7 @@ type DictationRouteEnv = {
   Variables: {
     user: AuthUser;
     db: Database;
+    account: Account;
     profileId: string | undefined;
     profileMeta: ProfileMeta;
   };
@@ -191,6 +193,7 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
     const rateLimited = await checkAndLogRateLimit(
       db,
       profileId,
+      c.get('account').id,
       'dictation_review',
       { hours: 1 / 60, maxCount: 10 }
     );

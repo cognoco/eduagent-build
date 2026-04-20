@@ -640,6 +640,17 @@ export async function buildKnowledgeInventory(
   const liveCurrentStreak = state.streak?.currentStreak ?? 0;
   const liveLongestStreak = state.streak?.longestStreak ?? 0;
 
+  // [BUG-498] Recompute global time values from live session data, matching
+  // the F-045 pattern for per-subject stats.  Cached snapshots written by
+  // older code paths may store seconds-as-minutes or lack the /60 divisor,
+  // producing absurd hero-pill totals (e.g. 13 000 "minutes").
+  const liveTotalActiveMinutes = Math.round(
+    state.sessions.reduce((sum, s) => sum + (s.durationSeconds ?? 0), 0) / 60
+  );
+  const liveTotalWallClockMinutes = Math.round(
+    state.sessions.reduce((sum, s) => sum + cappedWallClock(s), 0) / 60
+  );
+
   return knowledgeInventorySchema.parse({
     profileId,
     snapshotDate: latestSnapshot?.snapshotDate ?? isoDate(new Date()),
@@ -648,9 +659,9 @@ export async function buildKnowledgeInventory(
       topicsMastered: metrics.topicsMastered,
       vocabularyTotal: metrics.vocabularyTotal,
       vocabularyMastered: metrics.vocabularyMastered,
-      totalSessions: metrics.totalSessions,
-      totalActiveMinutes: metrics.totalActiveMinutes,
-      totalWallClockMinutes: metrics.totalWallClockMinutes,
+      totalSessions: state.sessions.length,
+      totalActiveMinutes: liveTotalActiveMinutes,
+      totalWallClockMinutes: liveTotalWallClockMinutes,
       currentStreak: liveCurrentStreak,
       longestStreak: liveLongestStreak,
     },

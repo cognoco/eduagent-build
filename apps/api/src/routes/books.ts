@@ -2,12 +2,6 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
 import type { Database } from '@eduagent/database';
-import {
-  curriculumTopics,
-  curriculumBooks,
-  subjects,
-} from '@eduagent/database';
-import { eq, and } from 'drizzle-orm';
 import { bookTopicGenerateInputSchema } from '@eduagent/schemas';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
@@ -17,6 +11,7 @@ import {
   getBookWithTopics,
   persistBookTopics,
   claimBookForGeneration,
+  moveTopicToBook,
 } from '../services/curriculum';
 import { getBookSessions } from '../services/session';
 import { generateBookTopics } from '../services/book-generation';
@@ -189,56 +184,21 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
         return c.json({ message: 'Topic is already in this book.' }, 400);
       }
 
-      // Verify ownership: subject belongs to this profile
-      const [subjectRow] = await db
-        .select({ id: subjects.id })
-        .from(subjects)
-        .where(
-          and(eq(subjects.id, subjectId), eq(subjects.profileId, profileId))
-        )
-        .limit(1);
-
-      if (!subjectRow) return c.json({ message: 'Subject not found.' }, 404);
-
-      // Verify target book belongs to the same subject
-      const [targetBook] = await db
-        .select({ id: curriculumBooks.id })
-        .from(curriculumBooks)
-        .where(
-          and(
-            eq(curriculumBooks.id, targetBookId),
-            eq(curriculumBooks.subjectId, subjectId)
-          )
-        )
-        .limit(1);
-
-      if (!targetBook)
-        return c.json(
-          { message: 'Target book not found in this subject.' },
-          404
+      try {
+        await moveTopicToBook(
+          db,
+          profileId,
+          subjectId,
+          bookId,
+          topicId,
+          targetBookId
         );
-
-      // Verify topic belongs to the source book
-      const [topic] = await db
-        .select({ id: curriculumTopics.id })
-        .from(curriculumTopics)
-        .where(
-          and(
-            eq(curriculumTopics.id, topicId),
-            eq(curriculumTopics.bookId, bookId)
-          )
-        )
-        .limit(1);
-
-      if (!topic)
-        return c.json({ message: 'Topic not found in this book.' }, 404);
-
-      // Move the topic
-      await db
-        .update(curriculumTopics)
-        .set({ bookId: targetBookId })
-        .where(eq(curriculumTopics.id, topicId));
-
-      return c.json({ moved: true, topicId, targetBookId });
+        return c.json({ moved: true, topicId, targetBookId });
+      } catch (error) {
+        if (error instanceof NotFoundError) {
+          return notFound(c, error.message);
+        }
+        throw error;
+      }
     }
   );

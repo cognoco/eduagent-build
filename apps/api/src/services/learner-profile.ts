@@ -1,5 +1,10 @@
 import { and, eq, sql } from 'drizzle-orm';
-import { learningProfiles, subjects, type Database } from '@eduagent/database';
+import {
+  learningProfiles,
+  profiles,
+  subjects,
+  type Database,
+} from '@eduagent/database';
 import {
   sessionAnalysisOutputSchema,
   type AccommodationMode,
@@ -1047,6 +1052,25 @@ export function buildMemoryBlock(
   return { text: block, entries };
 }
 
+// ---------------------------------------------------------------------------
+// Ownership guard — verifies profileId belongs to accountId before writes
+// ---------------------------------------------------------------------------
+
+async function verifyProfileOwnership(
+  db: Database,
+  profileId: string,
+  accountId: string | undefined
+): Promise<void> {
+  if (!accountId) return; // skipped when caller has verified via parent chain (assertParentAccess)
+  const [owner] = await db
+    .select({ id: profiles.id })
+    .from(profiles)
+    .where(and(eq(profiles.id, profileId), eq(profiles.accountId, accountId)));
+  if (!owner) {
+    throw new Error(`Profile ${profileId} not found for account`);
+  }
+}
+
 export async function getLearningProfile(
   db: Database,
   profileId: string
@@ -1078,6 +1102,10 @@ export async function getOrCreateLearningProfile(
   return retry;
 }
 
+/**
+ * Server-side only — internal helper called by applyAnalysis and deleteMemoryItem.
+ * The profileId is sourced from a DB row, not user input. No accountId guard required.
+ */
 async function updateWithRetry(
   db: Database,
   profileId: string,
@@ -1102,6 +1130,11 @@ async function updateWithRetry(
   return Boolean(updated);
 }
 
+/**
+ * Server-side only — called exclusively from Inngest session-completed pipeline.
+ * The profileId originates from a trusted DB-sourced session row, not user input.
+ * No accountId guard required.
+ */
 export async function applyAnalysis(
   db: Database,
   profileId: string,
@@ -1213,11 +1246,13 @@ export async function applyAnalysis(
 export async function deleteMemoryItem(
   db: Database,
   profileId: string,
+  accountId: string | undefined,
   category: string,
   value: string,
   suppress = false,
   subject?: string
 ): Promise<void> {
+  await verifyProfileOwnership(db, profileId, accountId);
   const profile = await getLearningProfile(db, profileId);
   if (!profile) return;
 
@@ -1267,8 +1302,10 @@ function buildUnsuppressUpdates(
 export async function unsuppressInference(
   db: Database,
   profileId: string,
+  accountId: string | undefined,
   value: string
 ): Promise<void> {
+  await verifyProfileOwnership(db, profileId, accountId);
   const profile = await getLearningProfile(db, profileId);
   if (!profile) return;
 
@@ -1293,8 +1330,10 @@ export async function unsuppressInference(
 export async function toggleMemoryEnabled(
   db: Database,
   profileId: string,
+  accountId: string | undefined,
   enabled: boolean
 ): Promise<void> {
+  await verifyProfileOwnership(db, profileId, accountId);
   const profile = await getOrCreateLearningProfile(db, profileId);
   const canCollect = enabled
     ? profile.memoryConsentStatus === 'granted'
@@ -1315,8 +1354,10 @@ export async function toggleMemoryEnabled(
 export async function toggleMemoryCollection(
   db: Database,
   profileId: string,
+  accountId: string | undefined,
   enabled: boolean
 ): Promise<void> {
+  await verifyProfileOwnership(db, profileId, accountId);
   const profile = await getOrCreateLearningProfile(db, profileId);
   const memoryConsentStatus: MemoryConsentStatus = enabled
     ? 'granted'
@@ -1338,8 +1379,10 @@ export async function toggleMemoryCollection(
 export async function toggleMemoryInjection(
   db: Database,
   profileId: string,
+  accountId: string | undefined,
   enabled: boolean
 ): Promise<void> {
+  await verifyProfileOwnership(db, profileId, accountId);
   const profile = await getOrCreateLearningProfile(db, profileId);
 
   // [F-PV-09] Refuse to enable injection when consent is not granted.
@@ -1361,8 +1404,10 @@ export async function toggleMemoryInjection(
 export async function grantMemoryConsent(
   db: Database,
   profileId: string,
+  accountId: string | undefined,
   consent: 'granted' | 'declined'
 ): Promise<void> {
+  await verifyProfileOwnership(db, profileId, accountId);
   await getOrCreateLearningProfile(db, profileId);
   const granted = consent === 'granted';
 
@@ -1389,8 +1434,10 @@ export async function grantMemoryConsent(
  */
 export async function deleteAllMemory(
   db: Database,
-  profileId: string
+  profileId: string,
+  accountId: string | undefined
 ): Promise<void> {
+  await verifyProfileOwnership(db, profileId, accountId);
   await db
     .delete(learningProfiles)
     .where(eq(learningProfiles.profileId, profileId));
@@ -1630,8 +1677,10 @@ export function buildAccommodationBlock(
 export async function updateAccommodationMode(
   db: Database,
   profileId: string,
+  accountId: string | undefined,
   mode: AccommodationMode
 ): Promise<void> {
+  await verifyProfileOwnership(db, profileId, accountId);
   // FR253.4: create row if it doesn't exist
   await getOrCreateLearningProfile(db, profileId);
 

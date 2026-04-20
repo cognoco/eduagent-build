@@ -63,7 +63,7 @@ jest.mock('../services/settings', () => ({
   }),
   upsertNotificationPrefs: jest
     .fn()
-    .mockImplementation((_db, _profileId, input) =>
+    .mockImplementation((_db, _profileId, _accountId, input) =>
       Promise.resolve({
         reviewReminders: input.reviewReminders,
         dailyReminders: input.dailyReminders,
@@ -74,11 +74,13 @@ jest.mock('../services/settings', () => ({
   getLearningMode: jest.fn().mockResolvedValue({ mode: 'serious' }),
   upsertLearningMode: jest
     .fn()
-    .mockImplementation((_db, _profileId, mode) => Promise.resolve({ mode })),
+    .mockImplementation((_db, _profileId, _accountId, mode) =>
+      Promise.resolve({ mode })
+    ),
   getCelebrationLevel: jest.fn().mockResolvedValue('all'),
   upsertCelebrationLevel: jest
     .fn()
-    .mockImplementation((_db, _profileId, celebrationLevel) =>
+    .mockImplementation((_db, _profileId, _accountId, celebrationLevel) =>
       Promise.resolve({ celebrationLevel })
     ),
 }));

@@ -288,12 +288,12 @@ export async function processInterviewExchange(
   options?: { exchangeCount?: number; profileId?: string }
 ): Promise<InterviewResult> {
   const focusLine = context.bookTitle
-    ? `\nFocus area: ${context.bookTitle}\nScope your questions to this specific focus area within the subject, not the entire subject.`
+    ? `\nFocus area: <book_title>${context.bookTitle}</book_title>\nScope your questions to this specific focus area within the subject, not the entire subject.`
     : '';
   const messages: ChatMessage[] = [
     {
       role: 'system',
-      content: `${INTERVIEW_SYSTEM_PROMPT}\n\nSubject: ${context.subjectName}${focusLine}`,
+      content: `${INTERVIEW_SYSTEM_PROMPT}\n\nSubject: <subject_name>${context.subjectName}</subject_name>${focusLine}`,
     },
     ...context.exchangeHistory.map((e) => ({
       role: e.role as 'user' | 'assistant',
@@ -342,12 +342,12 @@ export async function streamInterviewExchange(
   onComplete: (fullResponse: string) => Promise<InterviewResult>;
 }> {
   const focusLine = context.bookTitle
-    ? `\nFocus area: ${context.bookTitle}\nScope your questions to this specific focus area within the subject, not the entire subject.`
+    ? `\nFocus area: <book_title>${context.bookTitle}</book_title>\nScope your questions to this specific focus area within the subject, not the entire subject.`
     : '';
   const messages: ChatMessage[] = [
     {
       role: 'system',
-      content: `${INTERVIEW_SYSTEM_PROMPT}\n\nSubject: ${context.subjectName}${focusLine}`,
+      content: `${INTERVIEW_SYSTEM_PROMPT}\n\nSubject: <subject_name>${context.subjectName}</subject_name>${focusLine}`,
     },
     ...context.exchangeHistory.map((e) => ({
       role: e.role as 'user' | 'assistant',

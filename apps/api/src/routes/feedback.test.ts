@@ -64,7 +64,8 @@ afterEach(() => {
 });
 
 describe('POST /feedback', () => {
-  it('accepts valid feedback and sends email via Resend', async () => {
+  // Unit test: mocks Resend HTTP boundary (globalThis.fetch) to test route handler in isolation. For full email delivery, see integration tests.
+  it('accepts valid feedback and calls sendEmail with correct payload (verified via Resend HTTP mock)', async () => {
     const app = createTestApp();
     const res = await app.request('/feedback', {
       method: 'POST',

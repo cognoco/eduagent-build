@@ -35,7 +35,7 @@ function countLearnerWords(transcript: SessionTranscript): number {
 }
 
 function formatTranscriptForPrompt(transcript: SessionTranscript): string {
-  return transcript.exchanges
+  const lines = transcript.exchanges
     .filter((exchange) => !exchange.isSystemPrompt)
     .map((exchange) =>
       exchange.role === 'user'
@@ -43,6 +43,7 @@ function formatTranscriptForPrompt(transcript: SessionTranscript): string {
         : `Tutor: ${exchange.content}`
     )
     .join('\n');
+  return `<transcript>\n${lines}\n</transcript>`;
 }
 
 function parseDepthResponse(

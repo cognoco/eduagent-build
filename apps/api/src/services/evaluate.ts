@@ -59,6 +59,7 @@ export function getEvaluateRungDescription(rung: 1 | 2 | 3 | 4): string {
  * @param rawQuality - LLM-assessed quality (0-5) of the student's critique
  * @returns SM-2 quality rating (0-5)
  */
+// SM-2 algorithm requires quality in [3,5] for pass and [2,3] for fail. The stored quality field allows [0,5] per the schema, but this mapping intentionally narrows the range for the SM-2 algorithm.
 export function mapEvaluateQualityToSm2(
   passed: boolean,
   rawQuality: number

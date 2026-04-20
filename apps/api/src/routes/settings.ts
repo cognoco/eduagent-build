@@ -11,6 +11,7 @@ import {
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
+import type { Account } from '../services/account';
 import { requireProfileId } from '../middleware/profile-scope';
 import {
   getNotificationPrefs,
@@ -41,6 +42,7 @@ type SettingsRouteEnv = {
   Variables: {
     user: AuthUser;
     db: Database;
+    account: Account;
     profileId: string | undefined;
   };
 };
@@ -65,8 +67,14 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
     async (c) => {
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
+      const accountId = c.get('account').id;
       const body = c.req.valid('json');
-      const preferences = await upsertNotificationPrefs(db, profileId, body);
+      const preferences = await upsertNotificationPrefs(
+        db,
+        profileId,
+        accountId,
+        body
+      );
       return c.json({ preferences });
     }
   )
@@ -86,8 +94,14 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
     async (c) => {
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
+      const accountId = c.get('account').id;
       const body = c.req.valid('json');
-      const result = await upsertLearningMode(db, profileId, body.mode);
+      const result = await upsertLearningMode(
+        db,
+        profileId,
+        accountId,
+        body.mode
+      );
       return c.json({ mode: result.mode });
     }
   )
@@ -105,10 +119,12 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
     async (c) => {
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
+      const accountId = c.get('account').id;
       const body = c.req.valid('json');
       const result = await upsertCelebrationLevel(
         db,
         profileId,
+        accountId,
         body.celebrationLevel
       );
       return c.json(result);
@@ -122,8 +138,9 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
     async (c) => {
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
+      const accountId = c.get('account').id;
       const body = c.req.valid('json');
-      await registerPushToken(db, profileId, body.token);
+      await registerPushToken(db, profileId, accountId, body.token);
       return c.json({ registered: true });
     }
   )

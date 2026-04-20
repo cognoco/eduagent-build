@@ -251,8 +251,26 @@ export async function requestConsent(
   db: Database,
   input: ConsentRequest,
   appUrl: string,
-  emailOptions?: EmailOptions
+  emailOptions?: EmailOptions,
+  accountId?: string
 ): Promise<ConsentRequestResult> {
+  // Verify childProfileId belongs to the calling account when accountId is provided.
+  // Defense-in-depth: the route layer also enforces this via getProfile() before calling here.
+  if (accountId) {
+    const [owner] = await db
+      .select({ id: profiles.id })
+      .from(profiles)
+      .where(
+        and(
+          eq(profiles.id, input.childProfileId),
+          eq(profiles.accountId, accountId)
+        )
+      );
+    if (!owner) {
+      throw new Error('Child profile not found');
+    }
+  }
+
   const token = crypto.randomUUID();
 
   // Token expires in 7 days (PRD line 414)

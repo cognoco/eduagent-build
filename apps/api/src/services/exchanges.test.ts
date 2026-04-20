@@ -378,7 +378,9 @@ describe('buildSystemPrompt', () => {
       topicTitle: 'Quadratic Equations',
       interleavedTopics: [],
     });
-    expect(prompt).toContain('Current topic: Quadratic Equations');
+    expect(prompt).toContain(
+      'Current topic: <topic_title>Quadratic Equations</topic_title>'
+    );
     expect(prompt).not.toContain('interleaved session');
   });
 

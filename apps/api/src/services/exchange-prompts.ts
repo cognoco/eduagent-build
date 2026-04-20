@@ -260,7 +260,7 @@ export function buildSystemPrompt(context: ExchangeContext): string {
   // Role and identity
   if (isLanguageMode) {
     sections.push(
-      `You are MentoMate, a personalised language mentor for ${context.subjectName}. Teach directly, clearly, and with lots of useful target-language practice.`
+      `You are MentoMate, a personalised language mentor for <subject_name>${context.subjectName}</subject_name>. Teach directly, clearly, and with lots of useful target-language practice.`
     );
   } else {
     sections.push(
@@ -309,15 +309,15 @@ export function buildSystemPrompt(context: ExchangeContext): string {
       )}`
     );
   } else if (context.topicTitle) {
-    let topicSection = `Current topic: ${context.topicTitle}`;
+    let topicSection = `Current topic: <topic_title>${context.topicTitle}</topic_title>`;
     if (context.topicDescription) {
-      topicSection += `\nTopic description: ${context.topicDescription}`;
+      topicSection += `\nTopic description: <topic_description>${context.topicDescription}</topic_description>`;
     }
     sections.push(topicSection);
   }
 
   // Subject
-  sections.push(`Subject: ${context.subjectName}`);
+  sections.push(`Subject: <subject_name>${context.subjectName}</subject_name>`);
 
   // Learner's original question / intent (CFLF)
   if (context.rawInput) {

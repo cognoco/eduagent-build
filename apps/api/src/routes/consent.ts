@@ -89,10 +89,16 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
       }
       let result;
       try {
-        result = await requestConsent(db, input, apiOrigin, {
-          resendApiKey: c.env.RESEND_API_KEY,
-          emailFrom: c.env.EMAIL_FROM,
-        });
+        result = await requestConsent(
+          db,
+          input,
+          apiOrigin,
+          {
+            resendApiKey: c.env.RESEND_API_KEY,
+            emailFrom: c.env.EMAIL_FROM,
+          },
+          account.id
+        );
       } catch (error) {
         if (error instanceof ConsentResendLimitError) {
           return apiError(c, 429, ERROR_CODES.RATE_LIMITED, error.message);
