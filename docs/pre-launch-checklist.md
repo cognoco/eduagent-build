@@ -3,7 +3,7 @@
 Consolidated checklist of everything that must be done before MentoMate goes live.
 Items are grouped by category and ordered by priority within each group.
 
-Last updated: 2026-04-15
+Last updated: 2026-04-20
 
 ---
 
@@ -102,12 +102,36 @@ Ref: `docs/plans/order.md` Tier 3 — explicitly marked "before launch"
 
 ## Code Quality & Test Debt
 
-- [ ] **EP15-C2: Epic 15 test coverage** — 2 of 8 original gaps filled (milestone-detection, progress.tsx). Additional tests added (reports, use-progress, vocabulary, milestones, schemas, dashboard). Remaining: snapshot-aggregation.ts (1,087-line core engine — highest risk), monthly-report.ts, daily-snapshot.ts, weekly-progress-push.ts, monthly-report-cron.ts, progress/[subjectId].tsx
+- [x] **EP15-C2: Epic 15 test coverage** — RESOLVED 2026-04-19. All 8 original gaps filled. 220 new tests added: snapshot-aggregation.test.ts (35), monthly-report.test.ts (50), daily-snapshot.test.ts (17), weekly-progress-push.test.ts (40), monthly-report-cron.test.ts (37), progress/[subjectId].test.tsx (41). All passing.
 - [x] **EP15-C3: Step ordering decision** — RESOLVED 2026-04-19. Pipelines are independent (computeProgressMetrics never reads learning_profiles). Latency-first order confirmed correct; plan AD6 amended. See `session-completed.ts:515-518`.
 - [x] **EP15-C4: Session-complete debounce** (AR-13) — RESOLVED 2026-04-19. `RefreshProgressSnapshotOptions.sessionEndedAt` implemented in `snapshot-aggregation.ts:965-1000`. `getLatestSnapshot` returns `updatedAt`. `session-completed.ts:531` passes timestamp.
 - [ ] **Progressive disclosure** — plan written 2026-04-14, zero code changes (~1 day)
 - [ ] **Freeform-filing retry** — one missing Inngest function; failed freeform filing silently drops session
 - [ ] **Epic 16 test gaps** — ~90% of planned tests missing (cap eviction, stale demotion, struggle resolution)
+
+---
+
+## UX Fixes — Pre-Launch (2026-04-20)
+
+Ref: `docs/superpowers/plans/2026-04-19-pre-launch-ux-fixes.md`
+
+### Already Fixed (verified in codebase)
+
+- [x] **F-Q-08** Quiz quit confirm dialog — `platformAlert` in `quiz/play.tsx:159-168`
+- [x] **F-042** Interview deadlock — `MAX_INTERVIEW_EXCHANGES=6` hard cap in `interview.ts:267`
+- [x] **F-009** Topic deep-link — `useResolveTopicSubject` in `topic/[topicId].tsx:161-165`
+- [x] **F-Q-02** Wrong answer reveal — green highlight in `quiz/play.tsx:392-393`
+- [x] **F-Q-12** Challenge banner auto-advance — timer removed in `quiz/launch.tsx:117-119`
+- [x] **F-Q-13** Quiz timer label — timer hidden in `quiz/play.tsx:456-459`
+
+### Fixed in this pass
+
+- [x] **F-PV-06** Parent dashboard 500 — `getChildDetail` rewritten to single-child query path (~16 subrequests vs 7+10N)
+- [x] **F-Q-01** Raw JSON error body — `UpstreamError` typed class + `isTechnicalMessage` guard + SSE code extraction fix
+- [x] **F-PV-03/04** False progress signals at N=1 — `calculateRetentionTrend` undefined guard + XP pill guard
+- [x] **F-041** Non-language subject routing — empty `languageCode` params omitted from onboarding flow
+- [x] **F-PV-05/01/02** Copy bugs — '1 sessions' plural fix + trendText guarded behind `showFullSignals`
+- [x] **F-044** Loading screen timeout — 15s timeout with Retry + Go Back fallback
 
 ---
 
