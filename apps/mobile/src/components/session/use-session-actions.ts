@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 // Alert import removed — all calls migrated to platformAlert [F-029]
-import { platformAlert } from '../../../../lib/platform-alert';
+import { platformAlert } from '../../lib/platform-alert';
 import type {
   InputMode,
   HomeworkProblem,
@@ -8,7 +8,7 @@ import type {
   CelebrationReason,
 } from '@eduagent/schemas';
 import type { Router } from 'expo-router';
-import type { ChatMessage } from '../../../../components/session';
+import type { ChatMessage } from '../session';
 import type {
   useCloseSession,
   useRecordSystemPrompt,
@@ -16,14 +16,11 @@ import type {
   useFlagSessionContent,
   useAddParkingLotItem,
   useSetSessionInputMode,
-} from '../../../../hooks/use-sessions';
-import { clearSessionRecoveryMarker } from '../../../../lib/session-recovery';
-import * as SecureStore from '../../../../lib/secure-storage';
-import {
-  classifyApiError,
-  recoveryActions,
-} from '../../../../lib/format-api-error';
-import { withProblemMode } from '../../homework/_helpers/problem-cards';
+} from '../../hooks/use-sessions';
+import { clearSessionRecoveryMarker } from '../../lib/session-recovery';
+import * as SecureStore from '../../lib/secure-storage';
+import { classifyApiError, recoveryActions } from '../../lib/format-api-error';
+import { withProblemMode } from '../homework/problem-cards';
 import {
   getInputModeKey,
   serializeMilestones,

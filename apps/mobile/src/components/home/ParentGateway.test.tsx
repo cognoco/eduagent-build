@@ -58,7 +58,7 @@ describe('ParentGateway', () => {
     mockDashboardIsError = false;
     mockDashboardData = {
       children: [
-        { displayName: 'Emma', totalTimeThisWeek: 720, profileId: 'c1' },
+        { displayName: 'Emma', totalTimeThisWeek: 45, profileId: 'c1' },
       ],
     };
   });
@@ -80,7 +80,7 @@ describe('ParentGateway', () => {
   it('shows child activity highlight with time', () => {
     render(<ParentGateway {...defaultProps} />);
 
-    expect(screen.getByText('Emma practiced 12 min this week')).toBeTruthy();
+    expect(screen.getByText('Emma practiced 45 min this week')).toBeTruthy();
   });
 
   it('shows fallback highlight when no activity', () => {
@@ -113,7 +113,7 @@ describe('ParentGateway', () => {
 
     render(<ParentGateway {...defaultProps} />);
 
-    expect(screen.getByText('Tomas practiced 15 min this week')).toBeTruthy();
+    expect(screen.getByText('Tomas practiced 900 min this week')).toBeTruthy();
   });
 
   it('navigates to parent dashboard on "Check child\'s progress"', () => {

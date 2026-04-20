@@ -14,6 +14,7 @@ const mockPush = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ replace: mockReplace, push: mockPush }),
+  useLocalSearchParams: () => ({}),
 }));
 
 jest.mock('expo-linking', () => ({
@@ -28,6 +29,7 @@ jest.mock('react-native-safe-area-context', () => ({
 const signInModule = require('./sign-in');
 const SignInScreen = signInModule.default;
 const { clearTransitionState } = require('../../lib/auth-transition');
+const { clearPendingAuthRedirect } = require('../../lib/pending-auth-redirect');
 const {
   markSessionExpired,
   clearSessionExpiredNotice,
@@ -53,6 +55,7 @@ describe('SignInScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     clearTransitionState();
+    clearPendingAuthRedirect();
     clearSessionExpiredNotice();
     delete process.env.EXPO_PUBLIC_CLERK_OPENAI_SSO_KEY;
     (useSignIn as jest.Mock).mockReturnValue({

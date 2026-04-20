@@ -1,7 +1,7 @@
 import { render } from '@testing-library/react-native';
 import { SessionMessageActions } from './SessionMessageActions';
 import type { SessionMessageActionsProps } from './SessionMessageActions';
-import type { ChatMessage } from '../../../../components/session';
+import type { ChatMessage } from '../session';
 
 const baseMessage: ChatMessage = {
   id: 'ai-1',

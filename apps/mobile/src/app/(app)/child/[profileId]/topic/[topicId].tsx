@@ -103,7 +103,7 @@ export default function TopicDetailScreen() {
     >
       <View className="px-5 pt-4 pb-2 flex-row items-center">
         <Pressable
-          onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
+          onPress={() => goBackOrReplace(router, '/(app)/more' as const)}
           className="me-3 py-2 pe-2"
           accessibilityLabel="Go back"
           accessibilityRole="button"

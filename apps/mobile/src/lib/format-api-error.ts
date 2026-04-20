@@ -14,6 +14,7 @@
  * - TypeError from native fetch for network failures
  * - Standard Error for other caught exceptions
  */
+import { UpstreamError } from './api-errors';
 
 const NETWORK_MESSAGE =
   "Looks like you're offline or our servers can't be reached. Check your internet connection and try again.";
@@ -272,9 +273,15 @@ export function classifyApiError(error: unknown): FormattedApiError {
   // [I-13] UpstreamError — typed 5xx from api-client.ts. Classify before the
   // generic `instanceof Error` path so any .code value (not just
   // UPSTREAM_ERROR/INTERNAL_ERROR) is caught here rather than falling through
-  // to parseApiBody heuristics. Name-based check avoids circular import.
-  if (error instanceof Error && error.name === 'UpstreamError') {
-    return { message: SERVER_MESSAGE, category: 'server', recovery: 'retry' };
+  // to parseApiBody heuristics. Uses instanceof for type safety + .status/.code access.
+  if (error instanceof UpstreamError) {
+    return {
+      category: 'server' as const,
+      message:
+        friendlyMessage(error.message) ??
+        'Something went wrong on our end. Please try again.',
+      recovery: 'retry' as const,
+    };
   }
 
   if (error instanceof Error) {

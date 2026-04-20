@@ -1,12 +1,12 @@
 import { renderHook, act } from '@testing-library/react-native';
 import { useSessionActions } from './use-session-actions';
-import { platformAlert } from '../../../../lib/platform-alert';
+import { platformAlert } from '../../lib/platform-alert';
 
-jest.mock('../../../../lib/platform-alert', () => ({
+jest.mock('../../lib/platform-alert', () => ({
   platformAlert: jest.fn(),
 }));
 
-jest.mock('../../../../lib/session-recovery', () => ({
+jest.mock('../../lib/session-recovery', () => ({
   clearSessionRecoveryMarker: jest.fn().mockResolvedValue(undefined),
 }));
 

@@ -131,11 +131,11 @@ export default function DashboardScreen() {
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
       <View className="px-5 pt-4 pb-2">
         <Pressable
-          onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
+          onPress={() => goBackOrReplace(router, '/(app)/more' as const)}
           className="mb-2 self-start"
           hitSlop={12}
           testID="dashboard-back"
-          accessibilityLabel="Back to home"
+          accessibilityLabel="Back to more"
           accessibilityRole="button"
         >
           <Text className="text-body text-accent">← Back</Text>

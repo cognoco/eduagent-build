@@ -8,7 +8,7 @@ import {
   View,
 } from 'react-native';
 import type { ClientQuizQuestion } from '@eduagent/schemas';
-import { useThemeColors } from '../../../../lib/theme';
+import { useThemeColors } from '../../lib/theme';
 
 type ClientGuessWhoQuestion = Extract<
   ClientQuizQuestion,

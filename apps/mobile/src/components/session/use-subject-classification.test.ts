@@ -2,7 +2,7 @@ import { renderHook, act } from '@testing-library/react-native';
 import { useSubjectClassification } from './use-subject-classification';
 
 // Mock animateResponse from the session components barrel
-jest.mock('../../../../components/session', () => ({
+jest.mock('../session', () => ({
   animateResponse: jest.fn(() => jest.fn()),
 }));
 
@@ -31,7 +31,7 @@ function createMockOpts(overrides: Record<string, unknown> = {}) {
     continueWithMessage: jest.fn().mockResolvedValue(undefined),
     createLocalMessageId: jest.fn((prefix: string) => `${prefix}-1`),
     showConfirmation: jest.fn(),
-    animateResponse: require('../../../../components/session').animateResponse,
+    animateResponse: require('../session').animateResponse,
     userMessageCount: 0,
     sessionExperience: 0,
     animationCleanupRef: { current: null },
@@ -53,7 +53,7 @@ describe('useSubjectClassification — greeting guard', () => {
       await result.current.handleSend('hi');
     });
 
-    const { animateResponse } = require('../../../../components/session');
+    const { animateResponse } = require('../session');
     expect(animateResponse).toHaveBeenCalledTimes(1);
     expect(animateResponse).toHaveBeenCalledWith(
       'Hi! Ask me anything.',
@@ -72,7 +72,7 @@ describe('useSubjectClassification — greeting guard', () => {
       await result.current.handleSend('hey');
     });
 
-    const { animateResponse } = require('../../../../components/session');
+    const { animateResponse } = require('../session');
     expect(animateResponse).toHaveBeenCalledWith(
       'Hey again — what are you curious about?',
       opts.setMessages,
@@ -82,7 +82,7 @@ describe('useSubjectClassification — greeting guard', () => {
 
   it('stores cleanup function in animationCleanupRef', async () => {
     const cleanup = jest.fn();
-    const { animateResponse } = require('../../../../components/session');
+    const { animateResponse } = require('../session');
     animateResponse.mockReturnValueOnce(cleanup);
 
     const opts = createMockOpts();
@@ -112,7 +112,7 @@ describe('useSubjectClassification — greeting guard', () => {
       await result.current.handleSend('help me with quadratic equations');
     });
 
-    const { animateResponse } = require('../../../../components/session');
+    const { animateResponse } = require('../session');
     expect(animateResponse).not.toHaveBeenCalled();
     expect(opts.classifySubject.mutateAsync).toHaveBeenCalledWith({
       text: 'help me with quadratic equations',
@@ -138,7 +138,7 @@ describe('useSubjectClassification — greeting guard', () => {
       await result.current.handleSend('hi');
     });
 
-    const { animateResponse } = require('../../../../components/session');
+    const { animateResponse } = require('../session');
     // classifySubject is not called (subjectId provided), but continueWithMessage IS
     expect(animateResponse).not.toHaveBeenCalled();
     expect(opts.continueWithMessage).toHaveBeenCalled();
@@ -154,7 +154,7 @@ describe('useSubjectClassification — greeting guard', () => {
       await result.current.handleSend('hello');
     });
 
-    const { animateResponse } = require('../../../../components/session');
+    const { animateResponse } = require('../session');
     expect(animateResponse).not.toHaveBeenCalled();
     expect(opts.continueWithMessage).toHaveBeenCalled();
   });
@@ -177,7 +177,7 @@ describe('useSubjectClassification — greeting guard', () => {
       await result.current.handleSend('hi');
     });
 
-    const { animateResponse } = require('../../../../components/session');
+    const { animateResponse } = require('../session');
     expect(animateResponse).not.toHaveBeenCalled();
     // Classification or continueWithMessage must have been called
     expect(

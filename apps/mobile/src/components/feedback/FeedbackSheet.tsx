@@ -5,6 +5,7 @@ import {
   Modal,
   Platform,
   Pressable,
+  ScrollView,
   Text,
   TextInput,
   View,
@@ -101,7 +102,11 @@ export function FeedbackSheet({
           <View style={{ minWidth: 44 }} />
         </View>
 
-        <View className="flex-1 px-5 pt-4">
+        {/* [BUG-507] ScrollView so content doesn't push Send button off-screen */}
+        <ScrollView
+          className="flex-1 px-5 pt-4"
+          keyboardShouldPersistTaps="handled"
+        >
           <Text className="text-body-sm font-semibold text-text-secondary mb-2">
             What kind of feedback?
           </Text>
@@ -110,7 +115,7 @@ export function FeedbackSheet({
               <Pressable
                 key={cat.value}
                 onPress={() => setCategory(cat.value)}
-                className={`flex-1 py-2.5 rounded-button items-center ${
+                className={`flex-1 py-2.5 rounded-button items-center px-1 ${
                   category === cat.value
                     ? 'bg-primary'
                     : 'bg-surface border border-border'
@@ -119,7 +124,9 @@ export function FeedbackSheet({
                 accessibilityState={{ selected: category === cat.value }}
                 testID={`feedback-category-${cat.value}`}
               >
+                {/* [BUG-506] numberOfLines prevents clipping on narrow viewports */}
                 <Text
+                  numberOfLines={1}
                   className={`text-body-sm font-semibold ${
                     category === cat.value
                       ? 'text-text-inverse'
@@ -156,7 +163,7 @@ export function FeedbackSheet({
             We&apos;ll also include your app version and device info to help us
             investigate.
           </Text>
-        </View>
+        </ScrollView>
 
         <View className="px-5 pb-4">
           <Pressable

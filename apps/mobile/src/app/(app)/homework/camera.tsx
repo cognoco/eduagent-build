@@ -15,7 +15,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import type { HomeworkCaptureSource, HomeworkProblem } from '@eduagent/schemas';
 import { useThemeColors } from '../../../lib/theme';
-import { cameraReducer, initialCameraState } from './_helpers/camera-reducer';
+import {
+  cameraReducer,
+  initialCameraState,
+} from '../../../components/homework/camera-reducer';
 import { useHomeworkOcr } from '../../../hooks/use-homework-ocr';
 import { useCreateSubject, useSubjects } from '../../../hooks/use-subjects';
 import { useClassifySubject } from '../../../hooks/use-classify-subject';
@@ -29,7 +32,7 @@ import {
   getHomeworkProblemText,
   serializeHomeworkProblems,
   splitHomeworkProblems,
-} from './_helpers/problem-cards';
+} from '../../../components/homework/problem-cards';
 
 type FlashMode = 'off' | 'on' | 'auto';
 

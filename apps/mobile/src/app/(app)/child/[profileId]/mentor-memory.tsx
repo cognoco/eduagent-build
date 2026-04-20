@@ -1,4 +1,5 @@
 import {
+  Platform,
   Pressable,
   ScrollView,
   Share,
@@ -162,10 +163,34 @@ export default function ChildMentorMemoryScreen() {
         });
         await assertOk(res);
         const data = (await res.json()) as { text: string };
-        await Share.share({
-          message: data.text,
-          title: `${child?.displayName ?? 'Learner'} memory summary`,
-        });
+        if (Platform.OS === 'web') {
+          // Use globalThis casts to avoid DOM-lib requirement in RN tsconfig.
+          type WebDoc = {
+            createElement(tag: string): {
+              href: string;
+              download: string;
+              click(): void;
+            };
+          };
+          const doc = (globalThis as { document?: WebDoc }).document;
+          if (!doc) return;
+          // RN globals.d.ts requires both `type` and `lastModified` in BlobOptions.
+          const blob = new Blob([data.text], {
+            type: 'text/plain',
+            lastModified: Date.now(),
+          });
+          const url = URL.createObjectURL(blob);
+          const a = doc.createElement('a');
+          a.href = url;
+          a.download = `${child?.displayName ?? 'learner'}-memory-summary.txt`;
+          a.click();
+          URL.revokeObjectURL(url);
+        } else {
+          await Share.share({
+            message: data.text,
+            title: `${child?.displayName ?? 'Learner'} memory summary`,
+          });
+        }
       } catch {
         platformAlert('Could not export memory', 'Please try again.');
       }
@@ -187,7 +212,7 @@ export default function ChildMentorMemoryScreen() {
           You don&apos;t have access to this profile.
         </Text>
         <Pressable
-          onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
+          onPress={() => goBackOrReplace(router, '/(app)/more' as const)}
           className="bg-primary rounded-button px-6 py-3"
           accessibilityRole="button"
         >
@@ -203,7 +228,7 @@ export default function ChildMentorMemoryScreen() {
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
       <View className="px-5 pt-4 pb-2 flex-row items-center">
         <Pressable
-          onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
+          onPress={() => goBackOrReplace(router, '/(app)/more' as const)}
           className="me-3 py-2 pe-2"
           accessibilityRole="button"
           accessibilityLabel="Go back"

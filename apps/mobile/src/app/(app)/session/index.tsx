@@ -69,25 +69,28 @@ import {
 } from '../../../lib/session-recovery';
 import * as SecureStore from '../../../lib/secure-storage';
 import * as FileSystem from 'expo-file-system';
-import { parseHomeworkProblems } from '../homework/_helpers/problem-cards';
+import { parseHomeworkProblems } from '../../../components/homework/problem-cards';
 import {
   getInputModeKey,
   errorHasStatus,
   getConversationStage,
   type MessageFeedbackState,
   type PendingSubjectResolution,
-} from './_helpers/session-types';
-import { useSessionStreaming } from './_helpers/use-session-streaming';
-import { useSubjectClassification } from './_helpers/use-subject-classification';
-import { useSessionActions } from './_helpers/use-session-actions';
-import { SessionMessageActions } from './_helpers/SessionMessageActions';
+} from '../../../components/session/session-types';
+import { useSessionStreaming } from '../../../components/session/use-session-streaming';
+import { useSubjectClassification } from '../../../components/session/use-subject-classification';
+import { useSessionActions } from '../../../components/session/use-session-actions';
+import { SessionMessageActions } from '../../../components/session/SessionMessageActions';
 import {
   SessionToolAccessory,
   SessionAccessory,
-} from './_helpers/SessionAccessories';
-import { ParkingLotModal, TopicSwitcherModal } from './_helpers/SessionModals';
-import { SessionFooter } from './_helpers/SessionFooter';
-import { getResumeBannerCopy } from './_helpers/resume-banner-copy';
+} from '../../../components/session/SessionAccessories';
+import {
+  ParkingLotModal,
+  TopicSwitcherModal,
+} from '../../../components/session/SessionModals';
+import { SessionFooter } from '../../../components/session/SessionFooter';
+import { getResumeBannerCopy } from '../../../components/session/resume-banner-copy';
 import { Sentry } from '../../../lib/sentry';
 
 /**

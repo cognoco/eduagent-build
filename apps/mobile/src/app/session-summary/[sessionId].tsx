@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -22,6 +22,7 @@ import {
   useSubmitSummary,
   useRecallBridge,
 } from '../../hooks/use-sessions';
+import { useDepthEvaluation } from '../../hooks/use-depth-evaluation';
 import { goBackOrReplace } from '../../lib/navigation';
 import { platformAlert } from '../../lib/platform-alert';
 import { Sentry } from '../../lib/sentry';
@@ -85,6 +86,7 @@ export default function SessionSummaryScreen() {
   const { activeProfile } = useProfile();
   const persona = personaFromBirthYear(activeProfile?.birthYear);
   const recallBridge = useRecallBridge(sessionId ?? '');
+  const depthEvaluation = useDepthEvaluation();
   const [recallQuestions, setRecallQuestions] = useState<string[] | null>(null);
 
   // BUG-449: when the user re-enters this screen from Library → Shelf → Book →
@@ -98,6 +100,18 @@ export default function SessionSummaryScreen() {
     persisted?.status === 'submitted' || persisted?.status === 'accepted';
   const isPersistedSkipped = persisted?.status === 'skipped';
   const isAlreadyPersisted = isPersistedSubmitted || isPersistedSkipped;
+
+  // Fire depth evaluation for fresh sessions to trigger server-side telemetry
+  // (session quality gating, topic detection). Fire-and-forget — the result
+  // drives analytics, not UI. Skip for revisited/persisted sessions.
+  const depthFiredRef = useRef(false);
+  useEffect(() => {
+    if (sessionId && !isAlreadyPersisted && !depthFiredRef.current) {
+      depthFiredRef.current = true;
+      depthEvaluation.mutate({ sessionId });
+    }
+  }, [sessionId, isAlreadyPersisted, depthEvaluation]);
+
   const showSubmittedView = submitted || isPersistedSubmitted;
   const displayContent = submitted ? summaryText : persisted?.content ?? '';
   const displayAiFeedback = submitted

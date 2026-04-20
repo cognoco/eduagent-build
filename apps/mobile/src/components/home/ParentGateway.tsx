@@ -21,8 +21,10 @@ function getChildHighlight(dashboard: DashboardData | undefined): string {
   }
 
   if (child.totalTimeThisWeek > 0) {
-    const minutes = Math.round(child.totalTimeThisWeek / 60);
-    return `${child.displayName} practiced ${minutes} min this week`;
+    // [BUG-498] totalTimeThisWeek arrives from the API already in minutes
+    // (dashboard.ts maps totalTimeThisWeekMinutes → totalTimeThisWeek).
+    // The previous / 60 double-divided, under-reporting by 60×.
+    return `${child.displayName} practiced ${child.totalTimeThisWeek} min this week`;
   }
 
   return `${child.displayName} hasn't practiced this week`;

@@ -6,12 +6,12 @@ import {
 } from '@testing-library/react-native';
 import { SessionFooter } from './SessionFooter';
 
-jest.mock('../../../../components/session', () => ({
+jest.mock('../session', () => ({
   QuestionCounter: () => null,
   LibraryPrompt: () => null,
 }));
 
-jest.mock('../../../../lib/format-api-error', () => ({
+jest.mock('../../lib/format-api-error', () => ({
   formatApiError: (e: unknown) => String(e),
 }));
 

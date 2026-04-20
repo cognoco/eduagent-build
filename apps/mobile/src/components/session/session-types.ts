@@ -1,5 +1,5 @@
 import type { PendingCelebration } from '@eduagent/schemas';
-import type { ChatMessage } from '../../../../components/session';
+import type { ChatMessage } from '../session';
 
 export function computePaceMultiplier(
   history: Array<{ actualSeconds: number; expectedMinutes: number }>

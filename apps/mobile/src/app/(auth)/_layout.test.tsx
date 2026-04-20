@@ -1,18 +1,22 @@
 import { render, screen } from '@testing-library/react-native';
 import { useAuth } from '@clerk/clerk-expo';
+import {
+  clearPendingAuthRedirect,
+  rememberPendingAuthRedirect,
+} from '../../lib/pending-auth-redirect';
 
 const mockUseGlobalSearchParams = jest.fn();
+const mockUseLocalSearchParams = jest.fn();
+const mockReplace = jest.fn();
 
 jest.mock('expo-router', () => ({
-  Redirect: ({ href }: { href: string }) => {
-    const { Text } = require('react-native');
-    return <Text testID="redirect">{href}</Text>;
-  },
   Stack: ({ children }: { children?: React.ReactNode }) => {
     const { View } = require('react-native');
     return <View testID="stack">{children}</View>;
   },
   useGlobalSearchParams: () => mockUseGlobalSearchParams(),
+  useLocalSearchParams: () => mockUseLocalSearchParams(),
+  useRouter: () => ({ replace: mockReplace }),
 }));
 
 const AuthLayout = require('./_layout').default;
@@ -20,7 +24,10 @@ const AuthLayout = require('./_layout').default;
 describe('AuthRoutesLayout', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    clearPendingAuthRedirect();
+    mockReplace.mockReset();
     mockUseGlobalSearchParams.mockReturnValue({});
+    mockUseLocalSearchParams.mockReturnValue({});
   });
 
   it('redirects to (app)/home when user is signed in', () => {
@@ -31,12 +38,12 @@ describe('AuthRoutesLayout', () => {
 
     render(<AuthLayout />);
 
-    const redirect = screen.getByTestId('redirect');
-    expect(redirect.props.children).toBe('/home');
+    expect(screen.getByTestId('auth-redirecting')).toBeTruthy();
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
   });
 
   it('redirects signed-in users to the requested route when redirectTo is set', () => {
-    mockUseGlobalSearchParams.mockReturnValue({ redirectTo: '/quiz' });
+    mockUseLocalSearchParams.mockReturnValue({ redirectTo: '/quiz' });
     (useAuth as jest.Mock).mockReturnValue({
       isLoaded: true,
       isSignedIn: true,
@@ -44,8 +51,32 @@ describe('AuthRoutesLayout', () => {
 
     render(<AuthLayout />);
 
-    const redirect = screen.getByTestId('redirect');
-    expect(redirect.props.children).toBe('/quiz');
+    expect(screen.getByTestId('auth-redirecting')).toBeTruthy();
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/quiz');
+  });
+
+  it('keeps the requested route if auth search params clear during redirect', () => {
+    mockUseLocalSearchParams.mockReturnValue({ redirectTo: '/quiz' });
+    mockUseGlobalSearchParams.mockReturnValue({ redirectTo: '/quiz' });
+    (useAuth as jest.Mock).mockReturnValue({
+      isLoaded: true,
+      isSignedIn: false,
+    });
+
+    const { rerender } = render(<AuthLayout />);
+    expect(screen.getByTestId('stack')).toBeTruthy();
+
+    mockUseLocalSearchParams.mockReturnValue({});
+    mockUseGlobalSearchParams.mockReturnValue({});
+    (useAuth as jest.Mock).mockReturnValue({
+      isLoaded: true,
+      isSignedIn: true,
+    });
+
+    rerender(<AuthLayout />);
+
+    expect(screen.getByTestId('auth-redirecting')).toBeTruthy();
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/quiz');
   });
 
   it('renders Stack when user is not signed in', () => {
@@ -57,7 +88,8 @@ describe('AuthRoutesLayout', () => {
     render(<AuthLayout />);
 
     expect(screen.getByTestId('stack')).toBeTruthy();
-    expect(screen.queryByTestId('redirect')).toBeNull();
+    expect(screen.queryByTestId('auth-redirecting')).toBeNull();
+    expect(mockReplace).not.toHaveBeenCalled();
   });
 
   // ---------------------------------------------------------------------------
@@ -90,13 +122,13 @@ describe('AuthRoutesLayout', () => {
     rerender(<AuthLayout />);
 
     // Guard fires → user lands in app home
-    const redirect = screen.getByTestId('redirect');
-    expect(redirect.props.children).toBe('/home');
+    expect(screen.getByTestId('auth-redirecting')).toBeTruthy();
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
     expect(screen.queryByTestId('stack')).toBeNull();
   });
 
   it('ignores unsafe redirect targets and falls back to home', () => {
-    mockUseGlobalSearchParams.mockReturnValue({
+    mockUseLocalSearchParams.mockReturnValue({
       redirectTo: 'https://example.com/steal-session',
     });
     (useAuth as jest.Mock).mockReturnValue({
@@ -106,12 +138,12 @@ describe('AuthRoutesLayout', () => {
 
     render(<AuthLayout />);
 
-    const redirect = screen.getByTestId('redirect');
-    expect(redirect.props.children).toBe('/(app)/home');
+    expect(screen.getByTestId('auth-redirecting')).toBeTruthy();
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
   });
 
   it('normalizes route-group paths before redirecting signed-in users', () => {
-    mockUseGlobalSearchParams.mockReturnValue({ redirectTo: '/(app)/quiz' });
+    mockUseLocalSearchParams.mockReturnValue({ redirectTo: '/(app)/quiz' });
     (useAuth as jest.Mock).mockReturnValue({
       isLoaded: true,
       isSignedIn: true,
@@ -119,8 +151,34 @@ describe('AuthRoutesLayout', () => {
 
     render(<AuthLayout />);
 
-    const redirect = screen.getByTestId('redirect');
-    expect(redirect.props.children).toBe('/quiz');
+    expect(screen.getByTestId('auth-redirecting')).toBeTruthy();
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/quiz');
+  });
+
+  it('falls back to global params when local auth params are unavailable', () => {
+    mockUseGlobalSearchParams.mockReturnValue({ redirectTo: '/quiz' });
+    (useAuth as jest.Mock).mockReturnValue({
+      isLoaded: true,
+      isSignedIn: true,
+    });
+
+    render(<AuthLayout />);
+
+    expect(screen.getByTestId('auth-redirecting')).toBeTruthy();
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/quiz');
+  });
+
+  it('falls back to the remembered app route when auth params are unavailable', () => {
+    rememberPendingAuthRedirect('/(app)/quiz');
+    (useAuth as jest.Mock).mockReturnValue({
+      isLoaded: true,
+      isSignedIn: true,
+    });
+
+    render(<AuthLayout />);
+
+    expect(screen.getByTestId('auth-redirecting')).toBeTruthy();
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/quiz');
   });
 
   it('renders nothing when isLoaded is false (Clerk still initializing)', () => {
@@ -136,6 +194,7 @@ describe('AuthRoutesLayout', () => {
     // Rendering a Redirect would send users to the wrong place.
     expect(toJSON()).toBeNull();
     expect(screen.queryByTestId('stack')).toBeNull();
-    expect(screen.queryByTestId('redirect')).toBeNull();
+    expect(screen.queryByTestId('auth-redirecting')).toBeNull();
+    expect(mockReplace).not.toHaveBeenCalled();
   });
 });

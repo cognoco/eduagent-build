@@ -41,7 +41,7 @@ jest.mock('../../../lib/navigation', () => ({
   goBackOrReplace: jest.fn(),
 }));
 
-jest.mock('./_components/GuessWhoQuestion', () => ({
+jest.mock('../../../components/quiz/GuessWhoQuestion', () => ({
   GuessWhoQuestion: () => null,
 }));
 

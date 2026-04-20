@@ -26,7 +26,12 @@ import {
 import { evaluateSentryForProfile } from '../../lib/sentry';
 import { formatApiError } from '../../lib/format-api-error';
 import { clearTransitionState } from '../../lib/auth-transition';
-import { normalizeRedirectPath } from '../../lib/normalize-redirect-path';
+import { toInternalAppRedirectPath } from '../../lib/normalize-redirect-path';
+import {
+  clearPendingAuthRedirect,
+  peekPendingAuthRedirect,
+  rememberPendingAuthRedirect,
+} from '../../lib/pending-auth-redirect';
 import { platformAlert } from '../../lib/platform-alert';
 import { FeedbackProvider } from '../../components/feedback/FeedbackProvider';
 
@@ -87,11 +92,11 @@ function resolveAuthRedirectPath(pathname: string | undefined): string {
       globalThis as { window?: { location?: { pathname?: string } } }
     ).window;
     if (typeof win?.location?.pathname === 'string') {
-      return normalizeRedirectPath(win.location.pathname);
+      return toInternalAppRedirectPath(win.location.pathname);
     }
   }
 
-  return normalizeRedirectPath(pathname);
+  return toInternalAppRedirectPath(pathname);
 }
 
 /**
@@ -1029,7 +1034,9 @@ export default function AppLayout() {
   const colors = useThemeColors();
   const tokenVars = useTokenVars();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const pathname = usePathname();
+  const currentAppPath = toInternalAppRedirectPath(pathname);
   const {
     activeProfile,
     isLoading: isProfileLoading,
@@ -1043,6 +1050,9 @@ export default function AppLayout() {
   // Sync Clerk auth state with RevenueCat identity (runs on auth change)
   useRevenueCatIdentity();
 
+  const pendingAuthRedirect = isSignedIn ? peekPendingAuthRedirect() : null;
+  const replayedAuthRedirectRef = React.useRef<string | null>(null);
+
   // Age-gated Sentry: re-evaluate on profile switch (Story 10.14)
   React.useEffect(() => {
     evaluateSentryForProfile(
@@ -1054,6 +1064,26 @@ export default function AppLayout() {
     activeProfile?.birthYear,
     activeProfile?.consentStatus,
   ]);
+
+  React.useEffect(() => {
+    if (pendingAuthRedirect && currentAppPath === pendingAuthRedirect) {
+      clearPendingAuthRedirect();
+    }
+  }, [currentAppPath, pendingAuthRedirect]);
+
+  React.useEffect(() => {
+    if (!pendingAuthRedirect || currentAppPath === pendingAuthRedirect) {
+      replayedAuthRedirectRef.current = null;
+      return;
+    }
+
+    if (replayedAuthRedirectRef.current === pendingAuthRedirect) {
+      return;
+    }
+
+    replayedAuthRedirectRef.current = pendingAuthRedirect;
+    router.replace(pendingAuthRedirect as never);
+  }, [currentAppPath, pendingAuthRedirect, router]);
 
   // Show alert when a profile was removed server-side (consent denied / auto-deleted)
   React.useEffect(() => {
@@ -1087,8 +1117,21 @@ export default function AppLayout() {
       console.warn(
         '[AUTH-DEBUG] (app) layout → NOT signed in, bouncing to sign-in'
       );
-    const redirectTo = encodeURIComponent(resolveAuthRedirectPath(pathname));
+    const redirectTo = encodeURIComponent(
+      rememberPendingAuthRedirect(resolveAuthRedirectPath(pathname))
+    );
     return <Redirect href={`/sign-in?redirectTo=${redirectTo}` as const} />;
+  }
+
+  if (pendingAuthRedirect && currentAppPath !== pendingAuthRedirect) {
+    return (
+      <View
+        className="flex-1 bg-background items-center justify-center"
+        testID="auth-redirect-replay"
+      >
+        <ActivityIndicator size="large" />
+      </View>
+    );
   }
 
   // Show a centered spinner while profiles load — never return null (blank

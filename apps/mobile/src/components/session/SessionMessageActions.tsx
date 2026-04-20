@@ -1,7 +1,7 @@
 import { View, Text, Pressable } from 'react-native';
-import type { ChatMessage } from '../../../../components/session';
-import { QuotaExceededCard } from '../../../../components/session';
-import type { QuotaExceededDetails } from '../../../../lib/api-client';
+import type { ChatMessage } from '../session';
+import { QuotaExceededCard } from '../session';
+import type { QuotaExceededDetails } from '../../lib/api-client';
 import {
   getContextualQuickChips,
   QUICK_CHIP_CONFIG,

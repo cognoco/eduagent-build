@@ -23,7 +23,7 @@ import { useQuizFlow } from './_layout';
 import {
   GuessWhoQuestion,
   type GuessWhoResolvedResult,
-} from './_components/GuessWhoQuestion';
+} from '../../../components/quiz/GuessWhoQuestion';
 
 type AnswerState = 'unanswered' | 'checking' | 'correct' | 'wrong';
 

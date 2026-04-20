@@ -282,10 +282,37 @@ export default function MoreScreen() {
   const handleExport = useCallback(async () => {
     try {
       const data = await exportData.mutateAsync();
-      await Share.share({
-        title: 'MentoMate account data export',
-        message: JSON.stringify(data, null, 2),
-      });
+      const jsonString = JSON.stringify(data, null, 2);
+
+      if (Platform.OS === 'web') {
+        // [BUG-509] Web Share API is not universally supported — file download instead
+        // Use globalThis casts to avoid DOM-lib requirement in RN tsconfig.
+        type WebDoc = {
+          createElement(tag: string): {
+            href: string;
+            download: string;
+            click(): void;
+          };
+        };
+        const doc = (globalThis as { document?: WebDoc }).document;
+        if (!doc) return;
+        // RN globals.d.ts requires both `type` and `lastModified` in BlobOptions.
+        const blob = new Blob([jsonString], {
+          type: 'application/json',
+          lastModified: Date.now(),
+        });
+        const url = URL.createObjectURL(blob);
+        const a = doc.createElement('a');
+        a.href = url;
+        a.download = 'mentomate-data-export.json';
+        a.click();
+        URL.revokeObjectURL(url);
+      } else {
+        await Share.share({
+          title: 'MentoMate account data export',
+          message: jsonString,
+        });
+      }
     } catch (err: unknown) {
       platformAlert('Export failed', formatApiError(err));
     }

@@ -307,7 +307,7 @@ export default function ChildDetailScreen() {
           You don&apos;t have access to this profile.
         </Text>
         <Pressable
-          onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
+          onPress={() => goBackOrReplace(router, '/(app)/more' as const)}
           className="bg-primary rounded-button px-6 py-3"
           accessibilityRole="button"
         >
@@ -323,7 +323,7 @@ export default function ChildDetailScreen() {
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
       <View className="px-5 pt-4 pb-2 flex-row items-center">
         <Pressable
-          onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
+          onPress={() => goBackOrReplace(router, '/(app)/more' as const)}
           className="me-3 py-2 pe-2"
           accessibilityLabel="Go back"
           accessibilityRole="button"

@@ -105,7 +105,7 @@ export const curriculumTopicSchema = z.object({
   description: z.string(),
   sortOrder: z.number().int(),
   relevance: topicRelevanceSchema,
-  estimatedMinutes: z.number().int(),
+  estimatedMinutes: z.number().int().min(5).max(240),
   bookId: z.string().uuid(),
   chapter: z.string().nullable().optional(),
   skipped: z.boolean(),
@@ -182,7 +182,7 @@ export const generatedTopicSchema = z.object({
   title: z.string(),
   description: z.string(),
   relevance: topicRelevanceSchema,
-  estimatedMinutes: z.number().int(),
+  estimatedMinutes: z.number().int().min(5).max(240),
   cefrLevel: cefrLevelSchema.optional(),
   cefrSublevel: z.string().optional(),
   targetWordCount: z.number().int().optional(),
@@ -203,7 +203,7 @@ export const generatedBookTopicSchema = z.object({
   description: z.string(),
   chapter: z.string(),
   sortOrder: z.number().int(),
-  estimatedMinutes: z.number().int(),
+  estimatedMinutes: z.number().int().min(5).max(240),
 });
 export type GeneratedBookTopic = z.infer<typeof generatedBookTopicSchema>;
 

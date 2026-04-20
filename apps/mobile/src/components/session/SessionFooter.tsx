@@ -1,13 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
-import { QuestionCounter, LibraryPrompt } from '../../../../components/session';
-import { NoteInput } from '../../../../components/library/NoteInput';
-import type { useFiling } from '../../../../hooks/use-filing';
-import type { useUpsertNote } from '../../../../hooks/use-notes';
-import { formatApiError } from '../../../../lib/format-api-error';
-import { platformAlert } from '../../../../lib/platform-alert';
+import { QuestionCounter, LibraryPrompt } from '../session';
+import { NoteInput } from '../library/NoteInput';
+import type { useFiling } from '../../hooks/use-filing';
+import type { useUpsertNote } from '../../hooks/use-notes';
+import { formatApiError } from '../../lib/format-api-error';
+import { platformAlert } from '../../lib/platform-alert';
 import type { Router } from 'expo-router';
-import type { useThemeColors } from '../../../../lib/theme';
+import type { useThemeColors } from '../../lib/theme';
 
 export interface SessionFooterProps {
   showFilingPrompt: boolean;

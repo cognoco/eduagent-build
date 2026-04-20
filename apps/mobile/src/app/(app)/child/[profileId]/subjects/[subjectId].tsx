@@ -75,7 +75,7 @@ export default function SubjectTopicsScreen() {
           Unable to load subject details. Please go back and try again.
         </Text>
         <Pressable
-          onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
+          onPress={() => goBackOrReplace(router, '/(app)/more' as const)}
           className="bg-primary rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
           accessibilityRole="button"
           accessibilityLabel="Go back"
@@ -109,7 +109,7 @@ export default function SubjectTopicsScreen() {
           testID="retry-topics"
         />
         <Pressable
-          onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
+          onPress={() => goBackOrReplace(router, '/(app)/more' as const)}
           className="mt-3 py-3 px-6 min-h-[44px] items-center justify-center"
           accessibilityRole="button"
           accessibilityLabel="Go back"
@@ -125,7 +125,7 @@ export default function SubjectTopicsScreen() {
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
       <View className="px-5 pt-4 pb-2 flex-row items-center">
         <Pressable
-          onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
+          onPress={() => goBackOrReplace(router, '/(app)/more' as const)}
           className="me-3 py-2 pe-2"
           accessibilityLabel="Go back"
           accessibilityRole="button"

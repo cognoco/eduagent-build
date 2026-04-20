@@ -5,30 +5,30 @@ import type {
   HomeworkCaptureSource,
   HomeworkProblem,
 } from '@eduagent/schemas';
-import type { FluencyDrillEvent } from '../../../../lib/sse';
-import type { ChatMessage } from '../../../../components/session';
-import { animateResponse } from '../../../../components/session';
+import type { FluencyDrillEvent } from '../../lib/sse';
+import type { ChatMessage } from '../session';
+import { animateResponse } from '../session';
 import type {
   useStreamMessage,
   useStartSession,
   useRecordSystemPrompt,
-} from '../../../../hooks/use-sessions';
+} from '../../hooks/use-sessions';
 import {
   useApiClient,
   QuotaExceededError,
   type QuotaExceededDetails,
-} from '../../../../lib/api-client';
-import { formatApiError } from '../../../../lib/format-api-error';
-import { writeSessionRecoveryMarker } from '../../../../lib/session-recovery';
+} from '../../lib/api-client';
+import { formatApiError } from '../../lib/format-api-error';
+import { writeSessionRecoveryMarker } from '../../lib/session-recovery';
 import {
   buildHomeworkSessionMetadata,
   withProblemMode,
-} from '../../homework/_helpers/problem-cards';
+} from '../homework/problem-cards';
 import {
   celebrationForReason,
   type useMilestoneTracker,
-} from '../../../../hooks/use-milestone-tracker';
-import type { useCelebration } from '../../../../hooks/use-celebration';
+} from '../../hooks/use-milestone-tracker';
+import type { useCelebration } from '../../hooks/use-celebration';
 import {
   computePaceMultiplier,
   isReconnectableSessionError,
