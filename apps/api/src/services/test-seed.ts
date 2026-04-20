@@ -784,6 +784,9 @@ async function seedParentMultiChild(
     isOwner: true,
   });
 
+  // Parent also gets a subject so the inline "Learn something" view works
+  await createSubjectWithCurriculum(db, parentProfileId, 'General Knowledge');
+
   // Child 1 — teen with active learning
   const child1ProfileId = await createBaseProfile(db, accountId, {
     displayName: 'Emma',

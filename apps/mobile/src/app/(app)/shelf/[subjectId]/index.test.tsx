@@ -1,5 +1,4 @@
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
-import { Alert } from 'react-native';
 import ShelfScreen from './index';
 
 // ---------------------------------------------------------------------------
@@ -106,6 +105,11 @@ jest.mock('../../../../lib/theme', () => ({
 jest.mock('../../../../lib/format-api-error', () => ({
   formatApiError: (err: unknown) =>
     err instanceof Error ? err.message : 'Unknown error',
+  classifyApiError: (err: unknown) => ({
+    message: err instanceof Error ? err.message : 'Unknown error',
+    category: 'unknown' as const,
+    recovery: 'retry' as const,
+  }),
 }));
 
 // --- Library components ---
@@ -535,24 +539,21 @@ describe('ShelfScreen', () => {
     });
   });
 
-  it('shows error Alert when picking a book suggestion fails', async () => {
-    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(jest.fn());
-
+  it('shows ErrorFallback overlay when picking a book suggestion fails', async () => {
     mockUseBookSuggestions.mockReturnValue({
       data: [{ id: 'sug-1', title: 'Number Theory', emoji: '🔢' }],
     });
 
     mockFilingMutateAsync.mockRejectedValue(new Error('Filing failed'));
 
-    const { getByTestId } = render(<ShelfScreen />);
+    const { getByTestId, getByText } = render(<ShelfScreen />);
     fireEvent.press(getByTestId('shelf-suggestion-sug-1'));
 
     await waitFor(() => {
-      expect(alertSpy).toHaveBeenCalledWith(
-        'Error',
-        'Filing failed',
-        expect.any(Array)
-      );
+      expect(getByTestId('shelf-filing-error-overlay')).toBeTruthy();
+      expect(getByText('Filing failed')).toBeTruthy();
+      expect(getByTestId('shelf-filing-error-retry')).toBeTruthy();
+      expect(getByTestId('shelf-filing-error-back')).toBeTruthy();
     });
   });
 });

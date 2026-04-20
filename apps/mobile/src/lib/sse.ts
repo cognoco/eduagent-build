@@ -41,6 +41,8 @@ export interface StreamDoneEvent {
   notePromptPostSession?: boolean;
   /** Fluency drill start/end annotation for language sessions. */
   fluencyDrill?: FluencyDrillEvent;
+  /** F6: LLM self-reported confidence. Absent or 'medium'/'high' = no indicator. Only 'low' shows a UI prompt. */
+  confidence?: 'low' | 'medium' | 'high';
 }
 
 export type StreamEvent = StreamChunkEvent | StreamDoneEvent;

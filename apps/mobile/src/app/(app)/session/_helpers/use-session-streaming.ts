@@ -74,6 +74,10 @@ export interface UseSessionStreamingOptions {
   setFluencyDrill: React.Dispatch<
     React.SetStateAction<FluencyDrillEvent | null>
   >;
+  /** F6: setter to track the last AI message ID that had confidence=low */
+  setLowConfidenceMessageId: React.Dispatch<
+    React.SetStateAction<string | null>
+  >;
 
   // Homework state
   homeworkProblemsState: HomeworkProblem[];
@@ -152,6 +156,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
     setResponseHistory,
     setHomeworkProblemsState,
     setFluencyDrill,
+    setLowConfidenceMessageId,
     homeworkProblemsState,
     currentProblemIndex,
     activeHomeworkProblem,
@@ -578,6 +583,15 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
               setFluencyDrill(result.fluencyDrill);
             }
 
+            // F6: Surface low-confidence indicator below the AI message
+            // 'medium' and 'high' (and absent, treated as 'medium') show nothing.
+            if (result.confidence === 'low') {
+              setLowConfidenceMessageId(streamId);
+            } else {
+              // Clear any previous low-confidence indicator from a prior exchange.
+              setLowConfidenceMessageId(null);
+            }
+
             if (previousAiAt) {
               setResponseHistory((prev) => [
                 ...prev,
@@ -710,6 +724,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
       setFluencyDrill,
       setHomeworkProblemsState,
       setIsStreaming,
+      setLowConfidenceMessageId,
       setMessages,
       setNotePromptOffered,
       setQuotaError,

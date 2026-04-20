@@ -3,6 +3,7 @@ import { ParentDashboardSummary } from './ParentDashboardSummary';
 
 describe('ParentDashboardSummary', () => {
   const defaultProps = {
+    profileId: 'test-profile-123',
     childName: 'Alex',
     summary: 'Alex: Math strong, Science fading. 4 sessions this week.',
     subjects: [
@@ -97,14 +98,16 @@ describe('ParentDashboardSummary', () => {
   it('calls onDrillDown when card pressed', () => {
     render(<ParentDashboardSummary {...defaultProps} />);
 
-    fireEvent.press(screen.getByTestId('parent-dashboard-summary'));
+    fireEvent.press(screen.getByTestId('dashboard-child-test-profile-123'));
     expect(defaultProps.onDrillDown).toHaveBeenCalledTimes(1);
   });
 
   it('calls onDrillDown when View details pressed', () => {
     render(<ParentDashboardSummary {...defaultProps} />);
 
-    fireEvent.press(screen.getByTestId('parent-dashboard-summary-primary'));
+    fireEvent.press(
+      screen.getByTestId('dashboard-child-test-profile-123-primary')
+    );
     expect(defaultProps.onDrillDown).toHaveBeenCalled();
   });
 

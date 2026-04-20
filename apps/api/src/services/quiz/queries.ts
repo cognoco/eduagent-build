@@ -3,6 +3,7 @@ import {
   createScopedRepository,
   curricula,
   curriculumTopics,
+  quizMissedItems,
   quizRounds,
   subjects,
   vocabulary,
@@ -298,6 +299,39 @@ export async function markMissedItemsSurfaced(
 ): Promise<number> {
   const repo = createScopedRepository(db, profileId);
   return repo.quizMissedItems.markSurfaced(activityType);
+}
+
+/**
+ * Fetch recent unsurfaced missed items for a profile + activity type so the
+ * round-generation prompt can re-surface them. Best-effort: returns an empty
+ * array on any DB error so the quiz call still succeeds. [P1 — quiz_missed_items wiring]
+ */
+export async function getRecentMissedItems(
+  db: Database,
+  profileId: string,
+  activityType: QuizActivityType,
+  limit = 8
+): Promise<Array<{ questionText: string; correctAnswer: string }>> {
+  try {
+    const repo = createScopedRepository(db, profileId);
+    const rows = await repo.quizMissedItems.findMany(
+      and(
+        eq(quizMissedItems.activityType, activityType),
+        eq(quizMissedItems.surfaced, false),
+        eq(quizMissedItems.convertedToTopic, false)
+      )
+    );
+    return rows.slice(0, limit).map((r) => ({
+      questionText: r.questionText,
+      correctAnswer: r.correctAnswer,
+    }));
+  } catch (error) {
+    logger.warn('quiz.missed_items.fetch_failed', {
+      activityType,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return [];
+  }
 }
 
 /**

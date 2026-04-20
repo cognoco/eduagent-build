@@ -161,6 +161,196 @@ function parseApiBody(message: string): {
 }
 
 /**
+ * Structured error classification result.
+ *
+ * - `category` — what kind of error it is (drives icon / heading choice in UI)
+ * - `recovery` — what the user should do next (drives which action buttons to show)
+ * - `message` — kid-friendly body text (reuses all FRIENDLY_MESSAGE_MAP logic)
+ */
+export interface FormattedApiError {
+  message: string;
+  category: 'network' | 'not-found' | 'quota' | 'auth' | 'server' | 'unknown';
+  recovery: 'retry' | 'go-back' | 'sign-out' | 'none';
+}
+
+/**
+ * Classifies an error into a structured `FormattedApiError`.
+ *
+ * Classification order (each step narrows the raw error, NOT the formatted
+ * message — per the "Classify Before Format" rule):
+ *  1. Network / connectivity failures → network / retry
+ *  2. Named error types (QuotaExceededError, ForbiddenError) → quota or auth
+ *  3. Error codes on the error object (apiCode, code)
+ *  4. HTTP status from the "API error {status}: …" shape
+ *  5. Message pattern heuristics (network keywords)
+ *  6. Anything else → unknown / retry
+ *
+ * The message is derived AFTER classification so the classifier never
+ * string-matches on formatted output.
+ */
+export function classifyApiError(error: unknown): FormattedApiError {
+  // 1. Network errors (TypeError from native fetch)
+  if (error instanceof TypeError) {
+    const msg = error.message.toLowerCase();
+    if (msg.includes('fetch') || msg.includes('network')) {
+      return {
+        message: NETWORK_MESSAGE,
+        category: 'network',
+        recovery: 'retry',
+      };
+    }
+  }
+
+  if (error instanceof Error) {
+    const msg = error.message;
+    const msgLower = msg.toLowerCase();
+    const apiErrorLike = error as Error & {
+      status?: number;
+      code?: string;
+      apiCode?: string;
+    };
+
+    const effectiveCode = apiErrorLike.apiCode ?? apiErrorLike.code;
+
+    // 2. Named error types
+    if (error.name === 'QuotaExceededError') {
+      return { message: msg, category: 'quota', recovery: 'none' };
+    }
+
+    if (error.name === 'ForbiddenError') {
+      // Sub-classify by apiCode: SUBJECT_INACTIVE is a content state, not auth
+      if (
+        effectiveCode === 'SUBJECT_INACTIVE' ||
+        effectiveCode === 'SUBJECT_PAUSED'
+      ) {
+        return {
+          message: friendlyMessage(msg) ?? msg,
+          category: 'not-found',
+          recovery: 'go-back',
+        };
+      }
+      return {
+        message:
+          friendlyMessage(msg) ??
+          (msg || 'You do not have permission to view this.'),
+        category: 'auth',
+        recovery: 'sign-out',
+      };
+    }
+
+    // 3. Typed error codes
+    if (effectiveCode === 'EXCHANGE_LIMIT_EXCEEDED') {
+      return {
+        message: 'Session limit reached. Start a new session to keep going.',
+        category: 'quota',
+        recovery: 'go-back',
+      };
+    }
+    if (
+      effectiveCode === 'UPSTREAM_ERROR' ||
+      effectiveCode === 'INTERNAL_ERROR'
+    ) {
+      return { message: SERVER_MESSAGE, category: 'server', recovery: 'retry' };
+    }
+
+    // 4. HTTP status from "API error {status}: …"
+    const parsedApiBody = parseApiBody(msg);
+    if (parsedApiBody) {
+      const { status, code, apiMessage } = parsedApiBody;
+
+      if (code === 'EXCHANGE_LIMIT_EXCEEDED') {
+        return {
+          message: 'Session limit reached. Start a new session to keep going.',
+          category: 'quota',
+          recovery: 'go-back',
+        };
+      }
+
+      if (status === 401 || status === 403) {
+        const userMsg =
+          apiMessage && apiMessage.length < 200
+            ? friendlyMessage(apiMessage) ?? apiMessage
+            : 'You do not have permission to view this.';
+        return { message: userMsg, category: 'auth', recovery: 'sign-out' };
+      }
+
+      if (status === 404) {
+        const userMsg =
+          apiMessage && apiMessage.length < 200
+            ? friendlyMessage(apiMessage) ?? apiMessage
+            : 'That page or item no longer exists.';
+        return { message: userMsg, category: 'not-found', recovery: 'go-back' };
+      }
+
+      if (status === 429) {
+        const userMsg =
+          apiMessage && apiMessage.length < 200
+            ? friendlyMessage(apiMessage) ?? apiMessage
+            : "You've hit the limit. Wait a moment and try again.";
+        return { message: userMsg, category: 'quota', recovery: 'retry' };
+      }
+
+      if (status >= 500) {
+        const hasUsefulMsg =
+          apiMessage &&
+          apiMessage.length < 200 &&
+          !isGenericServerMessage(apiMessage) &&
+          !isTechnicalMessage(apiMessage);
+        return {
+          message: hasUsefulMsg
+            ? friendlyMessage(apiMessage) ?? apiMessage
+            : SERVER_MESSAGE,
+          category: 'server',
+          recovery: 'retry',
+        };
+      }
+
+      // 4xx client errors
+      if (apiMessage && apiMessage.length < 200) {
+        return {
+          message: friendlyMessage(apiMessage) ?? apiMessage,
+          category: 'unknown',
+          recovery: 'retry',
+        };
+      }
+      return {
+        message: "That didn't work. Please check your input and try again.",
+        category: 'unknown',
+        recovery: 'retry',
+      };
+    }
+
+    // 5. Network keyword heuristics on the raw message
+    if (isNetworkRelated(msgLower)) {
+      return {
+        message: NETWORK_MESSAGE,
+        category: 'network',
+        recovery: 'retry',
+      };
+    }
+
+    // 6. Short, user-facing messages — pass through
+    const looksLikeStack =
+      /\n\s+at /.test(msg) || /at [A-Z]\w*\./.test(msg) || /^at \S/.test(msg);
+    if (
+      msg.length > 0 &&
+      msg.length < 200 &&
+      !looksLikeStack &&
+      !msgLower.includes('undefined')
+    ) {
+      return {
+        message: friendlyMessage(msg) ?? msg,
+        category: 'unknown',
+        recovery: 'retry',
+      };
+    }
+  }
+
+  // 7. Fallback for null / undefined / non-Error values
+  return { message: DEFAULT_MESSAGE, category: 'unknown', recovery: 'retry' };
+}
+
+/**
  * Formats an error into a user-friendly, actionable message.
  *
  * @param error - The caught error (unknown type from catch blocks)

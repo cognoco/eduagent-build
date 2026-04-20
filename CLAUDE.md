@@ -23,6 +23,8 @@
 - Shared mobile components stay persona-unaware. Use semantic tokens and CSS variables, not persona checks or hardcoded hex colors.
 - Durable async work goes through Inngest. Do not fire-and-forget background work from route handlers.
 - LLM calls go through `services/llm/router.ts` (or its barrel), not direct provider SDK calls.
+- LLM responses that drive state-machine decisions (close interview, hold escalation, trigger UI widget) must use the structured response envelope (`llmResponseEnvelopeSchema` from `@eduagent/schemas`). Parse with `parseEnvelope()` from `services/llm/envelope.ts`. Never embed `[MARKER]` tokens or JSON blobs in free-text replies. Every envelope signal must have a server-side hard cap (e.g., `MAX_INTERVIEW_EXCHANGES = 6`) so the flow terminates even if the LLM never emits the signal. See `docs/architecture.md` → "LLM Response Envelope" for the full contract.
+- When changing LLM prompts, run the eval harness (`pnpm eval:llm`) to snapshot before/after across the 5 fixture profiles. Use `pnpm eval:llm --live` (Tier 2) to validate real LLM responses against `expectedResponseSchema` when set. Harness code: `apps/api/eval-llm/`.
 - Subagents (agents spawned via the Agent tool) must NEVER run `git add`, `git commit`, or `git push`. Only the coordinator (main conversation) commits. Subagents write code, run tests, and report which files they changed — the coordinator commits their work sequentially using `/commit`.
 
 ## Schema And Deploy Safety
@@ -77,6 +79,10 @@ cd apps/mobile && pnpm exec tsc --noEmit
 pnpm run db:push:stg
 pnpm run db:generate
 pnpm run db:migrate:dev
+
+# LLM Eval Harness
+pnpm eval:llm                    # Tier 1: snapshot prompts (no LLM call)
+pnpm eval:llm --live             # Tier 2: real LLM call + schema validation
 ```
 
-Last updated: 2026-04-04
+Last updated: 2026-04-20

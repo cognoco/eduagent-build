@@ -51,6 +51,20 @@ type VocabularyRetentionCardRow = typeof vocabularyRetentionCards.$inferSelect;
 
 type TopicWithSubject = TopicRow & { subjectId: string };
 
+// Sessions left active for long periods (e.g. Inngest cron not running in dev)
+// accumulate unreasonable wallClockSeconds when finally closed by the stale
+// cleanup.  Cap each session's contribution to prevent a single abandoned
+// session from inflating the user-facing "time spent" metric.
+const MAX_SESSION_WALL_CLOCK_SECONDS = 3 * 60 * 60; // 3 hours
+
+function cappedWallClock(session: {
+  wallClockSeconds: number | null;
+  durationSeconds: number | null;
+}): number {
+  const raw = session.wallClockSeconds ?? session.durationSeconds ?? 0;
+  return Math.min(raw, MAX_SESSION_WALL_CLOCK_SECONDS);
+}
+
 interface ProgressState {
   profileId: string;
   subjects: SubjectRow[];
@@ -337,8 +351,7 @@ function buildSubjectMetric(
   // [F-045] Wall-clock minutes per subject for user-facing display
   const totalWallClockMinutes = Math.round(
     subjectSessions.reduce(
-      (sum, session) =>
-        sum + (session.wallClockSeconds ?? session.durationSeconds ?? 0),
+      (sum, session) => sum + cappedWallClock(session),
       0
     ) / 60
   );
@@ -430,7 +443,7 @@ export async function computeProgressMetrics(
     ),
     totalWallClockMinutes: Math.round(
       state.sessions.reduce(
-        (sum, session) => sum + (session.wallClockSeconds ?? 0),
+        (sum, session) => sum + cappedWallClock(session),
         0
       ) / 60
     ),
@@ -562,10 +575,7 @@ async function buildSubjectInventory(
     subjectSessions.reduce((sum, s) => sum + (s.durationSeconds ?? 0), 0) / 60
   );
   const liveWallClockMinutes = Math.round(
-    subjectSessions.reduce(
-      (sum, s) => sum + (s.wallClockSeconds ?? s.durationSeconds ?? 0),
-      0
-    ) / 60
+    subjectSessions.reduce((sum, s) => sum + cappedWallClock(s), 0) / 60
   );
   const liveLastSessionAt = subjectSessions
     .map((s) => s.lastActivityAt)

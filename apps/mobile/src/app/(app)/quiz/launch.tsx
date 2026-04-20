@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { QuizRoundResponse } from '@eduagent/schemas';
+import { ErrorFallback } from '../../../components/common/ErrorFallback';
 import { useGenerateRound } from '../../../hooks/use-quiz';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { useThemeColors } from '../../../lib/theme';
@@ -185,44 +185,30 @@ export default function QuizLaunchScreen(): React.ReactElement {
 
     return (
       <View
-        className="flex-1 items-center justify-center bg-background px-6"
+        className="flex-1 bg-background"
         style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
         testID="quiz-launch-error"
       >
-        <Ionicons name="alert-circle-outline" size={52} color={colors.danger} />
-        <Text className="mt-4 text-center text-h3 font-bold text-text-primary">
-          Couldn&apos;t create a round
-        </Text>
-        <Text
-          className="mt-2 text-center text-body text-text-secondary"
-          testID="quiz-launch-error-message"
-        >
-          {errorMessage}
-        </Text>
-
-        <View className="mt-8 w-full gap-3">
-          {isUnretryable ? null : (
-            <Pressable
-              onPress={startRound}
-              className="min-h-[48px] items-center justify-center rounded-button bg-primary px-6 py-3"
-              testID="quiz-launch-retry"
-            >
-              <Text className="text-body font-semibold text-text-inverse">
-                Retry
-              </Text>
-            </Pressable>
-          )}
-
-          <Pressable
-            onPress={() => goBackOrReplace(router, '/(app)/quiz')}
-            className="min-h-[48px] items-center justify-center rounded-button bg-surface-elevated px-6 py-3"
-            testID="quiz-launch-back"
-          >
-            <Text className="text-body font-semibold text-text-primary">
-              Go Back
-            </Text>
-          </Pressable>
-        </View>
+        <ErrorFallback
+          variant="centered"
+          title="Couldn't create a round"
+          message={errorMessage}
+          primaryAction={
+            isUnretryable
+              ? undefined
+              : {
+                  label: 'Retry',
+                  onPress: startRound,
+                  testID: 'quiz-launch-retry',
+                }
+          }
+          secondaryAction={{
+            label: 'Go Back',
+            onPress: () => goBackOrReplace(router, '/(app)/quiz'),
+            testID: 'quiz-launch-back',
+          }}
+          testID="quiz-launch-error-fallback"
+        />
       </View>
     );
   }

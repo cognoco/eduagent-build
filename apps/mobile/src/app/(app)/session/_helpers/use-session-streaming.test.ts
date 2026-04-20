@@ -65,6 +65,7 @@ function createMockOpts(overrides: Record<string, unknown> = {}) {
     setResponseHistory: jest.fn(),
     setHomeworkProblemsState: jest.fn(),
     setFluencyDrill: jest.fn(),
+    setLowConfidenceMessageId: jest.fn(),
 
     homeworkProblemsState: [],
     currentProblemIndex: 0,
@@ -592,6 +593,85 @@ describe('useSessionStreaming', () => {
       expect(
         opts.apiClient.sessions[':sessionId']['homework-state'].$post
       ).not.toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // F6: confidence indicator state management
+  // -------------------------------------------------------------------------
+
+  describe('confidence indicator (F6)', () => {
+    it('sets lowConfidenceMessageId when done event has confidence=low', async () => {
+      const opts = makeOpts({
+        streamMessage: jest.fn(
+          async (
+            _text: string,
+            _onChunk: (accumulated: string) => void,
+            onComplete: (result: Record<string, unknown>) => Promise<void>,
+            _sessionId: string
+          ) => {
+            await onComplete({
+              aiEventId: 'ai-event-2',
+              exchangeCount: 1,
+              escalationRung: 0,
+              expectedResponseMinutes: 5,
+              confidence: 'low',
+            });
+          }
+        ),
+      });
+      const { result } = renderHook(() => useSessionStreaming(opts as any));
+
+      await act(async () => {
+        await result.current.continueWithMessage('Is this right?');
+      });
+
+      // setLowConfidenceMessageId should have been called with the AI stream message id
+      expect(opts.setLowConfidenceMessageId).toHaveBeenCalledWith(
+        expect.stringMatching(/^ai-/)
+      );
+    });
+
+    it('clears lowConfidenceMessageId when done event has confidence=high', async () => {
+      const opts = makeOpts({
+        streamMessage: jest.fn(
+          async (
+            _text: string,
+            _onChunk: (accumulated: string) => void,
+            onComplete: (result: Record<string, unknown>) => Promise<void>,
+            _sessionId: string
+          ) => {
+            await onComplete({
+              aiEventId: 'ai-event-3',
+              exchangeCount: 2,
+              escalationRung: 0,
+              expectedResponseMinutes: 5,
+              confidence: 'high',
+            });
+          }
+        ),
+      });
+      const { result } = renderHook(() => useSessionStreaming(opts as any));
+
+      await act(async () => {
+        await result.current.continueWithMessage('Good answer');
+      });
+
+      // Should clear the low-confidence indicator (null) since confidence is not 'low'
+      expect(opts.setLowConfidenceMessageId).toHaveBeenCalledWith(null);
+    });
+
+    it('clears lowConfidenceMessageId when confidence is absent (treat as medium)', async () => {
+      // Default streamMessage mock returns no confidence field
+      const opts = makeOpts();
+      const { result } = renderHook(() => useSessionStreaming(opts as any));
+
+      await act(async () => {
+        await result.current.continueWithMessage('Next question');
+      });
+
+      // No confidence field → treated as medium → clears any prior low-confidence state
+      expect(opts.setLowConfidenceMessageId).toHaveBeenCalledWith(null);
     });
   });
 });

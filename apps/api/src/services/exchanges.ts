@@ -1,4 +1,9 @@
-import { routeAndCall, routeAndStream } from './llm';
+import {
+  routeAndCall,
+  routeAndStream,
+  parseEnvelope,
+  teeEnvelopeStream,
+} from './llm';
 import type {
   ChatMessage,
   EscalationRung,
@@ -6,10 +11,8 @@ import type {
   RouteResult,
   StreamResult,
 } from './llm';
-import {
-  getEscalationPromptGuidance,
-  getPartialProgressInstruction,
-} from './escalation';
+import { getEscalationPromptGuidance } from './escalation';
+import { createLogger } from './logger';
 import { getEvaluateRungDescription } from './evaluate';
 import {
   computeAgeBracket,
@@ -23,6 +26,8 @@ import {
 } from '@eduagent/schemas';
 import { buildFourStrandsPrompt } from './language-prompts';
 import type { LLMTier } from './subscription';
+
+const logger = createLogger();
 
 // ---------------------------------------------------------------------------
 // Multimodal image support — IMG-VISION
@@ -147,11 +152,22 @@ export interface ExchangeResult {
   notePrompt?: boolean;
   /** Whether the note prompt is a post-session prompt */
   notePromptPostSession?: boolean;
+  /** Fluency drill annotation (language sessions only) */
+  fluencyDrill?: FluencyDrillAnnotation;
+  /** F6: LLM self-reported confidence level. Absent means treat as 'medium'. */
+  confidence?: 'low' | 'medium' | 'high';
 }
 
 /** Streaming variant result */
 export interface ExchangeStreamResult {
+  /** Client-facing stream: yields only envelope `reply` content, ready for SSE. */
   stream: AsyncIterable<string>;
+  /**
+   * Full raw envelope JSON accumulated from the provider stream, resolved
+   * after the caller drains `stream`. Used by `onComplete` helpers to
+   * parseEnvelope for signals + ui_hints.
+   */
+  rawResponsePromise: Promise<string>;
   newEscalationRung: EscalationRung;
   provider: string;
   model: string;
@@ -521,11 +537,11 @@ export function buildSystemPrompt(context: ExchangeContext): string {
     );
   }
 
-  // Partial progress, cognitive load, knowledge capture — skip for recitation
+  // Cognitive load + knowledge-capture behaviours — skip for recitation.
+  // The partial-progress / needs-deepening / note-prompt / fluency-drill
+  // signals that used to live as free-text markers now flow through the
+  // structured envelope documented at the bottom of this prompt.
   if (!isRecitation) {
-    // Partial progress signaling — LLM self-reports student progress (Gap 3)
-    sections.push(getPartialProgressInstruction());
-
     // Cognitive load management
     sections.push(
       'Cognitive load management:\n' +
@@ -534,14 +550,14 @@ export function buildSystemPrompt(context: ExchangeContext): string {
         '- Use concrete examples before abstract rules.'
     );
 
-    // Knowledge capture — prompts the learner to save a note mid-session or post-session
+    // Knowledge capture — the behaviour is unchanged but the annotation now
+    // flows via the envelope's `ui_hints.note_prompt` field instead of a
+    // JSON blob smuggled into the reply text.
     sections.push(
-      `KNOWLEDGE CAPTURE:\n` +
-        `After the learner has exchanged at least 5 messages with you, if they give a correct answer where they explain something in their own words (not short factual recall like "yes", a number, or a single term), respond naturally to their answer and then ask: "Shall we put down this knowledge?"\n` +
-        `When you ask this, append a JSON block at the very end of your response on its own line: {"notePrompt": true}\n` +
-        `Only ask this ONCE per session. After asking once (whether the learner agrees or not), never ask again in this session.\n` +
-        `At the end of the session, in your final closing message, ask: "Want to put down what you learned today?" and append: {"notePrompt": true, "postSession": true}\n` +
-        `The JSON block will be stripped before the learner sees it — they will only see your conversational text.`
+      'KNOWLEDGE CAPTURE:\n' +
+        'After the learner has exchanged at least 5 messages with you, if they give a correct answer where they explain something in their own words (not short factual recall like "yes", a number, or a single term), respond naturally to their answer and then ask: "Shall we put down this knowledge?" Set `ui_hints.note_prompt.show` to true on that turn.\n' +
+        'Only ask this ONCE per session — after asking once (whether the learner agrees or not), never ask again in this session.\n' +
+        'At the end of the session, in your final closing message, ask: "Want to put down what you learned today?" and set `ui_hints.note_prompt.show` to true AND `ui_hints.note_prompt.post_session` to true.'
     );
   }
 
@@ -569,8 +585,8 @@ export function buildSystemPrompt(context: ExchangeContext): string {
     );
   }
 
-  // Voice-mode brevity constraint — MUST be last section so it overrides
-  // any earlier instructions that encourage longer explanations (FR256).
+  // Voice-mode brevity constraint. Must come before the envelope block so
+  // the envelope instruction is the absolute last thing the model sees.
   if (context.inputMode === 'voice') {
     sections.push(
       'VOICE MODE: The learner is using voice. Keep every response under 50 words. ' +
@@ -580,7 +596,60 @@ export function buildSystemPrompt(context: ExchangeContext): string {
     );
   }
 
+  // Envelope response contract — MUST be last so the JSON-only instruction
+  // wins over any earlier "respond naturally" guidance. State-machine
+  // signals live in `signals`, UI widget hints live in `ui_hints`, and all
+  // prose goes in `reply`. See docs/specs/2026-04-18-llm-response-envelope.md.
+  sections.push(
+    getExchangeEnvelopeInstruction({ isRecitation, isLanguageMode })
+  );
+
   return sections.join('\n\n');
+}
+
+function getExchangeEnvelopeInstruction(context: {
+  isRecitation: boolean;
+  isLanguageMode: boolean;
+}): string {
+  const signals = context.isRecitation
+    ? '  "signals": { "understanding_check": <bool> },'
+    : '  "signals": { "partial_progress": <bool>, "needs_deepening": <bool>, "understanding_check": <bool> },';
+
+  const uiHints = context.isLanguageMode
+    ? '  "ui_hints": { "note_prompt": { "show": <bool>, "post_session": <bool> }, "fluency_drill": { "active": <bool>, "duration_s": <10-180>, "score": { "correct": <int>, "total": <int> } } }'
+    : '  "ui_hints": { "note_prompt": { "show": <bool>, "post_session": <bool> } }';
+
+  const signalGuidance: string[] = [];
+  if (!context.isRecitation) {
+    signalGuidance.push(
+      'Set `signals.partial_progress` to true when the learner\'s response shows partial understanding — they have part of the concept right but are missing a key piece. Do NOT set it if the learner is simply guessing, repeating what you said, or producing a wrong answer with no correct elements, or replying with only "yes"/"no" without justification.'
+    );
+    signalGuidance.push(
+      'Set `signals.needs_deepening` to true on the final turn of a rung-5 exit (learner still stuck after three exchanges at the Teaching-Mode Pivot rung). The system will queue the topic for remediation.'
+    );
+  }
+  signalGuidance.push(
+    'Set `signals.understanding_check` to true when your reply asks the learner to explain, paraphrase, or otherwise confirm they understood — observational only.'
+  );
+
+  const fluencyLine = context.isLanguageMode
+    ? '\n- When you start a fluency drill (rapid-fire translation, fill-blank, vocabulary recall), set `ui_hints.fluency_drill.active` to true and `ui_hints.fluency_drill.duration_s` to a value between 30 and 90. When you evaluate the drill result, set `active` to false and include `score` with `correct` and `total` integers.'
+    : '';
+
+  return (
+    'RESPONSE FORMAT — CRITICAL:\n' +
+    'Reply with ONLY valid JSON in this exact shape, no prose before or after:\n' +
+    '{\n' +
+    '  "reply": "<your full message to the learner — prose, newlines allowed>",\n' +
+    `${signals}\n` +
+    `${uiHints}\n` +
+    '}\n' +
+    'The `reply` field is the ONLY thing the learner sees. Do not mention JSON, signals, or ui_hints in the reply text. Do not include markers like [PARTIAL_PROGRESS] or [NEEDS_DEEPENING] — use the `signals` object instead.\n' +
+    '\n' +
+    'Signal guidance:\n' +
+    signalGuidance.map((line) => `- ${line}`).join('\n') +
+    fluencyLine
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -628,39 +697,29 @@ export async function processExchange(
     }
   );
 
-  const isUnderstandingCheck = detectUnderstandingCheck(result.response);
-  const needsDeepening = detectNeedsDeepening(result.response);
-  const partialProgress = detectPartialProgress(result.response);
-
-  // Strip system markers from the visible response
-  let cleanResponse = result.response;
-  if (needsDeepening) {
-    cleanResponse = cleanResponse.replace(/\[NEEDS_DEEPENING\]/g, '');
-  }
-  if (partialProgress) {
-    cleanResponse = cleanResponse.replace(/\[PARTIAL_PROGRESS\]/g, '');
-  }
-  cleanResponse = cleanResponse.trimEnd();
-
-  // Extract note prompt annotation before returning
-  const notePromptResult = extractNotePrompt(cleanResponse);
-  cleanResponse = notePromptResult.cleanResponse;
+  const parsed = parseExchangeEnvelope(result.response, {
+    sessionId: context.sessionId,
+    profileId: context.profileId,
+    flow: 'processExchange',
+  });
 
   return {
-    response: cleanResponse,
+    response: parsed.cleanResponse,
     newEscalationRung: context.escalationRung,
-    isUnderstandingCheck,
+    isUnderstandingCheck: parsed.understandingCheck,
     expectedResponseMinutes: estimateExpectedResponseMinutes(
-      cleanResponse,
+      parsed.cleanResponse,
       context
     ),
-    needsDeepening,
-    partialProgress,
+    needsDeepening: parsed.needsDeepening,
+    partialProgress: parsed.partialProgress,
     provider: result.provider,
     model: result.model,
     latencyMs: result.latencyMs,
-    notePrompt: notePromptResult.notePrompt || undefined,
-    notePromptPostSession: notePromptResult.notePromptPostSession || undefined,
+    notePrompt: parsed.notePrompt || undefined,
+    notePromptPostSession: parsed.notePromptPostSession || undefined,
+    fluencyDrill: parsed.fluencyDrill ?? undefined,
+    confidence: parsed.confidence,
   };
 }
 
@@ -700,43 +759,17 @@ export async function streamExchange(
     }
   );
 
+  const { cleanReplyStream, rawResponsePromise } = teeEnvelopeStream(
+    result.stream
+  );
+
   return {
-    stream: stripMarkersFromStream(result.stream),
+    stream: cleanReplyStream,
+    rawResponsePromise,
     newEscalationRung: context.escalationRung,
     provider: result.provider,
     model: result.model,
   };
-}
-
-// BS-05: strip internal control markers from streamed responses
-const MARKERS = ['[NEEDS_DEEPENING]', '[PARTIAL_PROGRESS]'] as const;
-const MAX_MARKER_LEN = Math.max(...MARKERS.map((m) => m.length));
-
-async function* stripMarkersFromStream(
-  source: AsyncIterable<string>
-): AsyncGenerator<string> {
-  let buffer = '';
-  for await (const chunk of source) {
-    buffer += chunk;
-    // Keep a trailing window long enough to detect markers straddling chunks
-    if (buffer.length > MAX_MARKER_LEN) {
-      const release = buffer.slice(0, buffer.length - MAX_MARKER_LEN);
-      let clean = release;
-      for (const marker of MARKERS) {
-        clean = clean.replaceAll(marker, '');
-      }
-      if (clean) yield clean;
-      buffer = buffer.slice(buffer.length - MAX_MARKER_LEN);
-    }
-  }
-  // Flush remaining buffer
-  if (buffer) {
-    let clean = buffer;
-    for (const marker of MARKERS) {
-      clean = clean.replaceAll(marker, '');
-    }
-    if (clean) yield clean;
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -918,94 +951,100 @@ function getLearningModeGuidance(mode: LearningMode): string {
   );
 }
 
-/** Extract and strip the notePrompt JSON annotation from a response */
-export function extractNotePrompt(response: string): {
-  cleanResponse: string;
-  notePrompt: boolean;
-  notePromptPostSession: boolean;
-} {
-  const notePromptMatch = response.match(
-    /\n?\{"notePrompt":\s*true(?:,\s*"postSession":\s*true)?\}\s*$/
-  );
-  if (!notePromptMatch) {
-    return {
-      cleanResponse: response,
-      notePrompt: false,
-      notePromptPostSession: false,
-    };
-  }
-  return {
-    cleanResponse: response.slice(0, notePromptMatch.index).trimEnd(),
-    notePrompt: true,
-    notePromptPostSession: notePromptMatch[0].includes('"postSession"'),
-  };
-}
-
-/** Fluency drill annotation extracted from LLM response */
+/** Fluency drill annotation extracted from the envelope's ui_hints.fluency_drill */
 export interface FluencyDrillAnnotation {
   active: boolean;
   durationSeconds?: number;
   score?: { correct: number; total: number };
 }
 
-/** Extract and strip the fluencyDrill JSON annotation from a response */
-export function extractFluencyDrill(response: string): {
+export interface ParsedExchangeEnvelope {
   cleanResponse: string;
+  understandingCheck: boolean;
+  partialProgress: boolean;
+  needsDeepening: boolean;
+  notePrompt: boolean;
+  notePromptPostSession: boolean;
   fluencyDrill: FluencyDrillAnnotation | null;
-} {
-  const match = response.match(/\n?\{"fluencyDrill":\s*\{[^}]*\}\s*\}\s*$/);
-  if (!match) {
-    return { cleanResponse: response, fluencyDrill: null };
-  }
-  try {
-    const parsed = JSON.parse(match[0].trim()) as {
-      fluencyDrill?: unknown;
-    };
-    const drill = parsed.fluencyDrill;
-    if (typeof drill !== 'object' || drill === null || !('active' in drill)) {
-      return { cleanResponse: response, fluencyDrill: null };
-    }
-    const d = drill as Record<string, unknown>;
-    const annotation: FluencyDrillAnnotation = {
-      active: Boolean(d.active),
-    };
-    if (typeof d.durationSeconds === 'number' && d.durationSeconds > 0) {
-      annotation.durationSeconds = Math.min(
-        90,
-        Math.max(15, d.durationSeconds)
-      );
-    }
-    if (
-      typeof d.score === 'object' &&
-      d.score !== null &&
-      typeof (d.score as Record<string, unknown>).correct === 'number' &&
-      typeof (d.score as Record<string, unknown>).total === 'number'
-    ) {
-      annotation.score = d.score as { correct: number; total: number };
-    }
-    return {
-      cleanResponse: response.slice(0, match.index).trimEnd(),
-      fluencyDrill: annotation,
-    };
-  } catch {
-    return { cleanResponse: response, fluencyDrill: null };
-  }
+  /** F6: LLM self-reported confidence level. Absent means treat as 'medium'. */
+  confidence?: 'low' | 'medium' | 'high';
 }
 
-/** Detect whether the LLM response contains an understanding check */
-export function detectUnderstandingCheck(response: string): boolean {
+/**
+ * Parse the full envelope from a (non-streaming or accumulated-stream) LLM
+ * response and normalise signals + ui_hints into the flat structure exchange
+ * callers consume today. On envelope parse failure, the raw text is surfaced
+ * as the reply and all signals default to false — no silent "everything is
+ * fine" recovery, because we also warn via the logger so the migration can
+ * be monitored.
+ */
+export function parseExchangeEnvelope(
+  response: string,
+  context?: { sessionId?: string; profileId?: string; flow?: string }
+): ParsedExchangeEnvelope {
+  const parsed = parseEnvelope(response);
+  if (!parsed.ok) {
+    logger.warn('exchange.envelope_parse_failed', {
+      flow: context?.flow,
+      session_id: context?.sessionId,
+      profile_id: context?.profileId,
+      reason: parsed.reason,
+    });
+    return {
+      cleanResponse: response.trim(),
+      understandingCheck: detectUnderstandingCheckFromProse(response),
+      partialProgress: false,
+      needsDeepening: false,
+      notePrompt: false,
+      notePromptPostSession: false,
+      fluencyDrill: null,
+    };
+  }
+
+  const { envelope } = parsed;
+  const signals = envelope.signals ?? {};
+  const uiHints = envelope.ui_hints ?? {};
+  const cleanReply = envelope.reply.trim();
+
+  const notePrompt = uiHints.note_prompt;
+  const drill = uiHints.fluency_drill;
+  const fluencyDrill: FluencyDrillAnnotation | null = drill
+    ? {
+        active: Boolean(drill.active),
+        durationSeconds:
+          typeof drill.duration_s === 'number'
+            ? Math.min(90, Math.max(15, drill.duration_s))
+            : undefined,
+        score:
+          drill.score &&
+          typeof drill.score.correct === 'number' &&
+          typeof drill.score.total === 'number'
+            ? { correct: drill.score.correct, total: drill.score.total }
+            : undefined,
+      }
+    : null;
+
+  return {
+    cleanResponse: cleanReply,
+    understandingCheck:
+      signals.understanding_check === true ||
+      // Legacy prose heuristic — kept as an observational fallback when the
+      // model doesn't emit the signal explicitly. Cheap to compute, no
+      // control-flow impact beyond the telemetry flag.
+      detectUnderstandingCheckFromProse(cleanReply),
+    partialProgress: signals.partial_progress === true,
+    needsDeepening: signals.needs_deepening === true,
+    notePrompt: notePrompt?.show === true,
+    notePromptPostSession: notePrompt?.post_session === true,
+    fluencyDrill,
+    confidence: envelope.confidence,
+  };
+}
+
+/** Observational prose heuristic — never drives control flow on its own. */
+function detectUnderstandingCheckFromProse(response: string): boolean {
   const lower = response.toLowerCase();
   return UNDERSTANDING_CHECK_PATTERNS.some((pattern) =>
     lower.includes(pattern.toLowerCase())
   );
-}
-
-/** Detect whether the LLM flagged this topic as needing deepening (rung 5 exit) */
-export function detectNeedsDeepening(response: string): boolean {
-  return /(?:^|\n)\[NEEDS_DEEPENING\]\s*$/.test(response);
-}
-
-/** Detect whether the LLM signalled partial progress (Gap 3) */
-export function detectPartialProgress(response: string): boolean {
-  return /(?:^|\n)\[PARTIAL_PROGRESS\]\s*$/.test(response);
 }

@@ -815,15 +815,17 @@ export const sessionCompleted = inngest.createFunction(
           // The neon-http driver does not support multi-statement transactions;
           // wrapping these in db.transaction() would either fail outright or
           // fall back to non-atomic execution via the client.ts shim.
-          // [F-044] Use effectiveQuality (includes engagement fallback) instead
-          // of raw completionQualityRating. Most session-close paths don't set
-          // qualityRating in the event, so the raw value is null and the streak
-          // was never updated. Any session with user engagement should count.
-          // Note: effectiveQuality floors at 3 via the fallback above (line ~327),
-          // so the old `>= 3` threshold is redundant. The only case where
-          // effectiveQuality < 3 would be an explicit low rating (1-2) from the
-          // evaluator — these still represent real engagement and should count.
-          if (effectiveQuality != null) {
+          //
+          // Streak recording is decoupled from effectiveQuality (which gates
+          // SM-2 retention updates).  Any session with user engagement
+          // (exchangeCount > 0) should count toward the streak, UNLESS it
+          // was an unattended close (e.g. silence_timeout from the stale-
+          // cleanup cron where no learning occurred).
+          const reason = event.data.reason as string | undefined;
+          const isUnattended =
+            reason != null &&
+            (UNATTENDED_REASONS as readonly string[]).includes(reason);
+          if (!isUnattended && (exchangeCount ?? 0) > 0) {
             stepStreak = await recordSessionActivity(db, profileId, today);
           }
 

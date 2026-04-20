@@ -295,6 +295,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                 notePromptPostSession:
                   result.notePromptPostSession || undefined,
                 fluencyDrill: result.fluencyDrill || undefined,
+                confidence: result.confidence || undefined,
               }),
             });
           } catch (err) {

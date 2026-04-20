@@ -15,6 +15,7 @@ interface SubjectInfo {
 }
 
 interface ParentDashboardSummaryProps {
+  profileId: string;
   childName: string;
   summary: string;
   subjects: SubjectInfo[];
@@ -130,6 +131,7 @@ function sessionWord(n: number): string {
 }
 
 export function ParentDashboardSummary({
+  profileId,
   childName,
   summary,
   subjects,
@@ -294,7 +296,7 @@ export function ParentDashboardSummary({
       metadata={metadata}
       onPress={onDrillDown}
       isLoading={isLoading}
-      testID="parent-dashboard-summary"
+      testID={`dashboard-child-${profileId}`}
     />
   );
 }

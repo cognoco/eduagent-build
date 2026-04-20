@@ -397,6 +397,10 @@ function SessionScreenInner() {
   const [quotaError, setQuotaError] = useState<QuotaExceededDetails | null>(
     null
   );
+  /** F6: ID of the latest AI message where the LLM reported confidence=low */
+  const [lowConfidenceMessageId, setLowConfidenceMessageId] = useState<
+    string | null
+  >(null);
 
   const sessionNoteSavedRef = useRef(false);
   const closedSessionRef = useRef<{
@@ -482,6 +486,7 @@ function SessionScreenInner() {
       setShowFilingPrompt(false);
       setFilingDismissed(false);
       setQuotaError(null);
+      setLowConfidenceMessageId(null);
       closedSessionRef.current = null;
       sessionNoteSavedRef.current = false;
       hasHydratedRecoveryRef.current = false;
@@ -760,6 +765,7 @@ function SessionScreenInner() {
     setResponseHistory,
     setHomeworkProblemsState,
     setFluencyDrill,
+    setLowConfidenceMessageId,
     homeworkProblemsState,
     currentProblemIndex,
     activeHomeworkProblem,
@@ -1036,23 +1042,61 @@ function SessionScreenInner() {
     />
   );
 
-  const renderMessageActions = (message: ChatMessage): React.ReactNode => (
-    <SessionMessageActions
-      message={message}
-      isStreaming={isStreaming}
-      latestAiMessageId={latestAiMessageId}
-      consumedQuickChipMessageId={consumedQuickChipMessageId}
-      userMessageCount={userMessageCount}
-      showWrongSubjectChip={showWrongSubjectChip}
-      messageFeedback={messageFeedback}
-      quotaError={quotaError}
-      isOwner={activeProfile?.isOwner === true}
-      stage={conversationStage}
-      handleQuickChip={handleQuickChip}
-      handleMessageFeedback={handleMessageFeedback}
-      handleReconnect={handleReconnect}
-    />
-  );
+  const renderMessageActions = (message: ChatMessage): React.ReactNode => {
+    const messageActions = (
+      <SessionMessageActions
+        message={message}
+        isStreaming={isStreaming}
+        latestAiMessageId={latestAiMessageId}
+        consumedQuickChipMessageId={consumedQuickChipMessageId}
+        userMessageCount={userMessageCount}
+        showWrongSubjectChip={showWrongSubjectChip}
+        messageFeedback={messageFeedback}
+        quotaError={quotaError}
+        isOwner={activeProfile?.isOwner === true}
+        stage={conversationStage}
+        handleQuickChip={handleQuickChip}
+        handleMessageFeedback={handleMessageFeedback}
+        handleReconnect={handleReconnect}
+      />
+    );
+
+    // F6: Confidence indicator — shown only when the LLM reports low confidence
+    // on this specific AI message. Dismissed when the learner taps it (sends a
+    // follow-up) or when a new exchange completes (lowConfidenceMessageId resets).
+    const showConfidenceIndicator =
+      message.id === lowConfidenceMessageId &&
+      !message.streaming &&
+      !isStreaming;
+    const confidenceIndicator = showConfidenceIndicator ? (
+      <Pressable
+        onPress={() => {
+          setLowConfidenceMessageId(null);
+          void continueWithMessage(
+            "I'm not sure that was right — can you explain it differently?"
+          );
+        }}
+        className="rounded-full bg-surface-elevated px-3 py-1.5 self-start mt-1"
+        testID="confidence-low-indicator"
+        accessibilityRole="button"
+        accessibilityLabel="Not sure about this? Tap to ask for a different explanation"
+      >
+        <Text className="text-caption font-semibold text-text-secondary">
+          Not sure about this? Tap to ask again
+        </Text>
+      </Pressable>
+    ) : null;
+
+    if (!messageActions && !confidenceIndicator) return null;
+    if (!messageActions) return confidenceIndicator;
+    if (!confidenceIndicator) return messageActions;
+    return (
+      <View className="gap-1">
+        {messageActions}
+        {confidenceIndicator}
+      </View>
+    );
+  };
 
   return (
     <View className="flex-1">

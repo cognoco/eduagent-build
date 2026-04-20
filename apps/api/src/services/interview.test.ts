@@ -14,10 +14,10 @@ jest.mock('./llm', () => {
       latencyMs: 50,
     }),
     routeAndStream: jest.fn(),
-    // Keep real envelope helpers — the service exercises parseEnvelope and
-    // logParserDisagreement against actual code.
+    // Keep the real envelope helpers — the service exercises parseEnvelope
+    // and teeEnvelopeStream against actual code.
     parseEnvelope: actual.parseEnvelope,
-    logParserDisagreement: actual.logParserDisagreement,
+    teeEnvelopeStream: actual.teeEnvelopeStream,
     registerProvider: jest.fn((p: { name: string }) =>
       providers.set(p.name, p)
     ),
@@ -192,34 +192,29 @@ describe('processInterviewExchange', () => {
     expect(result.extractedSignals?.goals).toEqual(['learn TypeScript']);
   });
 
-  it('falls back to [INTERVIEW_COMPLETE] marker when envelope parse fails', async () => {
-    // Legacy path: non-JSON prose with the old marker. The envelope parser
-    // fails cleanly; the service falls back to stripping the marker and
-    // honoring it for the terminal transition.
-    (routeAndCall as jest.Mock)
-      .mockResolvedValueOnce({
-        response: 'Great session! [INTERVIEW_COMPLETE]',
-        provider: 'gemini',
-        model: 'gemini-2.5-flash',
-        latencyMs: 50,
-      })
-      .mockResolvedValueOnce({
-        response:
-          '{"goals": ["legacy"], "experienceLevel": "beginner", "currentKnowledge": ""}',
-      });
+  it('[F1.1 break] when envelope parse fails, flow stays open and surfaces raw reply (no legacy-marker fallback)', async () => {
+    // Post-cutover contract: the legacy [INTERVIEW_COMPLETE] fallback is
+    // removed. Non-JSON prose degrades gracefully — the raw text is shown
+    // to the learner and the flow is NOT marked complete. The
+    // MAX_INTERVIEW_EXCHANGES cap still guarantees eventual termination.
+    (routeAndCall as jest.Mock).mockResolvedValueOnce({
+      response: 'Great session! [INTERVIEW_COMPLETE]',
+      provider: 'gemini',
+      model: 'gemini-2.5-flash',
+      latencyMs: 50,
+    });
 
     const result = await processInterviewExchange(baseContext, 'Hello');
 
-    expect(result.isComplete).toBe(true);
-    expect(result.response).not.toContain('[INTERVIEW_COMPLETE]');
-    expect(result.response).toBe('Great session!');
+    expect(result.isComplete).toBe(false);
+    expect(result.extractedSignals).toBeUndefined();
   });
 
   // --- F-042 break test -----------------------------------------------------
   // If the LLM returns ready_to_finish: false forever, the learner would be
   // trapped in the interview. The server-side cap must force close anyway.
   it('[F-042] force-closes at MAX_INTERVIEW_EXCHANGES regardless of signal', async () => {
-    // Return a valid envelope with ready_to_finish: false on turn 7.
+    // Return a valid envelope with ready_to_finish: false on turn 4 (past cap of 3).
     (routeAndCall as jest.Mock)
       .mockResolvedValueOnce({
         response:
@@ -235,7 +230,7 @@ describe('processInterviewExchange', () => {
       });
 
     const result = await processInterviewExchange(baseContext, 'Hello', {
-      exchangeCount: 7, // past the cap of 6
+      exchangeCount: 4, // past the cap of 3
     });
 
     expect(result.isComplete).toBe(true);
@@ -394,7 +389,7 @@ describe('streamInterviewExchange', () => {
     const { stream, onComplete } = await streamInterviewExchange(
       baseContext,
       'Hi',
-      { exchangeCount: 7 }
+      { exchangeCount: 4 } // past the cap of 3
     );
     let fullText = '';
     for await (const chunk of stream) fullText += chunk;

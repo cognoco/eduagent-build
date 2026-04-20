@@ -185,6 +185,55 @@ describe('reviewDictation', () => {
     expect(systemContent).not.toContain('precise grammar');
   });
 
+  it('includes struggle areas in the system prompt when recentStruggles is provided', async () => {
+    mockRouteAndCall.mockResolvedValueOnce({
+      response: JSON.stringify({
+        totalSentences: 2,
+        correctCount: 2,
+        mistakes: [],
+      }),
+      provider: 'gemini',
+      model: 'gemini-2.5-flash',
+      latencyMs: 100,
+    });
+
+    await reviewDictation({
+      ...BASE_INPUT,
+      recentStruggles: ['silent letters', 'apostrophes'],
+    });
+
+    const [messages] = mockRouteAndCall.mock.calls[0] as [
+      Array<{ role: string; content: unknown }>
+    ];
+    const systemContent = messages.find((m) => m.role === 'system')
+      ?.content as string;
+    expect(systemContent).toContain('recently struggled with');
+    expect(systemContent).toContain('silent letters');
+    expect(systemContent).toContain('apostrophes');
+  });
+
+  it('omits struggle hint in system prompt when recentStruggles is empty', async () => {
+    mockRouteAndCall.mockResolvedValueOnce({
+      response: JSON.stringify({
+        totalSentences: 2,
+        correctCount: 2,
+        mistakes: [],
+      }),
+      provider: 'gemini',
+      model: 'gemini-2.5-flash',
+      latencyMs: 100,
+    });
+
+    await reviewDictation({ ...BASE_INPUT, recentStruggles: [] });
+
+    const [messages] = mockRouteAndCall.mock.calls[0] as [
+      Array<{ role: string; content: unknown }>
+    ];
+    const systemContent = messages.find((m) => m.role === 'system')
+      ?.content as string;
+    expect(systemContent).not.toContain('recently struggled with');
+  });
+
   it('includes image inline_data part in the user message', async () => {
     mockRouteAndCall.mockResolvedValueOnce({
       response: JSON.stringify({
@@ -264,5 +313,29 @@ describe('buildReviewSystemPrompt', () => {
     // ageYears=13 → middle-school register
     expect(prompt).toContain('middle-schooler');
     expect(prompt).not.toContain('diagram');
+  });
+
+  it('includes struggle areas in the prompt when recentStruggles is provided', () => {
+    const prompt = buildReviewSystemPrompt({
+      ageYears: 12,
+      recentStruggles: ['silent letters', 'comma usage'],
+    });
+    expect(prompt).toContain('recently struggled with');
+    expect(prompt).toContain('silent letters');
+    expect(prompt).toContain('comma usage');
+    expect(prompt).toContain('targeted feedback');
+  });
+
+  it('does not add struggle hint when recentStruggles is empty', () => {
+    const prompt = buildReviewSystemPrompt({
+      ageYears: 12,
+      recentStruggles: [],
+    });
+    expect(prompt).not.toContain('recently struggled with');
+  });
+
+  it('does not add struggle hint when recentStruggles is undefined', () => {
+    const prompt = buildReviewSystemPrompt({ ageYears: 12 });
+    expect(prompt).not.toContain('recently struggled with');
   });
 });

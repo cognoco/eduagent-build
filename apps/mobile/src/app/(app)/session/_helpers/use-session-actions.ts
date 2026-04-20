@@ -19,7 +19,7 @@ import type {
 } from '../../../../hooks/use-sessions';
 import { clearSessionRecoveryMarker } from '../../../../lib/session-recovery';
 import * as SecureStore from '../../../../lib/secure-storage';
-import { formatApiError } from '../../../../lib/format-api-error';
+import { classifyApiError } from '../../../../lib/format-api-error';
 import { withProblemMode } from '../../homework/_helpers/problem-cards';
 import {
   getInputModeKey,
@@ -357,11 +357,10 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
                 );
               }
             } catch (err: unknown) {
+              const classified = classifyApiError(err);
               platformAlert(
                 'Could not end this session cleanly',
-                `${formatApiError(
-                  err
-                )} You can keep trying, or go home now and come back later.`,
+                `${classified.message} You can keep trying, or go home now and come back later.`,
                 [
                   {
                     text: 'Keep trying',
@@ -551,7 +550,7 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
           await handleSend(followUpPrompt);
         }
       } catch (err: unknown) {
-        platformAlert('Could not save feedback', formatApiError(err));
+        platformAlert('Could not save feedback', classifyApiError(err).message);
       }
     },
     [
@@ -582,7 +581,10 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
       setParkingLotDraft('');
       showConfirmation('Saved to your parking lot.');
     } catch (err: unknown) {
-      platformAlert('Could not save parking lot item', formatApiError(err));
+      platformAlert(
+        'Could not save parking lot item',
+        classifyApiError(err).message
+      );
     }
   }, [
     activeSessionId,
@@ -621,7 +623,7 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
         } as never);
       } catch (err: unknown) {
         setIsClosing(false);
-        platformAlert('Could not switch topic', formatApiError(err));
+        platformAlert('Could not switch topic', classifyApiError(err).message);
       }
     },
     [

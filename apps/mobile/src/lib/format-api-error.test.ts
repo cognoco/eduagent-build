@@ -1,4 +1,4 @@
-import { formatApiError } from './format-api-error';
+import { classifyApiError, formatApiError } from './format-api-error';
 
 /*
  * Screens updated with formatApiError (Story 10.4):
@@ -18,6 +18,157 @@ import { formatApiError } from './format-api-error';
  * E2E note: Error messages are hard to trigger deterministically in E2E.
  * These are validated via unit tests only.
  */
+
+describe('classifyApiError', () => {
+  // --- Network errors ---
+
+  it('classifies TypeError fetch failure as network / retry', () => {
+    const err = new TypeError('Failed to fetch');
+    const result = classifyApiError(err);
+    expect(result.category).toBe('network');
+    expect(result.recovery).toBe('retry');
+    expect(result.message).toContain('offline');
+  });
+
+  it('classifies TypeError network failure as network / retry', () => {
+    const err = new TypeError('A network error occurred');
+    const result = classifyApiError(err);
+    expect(result.category).toBe('network');
+    expect(result.recovery).toBe('retry');
+  });
+
+  it('classifies Error with "timeout" in message as network / retry', () => {
+    const err = new Error('Request timeout after 30000ms');
+    const result = classifyApiError(err);
+    expect(result.category).toBe('network');
+    expect(result.recovery).toBe('retry');
+  });
+
+  // --- HTTP status codes ---
+
+  it('classifies API error 404 as not-found / go-back', () => {
+    const err = new Error('API error 404: {"message":"Session not found"}');
+    const result = classifyApiError(err);
+    expect(result.category).toBe('not-found');
+    expect(result.recovery).toBe('go-back');
+    // Applies FRIENDLY_MESSAGE_MAP translation
+    expect(result.message).toContain('session');
+  });
+
+  it('classifies API error 401 as auth / sign-out', () => {
+    const err = new Error('API error 401: Unauthorized');
+    const result = classifyApiError(err);
+    expect(result.category).toBe('auth');
+    expect(result.recovery).toBe('sign-out');
+  });
+
+  it('classifies API error 403 as auth / sign-out', () => {
+    const err = new Error('API error 403: Forbidden');
+    const result = classifyApiError(err);
+    expect(result.category).toBe('auth');
+    expect(result.recovery).toBe('sign-out');
+  });
+
+  it('classifies API error 429 as quota / retry', () => {
+    const err = new Error('API error 429: {"message":"Rate limit exceeded"}');
+    const result = classifyApiError(err);
+    expect(result.category).toBe('quota');
+    expect(result.recovery).toBe('retry');
+  });
+
+  it('classifies API error 500 as server / retry', () => {
+    const err = new Error('API error 500: Internal Server Error');
+    const result = classifyApiError(err);
+    expect(result.category).toBe('server');
+    expect(result.recovery).toBe('retry');
+  });
+
+  it('classifies API error 502 as server / retry', () => {
+    const err = new Error('API error 502: Bad Gateway');
+    const result = classifyApiError(err);
+    expect(result.category).toBe('server');
+    expect(result.recovery).toBe('retry');
+  });
+
+  // --- Named error types ---
+
+  it('classifies QuotaExceededError as quota / none', () => {
+    const err = new Error('You have exceeded your monthly question limit');
+    err.name = 'QuotaExceededError';
+    const result = classifyApiError(err);
+    expect(result.category).toBe('quota');
+    expect(result.recovery).toBe('none');
+    expect(result.message).toContain('exceeded');
+  });
+
+  it('classifies ForbiddenError as auth / sign-out', () => {
+    const err = Object.assign(
+      new Error('You do not have permission to access this resource'),
+      { name: 'ForbiddenError', code: 'FORBIDDEN', apiCode: undefined }
+    );
+    const result = classifyApiError(err);
+    expect(result.category).toBe('auth');
+    expect(result.recovery).toBe('sign-out');
+  });
+
+  it('classifies ForbiddenError with SUBJECT_INACTIVE as not-found / go-back', () => {
+    const err = Object.assign(
+      new Error('Subject is paused — resume it before starting a session'),
+      { name: 'ForbiddenError', code: 'FORBIDDEN', apiCode: 'SUBJECT_INACTIVE' }
+    );
+    const result = classifyApiError(err);
+    expect(result.category).toBe('not-found');
+    expect(result.recovery).toBe('go-back');
+  });
+
+  // --- Error codes on the error object ---
+
+  it('classifies EXCHANGE_LIMIT_EXCEEDED code as quota / go-back', () => {
+    const err = Object.assign(new Error('Limit exceeded'), {
+      code: 'EXCHANGE_LIMIT_EXCEEDED',
+    });
+    const result = classifyApiError(err);
+    expect(result.category).toBe('quota');
+    expect(result.recovery).toBe('go-back');
+  });
+
+  it('classifies UPSTREAM_ERROR code as server / retry', () => {
+    const err = Object.assign(new Error('upstream issue'), {
+      code: 'UPSTREAM_ERROR',
+    });
+    const result = classifyApiError(err);
+    expect(result.category).toBe('server');
+    expect(result.recovery).toBe('retry');
+  });
+
+  // --- Unknown / fallback ---
+
+  it('classifies null as unknown / retry', () => {
+    const result = classifyApiError(null);
+    expect(result.category).toBe('unknown');
+    expect(result.recovery).toBe('retry');
+  });
+
+  it('classifies undefined as unknown / retry', () => {
+    const result = classifyApiError(undefined);
+    expect(result.category).toBe('unknown');
+    expect(result.recovery).toBe('retry');
+  });
+
+  it('classifies plain string as unknown / retry', () => {
+    const result = classifyApiError('something failed');
+    expect(result.category).toBe('unknown');
+    expect(result.recovery).toBe('retry');
+  });
+
+  it('classifies short user-facing Error messages as unknown / retry with passthrough', () => {
+    const err = new Error('Profile name must be at least 2 characters');
+    const result = classifyApiError(err);
+    expect(result.category).toBe('unknown');
+    expect(result.recovery).toBe('retry');
+    expect(result.message).toBe('Profile name must be at least 2 characters');
+  });
+});
 
 describe('formatApiError', () => {
   // --- Network errors ---

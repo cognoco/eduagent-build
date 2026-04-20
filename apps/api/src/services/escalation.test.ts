@@ -4,7 +4,6 @@ import {
   getEscalationPromptGuidance,
   getRetentionAwareStartingRung,
   detectPartialProgress,
-  getPartialProgressInstruction,
 } from './escalation';
 import type { EscalationState } from './escalation';
 
@@ -433,21 +432,7 @@ describe('retention-aware escalation speed', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// getPartialProgressInstruction
-// ---------------------------------------------------------------------------
-
-describe('getPartialProgressInstruction', () => {
-  it('includes PARTIAL_PROGRESS marker instruction', () => {
-    const instruction = getPartialProgressInstruction();
-
-    expect(instruction).toContain('[PARTIAL_PROGRESS]');
-    expect(instruction).toContain('partial understanding');
-  });
-
-  it('includes negative constraints for marker usage', () => {
-    const instruction = getPartialProgressInstruction();
-
-    expect(instruction).toContain('Do NOT use [PARTIAL_PROGRESS] if');
-  });
-});
+// getPartialProgressInstruction removed — partial-progress signalling
+// now flows through the envelope's `signals.partial_progress` field.
+// The detectPartialProgress helper above remains as a legacy regression
+// guard; see escalation.ts for its current status.

@@ -1,4 +1,5 @@
-import { mkdir } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
+import path from 'node:path';
 import { test as setup } from '@playwright/test';
 import { authScenarios } from '../fixtures/scenarios';
 import { signInAndPersistStorageState } from './auth';
@@ -19,6 +20,12 @@ for (const scenario of Object.values(authScenarios)) {
         scenario: scenario.seedScenario,
         email: scenario.email,
       });
+
+      // Persist seed IDs so journey tests can reference profile IDs, etc.
+      await writeFile(
+        path.join(authStateDir, `${scenario.key}-seed.json`),
+        JSON.stringify(seeded, null, 2)
+      );
 
       await signInAndPersistStorageState(page, {
         email: seeded.email,

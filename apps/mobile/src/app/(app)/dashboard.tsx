@@ -77,6 +77,7 @@ function renderChildCards(
   return children.map((child) => (
     <ParentDashboardSummary
       key={child.profileId}
+      profileId={child.profileId}
       childName={child.displayName}
       summary={child.summary}
       sessionsThisWeek={child.sessionsThisWeek}

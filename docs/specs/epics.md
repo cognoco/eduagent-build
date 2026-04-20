@@ -421,30 +421,50 @@ NFR45-47 derive from the architecture's "Offline Boundary" definition (architect
 
 ## Epic List
 
-**18 epics + standalone features:**
+**19 epics + standalone features:**
 
-| Epic | Scope | Detailed spec |
-|------|-------|---------------|
-| 0-5 | MVP — Foundation, onboarding, learning, retention, progress, billing | Stories in this file |
-| 6 | Language learning (Four Strands methodology) | `specs/2026-04-04-epic-6-language-learning-design.md` |
-| 7 | Self-building library (books, chapters, visual navigation) | `specs/2026-04-04-epic-7-library-design.md` |
-| 7.8-7.9 | Library UX refactor (shelf/book screens, topic notes) | `specs/2026-04-06-library-ux-refactor-design.md` |
-| 8 | Full voice mode (STT, TTS, accessibility) | `specs/2026-04-03-epic-8-voice-gap-closure-design.md` |
-| 9 | Native IAP (RevenueCat, Stripe dormant) | Stories in this file |
-| 10 | Pre-launch UX polish | Stories in this file |
-| 11 | Brand identity (teal/lavender, dark-first) | Stories in this file |
-| 12 | Persona removal (age + role + intent-as-cards) | `plans/epic-12-persona-to-roles.md` |
-| 13 | Session lifecycle (wall-clock, recovery, celebrations, adaptive silence) | Stories in this file |
-| 14 | Human agency & feedback | Stories in this file |
-| 15 | Visible progress (snapshots, milestones, journey screen, reports) | `specs/2026-04-07-epic-15-visible-progress-design.md` |
-| 16 | Adaptive memory (learner profiles, mentor memory, accommodations) | `specs/2026-04-07-epic-16-adaptive-memory-design.md` |
-| 17 | Voice-first learning (server STT/TTS, pronunciation, hands-free) | `specs/2026-04-07-epic-17-voice-first-design.md` |
-| — | Conversation-first learning flow | `specs/2026-04-08-conversation-first-learning-flow-design.md` |
-| — | Adaptive home screen | `specs/2026-04-04-adaptive-home-screen-design.md` |
-| WEB-A | Parent control center (web) — candidate | Stories in this file |
-| WEB-B | Text-mode learning flow (web) — candidate | Stories in this file |
+Completed specs are in `docs/specs/Done/`. Active/in-progress specs are in `docs/specs/`. Deferred specs are in `docs/specs/deffered/`.
 
-Smaller feature specs (April 10 UX improvements) are also in `docs/specs/` — see `docs/analysis/spec-vs-code-audit-2026-04-13.md` for a full inventory.
+| Epic | Scope | Detailed spec | Status |
+|------|-------|---------------|--------|
+| 0-5 | MVP — Foundation, onboarding, learning, retention, progress, billing | Stories in this file | DONE |
+| 6 | Language learning (Four Strands methodology) | `specs/Done/2026-04-04-epic-6-language-learning-design.md` | DONE |
+| 7 | Self-building library (books, chapters, visual navigation) | `specs/Done/2026-04-04-epic-7-library-design.md` | DONE |
+| 7.8-7.9 | Library UX refactor (shelf/book screens, topic notes) | `specs/Done/2026-04-06-library-ux-refactor-design.md` | DONE |
+| 8 | Full voice mode (STT, TTS, accessibility) | `specs/Done/2026-04-03-epic-8-voice-gap-closure-design.md` | DONE |
+| 9 | Native IAP (RevenueCat, Stripe dormant) | Stories in this file | DONE |
+| 10 | Pre-launch UX polish | Stories in this file | DONE |
+| 11 | Brand identity (teal/lavender, dark-first) | Stories in this file | DONE |
+| 12 | Persona removal (age + role + intent-as-cards) | `plans/epic-12-persona-to-roles.md` | DONE |
+| 13 | Session lifecycle (wall-clock, recovery, celebrations, adaptive silence) | Stories in this file | DONE |
+| 14 | Human agency & feedback | Stories in this file | DONE |
+| 15 | Visible progress (snapshots, milestones, journey screen, reports) | `specs/Done/2026-04-07-epic-15-visible-progress-design.md` | DONE |
+| 16 | Adaptive memory (learner profiles, mentor memory, accommodations) | `specs/Done/2026-04-07-epic-16-adaptive-memory-design.md` | DONE |
+| 17 | Voice-first learning (server STT/TTS, pronunciation, hands-free) | `specs/2026-04-07-epic-17-voice-first-design.md` | NOT STARTED |
+| 18 | LLM Tuning — Structured Output, Personalization & Reliability | `specs/2026-04-18-llm-*.md` (3 files) | IN PROGRESS |
+| — | Conversation-first learning flow | `specs/Done/2026-04-08-conversation-first-learning-flow-design.md` | DONE |
+| — | Adaptive home screen | `specs/Done/2026-04-04-adaptive-home-screen-design.md` | DONE |
+| — | EAS Update / OTA deploys | `specs/Done/2026-04-02-eas-update-ota-design.md` | DONE |
+| — | Teach-first posture | `specs/Done/2026-04-14-teach-first-posture-design.md` | DONE |
+| — | Conversation stage chips | `specs/Done/2026-04-15-conversation-stage-chips-design.md` | DONE |
+| — | Dictation mode | `specs/Done/2026-04-16-dictation-mode-design.md` | DONE |
+| — | Homework image vision | `specs/Done/2026-04-16-homework-image-vision-design.md` | DONE |
+| — | Quiz activities (capitals, vocab, guess-who) | `specs/Done/2026-04-16-quiz-activities-design.md` | DONE |
+| — | Home IA simplification | `specs/Done/2026-04-18-home-ia-simplification-design.md` | DONE |
+| — | Parent visibility & privacy | `specs/Done/2026-04-18-parent-visibility-privacy-design.md` | DONE |
+| — | Progress empty states & highlights | `specs/Done/2026-04-18-progress-empty-states-highlights-design.md` | DONE |
+| — | Quiz gaps completion | `specs/Done/2026-04-18-quiz-gaps-completion-design.md` | DONE |
+| — | Progressive disclosure | `specs/Done/2026-04-14-progressive-disclosure-design.md` | DONE |
+| — | Proactivity & copy sweep | `specs/Done/2026-04-19-proactivity-copy-sweep-design.md` | DONE |
+| — | Stabilization sprint | `specs/Done/2026-04-14-stabilization-sprint.md` | DONE |
+| — | Code review fixes plan | `specs/Done/plan-code-review-fixes.md` | DONE |
+| — | Animation improvements | `specs/2026-04-16-animation-improvements-design.md` | IN PROGRESS |
+| — | Quiz UI redesign fixes | `specs/2026-04-18-quiz-ui-redesign-finding-fixes.md` | IN PROGRESS |
+| — | Prompt tuning design | `specs/2026-04-19-prompt-tuning-design.md` | IN PROGRESS |
+| WEB-A | Parent control center (web) — candidate | Stories in this file | NOT STARTED |
+| WEB-B | Text-mode learning flow (web) — candidate | Stories in this file | NOT STARTED |
+
+April 10 UX improvement specs are listed in the Standalone Feature Specs section below. See `docs/analysis/spec-vs-code-audit-2026-04-13.md` for the original audit inventory.
 
 ### Epic 0: Project Foundation & User Registration
 
@@ -2969,7 +2989,7 @@ So that I can manage my usage and upgrade before hitting the ceiling.
 ## Epic 6: Language Learning — Stories
 
 **Scope:** FR96-FR107 (12 FRs) + FR146 (Language SPEAK/LISTEN Voice)
-Detailed design spec: `docs/specs/2026-04-04-epic-6-language-learning-design.md`
+Detailed design spec: `docs/specs/Done/2026-04-04-epic-6-language-learning-design.md`
 **Stories:** 6
 **Dependencies:** Epics 0-3 (full learning infrastructure), Epic 8 (voice infrastructure — complete)
 
@@ -6019,7 +6039,7 @@ Phase A all parallelizable. Phase B: 14.10 and 14.9 can be parallel, then 14.11,
 Replace points and streaks with proof-of-understanding progress signals. Daily snapshot aggregation, milestone detection, child-facing journey screen, parent dashboard enhancement, weekly push notifications, monthly learning reports.
 
 **FRs covered:** FR230-FR241 (12 FRs) | **Stories:** 15.1-15.9
-**Detailed spec:** `docs/specs/2026-04-07-epic-15-visible-progress-design.md`
+**Detailed spec:** `docs/specs/Done/2026-04-07-epic-15-visible-progress-design.md`
 
 **Dependencies:** Epic 3 (retention/SM-2), Epic 6 (language/vocabulary), Epic 7 (library), Epic 13 (session lifecycle), Epic 14 (human agency)
 
@@ -6030,7 +6050,7 @@ Replace points and streaks with proof-of-understanding progress signals. Daily s
 Build a persistent learner memory layer that adapts session style and content over time. Post-session LLM analysis extracts learning style, interests, struggles, and communication preferences. Memory is injected into system prompts with consent controls. "What My Mentor Knows" screens for child and parent. "Tell Your Mentor" free-text input. Learning accommodation modes (short-burst, audio-first, predictable) for ADHD/dyslexia/autism-spectrum learners.
 
 **FRs covered:** FR243-FR255 (13 FRs) | **Stories:** 16.1-16.13
-**Detailed spec:** `docs/specs/2026-04-07-epic-16-adaptive-memory-design.md`
+**Detailed spec:** `docs/specs/Done/2026-04-07-epic-16-adaptive-memory-design.md`
 
 **Dependencies:** Epic 13 (session events pipeline), Epic 14 (session context)
 
@@ -6047,38 +6067,91 @@ Make voice the default learning modality rather than an optional input method. A
 
 ---
 
+## Epic 18: LLM Tuning — Structured Output, Personalization & Reliability
+
+Replace fragile free-text markers and JSON-in-text patterns with a typed response envelope (`llmResponseEnvelopeSchema`). Wire unused learner data (interests, age, struggles, strengths, urgency) into all LLM prompt surfaces. Fix tone, shorten interview, add escape buttons and confidence-aware UI.
+
+**Detailed specs:**
+- `specs/2026-04-18-llm-response-envelope.md` — envelope schema contract + migration playbook
+- `specs/2026-04-18-llm-reliability-ux-audit.md` — 7 findings (F1.1–F8) on marker fragility, tone, UX dead-ends
+- `specs/2026-04-18-llm-personalization-audit.md` — 9 prompt surfaces audited, personalization gaps mapped
+
+**Dependencies:** Epic 2 (exchange loop), Epic 3 (assessment/retention), Epic 16 (adaptive memory)
+
+### Completed
+
+| Story | Scope | Status |
+|-------|-------|--------|
+| 18.1 | **Envelope schema** — `llmResponseEnvelopeSchema` in `@eduagent/schemas`, `parseEnvelope()` helper in `services/llm/envelope.ts` | DONE |
+| 18.2 | **F1.1 Interview envelope (shadow mode)** — `ready_to_finish` signal parsed, `MAX_INTERVIEW_EXCHANGES = 6` cap, legacy marker as fallback, `logParserDisagreement()` telemetry | DONE |
+| 18.3 | **F1.2 Divergent matchers hotfix** — both `detectPartialProgress` unified to strict own-line regex | DONE |
+| 18.4 | **F3 Tone register** — "learning mate" removed, "dive in" banned, `getAgeVoice()` rewritten to 4-tier register (early-teen / teen / young-adult / adult) | DONE |
+| 18.5 | **P0 Interests injection** — interests wired into all quiz prompts (capitals, vocabulary, guess-who) and dictation-generate | DONE |
+| 18.6 | **P0 ageYears everywhere** — all quiz + dictation prompts use `ageYears` instead of coarse `ageBracket` | DONE |
+| 18.7 | **P0 Session analysis context** — `knownStruggles` + `suppressedTopics` injected into `SESSION_ANALYSIS_PROMPT` | DONE |
+| 18.8 | **P1 Library topics in quizzes** — `libraryTopics` injected into capitals, vocabulary, guess-who prompts | DONE |
+| 18.9 | **P1 Strengths in memory block** — `buildMemoryBlock` includes up to 3 strengths alongside struggles | DONE |
+| 18.10 | **P1 Urgency in prompts** — `activeUrgency` (upcoming tests) injected via `buildMemoryBlock` | DONE |
+| 18.11 | **Dead code cleanup** — `AgeBracket.child` removed, `getLiteraryTheme` ≤7/≤10 branches removed | DONE |
+| 18.12 | **Eval harness** — `apps/api/eval-llm/` with 9 flows, 5 fixture profiles, `pnpm eval:llm`, `expectedResponseSchema` support | DONE |
+| 18.13 | **F4 Interview escape button** — "I'm ready to start learning" skip button + `useForceCompleteInterview` | DONE |
+| 18.14 | **F5 Friendly error messages** — `format-api-error.ts` with `FRIENDLY_MESSAGE_MAP` for kid-friendly errors | DONE (partial — no recovery action buttons yet) |
+| 18.15 | **F8 Memory source schema** — `sourceSessionId`/`sourceEventId` fields on `MemoryBlockEntry` | DONE (schema only — all values `null`) |
+
+### Remaining
+
+| Story | Scope | Priority | Blocked by |
+|-------|-------|----------|------------|
+| 18.16 | **F1.1 Interview cutover** — remove legacy `[INTERVIEW_COMPLETE]` marker from prompt, drop shadow fallback | HIGH | Telemetry confirmation (< 2% disagreement) |
+| 18.17 | **F1.2+F1.3 Exchange envelope migration** — migrate `[PARTIAL_PROGRESS]` + `[NEEDS_DEEPENING]` to `signals.*` in main exchange loop | HIGH | 18.16 (reference implementation) |
+| 18.18 | **F2.1+F2.2 UI hints migration** — migrate `notePrompt` + `fluencyDrill` JSON-in-text to `ui_hints.*` | HIGH | 18.17 (same prompt rewrite) |
+| 18.19 | **P1 quiz_missed_items in prompts** — wire SRS missed items into quiz generation prompts | HIGH | None |
+| 18.20 | **F7 Shorten interview** — `MAX_INTERVIEW_EXCHANGES` from 6 to 3, adjust session analysis threshold | MEDIUM | None |
+| 18.21 | **F6 Confidence-aware UI** — surface low/medium confidence as "Is this right?" tap target on mobile | MEDIUM | None |
+| 18.22 | **F5 Recovery action buttons** — error messages include recovery buttons (retry, switch path, go home) | MEDIUM | None |
+| 18.23 | **Dictation review personalization** — inject `ageYears` + struggle history into review prompt | MEDIUM | None |
+| 18.24 | **Eval harness schema wiring** — set `expectedResponseSchema` on exchange flow after envelope migration | MEDIUM | 18.17 |
+| 18.25 | **Prompt extraction** — extract prompt builders into per-flow `prompts/` modules with typed input shapes | MEDIUM | 18.17, 18.18 |
+| 18.26 | **F8 Memory source population** — populate real `sourceSessionId`/`sourceEventId` from session events | LOW | None |
+| 18.27 | **F4 Escape button sweep** — verify "I'm done" / exit button on all AI-driven screens | LOW | None |
+| 18.28 | **Near-miss cleanup** — remove natural-language phrases from `UNDERSTANDING_CHECK_PATTERNS` | LOW | None |
+| 18.29 | **P3 Cultural context** — inject `location` + `nativeLanguage` into guess-who for locale-aware figures | LOW | None |
+| 18.30 | **P3 Session continuity** — re-inject last session summary + parking-lot items at next session start | LOW | None |
+
+---
+
 ## Standalone Feature Specs
 
-These features are not assigned to a numbered epic. Full design specs live in `docs/specs/`.
+These features are not assigned to a numbered epic. Completed specs live in `docs/specs/Done/`, active specs in `docs/specs/`, deferred specs in `docs/specs/deffered/`.
 
-### Conversation-First Learning Flow
+### Conversation-First Learning Flow — DONE
 Redesign of the "learn something new" flow — conversation starts immediately, library structure is created post-session via a shared filing mechanism. Three paths: broad subjects (pick a book), narrow topics (auto-file), freeform/homework (file after session).
-**Spec:** `docs/specs/2026-04-08-conversation-first-learning-flow-design.md`
+**Spec:** `docs/specs/Done/2026-04-08-conversation-first-learning-flow-design.md`
 
-### Adaptive Home Screen
+### Adaptive Home Screen — DONE
 Replace the monolithic home screen with a state-driven intent router. ParentGateway for profiles with linked children, LearnerScreen for solo learners. Intent cards, session recovery, time-aware greeting.
-**Spec:** `docs/specs/2026-04-04-adaptive-home-screen-design.md`
+**Spec:** `docs/specs/Done/2026-04-04-adaptive-home-screen-design.md`
 
 ### April 10 UX Improvements
 13 focused feature specs addressing specific UX gaps discovered during code review and dead-end audits:
 
-| Spec ID | Title | Spec file |
-|---------|-------|-----------|
-| ACCOUNT-20 | Async consent handoff (child enters parent email) | `async-consent-handoff-design.md` |
-| ACCOUNT-22 | Consent pending gate enrichment | `consent-pending-enrichment-design.md` |
-| AUTH-05 | MFA fallback recovery | `auth-mfa-fallback-design.md` |
-| AUTH-11 | Session expiry recovery path | `session-expiry-recovery-design.md` |
-| BILLING-06 | Child paywall recovery actions | `child-paywall-recovery-design.md` |
-| BILLING-07 | Quota exceeded in-session actions | `quota-exceeded-actions-design.md` |
-| BILLING-09 | Top-up purchase confidence | `topup-purchase-confidence-design.md` |
-| HOME-01/06 | Smart home intent cards | `home-smart-cards-design.md` |
-| HOMEWORK-02 | Gallery image import | `homework-gallery-import-design.md` |
-| LEARN-16 | Retention review surfacing | `retention-review-surfacing-design.md` |
-| PARENT-06 | Parent monthly report empty state | `parent-report-empty-state-design.md` |
-| SUBJECT-01 | Subject creation suggestions | `subject-creation-suggestions-design.md` |
-| — | Account security (password + SSO) | `account-security-design.md` |
+| Spec ID | Title | Spec file | Status |
+|---------|-------|-----------|--------|
+| ACCOUNT-20 | Async consent handoff (child enters parent email) | `Done/2026-04-10-async-consent-handoff-design.md` | DONE |
+| ACCOUNT-22 | Consent pending gate enrichment | `deffered/2026-04-10-consent-pending-enrichment-design-skipped.md` | DEFERRED |
+| AUTH-05 | MFA fallback recovery | `Done/2026-04-10-auth-mfa-fallback-design.md` | DONE |
+| AUTH-11 | Session expiry recovery path | `deffered/2026-04-10-session-expiry-recovery-design-skipped.md` | DEFERRED |
+| BILLING-06 | Child paywall recovery actions | `Done/2026-04-10-child-paywall-recovery-design.md` | DONE |
+| BILLING-07 | Quota exceeded in-session actions | `Done/2026-04-10-quota-exceeded-actions-design.md` | DONE |
+| BILLING-09 | Top-up purchase confidence | `Done/2026-04-10-topup-purchase-confidence-design.md` | DONE |
+| HOME-01/06 | Smart home intent cards | `Done/2026-04-10-home-smart-cards-design.md` | DONE |
+| HOMEWORK-02 | Gallery image import | `Done/2026-04-10-homework-gallery-import-design.md` | DONE |
+| LEARN-16 | Retention review surfacing | `Done/2026-04-10-retention-review-surfacing-design.md` | DONE |
+| PARENT-06 | Parent monthly report empty state | `Done/2026-04-10-parent-report-empty-state-design.md` | DONE |
+| SUBJECT-01 | Subject creation suggestions | `Done/2026-04-10-subject-creation-suggestions-design.md` | DONE |
+| — | Account security (password + SSO) | `deffered/2026-04-04-account-security-design-deferred.md` | DEFERRED |
 
-All spec files in `docs/specs/2026-04-10-*.md` unless noted.
+All paths relative to `docs/specs/`.
 
 ---
 

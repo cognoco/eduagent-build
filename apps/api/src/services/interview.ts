@@ -11,9 +11,10 @@ import {
   routeAndCall,
   routeAndStream,
   parseEnvelope,
-  logParserDisagreement,
+  teeEnvelopeStream,
   type ChatMessage,
 } from './llm';
+import { createLogger } from './logger';
 import {
   generateCurriculum,
   ensureCurriculum,
@@ -264,15 +265,18 @@ export async function extractSignals(exchangeHistory: ChatExchange[]): Promise<{
  * done" case even if the LLM returns ready_to_finish: false forever.
  * [BUG-464] [BUG-470] [F-042]
  */
-const MAX_INTERVIEW_EXCHANGES = 6;
+const MAX_INTERVIEW_EXCHANGES = 3;
+
+const logger = createLogger();
 
 /**
  * Interpret an interview LLM response under the envelope contract.
  *
- * Shadow-parses the legacy [INTERVIEW_COMPLETE] marker and logs disagreements
- * during the migration window (per envelope spec §"Rollout telemetry"). The
- * visible reply and the `ready_to_finish` signal come from the envelope when
- * it parses cleanly; otherwise falls back to the raw text minus the marker.
+ * If envelope parse fails, fall through with readyToFinish=false — the
+ * MAX_INTERVIEW_EXCHANGES cap in the caller guarantees the flow still
+ * terminates. The raw response is surfaced as the reply so the learner
+ * sees something (rather than an error); any stray JSON braces are
+ * stripped as a best-effort defensive cleanup.
  */
 function interpretInterviewResponse(params: {
   rawResponse: string;
@@ -284,34 +288,24 @@ function interpretInterviewResponse(params: {
 } {
   const { rawResponse, profileId, flow } = params;
 
-  // Legacy parser — shadow during rollout.
-  const legacyMarkerPresent = rawResponse.includes('[INTERVIEW_COMPLETE]');
-
   const parse = parseEnvelope(rawResponse);
   if (parse.ok) {
-    const readyToFinish = parse.envelope.signals?.ready_to_finish === true;
-    logParserDisagreement({
-      flow,
-      profileId: profileId ?? 'unknown',
-      oldResult: legacyMarkerPresent,
-      newResult: readyToFinish,
-    });
-    return { cleanResponse: parse.envelope.reply.trim(), readyToFinish };
+    return {
+      cleanResponse: parse.envelope.reply.trim(),
+      readyToFinish: parse.envelope.signals?.ready_to_finish === true,
+    };
   }
 
-  // Envelope parse failed — degrade gracefully. Strip the legacy marker from
-  // the raw text so users never see it, and trust the legacy marker for this
-  // call (telemetry will surface if this path fires often in prod).
-  logParserDisagreement({
+  logger.warn('interview.envelope_parse_failed', {
     flow,
-    profileId: profileId ?? 'unknown',
-    oldResult: legacyMarkerPresent,
-    newResult: false,
-    parseFailureReason: parse.reason,
+    profile_id: profileId ?? 'unknown',
+    reason: parse.reason,
   });
+  // Best-effort surface of the raw text so the learner isn't stuck — the
+  // MAX_INTERVIEW_EXCHANGES cap still forces eventual completion.
   return {
-    cleanResponse: rawResponse.replace('[INTERVIEW_COMPLETE]', '').trim(),
-    readyToFinish: legacyMarkerPresent,
+    cleanResponse: rawResponse.trim(),
+    readyToFinish: false,
   };
 }
 
@@ -392,9 +386,19 @@ export async function streamInterviewExchange(
   const streamResult = await routeAndStream(messages, 1);
   const currentExchangeCount = options?.exchangeCount ?? 0;
 
-  const onComplete = async (fullResponse: string): Promise<InterviewResult> => {
+  // Tee the provider stream: mobile sees only the envelope `reply` chars,
+  // while the accumulator captures the full raw envelope for signal parsing
+  // at close. [F1.1 cutover]
+  const { cleanReplyStream, rawResponsePromise } = teeEnvelopeStream(
+    streamResult.stream
+  );
+
+  const onComplete = async (
+    _fullResponse: string
+  ): Promise<InterviewResult> => {
+    const rawResponse = await rawResponsePromise;
     const { cleanResponse, readyToFinish } = interpretInterviewResponse({
-      rawResponse: fullResponse,
+      rawResponse,
       profileId: options?.profileId,
       flow: 'streamInterviewExchange',
     });
@@ -414,7 +418,7 @@ export async function streamInterviewExchange(
     return { response: cleanResponse, isComplete };
   };
 
-  return { stream: streamResult.stream, onComplete };
+  return { stream: cleanReplyStream, onComplete };
 }
 
 // ---------------------------------------------------------------------------

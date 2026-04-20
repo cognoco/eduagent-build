@@ -54,16 +54,7 @@ export function buildFourStrandsPrompt(context: ExchangeContext): string[] {
       language
         ? `- Target STT/TTS locale: ${language.sttLocale}.`
         : '- Use the target language locale when speaking/listening features are available.',
-    ].join('\n'),
-    [
-      'Fluency drill annotation:',
-      'When you start a fluency drill (rapid-fire translation, fill-blank, vocabulary recall),',
-      'append this JSON on its own line at the very end of your message:',
-      '{"fluencyDrill":{"active":true,"durationSeconds":60}}',
-      'Adjust durationSeconds (30–90) based on drill difficulty.',
-      'When you evaluate the drill result, append:',
-      '{"fluencyDrill":{"active":false,"score":{"correct":N,"total":N}}}',
-      'These annotations are machine-parsed and stripped before display — do not reference them in your text.',
+      '- When you start a fluency drill, set `ui_hints.fluency_drill.active` to true and `duration_s` to 30–90 in the envelope (see response format). Score the drill via `ui_hints.fluency_drill.score` when evaluating — do NOT embed JSON in the reply text.',
     ].join('\n'),
   ];
 }

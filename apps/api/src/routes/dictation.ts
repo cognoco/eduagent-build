@@ -18,6 +18,7 @@ import {
   getDictationStreak,
   fetchGenerateContext,
 } from '../services/dictation';
+import { getLearningProfile } from '../services/learner-profile';
 import { checkAndLogRateLimit } from '../services/settings';
 
 // ---------------------------------------------------------------------------
@@ -202,11 +203,41 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
       );
     }
 
+    // Derive ageYears from profileMeta birthYear (same pattern as generate route).
+    const profileMeta = c.get('profileMeta');
+    const currentYear = new Date().getFullYear();
+    const ageYears =
+      profileMeta?.birthYear != null
+        ? currentYear - profileMeta.birthYear
+        : undefined;
+
+    // Fetch struggles best-effort — if DB fails, review proceeds without them.
+    let recentStruggles: string[] = [];
+    try {
+      const profile = await getLearningProfile(db, profileId);
+      if (profile && Array.isArray(profile.struggles)) {
+        recentStruggles = (profile.struggles as unknown[])
+          .filter(
+            (entry): entry is { topic: string; confidence?: string } =>
+              typeof entry === 'object' &&
+              entry !== null &&
+              typeof (entry as { topic?: unknown }).topic === 'string'
+          )
+          .filter((entry) => entry.confidence !== 'low')
+          .slice(0, 10)
+          .map((entry) => entry.topic);
+      }
+    } catch {
+      // Graceful degradation — review proceeds without struggle-aware feedback.
+    }
+
     const result = await reviewDictation({
       sentences: parsed.data.sentences,
       imageBase64: parsed.data.imageBase64,
       imageMimeType: parsed.data.imageMimeType,
       language: parsed.data.language,
+      ageYears,
+      recentStruggles,
     });
 
     return c.json(result, 200);

@@ -648,7 +648,7 @@ describe('BookScreen', () => {
     expect(mockPush).toHaveBeenCalledWith(
       expect.objectContaining({
         pathname: '/session-summary/[sessionId]',
-        params: { sessionId: 'sess-1' },
+        params: { sessionId: 'sess-1', subjectId: 'sub-1', topicId: 'topic-1' },
       })
     );
   });

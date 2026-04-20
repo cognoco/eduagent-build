@@ -14,7 +14,7 @@ export const runId =
 process.env.PLAYWRIGHT_RUN_ID = runId;
 
 export const seedEmailPrefix =
-  process.env.PLAYWRIGHT_EMAIL_PREFIX ?? `integ-playwright-${runId}-`;
+  process.env.PLAYWRIGHT_EMAIL_PREFIX ?? `pw-${runId}-`;
 process.env.PLAYWRIGHT_EMAIL_PREFIX = seedEmailPrefix;
 
 export const apiBaseUrl = trimTrailingSlash(
@@ -26,7 +26,7 @@ export const appBaseUrl = trimTrailingSlash(
 );
 
 export function buildSeedEmail(alias: string): string {
-  return `${seedEmailPrefix}${alias}@test.invalid`;
+  return `${seedEmailPrefix}${alias}@example.com`;
 }
 
 export function buildTestSeedHeaders(): Record<string, string> {

@@ -36,7 +36,9 @@ test('J-02 auth screen navigation works on web @smoke', async ({ page }) => {
 
   await page.getByTestId('back-to-sign-in').click();
   await expect(page).toHaveURL(/\/sign-in(?:\?.*)?$/);
-  await expect(page.getByTestId('sign-in-email')).toBeVisible({
+  await expect(
+    page.locator('[data-testid="sign-in-email"]').last()
+  ).toBeVisible({
     timeout: 30_000,
   });
 });

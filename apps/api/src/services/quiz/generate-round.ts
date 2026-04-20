@@ -11,6 +11,7 @@ import {
   type VocabularyQuestion,
 } from '@eduagent/schemas';
 import { createScopedRepository, type Database } from '@eduagent/database';
+import { getRecentMissedItems, markMissedItemsSurfaced } from './queries';
 import type { ChatMessage } from '../llm';
 import { routeAndCall } from '../llm';
 import { captureException } from '../sentry';
@@ -53,6 +54,12 @@ interface CapitalsPromptParams {
    * these weaker areas when it wouldn't feel forced. [P1-4]
    */
   recentStruggles?: string[];
+  /**
+   * Recently missed items for this activity (surfaced=false). The prompt
+   * asks the LLM to prefer re-surfacing these where they fit the theme.
+   * [P1 — quiz_missed_items wiring]
+   */
+  recentlyMissedItems?: string[];
 }
 
 export function buildCapitalsPrompt(params: CapitalsPromptParams): string {
@@ -65,6 +72,7 @@ export function buildCapitalsPrompt(params: CapitalsPromptParams): string {
     libraryTopics,
     ageYears,
     recentStruggles,
+    recentlyMissedItems,
   } = params;
 
   // Prefer fine-grained ageYears when available; fall back to coarse bracket.
@@ -121,10 +129,21 @@ export function buildCapitalsPrompt(params: CapitalsPromptParams): string {
           )}. If a capitals theme naturally connects to any of these, lean toward it — otherwise pick the best age-appropriate theme.`
       : '';
 
+  // Recently missed items (surfaced=false) — spaced reinforcement signal.
+  // Prefer re-surfacing these where the theme naturally includes them.
+  const missedHint =
+    recentlyMissedItems && recentlyMissedItems.length > 0
+      ? `\nRecently missed capitals (prefer re-surfacing where the theme fits): ${recentlyMissedItems
+          .slice(0, 8)
+          .join(
+            ', '
+          )}. Include at least one of these as a question if the chosen theme naturally accommodates it.`
+      : '';
+
   return `You are generating a multiple-choice capitals quiz for a ${ageLabel} learner.
 
 Activity: Capitals quiz
-${themeInstruction}${libraryHint}${struggleHint}
+${themeInstruction}${libraryHint}${struggleHint}${missedHint}
 Questions needed: exactly ${discoveryCount}
 
 ${exclusions}
@@ -400,6 +419,14 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
   }
   const resolvedNativeLanguage = nativeLanguage;
 
+  // [P1 — quiz_missed_items wiring] Fetch recent unsurfaced misses for this
+  // activity so the LLM can re-surface them in the new round. Best-effort:
+  // `getRecentMissedItems` returns [] on any DB error.
+  const missedRows = await getRecentMissedItems(db, profileId, activityType);
+  const recentlyMissedItems = missedRows.map((row) =>
+    extractMissedItemLabel(row.questionText, row.correctAnswer, activityType)
+  );
+
   let theme = '';
   let questions: QuizQuestion[] = [];
 
@@ -413,6 +440,7 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
       libraryTopics: topicTitles,
       ageYears,
       recentStruggles: resolvedStruggles,
+      recentlyMissedItems,
     });
     if (difficultyBump) {
       prompt +=
@@ -500,6 +528,7 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
       ageYears,
       learnerNativeLanguage: resolvedNativeLanguage,
       recentStruggles: resolvedStruggles,
+      recentlyMissedItems,
     });
 
     const messages: ChatMessage[] = [
@@ -563,6 +592,7 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
       libraryTopics: topicTitles,
       ageYears,
       recentStruggles: resolvedStruggles,
+      recentlyMissedItems,
     });
     if (difficultyBump) {
       prompt +=
@@ -679,6 +709,19 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
     throw new Error('Failed to persist quiz round');
   }
 
+  // Mark the surfaced misses as seen so they don't get re-injected into the
+  // next round. Best-effort: don't fail the quiz request if this errors.
+  if (missedRows.length > 0) {
+    try {
+      await markMissedItemsSurfaced(db, profileId, activityType);
+    } catch (error) {
+      logger.warn('quiz.missed_items.mark_surfaced_failed', {
+        activityType,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
   return {
     id: inserted.id,
     theme: round.theme,
@@ -686,4 +729,27 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
     total: round.total,
     difficultyBump,
   };
+}
+
+/**
+ * Extract a prompt-friendly label from a stored missed-item row. The prompts
+ * just need a short noun (country / target-language term / person name), not
+ * the full "What is the capital of …?" question text.
+ */
+function extractMissedItemLabel(
+  questionText: string,
+  correctAnswer: string,
+  activityType: QuizActivityType
+): string {
+  if (activityType === 'capitals') {
+    const match = questionText.match(/^What is the capital of (.+?)\?$/);
+    return match?.[1]?.trim() ?? correctAnswer;
+  }
+  if (activityType === 'vocabulary') {
+    const match = questionText.match(/^Translate:\s*(.+)$/);
+    return match?.[1]?.trim() ?? correctAnswer;
+  }
+  // guess_who — use the canonical name (correctAnswer) since the clue text
+  // would leak the whole prompt. Never include the clue.
+  return correctAnswer;
 }

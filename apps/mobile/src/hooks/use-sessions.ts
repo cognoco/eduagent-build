@@ -241,6 +241,7 @@ export function useStreamMessage(sessionId: string): {
       notePrompt?: boolean;
       notePromptPostSession?: boolean;
       fluencyDrill?: FluencyDrillEvent;
+      confidence?: 'low' | 'medium' | 'high';
     }) => void,
     overrideSessionId?: string,
     options?: {
@@ -277,6 +278,7 @@ export function useStreamMessage(sessionId: string): {
         notePrompt?: boolean;
         notePromptPostSession?: boolean;
         fluencyDrill?: FluencyDrillEvent;
+        confidence?: 'low' | 'medium' | 'high';
       }) => void,
       overrideSessionId?: string,
       options?: {
@@ -340,6 +342,7 @@ export function useStreamMessage(sessionId: string): {
               notePrompt: event.notePrompt,
               notePromptPostSession: event.notePromptPostSession,
               fluencyDrill: event.fluencyDrill,
+              confidence: event.confidence,
             });
           }
         }

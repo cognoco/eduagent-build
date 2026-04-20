@@ -25,10 +25,8 @@ import type {
 import {
   processExchange,
   streamExchange,
-  detectUnderstandingCheck,
   estimateExpectedResponseMinutes,
-  extractNotePrompt,
-  extractFluencyDrill,
+  parseExchangeEnvelope,
   type ExchangeContext,
   type FluencyDrillAnnotation,
   type ImageData,
@@ -36,7 +34,6 @@ import {
 import {
   evaluateEscalation,
   getRetentionAwareStartingRung,
-  detectPartialProgress,
 } from '../escalation';
 import {
   fetchPriorTopics,
@@ -87,6 +84,12 @@ export interface ExchangeBehavioralMetrics {
   expectedResponseMinutes?: number;
   /** FR228: Homework mode used for this exchange */
   homeworkMode?: 'help_me' | 'check_answer';
+  /** Envelope signal — read back next turn to hold escalation (F1.2) */
+  partialProgress?: boolean;
+  /** Envelope signal — used to queue topic for remediation (F1.3) */
+  needsDeepening?: boolean;
+  /** F6: LLM self-reported confidence — persisted so the next turn and analytics can read it. */
+  confidence?: 'low' | 'medium' | 'high';
 }
 
 // ---------------------------------------------------------------------------
@@ -549,10 +552,13 @@ export async function prepareExchangeContext(
   const lastAiResponseEvent = aiResponseEvents[aiResponseEvents.length - 1];
   const lastAiResponseAt = lastAiResponseEvent?.createdAt ?? null;
 
-  // 3d. Check the last AI response for [PARTIAL_PROGRESS] marker (Gap 3)
-  const lastAiResponse = lastAiResponseEvent?.content ?? '';
+  // 3d. Read the previous-turn partial_progress signal from metadata (F1.2).
+  // Pre-migration this was parsed from the AI response text via the
+  // [PARTIAL_PROGRESS] marker; after the envelope migration the signal
+  // lives in structured metadata persisted alongside the ai_response event.
   const previousResponseHadPartialProgress =
-    detectPartialProgress(lastAiResponse);
+    (lastAiResponseEvent?.metadata as Record<string, unknown> | null)
+      ?.partialProgress === true;
 
   // 4. Evaluate escalation (retention-aware + partial-progress-aware)
   // On first exchange: use retention-aware starting rung (Gap 4)
@@ -791,6 +797,17 @@ export async function persistExchangeResult(
       timeToAnswerMs: behavioral.timeToAnswerMs,
       hintCountInSession: behavioral.hintCountInSession,
       expectedResponseMinutes: behavioral.expectedResponseMinutes,
+      // Envelope signals persisted so the next turn can read them back for
+      // escalation-hold (F1.2) and remediation-queue (F1.3) decisions.
+      ...(behavioral.partialProgress !== undefined && {
+        partialProgress: behavioral.partialProgress,
+      }),
+      ...(behavioral.needsDeepening !== undefined && {
+        needsDeepening: behavioral.needsDeepening,
+      }),
+      ...(behavioral.confidence !== undefined && {
+        confidence: behavioral.confidence,
+      }),
     }),
   };
 
@@ -918,6 +935,9 @@ export async function processMessage(
       hintCountInSession: hintCount,
       expectedResponseMinutes: result.expectedResponseMinutes,
       homeworkMode: input.homeworkMode,
+      partialProgress: result.partialProgress,
+      needsDeepening: result.needsDeepening,
+      confidence: result.confidence,
     }
   );
 
@@ -954,6 +974,7 @@ export async function streamMessage(
     notePrompt?: boolean;
     notePromptPostSession?: boolean;
     fluencyDrill?: FluencyDrillAnnotation;
+    confidence?: 'low' | 'medium' | 'high';
   }>;
 }> {
   // Early exchange limit check — runs before expensive prepareExchangeContext
@@ -979,15 +1000,21 @@ export async function streamMessage(
 
   return {
     stream: result.stream,
-    async onComplete(fullResponse: string) {
-      // Extract and strip annotations before persisting — order matters:
-      // notePrompt first, then fluencyDrill from the (partially) cleaned response.
-      const notePromptResult = extractNotePrompt(fullResponse);
-      const drillResult = extractFluencyDrill(notePromptResult.cleanResponse);
-      const cleanedResponse = drillResult.cleanResponse;
+    async onComplete(_fullResponse: string) {
+      // The client-facing `stream` yields only envelope `reply` content via
+      // teeEnvelopeStream. The full raw envelope (with signals + ui_hints)
+      // is available through `rawResponsePromise` once the caller finishes
+      // draining the stream — that's the one parseExchangeEnvelope wants.
+      // `_fullResponse` is kept for backward compat and ignored.
+      const rawResponse = await result.rawResponsePromise;
+      const parsed = parseExchangeEnvelope(rawResponse, {
+        sessionId,
+        profileId,
+        flow: 'streamMessage',
+      });
 
       const expectedResponseMinutes = estimateExpectedResponseMinutes(
-        cleanedResponse,
+        parsed.cleanResponse,
         context
       );
       const persisted = await persistExchangeResult(
@@ -996,14 +1023,17 @@ export async function streamMessage(
         sessionId,
         session,
         input.message,
-        cleanedResponse,
+        parsed.cleanResponse,
         effectiveRung,
         {
-          isUnderstandingCheck: detectUnderstandingCheck(cleanedResponse),
+          isUnderstandingCheck: parsed.understandingCheck,
           timeToAnswerMs,
           hintCountInSession: hintCount,
           expectedResponseMinutes,
           homeworkMode: input.homeworkMode,
+          partialProgress: parsed.partialProgress,
+          needsDeepening: parsed.needsDeepening,
+          confidence: parsed.confidence,
         }
       );
       return {
@@ -1011,10 +1041,10 @@ export async function streamMessage(
         escalationRung: effectiveRung,
         expectedResponseMinutes,
         aiEventId: persisted.aiEventId,
-        notePrompt: notePromptResult.notePrompt || undefined,
-        notePromptPostSession:
-          notePromptResult.notePromptPostSession || undefined,
-        fluencyDrill: drillResult.fluencyDrill ?? undefined,
+        notePrompt: parsed.notePrompt || undefined,
+        notePromptPostSession: parsed.notePromptPostSession || undefined,
+        fluencyDrill: parsed.fluencyDrill ?? undefined,
+        confidence: parsed.confidence,
       };
     },
   };

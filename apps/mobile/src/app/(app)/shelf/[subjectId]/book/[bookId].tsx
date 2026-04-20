@@ -308,10 +308,14 @@ export default function BookScreen() {
     (session: BookSession) => {
       router.push({
         pathname: '/session-summary/[sessionId]',
-        params: { sessionId: session.id },
+        params: {
+          sessionId: session.id,
+          subjectId,
+          ...(session.topicId ? { topicId: session.topicId } : {}),
+        },
       } as never);
     },
-    [router]
+    [router, subjectId]
   );
 
   // --- Long-press: context menu for moving topic to a different book ---

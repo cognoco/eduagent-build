@@ -1,7 +1,7 @@
 # Playwright Web testID audit
 
 Date: 2026-04-20
-Status: initial audit for the shipped smoke lane
+Status: audit covers smoke lane + J-04 through J-07 role transition journeys
 
 This file records the selectors the first Playwright web slice relies on.
 It is intentionally narrower than the full plan matrix: smoke-critical IDs are
@@ -33,3 +33,11 @@ runtime-critical.
 | `profile-switcher-chip` | `components/common/ProfileSwitcher.tsx` | ✅ source audit | Needed by phase 2 journeys |
 | `profile-switcher-menu` | `components/common/ProfileSwitcher.tsx` | ✅ source audit | Needed by phase 2 journeys |
 | `profile-option-{id}` | `components/common/ProfileSwitcher.tsx` | ✅ source audit | Dynamic `testID` already implemented |
+| `post-approval-landing` | `app/(app)/_layout.tsx` | ✅ smoke runtime | Auth setup — overlay after consent |
+| `post-approval-continue` | `app/(app)/_layout.tsx` | ✅ smoke runtime | Auth setup — dismiss overlay |
+| `learner-back` | `components/home/LearnerScreen.tsx` | ✅ source audit | J-04 — back from inline learner to parent |
+| `dashboard-child-{id}` | `components/coaching/ParentDashboardSummary.tsx` | ✅ source audit | J-07 — per-child dashboard card (dynamic) |
+| `dashboard-back` | `app/(app)/dashboard.tsx` | ✅ source audit | J-07 — back from dashboard to home |
+| `dashboard-scroll` | `app/(app)/dashboard.tsx` | ✅ source audit | J-07 — dashboard scroll container |
+| `child-detail-scroll` | `app/(app)/child/[profileId]/index.tsx` | ✅ source audit | J-07 — child detail content |
+| `back-button` | `app/(app)/child/[profileId]/index.tsx` | ✅ source audit | J-07 — back from child detail |

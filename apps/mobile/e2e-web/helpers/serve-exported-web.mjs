@@ -2,7 +2,7 @@ import http from 'node:http';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { createReadStream } from 'node:fs';
-import { access, stat } from 'node:fs/promises';
+import { access, stat, readFile, writeFile, rename } from 'node:fs/promises';
 import { constants as fsConstants } from 'node:fs';
 
 const projectRoot = process.cwd();
@@ -92,9 +92,47 @@ async function startServer() {
   });
 }
 
-const exportProcess = spawnPnpm(['exec', 'expo', 'export', '--platform', 'web']);
+// ---------------------------------------------------------------------------
+// Swap .env.local to override EXPO_PUBLIC_API_URL for E2E.
+// Expo's @expo/env always reads .env.local and ignores process.env overrides
+// for EXPO_PUBLIC_* vars, so we must edit the file directly.
+// ---------------------------------------------------------------------------
+const envLocalPath = path.join(projectRoot, '.env.local');
+const envBackupPath = path.join(projectRoot, '.env.local.e2e-bak');
+const apiUrl = process.env.PLAYWRIGHT_API_URL ?? 'http://127.0.0.1:8787';
 
-exportProcess.on('exit', (code) => {
+let envLocalOriginal = null;
+
+async function overrideEnvLocal() {
+  if (await fileExists(envLocalPath)) {
+    envLocalOriginal = await readFile(envLocalPath, 'utf-8');
+    await rename(envLocalPath, envBackupPath);
+  }
+  // Write a minimal .env.local that points to the local API
+  const overridden = envLocalOriginal
+    ? envLocalOriginal.replace(
+        /^EXPO_PUBLIC_API_URL=.*/m,
+        `EXPO_PUBLIC_API_URL="${apiUrl}"`
+      )
+    : `EXPO_PUBLIC_API_URL="${apiUrl}"\n`;
+  await writeFile(envLocalPath, overridden, 'utf-8');
+}
+
+async function restoreEnvLocal() {
+  if (await fileExists(envBackupPath)) {
+    await rename(envBackupPath, envLocalPath);
+  }
+}
+
+await overrideEnvLocal();
+
+const exportProcess = spawnPnpm([
+  'exec', 'expo', 'export', '--platform', 'web', '--clear',
+]);
+
+exportProcess.on('exit', async (code) => {
+  await restoreEnvLocal();
+
   if (code !== 0) {
     process.exit(code ?? 1);
   }

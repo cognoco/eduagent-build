@@ -87,5 +87,13 @@ export default defineConfig({
         storageState: path.join(e2eWebDir, '.auth', 'owner-with-children.json'),
       },
     },
+    {
+      name: 'role-transitions',
+      dependencies: ['setup'],
+      testMatch: /flows[\\/]journeys[\\/]j0[4-7]-.*\.spec\.ts/,
+      use: {
+        storageState: path.join(e2eWebDir, '.auth', 'owner-with-children.json'),
+      },
+    },
   ],
 });
