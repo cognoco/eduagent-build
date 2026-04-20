@@ -122,7 +122,7 @@ importers:
         version: 22.2.0(@babel/traverse@7.28.5)(@swc-node/register@1.9.2(@swc/core@1.14.0(@swc/helpers@0.5.17))(@swc/types@0.1.25)(typescript@5.9.3))(@swc/core@1.14.0(@swc/helpers@0.5.17))(@typescript-eslint/parser@8.46.2(eslint@9.37.0(jiti@1.21.7))(typescript@5.9.3))(eslint-config-prettier@10.1.8(eslint@9.37.0(jiti@1.21.7)))(eslint@9.37.0(jiti@1.21.7))(nx@22.2.0(@swc-node/register@1.9.2(@swc/core@1.14.0(@swc/helpers@0.5.17))(@swc/types@0.1.25)(typescript@5.9.3))(@swc/core@1.14.0(@swc/helpers@0.5.17)))(typescript@5.9.3)
       '@nx/expo':
         specifier: 22.2.0
-        version: 22.2.0(be6faf93b683099aba6a76b06d4697ec)
+        version: 22.2.0(8c0cae51caa4462fe6df1d7d37338801)
       '@nx/jest':
         specifier: 22.2.0
         version: 22.2.0(@babel/traverse@7.28.5)(@swc-node/register@1.9.2(@swc/core@1.14.0(@swc/helpers@0.5.17))(@swc/types@0.1.25)(typescript@5.9.3))(@swc/core@1.14.0(@swc/helpers@0.5.17))(@types/node@22.19.1)(babel-plugin-macros@3.1.0)(esbuild-register@3.6.0(esbuild@0.19.12))(nx@22.2.0(@swc-node/register@1.9.2(@swc/core@1.14.0(@swc/helpers@0.5.17))(@swc/types@0.1.25)(typescript@5.9.3))(@swc/core@1.14.0(@swc/helpers@0.5.17)))(ts-node@10.9.1(@swc/core@1.14.0(@swc/helpers@0.5.17))(@types/node@22.19.1)(typescript@5.9.3))(typescript@5.9.3)
@@ -138,6 +138,9 @@ importers:
       '@nx/workspace':
         specifier: 22.2.0
         version: 22.2.0(@swc-node/register@1.9.2(@swc/core@1.14.0(@swc/helpers@0.5.17))(@swc/types@0.1.25)(typescript@5.9.3))(@swc/core@1.14.0(@swc/helpers@0.5.17))
+      '@playwright/test':
+        specifier: 1.56.1
+        version: 1.56.1
       '@swc-node/register':
         specifier: ~1.9.1
         version: 1.9.2(@swc/core@1.14.0(@swc/helpers@0.5.17))(@swc/types@0.1.25)(typescript@5.9.3)
@@ -14981,7 +14984,7 @@ snapshots:
       wrap-ansi: 7.0.0
       ws: 8.18.3(bufferutil@4.1.0)(utf-8-validate@5.0.10)
     optionalDependencies:
-      expo-router: 6.0.23(8ce52fd099a42c066e398124ac4ddd99)
+      expo-router: 6.0.23(6dd1148f933058b5aeda83504ee72d58)
       react-native: 0.81.5(@babel/core@7.28.5)(@react-native-community/cli@18.0.1(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10))(@types/react@19.1.0)(bufferutil@4.1.0)(react@19.1.0)(utf-8-validate@5.0.10)
     transitivePeerDependencies:
       - bufferutil
@@ -16386,7 +16389,7 @@ snapshots:
       - supports-color
       - verdaccio
 
-  '@nx/expo@22.2.0(be6faf93b683099aba6a76b06d4697ec)':
+  '@nx/expo@22.2.0(8c0cae51caa4462fe6df1d7d37338801)':
     dependencies:
       '@nx/devkit': 22.2.0(nx@22.2.0(@swc-node/register@1.9.2(@swc/core@1.14.0(@swc/helpers@0.5.17))(@swc/types@0.1.25)(typescript@5.9.3))(@swc/core@1.14.0(@swc/helpers@0.5.17)))
       '@nx/eslint': 22.2.0(@babel/traverse@7.28.5)(@swc-node/register@1.9.2(@swc/core@1.14.0(@swc/helpers@0.5.17))(@swc/types@0.1.25)(typescript@5.9.3))(@swc/core@1.14.0(@swc/helpers@0.5.17))(@zkochan/js-yaml@0.0.7)(eslint@9.37.0(jiti@1.21.7))(nx@22.2.0(@swc-node/register@1.9.2(@swc/core@1.14.0(@swc/helpers@0.5.17))(@swc/types@0.1.25)(typescript@5.9.3))(@swc/core@1.14.0(@swc/helpers@0.5.17)))
@@ -17757,7 +17760,6 @@ snapshots:
   '@playwright/test@1.56.1':
     dependencies:
       playwright: 1.56.1
-    optional: true
 
   '@poppinss/colors@4.1.6':
     dependencies:
@@ -25843,15 +25845,13 @@ snapshots:
       pathe: 2.0.3
     optional: true
 
-  playwright-core@1.56.1:
-    optional: true
+  playwright-core@1.56.1: {}
 
   playwright@1.56.1:
     dependencies:
       playwright-core: 1.56.1
     optionalDependencies:
       fsevents: 2.3.2
-    optional: true
 
   plist@3.1.0:
     dependencies:

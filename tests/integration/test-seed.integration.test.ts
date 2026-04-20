@@ -24,6 +24,9 @@ const PROD_ENV = buildIntegrationEnv({ ENVIRONMENT: 'production' });
 const LEARNING_EMAIL = 'integration-seed-learning@integration.test';
 const RESET_A_EMAIL = 'integration-seed-reset-a@integration.test';
 const RESET_B_EMAIL = 'integration-seed-reset-b@integration.test';
+const RESET_PREFIX = 'integ-playwright-reset-scope-';
+const RESET_PREFIX_EMAIL = `${RESET_PREFIX}target@test.invalid`;
+const RESET_OTHER_EMAIL = 'integration-seed-reset-other@integration.test';
 const MANUAL_EMAIL = 'integration-seed-manual@integration.test';
 
 async function findAccountByEmail(email: string) {
@@ -62,13 +65,27 @@ async function seedManualNonSeedAccount() {
 
 beforeEach(async () => {
   await cleanupAccounts({
-    emails: [LEARNING_EMAIL, RESET_A_EMAIL, RESET_B_EMAIL, MANUAL_EMAIL],
+    emails: [
+      LEARNING_EMAIL,
+      RESET_A_EMAIL,
+      RESET_B_EMAIL,
+      RESET_PREFIX_EMAIL,
+      RESET_OTHER_EMAIL,
+      MANUAL_EMAIL,
+    ],
   });
 });
 
 afterAll(async () => {
   await cleanupAccounts({
-    emails: [LEARNING_EMAIL, RESET_A_EMAIL, RESET_B_EMAIL, MANUAL_EMAIL],
+    emails: [
+      LEARNING_EMAIL,
+      RESET_A_EMAIL,
+      RESET_B_EMAIL,
+      RESET_PREFIX_EMAIL,
+      RESET_OTHER_EMAIL,
+      MANUAL_EMAIL,
+    ],
   });
 });
 
@@ -201,5 +218,48 @@ describe('Integration: test-seed routes', () => {
     expect(await findAccountByEmail(RESET_A_EMAIL)).toBeUndefined();
     expect(await findAccountByEmail(RESET_B_EMAIL)).toBeUndefined();
     expect(await findAccountByEmail(MANUAL_EMAIL)).toBeDefined();
+  });
+
+  it('resets only the requested seeded email prefix when prefix is provided', async () => {
+    await app.request(
+      '/v1/__test/seed',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scenario: 'onboarding-complete',
+          email: RESET_PREFIX_EMAIL,
+        }),
+      },
+      DEV_ENV
+    );
+    await app.request(
+      '/v1/__test/seed',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scenario: 'trial-active',
+          email: RESET_OTHER_EMAIL,
+        }),
+      },
+      DEV_ENV
+    );
+
+    const resetRes = await app.request(
+      `/v1/__test/reset?prefix=${encodeURIComponent(RESET_PREFIX)}`,
+      {
+        method: 'POST',
+      },
+      DEV_ENV
+    );
+
+    expect(resetRes.status).toBe(200);
+    const body = await resetRes.json();
+    expect(body.message).toBe('Database reset complete');
+    expect(body.deletedCount).toBe(1);
+
+    expect(await findAccountByEmail(RESET_PREFIX_EMAIL)).toBeUndefined();
+    expect(await findAccountByEmail(RESET_OTHER_EMAIL)).toBeDefined();
   });
 });

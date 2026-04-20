@@ -101,6 +101,11 @@ export interface ResetResult {
   clerkUsersDeleted: number;
 }
 
+export interface ResetOptions {
+  /** Optional email prefix filter for per-run cleanup, e.g. integ-playwright-1234- */
+  prefix?: string;
+}
+
 // ---------------------------------------------------------------------------
 // Clerk REST API helpers
 // ---------------------------------------------------------------------------
@@ -225,9 +230,11 @@ async function findClerkUserByEmail(
  * through all users and filter client-side by `external_id` prefix.
  */
 async function deleteClerkTestUsers(
-  env: SeedEnv
+  env: SeedEnv,
+  options: ResetOptions = {}
 ): Promise<{ count: number; clerkUserIds: string[] }> {
   if (!env.CLERK_SECRET_KEY) return { count: 0, clerkUserIds: [] };
+  const prefix = options.prefix?.trim().toLowerCase();
 
   // Paginate through Clerk users and filter client-side by external_id prefix.
   // Clerk's list users API supports `limit` and `offset` for pagination.
@@ -250,7 +257,14 @@ async function deleteClerkTestUsers(
 
     // Client-side filter: only keep users whose external_id starts with our seed prefix
     for (const user of users) {
-      if (user.external_id?.startsWith(SEED_CLERK_PREFIX)) {
+      const matchesSeedPrefix = user.external_id?.startsWith(SEED_CLERK_PREFIX);
+      const matchesEmailPrefix =
+        !prefix ||
+        user.email_addresses.some((email) =>
+          email.email_address.toLowerCase().startsWith(prefix)
+        );
+
+      if (matchesSeedPrefix && matchesEmailPrefix) {
         seedUsers.push(user);
       }
     }
@@ -1534,13 +1548,26 @@ export async function seedScenario(
 
 export async function resetDatabase(
   db: Database,
-  env: SeedEnv = {}
+  env: SeedEnv = {},
+  options: ResetOptions = {}
 ): Promise<ResetResult> {
+  const prefix = options.prefix?.trim();
+
   // Delete Clerk test users first (before DB cleanup removes the mapping).
   // Collects real Clerk user IDs so we can also delete their DB accounts.
   const { count: clerkUsersDeleted, clerkUserIds } = await deleteClerkTestUsers(
-    env
+    env,
+    { prefix }
   );
+
+  if (prefix) {
+    const deleted = await db
+      .delete(accounts)
+      .where(like(accounts.email, `${prefix}%`))
+      .returning({ id: accounts.id });
+
+    return { deletedCount: deleted.length, clerkUsersDeleted };
+  }
 
   // Build WHERE clause: match fake clerk_seed_* IDs OR real Clerk user IDs
   // that were created by the seed service.

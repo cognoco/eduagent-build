@@ -132,6 +132,11 @@ cache/
 # Maestro E2E screenshots (land at repo root when run from project root)
 /*.png
 
+# Playwright web E2E artifacts
+apps/mobile/e2e-web/.auth/
+apps/mobile/e2e-web/playwright-report/
+apps/mobile/e2e-web/test-results/
+
 # JVM crash logs (Android emulator, Gradle)
 hs_err_pid*.log
 

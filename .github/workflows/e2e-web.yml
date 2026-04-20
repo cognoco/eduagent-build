@@ -1,0 +1,63 @@
+name: E2E Web
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+      - improvements
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-web-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  smoke:
+    name: Playwright web smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CI: true
+      EXPO_PUBLIC_API_URL: https://api-stg.mentomate.com
+      EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY_PREVIEW }}
+      PLAYWRIGHT_API_URL: https://api-stg.mentomate.com
+      PLAYWRIGHT_SKIP_LOCAL_API: '1'
+      PLAYWRIGHT_TEST_SEED_SECRET: ${{ secrets.TEST_SEED_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          standalone: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build schemas package
+        run: pnpm exec tsc --build packages/schemas/tsconfig.lib.json
+
+      - name: Install Playwright browser
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run Playwright smoke suite
+        run: pnpm run test:e2e:web:smoke
+
+      - name: Upload Playwright artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-web-smoke
+          path: |
+            apps/mobile/e2e-web/playwright-report
+            apps/mobile/e2e-web/test-results
+          retention-days: 14
