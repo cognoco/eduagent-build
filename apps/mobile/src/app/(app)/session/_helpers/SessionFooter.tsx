@@ -1,10 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
-import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { QuestionCounter, LibraryPrompt } from '../../../../components/session';
 import { NoteInput } from '../../../../components/library/NoteInput';
 import type { useFiling } from '../../../../hooks/use-filing';
 import type { useUpsertNote } from '../../../../hooks/use-notes';
 import { formatApiError } from '../../../../lib/format-api-error';
+import { platformAlert } from '../../../../lib/platform-alert';
 import type { Router } from 'expo-router';
 import type { useThemeColors } from '../../../../lib/theme';
 
@@ -114,7 +115,7 @@ export function SessionFooter({
           <NoteInput
             onSave={(content) => {
               if (!topicId) {
-                Alert.alert(
+                platformAlert(
                   'Cannot save note',
                   'No topic selected for this session.'
                 );
@@ -138,7 +139,7 @@ export function SessionFooter({
                     setShowNoteInput(false);
                   },
                   onError: (error) => {
-                    Alert.alert(
+                    platformAlert(
                       "Couldn't save your note",
                       formatApiError(error)
                     );
@@ -206,7 +207,7 @@ function StandardFilingPrompt({
                 },
               } as never);
             } catch {
-              Alert.alert(
+              platformAlert(
                 "Couldn't add to library",
                 'Your session is still saved.',
                 [

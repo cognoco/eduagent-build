@@ -22,16 +22,9 @@ test('J-11 learner → Library → shelf → book → start learning', async ({
   });
 
   await page.getByTestId(`subject-card-${subjectId}`).click();
-  const shelfPlaceholder = page.getByTestId('shelf-single-book');
-  if (await shelfPlaceholder.isVisible({ timeout: 5_000 }).catch(() => false)) {
-    await expect(page.getByTestId('book-screen')).toBeVisible({
-      timeout: 30_000,
-    });
-  } else {
-    await expect(page.getByTestId('book-screen')).toBeVisible({
-      timeout: 30_000,
-    });
-  }
+  await expect(page.getByTestId('book-screen')).toBeVisible({
+    timeout: 30_000,
+  });
 
   await page.getByTestId('book-start-learning').click();
   await expect(page.getByTestId('chat-input')).toBeVisible({ timeout: 30_000 });

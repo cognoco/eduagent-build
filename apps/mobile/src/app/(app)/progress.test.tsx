@@ -5,7 +5,7 @@ import {
   useProgressMilestones,
   useRefreshProgressSnapshot,
 } from '../../hooks/use-progress';
-import ProgressScreen from './progress';
+import ProgressScreen from './progress/index';
 
 jest.mock('../../hooks/use-progress');
 jest.mock('expo-router', () => {

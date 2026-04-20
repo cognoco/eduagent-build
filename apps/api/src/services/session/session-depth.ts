@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   detectedTopicSchema,
+  type AgeBracket,
   type DepthEvaluation,
   type SessionTranscript,
 } from '@eduagent/schemas';
@@ -13,43 +14,12 @@ import {
   MIN_LEARNER_WORDS,
   TOPIC_DETECTION_TIMEOUT_MS,
 } from './session-depth.config';
+import {
+  DEPTH_EVALUATION_PROMPT,
+  TOPIC_DETECTION_PROMPT,
+} from './session-depth-prompts';
 
 const logger = createLogger();
-
-const DEPTH_EVALUATION_PROMPT = `Given this tutor session transcript, decide whether it was a meaningful learning exchange.
-
-Meaningful means all of these are true:
-1. The learner engaged beyond a quick factual lookup.
-2. The tutor explained, taught, or guided rather than just answered.
-3. The learner responded to that teaching through follow-ups, reflection, or application.
-
-Quick one-off Q&A sessions are not meaningful.
-
-Return ONLY JSON:
-{
-  "meaningful": boolean,
-  "reason": string,
-  "topics": [
-    {
-      "summary": "3-5 word topic label",
-      "depth": "substantial" | "partial" | "introduced"
-    }
-  ]
-}`;
-
-const TOPIC_DETECTION_PROMPT = `Given this tutor session transcript, identify the topics discussed.
-
-Return ONLY JSON:
-{
-  "meaningful": true,
-  "reason": "Session showed educational depth",
-  "topics": [
-    {
-      "summary": "3-5 word topic label",
-      "depth": "substantial" | "partial" | "introduced"
-    }
-  ]
-}`;
 
 const llmDepthResponseSchema = z.object({
   meaningful: z.boolean(),
@@ -106,12 +76,13 @@ function failOpen(
 
 async function callWithTimeout(
   messages: ChatMessage[],
-  timeoutMs: number
+  timeoutMs: number,
+  ageBracket?: AgeBracket
 ): Promise<string> {
   const timeoutPromise = new Promise<never>((_, reject) => {
     setTimeout(() => reject(new Error('timeout')), timeoutMs);
   });
-  const llmPromise = routeAndCall(messages, 1).then(
+  const llmPromise = routeAndCall(messages, 1, { ageBracket }).then(
     (result) => result.response
   );
   return Promise.race([llmPromise, timeoutPromise]);
@@ -119,7 +90,8 @@ async function callWithTimeout(
 
 async function detectTopicsOnly(
   transcript: SessionTranscript,
-  timeoutMs: number
+  timeoutMs: number,
+  ageBracket?: AgeBracket
 ): Promise<DepthEvaluation['topics']> {
   try {
     const raw = await callWithTimeout(
@@ -127,7 +99,8 @@ async function detectTopicsOnly(
         { role: 'system', content: TOPIC_DETECTION_PROMPT },
         { role: 'user', content: formatTranscriptForPrompt(transcript) },
       ],
-      timeoutMs
+      timeoutMs,
+      ageBracket
     );
     return parseDepthResponse(raw)?.topics ?? [];
   } catch (error) {
@@ -142,7 +115,8 @@ async function evaluateWithLlm(
   transcript: SessionTranscript,
   exchangeCount: number,
   learnerWordCount: number,
-  timeoutMs: number
+  timeoutMs: number,
+  ageBracket?: AgeBracket
 ): Promise<DepthEvaluation> {
   try {
     const raw = await callWithTimeout(
@@ -150,7 +124,8 @@ async function evaluateWithLlm(
         { role: 'system', content: DEPTH_EVALUATION_PROMPT },
         { role: 'user', content: formatTranscriptForPrompt(transcript) },
       ],
-      timeoutMs
+      timeoutMs,
+      ageBracket
     );
     const parsed = parseDepthResponse(raw);
     if (parsed) {
@@ -172,7 +147,11 @@ async function evaluateWithLlm(
 
 export async function evaluateSessionDepth(
   transcript: SessionTranscript,
-  options?: { timeoutMs?: number; topicTimeoutMs?: number }
+  options?: {
+    timeoutMs?: number;
+    topicTimeoutMs?: number;
+    ageBracket?: AgeBracket;
+  }
 ): Promise<DepthEvaluation> {
   const exchangeCount = transcript.exchanges.filter(
     (exchange) => exchange.role === 'user'
@@ -194,7 +173,8 @@ export async function evaluateSessionDepth(
   if (exchangeCount >= AUTO_MEANINGFUL_EXCHANGE_THRESHOLD) {
     const topics = await detectTopicsOnly(
       transcript,
-      options?.topicTimeoutMs ?? TOPIC_DETECTION_TIMEOUT_MS
+      options?.topicTimeoutMs ?? TOPIC_DETECTION_TIMEOUT_MS,
+      options?.ageBracket
     );
     return {
       meaningful: true,
@@ -208,6 +188,7 @@ export async function evaluateSessionDepth(
     transcript,
     exchangeCount,
     learnerWordCount,
-    options?.timeoutMs ?? GATE_TIMEOUT_MS
+    options?.timeoutMs ?? GATE_TIMEOUT_MS,
+    options?.ageBracket
   );
 }

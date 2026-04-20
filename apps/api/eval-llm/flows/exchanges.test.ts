@@ -77,12 +77,13 @@ describe('exchangesFlow', () => {
       expect(byId['S5-rung5-exit']).toBe(5);
     });
 
-    it('freeform scenario clears the topicTitle', () => {
+    it('casual freeform scenario clears the topicTitle', () => {
       const scenarios =
         exchangesFlow.enumerateScenarios?.(generalProfile) ?? [];
       const s8 = scenarios.find((s) => s.scenarioId === 'S8-casual-freeform');
       expect(s8?.input.context.topicTitle).toBeUndefined();
-      expect(s8?.input.context.sessionType).toBe('freeform');
+      expect(s8?.input.context.sessionType).toBe('learning');
+      expect(s8?.input.context.learningMode).toBe('casual');
     });
 
     it('exchangeHistory substitutes profile-specific tokens', () => {

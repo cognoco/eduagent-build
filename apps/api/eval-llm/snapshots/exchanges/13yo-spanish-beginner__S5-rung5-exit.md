@@ -35,7 +35,7 @@
     "profileId": "eval-profile-13yo-spanish-beginner",
     "subjectName": "Languages",
     "topicTitle": "Spanish present tense verbs",
-    "sessionType": "topic",
+    "sessionType": "learning",
     "escalationRung": 5,
     "exchangeHistory": [
       {
@@ -207,7 +207,7 @@ Signal guidance:
 ## Builder notes
 
 - Scenario: S5-rung5-exit — Rung-5 exit protocol — F1.3 NEEDS_DEEPENING migration target
-- Rung: 5, sessionType: topic, verification: standard
+- Rung: 5, sessionType: learning, verification: standard
 - History turns: 5, exchangeCount: 5
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs

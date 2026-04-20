@@ -257,22 +257,25 @@ describe('formatApiError', () => {
     );
   });
 
-  it('returns input message for API error 404 with unreadable body', () => {
+  it('returns not-found message for API error 404 with unreadable body', () => {
     const err = new Error('API error 404: {"complex":{"nested":"object"}}');
-    expect(formatApiError(err)).toBe(
-      "That didn't work. Please check your input and try again."
-    );
+    // classifyApiError recognises HTTP 404 and returns the not-found message
+    // even when the body doesn't contain a parseable apiMessage.
+    expect(formatApiError(err)).toBe('That page or item no longer exists.');
   });
 
   // --- ForbiddenError with apiCode [BUG-100] ---
 
-  it('returns subject-inactive message when ForbiddenError carries SUBJECT_INACTIVE apiCode', () => {
+  it('returns friendly subject-inactive message when ForbiddenError carries SUBJECT_INACTIVE apiCode', () => {
     const err = Object.assign(
       new Error('Subject is paused — resume it before starting a session'),
       { name: 'ForbiddenError', code: 'FORBIDDEN', apiCode: 'SUBJECT_INACTIVE' }
     );
+    // classifyApiError catches SUBJECT_INACTIVE as a code-level check
+    // (before ForbiddenError name check) and applies friendlyMessage()
+    // which matches the subject.*(paused|archived) pattern.
     expect(formatApiError(err)).toBe(
-      'Subject is paused — resume it before starting a session'
+      'This subject is on pause right now. You can resume it from your subjects list.'
     );
   });
 

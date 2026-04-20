@@ -30,6 +30,20 @@ export async function signIn(
   page: Page,
   options: SignInOptions
 ): Promise<void> {
+  const pageErrors: string[] = [];
+  const consoleErrors: string[] = [];
+  const onPageError = (error: Error) => {
+    pageErrors.push(error.message);
+  };
+  const onConsole = (message: { type(): string; text(): string }) => {
+    if (message.type() === 'error') {
+      consoleErrors.push(message.text());
+    }
+  };
+
+  page.on('pageerror', onPageError);
+  page.on('console', onConsole);
+
   await injectClerkTestingToken(page);
   await page.goto('/sign-in', { waitUntil: 'commit' });
   await expect(page.getByTestId('sign-in-email')).toBeVisible({
@@ -40,26 +54,61 @@ export async function signIn(
   await page.getByTestId('sign-in-password').fill(options.password);
   await page.getByTestId('sign-in-button').click();
 
-  // Tap through the post-approval landing if it appears (fresh SecureStore)
-  const postApproval = page.getByTestId('post-approval-continue');
-  const landing = page.getByTestId(options.landingTestId);
-  const first = await Promise.race([
-    postApproval
-      .waitFor({ state: 'visible', timeout: 60_000 })
-      .then(() => 'post-approval' as const),
-    landing
-      .waitFor({ state: 'visible', timeout: 60_000 })
-      .then(() => 'landing' as const),
-  ]);
-  if (first === 'post-approval') {
-    await postApproval.click();
-    await expect(landing).toBeVisible({ timeout: 60_000 });
-  }
+  try {
+    // Tap through the post-approval landing if it appears (fresh SecureStore)
+    const postApproval = page.getByTestId('post-approval-continue');
+    const landing = page.getByTestId(options.landingTestId);
+    const errorBoundary = page.getByTestId('error-boundary-fallback');
+    const first = await Promise.race([
+      postApproval
+        .waitFor({ state: 'visible', timeout: 60_000 })
+        .then(() => 'post-approval' as const),
+      landing
+        .waitFor({ state: 'visible', timeout: 60_000 })
+        .then(() => 'landing' as const),
+      errorBoundary
+        .waitFor({ state: 'visible', timeout: 60_000 })
+        .then(() => 'error-boundary' as const),
+    ]);
 
-  if (options.landingPath) {
-    await page.waitForURL((url) => url.pathname === options.landingPath, {
-      timeout: 60_000,
-    });
+    if (first === 'error-boundary') {
+      const diagnostics = [...pageErrors, ...consoleErrors].join(' | ');
+      throw new Error(
+        diagnostics
+          ? `Sign-in landed on the app error boundary: ${diagnostics}`
+          : 'Sign-in landed on the app error boundary.'
+      );
+    }
+
+    if (first === 'post-approval') {
+      await postApproval.click();
+      const second = await Promise.race([
+        landing
+          .waitFor({ state: 'visible', timeout: 60_000 })
+          .then(() => 'landing' as const),
+        errorBoundary
+          .waitFor({ state: 'visible', timeout: 60_000 })
+          .then(() => 'error-boundary' as const),
+      ]);
+
+      if (second === 'error-boundary') {
+        const diagnostics = [...pageErrors, ...consoleErrors].join(' | ');
+        throw new Error(
+          diagnostics
+            ? `Post-approval flow landed on the app error boundary: ${diagnostics}`
+            : 'Post-approval flow landed on the app error boundary.'
+        );
+      }
+    }
+
+    if (options.landingPath) {
+      await page.waitForURL((url) => url.pathname === options.landingPath, {
+        timeout: 60_000,
+      });
+    }
+  } finally {
+    page.off('pageerror', onPageError);
+    page.off('console', onConsole);
   }
 }
 

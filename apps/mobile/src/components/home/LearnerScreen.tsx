@@ -314,11 +314,13 @@ export function LearnerScreen({
               </Text>
             </Pressable>
             <Pressable
-              onPress={onBack}
+              onPress={onBack ?? (() => router.replace('/(app)/home' as never))}
               className="mt-2 min-h-[44px] items-center justify-center px-6 py-2"
               testID="learner-loading-go-back"
             >
-              <Text className="text-body text-text-secondary">Go back</Text>
+              <Text className="text-body text-text-secondary">
+                {onBack ? 'Go back' : 'Go home'}
+              </Text>
             </Pressable>
           </View>
         )}

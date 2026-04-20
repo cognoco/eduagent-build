@@ -1,14 +1,12 @@
 import type { SessionTranscript } from '@eduagent/schemas';
-import { routeAndCall } from '../llm';
+import {
+  registerProvider,
+  _clearProviders,
+  _resetCircuits,
+  createMockProvider,
+} from '../llm';
+import type { LLMProvider } from '../llm';
 import { evaluateSessionDepth } from './session-depth';
-
-jest.mock('../llm', () => ({
-  routeAndCall: jest.fn(),
-}));
-
-const mockRouteAndCall = routeAndCall as jest.MockedFunction<
-  typeof routeAndCall
->;
 
 function makeTranscript(
   pairs: Array<{ user: string; assistant: string }>
@@ -48,10 +46,21 @@ function makeTranscript(
 
 describe('evaluateSessionDepth', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    _clearProviders();
+    _resetCircuits();
+    // Register a default no-op provider; individual tests override chat as needed.
+    registerProvider(createMockProvider('gemini'));
   });
 
   it('returns not meaningful for short sessions', async () => {
+    const mockChat = jest.fn();
+    const provider: LLMProvider = {
+      ...createMockProvider('gemini'),
+      chat: mockChat,
+    };
+    _clearProviders();
+    registerProvider(provider);
+
     const transcript = makeTranscript([
       {
         user: 'What is the capital of France?',
@@ -71,20 +80,22 @@ describe('evaluateSessionDepth', () => {
       method: 'heuristic_shallow',
       topics: [],
     });
-    expect(mockRouteAndCall).not.toHaveBeenCalled();
+    // provider.chat should NOT have been called for short sessions
+    expect(mockChat).not.toHaveBeenCalled();
   });
 
   it('returns meaningful for long sessions and only detects topics', async () => {
-    mockRouteAndCall.mockResolvedValue({
-      response: JSON.stringify({
-        meaningful: true,
-        reason: 'Deep session',
-        topics: [{ summary: 'Photosynthesis basics', depth: 'substantial' }],
-      }),
-      provider: 'mock',
-      model: 'mock',
-      latencyMs: 1,
+    const rawResponse = JSON.stringify({
+      meaningful: true,
+      reason: 'Deep session',
+      topics: [{ summary: 'Photosynthesis basics', depth: 'substantial' }],
     });
+    const provider: LLMProvider = {
+      ...createMockProvider('gemini'),
+      chat: jest.fn().mockResolvedValue(rawResponse),
+    };
+    _clearProviders();
+    registerProvider(provider);
 
     const transcript = makeTranscript([
       {
@@ -117,20 +128,21 @@ describe('evaluateSessionDepth', () => {
       method: 'heuristic_deep',
       topics: [{ summary: 'Photosynthesis basics', depth: 'substantial' }],
     });
-    expect(mockRouteAndCall).toHaveBeenCalledTimes(1);
+    expect(provider.chat).toHaveBeenCalledTimes(1);
   });
 
   it('uses the LLM gate for ambiguous middle-length sessions', async () => {
-    mockRouteAndCall.mockResolvedValue({
-      response: JSON.stringify({
-        meaningful: false,
-        reason: 'Mostly factual lookup',
-        topics: [{ summary: 'Roman Empire', depth: 'introduced' }],
-      }),
-      provider: 'mock',
-      model: 'mock',
-      latencyMs: 1,
+    const rawResponse = JSON.stringify({
+      meaningful: false,
+      reason: 'Mostly factual lookup',
+      topics: [{ summary: 'Roman Empire', depth: 'introduced' }],
     });
+    const provider: LLMProvider = {
+      ...createMockProvider('gemini'),
+      chat: jest.fn().mockResolvedValue(rawResponse),
+    };
+    _clearProviders();
+    registerProvider(provider);
 
     const transcript = makeTranscript([
       {
@@ -158,12 +170,12 @@ describe('evaluateSessionDepth', () => {
   });
 
   it('fails open when the LLM response is unparseable', async () => {
-    mockRouteAndCall.mockResolvedValue({
-      response: 'not json',
-      provider: 'mock',
-      model: 'mock',
-      latencyMs: 1,
-    });
+    const provider: LLMProvider = {
+      ...createMockProvider('gemini'),
+      chat: jest.fn().mockResolvedValue('not json'),
+    };
+    _clearProviders();
+    registerProvider(provider);
 
     const transcript = makeTranscript([
       {

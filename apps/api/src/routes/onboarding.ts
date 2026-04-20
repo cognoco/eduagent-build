@@ -138,9 +138,17 @@ export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
     zValidator('json', onboardingInterestsContextPatchSchema),
     async (c) => {
       const db = c.get('db');
+      const account = c.get('account');
       const profileId = requireProfileId(c.get('profileId'));
       const { interests } = c.req.valid('json');
-      await updateInterestsContext(db, profileId, interests);
+      try {
+        await updateInterestsContext(db, profileId, account.id, interests);
+      } catch (err) {
+        if (err instanceof OnboardingNotFoundError) {
+          return notFound(c, 'Profile not found');
+        }
+        throw err;
+      }
       return c.json({ success: true });
     }
   )
@@ -149,11 +157,19 @@ export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
     zValidator('json', onboardingInterestsContextPatchSchema),
     async (c) => {
       const db = c.get('db');
+      const account = c.get('account');
       const parentProfileId = requireProfileId(c.get('profileId'));
       const childProfileId = c.req.param('profileId');
       await assertParentAccess(db, parentProfileId, childProfileId);
       const { interests } = c.req.valid('json');
-      await updateInterestsContext(db, childProfileId, interests);
+      try {
+        await updateInterestsContext(db, childProfileId, account.id, interests);
+      } catch (err) {
+        if (err instanceof OnboardingNotFoundError) {
+          return notFound(c, 'Profile not found');
+        }
+        throw err;
+      }
       return c.json({ success: true });
     }
   );

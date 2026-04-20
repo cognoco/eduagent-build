@@ -176,9 +176,12 @@ export interface ExchangeStreamResult {
 // Understanding check markers
 // ---------------------------------------------------------------------------
 
-/** Markers the LLM uses to signal an understanding check */
+/** Patterns the LLM uses to signal an understanding check.
+ * The authoritative signal is now the envelope's `needs_deepening` field;
+ * these heuristic phrases are a fallback for pre-envelope responses only.
+ * Do NOT add free-text markers like [UNDERSTANDING_CHECK] here — they can
+ * false-positive when a learner literally types the bracket string. */
 const UNDERSTANDING_CHECK_PATTERNS = [
-  '[UNDERSTANDING_CHECK]',
   'does that make sense',
   'can you explain that back',
   'what do you think',
@@ -423,7 +426,7 @@ export function parseExchangeEnvelope(
         active: Boolean(drill.active),
         durationSeconds:
           typeof drill.duration_s === 'number'
-            ? Math.min(90, Math.max(15, drill.duration_s))
+            ? Math.min(180, Math.max(10, drill.duration_s))
             : undefined,
         score:
           drill.score &&

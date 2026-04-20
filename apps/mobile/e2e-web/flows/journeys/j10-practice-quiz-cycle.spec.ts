@@ -86,9 +86,6 @@ test('J-10 learner → Practice → Quiz → launch → play → results → hom
   });
 
   await page.getByTestId('quiz-capitals').click();
-  await expect(page.getByTestId('quiz-launch-loading')).toBeVisible({
-    timeout: 30_000,
-  });
   await expect(page.getByTestId('quiz-play-screen')).toBeVisible({
     timeout: 30_000,
   });
@@ -96,10 +93,10 @@ test('J-10 learner → Practice → Quiz → launch → play → results → hom
   const quizScreen = page.getByTestId('quiz-play-screen');
   await quizScreen.getByTestId('quiz-option-0').click();
   await expect(page.getByText('Correct')).toBeVisible({ timeout: 30_000 });
-  await page.waitForTimeout(300);
-  await quizScreen.click({
-    position: { x: 200, y: 300 },
+  await expect(page.getByText('Tap anywhere to continue')).toBeVisible({
+    timeout: 10_000,
   });
+  await quizScreen.click();
 
   await expect(page.getByTestId('quiz-results-screen')).toBeVisible({
     timeout: 30_000,

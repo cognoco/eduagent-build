@@ -3,7 +3,11 @@ import { authStateDir } from './runtime';
 import { resetSeededAccounts } from './test-seed';
 
 async function globalTeardown(): Promise<void> {
-  await resetSeededAccounts();
+  try {
+    await resetSeededAccounts();
+  } catch (error) {
+    console.error('[global-teardown] resetSeededAccounts failed:', error);
+  }
   await rm(authStateDir, { recursive: true, force: true });
 }
 

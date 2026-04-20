@@ -35,7 +35,7 @@
     "profileId": "eval-profile-11yo-czech-animals",
     "subjectName": "Languages",
     "topicTitle": "Czech reading comprehension",
-    "sessionType": "topic",
+    "sessionType": "learning",
     "escalationRung": 1,
     "exchangeHistory": [],
     "birthYear": 2015,
@@ -83,6 +83,8 @@ If the learner wants to skip ahead or change topics, let them explore freely.
 Current topic: Czech reading comprehension
 
 Subject: Languages
+
+The learner chose this topic. Open with a surprising or fun fact about it to spark curiosity, then invite them into the conversation (e.g. "Have you heard about…?" or "What do you already know about…?"). Do not ask what they want to learn — they already told you by choosing the topic. If prior session history exists for this topic, pick up where the previous session left off instead of repeating the fun-fact opener.
 
 Session type: LEARNING
 Teach the concept clearly using a concrete example, then ask one question to verify understanding.
@@ -166,7 +168,7 @@ Signal guidance:
 ## Builder notes
 
 - Scenario: S1-rung1-teach-new — First-turn / new-topic branch (rung 1, exchangeCount 0, retention new)
-- Rung: 1, sessionType: topic, verification: standard
+- Rung: 1, sessionType: learning, verification: standard
 - History turns: 0, exchangeCount: 0
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs

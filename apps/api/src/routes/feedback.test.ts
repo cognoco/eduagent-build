@@ -1,15 +1,9 @@
 import { Hono } from 'hono';
 import { feedbackRoutes } from './feedback';
-import * as notifications from '../services/notifications';
 
-jest.mock('../services/notifications', () => ({
-  ...jest.requireActual('../services/notifications'),
-  sendEmail: jest.fn().mockResolvedValue({ sent: true, messageId: 'test-id' }),
-}));
-
-const mockSendEmail = notifications.sendEmail as jest.MockedFunction<
-  typeof notifications.sendEmail
->;
+const RESEND_API_URL = 'https://api.resend.com/emails';
+const TEST_API_KEY = 'test-resend-key';
+const TEST_EMAIL_FROM = 'noreply@test.com';
 
 type FeedbackEnv = {
   Variables: {
@@ -24,23 +18,53 @@ type FeedbackEnv = {
   };
 };
 
-function createTestApp() {
+function createTestApp(bindings?: Partial<FeedbackEnv['Bindings']>) {
   const app = new Hono<FeedbackEnv>();
   app.use('*', async (c, next) => {
     c.set('user', { userId: 'user-1', email: 'test@example.com' });
     c.set('profileId', 'profile-1');
+    // Inject bindings so sendEmail actually attempts the Resend fetch
+    c.env = {
+      RESEND_API_KEY: TEST_API_KEY,
+      EMAIL_FROM: TEST_EMAIL_FROM,
+      ...bindings,
+    } as FeedbackEnv['Bindings'];
     await next();
   });
   app.route('/', feedbackRoutes);
   return app;
 }
 
-describe('POST /feedback', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
+const originalFetch = globalThis.fetch;
+let fetchSpy: jest.SpiedFunction<typeof globalThis.fetch>;
 
-  it('accepts valid feedback and sends email', async () => {
+beforeEach(() => {
+  fetchSpy = jest
+    .spyOn(globalThis, 'fetch')
+    .mockImplementation(async (input, init) => {
+      const url =
+        typeof input === 'string'
+          ? input
+          : input instanceof URL
+          ? input.toString()
+          : (input as Request).url;
+      if (url === RESEND_API_URL) {
+        return new Response(JSON.stringify({ id: 'test-message-id' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      // Pass through any non-Resend fetch (shouldn't happen in these tests)
+      return originalFetch(input, init);
+    });
+});
+
+afterEach(() => {
+  fetchSpy.mockRestore();
+});
+
+describe('POST /feedback', () => {
+  it('accepts valid feedback and sends email via Resend', async () => {
     const app = createTestApp();
     const res = await app.request('/feedback', {
       method: 'POST',
@@ -57,14 +81,32 @@ describe('POST /feedback', () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { success: boolean };
     expect(body.success).toBe(true);
-    expect(mockSendEmail).toHaveBeenCalledTimes(1);
-    expect(mockSendEmail).toHaveBeenCalledWith(
+
+    // Verify fetch was called with Resend API
+    const resendCalls = fetchSpy.mock.calls.filter(([input]) => {
+      const url =
+        typeof input === 'string'
+          ? input
+          : input instanceof URL
+          ? input.toString()
+          : (input as Request).url;
+      return url === RESEND_API_URL;
+    });
+    expect(resendCalls).toHaveLength(1);
+
+    const [, init] = resendCalls[0];
+    const sentBody = JSON.parse(init?.body as string) as {
+      to: string[];
+      subject: string;
+      from: string;
+    };
+    expect(sentBody.to).toEqual(['support@mentomate.app']);
+    expect(sentBody.subject).toContain('Bug');
+    expect(sentBody.from).toBe(TEST_EMAIL_FROM);
+    expect(init?.headers).toEqual(
       expect.objectContaining({
-        to: 'support@mentomate.app',
-        subject: expect.stringContaining('Bug'),
-        type: 'feedback',
-      }),
-      expect.any(Object)
+        Authorization: `Bearer ${TEST_API_KEY}`,
+      })
     );
   });
 
@@ -88,8 +130,12 @@ describe('POST /feedback', () => {
     expect(res.status).toBe(400);
   });
 
-  it('returns success even if email fails (graceful degradation)', async () => {
-    mockSendEmail.mockResolvedValueOnce({ sent: false, reason: 'no_api_key' });
+  it('returns success even if Resend API returns an error (graceful degradation)', async () => {
+    fetchSpy.mockImplementationOnce(async () => {
+      return new Response(JSON.stringify({ error: 'rate_limited' }), {
+        status: 429,
+      });
+    });
     const app = createTestApp();
     const res = await app.request('/feedback', {
       method: 'POST',
@@ -101,5 +147,48 @@ describe('POST /feedback', () => {
     });
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ success: true });
+  });
+
+  it('returns success even if Resend fetch throws (network failure)', async () => {
+    fetchSpy.mockImplementationOnce(async () => {
+      throw new Error('Network unreachable');
+    });
+    const app = createTestApp();
+    const res = await app.request('/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        category: 'bug',
+        message: 'Something broke',
+      }),
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ success: true });
+  });
+
+  it('skips email when RESEND_API_KEY is not configured', async () => {
+    const app = createTestApp({ RESEND_API_KEY: undefined });
+    const res = await app.request('/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        category: 'bug',
+        message: 'No key configured',
+      }),
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ success: true });
+
+    // Verify no fetch to Resend was attempted
+    const resendCalls = fetchSpy.mock.calls.filter(([input]) => {
+      const url =
+        typeof input === 'string'
+          ? input
+          : input instanceof URL
+          ? input.toString()
+          : (input as Request).url;
+      return url === RESEND_API_URL;
+    });
+    expect(resendCalls).toHaveLength(0);
   });
 });

@@ -10,6 +10,7 @@
  * - Hono RPC client throws Error('API error {status}: {body}') for non-ok responses
  *   (see api-client.ts customFetch)
  * - QuotaExceededError for 402 responses (see api-client.ts)
+ * - UpstreamError for 5xx responses with a parsed JSON code (see api-client.ts)
  * - TypeError from native fetch for network failures
  * - Standard Error for other caught exceptions
  */
@@ -268,6 +269,14 @@ export function classifyApiError(error: unknown): FormattedApiError {
     }
   }
 
+  // [I-13] UpstreamError — typed 5xx from api-client.ts. Classify before the
+  // generic `instanceof Error` path so any .code value (not just
+  // UPSTREAM_ERROR/INTERNAL_ERROR) is caught here rather than falling through
+  // to parseApiBody heuristics. Name-based check avoids circular import.
+  if (error instanceof Error && error.name === 'UpstreamError') {
+    return { message: SERVER_MESSAGE, category: 'server', recovery: 'retry' };
+  }
+
   if (error instanceof Error) {
     const msg = error.message;
     const msgLower = msg.toLowerCase();
@@ -313,11 +322,27 @@ export function classifyApiError(error: unknown): FormattedApiError {
         recovery: 'go-back',
       };
     }
+    if (effectiveCode === 'SUBJECT_INACTIVE') {
+      return {
+        message: friendlyMessage(msg) ?? msg,
+        category: 'not-found',
+        recovery: 'go-back',
+      };
+    }
     if (
       effectiveCode === 'UPSTREAM_ERROR' ||
       effectiveCode === 'INTERNAL_ERROR'
     ) {
       return { message: SERVER_MESSAGE, category: 'server', recovery: 'retry' };
+    }
+
+    // 3b. SSE timeout
+    if (msgLower.includes('timed out while waiting for a reply')) {
+      return {
+        message: 'That reply took too long. Tap reconnect to try again.',
+        category: 'network',
+        recovery: 'retry',
+      };
     }
 
     // 4. HTTP status from "API error {status}: …"
@@ -331,6 +356,14 @@ export function classifyApiError(error: unknown): FormattedApiError {
           category: 'quota',
           recovery: 'go-back',
         };
+      }
+
+      if (code === 'SUBJECT_INACTIVE') {
+        const userMsg =
+          apiMessage && apiMessage.length < 200
+            ? friendlyMessage(apiMessage) ?? apiMessage
+            : 'This subject is paused or archived. Resume it before starting a session.';
+        return { message: userMsg, category: 'not-found', recovery: 'go-back' };
       }
 
       if (status === 401 || status === 403) {
@@ -420,128 +453,12 @@ export function classifyApiError(error: unknown): FormattedApiError {
 /**
  * Formats an error into a user-friendly, actionable message.
  *
+ * Delegates to `classifyApiError` — the classify-before-format pattern
+ * ensures classification logic lives in a single place.
+ *
  * @param error - The caught error (unknown type from catch blocks)
  * @returns A user-facing error string
  */
 export function formatApiError(error: unknown): string {
-  // 1. Network errors (TypeError from fetch failures)
-  if (error instanceof TypeError) {
-    const msg = error.message.toLowerCase();
-    if (msg.includes('fetch') || msg.includes('network')) {
-      return NETWORK_MESSAGE;
-    }
-  }
-
-  // 2. Error instances (most common — from Hono RPC customFetch)
-  if (error instanceof Error) {
-    const msg = error.message;
-    const msgLower = msg.toLowerCase();
-    const apiErrorLike = error as Error & {
-      status?: number;
-      code?: string;
-      apiCode?: string;
-      details?: unknown;
-    };
-
-    // [BUG-100] Check both .code and .apiCode — ForbiddenError stores the
-    // server's error code in .apiCode while .code stays 'FORBIDDEN'.
-    const effectiveCode = apiErrorLike.apiCode ?? apiErrorLike.code;
-
-    if (effectiveCode === 'EXCHANGE_LIMIT_EXCEEDED') {
-      return 'Session limit reached. Start a new session to keep going.';
-    }
-
-    if (effectiveCode === 'SUBJECT_INACTIVE') {
-      return msg;
-    }
-
-    // [F-Q-01] Upstream/technical errors — always show generic server message.
-    // Catches both UpstreamError (from customFetch) and duck-typed .code
-    // errors from SSE streaming path.
-    if (
-      effectiveCode === 'UPSTREAM_ERROR' ||
-      effectiveCode === 'INTERNAL_ERROR'
-    ) {
-      return SERVER_MESSAGE;
-    }
-
-    // 2a. QuotaExceededError — pass through its message
-    if (error.name === 'QuotaExceededError') {
-      return msg;
-    }
-
-    // [EP15-I5] ForbiddenError — translate or pass through the server's message
-    if (error.name === 'ForbiddenError') {
-      return (
-        friendlyMessage(msg) ??
-        (msg || 'You do not have permission to view this.')
-      );
-    }
-
-    if (msgLower.includes('timed out while waiting for a reply')) {
-      return 'That reply took too long. Tap reconnect to try again.';
-    }
-
-    // 2b. Parse 'API error {status}: {body}' from customFetch
-    const parsedApiBody = parseApiBody(msg);
-    if (parsedApiBody) {
-      if (parsedApiBody.code === 'EXCHANGE_LIMIT_EXCEEDED') {
-        return 'Session limit reached. Start a new session to keep going.';
-      }
-      if (parsedApiBody.code === 'SUBJECT_INACTIVE') {
-        return (
-          parsedApiBody.apiMessage ??
-          'This subject is paused or archived. Resume it before starting a session.'
-        );
-      }
-      if (parsedApiBody.status >= 500) {
-        if (
-          parsedApiBody.apiMessage &&
-          parsedApiBody.apiMessage.length < 200 &&
-          !isGenericServerMessage(parsedApiBody.apiMessage) &&
-          !isTechnicalMessage(parsedApiBody.apiMessage)
-        ) {
-          return (
-            friendlyMessage(parsedApiBody.apiMessage) ??
-            parsedApiBody.apiMessage
-          );
-        }
-        return SERVER_MESSAGE;
-      }
-      if (parsedApiBody.apiMessage && parsedApiBody.apiMessage.length < 200) {
-        // [BUG-465] Translate DB-schema jargon to kid-friendly language
-        return (
-          friendlyMessage(parsedApiBody.apiMessage) ?? parsedApiBody.apiMessage
-        );
-      }
-      return "That didn't work. Please check your input and try again.";
-    }
-
-    // Note: parseApiStatus was removed here — it matched the exact same
-    // "API error (\d{3}):" regex as parseApiBody, so if parseApiBody returned
-    // null the status fallback was also unreachable (dead code).
-
-    // 2c. Network-related error messages
-    if (isNetworkRelated(msgLower)) {
-      return NETWORK_MESSAGE;
-    }
-
-    // 2d. If the message looks user-facing (short, no stack traces), pass through.
-    // Stack traces contain patterns like "at Object.foo" or "at Module._compile".
-    // V8 stack frames: "\n    at " prefix, or "at CapitalizedWord." pattern.
-    const looksLikeStack =
-      /\n\s+at /.test(msg) || /at [A-Z]\w*\./.test(msg) || /^at \S/.test(msg);
-    if (
-      msg.length > 0 &&
-      msg.length < 200 &&
-      !looksLikeStack &&
-      !msgLower.includes('undefined')
-    ) {
-      // [BUG-465] Translate jargon before passing through to the user
-      return friendlyMessage(msg) ?? msg;
-    }
-  }
-
-  // 3. null/undefined/non-Error values
-  return DEFAULT_MESSAGE;
+  return classifyApiError(error).message;
 }

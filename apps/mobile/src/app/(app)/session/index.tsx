@@ -164,33 +164,41 @@ class SessionErrorBoundary extends Component<
           >
             {this.state.error?.message ?? 'Unknown error'}
           </Text>
-          <Text
-            style={{
-              fontSize: 11,
-              color: '#444',
-              fontFamily: 'monospace',
-              marginBottom: 16,
-            }}
-            selectable
-          >
-            {this.state.error?.stack?.slice(0, 1200) ?? ''}
-          </Text>
-          {this.state.componentStack && (
-            <View
-              style={{
-                backgroundColor: '#fee2e2',
-                borderRadius: 8,
-                padding: 12,
-                marginBottom: 16,
-              }}
-            >
+          {__DEV__ && (
+            <>
               <Text
-                style={{ fontSize: 10, color: '#333', fontFamily: 'monospace' }}
+                style={{
+                  fontSize: 11,
+                  color: '#444',
+                  fontFamily: 'monospace',
+                  marginBottom: 16,
+                }}
                 selectable
               >
-                {this.state.componentStack.trim().slice(0, 1000)}
+                {this.state.error?.stack?.slice(0, 1200) ?? ''}
               </Text>
-            </View>
+              {this.state.componentStack && (
+                <View
+                  style={{
+                    backgroundColor: '#fee2e2',
+                    borderRadius: 8,
+                    padding: 12,
+                    marginBottom: 16,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 10,
+                      color: '#333',
+                      fontFamily: 'monospace',
+                    }}
+                    selectable
+                  >
+                    {this.state.componentStack.trim().slice(0, 1000)}
+                  </Text>
+                </View>
+              )}
+            </>
           )}
           <Pressable
             onPress={() =>

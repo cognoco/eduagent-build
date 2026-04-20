@@ -95,6 +95,7 @@ type Bindings = {
   SENTRY_DSN?: string;
   TEST_SEED_SECRET?: string;
   REVENUECAT_WEBHOOK_SECRET?: string;
+  SUPPORT_EMAIL?: string;
 };
 
 type Variables = {

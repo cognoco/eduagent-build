@@ -49,7 +49,7 @@ export const llmResponseEnvelopeSchema = z.object({
       fluency_drill: z
         .object({
           active: z.boolean(),
-          duration_s: z.number().int().min(10).max(180).optional(),
+          duration_s: z.number().int().min(15).max(90).optional(),
           score: z
             .object({
               correct: z.number().int().min(0),

@@ -560,6 +560,23 @@ export async function prepareExchangeContext(
     (lastAiResponseEvent?.metadata as Record<string, unknown> | null)
       ?.partialProgress === true;
 
+  // 3e. Count consecutive trailing ai_response events with partialProgress
+  // so the MAX_PARTIAL_PROGRESS_HOLDS cap in evaluateEscalation fires. We
+  // walk backwards from the most recent ai_response; the streak breaks on
+  // the first event without the flag.
+  let consecutiveHolds = 0;
+  for (let i = aiResponseEvents.length - 1; i >= 0; i--) {
+    const meta = aiResponseEvents[i]?.metadata as Record<
+      string,
+      unknown
+    > | null;
+    if (meta?.partialProgress === true) {
+      consecutiveHolds++;
+    } else {
+      break;
+    }
+  }
+
   // 4. Evaluate escalation (retention-aware + partial-progress-aware)
   // On first exchange: use retention-aware starting rung (Gap 4)
   const currentRung =
@@ -575,6 +592,7 @@ export async function prepareExchangeContext(
       totalExchanges: session.exchangeCount,
       retentionStatus: retentionStatusValue,
       previousResponseHadPartialProgress,
+      consecutiveHolds,
     },
     userMessage
   );

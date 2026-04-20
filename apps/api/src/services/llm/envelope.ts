@@ -2,6 +2,7 @@ import {
   llmResponseEnvelopeSchema,
   type LlmResponseEnvelope,
 } from '@eduagent/schemas';
+import { extractFirstJsonObject } from './extract-json';
 
 // ---------------------------------------------------------------------------
 // parseEnvelope — shared helper for all LLM flows migrating to the structured
@@ -34,46 +35,6 @@ export type ParseEnvelopeFailure = {
 };
 
 export type ParseEnvelopeResult = ParseEnvelopeSuccess | ParseEnvelopeFailure;
-
-/**
- * Extract the first balanced JSON object substring from free text.
- * Matches `{ ... }` including nested braces — providers without JSON mode
- * sometimes prefix with prose even when the prompt forbids it.
- */
-function extractFirstJsonObject(text: string): string | null {
-  const start = text.indexOf('{');
-  if (start === -1) return null;
-
-  let depth = 0;
-  let inString = false;
-  let escaped = false;
-
-  for (let i = start; i < text.length; i++) {
-    const ch = text[i];
-
-    if (escaped) {
-      escaped = false;
-      continue;
-    }
-    if (ch === '\\') {
-      escaped = true;
-      continue;
-    }
-    if (ch === '"') {
-      inString = !inString;
-      continue;
-    }
-    if (inString) continue;
-
-    if (ch === '{') depth++;
-    else if (ch === '}') {
-      depth--;
-      if (depth === 0) return text.slice(start, i + 1);
-    }
-  }
-
-  return null;
-}
 
 export function parseEnvelope(response: string): ParseEnvelopeResult {
   const jsonStr = extractFirstJsonObject(response);

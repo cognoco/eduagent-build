@@ -32,7 +32,7 @@ describe('AuthRoutesLayout', () => {
     render(<AuthLayout />);
 
     const redirect = screen.getByTestId('redirect');
-    expect(redirect.props.children).toBe('/(app)/home');
+    expect(redirect.props.children).toBe('/home');
   });
 
   it('redirects signed-in users to the requested route when redirectTo is set', () => {
@@ -91,7 +91,7 @@ describe('AuthRoutesLayout', () => {
 
     // Guard fires → user lands in app home
     const redirect = screen.getByTestId('redirect');
-    expect(redirect.props.children).toBe('/(app)/home');
+    expect(redirect.props.children).toBe('/home');
     expect(screen.queryByTestId('stack')).toBeNull();
   });
 
@@ -108,6 +108,19 @@ describe('AuthRoutesLayout', () => {
 
     const redirect = screen.getByTestId('redirect');
     expect(redirect.props.children).toBe('/(app)/home');
+  });
+
+  it('normalizes route-group paths before redirecting signed-in users', () => {
+    mockUseLocalSearchParams.mockReturnValue({ redirectTo: '/(app)/quiz' });
+    (useAuth as jest.Mock).mockReturnValue({
+      isLoaded: true,
+      isSignedIn: true,
+    });
+
+    render(<AuthLayout />);
+
+    const redirect = screen.getByTestId('redirect');
+    expect(redirect.props.children).toBe('/quiz');
   });
 
   it('renders nothing when isLoaded is false (Clerk still initializing)', () => {

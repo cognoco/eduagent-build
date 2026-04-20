@@ -1,4 +1,4 @@
-import { streamEnvelopeReply } from './stream-envelope';
+import { streamEnvelopeReply, teeEnvelopeStream } from './stream-envelope';
 
 async function collect(source: AsyncIterable<string>): Promise<string> {
   let out = '';
@@ -8,6 +8,22 @@ async function collect(source: AsyncIterable<string>): Promise<string> {
 
 async function* fromChunks(chunks: string[]): AsyncGenerator<string> {
   for (const c of chunks) yield c;
+}
+
+// Yield `text` in fixed-size chunks of `size` characters.
+async function* chunked(text: string, size: number): AsyncIterable<string> {
+  for (let i = 0; i < text.length; i += size) {
+    yield text.slice(i, i + size);
+  }
+}
+
+// Fully drain an async iterable, returning the concatenated output.
+async function drain(stream: AsyncIterable<string>): Promise<string> {
+  let result = '';
+  for await (const chunk of stream) {
+    result += chunk;
+  }
+  return result;
 }
 
 describe('streamEnvelopeReply', () => {
@@ -73,5 +89,94 @@ describe('streamEnvelopeReply', () => {
   it('yields nothing when reply value is not a string', async () => {
     const stream = streamEnvelopeReply(fromChunks(['{"reply": 42}']));
     expect(await collect(stream)).toBe('');
+  });
+});
+
+describe('teeEnvelopeStream', () => {
+  it('happy path: cleanReplyStream yields reply text, rawResponsePromise resolves with full raw', async () => {
+    const raw = '{"reply":"Hello world","signals":{}}';
+    const { cleanReplyStream, rawResponsePromise } = teeEnvelopeStream(
+      fromChunks([raw])
+    );
+
+    const reply = await drain(cleanReplyStream);
+    const fullRaw = await rawResponsePromise;
+
+    expect(reply).toBe('Hello world');
+    expect(fullRaw).toBe(raw);
+  });
+
+  it('multi-chunk: reply is correctly reassembled when source is split into 5-char chunks', async () => {
+    const raw = '{"reply":"Hello world","signals":{}}';
+    const { cleanReplyStream, rawResponsePromise } = teeEnvelopeStream(
+      chunked(raw, 5)
+    );
+
+    const reply = await drain(cleanReplyStream);
+    const fullRaw = await rawResponsePromise;
+
+    expect(reply).toBe('Hello world');
+    expect(fullRaw).toBe(raw);
+  });
+
+  it('escape sequences: cleanReplyStream yields decoded characters (\\n → actual newline)', async () => {
+    const raw = '{"reply":"Line 1\\nLine 2","signals":{}}';
+    const { cleanReplyStream, rawResponsePromise } = teeEnvelopeStream(
+      fromChunks([raw])
+    );
+
+    const reply = await drain(cleanReplyStream);
+    const fullRaw = await rawResponsePromise;
+
+    // The encoded \n in JSON becomes a real newline in the decoded reply.
+    expect(reply).toBe('Line 1\nLine 2');
+    // The raw text is the original JSON string, escape sequences intact.
+    expect(fullRaw).toBe(raw);
+  });
+
+  it('deadlock safety: draining cleanReplyStream first, then awaiting rawResponsePromise, resolves correctly', async () => {
+    const raw = '{"reply":"Safe order","signals":{}}';
+    const { cleanReplyStream, rawResponsePromise } = teeEnvelopeStream(
+      fromChunks([raw])
+    );
+
+    // Drain the clean stream first — this is the correct, non-deadlocking order.
+    const reply = await drain(cleanReplyStream);
+    // Only then await the raw promise — it must already be settled.
+    const fullRaw = await rawResponsePromise;
+
+    expect(reply).toBe('Safe order');
+    expect(fullRaw).toBe(raw);
+  });
+
+  it('source error: rawResponsePromise rejects with the same error thrown by the source', async () => {
+    const boom = new Error('stream exploded');
+
+    async function* errorSource(): AsyncGenerator<string> {
+      yield '{"reply":"par';
+      throw boom;
+    }
+
+    const { cleanReplyStream, rawResponsePromise } = teeEnvelopeStream(
+      errorSource()
+    );
+
+    // Draining cleanReplyStream will throw once the source throws.
+    await expect(drain(cleanReplyStream)).rejects.toThrow('stream exploded');
+    // rawResponsePromise must reject with the same error.
+    await expect(rawResponsePromise).rejects.toThrow('stream exploded');
+  });
+
+  it('empty reply: cleanReplyStream yields nothing, rawResponsePromise resolves with full raw', async () => {
+    const raw = '{"reply":"","signals":{}}';
+    const { cleanReplyStream, rawResponsePromise } = teeEnvelopeStream(
+      fromChunks([raw])
+    );
+
+    const reply = await drain(cleanReplyStream);
+    const fullRaw = await rawResponsePromise;
+
+    expect(reply).toBe('');
+    expect(fullRaw).toBe(raw);
   });
 });

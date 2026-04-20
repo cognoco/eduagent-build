@@ -52,7 +52,9 @@ export {
   recordSystemPrompt,
   recordSessionEvent,
   flagContent,
+  getResumeNudgeCandidate,
 } from './session-crud';
+export type { ResumeNudgeCandidate } from './session-crud';
 
 // Exchange (message processing)
 export {

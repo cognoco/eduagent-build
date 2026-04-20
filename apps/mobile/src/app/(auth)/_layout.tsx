@@ -3,6 +3,8 @@ import { View } from 'react-native';
 import { useAuth } from '@clerk/clerk-expo';
 import { useThemeColors, useTokenVars } from '../../lib/theme';
 
+import { normalizeRedirectPath } from '../../lib/normalize-redirect-path';
+
 export default function AuthRoutesLayout() {
   const { isLoaded, isSignedIn } = useAuth();
   const { redirectTo } = useLocalSearchParams<{
@@ -12,10 +14,7 @@ export default function AuthRoutesLayout() {
   const colors = useThemeColors();
   const nextRoute =
     (Array.isArray(redirectTo) ? redirectTo[0] : redirectTo) ?? '/(app)/home';
-  const safeNextRoute =
-    typeof nextRoute === 'string' && nextRoute.startsWith('/')
-      ? nextRoute
-      : '/(app)/home';
+  const safeNextRoute = normalizeRedirectPath(nextRoute, '/(app)/home');
 
   if (!isLoaded) return null;
   if (__DEV__)

@@ -19,37 +19,46 @@ export function useShakeDetector(onShake: () => void): void {
   useEffect(() => {
     if (Platform.OS === 'web') return;
 
-    const timestamps: number[] = [];
-    let lastShakeTime = 0;
+    let subscription: { remove: () => void } | null = null;
+    let cancelled = false;
 
-    Accelerometer.setUpdateInterval(UPDATE_INTERVAL_MS);
+    (async () => {
+      const available = await Accelerometer.isAvailableAsync();
+      if (!available || cancelled) return;
 
-    const subscription = Accelerometer.addListener(({ x, y, z }) => {
-      const magnitude = Math.sqrt(x * x + y * y + z * z) - 1;
-      if (magnitude < SHAKE_THRESHOLD) return;
+      const timestamps: number[] = [];
+      let lastShakeTime = 0;
 
-      const now = Date.now();
-      timestamps.push(now);
+      Accelerometer.setUpdateInterval(UPDATE_INTERVAL_MS);
 
-      while (
-        timestamps.length > 0 &&
-        now - (timestamps[0] ?? 0) > SHAKE_WINDOW_MS
-      ) {
-        timestamps.shift();
-      }
+      subscription = Accelerometer.addListener(({ x, y, z }) => {
+        const magnitude = Math.sqrt(x * x + y * y + z * z) - 1;
+        if (magnitude < SHAKE_THRESHOLD) return;
 
-      if (
-        timestamps.length >= SHAKE_COUNT &&
-        now - lastShakeTime > SHAKE_COOLDOWN_MS
-      ) {
-        lastShakeTime = now;
-        timestamps.length = 0;
-        onShakeRef.current();
-      }
-    });
+        const now = Date.now();
+        timestamps.push(now);
+
+        while (
+          timestamps.length > 0 &&
+          now - (timestamps[0] ?? 0) > SHAKE_WINDOW_MS
+        ) {
+          timestamps.shift();
+        }
+
+        if (
+          timestamps.length >= SHAKE_COUNT &&
+          now - lastShakeTime > SHAKE_COOLDOWN_MS
+        ) {
+          lastShakeTime = now;
+          timestamps.length = 0;
+          onShakeRef.current();
+        }
+      });
+    })();
 
     return () => {
-      subscription.remove();
+      cancelled = true;
+      subscription?.remove();
     };
   }, []);
 }

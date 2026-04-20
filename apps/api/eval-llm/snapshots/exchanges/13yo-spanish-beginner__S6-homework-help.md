@@ -29,7 +29,7 @@
 ```json
 {
   "scenarioId": "S6-homework-help",
-  "scenarioPurpose": "Homework mode (help_solve) — not tutoring",
+  "scenarioPurpose": "Homework mode (help_me) — not tutoring",
   "context": {
     "sessionId": "eval-13yo-spanish-beginner",
     "profileId": "eval-profile-13yo-spanish-beginner",
@@ -66,7 +66,7 @@
     "inputMode": "text",
     "llmTier": "standard",
     "verificationType": "standard",
-    "homeworkMode": "help_solve",
+    "homeworkMode": "help_me",
     "retentionStatus": {
       "status": "new"
     }
@@ -100,12 +100,11 @@ Current topic: Spanish present tense verbs
 
 Subject: Languages
 
-Session type: HOMEWORK HELP
-CRITICAL: This is a homework session. Default to concise explanation and answer-checking, not Socratic interrogation.
-Be very brief: 1-2 sentences plus an example. Teens want speed, not essays.
-If the learner asks you to check an answer, say whether it is right, identify the error if needed, and explain why.
-Show a similar worked example (different numbers/context) when explaining methods.
-Do not reveal the final answer unless the learner has already shown it.
+Session type: HOMEWORK HELP — HELP ME SOLVE IT mode
+The learner wants guidance on how to approach this problem. Be very brief: 1-2 sentences plus an example. Teens want speed, not essays.
+Explain the approach briefly, then show a similar worked example (different numbers/context).
+Let the learner try the actual problem. Provide brief targeted feedback when they respond.
+Do not reveal the final answer to the actual homework problem.
 Ask a question only when it genuinely helps unblock the learner.
 
 Escalation Rung 2 — Socratic Questions (Narrowed):
@@ -194,7 +193,7 @@ Can you help me with this homework question? "Spanish present tense verbs — fi
 
 ## Builder notes
 
-- Scenario: S6-homework-help — Homework mode (help_solve) — not tutoring
+- Scenario: S6-homework-help — Homework mode (help_me) — not tutoring
 - Rung: 2, sessionType: homework, verification: standard
 - History turns: 2, exchangeCount: 1
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Tabs, Redirect, useRouter } from 'expo-router';
+import { Tabs, Redirect, usePathname, useRouter } from 'expo-router';
 import {
   View,
   Text,
@@ -26,6 +26,8 @@ import {
 import { evaluateSentryForProfile } from '../../lib/sentry';
 import { formatApiError } from '../../lib/format-api-error';
 import { clearTransitionState } from '../../lib/auth-transition';
+import { normalizeRedirectPath } from '../../lib/normalize-redirect-path';
+import { FeedbackProvider } from '../../components/feedback/FeedbackProvider';
 
 // ─── Tab visibility whitelist ────────────────────────────────────────
 // Only these routes render a visible tab button. Every other route in
@@ -1009,6 +1011,7 @@ export default function AppLayout() {
   const colors = useThemeColors();
   const tokenVars = useTokenVars();
   const insets = useSafeAreaInsets();
+  const pathname = usePathname();
   const {
     activeProfile,
     isLoading: isProfileLoading,
@@ -1066,7 +1069,14 @@ export default function AppLayout() {
       console.warn(
         '[AUTH-DEBUG] (app) layout → NOT signed in, bouncing to sign-in'
       );
-    return <Redirect href="/(auth)/sign-in" />;
+    return (
+      <Redirect
+        href={{
+          pathname: '/(auth)/sign-in',
+          params: { redirectTo: normalizeRedirectPath(pathname) },
+        }}
+      />
+    );
   }
 
   // Show a centered spinner while profiles load — never return null (blank
@@ -1111,9 +1121,13 @@ export default function AppLayout() {
 
   // key={themeKey} removed — crashes Android Fabric (MENTOMATE-MOBILE-6).
   // NativeWind vars() style updates propagate without remounting.
+
+  // FeedbackProvider scoped here (not in root _layout) so the accelerometer
+  // only runs on authenticated screens where feedback submission actually works.
   return (
-    <View style={[{ flex: 1 }, tokenVars]}>
-      {/* ─── Whitelist tab pattern ────────────────────────────────────
+    <FeedbackProvider>
+      <View style={[{ flex: 1 }, tokenVars]}>
+        {/* ─── Whitelist tab pattern ────────────────────────────────────
            Only routes listed in VISIBLE_TABS render a tab button.
            Everything else is auto-hidden via screenOptions defaults.
            Adding a new route file to (app)/ will NEVER create a
@@ -1122,86 +1136,87 @@ export default function AppLayout() {
            Routes in FULL_SCREEN_ROUTES also hide the entire tab bar
            (immersive screens like session, onboarding, homework).
          ──────────────────────────────────────────────────────────── */}
-      <Tabs
-        screenOptions={({ route }) => {
-          const isVisible = VISIBLE_TABS.has(route.name);
-          const isFullScreen = FULL_SCREEN_ROUTES.has(route.name);
-          return {
-            headerShown: false,
-            // F-003/F-016/F-055: on web, inactive tab scenes stay in the DOM.
-            // An opaque sceneStyle prevents the previous tab from bleeding
-            // through when switching to a full-screen route (session, quiz, etc.).
-            sceneStyle: { backgroundColor: colors.background },
-            tabBarStyle: isFullScreen
-              ? { display: 'none' }
-              : {
-                  backgroundColor: colors.surface,
-                  borderTopColor: colors.border,
-                  height: 56 + Math.max(insets.bottom, 24),
-                  paddingBottom: Math.max(insets.bottom, 24),
-                },
-            tabBarActiveTintColor: colors.accent,
-            tabBarInactiveTintColor: colors.textSecondary,
-            tabBarLabelStyle: { fontSize: 12 },
-            // Auto-hide any route not in the whitelist.
-            // href:null removes the link; tabBarItemStyle removes the
-            // flexbox space (Expo Router v6 + React Nav v7 regression).
-            ...(isVisible
-              ? {}
-              : { href: null, tabBarItemStyle: { display: 'none' } }),
-          };
-        }}
-      >
-        <Tabs.Screen
-          name="home"
-          options={{
-            title: 'Home',
-            tabBarButtonTestID: 'tab-home',
-            tabBarAccessibilityLabel: 'Home Tab',
-            // Lazy-load the Home tab so the initial mount only renders the
-            // visible gate screens (consent, profile creation). The trade-off
-            // is a brief spinner on the first Home tap, but it cuts ~200ms
-            // off the critical auth→gate path on low-end devices.
-            lazy: true,
-            tabBarIcon: ({ focused }) => (
-              <TabIcon name="Home" focused={focused} />
-            ),
+        <Tabs
+          screenOptions={({ route }) => {
+            const isVisible = VISIBLE_TABS.has(route.name);
+            const isFullScreen = FULL_SCREEN_ROUTES.has(route.name);
+            return {
+              headerShown: false,
+              // F-003/F-016/F-055: on web, inactive tab scenes stay in the DOM.
+              // An opaque sceneStyle prevents the previous tab from bleeding
+              // through when switching to a full-screen route (session, quiz, etc.).
+              sceneStyle: { backgroundColor: colors.background },
+              tabBarStyle: isFullScreen
+                ? { display: 'none' }
+                : {
+                    backgroundColor: colors.surface,
+                    borderTopColor: colors.border,
+                    height: 56 + Math.max(insets.bottom, 24),
+                    paddingBottom: Math.max(insets.bottom, 24),
+                  },
+              tabBarActiveTintColor: colors.accent,
+              tabBarInactiveTintColor: colors.textSecondary,
+              tabBarLabelStyle: { fontSize: 12 },
+              // Auto-hide any route not in the whitelist.
+              // href:null removes the link; tabBarItemStyle removes the
+              // flexbox space (Expo Router v6 + React Nav v7 regression).
+              ...(isVisible
+                ? {}
+                : { href: null, tabBarItemStyle: { display: 'none' } }),
+            };
           }}
-        />
-        <Tabs.Screen
-          name="library"
-          options={{
-            title: 'Library',
-            tabBarButtonTestID: 'tab-library',
-            tabBarAccessibilityLabel: 'Library Tab',
-            tabBarIcon: ({ focused }) => (
-              <TabIcon name="Book" focused={focused} />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="progress"
-          options={{
-            title: 'Progress',
-            tabBarButtonTestID: 'tab-progress',
-            tabBarAccessibilityLabel: 'Progress Tab',
-            tabBarIcon: ({ focused }) => (
-              <TabIcon name="Progress" focused={focused} />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="more"
-          options={{
-            title: 'More',
-            tabBarButtonTestID: 'tab-more',
-            tabBarAccessibilityLabel: 'More Tab',
-            tabBarIcon: ({ focused }) => (
-              <TabIcon name="More" focused={focused} />
-            ),
-          }}
-        />
-      </Tabs>
-    </View>
+        >
+          <Tabs.Screen
+            name="home"
+            options={{
+              title: 'Home',
+              tabBarButtonTestID: 'tab-home',
+              tabBarAccessibilityLabel: 'Home Tab',
+              // Lazy-load the Home tab so the initial mount only renders the
+              // visible gate screens (consent, profile creation). The trade-off
+              // is a brief spinner on the first Home tap, but it cuts ~200ms
+              // off the critical auth→gate path on low-end devices.
+              lazy: true,
+              tabBarIcon: ({ focused }) => (
+                <TabIcon name="Home" focused={focused} />
+              ),
+            }}
+          />
+          <Tabs.Screen
+            name="library"
+            options={{
+              title: 'Library',
+              tabBarButtonTestID: 'tab-library',
+              tabBarAccessibilityLabel: 'Library Tab',
+              tabBarIcon: ({ focused }) => (
+                <TabIcon name="Book" focused={focused} />
+              ),
+            }}
+          />
+          <Tabs.Screen
+            name="progress"
+            options={{
+              title: 'Progress',
+              tabBarButtonTestID: 'tab-progress',
+              tabBarAccessibilityLabel: 'Progress Tab',
+              tabBarIcon: ({ focused }) => (
+                <TabIcon name="Progress" focused={focused} />
+              ),
+            }}
+          />
+          <Tabs.Screen
+            name="more"
+            options={{
+              title: 'More',
+              tabBarButtonTestID: 'tab-more',
+              tabBarAccessibilityLabel: 'More Tab',
+              tabBarIcon: ({ focused }) => (
+                <TabIcon name="More" focused={focused} />
+              ),
+            }}
+          />
+        </Tabs>
+      </View>
+    </FeedbackProvider>
   );
 }

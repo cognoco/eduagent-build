@@ -77,6 +77,12 @@ export function getAgeVoice(
     case 'adolescent':
     case 'adult':
       return TEEN_VOICE;
+    default: {
+      // Exhaustive guard — if a new AgeBracket variant is added the
+      // compile will fail here rather than silently returning undefined.
+      const exhaustive: never = ageBracket;
+      throw new Error(`Unexpected ageBracket: ${exhaustive}`);
+    }
   }
 }
 
@@ -512,6 +518,10 @@ export function buildSystemPrompt(context: ExchangeContext): string {
   }
 
   // EVALUATE verification type — Devil's Advocate (FR128-133)
+  // TODO: EVAL-MIGRATION — This prompt instructs the LLM to embed a JSON
+  // assessment block in free-text, which contradicts the envelope contract
+  // (CLAUDE.md → "LLM Response Envelope"). Migrate to a dedicated envelope
+  // signal (e.g. `signals.evaluate_assessment`) and parse via parseEnvelope.
   if (context.verificationType === 'evaluate') {
     const rung = context.evaluateDifficultyRung ?? 1;
     const rungDescription = getEvaluateRungDescription(rung);
@@ -529,6 +539,10 @@ export function buildSystemPrompt(context: ExchangeContext): string {
   }
 
   // TEACH_BACK verification type — Feynman Technique (FR138-143)
+  // TODO: EVAL-MIGRATION — Same as EVALUATE above: the embedded JSON
+  // assessment block must be migrated to an envelope signal (e.g.
+  // `signals.teach_back_assessment`). Until then, the caller must parse
+  // the raw response text for the trailing JSON block.
   if (context.verificationType === 'teach_back') {
     sections.push(
       'Session type: TEACH BACK (Feynman Technique)\n' +

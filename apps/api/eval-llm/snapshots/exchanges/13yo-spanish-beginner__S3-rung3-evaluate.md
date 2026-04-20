@@ -35,7 +35,7 @@
     "profileId": "eval-profile-13yo-spanish-beginner",
     "subjectName": "Languages",
     "topicTitle": "Spanish present tense verbs",
-    "sessionType": "topic",
+    "sessionType": "learning",
     "escalationRung": 3,
     "exchangeHistory": [
       {
@@ -203,7 +203,7 @@ I'd start from the definition and work through an example.
 ## Builder notes
 
 - Scenario: S3-rung3-evaluate — Devil's Advocate / structured assessment path (rung 3)
-- Rung: 3, sessionType: topic, verification: evaluate
+- Rung: 3, sessionType: learning, verification: evaluate
 - History turns: 3, exchangeCount: 3
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs

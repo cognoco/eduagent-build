@@ -284,6 +284,7 @@ export default function PronounsScreen(): React.ReactElement {
           testID="pronouns-skip"
           className="py-2 items-center"
           onPress={handleSkip}
+          disabled={updatePronouns.isPending}
         >
           <Text className="text-body text-text-secondary">Skip</Text>
         </Pressable>

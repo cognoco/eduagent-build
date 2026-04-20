@@ -13,12 +13,7 @@ import {
   systemPromptBodySchema,
   ERROR_CODES,
 } from '@eduagent/schemas';
-import {
-  learningSessions,
-  sessionEvents,
-  type Database,
-} from '@eduagent/database';
-import { and, asc, desc, eq, gte, isNull, sql } from 'drizzle-orm';
+import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
 import { streamSSE } from 'hono/streaming';
@@ -43,6 +38,7 @@ import {
   syncHomeworkState,
   setSessionInputMode,
   evaluateSessionDepth,
+  getResumeNudgeCandidate,
 } from '../services/session';
 import type { LLMTier } from '../services/subscription';
 import { notFound, apiError } from '../errors';
@@ -54,6 +50,7 @@ import {
 } from '../services/settings';
 import { startInterleavedSession } from '../services/interleaved';
 import { generateRecallBridge } from '../services/recall-bridge';
+import { getProfileAgeBracket } from '../services/profile';
 
 const logger = createLogger();
 
@@ -76,57 +73,8 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
   .get('/sessions/resume-nudge', async (c) => {
     const db = c.get('db');
     const profileId = requireProfileId(c.get('profileId'));
-
-    const [candidate] = await db
-      .select({
-        id: learningSessions.id,
-        rawInput: learningSessions.rawInput,
-        exchangeCount: learningSessions.exchangeCount,
-        createdAt: learningSessions.createdAt,
-      })
-      .from(learningSessions)
-      .where(
-        and(
-          eq(learningSessions.profileId, profileId),
-          eq(learningSessions.status, 'auto_closed'),
-          eq(learningSessions.sessionType, 'learning'),
-          isNull(learningSessions.topicId),
-          gte(learningSessions.exchangeCount, 5),
-          sql`${learningSessions.metadata} ->> 'effectiveMode' = 'freeform'`,
-          gte(learningSessions.createdAt, sql`NOW() - INTERVAL '7 days'`)
-        )
-      )
-      .orderBy(desc(learningSessions.createdAt))
-      .limit(1);
-
-    if (!candidate) {
-      return c.json({ nudge: null });
-    }
-
-    const [firstMessage] = await db
-      .select({ content: sessionEvents.content })
-      .from(sessionEvents)
-      .where(
-        and(
-          eq(sessionEvents.sessionId, candidate.id),
-          eq(sessionEvents.profileId, profileId),
-          eq(sessionEvents.eventType, 'user_message')
-        )
-      )
-      .orderBy(asc(sessionEvents.createdAt))
-      .limit(1);
-
-    return c.json({
-      nudge: {
-        sessionId: candidate.id,
-        topicHint:
-          candidate.rawInput ??
-          firstMessage?.content?.slice(0, 80) ??
-          'your last session',
-        exchangeCount: candidate.exchangeCount,
-        createdAt: candidate.createdAt.toISOString(),
-      },
-    });
+    const nudge = await getResumeNudgeCandidate(db, profileId);
+    return c.json({ nudge });
   })
   // Start a new learning session for a subject
   .post(
@@ -215,12 +163,14 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     const transcript = await getSessionTranscript(db, profileId, sessionId);
     if (!transcript) return notFound(c, 'Session not found');
 
-    const result = await evaluateSessionDepth(transcript);
+    const ageBracket = await getProfileAgeBracket(db, profileId);
+    const result = await evaluateSessionDepth(transcript, { ageBracket });
     const learnerWordCount = transcript.exchanges.reduce((sum, exchange) => {
       if (exchange.role !== 'user') return sum;
       return sum + exchange.content.split(/\s+/).filter(Boolean).length;
     }, 0);
 
+    // Telemetry-only event — no Inngest handler; consumed by observability tooling.
     void inngest.send({
       name: 'app/ask.gate_decision',
       data: {
@@ -235,6 +185,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     });
 
     if (result.method === 'fail_open') {
+      // Telemetry-only event — no Inngest handler; consumed by observability tooling.
       void inngest.send({
         name: 'app/ask.gate_timeout',
         data: {

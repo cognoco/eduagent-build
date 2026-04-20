@@ -36,6 +36,7 @@ import {
 } from './guess-who-provider';
 import { type AgeBracket, type Interest } from './config';
 import { createLogger } from '../logger';
+import { extractFirstJsonObject } from '../llm/extract-json';
 import { buildCapitalsPrompt as _buildCapitalsPrompt } from './quiz-prompts';
 
 // Re-export prompt builders for backward compatibility
@@ -141,49 +142,17 @@ export function assembleRound(
 }
 
 /**
- * Extract the first balanced JSON object from an LLM response. Handles
- * triple-backtick fences (```json ... ```) AND stray prose preamble by
- * walking brace depth until the first complete object closes. Avoids the
- * greedy `/\{[\s\S]*\}/` regex which mis-matches when the response contains
- * multiple objects or has trailing prose.
+ * Extract the first balanced JSON object from an LLM response.
+ *
+ * Delegates to the shared `extractFirstJsonObject` utility (which handles
+ * markdown fences, prose preamble, and nested braces) and throws on failure.
  */
 export function extractJsonObject(response: string): string {
-  // Strip markdown code-fence wrappers if present.
-  const fenceMatch = response.match(/```(?:json)?\s*([\s\S]*?)```/);
-  const body = (fenceMatch?.[1] ?? response).trim();
-
-  let start = -1;
-  let depth = 0;
-  let inString = false;
-  let escape = false;
-
-  for (let i = 0; i < body.length; i++) {
-    const ch = body[i];
-    if (escape) {
-      escape = false;
-      continue;
-    }
-    if (ch === '\\' && inString) {
-      escape = true;
-      continue;
-    }
-    if (ch === '"') {
-      inString = !inString;
-      continue;
-    }
-    if (inString) continue;
-    if (ch === '{') {
-      if (depth === 0) start = i;
-      depth += 1;
-    } else if (ch === '}') {
-      depth -= 1;
-      if (depth === 0 && start !== -1) {
-        return body.slice(start, i + 1);
-      }
-    }
+  const result = extractFirstJsonObject(response);
+  if (result === null) {
+    throw new UpstreamLlmError('Quiz LLM returned no JSON object');
   }
-
-  throw new UpstreamLlmError('Quiz LLM returned no JSON object');
+  return result;
 }
 
 interface GenerateParams {

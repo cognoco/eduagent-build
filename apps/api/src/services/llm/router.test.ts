@@ -436,4 +436,134 @@ describe('LLM Router', () => {
       expect(msgs[0]!.content).toContain('politely decline and redirect');
     });
   });
+
+  describe('conversationLanguage / pronouns personalization preamble', () => {
+    beforeEach(() => {
+      _clearProviders();
+      _resetCircuits();
+    });
+
+    afterAll(() => {
+      _clearProviders();
+      _resetCircuits();
+      registerProvider(createMockProvider('gemini'));
+    });
+
+    it('prepends conversationLanguage line when provided', async () => {
+      const receivedMessages: ChatMessage[][] = [];
+      const spy: LLMProvider = {
+        id: 'gemini',
+        async chat(messages) {
+          receivedMessages.push(messages);
+          return 'ok';
+        },
+        async *chatStream() {
+          yield 'ok';
+        },
+      };
+      registerProvider(spy);
+
+      await routeAndCall([{ role: 'user', content: 'Ahoj' }], 1, {
+        conversationLanguage: 'cs',
+      });
+
+      const system = receivedMessages[0]![0]!.content;
+      expect(system).toContain('Respond in Czech unless the learner switches.');
+    });
+
+    it('prepends pronouns line when provided', async () => {
+      const receivedMessages: ChatMessage[][] = [];
+      const spy: LLMProvider = {
+        id: 'gemini',
+        async chat(messages) {
+          receivedMessages.push(messages);
+          return 'ok';
+        },
+        async *chatStream() {
+          yield 'ok';
+        },
+      };
+      registerProvider(spy);
+
+      await routeAndCall([{ role: 'user', content: 'Hi' }], 1, {
+        pronouns: 'they/them',
+      });
+
+      const system = receivedMessages[0]![0]!.content;
+      expect(system).toContain("The learner's pronouns are they/them.");
+    });
+
+    it('includes both language and pronouns when both provided', async () => {
+      const receivedMessages: ChatMessage[][] = [];
+      const spy: LLMProvider = {
+        id: 'gemini',
+        async chat(messages) {
+          receivedMessages.push(messages);
+          return 'ok';
+        },
+        async *chatStream() {
+          yield 'ok';
+        },
+      };
+      registerProvider(spy);
+
+      await routeAndCall([{ role: 'user', content: 'Hola' }], 1, {
+        conversationLanguage: 'es',
+        pronouns: 'she/her',
+      });
+
+      const system = receivedMessages[0]![0]!.content;
+      expect(system).toContain(
+        'Respond in Spanish unless the learner switches.'
+      );
+      expect(system).toContain("The learner's pronouns are she/her.");
+      // Personalization lines precede the safety identity statement
+      expect(system.indexOf('Respond in Spanish')).toBeLessThan(
+        system.indexOf('educational AI assistant')
+      );
+    });
+
+    it('omits personalization when neither field provided', async () => {
+      const receivedMessages: ChatMessage[][] = [];
+      const spy: LLMProvider = {
+        id: 'gemini',
+        async chat(messages) {
+          receivedMessages.push(messages);
+          return 'ok';
+        },
+        async *chatStream() {
+          yield 'ok';
+        },
+      };
+      registerProvider(spy);
+
+      await routeAndCall([{ role: 'user', content: 'Hello' }], 1);
+
+      const system = receivedMessages[0]![0]!.content;
+      expect(system).not.toContain('Respond in');
+      expect(system).not.toContain('pronouns');
+    });
+
+    it('trims whitespace-only pronouns and omits them', async () => {
+      const receivedMessages: ChatMessage[][] = [];
+      const spy: LLMProvider = {
+        id: 'gemini',
+        async chat(messages) {
+          receivedMessages.push(messages);
+          return 'ok';
+        },
+        async *chatStream() {
+          yield 'ok';
+        },
+      };
+      registerProvider(spy);
+
+      await routeAndCall([{ role: 'user', content: 'Hello' }], 1, {
+        pronouns: '   ',
+      });
+
+      const system = receivedMessages[0]![0]!.content;
+      expect(system).not.toContain('pronouns');
+    });
+  });
 });

@@ -35,7 +35,7 @@
     "profileId": "eval-profile-12yo-dinosaurs",
     "subjectName": "Science",
     "topicTitle": "Mesozoic era",
-    "sessionType": "topic",
+    "sessionType": "learning",
     "escalationRung": 2,
     "exchangeHistory": [
       {
@@ -189,7 +189,7 @@ Yeah, long division still doesn't make sense to me.
 ## Builder notes
 
 - Scenario: S2-rung2-revisit — Escalation + SM-2 review (rung 2, fading retention, mid-session)
-- Rung: 2, sessionType: topic, verification: standard
+- Rung: 2, sessionType: learning, verification: standard
 - History turns: 2, exchangeCount: 2
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs

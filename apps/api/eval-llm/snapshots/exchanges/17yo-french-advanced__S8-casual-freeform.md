@@ -34,7 +34,7 @@
     "sessionId": "eval-17yo-french-advanced",
     "profileId": "eval-profile-17yo-french-advanced",
     "subjectName": "Philosophy",
-    "sessionType": "freeform",
+    "sessionType": "learning",
     "escalationRung": 1,
     "exchangeHistory": [
       {
@@ -174,7 +174,7 @@ Can we just chat for a bit? Nothing heavy.
 ## Builder notes
 
 - Scenario: S8-casual-freeform — Freeform / casual-mode branch (no topic, casual tone)
-- Rung: 1, sessionType: freeform, verification: standard
+- Rung: 1, sessionType: learning, verification: standard
 - History turns: 1, exchangeCount: 1
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs

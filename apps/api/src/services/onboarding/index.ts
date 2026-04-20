@@ -99,8 +99,22 @@ export async function updatePronouns(
 export async function updateInterestsContext(
   db: Database,
   profileId: string,
+  accountId: string,
   interests: InterestEntry[]
 ): Promise<void> {
+  // Guard: verify the profile belongs to the calling account — mirrors the
+  // accountId check in updateConversationLanguage / updatePronouns. The
+  // learning_profiles table doesn't carry accountId directly, so we verify
+  // via the profiles table first.
+  const [owner] = await db
+    .select({ id: profiles.id })
+    .from(profiles)
+    .where(and(eq(profiles.id, profileId), eq(profiles.accountId, accountId)));
+
+  if (!owner) {
+    throw new OnboardingNotFoundError(profileId);
+  }
+
   // Ensure the learning_profiles row exists — see the accommodation-mode
   // precedent at learner-profile.ts:updateAccommodationMode. Idempotent.
   await getOrCreateLearningProfile(db, profileId);

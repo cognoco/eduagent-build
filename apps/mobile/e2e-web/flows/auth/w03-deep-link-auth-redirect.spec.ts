@@ -24,17 +24,10 @@ test('W-03 deep link to authenticated route redirects to sign-in and back', asyn
 
   const postApproval = page.getByTestId('post-approval-continue');
   const quizScreen = page.getByTestId('quiz-index-screen');
-  const first = await Promise.race([
-    postApproval
-      .waitFor({ state: 'visible', timeout: 60_000 })
-      .then(() => 'post-approval' as const),
-    quizScreen
-      .waitFor({ state: 'visible', timeout: 60_000 })
-      .then(() => 'quiz' as const),
-  ]);
+  await expect(postApproval.or(quizScreen)).toBeVisible({ timeout: 60_000 });
 
-  if (first === 'post-approval') {
-    await postApproval.click();
+  if (await postApproval.isVisible().catch(() => false)) {
+    await postApproval.click({ force: true });
   }
 
   await expect(quizScreen).toBeVisible({ timeout: 60_000 });

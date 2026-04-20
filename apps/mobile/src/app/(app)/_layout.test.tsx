@@ -4,6 +4,7 @@ import { useAuth } from '@clerk/clerk-expo';
 const mockUseProfile = jest.fn();
 const mockUseConsentStatus = jest.fn();
 const mockInvalidateQueries = jest.fn();
+const mockUsePathname = jest.fn();
 const mockTabs = Object.assign(
   ({ children }: { children?: React.ReactNode }) => {
     const { View } = require('react-native');
@@ -15,11 +16,12 @@ const mockTabs = Object.assign(
 );
 
 jest.mock('expo-router', () => ({
-  Redirect: ({ href }: { href: string }) => {
-    const { Text } = require('react-native');
-    return <Text testID="redirect">{href}</Text>;
+  Redirect: ({ href }: { href: unknown }) => {
+    const { View } = require('react-native');
+    return <View testID="redirect" href={href} />;
   },
   Tabs: mockTabs,
+  usePathname: () => mockUsePathname(),
   useRouter: () => ({ push: jest.fn() }),
 }));
 
@@ -90,11 +92,16 @@ jest.mock('expo-secure-store', () => ({
   setItemAsync: jest.fn(),
 }));
 
+jest.mock('../../components/feedback/FeedbackProvider', () => ({
+  FeedbackProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
+
 const AppLayout = require('./_layout').default;
 
 describe('AppLayout', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockUsePathname.mockReturnValue('/home');
     (useAuth as jest.Mock).mockReturnValue({
       isLoaded: true,
       isSignedIn: true,
@@ -151,8 +158,43 @@ describe('AppLayout', () => {
     render(<AppLayout />);
 
     const redirect = screen.getByTestId('redirect');
-    expect(redirect.props.children).toBe('/(auth)/sign-in');
+    expect(redirect.props.href).toEqual({
+      pathname: '/(auth)/sign-in',
+      params: { redirectTo: '/home' },
+    });
     expect(screen.queryByTestId('tabs')).toBeNull();
+  });
+
+  it('preserves the current path when redirecting unauthenticated users', () => {
+    mockUsePathname.mockReturnValue('/quiz');
+    (useAuth as jest.Mock).mockReturnValue({
+      isLoaded: true,
+      isSignedIn: false,
+    });
+
+    render(<AppLayout />);
+
+    const redirect = screen.getByTestId('redirect');
+    expect(redirect.props.href).toEqual({
+      pathname: '/(auth)/sign-in',
+      params: { redirectTo: '/quiz' },
+    });
+  });
+
+  it('strips route-group segments from redirect targets for unauthenticated users', () => {
+    mockUsePathname.mockReturnValue('/(app)/quiz');
+    (useAuth as jest.Mock).mockReturnValue({
+      isLoaded: true,
+      isSignedIn: false,
+    });
+
+    render(<AppLayout />);
+
+    const redirect = screen.getByTestId('redirect');
+    expect(redirect.props.href).toEqual({
+      pathname: '/(auth)/sign-in',
+      params: { redirectTo: '/quiz' },
+    });
   });
 
   it('renders nothing while Clerk auth is still loading', () => {

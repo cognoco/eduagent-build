@@ -35,7 +35,7 @@
     "profileId": "eval-profile-17yo-french-advanced",
     "subjectName": "Philosophy",
     "topicTitle": "Camus — L'Étranger",
-    "sessionType": "topic",
+    "sessionType": "learning",
     "escalationRung": 2,
     "exchangeHistory": [
       {
@@ -202,7 +202,7 @@ Yes, let's go.
 ## Builder notes
 
 - Scenario: S7-language-fluency — Four-strands pedagogy, fluency drill candidate — F2.2 ui_hints target
-- Rung: 2, sessionType: topic, verification: standard
+- Rung: 2, sessionType: learning, verification: standard
 - History turns: 2, exchangeCount: 2
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs

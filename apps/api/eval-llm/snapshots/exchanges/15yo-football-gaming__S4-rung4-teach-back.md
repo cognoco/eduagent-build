@@ -35,7 +35,7 @@
     "profileId": "eval-profile-15yo-football-gaming",
     "subjectName": "Mathematics",
     "topicTitle": "algebra equations",
-    "sessionType": "topic",
+    "sessionType": "learning",
     "escalationRung": 4,
     "exchangeHistory": [
       {
@@ -200,7 +200,7 @@ Signal guidance:
 ## Builder notes
 
 - Scenario: S4-rung4-teach-back — Feynman rubric path (rung 4, teach_back verification)
-- Rung: 4, sessionType: topic, verification: teach_back
+- Rung: 4, sessionType: learning, verification: teach_back
 - History turns: 4, exchangeCount: 4
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs

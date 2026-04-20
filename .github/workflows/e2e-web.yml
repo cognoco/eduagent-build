@@ -28,6 +28,7 @@ jobs:
       PLAYWRIGHT_API_URL: https://api-stg.mentomate.com
       PLAYWRIGHT_SKIP_LOCAL_API: '1'
       PLAYWRIGHT_TEST_SEED_SECRET: ${{ secrets.TEST_SEED_SECRET }}
+      CLERK_TESTING_TOKEN: ${{ secrets.CLERK_TESTING_TOKEN }}
     steps:
       - uses: actions/checkout@v4
 

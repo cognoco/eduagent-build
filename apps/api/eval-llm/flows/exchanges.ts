@@ -58,7 +58,7 @@ const SCENARIO_SPECS: readonly ScenarioSpec[] = [
     history: HISTORY_S1_RUNG1,
     contextOverrides: {
       escalationRung: 1,
-      sessionType: 'topic',
+      sessionType: 'learning',
       verificationType: 'standard',
       exchangeCount: 0,
       retentionStatus: { status: 'new' },
@@ -71,7 +71,7 @@ const SCENARIO_SPECS: readonly ScenarioSpec[] = [
     history: HISTORY_S2_RUNG2,
     contextOverrides: {
       escalationRung: 2,
-      sessionType: 'topic',
+      sessionType: 'learning',
       verificationType: 'standard',
       exchangeCount: 2,
       retentionStatus: {
@@ -88,7 +88,7 @@ const SCENARIO_SPECS: readonly ScenarioSpec[] = [
     history: HISTORY_S3_RUNG3,
     contextOverrides: {
       escalationRung: 3,
-      sessionType: 'topic',
+      sessionType: 'learning',
       verificationType: 'evaluate',
       evaluateDifficultyRung: 2,
       exchangeCount: 3,
@@ -102,7 +102,7 @@ const SCENARIO_SPECS: readonly ScenarioSpec[] = [
     history: HISTORY_S4_RUNG4,
     contextOverrides: {
       escalationRung: 4,
-      sessionType: 'topic',
+      sessionType: 'learning',
       verificationType: 'teach_back',
       exchangeCount: 4,
       retentionStatus: { status: 'strong' },
@@ -115,7 +115,7 @@ const SCENARIO_SPECS: readonly ScenarioSpec[] = [
     history: HISTORY_S5_RUNG5,
     contextOverrides: {
       escalationRung: 5,
-      sessionType: 'topic',
+      sessionType: 'learning',
       verificationType: 'standard',
       exchangeCount: 5,
       retentionStatus: { status: 'weak' },
@@ -124,13 +124,13 @@ const SCENARIO_SPECS: readonly ScenarioSpec[] = [
   },
   {
     id: 'S6-homework-help',
-    purpose: 'Homework mode (help_solve) — not tutoring',
+    purpose: 'Homework mode (help_me) — not tutoring',
     history: HISTORY_S6_HOMEWORK,
     contextOverrides: {
       escalationRung: 2,
       sessionType: 'homework',
       verificationType: 'standard',
-      homeworkMode: 'help_solve',
+      homeworkMode: 'help_me',
       exchangeCount: 1,
       retentionStatus: { status: 'new' },
     },
@@ -143,7 +143,7 @@ const SCENARIO_SPECS: readonly ScenarioSpec[] = [
     history: HISTORY_S7_LANGUAGE,
     contextOverrides: {
       escalationRung: 2,
-      sessionType: 'topic',
+      sessionType: 'learning',
       verificationType: 'standard',
       pedagogyMode: 'four_strands',
       exchangeCount: 2,
@@ -157,7 +157,7 @@ const SCENARIO_SPECS: readonly ScenarioSpec[] = [
     history: HISTORY_S8_FREEFORM,
     contextOverrides: {
       escalationRung: 1,
-      sessionType: 'freeform',
+      sessionType: 'learning',
       verificationType: 'standard',
       learningMode: 'casual',
       exchangeCount: 1,
@@ -273,7 +273,7 @@ function buildBaseContext(profile: EvalProfile): ExchangeContext {
     subjectName: subject,
     topicTitle: topic,
     topicDescription: undefined,
-    sessionType: 'topic',
+    sessionType: 'learning',
     escalationRung: 1,
     exchangeHistory: [],
     birthYear: profile.birthYear,
@@ -312,7 +312,7 @@ function buildScenarioContext(
     ...spec.contextOverrides,
     exchangeHistory: history,
     topicTitle:
-      spec.contextOverrides.sessionType === 'freeform'
+      spec.contextOverrides.learningMode === 'casual'
         ? undefined
         : base.topicTitle,
   };

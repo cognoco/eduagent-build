@@ -6,26 +6,26 @@ import {
   Text,
   View,
 } from 'react-native';
-import { platformAlert } from '../../lib/platform-alert';
+import { platformAlert } from '../../../lib/platform-alert';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ErrorFallback } from '../../components/common';
+import { ErrorFallback } from '../../../components/common';
 import {
   isNewLearner,
   sessionsUntilFullProgress,
-} from '../../lib/progressive-disclosure';
-import { formatMinutes } from '../../lib/format-relative-date';
+} from '../../../lib/progressive-disclosure';
+import { formatMinutes } from '../../../lib/format-relative-date';
 import {
   GrowthChart,
   MilestoneCard,
   SubjectCard,
-} from '../../components/progress';
+} from '../../../components/progress';
 import {
   useProgressHistory,
   useProgressInventory,
   useProgressMilestones,
   useRefreshProgressSnapshot,
-} from '../../hooks/use-progress';
+} from '../../../hooks/use-progress';
 
 function heroCopy(input: {
   topicsMastered: number;

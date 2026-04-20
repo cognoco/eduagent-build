@@ -48,18 +48,22 @@ export const feedbackRoutes = new Hono<FeedbackRouteEnv>().post(
       .filter(Boolean)
       .join('\n');
 
-    await sendEmail(
-      {
-        to: supportTo,
-        subject: `[MentoMate ${categoryLabel}] from ${profileId.slice(0, 8)}`,
-        body: `${body.message}\n\n---\n${metaLines}`,
-        type: 'feedback',
-      },
-      {
-        resendApiKey: env.RESEND_API_KEY,
-        emailFrom: env.EMAIL_FROM,
-      }
-    );
+    try {
+      await sendEmail(
+        {
+          to: supportTo,
+          subject: `[MentoMate ${categoryLabel}] from ${profileId.slice(0, 8)}`,
+          body: `${body.message}\n\n---\n${metaLines}`,
+          type: 'feedback',
+        },
+        {
+          resendApiKey: env.RESEND_API_KEY,
+          emailFrom: env.EMAIL_FROM,
+        }
+      );
+    } catch (err) {
+      console.error('[feedback] sendEmail threw unexpectedly:', err);
+    }
 
     return c.json({ success: true });
   }

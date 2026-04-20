@@ -46,6 +46,13 @@ async function resolveAssetPath(urlPath) {
   const safePath = path.normalize(urlPath).replace(/^(\.\.[/\\])+/, '');
   let candidate = path.join(distDir, safePath);
 
+  // [I-17] Path traversal containment — reject any resolved path that escapes distDir
+  const resolvedCandidate = path.resolve(candidate);
+  const resolvedDist = path.resolve(distDir);
+  if (!resolvedCandidate.startsWith(resolvedDist + path.sep) && resolvedCandidate !== resolvedDist) {
+    return null;
+  }
+
   if (await fileExists(candidate)) {
     const candidateStats = await stat(candidate);
     if (candidateStats.isDirectory()) {

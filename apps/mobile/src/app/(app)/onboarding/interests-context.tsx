@@ -6,7 +6,7 @@
 // entry the user doesn't touch (non-blocking per spec).
 // ---------------------------------------------------------------------------
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -168,9 +168,15 @@ export default function InterestsContextScreen(): React.ReactElement {
   }, [labels, submit]);
 
   // Edge case: interview ended with no extracted interests. Forward silently
-  // — no reason to show an empty picker.
+  // — no reason to show an empty picker. Use useEffect so navigation doesn't
+  // fire during render (React anti-pattern).
+  useEffect(() => {
+    if (labels.length === 0) {
+      navigateForward();
+    }
+  }, [labels.length, navigateForward]);
+
   if (labels.length === 0) {
-    navigateForward();
     return <View className="flex-1 bg-background" />;
   }
 
