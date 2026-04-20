@@ -61,7 +61,7 @@ describe('ParentDashboardSummary', () => {
 
     expect(
       screen.getByText(
-        '1 sessions, 12m this week (\u2193 down from 4 sessions, 1h 30m last week)'
+        '1 session, 12m this week (\u2193 down from 4 sessions, 1h 30m last week)'
       )
     ).toBeTruthy();
   });
@@ -263,11 +263,11 @@ describe('ParentDashboardSummary', () => {
       expect(screen.queryByTestId('parent-dashboard-teaser')).toBeNull();
     });
 
-    it('still shows trend text for new learner (always visible)', () => {
+    it('hides trend text for new learner (guarded by showFullSignals)', () => {
       render(<ParentDashboardSummary {...defaultProps} totalSessions={0} />);
 
-      // Trend text uses sessionsThisWeek (4) from defaultProps, not totalSessions
-      expect(screen.getByText(/4 sessions, 1h 25m this week/)).toBeTruthy();
+      // trendText is guarded by showFullSignals — new learners see the teaser instead
+      expect(screen.queryByText(/sessions, .* this week/)).toBeNull();
     });
 
     it('defaults to showing full signals when totalSessions is undefined', () => {
