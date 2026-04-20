@@ -62,6 +62,18 @@ export function LearnerScreen({
     string | null
   >(null);
 
+  // [F-044] Loading timeout — show fallback after 15s so users aren't
+  // stuck on a bare spinner with no escape.
+  const [loadingTimedOut, setLoadingTimedOut] = useState(false);
+  useEffect(() => {
+    if (!isLoading) {
+      setLoadingTimedOut(false);
+      return;
+    }
+    const timer = setTimeout(() => setLoadingTimedOut(true), 15_000);
+    return () => clearTimeout(timer);
+  }, [isLoading]);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -283,8 +295,32 @@ export function LearnerScreen({
           justifyContent: 'center',
           alignItems: 'center',
         }}
+        testID="learner-loading-state"
       >
         <ActivityIndicator size="large" />
+        {loadingTimedOut && (
+          <View className="mt-6 items-center" testID="learner-loading-timeout">
+            <Text className="text-body text-text-secondary text-center">
+              Taking longer than usual...
+            </Text>
+            <Pressable
+              onPress={() => refetch()}
+              className="mt-3 min-h-[44px] items-center justify-center rounded-button bg-primary px-6 py-2"
+              testID="learner-loading-retry"
+            >
+              <Text className="text-body font-semibold text-text-inverse">
+                Retry
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={onBack}
+              className="mt-2 min-h-[44px] items-center justify-center px-6 py-2"
+              testID="learner-loading-go-back"
+            >
+              <Text className="text-body text-text-secondary">Go back</Text>
+            </Pressable>
+          </View>
+        )}
       </ScrollView>
     );
   }
