@@ -63,6 +63,10 @@ jest.mock('../../hooks/use-coaching-card', () => ({
   useMarkQuizDiscoverySurfaced: () => mockUseMarkQuizDiscoverySurfaced(),
 }));
 
+jest.mock('./EarlyAdopterCard', () => ({
+  EarlyAdopterCard: () => null,
+}));
+
 jest.mock('../../lib/session-recovery', () => ({
   readSessionRecoveryMarker: (...args: unknown[]) =>
     mockReadSessionRecoveryMarker(...args),

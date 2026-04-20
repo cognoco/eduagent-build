@@ -25,8 +25,10 @@ interface ErrorBoundaryState {
  */
 function ErrorFallbackView({
   onRetry,
+  onGoHome,
 }: {
   onRetry: () => void;
+  onGoHome: () => void;
 }): React.ReactElement {
   const router = useRouter();
   return (
@@ -41,7 +43,13 @@ function ErrorFallbackView({
       }}
       secondaryAction={{
         label: 'Go Home',
-        onPress: () => router.replace('/(app)/home' as never),
+        onPress: () => {
+          // Reset the boundary BEFORE navigating — otherwise hasError stays
+          // true and the fallback renders over whatever Home resolves to,
+          // making the button appear to do nothing.
+          onGoHome();
+          router.replace('/(app)/home' as never);
+        },
         testID: 'error-boundary-go-home',
       }}
       testID="error-boundary-fallback"
@@ -83,7 +91,12 @@ export class ErrorBoundary extends Component<
 
   override render(): ReactNode {
     if (this.state.hasError) {
-      return <ErrorFallbackView onRetry={this.handleRetry} />;
+      return (
+        <ErrorFallbackView
+          onRetry={this.handleRetry}
+          onGoHome={this.handleRetry}
+        />
+      );
     }
 
     return this.props.children;

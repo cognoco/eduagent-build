@@ -29,6 +29,7 @@ import {
 } from '../../lib/session-recovery';
 import { useThemeColors } from '../../lib/theme';
 import { IntentCard } from './IntentCard';
+import { EarlyAdopterCard } from './EarlyAdopterCard';
 
 export interface LearnerScreenProps {
   profiles: Profile[];
@@ -406,6 +407,7 @@ export function LearnerScreen({
         }}
         keyboardShouldPersistTaps="handled"
       >
+        <EarlyAdopterCard />
         <View className="gap-4" testID="learner-intent-stack">
           {intentCards.map((card) => (
             <IntentCard key={card.testID} {...card} />

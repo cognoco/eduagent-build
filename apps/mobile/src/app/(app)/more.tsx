@@ -31,6 +31,7 @@ import {
 } from '../../hooks/use-learner-profile';
 import { useFamilySubscription } from '../../hooks/use-subscription';
 import { AccountSecurity } from '../../components/account-security';
+import { useFeedbackContext } from '../../components/feedback/FeedbackProvider';
 import {
   useNotificationSettings,
   useUpdateNotificationSettings,
@@ -201,6 +202,7 @@ export default function MoreScreen() {
   const updateCelebrationLevel = useUpdateCelebrationLevel();
   const { data: learnerProfile } = useLearnerProfile();
   const updateAccommodation = useUpdateAccommodationMode();
+  const { openFeedback } = useFeedbackContext();
 
   const pushEnabled = notifPrefs?.pushEnabled ?? false;
   const weeklyDigest = notifPrefs?.weeklyProgressPush ?? false;
@@ -558,6 +560,7 @@ export default function MoreScreen() {
           onPress={() => router.push('/(app)/subscription')}
         />
         <SettingsRow label="Help & Support" onPress={() => void handleHelp()} />
+        <SettingsRow label="Report a Problem" onPress={openFeedback} />
         <SettingsRow
           label="Privacy Policy"
           onPress={() => router.push('/privacy')}
