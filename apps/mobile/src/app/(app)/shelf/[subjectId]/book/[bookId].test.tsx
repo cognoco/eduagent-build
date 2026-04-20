@@ -667,7 +667,8 @@ describe('BookScreen', () => {
     expect(alertSpy).toHaveBeenCalledWith(
       'Session Topic 1',
       expect.any(String),
-      expect.any(Array)
+      expect.any(Array),
+      undefined
     );
   });
 
@@ -966,7 +967,8 @@ describe('BookScreen', () => {
       expect(alertSpy).toHaveBeenCalledWith(
         "Couldn't build this book",
         expect.any(String),
-        expect.any(Array)
+        expect.any(Array),
+        undefined
       );
     });
   });

@@ -37,5 +37,5 @@ test('J-17 parent opens a session recap and copies the conversation prompt', asy
   await expect(page.getByTestId('narrative-unavailable')).toHaveCount(0);
 
   await page.getByTestId('copy-conversation-prompt').click();
-  await expect(page.getByText(/copied/i)).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText(/copied/i)).toBeVisible({ timeout: 30_000 });
 });

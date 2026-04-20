@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react-native';
 import { useAuth } from '@clerk/clerk-expo';
 
-const mockUseLocalSearchParams = jest.fn();
+const mockUseGlobalSearchParams = jest.fn();
 
 jest.mock('expo-router', () => ({
   Redirect: ({ href }: { href: string }) => {
@@ -12,7 +12,7 @@ jest.mock('expo-router', () => ({
     const { View } = require('react-native');
     return <View testID="stack">{children}</View>;
   },
-  useLocalSearchParams: () => mockUseLocalSearchParams(),
+  useGlobalSearchParams: () => mockUseGlobalSearchParams(),
 }));
 
 const AuthLayout = require('./_layout').default;
@@ -20,7 +20,7 @@ const AuthLayout = require('./_layout').default;
 describe('AuthRoutesLayout', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockUseLocalSearchParams.mockReturnValue({});
+    mockUseGlobalSearchParams.mockReturnValue({});
   });
 
   it('redirects to (app)/home when user is signed in', () => {
@@ -36,7 +36,7 @@ describe('AuthRoutesLayout', () => {
   });
 
   it('redirects signed-in users to the requested route when redirectTo is set', () => {
-    mockUseLocalSearchParams.mockReturnValue({ redirectTo: '/quiz' });
+    mockUseGlobalSearchParams.mockReturnValue({ redirectTo: '/quiz' });
     (useAuth as jest.Mock).mockReturnValue({
       isLoaded: true,
       isSignedIn: true,
@@ -96,7 +96,7 @@ describe('AuthRoutesLayout', () => {
   });
 
   it('ignores unsafe redirect targets and falls back to home', () => {
-    mockUseLocalSearchParams.mockReturnValue({
+    mockUseGlobalSearchParams.mockReturnValue({
       redirectTo: 'https://example.com/steal-session',
     });
     (useAuth as jest.Mock).mockReturnValue({
@@ -111,7 +111,7 @@ describe('AuthRoutesLayout', () => {
   });
 
   it('normalizes route-group paths before redirecting signed-in users', () => {
-    mockUseLocalSearchParams.mockReturnValue({ redirectTo: '/(app)/quiz' });
+    mockUseGlobalSearchParams.mockReturnValue({ redirectTo: '/(app)/quiz' });
     (useAuth as jest.Mock).mockReturnValue({
       isLoaded: true,
       isSignedIn: true,

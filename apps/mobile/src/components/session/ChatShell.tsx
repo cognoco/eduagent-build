@@ -2,7 +2,6 @@ import type { InputMode } from '@eduagent/schemas';
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   AccessibilityInfo,
-  Alert,
   Image,
   Linking,
   View,
@@ -24,6 +23,7 @@ import { useSpeechRecognition } from '../../hooks/use-speech-recognition';
 import { useTextToSpeech } from '../../hooks/use-text-to-speech';
 import { useThemeColors } from '../../lib/theme';
 import { goBackOrReplace } from '../../lib/navigation';
+import { platformAlert } from '../../lib/platform-alert';
 import { LightBulbAnimation, MagicPenAnimation } from '../common';
 import Animated, { FadeOut } from 'react-native-reanimated';
 
@@ -321,7 +321,7 @@ export function ChatShell({
   useEffect(() => {
     if (!sttError) return;
     const isPermissionError = sttError.toLowerCase().includes('permission');
-    Alert.alert(
+    platformAlert(
       'Voice input error',
       isPermissionError
         ? 'Microphone access is needed for voice input. Please enable it in Settings.'

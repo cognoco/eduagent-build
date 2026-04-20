@@ -199,16 +199,22 @@ export function BooksTab({
         <Text className="text-body text-text-secondary text-center mb-4">
           Unable to load books. Please try again.
         </Text>
-        <Pressable
-          onPress={onRetry}
-          className="bg-primary rounded-button px-5 py-3 items-center min-h-[48px] justify-center"
-          accessibilityRole="button"
-          testID="books-tab-retry"
-        >
-          <Text className="text-body font-semibold text-text-inverse">
-            Retry
+        {onRetry != null ? (
+          <Pressable
+            onPress={onRetry}
+            className="bg-primary rounded-button px-5 py-3 items-center min-h-[48px] justify-center"
+            accessibilityRole="button"
+            testID="books-tab-retry"
+          >
+            <Text className="text-body font-semibold text-text-inverse">
+              Retry
+            </Text>
+          </Pressable>
+        ) : (
+          <Text className="text-body-sm text-text-tertiary text-center">
+            Pull down to refresh or go back.
           </Text>
-        </Pressable>
+        )}
       </View>
     );
   }

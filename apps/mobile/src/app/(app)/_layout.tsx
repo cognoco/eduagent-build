@@ -7,7 +7,6 @@ import {
   Pressable,
   ActivityIndicator,
   ScrollView,
-  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth, useClerk, useUser } from '@clerk/clerk-expo';
@@ -27,6 +26,7 @@ import { evaluateSentryForProfile } from '../../lib/sentry';
 import { formatApiError } from '../../lib/format-api-error';
 import { clearTransitionState } from '../../lib/auth-transition';
 import { normalizeRedirectPath } from '../../lib/normalize-redirect-path';
+import { platformAlert } from '../../lib/platform-alert';
 import { FeedbackProvider } from '../../components/feedback/FeedbackProvider';
 
 // ─── Tab visibility whitelist ────────────────────────────────────────
@@ -362,7 +362,7 @@ function CreateProfileGate(): React.ReactElement {
       await signOut();
     } catch (err: unknown) {
       console.error('signOut failed:', err);
-      Alert.alert('Sign Out Failed', 'Please try again or restart the app.');
+      platformAlert('Sign Out Failed', 'Please try again or restart the app.');
     }
   };
 
@@ -432,7 +432,7 @@ function ConsentWithdrawnGate(): React.ReactElement {
       await signOut();
     } catch (err: unknown) {
       console.error('signOut failed:', err);
-      Alert.alert('Sign Out Failed', 'Please try again or restart the app.');
+      platformAlert('Sign Out Failed', 'Please try again or restart the app.');
     }
   };
 
@@ -497,7 +497,7 @@ function ConsentWithdrawnGate(): React.ReactElement {
             const other = profiles.find((p) => p.id !== activeProfile?.id);
             if (other) {
               void switchProfile(other.id).catch(() => {
-                Alert.alert('Could not switch profile', 'Please try again.');
+                platformAlert('Could not switch profile', 'Please try again.');
               });
             }
           }}
@@ -539,7 +539,7 @@ function ConsentPendingGate(): React.ReactElement {
       await signOut();
     } catch (err: unknown) {
       console.error('signOut failed:', err);
-      Alert.alert('Sign Out Failed', 'Please try again or restart the app.');
+      platformAlert('Sign Out Failed', 'Please try again or restart the app.');
     }
   };
   const { profiles, activeProfile, switchProfile } = useProfile();
@@ -647,7 +647,7 @@ function ConsentPendingGate(): React.ReactElement {
           void queryClient.invalidateQueries({
             queryKey: ['consent-status'],
           });
-          Alert.alert(
+          platformAlert(
             'Link sent!',
             `We sent a consent link to ${sentTo}. Check their inbox (and spam folder).`
           );
@@ -715,7 +715,10 @@ function ConsentPendingGate(): React.ReactElement {
               const other = profiles.find((p) => p.id !== activeProfile?.id);
               if (other) {
                 void switchProfile(other.id).catch(() => {
-                  Alert.alert('Could not switch profile', 'Please try again.');
+                  platformAlert(
+                    'Could not switch profile',
+                    'Please try again.'
+                  );
                 });
               }
             }}
@@ -978,7 +981,7 @@ function ConsentPendingGate(): React.ReactElement {
             const other = profiles.find((p) => p.id !== activeProfile?.id);
             if (other) {
               void switchProfile(other.id).catch(() => {
-                Alert.alert('Could not switch profile', 'Please try again.');
+                platformAlert('Could not switch profile', 'Please try again.');
               });
             }
           }}
@@ -1040,7 +1043,7 @@ export default function AppLayout() {
   // Show alert when a profile was removed server-side (consent denied / auto-deleted)
   React.useEffect(() => {
     if (profileWasRemoved) {
-      Alert.alert(
+      platformAlert(
         'Profile switched',
         "One of your profiles is no longer available, so we've switched you to your main profile. Everything else is just as you left it.",
         [{ text: 'OK', onPress: acknowledgeProfileRemoval }]

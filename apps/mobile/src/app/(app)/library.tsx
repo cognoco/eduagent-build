@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import {
-  Alert,
   Modal,
   Platform,
   Pressable,
@@ -9,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import { useQueries } from '@tanstack/react-query';
+import { platformAlert } from '../../lib/platform-alert';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Subject, RetentionStatus } from '@eduagent/schemas';
@@ -257,7 +257,7 @@ export default function LibraryScreen() {
     try {
       await updateSubject.mutateAsync({ subjectId: subject.id, status });
     } catch (err: unknown) {
-      Alert.alert('Could not update subject', formatApiError(err));
+      platformAlert('Could not update subject', formatApiError(err));
     } finally {
       setPendingSubjectId(null);
     }

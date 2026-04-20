@@ -182,6 +182,7 @@ async function handleEmailBounced(
     emailId: data.email_id,
   });
 
+  // Telemetry-only event — no Inngest handler registered; consumed by observability tooling.
   await inngest.send({
     name: 'app/email.bounced',
     data: {

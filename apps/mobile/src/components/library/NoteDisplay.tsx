@@ -50,30 +50,34 @@ export function NoteDisplay({
         })}
       </View>
 
-      {!readOnly && (
+      {!readOnly && (onEdit != null || onDelete != null) && (
         <View className="flex-row justify-end gap-2">
-          <Pressable
-            testID="note-edit-button"
-            onPress={onEdit}
-            className="p-1"
-            accessibilityRole="button"
-            accessibilityLabel="Edit note"
-          >
-            <Ionicons name="pencil" size={18} color={themeColors.primary} />
-          </Pressable>
-          <Pressable
-            testID="note-delete-button"
-            onPress={onDelete}
-            className="p-1"
-            accessibilityRole="button"
-            accessibilityLabel="Delete note"
-          >
-            <Ionicons
-              name="trash-outline"
-              size={18}
-              color={themeColors.danger}
-            />
-          </Pressable>
+          {onEdit != null && (
+            <Pressable
+              testID="note-edit-button"
+              onPress={onEdit}
+              className="p-1"
+              accessibilityRole="button"
+              accessibilityLabel="Edit note"
+            >
+              <Ionicons name="pencil" size={18} color={themeColors.primary} />
+            </Pressable>
+          )}
+          {onDelete != null && (
+            <Pressable
+              testID="note-delete-button"
+              onPress={onDelete}
+              className="p-1"
+              accessibilityRole="button"
+              accessibilityLabel="Delete note"
+            >
+              <Ionicons
+                name="trash-outline"
+                size={18}
+                color={themeColors.danger}
+              />
+            </Pressable>
+          )}
         </View>
       )}
     </View>

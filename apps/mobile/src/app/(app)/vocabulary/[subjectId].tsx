@@ -1,6 +1,5 @@
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Pressable,
   Text,
@@ -15,6 +14,7 @@ import {
 } from '../../../hooks/use-vocabulary';
 import { useSubjects } from '../../../hooks/use-subjects';
 import { goBackOrReplace } from '../../../lib/navigation';
+import { platformAlert } from '../../../lib/platform-alert';
 import { useThemeColors } from '../../../lib/theme';
 import type { Vocabulary } from '@eduagent/schemas';
 
@@ -113,7 +113,7 @@ export default function VocabularyListScreen() {
     subjectsQuery.data?.find((s) => s.id === subjectId)?.name ?? 'Vocabulary';
 
   const handleDelete = (vocabularyId: string) => {
-    Alert.alert('Delete word', 'Remove this word from your vocabulary?', [
+    platformAlert('Delete word', 'Remove this word from your vocabulary?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
@@ -121,7 +121,7 @@ export default function VocabularyListScreen() {
         onPress: () => {
           deleteVocabulary.mutate(vocabularyId, {
             onError: (err) => {
-              Alert.alert(
+              platformAlert(
                 'Could not delete',
                 err instanceof Error
                   ? err.message

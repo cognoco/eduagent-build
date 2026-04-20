@@ -36,7 +36,8 @@ test('J-13 pending consent blocks app until parent approval completes', async ({
 
     const postApproval = page.getByTestId('post-approval-continue');
     await expect(postApproval).toBeVisible({ timeout: 30_000 });
-    await postApproval.click({ force: true });
+    await expect(postApproval).toBeEnabled();
+    await postApproval.click();
 
     await expect(
       page

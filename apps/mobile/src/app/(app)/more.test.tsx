@@ -327,7 +327,9 @@ describe('MoreScreen — Account Actions', () => {
     await waitFor(() => {
       expect(alertSpy).toHaveBeenCalledWith(
         'Contact support',
-        'Email support@mentomate.app for help with your account.'
+        'Email support@mentomate.app for help with your account.',
+        undefined,
+        undefined
       );
     });
   });

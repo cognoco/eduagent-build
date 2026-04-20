@@ -7,14 +7,8 @@ import {
   useMemo,
 } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
-import {
-  AppState,
-  View,
-  Text,
-  Pressable,
-  Alert,
-  ScrollView,
-} from 'react-native';
+import { AppState, View, Text, Pressable, ScrollView } from 'react-native';
+import { platformAlert } from '../../../lib/platform-alert';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type {
@@ -974,7 +968,7 @@ function SessionScreenInner() {
   const agencyBadge = (
     <Pressable
       onPress={() =>
-        Alert.alert(
+        platformAlert(
           agencyLabel === 'Guided' ? 'Guided mode' : 'Independent mode',
           agencyLabel === 'Guided'
             ? "I'm giving more structure right now because the conversation needed extra support."

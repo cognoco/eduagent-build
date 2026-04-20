@@ -3,12 +3,12 @@ import {
   Text,
   Pressable,
   ScrollView,
-  Alert,
   RefreshControl,
   ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { goBackOrReplace } from '../../lib/navigation';
+import { platformAlert } from '../../lib/platform-alert';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ParentDashboardSummary } from '../../components/coaching';
 import type { RetentionStatus } from '../../components/progress';
@@ -114,7 +114,7 @@ export default function DashboardScreen() {
 
   const handleDrillDown = (profileId: string): void => {
     if (isDemo) {
-      Alert.alert(
+      platformAlert(
         'Preview Mode',
         "Link your child's account to see real data.",
         [{ text: 'OK' }]

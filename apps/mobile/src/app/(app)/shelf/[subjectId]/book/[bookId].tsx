@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   Text,
@@ -33,6 +32,7 @@ import { InlineNoteCard } from '../../../../../components/library/InlineNoteCard
 import { formatApiError } from '../../../../../lib/format-api-error';
 import { formatRelativeDate } from '../../../../../lib/format-relative-date';
 import { goBackOrReplace } from '../../../../../lib/navigation';
+import { platformAlert } from '../../../../../lib/platform-alert';
 import { useThemeColors } from '../../../../../lib/theme';
 
 // ---------------------------------------------------------------------------
@@ -165,7 +165,7 @@ export default function BookScreen() {
         setGenPhase('timed_out');
         alreadyPending.current = false;
         // BUG-81: Show user-visible error feedback on initial generation failure
-        Alert.alert("Couldn't build this book", formatApiError(error), [
+        platformAlert("Couldn't build this book", formatApiError(error), [
           { text: 'OK' },
         ]);
       },
@@ -216,7 +216,7 @@ export default function BookScreen() {
         retryInFlight.current = false;
         for (const t of retryTimersRef.current) clearTimeout(t);
         retryTimersRef.current = [];
-        Alert.alert('Generation failed', formatApiError(error));
+        platformAlert('Generation failed', formatApiError(error));
       },
     });
   };
@@ -330,7 +330,7 @@ export default function BookScreen() {
       const otherBooks = safeAllBooks.filter((b) => b.id !== bookId);
 
       if (otherBooks.length === 0) {
-        Alert.alert(
+        platformAlert(
           session.topicTitle,
           'This is the only book on this shelf — there is nowhere to move this topic.'
         );
@@ -352,20 +352,20 @@ export default function BookScreen() {
             },
             {
               onSuccess: () => {
-                Alert.alert(
+                platformAlert(
                   'Moved',
                   `"${session.topicTitle}" moved to ${targetBook.title}.`
                 );
               },
               onError: (err) => {
-                Alert.alert('Could not move topic', formatApiError(err));
+                platformAlert('Could not move topic', formatApiError(err));
               },
             }
           );
         },
       }));
 
-      Alert.alert(session.topicTitle, 'Move to a different book?', [
+      platformAlert(session.topicTitle, 'Move to a different book?', [
         ...moveButtons,
         { text: 'Cancel', style: 'cancel' },
       ]);
@@ -902,7 +902,8 @@ export default function BookScreen() {
         {topics.length === 0 && !needsGeneration && (
           <View className="px-5 py-8 items-center" testID="book-empty-topics">
             <Text className="text-body text-text-secondary text-center mb-2">
-              This book doesn't have any topics yet. Start a learning session to add topics, or go back to the library.
+              This book doesn't have any topics yet. Start a learning session to
+              add topics, or go back to the library.
             </Text>
             <Pressable
               onPress={() => router.replace('/(app)/library' as never)}

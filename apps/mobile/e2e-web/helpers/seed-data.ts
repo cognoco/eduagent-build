@@ -9,6 +9,13 @@ import type { SeedResponse } from './test-seed';
  */
 export async function readSeedData(scenarioKey: string): Promise<SeedResponse> {
   const filePath = path.join(authStateDir, `${scenarioKey}-seed.json`);
-  const raw = await readFile(filePath, 'utf-8');
+  let raw: string;
+  try {
+    raw = await readFile(filePath, 'utf-8');
+  } catch {
+    throw new Error(
+      `Seed data not found for scenario "${scenarioKey}" at "${filePath}" — did auth setup run?`
+    );
+  }
   return JSON.parse(raw) as SeedResponse;
 }

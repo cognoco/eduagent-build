@@ -285,7 +285,9 @@ describe('CameraScreen', () => {
     await waitFor(() => {
       expect(alertSpy).toHaveBeenCalledWith(
         "Couldn't open your photos",
-        'Please try again or use the camera instead.'
+        'Please try again or use the camera instead.',
+        undefined,
+        undefined
       );
     });
 

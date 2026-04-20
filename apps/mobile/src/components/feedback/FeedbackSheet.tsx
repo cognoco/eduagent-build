@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -16,6 +15,7 @@ import type { FeedbackCategory } from '@eduagent/schemas';
 import { useThemeColors } from '../../lib/theme';
 import { useFeedbackSubmit } from '../../hooks/use-feedback';
 import { formatApiError } from '../../lib/format-api-error';
+import { platformAlert } from '../../lib/platform-alert';
 
 const CATEGORIES: { value: FeedbackCategory; label: string }[] = [
   { value: 'bug', label: 'Bug' },
@@ -59,14 +59,14 @@ export function FeedbackSheet({
       },
       {
         onSuccess: () => {
-          Alert.alert(
+          platformAlert(
             'Thank you!',
             "We've received your feedback and will look into it.",
             [{ text: 'OK', onPress: handleClose }]
           );
         },
         onError: (err) => {
-          Alert.alert('Could not send feedback', formatApiError(err));
+          platformAlert('Could not send feedback', formatApiError(err));
         },
       }
     );

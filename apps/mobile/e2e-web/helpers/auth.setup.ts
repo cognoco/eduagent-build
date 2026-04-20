@@ -9,7 +9,15 @@ import { seedScenario } from './test-seed';
 setup.describe.configure({ mode: 'serial' });
 
 setup.beforeAll(async () => {
-  await mkdir(authStateDir, { recursive: true });
+  try {
+    await mkdir(authStateDir, { recursive: true });
+  } catch (err) {
+    throw new Error(
+      `Failed to create auth state directory at "${authStateDir}": ${
+        err instanceof Error ? err.message : String(err)
+      }`
+    );
+  }
 });
 
 for (const scenario of Object.values(authScenarios)) {

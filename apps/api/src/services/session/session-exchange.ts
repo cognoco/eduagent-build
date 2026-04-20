@@ -421,6 +421,7 @@ export async function prepareExchangeContext(
   if (isFreeform && session.exchangeCount === 0) {
     likelyLanguage = LANGUAGE_REGEX.test(userMessage);
     if (likelyLanguage) {
+      // Telemetry-only event — no Inngest handler; consumed by observability tooling.
       void inngest.send({
         name: 'app/ask.language_preclassified',
         data: {

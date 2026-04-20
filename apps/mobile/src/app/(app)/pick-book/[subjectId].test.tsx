@@ -26,7 +26,7 @@ jest.mock('expo-router', () => ({
 const mockMutateAsync = jest.fn();
 
 const mockRefetch = jest.fn();
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 const mockUseBookSuggestions = jest.fn((): any => ({
   data: [
     {
@@ -138,7 +138,8 @@ describe('PickBookScreen', () => {
       expect(alertSpy).toHaveBeenCalledWith(
         'Something went wrong',
         expect.stringContaining("Couldn't set up that book"),
-        expect.any(Array)
+        expect.any(Array),
+        undefined
       );
     });
 

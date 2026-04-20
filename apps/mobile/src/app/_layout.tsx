@@ -1,14 +1,8 @@
 import '../../global.css';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import {
-  Alert,
-  Platform,
-  Pressable,
-  Text,
-  View,
-  useColorScheme,
-} from 'react-native';
+import { Platform, Pressable, Text, View, useColorScheme } from 'react-native';
 import * as SecureStore from '../lib/secure-storage';
+import { platformAlert } from '../lib/platform-alert';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
@@ -143,7 +137,7 @@ function ThemedApp() {
         () => undefined
       );
       void signOut().catch(() => {
-        Alert.alert(
+        platformAlert(
           'Could not sign you out',
           'Please close and reopen the app, then sign in again.'
         );
@@ -335,7 +329,7 @@ function ClerkGate({
           </Text>
           <Pressable
             onPress={() =>
-              Alert.alert(
+              platformAlert(
                 'Please restart',
                 'Close the app completely and reopen it.'
               )

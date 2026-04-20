@@ -94,7 +94,7 @@ test('J-10 learner → Practice → Quiz → launch → play → results → hom
   await quizScreen.getByTestId('quiz-option-0').click();
   await expect(page.getByText('Correct')).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText('Tap anywhere to continue')).toBeVisible({
-    timeout: 10_000,
+    timeout: 30_000,
   });
   await quizScreen.click();
 

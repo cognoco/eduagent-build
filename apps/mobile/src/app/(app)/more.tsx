@@ -5,12 +5,12 @@ import {
   Pressable,
   ScrollView,
   Switch,
-  Alert,
   Linking,
   Share,
 } from 'react-native';
 import { useState, useCallback } from 'react';
 import * as SecureStore from '../../lib/secure-storage';
+import { platformAlert } from '../../lib/platform-alert';
 import { clearTransitionState } from '../../lib/auth-transition';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -218,7 +218,7 @@ export default function MoreScreen() {
         },
         {
           onError: () => {
-            Alert.alert(
+            platformAlert(
               'Could not update notification settings',
               'Please try again.'
             );
@@ -240,7 +240,7 @@ export default function MoreScreen() {
         },
         {
           onError: () => {
-            Alert.alert(
+            platformAlert(
               'Could not update notification settings',
               'Please try again.'
             );
@@ -256,7 +256,7 @@ export default function MoreScreen() {
       if (mode !== learningMode) {
         updateLearningMode.mutate(mode, {
           onError: () => {
-            Alert.alert('Could not save setting', 'Please try again.');
+            platformAlert('Could not save setting', 'Please try again.');
           },
         });
       }
@@ -271,7 +271,7 @@ export default function MoreScreen() {
         { accommodationMode: mode },
         {
           onError: () => {
-            Alert.alert('Could not save setting', 'Please try again.');
+            platformAlert('Could not save setting', 'Please try again.');
           },
         }
       );
@@ -287,7 +287,7 @@ export default function MoreScreen() {
         message: JSON.stringify(data, null, 2),
       });
     } catch (err: unknown) {
-      Alert.alert('Export failed', formatApiError(err));
+      platformAlert('Export failed', formatApiError(err));
     }
   }, [exportData]);
 
@@ -297,7 +297,7 @@ export default function MoreScreen() {
         'mailto:support@mentomate.app?subject=MentoMate%20Support'
       );
     } catch {
-      Alert.alert(
+      platformAlert(
         'Contact support',
         'Email support@mentomate.app for help with your account.'
       );
@@ -312,7 +312,7 @@ export default function MoreScreen() {
     const tier = subscription.tier;
     // Whitelist: only family/pro may add children. Blocks free and plus.
     if (tier !== 'family' && tier !== 'pro') {
-      Alert.alert(
+      platformAlert(
         'Upgrade required',
         'Adding child profiles requires a Family or Pro subscription.',
         [
@@ -327,7 +327,7 @@ export default function MoreScreen() {
     }
 
     if (familyData && familyData.profileCount >= familyData.maxProfiles) {
-      Alert.alert(
+      platformAlert(
         'Profile limit reached',
         `Your ${tier === 'pro' ? 'Pro' : 'Family'} plan supports up to ${
           familyData.maxProfiles
@@ -429,7 +429,7 @@ export default function MoreScreen() {
             if (celebrationLevel !== 'all') {
               updateCelebrationLevel.mutate('all', {
                 onError: () => {
-                  Alert.alert('Could not save setting', 'Please try again.');
+                  platformAlert('Could not save setting', 'Please try again.');
                 },
               });
             }
@@ -445,7 +445,7 @@ export default function MoreScreen() {
             if (celebrationLevel !== 'big_only') {
               updateCelebrationLevel.mutate('big_only', {
                 onError: () => {
-                  Alert.alert('Could not save setting', 'Please try again.');
+                  platformAlert('Could not save setting', 'Please try again.');
                 },
               });
             }
@@ -461,7 +461,7 @@ export default function MoreScreen() {
             if (celebrationLevel !== 'off') {
               updateCelebrationLevel.mutate('off', {
                 onError: () => {
-                  Alert.alert('Could not save setting', 'Please try again.');
+                  platformAlert('Could not save setting', 'Please try again.');
                 },
               });
             }
@@ -594,7 +594,7 @@ export default function MoreScreen() {
               );
               await signOut();
             } catch {
-              Alert.alert(
+              platformAlert(
                 'Could not sign out',
                 'Please try again in a moment.'
               );

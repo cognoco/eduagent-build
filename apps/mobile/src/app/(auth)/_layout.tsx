@@ -1,4 +1,4 @@
-import { Redirect, Stack, useLocalSearchParams } from 'expo-router';
+import { Redirect, Stack, useGlobalSearchParams } from 'expo-router';
 import { View } from 'react-native';
 import { useAuth } from '@clerk/clerk-expo';
 import { useThemeColors, useTokenVars } from '../../lib/theme';
@@ -7,7 +7,7 @@ import { normalizeRedirectPath } from '../../lib/normalize-redirect-path';
 
 export default function AuthRoutesLayout() {
   const { isLoaded, isSignedIn } = useAuth();
-  const { redirectTo } = useLocalSearchParams<{
+  const { redirectTo } = useGlobalSearchParams<{
     redirectTo?: string | string[];
   }>();
   const tokenVars = useTokenVars();
