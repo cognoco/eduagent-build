@@ -142,6 +142,7 @@ cache/
 apps/mobile/e2e-web/.auth/
 apps/mobile/e2e-web/playwright-report/
 apps/mobile/e2e-web/test-results/
+apps/mobile/e2e-web/test-results-*/
 
 # JVM crash logs (Android emulator, Gradle)
 hs_err_pid*.log

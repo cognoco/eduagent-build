@@ -7,6 +7,7 @@ import {
   Pressable,
   ActivityIndicator,
   ScrollView,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth, useClerk, useUser } from '@clerk/clerk-expo';
@@ -78,6 +79,20 @@ const PENDING_CONSENT_STATUSES = new Set([
   'PENDING',
   'PARENTAL_CONSENT_REQUESTED',
 ]);
+
+function resolveAuthRedirectPath(pathname: string | undefined): string {
+  if (Platform.OS === 'web') {
+    // Access window via globalThis to avoid TS DOM-lib requirement in RN tsconfig.
+    const win = (
+      globalThis as { window?: { location?: { pathname?: string } } }
+    ).window;
+    if (typeof win?.location?.pathname === 'string') {
+      return normalizeRedirectPath(win.location.pathname);
+    }
+  }
+
+  return normalizeRedirectPath(pathname);
+}
 
 /**
  * Whether the "Switch profile" button should appear inside consent gates.
@@ -1072,7 +1087,7 @@ export default function AppLayout() {
       console.warn(
         '[AUTH-DEBUG] (app) layout → NOT signed in, bouncing to sign-in'
       );
-    const redirectTo = encodeURIComponent(normalizeRedirectPath(pathname));
+    const redirectTo = encodeURIComponent(resolveAuthRedirectPath(pathname));
     return <Redirect href={`/sign-in?redirectTo=${redirectTo}` as const} />;
   }
 
