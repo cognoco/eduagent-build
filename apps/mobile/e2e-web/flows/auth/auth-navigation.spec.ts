@@ -21,7 +21,9 @@ test('J-02 auth screen navigation works on web @smoke', async ({ page }) => {
 
   await page.getByTestId('sign-in-link').click();
   await expect(page).toHaveURL(/\/sign-in(?:\?.*)?$/);
-  const forgotPasswordLink = page.getByTestId('forgot-password-link').first();
+  const forgotPasswordLink = page
+    .locator('[data-testid="forgot-password-link"]')
+    .last();
   await expect(forgotPasswordLink).toBeVisible({
     timeout: 30_000,
   });
@@ -34,7 +36,7 @@ test('J-02 auth screen navigation works on web @smoke', async ({ page }) => {
 
   await page.getByTestId('back-to-sign-in').click();
   await expect(page).toHaveURL(/\/sign-in(?:\?.*)?$/);
-  await expect(page.getByTestId('sign-in-button')).toBeVisible({
+  await expect(page.getByTestId('sign-in-email')).toBeVisible({
     timeout: 30_000,
   });
 });
