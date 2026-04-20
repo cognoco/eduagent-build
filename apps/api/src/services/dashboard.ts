@@ -103,8 +103,11 @@ export function generateChildSummary(input: DashboardInput): string {
       ? `down from ${input.sessionsLastWeek}`
       : 'same as';
 
+  const sw = (n: number): string => (n === 1 ? 'session' : 'sessions');
   parts.push(
-    `${input.sessionsThisWeek} sessions this week (${trendArrow} ${trendWord} last week)`
+    `${input.sessionsThisWeek} ${sw(
+      input.sessionsThisWeek
+    )} this week (${trendArrow} ${trendWord} last week)`
   );
 
   return `${input.displayName}: ${parts.join('. ')}.`;
@@ -127,7 +130,7 @@ export function calculateRetentionTrend(
 ): 'improving' | 'declining' | 'stable' {
   if (
     subjectRetentionData.length === 0 ||
-    (totalSessions != null && totalSessions < MIN_TREND_SESSIONS)
+    (totalSessions ?? 0) < MIN_TREND_SESSIONS
   )
     return 'stable';
   const strongCount = subjectRetentionData.filter(

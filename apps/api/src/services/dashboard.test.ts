@@ -193,44 +193,63 @@ describe('calculateTrend', () => {
 describe('calculateRetentionTrend', () => {
   it('returns improving when strong subjects outnumber weak+fading', () => {
     expect(
-      calculateRetentionTrend([
-        { status: 'strong' },
-        { status: 'strong' },
-        { status: 'fading' },
-      ])
+      calculateRetentionTrend(
+        [{ status: 'strong' }, { status: 'strong' }, { status: 'fading' }],
+        3
+      )
     ).toBe('improving');
   });
 
   it('returns declining when weak+fading outnumber strong', () => {
     expect(
-      calculateRetentionTrend([
-        { status: 'strong' },
-        { status: 'weak' },
-        { status: 'fading' },
-      ])
+      calculateRetentionTrend(
+        [{ status: 'strong' }, { status: 'weak' }, { status: 'fading' }],
+        3
+      )
     ).toBe('declining');
   });
 
   it('returns stable when counts are equal', () => {
     expect(
-      calculateRetentionTrend([{ status: 'strong' }, { status: 'weak' }])
+      calculateRetentionTrend([{ status: 'strong' }, { status: 'weak' }], 3)
     ).toBe('stable');
   });
 
   it('returns stable for empty array', () => {
-    expect(calculateRetentionTrend([])).toBe('stable');
+    expect(calculateRetentionTrend([], 3)).toBe('stable');
   });
 
   it('returns improving when all subjects are strong', () => {
     expect(
-      calculateRetentionTrend([{ status: 'strong' }, { status: 'strong' }])
+      calculateRetentionTrend([{ status: 'strong' }, { status: 'strong' }], 3)
     ).toBe('improving');
   });
 
   it('returns declining when all subjects are weak', () => {
     expect(
-      calculateRetentionTrend([{ status: 'weak' }, { status: 'fading' }])
+      calculateRetentionTrend([{ status: 'weak' }, { status: 'fading' }], 3)
     ).toBe('declining');
+  });
+
+  it('returns stable when totalSessions is undefined (caller did not pass it)', () => {
+    expect(
+      calculateRetentionTrend(
+        [{ status: 'strong' }, { status: 'strong' }],
+        undefined
+      )
+    ).toBe('stable');
+  });
+
+  it('returns stable when totalSessions is 1 (below MIN_TREND_SESSIONS)', () => {
+    expect(
+      calculateRetentionTrend([{ status: 'strong' }, { status: 'strong' }], 1)
+    ).toBe('stable');
+  });
+
+  it('returns meaningful trend when totalSessions >= MIN_TREND_SESSIONS', () => {
+    expect(
+      calculateRetentionTrend([{ status: 'strong' }, { status: 'strong' }], 3)
+    ).toBe('improving');
   });
 });
 

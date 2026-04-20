@@ -359,12 +359,14 @@ export default function ChildDetailScreen() {
               </Text>
             </View>
           )}
-          <View className="flex-row items-center gap-1">
-            <Ionicons name="star-outline" size={16} color="#eab308" />
-            <Text className="text-text-secondary text-sm">
-              {child.totalXp} XP
-            </Text>
-          </View>
+          {child.totalXp > 0 && (
+            <View className="flex-row items-center gap-1">
+              <Ionicons name="star-outline" size={16} color="#eab308" />
+              <Text className="text-text-secondary text-sm">
+                {child.totalXp} XP
+              </Text>
+            </View>
+          )}
         </View>
       )}
 
