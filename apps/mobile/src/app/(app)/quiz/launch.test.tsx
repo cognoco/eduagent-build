@@ -64,7 +64,26 @@ jest.mock('./_layout', () => ({
   }),
 }));
 
-const { default: QuizLaunchScreen } = require('./launch');
+const { default: QuizLaunchScreen, friendlyErrorMessage } = require('./launch');
+
+describe('friendlyErrorMessage', () => {
+  it('returns friendly message for UPSTREAM_ERROR code', () => {
+    const result = friendlyErrorMessage('UPSTREAM_ERROR', 'anything');
+    expect(result).toBe('Something went wrong creating your quiz. Try again!');
+  });
+
+  it('returns generic message for long fallback strings (over 60 chars)', () => {
+    const longMessage =
+      'API error 502: {"code":"UPSTREAM_ERROR","message":"Quiz LLM returned invalid structured output"}';
+    const result = friendlyErrorMessage(undefined, longMessage);
+    expect(result).toBe('Something went wrong. Try again!');
+  });
+
+  it('passes through short non-technical fallback messages', () => {
+    const result = friendlyErrorMessage(undefined, 'Try again later');
+    expect(result).toBe('Try again later');
+  });
+});
 
 describe('QuizLaunchScreen', () => {
   beforeEach(() => {

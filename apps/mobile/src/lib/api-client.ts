@@ -83,6 +83,21 @@ export class ForbiddenError extends Error {
   }
 }
 
+/**
+ * [F-Q-01] Typed error for 5xx upstream responses.
+ * Thrown by customFetch so callers can read `.code` instead of parsing
+ * raw JSON from Error.message.
+ */
+export class UpstreamError extends Error {
+  readonly code: string;
+
+  constructor(message: string, code: string) {
+    super(message);
+    this.name = 'UpstreamError';
+    this.code = code;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Authenticated Hono RPC client
 // ---------------------------------------------------------------------------
@@ -167,7 +182,21 @@ export function useApiClient(): ApiClient {
           );
         }
 
+        // [F-Q-01] Parse JSON body for non-ok responses so typed errors
+        // carry a .code property that screens can classify.
         const errBody = await res.text().catch(() => '');
+        let parsed: { code?: string; message?: string } | null = null;
+        try {
+          parsed = JSON.parse(errBody) as { code?: string; message?: string };
+        } catch {
+          // Not JSON — fall through to generic error
+        }
+        if (parsed?.code) {
+          throw new UpstreamError(
+            parsed.message ?? (errBody || res.statusText),
+            parsed.code
+          );
+        }
         throw new Error(
           `API error ${res.status}: ${errBody || res.statusText}`
         );

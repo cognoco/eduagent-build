@@ -274,10 +274,12 @@ export function streamSSEViaXHR(
       }`;
       try {
         const parsed = JSON.parse(xhr.responseText || '{}') as {
+          code?: string;
           error?: { code?: string };
         };
-        if (typeof parsed.error?.code === 'string') {
-          apiError.code = parsed.error.code;
+        const errorCode = parsed.code ?? parsed.error?.code;
+        if (typeof errorCode === 'string') {
+          apiError.code = errorCode;
         }
       } catch {
         // Ignore malformed error bodies — formatApiError handles plain text.
@@ -327,10 +329,12 @@ export function streamSSEViaXHR(
       apiError.status = xhr.status;
       try {
         const parsed = JSON.parse(xhr.responseText || '{}') as {
+          code?: string;
           error?: { code?: string };
         };
-        if (typeof parsed.error?.code === 'string') {
-          apiError.code = parsed.error.code;
+        const errorCode = parsed.code ?? parsed.error?.code;
+        if (typeof errorCode === 'string') {
+          apiError.code = errorCode;
         }
       } catch {
         // Ignore malformed error bodies here — formatApiError handles plain text.

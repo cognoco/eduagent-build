@@ -87,6 +87,22 @@ const FRIENDLY_MESSAGE_MAP: Array<{
   },
 ];
 
+/**
+ * [F-Q-01] Detects messages that are technical/internal and should never
+ * reach a user — LLM provider errors, JSON fragments, stack traces, etc.
+ */
+function isTechnicalMessage(msg: string): boolean {
+  return (
+    /\bLLM\b|structured output|upstream|provider|JSON|malformed|parse error/i.test(
+      msg
+    ) ||
+    // JSON fragment or object literal in the message
+    /\{"|\{\\"|^\[/.test(msg) ||
+    // Stack trace indicators
+    /\bat\b.*\.(ts|js):\d+/i.test(msg)
+  );
+}
+
 /** Returns a friendly version if the message matches known jargon patterns. */
 function friendlyMessage(raw: string): string | null {
   for (const entry of FRIENDLY_MESSAGE_MAP) {
@@ -182,6 +198,16 @@ export function formatApiError(error: unknown): string {
       return msg;
     }
 
+    // [F-Q-01] Upstream/technical errors — always show generic server message.
+    // Catches both UpstreamError (from customFetch) and duck-typed .code
+    // errors from SSE streaming path.
+    if (
+      effectiveCode === 'UPSTREAM_ERROR' ||
+      effectiveCode === 'INTERNAL_ERROR'
+    ) {
+      return SERVER_MESSAGE;
+    }
+
     // 2a. QuotaExceededError — pass through its message
     if (error.name === 'QuotaExceededError') {
       return msg;
@@ -215,9 +241,13 @@ export function formatApiError(error: unknown): string {
         if (
           parsedApiBody.apiMessage &&
           parsedApiBody.apiMessage.length < 200 &&
-          !isGenericServerMessage(parsedApiBody.apiMessage)
+          !isGenericServerMessage(parsedApiBody.apiMessage) &&
+          !isTechnicalMessage(parsedApiBody.apiMessage)
         ) {
-          return parsedApiBody.apiMessage;
+          return (
+            friendlyMessage(parsedApiBody.apiMessage) ??
+            parsedApiBody.apiMessage
+          );
         }
         return SERVER_MESSAGE;
       }

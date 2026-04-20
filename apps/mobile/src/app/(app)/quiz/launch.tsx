@@ -11,7 +11,7 @@ import { useQuizFlow } from './_layout';
 
 // [F-Q-01] Map error codes to kid-friendly copy so the error panel
 // never leaks raw JSON envelopes or HTTP status codes. The fallback trims any
-// message over 100 chars — those are almost always raw API payloads.
+// message over 60 chars — those are almost always raw API payloads.
 export function friendlyErrorMessage(
   code: string | undefined,
   fallback: string
@@ -26,7 +26,7 @@ export function friendlyErrorMessage(
     case 'VALIDATION_ERROR':
       return 'Something went wrong. Please try a different activity.';
     default:
-      return fallback.length > 100
+      return fallback.length > 60
         ? 'Something went wrong. Try again!'
         : fallback;
   }
