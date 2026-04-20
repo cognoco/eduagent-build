@@ -104,16 +104,6 @@ export function getRetentionAwareStartingRung(
   }
 }
 
-/**
- * Legacy detector — retained only for backward-compat in regression tests
- * that exercise the strict-regex behaviour. Production code now reads the
- * envelope `signals.partial_progress` field via parseExchangeEnvelope and
- * the structured ai_response metadata column. [F1.2 migration]
- */
-export function detectPartialProgress(aiResponse: string): boolean {
-  return /(?:^|\n)\[PARTIAL_PROGRESS\]\s*$/.test(aiResponse);
-}
-
 // ---------------------------------------------------------------------------
 // Escalation evaluation
 // ---------------------------------------------------------------------------
@@ -133,7 +123,7 @@ export function detectPartialProgress(aiResponse: string): boolean {
  *
  * Partial progress detection (Gap 3): If the learner's response shows
  * genuine engagement (heuristic: length + not stuck) OR the previous AI
- * response contained [PARTIAL_PROGRESS], the escalation counter is frozen.
+ * response signalled partial progress via the envelope, the escalation counter is frozen.
  * The student can stay at a rung indefinitely as long as they're making
  * progress — escalation only fires when engagement drops.
  *
@@ -172,7 +162,7 @@ export function evaluateEscalation(
   // Heuristic: response is long enough to be a genuine attempt, not a stuck indicator
   const isEngagedResponse = normalised.length >= ENGAGED_RESPONSE_MIN_LENGTH;
 
-  // Authoritative signal: LLM [PARTIAL_PROGRESS] marker from the previous AI response.
+  // Authoritative signal: envelope `signals.partial_progress` from the previous AI response.
   // Length heuristic alone is insufficient (verbose wrong answers would stall escalation).
   // Hold only when: LLM signalled progress, OR both engaged length AND at early exchanges.
   const hasPartialProgress =

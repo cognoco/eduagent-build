@@ -28,7 +28,43 @@
 ```json
 {
   "nativeLanguage": "cs",
-  "ageYears": 17
+  "ageYears": 17,
+  "interests": [
+    {
+      "label": {
+        "label": "French literature",
+        "context": "both"
+      },
+      "context": "free_time"
+    },
+    {
+      "label": {
+        "label": "philosophy",
+        "context": "both"
+      },
+      "context": "free_time"
+    },
+    {
+      "label": {
+        "label": "existentialism",
+        "context": "free_time"
+      },
+      "context": "free_time"
+    },
+    {
+      "label": {
+        "label": "creative writing",
+        "context": "free_time"
+      },
+      "context": "free_time"
+    }
+  ],
+  "libraryTopics": [
+    "Camus — L'Étranger",
+    "French subjunctive",
+    "essay structure",
+    "Enlightenment thinkers"
+  ]
 }
 ```
 
@@ -43,6 +79,9 @@ THEME: Write sentences inspired by age-appropriate literature and stories.
 Draw from classic and contemporary literature — novels, short stories, literary fiction. Think Hemingway, Kafka, Čapek, or contemporary bestsellers. Use adult-level vocabulary and sentence structure.
 Write sentences that feel like they come from a story — natural prose with vivid imagery.
 Do NOT use geographical, scientific, or encyclopaedia-style factual content.
+PERSONALIZATION: This learner loves: [object Object], [object Object], [object Object], [object Object]. Where it fits naturally within the age-appropriate literary register, theme the passage around these interests (e.g. a dinosaur-loving child should get a narrative set in prehistoric times, not a generic fantasy forest). Do NOT sacrifice sentence quality, complexity, or literary style to chase the interest theme.
+LIBRARY TOPICS: The learner is currently studying: Camus — L'Étranger, French subjunctive, essay structure, Enlightenment thinkers. Prefer narrative themes that intersect with these topics where the literary register allows (e.g. a learner studying the Mesozoic era could get a passage set in prehistoric times).
+
 
 CONSTRAINTS:
 - 6-10 sentences total
@@ -93,7 +132,7 @@ Generate a dictation for me.
 
 ## Builder notes
 
-- Uses fine-grained ageYears=17 — 4-bucket literary scaling (strongest age handling in the codebase).
+- Uses fine-grained ageYears=17 — 2-bucket literary scaling (≤13 chapter-book, >13 literary).
 - Native language drives punctuation-name mapping.
-- Interests NOT used (gap flagged in audit P0) — dinosaur kid gets same Dahl theme as horse kid.
-- Library topics NOT used (gap flagged in audit P0) — WWII learner could get period-appropriate narrative passages.
+- Interests wired (audit P0.1): [object Object], [object Object], [object Object], [object Object].
+- Library topics wired (audit P0.1): Camus — L'Étranger, French subjunctive, essay structure, Enlightenment thinkers.

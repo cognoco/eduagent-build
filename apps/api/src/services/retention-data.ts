@@ -193,7 +193,7 @@ export async function getSubjectRetention(
   profileId: string,
   subjectId: string
 ): Promise<{
-  topics: (RetentionCardResponse & { topicTitle: string })[];
+  topics: (RetentionCardResponse & { topicTitle: string; bookId: string })[];
   reviewDueCount: number;
 }> {
   const repo = createScopedRepository(db, profileId);
@@ -213,6 +213,7 @@ export async function getSubjectRetention(
   });
   const topicIds = topics.map((t) => t.id);
   const topicTitleMap = new Map(topics.map((t) => [t.id, t.title]));
+  const topicBookIdMap = new Map(topics.map((t) => [t.id, t.bookId]));
 
   // Get retention cards for this subject's topics (DB-level filter — issue #22.2)
   const subjectCards =
@@ -231,11 +232,13 @@ export async function getSubjectRetention(
   // Library Topics tab shows the full curriculum, not just started topics.
   const cardByTopicId = new Map(subjectCards.map((c) => [c.topicId, c]));
   const allTopics = topicIds.map((tid) => {
+    const bookId = topicBookIdMap.get(tid) ?? '';
     const card = cardByTopicId.get(tid);
     if (card) {
       return {
         ...mapRetentionCardRow(card),
         topicTitle: topicTitleMap.get(tid) ?? tid,
+        bookId,
       };
     }
     // Synthesize a zero-state entry for topics never started
@@ -250,6 +253,7 @@ export async function getSubjectRetention(
       failureCount: 0,
       evaluateDifficultyRung: null,
       topicTitle: topicTitleMap.get(tid) ?? tid,
+      bookId,
     };
   });
 

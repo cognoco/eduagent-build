@@ -180,9 +180,7 @@ export default function InterviewScreen() {
         (exchange, index): ChatMessage => ({
           id: `draft-${index}`,
           role: exchange.role === 'assistant' ? 'assistant' : 'user',
-          content: exchange.content
-            .replace(/\[INTERVIEW_COMPLETE\]/g, '')
-            .trimEnd(),
+          content: exchange.content.trimEnd(),
         })
       ) ?? [];
 
@@ -297,10 +295,7 @@ export default function InterviewScreen() {
         await streamInterview(
           text,
           (accumulated) => {
-            // Strip the [INTERVIEW_COMPLETE] marker so it never appears in the UI
-            const clean = accumulated
-              .replace(/\[INTERVIEW_COMPLETE\]/g, '')
-              .trimEnd();
+            const clean = accumulated.trimEnd();
             setMessages((prev) =>
               prev.map((m) =>
                 m.id === streamMsgId ? { ...m, content: clean } : m
@@ -313,9 +308,7 @@ export default function InterviewScreen() {
                 m.id === streamMsgId
                   ? {
                       ...m,
-                      content: m.content
-                        .replace(/\[INTERVIEW_COMPLETE\]/g, '')
-                        .trimEnd(),
+                      content: m.content.trimEnd(),
                       streaming: false,
                     }
                   : m

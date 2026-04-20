@@ -117,10 +117,13 @@ export default function PickBookScreen(): React.ReactElement {
     }
   };
 
+  const MIN_TOPIC_INPUT_LENGTH = 3;
+
   const handleCustomSubmit = async () => {
     const trimmed = customText.trim();
     // BUG-323 + BUG-361: Double guard — isPending + ref lock
-    if (!trimmed || filing.isPending || filingInFlight.current) return;
+    // BUG-490: Require at least 3 characters to prevent stub book titles
+    if (trimmed.length < MIN_TOPIC_INPUT_LENGTH || filing.isPending || filingInFlight.current) return;
     filingInFlight.current = true;
     try {
       // M-10: Include subject name as context so the filing LLM places
@@ -313,10 +316,10 @@ export default function PickBookScreen(): React.ReactElement {
             <View className="flex-row gap-3">
               <Pressable
                 onPress={() => void handleCustomSubmit()}
-                disabled={!customText.trim() || filing.isPending}
+                disabled={customText.trim().length < MIN_TOPIC_INPUT_LENGTH || filing.isPending}
                 className="flex-1 bg-primary rounded-button py-3 items-center min-h-[48px] justify-center"
                 style={{
-                  opacity: customText.trim() && !filing.isPending ? 1 : 0.5,
+                  opacity: customText.trim().length >= MIN_TOPIC_INPUT_LENGTH && !filing.isPending ? 1 : 0.5,
                 }}
                 testID="pick-book-custom-submit"
               >

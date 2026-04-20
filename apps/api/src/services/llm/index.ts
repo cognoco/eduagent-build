@@ -12,7 +12,7 @@ export { createGeminiProvider } from './providers/gemini';
 export { createOpenAIProvider } from './providers/openai';
 export { createAnthropicProvider } from './providers/anthropic';
 export { getTextContent } from './types';
-export { parseEnvelope, logParserDisagreement } from './envelope';
+export { parseEnvelope } from './envelope';
 export { streamEnvelopeReply, teeEnvelopeStream } from './stream-envelope';
 export type {
   ParseEnvelopeResult,

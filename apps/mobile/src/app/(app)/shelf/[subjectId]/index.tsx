@@ -17,7 +17,10 @@ import { useBookSuggestions } from '../../../../hooks/use-book-suggestions';
 import { useBooks } from '../../../../hooks/use-books';
 import { useFiling } from '../../../../hooks/use-filing';
 import { useSubjects } from '../../../../hooks/use-subjects';
-import { classifyApiError } from '../../../../lib/format-api-error';
+import {
+  classifyApiError,
+  recoveryActions,
+} from '../../../../lib/format-api-error';
 import { goBackOrReplace } from '../../../../lib/navigation';
 import { useThemeColors } from '../../../../lib/theme';
 
@@ -242,6 +245,11 @@ export default function ShelfScreen() {
       classified.message !== 'Something unexpected happened. Please try again.'
         ? classified.message
         : 'Unable to load this shelf. Please try again.';
+    const actions = recoveryActions(classified, {
+      retry: handleRetry,
+      goBack: handleBack,
+      goHome: () => router.replace('/(app)/home' as never),
+    });
 
     return (
       <View
@@ -253,16 +261,8 @@ export default function ShelfScreen() {
           variant="centered"
           title="Couldn't load this shelf"
           message={errorMessage}
-          primaryAction={{
-            label: 'Retry',
-            onPress: handleRetry,
-            testID: 'shelf-retry-button',
-          }}
-          secondaryAction={{
-            label: 'Go Back',
-            onPress: handleBack,
-            testID: 'shelf-back-button',
-          }}
+          primaryAction={actions.primary}
+          secondaryAction={actions.secondary}
         />
       </View>
     );

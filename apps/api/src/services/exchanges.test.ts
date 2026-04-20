@@ -73,9 +73,13 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('Crisp, professional');
   });
 
-  it('falls back to adult voice when birthYear is unavailable', () => {
+  // [B.5] Defense-in-depth for the strict 11+ product: null birthYear
+  // means "unknown age inside the 11-17-and-up range", so the fallback
+  // serves TEEN_VOICE instead of adult-anchored text.
+  it('falls back to TEEN voice when birthYear is unavailable (defense-in-depth for 11+)', () => {
     const prompt = buildSystemPrompt({ ...baseContext, birthYear: null });
-    expect(prompt).toContain('Crisp, professional');
+    expect(prompt).toContain('Peer-adjacent and matter-of-fact');
+    expect(prompt).not.toContain('Crisp, professional');
   });
 
   describe('first-exchange teaching opener', () => {
@@ -155,7 +159,7 @@ describe('buildSystemPrompt', () => {
   it('uses teach-first role identity (not Socratic)', () => {
     const prompt = buildSystemPrompt(baseContext);
     // New identity should be present (F3 tone pass: "calm, clear tutor" replaces "learning mate")
-    expect(prompt).toContain('calm, clear tutor');
+    expect(prompt).toContain('calm, clear mentor');
     expect(prompt).toContain('Teach directly and check understanding');
     // Old Socratic identity should be gone
     expect(prompt).not.toContain('asks the right question at the right time');

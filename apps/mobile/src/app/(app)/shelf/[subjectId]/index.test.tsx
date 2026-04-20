@@ -102,15 +102,21 @@ jest.mock('../../../../lib/theme', () => ({
 }));
 
 // --- formatApiError ---
-jest.mock('../../../../lib/format-api-error', () => ({
-  formatApiError: (err: unknown) =>
-    err instanceof Error ? err.message : 'Unknown error',
-  classifyApiError: (err: unknown) => ({
-    message: err instanceof Error ? err.message : 'Unknown error',
-    category: 'unknown' as const,
-    recovery: 'retry' as const,
-  }),
-}));
+jest.mock('../../../../lib/format-api-error', () => {
+  const actual = jest.requireActual(
+    '../../../../lib/format-api-error'
+  ) as Record<string, unknown>;
+  return {
+    ...actual,
+    formatApiError: (err: unknown) =>
+      err instanceof Error ? err.message : 'Unknown error',
+    classifyApiError: (err: unknown) => ({
+      message: err instanceof Error ? err.message : 'Unknown error',
+      category: 'unknown' as const,
+      recovery: 'retry' as const,
+    }),
+  };
+});
 
 // --- Library components ---
 jest.mock('../../../../components/library/BookCard', () => ({
@@ -263,8 +269,8 @@ describe('ShelfScreen', () => {
     const { getByTestId, getByText } = render(<ShelfScreen />);
     expect(getByTestId('shelf-error')).toBeTruthy();
     expect(getByText('Failed to load books')).toBeTruthy();
-    expect(getByTestId('shelf-retry-button')).toBeTruthy();
-    expect(getByTestId('shelf-back-button')).toBeTruthy();
+    expect(getByTestId('recovery-retry')).toBeTruthy();
+    expect(getByTestId('recovery-go-home')).toBeTruthy();
   });
 
   it('retry button calls refetch on booksQuery when booksQuery fails [BUG-82]', () => {
@@ -277,7 +283,7 @@ describe('ShelfScreen', () => {
     });
 
     const { getByTestId } = render(<ShelfScreen />);
-    fireEvent.press(getByTestId('shelf-retry-button'));
+    fireEvent.press(getByTestId('recovery-retry'));
     expect(mockBooksRefetch).toHaveBeenCalledTimes(1);
   });
 
@@ -291,8 +297,8 @@ describe('ShelfScreen', () => {
     });
 
     const { getByTestId } = render(<ShelfScreen />);
-    fireEvent.press(getByTestId('shelf-back-button'));
-    expect(mockBack).toHaveBeenCalledTimes(1);
+    fireEvent.press(getByTestId('recovery-go-home'));
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
   });
 
   it('shows error state with retry and back buttons when subjectsQuery fails [BUG-82]', () => {
@@ -307,8 +313,8 @@ describe('ShelfScreen', () => {
     const { getByTestId, getByText } = render(<ShelfScreen />);
     expect(getByTestId('shelf-error')).toBeTruthy();
     expect(getByText('Subjects unavailable')).toBeTruthy();
-    expect(getByTestId('shelf-retry-button')).toBeTruthy();
-    expect(getByTestId('shelf-back-button')).toBeTruthy();
+    expect(getByTestId('recovery-retry')).toBeTruthy();
+    expect(getByTestId('recovery-go-home')).toBeTruthy();
   });
 
   it('retry button refetches both queries when subjectsQuery fails [BUG-82]', () => {
@@ -321,7 +327,7 @@ describe('ShelfScreen', () => {
     });
 
     const { getByTestId } = render(<ShelfScreen />);
-    fireEvent.press(getByTestId('shelf-retry-button'));
+    fireEvent.press(getByTestId('recovery-retry'));
     expect(mockSubjectsRefetch).toHaveBeenCalledTimes(1);
   });
 

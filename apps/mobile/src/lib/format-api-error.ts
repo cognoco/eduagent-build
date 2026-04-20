@@ -173,6 +173,73 @@ export interface FormattedApiError {
   recovery: 'retry' | 'go-back' | 'sign-out' | 'none';
 }
 
+interface RecoveryAction {
+  label: string;
+  onPress: () => void;
+  testID: string;
+}
+
+/**
+ * Maps a classified error's `recovery` field into primary + secondary actions
+ * suitable for `ErrorFallback` or `platformAlert` buttons.
+ *
+ * - `retry`    → primary "Try Again",   secondary "Go Home"
+ * - `go-back`  → primary "Go Back",     secondary "Go Home"
+ * - `sign-out` → primary "Sign Out",    secondary "Go Home"
+ * - `none`     → primary "Go Home" only (quota screens — nothing to retry)
+ */
+export function recoveryActions(
+  classified: FormattedApiError,
+  handlers: {
+    retry?: () => void;
+    goBack?: () => void;
+    goHome?: () => void;
+    signOut?: () => void;
+  }
+): { primary?: RecoveryAction; secondary?: RecoveryAction } {
+  const goHome = handlers.goHome
+    ? { label: 'Go Home', onPress: handlers.goHome, testID: 'recovery-go-home' }
+    : undefined;
+
+  switch (classified.recovery) {
+    case 'retry':
+      return {
+        primary: handlers.retry
+          ? {
+              label: 'Try Again',
+              onPress: handlers.retry,
+              testID: 'recovery-retry',
+            }
+          : goHome,
+        secondary: handlers.retry ? goHome : undefined,
+      };
+    case 'go-back':
+      return {
+        primary: handlers.goBack
+          ? {
+              label: 'Go Back',
+              onPress: handlers.goBack,
+              testID: 'recovery-go-back',
+            }
+          : goHome,
+        secondary: handlers.goBack ? goHome : undefined,
+      };
+    case 'sign-out':
+      return {
+        primary: handlers.signOut
+          ? {
+              label: 'Sign Out',
+              onPress: handlers.signOut,
+              testID: 'recovery-sign-out',
+            }
+          : goHome,
+        secondary: handlers.signOut ? goHome : undefined,
+      };
+    case 'none':
+      return { primary: goHome };
+  }
+}
+
 /**
  * Classifies an error into a structured `FormattedApiError`.
  *

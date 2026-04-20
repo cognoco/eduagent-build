@@ -898,16 +898,29 @@ export default function BookScreen() {
             </View>
           )}
 
-        {/* Empty topics state */}
+        {/* Empty topics state — BUG-487: provide actionable escape, not just Go back */}
         {topics.length === 0 && !needsGeneration && (
           <View className="px-5 py-8 items-center" testID="book-empty-topics">
             <Text className="text-body text-text-secondary text-center mb-2">
-              No topics in this book yet.
+              This book doesn't have any topics yet. Start a learning session to add topics, or go back to the library.
             </Text>
+            <Pressable
+              onPress={() => router.replace('/(app)/library' as never)}
+              className="bg-primary rounded-button px-6 py-3 items-center min-h-[48px] justify-center mb-3"
+              testID="book-empty-go-library"
+              accessibilityRole="button"
+              accessibilityLabel="Go to Library"
+            >
+              <Text className="text-text-inverse text-body font-semibold">
+                Go to Library
+              </Text>
+            </Pressable>
             <Pressable
               onPress={handleBack}
               className="bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
               testID="book-empty-back"
+              accessibilityRole="button"
+              accessibilityLabel="Go back"
             >
               <Text className="text-text-primary text-body font-semibold">
                 Go back

@@ -107,7 +107,12 @@ function installLlmMocks(): void {
         lastMessage.includes('I want to learn')
       ) {
         return buildLlmResult(
-          'What specific topics interest you? [INTERVIEW_COMPLETE]'
+          JSON.stringify({
+            reply: 'What specific topics interest you?',
+            signals: { ready_to_finish: true },
+            ui_hints: {},
+            confidence: 'high',
+          })
         );
       }
 
@@ -119,12 +124,12 @@ function installLlmMocks(): void {
     provider: 'mock',
     model: 'mock-stream',
     stream: (async function* () {
-      yield 'We ';
-      yield 'should ';
-      yield 'start ';
-      yield 'with ';
-      yield 'algebra. ';
-      yield '[INTERVIEW_COMPLETE]';
+      yield JSON.stringify({
+        reply: 'We should start with algebra.',
+        signals: { ready_to_finish: true },
+        ui_hints: {},
+        confidence: 'high',
+      });
     })(),
   }));
 }
@@ -289,6 +294,7 @@ describe('Integration: Onboarding interview routes', () => {
       goals: ['learn algebra'],
       experienceLevel: 'beginner',
       currentKnowledge: 'basic arithmetic',
+      interests: [],
     });
 
     const persisted = await loadCurriculum(subject.id);

@@ -3,6 +3,7 @@ import {
   type ExchangeContext,
 } from '../../src/services/exchanges';
 import { buildMemoryBlock } from '../../src/services/learner-profile';
+import { llmResponseEnvelopeSchema } from '@eduagent/schemas';
 import type { EvalProfile } from '../fixtures/profiles';
 import {
   HISTORY_S1_RUNG1,
@@ -321,6 +322,8 @@ export const exchangesFlow: FlowDefinition<ExchangeScenarioInput> = {
   id: 'exchanges',
   name: 'Exchanges (main tutoring loop)',
   sourceFile: 'apps/api/src/services/exchanges.ts:buildSystemPrompt',
+  emitsEnvelope: true,
+  expectedResponseSchema: llmResponseEnvelopeSchema,
 
   buildPromptInput(): ExchangeScenarioInput | null {
     // Not used — enumerateScenarios fans out instead.
@@ -363,10 +366,11 @@ export const exchangesFlow: FlowDefinition<ExchangeScenarioInput> = {
           input.context.exchangeHistory.length
         }, exchangeCount: ${input.context.exchangeCount ?? 0}`,
         `Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)`,
-        `expectedResponseSchema unset — main loop returns free text today; flip to llmResponseEnvelopeSchema after F1.1 lands`,
+        `expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs`,
       ],
     };
   },
 
-  // No runLive — main loop is streaming; Tier 2 wires up after F1.1 lands.
+  // No runLive yet — main loop is streaming. expectedResponseSchema is set
+  // so Tier 2 validates envelope shape automatically once runLive is added.
 };

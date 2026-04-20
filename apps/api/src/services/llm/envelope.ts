@@ -2,7 +2,6 @@ import {
   llmResponseEnvelopeSchema,
   type LlmResponseEnvelope,
 } from '@eduagent/schemas';
-import { createLogger } from '../logger';
 
 // ---------------------------------------------------------------------------
 // parseEnvelope — shared helper for all LLM flows migrating to the structured
@@ -16,8 +15,6 @@ import { createLogger } from '../logger';
 // should either fail the flow, fall back to a safe default, or log the raw
 // text for triage. See docs/specs/2026-04-18-llm-response-envelope.md.
 // ---------------------------------------------------------------------------
-
-const logger = createLogger();
 
 export type ParseEnvelopeSuccess = {
   ok: true;
@@ -102,26 +99,4 @@ export function parseEnvelope(response: string): ParseEnvelopeResult {
   }
 
   return { ok: true, envelope: result.data };
-}
-
-/**
- * Telemetry helper — logs when the legacy marker parser and the new envelope
- * parser disagree on a terminal-state decision. Temporary during migration;
- * remove after 2 weeks of clean data per the envelope spec.
- */
-export function logParserDisagreement(params: {
-  flow: string;
-  profileId: string;
-  oldResult: boolean;
-  newResult: boolean;
-  parseFailureReason?: ParseEnvelopeFailureReason;
-}): void {
-  if (params.oldResult === params.newResult) return;
-  logger.warn('envelope_migration.disagreement', {
-    flow: params.flow,
-    profile_id: params.profileId,
-    old_result: params.oldResult,
-    new_result: params.newResult,
-    parse_failure_reason: params.parseFailureReason,
-  });
 }

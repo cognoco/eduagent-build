@@ -61,14 +61,18 @@ Rules:
 - "interests": only include explicit enthusiasm, repeated curiosity, or strong engagement.
 - "strengths": only include clear mastery.
 - "struggles": only include repeated confusion on the same concept.
-- "resolvedTopics": include concepts that started shaky and ended with understanding.
+- "resolvedTopics": include concepts that started shaky and ended with understanding. Use this field when one of the {knownStruggles} below visibly clicks during this session.
 - "communicationNotes": short notes like "prefers short explanations" or "responds well to examples".
 - "urgencyDeadline": if the learner mentions an upcoming test, exam, quiz, or deadline, extract the reason and estimate how many days away it is (1-30). Return null if no deadline is mentioned.
 - Return null for any field without signal.
 - If the subject is freeform or unknown, use null for subject when needed.
+- Do NOT include any of {suppressedTopics} in "interests", "strengths", or "struggles" — the parent or learner has explicitly asked to hide these.
+- When emitting "struggles", avoid duplicating topics already listed in {knownStruggles} unless evidence in this session escalates confidence — this is a delta, not a full snapshot.
 
 Subject: Languages
 Topic: Spanish present tense verbs
+Known existing struggles for this learner (for context — do not re-emit unless evidence warrants): {knownStruggles}
+Suppressed topics (do NOT surface in any output field): {suppressedTopics}
 
 <learner_raw_input>
 I want to learn about Spanish present tense verbs. I'm into horses.

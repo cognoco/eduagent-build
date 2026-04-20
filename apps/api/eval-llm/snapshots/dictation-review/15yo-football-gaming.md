@@ -1,6 +1,6 @@
-# Dictation — Review (multimodal) × 15yo-football-gaming
+# Dictation — Review × 15yo-football-gaming
 
-> **Flow source:** `apps/api/src/services/dictation/review.ts:SYSTEM_PROMPT`
+> **Flow source:** `apps/api/src/services/dictation/review.ts:buildReviewSystemPrompt`
 > **Profile:** 15-year-old US teen, English native, into football and competitive gaming, low patience for formality
 
 ## Profile summary
@@ -27,10 +27,10 @@
 
 ```json
 {
-  "language": "en",
-  "originalSentences": [
-    "The cat ran through the garden.",
-    "After a while it began to rain."
+  "ageYears": 15,
+  "preferredExplanations": [
+    "examples",
+    "analogies"
   ]
 }
 ```
@@ -62,23 +62,19 @@ RESPOND WITH ONLY valid JSON in this exact format — no prose before or after:
 
 If there are no mistakes, return an empty array for "mistakes".
 Generate explanations in the child's language as instructed.
+
+EXPLANATION STYLE:
+You may use precise grammar and punctuation terminology. Keep explanations concise — the learner can handle technical language.
 ```
 
 ## Generated prompt — user
 
 ```
-[image part omitted]
-
-Original sentences:
-1. The cat ran through the garden.
-2. After a while it began to rain.
-
-Please generate all explanations in en.
+(multimodal — image + original sentences supplied at runtime)
 ```
 
 ## Builder notes
 
-- System prompt is static — zero personalization.
-- The ONLY personalized parameter is the explanation language.
-- Missing: age (explanation complexity calibration), learning style (humor/step-by-step register), struggle history (recurring-pattern-aware feedback).
-- Tier 2 (--live) requires a real handwriting image; not synthesized by this harness.
+- ageYears=15 — explanation register calibrated to age.
+- preferredExplanations=["examples","analogies"] — tone shaped by style preferences.
+- Struggle history NOT used (gap flagged in audit P2) — recurring patterns not surfaced to reviewer.

@@ -1,6 +1,6 @@
-# Dictation — Review (multimodal) × 11yo-czech-animals
+# Dictation — Review × 11yo-czech-animals
 
-> **Flow source:** `apps/api/src/services/dictation/review.ts:SYSTEM_PROMPT`
+> **Flow source:** `apps/api/src/services/dictation/review.ts:buildReviewSystemPrompt`
 > **Profile:** 11-year-old EU girl, Czech native, youngest in the target range, loves animals and nature, thorough pacer
 
 ## Profile summary
@@ -27,10 +27,10 @@
 
 ```json
 {
-  "language": "cs",
-  "originalSentences": [
-    "Kočka běžela zahradou.",
-    "Za chvíli začalo pršet."
+  "ageYears": 11,
+  "preferredExplanations": [
+    "stories",
+    "examples"
   ]
 }
 ```
@@ -62,23 +62,19 @@ RESPOND WITH ONLY valid JSON in this exact format — no prose before or after:
 
 If there are no mistakes, return an empty array for "mistakes".
 Generate explanations in the child's language as instructed.
+
+EXPLANATION STYLE:
+Use very simple, encouraging language — short sentences, everyday words, no grammar jargon. Say "you wrote X but it should be Y because…" not "this is a spelling error of type…". Where it fits, frame the correction as a tiny memorable story or mnemonic rather than a dry rule.
 ```
 
 ## Generated prompt — user
 
 ```
-[image part omitted]
-
-Original sentences:
-1. Kočka běžela zahradou.
-2. Za chvíli začalo pršet.
-
-Please generate all explanations in cs.
+(multimodal — image + original sentences supplied at runtime)
 ```
 
 ## Builder notes
 
-- System prompt is static — zero personalization.
-- The ONLY personalized parameter is the explanation language.
-- Missing: age (explanation complexity calibration), learning style (humor/step-by-step register), struggle history (recurring-pattern-aware feedback).
-- Tier 2 (--live) requires a real handwriting image; not synthesized by this harness.
+- ageYears=11 — explanation register calibrated to age.
+- preferredExplanations=["stories","examples"] — tone shaped by style preferences.
+- Struggle history NOT used (gap flagged in audit P2) — recurring patterns not surfaced to reviewer.

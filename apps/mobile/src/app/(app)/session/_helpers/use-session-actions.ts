@@ -19,7 +19,10 @@ import type {
 } from '../../../../hooks/use-sessions';
 import { clearSessionRecoveryMarker } from '../../../../lib/session-recovery';
 import * as SecureStore from '../../../../lib/secure-storage';
-import { classifyApiError } from '../../../../lib/format-api-error';
+import {
+  classifyApiError,
+  recoveryActions,
+} from '../../../../lib/format-api-error';
 import { withProblemMode } from '../../homework/_helpers/problem-cards';
 import {
   getInputModeKey,
@@ -358,22 +361,33 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
               }
             } catch (err: unknown) {
               const classified = classifyApiError(err);
+              const actions = recoveryActions(classified, {
+                retry: () => setIsClosing(false),
+                goBack: () => setIsClosing(false),
+                goHome: () => router.replace('/(app)/home' as never),
+              });
+              const buttons: Array<{
+                text: string;
+                style?: 'cancel' | 'destructive';
+                onPress?: () => void;
+              }> = [];
+              if (actions.primary) {
+                buttons.push({
+                  text: actions.primary.label,
+                  style: 'cancel',
+                  onPress: actions.primary.onPress,
+                });
+              }
+              if (actions.secondary) {
+                buttons.push({
+                  text: actions.secondary.label,
+                  onPress: actions.secondary.onPress,
+                });
+              }
               platformAlert(
                 'Could not end this session cleanly',
-                `${classified.message} You can keep trying, or go home now and come back later.`,
-                [
-                  {
-                    text: 'Keep trying',
-                    style: 'cancel',
-                    onPress: () => setIsClosing(false),
-                  },
-                  {
-                    text: 'Go Home',
-                    onPress: () => {
-                      router.replace('/(app)/home' as never);
-                    },
-                  },
-                ]
+                classified.message,
+                buttons
               );
             }
           },

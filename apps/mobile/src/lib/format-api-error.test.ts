@@ -1,4 +1,9 @@
-import { classifyApiError, formatApiError } from './format-api-error';
+import {
+  classifyApiError,
+  formatApiError,
+  recoveryActions,
+  type FormattedApiError,
+} from './format-api-error';
 
 /*
  * Screens updated with formatApiError (Story 10.4):
@@ -344,5 +349,67 @@ describe('formatApiError', () => {
     expect(formatApiError({})).toBe(
       'Something unexpected happened. Please try again.'
     );
+  });
+});
+
+describe('recoveryActions', () => {
+  const base: FormattedApiError = {
+    message: 'test',
+    category: 'unknown',
+    recovery: 'retry',
+  };
+  const retry = jest.fn();
+  const goBack = jest.fn();
+  const goHome = jest.fn();
+  const signOut = jest.fn();
+  const allHandlers = { retry, goBack, goHome, signOut };
+
+  it('maps retry to Try Again primary + Go Home secondary', () => {
+    const result = recoveryActions({ ...base, recovery: 'retry' }, allHandlers);
+    expect(result.primary?.label).toBe('Try Again');
+    expect(result.primary?.testID).toBe('recovery-retry');
+    expect(result.secondary?.label).toBe('Go Home');
+    result.primary?.onPress();
+    expect(retry).toHaveBeenCalled();
+  });
+
+  it('maps go-back to Go Back primary + Go Home secondary', () => {
+    const result = recoveryActions(
+      { ...base, recovery: 'go-back' },
+      allHandlers
+    );
+    expect(result.primary?.label).toBe('Go Back');
+    expect(result.primary?.testID).toBe('recovery-go-back');
+    expect(result.secondary?.label).toBe('Go Home');
+    result.primary?.onPress();
+    expect(goBack).toHaveBeenCalled();
+  });
+
+  it('maps sign-out to Sign Out primary + Go Home secondary', () => {
+    const result = recoveryActions(
+      { ...base, recovery: 'sign-out' },
+      allHandlers
+    );
+    expect(result.primary?.label).toBe('Sign Out');
+    expect(result.primary?.testID).toBe('recovery-sign-out');
+    result.primary?.onPress();
+    expect(signOut).toHaveBeenCalled();
+  });
+
+  it('maps none to Go Home primary only', () => {
+    const result = recoveryActions({ ...base, recovery: 'none' }, allHandlers);
+    expect(result.primary?.label).toBe('Go Home');
+    expect(result.secondary).toBeUndefined();
+  });
+
+  it('falls back to goHome when specific handler is missing', () => {
+    const result = recoveryActions({ ...base, recovery: 'retry' }, { goHome });
+    expect(result.primary?.label).toBe('Go Home');
+    expect(result.secondary).toBeUndefined();
+  });
+
+  it('returns no actions when no handlers provided', () => {
+    const result = recoveryActions({ ...base, recovery: 'none' }, {});
+    expect(result.primary).toBeUndefined();
   });
 });

@@ -7,6 +7,7 @@ type LibraryEmptyStateProps =
       entityName: string; // "shelves" | "books" | "topics"
       onClear: () => void;
       clearLabel?: string; // defaults to "Clear search"
+      message?: string; // overrides default "No {entityName} match your search"
     }
   | {
       variant: 'no-content';
@@ -23,7 +24,7 @@ export function LibraryEmptyState(
         testID="library-no-results"
       >
         <Text className="text-body text-text-secondary text-center mb-4">
-          No {props.entityName} match your search
+          {props.message ?? }
         </Text>
         <Pressable
           onPress={props.onClear}

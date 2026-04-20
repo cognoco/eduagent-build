@@ -46,7 +46,7 @@ const shelfRefSchema = z.union([
 const bookRefSchema = z.union([
   z.object({ id: z.string().uuid() }),
   z.object({
-    name: z.string().min(1).max(200),
+    name: z.string().min(3).max(200),
     emoji: z.string().max(10),
     description: z.string().max(500),
   }),

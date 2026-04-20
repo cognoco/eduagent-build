@@ -34,140 +34,15 @@ import {
   guessWhoMasteryClueSchema,
   validateGuessWhoRound,
 } from './guess-who-provider';
-import { describeAgeBracket, type AgeBracket, type Interest } from './config';
+import { type AgeBracket, type Interest } from './config';
 import { createLogger } from '../logger';
+import { buildCapitalsPrompt as _buildCapitalsPrompt } from './quiz-prompts';
+
+// Re-export prompt builders for backward compatibility
+// (eval harness imports buildCapitalsPrompt from this module)
+export { buildCapitalsPrompt } from './quiz-prompts';
 
 const logger = createLogger();
-
-interface CapitalsPromptParams {
-  discoveryCount: number;
-  ageBracket: AgeBracket;
-  recentAnswers: string[];
-  themePreference?: string;
-  // Personalization (P0.1 + P1.2) — all optional for backward compatibility
-  interests?: Interest[];
-  libraryTopics?: string[];
-  ageYears?: number;
-  /**
-   * Struggle topics from the learner's profile. Used as a soft steering signal
-   * for theme selection — the LLM may lean toward regions/themes relevant to
-   * these weaker areas when it wouldn't feel forced. [P1-4]
-   */
-  recentStruggles?: string[];
-  /**
-   * Recently missed items for this activity (surfaced=false). The prompt
-   * asks the LLM to prefer re-surfacing these where they fit the theme.
-   * [P1 — quiz_missed_items wiring]
-   */
-  recentlyMissedItems?: string[];
-}
-
-export function buildCapitalsPrompt(params: CapitalsPromptParams): string {
-  const {
-    discoveryCount,
-    ageBracket,
-    recentAnswers,
-    themePreference,
-    interests,
-    libraryTopics,
-    ageYears,
-    recentStruggles,
-    recentlyMissedItems,
-  } = params;
-
-  // Prefer fine-grained ageYears when available; fall back to coarse bracket.
-  const ageLabel =
-    ageYears != null ? `${ageYears}-year-old` : describeAgeBracket(ageBracket);
-
-  const exclusions =
-    recentAnswers.length > 0
-      ? `Do NOT include questions about these recently seen capitals: ${recentAnswers.join(
-          ', '
-        )}`
-      : 'No exclusions.';
-
-  // Build interest-driven theme instruction (P0.1).
-  // Use free_time and both-tagged interests to suggest a vivid theme.
-  const relevantInterests = (interests ?? [])
-    .filter((i) => i.context === 'free_time' || i.context === 'both')
-    .slice(0, 3)
-    .map((i) => i.label);
-
-  let themeInstruction: string;
-  if (themePreference) {
-    themeInstruction = `Theme: "${themePreference}"`;
-  } else if (relevantInterests.length > 0) {
-    themeInstruction =
-      `Choose a capitals theme that relates to the learner's interests: ${relevantInterests.join(
-        ', '
-      )}. ` +
-      `For example, if they love dinosaurs, pick "Capitals of countries with famous dinosaur fossil sites". ` +
-      `Be creative — make the theme vivid and specific to these interests.`;
-  } else {
-    themeInstruction =
-      'Choose an age-appropriate theme (e.g. "Central European Capitals").';
-  }
-
-  // Library-topic hint (P1.2): steer country selection toward topics being studied.
-  const libraryHint =
-    !themePreference && libraryTopics && libraryTopics.length > 0
-      ? `\nLibrary context: The learner is currently studying: ${libraryTopics
-          .slice(0, 10)
-          .join(
-            '; '
-          )}. Where possible, prefer capitals of countries relevant to these topics.`
-      : '';
-
-  // Struggle-aware steering (P1-4): soft preference toward regions/themes
-  // that help the learner revisit areas they find hard.
-  const struggleHint =
-    !themePreference && recentStruggles && recentStruggles.length > 0
-      ? `\nWeaker areas for this learner: ${recentStruggles
-          .slice(0, 10)
-          .join(
-            '; '
-          )}. If a capitals theme naturally connects to any of these, lean toward it — otherwise pick the best age-appropriate theme.`
-      : '';
-
-  // Recently missed items (surfaced=false) — spaced reinforcement signal.
-  // Prefer re-surfacing these where the theme naturally includes them.
-  const missedHint =
-    recentlyMissedItems && recentlyMissedItems.length > 0
-      ? `\nRecently missed capitals (prefer re-surfacing where the theme fits): ${recentlyMissedItems
-          .slice(0, 8)
-          .join(
-            ', '
-          )}. Include at least one of these as a question if the chosen theme naturally accommodates it.`
-      : '';
-
-  return `You are generating a multiple-choice capitals quiz for a ${ageLabel} learner.
-
-Activity: Capitals quiz
-${themeInstruction}${libraryHint}${struggleHint}${missedHint}
-Questions needed: exactly ${discoveryCount}
-
-${exclusions}
-
-Rules:
-- Generate exactly ${discoveryCount} questions
-- Each question must have exactly 3 distractors
-- Distractors must be plausible city names
-- Fun facts should be surprising, age-appropriate, and one sentence maximum
-- Keep the theme coherent across the full round
-
-Respond with ONLY valid JSON in this shape:
-{
-  "theme": "Theme Name",
-  "questions": [
-    {
-      "country": "Country Name",
-      "correctAnswer": "Capital City",
-      "distractors": ["City A", "City B", "City C"],
-      "funFact": "One surprising fact about this capital."
-    }
-  ]
-}`;
-}
 
 function buildMasteryDistractors(correctAnswer: string): string[] {
   const pool = CAPITALS_DATA.filter(
@@ -431,7 +306,7 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
   let questions: QuizQuestion[] = [];
 
   if (activityType === 'capitals') {
-    let prompt = buildCapitalsPrompt({
+    let prompt = _buildCapitalsPrompt({
       discoveryCount: plan.discoveryCount,
       ageBracket,
       recentAnswers,
