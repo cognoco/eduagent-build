@@ -1,0 +1,1 @@
+ALTER TABLE "weekly_reports" ENABLE ROW LEVEL SECURITY;

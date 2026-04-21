@@ -1454,3 +1454,67 @@ Same pattern as BUG-54 (session close endpoint), which was fixed in Session 16.
 - `app/consent.revoked` → try-catch ✓ (BUG-70, this fix)
 - `app/session.completed` → try-catch ✓ (BUG-54)
 - Restore endpoint → no Inngest call ✓ (no fix needed)
+
+---
+
+## BUG-71: Web E2E — Solo Learner Sees Onboarding Instead of Home (2026-04-21)
+
+**Status:** Open — needs investigation with local API
+**Severity:** High — smoke test failure
+**Affects:** Playwright J01 (`j01-learner-home.spec.ts`)
+**Type:** App bug (web platform, likely profile loading regression)
+**Found by:** Playwright Web Session 1
+
+**What happens:** J01 smoke-learner test navigates to `/home` with valid Clerk `storageState` from the setup project. Instead of the learner home with intent cards (Continue, Learn, Ask, Practice, Homework), the app shows the "Welcome! Let's set up your profile so your mentor can get to know you." onboarding screen with Get started button.
+
+**Why it matters:** J03 (parent, same auth mechanism) PASSES with its storageState. The sole difference is account type — solo learner vs parent with children. This suggests the profile loading path diverges for learner accounts.
+
+**Suspected root cause:** BUG-520 circular dependency fix (`api-client.ts` + `profile.ts`) changed how `activeProfileId` propagates. The `setActiveProfileId()` module-level variable may not be set before the first profile-fetch API calls. Alternatively, the missing `CLERK_TESTING_TOKEN` (Doppler value: `notsetyet`) causes Clerk to rate-limit or invalidate the solo-learner session.
+
+**Files to investigate:**
+- `apps/mobile/src/lib/api-client.ts` — `_activeProfileId` module variable, `setActiveProfileId()`
+- `apps/mobile/src/lib/profile.ts` — `ProfileProvider` `useEffect` that calls `setActiveProfileId()`
+- `apps/mobile/src/hooks/use-profiles.ts` — profile fetch timing
+
+**Reproduction:** Run `pnpm test:e2e:web --project=smoke-learner` against local API to eliminate staging/Cloudflare variables.
+
+---
+
+## BUG-72: Web E2E — Deep-Link Redirect Lands on Home Instead of Original Path (2026-04-21)
+
+**Status:** Open — needs investigation
+**Severity:** Medium — web-specific navigation bug
+**Affects:** Playwright W03 (`w03-deep-link-auth-redirect.spec.ts`)
+**Type:** App bug (web redirect logic)
+**Found by:** Playwright Web Session 1
+
+**What happens:** W03 navigates to an authenticated route without auth. The app correctly redirects to sign-in. After sign-in, the user lands on the default learner home instead of being redirected back to the original deep-linked path.
+
+**Screenshot:** Learner home screen with all intent cards visible and tab bar. App is working correctly but the redirect-back logic lost the original URL.
+
+**Suspected root cause:** `normalize-redirect-path.ts` has uncommitted changes on the `testing` branch. The redirect path storage (SecureStore or query parameter) may not correctly preserve or restore the return URL after Clerk sign-in completes on web.
+
+**Files to investigate:**
+- `apps/mobile/src/lib/normalize-redirect-path.ts` — uncommitted changes
+- `apps/mobile/src/app/(auth)/sign-in.tsx` — redirect after sign-in
+- Web-specific `useURL()` or `expo-linking` handling
+
+---
+
+## BUG-73: Web E2E — Library Loading Fails ("We couldn't load your library") (2026-04-21)
+
+**Status:** Open — needs investigation with local API
+**Severity:** Medium — data loading failure on web
+**Affects:** Playwright W02, J11, J13
+**Type:** App bug or infrastructure (needs isolation)
+**Found by:** Playwright Web Session 1
+
+**What happens:** Three tests show an authenticated user with the tab bar visible (Home, Library, Progress, More) but the main content area shows "We couldn't load your library right now" with a Retry button. The user IS authenticated and the profile IS loaded (tab bar renders correctly with correct nav items).
+
+**Screenshots:** Tab bar at bottom with all 4 tabs. Center of screen: "We couldn't load your library right now" + Retry button.
+
+**Suspected root cause (two possibilities):**
+1. **Cloudflare blocking:** Intermittent Cloudflare WAF blocks data-fetch API calls from the test runner. Would NOT reproduce against local API.
+2. **Schema drift:** The `testing` branch client expects a different response shape from the staging API (which runs `main` branch code). Library endpoint response parsing fails silently.
+
+**Reproduction:** Run the affected tests against local API. If they pass locally, this is pure infrastructure. If they fail locally too, it's a genuine API/client incompatibility.

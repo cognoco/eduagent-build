@@ -13,6 +13,7 @@ import type {
   ProgressHistory,
   SubjectProgress,
   TopicProgress,
+  WeeklyReportSummary,
 } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
@@ -535,5 +536,38 @@ export function useMarkChildReportViewed(): UseMutationResult<
         ],
       });
     },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Weekly Reports [BUG-524]
+// ---------------------------------------------------------------------------
+
+export function useChildWeeklyReports(
+  childProfileId: string | undefined
+): UseQueryResult<WeeklyReportSummary[]> {
+  const client = useApiClient();
+  const { activeProfile } = useProfile();
+
+  return useQuery({
+    queryKey: ['dashboard', 'child', childProfileId, 'weekly-reports'],
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const res = await client.dashboard.children[':profileId'][
+          'weekly-reports'
+        ].$get(
+          { param: { profileId: childProfileId ?? '' } },
+          { init: { signal } }
+        );
+        await assertOk(res);
+        const data = (await res.json()) as { reports: WeeklyReportSummary[] };
+        return data.reports;
+      } finally {
+        cleanup();
+      }
+    },
+    enabled:
+      !!activeProfile && activeProfile.isOwner === true && !!childProfileId,
   });
 }

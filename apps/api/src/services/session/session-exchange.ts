@@ -443,17 +443,21 @@ export async function prepareExchangeContext(
       .map((entry) => entry.content)
       .join('\n');
 
-    void inngest.send({
-      name: 'app/ask.classify_silently',
-      data: {
-        sessionId,
-        profileId,
-        classifyInput: [priorUserMessages, userMessage]
-          .filter(Boolean)
-          .join('\n'),
-        exchangeCount: session.exchangeCount + 1,
-      },
-    });
+    inngest
+      .send({
+        name: 'app/ask.classify_silently',
+        data: {
+          sessionId,
+          profileId,
+          classifyInput: [priorUserMessages, userMessage]
+            .filter(Boolean)
+            .join('\n'),
+          exchangeCount: session.exchangeCount + 1,
+        },
+      })
+      .catch((err) =>
+        logger.warn('ask.classify_silently.send_failed', { sessionId, err })
+      );
   }
 
   const [silentSubjectRows, silentTeachingPref] =
@@ -747,6 +751,8 @@ export async function prepareExchangeContext(
     // BKT-C.1 — source the profile-level tutor language + pronouns here so
     // every downstream call path (processExchange, streamExchange) receives
     // the same personalization. Defaults: 'en' (DB NOT NULL) and null.
+    // DB CHECK constraint guarantees this is a valid ConversationLanguage.
+    // Drizzle infers `string`; narrow to the union type for downstream safety.
     conversationLanguage: profile?.conversationLanguage as
       | ConversationLanguage
       | undefined,

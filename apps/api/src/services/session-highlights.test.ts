@@ -171,4 +171,27 @@ describe('buildBrowseHighlight', () => {
       'Zoe browsed Gravity — 1 min'
     );
   });
+
+  it('includes subject name when provided [BUG-526]', () => {
+    expect(
+      buildBrowseHighlight('Emma', ['Photosynthesis'], 120, 'Biology')
+    ).toBe('Emma browsed Biology: Photosynthesis — 2 min');
+  });
+
+  it('uses freeform fallback instead of "a topic" [BUG-526]', () => {
+    const result = buildBrowseHighlight(
+      'Alex',
+      ['a freeform session'],
+      300,
+      'Mathematics'
+    );
+    expect(result).toBe('Alex browsed Mathematics: a freeform session — 5 min');
+    expect(result).not.toContain('a topic');
+  });
+
+  it('omits subject prefix when subjectName is null', () => {
+    expect(buildBrowseHighlight('Sam', ['Fractions'], 60, null)).toBe(
+      'Sam browsed Fractions — 1 min'
+    );
+  });
 });

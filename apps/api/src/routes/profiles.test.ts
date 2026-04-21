@@ -103,6 +103,7 @@ jest.mock('../services/profile', () => ({
   switchProfile: jest.fn().mockResolvedValue({
     profileId: '550e8400-e29b-41d4-a716-446655440000',
   }),
+  findOwnerProfile: jest.fn().mockResolvedValue(null),
 }));
 
 import { app } from '../index';

@@ -53,6 +53,7 @@ jest.mock('../services/profile', () => ({
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   }),
+  findOwnerProfile: jest.fn().mockResolvedValue(null),
 }));
 
 // ---------------------------------------------------------------------------

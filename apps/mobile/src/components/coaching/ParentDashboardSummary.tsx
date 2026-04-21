@@ -294,7 +294,6 @@ export function ParentDashboardSummary({
       primaryLabel="View details"
       onPrimary={onDrillDown}
       metadata={metadata}
-      onPress={onDrillDown}
       isLoading={isLoading}
       testID={`dashboard-child-${profileId}`}
     />

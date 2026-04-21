@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native';
 import { platformAlert } from '../../../../lib/platform-alert';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MemoryConsentPrompt } from '../../../../components/memory-consent-prompt';
@@ -58,6 +58,16 @@ export default function ChildMentorMemoryScreen() {
   const [draft, setDraft] = useState('');
   const [correctionOpen, setCorrectionOpen] = useState(false);
   const [correctionText, setCorrectionText] = useState('');
+  // [BUG-533] Toast state for save confirmation — same pattern as session screen.
+  const [confirmationToast, setConfirmationToast] = useState<string | null>(
+    null
+  );
+
+  useEffect(() => {
+    if (!confirmationToast) return undefined;
+    const timer = setTimeout(() => setConfirmationToast(null), 5000);
+    return () => clearTimeout(timer);
+  }, [confirmationToast]);
 
   // S-2: Wrap mutateAsync calls so delete/unsuppress failures show user feedback.
   // Previously all 6 onRemove handlers used `void mutateAsync(...)` with no catch.
@@ -108,11 +118,16 @@ export default function ChildMentorMemoryScreen() {
   const handleTellMentor = useCallback(async () => {
     if (!childProfileId || draft.trim().length === 0) return;
     try {
-      await tellMentor.mutateAsync({
+      // [BUG-533] Consume the mutation result — the server returns a
+      // human-readable message summarising what it extracted from the note.
+      const result = await tellMentor.mutateAsync({
         childProfileId,
         text: draft.trim(),
       });
       setDraft('');
+      setConfirmationToast(
+        result.message || 'Saved — the mentor will remember this.'
+      );
     } catch {
       platformAlert('Could not save that', 'Please try again.');
     }
@@ -454,14 +469,21 @@ export default function ChildMentorMemoryScreen() {
                     const text = correctionText.trim();
                     if (!text) return;
                     try {
-                      await tellMentor.mutateAsync({
+                      // [BUG-533] Consume result and show confirmation.
+                      const result = await tellMentor.mutateAsync({
                         childProfileId: childProfileId!,
                         text: `[parent_correction] ${text}`,
                       });
                       setCorrectionOpen(false);
                       setCorrectionText('');
+                      setConfirmationToast(
+                        result.message || 'Correction noted — thank you.'
+                      );
                     } catch {
-                      // tellMentor mutation handles its own error toast
+                      platformAlert(
+                        'Could not save correction',
+                        'Please try again.'
+                      );
                     }
                   })()
                 }
@@ -475,6 +497,22 @@ export default function ChildMentorMemoryScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* [BUG-533] Confirmation toast after Tell the Mentor / correction save */}
+      {confirmationToast ? (
+        <View
+          pointerEvents="none"
+          className="absolute bottom-0 left-4 right-4 z-50 items-center"
+          style={{ bottom: Math.max(insets.bottom, 16) + 16 }}
+          testID="mentor-memory-confirmation-toast"
+        >
+          <View className="rounded-full bg-text-primary px-4 py-3">
+            <Text className="text-body-sm font-semibold text-text-inverse text-center">
+              {confirmationToast}
+            </Text>
+          </View>
+        </View>
+      ) : null}
     </View>
   );
 }

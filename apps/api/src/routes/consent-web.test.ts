@@ -71,6 +71,7 @@ jest.mock('../services/profile', () => ({
   createProfile: jest.fn(),
   updateProfile: jest.fn(),
   switchProfile: jest.fn(),
+  findOwnerProfile: jest.fn().mockResolvedValue(null),
 }));
 
 jest.mock('../services/consent', () => ({

@@ -211,8 +211,21 @@ export function validateGuessWhoRound(
     if (!canonicalName) return [];
 
     const acceptedAliasesRaw = dedupeCaseInsensitive(question.acceptedAliases);
-    const acceptedAliases =
-      acceptedAliasesRaw.length > 0 ? acceptedAliasesRaw : [canonicalName];
+    const acceptedAliases: string[] =
+      acceptedAliasesRaw.length > 0 ? [...acceptedAliasesRaw] : [canonicalName];
+    // Always accept the surname so "Bell" matches "Alexander Graham Bell" even
+    // when the LLM omits it from acceptedAliases.
+    const nameParts = canonicalName.trim().split(/\s+/);
+    if (nameParts.length > 1) {
+      const surname = nameParts[nameParts.length - 1]!;
+      if (
+        !acceptedAliases.some(
+          (a) => a.trim().toLowerCase() === surname.toLowerCase()
+        )
+      ) {
+        acceptedAliases.push(surname);
+      }
+    }
     const clues = question.clues.map((clue) => clue.trim());
     const funFact = question.funFact.trim();
 

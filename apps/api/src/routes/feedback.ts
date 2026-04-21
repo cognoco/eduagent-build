@@ -21,13 +21,49 @@ type FeedbackRouteEnv = {
 
 const DEFAULT_SUPPORT_EMAIL = 'support@mentomate.app';
 
+// SEC-03: In-memory sliding-window rate limit for feedback submissions.
+// 5 submissions per hour per user. Resets on worker restart — acceptable
+// for a low-volume endpoint; avoids adding a DB/KV dependency.
+const FEEDBACK_RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
+const FEEDBACK_RATE_LIMIT_MAX = 5;
+const feedbackTimestamps = new Map<string, number[]>();
+
+function isFeedbackRateLimited(userId: string): boolean {
+  const now = Date.now();
+  const cutoff = now - FEEDBACK_RATE_LIMIT_WINDOW_MS;
+  const timestamps = (feedbackTimestamps.get(userId) ?? []).filter(
+    (t) => t > cutoff
+  );
+  // Prune stale Map entry to prevent unbounded growth in long-lived isolates
+  if (timestamps.length === 0 && feedbackTimestamps.has(userId)) {
+    feedbackTimestamps.delete(userId);
+  }
+  if (timestamps.length >= FEEDBACK_RATE_LIMIT_MAX) {
+    feedbackTimestamps.set(userId, timestamps);
+    return true;
+  }
+  timestamps.push(now);
+  feedbackTimestamps.set(userId, timestamps);
+  return false;
+}
+
 export const feedbackRoutes = new Hono<FeedbackRouteEnv>().post(
   '/feedback',
   zValidator('json', feedbackSubmissionSchema),
   async (c) => {
+    const userId = c.get('user').userId;
+    if (isFeedbackRateLimited(userId)) {
+      return c.json(
+        {
+          success: false,
+          error: 'Too many submissions. Please try again later.',
+        },
+        429
+      );
+    }
+
     const body = c.req.valid('json');
     const profileId = c.get('profileId') ?? 'unknown';
-    const userId = c.get('user').userId;
     const env = c.env ?? {};
     const supportTo = env.SUPPORT_EMAIL ?? DEFAULT_SUPPORT_EMAIL;
 
@@ -49,28 +85,30 @@ export const feedbackRoutes = new Hono<FeedbackRouteEnv>().post(
       .filter(Boolean)
       .join('\n');
 
-    try {
-      await sendEmail(
-        {
-          to: supportTo,
-          subject: `[MentoMate ${categoryLabel}] from ${profileId.slice(0, 8)}`,
-          body: `${body.message}\n\n---\n${metaLines}`,
-          type: 'feedback',
-        },
-        {
-          resendApiKey: env.RESEND_API_KEY,
-          emailFrom: env.EMAIL_FROM,
-        }
-      );
-    } catch (err) {
-      console.error('[feedback] sendEmail threw unexpectedly:', err);
+    // D-1: sendEmail never throws — it returns { sent: false, reason } on all
+    // failure modes. Check the return value and queue for retry when unsent.
+    const emailResult = await sendEmail(
+      {
+        to: supportTo,
+        subject: `[MentoMate ${categoryLabel}] from ${profileId.slice(0, 8)}`,
+        body: `${body.message}\n\n---\n${metaLines}`,
+        type: 'feedback',
+      },
+      {
+        resendApiKey: env.RESEND_API_KEY,
+        emailFrom: env.EMAIL_FROM,
+      }
+    );
+
+    if (!emailResult.sent) {
       // [A-1] Awaited per CLAUDE.md — no silent fire-and-forget from route handlers.
       await inngest.send({
         name: 'app/feedback.delivery_failed',
         data: { profileId, category: body.category },
       });
+      return c.json({ success: true, queued: true });
     }
 
-    return c.json({ success: true });
+    return c.json({ success: true, queued: false });
   }
 );

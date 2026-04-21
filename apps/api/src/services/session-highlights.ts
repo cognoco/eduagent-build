@@ -139,7 +139,8 @@ export function validateSessionInsights(raw: string): SessionInsightsResult {
 export function buildBrowseHighlight(
   childDisplayName: string,
   topics: string[],
-  durationSeconds: number
+  durationSeconds: number,
+  subjectName?: string | null
 ): string {
   const safeName =
     childDisplayName
@@ -149,7 +150,9 @@ export function buildBrowseHighlight(
   const topicList = topics.slice(0, 3).join(', ');
   const suffix = topics.length > 3 ? ` and ${topics.length - 3} more` : '';
   const mins = Math.max(1, Math.round(durationSeconds / 60));
-  return `${safeName} browsed ${topicList}${suffix} — ${mins} min`;
+  // [BUG-526] Include subject name when available so parents see context
+  const subjectPrefix = subjectName ? `${subjectName}: ` : '';
+  return `${safeName} browsed ${subjectPrefix}${topicList}${suffix} — ${mins} min`;
 }
 
 const SESSION_INSIGHTS_SYSTEM_PROMPT = `You write concise parent recaps of a child's learning session.

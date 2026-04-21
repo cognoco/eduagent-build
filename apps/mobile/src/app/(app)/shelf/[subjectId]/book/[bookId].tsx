@@ -521,6 +521,7 @@ export default function BookScreen() {
         <Pressable
           onPress={handleBack}
           className="mt-6 px-5 py-3"
+          accessibilityRole="button"
           accessibilityLabel="Go back"
           testID="book-loading-back"
         >
@@ -549,6 +550,7 @@ export default function BookScreen() {
         <Pressable
           onPress={() => void bookQuery.refetch()}
           className="bg-primary rounded-button px-6 py-3 items-center min-h-[48px] justify-center mb-3"
+          accessibilityRole="button"
           testID="book-retry-button"
         >
           <Text className="text-text-inverse text-body font-semibold">
@@ -558,6 +560,7 @@ export default function BookScreen() {
         <Pressable
           onPress={handleBack}
           className="bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
+          accessibilityRole="button"
           testID="book-back-button"
         >
           <Text className="text-text-primary text-body font-semibold">
@@ -604,6 +607,7 @@ export default function BookScreen() {
             <Pressable
               onPress={handleRetryGeneration}
               className="bg-primary rounded-button px-6 py-3 items-center min-h-[48px] justify-center mb-3"
+              accessibilityRole="button"
               testID="book-gen-retry"
             >
               <Text className="text-text-inverse text-body font-semibold">
@@ -614,6 +618,7 @@ export default function BookScreen() {
               onPress={handleBack}
               className="px-5 py-3"
               testID="book-gen-back"
+              accessibilityRole="button"
               accessibilityLabel="Go back"
             >
               <Text className="text-body text-primary font-semibold">
@@ -628,6 +633,7 @@ export default function BookScreen() {
             onPress={handleBack}
             className="mt-6 px-5 py-3"
             accessibilityLabel="Go back"
+            accessibilityRole="button"
             testID="book-gen-back-idle"
           >
             <Text className="text-body text-primary font-semibold">
@@ -655,6 +661,7 @@ export default function BookScreen() {
           <Pressable
             onPress={handleBack}
             className="p-2 -ms-2 me-2"
+            accessibilityRole="button"
             accessibilityLabel="Back"
             testID="book-back"
           >
@@ -744,6 +751,7 @@ export default function BookScreen() {
             <Pressable
               onPress={() => void sessionsQuery.refetch()}
               className="self-start"
+              accessibilityRole="button"
               testID="sessions-retry-button"
             >
               <Text className="text-body-sm text-primary font-semibold">
@@ -941,6 +949,7 @@ export default function BookScreen() {
             onPress={handleStartLearning}
             className="bg-primary rounded-button px-5 py-4 flex-row items-center justify-center min-h-[48px]"
             testID="book-start-learning"
+            accessibilityRole="button"
             accessibilityLabel={
               completedTopicCount >= topics.length && topics.length > 0
                 ? 'Review a topic'
@@ -968,6 +977,7 @@ export default function BookScreen() {
               onPress={handleBuildLearningPath}
               className="mt-2 py-2 items-center"
               testID="book-build-path-link"
+              accessibilityRole="button"
               accessibilityLabel="Build a learning path"
             >
               <Text className="text-body-sm text-text-secondary underline">

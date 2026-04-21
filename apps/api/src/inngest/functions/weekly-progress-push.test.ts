@@ -55,6 +55,12 @@ function buildMockDb(overrides: Record<string, unknown> = {}) {
         }),
       }),
     }),
+    // [BUG-524] insert chain for weekly report persistence
+    insert: jest.fn().mockReturnValue({
+      values: jest.fn().mockReturnValue({
+        onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
+      }),
+    }),
     ...overrides,
   };
 }
@@ -73,16 +79,33 @@ function setMockDb(db: Record<string, unknown>) {
 // ---------------------------------------------------------------------------
 
 function makeSnapshot(overrides: Record<string, unknown> = {}) {
+  // Destructure metrics overrides separately to avoid the top-level spread
+  // replacing the entire merged metrics object.
+  const { metrics: metricsOverrides, ...topLevelOverrides } = overrides;
   return {
     snapshotDate: '2026-04-14',
     metrics: {
       topicsMastered: 5,
       vocabularyTotal: 20,
       totalSessions: 3,
+      // Fields required by generateWeeklyReportData (no longer mocked)
+      totalActiveMinutes: 60,
+      totalWallClockMinutes: 90,
+      totalExchanges: 10,
+      topicsAttempted: 6,
+      topicsInProgress: 1,
+      vocabularyMastered: 15,
+      vocabularyLearning: 3,
+      vocabularyNew: 2,
+      retentionCardsDue: 0,
+      retentionCardsStrong: 10,
+      retentionCardsFading: 2,
+      currentStreak: 2,
+      longestStreak: 5,
       subjects: [{ topicsExplored: 4 }],
-      ...((overrides.metrics as Record<string, unknown>) ?? {}),
+      ...((metricsOverrides as Record<string, unknown>) ?? {}),
     },
-    ...overrides,
+    ...topLevelOverrides,
   };
 }
 

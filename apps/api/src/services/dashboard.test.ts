@@ -13,6 +13,7 @@ const mockSubjectsFindMany = jest.fn();
 const mockSubjectsFindFirst = jest.fn();
 const mockCurriculaFindFirst = jest.fn();
 const mockCurriculumTopicsFindMany = jest.fn();
+const mockCurriculumTopicsFindFirst = jest.fn();
 const mockProgressSnapshotsFindFirst = jest.fn();
 const mockProgressSnapshotsFindMany = jest.fn();
 const mockMilestonesFindMany = jest.fn();
@@ -96,6 +97,7 @@ import {
   calculateTrend,
   calculateRetentionTrend,
   calculateGuidedRatio,
+  buildProgressGuidance,
   type DashboardInput,
 } from './dashboard';
 
@@ -280,6 +282,38 @@ describe('calculateGuidedRatio', () => {
 });
 
 // ---------------------------------------------------------------------------
+// buildProgressGuidance [BUG-523]
+// ---------------------------------------------------------------------------
+
+describe('buildProgressGuidance', () => {
+  it('returns "Quiet week" when sessionsThisWeek=0 and no streak', () => {
+    const result = buildProgressGuidance('Alex', ['Math'], 0, 3, 0);
+    expect(result).toMatch(/Quiet week/);
+  });
+
+  it('returns streak nudge (not "Quiet week") when sessionsThisWeek=0 but streak > 0 [BUG-523]', () => {
+    const result = buildProgressGuidance('Alex', ['Math'], 0, 2, 2);
+    expect(result).not.toMatch(/Quiet week/);
+    expect(result).toMatch(/2-day streak/);
+    expect(result).toMatch(/Math/);
+  });
+
+  it('returns decline nudge when sessions decreased', () => {
+    const result = buildProgressGuidance('Alex', ['Biology'], 1, 4);
+    expect(result).toMatch(/still building knowledge/);
+    expect(result).toMatch(/Biology/);
+  });
+
+  it('returns null when sessions are steady or increasing', () => {
+    expect(buildProgressGuidance('Alex', ['Math'], 4, 3)).toBeNull();
+  });
+
+  it('returns null when no subjects available', () => {
+    expect(buildProgressGuidance('Alex', [], 0, 3, 0)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // DB-aware functions — lazy import to allow mock wiring
 // ---------------------------------------------------------------------------
 
@@ -317,6 +351,7 @@ function createMockDb() {
       },
       curriculumTopics: {
         findMany: mockCurriculumTopicsFindMany,
+        findFirst: mockCurriculumTopicsFindFirst,
       },
       // Snapshot aggregation reads these when building child progress —
       // mocks default to empty so the legacy getChildrenForParent path still
@@ -780,6 +815,13 @@ describe('getChildSessions', () => {
         engagementSignal: 'focused',
       },
     ]);
+    // [BUG-526] Subject/topic name lookups for structured session fields
+    mockSubjectsFindMany.mockResolvedValue([
+      { id: SUBJECT_ID, name: 'Biology' },
+    ]);
+    mockCurriculumTopicsFindMany.mockResolvedValue([
+      { id: TOPIC_ID_1, title: 'Plant cells' },
+    ]);
 
     const now = new Date();
     const earlier = new Date(now.getTime() - 3600_000);
@@ -826,7 +868,9 @@ describe('getChildSessions', () => {
     expect(result).toHaveLength(2);
     expect(result[0].sessionId).toBe(SESSION_ID_1);
     expect(result[0].subjectId).toBe(SUBJECT_ID);
+    expect(result[0].subjectName).toBe('Biology');
     expect(result[0].topicId).toBe(TOPIC_ID_1);
+    expect(result[0].topicTitle).toBe('Plant cells');
     expect(result[0].sessionType).toBe('learning');
     expect(result[0].exchangeCount).toBe(8);
     expect(result[0].escalationRung).toBe(2);
@@ -844,6 +888,8 @@ describe('getChildSessions', () => {
     expect(result[1].endedAt).toBeNull();
     expect(result[1].durationSeconds).toBeNull();
     expect(result[1].wallClockSeconds).toBeNull();
+    expect(result[1].subjectName).toBe('Biology');
+    expect(result[1].topicTitle).toBeNull();
     expect(result[1].displayTitle).toBe('Math Homework');
     expect(result[1].displaySummary).toBe(
       '5 problems, practiced linear equations.'
@@ -883,6 +929,11 @@ describe('getChildSessionDetail', () => {
       conversationPrompt: 'Which fraction felt easiest to compare today?',
       engagementSignal: 'curious',
     });
+    // [BUG-526] subject + topic name lookups
+    mockSubjectsFindFirst.mockResolvedValue({ name: 'Mathematics' });
+    mockCurriculumTopicsFindFirst.mockResolvedValue({
+      title: 'Equivalent fractions',
+    });
 
     const result = await getChildSessionDetail(
       db as never,
@@ -894,6 +945,8 @@ describe('getChildSessionDetail', () => {
     expect(result).toEqual(
       expect.objectContaining({
         sessionId: SESSION_ID_1,
+        subjectName: 'Mathematics',
+        topicTitle: 'Equivalent fractions',
         highlight: 'Practiced equivalent fractions',
         narrative:
           'They compared fraction sizes and corrected one shaky step with a hint.',

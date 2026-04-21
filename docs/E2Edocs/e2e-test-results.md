@@ -1146,9 +1146,77 @@ Four new E2E flows added for Epic 4 (Library navigation) and Epic 10 (Subject au
 
 ---
 
+### Playwright Web Session 1 (2026-04-21) — Full Suite Against Staging
+
+**Environment:** Windows 11, Playwright 1.56.1, Chromium 141.0.7390.37
+**Branch:** `testing` (uncommitted changes to 19 files including api-client.ts, profile.ts, schemas)
+**API target:** Staging (`api-stg.mentomate.com`) via `PLAYWRIGHT_SKIP_LOCAL_API=1`
+**Web app:** Metro-bundled from local source (includes BUG-520 circular dependency fix)
+**CLERK_TESTING_TOKEN:** Not configured in Doppler (`notsetyet`)
+
+#### Results (25 tests)
+
+| # | Project | Test | Status | Notes |
+|---|---------|------|--------|-------|
+| 1 | setup | seed onboarding-complete + solo-learner | PASS | |
+| 2 | setup | seed parent-multi-child + owner-with-children | PASS | |
+| 3 | smoke-auth | J-02 auth screen navigation | PASS | |
+| 4 | smoke-learner | J-01 seeded learner lands on home | **FAIL** | BUG-71: Shows "Welcome" onboarding instead of learner home |
+| 5 | smoke-parent | J-03 seeded parent lands on gateway | PASS | |
+| 6 | role-transitions | J-04 parent Learn view + back | **FAIL** | "Welcome" screen — Clerk session sharing |
+| 7 | role-transitions | J-05 parent switch to child | **FAIL** | "Welcome" screen — Clerk session sharing |
+| 8 | role-transitions | J-06 child switch to parent | **FAIL** | "Welcome" screen — Clerk session sharing |
+| 9 | role-transitions | J-07 parent dashboard drilldown | **FAIL** | "Welcome" screen — Clerk session sharing |
+| 10 | later-phases | W-03 deep link auth redirect | **FAIL** | BUG-72: Lands on home, not original path |
+| 11 | later-phases | J-08 ask freeform session | **FAIL** | "Welcome" screen — CF seed block |
+| 12 | later-phases | J-09 learn create subject | **FAIL** | Cloudflare 403 on seed POST |
+| 13 | later-phases | J-10 practice quiz cycle | PASS | |
+| 14 | later-phases | J-11 library to book | **FAIL** | BUG-73: "Couldn't load library" |
+| 15 | later-phases | J-12 pre-profile create | **FAIL** | "Welcome" screen — CF seed block |
+| 16 | later-phases | J-13 consent pending | **FAIL** | "Couldn't load library" |
+| 17 | later-phases | J-14 loading timeout | PASS | |
+| 18 | later-phases | J-15 parent add child | **FAIL** | "Welcome" screen — CF seed block |
+| 19 | later-phases | J-16 parent drilldown | **FAIL** | "Welcome" screen — CF seed block |
+| 20 | later-phases | J-17 parent session recap | **FAIL** | "Welcome" screen — CF seed block |
+| 21 | later-phases | J-18 invalid profile | **FAIL** | "Welcome" screen — CF seed block |
+| 22 | later-phases | W-01 fullscreen tab bar | PASS | |
+| 23 | later-phases | W-02 goBackOrReplace | **FAIL** | "Couldn't load library" |
+| 24 | later-phases | W-04 browser history | PASS | |
+| 25 | later-phases | W-05 tab routes | **FAIL** | "Welcome" screen — CF seed block |
+
+**Pass rate: 8/25 = 32%**
+
+#### Failure Classification
+
+| Category | Count | Tests | Root Cause |
+|----------|-------|-------|------------|
+| Cloudflare seed block | 8 | J08, J09, J12, J15, J16, J17, J18, W05 | Parallel workers trigger Cloudflare WAF 403 on `POST /__test/seed` |
+| Clerk session sharing | 4 | J04, J05, J06, J07 | Concurrent workers with same storageState invalidate Clerk session |
+| App bug: profile loading | 1 | J01 | BUG-71: Solo learner sees onboarding (BUG-520 timing?) |
+| App bug: library error | 3 | J11, J13, W02 | BUG-73: "Couldn't load library" with tab bar visible |
+| App bug: redirect logic | 1 | W03 | BUG-72: Deep-link redirect doesn't preserve original path |
+
+#### Infrastructure Issues Identified
+
+1. **CLERK_TESTING_TOKEN not configured in Doppler** — staging value is `notsetyet`, causing potential Clerk rate limiting
+2. **Cloudflare WAF rate-limits `/__test/seed`** — parallel Playwright workers trigger 403 on staging
+
+#### Bugs Filed to Notion
+
+- BUG-71: Web E2E: Solo learner sees onboarding Welcome instead of learner home (J01)
+- BUG-72: Web E2E: Deep-link auth redirect lands on home instead of original path (W03)
+- BUG-73: Web E2E: Library loading fails — "We couldn't load your library right now" (W02, J11, J13)
+- INFRA: CLERK_TESTING_TOKEN not configured in Doppler
+- INFRA: Cloudflare rate-limits staging `/__test/seed`
+
+**Artifacts:** Playwright report at `apps/mobile/e2e-web/playwright-report/`, test results with screenshots/videos/traces at `apps/mobile/e2e-web/test-results/`.
+
+---
+
 ## References
 
-- **Bug details:** See `e2e-test-bugs.md` for all bug entries (BUG-1 through BUG-60) with root causes, fixes, and workarounds.
+- **Bug details:** See `e2e-test-bugs.md` for all bug entries (BUG-1 through BUG-73) with root causes, fixes, and workarounds.
 - **Environment setup:** See `e2e-emulator-issues.md` for emulator configuration, known environment issues, and operational notes.
 - **Infrastructure:** See `e2e-tech-spec.md` for flow specifications, seeding architecture, and CI integration.
 - **Screenshots:** Maestro test output at `~/.maestro/tests/` — directories timestamped per run, contains PNGs for warning/failure steps.
+- **Playwright artifacts:** `apps/mobile/e2e-web/playwright-report/` and `apps/mobile/e2e-web/test-results/`.

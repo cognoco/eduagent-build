@@ -77,6 +77,13 @@ interface DashboardStepResult extends StepOutcome {
 // Close reasons that indicate no user engagement — SM-2 fallback should not apply.
 // The plan listed 'crash_recovery' and 'app_background' but these do not exist
 // in the codebase as of 2026-04-16. Add them here if they are introduced.
+//
+// NOTE: 'auto_closed' is intentionally NOT in this list. An auto_closed session
+// with exchangeCount > 0 means the user engaged before being timed out, so it
+// should still count toward the streak. The isAbandoned guard (~line 127) uses
+// summaryStatus to skip the filing wait — that is a separate concern from
+// streak eligibility. Only 'silence_timeout' (stale-cleanup cron, 30 min idle,
+// no user action) represents truly unattended sessions.
 const UNATTENDED_REASONS = ['silence_timeout'] as const;
 
 async function runIsolated(
@@ -622,7 +629,17 @@ export const sessionCompleted = inngest.createFunction(
             const topicTitle = topicId
               ? await loadTopicTitle(db, topicId)
               : null;
-            const topics = topicTitle ? [topicTitle] : ['a topic'];
+            // [BUG-526] Use descriptive fallback instead of "a topic"
+            const topics = topicTitle ? [topicTitle] : ['a freeform session'];
+
+            // Resolve subject name for context in the highlight
+            const [subjectRow] = subjectId
+              ? await db
+                  .select({ name: subjects.name })
+                  .from(subjects)
+                  .where(eq(subjects.id, subjectId))
+                  .limit(1)
+              : [null];
 
             const [session] = await db
               .select({
@@ -638,7 +655,8 @@ export const sessionCompleted = inngest.createFunction(
             highlight = buildBrowseHighlight(
               profile?.displayName ?? 'Your child',
               topics,
-              duration
+              duration,
+              subjectRow?.name
             );
           }
 

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Platform, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import type { KnowledgeInventory } from '@eduagent/schemas';
@@ -102,9 +102,11 @@ export function EarlyAdopterCard(): React.ReactElement | null {
           <Ionicons name="close" size={18} color={colors.textSecondary} />
         </Pressable>
       </View>
-      <Text className="text-caption text-text-muted mt-2">
-        On your phone, shake it anytime to report a problem.
-      </Text>
+      {Platform.OS !== 'web' && (
+        <Text className="text-caption text-text-muted mt-2">
+          On your phone, shake it anytime to report a problem.
+        </Text>
+      )}
     </View>
   );
 }

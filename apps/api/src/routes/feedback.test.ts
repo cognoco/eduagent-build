@@ -147,7 +147,7 @@ describe('POST /feedback', () => {
       }),
     });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ success: true });
+    expect(await res.json()).toEqual({ success: true, queued: true });
   });
 
   it('returns success even if Resend fetch throws (network failure)', async () => {
@@ -164,7 +164,7 @@ describe('POST /feedback', () => {
       }),
     });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ success: true });
+    expect(await res.json()).toEqual({ success: true, queued: true });
   });
 
   it('skips email when RESEND_API_KEY is not configured', async () => {
@@ -178,7 +178,7 @@ describe('POST /feedback', () => {
       }),
     });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ success: true });
+    expect(await res.json()).toEqual({ success: true, queued: true });
 
     // Verify no fetch to Resend was attempted
     const resendCalls = fetchSpy.mock.calls.filter(([input]) => {

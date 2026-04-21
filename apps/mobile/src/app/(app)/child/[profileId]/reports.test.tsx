@@ -24,8 +24,11 @@ jest.mock('../../../../hooks/use-dashboard', () => ({
 }));
 
 const mockUseChildReports = jest.fn();
+const mockUseChildWeeklyReports = jest.fn();
 jest.mock('../../../../hooks/use-progress', () => ({
   useChildReports: (...args: unknown[]) => mockUseChildReports(...args),
+  useChildWeeklyReports: (...args: unknown[]) =>
+    mockUseChildWeeklyReports(...args),
 }));
 
 jest.mock('../../../../lib/navigation', () => ({
@@ -44,6 +47,7 @@ describe('ChildReportsScreen', () => {
     mockUseChildDetail.mockReturnValue({
       data: { displayName: 'Emma', profileId: 'child-001' },
     });
+    mockUseChildWeeklyReports.mockReturnValue({ data: undefined });
   });
 
   describe('empty state', () => {

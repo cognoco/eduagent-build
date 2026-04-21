@@ -25,6 +25,11 @@ function getTopicHeadline(subject: SubjectInventory): {
   hideBar: boolean;
 } {
   const hasFixedGoal = subject.topics.total != null && subject.topics.total > 0;
+  // [M5] || is intentional: wallClockMinutes defaults to 0 for pre-F-045
+  // snapshots, so falsy-fallback correctly shows activeMinutes instead of 0.
+  const displayMinutes = formatMinutes(
+    subject.wallClockMinutes || subject.activeMinutes
+  );
 
   if (!hasFixedGoal) {
     const exploredCount = Math.max(
@@ -32,38 +37,59 @@ function getTopicHeadline(subject: SubjectInventory): {
       subject.topics.mastered + subject.topics.inProgress
     );
     return {
-      headline: `${exploredCount} topics explored`,
+      headline: `${exploredCount} ${
+        exploredCount === 1 ? 'topic' : 'topics'
+      } explored`,
       progressValue: exploredCount,
       progressMax: Math.max(1, exploredCount),
-      // [M5] || is intentional: wallClockMinutes defaults to 0 for pre-F-045
-      // snapshots, so falsy-fallback correctly shows activeMinutes instead of 0.
-      footnote: formatMinutes(
-        subject.wallClockMinutes || subject.activeMinutes
-      ),
+      footnote: displayMinutes,
       hideBar: true,
     };
   }
 
-  if (subject.topics.explored > 0) {
+  // [BUG-525/BUG-527] Compute the effective engagement count: how many
+  // distinct topics the child has touched in any state. This guards against
+  // the impossible state "explored > 0 but sessions = 0" by reconciling
+  // with sessionsCount — and ensures mastered=0 cards still show activity.
+  const touchedTopics =
+    subject.topics.explored +
+    subject.topics.mastered +
+    subject.topics.inProgress;
+
+  if (touchedTopics > 0) {
+    // Show engagement (topics studied) as the primary headline so parents
+    // see activity even when mastery is 0. Mastery fraction is the footnote.
     return {
-      headline: `${
-        subject.topics.mastered + subject.topics.explored
-      } topics explored`,
+      headline: `${touchedTopics} ${
+        touchedTopics === 1 ? 'topic' : 'topics'
+      } studied`,
       progressValue: subject.topics.mastered,
       progressMax: subject.topics.total ?? 0,
-      footnote: `${subject.topics.mastered}/${subject.topics.total} planned topics mastered`,
+      footnote: `${subject.topics.mastered}/${subject.topics.total} mastered`,
       hideBar: false,
     };
   }
 
-  // BUG-[NOTION-3468bce9]: Label "mastered" explicitly so the Progress
-  // screen's count isn't confused with the Library's "completed" count.
+  // No topics touched yet. If sessions > 0, the child engaged but no topic
+  // was classified — show session-based engagement instead of bare "0/N mastered".
+  if (subject.sessionsCount > 0) {
+    return {
+      headline: `${subject.sessionsCount} ${
+        subject.sessionsCount === 1 ? 'session' : 'sessions'
+      } completed`,
+      progressValue: 0,
+      progressMax: subject.topics.total ?? 0,
+      footnote: `${displayMinutes} · 0/${subject.topics.total} mastered`,
+      hideBar: false,
+    };
+  }
+
+  // Truly no activity — show the mastery target.
   return {
-    headline: `${subject.topics.mastered}/${subject.topics.total} topics mastered`,
-    progressValue: subject.topics.mastered,
+    headline: `0/${subject.topics.total} topics mastered`,
+    progressValue: 0,
     progressMax: subject.topics.total ?? 0,
-    // [M5] || intentional — see open-curriculum branch comment above.
-    footnote: formatMinutes(subject.wallClockMinutes || subject.activeMinutes),
+    footnote: displayMinutes,
     hideBar: false,
   };
 }
@@ -120,7 +146,9 @@ export function SubjectCard({
         <View className="flex-row items-center gap-3">
           <Text className="text-caption text-text-secondary">
             {subject.vocabulary.total > 0
-              ? `${subject.vocabulary.total} words`
+              ? `${subject.vocabulary.total} ${
+                  subject.vocabulary.total === 1 ? 'word' : 'words'
+                }`
               : `${subject.sessionsCount} ${
                   subject.sessionsCount === 1 ? 'session' : 'sessions'
                 }`}

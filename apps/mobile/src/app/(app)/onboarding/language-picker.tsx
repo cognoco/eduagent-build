@@ -18,7 +18,7 @@ import { OnboardingStepIndicator } from '../../../components/onboarding/Onboardi
 import { useUpdateConversationLanguage } from '../../../hooks/use-onboarding-dimensions';
 import { useProfile } from '../../../lib/profile';
 import { goBackOrReplace } from '../../../lib/navigation';
-import { platformAlert } from '../../../lib/platform-alert';
+import { formatApiError } from '../../../lib/format-api-error';
 import { useThemeColors } from '../../../lib/theme';
 
 // Ordered to put English first (most common), then alphabetical by English name
@@ -70,6 +70,7 @@ export default function LanguagePickerScreen(): React.ReactElement {
   const [selected, setSelected] = useState<ConversationLanguage>(
     activeProfile?.conversationLanguage ?? 'en'
   );
+  const [error, setError] = useState('');
   const updateLanguage = useUpdateConversationLanguage();
 
   const navigateForward = useCallback(() => {
@@ -102,19 +103,13 @@ export default function LanguagePickerScreen(): React.ReactElement {
   }, [returnTo, router]);
 
   const handleContinue = useCallback(() => {
+    setError('');
     updateLanguage.mutate(
       { conversationLanguage: selected },
       {
         onSuccess: navigateForward,
-        onError: () => {
-          // Specific-error-first per the UX resilience rules; the Zod
-          // validator rejects out-of-whitelist codes with a typed error and
-          // the client hook surfaces it. Generic fallback here as a
-          // defense-in-depth only.
-          platformAlert(
-            'Could not save language',
-            'Please check your connection and try again.'
-          );
+        onError: (err) => {
+          setError(formatApiError(err));
         },
       }
     );
@@ -200,6 +195,11 @@ export default function LanguagePickerScreen(): React.ReactElement {
       </ScrollView>
 
       <View className="px-5 py-4">
+        {error !== '' && (
+          <View className="bg-danger/10 rounded-card px-4 py-3 mb-3">
+            <Text className="text-danger text-body-sm">{error}</Text>
+          </View>
+        )}
         <Pressable
           testID="language-picker-continue"
           className="bg-primary rounded-button py-4 items-center"
@@ -211,6 +211,16 @@ export default function LanguagePickerScreen(): React.ReactElement {
             {updateLanguage.isPending ? 'Saving…' : 'Continue'}
           </Text>
         </Pressable>
+        {returnTo === 'settings' && (
+          <Pressable
+            testID="language-picker-cancel"
+            className="py-3 mt-2 items-center"
+            onPress={handleBack}
+            accessibilityRole="button"
+          >
+            <Text className="text-primary text-body font-semibold">Cancel</Text>
+          </Pressable>
+        )}
       </View>
     </View>
   );

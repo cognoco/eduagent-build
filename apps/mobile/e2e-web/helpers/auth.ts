@@ -13,6 +13,15 @@ export interface PersistedSignInOptions extends SignInOptions {
   storageStatePath: string;
 }
 
+// [BUG-531] Sentinel values that indicate the token was never actually set.
+const INVALID_TOKEN_SENTINELS = new Set([
+  'notsetyet',
+  'changeme',
+  'placeholder',
+  'todo',
+  '',
+]);
+
 /**
  * Inject Clerk testing token into the page if CLERK_TESTING_TOKEN is set.
  * This bypasses Clerk's bot detection and rate limiting for E2E.
@@ -20,7 +29,20 @@ export interface PersistedSignInOptions extends SignInOptions {
  */
 async function injectClerkTestingToken(page: Page): Promise<void> {
   const token = process.env.CLERK_TESTING_TOKEN;
-  if (!token) return;
+  if (!token) {
+    console.warn(
+      '[E2E] CLERK_TESTING_TOKEN is not set — Clerk may rate-limit sign-in attempts.\n' +
+        '  Fix: set CLERK_TESTING_TOKEN in Doppler (dev + stg) from Clerk Dashboard → API Keys → Testing Token.'
+    );
+    return;
+  }
+  if (INVALID_TOKEN_SENTINELS.has(token.trim().toLowerCase())) {
+    console.warn(
+      `[E2E] CLERK_TESTING_TOKEN is set to "${token}" which is a placeholder, not a real token.\n` +
+        '  Fix: set CLERK_TESTING_TOKEN in Doppler (dev + stg) from Clerk Dashboard → API Keys → Testing Token.'
+    );
+    return;
+  }
   await page.addInitScript((t) => {
     (window as Record<string, unknown>).__clerk_testing_token = t;
   }, token);

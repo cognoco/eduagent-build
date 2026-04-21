@@ -4,6 +4,7 @@ import {
   familyLinks,
   notificationPreferences,
   profiles,
+  weeklyReports,
 } from '@eduagent/database';
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
@@ -12,6 +13,7 @@ import {
   getLatestSnapshot,
   getLatestSnapshotOnOrBefore,
 } from '../../services/snapshot-aggregation';
+import { generateWeeklyReportData } from '../../services/weekly-report';
 import { captureException } from '../../services/sentry';
 
 function isoDate(date: Date): string {
@@ -152,6 +154,15 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
           return { status: 'skipped', reason: 'no_children', parentId };
         }
 
+        // [BUG-524] Compute the Monday start date for this week's report
+        const now = new Date();
+        const day = now.getUTCDay();
+        const mondayOffset = day === 0 ? -6 : 1 - day;
+        const weekStartDate = new Date(now);
+        weekStartDate.setUTCDate(weekStartDate.getUTCDate() + mondayOffset);
+        weekStartDate.setUTCHours(0, 0, 0, 0);
+        const reportWeek = isoDate(weekStartDate);
+
         const childSummaries: string[] = [];
         for (const link of links) {
           const latest = await getLatestSnapshot(db, link.childProfileId);
@@ -191,6 +202,24 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
                   sumTopicsExplored(previous.metrics)
               )
             : null;
+
+          // [BUG-524] Persist the weekly report before building the push summary.
+          // Uses onConflictDoNothing so re-runs for the same week are idempotent.
+          const reportData = generateWeeklyReportData(
+            name,
+            reportWeek,
+            latest.metrics,
+            previous?.metrics ?? null
+          );
+          await db
+            .insert(weeklyReports)
+            .values({
+              profileId: parentId,
+              childProfileId: link.childProfileId,
+              reportWeek,
+              reportData,
+            })
+            .onConflictDoNothing();
 
           if (
             latest.metrics.totalSessions === 0 ||

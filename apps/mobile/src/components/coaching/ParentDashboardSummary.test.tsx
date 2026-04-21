@@ -95,11 +95,13 @@ describe('ParentDashboardSummary', () => {
     expect(screen.getByText('A few things to refresh')).toBeTruthy();
   });
 
-  it('calls onDrillDown when card pressed', () => {
+  it('card wrapper is not pressable (navigation via View details button only) [BUG-517]', () => {
     render(<ParentDashboardSummary {...defaultProps} />);
 
+    // [BUG-517] The outer card no longer has onPress to avoid nested
+    // <button> on web. Only the "View details" button navigates.
     fireEvent.press(screen.getByTestId('dashboard-child-test-profile-123'));
-    expect(defaultProps.onDrillDown).toHaveBeenCalledTimes(1);
+    expect(defaultProps.onDrillDown).not.toHaveBeenCalled();
   });
 
   it('calls onDrillDown when View details pressed', () => {

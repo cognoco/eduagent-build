@@ -17,6 +17,11 @@ import {
   getChildSessionDetail,
 } from '../services/dashboard';
 import { getLearningProfile } from '../services/learner-profile';
+import {
+  listWeeklyReportsForParentChild,
+  getWeeklyReportForParentChild,
+  markWeeklyReportViewed,
+} from '../services/weekly-report';
 import { buildCuratedMemoryView } from '../services/curated-memory';
 import { assertParentAccess } from '../services/family-access';
 
@@ -192,6 +197,53 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     await markChildReportViewed(db, parentProfileId, childProfileId, reportId);
     return c.json({ viewed: true });
   })
+
+  // [BUG-524] Weekly reports
+  .get('/dashboard/children/:profileId/weekly-reports', async (c) => {
+    const db = c.get('db');
+    const parentProfileId = requireProfileId(c.get('profileId'));
+    const childProfileId = c.req.param('profileId');
+
+    const reports = await listWeeklyReportsForParentChild(
+      db,
+      parentProfileId,
+      childProfileId
+    );
+    return c.json({ reports });
+  })
+
+  .get('/dashboard/children/:profileId/weekly-reports/:reportId', async (c) => {
+    const db = c.get('db');
+    const parentProfileId = requireProfileId(c.get('profileId'));
+    const childProfileId = c.req.param('profileId');
+    const reportId = c.req.param('reportId');
+
+    const report = await getWeeklyReportForParentChild(
+      db,
+      parentProfileId,
+      childProfileId,
+      reportId
+    );
+    return c.json({ report });
+  })
+
+  .post(
+    '/dashboard/children/:profileId/weekly-reports/:reportId/view',
+    async (c) => {
+      const db = c.get('db');
+      const parentProfileId = requireProfileId(c.get('profileId'));
+      const childProfileId = c.req.param('profileId');
+      const reportId = c.req.param('reportId');
+
+      await markWeeklyReportViewed(
+        db,
+        parentProfileId,
+        childProfileId,
+        reportId
+      );
+      return c.json({ viewed: true });
+    }
+  )
 
   // Get demo mode fixture data
   .get('/dashboard/demo', async (c) => {
