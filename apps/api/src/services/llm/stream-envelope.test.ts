@@ -179,4 +179,16 @@ describe('teeEnvelopeStream', () => {
     expect(reply).toBe('');
     expect(fullRaw).toBe(raw);
   });
+
+  it('[A-2] rejects rawResponsePromise with deadlock error when awaited before draining', async () => {
+    const { rawResponsePromise } = teeEnvelopeStream(
+      fromChunks(['{"reply":"nope"}'])
+    );
+
+    // Awaiting the raw promise without ever draining cleanReplyStream
+    // should reject with a deadlock-detection error, not hang forever.
+    await expect(rawResponsePromise).rejects.toThrow(
+      'Drain cleanReplyStream first'
+    );
+  });
 });

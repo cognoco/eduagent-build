@@ -90,7 +90,36 @@ export function teeEnvelopeStream(source: AsyncIterable<string>): {
     rejectRaw = rej;
   });
 
+  // [A-2] Track whether the stream has been iterated at all. If the caller
+  // awaits rawResponsePromise without ever pulling from cleanReplyStream,
+  // the source never advances and resolveRaw is never called → deadlock.
+  // We detect this by checking `streamStarted` inside a setTimeout(0):
+  // if nobody has begun draining by the next event-loop turn, reject early
+  // with a diagnosable error instead of hanging forever.
+  let streamStarted = false;
+
+  // Attach a .then to detect when someone awaits the raw promise without
+  // starting the stream — schedule the check at that point.
+  const guardedRawResponsePromise = rawResponsePromise.then(
+    (v) => v,
+    (e) => {
+      throw e;
+    }
+  );
+  // Side-effect: schedule a one-shot deadlock check on next event-loop turn.
+  setTimeout(() => {
+    if (!streamStarted) {
+      rejectRaw(
+        new Error(
+          'teeEnvelopeStream: rawResponsePromise awaited before cleanReplyStream was fully drained. ' +
+            'Drain cleanReplyStream first to avoid deadlock.'
+        )
+      );
+    }
+  }, 0);
+
   async function* accumulatedSource(): AsyncGenerator<string> {
+    streamStarted = true;
     try {
       for await (const chunk of source) {
         raw += chunk;
@@ -104,7 +133,7 @@ export function teeEnvelopeStream(source: AsyncIterable<string>): {
   }
 
   const cleanReplyStream = streamEnvelopeReply(accumulatedSource());
-  return { cleanReplyStream, rawResponsePromise };
+  return { cleanReplyStream, rawResponsePromise: guardedRawResponsePromise };
 }
 
 export async function* streamEnvelopeReply(

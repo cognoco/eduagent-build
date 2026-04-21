@@ -4,7 +4,7 @@ import { zValidator } from '@hono/zod-validator';
 import {
   interviewMessageSchema,
   type InterviewResult,
-  type ExtractedInterviewSignals,
+  extractedInterviewSignalsSchema,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
@@ -246,19 +246,15 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
     if (!draft || draft.status !== 'in_progress') {
       // Already completed or no draft — return signals from the persisted
       // draft if present, so a second /complete call is still navigable.
+      // [A-3] safeParse replaces the unsafe double cast — validates JSONB shape at runtime.
+      const parsed = extractedInterviewSignalsSchema.safeParse(
+        draft?.extractedSignals
+      );
       return c.json({
         isComplete: true,
         exchangeCount:
           draft?.exchangeHistory.filter((e) => e.role === 'user').length ?? 0,
-        ...(draft?.extractedSignals &&
-        typeof draft.extractedSignals === 'object' &&
-        Object.keys(draft.extractedSignals as Record<string, unknown>).length >
-          0
-          ? {
-              extractedSignals:
-                draft.extractedSignals as unknown as ExtractedInterviewSignals,
-            }
-          : {}),
+        ...(parsed.success ? { extractedSignals: parsed.data } : {}),
       });
     }
 
@@ -312,11 +308,11 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
     // read extracted interests and route through the interests-context picker
     // before the downstream onboarding fork. The shape is validated by
     // @eduagent/schemas/extractedInterviewSignalsSchema.
-    const hasExtractedSignals =
-      draft.status === 'completed' &&
-      draft.extractedSignals &&
-      typeof draft.extractedSignals === 'object' &&
-      Object.keys(draft.extractedSignals as Record<string, unknown>).length > 0;
+    // [A-3] safeParse replaces the unsafe double cast — validates JSONB shape at runtime.
+    const parsedSignals =
+      draft.status === 'completed'
+        ? extractedInterviewSignalsSchema.safeParse(draft.extractedSignals)
+        : undefined;
 
     return c.json({
       state: {
@@ -332,11 +328,8 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
             }
           : {}),
         ...(draft.expiresAt ? { expiresAt: draft.expiresAt } : {}),
-        ...(hasExtractedSignals
-          ? {
-              extractedSignals:
-                draft.extractedSignals as unknown as ExtractedInterviewSignals,
-            }
+        ...(parsedSignals?.success
+          ? { extractedSignals: parsedSignals.data }
           : {}),
       },
     });

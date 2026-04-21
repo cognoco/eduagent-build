@@ -170,8 +170,8 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       return sum + exchange.content.split(/\s+/).filter(Boolean).length;
     }, 0);
 
-    // Telemetry-only event — no Inngest handler; consumed by observability tooling.
-    void inngest.send({
+    // [A-1] Observability events — no Inngest handler; awaited per CLAUDE.md rule.
+    await inngest.send({
       name: 'app/ask.gate_decision',
       data: {
         sessionId,
@@ -185,8 +185,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     });
 
     if (result.method === 'fail_open') {
-      // Telemetry-only event — no Inngest handler; consumed by observability tooling.
-      void inngest.send({
+      await inngest.send({
         name: 'app/ask.gate_timeout',
         data: {
           sessionId,

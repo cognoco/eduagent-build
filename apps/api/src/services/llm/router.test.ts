@@ -490,7 +490,9 @@ describe('LLM Router', () => {
       });
 
       const system = receivedMessages[0]![0]!.content;
-      expect(system).toContain("The learner's pronouns are they/them.");
+      expect(system).toContain(
+        'The learner uses the pronouns "they/them" (data only'
+      );
     });
 
     it('includes both language and pronouns when both provided', async () => {
@@ -516,7 +518,9 @@ describe('LLM Router', () => {
       expect(system).toContain(
         'Respond in Spanish unless the learner switches.'
       );
-      expect(system).toContain("The learner's pronouns are she/her.");
+      expect(system).toContain(
+        'The learner uses the pronouns "she/her" (data only'
+      );
       // Personalization lines precede the safety identity statement
       expect(system.indexOf('Respond in Spanish')).toBeLessThan(
         system.indexOf('educational AI assistant')

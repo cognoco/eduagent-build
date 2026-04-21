@@ -64,7 +64,8 @@ export const feedbackRoutes = new Hono<FeedbackRouteEnv>().post(
       );
     } catch (err) {
       console.error('[feedback] sendEmail threw unexpectedly:', err);
-      void inngest.send({
+      // [A-1] Awaited per CLAUDE.md — no silent fire-and-forget from route handlers.
+      await inngest.send({
         name: 'app/feedback.delivery_failed',
         data: { profileId, category: body.category },
       });
