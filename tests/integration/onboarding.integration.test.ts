@@ -82,7 +82,7 @@ function installLlmMocks(): void {
 
       if (
         lastMessage.includes('Subject:') &&
-        lastMessage.includes('Interview Summary:')
+        lastMessage.includes('Interview Summary')
       ) {
         return buildLlmResult(
           JSON.stringify([

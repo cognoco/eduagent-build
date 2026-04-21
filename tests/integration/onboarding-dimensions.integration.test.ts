@@ -13,7 +13,12 @@
  */
 
 import { eq } from 'drizzle-orm';
-import { profiles, learningProfiles, familyLinks } from '@eduagent/database';
+import {
+  profiles,
+  accounts,
+  learningProfiles,
+  familyLinks,
+} from '@eduagent/database';
 
 import { jwtMock, configureValidJWT } from './mocks';
 import {
@@ -65,6 +70,28 @@ async function createProfileForUser(
   expect(res.status).toBe(201);
   const body = (await res.json()) as { profile: { id: string } };
   return body.profile.id;
+}
+
+/** Insert a child profile directly in the DB, bypassing the subscription-tier
+ *  limit enforced by POST /v1/profiles. Returns the child profileId. */
+async function createChildProfileDirect(
+  parentProfileId: string,
+  displayName: string,
+  birthYear: number
+): Promise<string> {
+  const db = createIntegrationDb();
+  // Look up accountId from the parent profile
+  const [parent] = await db
+    .select({ accountId: profiles.accountId })
+    .from(profiles)
+    .where(eq(profiles.id, parentProfileId));
+  if (!parent) throw new Error(`Parent profile ${parentProfileId} not found`);
+
+  const [child] = await db
+    .insert(profiles)
+    .values({ accountId: parent.accountId, displayName, birthYear })
+    .returning({ id: profiles.id });
+  return child!.id;
 }
 
 async function createFamilyLink(
@@ -203,7 +230,7 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
 
   // ---- Cross-account rejection (negative-path / break test) ----------------
 
-  it('returns 404 when PATCH /onboarding/language targets a profile owned by another account [SECURITY]', async () => {
+  it('returns 403 when PATCH /onboarding/language targets a profile owned by another account [SECURITY]', async () => {
     // User A creates a profile
     const profileA = await createProfileForUser(
       USER_A_CLERK_ID,
@@ -244,10 +271,11 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
       .select({ conversationLanguage: profiles.conversationLanguage })
       .from(profiles)
       .where(eq(profiles.id, profileA));
-    expect(profile!.conversationLanguage).toBeNull();
+    // Default is 'en' (NOT NULL) — verify the attacker's PATCH didn't change it.
+    expect(profile!.conversationLanguage).toBe('en');
   });
 
-  it('returns 404 when PATCH /onboarding/pronouns targets a profile owned by another account [SECURITY]', async () => {
+  it('returns 403 when PATCH /onboarding/pronouns targets a profile owned by another account [SECURITY]', async () => {
     const profileA = await createProfileForUser(
       USER_A_CLERK_ID,
       USER_A_EMAIL,
@@ -325,21 +353,12 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
       1985
     );
 
-    // Create child profile under same account
-    const childRes = await app.request(
-      '/v1/profiles',
-      {
-        method: 'POST',
-        headers: buildAuthHeaders(parentProfileId),
-        body: JSON.stringify({ displayName: 'Child', birthYear: 2014 }),
-      },
-      TEST_ENV
+    // Insert child directly in DB (bypasses subscription tier limit).
+    const childProfileId = await createChildProfileDirect(
+      parentProfileId,
+      'Child',
+      2014
     );
-    expect(childRes.status).toBe(201);
-    const childBody = (await childRes.json()) as { profile: { id: string } };
-    const childProfileId = childBody.profile.id;
-
-    // Create family link
     await createFamilyLink(parentProfileId, childProfileId);
 
     // Parent updates child's language
@@ -371,18 +390,12 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
       'Parent A',
       1985
     );
-    const childRes = await app.request(
-      '/v1/profiles',
-      {
-        method: 'POST',
-        headers: buildAuthHeaders(parentA),
-        body: JSON.stringify({ displayName: 'Child A', birthYear: 2014 }),
-      },
-      TEST_ENV
+    // Insert child directly (bypasses subscription tier limit).
+    const childProfileId = await createChildProfileDirect(
+      parentA,
+      'Child A',
+      2014
     );
-    expect(childRes.status).toBe(201);
-    const childBody = (await childRes.json()) as { profile: { id: string } };
-    const childProfileId = childBody.profile.id;
 
     // User B (no family link) tries to update the child
     const parentB = await createProfileForUser(
@@ -411,7 +424,8 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
       .select({ conversationLanguage: profiles.conversationLanguage })
       .from(profiles)
       .where(eq(profiles.id, childProfileId));
-    expect(profile!.conversationLanguage).toBeNull();
+    // Default is 'en' (NOT NULL) — verify the attacker's PATCH didn't change it.
+    expect(profile!.conversationLanguage).toBe('en');
   });
 
   // ---- Validation -----------------------------------------------------------
