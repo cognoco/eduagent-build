@@ -2,7 +2,7 @@
  * Integration: Settings routes
  *
  * Exercises the real settings routes through the full app + real database.
- * JWT verification is the only mocked boundary.
+ * JWT verification uses real signed tokens via the fetch interceptor in setup.ts.
  */
 
 import { and, eq } from 'drizzle-orm';
@@ -12,7 +12,6 @@ import {
   teachingPreferences,
 } from '@eduagent/database';
 
-import { jwtMock } from './mocks';
 import { buildIntegrationEnv, cleanupAccounts } from './helpers';
 import {
   buildAuthHeaders,
@@ -22,11 +21,7 @@ import {
   seedNotificationPreferences,
   seedSubject,
   seedTeachingPreference,
-  setAuthenticatedUser,
 } from './route-fixtures';
-
-const jwt = jwtMock();
-jest.mock('../../apps/api/src/middleware/jwt', () => jwt);
 
 import { app } from '../../apps/api/src/index';
 
@@ -62,7 +57,6 @@ async function createProfileFor(
   return createProfileViaRoute({
     app,
     env: TEST_ENV,
-    jwt,
     user,
     displayName,
     birthYear: 2000,
@@ -81,10 +75,15 @@ describe('Integration: settings routes', () => {
       maxDailyPush: 5,
     });
 
-    setAuthenticatedUser(jwt, SETTINGS_USER);
     const res = await app.request(
       '/v1/settings/notifications',
-      { method: 'GET', headers: buildAuthHeaders() },
+      {
+        method: 'GET',
+        headers: buildAuthHeaders({
+          sub: SETTINGS_USER.userId,
+          email: SETTINGS_USER.email,
+        }),
+      },
       TEST_ENV
     );
 
@@ -102,12 +101,14 @@ describe('Integration: settings routes', () => {
   it('updates notification preferences and persists the default maxDailyPush', async () => {
     const profile = await createProfileFor(SETTINGS_USER, 'Settings Learner');
 
-    setAuthenticatedUser(jwt, SETTINGS_USER);
     const res = await app.request(
       '/v1/settings/notifications',
       {
         method: 'PUT',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: SETTINGS_USER.userId, email: SETTINGS_USER.email },
+          profile.id
+        ),
         body: JSON.stringify({
           reviewReminders: false,
           dailyReminders: true,
@@ -145,12 +146,14 @@ describe('Integration: settings routes', () => {
   it('rejects an invalid notification payload', async () => {
     const profile = await createProfileFor(SETTINGS_USER, 'Settings Learner');
 
-    setAuthenticatedUser(jwt, SETTINGS_USER);
     const res = await app.request(
       '/v1/settings/notifications',
       {
         method: 'PUT',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: SETTINGS_USER.userId, email: SETTINGS_USER.email },
+          profile.id
+        ),
         body: JSON.stringify({
           reviewReminders: 'yes',
         }),
@@ -164,12 +167,14 @@ describe('Integration: settings routes', () => {
   it('returns the real default learning mode when no row exists yet', async () => {
     const profile = await createProfileFor(SETTINGS_USER, 'Settings Learner');
 
-    setAuthenticatedUser(jwt, SETTINGS_USER);
     const res = await app.request(
       '/v1/settings/learning-mode',
       {
         method: 'GET',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: SETTINGS_USER.userId, email: SETTINGS_USER.email },
+          profile.id
+        ),
       },
       TEST_ENV
     );
@@ -181,12 +186,14 @@ describe('Integration: settings routes', () => {
   it('updates the learning mode and persists it', async () => {
     const profile = await createProfileFor(SETTINGS_USER, 'Settings Learner');
 
-    setAuthenticatedUser(jwt, SETTINGS_USER);
     const res = await app.request(
       '/v1/settings/learning-mode',
       {
         method: 'PUT',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: SETTINGS_USER.userId, email: SETTINGS_USER.email },
+          profile.id
+        ),
         body: JSON.stringify({ mode: 'serious' }),
       },
       TEST_ENV
@@ -205,12 +212,14 @@ describe('Integration: settings routes', () => {
   it('rejects an invalid learning mode', async () => {
     const profile = await createProfileFor(SETTINGS_USER, 'Settings Learner');
 
-    setAuthenticatedUser(jwt, SETTINGS_USER);
     const res = await app.request(
       '/v1/settings/learning-mode',
       {
         method: 'PUT',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: SETTINGS_USER.userId, email: SETTINGS_USER.email },
+          profile.id
+        ),
         body: JSON.stringify({ mode: 'speedrun' }),
       },
       TEST_ENV
@@ -227,12 +236,14 @@ describe('Integration: settings routes', () => {
       celebrationLevel: 'all',
     });
 
-    setAuthenticatedUser(jwt, SETTINGS_USER);
     const getRes = await app.request(
       '/v1/settings/celebration-level',
       {
         method: 'GET',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: SETTINGS_USER.userId, email: SETTINGS_USER.email },
+          profile.id
+        ),
       },
       TEST_ENV
     );
@@ -244,7 +255,10 @@ describe('Integration: settings routes', () => {
       '/v1/settings/celebration-level',
       {
         method: 'PUT',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: SETTINGS_USER.userId, email: SETTINGS_USER.email },
+          profile.id
+        ),
         body: JSON.stringify({ celebrationLevel: 'big_only' }),
       },
       TEST_ENV
@@ -264,12 +278,14 @@ describe('Integration: settings routes', () => {
     const profile = await createProfileFor(SETTINGS_USER, 'Settings Learner');
     const subject = await seedSubject(profile.id, 'Math');
 
-    setAuthenticatedUser(jwt, SETTINGS_USER);
     const initialRes = await app.request(
       `/v1/settings/subjects/${subject.id}/analogy-domain`,
       {
         method: 'GET',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: SETTINGS_USER.userId, email: SETTINGS_USER.email },
+          profile.id
+        ),
       },
       TEST_ENV
     );
@@ -281,7 +297,10 @@ describe('Integration: settings routes', () => {
       `/v1/settings/subjects/${subject.id}/analogy-domain`,
       {
         method: 'PUT',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: SETTINGS_USER.userId, email: SETTINGS_USER.email },
+          profile.id
+        ),
         body: JSON.stringify({ analogyDomain: 'sports' }),
       },
       TEST_ENV
@@ -294,7 +313,10 @@ describe('Integration: settings routes', () => {
       `/v1/settings/subjects/${subject.id}/analogy-domain`,
       {
         method: 'PUT',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: SETTINGS_USER.userId, email: SETTINGS_USER.email },
+          profile.id
+        ),
         body: JSON.stringify({ analogyDomain: null }),
       },
       TEST_ENV
@@ -318,12 +340,14 @@ describe('Integration: settings routes', () => {
     const otherProfile = await createProfileFor(OTHER_SETTINGS_USER, 'Owner B');
     const otherSubject = await seedSubject(otherProfile.id, 'Chemistry');
 
-    setAuthenticatedUser(jwt, SETTINGS_USER);
     const res = await app.request(
       `/v1/settings/subjects/${otherSubject.id}/analogy-domain`,
       {
         method: 'PUT',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: SETTINGS_USER.userId, email: SETTINGS_USER.email },
+          profile.id
+        ),
         body: JSON.stringify({ analogyDomain: 'gaming' }),
       },
       TEST_ENV
@@ -336,12 +360,14 @@ describe('Integration: settings routes', () => {
     const profile = await createProfileFor(SETTINGS_USER, 'Settings Learner');
     const subject = await seedSubject(profile.id, 'Math');
 
-    setAuthenticatedUser(jwt, SETTINGS_USER);
     const invalidBodyRes = await app.request(
       `/v1/settings/subjects/${subject.id}/analogy-domain`,
       {
         method: 'PUT',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: SETTINGS_USER.userId, email: SETTINGS_USER.email },
+          profile.id
+        ),
         body: JSON.stringify({ analogyDomain: 'invalid' }),
       },
       TEST_ENV
@@ -352,7 +378,10 @@ describe('Integration: settings routes', () => {
       '/v1/settings/subjects/not-a-uuid/analogy-domain',
       {
         method: 'PUT',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: SETTINGS_USER.userId, email: SETTINGS_USER.email },
+          profile.id
+        ),
         body: JSON.stringify({ analogyDomain: 'sports' }),
       },
       TEST_ENV
@@ -369,12 +398,14 @@ describe('Integration: settings routes', () => {
       nativeLanguage: null,
     });
 
-    setAuthenticatedUser(jwt, SETTINGS_USER);
     const initialRes = await app.request(
       `/v1/settings/subjects/${subject.id}/native-language`,
       {
         method: 'GET',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: SETTINGS_USER.userId, email: SETTINGS_USER.email },
+          profile.id
+        ),
       },
       TEST_ENV
     );
@@ -386,7 +417,10 @@ describe('Integration: settings routes', () => {
       `/v1/settings/subjects/${subject.id}/native-language`,
       {
         method: 'PUT',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: SETTINGS_USER.userId, email: SETTINGS_USER.email },
+          profile.id
+        ),
         body: JSON.stringify({ nativeLanguage: 'en' }),
       },
       TEST_ENV
@@ -408,7 +442,10 @@ describe('Integration: settings routes', () => {
       `/v1/settings/subjects/${subject.id}/native-language`,
       {
         method: 'PUT',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: SETTINGS_USER.userId, email: SETTINGS_USER.email },
+          profile.id
+        ),
         body: JSON.stringify({ nativeLanguage: null }),
       },
       TEST_ENV
@@ -423,12 +460,14 @@ describe('Integration: settings routes', () => {
     const otherProfile = await createProfileFor(OTHER_SETTINGS_USER, 'Owner B');
     const otherSubject = await seedSubject(otherProfile.id, 'French');
 
-    setAuthenticatedUser(jwt, SETTINGS_USER);
     const res = await app.request(
       `/v1/settings/subjects/${otherSubject.id}/native-language`,
       {
         method: 'PUT',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: SETTINGS_USER.userId, email: SETTINGS_USER.email },
+          profile.id
+        ),
         body: JSON.stringify({ nativeLanguage: 'en' }),
       },
       TEST_ENV
@@ -441,12 +480,14 @@ describe('Integration: settings routes', () => {
     const profile = await createProfileFor(SETTINGS_USER, 'Settings Learner');
     const subject = await seedSubject(profile.id, 'Spanish');
 
-    setAuthenticatedUser(jwt, SETTINGS_USER);
     const invalidBodyRes = await app.request(
       `/v1/settings/subjects/${subject.id}/native-language`,
       {
         method: 'PUT',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: SETTINGS_USER.userId, email: SETTINGS_USER.email },
+          profile.id
+        ),
         body: JSON.stringify({ nativeLanguage: '' }),
       },
       TEST_ENV
@@ -457,7 +498,10 @@ describe('Integration: settings routes', () => {
       '/v1/settings/subjects/not-a-uuid/native-language',
       {
         method: 'PUT',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: SETTINGS_USER.userId, email: SETTINGS_USER.email },
+          profile.id
+        ),
         body: JSON.stringify({ nativeLanguage: 'en' }),
       },
       TEST_ENV

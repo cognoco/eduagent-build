@@ -9,26 +9,18 @@
  * 4. Non-parent blocked from foreign child (403)
  *
  * Mocked boundaries:
- * - JWT verification
+ * - JWT verification (real RS256 via fetch interceptor in setup.ts)
  */
 
 import { eq } from 'drizzle-orm';
-import {
-  profiles,
-  accounts,
-  learningProfiles,
-  familyLinks,
-} from '@eduagent/database';
+import { profiles, learningProfiles, familyLinks } from '@eduagent/database';
 
-import { jwtMock, configureValidJWT } from './mocks';
 import {
   buildIntegrationEnv,
   cleanupAccounts,
   createIntegrationDb,
 } from './helpers';
-
-const jwt = jwtMock();
-jest.mock('../../apps/api/src/middleware/jwt', () => jwt);
+import { buildAuthHeaders } from './test-keys';
 
 import { app } from '../../apps/api/src/index';
 
@@ -39,30 +31,17 @@ const USER_A_EMAIL = 'integration-onb-dim-a@integration.test';
 const USER_B_CLERK_ID = 'integration-onb-dim-user-b';
 const USER_B_EMAIL = 'integration-onb-dim-b@integration.test';
 
-function buildAuthHeaders(profileId?: string): HeadersInit {
-  return {
-    Authorization: 'Bearer valid.jwt.token',
-    'Content-Type': 'application/json',
-    ...(profileId ? { 'X-Profile-Id': profileId } : {}),
-  };
-}
-
-function setAuthUser(userId: string, email: string): void {
-  configureValidJWT(jwt, { sub: userId, email });
-}
-
 async function createProfileForUser(
   userId: string,
   email: string,
   displayName: string,
   birthYear: number
 ): Promise<string> {
-  setAuthUser(userId, email);
   const res = await app.request(
     '/v1/profiles',
     {
       method: 'POST',
-      headers: buildAuthHeaders(),
+      headers: buildAuthHeaders({ sub: userId, email }),
       body: JSON.stringify({ displayName, birthYear }),
     },
     TEST_ENV
@@ -107,7 +86,6 @@ async function createFamilyLink(
 }
 
 beforeEach(async () => {
-  jest.clearAllMocks();
   await cleanupAccounts({
     emails: [USER_A_EMAIL, USER_B_EMAIL],
     clerkUserIds: [USER_A_CLERK_ID, USER_B_CLERK_ID],
@@ -136,7 +114,10 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
       '/v1/onboarding/language',
       {
         method: 'PATCH',
-        headers: buildAuthHeaders(profileId),
+        headers: buildAuthHeaders(
+          { sub: USER_A_CLERK_ID, email: USER_A_EMAIL },
+          profileId
+        ),
         body: JSON.stringify({ conversationLanguage: 'cs' }),
       },
       TEST_ENV
@@ -167,7 +148,10 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
       '/v1/onboarding/pronouns',
       {
         method: 'PATCH',
-        headers: buildAuthHeaders(profileId),
+        headers: buildAuthHeaders(
+          { sub: USER_A_CLERK_ID, email: USER_A_EMAIL },
+          profileId
+        ),
         body: JSON.stringify({ pronouns: 'they/them' }),
       },
       TEST_ENV
@@ -202,7 +186,10 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
       '/v1/onboarding/interests/context',
       {
         method: 'PATCH',
-        headers: buildAuthHeaders(profileId),
+        headers: buildAuthHeaders(
+          { sub: USER_A_CLERK_ID, email: USER_A_EMAIL },
+          profileId
+        ),
         body: JSON.stringify({ interests }),
       },
       TEST_ENV
@@ -239,10 +226,8 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
       2010
     );
 
-    // User B authenticates and tries to update User A's profile
-    setAuthUser(USER_B_CLERK_ID, USER_B_EMAIL);
     // User B needs their own profile first (profile-scope middleware requires it)
-    const profileB = await createProfileForUser(
+    await createProfileForUser(
       USER_B_CLERK_ID,
       USER_B_EMAIL,
       'Attacker B',
@@ -256,7 +241,10 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
       '/v1/onboarding/language',
       {
         method: 'PATCH',
-        headers: buildAuthHeaders(profileA),
+        headers: buildAuthHeaders(
+          { sub: USER_B_CLERK_ID, email: USER_B_EMAIL },
+          profileA
+        ),
         body: JSON.stringify({ conversationLanguage: 'de' }),
       },
       TEST_ENV
@@ -283,7 +271,6 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
       2010
     );
 
-    setAuthUser(USER_B_CLERK_ID, USER_B_EMAIL);
     await createProfileForUser(
       USER_B_CLERK_ID,
       USER_B_EMAIL,
@@ -295,7 +282,10 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
       '/v1/onboarding/pronouns',
       {
         method: 'PATCH',
-        headers: buildAuthHeaders(profileA),
+        headers: buildAuthHeaders(
+          { sub: USER_B_CLERK_ID, email: USER_B_EMAIL },
+          profileA
+        ),
         body: JSON.stringify({ pronouns: 'he/him' }),
       },
       TEST_ENV
@@ -319,7 +309,6 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
       2010
     );
 
-    setAuthUser(USER_B_CLERK_ID, USER_B_EMAIL);
     await createProfileForUser(
       USER_B_CLERK_ID,
       USER_B_EMAIL,
@@ -331,7 +320,10 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
       '/v1/onboarding/interests/context',
       {
         method: 'PATCH',
-        headers: buildAuthHeaders(profileA),
+        headers: buildAuthHeaders(
+          { sub: USER_B_CLERK_ID, email: USER_B_EMAIL },
+          profileA
+        ),
         body: JSON.stringify({
           interests: [{ label: 'Hacking', context: 'free_time' }],
         }),
@@ -366,7 +358,10 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
       `/v1/onboarding/${childProfileId}/language`,
       {
         method: 'PATCH',
-        headers: buildAuthHeaders(parentProfileId),
+        headers: buildAuthHeaders(
+          { sub: USER_A_CLERK_ID, email: USER_A_EMAIL },
+          parentProfileId
+        ),
         body: JSON.stringify({ conversationLanguage: 'es' }),
       },
       TEST_ENV
@@ -409,7 +404,10 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
       `/v1/onboarding/${childProfileId}/language`,
       {
         method: 'PATCH',
-        headers: buildAuthHeaders(parentB),
+        headers: buildAuthHeaders(
+          { sub: USER_B_CLERK_ID, email: USER_B_EMAIL },
+          parentB
+        ),
         body: JSON.stringify({ conversationLanguage: 'fr' }),
       },
       TEST_ENV
@@ -442,7 +440,10 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
       '/v1/onboarding/language',
       {
         method: 'PATCH',
-        headers: buildAuthHeaders(profileId),
+        headers: buildAuthHeaders(
+          { sub: USER_A_CLERK_ID, email: USER_A_EMAIL },
+          profileId
+        ),
         body: JSON.stringify({ conversationLanguage: 'xx-invalid' }),
       },
       TEST_ENV
@@ -464,7 +465,10 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
       '/v1/onboarding/pronouns',
       {
         method: 'PATCH',
-        headers: buildAuthHeaders(profileId),
+        headers: buildAuthHeaders(
+          { sub: USER_A_CLERK_ID, email: USER_A_EMAIL },
+          profileId
+        ),
         body: JSON.stringify({ pronouns: 'a'.repeat(33) }),
       },
       TEST_ENV
@@ -485,7 +489,10 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
       '/v1/onboarding/interests/context',
       {
         method: 'PATCH',
-        headers: buildAuthHeaders(profileId),
+        headers: buildAuthHeaders(
+          { sub: USER_A_CLERK_ID, email: USER_A_EMAIL },
+          profileId
+        ),
         body: JSON.stringify({
           interests: [{ label: '', context: 'free_time' }],
         }),
@@ -499,15 +506,12 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
   // ---- Unauthenticated access -----------------------------------------------
 
   it('returns 401 without authentication', async () => {
-    const { configureInvalidJWT } = await import('./mocks');
     const profileId = await createProfileForUser(
       USER_A_CLERK_ID,
       USER_A_EMAIL,
       'Unauth Test',
       2010
     );
-
-    configureInvalidJWT(jwt);
 
     const res = await app.request(
       '/v1/onboarding/language',

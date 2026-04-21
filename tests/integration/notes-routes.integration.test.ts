@@ -2,13 +2,12 @@
  * Integration: Note routes
  *
  * Exercises the real note routes through the full app + real database.
- * JWT verification is the only mocked boundary.
+ * Real JWT verification via the global fetch interceptor in setup.ts.
  */
 
 import { and, eq } from 'drizzle-orm';
 import { topicNotes } from '@eduagent/database';
 
-import { jwtMock } from './mocks';
 import { buildIntegrationEnv, cleanupAccounts } from './helpers';
 import {
   buildAuthHeaders,
@@ -17,11 +16,7 @@ import {
   seedCurriculum,
   seedSubject,
   seedTopicNote,
-  setAuthenticatedUser,
 } from './route-fixtures';
-
-const jwt = jwtMock();
-jest.mock('../../apps/api/src/middleware/jwt', () => jwt);
 
 import { app } from '../../apps/api/src/index';
 
@@ -54,7 +49,6 @@ async function createTopicFixture() {
   const profile = await createProfileViaRoute({
     app,
     env: TEST_ENV,
-    jwt,
     user: NOTES_USER,
     displayName: 'Notes Learner',
     birthYear: 2008,
@@ -92,10 +86,15 @@ describe('Integration: note routes', () => {
       content: 'Roman roads made movement faster',
     });
 
-    setAuthenticatedUser(jwt, NOTES_USER);
     const res = await app.request(
       `/v1/subjects/${subject.id}/books/${bookId}/notes`,
-      { method: 'GET', headers: buildAuthHeaders() },
+      {
+        method: 'GET',
+        headers: buildAuthHeaders({
+          sub: NOTES_USER.userId,
+          email: NOTES_USER.email,
+        }),
+      },
       TEST_ENV
     );
 
@@ -119,12 +118,14 @@ describe('Integration: note routes', () => {
   it('returns null when no note exists for the topic', async () => {
     const { profile, subject, topicId } = await createTopicFixture();
 
-    setAuthenticatedUser(jwt, NOTES_USER);
     const res = await app.request(
       `/v1/subjects/${subject.id}/topics/${topicId}/note`,
       {
         method: 'GET',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: NOTES_USER.userId, email: NOTES_USER.email },
+          profile.id
+        ),
       },
       TEST_ENV
     );
@@ -137,12 +138,14 @@ describe('Integration: note routes', () => {
   it('creates and appends to a note with real persistence', async () => {
     const { profile, subject, topicId } = await createTopicFixture();
 
-    setAuthenticatedUser(jwt, NOTES_USER);
     const createRes = await app.request(
       `/v1/subjects/${subject.id}/topics/${topicId}/note`,
       {
         method: 'PUT',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: NOTES_USER.userId, email: NOTES_USER.email },
+          profile.id
+        ),
         body: JSON.stringify({ content: 'First line' }),
       },
       TEST_ENV
@@ -156,7 +159,10 @@ describe('Integration: note routes', () => {
       `/v1/subjects/${subject.id}/topics/${topicId}/note`,
       {
         method: 'PUT',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: NOTES_USER.userId, email: NOTES_USER.email },
+          profile.id
+        ),
         body: JSON.stringify({
           content: 'Second line',
           append: true,
@@ -182,12 +188,14 @@ describe('Integration: note routes', () => {
   it('returns 400 for invalid note input', async () => {
     const { profile, subject, topicId } = await createTopicFixture();
 
-    setAuthenticatedUser(jwt, NOTES_USER);
     const res = await app.request(
       `/v1/subjects/${subject.id}/topics/${topicId}/note`,
       {
         method: 'PUT',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: NOTES_USER.userId, email: NOTES_USER.email },
+          profile.id
+        ),
         body: JSON.stringify({ content: '' }),
       },
       TEST_ENV
@@ -199,12 +207,14 @@ describe('Integration: note routes', () => {
   it('returns 400 for an invalid topic id', async () => {
     const { profile, subject } = await createTopicFixture();
 
-    setAuthenticatedUser(jwt, NOTES_USER);
     const res = await app.request(
       `/v1/subjects/${subject.id}/topics/not-a-uuid/note`,
       {
         method: 'GET',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: NOTES_USER.userId, email: NOTES_USER.email },
+          profile.id
+        ),
       },
       TEST_ENV
     );
@@ -225,12 +235,14 @@ describe('Integration: note routes', () => {
       content: 'Two',
     });
 
-    setAuthenticatedUser(jwt, NOTES_USER);
     const res = await app.request(
       '/v1/notes/topic-ids',
       {
         method: 'GET',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: NOTES_USER.userId, email: NOTES_USER.email },
+          profile.id
+        ),
       },
       TEST_ENV
     );
@@ -250,12 +262,14 @@ describe('Integration: note routes', () => {
       content: 'Delete me',
     });
 
-    setAuthenticatedUser(jwt, NOTES_USER);
     const res = await app.request(
       `/v1/subjects/${subject.id}/topics/${topicId}/note`,
       {
         method: 'DELETE',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: NOTES_USER.userId, email: NOTES_USER.email },
+          profile.id
+        ),
       },
       TEST_ENV
     );
@@ -275,12 +289,14 @@ describe('Integration: note routes', () => {
   it('returns 404 when deleting a note that does not exist', async () => {
     const { profile, subject, topicId } = await createTopicFixture();
 
-    setAuthenticatedUser(jwt, NOTES_USER);
     const res = await app.request(
       `/v1/subjects/${subject.id}/topics/${topicId}/note`,
       {
         method: 'DELETE',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: NOTES_USER.userId, email: NOTES_USER.email },
+          profile.id
+        ),
       },
       TEST_ENV
     );
@@ -292,7 +308,6 @@ describe('Integration: note routes', () => {
     const profile = await createProfileViaRoute({
       app,
       env: TEST_ENV,
-      jwt,
       user: NOTES_USER,
       displayName: 'Owner A',
       birthYear: 2008,
@@ -300,7 +315,6 @@ describe('Integration: note routes', () => {
     const otherProfile = await createProfileViaRoute({
       app,
       env: TEST_ENV,
-      jwt,
       user: OTHER_NOTES_USER,
       displayName: 'Owner B',
       birthYear: 2008,
@@ -311,12 +325,14 @@ describe('Integration: note routes', () => {
       topics: [{ title: 'Atoms', sortOrder: 0 }],
     });
 
-    setAuthenticatedUser(jwt, NOTES_USER);
     const res = await app.request(
       `/v1/subjects/${otherSubject.id}/topics/${otherCurriculum.topicIds[0]}/note`,
       {
         method: 'GET',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: NOTES_USER.userId, email: NOTES_USER.email },
+          profile.id
+        ),
       },
       TEST_ENV
     );

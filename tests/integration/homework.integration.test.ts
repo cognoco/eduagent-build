@@ -4,28 +4,25 @@
  * Exercises the real homework routes through the full app + real DB.
  *
  * Mocked boundaries:
- * - JWT verification
  * - OCR provider extraction via service DI
  */
 
 import { eq } from 'drizzle-orm';
 import { subjects, learningSessions, sessionEvents } from '@eduagent/database';
 
-import { jwtMock, configureValidJWT, configureInvalidJWT } from './mocks';
 import {
   buildIntegrationEnv,
   cleanupAccounts,
   createIntegrationDb,
 } from './helpers';
+import { buildAuthHeaders } from './route-fixtures';
+import { signTestJWT } from './test-keys';
 import {
   resetOcrProvider,
   setOcrProvider,
 } from '../../apps/api/src/services/ocr';
 
-const jwt = jwtMock();
 const mockExtractText = jest.fn();
-
-jest.mock('../../apps/api/src/middleware/jwt', () => jwt);
 
 import { app } from '../../apps/api/src/index';
 
@@ -34,29 +31,24 @@ const HOMEWORK_USER_ID = 'integration-homework-user';
 const HOMEWORK_EMAIL = 'integration-homework@integration.test';
 const UNKNOWN_ID = '00000000-0000-4000-8000-000000000099';
 
-function buildAuthHeaders(profileId?: string): HeadersInit {
+/** Builds auth headers for multipart/FormData requests — omits Content-Type so the boundary is set automatically. */
+function buildFormAuthHeaders(profileId?: string): Record<string, string> {
+  const token = signTestJWT({ sub: HOMEWORK_USER_ID, email: HOMEWORK_EMAIL });
   return {
-    Authorization: 'Bearer valid.jwt.token',
-    'Content-Type': 'application/json',
+    Authorization: `Bearer ${token}`,
     ...(profileId ? { 'X-Profile-Id': profileId } : {}),
   };
 }
 
-function setValidAuth(): void {
-  configureValidJWT(jwt, {
-    sub: HOMEWORK_USER_ID,
-    email: HOMEWORK_EMAIL,
-  });
-}
-
 async function createOwnerProfile(): Promise<string> {
-  setValidAuth();
-
   const res = await app.request(
     '/v1/profiles',
     {
       method: 'POST',
-      headers: buildAuthHeaders(),
+      headers: buildAuthHeaders({
+        sub: HOMEWORK_USER_ID,
+        email: HOMEWORK_EMAIL,
+      }),
       body: JSON.stringify({
         displayName: 'Homework Learner',
         birthYear: 2000,
@@ -105,7 +97,6 @@ async function loadSessionEvents(sessionId: string) {
 
 beforeEach(async () => {
   jest.clearAllMocks();
-  setValidAuth();
   resetOcrProvider();
   setOcrProvider({
     extractText: mockExtractText,
@@ -138,7 +129,10 @@ describe('Integration: POST /v1/subjects/:subjectId/homework', () => {
       `/v1/subjects/${subject.id}/homework`,
       {
         method: 'POST',
-        headers: buildAuthHeaders(profileId),
+        headers: buildAuthHeaders(
+          { sub: HOMEWORK_USER_ID, email: HOMEWORK_EMAIL },
+          profileId
+        ),
       },
       TEST_ENV
     );
@@ -170,7 +164,10 @@ describe('Integration: POST /v1/subjects/:subjectId/homework', () => {
       `/v1/subjects/${subject.id}/homework`,
       {
         method: 'POST',
-        headers: buildAuthHeaders(profileId),
+        headers: buildAuthHeaders(
+          { sub: HOMEWORK_USER_ID, email: HOMEWORK_EMAIL },
+          profileId
+        ),
       },
       TEST_ENV
     );
@@ -181,8 +178,6 @@ describe('Integration: POST /v1/subjects/:subjectId/homework', () => {
   });
 
   it('returns 401 without auth token', async () => {
-    configureInvalidJWT(jwt);
-
     const res = await app.request(
       `/v1/subjects/${UNKNOWN_ID}/homework`,
       {
@@ -208,10 +203,7 @@ describe('Integration: POST /v1/ocr', () => {
       '/v1/ocr',
       {
         method: 'POST',
-        headers: {
-          Authorization: 'Bearer valid.jwt.token',
-          'X-Profile-Id': profileId,
-        },
+        headers: buildFormAuthHeaders(profileId),
         body: formData,
       },
       TEST_ENV
@@ -236,10 +228,7 @@ describe('Integration: POST /v1/ocr', () => {
       '/v1/ocr',
       {
         method: 'POST',
-        headers: {
-          Authorization: 'Bearer valid.jwt.token',
-          'X-Profile-Id': profileId,
-        },
+        headers: buildFormAuthHeaders(profileId),
         body: formData,
       },
       TEST_ENV
@@ -262,10 +251,7 @@ describe('Integration: POST /v1/ocr', () => {
       '/v1/ocr',
       {
         method: 'POST',
-        headers: {
-          Authorization: 'Bearer valid.jwt.token',
-          'X-Profile-Id': profileId,
-        },
+        headers: buildFormAuthHeaders(profileId),
         body: formData,
       },
       TEST_ENV
@@ -278,8 +264,6 @@ describe('Integration: POST /v1/ocr', () => {
   });
 
   it('returns 401 without auth token', async () => {
-    configureInvalidJWT(jwt);
-
     const formData = new FormData();
     const imageBlob = new Blob(['fake-image-data'], { type: 'image/jpeg' });
     formData.append('image', imageBlob, 'homework.jpg');

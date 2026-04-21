@@ -41,7 +41,6 @@ async function createProfileWithConsentToken(token: string) {
   const profile = await createProfileViaRoute({
     app,
     env: TEST_ENV,
-    jwt,
     user: CONSENT_WEB_USER,
     displayName: 'Emma',
     birthYear: 2000,

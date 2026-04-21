@@ -40,10 +40,15 @@ These existing scenarios are reused:
 ## Task 1: Add `language-learner` seed scenario
 
 **Files:**
-- Modify: `apps/api/src/services/test-seed.ts`
-- Test: `apps/api/src/services/test-seed.ts` (manual — run seed via curl)
+- Modify: `apps/api/src/services/test-seed.ts` (add import for `vocabulary` table + new seed function)
+- Create: `apps/api/src/services/test-seed.language-learner.test.ts` (integration test)
 
 This seed scenario creates a learner with a language subject (Spanish), seeded vocabulary entries, and enough completed sessions to bypass the "new learner" gate on the vocabulary browser.
+
+**Key API constraints (verified by reading test-seed.ts):**
+- `createSubjectWithCurriculum(db, profileId, name, status='active', topicCount=3)` — does **NOT** accept `pedagogyMode` or `languageCode`. The subject must be inserted directly.
+- The vocabulary table is `vocabulary` (exported from `@eduagent/database` via `schema/language.ts` → `schema/index.ts`). Columns: `id, profileId, subjectId, term, termNormalized (required!), translation, type ('word'|'chunk'), cefrLevel, mastered, milestoneId, createdAt, updatedAt`.
+- The `subjects` table has `pedagogyMode` (enum: `'socratic'|'four_strands'`, default `'socratic'`) and `languageCode` (nullable text) — both defined in `packages/database/src/schema/subjects.ts:56-59`.
 
 - [ ] **Step 1: Add `language-learner` to the `SeedScenario` union type**
 
@@ -59,15 +64,38 @@ export type SeedScenario =
   | 'language-learner';  // ← ADD
 ```
 
-- [ ] **Step 2: Write the `seedLanguageLearner` function**
+- [ ] **Step 2: Add the `vocabulary` import**
 
-Add after the last seed function (before the dispatcher map at ~line 1560). The function must:
-1. Create account + profile + consent (same pattern as `seedOnboardingComplete`)
-2. Create a subject with `pedagogyMode: 'four_strands'` and `languageCode: 'es'`
-3. Create curriculum with 3 topics (vocabulary-related)
-4. Seed vocabulary entries (import `vocabularyEntries` from `@eduagent/database`)
-5. Create 4 completed learning sessions (to bypass the ≥4 session gate in vocabulary browser)
-6. Return `{ subjectId }` in the `ids` field
+At the top of `test-seed.ts`, add `vocabulary` to the `@eduagent/database` import (around line 14-35):
+
+```typescript
+import {
+  accounts,
+  profiles,
+  subjects,
+  curricula,
+  curriculumTopics,
+  curriculumBooks,
+  learningSessions,
+  sessionEvents,
+  sessionSummaries,
+  retentionCards,
+  assessments,
+  subscriptions,
+  quotaPools,
+  familyLinks,
+  consentStates,
+  streaks,
+  needsDeepeningTopics,
+  vocabulary,           // ← ADD
+  generateUUIDv7,
+  type Database,
+} from '@eduagent/database';
+```
+
+- [ ] **Step 3: Write the `seedLanguageLearner` function**
+
+Add after the last seed function (before the dispatcher map at ~line 1560). The function inserts the subject directly (bypassing `createSubjectWithCurriculum`) because the helper doesn't support `pedagogyMode`/`languageCode` parameters.
 
 ```typescript
 async function seedLanguageLearner(
@@ -91,25 +119,60 @@ async function seedLanguageLearner(
     respondedAt: new Date(),
   });
 
-  // Language subject with four_strands pedagogy — required for vocabulary browser
-  const { subjectId, topicIds } = await createSubjectWithCurriculum(
-    db,
+  // ── Language subject (direct insert — createSubjectWithCurriculum
+  //    doesn't accept pedagogyMode/languageCode) ─────────────────────
+  const subjectId = generateUUIDv7();
+  await db.insert(subjects).values({
+    id: subjectId,
     profileId,
-    'Spanish',
-    { pedagogyMode: 'four_strands', languageCode: 'es' }
-  );
+    name: 'Spanish',
+    status: 'active',
+    pedagogyMode: 'four_strands',
+    languageCode: 'es',
+  });
 
-  // Seed vocabulary entries — the vocabulary browser needs at least 1 word
-  // Import vocabularyEntries table from @eduagent/database if not already imported
-  await db.insert(vocabularyEntries).values([
+  const curriculumId = generateUUIDv7();
+  await db.insert(curricula).values({
+    id: curriculumId,
+    subjectId,
+    version: 1,
+  });
+
+  const bookId = generateUUIDv7();
+  await db.insert(curriculumBooks).values({
+    id: bookId,
+    subjectId,
+    title: 'Spanish',
+    sortOrder: 0,
+    topicsGenerated: true,
+  });
+
+  const topicCount = 3;
+  const topicValues = Array.from({ length: topicCount }, (_, i) => ({
+    id: generateUUIDv7(),
+    curriculumId,
+    bookId,
+    title: `Spanish Topic ${i + 1}`,
+    description: `Introduction to Spanish Topic ${i + 1}`,
+    sortOrder: i,
+    relevance: 'core' as const,
+    estimatedMinutes: 30,
+  }));
+  await db.insert(curriculumTopics).values(topicValues);
+  const topicIds = topicValues.map((t) => t.id);
+
+  // ── Vocabulary entries (3 words: 2×A1, 1×A2) ─────────────────────
+  // termNormalized is required — use lowercased term.
+  await db.insert(vocabulary).values([
     {
       id: generateUUIDv7(),
       profileId,
       subjectId,
       term: 'hola',
+      termNormalized: 'hola',
       translation: 'hello',
       cefrLevel: 'A1',
-      wordType: 'word',
+      type: 'word',
       mastered: false,
     },
     {
@@ -117,9 +180,10 @@ async function seedLanguageLearner(
       profileId,
       subjectId,
       term: 'gracias',
+      termNormalized: 'gracias',
       translation: 'thank you',
       cefrLevel: 'A1',
-      wordType: 'phrase',
+      type: 'chunk',
       mastered: true,
     },
     {
@@ -127,15 +191,15 @@ async function seedLanguageLearner(
       profileId,
       subjectId,
       term: 'biblioteca',
+      termNormalized: 'biblioteca',
       translation: 'library',
       cefrLevel: 'A2',
-      wordType: 'word',
+      type: 'word',
       mastered: false,
     },
   ]);
 
-  // 4 completed sessions — bypasses the "new learner" gate in vocabulary browser
-  // (progress/vocabulary.tsx shows vocab-browser-new-learner when session count < 4)
+  // ── 4 completed sessions (bypasses ≥4-session gate in vocab browser)
   const now = new Date();
   for (let i = 0; i < 4; i++) {
     const sessionId = generateUUIDv7();
@@ -147,7 +211,9 @@ async function seedLanguageLearner(
       topicId,
       status: 'completed',
       startedAt: new Date(now.getTime() - (4 - i) * 24 * 60 * 60 * 1000),
-      endedAt: new Date(now.getTime() - (4 - i) * 24 * 60 * 60 * 1000 + 15 * 60 * 1000),
+      endedAt: new Date(
+        now.getTime() - (4 - i) * 24 * 60 * 60 * 1000 + 15 * 60 * 1000
+      ),
       exchangeCount: 4,
     });
     await db.insert(sessionSummaries).values({
@@ -169,9 +235,7 @@ async function seedLanguageLearner(
 }
 ```
 
-> **IMPORTANT:** Before writing this code, read the actual `createSubjectWithCurriculum` helper signature (around line 350-420 of test-seed.ts) to verify it accepts `pedagogyMode`/`languageCode` options. If it doesn't, either extend the helper or insert the subject row directly. Also verify that `vocabularyEntries` is exported from `@eduagent/database` — if not, import directly from the schema file.
-
-- [ ] **Step 3: Register in the dispatcher map**
+- [ ] **Step 4: Register in the dispatcher map**
 
 Add to the scenario-to-function map (around line 1560):
 
@@ -180,25 +244,107 @@ Add to the scenario-to-function map (around line 1560):
   'language-learner': seedLanguageLearner,  // ← ADD
 ```
 
-- [ ] **Step 4: Verify the seed works**
+- [ ] **Step 5: Write the integration test**
 
-Run the API locally and test:
+Create `apps/api/src/services/test-seed.language-learner.test.ts`:
 
-```bash
-curl -X POST http://localhost:8787/v1/__test/seed \
-  -H "Content-Type: application/json" \
-  -d '{"scenario":"language-learner","email":"test-lang@example.com"}'
+```typescript
+import { eq, and } from 'drizzle-orm';
+import {
+  subjects,
+  vocabulary,
+  learningSessions,
+  type Database,
+} from '@eduagent/database';
+import { seedTestScenario, resetDatabase, type SeedResult } from './test-seed';
+
+// Uses the real database — no mocks.
+// Relies on the integration test setup in tests/integration/setup.ts.
+
+let db: Database;
+let result: SeedResult;
+
+beforeAll(async () => {
+  // Import the test database from integration setup
+  const { getTestDatabase } = await import('../../../tests/integration/setup');
+  db = getTestDatabase();
+});
+
+afterAll(async () => {
+  await resetDatabase(db, {});
+});
+
+describe('language-learner seed scenario', () => {
+  it('seeds a four_strands subject with vocabulary and sessions', async () => {
+    result = await seedTestScenario(db, 'language-learner', {});
+
+    expect(result.scenario).toBe('language-learner');
+    expect(result.ids.subjectId).toBeDefined();
+
+    // Verify subject has four_strands pedagogy and language code
+    const [subject] = await db
+      .select()
+      .from(subjects)
+      .where(eq(subjects.id, result.ids.subjectId!));
+    expect(subject).toBeDefined();
+    expect(subject!.pedagogyMode).toBe('four_strands');
+    expect(subject!.languageCode).toBe('es');
+    expect(subject!.name).toBe('Spanish');
+
+    // Verify ≥3 vocabulary entries exist for the subject
+    const vocabRows = await db
+      .select()
+      .from(vocabulary)
+      .where(
+        and(
+          eq(vocabulary.profileId, result.profileId),
+          eq(vocabulary.subjectId, result.ids.subjectId!)
+        )
+      );
+    expect(vocabRows.length).toBeGreaterThanOrEqual(3);
+    // Verify CEFR levels are populated
+    const cefrLevels = vocabRows.map((v) => v.cefrLevel).filter(Boolean);
+    expect(cefrLevels).toContain('A1');
+    expect(cefrLevels).toContain('A2');
+
+    // Verify ≥4 completed sessions (bypasses new-learner gate)
+    const sessions = await db
+      .select()
+      .from(learningSessions)
+      .where(
+        and(
+          eq(learningSessions.profileId, result.profileId),
+          eq(learningSessions.status, 'completed')
+        )
+      );
+    expect(sessions.length).toBeGreaterThanOrEqual(4);
+  });
+});
 ```
 
-Expected: 200 response with `{ scenario: "language-learner", accountId, profileId, email, password, ids: { subjectId } }`.
+> **NOTE:** The exact import path for the test database helper depends on the integration test infrastructure. Check `tests/integration/setup.ts` for the correct export name and adjust `getTestDatabase` accordingly. If the integration test setup doesn't export a standalone DB getter, use the same pattern as existing seed tests (grep for `seedTestScenario` or `seedOnboardingComplete` in test files for the correct import pattern).
 
-- [ ] **Step 5: Run typecheck**
+- [ ] **Step 6: Run integration tests**
 
 ```bash
-pnpm exec nx run api:typecheck
+pnpm exec jest apps/api/src/services/test-seed.language-learner.test.ts --no-coverage
 ```
 
-Expected: PASS — no type errors from the new scenario.
+Expected: PASS — subject is `four_strands` with `languageCode: 'es'`, ≥3 vocabulary rows, ≥4 completed sessions.
+
+- [ ] **Step 7: Run lint and typecheck**
+
+```bash
+pnpm exec nx run api:lint && pnpm exec nx run api:typecheck
+```
+
+Expected: both PASS — no lint violations or type errors from the new scenario.
+
+- [ ] **Step 8: Commit**
+
+```
+feat(api): add language-learner seed scenario for vocabulary E2E [E2E-T1]
+```
 
 ---
 
@@ -223,7 +369,7 @@ Home (home-scroll-view)
           → Quiz Results (quiz-results-screen)
             → tap "View History" (quiz-results-history)
             → Quiz History (quiz-history-screen)
-              → tap first round row (quiz-history-row-*)
+              → tap round row by "Capitals" text (rows have dynamic quiz-history-row-* IDs)
               → Round Detail (round-detail-screen)
 ```
 
@@ -633,19 +779,31 @@ tags:
     id: "playback-exit"
     optional: true
 
-# After exit, we should land on either complete screen or choice screen.
-# If exit sent us back to choice, the flow ends here (playback unavailable
-# in this emulator). Otherwise continue to verify complete screen.
+# ── 10. Gate assertion — flow must land on one of two known screens ───
+# After playback completes (or exit is tapped), the user must be on
+# either the complete screen OR back at the choice screen. If neither
+# is visible, something is broken. This is NOT optional — at least one
+# screen must be reachable.
 - extendedWaitUntil:
     visible:
       id: "dictation-complete-screen"
     timeout: 10000
     optional: true
 
-# ── 10. Verify complete screen ────────────────────────────────────────
-- takeScreenshot: dictation-05-complete
+- extendedWaitUntil:
+    visible:
+      id: "dictation-choice-screen"
+    timeout: 5000
+    optional: true
 
-# Verify all three actions are present on complete screen
+# Non-optional gate: screenshot captures whichever screen we landed on.
+# If neither screen loaded, Maestro's implicit timeout on the next
+# non-optional tap will fail the flow — that's the correct outcome.
+- takeScreenshot: dictation-05-post-playback-gate
+
+# ── 11. Verify complete screen (if we reached it) ────────────────────
+# If playback exit returned to choice, these are skipped (optional).
+# If we're on complete, verify all three actions exist.
 - assertVisible:
     id: "complete-done"
     optional: true
@@ -658,16 +816,23 @@ tags:
     id: "complete-try-again"
     optional: true
 
-# ── 11. Tap "I'm done" to return to practice ─────────────────────────
+# ── 12. Return to a known screen ─────────────────────────────────────
+# Tap "I'm done" if on complete screen, or verify choice screen if
+# playback exited early.
 - tapOn:
     id: "complete-done"
     optional: true
 
+- tapOn:
+    id: "dictation-choice-back"
+    optional: true
+
+# Non-optional: we MUST end on either practice screen or home.
+# This catches the case where both optional taps above missed.
 - extendedWaitUntil:
     visible:
       id: "practice-screen"
     timeout: 10000
-    optional: true
 
 - takeScreenshot: dictation-06-back-at-practice
 ```
@@ -772,15 +937,37 @@ tags:
 - tapOn:
     id: "subject-card-${SUBJECT_ID}"
 
-# ── 5. Wait for book detail ──────────────────────────────────────────
-# If the subject has exactly 1 book (common for single-subject scenarios),
-# the shelf auto-redirects to book detail via router.replace.
-# The shelf briefly shows shelf-single-book during the redirect.
-# Wait for the final destination: book-screen.
+# ── 5. Handle shelf → book navigation ────────────────────────────────
+# Single-book subjects: shelf auto-redirects to book detail (shelf-single-book
+# flashes briefly during the redirect). Multi-book subjects: shelf stays on
+# shelf-screen and the user must tap a book card.
+#
+# Strategy: wait for book-screen first (covers single-book auto-redirect).
+# If it doesn't appear, we're on the shelf — tap the first book card.
 - extendedWaitUntil:
     visible:
       id: "book-screen"
-    timeout: 15000
+    timeout: 10000
+    optional: true
+
+# Fallback: multi-book shelf — tap the first book card
+- runFlow:
+    when:
+      visible:
+        id: "shelf-screen"
+    commands:
+      - takeScreenshot: book-02a-shelf-multi-book
+      - scrollUntilVisible:
+          element:
+            text: "World History"
+          direction: DOWN
+          timeout: 5000
+      - tapOn:
+          text: "World History"
+      - extendedWaitUntil:
+          visible:
+            id: "book-screen"
+          timeout: 15000
 
 - takeScreenshot: book-02-book-detail
 
@@ -1095,22 +1282,26 @@ feat(e2e): add SSO button verification on sign-in screen [E2E-A2]
 
 ## Coverage Summary
 
-| Flow | File | Screens covered | Seed |
-|------|------|----------------|------|
-| Quiz full flow | `flows/quiz/quiz-full-flow.yaml` | 6 (index, launch, play, results, history, round detail) | `onboarding-complete` |
-| Dictation full flow | `flows/dictation/dictation-full-flow.yaml` | 5 (choice, text-preview, playback, complete) | `onboarding-complete` |
-| Book detail | `flows/learning/book-detail.yaml` | 1-3 (library, shelf, book detail) | `learning-active` |
-| Vocabulary browser | `flows/learning/vocabulary-flow.yaml` | 2 (progress, vocab browser) | `language-learner` (new) |
-| SSO buttons | `flows/auth/sso-buttons.yaml` | 1 (sign-in with SSO buttons) | none |
+| Flow | File | Critical-gap screens covered | Seed |
+|------|------|------------------------------|------|
+| Quiz full flow | `flows/quiz/quiz-full-flow.yaml` | 5 of 5: index, launch, play, results, history (+ bonus: round detail) | `onboarding-complete` |
+| Dictation full flow | `flows/dictation/dictation-full-flow.yaml` | 4 of 5: choice, text-preview, playback, complete. **Not covered: review (requires device camera)** | `onboarding-complete` |
+| Book detail | `flows/learning/book-detail.yaml` | 1 of 1: book detail screen | `learning-active` |
+| Vocabulary browser | `flows/learning/vocabulary-flow.yaml` | 1 of 1: vocabulary browser | `language-learner` (new) |
+| SSO buttons | `flows/auth/sso-buttons.yaml` | 0 of 1: verifies SSO buttons on sign-in, but **sso-callback screen not reachable** (external browser redirect) | none |
 
-**Total new screen coverage:** ~15 screens → raises coverage from 63/88 (72%) to ~78/88 (89%)
+**Total: 11 of 13 critical-gap screens covered.** Raises overall coverage from 63/88 (72%) to 74/88 (84%).
+
+Two screens remain uncoverable by Maestro automation:
+- **Dictation review** — requires device camera to capture handwriting
+- **SSO callback** — requires external browser redirect (`mentomate://sso-callback`)
 
 ## Known Limitations
 
 1. **Quiz answer loop:** The `repeat: while: notVisible` pattern requires Maestro 1.36+. If your Maestro version doesn't support it, replace with `repeat: times: 12` and mark all inner commands `optional: true`.
 
-2. **Dictation playback:** TTS may not produce audible output in WHPX emulator, but the state machine still advances. If it stalls, the `playback-exit` fallback captures the playback screen state before bailing.
+2. **Dictation playback:** TTS may not produce audible output in WHPX emulator, but the state machine still advances. If it stalls, the `playback-exit` fallback fires. The flow uses a non-optional gate assertion (`practice-screen` must be visible at exit) to ensure something was tested regardless of which path was taken.
 
 3. **SSO callback:** The actual OAuth redirect (external browser → `mentomate://sso-callback`) cannot be automated by Maestro. The `sso-callback.tsx` screen's 10s timeout fallback is the only automatable behavior, but requires deep-linking which is unreliable in dev-client.
 
-4. **Book detail shelf redirect:** If `learning-active` creates a subject with multiple books, the shelf won't auto-redirect. The flow would need an additional tap on a book card — adjust if the seed data changes.
+4. **Book detail shelf:** The flow handles both single-book (auto-redirect) and multi-book (conditional `runFlow: when: visible: shelf-screen` tap) scenarios. No manual adjustment needed if the seed data changes.

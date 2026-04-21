@@ -1,0 +1,78 @@
+# Flow V1: Vocabulary Browser
+# Validates: progress screen vocabulary entry point and CEFR breakdown for a language learner.
+# Tags: nightly, learning
+#
+# Journey: UX Journey 4 (Progress & Analytics)
+# Epics: Epic 11 (Language Pedagogy / Vocabulary)
+# Prerequisite: Seeded language learner with vocabulary and 4 completed sessions (scenario: language-learner)
+#
+# testIDs verified against:
+#   - apps/mobile/src/app/(app)/_layout.tsx (tab-progress)
+#   - apps/mobile/src/app/(app)/progress/index.tsx (progress-vocab-stat)
+#   - apps/mobile/src/app/(app)/progress/vocabulary.tsx (vocab-browser-back, vocab-browser-error, vocab-browser-no-language, vocab-browser-new-learner, vocab-browser-empty)
+appId: com.mentomate.app
+tags:
+  - nightly
+  - learning
+---
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "language-learner"
+      API_URL: ${API_URL}
+
+- extendedWaitUntil:
+    visible:
+      id: "home-scroll-view"
+    timeout: 15000
+
+- tapOn:
+    id: "tab-progress"
+
+- scrollUntilVisible:
+    element:
+      id: "progress-vocab-stat"
+    direction: DOWN
+    timeout: 10000
+
+- takeScreenshot: vocab-01-progress
+
+- tapOn:
+    id: "progress-vocab-stat"
+
+- extendedWaitUntil:
+    visible:
+      id: "vocab-browser-back"
+    timeout: 10000
+
+- takeScreenshot: vocab-02-browser
+
+- assertNotVisible:
+    id: "vocab-browser-error"
+
+- assertNotVisible:
+    id: "vocab-browser-no-language"
+
+- assertNotVisible:
+    id: "vocab-browser-new-learner"
+
+- assertNotVisible:
+    id: "vocab-browser-empty"
+
+- assertVisible:
+    text: "A1"
+
+- assertVisible:
+    text: "A2"
+
+- takeScreenshot: vocab-03-cefr
+
+- tapOn:
+    id: "vocab-browser-back"
+
+- extendedWaitUntil:
+    visible:
+      id: "progress-vocab-stat"
+    timeout: 10000
+
+- takeScreenshot: vocab-04-back-to-progress

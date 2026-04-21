@@ -2,10 +2,9 @@
  * Integration: Language progress routes
  *
  * Exercises the real language progress route through the full app + real DB.
- * JWT verification is the only mocked boundary.
+ * Real JWT verification via the global fetch interceptor in setup.ts.
  */
 
-import { jwtMock } from './mocks';
 import { buildIntegrationEnv, cleanupAccounts } from './helpers';
 import {
   buildAuthHeaders,
@@ -13,11 +12,7 @@ import {
   seedCurriculum,
   seedSubject,
   seedVocabularyEntry,
-  setAuthenticatedUser,
 } from './route-fixtures';
-
-const jwt = jwtMock();
-jest.mock('../../apps/api/src/middleware/jwt', () => jwt);
 
 import { app } from '../../apps/api/src/index';
 
@@ -46,7 +41,6 @@ async function createOwnerProfile() {
   return createProfileViaRoute({
     app,
     env: TEST_ENV,
-    jwt,
     user: LANGUAGE_USER,
     displayName: 'Language Learner',
     birthYear: 1999,
@@ -114,10 +108,15 @@ describe('Integration: GET /v1/subjects/:subjectId/cefr-progress', () => {
       cefrLevel: 'A1',
     });
 
-    setAuthenticatedUser(jwt, LANGUAGE_USER);
     const res = await app.request(
       `/v1/subjects/${subject.id}/cefr-progress`,
-      { method: 'GET', headers: buildAuthHeaders() },
+      {
+        method: 'GET',
+        headers: buildAuthHeaders({
+          sub: LANGUAGE_USER.userId,
+          email: LANGUAGE_USER.email,
+        }),
+      },
       TEST_ENV
     );
 
@@ -153,12 +152,14 @@ describe('Integration: GET /v1/subjects/:subjectId/cefr-progress', () => {
       languageCode: 'es',
     });
 
-    setAuthenticatedUser(jwt, LANGUAGE_USER);
     const res = await app.request(
       `/v1/subjects/${subject.id}/cefr-progress`,
       {
         method: 'GET',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: LANGUAGE_USER.userId, email: LANGUAGE_USER.email },
+          profile.id
+        ),
       },
       TEST_ENV
     );
@@ -183,12 +184,14 @@ describe('Integration: GET /v1/subjects/:subjectId/cefr-progress', () => {
       languageCode: null,
     });
 
-    setAuthenticatedUser(jwt, LANGUAGE_USER);
     const res = await app.request(
       `/v1/subjects/${subject.id}/cefr-progress`,
       {
         method: 'GET',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: LANGUAGE_USER.userId, email: LANGUAGE_USER.email },
+          profile.id
+        ),
       },
       TEST_ENV
     );

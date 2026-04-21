@@ -53,7 +53,6 @@ async function createProfileFor(
   return createProfileViaRoute({
     app,
     env: TEST_ENV,
-    jwt,
     user,
     displayName,
     birthYear: 2003,
@@ -223,10 +222,15 @@ describe('Integration: progress routes', () => {
   it('returns subject progress from the real curriculum and progress rows', async () => {
     const scenario = await createProgressScenario();
 
-    setAuthenticatedUser(jwt, PROGRESS_USER);
     const res = await app.request(
       `/v1/subjects/${scenario.subject.id}/progress`,
-      { method: 'GET', headers: buildAuthHeaders() },
+      {
+        method: 'GET',
+        headers: buildAuthHeaders({
+          sub: PROGRESS_USER.userId,
+          email: PROGRESS_USER.email,
+        }),
+      },
       TEST_ENV
     );
 
@@ -247,12 +251,14 @@ describe('Integration: progress routes', () => {
   it('returns detailed topic progress including summary, retention, and struggle status', async () => {
     const scenario = await createProgressScenario();
 
-    setAuthenticatedUser(jwt, PROGRESS_USER);
     const res = await app.request(
       `/v1/subjects/${scenario.subject.id}/topics/${scenario.reviewTopicId}/progress`,
       {
         method: 'GET',
-        headers: buildAuthHeaders(scenario.profile.id),
+        headers: buildAuthHeaders(
+          { sub: PROGRESS_USER.userId, email: PROGRESS_USER.email },
+          scenario.profile.id
+        ),
       },
       TEST_ENV
     );
@@ -277,12 +283,14 @@ describe('Integration: progress routes', () => {
   it('returns overall progress across subjects', async () => {
     const scenario = await createProgressScenario();
 
-    setAuthenticatedUser(jwt, PROGRESS_USER);
     const res = await app.request(
       '/v1/progress/overview',
       {
         method: 'GET',
-        headers: buildAuthHeaders(scenario.profile.id),
+        headers: buildAuthHeaders(
+          { sub: PROGRESS_USER.userId, email: PROGRESS_USER.email },
+          scenario.profile.id
+        ),
       },
       TEST_ENV
     );
@@ -302,12 +310,14 @@ describe('Integration: progress routes', () => {
   it('returns overdue review summary data with next review and next upcoming review', async () => {
     const scenario = await createProgressScenario();
 
-    setAuthenticatedUser(jwt, PROGRESS_USER);
     const res = await app.request(
       '/v1/progress/review-summary',
       {
         method: 'GET',
-        headers: buildAuthHeaders(scenario.profile.id),
+        headers: buildAuthHeaders(
+          { sub: PROGRESS_USER.userId, email: PROGRESS_USER.email },
+          scenario.profile.id
+        ),
       },
       TEST_ENV
     );
@@ -329,12 +339,14 @@ describe('Integration: progress routes', () => {
   it('returns the next incomplete topic and keeps lastSessionId aligned to that topic', async () => {
     const scenario = await createProgressScenario();
 
-    setAuthenticatedUser(jwt, PROGRESS_USER);
     const res = await app.request(
       '/v1/progress/continue',
       {
         method: 'GET',
-        headers: buildAuthHeaders(scenario.profile.id),
+        headers: buildAuthHeaders(
+          { sub: PROGRESS_USER.userId, email: PROGRESS_USER.email },
+          scenario.profile.id
+        ),
       },
       TEST_ENV
     );
@@ -353,12 +365,14 @@ describe('Integration: progress routes', () => {
   it('returns the active session id for a topic and null when none exists', async () => {
     const scenario = await createProgressScenario();
 
-    setAuthenticatedUser(jwt, PROGRESS_USER);
     const activeRes = await app.request(
       `/v1/progress/topic/${scenario.continueTopicId}/active-session`,
       {
         method: 'GET',
-        headers: buildAuthHeaders(scenario.profile.id),
+        headers: buildAuthHeaders(
+          { sub: PROGRESS_USER.userId, email: PROGRESS_USER.email },
+          scenario.profile.id
+        ),
       },
       TEST_ENV
     );
@@ -372,7 +386,10 @@ describe('Integration: progress routes', () => {
       `/v1/progress/topic/${scenario.completedTopicId}/active-session`,
       {
         method: 'GET',
-        headers: buildAuthHeaders(scenario.profile.id),
+        headers: buildAuthHeaders(
+          { sub: PROGRESS_USER.userId, email: PROGRESS_USER.email },
+          scenario.profile.id
+        ),
       },
       TEST_ENV
     );
@@ -393,12 +410,14 @@ describe('Integration: progress routes', () => {
       topics: [{ title: 'Atoms', sortOrder: 0 }],
     });
 
-    setAuthenticatedUser(jwt, PROGRESS_USER);
     const resolveRes = await app.request(
       `/v1/topics/${scenario.continueTopicId}/resolve`,
       {
         method: 'GET',
-        headers: buildAuthHeaders(scenario.profile.id),
+        headers: buildAuthHeaders(
+          { sub: PROGRESS_USER.userId, email: PROGRESS_USER.email },
+          scenario.profile.id
+        ),
       },
       TEST_ENV
     );
@@ -414,7 +433,10 @@ describe('Integration: progress routes', () => {
       `/v1/topics/${otherCurriculum.topicIds[0]}/resolve`,
       {
         method: 'GET',
-        headers: buildAuthHeaders(scenario.profile.id),
+        headers: buildAuthHeaders(
+          { sub: PROGRESS_USER.userId, email: PROGRESS_USER.email },
+          scenario.profile.id
+        ),
       },
       TEST_ENV
     );

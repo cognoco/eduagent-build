@@ -2,10 +2,9 @@
  * Integration: Streak and XP routes
  *
  * Exercises the real routes through the full app + real database.
- * JWT verification is the only mocked boundary.
+ * JWT verification uses the real fetch interceptor installed in setup.ts.
  */
 
-import { jwtMock } from './mocks';
 import { buildIntegrationEnv, cleanupAccounts } from './helpers';
 import {
   buildAuthHeaders,
@@ -14,11 +13,7 @@ import {
   seedStreakRecord,
   seedSubject,
   seedXpLedgerEntry,
-  setAuthenticatedUser,
 } from './route-fixtures';
-
-const jwt = jwtMock();
-jest.mock('../../apps/api/src/middleware/jwt', () => jwt);
 
 import { app } from '../../apps/api/src/index';
 
@@ -47,7 +42,6 @@ async function createOwnerProfile() {
   return createProfileViaRoute({
     app,
     env: TEST_ENV,
-    jwt,
     user: STREAKS_USER,
     displayName: 'Streak Learner',
     birthYear: 2007,
@@ -58,10 +52,15 @@ describe('Integration: GET /v1/streaks', () => {
   it('auto-resolves the owner profile when X-Profile-Id is omitted', async () => {
     await createOwnerProfile();
 
-    setAuthenticatedUser(jwt, STREAKS_USER);
     const res = await app.request(
       '/v1/streaks',
-      { method: 'GET', headers: buildAuthHeaders() },
+      {
+        method: 'GET',
+        headers: buildAuthHeaders({
+          sub: STREAKS_USER.userId,
+          email: STREAKS_USER.email,
+        }),
+      },
       TEST_ENV
     );
 
@@ -90,12 +89,14 @@ describe('Integration: GET /v1/streaks', () => {
       lastActivityDate: twoDaysAgo,
     });
 
-    setAuthenticatedUser(jwt, STREAKS_USER);
     const res = await app.request(
       '/v1/streaks',
       {
         method: 'GET',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: STREAKS_USER.userId, email: STREAKS_USER.email },
+          profile.id
+        ),
       },
       TEST_ENV
     );
@@ -153,12 +154,14 @@ describe('Integration: GET /v1/xp', () => {
       status: 'decayed',
     });
 
-    setAuthenticatedUser(jwt, STREAKS_USER);
     const res = await app.request(
       '/v1/xp',
       {
         method: 'GET',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: STREAKS_USER.userId, email: STREAKS_USER.email },
+          profile.id
+        ),
       },
       TEST_ENV
     );

@@ -30,6 +30,7 @@ import {
   consentStates,
   streaks,
   needsDeepeningTopics,
+  vocabulary,
   generateUUIDv7,
   type Database,
 } from '@eduagent/database';
@@ -76,7 +77,8 @@ export type SeedScenario =
   | 'pre-profile'
   | 'consent-pending'
   | 'parent-multi-child'
-  | 'daily-limit-reached';
+  | 'daily-limit-reached'
+  | 'language-learner';
 
 /** Environment bindings needed by the seed service */
 export interface SeedEnv {
@@ -1466,6 +1468,142 @@ async function seedConsentPending(
   };
 }
 
+async function seedLanguageLearner(
+  db: Database,
+  email: string,
+  env: SeedEnv
+): Promise<SeedResult> {
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const profileId = await createBaseProfile(db, accountId, {
+    displayName: 'Language Learner',
+    birthYear: LEARNER_BIRTH_YEAR,
+  });
+
+  await db.insert(consentStates).values({
+    id: generateUUIDv7(),
+    profileId,
+    consentType: 'GDPR',
+    status: 'CONSENTED',
+    parentEmail: 'parent-seed@example.com',
+    respondedAt: new Date(),
+  });
+
+  const subjectId = generateUUIDv7();
+  await db.insert(subjects).values({
+    id: subjectId,
+    profileId,
+    name: 'Spanish',
+    status: 'active',
+    pedagogyMode: 'four_strands',
+    languageCode: 'es',
+  });
+
+  const curriculumId = generateUUIDv7();
+  await db.insert(curricula).values({
+    id: curriculumId,
+    subjectId,
+    version: 1,
+  });
+
+  const bookId = generateUUIDv7();
+  await db.insert(curriculumBooks).values({
+    id: bookId,
+    subjectId,
+    title: 'Spanish',
+    sortOrder: 0,
+    topicsGenerated: true,
+  });
+
+  const topicValues = Array.from({ length: 3 }, (_, index) => ({
+    id: generateUUIDv7(),
+    curriculumId,
+    bookId,
+    title: `Spanish Topic ${index + 1}`,
+    description: `Introduction to Spanish Topic ${index + 1}`,
+    sortOrder: index,
+    relevance: 'core' as const,
+    estimatedMinutes: 30,
+  }));
+  await db.insert(curriculumTopics).values(topicValues);
+  const topicIds = topicValues.map((topic) => topic.id);
+
+  await db.insert(vocabulary).values([
+    {
+      id: generateUUIDv7(),
+      profileId,
+      subjectId,
+      term: 'hola',
+      termNormalized: 'hola',
+      translation: 'hello',
+      type: 'word',
+      cefrLevel: 'A1',
+      mastered: false,
+    },
+    {
+      id: generateUUIDv7(),
+      profileId,
+      subjectId,
+      term: 'gracias',
+      termNormalized: 'gracias',
+      translation: 'thank you',
+      type: 'chunk',
+      cefrLevel: 'A1',
+      mastered: true,
+    },
+    {
+      id: generateUUIDv7(),
+      profileId,
+      subjectId,
+      term: 'biblioteca',
+      termNormalized: 'biblioteca',
+      translation: 'library',
+      type: 'word',
+      cefrLevel: 'A2',
+      mastered: false,
+    },
+  ]);
+
+  for (let index = 0; index < 4; index += 1) {
+    const sessionId = generateUUIDv7();
+    const topicId = topicIds[index % topicIds.length];
+    const startedAt = pastDate(4 - index);
+    const endedAt = new Date(startedAt.getTime() + 15 * 60 * 1000);
+
+    await db.insert(learningSessions).values({
+      id: sessionId,
+      profileId,
+      subjectId,
+      topicId,
+      sessionType: 'learning',
+      status: 'completed',
+      exchangeCount: 4,
+      startedAt,
+      lastActivityAt: endedAt,
+      endedAt,
+      wallClockSeconds: 900,
+    });
+
+    await db.insert(sessionSummaries).values({
+      id: generateUUIDv7(),
+      sessionId,
+      profileId,
+      topicId,
+      content: `Session ${index + 1} focused on practical Spanish vocabulary.`,
+      status: 'accepted',
+    });
+  }
+
+  return {
+    scenario: 'language-learner',
+    accountId,
+    profileId,
+    email,
+    password,
+    ids: { subjectId },
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Scenario: daily-limit-reached
 // Free-tier user who has hit the daily question cap (10/10) but still has
@@ -1576,6 +1714,7 @@ const SCENARIO_MAP: Record<SeedScenario, SeederFn> = {
   'consent-pending': seedConsentPending,
   'parent-multi-child': seedParentMultiChild,
   'daily-limit-reached': seedDailyLimitReached,
+  'language-learner': seedLanguageLearner,
 };
 
 export const VALID_SCENARIOS = Object.keys(SCENARIO_MAP) as SeedScenario[];

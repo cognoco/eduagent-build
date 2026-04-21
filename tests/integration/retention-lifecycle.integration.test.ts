@@ -2,9 +2,9 @@
  * Integration: Retention Lifecycle
  *
  * Exercises the SM-2 retention routes via the real app + real database.
- * JWT verification is the only mocked boundary. The mock LLM provider
- * registered in setup.ts handles recall quality evaluation (falls back to
- * the length-based heuristic: >100 chars → 4, >20 chars → 3, else → 2).
+ * JWT verification uses real signed tokens via the fetch interceptor in setup.ts.
+ * The mock LLM provider registered in setup.ts handles recall quality evaluation
+ * (falls back to the length-based heuristic: >100 chars → 4, >20 chars → 3, else → 2).
  *
  * Validates:
  * 1. GET /v1/subjects/:subjectId/retention — returns retention cards
@@ -25,15 +25,12 @@ import {
   retentionCards,
 } from '@eduagent/database';
 
-import { jwtMock, configureValidJWT, configureInvalidJWT } from './mocks';
 import {
   buildIntegrationEnv,
   cleanupAccounts,
   createIntegrationDb,
 } from './helpers';
-
-const jwt = jwtMock();
-jest.mock('../../apps/api/src/middleware/jwt', () => jwt);
+import { buildAuthHeaders } from './test-keys';
 
 import { app } from '../../apps/api/src/index';
 
@@ -42,22 +39,12 @@ const TEST_ENV = buildIntegrationEnv();
 const AUTH_USER_ID = 'integration-retention-user';
 const AUTH_EMAIL = 'integration-retention@integration.test';
 
-function buildAuthHeaders(profileId?: string): HeadersInit {
-  return {
-    Authorization: 'Bearer valid.jwt.token',
-    'Content-Type': 'application/json',
-    ...(profileId ? { 'X-Profile-Id': profileId } : {}),
-  };
-}
-
 async function createOwnerProfile(): Promise<string> {
-  configureValidJWT(jwt, { sub: AUTH_USER_ID, email: AUTH_EMAIL });
-
   const res = await app.request(
     '/v1/profiles',
     {
       method: 'POST',
-      headers: buildAuthHeaders(),
+      headers: buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }),
       body: JSON.stringify({
         displayName: 'Retention Test User',
         birthYear: 2000,
@@ -76,7 +63,10 @@ async function createSubject(profileId: string, name: string): Promise<string> {
     '/v1/subjects',
     {
       method: 'POST',
-      headers: buildAuthHeaders(profileId),
+      headers: buildAuthHeaders(
+        { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+        profileId
+      ),
       body: JSON.stringify({ name }),
     },
     TEST_ENV
@@ -175,7 +165,6 @@ afterAll(async () => {
 describe('Integration: GET /v1/subjects/:subjectId/retention', () => {
   it('returns retention cards for subject', async () => {
     const profileId = await createOwnerProfile();
-    configureValidJWT(jwt, { sub: AUTH_USER_ID, email: AUTH_EMAIL });
 
     const subjectId = await createSubject(profileId, 'Calculus');
     const { topicIds } = await seedCurriculumWithTopics(subjectId, [
@@ -189,7 +178,13 @@ describe('Integration: GET /v1/subjects/:subjectId/retention', () => {
 
     const res = await app.request(
       `/v1/subjects/${subjectId}/retention`,
-      { method: 'GET', headers: buildAuthHeaders(profileId) },
+      {
+        method: 'GET',
+        headers: buildAuthHeaders(
+          { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+          profileId
+        ),
+      },
       TEST_ENV
     );
 
@@ -205,13 +200,18 @@ describe('Integration: GET /v1/subjects/:subjectId/retention', () => {
 
   it('returns empty when no curriculum exists', async () => {
     const profileId = await createOwnerProfile();
-    configureValidJWT(jwt, { sub: AUTH_USER_ID, email: AUTH_EMAIL });
 
     const subjectId = await createSubject(profileId, 'Empty Subject');
 
     const res = await app.request(
       `/v1/subjects/${subjectId}/retention`,
-      { method: 'GET', headers: buildAuthHeaders(profileId) },
+      {
+        method: 'GET',
+        headers: buildAuthHeaders(
+          { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+          profileId
+        ),
+      },
       TEST_ENV
     );
 
@@ -229,7 +229,6 @@ describe('Integration: GET /v1/subjects/:subjectId/retention', () => {
 describe('Integration: GET /v1/topics/:topicId/retention', () => {
   it('returns retention card for topic', async () => {
     const profileId = await createOwnerProfile();
-    configureValidJWT(jwt, { sub: AUTH_USER_ID, email: AUTH_EMAIL });
 
     const subjectId = await createSubject(profileId, 'Physics');
     const { topicIds } = await seedCurriculumWithTopics(subjectId, [
@@ -239,7 +238,13 @@ describe('Integration: GET /v1/topics/:topicId/retention', () => {
 
     const res = await app.request(
       `/v1/topics/${topicIds[0]}/retention`,
-      { method: 'GET', headers: buildAuthHeaders(profileId) },
+      {
+        method: 'GET',
+        headers: buildAuthHeaders(
+          { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+          profileId
+        ),
+      },
       TEST_ENV
     );
 
@@ -253,14 +258,19 @@ describe('Integration: GET /v1/topics/:topicId/retention', () => {
 
   it('returns null when no retention card exists', async () => {
     const profileId = await createOwnerProfile();
-    configureValidJWT(jwt, { sub: AUTH_USER_ID, email: AUTH_EMAIL });
 
     const subjectId = await createSubject(profileId, 'Biology');
     const { topicIds } = await seedCurriculumWithTopics(subjectId, ['Cells']);
 
     const res = await app.request(
       `/v1/topics/${topicIds[0]}/retention`,
-      { method: 'GET', headers: buildAuthHeaders(profileId) },
+      {
+        method: 'GET',
+        headers: buildAuthHeaders(
+          { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+          profileId
+        ),
+      },
       TEST_ENV
     );
 
@@ -277,7 +287,6 @@ describe('Integration: GET /v1/topics/:topicId/retention', () => {
 describe('Integration: POST /v1/retention/recall-test', () => {
   it('submits successful recall test (long answer → quality 3+ via length heuristic)', async () => {
     const profileId = await createOwnerProfile();
-    configureValidJWT(jwt, { sub: AUTH_USER_ID, email: AUTH_EMAIL });
 
     const subjectId = await createSubject(profileId, 'Calculus');
     const { topicIds } = await seedCurriculumWithTopics(subjectId, [
@@ -290,7 +299,10 @@ describe('Integration: POST /v1/retention/recall-test', () => {
       '/v1/retention/recall-test',
       {
         method: 'POST',
-        headers: buildAuthHeaders(profileId),
+        headers: buildAuthHeaders(
+          { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+          profileId
+        ),
         body: JSON.stringify({
           topicId: topicIds[0],
           answer:
@@ -309,7 +321,6 @@ describe('Integration: POST /v1/retention/recall-test', () => {
 
   it('submits failed recall test (short answer → quality 2 via length heuristic)', async () => {
     const profileId = await createOwnerProfile();
-    configureValidJWT(jwt, { sub: AUTH_USER_ID, email: AUTH_EMAIL });
 
     const subjectId = await createSubject(profileId, 'Calculus');
     const { topicIds } = await seedCurriculumWithTopics(subjectId, [
@@ -322,7 +333,10 @@ describe('Integration: POST /v1/retention/recall-test', () => {
       '/v1/retention/recall-test',
       {
         method: 'POST',
-        headers: buildAuthHeaders(profileId),
+        headers: buildAuthHeaders(
+          { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+          profileId
+        ),
         body: JSON.stringify({
           topicId: topicIds[0],
           answer: 'Something math',
@@ -340,7 +354,6 @@ describe('Integration: POST /v1/retention/recall-test', () => {
 
   it('returns remediation after 3+ failures (FR52-58)', async () => {
     const profileId = await createOwnerProfile();
-    configureValidJWT(jwt, { sub: AUTH_USER_ID, email: AUTH_EMAIL });
 
     const subjectId = await createSubject(profileId, 'Calculus');
     const { topicIds } = await seedCurriculumWithTopics(subjectId, [
@@ -353,7 +366,10 @@ describe('Integration: POST /v1/retention/recall-test', () => {
       '/v1/retention/recall-test',
       {
         method: 'POST',
-        headers: buildAuthHeaders(profileId),
+        headers: buildAuthHeaders(
+          { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+          profileId
+        ),
         body: JSON.stringify({
           topicId: topicIds[0],
           answer: 'No idea',
@@ -374,13 +390,15 @@ describe('Integration: POST /v1/retention/recall-test', () => {
 
   it('rejects missing topicId', async () => {
     const profileId = await createOwnerProfile();
-    configureValidJWT(jwt, { sub: AUTH_USER_ID, email: AUTH_EMAIL });
 
     const res = await app.request(
       '/v1/retention/recall-test',
       {
         method: 'POST',
-        headers: buildAuthHeaders(profileId),
+        headers: buildAuthHeaders(
+          { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+          profileId
+        ),
         body: JSON.stringify({ answer: 'Something' }),
       },
       TEST_ENV
@@ -390,8 +408,6 @@ describe('Integration: POST /v1/retention/recall-test', () => {
   });
 
   it('returns 401 without auth', async () => {
-    configureInvalidJWT(jwt);
-
     const res = await app.request(
       '/v1/retention/recall-test',
       {
@@ -416,7 +432,6 @@ describe('Integration: POST /v1/retention/recall-test', () => {
 describe('Integration: POST /v1/retention/relearn', () => {
   it('starts relearning with same method and resets retention card', async () => {
     const profileId = await createOwnerProfile();
-    configureValidJWT(jwt, { sub: AUTH_USER_ID, email: AUTH_EMAIL });
 
     const subjectId = await createSubject(profileId, 'Physics');
     const { topicIds } = await seedCurriculumWithTopics(subjectId, [
@@ -435,7 +450,10 @@ describe('Integration: POST /v1/retention/relearn', () => {
       '/v1/retention/relearn',
       {
         method: 'POST',
-        headers: buildAuthHeaders(profileId),
+        headers: buildAuthHeaders(
+          { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+          profileId
+        ),
         body: JSON.stringify({
           topicId: topicIds[0],
           method: 'same',
@@ -474,13 +492,18 @@ describe('Integration: POST /v1/retention/relearn', () => {
 describe('Integration: GET /v1/subjects/:subjectId/needs-deepening', () => {
   it('returns empty when no topics need deepening', async () => {
     const profileId = await createOwnerProfile();
-    configureValidJWT(jwt, { sub: AUTH_USER_ID, email: AUTH_EMAIL });
 
     const subjectId = await createSubject(profileId, 'Chemistry');
 
     const res = await app.request(
       `/v1/subjects/${subjectId}/needs-deepening`,
-      { method: 'GET', headers: buildAuthHeaders(profileId) },
+      {
+        method: 'GET',
+        headers: buildAuthHeaders(
+          { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+          profileId
+        ),
+      },
       TEST_ENV
     );
 
@@ -492,7 +515,6 @@ describe('Integration: GET /v1/subjects/:subjectId/needs-deepening', () => {
 
   it('returns topics flagged for deepening after relearn', async () => {
     const profileId = await createOwnerProfile();
-    configureValidJWT(jwt, { sub: AUTH_USER_ID, email: AUTH_EMAIL });
 
     const subjectId = await createSubject(profileId, 'Physics');
     const { topicIds } = await seedCurriculumWithTopics(subjectId, [
@@ -505,7 +527,10 @@ describe('Integration: GET /v1/subjects/:subjectId/needs-deepening', () => {
       '/v1/retention/relearn',
       {
         method: 'POST',
-        headers: buildAuthHeaders(profileId),
+        headers: buildAuthHeaders(
+          { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+          profileId
+        ),
         body: JSON.stringify({
           topicId: topicIds[0],
           method: 'same',
@@ -516,7 +541,13 @@ describe('Integration: GET /v1/subjects/:subjectId/needs-deepening', () => {
 
     const res = await app.request(
       `/v1/subjects/${subjectId}/needs-deepening`,
-      { method: 'GET', headers: buildAuthHeaders(profileId) },
+      {
+        method: 'GET',
+        headers: buildAuthHeaders(
+          { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+          profileId
+        ),
+      },
       TEST_ENV
     );
 
@@ -536,13 +567,18 @@ describe('Integration: GET /v1/subjects/:subjectId/needs-deepening', () => {
 describe('Integration: Teaching Preference CRUD', () => {
   it('returns null when no preference set', async () => {
     const profileId = await createOwnerProfile();
-    configureValidJWT(jwt, { sub: AUTH_USER_ID, email: AUTH_EMAIL });
 
     const subjectId = await createSubject(profileId, 'History');
 
     const res = await app.request(
       `/v1/subjects/${subjectId}/teaching-preference`,
-      { method: 'GET', headers: buildAuthHeaders(profileId) },
+      {
+        method: 'GET',
+        headers: buildAuthHeaders(
+          { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+          profileId
+        ),
+      },
       TEST_ENV
     );
 
@@ -553,7 +589,6 @@ describe('Integration: Teaching Preference CRUD', () => {
 
   it('sets and retrieves teaching preference', async () => {
     const profileId = await createOwnerProfile();
-    configureValidJWT(jwt, { sub: AUTH_USER_ID, email: AUTH_EMAIL });
 
     const subjectId = await createSubject(profileId, 'History');
 
@@ -562,7 +597,10 @@ describe('Integration: Teaching Preference CRUD', () => {
       `/v1/subjects/${subjectId}/teaching-preference`,
       {
         method: 'PUT',
-        headers: buildAuthHeaders(profileId),
+        headers: buildAuthHeaders(
+          { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+          profileId
+        ),
         body: JSON.stringify({
           subjectId,
           method: 'step_by_step',
@@ -578,7 +616,13 @@ describe('Integration: Teaching Preference CRUD', () => {
     // GET — verify persistence
     const getRes = await app.request(
       `/v1/subjects/${subjectId}/teaching-preference`,
-      { method: 'GET', headers: buildAuthHeaders(profileId) },
+      {
+        method: 'GET',
+        headers: buildAuthHeaders(
+          { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+          profileId
+        ),
+      },
       TEST_ENV
     );
 
@@ -590,7 +634,6 @@ describe('Integration: Teaching Preference CRUD', () => {
 
   it('sets preference with analogy domain (FR134-FR137)', async () => {
     const profileId = await createOwnerProfile();
-    configureValidJWT(jwt, { sub: AUTH_USER_ID, email: AUTH_EMAIL });
 
     const subjectId = await createSubject(profileId, 'Science');
 
@@ -598,7 +641,10 @@ describe('Integration: Teaching Preference CRUD', () => {
       `/v1/subjects/${subjectId}/teaching-preference`,
       {
         method: 'PUT',
-        headers: buildAuthHeaders(profileId),
+        headers: buildAuthHeaders(
+          { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+          profileId
+        ),
         body: JSON.stringify({
           subjectId,
           method: 'real_world_examples',
@@ -616,7 +662,6 @@ describe('Integration: Teaching Preference CRUD', () => {
 
   it('resets teaching preference', async () => {
     const profileId = await createOwnerProfile();
-    configureValidJWT(jwt, { sub: AUTH_USER_ID, email: AUTH_EMAIL });
 
     const subjectId = await createSubject(profileId, 'Art');
 
@@ -625,7 +670,10 @@ describe('Integration: Teaching Preference CRUD', () => {
       `/v1/subjects/${subjectId}/teaching-preference`,
       {
         method: 'PUT',
-        headers: buildAuthHeaders(profileId),
+        headers: buildAuthHeaders(
+          { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+          profileId
+        ),
         body: JSON.stringify({ subjectId, method: 'visual_diagrams' }),
       },
       TEST_ENV
@@ -634,7 +682,13 @@ describe('Integration: Teaching Preference CRUD', () => {
     // Delete
     const delRes = await app.request(
       `/v1/subjects/${subjectId}/teaching-preference`,
-      { method: 'DELETE', headers: buildAuthHeaders(profileId) },
+      {
+        method: 'DELETE',
+        headers: buildAuthHeaders(
+          { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+          profileId
+        ),
+      },
       TEST_ENV
     );
 
@@ -645,7 +699,13 @@ describe('Integration: Teaching Preference CRUD', () => {
     // Verify it's gone
     const getRes = await app.request(
       `/v1/subjects/${subjectId}/teaching-preference`,
-      { method: 'GET', headers: buildAuthHeaders(profileId) },
+      {
+        method: 'GET',
+        headers: buildAuthHeaders(
+          { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+          profileId
+        ),
+      },
       TEST_ENV
     );
     const getBody = await getRes.json();
@@ -660,7 +720,6 @@ describe('Integration: Teaching Preference CRUD', () => {
 describe('Integration: GET /v1/retention/stability', () => {
   it('returns stable topics with 5+ consecutive successes', async () => {
     const profileId = await createOwnerProfile();
-    configureValidJWT(jwt, { sub: AUTH_USER_ID, email: AUTH_EMAIL });
 
     const subjectId = await createSubject(profileId, 'Calculus');
     const { topicIds } = await seedCurriculumWithTopics(subjectId, [
@@ -678,7 +737,13 @@ describe('Integration: GET /v1/retention/stability', () => {
 
     const res = await app.request(
       `/v1/retention/stability?subjectId=${subjectId}`,
-      { method: 'GET', headers: buildAuthHeaders(profileId) },
+      {
+        method: 'GET',
+        headers: buildAuthHeaders(
+          { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+          profileId
+        ),
+      },
       TEST_ENV
     );
 
@@ -701,7 +766,6 @@ describe('Integration: GET /v1/retention/stability', () => {
 
   it('returns all topics when no subjectId provided', async () => {
     const profileId = await createOwnerProfile();
-    configureValidJWT(jwt, { sub: AUTH_USER_ID, email: AUTH_EMAIL });
 
     const subjectId = await createSubject(profileId, 'Physics');
     const { topicIds } = await seedCurriculumWithTopics(subjectId, [
@@ -711,7 +775,13 @@ describe('Integration: GET /v1/retention/stability', () => {
 
     const res = await app.request(
       '/v1/retention/stability',
-      { method: 'GET', headers: buildAuthHeaders(profileId) },
+      {
+        method: 'GET',
+        headers: buildAuthHeaders(
+          { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+          profileId
+        ),
+      },
       TEST_ENV
     );
 

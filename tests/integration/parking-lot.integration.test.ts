@@ -8,7 +8,6 @@
 import { eq } from 'drizzle-orm';
 import { parkingLotItems } from '@eduagent/database';
 
-import { jwtMock } from './mocks';
 import { buildIntegrationEnv, cleanupAccounts } from './helpers';
 import {
   buildAuthHeaders,
@@ -18,11 +17,7 @@ import {
   seedLearningSession,
   seedParkingLotItem,
   seedSubject,
-  setAuthenticatedUser,
 } from './route-fixtures';
-
-const jwt = jwtMock();
-jest.mock('../../apps/api/src/middleware/jwt', () => jwt);
 
 import { app } from '../../apps/api/src/index';
 
@@ -33,7 +28,6 @@ const PARKING_USER = {
 };
 
 beforeEach(async () => {
-  jest.clearAllMocks();
   await cleanupAccounts({
     emails: [PARKING_USER.email],
     clerkUserIds: [PARKING_USER.userId],
@@ -51,7 +45,6 @@ async function createSessionFixture() {
   const profile = await createProfileViaRoute({
     app,
     env: TEST_ENV,
-    jwt,
     user: PARKING_USER,
     displayName: 'Parking Learner',
     birthYear: 2006,
@@ -81,10 +74,15 @@ describe('Integration: parking lot routes', () => {
       question: 'Why does light bend in water?',
     });
 
-    setAuthenticatedUser(jwt, PARKING_USER);
     const res = await app.request(
       `/v1/sessions/${sessionId}/parking-lot`,
-      { method: 'GET', headers: buildAuthHeaders() },
+      {
+        method: 'GET',
+        headers: buildAuthHeaders({
+          sub: PARKING_USER.userId,
+          email: PARKING_USER.email,
+        }),
+      },
       TEST_ENV
     );
 
@@ -97,12 +95,14 @@ describe('Integration: parking lot routes', () => {
   it('creates a parked question and persists it', async () => {
     const { profile, sessionId, topicId } = await createSessionFixture();
 
-    setAuthenticatedUser(jwt, PARKING_USER);
     const res = await app.request(
       `/v1/sessions/${sessionId}/parking-lot`,
       {
         method: 'POST',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: PARKING_USER.userId, email: PARKING_USER.email },
+          profile.id
+        ),
         body: JSON.stringify({
           question: 'Can you come back to total internal reflection later?',
         }),
@@ -128,12 +128,14 @@ describe('Integration: parking lot routes', () => {
   it('returns 404 when posting to a missing session', async () => {
     const { profile } = await createSessionFixture();
 
-    setAuthenticatedUser(jwt, PARKING_USER);
     const res = await app.request(
       '/v1/sessions/00000000-0000-4000-8000-000000000099/parking-lot',
       {
         method: 'POST',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: PARKING_USER.userId, email: PARKING_USER.email },
+          profile.id
+        ),
         body: JSON.stringify({ question: 'Missing session?' }),
       },
       TEST_ENV
@@ -145,12 +147,14 @@ describe('Integration: parking lot routes', () => {
   it('returns 400 for an empty question', async () => {
     const { profile, sessionId } = await createSessionFixture();
 
-    setAuthenticatedUser(jwt, PARKING_USER);
     const res = await app.request(
       `/v1/sessions/${sessionId}/parking-lot`,
       {
         method: 'POST',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: PARKING_USER.userId, email: PARKING_USER.email },
+          profile.id
+        ),
         body: JSON.stringify({ question: '' }),
       },
       TEST_ENV
@@ -171,12 +175,14 @@ describe('Integration: parking lot routes', () => {
       });
     }
 
-    setAuthenticatedUser(jwt, PARKING_USER);
     const res = await app.request(
       `/v1/sessions/${sessionId}/parking-lot`,
       {
         method: 'POST',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: PARKING_USER.userId, email: PARKING_USER.email },
+          profile.id
+        ),
         body: JSON.stringify({ question: 'One too many' }),
       },
       TEST_ENV
@@ -197,12 +203,14 @@ describe('Integration: parking lot routes', () => {
       question: 'Why does factoring help here?',
     });
 
-    setAuthenticatedUser(jwt, PARKING_USER);
     const res = await app.request(
       `/v1/subjects/${subject.id}/topics/${topicId}/parking-lot`,
       {
         method: 'GET',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: PARKING_USER.userId, email: PARKING_USER.email },
+          profile.id
+        ),
       },
       TEST_ENV
     );

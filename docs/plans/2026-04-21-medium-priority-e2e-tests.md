@@ -41,6 +41,18 @@
 
 ---
 
+## Important: Dashboard & Library testID Drift
+
+Two testIDs referenced in older E2E flows no longer exist:
+
+- **`parent-dashboard-summary-primary`** — removed during dashboard refactor. The child card is now `ParentDashboardSummary` → `BaseCoachingCard` with testID `dashboard-child-${profileId}`. The "View details" button is `dashboard-child-${profileId}-primary`. For `parent-multi-child`, use env var `CHILD1_PROFILE_ID`; for seeds returning `childProfileId`, use `CHILD_PROFILE_ID`.
+
+- **`add-subject-button`** — removed from the home screen. The library screen now has `library-add-subject` (when subjects exist) and `library-add-subject-empty` (empty state). Navigate via `"Library Tab"` first.
+
+All flows in this plan use the corrected testIDs.
+
+---
+
 ## Phase 2: Quick Coverage with Existing Seeds
 
 These 5 tasks use existing seed scenarios and require zero source code changes.
@@ -195,11 +207,12 @@ tags:
 
 - takeScreenshot: 01-parent-dashboard
 
-# ── Drill into first child ──────────────────────────────────────────
-# parent-dashboard-summary-primary is the "View details" button on
-# the first child card. For parent-multi-child, this is Emma.
+# ── Drill into first child (Emma) ───────────────────────────────────
+# BaseCoachingCard generates testID: dashboard-child-${profileId}-primary
+# for the "View details" button. CHILD1_PROFILE_ID comes from the
+# parent-multi-child seed response (Emma is child 1).
 - tapOn:
-    id: "parent-dashboard-summary-primary"
+    id: "dashboard-child-${CHILD1_PROFILE_ID}-primary"
 
 - extendedWaitUntil:
     visible:
@@ -308,6 +321,9 @@ tags:
     timeout: 10000
 
 # ── Find and tap "What My Mentor Knows" ─────────────────────────────
+# NOTE: This navigates to the LEARNER view at /(app)/mentor-memory.tsx —
+# distinct from the PARENT view at /(app)/child/[profileId]/mentor-memory.tsx
+# tested in Task 4.
 # SettingsRow uses accessibilityLabel={label} so text match works.
 # The row is in the Account section, may need scroll.
 - scrollUntilVisible:
@@ -392,9 +408,12 @@ tags:
       id: "dashboard-scroll"
     timeout: 15000
 
-# ── Drill into first child ──────────────────────────────────────────
+# ── Drill into first child (Emma) ───────────────────────────────────
+# NOTE: This is the PARENT view of mentor memory at
+# /(app)/child/[profileId]/mentor-memory.tsx — distinct from the
+# LEARNER view at /(app)/mentor-memory.tsx tested in Task 3.
 - tapOn:
-    id: "parent-dashboard-summary-primary"
+    id: "dashboard-child-${CHILD1_PROFILE_ID}-primary"
 
 - extendedWaitUntil:
     visible:
@@ -779,16 +798,18 @@ tags:
       id: "home-scroll-view"
     timeout: 15000
 
-# ── Trigger subject creation ────────────────────────────────────────
-# Scroll to find the add-subject button (BUG-44: may be below fold)
-- scrollUntilVisible:
-    element:
-      id: "add-subject-button"
-    direction: DOWN
+# ── Trigger subject creation via Library tab ────────────────────────
+# add-subject-button was removed from home. Use library-add-subject
+# on the Library tab instead.
+- tapOn: "Library Tab"
+
+- extendedWaitUntil:
+    visible:
+      id: "library-add-subject"
     timeout: 10000
 
 - tapOn:
-    id: "add-subject-button"
+    id: "library-add-subject"
 
 - extendedWaitUntil:
     visible:
@@ -1031,9 +1052,9 @@ tags:
       id: "dashboard-scroll"
     timeout: 15000
 
-# Drill into child
+# Drill into child — parent-with-reports seed returns CHILD_PROFILE_ID
 - tapOn:
-    id: "parent-dashboard-summary-primary"
+    id: "dashboard-child-${CHILD_PROFILE_ID}-primary"
 
 - extendedWaitUntil:
     visible:
@@ -1106,8 +1127,10 @@ tags:
 - takeScreenshot: 02-report-detail-full
 
 # ── Navigate back ───────────────────────────────────────────────────
-- tapOn:
-    id: "child-report-back"
+# IMPORTANT: Do NOT use child-report-back here — it calls
+# goBackOrReplace(router, '/(app)/more') which lands on the More tab,
+# not the reports list. Use Android hardware back to pop the stack.
+- pressKey: back
 
 - extendedWaitUntil:
     visible:
@@ -1259,8 +1282,9 @@ tags:
       id: "dashboard-scroll"
     timeout: 15000
 
+# mentor-memory-populated seed returns CHILD_PROFILE_ID
 - tapOn:
-    id: "parent-dashboard-summary-primary"
+    id: "dashboard-child-${CHILD_PROFILE_ID}-primary"
 
 - extendedWaitUntil:
     visible:
@@ -1338,4 +1362,4 @@ git commit -m "test(e2e): add populated mentor memory flows with new seed scenar
 
 2. **Progress with milestones data:** Phase 2 tests milestones empty state. For a data-rich milestones flow (cards rendering), investigate whether milestones are stored in a table or computed — if computed, seeding enough sessions/topics may auto-generate milestones.
 
-3. **Weekly reports:** The reports list screen shows weekly snapshots above monthly reports. The `parent-with-reports` seed in Task 9 only covers monthly reports. Add weekly report rows to the seed for full weekly section coverage.
+3. **Weekly reports:** The reports list screen shows weekly snapshots above monthly reports (testID pattern: `weekly-report-card-${report.id}` vs `report-card-${report.id}` for monthly). The `parent-with-reports` seed in Task 9 only covers monthly reports. Add weekly report rows to the seed for full weekly section coverage.
