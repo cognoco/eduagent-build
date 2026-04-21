@@ -93,6 +93,9 @@ temp/*
 .worktrees/
 .claude/worktrees/
 
+# Local Claude Code settings (personal tool permissions, output style)
+.claude/settings.local.json
+
 # TestSprite AI Testing (generated tests, ephemeral results)
 testsprite_tests/
 
@@ -131,6 +134,15 @@ cache/
 
 # Maestro E2E screenshots (land at repo root when run from project root)
 /*.png
+
+# E2E env backup (created by serve-exported-web.mjs, may survive a crash)
+.env.local.e2e-bak
+
+# Playwright web E2E artifacts
+apps/mobile/e2e-web/.auth/
+apps/mobile/e2e-web/playwright-report/
+apps/mobile/e2e-web/test-results/
+apps/mobile/e2e-web/test-results-*/
 
 # JVM crash logs (Android emulator, Gradle)
 hs_err_pid*.log

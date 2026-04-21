@@ -161,9 +161,7 @@ export default function VocabularyBrowserScreen(): React.ReactElement {
               Vocabulary tracking is available for language subjects.
             </Text>
             <Pressable
-              onPress={() =>
-                goBackOrReplace(router, '/(app)/progress' as const)
-              }
+              onPress={() => router.replace('/(app)/progress' as never)}
               className="mt-4 rounded-lg bg-primary px-6 py-3"
               accessibilityRole="button"
               accessibilityLabel="Go back"
@@ -184,9 +182,7 @@ export default function VocabularyBrowserScreen(): React.ReactElement {
               Keep learning and the words you discover will appear here.
             </Text>
             <Pressable
-              onPress={() =>
-                goBackOrReplace(router, '/(app)/progress' as const)
-              }
+              onPress={() => router.replace('/(app)/progress' as never)}
               className="bg-background rounded-button px-5 py-3 mt-4"
               accessibilityRole="button"
               accessibilityLabel="Go back"
@@ -209,9 +205,7 @@ export default function VocabularyBrowserScreen(): React.ReactElement {
               {emptyMessage}
             </Text>
             <Pressable
-              onPress={() =>
-                goBackOrReplace(router, '/(app)/progress' as const)
-              }
+              onPress={() => router.replace('/(app)/progress' as never)}
               className="bg-background rounded-button px-5 py-3 mt-4"
               accessibilityRole="button"
               accessibilityLabel="Go back to Journey"

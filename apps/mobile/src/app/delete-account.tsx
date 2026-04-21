@@ -5,7 +5,6 @@ import {
   Pressable,
   ActivityIndicator,
   ScrollView,
-  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,6 +12,7 @@ import { useDeleteAccount, useCancelDeletion } from '../hooks/use-account';
 import { useThemeColors } from '../lib/theme';
 import { goBackOrReplace } from '../lib/navigation';
 import { formatApiError } from '../lib/format-api-error';
+import { platformAlert } from '../lib/platform-alert';
 
 export default function DeleteAccountScreen() {
   const insets = useSafeAreaInsets();
@@ -29,7 +29,7 @@ export default function DeleteAccountScreen() {
   }, [router]);
 
   const onDelete = useCallback(() => {
-    Alert.alert(
+    platformAlert(
       'Delete account?',
       'This action is irreversible. All your data will be permanently deleted.',
       [

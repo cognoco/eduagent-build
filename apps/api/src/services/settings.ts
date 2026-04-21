@@ -8,6 +8,7 @@ import {
   notificationPreferences,
   notificationLog,
   learningModes,
+  profiles,
   type Database,
 } from '@eduagent/database';
 import type {
@@ -54,6 +55,24 @@ const DEFAULT_LEARNING_MODE: LearningModeRecord = {
 };
 
 // ---------------------------------------------------------------------------
+// Ownership guard — verifies profileId belongs to accountId before writes
+// ---------------------------------------------------------------------------
+
+async function verifyProfileOwnership(
+  db: Database,
+  profileId: string,
+  accountId: string
+): Promise<void> {
+  const [owner] = await db
+    .select({ id: profiles.id })
+    .from(profiles)
+    .where(and(eq(profiles.id, profileId), eq(profiles.accountId, accountId)));
+  if (!owner) {
+    throw new Error(`Profile ${profileId} not found for account`);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Notification Preferences
 // ---------------------------------------------------------------------------
 
@@ -79,8 +98,10 @@ export async function getNotificationPrefs(
 export async function upsertNotificationPrefs(
   db: Database,
   profileId: string,
+  accountId: string,
   input: NotificationPrefsInput
 ): Promise<NotificationPrefs> {
+  await verifyProfileOwnership(db, profileId, accountId);
   const existing = await db.query.notificationPreferences.findFirst({
     where: eq(notificationPreferences.profileId, profileId),
   });
@@ -143,8 +164,10 @@ export async function getLearningMode(
 export async function upsertLearningMode(
   db: Database,
   profileId: string,
+  accountId: string,
   mode: LearningMode
 ): Promise<LearningModeRecord> {
+  await verifyProfileOwnership(db, profileId, accountId);
   const existing = await db.query.learningModes.findFirst({
     where: eq(learningModes.profileId, profileId),
   });
@@ -175,8 +198,10 @@ export async function getCelebrationLevel(
 export async function upsertCelebrationLevel(
   db: Database,
   profileId: string,
+  accountId: string,
   celebrationLevel: CelebrationLevel
 ): Promise<{ celebrationLevel: CelebrationLevel }> {
+  await verifyProfileOwnership(db, profileId, accountId);
   const existing = await db.query.learningModes.findFirst({
     where: eq(learningModes.profileId, profileId),
   });
@@ -205,6 +230,11 @@ export async function getMedianResponseSeconds(
   return row?.medianResponseSeconds ?? null;
 }
 
+/**
+ * Server-side only — called exclusively from Inngest functions (session-completed).
+ * The profileId originates from a trusted DB-sourced session row, not user input.
+ * No accountId guard required.
+ */
 export async function updateMedianResponseSeconds(
   db: Database,
   profileId: string,
@@ -289,6 +319,11 @@ export async function getConsecutiveSummarySkips(
   return row?.consecutiveSummarySkips ?? 0;
 }
 
+/**
+ * Server-side only — called exclusively from Inngest functions and session services.
+ * The profileId originates from a trusted DB-sourced session row, not user input.
+ * No accountId guard required.
+ */
 export async function incrementSummarySkips(
   db: Database,
   profileId: string
@@ -313,6 +348,11 @@ export async function incrementSummarySkips(
   return newCount;
 }
 
+/**
+ * Server-side only — called exclusively from Inngest functions and session services.
+ * The profileId originates from a trusted DB-sourced session row, not user input.
+ * No accountId guard required.
+ */
 export async function resetSummarySkips(
   db: Database,
   profileId: string
@@ -408,8 +448,10 @@ export async function getSkipWarningFlags(
 export async function registerPushToken(
   db: Database,
   profileId: string,
+  accountId: string,
   token: string
 ): Promise<void> {
+  await verifyProfileOwnership(db, profileId, accountId);
   const existing = await db.query.notificationPreferences.findFirst({
     where: eq(notificationPreferences.profileId, profileId),
   });
@@ -460,6 +502,11 @@ export async function getDailyNotificationCount(
   return rows.length;
 }
 
+/**
+ * Server-side only — called exclusively from services/notifications.ts (Inngest pipeline).
+ * The profileId originates from a trusted internal notification payload, not user input.
+ * No accountId guard required.
+ */
 export async function logNotification(
   db: Database,
   profileId: string,
@@ -509,9 +556,11 @@ export async function getRecentNotificationCount(
 export async function checkAndLogRateLimit(
   db: Database,
   profileId: string,
+  accountId: string,
   type: NotificationPayload['type'],
   opts: { hours: number; maxCount: number }
 ): Promise<boolean> {
+  await verifyProfileOwnership(db, profileId, accountId);
   return db.transaction(async (tx) => {
     const since = new Date(Date.now() - opts.hours * 60 * 60 * 1000);
     const rows = await tx

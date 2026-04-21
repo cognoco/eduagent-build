@@ -11,6 +11,8 @@ const makeProfile = (overrides: Partial<Profile> = {}): Profile => ({
   location: null,
   isOwner: true,
   hasPremiumLlm: false,
+  conversationLanguage: 'en',
+  pronouns: null,
   consentStatus: null,
   createdAt: '2025-01-01T00:00:00Z',
   updatedAt: '2025-01-01T00:00:00Z',

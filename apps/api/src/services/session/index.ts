@@ -52,7 +52,9 @@ export {
   recordSystemPrompt,
   recordSessionEvent,
   flagContent,
+  getResumeNudgeCandidate,
 } from './session-crud';
+export type { ResumeNudgeCandidate } from './session-crud';
 
 // Exchange (message processing)
 export {
@@ -81,3 +83,6 @@ export {
 // Book sessions
 export { getBookSessions, backfillSessionTopicId } from './session-book';
 export type { BookSession } from './session-book';
+
+// Depth evaluation
+export { evaluateSessionDepth } from './session-depth';

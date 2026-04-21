@@ -47,7 +47,7 @@ export const TOPICS_TAB_INITIAL_STATE: TopicsTabState = {
 interface TopicsTabProps {
   topics: EnrichedTopic[];
   subjects: Array<{ id: string; name: string }>;
-  books: Array<{ id: string; title: string }>;
+  books: Array<{ id: string; title: string; subjectName: string }>;
   noteTopicIds: Set<string>;
   state: TopicsTabState;
   onStateChange: (state: TopicsTabState) => void;
@@ -120,7 +120,14 @@ export function TopicsTab({
     {
       key: 'book',
       label: 'Book',
-      options: books.map((b) => ({ key: b.id, label: b.title })),
+      options: books.map((b) => {
+        const hasDuplicate =
+          books.filter((other) => other.title === b.title).length > 1;
+        return {
+          key: b.id,
+          label: hasDuplicate ? `${b.title} (${b.subjectName})` : b.title,
+        };
+      }),
       selected: state.filters.bookIds,
     },
     {
@@ -234,16 +241,22 @@ export function TopicsTab({
         <Text className="text-body text-text-secondary text-center mb-4">
           Unable to load topics. Please try again.
         </Text>
-        <Pressable
-          onPress={onRetry}
-          className="bg-primary rounded-button px-5 py-3 items-center min-h-[48px] justify-center"
-          accessibilityRole="button"
-          testID="topics-tab-retry"
-        >
-          <Text className="text-body font-semibold text-text-inverse">
-            Retry
+        {onRetry != null ? (
+          <Pressable
+            onPress={onRetry}
+            className="bg-primary rounded-button px-5 py-3 items-center min-h-[48px] justify-center"
+            accessibilityRole="button"
+            testID="topics-tab-retry"
+          >
+            <Text className="text-body font-semibold text-text-inverse">
+              Retry
+            </Text>
+          </Pressable>
+        ) : (
+          <Text className="text-body-sm text-text-tertiary text-center">
+            Pull down to refresh or go back.
           </Text>
-        </Pressable>
+        )}
       </View>
     );
   }
@@ -345,6 +358,7 @@ export function TopicsTab({
           entityName="topics"
           onClear={clearAction.handler}
           clearLabel={clearAction.label}
+          message={hasSearch ? undefined : 'No topics match your filters'}
         />
       ) : (
         <FlatList

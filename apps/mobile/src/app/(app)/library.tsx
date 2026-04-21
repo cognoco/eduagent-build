@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import {
-  Alert,
   Modal,
   Platform,
   Pressable,
@@ -9,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import { useQueries } from '@tanstack/react-query';
+import { platformAlert } from '../../lib/platform-alert';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Subject, RetentionStatus } from '@eduagent/schemas';
@@ -51,6 +51,7 @@ import { formatApiError } from '../../lib/format-api-error';
 interface SubjectRetentionTopic {
   topicId: string;
   topicTitle?: string;
+  bookId?: string | null;
   easeFactor: number;
   repetitions: number;
   nextReviewAt?: string | null;
@@ -160,6 +161,12 @@ export default function LibraryScreen() {
     })),
   });
 
+  // BUG-486: Build bookId→title lookup from already-fetched books data
+  const bookTitleMap = useMemo(
+    () => new Map(allBooksQuery.books.map((b) => [b.book.id, b.book.title])),
+    [allBooksQuery.books]
+  );
+
   const allTopics = useMemo<LibFilterEnrichedTopic[]>(() => {
     if (!subjectsQuery.data) return [];
     return subjectsQuery.data.flatMap((subject, index) => {
@@ -171,8 +178,8 @@ export default function LibraryScreen() {
         name: topic.topicTitle ?? topic.topicId,
         subjectName: subject.name,
         subjectStatus: subject.status,
-        bookId: null,
-        bookTitle: null,
+        bookId: topic.bookId ?? null,
+        bookTitle: topic.bookId ? bookTitleMap.get(topic.bookId) ?? null : null,
         chapter: null,
         retention: getTopicRetention(topic),
         lastReviewedAt: topic.lastReviewedAt,
@@ -181,7 +188,7 @@ export default function LibraryScreen() {
         hasNote: noteIdSet.has(topic.topicId),
       }));
     });
-  }, [retentionQueries, subjectsQuery.data, noteIdSet]);
+  }, [retentionQueries, subjectsQuery.data, noteIdSet, bookTitleMap]);
 
   const progressBySubjectId = useMemo(
     () =>
@@ -250,7 +257,7 @@ export default function LibraryScreen() {
     try {
       await updateSubject.mutateAsync({ subjectId: subject.id, status });
     } catch (err: unknown) {
-      Alert.alert('Could not update subject', formatApiError(err));
+      platformAlert('Could not update subject', formatApiError(err));
     } finally {
       setPendingSubjectId(null);
     }
@@ -330,6 +337,7 @@ export default function LibraryScreen() {
     const bookList = allBooksQuery.books.map((b) => ({
       id: b.book.id,
       title: b.book.title,
+      subjectName: b.subjectName,
     }));
 
     return (
@@ -513,10 +521,22 @@ export default function LibraryScreen() {
         animationType="slide"
         onRequestClose={() => setShowManageSubjects(false)}
       >
-        <View className="flex-1 bg-black/40 justify-end">
-          <View
+        <Pressable
+          className="flex-1 bg-black/40 justify-end"
+          onPress={() => setShowManageSubjects(false)}
+          accessibilityRole="button"
+          accessibilityLabel="Close manage subjects"
+        >
+          <Pressable
             className="bg-background rounded-t-3xl px-5 pt-5"
-            style={{ paddingBottom: Math.max(insets.bottom, 24) }}
+            style={{
+              paddingBottom: Math.max(
+                insets.bottom,
+                Platform.OS === 'web' ? 80 : 24
+              ),
+            }}
+            /* Stop taps on modal content from closing the modal */
+            onPress={(e) => e.stopPropagation()}
           >
             <View className="items-center mb-4">
               <View className="w-10 h-1 rounded-full bg-text-secondary/30" />
@@ -627,13 +647,16 @@ export default function LibraryScreen() {
             <Pressable
               onPress={() => setShowManageSubjects(false)}
               className="items-center py-3"
+              accessibilityRole="button"
+              accessibilityLabel="Close manage subjects"
+              testID="manage-subjects-close"
             >
               <Text className="text-body font-semibold text-text-secondary">
                 Close
               </Text>
             </Pressable>
-          </View>
-        </View>
+          </Pressable>
+        </Pressable>
       </Modal>
     </View>
   );

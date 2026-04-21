@@ -17,12 +17,13 @@ import {
   usePrefetchRound,
 } from '../../../hooks/use-quiz';
 import { goBackOrReplace } from '../../../lib/navigation';
+import { platformAlert } from '../../../lib/platform-alert';
 import { useThemeColors } from '../../../lib/theme';
 import { useQuizFlow } from './_layout';
 import {
   GuessWhoQuestion,
   type GuessWhoResolvedResult,
-} from './_components/GuessWhoQuestion';
+} from '../../../components/quiz/GuessWhoQuestion';
 
 type AnswerState = 'unanswered' | 'checking' | 'correct' | 'wrong';
 
@@ -55,9 +56,14 @@ export default function QuizPlayScreen(): React.ReactElement {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answerState, setAnswerState] = useState<AnswerState>('unanswered');
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
+  // [F-Q-02/F-Q-07] Server reveals correctAnswer on wrong submissions so the
+  // client can highlight the right option and show the person's name.
+  const [correctAnswer, setCorrectAnswer] = useState<string | null>(null);
   const [showContinueHint, setShowContinueHint] = useState(false);
   const [shuffledOptions, setShuffledOptions] = useState<string[]>([]);
-  const [elapsedMs, setElapsedMs] = useState(0);
+  // [F-Q-13] elapsedMs is computed for analytics (timeMs in QuestionResult)
+  // but no longer displayed. Prefixed with _ to satisfy no-unused-vars.
+  const [_elapsedMs, setElapsedMs] = useState(0);
   const [guessWhoCluesUsed, setGuessWhoCluesUsed] = useState(1);
   const [freeTextAnswer, setFreeTextAnswer] = useState('');
 
@@ -69,6 +75,9 @@ export default function QuizPlayScreen(): React.ReactElement {
     null
   );
   const answerSubmittedRef = useRef(false);
+  // [F-Q-07] Tracks whether correctAnswer was captured via handleCheckGuessWhoAnswer
+  // so the onResolved skip-path only fires a background check when needed.
+  const correctAnswerCapturedRef = useRef(false);
 
   const currentQuestion = questions[currentIndex];
 
@@ -91,8 +100,10 @@ export default function QuizPlayScreen(): React.ReactElement {
     }
 
     answerSubmittedRef.current = false;
+    correctAnswerCapturedRef.current = false;
     setAnswerState('unanswered');
     setSelectedAnswer(null);
+    setCorrectAnswer(null);
     setShowContinueHint(false);
     setFreeTextAnswer('');
     questionStartTimeRef.current = Date.now();
@@ -144,12 +155,22 @@ export default function QuizPlayScreen(): React.ReactElement {
   // the next round launch. Declared BEFORE the early-return so React's
   // rules-of-hooks invariant (no conditional hooks) is respected even though
   // this particular handler is a plain function.
+  // [F-Q-08] Show a confirmation dialog before discarding in-progress answers.
   const handleQuit = () => {
-    goBackOrReplace(router, '/(app)/quiz');
+    platformAlert('Quit this round?', 'Your progress will not be saved.', [
+      { text: 'Keep playing', style: 'cancel' },
+      {
+        text: 'Quit',
+        style: 'destructive',
+        onPress: () => goBackOrReplace(router, '/(app)/quiz'),
+      },
+    ]);
   };
 
   // [CR-1] Callback for server-side answer checking, declared before the
   // early return so the rules-of-hooks invariant is satisfied.
+  // [F-Q-07] When the answer is wrong, capture correctAnswer from the server
+  // response so it can be shown in the post-answer feedback panel.
   const roundId = round?.id ?? '';
   const handleCheckGuessWhoAnswer = useCallback(
     async (answerGiven: string): Promise<boolean> => {
@@ -159,6 +180,10 @@ export default function QuizPlayScreen(): React.ReactElement {
           questionIndex: currentIndex,
           answerGiven,
         });
+        if (!result.correct && result.correctAnswer) {
+          correctAnswerCapturedRef.current = true;
+          setCorrectAnswer(result.correctAnswer);
+        }
         return result.correct;
       } catch {
         return false;
@@ -291,6 +316,11 @@ export default function QuizPlayScreen(): React.ReactElement {
         answerGiven: answer,
       });
       correct = result.correct;
+      // [F-Q-02] Server reveals correctAnswer on wrong submissions so the
+      // client can highlight the right option without a second round-trip.
+      if (!correct && result.correctAnswer) {
+        setCorrectAnswer(result.correctAnswer);
+      }
     } catch {
       // On check failure, assume wrong — server re-validates on complete
       correct = false;
@@ -348,14 +378,19 @@ export default function QuizPlayScreen(): React.ReactElement {
     setCurrentIndex((current) => current + 1);
   }
 
-  // [CR-1] Without the correct answer client-side, we highlight only the
-  // selected option — green if correct, red if wrong. The correct answer
-  // (when wrong) is revealed on the results screen via questionResults.
+  // [F-Q-02] The selected wrong option turns red; the correct option turns
+  // green so the user immediately sees what they should have picked. All
+  // other options are dimmed as before.
   function getOptionContainerClass(option: string): string {
     if (answerState === 'unanswered' || answerState === 'checking')
       return 'bg-surface-elevated';
-    if (option === selectedAnswer) {
-      return answerState === 'correct' ? 'bg-primary' : 'bg-danger';
+    if (answerState === 'correct' && option === selectedAnswer) {
+      return 'bg-primary';
+    }
+    if (answerState === 'wrong') {
+      if (option === selectedAnswer) return 'bg-danger';
+      if (correctAnswer && option === correctAnswer)
+        return 'bg-success/20 border border-success';
     }
     return 'bg-surface opacity-60';
   }
@@ -364,6 +399,8 @@ export default function QuizPlayScreen(): React.ReactElement {
     if (answerState === 'unanswered' || answerState === 'checking')
       return 'text-text-primary';
     if (option === selectedAnswer) return 'text-text-inverse';
+    if (answerState === 'wrong' && correctAnswer && option === correctAnswer)
+      return 'text-success font-semibold';
     return 'text-text-secondary';
   }
 
@@ -416,9 +453,10 @@ export default function QuizPlayScreen(): React.ReactElement {
           </View>
         </View>
 
-        <Text className="text-body-sm font-semibold text-text-secondary">
-          {Math.floor(elapsedMs / 1000)}s
-        </Text>
+        {/* [F-Q-13] Timer hidden — elapsed time is tracked for analytics
+            (feeds timeMs into QuestionResult) but not shown to avoid
+            countdown anxiety. */}
+        <View className="w-[32px]" />
       </View>
 
       <View className="mb-8 px-5">
@@ -562,6 +600,25 @@ export default function QuizPlayScreen(): React.ReactElement {
                   ? Haptics.NotificationFeedbackType.Success
                   : Haptics.NotificationFeedbackType.Error
               );
+              // [F-Q-07] If the answer was wrong and we don't already have the
+              // correct answer (e.g. skip path bypasses onCheckAnswer), fire a
+              // background check to get it for the feedback panel.
+              if (!result.correct && !correctAnswerCapturedRef.current) {
+                void checkAnswer
+                  .mutateAsync({
+                    roundId: activeRound.id,
+                    questionIndex: currentIndex,
+                    answerGiven: result.answerGiven,
+                  })
+                  .then((checkResult) => {
+                    if (checkResult.correctAnswer) {
+                      setCorrectAnswer(checkResult.correctAnswer);
+                    }
+                  })
+                  .catch(() => {
+                    /* network failure — best-effort reveal */
+                  });
+              }
             }}
           />
         </View>
@@ -577,9 +634,20 @@ export default function QuizPlayScreen(): React.ReactElement {
                   {guessWhoCluesUsed !== 1 ? 's' : ''}!
                 </Text>
               ) : (
-                <Text className="text-center text-body-lg text-text-primary">
-                  Better luck next time!
-                </Text>
+                <>
+                  <Text className="text-center text-body-lg text-text-primary">
+                    Better luck next time!
+                  </Text>
+                  {/* [F-Q-07] Reveal the person's name after wrong/skip */}
+                  {correctAnswer ? (
+                    <Text className="mt-1 text-center text-body-sm text-text-secondary">
+                      The answer was{' '}
+                      <Text className="font-bold text-success">
+                        {correctAnswer}
+                      </Text>
+                    </Text>
+                  ) : null}
+                </>
               )}
             </View>
           ) : null}

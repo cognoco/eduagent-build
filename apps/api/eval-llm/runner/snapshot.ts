@@ -1,5 +1,5 @@
 import { promises as fs } from 'node:fs';
-import path from 'node:path';
+import * as path from 'node:path';
 import type { EvalProfile } from '../fixtures/profiles';
 import type { FlowDefinition, PromptMessages } from './types';
 
@@ -14,6 +14,12 @@ import type { FlowDefinition, PromptMessages } from './types';
 export interface SnapshotInputs {
   flow: FlowDefinition;
   profile: EvalProfile;
+  /**
+   * Optional scenario identifier — when present, the snapshot filename
+   * becomes `{profile.id}__{scenarioId}.md`. Flows without scenarios
+   * keep the original `{profile.id}.md` filename.
+   */
+  scenarioId?: string;
   builderInput: unknown;
   messages: PromptMessages;
   liveResponse?: string; // only present when --live was passed and runLive exists
@@ -34,7 +40,10 @@ export async function ensureSnapshotDir(flowId: string): Promise<string> {
 
 export async function writeSnapshot(inputs: SnapshotInputs): Promise<string> {
   const dir = await ensureSnapshotDir(inputs.flow.id);
-  const filePath = path.join(dir, `${inputs.profile.id}.md`);
+  const fileName = inputs.scenarioId
+    ? `${inputs.profile.id}__${inputs.scenarioId}.md`
+    : `${inputs.profile.id}.md`;
+  const filePath = path.join(dir, fileName);
   const body = renderSnapshot(inputs);
   await fs.writeFile(filePath, body, 'utf8');
   return filePath;
@@ -54,10 +63,14 @@ function renderSnapshot(inputs: SnapshotInputs): string {
 
   const sections: string[] = [];
 
-  sections.push(`# ${flow.name} × ${profile.id}`);
+  const scenarioSuffix = inputs.scenarioId ? ` · ${inputs.scenarioId}` : '';
+  sections.push(`# ${flow.name} × ${profile.id}${scenarioSuffix}`);
   sections.push(``);
   sections.push(`> **Flow source:** \`${flow.sourceFile}\``);
   sections.push(`> **Profile:** ${profile.description}`);
+  if (inputs.scenarioId) {
+    sections.push(`> **Scenario:** \`${inputs.scenarioId}\``);
+  }
   sections.push(``);
 
   sections.push(`## Profile summary`);

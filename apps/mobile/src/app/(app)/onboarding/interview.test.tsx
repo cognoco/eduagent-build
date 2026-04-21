@@ -105,7 +105,7 @@ describe('InterviewScreen', () => {
         onChunk: (accumulated: string) => void,
         onDone: (result: { isComplete: boolean; exchangeCount: number }) => void
       ) => {
-        onChunk('Great summary of your goals!\n[INTERVIEW_COMPLETE]');
+        onChunk('Great summary of your goals!');
         onDone({ isComplete: true, exchangeCount: 1 });
       }
     );
@@ -148,7 +148,7 @@ describe('InterviewScreen', () => {
         onChunk: (accumulated: string) => void,
         onDone: (result: { isComplete: boolean; exchangeCount: number }) => void
       ) => {
-        onChunk('Ready!\n[INTERVIEW_COMPLETE]');
+        onChunk('Ready!');
         onDone({ isComplete: true, exchangeCount: 1 });
       }
     );

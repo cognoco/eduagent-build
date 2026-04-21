@@ -7,7 +7,14 @@ import {
   createScopedRepository,
   type Database,
 } from '@eduagent/database';
-import { routeAndCall, routeAndStream, type ChatMessage } from './llm';
+import {
+  routeAndCall,
+  routeAndStream,
+  parseEnvelope,
+  teeEnvelopeStream,
+  type ChatMessage,
+} from './llm';
+import { createLogger } from './logger';
 import {
   generateCurriculum,
   ensureCurriculum,
@@ -21,6 +28,10 @@ import type {
   ChatExchange,
   DraftStatus,
 } from '@eduagent/schemas';
+import {
+  INTERVIEW_SYSTEM_PROMPT,
+  SIGNAL_EXTRACTION_PROMPT,
+} from './interview-prompts';
 
 // ---------------------------------------------------------------------------
 // Interview service — pure business logic, no Hono imports
@@ -49,14 +60,11 @@ export async function getBookTitle(
   return row?.title;
 }
 
-const INTERVIEW_SYSTEM_PROMPT = `You are MentoMate, a calm, clear tutor conducting a brief assessment interview.
-Ask about the learner's goals, prior experience, and current knowledge level for the given subject.
-Keep questions conversational and brief. After 2-3 exchanges when you have enough signal,
-wrap up with a short summary of what you learned and a brief, natural transition to the first session.
-Keep the tone warm but calm — don't over-celebrate. Vary your acknowledgments: sometimes "yes", sometimes just move on. Silence after a correct answer is fine.
-NEVER use stock phrases like "Let's dive in!", "I've got a great picture", "Amazing!", "Fantastic!", "Awesome!". Just be direct.
-Then place the marker [INTERVIEW_COMPLETE] on its own line at the very end (after your message).
-The marker will be hidden from the learner, so your visible text should feel like a natural ending.`;
+// Re-export prompt constants for backward compatibility
+export {
+  INTERVIEW_SYSTEM_PROMPT,
+  SIGNAL_EXTRACTION_PROMPT,
+} from './interview-prompts';
 
 const DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -152,28 +160,18 @@ export function buildDraftResumeSummary(
 }
 
 // ---------------------------------------------------------------------------
-// Signal extraction prompt
-// ---------------------------------------------------------------------------
-
-const SIGNAL_EXTRACTION_PROMPT = `You are MentoMate's signal extractor. Analyze the interview conversation and extract structured signals.
-
-Return a JSON object with this exact structure:
-{
-  "goals": ["goal1", "goal2"],
-  "experienceLevel": "beginner|intermediate|advanced",
-  "currentKnowledge": "Brief description of what the learner already knows"
-}
-
-Be concise. Extract only what's clearly stated or strongly implied.`;
-
-// ---------------------------------------------------------------------------
 // Signal extraction — extracts structured learner data from interview
 // ---------------------------------------------------------------------------
+
+// Hard cap on extracted interests. Matches the prompt's "max 8" rule so a
+// verbose LLM response can't overflow what the mobile picker can render.
+const MAX_EXTRACTED_INTERESTS = 8;
 
 export async function extractSignals(exchangeHistory: ChatExchange[]): Promise<{
   goals: string[];
   experienceLevel: string;
   currentKnowledge: string;
+  interests: string[];
 }> {
   const conversationText = exchangeHistory
     .map((e) => `${e.role}: ${e.content}`)
@@ -193,19 +191,41 @@ export async function extractSignals(exchangeHistory: ChatExchange[]): Promise<{
     const jsonMatch = result.response.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0]) as Record<string, unknown>;
+      // Coerce and dedupe interests defensively — the LLM occasionally emits
+      // duplicates with different capitalization. Per-label length-cap at 60.
+      const rawInterests = Array.isArray(parsed.interests)
+        ? (parsed.interests as unknown[])
+            .map((v) => String(v).trim())
+            .filter((v) => v.length > 0 && v.length <= 60)
+        : [];
+      const seen = new Set<string>();
+      const interests: string[] = [];
+      for (const label of rawInterests) {
+        const key = label.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        interests.push(label);
+        if (interests.length >= MAX_EXTRACTED_INTERESTS) break;
+      }
       return {
         goals: Array.isArray(parsed.goals)
           ? (parsed.goals as unknown[]).map(String)
           : [],
         experienceLevel: String(parsed.experienceLevel ?? 'beginner'),
         currentKnowledge: String(parsed.currentKnowledge ?? ''),
+        interests,
       };
     }
   } catch {
     // Fall through to default
   }
 
-  return { goals: [], experienceLevel: 'beginner', currentKnowledge: '' };
+  return {
+    goals: [],
+    experienceLevel: 'beginner',
+    currentKnowledge: '',
+    interests: [],
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -214,23 +234,66 @@ export async function extractSignals(exchangeHistory: ChatExchange[]): Promise<{
 
 /**
  * Server-side hard cap: force interview completion after this many user exchanges.
- * Prevents indefinite interviews when the LLM fails to emit the completion marker.
- * [BUG-464] [BUG-470]
+ * Belt + suspenders — the state machine fail-safes the "model never declares
+ * done" case even if the LLM returns ready_to_finish: false forever.
+ * [BUG-464] [BUG-470] [F-042]
  */
-const INTERVIEW_HARD_CAP_EXCHANGES = 3;
+const MAX_INTERVIEW_EXCHANGES = 3;
+
+const logger = createLogger();
+
+/**
+ * Interpret an interview LLM response under the envelope contract.
+ *
+ * If envelope parse fails, fall through with readyToFinish=false — the
+ * MAX_INTERVIEW_EXCHANGES cap in the caller guarantees the flow still
+ * terminates. The raw response is surfaced as the reply so the learner
+ * sees something (rather than an error); any stray JSON braces are
+ * stripped as a best-effort defensive cleanup.
+ */
+function interpretInterviewResponse(params: {
+  rawResponse: string;
+  profileId: string | undefined;
+  flow: 'processInterviewExchange' | 'streamInterviewExchange';
+}): {
+  cleanResponse: string;
+  readyToFinish: boolean;
+} {
+  const { rawResponse, profileId, flow } = params;
+
+  const parse = parseEnvelope(rawResponse);
+  if (parse.ok) {
+    return {
+      cleanResponse: parse.envelope.reply.trim(),
+      readyToFinish: parse.envelope.signals?.ready_to_finish === true,
+    };
+  }
+
+  logger.warn('interview.envelope_parse_failed', {
+    flow,
+    profile_id: profileId ?? 'unknown',
+    reason: parse.reason,
+  });
+  // Best-effort surface of the raw text so the learner isn't stuck — the
+  // MAX_INTERVIEW_EXCHANGES cap still forces eventual completion.
+  return {
+    cleanResponse: rawResponse.trim(),
+    readyToFinish: false,
+  };
+}
 
 export async function processInterviewExchange(
   context: InterviewContext,
   userMessage: string,
-  options?: { exchangeCount?: number }
+  options?: { exchangeCount?: number; profileId?: string }
 ): Promise<InterviewResult> {
   const focusLine = context.bookTitle
-    ? `\nFocus area: ${context.bookTitle}\nScope your questions to this specific focus area within the subject, not the entire subject.`
+    ? `\nFocus area: <book_title>${context.bookTitle}</book_title>\nScope your questions to this specific focus area within the subject, not the entire subject.`
     : '';
   const messages: ChatMessage[] = [
     {
       role: 'system',
-      content: `${INTERVIEW_SYSTEM_PROMPT}\n\nSubject: ${context.subjectName}${focusLine}`,
+      content: `${INTERVIEW_SYSTEM_PROMPT}\n\nSubject: <subject_name>${context.subjectName}</subject_name>${focusLine}`,
     },
     ...context.exchangeHistory.map((e) => ({
       role: e.role as 'user' | 'assistant',
@@ -240,15 +303,19 @@ export async function processInterviewExchange(
   ];
 
   const result = await routeAndCall(messages, 1);
-  const markerPresent = result.response.includes('[INTERVIEW_COMPLETE]');
-  const cleanResponse = result.response
-    .replace('[INTERVIEW_COMPLETE]', '')
-    .trim();
+  const { cleanResponse, readyToFinish } = interpretInterviewResponse({
+    rawResponse: result.response,
+    profileId: options?.profileId,
+    flow: 'processInterviewExchange',
+  });
 
-  // [BUG-464] Server-side hard cap: force completion after N exchanges
+  // Server-side cap — force completion regardless of model signal.
+  // `exchangeCount` from the route is the 1-indexed number of the current
+  // user turn (including this one). [F-042] This is belt + suspenders: even
+  // if the LLM returns ready_to_finish: false forever, the interview ends.
   const currentExchangeCount = options?.exchangeCount ?? 0;
   const isComplete =
-    markerPresent || currentExchangeCount >= INTERVIEW_HARD_CAP_EXCHANGES;
+    readyToFinish || currentExchangeCount >= MAX_INTERVIEW_EXCHANGES;
 
   if (isComplete) {
     const signals = await extractSignals([
@@ -269,18 +336,18 @@ export async function processInterviewExchange(
 export async function streamInterviewExchange(
   context: InterviewContext,
   userMessage: string,
-  options?: { exchangeCount?: number }
+  options?: { exchangeCount?: number; profileId?: string }
 ): Promise<{
   stream: AsyncIterable<string>;
   onComplete: (fullResponse: string) => Promise<InterviewResult>;
 }> {
   const focusLine = context.bookTitle
-    ? `\nFocus area: ${context.bookTitle}\nScope your questions to this specific focus area within the subject, not the entire subject.`
+    ? `\nFocus area: <book_title>${context.bookTitle}</book_title>\nScope your questions to this specific focus area within the subject, not the entire subject.`
     : '';
   const messages: ChatMessage[] = [
     {
       role: 'system',
-      content: `${INTERVIEW_SYSTEM_PROMPT}\n\nSubject: ${context.subjectName}${focusLine}`,
+      content: `${INTERVIEW_SYSTEM_PROMPT}\n\nSubject: <subject_name>${context.subjectName}</subject_name>${focusLine}`,
     },
     ...context.exchangeHistory.map((e) => ({
       role: e.role as 'user' | 'assistant',
@@ -292,15 +359,25 @@ export async function streamInterviewExchange(
   const streamResult = await routeAndStream(messages, 1);
   const currentExchangeCount = options?.exchangeCount ?? 0;
 
-  const onComplete = async (fullResponse: string): Promise<InterviewResult> => {
-    const markerPresent = fullResponse.includes('[INTERVIEW_COMPLETE]');
-    const cleanResponse = fullResponse
-      .replace('[INTERVIEW_COMPLETE]', '')
-      .trim();
+  // Tee the provider stream: mobile sees only the envelope `reply` chars,
+  // while the accumulator captures the full raw envelope for signal parsing
+  // at close. [F1.1 cutover]
+  const { cleanReplyStream, rawResponsePromise } = teeEnvelopeStream(
+    streamResult.stream
+  );
 
-    // [BUG-464] Server-side hard cap: force completion after N exchanges
+  const onComplete = async (
+    _fullResponse: string
+  ): Promise<InterviewResult> => {
+    const rawResponse = await rawResponsePromise;
+    const { cleanResponse, readyToFinish } = interpretInterviewResponse({
+      rawResponse,
+      profileId: options?.profileId,
+      flow: 'streamInterviewExchange',
+    });
+
     const isComplete =
-      markerPresent || currentExchangeCount >= INTERVIEW_HARD_CAP_EXCHANGES;
+      readyToFinish || currentExchangeCount >= MAX_INTERVIEW_EXCHANGES;
 
     if (isComplete) {
       const signals = await extractSignals([
@@ -314,7 +391,7 @@ export async function streamInterviewExchange(
     return { response: cleanResponse, isComplete };
   };
 
-  return { stream: streamResult.stream, onComplete };
+  return { stream: cleanReplyStream, onComplete };
 }
 
 // ---------------------------------------------------------------------------

@@ -32,7 +32,7 @@ import {
   topUpCredits,
   type Database,
 } from '@eduagent/database';
-import type { DataExport, ConsentStatus } from '@eduagent/schemas';
+import type { DataExport, ConsentStatus, Profile } from '@eduagent/schemas';
 
 export async function generateExport(
   db: Database,
@@ -255,6 +255,13 @@ export async function generateExport(
       location: row.location ?? null,
       isOwner: row.isOwner,
       hasPremiumLlm: row.hasPremiumLlm,
+      // BKT-C.1 — include the new personalization dimensions in the GDPR
+      // export. The CHECK constraint on conversation_language guarantees the
+      // value is one of the 8 codes; cast narrows Drizzle's `string` to the
+      // schema enum.
+      conversationLanguage:
+        row.conversationLanguage as Profile['conversationLanguage'],
+      pronouns: row.pronouns ?? null,
       consentStatus: consentStatusByProfileId.get(row.id) ?? null,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),

@@ -296,6 +296,7 @@ describe('learner-profile routes', () => {
       expect(mockGrantMemoryConsent).toHaveBeenCalledWith(
         undefined,
         OWN_CHILD_PROFILE_ID,
+        undefined,
         'granted'
       );
     });
@@ -329,7 +330,8 @@ describe('learner-profile routes', () => {
       expect(res.status).toBe(200);
       expect(mockDeleteAllMemory).toHaveBeenCalledWith(
         undefined,
-        PARENT_PROFILE_ID
+        PARENT_PROFILE_ID,
+        'test-account-id'
       );
       // Family-link check is not required for self-scoped routes.
       expect(mockHasParentAccess).not.toHaveBeenCalled();
@@ -350,6 +352,7 @@ describe('learner-profile routes', () => {
       expect(mockGrantMemoryConsent).toHaveBeenCalledWith(
         undefined,
         PARENT_PROFILE_ID,
+        'test-account-id',
         'granted'
       );
       expect(mockHasParentAccess).not.toHaveBeenCalled();
@@ -370,6 +373,7 @@ describe('learner-profile routes', () => {
       expect(mockToggleMemoryEnabled).toHaveBeenCalledWith(
         undefined,
         PARENT_PROFILE_ID,
+        'test-account-id',
         false
       );
     });
@@ -393,6 +397,7 @@ describe('learner-profile routes', () => {
       expect(mockDeleteMemoryItem).toHaveBeenCalledWith(
         undefined,
         PARENT_PROFILE_ID,
+        'test-account-id',
         'interests',
         'dinosaurs',
         true,
@@ -432,6 +437,7 @@ describe('learner-profile routes', () => {
       expect(mockUpdateAccommodationMode).toHaveBeenCalledWith(
         undefined,
         PARENT_PROFILE_ID,
+        'test-account-id',
         'short-burst'
       );
       expect(mockHasParentAccess).not.toHaveBeenCalled();
@@ -475,6 +481,7 @@ describe('learner-profile routes', () => {
       expect(mockUpdateAccommodationMode).toHaveBeenCalledWith(
         undefined,
         OWN_CHILD_PROFILE_ID,
+        undefined,
         'audio-first'
       );
     });

@@ -1,4 +1,9 @@
-import { formatApiError } from './format-api-error';
+import {
+  classifyApiError,
+  formatApiError,
+  recoveryActions,
+  type FormattedApiError,
+} from './format-api-error';
 
 /*
  * Screens updated with formatApiError (Story 10.4):
@@ -18,6 +23,157 @@ import { formatApiError } from './format-api-error';
  * E2E note: Error messages are hard to trigger deterministically in E2E.
  * These are validated via unit tests only.
  */
+
+describe('classifyApiError', () => {
+  // --- Network errors ---
+
+  it('classifies TypeError fetch failure as network / retry', () => {
+    const err = new TypeError('Failed to fetch');
+    const result = classifyApiError(err);
+    expect(result.category).toBe('network');
+    expect(result.recovery).toBe('retry');
+    expect(result.message).toContain('offline');
+  });
+
+  it('classifies TypeError network failure as network / retry', () => {
+    const err = new TypeError('A network error occurred');
+    const result = classifyApiError(err);
+    expect(result.category).toBe('network');
+    expect(result.recovery).toBe('retry');
+  });
+
+  it('classifies Error with "timeout" in message as network / retry', () => {
+    const err = new Error('Request timeout after 30000ms');
+    const result = classifyApiError(err);
+    expect(result.category).toBe('network');
+    expect(result.recovery).toBe('retry');
+  });
+
+  // --- HTTP status codes ---
+
+  it('classifies API error 404 as not-found / go-back', () => {
+    const err = new Error('API error 404: {"message":"Session not found"}');
+    const result = classifyApiError(err);
+    expect(result.category).toBe('not-found');
+    expect(result.recovery).toBe('go-back');
+    // Applies FRIENDLY_MESSAGE_MAP translation
+    expect(result.message).toContain('session');
+  });
+
+  it('classifies API error 401 as auth / sign-out', () => {
+    const err = new Error('API error 401: Unauthorized');
+    const result = classifyApiError(err);
+    expect(result.category).toBe('auth');
+    expect(result.recovery).toBe('sign-out');
+  });
+
+  it('classifies API error 403 as auth / sign-out', () => {
+    const err = new Error('API error 403: Forbidden');
+    const result = classifyApiError(err);
+    expect(result.category).toBe('auth');
+    expect(result.recovery).toBe('sign-out');
+  });
+
+  it('classifies API error 429 as quota / retry', () => {
+    const err = new Error('API error 429: {"message":"Rate limit exceeded"}');
+    const result = classifyApiError(err);
+    expect(result.category).toBe('quota');
+    expect(result.recovery).toBe('retry');
+  });
+
+  it('classifies API error 500 as server / retry', () => {
+    const err = new Error('API error 500: Internal Server Error');
+    const result = classifyApiError(err);
+    expect(result.category).toBe('server');
+    expect(result.recovery).toBe('retry');
+  });
+
+  it('classifies API error 502 as server / retry', () => {
+    const err = new Error('API error 502: Bad Gateway');
+    const result = classifyApiError(err);
+    expect(result.category).toBe('server');
+    expect(result.recovery).toBe('retry');
+  });
+
+  // --- Named error types ---
+
+  it('classifies QuotaExceededError as quota / none', () => {
+    const err = new Error('You have exceeded your monthly question limit');
+    err.name = 'QuotaExceededError';
+    const result = classifyApiError(err);
+    expect(result.category).toBe('quota');
+    expect(result.recovery).toBe('none');
+    expect(result.message).toContain('exceeded');
+  });
+
+  it('classifies ForbiddenError as auth / sign-out', () => {
+    const err = Object.assign(
+      new Error('You do not have permission to access this resource'),
+      { name: 'ForbiddenError', code: 'FORBIDDEN', apiCode: undefined }
+    );
+    const result = classifyApiError(err);
+    expect(result.category).toBe('auth');
+    expect(result.recovery).toBe('sign-out');
+  });
+
+  it('classifies ForbiddenError with SUBJECT_INACTIVE as not-found / go-back', () => {
+    const err = Object.assign(
+      new Error('Subject is paused — resume it before starting a session'),
+      { name: 'ForbiddenError', code: 'FORBIDDEN', apiCode: 'SUBJECT_INACTIVE' }
+    );
+    const result = classifyApiError(err);
+    expect(result.category).toBe('not-found');
+    expect(result.recovery).toBe('go-back');
+  });
+
+  // --- Error codes on the error object ---
+
+  it('classifies EXCHANGE_LIMIT_EXCEEDED code as quota / go-back', () => {
+    const err = Object.assign(new Error('Limit exceeded'), {
+      code: 'EXCHANGE_LIMIT_EXCEEDED',
+    });
+    const result = classifyApiError(err);
+    expect(result.category).toBe('quota');
+    expect(result.recovery).toBe('go-back');
+  });
+
+  it('classifies UPSTREAM_ERROR code as server / retry', () => {
+    const err = Object.assign(new Error('upstream issue'), {
+      code: 'UPSTREAM_ERROR',
+    });
+    const result = classifyApiError(err);
+    expect(result.category).toBe('server');
+    expect(result.recovery).toBe('retry');
+  });
+
+  // --- Unknown / fallback ---
+
+  it('classifies null as unknown / retry', () => {
+    const result = classifyApiError(null);
+    expect(result.category).toBe('unknown');
+    expect(result.recovery).toBe('retry');
+  });
+
+  it('classifies undefined as unknown / retry', () => {
+    const result = classifyApiError(undefined);
+    expect(result.category).toBe('unknown');
+    expect(result.recovery).toBe('retry');
+  });
+
+  it('classifies plain string as unknown / retry', () => {
+    const result = classifyApiError('something failed');
+    expect(result.category).toBe('unknown');
+    expect(result.recovery).toBe('retry');
+  });
+
+  it('classifies short user-facing Error messages as unknown / retry with passthrough', () => {
+    const err = new Error('Profile name must be at least 2 characters');
+    const result = classifyApiError(err);
+    expect(result.category).toBe('unknown');
+    expect(result.recovery).toBe('retry');
+    expect(result.message).toBe('Profile name must be at least 2 characters');
+  });
+});
 
 describe('formatApiError', () => {
   // --- Network errors ---
@@ -101,22 +257,25 @@ describe('formatApiError', () => {
     );
   });
 
-  it('returns input message for API error 404 with unreadable body', () => {
+  it('returns not-found message for API error 404 with unreadable body', () => {
     const err = new Error('API error 404: {"complex":{"nested":"object"}}');
-    expect(formatApiError(err)).toBe(
-      "That didn't work. Please check your input and try again."
-    );
+    // classifyApiError recognises HTTP 404 and returns the not-found message
+    // even when the body doesn't contain a parseable apiMessage.
+    expect(formatApiError(err)).toBe('That page or item no longer exists.');
   });
 
   // --- ForbiddenError with apiCode [BUG-100] ---
 
-  it('returns subject-inactive message when ForbiddenError carries SUBJECT_INACTIVE apiCode', () => {
+  it('returns friendly subject-inactive message when ForbiddenError carries SUBJECT_INACTIVE apiCode', () => {
     const err = Object.assign(
       new Error('Subject is paused — resume it before starting a session'),
       { name: 'ForbiddenError', code: 'FORBIDDEN', apiCode: 'SUBJECT_INACTIVE' }
     );
+    // classifyApiError catches SUBJECT_INACTIVE as a code-level check
+    // (before ForbiddenError name check) and applies friendlyMessage()
+    // which matches the subject.*(paused|archived) pattern.
     expect(formatApiError(err)).toBe(
-      'Subject is paused — resume it before starting a session'
+      'This subject is on pause right now. You can resume it from your subjects list.'
     );
   });
 
@@ -193,5 +352,67 @@ describe('formatApiError', () => {
     expect(formatApiError({})).toBe(
       'Something unexpected happened. Please try again.'
     );
+  });
+});
+
+describe('recoveryActions', () => {
+  const base: FormattedApiError = {
+    message: 'test',
+    category: 'unknown',
+    recovery: 'retry',
+  };
+  const retry = jest.fn();
+  const goBack = jest.fn();
+  const goHome = jest.fn();
+  const signOut = jest.fn();
+  const allHandlers = { retry, goBack, goHome, signOut };
+
+  it('maps retry to Try Again primary + Go Home secondary', () => {
+    const result = recoveryActions({ ...base, recovery: 'retry' }, allHandlers);
+    expect(result.primary?.label).toBe('Try Again');
+    expect(result.primary?.testID).toBe('recovery-retry');
+    expect(result.secondary?.label).toBe('Go Home');
+    result.primary?.onPress();
+    expect(retry).toHaveBeenCalled();
+  });
+
+  it('maps go-back to Go Back primary + Go Home secondary', () => {
+    const result = recoveryActions(
+      { ...base, recovery: 'go-back' },
+      allHandlers
+    );
+    expect(result.primary?.label).toBe('Go Back');
+    expect(result.primary?.testID).toBe('recovery-go-back');
+    expect(result.secondary?.label).toBe('Go Home');
+    result.primary?.onPress();
+    expect(goBack).toHaveBeenCalled();
+  });
+
+  it('maps sign-out to Sign Out primary + Go Home secondary', () => {
+    const result = recoveryActions(
+      { ...base, recovery: 'sign-out' },
+      allHandlers
+    );
+    expect(result.primary?.label).toBe('Sign Out');
+    expect(result.primary?.testID).toBe('recovery-sign-out');
+    result.primary?.onPress();
+    expect(signOut).toHaveBeenCalled();
+  });
+
+  it('maps none to Go Home primary only', () => {
+    const result = recoveryActions({ ...base, recovery: 'none' }, allHandlers);
+    expect(result.primary?.label).toBe('Go Home');
+    expect(result.secondary).toBeUndefined();
+  });
+
+  it('falls back to goHome when specific handler is missing', () => {
+    const result = recoveryActions({ ...base, recovery: 'retry' }, { goHome });
+    expect(result.primary?.label).toBe('Go Home');
+    expect(result.secondary).toBeUndefined();
+  });
+
+  it('returns no actions when no handlers provided', () => {
+    const result = recoveryActions({ ...base, recovery: 'none' }, {});
+    expect(result.primary).toBeUndefined();
   });
 });

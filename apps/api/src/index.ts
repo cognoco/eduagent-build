@@ -38,6 +38,7 @@ import { accountRoutes } from './routes/account';
 import { inngestRoute } from './routes/inngest';
 import { subjectRoutes } from './routes/subjects';
 import { interviewRoutes } from './routes/interview';
+import { onboardingRoutes } from './routes/onboarding';
 import { curriculumRoutes } from './routes/curriculum';
 import { bookRoutes } from './routes/books';
 import { noteRoutes } from './routes/notes';
@@ -66,6 +67,7 @@ import { topicSuggestionRoutes } from './routes/topic-suggestions';
 import { learnerProfileRoutes } from './routes/learner-profile';
 import { dictationRoutes } from './routes/dictation';
 import { quizRoutes } from './routes/quiz';
+import { feedbackRoutes } from './routes/feedback';
 
 type Bindings = {
   ENVIRONMENT: string;
@@ -93,6 +95,7 @@ type Bindings = {
   SENTRY_DSN?: string;
   TEST_SEED_SECRET?: string;
   REVENUECAT_WEBHOOK_SECRET?: string;
+  SUPPORT_EMAIL?: string;
 };
 
 type Variables = {
@@ -188,6 +191,7 @@ const routes = api
   .route('/', inngestRoute)
   .route('/', subjectRoutes)
   .route('/', interviewRoutes)
+  .route('/', onboardingRoutes)
   .route('/', curriculumRoutes)
   .route('/', bookRoutes)
   .route('/', noteRoutes)
@@ -215,7 +219,8 @@ const routes = api
   .route('/', topicSuggestionRoutes)
   .route('/', learnerProfileRoutes)
   .route('/', dictationRoutes)
-  .route('/', quizRoutes);
+  .route('/', quizRoutes)
+  .route('/', feedbackRoutes);
 
 // ---------------------------------------------------------------------------
 // App — mounts routes under /v1 for the actual Cloudflare Worker runtime.

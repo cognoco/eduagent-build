@@ -4,14 +4,20 @@
 
 jest.mock('./llm', () => {
   const providers = new Map();
+  const actual = jest.requireActual('./llm');
   return {
     routeAndCall: jest.fn().mockResolvedValue({
-      response: 'Mock interview response echoing user input',
+      response:
+        '{"reply": "Mock interview response echoing user input", "signals": {"ready_to_finish": false}}',
       provider: 'gemini',
       model: 'gemini-2.5-flash',
       latencyMs: 50,
     }),
     routeAndStream: jest.fn(),
+    // Keep the real envelope helpers — the service exercises parseEnvelope
+    // and teeEnvelopeStream against actual code.
+    parseEnvelope: actual.parseEnvelope,
+    teeEnvelopeStream: actual.teeEnvelopeStream,
     registerProvider: jest.fn((p: { name: string }) =>
       providers.set(p.name, p)
     ),
@@ -162,10 +168,11 @@ describe('processInterviewExchange', () => {
     expect(result.isComplete).toBe(false);
   });
 
-  it('marks exchange as complete when marker is present', async () => {
+  it('marks exchange as complete when envelope signals ready_to_finish', async () => {
     (routeAndCall as jest.Mock)
       .mockResolvedValueOnce({
-        response: 'Great session! [INTERVIEW_COMPLETE]',
+        response:
+          '{"reply": "Great session!", "signals": {"ready_to_finish": true}}',
         provider: 'gemini',
         model: 'gemini-2.5-flash',
         latencyMs: 50,
@@ -179,9 +186,75 @@ describe('processInterviewExchange', () => {
     const result = await processInterviewExchange(baseContext, 'Hello');
 
     expect(result.isComplete).toBe(true);
+    expect(result.response).toBe('Great session!');
     expect(result.response).not.toContain('[INTERVIEW_COMPLETE]');
     expect(result.extractedSignals).toBeDefined();
     expect(result.extractedSignals?.goals).toEqual(['learn TypeScript']);
+  });
+
+  it('[F1.1 break] when envelope parse fails, flow stays open and surfaces raw reply (no legacy-marker fallback)', async () => {
+    // Post-cutover contract: the legacy [INTERVIEW_COMPLETE] fallback is
+    // removed. Non-JSON prose degrades gracefully — the raw text is shown
+    // to the learner and the flow is NOT marked complete. The
+    // MAX_INTERVIEW_EXCHANGES cap still guarantees eventual termination.
+    (routeAndCall as jest.Mock).mockResolvedValueOnce({
+      response: 'Great session! [INTERVIEW_COMPLETE]',
+      provider: 'gemini',
+      model: 'gemini-2.5-flash',
+      latencyMs: 50,
+    });
+
+    const result = await processInterviewExchange(baseContext, 'Hello');
+
+    expect(result.isComplete).toBe(false);
+    expect(result.extractedSignals).toBeUndefined();
+  });
+
+  // --- F-042 break test -----------------------------------------------------
+  // If the LLM returns ready_to_finish: false forever, the learner would be
+  // trapped in the interview. The server-side cap must force close anyway.
+  it('[F-042] force-closes at MAX_INTERVIEW_EXCHANGES regardless of signal', async () => {
+    // Return a valid envelope with ready_to_finish: false on turn 4 (past cap of 3).
+    (routeAndCall as jest.Mock)
+      .mockResolvedValueOnce({
+        response:
+          '{"reply": "Tell me more about that.", "signals": {"ready_to_finish": false}}',
+        provider: 'gemini',
+        model: 'gemini-2.5-flash',
+        latencyMs: 50,
+      })
+      // extractSignals call — triggered only because the cap fired.
+      .mockResolvedValueOnce({
+        response:
+          '{"goals": ["capped"], "experienceLevel": "beginner", "currentKnowledge": ""}',
+      });
+
+    const result = await processInterviewExchange(baseContext, 'Hello', {
+      exchangeCount: 4, // past the cap of 3
+    });
+
+    expect(result.isComplete).toBe(true);
+    expect(result.extractedSignals).toBeDefined();
+    expect(result.extractedSignals?.goals).toEqual(['capped']);
+    // Visible reply is the envelope's reply, not the marker form.
+    expect(result.response).toBe('Tell me more about that.');
+  });
+
+  it('[F-042] stays open below the cap when ready_to_finish is false', async () => {
+    (routeAndCall as jest.Mock).mockResolvedValueOnce({
+      response:
+        '{"reply": "What else interests you?", "signals": {"ready_to_finish": false}}',
+      provider: 'gemini',
+      model: 'gemini-2.5-flash',
+      latencyMs: 50,
+    });
+
+    const result = await processInterviewExchange(baseContext, 'Hello', {
+      exchangeCount: 2, // well below cap
+    });
+
+    expect(result.isComplete).toBe(false);
+    expect(result.extractedSignals).toBeUndefined();
   });
 
   it('passes exchange history to the LLM', async () => {
@@ -241,10 +314,10 @@ describe('streamInterviewExchange', () => {
     expect(typeof result.onComplete).toBe('function');
   });
 
-  it('onComplete returns non-complete result when marker absent', async () => {
+  it('onComplete returns non-complete result when envelope signals ready_to_finish false', async () => {
     (routeAndStream as jest.Mock).mockResolvedValueOnce({
       stream: (async function* () {
-        yield 'Tell me more.';
+        yield '{"reply": "Tell me more.", "signals": {"ready_to_finish": false}}';
       })(),
       provider: 'gemini',
       model: 'gemini-2.5-flash',
@@ -267,10 +340,10 @@ describe('streamInterviewExchange', () => {
     expect(result.extractedSignals).toBeUndefined();
   });
 
-  it('onComplete strips marker and extracts signals when complete', async () => {
+  it('onComplete extracts signals when envelope signals ready_to_finish true', async () => {
     (routeAndStream as jest.Mock).mockResolvedValueOnce({
       stream: (async function* () {
-        yield 'Great session! [INTERVIEW_COMPLETE]';
+        yield '{"reply": "Great session!", "signals": {"ready_to_finish": true}}';
       })(),
       provider: 'gemini',
       model: 'gemini-2.5-flash',
@@ -298,6 +371,34 @@ describe('streamInterviewExchange', () => {
     expect(result.response).toBe('Great session!');
     expect(result.extractedSignals).toBeDefined();
     expect(result.extractedSignals?.goals).toEqual(['learn TS']);
+  });
+
+  it('[F-042] streaming path force-closes at cap even when signal says false', async () => {
+    (routeAndStream as jest.Mock).mockResolvedValueOnce({
+      stream: (async function* () {
+        yield '{"reply": "And another question?", "signals": {"ready_to_finish": false}}';
+      })(),
+      provider: 'gemini',
+      model: 'gemini-2.5-flash',
+    });
+    (routeAndCall as jest.Mock).mockResolvedValueOnce({
+      response:
+        '{"goals": ["capped"], "experienceLevel": "beginner", "currentKnowledge": ""}',
+    });
+
+    const { stream, onComplete } = await streamInterviewExchange(
+      baseContext,
+      'Hi',
+      { exchangeCount: 4 } // past the cap of 3
+    );
+    let fullText = '';
+    for await (const chunk of stream) fullText += chunk;
+
+    const result = await onComplete(fullText);
+
+    expect(result.isComplete).toBe(true);
+    expect(result.response).toBe('And another question?');
+    expect(result.extractedSignals).toBeDefined();
   });
 
   it('calls routeAndStream at rung 1', async () => {
@@ -410,6 +511,123 @@ describe('extractSignals', () => {
       ]),
       2
     );
+  });
+
+  // -------------------------------------------------------------------------
+  // BKT-C.2 — interests extraction from interview transcripts
+  // -------------------------------------------------------------------------
+
+  it('[BKT-C.2] extracts interests from LLM response', async () => {
+    (routeAndCall as jest.Mock).mockResolvedValueOnce({
+      response:
+        '{"goals": ["learn"], "experienceLevel": "beginner", "currentKnowledge": "", "interests": ["chess club", "anime", "football"]}',
+    });
+
+    const result = await extractSignals([
+      {
+        role: 'user',
+        content: "I'm in chess club and I love anime and football",
+      },
+    ]);
+
+    expect(result.interests).toEqual(['chess club', 'anime', 'football']);
+  });
+
+  it('[BKT-C.2] returns empty interests array when field missing', async () => {
+    // Backward compat: prompt asks for interests but a legacy cached response
+    // or off-schema reply omits them. Consumers must tolerate [].
+    (routeAndCall as jest.Mock).mockResolvedValueOnce({
+      response:
+        '{"goals": ["learn"], "experienceLevel": "beginner", "currentKnowledge": ""}',
+    });
+
+    const result = await extractSignals([{ role: 'user', content: 'hi' }]);
+
+    expect(result.interests).toEqual([]);
+  });
+
+  it('[BKT-C.2] returns empty interests when no JSON object found in response', async () => {
+    (routeAndCall as jest.Mock).mockResolvedValueOnce({
+      response: 'not json at all',
+    });
+
+    const result = await extractSignals([{ role: 'user', content: 'hi' }]);
+
+    expect(result.interests).toEqual([]);
+  });
+
+  it('[BKT-C.2] returns empty interests when JSON.parse throws on partial JSON', async () => {
+    // The regex matches `{...}` but the content is not valid JSON —
+    // exercises the catch block rather than the regex-miss path above.
+    (routeAndCall as jest.Mock).mockResolvedValueOnce({
+      response: '{invalid json content}',
+    });
+
+    const result = await extractSignals([{ role: 'user', content: 'hi' }]);
+
+    expect(result.interests).toEqual([]);
+  });
+
+  it('[BKT-C.2] dedupes interests case-insensitively', async () => {
+    (routeAndCall as jest.Mock).mockResolvedValueOnce({
+      response:
+        '{"goals": [], "experienceLevel": "beginner", "currentKnowledge": "", "interests": ["Chess", "chess", "CHESS", "football"]}',
+    });
+
+    const result = await extractSignals([{ role: 'user', content: 'hi' }]);
+
+    // First-seen-wins for the canonical casing — matches the Set-based dedupe.
+    expect(result.interests).toEqual(['Chess', 'football']);
+  });
+
+  it('[BKT-C.2] caps interests at MAX_EXTRACTED_INTERESTS (8)', async () => {
+    // A chatty LLM could return more than the prompt's max. The service must
+    // hard-cap to protect the mobile picker's rendering budget.
+    // Asserts both the length cap AND first-N-in-order preservation.
+    const tenInterests = Array.from({ length: 10 }, (_, i) => `hobby-${i}`);
+    (routeAndCall as jest.Mock).mockResolvedValueOnce({
+      response: JSON.stringify({
+        goals: [],
+        experienceLevel: 'beginner',
+        currentKnowledge: '',
+        interests: tenInterests,
+      }),
+    });
+
+    const result = await extractSignals([{ role: 'user', content: 'hi' }]);
+
+    expect(result.interests).toHaveLength(8);
+    expect(result.interests).toEqual(tenInterests.slice(0, 8));
+  });
+
+  it('[BKT-C.2] strips empty and over-long interests defensively', async () => {
+    const atBoundary = 'x'.repeat(60); // exactly at the 60-char limit — kept
+    const tooLong = 'x'.repeat(61); // one over — stripped
+    (routeAndCall as jest.Mock).mockResolvedValueOnce({
+      response: JSON.stringify({
+        goals: [],
+        experienceLevel: 'beginner',
+        currentKnowledge: '',
+        interests: ['chess', '', '   ', atBoundary, tooLong, 'football'],
+      }),
+    });
+
+    const result = await extractSignals([{ role: 'user', content: 'hi' }]);
+
+    expect(result.interests).toEqual(['chess', atBoundary, 'football']);
+  });
+
+  it('[BKT-C.2] coerces non-array interests to empty array', async () => {
+    // A broken LLM could return a string where an array is expected. The
+    // service must not crash or leak the raw value into a typed array.
+    (routeAndCall as jest.Mock).mockResolvedValueOnce({
+      response:
+        '{"goals": [], "experienceLevel": "beginner", "currentKnowledge": "", "interests": "chess, football"}',
+    });
+
+    const result = await extractSignals([{ role: 'user', content: 'hi' }]);
+
+    expect(result.interests).toEqual([]);
   });
 });
 

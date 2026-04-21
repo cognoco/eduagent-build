@@ -14,6 +14,7 @@ import {
   type Database,
 } from '@eduagent/database';
 import type {
+  ConversationLanguage,
   LearningSession,
   SessionMessageInput,
   LearningStyle,
@@ -24,10 +25,8 @@ import type {
 import {
   processExchange,
   streamExchange,
-  detectUnderstandingCheck,
   estimateExpectedResponseMinutes,
-  extractNotePrompt,
-  extractFluencyDrill,
+  parseExchangeEnvelope,
   type ExchangeContext,
   type FluencyDrillAnnotation,
   type ImageData,
@@ -35,7 +34,6 @@ import {
 import {
   evaluateEscalation,
   getRetentionAwareStartingRung,
-  detectPartialProgress,
 } from '../escalation';
 import {
   fetchPriorTopics,
@@ -55,6 +53,7 @@ import { shouldTriggerTeachBack } from '../teach-back';
 import { getRetentionStatus, type RetentionState } from '../retention';
 import { getLearningMode } from '../settings';
 import type { EscalationRung } from '../llm';
+import { inngest } from '../../inngest/client';
 import {
   getSessionStaticContext,
   getSessionStaticContextCacheKey,
@@ -68,6 +67,12 @@ import {
   SessionExchangeLimitError,
 } from './session-crud';
 import { createLogger } from '../logger';
+/**
+ * English-language intent pre-classifier used to fast-path four-strands
+ * pedagogy for obvious translation / "how do you say" asks.
+ */
+const LANGUAGE_REGEX =
+  /\b(how do (you|i) say|translate|in (french|spanish|german|czech|italian|portuguese|japanese|chinese|korean|arabic|russian|hindi|dutch|polish|swedish|norwegian|danish|finnish|greek|turkish|hungarian|romanian|thai|vietnamese|indonesian|malay|tagalog|swahili|hebrew|ukrainian|croatian|serbian|slovak|slovenian|bulgarian|latvian|lithuanian|estonian)|what('s| is) .+ in \w+)\b/i;
 
 const logger = createLogger();
 
@@ -84,6 +89,12 @@ export interface ExchangeBehavioralMetrics {
   expectedResponseMinutes?: number;
   /** FR228: Homework mode used for this exchange */
   homeworkMode?: 'help_me' | 'check_answer';
+  /** Envelope signal — read back next turn to hold escalation (F1.2) */
+  partialProgress?: boolean;
+  /** Envelope signal — used to queue topic for remediation (F1.3) */
+  needsDeepening?: boolean;
+  /** F6: LLM self-reported confidence — persisted so the next turn and analytics can read it. */
+  confidence?: 'low' | 'medium' | 'high';
 }
 
 // ---------------------------------------------------------------------------
@@ -162,6 +173,13 @@ export async function prepareExchangeContext(
     throw new Error('Session not found');
   }
 
+  const sessionMeta = ((session.metadata as
+    | Record<string, unknown>
+    | undefined) ?? {}) as Record<string, unknown>;
+  const isFreeform =
+    session.sessionType === 'learning' &&
+    !session.topicId &&
+    sessionMeta['effectiveMode'] === 'freeform';
   const isInterleaved = session.sessionType === 'interleaved';
   const staticContext = await getSessionStaticContext(
     db,
@@ -173,7 +191,7 @@ export async function prepareExchangeContext(
   // 2. Load all supplementary data in parallel (all independent after session load)
   // CFLF-23: For freeform sessions with rawInput, also scan prior sessions
   // by the learner's original intent so the very first exchange has rich context.
-  const isFreeformWithRawInput = !session.topicId && !!session.rawInput;
+  const isFreeformWithRawInput = isFreeform && !!session.rawInput;
 
   // BUG-70: Use cached supplementary data for lookups that are static within
   // a session (priorTopics, teachingPref, learningMode, learningProfile,
@@ -225,11 +243,15 @@ export async function prepareExchangeContext(
     }),
     cachedSupp
       ? Promise.resolve(cachedSupp.priorTopics)
+      : isFreeform
+      ? Promise.resolve([])
       : fetchPriorTopics(db, profileId, session.subjectId),
     retrieveRelevantMemory(db, profileId, userMessage, options?.voyageApiKey),
     // FR58: Load teaching method preference for adaptive teaching
     cachedSupp
       ? Promise.resolve(cachedSupp.teachingPref)
+      : isFreeform
+      ? Promise.resolve(null)
       : getTeachingPreference(db, profileId, session.subjectId),
     // FR92: Load session metadata for interleaved topic list
     isInterleaved
@@ -251,6 +273,8 @@ export async function prepareExchangeContext(
     // Story 16.0: Cross-subject learning highlights for broader context
     cachedSupp
       ? Promise.resolve(cachedSupp.crossSubjectHighlights)
+      : isFreeform
+      ? Promise.resolve([])
       : fetchCrossSubjectHighlights(db, profileId, session.subjectId),
     // CFLF-23: Pre-session similarity scan — uses rawInput for freeform sessions
     // Graceful degradation: if Voyage API is down, returns empty (never breaks session)
@@ -292,21 +316,6 @@ export async function prepareExchangeContext(
     );
   }
   const retentionCard = retentionRows[0];
-  const knownVocabularyRows =
-    subject?.pedagogyMode === 'four_strands'
-      ? await db
-          .select({ term: vocabulary.term })
-          .from(vocabulary)
-          .where(
-            and(
-              eq(vocabulary.profileId, profileId),
-              eq(vocabulary.subjectId, session.subjectId),
-              eq(vocabulary.mastered, true)
-            )
-          )
-          .orderBy(desc(vocabulary.updatedAt))
-          .limit(60)
-      : [];
 
   // Determine verification type: explicit from session, or auto-select from retention card
   let verificationType: VerificationType | undefined;
@@ -392,6 +401,119 @@ export async function prepareExchangeContext(
       content: e.content,
     }));
 
+  const rawSilentClassification = sessionMeta['silentClassification'];
+  const silentClassification =
+    rawSilentClassification &&
+    typeof rawSilentClassification === 'object' &&
+    !Array.isArray(rawSilentClassification) &&
+    typeof (rawSilentClassification as { subjectId?: unknown }).subjectId ===
+      'string' &&
+    typeof (rawSilentClassification as { subjectName?: unknown })
+      .subjectName === 'string' &&
+    typeof (rawSilentClassification as { confidence?: unknown }).confidence ===
+      'number'
+      ? {
+          subjectId: (rawSilentClassification as { subjectId: string })
+            .subjectId,
+          subjectName: (rawSilentClassification as { subjectName: string })
+            .subjectName,
+          confidence: (rawSilentClassification as { confidence: number })
+            .confidence,
+        }
+      : undefined;
+
+  let likelyLanguage = false;
+  if (isFreeform && session.exchangeCount === 0) {
+    likelyLanguage = LANGUAGE_REGEX.test(userMessage);
+    if (likelyLanguage) {
+      // Telemetry-only event — no Inngest handler; consumed by observability tooling.
+      void inngest.send({
+        name: 'app/ask.language_preclassified',
+        data: {
+          sessionId,
+          matchedPattern: userMessage.match(LANGUAGE_REGEX)?.[0] ?? '',
+        },
+      });
+    }
+  }
+
+  if (isFreeform && session.exchangeCount === 1 && !silentClassification) {
+    const priorUserMessages = exchangeHistory
+      .filter((entry) => entry.role === 'user')
+      .map((entry) => entry.content)
+      .join('\n');
+
+    void inngest.send({
+      name: 'app/ask.classify_silently',
+      data: {
+        sessionId,
+        profileId,
+        classifyInput: [priorUserMessages, userMessage]
+          .filter(Boolean)
+          .join('\n'),
+        exchangeCount: session.exchangeCount + 1,
+      },
+    });
+  }
+
+  const [silentSubjectRows, silentTeachingPref] =
+    silentClassification?.subjectId
+      ? await Promise.all([
+          db
+            .select({
+              id: subjects.id,
+              name: subjects.name,
+              pedagogyMode: subjects.pedagogyMode,
+              languageCode: subjects.languageCode,
+            })
+            .from(subjects)
+            .where(
+              and(
+                eq(subjects.id, silentClassification.subjectId),
+                eq(subjects.profileId, profileId),
+                eq(subjects.status, 'active')
+              )
+            )
+            .limit(1),
+          getTeachingPreference(db, profileId, silentClassification.subjectId),
+        ])
+      : [[], null];
+  const silentSubject = silentSubjectRows[0];
+  const effectiveSubjectName = isFreeform
+    ? silentClassification?.subjectName ?? 'Unknown'
+    : subject?.name ?? 'Unknown';
+  const effectivePedagogyMode: 'socratic' | 'four_strands' = likelyLanguage
+    ? 'four_strands'
+    : isFreeform
+    ? (silentSubject?.pedagogyMode as
+        | 'socratic'
+        | 'four_strands'
+        | undefined) ?? 'socratic'
+    : (subject?.pedagogyMode as 'socratic' | 'four_strands' | undefined) ??
+      'socratic';
+  const effectiveLanguageCode = isFreeform
+    ? silentSubject?.languageCode ?? undefined
+    : subject?.languageCode ?? undefined;
+  const effectiveTeachingPref = isFreeform ? silentTeachingPref : teachingPref;
+  const effectiveVocabularySubjectId = isFreeform
+    ? silentClassification?.subjectId
+    : session.subjectId;
+  const knownVocabularyRows =
+    effectivePedagogyMode === 'four_strands' && effectiveVocabularySubjectId
+      ? await db
+          .select({ term: vocabulary.term })
+          .from(vocabulary)
+          .where(
+            and(
+              eq(vocabulary.profileId, profileId),
+              eq(vocabulary.subjectId, effectiveVocabularySubjectId),
+              eq(vocabulary.mastered, true)
+            )
+          )
+          .orderBy(desc(vocabulary.updatedAt))
+          .limit(60)
+      : [];
+
   // 3b. Compute SM-2 retention status from retention card (Gap 4)
   let retentionStatusValue:
     | 'new'
@@ -436,10 +558,30 @@ export async function prepareExchangeContext(
   const lastAiResponseEvent = aiResponseEvents[aiResponseEvents.length - 1];
   const lastAiResponseAt = lastAiResponseEvent?.createdAt ?? null;
 
-  // 3d. Check the last AI response for [PARTIAL_PROGRESS] marker (Gap 3)
-  const lastAiResponse = lastAiResponseEvent?.content ?? '';
+  // 3d. Read the previous-turn partial_progress signal from metadata (F1.2).
+  // Pre-migration this was parsed from the AI response text via the
+  // [PARTIAL_PROGRESS] marker; after the envelope migration the signal
+  // lives in structured metadata persisted alongside the ai_response event.
   const previousResponseHadPartialProgress =
-    detectPartialProgress(lastAiResponse);
+    (lastAiResponseEvent?.metadata as Record<string, unknown> | null)
+      ?.partialProgress === true;
+
+  // 3e. Count consecutive trailing ai_response events with partialProgress
+  // so the MAX_PARTIAL_PROGRESS_HOLDS cap in evaluateEscalation fires. We
+  // walk backwards from the most recent ai_response; the streak breaks on
+  // the first event without the flag.
+  let consecutiveHolds = 0;
+  for (let i = aiResponseEvents.length - 1; i >= 0; i--) {
+    const meta = aiResponseEvents[i]?.metadata as Record<
+      string,
+      unknown
+    > | null;
+    if (meta?.partialProgress === true) {
+      consecutiveHolds++;
+    } else {
+      break;
+    }
+  }
 
   // 4. Evaluate escalation (retention-aware + partial-progress-aware)
   // On first exchange: use retention-aware starting rung (Gap 4)
@@ -456,6 +598,7 @@ export async function prepareExchangeContext(
       totalExchanges: session.exchangeCount,
       retentionStatus: retentionStatusValue,
       previousResponseHadPartialProgress,
+      consecutiveHolds,
     },
     userMessage
   );
@@ -513,7 +656,7 @@ export async function prepareExchangeContext(
 
   // P1.4: Load urgency boost for the current session's subject (if any)
   let activeUrgency: { reason: string; boostUntil: Date } | null = null;
-  if (session.subjectId) {
+  if (session.subjectId && !isFreeform) {
     const urgencyRows = await db
       .select({
         urgencyBoostReason: subjects.urgencyBoostReason,
@@ -565,7 +708,9 @@ export async function prepareExchangeContext(
             learningProfile.effectivenessSessionCount ?? 0,
           activeUrgency,
         },
-        subject?.name ?? null,
+        isFreeform
+          ? silentClassification?.subjectName ?? null
+          : subject?.name ?? null,
         topic?.title ?? null,
         {
           status: retentionStatusValue,
@@ -592,13 +737,20 @@ export async function prepareExchangeContext(
   const context: ExchangeContext = {
     sessionId,
     profileId,
-    subjectName: subject?.name ?? 'Unknown',
+    subjectName: effectiveSubjectName,
     topicTitle: interleavedTopics ? undefined : topic?.title,
     topicDescription: interleavedTopics ? undefined : topic?.description,
     sessionType: session.sessionType,
     escalationRung: effectiveRung,
     exchangeHistory,
     birthYear: profile?.birthYear ?? null,
+    // BKT-C.1 — source the profile-level tutor language + pronouns here so
+    // every downstream call path (processExchange, streamExchange) receives
+    // the same personalization. Defaults: 'en' (DB NOT NULL) and null.
+    conversationLanguage: profile?.conversationLanguage as
+      | ConversationLanguage
+      | undefined,
+    pronouns: profile?.pronouns ?? null,
     workedExampleLevel: interleavedTopics ? undefined : workedExampleLevel,
     priorLearningContext: priorLearning.contextText || undefined,
     crossSubjectContext,
@@ -608,12 +760,12 @@ export async function prepareExchangeContext(
     // CFLF-23: Merge per-message memory with rawInput-based pre-session memory
     embeddingMemoryContext:
       mergeMemoryContexts(memory.context, rawInputMemory.context) || undefined,
-    pedagogyMode: subject?.pedagogyMode ?? 'socratic',
-    nativeLanguage: teachingPref?.nativeLanguage ?? undefined,
-    languageCode: subject?.languageCode ?? undefined,
+    pedagogyMode: effectivePedagogyMode,
+    nativeLanguage: effectiveTeachingPref?.nativeLanguage ?? undefined,
+    languageCode: effectiveLanguageCode,
     knownVocabulary: knownVocabularyRows.map((row) => row.term).slice(0, 60),
-    teachingPreference: teachingPref?.method,
-    analogyDomain: teachingPref?.analogyDomain ?? undefined,
+    teachingPreference: effectiveTeachingPref?.method,
+    analogyDomain: effectiveTeachingPref?.analogyDomain ?? undefined,
     interleavedTopics,
     verificationType,
     evaluateDifficultyRung,
@@ -669,6 +821,17 @@ export async function persistExchangeResult(
       timeToAnswerMs: behavioral.timeToAnswerMs,
       hintCountInSession: behavioral.hintCountInSession,
       expectedResponseMinutes: behavioral.expectedResponseMinutes,
+      // Envelope signals persisted so the next turn can read them back for
+      // escalation-hold (F1.2) and remediation-queue (F1.3) decisions.
+      ...(behavioral.partialProgress !== undefined && {
+        partialProgress: behavioral.partialProgress,
+      }),
+      ...(behavioral.needsDeepening !== undefined && {
+        needsDeepening: behavioral.needsDeepening,
+      }),
+      ...(behavioral.confidence !== undefined && {
+        confidence: behavioral.confidence,
+      }),
     }),
   };
 
@@ -796,6 +959,9 @@ export async function processMessage(
       hintCountInSession: hintCount,
       expectedResponseMinutes: result.expectedResponseMinutes,
       homeworkMode: input.homeworkMode,
+      partialProgress: result.partialProgress,
+      needsDeepening: result.needsDeepening,
+      confidence: result.confidence,
     }
   );
 
@@ -824,7 +990,7 @@ export async function streamMessage(
   }
 ): Promise<{
   stream: AsyncIterable<string>;
-  onComplete: (fullResponse: string) => Promise<{
+  onComplete: () => Promise<{
     exchangeCount: number;
     escalationRung: number;
     expectedResponseMinutes: number;
@@ -832,6 +998,7 @@ export async function streamMessage(
     notePrompt?: boolean;
     notePromptPostSession?: boolean;
     fluencyDrill?: FluencyDrillAnnotation;
+    confidence?: 'low' | 'medium' | 'high';
   }>;
 }> {
   // Early exchange limit check — runs before expensive prepareExchangeContext
@@ -857,15 +1024,20 @@ export async function streamMessage(
 
   return {
     stream: result.stream,
-    async onComplete(fullResponse: string) {
-      // Extract and strip annotations before persisting — order matters:
-      // notePrompt first, then fluencyDrill from the (partially) cleaned response.
-      const notePromptResult = extractNotePrompt(fullResponse);
-      const drillResult = extractFluencyDrill(notePromptResult.cleanResponse);
-      const cleanedResponse = drillResult.cleanResponse;
+    async onComplete() {
+      // The client-facing `stream` yields only decoded `reply` text via
+      // teeEnvelopeStream. The full raw envelope (with signals + ui_hints)
+      // is available through `rawResponsePromise` once the caller finishes
+      // draining the stream — that's the one parseExchangeEnvelope wants.
+      const rawResponse = await result.rawResponsePromise;
+      const parsed = parseExchangeEnvelope(rawResponse, {
+        sessionId,
+        profileId,
+        flow: 'streamMessage',
+      });
 
       const expectedResponseMinutes = estimateExpectedResponseMinutes(
-        cleanedResponse,
+        parsed.cleanResponse,
         context
       );
       const persisted = await persistExchangeResult(
@@ -874,14 +1046,17 @@ export async function streamMessage(
         sessionId,
         session,
         input.message,
-        cleanedResponse,
+        parsed.cleanResponse,
         effectiveRung,
         {
-          isUnderstandingCheck: detectUnderstandingCheck(cleanedResponse),
+          isUnderstandingCheck: parsed.understandingCheck,
           timeToAnswerMs,
           hintCountInSession: hintCount,
           expectedResponseMinutes,
           homeworkMode: input.homeworkMode,
+          partialProgress: parsed.partialProgress,
+          needsDeepening: parsed.needsDeepening,
+          confidence: parsed.confidence,
         }
       );
       return {
@@ -889,10 +1064,10 @@ export async function streamMessage(
         escalationRung: effectiveRung,
         expectedResponseMinutes,
         aiEventId: persisted.aiEventId,
-        notePrompt: notePromptResult.notePrompt || undefined,
-        notePromptPostSession:
-          notePromptResult.notePromptPostSession || undefined,
-        fluencyDrill: drillResult.fluencyDrill ?? undefined,
+        notePrompt: parsed.notePrompt || undefined,
+        notePromptPostSession: parsed.notePromptPostSession || undefined,
+        fluencyDrill: parsed.fluencyDrill ?? undefined,
+        confidence: parsed.confidence,
       };
     },
   };

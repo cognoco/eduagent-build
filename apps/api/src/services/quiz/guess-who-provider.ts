@@ -18,6 +18,12 @@ export interface GuessWhoPromptParams {
    * [P1-4]
    */
   recentStruggles?: string[];
+  /**
+   * Recently missed people (surfaced=false) — quiz_missed_items entries for
+   * prior guess-who rounds. The prompt asks the LLM to re-surface them when
+   * the chosen theme fits naturally. [P1 — quiz_missed_items wiring]
+   */
+  recentlyMissedItems?: string[];
 }
 
 export interface ValidatedGuessWhoQuestion {
@@ -101,6 +107,7 @@ export function buildGuessWhoPrompt(params: GuessWhoPromptParams): string {
     libraryTopics = [],
     ageYears,
     recentStruggles = [],
+    recentlyMissedItems = [],
   } = params;
   const ageLabel =
     ageYears !== undefined
@@ -151,6 +158,15 @@ export function buildGuessWhoPrompt(params: GuessWhoPromptParams): string {
           )}. Where a naturally fitting figure exists, prefer people who help revisit these topics — but do not force a weak connection if none exists.`
       : '';
 
+  const missedHint =
+    recentlyMissedItems.length > 0
+      ? `\nRecently missed people (re-surface where the theme fits): ${recentlyMissedItems
+          .slice(0, 8)
+          .join(
+            ', '
+          )}. Include at least one of these as a question when the chosen theme naturally accommodates them.`
+      : '';
+
   return `You are generating a clue-by-clue Guess Who quiz for a ${ageLabel} learner.
 
 Activity: Guess Who
@@ -158,7 +174,7 @@ ${themeInstruction}
 Questions needed: exactly ${discoveryCount}
 
 ${recentExclusions}
-${topicHintText}${struggleHint}
+${topicHintText}${struggleHint}${missedHint}
 
 Rules:
 - Generate exactly ${discoveryCount} questions.

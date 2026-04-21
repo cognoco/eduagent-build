@@ -73,6 +73,30 @@ export async function checkQuizAnswer(
 }
 
 /**
+ * [F-Q-02/F-Q-07] Extended check that also returns `correctAnswer` when the
+ * submission is wrong. The answer is safe to reveal once the user has already
+ * submitted — this is post-submission feedback, not a hint during play.
+ */
+export async function checkQuizAnswerWithCorrect(
+  db: Database,
+  profileId: string,
+  roundId: string,
+  questionIndex: number,
+  answerGiven: string
+): Promise<{ correct: boolean; correctAnswer: string }> {
+  const repo = createScopedRepository(db, profileId);
+  const round = await repo.quizRounds.findById(roundId);
+  if (!round) throw new NotFoundError('Round');
+  if (round.status !== 'active')
+    throw new ConflictError('Round already completed');
+  const questions = round.questions as QuizQuestion[];
+  const question = questions[questionIndex];
+  if (!question) throw new NotFoundError('Question');
+  const correct = isAnswerCorrect(question, answerGiven);
+  return { correct, correctAnswer: question.correctAnswer };
+}
+
+/**
  * [ASSUMP-F5] Re-derive correctness for every client-reported result.
  * If the client references a `questionIndex` out of bounds, that entry is
  * dropped (rather than trusted) — it can't match any real question.

@@ -291,7 +291,10 @@ describe('interview routes', () => {
           exchangeHistory: [],
         }),
         'I want to learn calculus',
-        { exchangeCount: 1 }
+        expect.objectContaining({
+          exchangeCount: 1,
+          profileId: expect.any(String),
+        })
       );
     });
 
@@ -465,7 +468,10 @@ describe('interview routes', () => {
           exchangeHistory: [],
         }),
         'Hello',
-        { exchangeCount: 1 }
+        expect.objectContaining({
+          exchangeCount: 1,
+          profileId: expect.any(String),
+        })
       );
       // The non-streaming variant should not be called
       expect(processInterviewExchange).not.toHaveBeenCalled();

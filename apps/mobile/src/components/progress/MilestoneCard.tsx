@@ -13,15 +13,20 @@ const MILESTONE_COPY: Record<
 > = {
   vocabulary_count: {
     icon: '📚',
-    label: (threshold) => `${threshold} words learned`,
+    label: (threshold) =>
+      `${threshold} ${threshold === 1 ? 'word' : 'words'} learned`,
   },
   topic_mastered_count: {
     icon: '🎯',
-    label: (threshold) => `${threshold} topics mastered`,
+    label: (threshold) =>
+      `${threshold} ${threshold === 1 ? 'topic' : 'topics'} mastered`,
   },
   session_count: {
     icon: '🧭',
-    label: (threshold) => `${threshold} learning sessions completed`,
+    label: (threshold) =>
+      `${threshold} learning ${
+        threshold === 1 ? 'session' : 'sessions'
+      } completed`,
   },
   streak_length: {
     icon: '🔥',
@@ -38,7 +43,8 @@ const MILESTONE_COPY: Record<
   },
   learning_time: {
     icon: '⏱',
-    label: (threshold) => `${threshold} hours of learning`,
+    label: (threshold) =>
+      `${threshold} ${threshold === 1 ? 'hour' : 'hours'} of learning`,
   },
   cefr_level_up: {
     icon: '🗣',

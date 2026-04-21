@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
-import { ScrollView, View, Text, Pressable } from 'react-native';
+import { useRouter } from 'expo-router';
+import { ErrorFallback } from './ErrorFallback';
 import { Sentry } from '../../lib/sentry';
 
 interface ErrorBoundaryProps {
@@ -10,6 +11,50 @@ interface ErrorBoundaryState {
   hasError: boolean;
   error: Error | null;
   componentStack: string | null;
+}
+
+/**
+ * Functional inner component so we can use `useRouter` inside a class boundary.
+ * The boundary itself must be a class (React constraint), but the error UI is
+ * rendered by this function component and has full hook access.
+ *
+ * NOTE: This boundary wraps ThemedApp (see _layout.tsx), so ThemeContext and
+ * CSS custom properties are NOT available here. ErrorFallback uses NativeWind
+ * classes that reference CSS variables — they will fall back to their default
+ * values, which is acceptable for this rarely-seen crash screen.
+ */
+function ErrorFallbackView({
+  onRetry,
+  onGoHome,
+}: {
+  onRetry: () => void;
+  onGoHome: () => void;
+}): React.ReactElement {
+  const router = useRouter();
+  return (
+    <ErrorFallback
+      variant="centered"
+      title="Something went wrong"
+      message="An unexpected error occurred. You can try again or go back to the home screen."
+      primaryAction={{
+        label: 'Try Again',
+        onPress: onRetry,
+        testID: 'error-boundary-retry',
+      }}
+      secondaryAction={{
+        label: 'Go Home',
+        onPress: () => {
+          // Reset the boundary BEFORE navigating — otherwise hasError stays
+          // true and the fallback renders over whatever Home resolves to,
+          // making the button appear to do nothing.
+          onGoHome();
+          router.replace('/(app)/home' as never);
+        },
+        testID: 'error-boundary-go-home',
+      }}
+      testID="error-boundary-fallback"
+    />
+  );
 }
 
 export class ErrorBoundary extends Component<
@@ -46,76 +91,11 @@ export class ErrorBoundary extends Component<
 
   override render(): ReactNode {
     if (this.state.hasError) {
-      // Use inline styles — NOT NativeWind classes. This boundary may render
-      // outside ThemeContext (e.g. it wraps ThemedApp), so CSS custom
-      // properties like --color-text-primary won't exist. Hardcoded colors
-      // guarantee the error message is always readable.
       return (
-        <ScrollView
-          style={{ flex: 1, backgroundColor: '#faf5ef' }}
-          contentContainerStyle={{
-            alignItems: 'center',
-            justifyContent: 'center',
-            paddingHorizontal: 32,
-            paddingVertical: 48,
-          }}
-          accessibilityRole="alert"
-        >
-          <Text
-            style={{
-              fontSize: 22,
-              fontWeight: 'bold',
-              color: '#1a1a1a',
-              marginBottom: 8,
-            }}
-          >
-            Something went wrong
-          </Text>
-          <Text
-            style={{
-              fontSize: 16,
-              color: '#555',
-              textAlign: 'center',
-              marginBottom: 16,
-            }}
-          >
-            {this.state.error?.message ?? 'An unexpected error occurred.'}
-          </Text>
-          {this.state.componentStack && (
-            <View
-              style={{
-                backgroundColor: '#eee',
-                borderRadius: 8,
-                paddingHorizontal: 12,
-                paddingVertical: 8,
-                marginBottom: 16,
-                width: '100%',
-              }}
-            >
-              <Text
-                style={{ fontSize: 11, color: '#333', fontFamily: 'monospace' }}
-                selectable
-              >
-                {this.state.componentStack.trim().slice(0, 800)}
-              </Text>
-            </View>
-          )}
-          <Pressable
-            onPress={this.handleRetry}
-            style={{
-              backgroundColor: '#0d9488',
-              borderRadius: 12,
-              paddingHorizontal: 24,
-              paddingVertical: 14,
-            }}
-            accessibilityLabel="Try again"
-            accessibilityRole="button"
-          >
-            <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>
-              Try Again
-            </Text>
-          </Pressable>
-        </ScrollView>
+        <ErrorFallbackView
+          onRetry={this.handleRetry}
+          onGoHome={this.handleRetry}
+        />
       );
     }
 

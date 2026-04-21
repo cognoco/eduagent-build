@@ -70,7 +70,7 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 - **Coaching model** (Recall → Build → Apply → Close): Requires session state machine with rung tracking and LLM context injection
 - **Socratic Escalation Ladder**: 5 rungs driving model routing — fastest model at rung 1-2, reasoning models at rung 3+
 - **Coaching card two-path loading**: Cached path (<1s, context-hash freshness) vs fresh path (1-2s skeleton) — requires background precomputation pipeline
-- **Three-persona theming**: Teen dark, learner calm, parent light — theme derived from `birthYear` via `personaFromBirthYear()`, CSS variable layer, components stay persona-unaware. `personaType` DB column removed in Epic 12.
+- **Age-based theming**: Teal primary + lavender secondary, dark-first default — theme follows system preference, components stay persona-unaware. `personaType` DB column removed in Epic 12.
 - **Confidence scoring**: Per-problem behavioral metrics feeding parent dashboard — time-to-answer, hints needed, escalation rung, difficulty
 - **Cold start framing**: Sessions 1-5 use coaching-voiced three-button menu, invisible transition to adaptive entry at session 6+
 - **Phase 1 MVP components**: `BaseCoachingCard`, Camera Capture, `ChatShell` + `MessageBubble`, `SessionCloseSummary`, `RetentionSignal`, `ErrorBoundary`, `ErrorFallback`
@@ -127,7 +127,7 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 
 | Concern | Architectural Pattern | Scope |
 |---------|----------------------|-------|
-| **Persona-aware theming** | CSS variable layer via NativeWind. Theme is derived from `birthYear` via `personaFromBirthYear()` in `lib/profile.ts` (mobile-only). Produces one of three theme keys: `teen` / `learner` / `parent`. Tokens are in `lib/design-tokens.ts` (TypeScript, not JSON files) + `lib/theme.ts` (context + hooks). Components stay completely persona-unaware. The `personaType` database column was removed in Epic 12. Profile switching within family account swaps the theme key without re-authentication. **Note:** The original target of `theme/tokens/*.json` + `theme/provider.tsx` (6 JSON files, 3 personas × 2 color modes) is deferred to v1.1 when design-tool integration and automated contrast validation become necessary. | All UI |
+| **Theming** | CSS variable layer via NativeWind. One light palette + one dark palette in `lib/design-tokens.ts` (TypeScript, not JSON files) + `lib/theme.ts` (context + hooks). Theme follows system preference by default. The `personaType` database column was removed in Epic 12 — no per-persona theme variants. Components stay completely persona-unaware; use semantic tokens and CSS variables, not persona checks or hardcoded hex colors. Teal primary + lavender secondary (Epic 11). Dark-first default. | All UI |
 | **AI cost management** | Split into two layers: (1) **Metering middleware** calling `decrementQuota()` in `services/billing.ts` — conditional UPDATE via Drizzle ORM (`usedThisMonth < monthlyLimit`), returns remaining balance or rejection. Middleware interprets result: forward to LLM or return quota-exceeded with soft paywall data. Concurrent family usage handled by PostgreSQL row-level locking (`UPDATE ... SET remaining = remaining - 1 WHERE remaining > 0`) — no application-level locking. (2) **LLM orchestration module** in `services/llm/router.ts` — `routeAndCall(messages: ChatMessage[], rung: EscalationRung, options?) → Promise<RouteResult>`. Handles model selection by escalation rung, provider failover, streaming normalization (`routeAndStream` for SSE). Soft ceiling €0.05/session: **monitoring threshold, not a cutoff.** Never interrupt a learning session for cost reasons. Log when sessions exceed €0.05. If >20% of sessions consistently exceed ceiling, tune routing rules (e.g., lower the escalation rung threshold for reasoning models). Surface as a dashboard metric for cost monitoring. The metering middleware tracks per-session cost accumulation but does not enforce a hard stop — the quota system (monthly pool + top-ups) is the actual spending control. | Backend |
 | **Prompt caching** | Provider-level first (Anthropic prompt caching for system prompts — stable per subject/persona combination). **Parallel Example templates** cached in database: keyed by `subject + type + difficulty + system_prompt_hash`. System prompt change → hash change → old cache entries naturally bypassed. No explicit invalidation or TTL needed — stale entries are orphaned and can be garbage-collected periodically. No general-purpose prompt cache layer at MVP. | Backend |
 | **Multi-profile data isolation** | **Repository pattern** with automatic scope injection: `createScopedRepository(profileId)` — every query gets `WHERE profile_id = $1` automatically. **Neon RLS** as defense-in-depth, not primary enforcement. Profile ID set via session context, not passed per-request. | Data layer |
@@ -1040,8 +1040,9 @@ eduagent/
 │       │   │   ├── stripe.ts       # Stripe SDK helpers (customer, checkout, portal)
 │       │   │   └── llm/             # LLM orchestration — imported via barrel
 │       │   │       ├── router.ts    # routeAndCall(messages, rung, options?) — model routing, streaming
+│       │   │       ├── envelope.ts  # parseEnvelope() — structured output extraction + Zod validation
 │       │   │       ├── types.ts     # ChatMessage, EscalationRung, RouteResult, StreamResult
-│       │   │       ├── index.ts     # Barrel: export { routeAndCall, routeAndStream, registerProvider }
+│       │   │       ├── index.ts     # Barrel: export { routeAndCall, routeAndStream, registerProvider, parseEnvelope }
 │       │   │       └── providers/
 │       │   │           ├── gemini.ts     # Gemini 2.5 Flash (rung 1-2) + Gemini 2.5 Pro (rung 3+)
 │       │   │           ├── openai.ts     # GPT-4o-mini (rung 1-2) + GPT-4o (rung 3+)
@@ -1090,6 +1091,7 @@ eduagent/
 │   │   │   ├── consent.ts          # Consent flow schemas
 │   │   │   ├── progress.ts         # Progress tracking schemas
 │   │   │   ├── errors.ts           # ApiErrorSchema, typed error codes
+│   │   │   ├── llm-envelope.ts     # llmResponseEnvelopeSchema — shared structured output contract
 │   │   │   └── index.ts            # Barrel export
 │   │   ├── tsconfig.json
 │   │   ├── project.json
@@ -1158,6 +1160,69 @@ The original `lib/` was accumulating too many unrelated concerns. Replaced with 
 - **`services/`** — Business logic extracted from route handlers, including the `services/llm/` orchestration sub-module. Cross-service calls go through exported function interfaces (e.g., `exchanges.ts` calls `getTopicSchedules()` from `retention.ts`), never internal imports. When the dependency graph between services gets tangled, that's a refactoring signal.
 - **`services/llm/`** — LLM orchestration module, nested inside `services/`. `routeAndCall()` in `router.ts`, exported via `index.ts` barrel. Services import as `from './llm'`. Three providers are fully implemented: Gemini (2.5 Flash/Pro), OpenAI (GPT-4o-mini/GPT-4o), and Anthropic (Claude). The LLM middleware registers all three based on config keys. Also includes a mock provider for testing. Does NOT include embedding generation — embedding is a different call pattern (single vector output, not streaming conversation).
 
+**LLM Response Envelope — Structured Output Contract:**
+
+All LLM calls that make state-machine decisions (close an interview, hold escalation, queue remediation, trigger a UI widget) must return a typed JSON envelope instead of embedding markers or JSON blobs in free text. The contract lives in `@eduagent/schemas` as `llmResponseEnvelopeSchema` (`packages/schemas/src/llm-envelope.ts`), and a `parseEnvelope()` helper in `services/llm/envelope.ts` handles extraction + Zod validation.
+
+```ts
+// Canonical shape — every state-machine LLM response conforms to this
+{
+  reply: string;           // The text the learner sees. Streamed. Never parsed for control flow.
+  signals?: {              // Binary state-machine decisions — server reads these, not the reply.
+    ready_to_finish?: boolean;      // Interview: model believes it can conclude
+    partial_progress?: boolean;     // Exchange: hold escalation — learner is progressing
+    needs_deepening?: boolean;      // Exchange: queue topic for remediation
+    understanding_check?: boolean;  // Exchange: observational — AI asked a check question
+  };
+  ui_hints?: {             // Presentation hints — UI degrades gracefully if missing.
+    note_prompt?: { show: boolean; post_session?: boolean };
+    fluency_drill?: { active: boolean; duration_s?: number; score?: { correct: number; total: number } };
+  };
+  confidence?: 'low' | 'medium' | 'high';  // Model's self-assessed certainty
+}
+```
+
+Key rules for the envelope pattern:
+
+1. **Every signal needs a server-side hard cap.** A model can return `ready_to_finish: false` forever. After N exchanges, the server forces the terminal transition regardless. Examples: `MAX_INTERVIEW_EXCHANGES = 6`, `MAX_PARTIAL_PROGRESS_HOLDS = 2`, `MAX_NEEDS_DEEPENING_PER_SUBJECT = 10`.
+2. **`reply` is never parsed for decisions.** All control flow comes from `signals` or `ui_hints`. The reply streams to the client as-is.
+3. **New decisions are new fields**, not new markers embedded in text. Adding a feature means adding an optional field to the schema and a cap on the server.
+4. **Flows that only return prose** (e.g., dictation-prepare-homework) do not use the envelope. It is strictly for state-machine decisions.
+5. **Providers that support JSON mode** (Gemini, OpenAI, Anthropic) get the schema as `response_format`. Fallback providers receive an in-prompt JSON instruction; `parseEnvelope()` extracts the first balanced `{…}` from the response and validates it.
+
+Migration status (see `docs/specs/2026-04-18-llm-response-envelope.md` for full spec):
+
+| Flow | Old mechanism | Envelope field | Status |
+|---|---|---|---|
+| Interview complete | `[INTERVIEW_COMPLETE]` marker | `signals.ready_to_finish` | Shadow mode — both parsers run, envelope preferred, legacy fallback |
+| Partial progress | `[PARTIAL_PROGRESS]` marker | `signals.partial_progress` | Schema ready, not yet wired |
+| Needs deepening | `[NEEDS_DEEPENING]` marker | `signals.needs_deepening` | Schema ready, not yet wired |
+| Note prompt | `{"notePrompt":true}` JSON-in-text | `ui_hints.note_prompt` | Schema ready, not yet wired |
+| Fluency drill | `{"fluencyDrill":{…}}` JSON-in-text | `ui_hints.fluency_drill` | Schema ready, not yet wired |
+
+**LLM Personalization Pipeline:**
+
+Every prompt surface receives learner context. The standard injection points are:
+
+- **`buildMemoryBlock()`** (`services/learner-profile.ts`) — assembles a text block from profile data: interests (top 5), strengths (top 3), struggles, learning style, communication notes, active urgency (upcoming tests), and accommodation mode. Wired into the exchange system prompt.
+- **`ageYears`** — computed from `birthYear`, passed to all quiz and dictation prompt builders. Each prompt decides its own age bucketing. The coarse `AgeBracket` type (`'adolescent' | 'adult'`) is a fallback only.
+- **`interests`** — injected into all quiz (capitals, vocabulary, guess-who) and dictation-generate prompts. Filtered by `context: 'free_time' | 'both'` to avoid school-only interests steering leisure-styled content.
+- **`libraryTopics`** — the learner's curriculum topics are injected into quiz prompts for thematic alignment.
+- **`knownStruggles` + `suppressedTopics`** — injected into session analysis to prevent duplicate extraction and respect learner deletions.
+
+When adding a new LLM flow, check whether it should receive any of these inputs. If it makes a state-machine decision, use the envelope. If it only returns text, return plain text.
+
+**LLM Eval Harness:**
+
+`apps/api/eval-llm/` provides a fixture-based evaluation framework for prompt quality. Run via `pnpm eval:llm`.
+
+- **Fixtures:** 5 synthetic learner profiles (ages 11–17) with diverse interests, languages, and learning styles in `eval-llm/fixtures/profiles.ts`.
+- **Flows:** 9 registered flow definitions (quiz-capitals, quiz-vocabulary, quiz-guess-who, dictation-generate, dictation-prepare-homework, dictation-review, session-analysis, filing-pre-session, exchanges). Each flow builds the real prompt from fixture data, captures the output as a markdown snapshot.
+- **Tiers:** Tier 1 (default) — snapshot-only, no LLM call, validates prompt assembly. Tier 2 (`--live`) — calls the real LLM, validates response shape against `expectedResponseSchema` if set.
+- **`expectedResponseSchema`** — optional field on `FlowDefinition`. When set and running Tier 2, the runner parses the LLM response as JSON and runs Zod `.safeParse()`. Schema violations render in the snapshot markdown. Currently dormant pending full envelope migration of the exchange loop.
+
+Use the eval harness to validate prompt changes before shipping: run baseline → make change → re-run → diff snapshots.
+
 **EVALUATE verification prompt (Epic 3 extension):**
 
 New prompt template in `services/llm/` for generating plausibly flawed explanations. The LLM presents reasoning that contains a deliberate error; the student must identify the flaw. Forces Bloom's Level 5-6 (Evaluate/Create). Trigger condition: strong retention topics only (`easeFactor >= 2.5` and `repetitions > 0` on the SM-2 retention card) — students must demonstrate solid foundational knowledge before being challenged with analytical critique.
@@ -1165,14 +1230,14 @@ New prompt template in `services/llm/` for generating plausibly flawed explanati
 - **Prompt inputs:** topic key concepts, common misconceptions, student mastery level, current EVALUATE difficulty rung (1-4, stored on retention card as `evaluateDifficultyRung`).
 - **Difficulty calibration reuses the existing escalation rung system** — not a parallel mechanism. Rung 1-2: obvious flaw (wrong formula, reversed cause-effect). Rung 3-4: subtle flaw (correct reasoning with one incorrect premise, edge case error).
 - **Prompt engineering constraint:** the flawed argument must sound plausible. Too obvious = no learning value, too subtle = frustrating. The difficulty rung controls this balance.
-- **Persona-aware framing** injected via the existing persona voice system in `buildSystemPrompt()`.
+- **Age-aware framing** injected via `getAgeVoice()` in `buildSystemPrompt()`.
 
 **Analogy Domain Injection (Epic 3 extension):**
 
 `buildSystemPrompt()` checks `ExchangeContext.analogyDomain` (nullable string). When set, appends instruction: *"When explaining abstract concepts, use analogies from the domain of [domain]. Maintain this analogy framework consistently throughout the session. Adapt analogy complexity to the learner's level."* When null, no analogy instruction is added — direct technical explanation.
 
 - **6 curated domains at launch:** cooking, sports, building, music, nature, gaming.
-- **Single universal list** (not split by persona) — the LLM already adjusts tone via `getPersonaVoice()`, so analogies naturally adapt to teen vs adult register.
+- **Single universal list** (not split by persona) — the LLM already adjusts tone via `getAgeVoice()`, so analogies naturally adapt to teen vs adult register.
 - **Domain selection is per-profile, per-subject** — stored alongside existing teaching method preference in `teachingPreferences` table. CRUD via `services/retention-data.ts` (same service that handles `get/set/deleteTeachingPreference`).
 - **Prompt hash keying:** existing `system_prompt_hash` approach handles invalidation automatically when domain changes — a different analogy domain produces a different system prompt, which produces a different hash, which naturally bypasses stale cached prompt templates.
 
@@ -1185,7 +1250,7 @@ TEACH_BACK is the 9th verification type — Feynman Technique at scale. The LLM 
 - **Same two-output pattern as EVALUATE** — natural student interaction + machine-readable scoring. The conversational response keeps the student engaged; the structured assessment feeds the retention system without exposing raw scores mid-session.
 - **Trigger condition:** moderate-to-strong retention topics only (student must know the concept before teaching it). Weaker than EVALUATE's threshold (`easeFactor >= 2.5`) — TEACH_BACK tests explanation ability, not analytical critique.
 - **TTS response:** `expo-speech` (built into Expo) reads the AI response aloud after SSE streaming completes (Option A: wait for complete response). Session-level mute toggle for TTS output, not a persistent preference.
-- **Persona-aware framing** injected via the existing persona voice system in `buildSystemPrompt()`.
+- **Age-aware framing** injected via `getAgeVoice()` in `buildSystemPrompt()`.
 
 **Prerequisite context in system prompt (Epic 7, v1.1):**
 
@@ -1519,15 +1584,25 @@ No contradictory decisions found. The Workers → Railway/Fly fallback path is c
 
 | Epic | Architectural Support | Coverage |
 |------|----------------------|----------|
-| Epic 0: Registration & Account Setup | Clerk auth, consent state machine, profile scoping, deletion orchestrator | Full |
-| Epic 1: Onboarding & Interview | LLM orchestration for curriculum gen, `(app)/onboarding/` route split (interview + curriculum review), curricula schema | Full |
-| Epic 2: Learning Experience | SSE streaming, session state hybrid model, exchange processing, LLM routing by escalation rung, OCR pipeline (ML Kit + server fallback), homework integrity via prompt design | Full |
-| Epic 3: Assessment & Retention | SM-2 library, Inngest lifecycle chain, mastery scoring in schema, delayed recall scheduling, "Needs Deepening" topic flagging, analogy domain injection in system prompt, TEACH_BACK verification (Feynman stage) with on-device STT/TTS | Full |
-| Epic 4: Progress & Motivation | Library (full fetch), coaching card (KV cache), decay visualization, honest streak, notifications service | Full |
-| Epic 5: Subscription | RevenueCat webhook-synced (mobile IAP primary), `decrementQuota()` via Drizzle ORM, KV-cached subscription status, family pool with row-level locking | Full |
-| Epic 6: Language Learning (v1.1) | Deferred. Route/service/schema/component extension points documented. No blocking architectural debt. | Deferred by design |
-| Epic 7: Concept Map (v1.1) | `topic_prerequisites` join table, DAG cycle detection service, graph-aware coaching card precomputation, `prerequisiteContext` JSONB on adaptations | Planned (v1.1) |
-| Epic 8: Full Voice Mode (v1.1) | On-device STT/TTS pipeline (`expo-speech-recognition` + `expo-speech`), voice session controls (pause/resume/replay/speed), session-level input mode for all session types, screen-reader-aware manual playback fallback, VAD left as stretch. Dependency: Epic 8 before Epic 6 SPEAK/LISTEN | Implemented (8.6 stretch deferred) |
+| Epic 0: Registration & Account Setup | Clerk auth, consent state machine, profile scoping, deletion orchestrator | DONE |
+| Epic 1: Onboarding & Interview | LLM orchestration for curriculum gen, `(app)/onboarding/` route split (interview + curriculum review), curricula schema | DONE |
+| Epic 2: Learning Experience | SSE streaming, session state hybrid model, exchange processing, LLM routing by escalation rung, OCR pipeline (ML Kit + server fallback), homework integrity via prompt design | DONE |
+| Epic 3: Assessment & Retention | SM-2 library, Inngest lifecycle chain, mastery scoring in schema, delayed recall scheduling, "Needs Deepening" topic flagging, analogy domain injection in system prompt, TEACH_BACK verification (Feynman stage) with on-device STT/TTS | DONE |
+| Epic 4: Progress & Motivation | Library (full fetch), coaching card (KV cache), decay visualization, honest streak, notifications service | DONE |
+| Epic 5: Subscription | RevenueCat webhook-synced (mobile IAP primary), `decrementQuota()` via Drizzle ORM, KV-cached subscription status, family pool with row-level locking | DONE |
+| Epic 6: Language Learning | Four Strands methodology, vocabulary CRUD, CEFR levels, per-subject teaching preferences, language-aware prompts | DONE |
+| Epic 7: Self-Building Library | `topic_prerequisites` join table, shelf/book/chapter hierarchy, visual navigation, topic notes, filing mechanism | DONE |
+| Epic 8: Full Voice Mode | On-device STT/TTS pipeline (`expo-speech-recognition` + `expo-speech`), voice session controls (pause/resume/replay/speed), session-level input mode, screen-reader-aware manual playback fallback | DONE |
+| Epic 9: Native IAP | RevenueCat integration, Apple StoreKit 2 + Google Play Billing, Stripe dormant for future web | DONE |
+| Epic 10: Pre-Launch UX Polish | 19 UX gap stories, consent flows, error handling, offline warnings | DONE |
+| Epic 11: Brand Identity | Teal/lavender palette, dark-first default, semantic design tokens | DONE |
+| Epic 12: Persona Removal | `personaType` enum removed, age from `birthYear`, role from `familyLinks`, intent-as-cards | DONE |
+| Epic 13: Session Lifecycle | Wall-clock for users, active time internal, adaptive silence, recovery, celebrations | DONE |
+| Epic 14: Human Agency & Feedback | Human override on all AI screens, feedback mechanisms, learner control | DONE |
+| Epic 15: Visible Progress | Daily snapshots, milestone detection, journey screen, parent reports, weekly push notifications | DONE |
+| Epic 16: Adaptive Memory | Post-session LLM analysis, learner profiles, mentor memory, accommodation modes, "What My Mentor Knows" screens | DONE |
+| Epic 17: Voice-First Learning | Server-side STT/TTS, pronunciation, hands-free mode, voice-optimized prompting | NOT STARTED |
+| Epic 18: LLM Tuning | Structured response envelope (`llmResponseEnvelopeSchema`), personalization injection (interests, ageYears, strengths, urgency into all prompts), reliability fixes (marker migration, tone register), eval harness (`pnpm eval:llm`) | IN PROGRESS |
 
 **Functional Requirements Coverage (121 MVP FRs):**
 
@@ -1571,7 +1646,7 @@ MVP offline behavior is **read-only cached data, no offline writes**:
 **Structure Completeness:**
 
 - Complete project tree with every file and directory specified
-- All 8 epics mapped to specific routes, services, components, schemas, and database files
+- All 19 epics mapped to specific routes, services, components, schemas, and database files
 - 13 cross-cutting concerns mapped to specific file locations
 - Integration points documented with protocol, auth, and data flow
 

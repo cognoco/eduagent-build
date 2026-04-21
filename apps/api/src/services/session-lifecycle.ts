@@ -31,6 +31,7 @@ export interface TimerCheck {
 }
 
 const DEFAULT_EXPECTED_RESPONSE_MINUTES = 10;
+// Intentionally higher than schema min (1). The schema allows 1-minute sessions for storage, but the silence timer clamps to this minimum for UX reasons.
 const MIN_EXPECTED_RESPONSE_MINUTES = 2;
 const MAX_EXPECTED_RESPONSE_MINUTES = 20;
 const MIN_PACE_MULTIPLIER = 0.5;

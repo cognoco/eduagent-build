@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   Text,
@@ -33,6 +32,7 @@ import { InlineNoteCard } from '../../../../../components/library/InlineNoteCard
 import { formatApiError } from '../../../../../lib/format-api-error';
 import { formatRelativeDate } from '../../../../../lib/format-relative-date';
 import { goBackOrReplace } from '../../../../../lib/navigation';
+import { platformAlert } from '../../../../../lib/platform-alert';
 import { useThemeColors } from '../../../../../lib/theme';
 
 // ---------------------------------------------------------------------------
@@ -165,7 +165,7 @@ export default function BookScreen() {
         setGenPhase('timed_out');
         alreadyPending.current = false;
         // BUG-81: Show user-visible error feedback on initial generation failure
-        Alert.alert("Couldn't build this book", formatApiError(error), [
+        platformAlert("Couldn't build this book", formatApiError(error), [
           { text: 'OK' },
         ]);
       },
@@ -216,7 +216,7 @@ export default function BookScreen() {
         retryInFlight.current = false;
         for (const t of retryTimersRef.current) clearTimeout(t);
         retryTimersRef.current = [];
-        Alert.alert('Generation failed', formatApiError(error));
+        platformAlert('Generation failed', formatApiError(error));
       },
     });
   };
@@ -308,10 +308,14 @@ export default function BookScreen() {
     (session: BookSession) => {
       router.push({
         pathname: '/session-summary/[sessionId]',
-        params: { sessionId: session.id },
+        params: {
+          sessionId: session.id,
+          subjectId,
+          ...(session.topicId ? { topicId: session.topicId } : {}),
+        },
       } as never);
     },
-    [router]
+    [router, subjectId]
   );
 
   // --- Long-press: context menu for moving topic to a different book ---
@@ -326,7 +330,7 @@ export default function BookScreen() {
       const otherBooks = safeAllBooks.filter((b) => b.id !== bookId);
 
       if (otherBooks.length === 0) {
-        Alert.alert(
+        platformAlert(
           session.topicTitle,
           'This is the only book on this shelf — there is nowhere to move this topic.'
         );
@@ -348,20 +352,20 @@ export default function BookScreen() {
             },
             {
               onSuccess: () => {
-                Alert.alert(
+                platformAlert(
                   'Moved',
                   `"${session.topicTitle}" moved to ${targetBook.title}.`
                 );
               },
               onError: (err) => {
-                Alert.alert('Could not move topic', formatApiError(err));
+                platformAlert('Could not move topic', formatApiError(err));
               },
             }
           );
         },
       }));
 
-      Alert.alert(session.topicTitle, 'Move to a different book?', [
+      platformAlert(session.topicTitle, 'Move to a different book?', [
         ...moveButtons,
         { text: 'Cancel', style: 'cancel' },
       ]);
@@ -894,16 +898,30 @@ export default function BookScreen() {
             </View>
           )}
 
-        {/* Empty topics state */}
+        {/* Empty topics state — BUG-487: provide actionable escape, not just Go back */}
         {topics.length === 0 && !needsGeneration && (
           <View className="px-5 py-8 items-center" testID="book-empty-topics">
             <Text className="text-body text-text-secondary text-center mb-2">
-              No topics in this book yet.
+              This book doesn't have any topics yet. Start a learning session to
+              add topics, or go back to the library.
             </Text>
+            <Pressable
+              onPress={() => router.replace('/(app)/library' as never)}
+              className="bg-primary rounded-button px-6 py-3 items-center min-h-[48px] justify-center mb-3"
+              testID="book-empty-go-library"
+              accessibilityRole="button"
+              accessibilityLabel="Go to Library"
+            >
+              <Text className="text-text-inverse text-body font-semibold">
+                Go to Library
+              </Text>
+            </Pressable>
             <Pressable
               onPress={handleBack}
               className="bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
               testID="book-empty-back"
+              accessibilityRole="button"
+              accessibilityLabel="Go back"
             >
               <Text className="text-text-primary text-body font-semibold">
                 Go back

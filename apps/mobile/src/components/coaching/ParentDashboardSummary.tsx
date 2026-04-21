@@ -15,6 +15,7 @@ interface SubjectInfo {
 }
 
 interface ParentDashboardSummaryProps {
+  profileId: string;
   childName: string;
   summary: string;
   subjects: SubjectInfo[];
@@ -125,7 +126,12 @@ const formatTime = (mins: number): string => {
   return m > 0 ? `${h}h ${m}m` : `${h}h`;
 };
 
+function sessionWord(n: number): string {
+  return n === 1 ? 'session' : 'sessions';
+}
+
 export function ParentDashboardSummary({
+  profileId,
   childName,
   summary,
   subjects,
@@ -145,11 +151,13 @@ export function ParentDashboardSummary({
   const showFullSignals = !isNewLearner(totalSessions);
   const remaining = sessionsUntilFullProgress(totalSessions);
 
-  const trendText = `${sessionsThisWeek} sessions, ${formatTime(
-    totalTimeThisWeek
-  )} this week (${TREND_ARROWS[trend]} ${
+  const trendText = `${sessionsThisWeek} ${sessionWord(
+    sessionsThisWeek
+  )}, ${formatTime(totalTimeThisWeek)} this week (${TREND_ARROWS[trend]} ${
     TREND_LABELS[trend]
-  } ${sessionsLastWeek} sessions, ${formatTime(totalTimeLastWeek)} last week)`;
+  } ${sessionsLastWeek} ${sessionWord(sessionsLastWeek)}, ${formatTime(
+    totalTimeLastWeek
+  )} last week)`;
 
   const metadata = (
     <>
@@ -181,12 +189,14 @@ export function ParentDashboardSummary({
           </Text>
         )
       ) : null}
-      <Text
-        className="text-caption text-text-secondary mt-1"
-        accessibilityLabel={`Trend: ${trendText}`}
-      >
-        {trendText}
-      </Text>
+      {showFullSignals && (
+        <Text
+          className="text-caption text-text-secondary mt-1"
+          accessibilityLabel={`Trend: ${trendText}`}
+        >
+          {trendText}
+        </Text>
+      )}
       {showFullSignals ? (
         retentionTrend ? (
           <View
@@ -286,7 +296,7 @@ export function ParentDashboardSummary({
       metadata={metadata}
       onPress={onDrillDown}
       isLoading={isLoading}
-      testID="parent-dashboard-summary"
+      testID={`dashboard-child-${profileId}`}
     />
   );
 }

@@ -128,7 +128,11 @@ function formatTopicsForContext(topics: PriorTopic[]): string {
     const parts: string[] = [`- ${topic.title}`];
 
     if (topic.summary) {
-      parts.push(`  Learner summary: "${topic.summary}"`);
+      // Data-not-instruction framing: the summary is learner-authored text
+      // and must not be interpreted as a directive to the model.
+      parts.push(
+        `  Learner's own summary: <learner_summary>${topic.summary}</learner_summary>`
+      );
     }
 
     if (topic.masteryScore != null) {

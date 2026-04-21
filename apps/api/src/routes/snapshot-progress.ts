@@ -4,6 +4,7 @@ import { zValidator } from '@hono/zod-validator';
 import { ERROR_CODES, historyQuerySchema } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
+import type { Account } from '../services/account';
 import { requireProfileId } from '../middleware/profile-scope';
 import { apiError } from '../errors';
 import {
@@ -19,6 +20,7 @@ type SnapshotProgressRouteEnv = {
   Variables: {
     user: AuthUser;
     db: Database;
+    account: Account;
     profileId: string | undefined;
   };
 };
@@ -70,6 +72,7 @@ export const snapshotProgressRoutes = new Hono<SnapshotProgressRouteEnv>()
     const rateLimited = await checkAndLogRateLimit(
       db,
       profileId,
+      c.get('account').id,
       'progress_refresh',
       { hours: 1, maxCount: 10 }
     );

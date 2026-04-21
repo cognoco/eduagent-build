@@ -9,15 +9,14 @@ describe('LibraryTabs', () => {
     counts: { shelves: 4, books: 12, topics: 87 },
   };
 
-  it('renders all three tabs and keeps topic label compact', () => {
+  it('renders all three tabs with count badges', () => {
     render(<LibraryTabs {...defaultProps} />);
     expect(screen.getByTestId('library-tab-shelves')).toBeTruthy();
     expect(screen.getByTestId('library-tab-books')).toBeTruthy();
     expect(screen.getByTestId('library-tab-topics')).toBeTruthy();
     expect(screen.getByText('Shelves (4)')).toBeTruthy();
     expect(screen.getByText('Books (12)')).toBeTruthy();
-    expect(screen.getByText('Topics')).toBeTruthy();
-    expect(screen.queryByText('Topics (87)')).toBeNull();
+    expect(screen.getByText('Topics (87)')).toBeTruthy();
   });
 
   it('calls onTabChange when a tab is pressed', () => {
@@ -39,7 +38,7 @@ describe('LibraryTabs', () => {
     );
     expect(screen.getByText('Shelves (0)')).toBeTruthy();
     expect(screen.getByText('Books (0)')).toBeTruthy();
-    expect(screen.getByText('Topics')).toBeTruthy();
+    expect(screen.getByText('Topics (0)')).toBeTruthy();
   });
 
   it('shows overdue review badge on the topics tab when provided', () => {

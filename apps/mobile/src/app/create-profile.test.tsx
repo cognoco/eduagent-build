@@ -371,7 +371,9 @@ describe('CreateProfileScreen', () => {
       await waitFor(() => {
         expect(Alert.alert).toHaveBeenCalledWith(
           'Profile created',
-          "Lily's profile is ready. You can switch to it from the Profiles screen."
+          "Lily's profile is ready. You can switch to it from the Profiles screen.",
+          undefined,
+          undefined
         );
       });
 

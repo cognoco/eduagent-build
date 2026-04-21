@@ -138,7 +138,10 @@ testSeedRoutes.post('/__test/reset', async (c) => {
     CLERK_SECRET_KEY: c.env.CLERK_SECRET_KEY,
     SEED_PASSWORD: c.env.SEED_PASSWORD,
   };
-  const { deletedCount, clerkUsersDeleted } = await resetDatabase(db, seedEnv);
+  const prefix = c.req.query('prefix')?.trim() || undefined;
+  const { deletedCount, clerkUsersDeleted } = await resetDatabase(db, seedEnv, {
+    prefix,
+  });
   return c.json({
     message: 'Database reset complete',
     deletedCount,

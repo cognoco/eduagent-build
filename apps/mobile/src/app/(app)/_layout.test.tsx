@@ -1,9 +1,16 @@
-import { render, screen } from '@testing-library/react-native';
+import { act, render, screen } from '@testing-library/react-native';
 import { useAuth } from '@clerk/clerk-expo';
+import {
+  clearPendingAuthRedirect,
+  rememberPendingAuthRedirect,
+  peekPendingAuthRedirect,
+} from '../../lib/pending-auth-redirect';
 
 const mockUseProfile = jest.fn();
 const mockUseConsentStatus = jest.fn();
 const mockInvalidateQueries = jest.fn();
+const mockUsePathname = jest.fn();
+const mockReplace = jest.fn();
 const mockTabs = Object.assign(
   ({ children }: { children?: React.ReactNode }) => {
     const { View } = require('react-native');
@@ -15,12 +22,13 @@ const mockTabs = Object.assign(
 );
 
 jest.mock('expo-router', () => ({
-  Redirect: ({ href }: { href: string }) => {
-    const { Text } = require('react-native');
-    return <Text testID="redirect">{href}</Text>;
+  Redirect: ({ href }: { href: unknown }) => {
+    const { View } = require('react-native');
+    return <View testID="redirect" href={href} />;
   },
   Tabs: mockTabs,
-  useRouter: () => ({ push: jest.fn() }),
+  usePathname: () => mockUsePathname(),
+  useRouter: () => ({ push: jest.fn(), replace: mockReplace }),
 }));
 
 jest.mock('react-native-safe-area-context', () => ({
@@ -90,11 +98,18 @@ jest.mock('expo-secure-store', () => ({
   setItemAsync: jest.fn(),
 }));
 
+jest.mock('../../components/feedback/FeedbackProvider', () => ({
+  FeedbackProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
+
 const AppLayout = require('./_layout').default;
 
 describe('AppLayout', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    clearPendingAuthRedirect();
+    mockReplace.mockReset();
+    mockUsePathname.mockReturnValue('/home');
     (useAuth as jest.Mock).mockReturnValue({
       isLoaded: true,
       isSignedIn: true,
@@ -124,6 +139,10 @@ describe('AppLayout', () => {
     });
   });
 
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   it('keeps linked-parent accounts in the learner tab shell for adaptive home', () => {
     render(<AppLayout />);
 
@@ -151,8 +170,80 @@ describe('AppLayout', () => {
     render(<AppLayout />);
 
     const redirect = screen.getByTestId('redirect');
-    expect(redirect.props.children).toBe('/(auth)/sign-in');
+    expect(redirect.props.href).toBe('/sign-in?redirectTo=%2F(app)%2Fhome');
     expect(screen.queryByTestId('tabs')).toBeNull();
+  });
+
+  it('preserves the current path when redirecting unauthenticated users', () => {
+    mockUsePathname.mockReturnValue('/quiz');
+    (useAuth as jest.Mock).mockReturnValue({
+      isLoaded: true,
+      isSignedIn: false,
+    });
+
+    render(<AppLayout />);
+
+    const redirect = screen.getByTestId('redirect');
+    expect(redirect.props.href).toBe('/sign-in?redirectTo=%2F(app)%2Fquiz');
+    expect(peekPendingAuthRedirect()).toBe('/(app)/quiz');
+  });
+
+  it('replays a pending auth redirect when the signed-in app shell lands on home', () => {
+    rememberPendingAuthRedirect('/(app)/quiz');
+    mockUsePathname.mockReturnValue('/home');
+
+    render(<AppLayout />);
+
+    expect(screen.getByTestId('auth-redirect-replay')).toBeTruthy();
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/quiz');
+  });
+
+  it('keeps a matching auth redirect long enough to recover from a late home fallback', () => {
+    jest.useFakeTimers();
+    rememberPendingAuthRedirect('/(app)/quiz');
+    mockUsePathname.mockReturnValue('/quiz');
+
+    const view = render(<AppLayout />);
+
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
+
+    mockUsePathname.mockReturnValue('/home');
+    view.rerender(<AppLayout />);
+
+    expect(peekPendingAuthRedirect()).toBe('/(app)/quiz');
+    expect(screen.getByTestId('auth-redirect-replay')).toBeTruthy();
+    expect(mockReplace).toHaveBeenLastCalledWith('/(app)/quiz');
+  });
+
+  it('clears a pending auth redirect after the target path stays stable', () => {
+    jest.useFakeTimers();
+    rememberPendingAuthRedirect('/(app)/quiz');
+    mockUsePathname.mockReturnValue('/quiz');
+
+    render(<AppLayout />);
+
+    expect(peekPendingAuthRedirect()).toBe('/(app)/quiz');
+
+    act(() => {
+      jest.advanceTimersByTime(1_000);
+    });
+
+    expect(peekPendingAuthRedirect()).toBeNull();
+  });
+
+  it('strips route-group segments from redirect targets for unauthenticated users', () => {
+    mockUsePathname.mockReturnValue('/(app)/quiz');
+    (useAuth as jest.Mock).mockReturnValue({
+      isLoaded: true,
+      isSignedIn: false,
+    });
+
+    render(<AppLayout />);
+
+    const redirect = screen.getByTestId('redirect');
+    expect(redirect.props.href).toBe('/sign-in?redirectTo=%2F(app)%2Fquiz');
   });
 
   it('renders nothing while Clerk auth is still loading', () => {

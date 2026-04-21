@@ -5,18 +5,19 @@ import {
   Pressable,
   ScrollView,
   Switch,
-  Alert,
   Linking,
   Share,
 } from 'react-native';
 import { useState, useCallback } from 'react';
 import * as SecureStore from '../../lib/secure-storage';
+import { platformAlert } from '../../lib/platform-alert';
 import { clearTransitionState } from '../../lib/auth-transition';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth, useUser } from '@clerk/clerk-expo';
 import type {
   AccommodationMode,
+  ConversationLanguage,
   KnowledgeInventory,
   LearningMode,
 } from '@eduagent/schemas';
@@ -30,6 +31,7 @@ import {
 } from '../../hooks/use-learner-profile';
 import { useFamilySubscription } from '../../hooks/use-subscription';
 import { AccountSecurity } from '../../components/account-security';
+import { useFeedbackContext } from '../../components/feedback/FeedbackProvider';
 import {
   useNotificationSettings,
   useUpdateNotificationSettings,
@@ -94,6 +96,21 @@ function ToggleRow({
     </View>
   );
 }
+
+// BKT-C.1 — Settings display names for the 8 supported tutor languages. Kept
+// inline (rather than imported from onboarding/language-picker.tsx) to avoid
+// Expo Router treating a shared helper under app/(app)/ as a route. The source
+// of truth for the allowed codes is packages/schemas/src/profiles.ts.
+const TUTOR_LANGUAGE_LABELS: Record<ConversationLanguage, string> = {
+  en: 'English',
+  cs: 'Czech',
+  de: 'German',
+  es: 'Spanish',
+  fr: 'French',
+  it: 'Italian',
+  pl: 'Polish',
+  pt: 'Portuguese',
+};
 
 const LEARNING_MODE_OPTIONS: {
   mode: LearningMode;
@@ -185,6 +202,7 @@ export default function MoreScreen() {
   const updateCelebrationLevel = useUpdateCelebrationLevel();
   const { data: learnerProfile } = useLearnerProfile();
   const updateAccommodation = useUpdateAccommodationMode();
+  const { openFeedback } = useFeedbackContext();
 
   const pushEnabled = notifPrefs?.pushEnabled ?? false;
   const weeklyDigest = notifPrefs?.weeklyProgressPush ?? false;
@@ -200,7 +218,7 @@ export default function MoreScreen() {
         },
         {
           onError: () => {
-            Alert.alert(
+            platformAlert(
               'Could not update notification settings',
               'Please try again.'
             );
@@ -222,7 +240,7 @@ export default function MoreScreen() {
         },
         {
           onError: () => {
-            Alert.alert(
+            platformAlert(
               'Could not update notification settings',
               'Please try again.'
             );
@@ -238,7 +256,7 @@ export default function MoreScreen() {
       if (mode !== learningMode) {
         updateLearningMode.mutate(mode, {
           onError: () => {
-            Alert.alert('Could not save setting', 'Please try again.');
+            platformAlert('Could not save setting', 'Please try again.');
           },
         });
       }
@@ -253,7 +271,7 @@ export default function MoreScreen() {
         { accommodationMode: mode },
         {
           onError: () => {
-            Alert.alert('Could not save setting', 'Please try again.');
+            platformAlert('Could not save setting', 'Please try again.');
           },
         }
       );
@@ -264,12 +282,39 @@ export default function MoreScreen() {
   const handleExport = useCallback(async () => {
     try {
       const data = await exportData.mutateAsync();
-      await Share.share({
-        title: 'MentoMate account data export',
-        message: JSON.stringify(data, null, 2),
-      });
+      const jsonString = JSON.stringify(data, null, 2);
+
+      if (Platform.OS === 'web') {
+        // [BUG-509] Web Share API is not universally supported — file download instead
+        // Use globalThis casts to avoid DOM-lib requirement in RN tsconfig.
+        type WebDoc = {
+          createElement(tag: string): {
+            href: string;
+            download: string;
+            click(): void;
+          };
+        };
+        const doc = (globalThis as { document?: WebDoc }).document;
+        if (!doc) return;
+        // RN globals.d.ts requires both `type` and `lastModified` in BlobOptions.
+        const blob = new Blob([jsonString], {
+          type: 'application/json',
+          lastModified: Date.now(),
+        });
+        const url = URL.createObjectURL(blob);
+        const a = doc.createElement('a');
+        a.href = url;
+        a.download = 'mentomate-data-export.json';
+        a.click();
+        URL.revokeObjectURL(url);
+      } else {
+        await Share.share({
+          title: 'MentoMate account data export',
+          message: jsonString,
+        });
+      }
     } catch (err: unknown) {
-      Alert.alert('Export failed', formatApiError(err));
+      platformAlert('Export failed', formatApiError(err));
     }
   }, [exportData]);
 
@@ -279,7 +324,7 @@ export default function MoreScreen() {
         'mailto:support@mentomate.app?subject=MentoMate%20Support'
       );
     } catch {
-      Alert.alert(
+      platformAlert(
         'Contact support',
         'Email support@mentomate.app for help with your account.'
       );
@@ -294,7 +339,7 @@ export default function MoreScreen() {
     const tier = subscription.tier;
     // Whitelist: only family/pro may add children. Blocks free and plus.
     if (tier !== 'family' && tier !== 'pro') {
-      Alert.alert(
+      platformAlert(
         'Upgrade required',
         'Adding child profiles requires a Family or Pro subscription.',
         [
@@ -309,7 +354,7 @@ export default function MoreScreen() {
     }
 
     if (familyData && familyData.profileCount >= familyData.maxProfiles) {
-      Alert.alert(
+      platformAlert(
         'Profile limit reached',
         `Your ${tier === 'pro' ? 'Pro' : 'Family'} plan supports up to ${
           familyData.maxProfiles
@@ -411,7 +456,7 @@ export default function MoreScreen() {
             if (celebrationLevel !== 'all') {
               updateCelebrationLevel.mutate('all', {
                 onError: () => {
-                  Alert.alert('Could not save setting', 'Please try again.');
+                  platformAlert('Could not save setting', 'Please try again.');
                 },
               });
             }
@@ -427,7 +472,7 @@ export default function MoreScreen() {
             if (celebrationLevel !== 'big_only') {
               updateCelebrationLevel.mutate('big_only', {
                 onError: () => {
-                  Alert.alert('Could not save setting', 'Please try again.');
+                  platformAlert('Could not save setting', 'Please try again.');
                 },
               });
             }
@@ -443,7 +488,7 @@ export default function MoreScreen() {
             if (celebrationLevel !== 'off') {
               updateCelebrationLevel.mutate('off', {
                 onError: () => {
-                  Alert.alert('Could not save setting', 'Please try again.');
+                  platformAlert('Could not save setting', 'Please try again.');
                 },
               });
             }
@@ -507,6 +552,23 @@ export default function MoreScreen() {
           value={displayName}
           onPress={() => router.push('/profiles')}
         />
+        {/* BKT-C.1 — Tutor language edit path. Launches the same picker the */}
+        {/* interview onboarding uses, with returnTo=settings so the picker's */}
+        {/* onSave returns here instead of forward-routing into language-setup. */}
+        <SettingsRow
+          label="Tutor language"
+          value={
+            activeProfile?.conversationLanguage
+              ? TUTOR_LANGUAGE_LABELS[activeProfile.conversationLanguage]
+              : undefined
+          }
+          onPress={() =>
+            router.push({
+              pathname: '/(app)/onboarding/language-picker',
+              params: { returnTo: 'settings' },
+            })
+          }
+        />
         {!hideMentorMemory ? (
           <SettingsRow
             label="What My Mentor Knows"
@@ -525,6 +587,7 @@ export default function MoreScreen() {
           onPress={() => router.push('/(app)/subscription')}
         />
         <SettingsRow label="Help & Support" onPress={() => void handleHelp()} />
+        <SettingsRow label="Report a Problem" onPress={openFeedback} />
         <SettingsRow
           label="Privacy Policy"
           onPress={() => router.push('/privacy')}
@@ -558,7 +621,7 @@ export default function MoreScreen() {
               );
               await signOut();
             } catch {
-              Alert.alert(
+              platformAlert(
                 'Could not sign out',
                 'Please try again in a moment.'
               );

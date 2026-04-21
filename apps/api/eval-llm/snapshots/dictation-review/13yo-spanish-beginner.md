@@ -1,6 +1,6 @@
-# Dictation — Review (multimodal) × 13yo-spanish-beginner
+# Dictation — Review × 13yo-spanish-beginner
 
-> **Flow source:** `apps/api/src/services/dictation/review.ts:SYSTEM_PROMPT`
+> **Flow source:** `apps/api/src/services/dictation/review.ts:buildReviewSystemPrompt`
 > **Profile:** 13-year-old EU girl, English native, learning Spanish (CEFR A2), loves horses and equestrian sports
 
 ## Profile summary
@@ -27,10 +27,10 @@
 
 ```json
 {
-  "language": "en",
-  "originalSentences": [
-    "The cat ran through the garden.",
-    "After a while it began to rain."
+  "ageYears": 13,
+  "preferredExplanations": [
+    "step-by-step",
+    "examples"
   ]
 }
 ```
@@ -62,23 +62,19 @@ RESPOND WITH ONLY valid JSON in this exact format — no prose before or after:
 
 If there are no mistakes, return an empty array for "mistakes".
 Generate explanations in the child's language as instructed.
+
+EXPLANATION STYLE:
+Use clear, direct explanations suitable for a middle-schooler. You can name grammar concepts (e.g. "silent letter", "comma splice") but keep it brief. Structure each explanation as a numbered 1–2–3 breakdown: (1) what the mistake was, (2) the rule, (3) the correct version.
 ```
 
 ## Generated prompt — user
 
 ```
-[image part omitted]
-
-Original sentences:
-1. The cat ran through the garden.
-2. After a while it began to rain.
-
-Please generate all explanations in en.
+(multimodal — image + original sentences supplied at runtime)
 ```
 
 ## Builder notes
 
-- System prompt is static — zero personalization.
-- The ONLY personalized parameter is the explanation language.
-- Missing: age (explanation complexity calibration), learning style (humor/step-by-step register), struggle history (recurring-pattern-aware feedback).
-- Tier 2 (--live) requires a real handwriting image; not synthesized by this harness.
+- ageYears=13 — explanation register calibrated to age.
+- preferredExplanations=["step-by-step","examples"] — tone shaped by style preferences.
+- Struggle history NOT used (gap flagged in audit P2) — recurring patterns not surfaced to reviewer.

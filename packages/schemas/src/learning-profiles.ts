@@ -25,6 +25,35 @@ export type EngagementLevel = z.infer<typeof engagementLevelSchema>;
 export const memorySourceSchema = z.enum(['inferred', 'learner', 'parent']);
 export type MemorySource = z.infer<typeof memorySourceSchema>;
 
+// BKT-C.2 — per-interest context annotation. Captures *why* a subject is an
+// interest so prompts can choose register: `'school'` lands the item in
+// curriculum-adjacent examples; `'free_time'` lands it in motivation/lead-in
+// examples; `'both'` is the neutral fallback (safest default for LLM-inferred
+// additions).
+export const interestContextSchema = z.enum(['free_time', 'school', 'both']);
+export type InterestContext = z.infer<typeof interestContextSchema>;
+
+export const interestEntrySchema = z.object({
+  label: z.string().min(1).max(60),
+  context: interestContextSchema,
+});
+export type InterestEntry = z.infer<typeof interestEntrySchema>;
+
+// BKT-C.2 — forward-compatible reader: accepts legacy `string[]` rows that
+// predate the shape migration and normalizes them to `InterestEntry[]` with
+// context='both' on read. After 0035 migrates production data, every row is
+// already InterestEntry[] on disk — the preprocessor becomes a no-op but is
+// kept for defense-in-depth against any lingering legacy inputs.
+export const interestsArraySchema = z.preprocess((value) => {
+  if (!Array.isArray(value)) return value;
+  return value.map((item) => {
+    if (typeof item === 'string') {
+      return { label: item, context: 'both' as const };
+    }
+    return item;
+  });
+}, z.array(interestEntrySchema));
+
 export const memoryConsentStatusSchema = z.enum([
   'pending',
   'granted',
@@ -74,7 +103,10 @@ export const learningProfileSchema = z.object({
   id: z.string().uuid(),
   profileId: z.string().uuid(),
   learningStyle: learningStyleSchema,
-  interests: z.array(z.string()),
+  // BKT-C.2 — reshape: `string[]` → `InterestEntry[]`. Reads tolerate both
+  // shapes via `interestsArraySchema` preprocessor; writes must use
+  // `InterestEntry` directly.
+  interests: interestsArraySchema,
   strengths: z.array(strengthEntrySchema),
   struggles: z.array(struggleEntrySchema),
   communicationNotes: z.array(z.string()),
@@ -180,6 +212,16 @@ export const grantMemoryConsentSchema = z.object({
   consent: z.enum(['granted', 'declined']),
 });
 export type GrantMemoryConsentInput = z.infer<typeof grantMemoryConsentSchema>;
+
+// BKT-C.2 — wholesale replace of interests with context-tagged entries. Used
+// by the per-interest picker at the end of the onboarding interview. Writes
+// through createScopedRepository(profileId) in the onboarding service.
+export const onboardingInterestsContextPatchSchema = z.object({
+  interests: z.array(interestEntrySchema),
+});
+export type OnboardingInterestsContextPatch = z.infer<
+  typeof onboardingInterestsContextPatchSchema
+>;
 
 export const tellMentorInputSchema = z.object({
   text: z.string().min(1).max(500),

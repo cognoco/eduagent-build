@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   Text,
@@ -13,6 +12,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '../../../lib/theme';
 import { goBackOrReplace } from '../../../lib/navigation';
+import { platformAlert } from '../../../lib/platform-alert';
 import { useDictationData } from './_layout';
 import { useRecordDictationResult } from '../../../hooks/use-dictation-api';
 
@@ -67,7 +67,7 @@ export default function DictationReviewScreen(): React.ReactElement {
         err instanceof Error && err.message
           ? err.message
           : 'We couldn\u2019t save your review result.';
-      Alert.alert('Couldn\u2019t save result', message, [
+      platformAlert('Couldn\u2019t save result', message, [
         {
           text: 'Retry',
           onPress: () => void handleDone(),

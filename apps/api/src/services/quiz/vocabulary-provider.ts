@@ -31,6 +31,13 @@ export interface VocabularyPromptParams {
    * filter. [P1-4]
    */
   recentStruggles?: string[];
+  /**
+   * Recently missed vocabulary items (surfaced=false). Extracted from
+   * `quiz_missed_items.questionText` for prior rounds; the prompt asks
+   * the LLM to re-include them where they fit the theme/CEFR ceiling.
+   * [P1 — quiz_missed_items wiring]
+   */
+  recentlyMissedItems?: string[];
 }
 
 export interface ValidatedVocabularyQuestion {
@@ -223,6 +230,7 @@ export function buildVocabularyPrompt(params: VocabularyPromptParams): string {
     ageYears,
     learnerNativeLanguage,
     recentStruggles = [],
+    recentlyMissedItems = [],
   } = params;
 
   const languageName = getLanguageDisplayName(languageCode);
@@ -279,6 +287,15 @@ export function buildVocabularyPrompt(params: VocabularyPromptParams): string {
           )}. Where it fits the theme, prefer vocabulary from these semantic fields so the learner gets extra reps on what they find hard — do not force it if the fit is weak.`
       : '';
 
+  const missedHint =
+    recentlyMissedItems.length > 0
+      ? `\nRecently missed vocabulary (re-surface where the theme and CEFR fit): ${recentlyMissedItems
+          .slice(0, 8)
+          .join(
+            ', '
+          )}. Include at least one of these as a question when the chosen theme and CEFR ceiling allow it.`
+      : '';
+
   const l1DistractorHint = buildL1DistractorHint(
     learnerNativeLanguage,
     languageCode
@@ -293,7 +310,7 @@ ${themeInstruction}
 Questions needed: exactly ${discoveryCount}
 
 ${recentExclusions}
-${bankExclusions}${libraryHint}${struggleHint}
+${bankExclusions}${libraryHint}${struggleHint}${missedHint}
 
 Rules:
 - Generate exactly ${discoveryCount} questions.

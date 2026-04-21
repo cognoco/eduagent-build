@@ -38,9 +38,9 @@ export async function extractVocabularyFromTranscript(
       content: [
         `Target language: ${language.names[0]} (${language.code})`,
         cefrLevel ? `CEFR target level: ${cefrLevel}` : '',
-        transcript
+        `<transcript>\n${transcript
           .map((entry) => `${entry.role.toUpperCase()}: ${entry.content}`)
-          .join('\n'),
+          .join('\n')}\n</transcript>`,
       ]
         .filter(Boolean)
         .join('\n\n'),

@@ -1,0 +1,105 @@
+import path from 'node:path';
+import { defineConfig } from '@playwright/test';
+import { apiBaseUrl, appBaseUrl, runId } from './e2e-web/helpers/runtime';
+
+const e2eWebDir = path.join(process.cwd(), 'apps', 'mobile', 'e2e-web');
+const shouldStartLocalApi = process.env.PLAYWRIGHT_SKIP_LOCAL_API !== '1';
+
+export default defineConfig({
+  testDir: e2eWebDir,
+  outputDir: path.join(e2eWebDir, 'test-results'),
+  fullyParallel: true,
+  forbidOnly: !!process.env.CI,
+  retries: process.env.CI ? 1 : 0,
+  workers: process.env.CI ? 4 : undefined,
+  reporter: [
+    ['line'],
+    [
+      'html',
+      {
+        open: 'never',
+        outputFolder: path.join(e2eWebDir, 'playwright-report'),
+      },
+    ],
+  ],
+  timeout: 90_000,
+  expect: {
+    timeout: 15_000,
+  },
+  metadata: {
+    runId,
+  },
+  use: {
+    actionTimeout: 15_000,
+    baseURL: appBaseUrl,
+    headless: process.env.PLAYWRIGHT_HEADED === '1' ? false : true,
+    navigationTimeout: 120_000,
+    screenshot: 'only-on-failure',
+    trace: 'retain-on-failure',
+    video: 'retain-on-failure',
+    viewport: { width: 1440, height: 1080 },
+  },
+  globalTeardown: path.join(e2eWebDir, 'helpers', 'global-teardown.ts'),
+  webServer: [
+    ...(shouldStartLocalApi
+      ? [
+          {
+            command: 'pnpm --dir ../api exec wrangler dev --port 8787',
+            url: `${apiBaseUrl}/v1/health`,
+            reuseExistingServer: !process.env.CI,
+            stdout: 'pipe' as const,
+            stderr: 'pipe' as const,
+            timeout: 120_000,
+          },
+        ]
+      : []),
+    {
+      command: 'node e2e-web/helpers/serve-exported-web.mjs',
+      url: appBaseUrl,
+      reuseExistingServer: !process.env.CI,
+      stdout: 'pipe',
+      stderr: 'pipe',
+      timeout: 240_000,
+    },
+  ],
+  projects: [
+    {
+      name: 'setup',
+      testMatch: /helpers[\\/]auth\.setup\.ts/,
+    },
+    {
+      name: 'smoke-auth',
+      testMatch: /flows[\\/]auth[\\/]auth-navigation\.spec\.ts/,
+    },
+    {
+      name: 'smoke-learner',
+      dependencies: ['setup'],
+      testMatch: /flows[\\/]journeys[\\/]j01-.*\.spec\.ts/,
+      use: {
+        storageState: path.join(e2eWebDir, '.auth', 'solo-learner.json'),
+      },
+    },
+    {
+      name: 'smoke-parent',
+      dependencies: ['setup'],
+      testMatch: /flows[\\/]journeys[\\/]j03-.*\.spec\.ts/,
+      use: {
+        storageState: path.join(e2eWebDir, '.auth', 'owner-with-children.json'),
+      },
+    },
+    {
+      name: 'role-transitions',
+      dependencies: ['setup'],
+      testMatch: /flows[\\/]journeys[\\/]j0[4-7]-.*\.spec\.ts/,
+      use: {
+        storageState: path.join(e2eWebDir, '.auth', 'owner-with-children.json'),
+      },
+    },
+    {
+      name: 'later-phases',
+      dependencies: ['setup'],
+      testMatch:
+        /flows[\\/](journeys[\\/](j0[89]|j1[0-8])-.*|auth[\\/]w03-.*|navigation[\\/]w0[1-5]-.*)\.spec\.ts/,
+    },
+  ],
+});

@@ -41,6 +41,8 @@ export interface StreamDoneEvent {
   notePromptPostSession?: boolean;
   /** Fluency drill start/end annotation for language sessions. */
   fluencyDrill?: FluencyDrillEvent;
+  /** F6: LLM self-reported confidence. Absent or 'medium'/'high' = no indicator. Only 'low' shows a UI prompt. */
+  confidence?: 'low' | 'medium' | 'high';
 }
 
 export type StreamEvent = StreamChunkEvent | StreamDoneEvent;
@@ -274,10 +276,12 @@ export function streamSSEViaXHR(
       }`;
       try {
         const parsed = JSON.parse(xhr.responseText || '{}') as {
+          code?: string;
           error?: { code?: string };
         };
-        if (typeof parsed.error?.code === 'string') {
-          apiError.code = parsed.error.code;
+        const errorCode = parsed.code ?? parsed.error?.code;
+        if (typeof errorCode === 'string') {
+          apiError.code = errorCode;
         }
       } catch {
         // Ignore malformed error bodies — formatApiError handles plain text.
@@ -327,10 +331,12 @@ export function streamSSEViaXHR(
       apiError.status = xhr.status;
       try {
         const parsed = JSON.parse(xhr.responseText || '{}') as {
+          code?: string;
           error?: { code?: string };
         };
-        if (typeof parsed.error?.code === 'string') {
-          apiError.code = parsed.error.code;
+        const errorCode = parsed.code ?? parsed.error?.code;
+        if (typeof errorCode === 'string') {
+          apiError.code = errorCode;
         }
       } catch {
         // Ignore malformed error bodies here — formatApiError handles plain text.

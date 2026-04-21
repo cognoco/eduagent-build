@@ -2,7 +2,7 @@
 // Session CRUD — core session lifecycle: start, get, close, transcript
 // ---------------------------------------------------------------------------
 
-import { eq, and, asc, lt } from 'drizzle-orm';
+import { eq, and, asc, desc, gte, isNull, lt, sql } from 'drizzle-orm';
 import {
   learningSessions,
   sessionEvents,
@@ -14,15 +14,15 @@ import {
 } from '@eduagent/database';
 import { z } from 'zod';
 import type {
+  CelebrationReason,
   LearningSession,
   SessionStartInput,
   SessionCloseInput,
   SessionAnalyticsEventInput,
   ContentFlagInput,
-  SessionType,
-  InputMode,
-  VerificationType,
+  SessionTranscript,
 } from '@eduagent/schemas';
+import { celebrationReasonSchema } from '@eduagent/schemas';
 import { insertSessionEvent } from './session-events';
 import { getSubject } from '../subject';
 import { createPendingSessionSummary } from '../summaries';
@@ -454,28 +454,7 @@ export async function getSessionTranscript(
   db: Database,
   profileId: string,
   sessionId: string
-): Promise<{
-  session: {
-    sessionId: string;
-    subjectId: string;
-    topicId: string | null;
-    sessionType: SessionType;
-    inputMode: InputMode;
-    verificationType?: VerificationType | null;
-    startedAt: string;
-    exchangeCount: number;
-    milestonesReached: string[];
-    wallClockSeconds: number | null;
-  };
-  exchanges: Array<{
-    eventId?: string;
-    role: 'user' | 'assistant';
-    content: string;
-    timestamp: string;
-    escalationRung?: number;
-    isSystemPrompt?: boolean;
-  }>;
-} | null> {
+): Promise<SessionTranscript | null> {
   const session = await getSession(db, profileId, sessionId);
   if (!session) return null;
 
@@ -520,9 +499,13 @@ export async function getSessionTranscript(
   const metadata =
     (rawSession?.metadata as Record<string, unknown> | null) ?? {};
   const milestonesReached = Array.isArray(metadata['milestonesReached'])
-    ? metadata['milestonesReached'].filter(
-        (value): value is string => typeof value === 'string'
-      )
+    ? metadata['milestonesReached']
+        .map((value) => celebrationReasonSchema.safeParse(value))
+        .filter(
+          (result): result is { success: true; data: CelebrationReason } =>
+            result.success
+        )
+        .map((result) => result.data)
     : [];
 
   return {
@@ -610,4 +593,67 @@ export async function flagContent(
   });
 
   return { message: 'Content flagged for review. Thank you!' };
+}
+
+// ---------------------------------------------------------------------------
+// Resume nudge — find a recent auto-closed freeform session worth resuming
+// ---------------------------------------------------------------------------
+
+export interface ResumeNudgeCandidate {
+  sessionId: string;
+  topicHint: string;
+  exchangeCount: number;
+  createdAt: string;
+}
+
+export async function getResumeNudgeCandidate(
+  db: Database,
+  profileId: string
+): Promise<ResumeNudgeCandidate | null> {
+  const [candidate] = await db
+    .select({
+      id: learningSessions.id,
+      rawInput: learningSessions.rawInput,
+      exchangeCount: learningSessions.exchangeCount,
+      createdAt: learningSessions.createdAt,
+    })
+    .from(learningSessions)
+    .where(
+      and(
+        eq(learningSessions.profileId, profileId),
+        eq(learningSessions.status, 'auto_closed'),
+        eq(learningSessions.sessionType, 'learning'),
+        isNull(learningSessions.topicId),
+        gte(learningSessions.exchangeCount, 5),
+        sql`${learningSessions.metadata} ->> 'effectiveMode' = 'freeform'`,
+        gte(learningSessions.createdAt, sql`NOW() - INTERVAL '7 days'`)
+      )
+    )
+    .orderBy(desc(learningSessions.createdAt))
+    .limit(1);
+
+  if (!candidate) return null;
+
+  const [firstMessage] = await db
+    .select({ content: sessionEvents.content })
+    .from(sessionEvents)
+    .where(
+      and(
+        eq(sessionEvents.sessionId, candidate.id),
+        eq(sessionEvents.profileId, profileId),
+        eq(sessionEvents.eventType, 'user_message')
+      )
+    )
+    .orderBy(asc(sessionEvents.createdAt))
+    .limit(1);
+
+  return {
+    sessionId: candidate.id,
+    topicHint:
+      candidate.rawInput ??
+      firstMessage?.content?.slice(0, 80) ??
+      'your last session',
+    exchangeCount: candidate.exchangeCount,
+    createdAt: candidate.createdAt.toISOString(),
+  };
 }

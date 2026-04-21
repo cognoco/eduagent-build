@@ -12,6 +12,15 @@ export { createGeminiProvider } from './providers/gemini';
 export { createOpenAIProvider } from './providers/openai';
 export { createAnthropicProvider } from './providers/anthropic';
 export { getTextContent } from './types';
+export { extractFirstJsonObject } from './extract-json';
+export { parseEnvelope } from './envelope';
+export { streamEnvelopeReply, teeEnvelopeStream } from './stream-envelope';
+export type {
+  ParseEnvelopeResult,
+  ParseEnvelopeSuccess,
+  ParseEnvelopeFailure,
+  ParseEnvelopeFailureReason,
+} from './envelope';
 export type {
   ChatMessage,
   EscalationRung,

@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
-import { View, Text, Pressable, Alert } from 'react-native';
+import { View, Text, Pressable } from 'react-native';
+import { platformAlert } from '../lib/platform-alert';
 import { useUser, useAuth } from '@clerk/clerk-expo';
 import { useRouter } from 'expo-router';
 import { PasswordInput } from './common';
@@ -54,7 +55,7 @@ export function ChangePassword(): React.JSX.Element {
     try {
       await signOut();
     } catch {
-      Alert.alert('Could not sign out', 'Please try again.');
+      platformAlert('Could not sign out', 'Please try again.');
       return;
     } finally {
       setIsSigningOut(false);

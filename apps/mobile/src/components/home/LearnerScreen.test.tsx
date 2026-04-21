@@ -63,6 +63,10 @@ jest.mock('../../hooks/use-coaching-card', () => ({
   useMarkQuizDiscoverySurfaced: () => mockUseMarkQuizDiscoverySurfaced(),
 }));
 
+jest.mock('./EarlyAdopterCard', () => ({
+  EarlyAdopterCard: () => null,
+}));
+
 jest.mock('../../lib/session-recovery', () => ({
   readSessionRecoveryMarker: (...args: unknown[]) =>
     mockReadSessionRecoveryMarker(...args),
@@ -162,7 +166,9 @@ describe('LearnerScreen', () => {
 
     expect(screen.getByTestId('intent-continue')).toBeTruthy();
     expect(screen.getByText('Continue')).toBeTruthy();
-    expect(screen.getByText('Math · Fractions')).toBeTruthy();
+    // U1 copy sweep 2026-04-19: subtitle leads with topic, drops subject label
+    expect(screen.getByText('Pick up Fractions')).toBeTruthy();
+    expect(screen.queryByText('Math · Fractions')).toBeNull();
 
     fireEvent.press(screen.getByTestId('intent-continue'));
     expect(mockPush).toHaveBeenCalledWith({

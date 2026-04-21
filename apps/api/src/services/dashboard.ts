@@ -103,8 +103,11 @@ export function generateChildSummary(input: DashboardInput): string {
       ? `down from ${input.sessionsLastWeek}`
       : 'same as';
 
+  const sw = (n: number): string => (n === 1 ? 'session' : 'sessions');
   parts.push(
-    `${input.sessionsThisWeek} sessions this week (${trendArrow} ${trendWord} last week)`
+    `${input.sessionsThisWeek} ${sw(
+      input.sessionsThisWeek
+    )} this week (${trendArrow} ${trendWord} last week)`
   );
 
   return `${input.displayName}: ${parts.join('. ')}.`;
@@ -127,7 +130,7 @@ export function calculateRetentionTrend(
 ): 'improving' | 'declining' | 'stable' {
   if (
     subjectRetentionData.length === 0 ||
-    (totalSessions != null && totalSessions < MIN_TREND_SESSIONS)
+    (totalSessions ?? 0) < MIN_TREND_SESSIONS
   )
     return 'stable';
   const strongCount = subjectRetentionData.filter(
@@ -506,10 +509,16 @@ export async function getChildrenForParent(
     ).length;
 
     // Prefer wall-clock time with active-time fallback for legacy sessions.
+    // Cap per session to prevent abandoned sessions from inflating the total.
+    const MAX_SESSION_WALL_CLOCK_SECONDS = 3 * 60 * 60; // 3 hours
     const getDisplaySeconds = (session: {
       wallClockSeconds: number | null;
       durationSeconds: number | null;
-    }): number => session.wallClockSeconds ?? session.durationSeconds ?? 0;
+    }): number =>
+      Math.min(
+        session.wallClockSeconds ?? session.durationSeconds ?? 0,
+        MAX_SESSION_WALL_CLOCK_SECONDS
+      );
 
     const totalTimeThisWeek = recentSessions
       .filter((s) => s.startedAt >= startOfThisWeek)
@@ -632,6 +641,11 @@ export async function getChildrenForParent(
 
 /**
  * Fetches detailed dashboard data for a single child, with parent access check.
+ *
+ * [F-PV-06] Replaces the previous all-children fan-out (getChildrenForParent →
+ * find) which hit 7 + 10N subrequests and breached the Cloudflare Workers 50-
+ * subrequest cap at N≥5. This implementation queries only the requested child,
+ * targeting ≤16 subrequests.
  */
 export async function getChildDetail(
   db: Database,
@@ -641,10 +655,156 @@ export async function getChildDetail(
   // [EP15-I5] Throws ForbiddenError (→ 403) on access denial instead of
   // returning null. A null return here now means "parent has access but
   // the child was not present in the dashboard list" — a genuine not-found.
-  await assertParentAccess(db, parentProfileId, childProfileId);
+  await assertParentAccess(db, parentProfileId, childProfileId); // 1 query
 
-  const children = await getChildrenForParent(db, parentProfileId);
-  return children.find((c) => c.profileId === childProfileId) ?? null;
+  // Step 1: Get the child's profile — 1 query
+  const profile = await db.query.profiles.findFirst({
+    where: eq(profiles.id, childProfileId),
+  });
+  if (!profile) return null;
+
+  // Step 2: Get the child's subjects — 1 query
+  const childSubjects = await db.query.subjects.findMany({
+    where: eq(subjects.profileId, childProfileId),
+  });
+  const rawInputMap = new Map<string, string | null>(
+    childSubjects.map((s) => [s.id, s.rawInput ?? null])
+  );
+
+  // Step 3: Get recent sessions (last 2 weeks, exchangeCount >= 1) — 1 query
+  const now = new Date();
+  const startOfThisWeek = getStartOfWeek(now);
+  const startOfLastWeek = new Date(startOfThisWeek);
+  startOfLastWeek.setDate(startOfLastWeek.getDate() - 7);
+
+  const recentSessions = await db.query.learningSessions.findMany({
+    where: and(
+      eq(learningSessions.profileId, childProfileId),
+      gte(learningSessions.startedAt, startOfLastWeek),
+      gte(learningSessions.exchangeCount, 1)
+    ),
+  });
+
+  // Step 4: Compute derived session metrics
+  const sessionsThisWeek = recentSessions.filter(
+    (s) => s.startedAt >= startOfThisWeek
+  ).length;
+  const sessionsLastWeek = recentSessions.filter(
+    (s) => s.startedAt >= startOfLastWeek && s.startedAt < startOfThisWeek
+  ).length;
+
+  const getDisplaySeconds = (session: {
+    wallClockSeconds: number | null;
+    durationSeconds: number | null;
+  }): number => session.wallClockSeconds ?? session.durationSeconds ?? 0;
+
+  const totalTimeThisWeek = recentSessions
+    .filter((s) => s.startedAt >= startOfThisWeek)
+    .reduce((acc, s) => acc + getDisplaySeconds(s), 0);
+  const totalTimeLastWeek = recentSessions
+    .filter(
+      (s) => s.startedAt >= startOfLastWeek && s.startedAt < startOfThisWeek
+    )
+    .reduce((acc, s) => acc + getDisplaySeconds(s), 0);
+
+  const exchangesThisWeek = recentSessions
+    .filter((s) => s.startedAt >= startOfThisWeek)
+    .reduce((acc, s) => acc + s.exchangeCount, 0);
+  const exchangesLastWeek = recentSessions
+    .filter(
+      (s) => s.startedAt >= startOfLastWeek && s.startedAt < startOfThisWeek
+    )
+    .reduce((acc, s) => acc + s.exchangeCount, 0);
+
+  // Step 5: Parallel fan-out — getOverallProgress (~6 queries), countGuidedMetrics
+  // (1 query), streaks + XP (2 queries) — all concurrent
+  const [progress, guidedMetrics, streakRow, xpResult] = await Promise.all([
+    getOverallProgress(db, childProfileId),
+    countGuidedMetrics(db, childProfileId, startOfLastWeek),
+    db.query.streaks.findFirst({
+      where: eq(streaks.profileId, childProfileId),
+    }),
+    db
+      .select({
+        profileId: xpLedger.profileId,
+        totalXp: sum(xpLedger.amount).mapWith(Number),
+      })
+      .from(xpLedger)
+      .where(eq(xpLedger.profileId, childProfileId))
+      .groupBy(xpLedger.profileId),
+  ]);
+
+  const totalTimeThisWeekMinutes = Math.round(totalTimeThisWeek / 60);
+  const totalTimeLastWeekMinutes = Math.round(totalTimeLastWeek / 60);
+  const subjectNames = progress.subjects.map((s) => s.name);
+
+  // Step 6: buildChildProgressSummary — 2 queries (snapshot reads)
+  const { progress: progressSummary, totalSessions } =
+    await buildChildProgressSummary(
+      db,
+      childProfileId,
+      profile.displayName,
+      sessionsThisWeek,
+      sessionsLastWeek,
+      totalTimeThisWeekMinutes,
+      subjectNames
+    );
+
+  // Step 7: Compute all derived fields using the same helpers as getChildrenForParent
+  const subjectRetentionData = progress.subjects.map((s) => ({
+    name: s.name,
+    status: s.retentionStatus,
+  }));
+
+  const dashboardInput: DashboardInput = {
+    childProfileId,
+    displayName: profile.displayName,
+    sessionsThisWeek,
+    sessionsLastWeek,
+    totalTimeThisWeekMinutes,
+    totalTimeLastWeekMinutes,
+    exchangesThisWeek,
+    exchangesLastWeek,
+    subjectRetentionData,
+    guidedCount: guidedMetrics.guidedCount,
+    totalProblemCount: guidedMetrics.totalProblemCount,
+  };
+
+  const summary = generateChildSummary(dashboardInput);
+  const trend = calculateTrend(sessionsThisWeek, sessionsLastWeek);
+  const retentionTrend = calculateRetentionTrend(
+    subjectRetentionData,
+    totalSessions
+  );
+
+  return {
+    profileId: childProfileId,
+    displayName: profile.displayName,
+    summary,
+    sessionsThisWeek,
+    sessionsLastWeek,
+    totalTimeThisWeek: totalTimeThisWeekMinutes,
+    totalTimeLastWeek: totalTimeLastWeekMinutes,
+    exchangesThisWeek,
+    exchangesLastWeek,
+    trend,
+    subjects: progress.subjects.map((s) => ({
+      subjectId: s.subjectId,
+      name: s.name,
+      retentionStatus: s.retentionStatus,
+      rawInput: rawInputMap.get(s.subjectId) ?? null,
+    })),
+    guidedVsImmediateRatio: calculateGuidedRatio(
+      guidedMetrics.guidedCount,
+      guidedMetrics.totalProblemCount
+    ),
+    retentionTrend,
+    totalSessions,
+    progress: progressSummary,
+    currentStreak: streakRow?.currentStreak ?? 0,
+    longestStreak: streakRow?.longestStreak ?? 0,
+    totalXp: xpResult[0]?.totalXp ?? 0,
+  };
 }
 
 /**

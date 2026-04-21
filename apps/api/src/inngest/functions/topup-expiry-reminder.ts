@@ -60,6 +60,7 @@ export const topupExpiryReminder = inngest.createFunction(
           // Queue individual reminder events for each expiring credit pack.
           // A downstream notification function (Story 5.6+) will handle
           // the actual email/push delivery.
+          // NOTE: No handler is registered for this event yet — silently dropped by Inngest until Story 5.6+ is implemented.
           const events = credits.map((credit) => ({
             name: 'app/topup.expiry-reminder' as const,
             data: {

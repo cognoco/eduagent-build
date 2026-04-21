@@ -4,7 +4,6 @@ import {
   Text,
   TextInput,
   Pressable,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -24,6 +23,7 @@ import { goBackOrReplace } from '../lib/navigation';
 import { Button } from '../components/common/Button';
 import { useKeyboardScroll } from '../hooks/use-keyboard-scroll';
 import { formatApiError } from '../lib/format-api-error';
+import { platformAlert } from '../lib/platform-alert';
 
 // Captured at module load — safe because these screens are portrait-locked.
 // On web, cap at a mobile-like height to avoid massive whitespace.
@@ -162,7 +162,7 @@ export default function CreateProfileScreen() {
       if (isParentAddingChild) {
         handleClose();
         // Show confirmation — parent stays on their own profile
-        Alert.alert(
+        platformAlert(
           'Profile created',
           `${trimmedName}'s profile is ready. You can switch to it from the Profiles screen.`
         );
@@ -180,7 +180,7 @@ export default function CreateProfileScreen() {
 
       const switchResult = await switchProfile(result.profile.id);
       if (switchResult?.success === false) {
-        Alert.alert(
+        platformAlert(
           'Profile created',
           switchResult.error ??
             'We created the profile, but could not switch to it automatically. You can switch from the Profiles screen.'

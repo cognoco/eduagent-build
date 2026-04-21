@@ -9,10 +9,12 @@ import { createLogger } from './logger';
 
 const logger = createLogger();
 import type {
+  AgeBracket,
   ProfileCreateInput,
   ProfileUpdateInput,
   Profile,
 } from '@eduagent/schemas';
+import { computeAgeBracket } from '@eduagent/schemas';
 export type ProfileValidationCode = 'CHILD_AGE_VIOLATION';
 
 export class ProfileValidationError extends Error {
@@ -58,6 +60,12 @@ function mapProfileRow(
     location: row.location ?? null,
     isOwner: row.isOwner,
     hasPremiumLlm: row.hasPremiumLlm,
+    // BKT-C.1 — narrow the DB row's text type to the Zod enum. The CHECK
+    // constraint guarantees the value is always one of the 8 codes; the cast
+    // is a type-narrowing no-op at runtime.
+    conversationLanguage:
+      row.conversationLanguage as Profile['conversationLanguage'],
+    pronouns: row.pronouns ?? null,
     consentStatus,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
@@ -343,6 +351,21 @@ export async function getProfileAge(
   });
   const currentYear = new Date().getUTCFullYear();
   return profile?.birthYear ? Math.max(5, currentYear - profile.birthYear) : 12;
+}
+
+/**
+ * Resolves a profile's AgeBracket for passing to LLM safety-preamble calls.
+ * Returns `'adult'` (the conservative minor-safe default) if birthYear is unset.
+ */
+export async function getProfileAgeBracket(
+  db: Database,
+  profileId: string
+): Promise<AgeBracket> {
+  const profile = await db.query.profiles.findFirst({
+    where: eq(profiles.id, profileId),
+    columns: { birthYear: true },
+  });
+  return profile?.birthYear ? computeAgeBracket(profile.birthYear) : 'adult';
 }
 
 // ---------------------------------------------------------------------------

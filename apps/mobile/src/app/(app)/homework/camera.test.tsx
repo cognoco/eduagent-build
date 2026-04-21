@@ -190,6 +190,24 @@ describe('CameraScreen', () => {
     expect(getByTestId('grant-permission-button')).toBeTruthy();
   });
 
+  it('permission body copy is jargon-free (U2, copy sweep 2026-04-19)', () => {
+    useCameraPermissions.mockReturnValue([
+      { granted: false, canAskAgain: true },
+      jest.fn(),
+    ]);
+
+    const { getByText, queryByText } = render(<CameraScreen />);
+    // New first-person, outcome-first copy is present
+    expect(
+      getByText(
+        /Snap a picture of your homework and I'll help you solve it step by step/i
+      )
+    ).toBeTruthy();
+    // Old jargon phrasings are gone
+    expect(queryByText(/AI tutor/i)).toBeNull();
+    expect(queryByText(/photograph homework problems so your/i)).toBeNull();
+  });
+
   it('shows Settings link when permission denied and cannot ask again', () => {
     useCameraPermissions.mockReturnValue([
       { granted: false, canAskAgain: false },
@@ -267,7 +285,9 @@ describe('CameraScreen', () => {
     await waitFor(() => {
       expect(alertSpy).toHaveBeenCalledWith(
         "Couldn't open your photos",
-        'Please try again or use the camera instead.'
+        'Please try again or use the camera instead.',
+        undefined,
+        undefined
       );
     });
 

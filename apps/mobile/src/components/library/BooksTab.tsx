@@ -199,16 +199,22 @@ export function BooksTab({
         <Text className="text-body text-text-secondary text-center mb-4">
           Unable to load books. Please try again.
         </Text>
-        <Pressable
-          onPress={onRetry}
-          className="bg-primary rounded-button px-5 py-3 items-center min-h-[48px] justify-center"
-          accessibilityRole="button"
-          testID="books-tab-retry"
-        >
-          <Text className="text-body font-semibold text-text-inverse">
-            Retry
+        {onRetry != null ? (
+          <Pressable
+            onPress={onRetry}
+            className="bg-primary rounded-button px-5 py-3 items-center min-h-[48px] justify-center"
+            accessibilityRole="button"
+            testID="books-tab-retry"
+          >
+            <Text className="text-body font-semibold text-text-inverse">
+              Retry
+            </Text>
+          </Pressable>
+        ) : (
+          <Text className="text-body-sm text-text-tertiary text-center">
+            Pull down to refresh or go back.
           </Text>
-        </Pressable>
+        )}
       </View>
     );
   }
@@ -242,7 +248,7 @@ export function BooksTab({
         onPress={() => onBookPress(item.subjectId, book.id)}
         className={`rounded-card px-4 py-4 mb-3 ${STATUS_STYLES[status]}`}
         accessibilityRole="button"
-        accessibilityLabel={`${book.title}. ${STATUS_LABELS[status]}. ${progressLabel}.`}
+        accessibilityLabel={`${book.title}, ${subjectName}. ${STATUS_LABELS[status]}. ${progressLabel}.`}
         testID={`book-card-${book.id}`}
       >
         <View className="flex-row items-start">
@@ -303,6 +309,7 @@ export function BooksTab({
           entityName="books"
           onClear={clearAction.handler}
           clearLabel={clearAction.label}
+          message={hasSearch ? undefined : `No books match your filters`}
         />
       ) : (
         <FlatList

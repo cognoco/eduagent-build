@@ -220,6 +220,18 @@ describe('BooksTab', () => {
     expect(onStateChange).toHaveBeenCalledWith(BOOKS_TAB_INITIAL_STATE);
   });
 
+  it('book card a11y label includes subject name (BUG-513)', () => {
+    render(<BooksTab {...defaultProps} />);
+
+    const card1 = screen.getByTestId('book-card-book-1');
+    expect(card1.props.accessibilityLabel).toContain('Mathematics');
+    expect(card1.props.accessibilityLabel).toContain('Algebra Basics');
+
+    const card2 = screen.getByTestId('book-card-book-2');
+    expect(card2.props.accessibilityLabel).toContain('History');
+    expect(card2.props.accessibilityLabel).toContain('Ancient Egypt');
+  });
+
   it('shows "Clear filters" when only filters cause no results', () => {
     const onStateChange = jest.fn();
     const filterOnlyState: BooksTabState = {

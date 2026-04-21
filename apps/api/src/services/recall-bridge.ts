@@ -95,8 +95,8 @@ function buildRecallBridgePrompt(
     '- Keep questions short (1-2 sentences each)\n' +
     '- Frame positively — this is a celebration of their success\n' +
     '- Questions should be answerable in 1-2 sentences\n' +
-    `- Topic: ${topicTitle}\n` +
-    `- Description: ${topicDescription}\n\n` +
+    `- Topic: <topic_title>${topicTitle}</topic_title>\n` +
+    `- Description: <topic_description>${topicDescription}</topic_description>\n\n` +
     'Return exactly 2 questions, one per line.'
   );
 }

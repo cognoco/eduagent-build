@@ -1,13 +1,36 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { QuizRoundResponse } from '@eduagent/schemas';
+import { ErrorFallback } from '../../../components/common/ErrorFallback';
 import { useGenerateRound } from '../../../hooks/use-quiz';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { useThemeColors } from '../../../lib/theme';
 import { useQuizFlow } from './_layout';
+
+// [F-Q-01] Map error codes to kid-friendly copy so the error panel
+// never leaks raw JSON envelopes or HTTP status codes. The fallback trims any
+// message over 60 chars — those are almost always raw API payloads.
+export function friendlyErrorMessage(
+  code: string | undefined,
+  fallback: string
+): string {
+  switch (code) {
+    case 'UPSTREAM_ERROR':
+      return 'Something went wrong creating your quiz. Try again!';
+    case 'TIMEOUT':
+      return 'The quiz took too long to create. Try again!';
+    case 'RATE_LIMITED':
+      return 'Too many requests — wait a moment and try again.';
+    case 'VALIDATION_ERROR':
+      return 'Something went wrong. Please try a different activity.';
+    default:
+      return fallback.length > 60
+        ? 'Something went wrong. Try again!'
+        : fallback;
+  }
+}
 
 const LOADING_MESSAGES = [
   'Shuffling questions...',
@@ -91,13 +114,9 @@ export default function QuizLaunchScreen(): React.ReactElement {
     return () => clearTimeout(timer);
   }, [generateRound.isPending]);
 
-  useEffect(() => {
-    if (!challengeRound) return;
-    const timer = setTimeout(() => {
-      enterPlay(challengeRound);
-    }, 3000);
-    return () => clearTimeout(timer);
-  }, [challengeRound, enterPlay]);
+  // [F-Q-12] Removed the 3s auto-advance timer for challenge banners.
+  // Kids reading slowly may miss the banner entirely if it auto-dismisses.
+  // The Start button is the only way to advance — explicit user action.
 
   if (!activityType) {
     return <View className="flex-1 bg-background" />;
@@ -140,16 +159,6 @@ export default function QuizLaunchScreen(): React.ReactElement {
   }
 
   if (generateRound.isError) {
-    // [ASSUMP-F3] Prefer the server-extracted error message (quota reached,
-    // consent required, forbidden) over a generic fallback. Our apiClient's
-    // assertOk parses the JSON body and throws an Error whose `.message`
-    // already carries the server's human message. Never replace that with
-    // "check your connection" — the CLAUDE.md rule is explicit about this.
-    const errorMessage =
-      generateRound.error instanceof Error && generateRound.error.message
-        ? generateRound.error.message
-        : 'Try again, or head back and pick a different activity.';
-
     // [ASSUMP-F3] [IMP-2] Hide the Retry button when retrying can't possibly
     // help (quota exhausted, consent required). Classify on the typed error
     // code from assertOk's ApiResponseError — never string-match on the
@@ -165,46 +174,41 @@ export default function QuizLaunchScreen(): React.ReactElement {
       errorCode === 'FORBIDDEN' ||
       (errorCode != null && errorCode.startsWith('CONSENT_'));
 
+    // [F-Q-01] Route through friendlyErrorMessage so the panel never renders
+    // raw JSON envelopes or verbose API payloads. errorCode is classified first
+    // (before formatting) to avoid string-matching on formatted output.
+    const rawMessage =
+      generateRound.error instanceof Error && generateRound.error.message
+        ? generateRound.error.message
+        : 'Try again, or head back and pick a different activity.';
+    const errorMessage = friendlyErrorMessage(errorCode, rawMessage);
+
     return (
       <View
-        className="flex-1 items-center justify-center bg-background px-6"
+        className="flex-1 bg-background"
         style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
         testID="quiz-launch-error"
       >
-        <Ionicons name="alert-circle-outline" size={52} color={colors.danger} />
-        <Text className="mt-4 text-center text-h3 font-bold text-text-primary">
-          Couldn&apos;t create a round
-        </Text>
-        <Text
-          className="mt-2 text-center text-body text-text-secondary"
-          testID="quiz-launch-error-message"
-        >
-          {errorMessage}
-        </Text>
-
-        <View className="mt-8 w-full gap-3">
-          {isUnretryable ? null : (
-            <Pressable
-              onPress={startRound}
-              className="min-h-[48px] items-center justify-center rounded-button bg-primary px-6 py-3"
-              testID="quiz-launch-retry"
-            >
-              <Text className="text-body font-semibold text-text-inverse">
-                Retry
-              </Text>
-            </Pressable>
-          )}
-
-          <Pressable
-            onPress={() => goBackOrReplace(router, '/(app)/quiz')}
-            className="min-h-[48px] items-center justify-center rounded-button bg-surface-elevated px-6 py-3"
-            testID="quiz-launch-back"
-          >
-            <Text className="text-body font-semibold text-text-primary">
-              Go Back
-            </Text>
-          </Pressable>
-        </View>
+        <ErrorFallback
+          variant="centered"
+          title="Couldn't create a round"
+          message={errorMessage}
+          primaryAction={
+            isUnretryable
+              ? undefined
+              : {
+                  label: 'Retry',
+                  onPress: startRound,
+                  testID: 'quiz-launch-retry',
+                }
+          }
+          secondaryAction={{
+            label: 'Go Back',
+            onPress: () => goBackOrReplace(router, '/(app)/quiz'),
+            testID: 'quiz-launch-back',
+          }}
+          testID="quiz-launch-error-fallback"
+        />
       </View>
     );
   }

@@ -1,6 +1,6 @@
-# Dictation — Review (multimodal) × 17yo-french-advanced
+# Dictation — Review × 17yo-french-advanced
 
-> **Flow source:** `apps/api/src/services/dictation/review.ts:SYSTEM_PROMPT`
+> **Flow source:** `apps/api/src/services/dictation/review.ts:buildReviewSystemPrompt`
 > **Profile:** 17-year-old EU teen, Czech native but conversational French with tutor, advanced French (CEFR B2), literature and philosophy
 
 ## Profile summary
@@ -27,10 +27,10 @@
 
 ```json
 {
-  "language": "fr",
-  "originalSentences": [
-    "Le soleil se couche tôt.",
-    "Elle marchait sans parler."
+  "ageYears": 17,
+  "preferredExplanations": [
+    "step-by-step",
+    "analogies"
   ]
 }
 ```
@@ -62,23 +62,19 @@ RESPOND WITH ONLY valid JSON in this exact format — no prose before or after:
 
 If there are no mistakes, return an empty array for "mistakes".
 Generate explanations in the child's language as instructed.
+
+EXPLANATION STYLE:
+You may use precise grammar and punctuation terminology. Keep explanations concise — the learner can handle technical language. Structure each explanation as a numbered 1–2–3 breakdown: (1) what the mistake was, (2) the rule, (3) the correct version.
 ```
 
 ## Generated prompt — user
 
 ```
-[image part omitted]
-
-Original sentences:
-1. Le soleil se couche tôt.
-2. Elle marchait sans parler.
-
-Please generate all explanations in fr.
+(multimodal — image + original sentences supplied at runtime)
 ```
 
 ## Builder notes
 
-- System prompt is static — zero personalization.
-- The ONLY personalized parameter is the explanation language.
-- Missing: age (explanation complexity calibration), learning style (humor/step-by-step register), struggle history (recurring-pattern-aware feedback).
-- Tier 2 (--live) requires a real handwriting image; not synthesized by this harness.
+- ageYears=17 — explanation register calibrated to age.
+- preferredExplanations=["step-by-step","analogies"] — tone shaped by style preferences.
+- Struggle history NOT used (gap flagged in audit P2) — recurring patterns not surfaced to reviewer.

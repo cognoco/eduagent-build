@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Pressable,
   Text,
@@ -11,13 +10,17 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import type { BookProgressStatus, BookSuggestion } from '@eduagent/schemas';
+import { ErrorFallback } from '../../../../components/common/ErrorFallback';
 import { BookCard } from '../../../../components/library/BookCard';
 import { SuggestionCard } from '../../../../components/library/SuggestionCard';
 import { useBookSuggestions } from '../../../../hooks/use-book-suggestions';
 import { useBooks } from '../../../../hooks/use-books';
 import { useFiling } from '../../../../hooks/use-filing';
 import { useSubjects } from '../../../../hooks/use-subjects';
-import { formatApiError } from '../../../../lib/format-api-error';
+import {
+  classifyApiError,
+  recoveryActions,
+} from '../../../../lib/format-api-error';
 import { goBackOrReplace } from '../../../../lib/navigation';
 import { useThemeColors } from '../../../../lib/theme';
 
@@ -47,6 +50,11 @@ export default function ShelfScreen() {
 
   // Filing overlay: show spinner + skip button after 15s (same pattern as pick-book)
   const [showSkip, setShowSkip] = useState(false);
+  // Error state for filing failures — shown as an ErrorFallback overlay
+  const [filingError, setFilingError] = useState<{
+    message: string;
+    suggestion: BookSuggestion;
+  } | null>(null);
 
   useEffect(() => {
     if (filing.isPending) {
@@ -65,6 +73,7 @@ export default function ShelfScreen() {
     // BUG-323 + R-1: Double guard — isPending (React state) + ref lock
     if (filing.isPending || filingInFlight.current) return;
     filingInFlight.current = true;
+    setFilingError(null);
     try {
       const result = await filing.mutateAsync({
         rawInput: suggestion.title,
@@ -86,13 +95,8 @@ export default function ShelfScreen() {
       } as never);
     } catch (err) {
       filingInFlight.current = false;
-      Alert.alert('Error', formatApiError(err), [
-        {
-          text: 'Try again',
-          onPress: () => void handlePickBookSuggestion(suggestion),
-        },
-        { text: 'Go back', onPress: handleBack },
-      ]);
+      const classified = classifyApiError(err);
+      setFilingError({ message: classified.message, suggestion });
     }
   };
 
@@ -236,38 +240,30 @@ export default function ShelfScreen() {
   }
 
   if (isError) {
+    const classified = classifyApiError(failedQuery?.error);
     const errorMessage =
-      failedQuery?.error instanceof Error
-        ? failedQuery.error.message
-        : 'Unable to load this shelf.';
+      classified.message !== 'Something unexpected happened. Please try again.'
+        ? classified.message
+        : 'Unable to load this shelf. Please try again.';
+    const actions = recoveryActions(classified, {
+      retry: handleRetry,
+      goBack: handleBack,
+      goHome: () => router.replace('/(app)/home' as never),
+    });
 
     return (
       <View
-        className="flex-1 bg-background items-center justify-center px-5"
+        className="flex-1 bg-background"
         style={{ paddingTop: insets.top }}
         testID="shelf-error"
       >
-        <Text className="text-body text-text-secondary text-center mb-4">
-          {errorMessage}
-        </Text>
-        <Pressable
-          onPress={handleRetry}
-          className="bg-primary rounded-button px-6 py-3 items-center min-h-[48px] justify-center mb-3"
-          testID="shelf-retry-button"
-        >
-          <Text className="text-text-inverse text-body font-semibold">
-            Retry
-          </Text>
-        </Pressable>
-        <Pressable
-          onPress={handleBack}
-          className="bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
-          testID="shelf-back-button"
-        >
-          <Text className="text-text-primary text-body font-semibold">
-            Go back
-          </Text>
-        </Pressable>
+        <ErrorFallback
+          variant="centered"
+          title="Couldn't load this shelf"
+          message={errorMessage}
+          primaryAction={actions.primary}
+          secondaryAction={actions.secondary}
+        />
       </View>
     );
   }
@@ -452,6 +448,31 @@ export default function ShelfScreen() {
               </Text>
             </Pressable>
           )}
+        </View>
+      ) : null}
+
+      {/* Error overlay when filing (adding a suggestion) fails */}
+      {filingError ? (
+        <View
+          className="absolute inset-0 bg-background/90 items-center justify-center px-5"
+          testID="shelf-filing-error-overlay"
+        >
+          <ErrorFallback
+            variant="centered"
+            title="Couldn't add that book"
+            message={filingError.message}
+            primaryAction={{
+              label: 'Try Again',
+              onPress: () =>
+                void handlePickBookSuggestion(filingError.suggestion),
+              testID: 'shelf-filing-error-retry',
+            }}
+            secondaryAction={{
+              label: 'Go Back',
+              onPress: handleBack,
+              testID: 'shelf-filing-error-back',
+            }}
+          />
         </View>
       ) : null}
     </View>

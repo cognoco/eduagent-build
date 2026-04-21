@@ -51,6 +51,7 @@ export function PasswordInput({
           onSubmitEditing={onSubmitEditing}
           testID={testID}
           onFocus={onFocus}
+          accessibilityLabel={placeholder}
         />
         <Pressable
           onPress={() => setVisible((v) => !v)}

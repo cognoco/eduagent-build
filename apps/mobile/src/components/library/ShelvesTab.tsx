@@ -303,6 +303,7 @@ export function ShelvesTab({
           entityName="shelves"
           onClear={clearAction.handler}
           clearLabel={clearAction.label}
+          message={hasSearch ? undefined : `No shelves match your filters`}
         />
       ) : (
         <View testID="shelves-list">

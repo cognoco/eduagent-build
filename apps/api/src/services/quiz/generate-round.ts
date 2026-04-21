@@ -11,6 +11,7 @@ import {
   type VocabularyQuestion,
 } from '@eduagent/schemas';
 import { createScopedRepository, type Database } from '@eduagent/database';
+import { getRecentMissedItems, markMissedItemsSurfaced } from './queries';
 import type { ChatMessage } from '../llm';
 import { routeAndCall } from '../llm';
 import { captureException } from '../sentry';
@@ -33,122 +34,16 @@ import {
   guessWhoMasteryClueSchema,
   validateGuessWhoRound,
 } from './guess-who-provider';
-import { describeAgeBracket, type AgeBracket, type Interest } from './config';
+import { type AgeBracket, type Interest } from './config';
 import { createLogger } from '../logger';
+import { extractFirstJsonObject } from '../llm/extract-json';
+import { buildCapitalsPrompt as _buildCapitalsPrompt } from './quiz-prompts';
+
+// Re-export prompt builders for backward compatibility
+// (eval harness imports buildCapitalsPrompt from this module)
+export { buildCapitalsPrompt } from './quiz-prompts';
 
 const logger = createLogger();
-
-interface CapitalsPromptParams {
-  discoveryCount: number;
-  ageBracket: AgeBracket;
-  recentAnswers: string[];
-  themePreference?: string;
-  // Personalization (P0.1 + P1.2) — all optional for backward compatibility
-  interests?: Interest[];
-  libraryTopics?: string[];
-  ageYears?: number;
-  /**
-   * Struggle topics from the learner's profile. Used as a soft steering signal
-   * for theme selection — the LLM may lean toward regions/themes relevant to
-   * these weaker areas when it wouldn't feel forced. [P1-4]
-   */
-  recentStruggles?: string[];
-}
-
-export function buildCapitalsPrompt(params: CapitalsPromptParams): string {
-  const {
-    discoveryCount,
-    ageBracket,
-    recentAnswers,
-    themePreference,
-    interests,
-    libraryTopics,
-    ageYears,
-    recentStruggles,
-  } = params;
-
-  // Prefer fine-grained ageYears when available; fall back to coarse bracket.
-  const ageLabel =
-    ageYears != null ? `${ageYears}-year-old` : describeAgeBracket(ageBracket);
-
-  const exclusions =
-    recentAnswers.length > 0
-      ? `Do NOT include questions about these recently seen capitals: ${recentAnswers.join(
-          ', '
-        )}`
-      : 'No exclusions.';
-
-  // Build interest-driven theme instruction (P0.1).
-  // Use free_time and both-tagged interests to suggest a vivid theme.
-  const relevantInterests = (interests ?? [])
-    .filter((i) => i.context === 'free_time' || i.context === 'both')
-    .slice(0, 3)
-    .map((i) => i.label);
-
-  let themeInstruction: string;
-  if (themePreference) {
-    themeInstruction = `Theme: "${themePreference}"`;
-  } else if (relevantInterests.length > 0) {
-    themeInstruction =
-      `Choose a capitals theme that relates to the learner's interests: ${relevantInterests.join(
-        ', '
-      )}. ` +
-      `For example, if they love dinosaurs, pick "Capitals of countries with famous dinosaur fossil sites". ` +
-      `Be creative — make the theme vivid and specific to these interests.`;
-  } else {
-    themeInstruction =
-      'Choose an age-appropriate theme (e.g. "Central European Capitals").';
-  }
-
-  // Library-topic hint (P1.2): steer country selection toward topics being studied.
-  const libraryHint =
-    !themePreference && libraryTopics && libraryTopics.length > 0
-      ? `\nLibrary context: The learner is currently studying: ${libraryTopics
-          .slice(0, 10)
-          .join(
-            '; '
-          )}. Where possible, prefer capitals of countries relevant to these topics.`
-      : '';
-
-  // Struggle-aware steering (P1-4): soft preference toward regions/themes
-  // that help the learner revisit areas they find hard.
-  const struggleHint =
-    !themePreference && recentStruggles && recentStruggles.length > 0
-      ? `\nWeaker areas for this learner: ${recentStruggles
-          .slice(0, 10)
-          .join(
-            '; '
-          )}. If a capitals theme naturally connects to any of these, lean toward it — otherwise pick the best age-appropriate theme.`
-      : '';
-
-  return `You are generating a multiple-choice capitals quiz for a ${ageLabel} learner.
-
-Activity: Capitals quiz
-${themeInstruction}${libraryHint}${struggleHint}
-Questions needed: exactly ${discoveryCount}
-
-${exclusions}
-
-Rules:
-- Generate exactly ${discoveryCount} questions
-- Each question must have exactly 3 distractors
-- Distractors must be plausible city names
-- Fun facts should be surprising, age-appropriate, and one sentence maximum
-- Keep the theme coherent across the full round
-
-Respond with ONLY valid JSON in this shape:
-{
-  "theme": "Theme Name",
-  "questions": [
-    {
-      "country": "Country Name",
-      "correctAnswer": "Capital City",
-      "distractors": ["City A", "City B", "City C"],
-      "funFact": "One surprising fact about this capital."
-    }
-  ]
-}`;
-}
 
 function buildMasteryDistractors(correctAnswer: string): string[] {
   const pool = CAPITALS_DATA.filter(
@@ -247,49 +142,17 @@ export function assembleRound(
 }
 
 /**
- * Extract the first balanced JSON object from an LLM response. Handles
- * triple-backtick fences (```json ... ```) AND stray prose preamble by
- * walking brace depth until the first complete object closes. Avoids the
- * greedy `/\{[\s\S]*\}/` regex which mis-matches when the response contains
- * multiple objects or has trailing prose.
+ * Extract the first balanced JSON object from an LLM response.
+ *
+ * Delegates to the shared `extractFirstJsonObject` utility (which handles
+ * markdown fences, prose preamble, and nested braces) and throws on failure.
  */
 export function extractJsonObject(response: string): string {
-  // Strip markdown code-fence wrappers if present.
-  const fenceMatch = response.match(/```(?:json)?\s*([\s\S]*?)```/);
-  const body = (fenceMatch?.[1] ?? response).trim();
-
-  let start = -1;
-  let depth = 0;
-  let inString = false;
-  let escape = false;
-
-  for (let i = 0; i < body.length; i++) {
-    const ch = body[i];
-    if (escape) {
-      escape = false;
-      continue;
-    }
-    if (ch === '\\' && inString) {
-      escape = true;
-      continue;
-    }
-    if (ch === '"') {
-      inString = !inString;
-      continue;
-    }
-    if (inString) continue;
-    if (ch === '{') {
-      if (depth === 0) start = i;
-      depth += 1;
-    } else if (ch === '}') {
-      depth -= 1;
-      if (depth === 0 && start !== -1) {
-        return body.slice(start, i + 1);
-      }
-    }
+  const result = extractFirstJsonObject(response);
+  if (result === null) {
+    throw new UpstreamLlmError('Quiz LLM returned no JSON object');
   }
-
-  throw new UpstreamLlmError('Quiz LLM returned no JSON object');
+  return result;
 }
 
 interface GenerateParams {
@@ -400,11 +263,19 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
   }
   const resolvedNativeLanguage = nativeLanguage;
 
+  // [P1 — quiz_missed_items wiring] Fetch recent unsurfaced misses for this
+  // activity so the LLM can re-surface them in the new round. Best-effort:
+  // `getRecentMissedItems` returns [] on any DB error.
+  const missedRows = await getRecentMissedItems(db, profileId, activityType);
+  const recentlyMissedItems = missedRows.map((row) =>
+    extractMissedItemLabel(row.questionText, row.correctAnswer, activityType)
+  );
+
   let theme = '';
   let questions: QuizQuestion[] = [];
 
   if (activityType === 'capitals') {
-    let prompt = buildCapitalsPrompt({
+    let prompt = _buildCapitalsPrompt({
       discoveryCount: plan.discoveryCount,
       ageBracket,
       recentAnswers,
@@ -413,6 +284,7 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
       libraryTopics: topicTitles,
       ageYears,
       recentStruggles: resolvedStruggles,
+      recentlyMissedItems,
     });
     if (difficultyBump) {
       prompt +=
@@ -500,6 +372,7 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
       ageYears,
       learnerNativeLanguage: resolvedNativeLanguage,
       recentStruggles: resolvedStruggles,
+      recentlyMissedItems,
     });
 
     const messages: ChatMessage[] = [
@@ -563,6 +436,7 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
       libraryTopics: topicTitles,
       ageYears,
       recentStruggles: resolvedStruggles,
+      recentlyMissedItems,
     });
     if (difficultyBump) {
       prompt +=
@@ -679,6 +553,19 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
     throw new Error('Failed to persist quiz round');
   }
 
+  // Mark the surfaced misses as seen so they don't get re-injected into the
+  // next round. Best-effort: don't fail the quiz request if this errors.
+  if (missedRows.length > 0) {
+    try {
+      await markMissedItemsSurfaced(db, profileId, activityType);
+    } catch (error) {
+      logger.warn('quiz.missed_items.mark_surfaced_failed', {
+        activityType,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
   return {
     id: inserted.id,
     theme: round.theme,
@@ -686,4 +573,27 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
     total: round.total,
     difficultyBump,
   };
+}
+
+/**
+ * Extract a prompt-friendly label from a stored missed-item row. The prompts
+ * just need a short noun (country / target-language term / person name), not
+ * the full "What is the capital of …?" question text.
+ */
+function extractMissedItemLabel(
+  questionText: string,
+  correctAnswer: string,
+  activityType: QuizActivityType
+): string {
+  if (activityType === 'capitals') {
+    const match = questionText.match(/^What is the capital of (.+?)\?$/);
+    return match?.[1]?.trim() ?? correctAnswer;
+  }
+  if (activityType === 'vocabulary') {
+    const match = questionText.match(/^Translate:\s*(.+)$/);
+    return match?.[1]?.trim() ?? correctAnswer;
+  }
+  // guess_who — use the canonical name (correctAnswer) since the clue text
+  // would leak the whole prompt. Never include the clue.
+  return correctAnswer;
 }

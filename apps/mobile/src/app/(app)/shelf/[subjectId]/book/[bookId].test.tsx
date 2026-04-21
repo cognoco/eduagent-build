@@ -648,7 +648,7 @@ describe('BookScreen', () => {
     expect(mockPush).toHaveBeenCalledWith(
       expect.objectContaining({
         pathname: '/session-summary/[sessionId]',
-        params: { sessionId: 'sess-1' },
+        params: { sessionId: 'sess-1', subjectId: 'sub-1', topicId: 'topic-1' },
       })
     );
   });
@@ -667,7 +667,8 @@ describe('BookScreen', () => {
     expect(alertSpy).toHaveBeenCalledWith(
       'Session Topic 1',
       expect.any(String),
-      expect.any(Array)
+      expect.any(Array),
+      undefined
     );
   });
 
@@ -837,7 +838,7 @@ describe('BookScreen', () => {
 
     const { getByTestId, getByText } = render(<BookScreen />);
     expect(getByTestId('book-empty-topics')).toBeTruthy();
-    expect(getByText('No topics in this book yet.')).toBeTruthy();
+    expect(getByText(/doesn't have any topics yet/)).toBeTruthy();
   });
 
   it('hides start learning button when no topics exist', () => {
@@ -966,7 +967,8 @@ describe('BookScreen', () => {
       expect(alertSpy).toHaveBeenCalledWith(
         "Couldn't build this book",
         expect.any(String),
-        expect.any(Array)
+        expect.any(Array),
+        undefined
       );
     });
   });

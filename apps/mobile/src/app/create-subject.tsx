@@ -150,8 +150,12 @@ export default function CreateSubjectScreen() {
             params: {
               subjectId: result.subject.id,
               subjectName: result.subject.name,
-              languageCode: result.subject.languageCode ?? '',
-              languageName: result.subject.name,
+              ...(result.subject.languageCode
+                ? {
+                    languageCode: result.subject.languageCode,
+                    languageName: result.subject.name,
+                  }
+                : {}),
               step: '1',
               totalSteps: '4',
             },

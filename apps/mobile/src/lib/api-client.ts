@@ -16,10 +16,23 @@ import { getApiUrl } from './api';
 import { useProfile } from './profile';
 
 // ---------------------------------------------------------------------------
-// Quota-exceeded error — type derived from @eduagent/schemas QuotaExceeded
+// Typed error classes — defined in api-errors.ts (no React deps) and
+// re-exported here so existing imports from 'api-client' keep working.
 // ---------------------------------------------------------------------------
 
-import type { QuotaExceeded } from '@eduagent/schemas';
+import {
+  QuotaExceededError,
+  ForbiddenError,
+  UpstreamError,
+} from './api-errors';
+import type { QuotaExceededDetails } from './api-errors';
+
+export {
+  QuotaExceededError,
+  ForbiddenError,
+  UpstreamError,
+} from './api-errors';
+export type { QuotaExceededDetails, UpgradeOption } from './api-errors';
 
 // ---------------------------------------------------------------------------
 // Auth-expired callback — handles 401 from expired Clerk tokens
@@ -44,43 +57,6 @@ export function setOnAuthExpired(cb: AuthExpiredCallback): void {
 export function clearOnAuthExpired(): void {
   _onAuthExpired = null;
   _authExpiredFiring = false;
-}
-
-export type QuotaExceededDetails = QuotaExceeded['details'];
-export type UpgradeOption = QuotaExceededDetails['upgradeOptions'][number];
-
-export class QuotaExceededError extends Error {
-  readonly code = 'QUOTA_EXCEEDED' as const;
-  readonly details: QuotaExceededDetails;
-
-  constructor(message: string, details: QuotaExceededDetails) {
-    super(message);
-    this.name = 'QuotaExceededError';
-    this.details = details;
-  }
-}
-
-/**
- * [EP15-I5] Typed error for 403 responses.
- * Thrown by customFetch so callers can `instanceof ForbiddenError` instead
- * of parsing status codes from generic Error message strings.
- *
- * [BUG-100] `apiCode` preserves the server's application-level error code
- * (e.g. 'SUBJECT_INACTIVE') so downstream classifiers like `errorHasCode`
- * can distinguish specific 403 reasons without string-matching the message.
- */
-export class ForbiddenError extends Error {
-  readonly code = 'FORBIDDEN' as const;
-  readonly apiCode: string | undefined;
-
-  constructor(
-    message = 'You do not have permission to access this resource',
-    apiCode?: string
-  ) {
-    super(message);
-    this.name = 'ForbiddenError';
-    this.apiCode = apiCode;
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -167,7 +143,22 @@ export function useApiClient(): ApiClient {
           );
         }
 
+        // [F-Q-01] Parse JSON body for non-ok responses so typed errors
+        // carry a .code property that screens can classify.
         const errBody = await res.text().catch(() => '');
+        let parsed: { code?: string; message?: string } | null = null;
+        try {
+          parsed = JSON.parse(errBody) as { code?: string; message?: string };
+        } catch {
+          // Not JSON — fall through to generic error
+        }
+        if (parsed?.code) {
+          throw new UpstreamError(
+            parsed.message ?? (errBody || res.statusText),
+            parsed.code,
+            res.status
+          );
+        }
         throw new Error(
           `API error ${res.status}: ${errBody || res.statusText}`
         );

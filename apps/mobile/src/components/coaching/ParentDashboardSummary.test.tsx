@@ -3,6 +3,7 @@ import { ParentDashboardSummary } from './ParentDashboardSummary';
 
 describe('ParentDashboardSummary', () => {
   const defaultProps = {
+    profileId: 'test-profile-123',
     childName: 'Alex',
     summary: 'Alex: Math strong, Science fading. 4 sessions this week.',
     subjects: [
@@ -61,7 +62,7 @@ describe('ParentDashboardSummary', () => {
 
     expect(
       screen.getByText(
-        '1 sessions, 12m this week (\u2193 down from 4 sessions, 1h 30m last week)'
+        '1 session, 12m this week (\u2193 down from 4 sessions, 1h 30m last week)'
       )
     ).toBeTruthy();
   });
@@ -97,14 +98,16 @@ describe('ParentDashboardSummary', () => {
   it('calls onDrillDown when card pressed', () => {
     render(<ParentDashboardSummary {...defaultProps} />);
 
-    fireEvent.press(screen.getByTestId('parent-dashboard-summary'));
+    fireEvent.press(screen.getByTestId('dashboard-child-test-profile-123'));
     expect(defaultProps.onDrillDown).toHaveBeenCalledTimes(1);
   });
 
   it('calls onDrillDown when View details pressed', () => {
     render(<ParentDashboardSummary {...defaultProps} />);
 
-    fireEvent.press(screen.getByTestId('parent-dashboard-summary-primary'));
+    fireEvent.press(
+      screen.getByTestId('dashboard-child-test-profile-123-primary')
+    );
     expect(defaultProps.onDrillDown).toHaveBeenCalled();
   });
 
@@ -263,11 +266,11 @@ describe('ParentDashboardSummary', () => {
       expect(screen.queryByTestId('parent-dashboard-teaser')).toBeNull();
     });
 
-    it('still shows trend text for new learner (always visible)', () => {
+    it('hides trend text for new learner (guarded by showFullSignals)', () => {
       render(<ParentDashboardSummary {...defaultProps} totalSessions={0} />);
 
-      // Trend text uses sessionsThisWeek (4) from defaultProps, not totalSessions
-      expect(screen.getByText(/4 sessions, 1h 25m this week/)).toBeTruthy();
+      // trendText is guarded by showFullSignals — new learners see the teaser instead
+      expect(screen.queryByText(/sessions, .* this week/)).toBeNull();
     });
 
     it('defaults to showing full signals when totalSessions is undefined', () => {

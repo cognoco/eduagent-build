@@ -79,17 +79,24 @@ export default function QuizResultsScreen(): React.ReactElement {
       case 'vocabulary':
         return q.term;
       case 'guess_who':
-        return 'Guess Who';
+        // [F-Q-04] Use the first clue as the prompt — it's the hardest/most
+        // vague, making it spoiler-safe. Falls back to 'Guess Who' only if
+        // clues are unexpectedly absent.
+        return q.clues[0] ?? 'Guess Who';
     }
   }
 
   function handlePlayAgain() {
-    setCompletionResult(null);
-
+    // [F-Q-09] Navigate FIRST, then clear completionResult. Clearing first
+    // triggers the useEffect guard at the top of this screen (which fires when
+    // completionResult becomes null) and causes an unintended redirect to
+    // /practice before our explicit replace() runs. By navigating first we
+    // leave the results screen before the null-check effect can react.
     if (prefetchedRound.data) {
       setRound(prefetchedRound.data);
       setPrefetchedRoundId(null);
       router.replace('/(app)/quiz/play' as never);
+      setCompletionResult(null);
       return;
     }
 
@@ -107,6 +114,7 @@ export default function QuizResultsScreen(): React.ReactElement {
     }
 
     router.replace('/(app)/quiz/launch' as never);
+    setCompletionResult(null);
   }
 
   function handleDone() {
@@ -182,14 +190,31 @@ export default function QuizResultsScreen(): React.ReactElement {
                 className="mb-2 rounded-card bg-surface p-3"
                 testID={`quiz-results-missed-item-${qr.questionIndex}`}
                 accessibilityRole="text"
-                accessibilityLabel={`${prompt}. You said ${qr.answerGiven}. Correct answer ${qr.correctAnswer}.`}
+                accessibilityLabel={`${prompt}. ${
+                  qr.answerGiven && qr.answerGiven !== '[skipped]'
+                    ? `You said ${qr.answerGiven}`
+                    : qr.answerGiven === '[skipped]'
+                    ? 'You skipped this question'
+                    : "You didn't answer"
+                }. Correct answer ${qr.correctAnswer}.`}
               >
                 <Text className="text-body-sm text-text-secondary">
                   {prompt}
                 </Text>
-                <Text className="mt-1 text-body text-danger opacity-70">
-                  You said: {qr.answerGiven}
-                </Text>
+                {/* [F-Q-03] Three-way guard: real answer, skipped, or missing */}
+                {qr.answerGiven && qr.answerGiven !== '[skipped]' ? (
+                  <Text className="mt-1 text-body text-danger opacity-70">
+                    You said: {qr.answerGiven}
+                  </Text>
+                ) : qr.answerGiven === '[skipped]' ? (
+                  <Text className="mt-1 text-body text-text-secondary opacity-70">
+                    You skipped this question
+                  </Text>
+                ) : (
+                  <Text className="mt-1 text-body text-text-secondary opacity-70">
+                    {"You didn't answer"}
+                  </Text>
+                )}
                 <Text className="mt-0.5 text-body font-semibold text-success">
                   {qr.correctAnswer}
                 </Text>

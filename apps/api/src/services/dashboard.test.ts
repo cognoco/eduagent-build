@@ -17,6 +17,7 @@ const mockProgressSnapshotsFindFirst = jest.fn();
 const mockProgressSnapshotsFindMany = jest.fn();
 const mockMilestonesFindMany = jest.fn();
 const mockStreaksFindMany = jest.fn();
+const mockStreaksFindFirst = jest.fn();
 const mockDbSelect = jest.fn();
 const mockSessionSummariesFindFirst = jest.fn();
 const mockSessionSummariesFindMany = jest.fn();
@@ -192,44 +193,63 @@ describe('calculateTrend', () => {
 describe('calculateRetentionTrend', () => {
   it('returns improving when strong subjects outnumber weak+fading', () => {
     expect(
-      calculateRetentionTrend([
-        { status: 'strong' },
-        { status: 'strong' },
-        { status: 'fading' },
-      ])
+      calculateRetentionTrend(
+        [{ status: 'strong' }, { status: 'strong' }, { status: 'fading' }],
+        3
+      )
     ).toBe('improving');
   });
 
   it('returns declining when weak+fading outnumber strong', () => {
     expect(
-      calculateRetentionTrend([
-        { status: 'strong' },
-        { status: 'weak' },
-        { status: 'fading' },
-      ])
+      calculateRetentionTrend(
+        [{ status: 'strong' }, { status: 'weak' }, { status: 'fading' }],
+        3
+      )
     ).toBe('declining');
   });
 
   it('returns stable when counts are equal', () => {
     expect(
-      calculateRetentionTrend([{ status: 'strong' }, { status: 'weak' }])
+      calculateRetentionTrend([{ status: 'strong' }, { status: 'weak' }], 3)
     ).toBe('stable');
   });
 
   it('returns stable for empty array', () => {
-    expect(calculateRetentionTrend([])).toBe('stable');
+    expect(calculateRetentionTrend([], 3)).toBe('stable');
   });
 
   it('returns improving when all subjects are strong', () => {
     expect(
-      calculateRetentionTrend([{ status: 'strong' }, { status: 'strong' }])
+      calculateRetentionTrend([{ status: 'strong' }, { status: 'strong' }], 3)
     ).toBe('improving');
   });
 
   it('returns declining when all subjects are weak', () => {
     expect(
-      calculateRetentionTrend([{ status: 'weak' }, { status: 'fading' }])
+      calculateRetentionTrend([{ status: 'weak' }, { status: 'fading' }], 3)
     ).toBe('declining');
+  });
+
+  it('returns stable when totalSessions is undefined (caller did not pass it)', () => {
+    expect(
+      calculateRetentionTrend(
+        [{ status: 'strong' }, { status: 'strong' }],
+        undefined
+      )
+    ).toBe('stable');
+  });
+
+  it('returns stable when totalSessions is 1 (below MIN_TREND_SESSIONS)', () => {
+    expect(
+      calculateRetentionTrend([{ status: 'strong' }, { status: 'strong' }], 1)
+    ).toBe('stable');
+  });
+
+  it('returns meaningful trend when totalSessions >= MIN_TREND_SESSIONS', () => {
+    expect(
+      calculateRetentionTrend([{ status: 'strong' }, { status: 'strong' }], 3)
+    ).toBe('improving');
   });
 });
 
@@ -310,6 +330,7 @@ function createMockDb() {
       },
       streaks: {
         findMany: mockStreaksFindMany,
+        findFirst: mockStreaksFindFirst,
       },
       sessionSummaries: {
         findFirst: mockSessionSummariesFindFirst,
@@ -335,6 +356,7 @@ beforeEach(() => {
   mockProgressSnapshotsFindMany.mockResolvedValue([]);
   mockMilestonesFindMany.mockResolvedValue([]);
   mockStreaksFindMany.mockResolvedValue([]);
+  mockStreaksFindFirst.mockResolvedValue(undefined);
   mockSessionSummariesFindFirst.mockResolvedValue(null);
   mockSessionSummariesFindMany.mockResolvedValue([]);
   // `dashboard.ts` uses db.select().from().where().groupBy() for XP rollup
@@ -556,13 +578,7 @@ describe('getChildDetail', () => {
       childProfileId: CHILD_ID,
     });
 
-    // getChildDetail delegates to getChildrenForParent internally
-    mockFamilyLinksFindMany.mockResolvedValue([
-      { parentProfileId: PARENT_ID, childProfileId: CHILD_ID },
-    ]);
-    mockProfilesFindMany.mockResolvedValue([
-      { id: CHILD_ID, displayName: 'Alex' },
-    ]);
+    // getChildDetail queries the requested child directly (single-child path)
     mockProfilesFindFirst.mockResolvedValue({
       id: CHILD_ID,
       displayName: 'Alex',

@@ -53,13 +53,31 @@ export default function PracticeScreen(): React.ReactElement {
     quizStats?.reduce((sum, s) => sum + (s.roundsPlayed ?? 0), 0) ?? 0;
   // [F-035] Surface totalXp — the main gamification metric is earned but never shown.
   const totalXp = quizStats?.reduce((sum, s) => sum + (s.totalXp ?? 0), 0) ?? 0;
-  const xpSuffix = totalXp > 0 ? ` · ${totalXp} XP` : '';
+  // [F-Q-11] Show best as a percentage so cross-activity comparisons are
+  // meaningful (4/8 = 50% vs 3/4 = 75%) instead of misleading raw fractions.
+  const bestPct =
+    bestActivity &&
+    bestActivity.bestScore != null &&
+    bestActivity.bestTotal != null &&
+    bestActivity.bestTotal > 0
+      ? `Best: ${Math.round(
+          (bestActivity.bestScore / bestActivity.bestTotal) * 100
+        )}%`
+      : null;
   const quizSubtitle = statsError
     ? 'Could not load quiz stats'
-    : bestActivity && bestActivity.bestScore != null
-    ? `Best: ${bestActivity.bestScore}/${bestActivity.bestTotal} · Played: ${totalRoundsPlayed}${xpSuffix}`
+    : bestPct
+    ? [
+        bestPct,
+        `Played: ${totalRoundsPlayed}`,
+        totalXp > 0 ? `${totalXp} XP` : null,
+      ]
+        .filter(Boolean)
+        .join(' · ')
     : totalRoundsPlayed > 0
-    ? `Played: ${totalRoundsPlayed}${xpSuffix}`
+    ? [`Played: ${totalRoundsPlayed}`, totalXp > 0 ? `${totalXp} XP` : null]
+        .filter(Boolean)
+        .join(' · ')
     : 'Test yourself with multiple choice questions';
 
   const handleBack = () => {

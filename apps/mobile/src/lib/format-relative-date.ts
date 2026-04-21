@@ -1,3 +1,12 @@
+// [BUG-498] Format raw minutes into a readable string.
+// e.g. 45 → "45 min", 130 → "2h 10m", 240 → "4h"
+export function formatMinutes(min: number): string {
+  if (min < 60) return `${min} min`;
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return m > 0 ? `${h}h ${m}m` : `${h}h`;
+}
+
 export function formatRelativeDate(isoDate: string): string {
   const then = new Date(isoDate);
   if (isNaN(then.getTime())) return '';

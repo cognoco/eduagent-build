@@ -1,7 +1,11 @@
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import { zValidator } from '@hono/zod-validator';
-import { interviewMessageSchema } from '@eduagent/schemas';
+import {
+  interviewMessageSchema,
+  type InterviewResult,
+  extractedInterviewSignalsSchema,
+} from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
@@ -60,6 +64,7 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
         draft.exchangeHistory.filter((e) => e.role === 'user').length + 1;
       const result = await processInterviewExchange(context, message, {
         exchangeCount,
+        profileId,
       });
 
       const updatedHistory = [
@@ -136,12 +141,11 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
         draft.exchangeHistory.filter((e) => e.role === 'user').length + 1;
 
       let stream: AsyncIterable<string>;
-      let onComplete: (
-        fullResponse: string
-      ) => Promise<import('@eduagent/schemas').InterviewResult>;
+      let onComplete: (fullResponse: string) => Promise<InterviewResult>;
       try {
         const streamResult = await streamInterviewExchange(context, message, {
           exchangeCount,
+          profileId,
         });
         stream = streamResult.stream;
         onComplete = streamResult.onComplete;
@@ -240,11 +244,17 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
 
     const draft = await getDraftState(db, profileId, subjectId);
     if (!draft || draft.status !== 'in_progress') {
-      // Already completed or no draft — just return success
+      // Already completed or no draft — return signals from the persisted
+      // draft if present, so a second /complete call is still navigable.
+      // [A-3] safeParse replaces the unsafe double cast — validates JSONB shape at runtime.
+      const parsed = extractedInterviewSignalsSchema.safeParse(
+        draft?.extractedSignals
+      );
       return c.json({
         isComplete: true,
         exchangeCount:
           draft?.exchangeHistory.filter((e) => e.role === 'user').length ?? 0,
+        ...(parsed.success ? { extractedSignals: parsed.data } : {}),
       });
     }
 
@@ -273,10 +283,14 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
       status: 'completed',
     });
 
+    // Return extracted signals alongside completion so the mobile force-complete
+    // mutation can route into interests-context without waiting for a state
+    // refetch round-trip. The shape matches extractedInterviewSignalsSchema.
     return c.json({
       isComplete: true,
       exchangeCount: draft.exchangeHistory.filter((e) => e.role === 'user')
         .length,
+      extractedSignals: signals,
     });
   })
   // Get current interview state
@@ -289,6 +303,16 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
     if (!draft) return c.json({ state: null });
 
     const subject = await getSubject(db, profileId, subjectId);
+
+    // Surface extractedSignals on completed drafts so the mobile client can
+    // read extracted interests and route through the interests-context picker
+    // before the downstream onboarding fork. The shape is validated by
+    // @eduagent/schemas/extractedInterviewSignalsSchema.
+    // [A-3] safeParse replaces the unsafe double cast — validates JSONB shape at runtime.
+    const parsedSignals =
+      draft.status === 'completed'
+        ? extractedInterviewSignalsSchema.safeParse(draft.extractedSignals)
+        : undefined;
 
     return c.json({
       state: {
@@ -304,6 +328,9 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
             }
           : {}),
         ...(draft.expiresAt ? { expiresAt: draft.expiresAt } : {}),
+        ...(parsedSignals?.success
+          ? { extractedSignals: parsedSignals.data }
+          : {}),
       },
     });
   });

@@ -7,12 +7,12 @@ import {
   ActivityIndicator,
   TextInput,
   Modal,
-  Alert,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '../../../lib/theme';
 import { goBackOrReplace } from '../../../lib/navigation';
+import { platformAlert } from '../../../lib/platform-alert';
 import { OnboardingStepIndicator } from '../../../components/onboarding/OnboardingStepIndicator';
 import {
   useCurriculum,
@@ -140,7 +140,7 @@ export default function CurriculumScreen() {
       setChallengeFeedback('');
       setShowChallengeModal(false);
     } catch (err: unknown) {
-      Alert.alert('Curriculum update failed', formatApiError(err));
+      platformAlert('Curriculum update failed', formatApiError(err));
     }
   };
 
@@ -213,7 +213,7 @@ export default function CurriculumScreen() {
       setWhyExplanation(explanation);
       setShowWhyModal(true);
     } catch (err: unknown) {
-      Alert.alert('Could not explain the order', formatApiError(err));
+      platformAlert('Could not explain the order', formatApiError(err));
     } finally {
       setExplainingTopicId(null);
     }
@@ -367,7 +367,7 @@ export default function CurriculumScreen() {
                 {!topic.skipped ? (
                   <Pressable
                     onPress={() =>
-                      Alert.alert(
+                      platformAlert(
                         'Skip this topic?',
                         'You can always bring it back later.',
                         [

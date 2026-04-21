@@ -5,7 +5,6 @@ import {
   Pressable,
   ScrollView,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,6 +14,7 @@ import {
   useSubscription,
   useFamilySubscription,
 } from '../hooks/use-subscription';
+import { platformAlert } from '../lib/platform-alert';
 
 export default function ProfilesScreen() {
   const insets = useSafeAreaInsets();
@@ -45,7 +45,7 @@ export default function ProfilesScreen() {
     // Whitelist: only family/pro may add profiles. Blocks free and plus.
     // Exception: first child profile is always allowed regardless of tier.
     if (!hasNoChildren && tier !== 'family' && tier !== 'pro') {
-      Alert.alert(
+      platformAlert(
         'Upgrade required',
         'Adding more profiles requires a Family or Pro subscription.',
         [
@@ -60,7 +60,7 @@ export default function ProfilesScreen() {
     }
 
     if (familyData && familyData.profileCount >= familyData.maxProfiles) {
-      Alert.alert(
+      platformAlert(
         'Profile limit reached',
         `Your ${tier === 'pro' ? 'Pro' : 'Family'} plan supports up to ${
           familyData.maxProfiles
@@ -87,7 +87,7 @@ export default function ProfilesScreen() {
     try {
       const result = await switchProfile(profileId);
       if (result?.success === false) {
-        Alert.alert(
+        platformAlert(
           'Could not switch profiles',
           result.error ?? 'Please try again.'
         );

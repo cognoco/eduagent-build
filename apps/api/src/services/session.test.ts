@@ -13,15 +13,14 @@ jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 jest.mock('./exchanges', () => ({
   processExchange: jest.fn(),
   streamExchange: jest.fn(),
-  detectUnderstandingCheck: jest.fn().mockReturnValue(false),
   estimateExpectedResponseMinutes: jest.fn().mockReturnValue(2),
-  extractNotePrompt: jest.fn().mockReturnValue({
+  parseExchangeEnvelope: jest.fn().mockReturnValue({
     cleanResponse: 'Hello world! This is the full response.',
-    notePrompt: null,
-    notePromptPostSession: null,
-  }),
-  extractFluencyDrill: jest.fn().mockReturnValue({
-    cleanResponse: 'Hello world! This is the full response.',
+    understandingCheck: false,
+    partialProgress: false,
+    needsDeepening: false,
+    notePrompt: false,
+    notePromptPostSession: false,
     fluencyDrill: null,
   }),
 }));
@@ -29,7 +28,6 @@ jest.mock('./exchanges', () => ({
 jest.mock('./escalation', () => ({
   evaluateEscalation: jest.fn(),
   getRetentionAwareStartingRung: jest.fn().mockReturnValue(1),
-  detectPartialProgress: jest.fn().mockReturnValue(false),
 }));
 
 const mockCreatePendingSessionSummary = jest.fn();
@@ -2043,6 +2041,12 @@ describe('streamMessage', () => {
 
     (streamExchange as jest.Mock).mockResolvedValue({
       stream: fakeStream(),
+      // Envelope migration: onComplete reads the raw envelope JSON from
+      // rawResponsePromise. Mock resolves with a shape `parseExchangeEnvelope`
+      // is mocked to ignore anyway (see top-of-file mock).
+      rawResponsePromise: Promise.resolve(
+        '{"reply":"Hello world! This is the full response.","signals":{}}'
+      ),
       newEscalationRung: 1,
       provider: 'gemini',
       model: 'gemini-2.5-flash',
@@ -2101,9 +2105,7 @@ describe('streamMessage', () => {
       // consume
     }
 
-    const metadata = await result.onComplete(
-      'Hello world! This is the full response.'
-    );
+    const metadata = await result.onComplete();
 
     expect(metadata).toHaveProperty('exchangeCount');
     expect(metadata).toHaveProperty('escalationRung');
@@ -2136,5 +2138,77 @@ describe('streamMessage', () => {
         message: 'Hello',
       })
     ).rejects.toThrow(/not found/i);
+  });
+
+  // ---------------------------------------------------------------------------
+  // F6: confidence persistence
+  // ---------------------------------------------------------------------------
+
+  it('persists confidence=low in ai_response metadata when envelope reports low confidence', async () => {
+    const { parseExchangeEnvelope } = require('./exchanges') as {
+      parseExchangeEnvelope: jest.Mock;
+    };
+    parseExchangeEnvelope.mockReturnValueOnce({
+      cleanResponse: 'This is my best guess.',
+      understandingCheck: false,
+      partialProgress: false,
+      needsDeepening: false,
+      notePrompt: false,
+      notePromptPostSession: false,
+      fluencyDrill: null,
+      confidence: 'low' as const,
+    });
+
+    const row = mockSessionRow({ exchangeCount: 1, topicId: null });
+    setupScopedRepo({ sessionFindFirst: row });
+    const db = createMockDb({
+      learningSessionFindFirst: row,
+      updateReturning: [{ exchangeCount: 2 }],
+    });
+
+    const result = await streamMessage(db, profileId, sessionId, {
+      message: 'Can you explain this?',
+    });
+
+    for await (const _chunk of result.stream) {
+      // consume stream
+    }
+
+    const metadata = await result.onComplete();
+
+    // The returned metadata must include confidence
+    expect(metadata.confidence).toBe('low');
+
+    // The DB insert must have persisted confidence in ai_response metadata
+    const insertValues = (db.insert as jest.Mock).mock.results[0]?.value?.values
+      ?.mock?.calls[0]?.[0] as
+      | Array<{ eventType?: string; metadata?: Record<string, unknown> }>
+      | undefined;
+    const aiResponseRow = insertValues?.find(
+      (row) => row.eventType === 'ai_response'
+    );
+    expect(aiResponseRow?.metadata).toMatchObject({ confidence: 'low' });
+  });
+
+  it('onComplete returns confidence=undefined when envelope has no confidence', async () => {
+    const row = mockSessionRow({ exchangeCount: 2, topicId: null });
+    setupScopedRepo({ sessionFindFirst: row });
+    const db = createMockDb({
+      learningSessionFindFirst: row,
+      updateReturning: [{ exchangeCount: 3 }],
+    });
+
+    const result = await streamMessage(db, profileId, sessionId, {
+      message: 'Help me',
+    });
+
+    for await (const _chunk of result.stream) {
+      // consume stream
+    }
+
+    const metadata = await result.onComplete();
+
+    // Default mock returns no confidence field — should be absent/undefined
+    expect(metadata.confidence).toBeUndefined();
   });
 });

@@ -1,5 +1,4 @@
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
-import { Alert } from 'react-native';
 import ShelfScreen from './index';
 
 // ---------------------------------------------------------------------------
@@ -103,10 +102,21 @@ jest.mock('../../../../lib/theme', () => ({
 }));
 
 // --- formatApiError ---
-jest.mock('../../../../lib/format-api-error', () => ({
-  formatApiError: (err: unknown) =>
-    err instanceof Error ? err.message : 'Unknown error',
-}));
+jest.mock('../../../../lib/format-api-error', () => {
+  const actual = jest.requireActual(
+    '../../../../lib/format-api-error'
+  ) as Record<string, unknown>;
+  return {
+    ...actual,
+    formatApiError: (err: unknown) =>
+      err instanceof Error ? err.message : 'Unknown error',
+    classifyApiError: (err: unknown) => ({
+      message: err instanceof Error ? err.message : 'Unknown error',
+      category: 'unknown' as const,
+      recovery: 'retry' as const,
+    }),
+  };
+});
 
 // --- Library components ---
 jest.mock('../../../../components/library/BookCard', () => ({
@@ -259,8 +269,8 @@ describe('ShelfScreen', () => {
     const { getByTestId, getByText } = render(<ShelfScreen />);
     expect(getByTestId('shelf-error')).toBeTruthy();
     expect(getByText('Failed to load books')).toBeTruthy();
-    expect(getByTestId('shelf-retry-button')).toBeTruthy();
-    expect(getByTestId('shelf-back-button')).toBeTruthy();
+    expect(getByTestId('recovery-retry')).toBeTruthy();
+    expect(getByTestId('recovery-go-home')).toBeTruthy();
   });
 
   it('retry button calls refetch on booksQuery when booksQuery fails [BUG-82]', () => {
@@ -273,7 +283,7 @@ describe('ShelfScreen', () => {
     });
 
     const { getByTestId } = render(<ShelfScreen />);
-    fireEvent.press(getByTestId('shelf-retry-button'));
+    fireEvent.press(getByTestId('recovery-retry'));
     expect(mockBooksRefetch).toHaveBeenCalledTimes(1);
   });
 
@@ -287,8 +297,8 @@ describe('ShelfScreen', () => {
     });
 
     const { getByTestId } = render(<ShelfScreen />);
-    fireEvent.press(getByTestId('shelf-back-button'));
-    expect(mockBack).toHaveBeenCalledTimes(1);
+    fireEvent.press(getByTestId('recovery-go-home'));
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
   });
 
   it('shows error state with retry and back buttons when subjectsQuery fails [BUG-82]', () => {
@@ -303,8 +313,8 @@ describe('ShelfScreen', () => {
     const { getByTestId, getByText } = render(<ShelfScreen />);
     expect(getByTestId('shelf-error')).toBeTruthy();
     expect(getByText('Subjects unavailable')).toBeTruthy();
-    expect(getByTestId('shelf-retry-button')).toBeTruthy();
-    expect(getByTestId('shelf-back-button')).toBeTruthy();
+    expect(getByTestId('recovery-retry')).toBeTruthy();
+    expect(getByTestId('recovery-go-home')).toBeTruthy();
   });
 
   it('retry button refetches both queries when subjectsQuery fails [BUG-82]', () => {
@@ -317,7 +327,7 @@ describe('ShelfScreen', () => {
     });
 
     const { getByTestId } = render(<ShelfScreen />);
-    fireEvent.press(getByTestId('shelf-retry-button'));
+    fireEvent.press(getByTestId('recovery-retry'));
     expect(mockSubjectsRefetch).toHaveBeenCalledTimes(1);
   });
 
@@ -535,24 +545,21 @@ describe('ShelfScreen', () => {
     });
   });
 
-  it('shows error Alert when picking a book suggestion fails', async () => {
-    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(jest.fn());
-
+  it('shows ErrorFallback overlay when picking a book suggestion fails', async () => {
     mockUseBookSuggestions.mockReturnValue({
       data: [{ id: 'sug-1', title: 'Number Theory', emoji: '🔢' }],
     });
 
     mockFilingMutateAsync.mockRejectedValue(new Error('Filing failed'));
 
-    const { getByTestId } = render(<ShelfScreen />);
+    const { getByTestId, getByText } = render(<ShelfScreen />);
     fireEvent.press(getByTestId('shelf-suggestion-sug-1'));
 
     await waitFor(() => {
-      expect(alertSpy).toHaveBeenCalledWith(
-        'Error',
-        'Filing failed',
-        expect.any(Array)
-      );
+      expect(getByTestId('shelf-filing-error-overlay')).toBeTruthy();
+      expect(getByText('Filing failed')).toBeTruthy();
+      expect(getByTestId('shelf-filing-error-retry')).toBeTruthy();
+      expect(getByTestId('shelf-filing-error-back')).toBeTruthy();
     });
   });
 });

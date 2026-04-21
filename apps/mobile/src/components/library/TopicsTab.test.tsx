@@ -76,8 +76,8 @@ const subjects = [
   { id: 'sub-2', name: 'History' },
 ];
 const books = [
-  { id: 'book-1', title: 'Algebra Basics' },
-  { id: 'book-2', title: 'Ancient Egypt' },
+  { id: 'book-1', title: 'Algebra Basics', subjectName: 'Mathematics' },
+  { id: 'book-2', title: 'Ancient Egypt', subjectName: 'History' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -148,7 +148,7 @@ describe('TopicsTab', () => {
     });
   });
 
-  it('shows no-results state when nothing matches', () => {
+  it('shows no-results with "search" message when search produces no matches', () => {
     const searchState: TopicsTabState = {
       ...defaultState,
       search: 'quantum',
@@ -157,6 +157,58 @@ describe('TopicsTab', () => {
 
     expect(screen.getByTestId('library-no-results')).toBeTruthy();
     expect(screen.getByText('No topics match your search')).toBeTruthy();
+  });
+
+  it('shows "filters" message when only filter applied (BUG-512)', () => {
+    const filterOnlyState: TopicsTabState = {
+      search: '',
+      sortKey: 'name-asc',
+      filters: {
+        subjectIds: ['sub-999'],
+        bookIds: [],
+        retention: [],
+        needsAttention: false,
+        hasNotes: false,
+      },
+    };
+    render(<TopicsTab {...defaultProps} state={filterOnlyState} />);
+
+    expect(screen.getByTestId('library-no-results')).toBeTruthy();
+    expect(screen.getByText('No topics match your filters')).toBeTruthy();
+  });
+
+  it('book filter matches topics by bookId (BUG-511)', () => {
+    const bookFilterState: TopicsTabState = {
+      search: '',
+      sortKey: 'name-asc',
+      filters: {
+        subjectIds: [],
+        bookIds: ['book-1'],
+        retention: [],
+        needsAttention: false,
+        hasNotes: false,
+      },
+    };
+    render(<TopicsTab {...defaultProps} state={bookFilterState} />);
+
+    // topic1 has bookId 'book-1', topic2 has bookId 'book-2'
+    expect(screen.getByTestId('topic-row-topic-1')).toBeTruthy();
+    expect(screen.queryByTestId('topic-row-topic-2')).toBeNull();
+  });
+
+  it('disambiguates duplicate book titles with subject name (BUG-513)', () => {
+    const dupeBooks = [
+      { id: 'book-a', title: 'Uncategorized', subjectName: 'Mathematics' },
+      { id: 'book-b', title: 'Uncategorized', subjectName: 'History' },
+    ];
+    render(<TopicsTab {...defaultProps} books={dupeBooks} />);
+
+    // Open filter sheet
+    fireEvent.press(screen.getByTestId('library-filter-button'));
+
+    // Disambiguated labels should appear
+    expect(screen.getByText('Uncategorized (Mathematics)')).toBeTruthy();
+    expect(screen.getByText('Uncategorized (History)')).toBeTruthy();
   });
 
   it('calls onTopicPress with topicId and subjectId', () => {

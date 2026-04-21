@@ -7,7 +7,6 @@ import {
   TextInput,
   Linking,
   ScrollView,
-  Alert,
 } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
@@ -16,20 +15,24 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import type { HomeworkCaptureSource, HomeworkProblem } from '@eduagent/schemas';
 import { useThemeColors } from '../../../lib/theme';
-import { cameraReducer, initialCameraState } from './_helpers/camera-reducer';
+import {
+  cameraReducer,
+  initialCameraState,
+} from '../../../components/homework/camera-reducer';
 import { useHomeworkOcr } from '../../../hooks/use-homework-ocr';
 import { useCreateSubject, useSubjects } from '../../../hooks/use-subjects';
 import { useClassifySubject } from '../../../hooks/use-classify-subject';
 import { CelebrationAnimation } from '../../../components/common';
 import { formatApiError } from '../../../lib/format-api-error';
 import { goBackOrReplace } from '../../../lib/navigation';
+import { platformAlert } from '../../../lib/platform-alert';
 import { Sentry } from '../../../lib/sentry';
 import {
   createHomeworkProblem,
   getHomeworkProblemText,
   serializeHomeworkProblems,
   splitHomeworkProblems,
-} from './_helpers/problem-cards';
+} from '../../../components/homework/problem-cards';
 
 type FlashMode = 'off' | 'on' | 'auto';
 
@@ -158,7 +161,7 @@ export default function CameraScreen(): React.ReactNode {
                 action: 'auto-create-subject',
               },
             });
-            Alert.alert(
+            platformAlert(
               'Could not detect subject',
               'Please select your subject manually.'
             );
@@ -185,7 +188,7 @@ export default function CameraScreen(): React.ReactNode {
       }
     } catch (error) {
       console.error('[HomeworkCamera] Failed to capture photo:', error);
-      Alert.alert(
+      platformAlert(
         'Could not take photo',
         'Please try again. If the problem continues, try importing from your gallery instead.'
       );
@@ -206,7 +209,7 @@ export default function CameraScreen(): React.ReactNode {
 
       const selectedImage = result.assets?.[0];
       if (!selectedImage?.uri) {
-        Alert.alert(
+        platformAlert(
           "Couldn't open your photos",
           'Please try again or use the camera instead.'
         );
@@ -225,7 +228,7 @@ export default function CameraScreen(): React.ReactNode {
       const permission =
         await ImagePicker.getMediaLibraryPermissionsAsync().catch(() => null);
       if (permission && !permission.granted && !permission.canAskAgain) {
-        Alert.alert(
+        platformAlert(
           'Photo access needed',
           'Please enable photo library access in Settings to import homework from your gallery.',
           [
@@ -241,7 +244,7 @@ export default function CameraScreen(): React.ReactNode {
         return;
       }
 
-      Alert.alert(
+      platformAlert(
         "Couldn't open your photos",
         'Please try again or use the camera instead.'
       );
@@ -336,14 +339,14 @@ export default function CameraScreen(): React.ReactNode {
     const effectiveSubjectName =
       subjectName ?? autoDetectedSubject?.subjectName ?? '';
     if (!combinedProblemText.trim()) {
-      Alert.alert(
+      platformAlert(
         'No problems found',
         'Please keep at least one problem card.'
       );
       return;
     }
     if (!effectiveSubjectId) {
-      Alert.alert(
+      platformAlert(
         'No subject selected',
         'Please go back and select a subject first.'
       );
@@ -427,7 +430,7 @@ export default function CameraScreen(): React.ReactNode {
         homeworkCaptureSource
       );
     } catch (err: unknown) {
-      Alert.alert('Could not create subject', formatApiError(err));
+      platformAlert('Could not create subject', formatApiError(err));
     }
   }, [
     combinedProblemText,
@@ -477,7 +480,7 @@ export default function CameraScreen(): React.ReactNode {
       Sentry.captureException(classifyErr, {
         tags: { component: 'HomeworkCamera', action: 'manual-classify' },
       });
-      Alert.alert(
+      platformAlert(
         'Could not identify the subject',
         'Please pick the subject this homework belongs to.',
         [{ text: 'OK' }]
@@ -555,7 +558,7 @@ export default function CameraScreen(): React.ReactNode {
         <Text className="text-body text-text-secondary text-center mb-8">
           {denied
             ? 'Camera access was denied. You can enable it in your device settings to photograph homework problems.'
-            : 'We need your camera to photograph homework problems so your AI tutor can help you work through them step by step.'}
+            : "Snap a picture of your homework and I'll help you solve it step by step."}
         </Text>
         {denied ? (
           <Pressable

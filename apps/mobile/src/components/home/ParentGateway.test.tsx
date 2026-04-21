@@ -58,7 +58,7 @@ describe('ParentGateway', () => {
     mockDashboardIsError = false;
     mockDashboardData = {
       children: [
-        { displayName: 'Emma', totalTimeThisWeek: 720, profileId: 'c1' },
+        { displayName: 'Emma', totalTimeThisWeek: 45, profileId: 'c1' },
       ],
     };
   });
@@ -80,7 +80,7 @@ describe('ParentGateway', () => {
   it('shows child activity highlight with time', () => {
     render(<ParentGateway {...defaultProps} />);
 
-    expect(screen.getByText('Emma practiced 12 min this week')).toBeTruthy();
+    expect(screen.getByText('Emma practiced 45 min this week')).toBeTruthy();
   });
 
   it('shows fallback highlight when no activity', () => {
@@ -113,7 +113,7 @@ describe('ParentGateway', () => {
 
     render(<ParentGateway {...defaultProps} />);
 
-    expect(screen.getByText('Tomas practiced 15 min this week')).toBeTruthy();
+    expect(screen.getByText('Tomas practiced 900 min this week')).toBeTruthy();
   });
 
   it('navigates to parent dashboard on "Check child\'s progress"', () => {
@@ -123,7 +123,16 @@ describe('ParentGateway', () => {
     expect(mockPush).toHaveBeenCalledWith('/(app)/dashboard');
   });
 
-  it('navigates to /create-subject on "Learn something"', () => {
+  it('calls onLearn when "Learn something" is pressed', () => {
+    const onLearn = jest.fn();
+    render(<ParentGateway {...defaultProps} onLearn={onLearn} />);
+
+    fireEvent.press(screen.getByTestId('gateway-learn'));
+    expect(onLearn).toHaveBeenCalledTimes(1);
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('falls back to /create-subject when onLearn is not provided', () => {
     render(<ParentGateway {...defaultProps} />);
 
     fireEvent.press(screen.getByTestId('gateway-learn'));

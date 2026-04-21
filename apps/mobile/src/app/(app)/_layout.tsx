@@ -1,5 +1,5 @@
 import React from 'react';
-import { Tabs, Redirect, useRouter } from 'expo-router';
+import { Tabs, Redirect, usePathname, useRouter } from 'expo-router';
 import {
   View,
   Text,
@@ -7,7 +7,7 @@ import {
   Pressable,
   ActivityIndicator,
   ScrollView,
-  Alert,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth, useClerk, useUser } from '@clerk/clerk-expo';
@@ -26,6 +26,14 @@ import {
 import { evaluateSentryForProfile } from '../../lib/sentry';
 import { formatApiError } from '../../lib/format-api-error';
 import { clearTransitionState } from '../../lib/auth-transition';
+import { toInternalAppRedirectPath } from '../../lib/normalize-redirect-path';
+import {
+  clearPendingAuthRedirect,
+  peekPendingAuthRedirect,
+  rememberPendingAuthRedirect,
+} from '../../lib/pending-auth-redirect';
+import { platformAlert } from '../../lib/platform-alert';
+import { FeedbackProvider } from '../../components/feedback/FeedbackProvider';
 
 // ─── Tab visibility whitelist ────────────────────────────────────────
 // Only these routes render a visible tab button. Every other route in
@@ -43,6 +51,8 @@ const FULL_SCREEN_ROUTES = new Set([
   'shelf/[subjectId]',
   'shelf/[subjectId]/book/[bookId]',
 ]);
+
+const PENDING_AUTH_REDIRECT_SETTLE_MS = 1_000;
 
 const iconMap: Record<
   string,
@@ -76,6 +86,20 @@ const PENDING_CONSENT_STATUSES = new Set([
   'PENDING',
   'PARENTAL_CONSENT_REQUESTED',
 ]);
+
+function resolveAuthRedirectPath(pathname: string | undefined): string {
+  if (Platform.OS === 'web') {
+    // Access window via globalThis to avoid TS DOM-lib requirement in RN tsconfig.
+    const win = (
+      globalThis as { window?: { location?: { pathname?: string } } }
+    ).window;
+    if (typeof win?.location?.pathname === 'string') {
+      return toInternalAppRedirectPath(win.location.pathname);
+    }
+  }
+
+  return toInternalAppRedirectPath(pathname);
+}
 
 /**
  * Whether the "Switch profile" button should appear inside consent gates.
@@ -360,7 +384,7 @@ function CreateProfileGate(): React.ReactElement {
       await signOut();
     } catch (err: unknown) {
       console.error('signOut failed:', err);
-      Alert.alert('Sign Out Failed', 'Please try again or restart the app.');
+      platformAlert('Sign Out Failed', 'Please try again or restart the app.');
     }
   };
 
@@ -430,7 +454,7 @@ function ConsentWithdrawnGate(): React.ReactElement {
       await signOut();
     } catch (err: unknown) {
       console.error('signOut failed:', err);
-      Alert.alert('Sign Out Failed', 'Please try again or restart the app.');
+      platformAlert('Sign Out Failed', 'Please try again or restart the app.');
     }
   };
 
@@ -495,7 +519,7 @@ function ConsentWithdrawnGate(): React.ReactElement {
             const other = profiles.find((p) => p.id !== activeProfile?.id);
             if (other) {
               void switchProfile(other.id).catch(() => {
-                Alert.alert('Could not switch profile', 'Please try again.');
+                platformAlert('Could not switch profile', 'Please try again.');
               });
             }
           }}
@@ -537,7 +561,7 @@ function ConsentPendingGate(): React.ReactElement {
       await signOut();
     } catch (err: unknown) {
       console.error('signOut failed:', err);
-      Alert.alert('Sign Out Failed', 'Please try again or restart the app.');
+      platformAlert('Sign Out Failed', 'Please try again or restart the app.');
     }
   };
   const { profiles, activeProfile, switchProfile } = useProfile();
@@ -645,7 +669,7 @@ function ConsentPendingGate(): React.ReactElement {
           void queryClient.invalidateQueries({
             queryKey: ['consent-status'],
           });
-          Alert.alert(
+          platformAlert(
             'Link sent!',
             `We sent a consent link to ${sentTo}. Check their inbox (and spam folder).`
           );
@@ -713,7 +737,10 @@ function ConsentPendingGate(): React.ReactElement {
               const other = profiles.find((p) => p.id !== activeProfile?.id);
               if (other) {
                 void switchProfile(other.id).catch(() => {
-                  Alert.alert('Could not switch profile', 'Please try again.');
+                  platformAlert(
+                    'Could not switch profile',
+                    'Please try again.'
+                  );
                 });
               }
             }}
@@ -976,7 +1003,7 @@ function ConsentPendingGate(): React.ReactElement {
             const other = profiles.find((p) => p.id !== activeProfile?.id);
             if (other) {
               void switchProfile(other.id).catch(() => {
-                Alert.alert('Could not switch profile', 'Please try again.');
+                platformAlert('Could not switch profile', 'Please try again.');
               });
             }
           }}
@@ -1009,6 +1036,9 @@ export default function AppLayout() {
   const colors = useThemeColors();
   const tokenVars = useTokenVars();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const pathname = usePathname();
+  const currentAppPath = toInternalAppRedirectPath(pathname);
   const {
     activeProfile,
     isLoading: isProfileLoading,
@@ -1022,6 +1052,9 @@ export default function AppLayout() {
   // Sync Clerk auth state with RevenueCat identity (runs on auth change)
   useRevenueCatIdentity();
 
+  const pendingAuthRedirect = isSignedIn ? peekPendingAuthRedirect() : null;
+  const replayedAuthRedirectRef = React.useRef<string | null>(null);
+
   // Age-gated Sentry: re-evaluate on profile switch (Story 10.14)
   React.useEffect(() => {
     evaluateSentryForProfile(
@@ -1034,10 +1067,42 @@ export default function AppLayout() {
     activeProfile?.consentStatus,
   ]);
 
+  React.useEffect(() => {
+    if (!pendingAuthRedirect || currentAppPath !== pendingAuthRedirect) {
+      return;
+    }
+
+    // W-03: on web we can briefly land on the requested route before a later
+    // mount-time redirect snaps the tab shell back to /home. Keep the pending
+    // redirect alive until the target path stays stable for a short window so
+    // the replay effect can recover from that late navigation.
+    const clearTimer = setTimeout(() => {
+      if (peekPendingAuthRedirect() === pendingAuthRedirect) {
+        clearPendingAuthRedirect();
+      }
+    }, PENDING_AUTH_REDIRECT_SETTLE_MS);
+
+    return () => clearTimeout(clearTimer);
+  }, [currentAppPath, pendingAuthRedirect]);
+
+  React.useEffect(() => {
+    if (!pendingAuthRedirect || currentAppPath === pendingAuthRedirect) {
+      replayedAuthRedirectRef.current = null;
+      return;
+    }
+
+    if (replayedAuthRedirectRef.current === pendingAuthRedirect) {
+      return;
+    }
+
+    replayedAuthRedirectRef.current = pendingAuthRedirect;
+    router.replace(pendingAuthRedirect as never);
+  }, [currentAppPath, pendingAuthRedirect, router]);
+
   // Show alert when a profile was removed server-side (consent denied / auto-deleted)
   React.useEffect(() => {
     if (profileWasRemoved) {
-      Alert.alert(
+      platformAlert(
         'Profile switched',
         "One of your profiles is no longer available, so we've switched you to your main profile. Everything else is just as you left it.",
         [{ text: 'OK', onPress: acknowledgeProfileRemoval }]
@@ -1066,7 +1131,21 @@ export default function AppLayout() {
       console.warn(
         '[AUTH-DEBUG] (app) layout → NOT signed in, bouncing to sign-in'
       );
-    return <Redirect href="/(auth)/sign-in" />;
+    const redirectTo = encodeURIComponent(
+      rememberPendingAuthRedirect(resolveAuthRedirectPath(pathname))
+    );
+    return <Redirect href={`/sign-in?redirectTo=${redirectTo}` as const} />;
+  }
+
+  if (pendingAuthRedirect && currentAppPath !== pendingAuthRedirect) {
+    return (
+      <View
+        className="flex-1 bg-background items-center justify-center"
+        testID="auth-redirect-replay"
+      >
+        <ActivityIndicator size="large" />
+      </View>
+    );
   }
 
   // Show a centered spinner while profiles load — never return null (blank
@@ -1111,9 +1190,13 @@ export default function AppLayout() {
 
   // key={themeKey} removed — crashes Android Fabric (MENTOMATE-MOBILE-6).
   // NativeWind vars() style updates propagate without remounting.
+
+  // FeedbackProvider scoped here (not in root _layout) so the accelerometer
+  // only runs on authenticated screens where feedback submission actually works.
   return (
-    <View style={[{ flex: 1 }, tokenVars]}>
-      {/* ─── Whitelist tab pattern ────────────────────────────────────
+    <FeedbackProvider>
+      <View style={[{ flex: 1 }, tokenVars]}>
+        {/* ─── Whitelist tab pattern ────────────────────────────────────
            Only routes listed in VISIBLE_TABS render a tab button.
            Everything else is auto-hidden via screenOptions defaults.
            Adding a new route file to (app)/ will NEVER create a
@@ -1122,86 +1205,87 @@ export default function AppLayout() {
            Routes in FULL_SCREEN_ROUTES also hide the entire tab bar
            (immersive screens like session, onboarding, homework).
          ──────────────────────────────────────────────────────────── */}
-      <Tabs
-        screenOptions={({ route }) => {
-          const isVisible = VISIBLE_TABS.has(route.name);
-          const isFullScreen = FULL_SCREEN_ROUTES.has(route.name);
-          return {
-            headerShown: false,
-            // F-003/F-016/F-055: on web, inactive tab scenes stay in the DOM.
-            // An opaque sceneStyle prevents the previous tab from bleeding
-            // through when switching to a full-screen route (session, quiz, etc.).
-            sceneStyle: { backgroundColor: colors.background },
-            tabBarStyle: isFullScreen
-              ? { display: 'none' }
-              : {
-                  backgroundColor: colors.surface,
-                  borderTopColor: colors.border,
-                  height: 56 + Math.max(insets.bottom, 24),
-                  paddingBottom: Math.max(insets.bottom, 24),
-                },
-            tabBarActiveTintColor: colors.accent,
-            tabBarInactiveTintColor: colors.textSecondary,
-            tabBarLabelStyle: { fontSize: 12 },
-            // Auto-hide any route not in the whitelist.
-            // href:null removes the link; tabBarItemStyle removes the
-            // flexbox space (Expo Router v6 + React Nav v7 regression).
-            ...(isVisible
-              ? {}
-              : { href: null, tabBarItemStyle: { display: 'none' } }),
-          };
-        }}
-      >
-        <Tabs.Screen
-          name="home"
-          options={{
-            title: 'Home',
-            tabBarButtonTestID: 'tab-home',
-            tabBarAccessibilityLabel: 'Home Tab',
-            // Lazy-load the Home tab so the initial mount only renders the
-            // visible gate screens (consent, profile creation). The trade-off
-            // is a brief spinner on the first Home tap, but it cuts ~200ms
-            // off the critical auth→gate path on low-end devices.
-            lazy: true,
-            tabBarIcon: ({ focused }) => (
-              <TabIcon name="Home" focused={focused} />
-            ),
+        <Tabs
+          screenOptions={({ route }) => {
+            const isVisible = VISIBLE_TABS.has(route.name);
+            const isFullScreen = FULL_SCREEN_ROUTES.has(route.name);
+            return {
+              headerShown: false,
+              // F-003/F-016/F-055: on web, inactive tab scenes stay in the DOM.
+              // An opaque sceneStyle prevents the previous tab from bleeding
+              // through when switching to a full-screen route (session, quiz, etc.).
+              sceneStyle: { backgroundColor: colors.background },
+              tabBarStyle: isFullScreen
+                ? { display: 'none' }
+                : {
+                    backgroundColor: colors.surface,
+                    borderTopColor: colors.border,
+                    height: 56 + Math.max(insets.bottom, 24),
+                    paddingBottom: Math.max(insets.bottom, 24),
+                  },
+              tabBarActiveTintColor: colors.accent,
+              tabBarInactiveTintColor: colors.textSecondary,
+              tabBarLabelStyle: { fontSize: 12 },
+              // Auto-hide any route not in the whitelist.
+              // href:null removes the link; tabBarItemStyle removes the
+              // flexbox space (Expo Router v6 + React Nav v7 regression).
+              ...(isVisible
+                ? {}
+                : { href: null, tabBarItemStyle: { display: 'none' } }),
+            };
           }}
-        />
-        <Tabs.Screen
-          name="library"
-          options={{
-            title: 'Library',
-            tabBarButtonTestID: 'tab-library',
-            tabBarAccessibilityLabel: 'Library Tab',
-            tabBarIcon: ({ focused }) => (
-              <TabIcon name="Book" focused={focused} />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="progress"
-          options={{
-            title: 'Progress',
-            tabBarButtonTestID: 'tab-progress',
-            tabBarAccessibilityLabel: 'Progress Tab',
-            tabBarIcon: ({ focused }) => (
-              <TabIcon name="Progress" focused={focused} />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="more"
-          options={{
-            title: 'More',
-            tabBarButtonTestID: 'tab-more',
-            tabBarAccessibilityLabel: 'More Tab',
-            tabBarIcon: ({ focused }) => (
-              <TabIcon name="More" focused={focused} />
-            ),
-          }}
-        />
-      </Tabs>
-    </View>
+        >
+          <Tabs.Screen
+            name="home"
+            options={{
+              title: 'Home',
+              tabBarButtonTestID: 'tab-home',
+              tabBarAccessibilityLabel: 'Home Tab',
+              // Lazy-load the Home tab so the initial mount only renders the
+              // visible gate screens (consent, profile creation). The trade-off
+              // is a brief spinner on the first Home tap, but it cuts ~200ms
+              // off the critical auth→gate path on low-end devices.
+              lazy: true,
+              tabBarIcon: ({ focused }) => (
+                <TabIcon name="Home" focused={focused} />
+              ),
+            }}
+          />
+          <Tabs.Screen
+            name="library"
+            options={{
+              title: 'Library',
+              tabBarButtonTestID: 'tab-library',
+              tabBarAccessibilityLabel: 'Library Tab',
+              tabBarIcon: ({ focused }) => (
+                <TabIcon name="Book" focused={focused} />
+              ),
+            }}
+          />
+          <Tabs.Screen
+            name="progress"
+            options={{
+              title: 'Progress',
+              tabBarButtonTestID: 'tab-progress',
+              tabBarAccessibilityLabel: 'Progress Tab',
+              tabBarIcon: ({ focused }) => (
+                <TabIcon name="Progress" focused={focused} />
+              ),
+            }}
+          />
+          <Tabs.Screen
+            name="more"
+            options={{
+              title: 'More',
+              tabBarButtonTestID: 'tab-more',
+              tabBarAccessibilityLabel: 'More Tab',
+              tabBarIcon: ({ focused }) => (
+                <TabIcon name="More" focused={focused} />
+              ),
+            }}
+          />
+        </Tabs>
+      </View>
+    </FeedbackProvider>
   );
 }

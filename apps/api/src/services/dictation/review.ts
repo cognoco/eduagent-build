@@ -25,12 +25,17 @@ export interface BuildReviewSystemPromptParams {
    * 'stories', 'examples', 'analogies', 'diagrams'.
    */
   preferredExplanations?: string[];
+  /**
+   * Topics the learner has recently struggled with — used to direct targeted
+   * feedback in the review. Optional. Medium/high confidence struggles only.
+   */
+  recentStruggles?: string[];
 }
 
 function buildExplanationStyleGuidance(
   params: BuildReviewSystemPromptParams
 ): string {
-  const { ageYears, preferredExplanations = [] } = params;
+  const { ageYears, preferredExplanations = [], recentStruggles } = params;
 
   const parts: string[] = [];
 
@@ -71,7 +76,17 @@ function buildExplanationStyleGuidance(
     );
   }
 
-  return parts.length > 0 ? '\n\nEXPLANATION STYLE:\n' + parts.join(' ') : '';
+  const struggleHint =
+    recentStruggles && recentStruggles.length > 0
+      ? `\nThe learner has recently struggled with: ${recentStruggles.join(
+          ', '
+        )}. When reviewing their dictation, pay extra attention to errors related to these areas and provide targeted feedback.`
+      : '';
+
+  return (
+    (parts.length > 0 ? '\n\nEXPLANATION STYLE:\n' + parts.join(' ') : '') +
+    struggleHint
+  );
 }
 
 export function buildReviewSystemPrompt(
@@ -123,6 +138,11 @@ export interface ReviewDictationInput {
   ageYears?: number;
   /** Learner's preferred explanation styles — used to tune mistake explanations. Optional. */
   preferredExplanations?: string[];
+  /**
+   * Topics the learner has recently struggled with — used to direct targeted
+   * feedback in the review. Optional. Medium/high confidence struggles only.
+   */
+  recentStruggles?: string[];
 }
 
 export async function reviewDictation(
@@ -135,6 +155,7 @@ export async function reviewDictation(
     language,
     ageYears,
     preferredExplanations,
+    recentStruggles,
   } = input;
 
   const originalText = sentences
@@ -152,6 +173,7 @@ export async function reviewDictation(
   const systemPrompt = buildReviewSystemPrompt({
     ageYears,
     preferredExplanations,
+    recentStruggles,
   });
 
   const messages: ChatMessage[] = [

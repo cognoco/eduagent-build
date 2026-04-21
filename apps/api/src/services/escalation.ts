@@ -14,7 +14,11 @@ export interface EscalationState {
   totalExchanges: number;
   /** SM-2 retention status — affects escalation speed (Gap 4) */
   retentionStatus?: 'new' | 'strong' | 'fading' | 'weak' | 'forgotten';
-  /** Whether the previous AI response contained [PARTIAL_PROGRESS] (Gap 3) */
+  /**
+   * Whether the previous AI turn set envelope `signals.partial_progress`
+   * (Gap 3). Pre-migration this was derived from a [PARTIAL_PROGRESS] free-
+   * text marker; it now comes from structured ai_response metadata.
+   */
   previousResponseHadPartialProgress?: boolean;
   /** Consecutive exchanges held by partial progress (Gap 3 cap) */
   consecutiveHolds?: number;
@@ -100,21 +104,6 @@ export function getRetentionAwareStartingRung(
   }
 }
 
-/**
- * Detects the [PARTIAL_PROGRESS] marker in an AI response.
- * The LLM self-reports when a student's answer shows partial understanding
- * — they have part of the concept right but are missing a key piece.
- *
- * MUST use the strict own-line regex — a permissive .includes() match would
- * fire on mid-sentence occurrences, leaking the raw token to learners
- * because the companion strip step in exchanges.ts:cleanMarkersFromResponse
- * uses the same strict pattern. See docs/specs/2026-04-18-llm-reliability-ux-audit.md
- * finding F1.2 for history.
- */
-export function detectPartialProgress(aiResponse: string): boolean {
-  return /(?:^|\n)\[PARTIAL_PROGRESS\]\s*$/.test(aiResponse);
-}
-
 // ---------------------------------------------------------------------------
 // Escalation evaluation
 // ---------------------------------------------------------------------------
@@ -134,7 +123,7 @@ export function detectPartialProgress(aiResponse: string): boolean {
  *
  * Partial progress detection (Gap 3): If the learner's response shows
  * genuine engagement (heuristic: length + not stuck) OR the previous AI
- * response contained [PARTIAL_PROGRESS], the escalation counter is frozen.
+ * response signalled partial progress via the envelope, the escalation counter is frozen.
  * The student can stay at a rung indefinitely as long as they're making
  * progress — escalation only fires when engagement drops.
  *
@@ -173,7 +162,7 @@ export function evaluateEscalation(
   // Heuristic: response is long enough to be a genuine attempt, not a stuck indicator
   const isEngagedResponse = normalised.length >= ENGAGED_RESPONSE_MIN_LENGTH;
 
-  // Authoritative signal: LLM [PARTIAL_PROGRESS] marker from the previous AI response.
+  // Authoritative signal: envelope `signals.partial_progress` from the previous AI response.
   // Length heuristic alone is insufficient (verbose wrong answers would stall escalation).
   // Hold only when: LLM signalled progress, OR both engaged length AND at early exchanges.
   const hasPartialProgress =
@@ -280,26 +269,11 @@ export function getEscalationPromptGuidance(
         `If the learner is still stuck after three exchanges at rung 5, this topic needs a different approach.\n` +
         `- Deliver the full worked example collaboratively. Frame it as exploration, not failure.\n` +
         `- Suggest a break: "This is a tough one — let's come back to it fresh later."\n` +
-        `- End your response with the marker [NEEDS_DEEPENING] on its own line (the system will flag this topic for review).\n` +
+        `- Set \`signals.needs_deepening\` to true on that turn (the system will flag the topic for review).\n` +
         `- Do NOT loop. Do not keep asking variants of the same question. The learner has given their best effort.`
       );
 
     default:
       return '';
   }
-}
-
-/**
- * Returns the partial-progress signaling instruction appended to the system
- * prompt. Kept separate from rung guidance so it applies uniformly.
- */
-export function getPartialProgressInstruction(): string {
-  return (
-    'Progress signaling:\n' +
-    "If the learner's response shows partial understanding — they have part of the concept right " +
-    'but are missing a key piece — include [PARTIAL_PROGRESS] on its own line at the end of your response.\n' +
-    'This tells the system the learner is moving forward and should not be escalated prematurely.\n' +
-    'Do NOT use [PARTIAL_PROGRESS] if the learner is simply guessing, repeating what you said, or producing a wrong answer with no correct elements.\n' +
-    'Do NOT use [PARTIAL_PROGRESS] for responses that are just "yes" or "no" without justification.'
-  );
 }

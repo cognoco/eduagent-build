@@ -204,6 +204,20 @@ export default function QuizIndexScreen(): React.ReactElement {
             }}
             testID="quiz-guess-who"
           />
+          {/* [F-Q-15] When no language subjects exist, show a dimmed card
+              nudging the user to add one so they can discover vocabulary
+              quizzes. Without this, the feature is invisible to 100% of
+              users who haven't set up a four_strands subject. */}
+          {languageSubjects.length === 0 && (
+            <View className="opacity-60">
+              <IntentCard
+                title="Vocabulary"
+                subtitle="Add a language subject to unlock vocabulary quizzes"
+                onPress={() => router.push('/(app)/library' as never)}
+                testID="quiz-vocab-locked"
+              />
+            </View>
+          )}
         </View>
       )}
     </ScrollView>

@@ -37,6 +37,8 @@ import {
   submitSummary,
   syncHomeworkState,
   setSessionInputMode,
+  evaluateSessionDepth,
+  getResumeNudgeCandidate,
 } from '../services/session';
 import type { LLMTier } from '../services/subscription';
 import { notFound, apiError } from '../errors';
@@ -48,6 +50,7 @@ import {
 } from '../services/settings';
 import { startInterleavedSession } from '../services/interleaved';
 import { generateRecallBridge } from '../services/recall-bridge';
+import { getProfileAgeBracket } from '../services/profile';
 
 const logger = createLogger();
 
@@ -67,6 +70,12 @@ type SessionRouteEnv = {
 };
 
 export const sessionRoutes = new Hono<SessionRouteEnv>()
+  .get('/sessions/resume-nudge', async (c) => {
+    const db = c.get('db');
+    const profileId = requireProfileId(c.get('profileId'));
+    const nudge = await getResumeNudgeCandidate(db, profileId);
+    return c.json({ nudge });
+  })
   // Start a new learning session for a subject
   .post(
     '/subjects/:subjectId/sessions',
@@ -147,6 +156,47 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     return c.json(transcript);
   })
 
+  .post('/sessions/:sessionId/evaluate-depth', async (c) => {
+    const db = c.get('db');
+    const profileId = requireProfileId(c.get('profileId'));
+    const sessionId = c.req.param('sessionId');
+    const transcript = await getSessionTranscript(db, profileId, sessionId);
+    if (!transcript) return notFound(c, 'Session not found');
+
+    const ageBracket = await getProfileAgeBracket(db, profileId);
+    const result = await evaluateSessionDepth(transcript, { ageBracket });
+    const learnerWordCount = transcript.exchanges.reduce((sum, exchange) => {
+      if (exchange.role !== 'user') return sum;
+      return sum + exchange.content.split(/\s+/).filter(Boolean).length;
+    }, 0);
+
+    // [A-1] Observability events — no Inngest handler; awaited per CLAUDE.md rule.
+    await inngest.send({
+      name: 'app/ask.gate_decision',
+      data: {
+        sessionId,
+        meaningful: result.meaningful,
+        reason: result.reason,
+        method: result.method,
+        exchangeCount: transcript.session.exchangeCount,
+        learnerWordCount,
+        topicCount: result.topics.length,
+      },
+    });
+
+    if (result.method === 'fail_open') {
+      await inngest.send({
+        name: 'app/ask.gate_timeout',
+        data: {
+          sessionId,
+          exchangeCount: transcript.session.exchangeCount,
+        },
+      });
+    }
+
+    return c.json(result);
+  })
+
   // Stream a message response via SSE
   .post(
     '/sessions/:sessionId/stream',
@@ -173,17 +223,16 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         );
 
         return streamSSE(c, async (sseStream) => {
-          let fullResponse = '';
-
           for await (const chunk of stream) {
-            fullResponse += chunk;
             await sseStream.writeSSE({
               data: JSON.stringify({ type: 'chunk', content: chunk }),
             });
           }
 
           try {
-            const result = await onComplete(fullResponse);
+            // onComplete reads the raw envelope via rawResponsePromise internally —
+            // the clean reply text from the stream is not needed.
+            const result = await onComplete();
             await sseStream.writeSSE({
               data: JSON.stringify({
                 type: 'done',
@@ -195,6 +244,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                 notePromptPostSession:
                   result.notePromptPostSession || undefined,
                 fluencyDrill: result.fluencyDrill || undefined,
+                confidence: result.confidence || undefined,
               }),
             });
           } catch (err) {

@@ -12,6 +12,7 @@ import {
   updateAccommodationModeSchema,
 } from '@eduagent/schemas';
 import type { AuthUser } from '../middleware/auth';
+import type { Account } from '../services/account';
 import { requireProfileId } from '../middleware/profile-scope';
 import {
   buildHumanReadableMemoryExport,
@@ -33,6 +34,7 @@ type LearnerProfileRouteEnv = {
   Variables: {
     user: AuthUser;
     db: Database;
+    account: Account;
     profileId: string | undefined;
   };
 };
@@ -78,10 +80,12 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
     async (c) => {
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
+      const accountId = c.get('account').id;
       const input = c.req.valid('json');
       await deleteMemoryItem(
         db,
         profileId,
+        accountId,
         input.category,
         input.value,
         input.suppress ?? false,
@@ -99,9 +103,11 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       const childProfileId = c.req.param('profileId');
       await assertParentAccess(db, parentProfileId, childProfileId);
       const input = c.req.valid('json');
+      // accountId omitted: ownership verified via assertParentAccess (parent chain)
       await deleteMemoryItem(
         db,
         childProfileId,
+        undefined,
         input.category,
         input.value,
         input.suppress ?? false,
@@ -113,7 +119,8 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
   .delete('/learner-profile/all', async (c) => {
     const db = c.get('db');
     const profileId = requireProfileId(c.get('profileId'));
-    await deleteAllMemory(db, profileId);
+    const accountId = c.get('account').id;
+    await deleteAllMemory(db, profileId, accountId);
     return c.json({ success: true });
   })
   .delete('/learner-profile/:profileId/all', async (c) => {
@@ -121,7 +128,8 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
     const parentProfileId = requireProfileId(c.get('profileId'));
     const childProfileId = c.req.param('profileId');
     await assertParentAccess(db, parentProfileId, childProfileId);
-    await deleteAllMemory(db, childProfileId);
+    // accountId omitted: ownership verified via assertParentAccess (parent chain)
+    await deleteAllMemory(db, childProfileId, undefined);
     return c.json({ success: true });
   })
   .patch(
@@ -130,8 +138,9 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
     async (c) => {
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
+      const accountId = c.get('account').id;
       const { memoryEnabled } = c.req.valid('json');
-      await toggleMemoryEnabled(db, profileId, memoryEnabled);
+      await toggleMemoryEnabled(db, profileId, accountId, memoryEnabled);
       return c.json({ success: true });
     }
   )
@@ -144,7 +153,8 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       const childProfileId = c.req.param('profileId');
       await assertParentAccess(db, parentProfileId, childProfileId);
       const { memoryEnabled } = c.req.valid('json');
-      await toggleMemoryEnabled(db, childProfileId, memoryEnabled);
+      // accountId omitted: ownership verified via assertParentAccess (parent chain)
+      await toggleMemoryEnabled(db, childProfileId, undefined, memoryEnabled);
       return c.json({ success: true });
     }
   )
@@ -154,8 +164,14 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
     async (c) => {
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
+      const accountId = c.get('account').id;
       const { memoryCollectionEnabled } = c.req.valid('json');
-      await toggleMemoryCollection(db, profileId, memoryCollectionEnabled);
+      await toggleMemoryCollection(
+        db,
+        profileId,
+        accountId,
+        memoryCollectionEnabled
+      );
       return c.json({ success: true });
     }
   )
@@ -168,7 +184,13 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       const childProfileId = c.req.param('profileId');
       await assertParentAccess(db, parentProfileId, childProfileId);
       const { memoryCollectionEnabled } = c.req.valid('json');
-      await toggleMemoryCollection(db, childProfileId, memoryCollectionEnabled);
+      // accountId omitted: ownership verified via assertParentAccess (parent chain)
+      await toggleMemoryCollection(
+        db,
+        childProfileId,
+        undefined,
+        memoryCollectionEnabled
+      );
       return c.json({ success: true });
     }
   )
@@ -178,8 +200,14 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
     async (c) => {
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
+      const accountId = c.get('account').id;
       const { memoryInjectionEnabled } = c.req.valid('json');
-      await toggleMemoryInjection(db, profileId, memoryInjectionEnabled);
+      await toggleMemoryInjection(
+        db,
+        profileId,
+        accountId,
+        memoryInjectionEnabled
+      );
       return c.json({ success: true });
     }
   )
@@ -192,7 +220,13 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       const childProfileId = c.req.param('profileId');
       await assertParentAccess(db, parentProfileId, childProfileId);
       const { memoryInjectionEnabled } = c.req.valid('json');
-      await toggleMemoryInjection(db, childProfileId, memoryInjectionEnabled);
+      // accountId omitted: ownership verified via assertParentAccess (parent chain)
+      await toggleMemoryInjection(
+        db,
+        childProfileId,
+        undefined,
+        memoryInjectionEnabled
+      );
       return c.json({ success: true });
     }
   )
@@ -202,8 +236,9 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
     async (c) => {
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
+      const accountId = c.get('account').id;
       const { consent } = c.req.valid('json');
-      await grantMemoryConsent(db, profileId, consent);
+      await grantMemoryConsent(db, profileId, accountId, consent);
       return c.json({ success: true });
     }
   )
@@ -216,7 +251,8 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       const childProfileId = c.req.param('profileId');
       await assertParentAccess(db, parentProfileId, childProfileId);
       const { consent } = c.req.valid('json');
-      await grantMemoryConsent(db, childProfileId, consent);
+      // accountId omitted: ownership verified via assertParentAccess (parent chain)
+      await grantMemoryConsent(db, childProfileId, undefined, consent);
       return c.json({ success: true });
     }
   )
@@ -255,8 +291,9 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
     async (c) => {
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
+      const accountId = c.get('account').id;
       const { value } = c.req.valid('json');
-      await unsuppressInference(db, profileId, value);
+      await unsuppressInference(db, profileId, accountId, value);
       return c.json({ success: true });
     }
   )
@@ -269,7 +306,8 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       const childProfileId = c.req.param('profileId');
       await assertParentAccess(db, parentProfileId, childProfileId);
       const { value } = c.req.valid('json');
-      await unsuppressInference(db, childProfileId, value);
+      // accountId omitted: ownership verified via assertParentAccess (parent chain)
+      await unsuppressInference(db, childProfileId, undefined, value);
       return c.json({ success: true });
     }
   )
@@ -279,8 +317,14 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
     async (c) => {
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
+      const accountId = c.get('account').id;
       const { accommodationMode } = c.req.valid('json');
-      await updateAccommodationMode(db, profileId, accommodationMode);
+      await updateAccommodationMode(
+        db,
+        profileId,
+        accountId,
+        accommodationMode
+      );
       return c.json({ success: true });
     }
   )
@@ -293,7 +337,13 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       const childProfileId = c.req.param('profileId');
       await assertParentAccess(db, parentProfileId, childProfileId);
       const { accommodationMode } = c.req.valid('json');
-      await updateAccommodationMode(db, childProfileId, accommodationMode);
+      // accountId omitted: ownership verified via assertParentAccess (parent chain)
+      await updateAccommodationMode(
+        db,
+        childProfileId,
+        undefined,
+        accommodationMode
+      );
       return c.json({ success: true });
     }
   );

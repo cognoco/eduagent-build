@@ -24,6 +24,13 @@ function formatDateHeader(isoDate: string): string {
   });
 }
 
+// [F-Q-05] Client-side label mapping so the UI never renders raw activity slugs.
+const ACTIVITY_LABELS: Record<string, string> = {
+  capitals: 'Capitals',
+  guess_who: 'Guess Who',
+  vocabulary: 'Vocabulary',
+};
+
 export default function QuizHistoryScreen() {
   const router = useRouter();
   const colors = useThemeColors();
@@ -100,29 +107,29 @@ export default function QuizHistoryScreen() {
             <Text className="text-on-surface-muted px-4 py-2 text-sm font-medium">
               {formatDateHeader(section.date)}
             </Text>
-            {section.items.map((round) => (
-              <Pressable
-                key={round.id}
-                testID={`quiz-history-row-${round.id}`}
-                className="bg-surface-elevated mx-4 mb-2 rounded-xl p-4"
-                onPress={() => router.push(`/(app)/quiz/${round.id}`)}
-              >
-                <Text className="text-on-surface font-semibold">
-                  {/* [F-036b] Server provides pre-formatted activityLabel
-                      ("Capitals", "Guess Who"). Fall back to the raw slug
-                      only for older cached responses that predate the
-                      field. */}
-                  {(round as { activityLabel?: string }).activityLabel ??
-                    round.activityType.replace('_', ' ')}
-                </Text>
-                <Text className="text-on-surface-muted text-sm">
-                  {round.theme}
-                </Text>
-                <Text className="text-on-surface mt-1">
-                  {round.score}/{round.total} · {round.xpEarned} XP
-                </Text>
-              </Pressable>
-            ))}
+            {section.items.map((round) => {
+              const label =
+                ACTIVITY_LABELS[round.activityType] ??
+                round.activityType.replace(/_/g, ' ');
+              return (
+                <Pressable
+                  key={round.id}
+                  testID={`quiz-history-row-${round.id}`}
+                  className="bg-surface-elevated mx-4 mb-2 rounded-xl p-4"
+                  onPress={() => router.push(`/(app)/quiz/${round.id}`)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${label} round — ${round.theme} — ${round.score} out of ${round.total}. Open details.`}
+                >
+                  <Text className="text-on-surface font-semibold">{label}</Text>
+                  <Text className="text-on-surface-muted text-sm">
+                    {round.theme}
+                  </Text>
+                  <Text className="text-on-surface mt-1">
+                    {round.score}/{round.total} · {round.xpEarned} XP
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
         )}
       />

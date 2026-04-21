@@ -7,14 +7,8 @@ import {
   useMemo,
 } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
-import {
-  AppState,
-  View,
-  Text,
-  Pressable,
-  Alert,
-  ScrollView,
-} from 'react-native';
+import { AppState, View, Text, Pressable, ScrollView } from 'react-native';
+import { platformAlert } from '../../../lib/platform-alert';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type {
@@ -75,24 +69,28 @@ import {
 } from '../../../lib/session-recovery';
 import * as SecureStore from '../../../lib/secure-storage';
 import * as FileSystem from 'expo-file-system';
-import { parseHomeworkProblems } from '../homework/_helpers/problem-cards';
+import { parseHomeworkProblems } from '../../../components/homework/problem-cards';
 import {
   getInputModeKey,
   errorHasStatus,
   getConversationStage,
   type MessageFeedbackState,
   type PendingSubjectResolution,
-} from './_helpers/session-types';
-import { useSessionStreaming } from './_helpers/use-session-streaming';
-import { useSubjectClassification } from './_helpers/use-subject-classification';
-import { useSessionActions } from './_helpers/use-session-actions';
-import { SessionMessageActions } from './_helpers/SessionMessageActions';
+} from '../../../components/session/session-types';
+import { useSessionStreaming } from '../../../components/session/use-session-streaming';
+import { useSubjectClassification } from '../../../components/session/use-subject-classification';
+import { useSessionActions } from '../../../components/session/use-session-actions';
+import { SessionMessageActions } from '../../../components/session/SessionMessageActions';
 import {
   SessionToolAccessory,
   SessionAccessory,
-} from './_helpers/SessionAccessories';
-import { ParkingLotModal, TopicSwitcherModal } from './_helpers/SessionModals';
-import { SessionFooter } from './_helpers/SessionFooter';
+} from '../../../components/session/SessionAccessories';
+import {
+  ParkingLotModal,
+  TopicSwitcherModal,
+} from '../../../components/session/SessionModals';
+import { SessionFooter } from '../../../components/session/SessionFooter';
+import { getResumeBannerCopy } from '../../../components/session/resume-banner-copy';
 import { Sentry } from '../../../lib/sentry';
 
 /**
@@ -163,33 +161,41 @@ class SessionErrorBoundary extends Component<
           >
             {this.state.error?.message ?? 'Unknown error'}
           </Text>
-          <Text
-            style={{
-              fontSize: 11,
-              color: '#444',
-              fontFamily: 'monospace',
-              marginBottom: 16,
-            }}
-            selectable
-          >
-            {this.state.error?.stack?.slice(0, 1200) ?? ''}
-          </Text>
-          {this.state.componentStack && (
-            <View
-              style={{
-                backgroundColor: '#fee2e2',
-                borderRadius: 8,
-                padding: 12,
-                marginBottom: 16,
-              }}
-            >
+          {__DEV__ && (
+            <>
               <Text
-                style={{ fontSize: 10, color: '#333', fontFamily: 'monospace' }}
+                style={{
+                  fontSize: 11,
+                  color: '#444',
+                  fontFamily: 'monospace',
+                  marginBottom: 16,
+                }}
                 selectable
               >
-                {this.state.componentStack.trim().slice(0, 1000)}
+                {this.state.error?.stack?.slice(0, 1200) ?? ''}
               </Text>
-            </View>
+              {this.state.componentStack && (
+                <View
+                  style={{
+                    backgroundColor: '#fee2e2',
+                    borderRadius: 8,
+                    padding: 12,
+                    marginBottom: 16,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 10,
+                      color: '#333',
+                      fontFamily: 'monospace',
+                    }}
+                    selectable
+                  >
+                    {this.state.componentStack.trim().slice(0, 1000)}
+                  </Text>
+                </View>
+              )}
+            </>
           )}
           <Pressable
             onPress={() =>
@@ -396,6 +402,10 @@ function SessionScreenInner() {
   const [quotaError, setQuotaError] = useState<QuotaExceededDetails | null>(
     null
   );
+  /** F6: ID of the latest AI message where the LLM reported confidence=low */
+  const [lowConfidenceMessageId, setLowConfidenceMessageId] = useState<
+    string | null
+  >(null);
 
   const sessionNoteSavedRef = useRef(false);
   const closedSessionRef = useRef<{
@@ -481,6 +491,7 @@ function SessionScreenInner() {
       setShowFilingPrompt(false);
       setFilingDismissed(false);
       setQuotaError(null);
+      setLowConfidenceMessageId(null);
       closedSessionRef.current = null;
       sessionNoteSavedRef.current = false;
       hasHydratedRecoveryRef.current = false;
@@ -759,6 +770,7 @@ function SessionScreenInner() {
     setResponseHistory,
     setHomeworkProblemsState,
     setFluencyDrill,
+    setLowConfidenceMessageId,
     homeworkProblemsState,
     currentProblemIndex,
     activeHomeworkProblem,
@@ -923,16 +935,6 @@ function SessionScreenInner() {
     syncHomeworkMetadata,
     fetchFastCelebrations,
     showConfirmation,
-    filing,
-    retryFiling: async (input: {
-      sessionId: string;
-      sessionMode: 'freeform' | 'homework';
-    }) => {
-      const res = await apiClient.filing['request-retry'].$post({
-        json: input,
-      });
-      if (!res.ok) throw new Error(`retry-filing failed: ${res.status}`);
-    },
     router,
   });
 
@@ -969,7 +971,7 @@ function SessionScreenInner() {
   const agencyBadge = (
     <Pressable
       onPress={() =>
-        Alert.alert(
+        platformAlert(
           agencyLabel === 'Guided' ? 'Guided mode' : 'Independent mode',
           agencyLabel === 'Guided'
             ? "I'm giving more structure right now because the conversation needed extra support."
@@ -1003,7 +1005,7 @@ function SessionScreenInner() {
     : sessionExpired
     ? 'Session expired - start a new one.'
     : resumedBanner
-    ? 'Welcome back - your session is ready.'
+    ? getResumeBannerCopy(topicName)
     : apiChecked && !isApiReachable
     ? 'Server unreachable - messages may fail'
     : modeConfig.subtitle;
@@ -1045,23 +1047,61 @@ function SessionScreenInner() {
     />
   );
 
-  const renderMessageActions = (message: ChatMessage): React.ReactNode => (
-    <SessionMessageActions
-      message={message}
-      isStreaming={isStreaming}
-      latestAiMessageId={latestAiMessageId}
-      consumedQuickChipMessageId={consumedQuickChipMessageId}
-      userMessageCount={userMessageCount}
-      showWrongSubjectChip={showWrongSubjectChip}
-      messageFeedback={messageFeedback}
-      quotaError={quotaError}
-      isOwner={activeProfile?.isOwner === true}
-      stage={conversationStage}
-      handleQuickChip={handleQuickChip}
-      handleMessageFeedback={handleMessageFeedback}
-      handleReconnect={handleReconnect}
-    />
-  );
+  const renderMessageActions = (message: ChatMessage): React.ReactNode => {
+    const messageActions = (
+      <SessionMessageActions
+        message={message}
+        isStreaming={isStreaming}
+        latestAiMessageId={latestAiMessageId}
+        consumedQuickChipMessageId={consumedQuickChipMessageId}
+        userMessageCount={userMessageCount}
+        showWrongSubjectChip={showWrongSubjectChip}
+        messageFeedback={messageFeedback}
+        quotaError={quotaError}
+        isOwner={activeProfile?.isOwner === true}
+        stage={conversationStage}
+        handleQuickChip={handleQuickChip}
+        handleMessageFeedback={handleMessageFeedback}
+        handleReconnect={handleReconnect}
+      />
+    );
+
+    // F6: Confidence indicator — shown only when the LLM reports low confidence
+    // on this specific AI message. Dismissed when the learner taps it (sends a
+    // follow-up) or when a new exchange completes (lowConfidenceMessageId resets).
+    const showConfidenceIndicator =
+      message.id === lowConfidenceMessageId &&
+      !message.streaming &&
+      !isStreaming;
+    const confidenceIndicator = showConfidenceIndicator ? (
+      <Pressable
+        onPress={() => {
+          setLowConfidenceMessageId(null);
+          void continueWithMessage(
+            "I'm not sure that was right — can you explain it differently?"
+          );
+        }}
+        className="rounded-full bg-surface-elevated px-3 py-1.5 self-start mt-1"
+        testID="confidence-low-indicator"
+        accessibilityRole="button"
+        accessibilityLabel="Not sure about this? Tap to ask for a different explanation"
+      >
+        <Text className="text-caption font-semibold text-text-secondary">
+          Not sure about this? Tap to ask again
+        </Text>
+      </Pressable>
+    ) : null;
+
+    if (!messageActions && !confidenceIndicator) return null;
+    if (!messageActions) return confidenceIndicator;
+    if (!confidenceIndicator) return messageActions;
+    return (
+      <View className="gap-1">
+        {messageActions}
+        {confidenceIndicator}
+      </View>
+    );
+  };
 
   return (
     <View className="flex-1">

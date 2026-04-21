@@ -20,6 +20,21 @@ export const draftStatusSchema = z.enum([
 ]);
 export type DraftStatus = z.infer<typeof draftStatusSchema>;
 
+// Extracted signals — structured data parsed from a completed interview.
+// `interests` is surfaced to the interests-context picker on mobile, which
+// lets the learner tag each extracted label as school / free-time / both.
+// Optional because the LLM extraction may return an empty array for short
+// or off-topic interviews — consumers MUST tolerate missing/empty interests.
+export const extractedInterviewSignalsSchema = z.object({
+  goals: z.array(z.string()),
+  experienceLevel: z.string(),
+  currentKnowledge: z.string(),
+  interests: z.array(z.string()).optional(),
+});
+export type ExtractedInterviewSignals = z.infer<
+  typeof extractedInterviewSignalsSchema
+>;
+
 export const interviewStateSchema = z.object({
   draftId: z.string().uuid(),
   status: draftStatusSchema,
@@ -28,6 +43,9 @@ export const interviewStateSchema = z.object({
   resumeSummary: z.string().nullable().optional(),
   exchangeHistory: z.array(chatExchangeSchema).optional(),
   expiresAt: z.string().datetime().nullable().optional(),
+  // Populated only when status === 'completed'. Mobile reads `interests` to
+  // route into the interests-context picker before the downstream fork.
+  extractedSignals: extractedInterviewSignalsSchema.optional(),
 });
 export type InterviewState = z.infer<typeof interviewStateSchema>;
 
@@ -45,13 +63,7 @@ export type InterviewContext = z.infer<typeof interviewContextSchema>;
 export const interviewResultSchema = z.object({
   response: z.string(),
   isComplete: z.boolean(),
-  extractedSignals: z
-    .object({
-      goals: z.array(z.string()),
-      experienceLevel: z.string(),
-      currentKnowledge: z.string(),
-    })
-    .optional(),
+  extractedSignals: extractedInterviewSignalsSchema.optional(),
 });
 export type InterviewResult = z.infer<typeof interviewResultSchema>;
 

@@ -3,12 +3,12 @@ import {
   Text,
   Pressable,
   ScrollView,
-  Alert,
   RefreshControl,
   ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { goBackOrReplace } from '../../lib/navigation';
+import { platformAlert } from '../../lib/platform-alert';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ParentDashboardSummary } from '../../components/coaching';
 import type { RetentionStatus } from '../../components/progress';
@@ -77,6 +77,7 @@ function renderChildCards(
   return children.map((child) => (
     <ParentDashboardSummary
       key={child.profileId}
+      profileId={child.profileId}
       childName={child.displayName}
       summary={child.summary}
       sessionsThisWeek={child.sessionsThisWeek}
@@ -113,7 +114,7 @@ export default function DashboardScreen() {
 
   const handleDrillDown = (profileId: string): void => {
     if (isDemo) {
-      Alert.alert(
+      platformAlert(
         'Preview Mode',
         "Link your child's account to see real data.",
         [{ text: 'OK' }]
@@ -130,11 +131,11 @@ export default function DashboardScreen() {
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
       <View className="px-5 pt-4 pb-2">
         <Pressable
-          onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
+          onPress={() => goBackOrReplace(router, '/(app)/more' as const)}
           className="mb-2 self-start"
           hitSlop={12}
           testID="dashboard-back"
-          accessibilityLabel="Back to home"
+          accessibilityLabel="Back to more"
           accessibilityRole="button"
         >
           <Text className="text-body text-accent">← Back</Text>

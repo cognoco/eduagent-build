@@ -10,7 +10,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useSignIn, useSSO } from '@clerk/clerk-expo';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Linking from 'expo-linking';
 import * as SecureStore from '../../lib/secure-storage';
 import { useWebBrowserWarmup } from '../../hooks/use-web-browser-warmup';
@@ -33,6 +33,14 @@ import {
   SESSION_TRANSITION_MS,
 } from '../../lib/auth-transition';
 import { consumeSessionExpiredNotice } from '../../lib/auth-expiry';
+import {
+  readWebSearchParam,
+  toInternalAppRedirectPath,
+} from '../../lib/normalize-redirect-path';
+import {
+  peekPendingAuthRedirect,
+  rememberPendingAuthRedirect,
+} from '../../lib/pending-auth-redirect';
 
 // Use physical screen height (not window) so the content container always
 // overflows the ScrollView after adjustResize shrinks it for the keyboard.
@@ -196,8 +204,30 @@ function formatUnsupportedVerificationMessage(strategies: string[]): string {
 export default function SignInScreen() {
   const { signIn, setActive, isLoaded } = useSignIn();
   const router = useRouter();
+  const params = useLocalSearchParams<{
+    redirectTo?: string | string[];
+  }>();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
+  const localRedirectTarget = Array.isArray(params.redirectTo)
+    ? params.redirectTo[0]
+    : params.redirectTo;
+  const browserRedirectTarget = readWebSearchParam('redirectTo');
+  const requestedRedirectTarget = toInternalAppRedirectPath(
+    localRedirectTarget ?? browserRedirectTarget ?? undefined,
+    peekPendingAuthRedirect() ?? '/(app)/home'
+  );
+  const requestedRedirectRef = useRef(
+    localRedirectTarget || browserRedirectTarget
+      ? rememberPendingAuthRedirect(requestedRedirectTarget)
+      : requestedRedirectTarget
+  );
+
+  if (localRedirectTarget || browserRedirectTarget) {
+    requestedRedirectRef.current = rememberPendingAuthRedirect(
+      requestedRedirectTarget
+    );
+  }
 
   const [emailAddress, setEmailAddress] = useState('');
   const [password, setPassword] = useState('');
@@ -507,6 +537,7 @@ export default function SignInScreen() {
       }
 
       try {
+        rememberPendingAuthRedirect(requestedRedirectRef.current);
         if (__DEV__)
           console.log(
             `[AUTH-DEBUG] activateSession → calling setActive(${sessionId}) context=${context}`

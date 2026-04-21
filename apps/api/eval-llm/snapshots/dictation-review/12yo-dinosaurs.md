@@ -1,6 +1,6 @@
-# Dictation — Review (multimodal) × 12yo-dinosaurs
+# Dictation — Review × 12yo-dinosaurs
 
-> **Flow source:** `apps/api/src/services/dictation/review.ts:SYSTEM_PROMPT`
+> **Flow source:** `apps/api/src/services/dictation/review.ts:buildReviewSystemPrompt`
 > **Profile:** 12-year-old US boy, English native, obsessed with dinosaurs and prehistoric life, quick pace, humor works
 
 ## Profile summary
@@ -27,10 +27,11 @@
 
 ```json
 {
-  "language": "en",
-  "originalSentences": [
-    "The cat ran through the garden.",
-    "After a while it began to rain."
+  "ageYears": 12,
+  "preferredExplanations": [
+    "humor",
+    "examples",
+    "stories"
   ]
 }
 ```
@@ -62,23 +63,19 @@ RESPOND WITH ONLY valid JSON in this exact format — no prose before or after:
 
 If there are no mistakes, return an empty array for "mistakes".
 Generate explanations in the child's language as instructed.
+
+EXPLANATION STYLE:
+Use clear, direct explanations suitable for a middle-schooler. You can name grammar concepts (e.g. "silent letter", "comma splice") but keep it brief. Add a touch of gentle, age-appropriate humour to explanations where it fits naturally — a playful tone helps the mistake stick in memory without feeling like a scolding. Where it fits, frame the correction as a tiny memorable story or mnemonic rather than a dry rule.
 ```
 
 ## Generated prompt — user
 
 ```
-[image part omitted]
-
-Original sentences:
-1. The cat ran through the garden.
-2. After a while it began to rain.
-
-Please generate all explanations in en.
+(multimodal — image + original sentences supplied at runtime)
 ```
 
 ## Builder notes
 
-- System prompt is static — zero personalization.
-- The ONLY personalized parameter is the explanation language.
-- Missing: age (explanation complexity calibration), learning style (humor/step-by-step register), struggle history (recurring-pattern-aware feedback).
-- Tier 2 (--live) requires a real handwriting image; not synthesized by this harness.
+- ageYears=12 — explanation register calibrated to age.
+- preferredExplanations=["humor","examples","stories"] — tone shaped by style preferences.
+- Struggle history NOT used (gap flagged in audit P2) — recurring patterns not surfaced to reviewer.

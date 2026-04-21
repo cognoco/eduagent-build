@@ -279,7 +279,7 @@ async function handlePaymentFailed(
   if (updated) {
     await refreshKvCache(kv, db, updated.accountId);
 
-    // Emit Inngest event for payment retry flow
+    // Telemetry-only event — no Inngest handler registered; consumed by observability tooling.
     await inngest.send({
       name: 'app/payment.failed',
       data: {

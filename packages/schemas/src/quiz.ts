@@ -154,6 +154,14 @@ export const questionCheckInputSchema = z.object({
 });
 export type QuestionCheckInput = z.infer<typeof questionCheckInputSchema>;
 
+// [F-Q-02/F-Q-07] Check response reveals correctAnswer on wrong submissions
+// so the client can highlight the right option and show the person's name.
+export const questionCheckResponseSchema = z.object({
+  correct: z.boolean(),
+  correctAnswer: z.string().optional(),
+});
+export type QuestionCheckResponse = z.infer<typeof questionCheckResponseSchema>;
+
 // Client-safe round response — answer fields stripped from questions
 export const quizRoundResponseSchema = z.object({
   id: z.string().uuid(),
