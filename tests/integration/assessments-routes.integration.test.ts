@@ -8,7 +8,6 @@
 import { and, eq } from 'drizzle-orm';
 import { assessments, retentionCards, xpLedger } from '@eduagent/database';
 
-import { jwtMock, configureInvalidJWT } from './mocks';
 import { buildIntegrationEnv, cleanupAccounts } from './helpers';
 import {
   buildAuthHeaders,
@@ -18,26 +17,14 @@ import {
   seedCurriculum,
   seedLearningSession,
   seedSubject,
-  setAuthenticatedUser,
 } from './route-fixtures';
-
-const mockRouteAndCall = jest.fn();
-
-jest.mock('../../apps/api/src/services/llm', () => {
-  const actual = jest.requireActual(
-    '../../apps/api/src/services/llm'
-  ) as Record<string, unknown>;
-
-  return {
-    ...actual,
-    routeAndCall: (...args: unknown[]) => mockRouteAndCall(...args),
-  };
-});
-
-const jwt = jwtMock();
-jest.mock('../../apps/api/src/middleware/jwt', () => jwt);
-
+import { registerProvider } from '../../apps/api/src/services/llm';
 import { app } from '../../apps/api/src/index';
+
+// Controllable mock provider — overrides the default mock registered in setup.ts.
+// Avoids jest.mock on an internal service (CLAUDE.md rule: no internal mocks in
+// integration tests). Uses registerProvider so the full routeAndCall path runs.
+const mockChat = jest.fn<Promise<string>, [unknown, unknown]>();
 
 const TEST_ENV = buildIntegrationEnv();
 const ASSESSMENTS_USER = {
@@ -72,7 +59,6 @@ async function createOwnerProfile() {
   return createProfileViaRoute({
     app,
     env: TEST_ENV,
-    jwt,
     user: ASSESSMENTS_USER,
     displayName: 'Assessment Learner',
     birthYear: 2000,
@@ -107,12 +93,14 @@ describe('Integration: assessment routes', () => {
     });
     const topicId = curriculum.topicIds[0]!;
 
-    setAuthenticatedUser(jwt, ASSESSMENTS_USER);
     const res = await app.request(
       `/v1/subjects/${subject.id}/topics/${topicId}/assessments`,
       {
         method: 'POST',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: ASSESSMENTS_USER.userId, email: ASSESSMENTS_USER.email },
+          profile.id
+        ),
         body: JSON.stringify({}),
       },
       TEST_ENV
@@ -143,8 +131,6 @@ describe('Integration: assessment routes', () => {
       subjectId: subject.id,
       topics: [{ title: 'Photosynthesis', sortOrder: 0 }],
     });
-    configureInvalidJWT(jwt);
-
     const res = await app.request(
       `/v1/subjects/${subject.id}/topics/${curriculum.topicIds[0]}/assessments`,
       {
@@ -172,12 +158,14 @@ describe('Integration: assessment routes', () => {
       topicId,
     });
 
-    setAuthenticatedUser(jwt, ASSESSMENTS_USER);
     const getRes = await app.request(
       `/v1/assessments/${assessmentId}`,
       {
         method: 'GET',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: ASSESSMENTS_USER.userId, email: ASSESSMENTS_USER.email },
+          profile.id
+        ),
       },
       TEST_ENV
     );
@@ -191,7 +179,10 @@ describe('Integration: assessment routes', () => {
       `/v1/assessments/${assessmentId}/answer`,
       {
         method: 'POST',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: ASSESSMENTS_USER.userId, email: ASSESSMENTS_USER.email },
+          profile.id
+        ),
         body: JSON.stringify({
           answer:
             'Photosynthesis is the process by which plants convert light energy into chemical energy.',
@@ -245,12 +236,14 @@ describe('Integration: assessment routes', () => {
       topicId,
     });
 
-    setAuthenticatedUser(jwt, ASSESSMENTS_USER);
     const res = await app.request(
       `/v1/assessments/${assessmentId}/answer`,
       {
         method: 'POST',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: ASSESSMENTS_USER.userId, email: ASSESSMENTS_USER.email },
+          profile.id
+        ),
         body: JSON.stringify({
           answer: 'Plants use light to make energy-rich sugars.',
         }),
@@ -308,12 +301,14 @@ describe('Integration: assessment routes', () => {
       )
     );
 
-    setAuthenticatedUser(jwt, ASSESSMENTS_USER);
     const res = await app.request(
       `/v1/assessments/${assessmentId}/answer`,
       {
         method: 'POST',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: ASSESSMENTS_USER.userId, email: ASSESSMENTS_USER.email },
+          profile.id
+        ),
         body: JSON.stringify({
           answer: 'A partial answer.',
         }),
@@ -359,12 +354,14 @@ describe('Integration: assessment routes', () => {
       topicId: curriculum.topicIds[0]!,
     });
 
-    setAuthenticatedUser(jwt, ASSESSMENTS_USER);
     const res = await app.request(
       `/v1/assessments/${assessmentId}/answer`,
       {
         method: 'POST',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: ASSESSMENTS_USER.userId, email: ASSESSMENTS_USER.email },
+          profile.id
+        ),
         body: JSON.stringify({ answer: '' }),
       },
       TEST_ENV
@@ -376,12 +373,14 @@ describe('Integration: assessment routes', () => {
   it('returns 404 when the assessment is not found', async () => {
     const profile = await createOwnerProfile();
 
-    setAuthenticatedUser(jwt, ASSESSMENTS_USER);
     const res = await app.request(
       '/v1/assessments/00000000-0000-4000-8000-000000000099/answer',
       {
         method: 'POST',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: ASSESSMENTS_USER.userId, email: ASSESSMENTS_USER.email },
+          profile.id
+        ),
         body: JSON.stringify({ answer: 'Some answer' }),
       },
       TEST_ENV
@@ -406,12 +405,14 @@ describe('Integration: assessment routes', () => {
       topicId,
     });
 
-    setAuthenticatedUser(jwt, ASSESSMENTS_USER);
     const res = await app.request(
       `/v1/sessions/${sessionId}/quick-check`,
       {
         method: 'POST',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: ASSESSMENTS_USER.userId, email: ASSESSMENTS_USER.email },
+          profile.id
+        ),
         body: JSON.stringify({
           answer: 'Plants use light energy to make food.',
         }),
@@ -430,12 +431,14 @@ describe('Integration: assessment routes', () => {
   it('returns 404 when the session quick check targets a missing session', async () => {
     const profile = await createOwnerProfile();
 
-    setAuthenticatedUser(jwt, ASSESSMENTS_USER);
     const res = await app.request(
       '/v1/sessions/00000000-0000-4000-8000-000000000088/quick-check',
       {
         method: 'POST',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: ASSESSMENTS_USER.userId, email: ASSESSMENTS_USER.email },
+          profile.id
+        ),
         body: JSON.stringify({ answer: 'Some answer' }),
       },
       TEST_ENV

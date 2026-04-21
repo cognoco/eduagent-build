@@ -6,7 +6,7 @@
  * and DB interactions are tested end-to-end.
  *
  * Mocked boundaries (true external dependencies):
- * - Voyage AI embedding storage (`storeSessionEmbedding`)
+ * - Voyage AI embedding API (fetch interceptor via mockVoyageAI)
  * - Sentry error reporting (`captureException`)
  *
  * Real:
@@ -14,6 +14,7 @@
  * - Repositories and all internal services
  * - LLM router (registered with mock provider via setup.ts)
  * - Inngest step utilities (simple passthrough object)
+ * - embeddings service (storeSessionEmbedding + extractSessionContent run real)
  *
  * Test cases:
  *   1. generates curriculum updates after session completion
@@ -45,37 +46,26 @@ import {
 import { getChildSessionDetail } from '../../apps/api/src/services/dashboard';
 
 import { cleanupAccounts, createIntegrationDb } from './helpers';
+import { clearFetchCalls, getFetchCalls } from './fetch-interceptor';
+import { mockVoyageAI, type MockHandle } from './external-mocks';
 
 // ---------------------------------------------------------------------------
 // External boundary mocks — must be declared before importing the handler
 // ---------------------------------------------------------------------------
 
-const mockStoreSessionEmbedding = jest.fn().mockResolvedValue(undefined);
-const mockExtractSessionContent = jest
-  .fn()
-  .mockResolvedValue(
-    'User: What is photosynthesis?\n\nAI: Plants use sunlight to make food.'
-  );
 const mockCaptureException = jest.fn();
-
-jest.mock('../../apps/api/src/services/embeddings', () => {
-  const actual = jest.requireActual(
-    '../../apps/api/src/services/embeddings'
-  ) as Record<string, unknown>;
-  return {
-    ...actual,
-    storeSessionEmbedding: (...args: unknown[]) =>
-      mockStoreSessionEmbedding(...args),
-    extractSessionContent: (...args: unknown[]) =>
-      mockExtractSessionContent(...args),
-  };
-});
 
 jest.mock('../../apps/api/src/services/sentry', () => ({
   captureException: (...args: unknown[]) => mockCaptureException(...args),
 }));
 
 import { sessionCompleted } from '../../apps/api/src/inngest/functions/session-completed';
+
+// ---------------------------------------------------------------------------
+// Voyage AI fetch interceptor handle
+// ---------------------------------------------------------------------------
+
+let voyageHandle: MockHandle;
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -321,16 +311,16 @@ async function loadSessionSummary(sessionId: string) {
 // Test lifecycle
 // ---------------------------------------------------------------------------
 
+beforeAll(() => {
+  // Register Voyage AI fetch interceptor — the real embeddings service
+  // calls fetch('https://api.voyageai.com/...') which we intercept
+  voyageHandle = mockVoyageAI();
+});
+
 beforeEach(async () => {
   registerProvider(createMockProvider('gemini'));
-  mockStoreSessionEmbedding.mockReset();
-  mockStoreSessionEmbedding.mockResolvedValue(undefined);
-  mockExtractSessionContent.mockReset();
-  mockExtractSessionContent.mockResolvedValue(
-    'User: What is photosynthesis?\n\nAI: Plants use sunlight to make food.'
-  );
   mockCaptureException.mockReset();
-
+  clearFetchCalls();
   process.env['VOYAGE_API_KEY'] = 'voyage-stab-pipeline-test-key';
 
   // Clean up any data left from a previous run of this suite
@@ -457,14 +447,17 @@ describe('session-completed Inngest pipeline (integration)', () => {
     );
     expect(retentionOutcome?.status).toBe('ok');
 
-    // Embedding was attempted for the session content
-    expect(mockStoreSessionEmbedding).toHaveBeenCalledWith(
-      expect.anything(),
-      scenario.sessionId,
-      scenario.profileId,
-      scenario.topicId,
-      expect.stringContaining('What is photosynthesis?'),
-      'voyage-stab-pipeline-test-key'
+    // Embedding was attempted for the session content via the real Voyage AI fetch
+    const voyageCalls = getFetchCalls('voyageai');
+    expect(voyageCalls).toHaveLength(1);
+    expect(voyageCalls[0].method).toBe('POST');
+
+    const voyageBody = JSON.parse(voyageCalls[0].body!);
+    expect(voyageBody.input[0]).toContain('What is photosynthesis?');
+
+    // Verify the Authorization header used the right API key
+    expect(voyageCalls[0].headers['Authorization']).toBe(
+      'Bearer voyage-stab-pipeline-test-key'
     );
   });
 

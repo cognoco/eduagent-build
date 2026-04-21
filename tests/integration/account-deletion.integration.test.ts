@@ -5,7 +5,7 @@
  * GET /v1/account/export via the real app + real database.
  *
  * Mocked boundaries:
- * - JWT verification (Clerk JWKS)
+ * - JWT verification (Clerk JWKS) — intercepted via global fetch mock in setup.ts
  * - Inngest transport (external event dispatch — asserted but not delivered)
  *
  * Validates:
@@ -20,16 +20,12 @@
 import { eq } from 'drizzle-orm';
 import { accounts } from '@eduagent/database';
 
-import { jwtMock, configureValidJWT, configureInvalidJWT } from './mocks';
 import {
   buildIntegrationEnv,
   cleanupAccounts,
   createIntegrationDb,
 } from './helpers';
-
-// --- JWT mock (external boundary) ---
-const jwt = jwtMock();
-jest.mock('../../apps/api/src/middleware/jwt', () => jwt);
+import { buildAuthHeaders } from './test-keys';
 
 // --- Inngest transport mock (external boundary) ---
 const mockInngestSend = jest.fn().mockResolvedValue({ ids: [] });
@@ -56,22 +52,12 @@ const TEST_ENV = buildIntegrationEnv();
 const AUTH_USER_ID = 'integration-deletion-user';
 const AUTH_EMAIL = 'integration-deletion@integration.test';
 
-function buildAuthHeaders(profileId?: string): HeadersInit {
-  return {
-    Authorization: 'Bearer valid.jwt.token',
-    'Content-Type': 'application/json',
-    ...(profileId ? { 'X-Profile-Id': profileId } : {}),
-  };
-}
-
 async function createOwnerProfile(): Promise<string> {
-  configureValidJWT(jwt, { sub: AUTH_USER_ID, email: AUTH_EMAIL });
-
   const res = await app.request(
     '/v1/profiles',
     {
       method: 'POST',
-      headers: buildAuthHeaders(),
+      headers: buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }),
       body: JSON.stringify({
         displayName: 'Deletion Test User',
         birthYear: 2000,
@@ -107,11 +93,13 @@ afterAll(async () => {
 describe('Integration: POST /v1/account/delete (P0-004)', () => {
   it('returns 200 with gracePeriodEnds', async () => {
     await createOwnerProfile();
-    configureValidJWT(jwt, { sub: AUTH_USER_ID, email: AUTH_EMAIL });
 
     const res = await app.request(
       '/v1/account/delete',
-      { method: 'POST', headers: buildAuthHeaders() },
+      {
+        method: 'POST',
+        headers: buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }),
+      },
       TEST_ENV
     );
 
@@ -130,7 +118,6 @@ describe('Integration: POST /v1/account/delete (P0-004)', () => {
 
   it('sets deletionScheduledAt on the account row', async () => {
     await createOwnerProfile();
-    configureValidJWT(jwt, { sub: AUTH_USER_ID, email: AUTH_EMAIL });
 
     const db = createIntegrationDb();
 
@@ -143,7 +130,10 @@ describe('Integration: POST /v1/account/delete (P0-004)', () => {
 
     await app.request(
       '/v1/account/delete',
-      { method: 'POST', headers: buildAuthHeaders() },
+      {
+        method: 'POST',
+        headers: buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }),
+      },
       TEST_ENV
     );
 
@@ -156,11 +146,13 @@ describe('Integration: POST /v1/account/delete (P0-004)', () => {
 
   it('emits app/account.deletion-scheduled Inngest event with profileIds', async () => {
     const profileId = await createOwnerProfile();
-    configureValidJWT(jwt, { sub: AUTH_USER_ID, email: AUTH_EMAIL });
 
     await app.request(
       '/v1/account/delete',
-      { method: 'POST', headers: buildAuthHeaders() },
+      {
+        method: 'POST',
+        headers: buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }),
+      },
       TEST_ENV
     );
 
@@ -176,8 +168,6 @@ describe('Integration: POST /v1/account/delete (P0-004)', () => {
   });
 
   it('returns 401 without authentication', async () => {
-    configureInvalidJWT(jwt);
-
     const res = await app.request(
       '/v1/account/delete',
       { method: 'POST' },
@@ -196,18 +186,23 @@ describe('Integration: POST /v1/account/delete (P0-004)', () => {
 describe('Integration: POST /v1/account/cancel-deletion (P0-004)', () => {
   it('returns 200 with cancellation message', async () => {
     await createOwnerProfile();
-    configureValidJWT(jwt, { sub: AUTH_USER_ID, email: AUTH_EMAIL });
 
     // Schedule first, then cancel
     await app.request(
       '/v1/account/delete',
-      { method: 'POST', headers: buildAuthHeaders() },
+      {
+        method: 'POST',
+        headers: buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }),
+      },
       TEST_ENV
     );
 
     const res = await app.request(
       '/v1/account/cancel-deletion',
-      { method: 'POST', headers: buildAuthHeaders() },
+      {
+        method: 'POST',
+        headers: buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }),
+      },
       TEST_ENV
     );
 
@@ -218,17 +213,22 @@ describe('Integration: POST /v1/account/cancel-deletion (P0-004)', () => {
 
   it('sets deletionCancelledAt on the account row', async () => {
     await createOwnerProfile();
-    configureValidJWT(jwt, { sub: AUTH_USER_ID, email: AUTH_EMAIL });
 
     // Schedule then cancel
     await app.request(
       '/v1/account/delete',
-      { method: 'POST', headers: buildAuthHeaders() },
+      {
+        method: 'POST',
+        headers: buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }),
+      },
       TEST_ENV
     );
     await app.request(
       '/v1/account/cancel-deletion',
-      { method: 'POST', headers: buildAuthHeaders() },
+      {
+        method: 'POST',
+        headers: buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }),
+      },
       TEST_ENV
     );
 
@@ -245,8 +245,6 @@ describe('Integration: POST /v1/account/cancel-deletion (P0-004)', () => {
   });
 
   it('returns 401 without authentication', async () => {
-    configureInvalidJWT(jwt);
-
     const res = await app.request(
       '/v1/account/cancel-deletion',
       { method: 'POST' },
@@ -264,11 +262,13 @@ describe('Integration: POST /v1/account/cancel-deletion (P0-004)', () => {
 describe('Integration: GET /v1/account/export', () => {
   it('returns exported data including profiles', async () => {
     const profileId = await createOwnerProfile();
-    configureValidJWT(jwt, { sub: AUTH_USER_ID, email: AUTH_EMAIL });
 
     const res = await app.request(
       '/v1/account/export',
-      { method: 'GET', headers: buildAuthHeaders() },
+      {
+        method: 'GET',
+        headers: buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }),
+      },
       TEST_ENV
     );
 

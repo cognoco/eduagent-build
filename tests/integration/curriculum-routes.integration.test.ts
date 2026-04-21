@@ -12,7 +12,6 @@ import {
   curriculumTopics,
 } from '@eduagent/database';
 
-import { jwtMock, configureInvalidJWT } from './mocks';
 import { buildIntegrationEnv, cleanupAccounts } from './helpers';
 import {
   buildAuthHeaders,
@@ -20,7 +19,6 @@ import {
   getIntegrationDb,
   seedCurriculum,
   seedSubject,
-  setAuthenticatedUser,
 } from './route-fixtures';
 
 const mockRouteAndCall = jest.fn();
@@ -35,9 +33,6 @@ jest.mock('../../apps/api/src/services/llm', () => {
     routeAndCall: (...args: unknown[]) => mockRouteAndCall(...args),
   };
 });
-
-const jwt = jwtMock();
-jest.mock('../../apps/api/src/middleware/jwt', () => jwt);
 
 import { app } from '../../apps/api/src/index';
 
@@ -106,7 +101,6 @@ async function createOwnerProfile() {
   return createProfileViaRoute({
     app,
     env: TEST_ENV,
-    jwt,
     user: CURRICULUM_USER,
     displayName: 'Curriculum Learner',
     birthYear: 2000,
@@ -143,12 +137,14 @@ describe('Integration: curriculum routes', () => {
       ],
     });
 
-    setAuthenticatedUser(jwt, CURRICULUM_USER);
     const res = await app.request(
       `/v1/subjects/${subject.id}/curriculum`,
       {
         method: 'GET',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: CURRICULUM_USER.userId, email: CURRICULUM_USER.email },
+          profile.id
+        ),
       },
       TEST_ENV
     );
@@ -164,8 +160,6 @@ describe('Integration: curriculum routes', () => {
   it('returns 401 without auth for GET curriculum', async () => {
     const profile = await createOwnerProfile();
     const subject = await seedSubject(profile.id, 'Mathematics');
-    configureInvalidJWT(jwt);
-
     const res = await app.request(
       `/v1/subjects/${subject.id}/curriculum`,
       { method: 'GET' },
@@ -187,12 +181,14 @@ describe('Integration: curriculum routes', () => {
     });
     const topicId = curriculum.topicIds[0]!;
 
-    setAuthenticatedUser(jwt, CURRICULUM_USER);
     const res = await app.request(
       `/v1/subjects/${subject.id}/curriculum/skip`,
       {
         method: 'POST',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: CURRICULUM_USER.userId, email: CURRICULUM_USER.email },
+          profile.id
+        ),
         body: JSON.stringify({ topicId }),
       },
       TEST_ENV
@@ -225,12 +221,14 @@ describe('Integration: curriculum routes', () => {
     const profile = await createOwnerProfile();
     const subject = await seedSubject(profile.id, 'Mathematics');
 
-    setAuthenticatedUser(jwt, CURRICULUM_USER);
     const res = await app.request(
       `/v1/subjects/${subject.id}/curriculum/skip`,
       {
         method: 'POST',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: CURRICULUM_USER.userId, email: CURRICULUM_USER.email },
+          profile.id
+        ),
         body: JSON.stringify({ topicId: 'not-a-uuid' }),
       },
       TEST_ENV
@@ -251,12 +249,14 @@ describe('Integration: curriculum routes', () => {
     });
     const topicId = curriculum.topicIds[0]!;
 
-    setAuthenticatedUser(jwt, CURRICULUM_USER);
     const res = await app.request(
       `/v1/subjects/${subject.id}/curriculum/unskip`,
       {
         method: 'POST',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: CURRICULUM_USER.userId, email: CURRICULUM_USER.email },
+          profile.id
+        ),
         body: JSON.stringify({ topicId }),
       },
       TEST_ENV
@@ -294,12 +294,14 @@ describe('Integration: curriculum routes', () => {
     });
     const topicId = curriculum.topicIds[0]!;
 
-    setAuthenticatedUser(jwt, CURRICULUM_USER);
     const res = await app.request(
       `/v1/subjects/${subject.id}/curriculum/unskip`,
       {
         method: 'POST',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: CURRICULUM_USER.userId, email: CURRICULUM_USER.email },
+          profile.id
+        ),
         body: JSON.stringify({ topicId }),
       },
       TEST_ENV
@@ -318,12 +320,14 @@ describe('Integration: curriculum routes', () => {
       topics: [{ title: 'Algebra Basics', sortOrder: 0 }],
     });
 
-    setAuthenticatedUser(jwt, CURRICULUM_USER);
     const res = await app.request(
       `/v1/subjects/${subject.id}/curriculum/topics`,
       {
         method: 'POST',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: CURRICULUM_USER.userId, email: CURRICULUM_USER.email },
+          profile.id
+        ),
         body: JSON.stringify({
           mode: 'preview',
           title: 'trig',
@@ -355,12 +359,14 @@ describe('Integration: curriculum routes', () => {
       ],
     });
 
-    setAuthenticatedUser(jwt, CURRICULUM_USER);
     const res = await app.request(
       `/v1/subjects/${subject.id}/curriculum/topics`,
       {
         method: 'POST',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: CURRICULUM_USER.userId, email: CURRICULUM_USER.email },
+          profile.id
+        ),
         body: JSON.stringify({
           mode: 'create',
           title: 'Trigonometry Basics',
@@ -396,12 +402,14 @@ describe('Integration: curriculum routes', () => {
     const profile = await createOwnerProfile();
     const subject = await seedSubject(profile.id, 'Mathematics');
 
-    setAuthenticatedUser(jwt, CURRICULUM_USER);
     const res = await app.request(
       `/v1/subjects/${subject.id}/curriculum/topics`,
       {
         method: 'POST',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: CURRICULUM_USER.userId, email: CURRICULUM_USER.email },
+          profile.id
+        ),
         body: JSON.stringify({
           mode: 'create',
           title: 'Test Topic',
@@ -428,12 +436,14 @@ describe('Integration: curriculum routes', () => {
       ],
     });
 
-    setAuthenticatedUser(jwt, CURRICULUM_USER);
     const res = await app.request(
       `/v1/subjects/${subject.id}/curriculum/challenge`,
       {
         method: 'POST',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: CURRICULUM_USER.userId, email: CURRICULUM_USER.email },
+          profile.id
+        ),
         body: JSON.stringify({
           feedback: 'I already know the basics, skip intro topics',
         }),
@@ -469,12 +479,14 @@ describe('Integration: curriculum routes', () => {
     const profile = await createOwnerProfile();
     const subject = await seedSubject(profile.id, 'Mathematics');
 
-    setAuthenticatedUser(jwt, CURRICULUM_USER);
     const res = await app.request(
       `/v1/subjects/${subject.id}/curriculum/challenge`,
       {
         method: 'POST',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: CURRICULUM_USER.userId, email: CURRICULUM_USER.email },
+          profile.id
+        ),
         body: JSON.stringify({ feedback: '' }),
       },
       TEST_ENV
@@ -497,12 +509,14 @@ describe('Integration: curriculum routes', () => {
     });
     const topicId = curriculum.topicIds[1]!;
 
-    setAuthenticatedUser(jwt, CURRICULUM_USER);
     const res = await app.request(
       `/v1/subjects/${subject.id}/curriculum/adapt`,
       {
         method: 'POST',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: CURRICULUM_USER.userId, email: CURRICULUM_USER.email },
+          profile.id
+        ),
         body: JSON.stringify({
           topicId,
           signal: 'struggling',
@@ -554,12 +568,14 @@ describe('Integration: curriculum routes', () => {
       topics: [{ title: 'Topic A', sortOrder: 0 }],
     });
 
-    setAuthenticatedUser(jwt, CURRICULUM_USER);
     const res = await app.request(
       `/v1/subjects/${subject.id}/curriculum/adapt`,
       {
         method: 'POST',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: CURRICULUM_USER.userId, email: CURRICULUM_USER.email },
+          profile.id
+        ),
         body: JSON.stringify({
           topicId: curriculum.topicIds[0],
           signal: 'invalid_signal',
@@ -582,12 +598,14 @@ describe('Integration: curriculum routes', () => {
       ],
     });
 
-    setAuthenticatedUser(jwt, CURRICULUM_USER);
     const res = await app.request(
       `/v1/subjects/${subject.id}/curriculum/topics/${curriculum.topicIds[1]}/explain`,
       {
         method: 'GET',
-        headers: buildAuthHeaders(profile.id),
+        headers: buildAuthHeaders(
+          { sub: CURRICULUM_USER.userId, email: CURRICULUM_USER.email },
+          profile.id
+        ),
       },
       TEST_ENV
     );

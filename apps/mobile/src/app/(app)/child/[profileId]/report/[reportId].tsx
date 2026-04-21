@@ -12,12 +12,14 @@ import {
 function MetricCard({
   label,
   value,
+  testID,
 }: {
   label: string;
   value: string;
+  testID?: string;
 }): React.ReactElement {
   return (
-    <View className="bg-background rounded-card p-4 flex-1">
+    <View className="bg-background rounded-card p-4 flex-1" testID={testID}>
       <Text className="text-caption text-text-secondary">{label}</Text>
       <Text className="text-h3 font-semibold text-text-primary mt-2">
         {value}
@@ -87,7 +89,10 @@ export default function ChildReportDetailScreen(): React.ReactElement {
           </View>
         ) : report ? (
           <>
-            <View className="bg-coaching-card rounded-card p-5 mt-4">
+            <View
+              className="bg-coaching-card rounded-card p-5 mt-4"
+              testID="child-report-hero"
+            >
               <Text className="text-caption text-text-secondary">
                 {report.reportData.childName}
               </Text>
@@ -104,10 +109,12 @@ export default function ChildReportDetailScreen(): React.ReactElement {
               <MetricCard
                 label="Sessions"
                 value={String(report.reportData.thisMonth.totalSessions)}
+                testID="child-report-metric-sessions"
               />
               <MetricCard
                 label="Active minutes"
                 value={String(report.reportData.thisMonth.totalActiveMinutes)}
+                testID="child-report-metric-minutes"
               />
             </View>
 
@@ -115,6 +122,7 @@ export default function ChildReportDetailScreen(): React.ReactElement {
               <MetricCard
                 label="Topics mastered"
                 value={String(report.reportData.thisMonth.topicsMastered)}
+                testID="child-report-metric-topics"
               />
               {/* [EP15-I2] Field renamed from vocabularyLearned to
                   vocabularyTotal — it's cumulative, not per-month delta.
@@ -122,11 +130,15 @@ export default function ChildReportDetailScreen(): React.ReactElement {
               <MetricCard
                 label="Total words"
                 value={String(report.reportData.thisMonth.vocabularyTotal)}
+                testID="child-report-metric-vocabulary"
               />
             </View>
 
             {report.reportData.highlights.length > 0 ? (
-              <View className="bg-surface rounded-card p-4 mt-4">
+              <View
+                className="bg-surface rounded-card p-4 mt-4"
+                testID="child-report-highlights"
+              >
                 <Text className="text-h3 font-semibold text-text-primary">
                   Highlights
                 </Text>
@@ -144,7 +156,10 @@ export default function ChildReportDetailScreen(): React.ReactElement {
             ) : null}
 
             {report.reportData.nextSteps.length > 0 ? (
-              <View className="bg-surface rounded-card p-4 mt-4">
+              <View
+                className="bg-surface rounded-card p-4 mt-4"
+                testID="child-report-next-steps"
+              >
                 <Text className="text-h3 font-semibold text-text-primary">
                   What's next
                 </Text>
@@ -161,7 +176,10 @@ export default function ChildReportDetailScreen(): React.ReactElement {
               </View>
             ) : null}
 
-            <View className="bg-surface rounded-card p-4 mt-4">
+            <View
+              className="bg-surface rounded-card p-4 mt-4"
+              testID="child-report-subjects"
+            >
               <Text className="text-h3 font-semibold text-text-primary">
                 Subject breakdown
               </Text>

@@ -16,10 +16,14 @@
 |------|---------------|-------------|
 | `apps/api/src/services/snapshot-aggregation.ts` | Mastery + exploration computation | Modify (lines 332–343, 490–525) |
 | `apps/api/src/services/snapshot-aggregation.test.ts` | Backend tests for tightened logic | Modify (add new test cases) |
-| `apps/mobile/src/components/progress/SubjectCard.tsx` | Card UI: headline, accordion, topic list | Modify (major rewrite of `getTopicHeadline`, new accordion mode) |
-| `apps/mobile/src/components/progress/SubjectCard.test.tsx` | Frontend tests for card behavior | Modify (rewrite headline tests, add accordion tests) |
+| `apps/mobile/src/components/progress/SubjectCard.tsx` | Card UI: headline unification, accordion shell | Modify (rewrite `getTopicHeadline`, add accordion mode with expand/collapse) |
+| `apps/mobile/src/components/progress/AccordionTopicList.tsx` | Expanded topic list with lazy loading + navigation | **Create** (encapsulates `useChildSubjectTopics` + `useRouter`) |
+| `apps/mobile/src/components/progress/AccordionTopicList.test.tsx` | Tests for topic loading, navigation, error states | **Create** |
+| `apps/mobile/src/components/progress/SubjectCard.test.tsx` | Frontend tests for headline + accordion toggle | Modify (rewrite headline tests, add accordion tests) |
 | `apps/mobile/src/app/(app)/child/[profileId]/index.tsx` | Parent dashboard: filter + accordion wiring | Modify (lines 458–482) |
 | `apps/mobile/src/app/_layout.tsx` or app init | LayoutAnimation Android enablement | Modify (one-liner) |
+
+**Design note (H3):** `useRouter` and `useChildSubjectTopics` are extracted into `AccordionTopicList` — a child component rendered inside SubjectCard only when in accordion mode. This keeps SubjectCard a pure presentational component (no data-fetching hooks, no routing dependency), which makes it testable without mocking expo-router or React Query. It also respects the React rules of hooks — no conditional hook calls.
 
 ---
 
@@ -33,37 +37,7 @@
 
 - [ ] **Step 1: Write the failing test**
 
-Add to `apps/api/src/services/snapshot-aggregation.test.ts`. This test requires calling `computeProgressMetrics` with a state where a topic has `assessment.status === 'passed'` but no retention card with `xpStatus === 'verified'`. Since the existing test file mocks at the DB level (using `jest.mock` for milestone-detection, celebrations, etc.) and tests `refreshProgressSnapshot`/`upsertProgressSnapshot`, we need a unit-level test for `buildSubjectMetric`.
-
-However, `buildSubjectMetric` is not exported — it's a private function called by `computeProgressMetrics`, which IS exported. The test must go through `computeProgressMetrics`, which calls `loadProgressState` (DB access). The existing test pattern mocks the DB query layer.
-
-**Alternative approach:** Since the existing tests mock at the snapshot level (`makeMetrics`) and don't test the inner aggregation functions, and `computeProgressMetrics` requires DB access, the best approach for this data-layer change is to add **integration tests** that exercise the real aggregation pipeline. Create a focused test file:
-
-Add to `apps/api/src/services/snapshot-aggregation.test.ts` alongside existing tests. Since the existing file already mocks `milestone-detection`, `celebrations`, `language-curriculum`, and `sentry`, we can add a describe block that tests `computeProgressMetrics` by mocking `loadProgressState` directly.
-
-First, we need to check if `loadProgressState` can be mocked. It's a private async function. The cleanest approach is to extract the pure computation into a testable helper. But that's a refactor beyond scope.
-
-**Practical approach:** The `buildSubjectMetric` and `buildSubjectInventory` functions operate on `ProgressState` — a plain object. We can test them by extracting them or by testing through the integration test suite. Since the spec's "Verified by" section specifies test names like `"counts assessment-passed-only topic as inProgress, not mastered"`, we should create a targeted test file that directly tests the aggregation logic.
-
-Create `apps/api/src/services/snapshot-mastery.test.ts` — a focused unit test that imports the functions we need to make testable.
-
-**Actually — simplest path:** Export `buildSubjectMetric` and `buildSubjectInventory` for testing (add `/** @internal */` JSDoc). Then write direct unit tests.
-
-```ts
-// In snapshot-aggregation.test.ts, add this describe block at the end:
-
-describe('masteredTopicIds tightening [1A]', () => {
-  // We'll test via computeProgressMetrics by mocking loadProgressState.
-  // Since loadProgressState is not exported, we test the observable behavior:
-  // the ProgressMetrics.subjects[].topicsMastered output.
-  //
-  // For unit-level testing of the pure logic, we export the helpers.
-});
-```
-
-Given the complexity of mocking `loadProgressState`, the most pragmatic path is to:
-1. Export `buildSubjectMetric` as `/** @internal */` for testing
-2. Write a direct unit test with a hand-built `ProgressState`
+`buildSubjectMetric` is a private function, so we export it with `/** @internal */` for direct unit testing with hand-built `ProgressState` objects. This avoids mocking the DB-dependent `loadProgressState`.
 
 In `apps/api/src/services/snapshot-aggregation.ts`, at line 286, change `function buildSubjectMetric` to `/** @internal */ export function buildSubjectMetric`.
 
@@ -258,7 +232,7 @@ async function buildSubjectInventory(
 export async function buildSubjectInventory(
 ```
 
-Add test (note: this function is async and takes a `db` param — pass `null as any` since we won't hit the language-progress DB path for `socratic` subjects):
+Add test (note: this function is async and takes a `db` param — pass `null as any` since the `getCurrentLanguageProgress` DB call is only reached for `four_strands` pedagogy subjects; our fixtures use `pedagogyMode: 'socratic'` so the `db` param is never dereferenced. If a future fixture uses `four_strands`, this will crash — use a real DB or mock `getCurrentLanguageProgress` in that case):
 
 ```ts
 import { buildSubjectInventory } from './snapshot-aggregation';
@@ -387,6 +361,8 @@ In `apps/api/src/services/snapshot-aggregation.ts`, replace lines 505–517:
 ```
 
 Only the `if (assessment.status === 'passed') { masteredTopicIds.add(...) }` block is removed. The `attemptedTopicIds.add` stays — assessment-passed topics still count as "attempted" (in progress).
+
+**IMPORTANT: Leave lines 519–525 (retention card loop) completely untouched.** That loop adds `xpStatus === 'verified'` topics to `masteredTopicIds` — it is the correct and now sole mastery source. Only the assessment loop at 514 is removed.
 
 - [ ] **Step 4: Run tests — expect PASS**
 
@@ -576,7 +552,7 @@ describe('SubjectCard unified headline', () => {
     render(
       <SubjectCard
         subject={makeSubject({
-          topics: { total: 13, explored: 2, mastered: 1, inProgress: 1, notStarted: 9 },
+          topics: { total: 13, explored: 2, mastered: 1, inProgress: 3, notStarted: 9 },
           sessionsCount: 4,
           wallClockMinutes: 69,
         })}
@@ -584,7 +560,8 @@ describe('SubjectCard unified headline', () => {
       />
     );
 
-    // 2 explored + 1 mastered + 1 inProgress = 4 studied
+    // studiedCount = inProgress(3) + mastered(1) = 4 (unique attempted topics)
+    // NOTE: explored overlaps with inProgress/mastered — never sum all three
     expect(screen.getByText(/4 topics studied/)).toBeTruthy();
     expect(screen.getByText(/1 mastered/)).toBeTruthy();
   });
@@ -593,7 +570,7 @@ describe('SubjectCard unified headline', () => {
     render(
       <SubjectCard
         subject={makeSubject({
-          topics: { total: 13, explored: 2, mastered: 0, inProgress: 0, notStarted: 11 },
+          topics: { total: 13, explored: 2, mastered: 0, inProgress: 2, notStarted: 11 },
           sessionsCount: 2,
           wallClockMinutes: 30,
         })}
@@ -601,6 +578,7 @@ describe('SubjectCard unified headline', () => {
       />
     );
 
+    // studiedCount = inProgress(2) + mastered(0) = 2
     expect(screen.getByText(/2 topics studied/)).toBeTruthy();
     expect(screen.getByText(/0 mastered/)).toBeTruthy();
   });
@@ -617,6 +595,7 @@ describe('SubjectCard unified headline', () => {
       />
     );
 
+    // studiedCount = inProgress(0) + mastered(1) = 1
     expect(screen.getByText(/1 topic studied/)).toBeTruthy();
   });
 
@@ -639,7 +618,7 @@ describe('SubjectCard unified headline', () => {
     render(
       <SubjectCard
         subject={makeSubject({
-          topics: { total: null as unknown as number, explored: 5, mastered: 2, inProgress: 1, notStarted: 0 },
+          topics: { total: null as unknown as number, explored: 5, mastered: 2, inProgress: 3, notStarted: 0 },
           sessionsCount: 8,
           wallClockMinutes: 200,
         })}
@@ -647,6 +626,7 @@ describe('SubjectCard unified headline', () => {
       />
     );
 
+    // studiedCount = inProgress(3) + mastered(2) = 5
     expect(screen.getByText(/5 topics studied/)).toBeTruthy();
     expect(screen.getByText(/2 mastered/)).toBeTruthy();
   });
@@ -655,7 +635,7 @@ describe('SubjectCard unified headline', () => {
     render(
       <SubjectCard
         subject={makeSubject({
-          topics: { total: 13, explored: 3, mastered: 2, inProgress: 1, notStarted: 7 },
+          topics: { total: 13, explored: 2, mastered: 2, inProgress: 3, notStarted: 8 },
           sessionsCount: 5,
           wallClockMinutes: 100,
         })}
@@ -670,7 +650,7 @@ describe('SubjectCard unified headline', () => {
     render(
       <SubjectCard
         subject={makeSubject({
-          topics: { total: null as unknown as number, explored: 5, mastered: 2, inProgress: 1, notStarted: 0 },
+          topics: { total: null as unknown as number, explored: 5, mastered: 2, inProgress: 3, notStarted: 0 },
           sessionsCount: 8,
           wallClockMinutes: 200,
         })}
@@ -685,7 +665,7 @@ describe('SubjectCard unified headline', () => {
     render(
       <SubjectCard
         subject={makeSubject({
-          topics: { total: 13, explored: 2, mastered: 1, inProgress: 0, notStarted: 10 },
+          topics: { total: 13, explored: 1, mastered: 1, inProgress: 1, notStarted: 11 },
           sessionsCount: 3,
           wallClockMinutes: 69,
         })}
@@ -730,10 +710,12 @@ function getTopicHeadline(subject: SubjectInventory): {
     subject.wallClockMinutes || subject.activeMinutes
   );
 
-  const studiedCount =
-    subject.topics.explored +
-    subject.topics.mastered +
-    subject.topics.inProgress;
+  // studiedCount = unique topics the child has attempted.
+  // inProgress = attemptedTopicIds.size - masteredTopicIds.size (backend).
+  // So inProgress + mastered = attemptedTopicIds.size (no double-counting).
+  // DO NOT use explored here — explored overlaps with inProgress/mastered
+  // because exploredTopicIds seeds attemptedTopicIds in the backend.
+  const studiedCount = subject.topics.inProgress + subject.topics.mastered;
 
   // Truly no activity — show the mastery target.
   if (studiedCount === 0 && subject.sessionsCount === 0) {
@@ -861,32 +843,57 @@ chore(mobile): enable LayoutAnimation on Android for accordion cards
 
 ---
 
-## Task 6: Accordion mode — expand/collapse with lazy topic loading
+## Task 6: Create `AccordionTopicList` component (extracted child)
 
 **Files:**
-- Modify: `apps/mobile/src/components/progress/SubjectCard.tsx`
-- Test: `apps/mobile/src/components/progress/SubjectCard.test.tsx`
+- Create: `apps/mobile/src/components/progress/AccordionTopicList.tsx`
+- Create: `apps/mobile/src/components/progress/AccordionTopicList.test.tsx`
 
-**Context:** Add accordion mode to SubjectCard. When `childProfileId` and `subjectId` props are provided (and `onPress` is NOT), tapping the card toggles an expanded state that lazy-loads and displays topics inline.
+**Context (H3 fix):** Data-fetching hooks (`useChildSubjectTopics`) and navigation (`useRouter`) are extracted into a dedicated `AccordionTopicList` child component. This keeps `SubjectCard` as a pure presentational component — no React Query, no expo-router dependency. The parent `SubjectCard` passes `expanded`, `childProfileId`, `subjectId`, and `subjectName` as props; `AccordionTopicList` handles the rest. This also satisfies the React rules of hooks — no conditional hook calls.
 
-- [ ] **Step 1: Write failing tests for accordion behavior**
+**Note on mocking (H2):** The `AccordionTopicList.test.tsx` mocks `useChildSubjectTopics` (an internal hook) and `useRouter` (expo-router). Per CLAUDE.md, "No internal mocks" applies to **integration tests**. These are **component unit tests** using React Testing Library — mocking the data boundary at the hook level is standard practice for isolated component testing. The integration test for the full flow lives in the E2E suite.
 
-Add to `apps/mobile/src/components/progress/SubjectCard.test.tsx`:
+- [ ] **Step 1: Write the failing tests**
+
+Create `apps/mobile/src/components/progress/AccordionTopicList.test.tsx`:
 
 ```tsx
-import { fireEvent, waitFor } from '@testing-library/react-native';
+import { render, screen, fireEvent } from '@testing-library/react-native';
 
-// Mock the hook at the top of the file
+// Mock external boundaries for this component
+const mockPush = jest.fn();
+jest.mock('expo-router', () => ({
+  useRouter: () => ({ push: mockPush }),
+}));
+
 jest.mock('../../hooks/use-dashboard', () => ({
   useChildSubjectTopics: jest.fn(),
 }));
 
+import { AccordionTopicList } from './AccordionTopicList';
 import { useChildSubjectTopics } from '../../hooks/use-dashboard';
 
 const mockUseChildSubjectTopics = useChildSubjectTopics as jest.Mock;
 
-describe('SubjectCard accordion mode', () => {
+function makeTopic(overrides: Record<string, unknown> = {}) {
+  return {
+    topicId: 't-1',
+    title: 'Algebra basics',
+    description: '',
+    completionStatus: 'in_progress',
+    retentionStatus: null,
+    struggleStatus: 'normal',
+    masteryScore: null,
+    summaryExcerpt: null,
+    xpStatus: null,
+    totalSessions: 2,
+    ...overrides,
+  };
+}
+
+describe('AccordionTopicList', () => {
   beforeEach(() => {
+    mockPush.mockClear();
     mockUseChildSubjectTopics.mockReturnValue({
       data: undefined,
       isLoading: false,
@@ -895,71 +902,38 @@ describe('SubjectCard accordion mode', () => {
     });
   });
 
-  it('toggles expanded state on tap', () => {
-    render(
-      <SubjectCard
-        subject={makeSubject({ sessionsCount: 3, wallClockMinutes: 60 })}
+  it('returns null when not expanded', () => {
+    const { toJSON } = render(
+      <AccordionTopicList
         childProfileId="child-1"
         subjectId="sub-1"
-        testID="card"
+        subjectName="Math"
+        expanded={false}
       />
     );
 
-    expect(screen.getByText(/See topics/)).toBeTruthy();
-    fireEvent.press(screen.getByTestId('card'));
-    expect(screen.getByText(/Hide topics/)).toBeTruthy();
-    fireEvent.press(screen.getByTestId('card'));
-    expect(screen.getByText(/See topics/)).toBeTruthy();
+    expect(toJSON()).toBeNull();
   });
 
   it('lazy-loads topics on first expand', () => {
     mockUseChildSubjectTopics.mockReturnValue({
-      data: [
-        {
-          topicId: 't-1', title: 'Algebra basics',
-          completionStatus: 'in_progress', retentionStatus: null,
-          struggleStatus: 'normal', masteryScore: null,
-          summaryExcerpt: null, xpStatus: null, totalSessions: 2,
-          description: '',
-        },
-      ],
+      data: [makeTopic()],
       isLoading: false,
       isError: false,
       refetch: jest.fn(),
     });
 
     render(
-      <SubjectCard
-        subject={makeSubject({
-          topics: { total: 13, explored: 1, mastered: 0, inProgress: 1, notStarted: 11 },
-          sessionsCount: 2,
-          wallClockMinutes: 30,
-        })}
+      <AccordionTopicList
         childProfileId="child-1"
         subjectId="sub-1"
-        testID="card"
+        subjectName="Math"
+        expanded={true}
       />
     );
 
-    // Initially hook should be called with enabled: false
-    fireEvent.press(screen.getByTestId('card'));
     expect(screen.getByText('Algebra basics')).toBeTruthy();
     expect(screen.getByText('In progress')).toBeTruthy();
-  });
-
-  it('sets accessibilityRole and accessibilityState on accordion', () => {
-    render(
-      <SubjectCard
-        subject={makeSubject({ sessionsCount: 1, wallClockMinutes: 10 })}
-        childProfileId="child-1"
-        subjectId="sub-1"
-        testID="card"
-      />
-    );
-
-    const card = screen.getByTestId('card');
-    expect(card.props.accessibilityRole).toBe('button');
-    expect(card.props.accessibilityState).toEqual({ expanded: false });
   });
 
   it('shows skeleton rows while loading topics', () => {
@@ -971,15 +945,14 @@ describe('SubjectCard accordion mode', () => {
     });
 
     render(
-      <SubjectCard
-        subject={makeSubject({ sessionsCount: 2, wallClockMinutes: 30 })}
+      <AccordionTopicList
         childProfileId="child-1"
         subjectId="sub-1"
-        testID="card"
+        subjectName="Math"
+        expanded={true}
       />
     );
 
-    fireEvent.press(screen.getByTestId('card'));
     expect(screen.getAllByTestId(/topic-skeleton/)).toHaveLength(3);
   });
 
@@ -993,74 +966,149 @@ describe('SubjectCard accordion mode', () => {
     });
 
     render(
-      <SubjectCard
-        subject={makeSubject({ sessionsCount: 2, wallClockMinutes: 30 })}
+      <AccordionTopicList
         childProfileId="child-1"
         subjectId="sub-1"
-        testID="card"
+        subjectName="Math"
+        expanded={true}
       />
     );
 
-    fireEvent.press(screen.getByTestId('card'));
     expect(screen.getByText(/Could not load topics/)).toBeTruthy();
     fireEvent.press(screen.getByText(/Tap to retry/));
     expect(refetchMock).toHaveBeenCalled();
   });
 
-  it('does not show See topics hint when no topics studied and no sessions', () => {
+  it('navigates to topic detail on topic row press', () => {
+    mockUseChildSubjectTopics.mockReturnValue({
+      data: [makeTopic({ retentionStatus: 'strong' })],
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+
     render(
-      <SubjectCard
-        subject={makeSubject()}
+      <AccordionTopicList
         childProfileId="child-1"
         subjectId="sub-1"
-        testID="card"
+        subjectName="Math"
+        expanded={true}
       />
     );
 
-    expect(screen.queryByText(/See topics/)).toBeNull();
+    fireEvent.press(screen.getByText('Algebra basics'));
+
+    expect(mockPush).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pathname: '/(app)/child/[profileId]/topic/[topicId]',
+        params: expect.objectContaining({
+          profileId: 'child-1',
+          topicId: 't-1',
+        }),
+      })
+    );
+  });
+
+  it('shows "Mastered" for xpStatus verified', () => {
+    mockUseChildSubjectTopics.mockReturnValue({
+      data: [makeTopic({ completionStatus: 'verified', xpStatus: 'verified' })],
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+
+    render(
+      <AccordionTopicList
+        childProfileId="child-1"
+        subjectId="sub-1"
+        subjectName="Math"
+        expanded={true}
+      />
+    );
+
+    expect(screen.getByText('Mastered')).toBeTruthy();
+  });
+
+  it('shows "Needs review" for decayed xpStatus', () => {
+    mockUseChildSubjectTopics.mockReturnValue({
+      data: [makeTopic({ completionStatus: 'verified', xpStatus: 'decayed' })],
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+
+    render(
+      <AccordionTopicList
+        childProfileId="child-1"
+        subjectId="sub-1"
+        subjectName="Math"
+        expanded={true}
+      />
+    );
+
+    expect(screen.getByText('Needs review')).toBeTruthy();
+  });
+
+  it('shows "Covered" for assessment-passed without verification', () => {
+    mockUseChildSubjectTopics.mockReturnValue({
+      data: [makeTopic({ completionStatus: 'completed', xpStatus: 'pending' })],
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+
+    render(
+      <AccordionTopicList
+        childProfileId="child-1"
+        subjectId="sub-1"
+        subjectName="Math"
+        expanded={true}
+      />
+    );
+
+    expect(screen.getByText('Covered')).toBeTruthy();
+  });
+
+  it('sets accessibilityRole="link" on topic rows', () => {
+    mockUseChildSubjectTopics.mockReturnValue({
+      data: [makeTopic()],
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+
+    render(
+      <AccordionTopicList
+        childProfileId="child-1"
+        subjectId="sub-1"
+        subjectName="Math"
+        expanded={true}
+      />
+    );
+
+    const row = screen.getByLabelText('View Algebra basics details');
+    expect(row.props.accessibilityRole).toBe('link');
   });
 });
 ```
 
 - [ ] **Step 2: Run tests — expect FAILURES**
 
-Run: `cd apps/mobile && pnpm exec jest SubjectCard.test.tsx --no-coverage`
+Run: `cd apps/mobile && pnpm exec jest AccordionTopicList.test.tsx --no-coverage`
 
-Expected: Multiple failures — accordion props don't exist yet.
+Expected: FAIL — component doesn't exist yet.
 
-- [ ] **Step 3: Add accordion props and state to SubjectCard**
+- [ ] **Step 3: Create `AccordionTopicList` component**
 
-Update the props interface in `SubjectCard.tsx`:
-
-```ts
-interface SubjectCardProps {
-  subject: SubjectInventory;
-  onPress?: () => void;
-  onAction?: (action: SubjectCardAction) => void;
-  /** Accordion mode: provide childProfileId + subjectId to enable expand/collapse with topic list */
-  childProfileId?: string;
-  subjectId?: string;
-  testID?: string;
-}
-```
-
-Add imports at the top:
-
-```ts
-import { useState } from 'react';
-import { LayoutAnimation, Pressable, Text, View } from 'react-native';
-import type { SubjectInventory, TopicProgress } from '@eduagent/schemas';
-import { useChildSubjectTopics } from '../../hooks/use-dashboard';
-import { RetentionSignal, type RetentionStatus } from './RetentionSignal';
-import { ProgressBar } from './ProgressBar';
-import { formatMinutes } from '../../lib/format-relative-date';
-```
-
-- [ ] **Step 4: Implement accordion mode in the component body**
-
-Replace the `SubjectCard` component function:
+Create `apps/mobile/src/components/progress/AccordionTopicList.tsx`:
 
 ```tsx
+import { Pressable, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import type { TopicProgress } from '@eduagent/schemas';
+import { useChildSubjectTopics } from '../../hooks/use-dashboard';
+import { RetentionSignal, type RetentionStatus } from './RetentionSignal';
+
 const TOPIC_STATUS_LABELS: Record<string, string> = {
   not_started: 'Not started',
   in_progress: 'In progress',
@@ -1087,6 +1135,258 @@ function TopicSkeleton({ index }: { index: number }): React.ReactElement {
   );
 }
 
+interface AccordionTopicListProps {
+  childProfileId: string;
+  subjectId: string;
+  subjectName: string;
+  expanded: boolean;
+}
+
+export function AccordionTopicList({
+  childProfileId,
+  subjectId,
+  subjectName,
+  expanded,
+}: AccordionTopicListProps): React.ReactElement | null {
+  const router = useRouter();
+  const { data: topics, isLoading, isError, refetch } = useChildSubjectTopics(
+    childProfileId,
+    expanded ? subjectId : undefined
+  );
+
+  if (!expanded) return null;
+
+  return (
+    <View className="mt-3 border-t border-border pt-3">
+      {isLoading ? (
+        <>
+          <TopicSkeleton index={0} />
+          <TopicSkeleton index={1} />
+          <TopicSkeleton index={2} />
+        </>
+      ) : isError ? (
+        <Pressable onPress={() => refetch()}>
+          <Text className="text-caption text-text-secondary text-center py-2">
+            Could not load topics. Tap to retry.
+          </Text>
+        </Pressable>
+      ) : topics && topics.length > 0 ? (
+        topics.map((topic) => (
+          <Pressable
+            key={topic.topicId}
+            onPress={(e) => {
+              e.stopPropagation?.();
+              router.push({
+                pathname: '/(app)/child/[profileId]/topic/[topicId]',
+                params: {
+                  profileId: childProfileId,
+                  topicId: topic.topicId,
+                  title: topic.title,
+                  completionStatus: topic.completionStatus,
+                  masteryScore:
+                    topic.masteryScore != null
+                      ? String(topic.masteryScore)
+                      : '',
+                  retentionStatus: topic.retentionStatus ?? '',
+                  totalSessions: String(topic.totalSessions ?? 0),
+                  subjectId,
+                  subjectName,
+                },
+              } as never);
+            }}
+            className="flex-row items-center justify-between py-2"
+            accessibilityRole="link"
+            accessibilityLabel={`View ${topic.title} details`}
+          >
+            <Text className="text-body-sm text-text-primary flex-1 me-3">
+              {topic.title}
+            </Text>
+            <View className="flex-row items-center gap-2">
+              <Text className="text-caption text-text-secondary">
+                {getTopicStatusLabel(topic)}
+              </Text>
+              {topic.retentionStatus &&
+              topic.totalSessions >= 1 &&
+              topic.completionStatus !== 'not_started' ? (
+                <RetentionSignal
+                  status={topic.retentionStatus as RetentionStatus}
+                  compact
+                  parentFacing
+                />
+              ) : null}
+            </View>
+          </Pressable>
+        ))
+      ) : (
+        <Text className="text-caption text-text-secondary text-center py-2">
+          No topics yet
+        </Text>
+      )}
+    </View>
+  );
+}
+```
+
+- [ ] **Step 4: Run tests — expect PASS**
+
+Run: `cd apps/mobile && pnpm exec jest AccordionTopicList.test.tsx --no-coverage`
+
+Expected: ALL pass.
+
+- [ ] **Step 5: Commit**
+
+```
+feat(mobile): create AccordionTopicList component with lazy loading and navigation
+```
+
+---
+
+## Task 7: Accordion mode on SubjectCard (shell only)
+
+**Files:**
+- Modify: `apps/mobile/src/components/progress/SubjectCard.tsx`
+- Test: `apps/mobile/src/components/progress/SubjectCard.test.tsx`
+
+**Context:** Add accordion expand/collapse to SubjectCard. The card manages `expanded` state and renders `AccordionTopicList` as a child. SubjectCard itself gains NO new hooks — it stays presentational. When `childProfileId` + `subjectId` are provided (and `onPress` is NOT), tapping toggles expand.
+
+- [ ] **Step 1: Write failing tests for accordion shell behavior**
+
+Add to `apps/mobile/src/components/progress/SubjectCard.test.tsx`:
+
+```tsx
+import { fireEvent } from '@testing-library/react-native';
+
+// AccordionTopicList is the only thing we mock from SubjectCard's perspective.
+// This is the component boundary — SubjectCard doesn't know about hooks/router.
+jest.mock('./AccordionTopicList', () => ({
+  AccordionTopicList: ({ expanded }: { expanded: boolean }) =>
+    expanded ? <MockExpandedView /> : null,
+}));
+
+// Simple mock component to detect expanded state
+function MockExpandedView() {
+  const { Text } = require('react-native');
+  return <Text testID="mock-topic-list">Topics visible</Text>;
+}
+
+describe('SubjectCard accordion mode', () => {
+  it('toggles expanded state on tap', () => {
+    render(
+      <SubjectCard
+        subject={makeSubject({
+          topics: { total: 13, explored: 1, mastered: 0, inProgress: 1, notStarted: 11 },
+          sessionsCount: 3,
+          wallClockMinutes: 60,
+        })}
+        childProfileId="child-1"
+        subjectId="sub-1"
+        testID="card"
+      />
+    );
+
+    expect(screen.getByText(/See topics/)).toBeTruthy();
+    expect(screen.queryByTestId('mock-topic-list')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('card'));
+    expect(screen.getByText(/Hide topics/)).toBeTruthy();
+    expect(screen.getByTestId('mock-topic-list')).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('card'));
+    expect(screen.getByText(/See topics/)).toBeTruthy();
+    expect(screen.queryByTestId('mock-topic-list')).toBeNull();
+  });
+
+  it('sets accessibilityRole and accessibilityState on accordion', () => {
+    render(
+      <SubjectCard
+        subject={makeSubject({
+          topics: { total: 13, explored: 0, mastered: 0, inProgress: 1, notStarted: 12 },
+          sessionsCount: 1,
+          wallClockMinutes: 10,
+        })}
+        childProfileId="child-1"
+        subjectId="sub-1"
+        testID="card"
+      />
+    );
+
+    const card = screen.getByTestId('card');
+    expect(card.props.accessibilityRole).toBe('button');
+    expect(card.props.accessibilityState).toEqual({ expanded: false });
+  });
+
+  it('does not show See topics hint when no topics studied and no sessions', () => {
+    render(
+      <SubjectCard
+        subject={makeSubject()}
+        childProfileId="child-1"
+        subjectId="sub-1"
+        testID="card"
+      />
+    );
+
+    expect(screen.queryByText(/See topics/)).toBeNull();
+  });
+
+  it('keeps navigation mode when onPress is provided (child view)', () => {
+    const onPress = jest.fn();
+    render(
+      <SubjectCard
+        subject={makeSubject({ sessionsCount: 2, wallClockMinutes: 30 })}
+        onPress={onPress}
+        testID="card"
+      />
+    );
+
+    fireEvent.press(screen.getByTestId('card'));
+    expect(onPress).toHaveBeenCalled();
+    // No accordion behavior
+    expect(screen.queryByText(/See topics/)).toBeNull();
+    expect(screen.queryByTestId('mock-topic-list')).toBeNull();
+  });
+});
+```
+
+- [ ] **Step 2: Run tests — expect FAILURES**
+
+Run: `cd apps/mobile && pnpm exec jest SubjectCard.test.tsx --no-coverage`
+
+Expected: Multiple failures — accordion props don't exist yet.
+
+- [ ] **Step 3: Add accordion props and wire AccordionTopicList**
+
+Update the props interface in `SubjectCard.tsx`:
+
+```ts
+interface SubjectCardProps {
+  subject: SubjectInventory;
+  onPress?: () => void;
+  onAction?: (action: SubjectCardAction) => void;
+  /** Accordion mode: provide childProfileId + subjectId to enable expand/collapse with topic list */
+  childProfileId?: string;
+  subjectId?: string;
+  testID?: string;
+}
+```
+
+Add imports:
+
+```ts
+import { useState } from 'react';
+import { LayoutAnimation, Pressable, Text, View } from 'react-native';
+import type { SubjectInventory } from '@eduagent/schemas';
+import { AccordionTopicList } from './AccordionTopicList';
+import { ProgressBar } from './ProgressBar';
+import { formatMinutes } from '../../lib/format-relative-date';
+```
+
+Note: NO `useRouter`, NO `useChildSubjectTopics`, NO `TopicProgress` import. SubjectCard stays hook-free (apart from `useState`).
+
+- [ ] **Step 4: Implement accordion mode in the component body**
+
+Replace the `SubjectCard` component function:
+
+```tsx
 export function SubjectCard({
   subject,
   onPress,
@@ -1099,14 +1399,8 @@ export function SubjectCard({
   const [expanded, setExpanded] = useState(false);
 
   const hasExpandableTopics =
-    subject.topics.explored + subject.topics.mastered + subject.topics.inProgress > 0 ||
+    subject.topics.inProgress + subject.topics.mastered > 0 ||
     subject.sessionsCount > 0;
-
-  const { data: topics, isLoading: topicsLoading, isError: topicsError, refetch } =
-    useChildSubjectTopics(
-      isAccordionMode ? childProfileId : undefined,
-      isAccordionMode && expanded ? subjectId : undefined
-    );
 
   const topicHeadline = getTopicHeadline(subject);
   const action = getContextualAction(subject);
@@ -1174,53 +1468,14 @@ export function SubjectCard({
         </View>
       </View>
 
-      {/* Expanded topic list */}
-      {isAccordionMode && expanded ? (
-        <View className="mt-3 border-t border-border pt-3">
-          {topicsLoading ? (
-            <>
-              <TopicSkeleton index={0} />
-              <TopicSkeleton index={1} />
-              <TopicSkeleton index={2} />
-            </>
-          ) : topicsError ? (
-            <Pressable onPress={() => refetch()}>
-              <Text className="text-caption text-text-secondary text-center py-2">
-                Could not load topics. Tap to retry.
-              </Text>
-            </Pressable>
-          ) : topics && topics.length > 0 ? (
-            topics.map((topic) => (
-              <View
-                key={topic.topicId}
-                className="flex-row items-center justify-between py-2"
-                accessibilityRole="text"
-              >
-                <Text className="text-body-sm text-text-primary flex-1 me-3">
-                  {topic.title}
-                </Text>
-                <View className="flex-row items-center gap-2">
-                  <Text className="text-caption text-text-secondary">
-                    {getTopicStatusLabel(topic)}
-                  </Text>
-                  {topic.retentionStatus &&
-                  topic.totalSessions >= 1 &&
-                  topic.completionStatus !== 'not_started' ? (
-                    <RetentionSignal
-                      status={topic.retentionStatus as RetentionStatus}
-                      compact
-                      parentFacing
-                    />
-                  ) : null}
-                </View>
-              </View>
-            ))
-          ) : (
-            <Text className="text-caption text-text-secondary text-center py-2">
-              No topics yet
-            </Text>
-          )}
-        </View>
+      {/* Expanded topic list — data fetching + navigation live in AccordionTopicList */}
+      {isAccordionMode ? (
+        <AccordionTopicList
+          childProfileId={childProfileId}
+          subjectId={subjectId}
+          subjectName={subject.subjectName}
+          expanded={expanded}
+        />
       ) : null}
     </View>
   );
@@ -1266,7 +1521,7 @@ Expected: ALL pass (both headline and accordion describe blocks).
 - [ ] **Step 6: Commit**
 
 ```
-feat(mobile): accordion expand/collapse with lazy topic list on SubjectCard
+feat(mobile): accordion expand/collapse shell on SubjectCard using AccordionTopicList
 ```
 
 ---

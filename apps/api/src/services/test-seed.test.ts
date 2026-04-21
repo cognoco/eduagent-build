@@ -40,7 +40,7 @@ function createMockDb(): Database {
 // ---------------------------------------------------------------------------
 
 describe('VALID_SCENARIOS', () => {
-  it('contains all 20 expected scenarios', () => {
+  it('contains all 23 expected scenarios', () => {
     expect(VALID_SCENARIOS).toEqual([
       'onboarding-complete',
       'onboarding-no-subject',
@@ -62,6 +62,9 @@ describe('VALID_SCENARIOS', () => {
       'parent-multi-child',
       'daily-limit-reached',
       'language-learner',
+      'language-subject-active',
+      'parent-with-reports',
+      'mentor-memory-populated',
     ]);
   });
 

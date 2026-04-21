@@ -1,0 +1,93 @@
+# Parent child report detail - drill from list into a populated report
+# Tags: nightly, parent
+# Seed: parent-with-reports
+# Covers: reports list with data and report detail sections
+# Usage: ./scripts/seed-and-run.sh parent-with-reports flows/parent/child-report-detail.yaml
+appId: com.mentomate.app
+tags:
+  - nightly
+  - parent
+---
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+
+- extendedWaitUntil:
+    visible:
+      id: "dashboard-scroll"
+    timeout: 15000
+
+- tapOn:
+    id: "dashboard-child-${CHILD_PROFILE_ID}-primary"
+
+- extendedWaitUntil:
+    visible:
+      id: "child-detail-scroll"
+    timeout: 10000
+
+- scrollUntilVisible:
+    element:
+      id: "child-reports-link"
+    direction: DOWN
+    timeout: 10000
+
+- tapOn:
+    id: "child-reports-link"
+
+- extendedWaitUntil:
+    visible:
+      id: "child-reports-back"
+    timeout: 10000
+
+- assertVisible:
+    id: "report-card-${REPORT_ID}"
+
+- takeScreenshot: 01-reports-list
+
+- tapOn:
+    id: "report-card-${REPORT_ID}"
+
+- extendedWaitUntil:
+    visible:
+      id: "child-report-back"
+    timeout: 10000
+
+- assertVisible:
+    id: "child-report-hero"
+
+- assertVisible:
+    id: "child-report-metric-sessions"
+
+- assertVisible:
+    id: "child-report-metric-minutes"
+
+- assertVisible:
+    id: "child-report-highlights"
+
+- scrollUntilVisible:
+    element:
+      id: "child-report-next-steps"
+    direction: DOWN
+    timeout: 10000
+
+- assertVisible:
+    id: "child-report-next-steps"
+
+- scrollUntilVisible:
+    element:
+      id: "child-report-subjects"
+    direction: DOWN
+    timeout: 10000
+
+- assertVisible:
+    id: "child-report-subjects"
+
+- takeScreenshot: 02-report-detail
+
+- pressKey: back
+
+- extendedWaitUntil:
+    visible:
+      id: "child-reports-back"
+    timeout: 10000
+
+- takeScreenshot: 03-back-to-reports

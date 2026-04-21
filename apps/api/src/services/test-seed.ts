@@ -15,6 +15,7 @@ import { eq, like, inArray, or } from 'drizzle-orm';
 import {
   accounts,
   profiles,
+  learningProfiles,
   subjects,
   curricula,
   curriculumTopics,
@@ -22,6 +23,7 @@ import {
   learningSessions,
   sessionEvents,
   sessionSummaries,
+  monthlyReports,
   retentionCards,
   assessments,
   subscriptions,
@@ -78,7 +80,10 @@ export type SeedScenario =
   | 'consent-pending'
   | 'parent-multi-child'
   | 'daily-limit-reached'
-  | 'language-learner';
+  | 'language-learner'
+  | 'language-subject-active'
+  | 'parent-with-reports'
+  | 'mentor-memory-populated';
 
 /** Environment bindings needed by the seed service */
 export interface SeedEnv {
@@ -1604,6 +1609,218 @@ async function seedLanguageLearner(
   };
 }
 
+async function seedLanguageSubjectActive(
+  db: Database,
+  email: string,
+  env: SeedEnv
+): Promise<SeedResult> {
+  const base = await seedLanguageLearner(db, email, env);
+  const subjectId = base.ids.subjectId;
+  if (!subjectId) {
+    throw new Error('language-learner seed did not return subjectId');
+  }
+
+  await db.insert(vocabulary).values([
+    {
+      id: generateUUIDv7(),
+      profileId: base.profileId,
+      subjectId,
+      term: 'aprender',
+      termNormalized: 'aprender',
+      translation: 'to learn',
+      type: 'word',
+      cefrLevel: 'B1',
+      mastered: false,
+    },
+    {
+      id: generateUUIDv7(),
+      profileId: base.profileId,
+      subjectId,
+      term: 'me doy cuenta',
+      termNormalized: 'me doy cuenta',
+      translation: 'I realize',
+      type: 'chunk',
+      cefrLevel: 'B1',
+      mastered: false,
+    },
+  ]);
+
+  const sessionId = generateUUIDv7();
+  const startedAt = pastDate(1);
+  const endedAt = new Date(startedAt.getTime() + 16 * 60 * 1000);
+  await db.insert(learningSessions).values({
+    id: sessionId,
+    profileId: base.profileId,
+    subjectId,
+    sessionType: 'learning',
+    status: 'completed',
+    exchangeCount: 5,
+    startedAt,
+    lastActivityAt: endedAt,
+    endedAt,
+    wallClockSeconds: 960,
+  });
+  await db.insert(sessionSummaries).values({
+    id: generateUUIDv7(),
+    sessionId,
+    profileId: base.profileId,
+    content: 'A fifth Spanish session reviewed everyday phrases and B1 verbs.',
+    status: 'accepted',
+  });
+
+  return {
+    ...base,
+    scenario: 'language-subject-active',
+  };
+}
+
+async function seedParentWithReports(
+  db: Database,
+  email: string,
+  env: SeedEnv
+): Promise<SeedResult> {
+  const base = await seedParentWithChildren(db, email, env);
+  const parentProfileId = base.ids.parentProfileId;
+  const childProfileId = base.ids.childProfileId;
+
+  if (!parentProfileId || !childProfileId) {
+    throw new Error(
+      'parent-with-children seed did not return parent/child IDs'
+    );
+  }
+
+  const reportId = generateUUIDv7();
+  await db.insert(monthlyReports).values({
+    id: reportId,
+    profileId: parentProfileId,
+    childProfileId,
+    reportMonth: '2026-03-01',
+    reportData: {
+      childName: 'Test Teen',
+      month: 'March 2026',
+      thisMonth: {
+        totalSessions: 15,
+        totalActiveMinutes: 180,
+        topicsMastered: 12,
+        topicsExplored: 15,
+        vocabularyTotal: 45,
+        streakBest: 6,
+      },
+      lastMonth: null,
+      highlights: ['Completed the geometry unit', 'Consistent daily practice'],
+      nextSteps: [
+        'Start algebra fundamentals',
+        'Review weak areas in fractions',
+      ],
+      subjects: [
+        {
+          subjectName: 'Mathematics',
+          topicsMastered: 12,
+          topicsAttempted: 15,
+          topicsExplored: 15,
+          vocabularyTotal: 45,
+          activeMinutes: 180,
+          trend: 'growing',
+        },
+      ],
+      headlineStat: {
+        value: 12,
+        label: 'Topics mastered',
+        comparison: 'Up from 8 last month',
+      },
+    },
+  });
+
+  return {
+    ...base,
+    scenario: 'parent-with-reports',
+    ids: {
+      ...base.ids,
+      reportId,
+    },
+  };
+}
+
+async function seedMentorMemoryPopulated(
+  db: Database,
+  email: string,
+  env: SeedEnv
+): Promise<SeedResult> {
+  const base = await seedParentWithChildren(db, email, env);
+  const childProfileId = base.ids.childProfileId;
+  const subjectId = base.ids.subjectId;
+
+  if (!childProfileId || !subjectId) {
+    throw new Error(
+      'parent-with-children seed did not return childProfileId/subjectId'
+    );
+  }
+
+  for (let index = 0; index < 3; index += 1) {
+    const sessionId = generateUUIDv7();
+    const startedAt = pastDate(index + 2);
+    const endedAt = new Date(startedAt.getTime() + 14 * 60 * 1000);
+    await db.insert(learningSessions).values({
+      id: sessionId,
+      profileId: childProfileId,
+      subjectId,
+      sessionType: 'learning',
+      status: 'completed',
+      exchangeCount: 6,
+      startedAt,
+      lastActivityAt: endedAt,
+      endedAt,
+      wallClockSeconds: 840,
+    });
+  }
+
+  await db.insert(learningProfiles).values({
+    profileId: childProfileId,
+    learningStyle: {
+      preferredExplanations: ['diagrams', 'examples'],
+      pacePreference: 'thorough',
+      responseToChallenge: 'motivated',
+      confidence: 'medium',
+      corroboratingSessions: 4,
+      source: 'inferred',
+    },
+    interests: ['Soccer', 'History'],
+    strengths: [
+      {
+        subject: 'History',
+        topics: ['Critical thinking'],
+        confidence: 'high',
+        source: 'inferred',
+      },
+    ],
+    struggles: [
+      {
+        subject: 'English',
+        topic: 'Long reading passages',
+        lastSeen: pastDate(2).toISOString(),
+        attempts: 3,
+        confidence: 'medium',
+        source: 'inferred',
+      },
+    ],
+    communicationNotes: ['Responds well to encouragement'],
+    suppressedInferences: [],
+    interestTimestamps: {
+      Soccer: pastDate(5).toISOString(),
+      History: pastDate(3).toISOString(),
+    },
+    memoryEnabled: true,
+    memoryConsentStatus: 'granted',
+    memoryCollectionEnabled: true,
+    memoryInjectionEnabled: true,
+  });
+
+  return {
+    ...base,
+    scenario: 'mentor-memory-populated',
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Scenario: daily-limit-reached
 // Free-tier user who has hit the daily question cap (10/10) but still has
@@ -1715,6 +1932,9 @@ const SCENARIO_MAP: Record<SeedScenario, SeederFn> = {
   'parent-multi-child': seedParentMultiChild,
   'daily-limit-reached': seedDailyLimitReached,
   'language-learner': seedLanguageLearner,
+  'language-subject-active': seedLanguageSubjectActive,
+  'parent-with-reports': seedParentWithReports,
+  'mentor-memory-populated': seedMentorMemoryPopulated,
 };
 
 export const VALID_SCENARIOS = Object.keys(SCENARIO_MAP) as SeedScenario[];

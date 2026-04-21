@@ -1,0 +1,51 @@
+# Learner mentor memory - empty state and controls
+# Tags: nightly, account
+# Seed: language-subject-active
+# Covers: More -> learner mentor memory empty state
+# Usage: ./scripts/seed-and-run.sh language-subject-active flows/account/learner-mentor-memory.yaml
+appId: com.mentomate.app
+tags:
+  - nightly
+  - account
+---
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+
+- extendedWaitUntil:
+    visible:
+      id: "home-scroll-view"
+    timeout: 15000
+
+- tapOn: "More Tab"
+
+- extendedWaitUntil:
+    visible:
+      id: "sign-out-button"
+    timeout: 10000
+
+- scrollUntilVisible:
+    element:
+      text: "What My Mentor Knows"
+    direction: DOWN
+    timeout: 10000
+
+- tapOn: "What My Mentor Knows"
+
+- extendedWaitUntil:
+    visible:
+      id: "mentor-memory-all-empty"
+    timeout: 10000
+
+- assertVisible:
+    id: "memory-status-text"
+
+- takeScreenshot: 01-learner-memory-empty
+
+- pressKey: back
+
+- extendedWaitUntil:
+    visible:
+      id: "sign-out-button"
+    timeout: 10000
+
+- takeScreenshot: 02-back-to-more

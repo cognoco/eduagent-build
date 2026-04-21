@@ -17,12 +17,12 @@ import {
   subjects,
 } from '@eduagent/database';
 
-import { jwtMock, configureValidJWT, configureInvalidJWT } from './mocks';
 import {
   buildIntegrationEnv,
   cleanupAccounts,
   createIntegrationDb,
 } from './helpers';
+import { buildAuthHeaders } from './test-keys';
 
 const mockRouteAndCall = jest.fn();
 const mockRouteAndStream = jest.fn();
@@ -39,22 +39,11 @@ jest.mock('../../apps/api/src/services/llm', () => {
   };
 });
 
-const jwt = jwtMock();
-jest.mock('../../apps/api/src/middleware/jwt', () => jwt);
-
 import { app } from '../../apps/api/src/index';
 
 const TEST_ENV = buildIntegrationEnv();
 const AUTH_USER_ID = 'integration-onboarding-user';
 const AUTH_EMAIL = 'integration-onboarding@integration.test';
-
-function buildAuthHeaders(profileId?: string): HeadersInit {
-  return {
-    Authorization: 'Bearer valid.jwt.token',
-    'Content-Type': 'application/json',
-    ...(profileId ? { 'X-Profile-Id': profileId } : {}),
-  };
-}
 
 function buildLlmResult(response: string) {
   return {
@@ -139,7 +128,7 @@ async function createOwnerProfile(): Promise<string> {
     '/v1/profiles',
     {
       method: 'POST',
-      headers: buildAuthHeaders(),
+      headers: buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }),
       body: JSON.stringify({
         displayName: 'Onboarding Learner',
         birthYear: 2000,
@@ -196,7 +185,6 @@ async function loadCurriculum(subjectId: string) {
 
 beforeEach(async () => {
   jest.clearAllMocks();
-  configureValidJWT(jwt, { sub: AUTH_USER_ID, email: AUTH_EMAIL });
   installLlmMocks();
 
   await cleanupAccounts({
@@ -221,7 +209,10 @@ describe('Integration: Onboarding interview routes', () => {
       `/v1/subjects/${subject.id}/interview`,
       {
         method: 'POST',
-        headers: buildAuthHeaders(profileId),
+        headers: buildAuthHeaders(
+          { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+          profileId
+        ),
         body: JSON.stringify({ message: 'Hello, I just started' }),
       },
       TEST_ENV
@@ -250,7 +241,10 @@ describe('Integration: Onboarding interview routes', () => {
       `/v1/subjects/${subject.id}/interview`,
       {
         method: 'GET',
-        headers: buildAuthHeaders(profileId),
+        headers: buildAuthHeaders(
+          { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+          profileId
+        ),
       },
       TEST_ENV
     );
@@ -272,7 +266,10 @@ describe('Integration: Onboarding interview routes', () => {
       `/v1/subjects/${subject.id}/interview`,
       {
         method: 'POST',
-        headers: buildAuthHeaders(profileId),
+        headers: buildAuthHeaders(
+          { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+          profileId
+        ),
         body: JSON.stringify({
           message: 'I am interested in learning algebra',
         }),
@@ -309,7 +306,10 @@ describe('Integration: Onboarding interview routes', () => {
       `/v1/subjects/${subject.id}/curriculum`,
       {
         method: 'GET',
-        headers: buildAuthHeaders(profileId),
+        headers: buildAuthHeaders(
+          { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+          profileId
+        ),
       },
       TEST_ENV
     );
@@ -330,7 +330,10 @@ describe('Integration: Onboarding interview routes', () => {
       `/v1/subjects/${subject.id}/interview/stream`,
       {
         method: 'POST',
-        headers: buildAuthHeaders(profileId),
+        headers: buildAuthHeaders(
+          { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+          profileId
+        ),
         body: JSON.stringify({ message: 'I want to learn geometry' }),
       },
       TEST_ENV
@@ -355,7 +358,6 @@ describe('Integration: Onboarding interview routes', () => {
   it('returns 401 without authentication', async () => {
     const profileId = await createOwnerProfile();
     const subject = await seedSubject(profileId);
-    configureInvalidJWT(jwt);
 
     const res = await app.request(
       `/v1/subjects/${subject.id}/interview`,

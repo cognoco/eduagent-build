@@ -25,14 +25,13 @@ import {
 } from '@eduagent/database';
 import type { SessionType } from '@eduagent/schemas';
 
-import { jwtMock, configureValidJWT } from './mocks';
 import {
   buildIntegrationEnv,
   cleanupAccounts,
   createIntegrationDb,
 } from './helpers';
+import { buildAuthHeaders } from './test-keys';
 
-const jwt = jwtMock();
 const mockInngestSend = jest.fn();
 const mockInngestCreateFunction = jest.fn().mockImplementation((config) => {
   const id = config?.id ?? 'mock-inngest-function';
@@ -65,7 +64,6 @@ jest.mock('../../apps/api/src/services/llm', () => {
   };
 });
 
-jest.mock('../../apps/api/src/middleware/jwt', () => jwt);
 jest.mock('../../apps/api/src/inngest/client', () => ({
   inngest: {
     send: mockInngestSend,
@@ -81,20 +79,12 @@ const AUTH_EMAIL = 'integration-learning@integration.test';
 const FLAG_EVENT_ID = '00000000-0000-4000-8000-000000000091';
 const UNKNOWN_ID = '00000000-0000-4000-8000-000000000099';
 
-function buildAuthHeaders(profileId?: string): HeadersInit {
-  return {
-    Authorization: 'Bearer valid.jwt.token',
-    'Content-Type': 'application/json',
-    ...(profileId ? { 'X-Profile-Id': profileId } : {}),
-  };
-}
-
 async function createOwnerProfile(): Promise<string> {
   const res = await app.request(
     '/v1/profiles',
     {
       method: 'POST',
-      headers: buildAuthHeaders(),
+      headers: buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }),
       body: JSON.stringify({
         displayName: 'Integration Learner',
         birthYear: 2000,
@@ -197,7 +187,10 @@ async function startSession(
     `/v1/subjects/${subjectId}/sessions`,
     {
       method: 'POST',
-      headers: buildAuthHeaders(profileId),
+      headers: buildAuthHeaders(
+        { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+        profileId
+      ),
       body: JSON.stringify({
         subjectId,
         ...(input ?? {}),
@@ -261,11 +254,6 @@ async function loadSubscriptionAndQuota() {
 }
 
 beforeEach(async () => {
-  Object.values(jwt).forEach((fn) => fn.mockReset());
-  configureValidJWT(jwt, {
-    sub: AUTH_USER_ID,
-    email: AUTH_EMAIL,
-  });
   mockInngestSend.mockReset();
   mockInngestSend.mockResolvedValue({ ids: [] });
   await cleanupAccounts({
@@ -291,7 +279,10 @@ describe('Integration: Learning Session Lifecycle', () => {
         `/v1/subjects/${subject.id}/sessions`,
         {
           method: 'POST',
-          headers: buildAuthHeaders(profileId),
+          headers: buildAuthHeaders(
+            { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+            profileId
+          ),
           body: JSON.stringify({ subjectId: subject.id }),
         },
         TEST_ENV
@@ -319,7 +310,10 @@ describe('Integration: Learning Session Lifecycle', () => {
         `/v1/subjects/${subject.id}/sessions`,
         {
           method: 'POST',
-          headers: buildAuthHeaders(profileId),
+          headers: buildAuthHeaders(
+            { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+            profileId
+          ),
           body: JSON.stringify({ subjectId: subject.id }),
         },
         TEST_ENV
@@ -353,7 +347,13 @@ describe('Integration: Learning Session Lifecycle', () => {
 
       const res = await app.request(
         `/v1/sessions/${session.id}`,
-        { method: 'GET', headers: buildAuthHeaders(profileId) },
+        {
+          method: 'GET',
+          headers: buildAuthHeaders(
+            { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+            profileId
+          ),
+        },
         TEST_ENV
       );
 
@@ -369,7 +369,13 @@ describe('Integration: Learning Session Lifecycle', () => {
 
       const res = await app.request(
         `/v1/sessions/${UNKNOWN_ID}`,
-        { method: 'GET', headers: buildAuthHeaders(profileId) },
+        {
+          method: 'GET',
+          headers: buildAuthHeaders(
+            { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+            profileId
+          ),
+        },
         TEST_ENV
       );
 
@@ -389,7 +395,10 @@ describe('Integration: Learning Session Lifecycle', () => {
         `/v1/sessions/${session.id}/messages`,
         {
           method: 'POST',
-          headers: buildAuthHeaders(profileId),
+          headers: buildAuthHeaders(
+            { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+            profileId
+          ),
           body: JSON.stringify({ message: 'What is photosynthesis?' }),
         },
         TEST_ENV
@@ -427,7 +436,10 @@ describe('Integration: Learning Session Lifecycle', () => {
         `/v1/sessions/${session.id}/messages`,
         {
           method: 'POST',
-          headers: buildAuthHeaders(profileId),
+          headers: buildAuthHeaders(
+            { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+            profileId
+          ),
           body: JSON.stringify({}),
         },
         TEST_ENV
@@ -447,7 +459,10 @@ describe('Integration: Learning Session Lifecycle', () => {
         `/v1/sessions/${session.id}/stream`,
         {
           method: 'POST',
-          headers: buildAuthHeaders(profileId),
+          headers: buildAuthHeaders(
+            { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+            profileId
+          ),
           body: JSON.stringify({ message: 'Explain gravity' }),
         },
         TEST_ENV
@@ -480,7 +495,10 @@ describe('Integration: Learning Session Lifecycle', () => {
         `/v1/sessions/${session.id}/close`,
         {
           method: 'POST',
-          headers: buildAuthHeaders(profileId),
+          headers: buildAuthHeaders(
+            { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+            profileId
+          ),
           body: JSON.stringify({}),
         },
         TEST_ENV
@@ -502,7 +520,13 @@ describe('Integration: Learning Session Lifecycle', () => {
 
       const summaryRes = await app.request(
         `/v1/sessions/${session.id}/summary`,
-        { method: 'GET', headers: buildAuthHeaders(profileId) },
+        {
+          method: 'GET',
+          headers: buildAuthHeaders(
+            { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+            profileId
+          ),
+        },
         TEST_ENV
       );
 
@@ -522,7 +546,10 @@ describe('Integration: Learning Session Lifecycle', () => {
         `/v1/sessions/${session.id}/close`,
         {
           method: 'POST',
-          headers: buildAuthHeaders(profileId),
+          headers: buildAuthHeaders(
+            { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+            profileId
+          ),
           body: JSON.stringify({}),
         },
         TEST_ENV
@@ -533,7 +560,10 @@ describe('Integration: Learning Session Lifecycle', () => {
         `/v1/sessions/${session.id}/summary`,
         {
           method: 'POST',
-          headers: buildAuthHeaders(profileId),
+          headers: buildAuthHeaders(
+            { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+            profileId
+          ),
           body: JSON.stringify({
             content:
               'I learned that plants use sunlight to turn water and carbon dioxide into food.',
@@ -579,7 +609,10 @@ describe('Integration: Learning Session Lifecycle', () => {
         `/v1/sessions/${session.id}/flag`,
         {
           method: 'POST',
-          headers: buildAuthHeaders(profileId),
+          headers: buildAuthHeaders(
+            { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+            profileId
+          ),
           body: JSON.stringify({
             eventId: FLAG_EVENT_ID,
             reason: 'Incorrect information',
@@ -619,7 +652,10 @@ describe('Integration: Learning Session Lifecycle', () => {
         '/v1/sessions/interleaved',
         {
           method: 'POST',
-          headers: buildAuthHeaders(profileId),
+          headers: buildAuthHeaders(
+            { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+            profileId
+          ),
           body: JSON.stringify({ subjectId: subject.id, topicCount: 2 }),
         },
         TEST_ENV
@@ -657,7 +693,10 @@ describe('Integration: Learning Session Lifecycle', () => {
         '/v1/sessions/interleaved',
         {
           method: 'POST',
-          headers: buildAuthHeaders(profileId),
+          headers: buildAuthHeaders(
+            { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+            profileId
+          ),
           body: JSON.stringify({ subjectId: subject.id }),
         },
         TEST_ENV
@@ -683,7 +722,10 @@ describe('Integration: Learning Session Lifecycle', () => {
         `/v1/sessions/${homeworkSession.id}/recall-bridge`,
         {
           method: 'POST',
-          headers: buildAuthHeaders(profileId),
+          headers: buildAuthHeaders(
+            { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+            profileId
+          ),
           body: JSON.stringify({}),
         },
         TEST_ENV
@@ -705,7 +747,10 @@ describe('Integration: Learning Session Lifecycle', () => {
         `/v1/sessions/${session.id}/recall-bridge`,
         {
           method: 'POST',
-          headers: buildAuthHeaders(profileId),
+          headers: buildAuthHeaders(
+            { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+            profileId
+          ),
           body: JSON.stringify({}),
         },
         TEST_ENV
@@ -723,7 +768,10 @@ describe('Integration: Learning Session Lifecycle', () => {
         `/v1/sessions/${UNKNOWN_ID}/recall-bridge`,
         {
           method: 'POST',
-          headers: buildAuthHeaders(profileId),
+          headers: buildAuthHeaders(
+            { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+            profileId
+          ),
           body: JSON.stringify({}),
         },
         TEST_ENV

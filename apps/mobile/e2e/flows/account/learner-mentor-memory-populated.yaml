@@ -1,0 +1,78 @@
+# Learner mentor memory - populated with seeded memory data
+# Tags: nightly, account
+# Seed: mentor-memory-populated
+# Covers: switch to child profile and verify populated learner memory sections
+# Usage: ./scripts/seed-and-run.sh mentor-memory-populated flows/account/learner-mentor-memory-populated.yaml
+appId: com.mentomate.app
+tags:
+  - nightly
+  - account
+---
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+
+- extendedWaitUntil:
+    visible:
+      id: "dashboard-scroll"
+    timeout: 15000
+
+- runFlow:
+    file: ../_setup/switch-to-child.yaml
+    env:
+      CHILD_NAME: "Test Teen"
+
+- extendedWaitUntil:
+    visible:
+      id: "home-scroll-view"
+    timeout: 15000
+
+- tapOn: "More Tab"
+
+- extendedWaitUntil:
+    visible:
+      id: "sign-out-button"
+    timeout: 10000
+
+- scrollUntilVisible:
+    element:
+      text: "What My Mentor Knows"
+    direction: DOWN
+    timeout: 10000
+
+- tapOn: "What My Mentor Knows"
+
+- extendedWaitUntil:
+    visible:
+      id: "memory-status-text"
+    timeout: 10000
+
+- assertNotVisible:
+    id: "mentor-memory-all-empty"
+
+- takeScreenshot: 01-learner-memory-populated
+
+- scrollUntilVisible:
+    element:
+      text: "Interests"
+    direction: DOWN
+    timeout: 10000
+
+- assertVisible:
+    text: "Soccer"
+
+- takeScreenshot: 02-learner-memory-interests
+
+- scrollUntilVisible:
+    element:
+      text: "Strengths"
+    direction: DOWN
+    timeout: 10000
+
+- takeScreenshot: 03-learner-memory-strengths
+
+- pressKey: back
+
+- extendedWaitUntil:
+    visible:
+      id: "sign-out-button"
+    timeout: 10000
