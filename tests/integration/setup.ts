@@ -84,23 +84,31 @@ registerProvider(createMockProvider('gemini'));
 // ---------------------------------------------------------------------------
 // Global fetch interceptor + JWKS mock
 //
-// Direction of travel: once all test files are migrated to composable
-// interceptors, remove `passthrough: true` so unmatched URLs throw.
+// All integration tests use real JWT verification via the fetch interceptor.
+// Unmatched URLs throw — no silent external HTTP calls during tests.
+// Per-boundary mocks (mockExpoPush, mockVoyageAI, etc.) are added by
+// individual test files that touch those services.
 // ---------------------------------------------------------------------------
 
-import { installFetchInterceptor, restoreFetch } from './fetch-interceptor';
+import {
+  installFetchInterceptor,
+  restoreFetch,
+  addFetchHandler,
+} from './fetch-interceptor';
 import { mockClerkJWKS } from './external-mocks';
 import { clearJWKSCache } from '../../apps/api/src/middleware/jwt';
 
-// Passthrough mode: unmatched URLs fall through to real fetch so tests
-// that still use the old jest.mock('jwt') pattern continue to work.
-// TODO [INT-MIGRATION]: Remove passthrough once remaining legacy test files are
-// migrated off jest.mock('../../apps/api/src/middleware/jwt'). Remaining files:
-// account-deletion, and any others using the old jwt-mock pattern.
-// Once all files are migrated, flip to passthrough: false so stray external
-// HTTP calls fail loudly in CI.
-installFetchInterceptor({ passthrough: true });
+// Capture the real fetch before installing the interceptor — Neon's
+// serverless driver uses fetch() for SQL-over-HTTP and needs passthrough.
+const nativeFetch = globalThis.fetch;
+
+installFetchInterceptor();
 mockClerkJWKS();
+
+// In dev, the database is on Neon — the HTTP driver sends SQL via fetch to
+// *.neon.tech. In CI, the pg wire-protocol driver is used instead, so this
+// handler never fires. This is the only intentional passthrough.
+addFetchHandler(/\.neon\.tech/, (url, init) => nativeFetch(url, init));
 
 // Clear the in-memory JWKS cache between test files to prevent stale keys
 beforeEach(() => {

@@ -22,14 +22,11 @@ import {
   xpLedger,
   type Database,
 } from '@eduagent/database';
-import { configureValidJWT } from './mocks';
 import {
   buildAuthHeaders as buildSignedAuthHeaders,
   type TestJWTClaims,
 } from './test-keys';
 import { createIntegrationDb } from './helpers';
-
-type JwtMocks = Record<string, jest.Mock>;
 
 type AppLike = {
   request: (
@@ -63,52 +60,26 @@ export interface TopicSeedInput {
 /**
  * Builds HTTP headers with a real signed JWT.
  *
- * Backwards-compatible: accepts either the old signature (profileId?: string)
- * or the new signature (claims?: TestJWTClaims, profileId?: string).
- *
- * Old tests that mock the jwt module don't care about the token content —
- * the mock intercepts before verification. New tests that use real jwt
- * verification get a properly signed RS256 token.
+ * Accepts either `buildAuthHeaders('profile-id')` (profileId only, default
+ * claims) or `buildAuthHeaders({ sub: '...', email: '...' }, 'profile-id')`
+ * (explicit claims).
  */
 export function buildAuthHeaders(
   claimsOrProfileId?: TestJWTClaims | string,
   profileId?: string
 ): HeadersInit {
   if (typeof claimsOrProfileId === 'string') {
-    // Old usage: buildAuthHeaders('profile-id')
     return buildSignedAuthHeaders(undefined, claimsOrProfileId);
   }
-  // New usage: buildAuthHeaders({ sub: '...' }, 'profile-id')
-  // or: buildAuthHeaders() — default claims
   return buildSignedAuthHeaders(claimsOrProfileId, profileId);
 }
 
 /**
- * Configures a JWT mock to return specific claims.
- *
- * @deprecated — Migrated tests use buildAuthHeaders({ sub, email }) instead.
- * Kept for non-migrated test files that still use jest.mock('jwt').
- */
-export function setAuthenticatedUser(
-  jwt: JwtMocks,
-  user: AuthFixtureUser
-): void {
-  configureValidJWT(jwt, {
-    sub: user.userId,
-    email: user.email,
-  });
-}
-
-/**
  * Creates a profile through the real route.
- *
- * @param input.jwt — Optional. When provided, configures the jwt mock (legacy).
- *   When omitted, relies on real JWT verification via the fetch interceptor.
  */
 export async function createProfileViaRoute(input: {
   app: AppLike;
   env: Record<string, string>;
-  jwt?: JwtMocks;
   user: AuthFixtureUser;
   displayName: string;
   birthYear: number;
@@ -120,10 +91,6 @@ export async function createProfileViaRoute(input: {
   isOwner: boolean;
   consentStatus: string | null;
 }> {
-  if (input.jwt) {
-    setAuthenticatedUser(input.jwt, input.user);
-  }
-
   const res = await input.app.request(
     '/v1/profiles',
     {

@@ -10,6 +10,7 @@ import {
   GrowthChart,
   RetentionSignal,
   SubjectCard,
+  hasSubjectActivity,
   type RetentionStatus,
 } from '../../../../components/progress';
 import {
@@ -155,6 +156,7 @@ export default function ChildDetailScreen() {
   const { data: history } = useChildProgressHistory(profileId, {
     granularity: 'weekly',
   });
+  const visibleSubjects = inventory?.subjects.filter(hasSubjectActivity) ?? [];
   const { data: reports } = useChildReports(profileId);
   const pendingCelebrations = usePendingCelebrations({
     profileId,
@@ -455,31 +457,30 @@ export default function ChildDetailScreen() {
             <SubjectSkeleton />
             <SubjectSkeleton />
           </>
-        ) : inventory?.subjects && inventory.subjects.length > 0 ? (
-          <>
-            <Text className="text-h3 font-semibold text-text-primary mt-4 mb-2">
-              Subjects
-            </Text>
-            {inventory.subjects.map((subject) => (
-              <View key={subject.subjectId} className="mt-3">
-                <SubjectCard
-                  subject={subject}
-                  onPress={() => {
-                    if (!profileId) return;
-                    router.push({
-                      pathname: '/(app)/child/[profileId]/subjects/[subjectId]',
-                      params: {
-                        profileId,
-                        subjectId: subject.subjectId,
-                        subjectName: subject.subjectName,
-                      },
-                    } as never);
-                  }}
-                  testID={`subject-card-${subject.subjectId}`}
-                />
-              </View>
-            ))}
-          </>
+        ) : inventory?.subjects ? (
+          visibleSubjects.length > 0 ? (
+            <>
+              <Text className="text-h3 font-semibold text-text-primary mt-4 mb-2">
+                Subjects
+              </Text>
+              {visibleSubjects.map((subject) => (
+                <View key={subject.subjectId} className="mt-3">
+                  <SubjectCard
+                    subject={subject}
+                    childProfileId={profileId}
+                    subjectId={subject.subjectId}
+                    testID={`subject-card-${subject.subjectId}`}
+                  />
+                </View>
+              ))}
+            </>
+          ) : (
+            <View className="py-8 items-center">
+              <Text className="text-body text-text-secondary">
+                No subjects yet
+              </Text>
+            </View>
+          )
         ) : child?.subjects && child.subjects.length > 0 ? (
           <>
             <Text className="text-h3 font-semibold text-text-primary mt-4 mb-2">

@@ -283,7 +283,8 @@ async function loadProgressState(
   };
 }
 
-function buildSubjectMetric(
+/** @internal - exported for testing only */
+export function buildSubjectMetric(
   subject: SubjectRow,
   state: ProgressState
 ): SubjectProgressMetrics {
@@ -304,9 +305,18 @@ function buildSubjectMetric(
       .filter((topic) => topic.filedFrom === 'pre_generated')
       .map((topic) => topic.id)
   );
+  const subjectSessionTopicIds = new Set(
+    subjectSessions
+      .filter((session) => session.topicId != null)
+      .map((session) => session.topicId as string)
+  );
   const exploredTopicIds = new Set(
     allTopics
-      .filter((topic) => topic.filedFrom !== 'pre_generated')
+      .filter(
+        (topic) =>
+          topic.filedFrom !== 'pre_generated' &&
+          subjectSessionTopicIds.has(topic.id)
+      )
       .map((topic) => topic.id)
   );
   const attemptedTopicIds = new Set<string>(exploredTopicIds);
@@ -330,12 +340,6 @@ function buildSubjectMetric(
   }
 
   const masteredTopicIds = new Set<string>();
-  for (const assessment of subjectAssessments) {
-    if (assessment.status === 'passed') {
-      masteredTopicIds.add(assessment.topicId);
-    }
-  }
-
   for (const card of state.retentionCards) {
     if (card.xpStatus === 'verified' && allTopicIds.has(card.topicId)) {
       masteredTopicIds.add(card.topicId);
@@ -467,7 +471,8 @@ export async function computeProgressMetrics(
   });
 }
 
-async function buildSubjectInventory(
+/** @internal - exported for testing only */
+export async function buildSubjectInventory(
   db: Database,
   state: ProgressState,
   subjectMetric: SubjectProgressMetrics
@@ -487,9 +492,21 @@ async function buildSubjectInventory(
       .filter((topic) => topic.filedFrom === 'pre_generated')
       .map((topic) => topic.id)
   );
+  const subjectSessions = state.sessions.filter(
+    (s) => s.subjectId === subject.id
+  );
+  const subjectSessionTopicIds = new Set(
+    subjectSessions
+      .filter((session) => session.topicId != null)
+      .map((session) => session.topicId as string)
+  );
   const exploredTopicIds = new Set(
     allTopics
-      .filter((topic) => topic.filedFrom !== 'pre_generated')
+      .filter(
+        (topic) =>
+          topic.filedFrom !== 'pre_generated' &&
+          subjectSessionTopicIds.has(topic.id)
+      )
       .map((topic) => topic.id)
   );
   const attemptedTopicIds = new Set<string>(exploredTopicIds);
@@ -511,9 +528,6 @@ async function buildSubjectInventory(
     }
 
     attemptedTopicIds.add(assessment.topicId);
-    if (assessment.status === 'passed') {
-      masteredTopicIds.add(assessment.topicId);
-    }
   }
 
   for (const card of state.retentionCards) {
@@ -568,9 +582,6 @@ async function buildSubjectInventory(
   // which causes the SubjectCard to fall back to activeMinutes and show a much
   // smaller number than what the session card (which reads wallClockSeconds live)
   // displays. Reading from state.sessions here keeps both surfaces consistent.
-  const subjectSessions = state.sessions.filter(
-    (s) => s.subjectId === subject.id
-  );
   const liveActiveMinutes = Math.round(
     subjectSessions.reduce((sum, s) => sum + (s.durationSeconds ?? 0), 0) / 60
   );

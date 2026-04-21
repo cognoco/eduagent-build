@@ -1,6 +1,13 @@
 import '../../global.css';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Platform, Pressable, Text, View, useColorScheme } from 'react-native';
+import {
+  Platform,
+  Pressable,
+  Text,
+  UIManager,
+  View,
+  useColorScheme,
+} from 'react-native';
 import * as SecureStore from '../lib/secure-storage';
 import { platformAlert } from '../lib/platform-alert';
 import { Stack } from 'expo-router';
@@ -405,6 +412,12 @@ export default function RootLayout() {
   const onClerkReady = useCallback(() => {
     if (__DEV__) console.log('[Splash] Clerk ready');
     setClerkReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      UIManager.setLayoutAnimationEnabledExperimental?.(true);
+    }
   }, []);
 
   // Safety: force-dismiss splash if animation callback never fires.

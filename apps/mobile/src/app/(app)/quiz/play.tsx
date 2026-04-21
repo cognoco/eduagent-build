@@ -45,6 +45,9 @@ export default function QuizPlayScreen(): React.ReactElement {
   // instead of silently fabricating a 0-XP "nice" result and navigating.
   // Users should always know when the server didn't accept their round.
   const [completeError, setCompleteError] = useState<string | null>(null);
+  // [IMP-7] Show non-blocking warning when answer-check API call fails so the
+  // user knows the result may be inaccurate. Cleared on each new question.
+  const [answerCheckFailed, setAnswerCheckFailed] = useState(false);
   // [BUG-469] Track which question indices the user has disputed
   const [disputedIndices, setDisputedIndices] = useState<Set<number>>(
     new Set()
@@ -106,6 +109,7 @@ export default function QuizPlayScreen(): React.ReactElement {
     setCorrectAnswer(null);
     setShowContinueHint(false);
     setFreeTextAnswer('');
+    setAnswerCheckFailed(false);
     questionStartTimeRef.current = Date.now();
     setElapsedMs(0);
 
@@ -191,10 +195,11 @@ export default function QuizPlayScreen(): React.ReactElement {
         }
         return result.correct;
       } catch {
+        setAnswerCheckFailed(true);
         return false;
       }
     },
-    [roundId, checkAnswerMutateAsync, currentIndex]
+    [roundId, checkAnswerMutateAsync, currentIndex, setAnswerCheckFailed]
   );
 
   // [BUG-542] Extract onResolved from inline JSX to a stable useCallback.
@@ -384,6 +389,7 @@ export default function QuizPlayScreen(): React.ReactElement {
     } catch {
       // On check failure, assume wrong — server re-validates on complete
       correct = false;
+      setAnswerCheckFailed(true);
     }
 
     const nextResult: QuestionResult = {
@@ -518,6 +524,15 @@ export default function QuizPlayScreen(): React.ReactElement {
             countdown anxiety. */}
         <View className="w-[32px]" />
       </View>
+
+      {/* [IMP-7] Non-blocking warning when answer-check API fails. The quiz
+          continues with the result assumed wrong; this banner lets the user
+          know so they don't think their connection is fine. */}
+      {answerCheckFailed ? (
+        <Text className="text-caption text-warning text-center mb-2 px-5">
+          Answer check failed — result may be inaccurate
+        </Text>
+      ) : null}
 
       <View className="mb-8 px-5">
         {currentQuestion.type === 'capitals' ? (

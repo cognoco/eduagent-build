@@ -5,8 +5,9 @@
  * Session, interleaved, recall bridge, billing, and settings logic stay real.
  *
  * Mocked boundaries:
- * - JWT verification
+ * - JWT verification (Clerk JWKS — via fetch interceptor in setup.ts)
  * - Inngest transport bootstrapping / send
+ * - LLM provider — via registerProvider (real routeAndCall dispatch, mock chat fn)
  */
 
 import { and, eq } from 'drizzle-orm';
@@ -31,6 +32,21 @@ import {
   createIntegrationDb,
 } from './helpers';
 import { buildAuthHeaders } from './test-keys';
+import { registerProvider } from '../../apps/api/src/services/llm';
+
+// Controllable mock provider — overrides the default mock registered in setup.ts.
+// Avoids jest.mock on an internal service (CLAUDE.md rule: no internal mocks in
+// integration tests). Uses registerProvider so the full routeAndCall path runs.
+const mockChat = jest
+  .fn<Promise<string>, [unknown, unknown]>()
+  .mockResolvedValue(
+    JSON.stringify({
+      feedback: 'Great summary!',
+      hasUnderstandingGaps: false,
+      gapAreas: [],
+      isAccepted: true,
+    })
+  );
 
 const mockInngestSend = jest.fn();
 const mockInngestCreateFunction = jest.fn().mockImplementation((config) => {
@@ -42,34 +58,24 @@ const mockInngestCreateFunction = jest.fn().mockImplementation((config) => {
   return fn;
 });
 
-const mockRouteAndCall = jest.fn().mockResolvedValue({
-  response: JSON.stringify({
-    feedback: 'Great summary!',
-    hasUnderstandingGaps: false,
-    gapAreas: [],
-    isAccepted: true,
-  }),
-  model: 'mock',
-  rung: 1,
-});
-
-jest.mock('../../apps/api/src/services/llm', () => {
-  const actual = jest.requireActual(
-    '../../apps/api/src/services/llm'
-  ) as Record<string, unknown>;
-
-  return {
-    ...actual,
-    routeAndCall: (...args: unknown[]) => mockRouteAndCall(...args),
-  };
-});
-
 jest.mock('../../apps/api/src/inngest/client', () => ({
   inngest: {
     send: mockInngestSend,
     createFunction: mockInngestCreateFunction,
   },
 }));
+
+// Register once — overrides setup.ts default so tests control the LLM response
+// without bypassing the real routeAndCall dispatch path.
+beforeAll(() => {
+  registerProvider({
+    id: 'gemini',
+    chat: mockChat,
+    async *chatStream() {
+      yield* []; // no-op: streaming not used in these tests
+    },
+  });
+});
 
 import { app } from '../../apps/api/src/index';
 
