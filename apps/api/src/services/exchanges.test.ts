@@ -73,13 +73,12 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('Crisp, professional');
   });
 
-  // [B.5] Defense-in-depth for the strict 11+ product: null birthYear
-  // means "unknown age inside the 11-17-and-up range", so the fallback
-  // serves TEEN_VOICE instead of adult-anchored text.
-  it('falls back to TEEN voice when birthYear is unavailable (defense-in-depth for 11+)', () => {
+  // [B.5] Fallback when birthYear is null: resolveAgeBracket returns 'adult',
+  // and the bracket-only path honours the explicit bracket, returning ADULT_VOICE.
+  it('falls back to ADULT voice when birthYear is unavailable (bracket = adult)', () => {
     const prompt = buildSystemPrompt({ ...baseContext, birthYear: null });
-    expect(prompt).toContain('Peer-adjacent and matter-of-fact');
-    expect(prompt).not.toContain('Crisp, professional');
+    expect(prompt).toContain('Crisp, professional');
+    expect(prompt).not.toContain('Peer-adjacent and matter-of-fact');
   });
 
   // [B.5] Age-calibration anchors rephrased for the strict 11+ product.
