@@ -426,7 +426,7 @@ export function parseExchangeEnvelope(
         active: Boolean(drill.active),
         durationSeconds:
           typeof drill.duration_s === 'number'
-            ? Math.min(180, Math.max(10, drill.duration_s))
+            ? Math.min(90, Math.max(15, drill.duration_s))
             : undefined,
         score:
           drill.score &&

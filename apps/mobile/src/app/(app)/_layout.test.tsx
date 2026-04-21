@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react-native';
+import { act, render, screen } from '@testing-library/react-native';
 import { useAuth } from '@clerk/clerk-expo';
 import {
   clearPendingAuthRedirect,
@@ -139,6 +139,10 @@ describe('AppLayout', () => {
     });
   });
 
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   it('keeps linked-parent accounts in the learner tab shell for adaptive home', () => {
     render(<AppLayout />);
 
@@ -192,6 +196,41 @@ describe('AppLayout', () => {
 
     expect(screen.getByTestId('auth-redirect-replay')).toBeTruthy();
     expect(mockReplace).toHaveBeenCalledWith('/(app)/quiz');
+  });
+
+  it('keeps a matching auth redirect long enough to recover from a late home fallback', () => {
+    jest.useFakeTimers();
+    rememberPendingAuthRedirect('/(app)/quiz');
+    mockUsePathname.mockReturnValue('/quiz');
+
+    const view = render(<AppLayout />);
+
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
+
+    mockUsePathname.mockReturnValue('/home');
+    view.rerender(<AppLayout />);
+
+    expect(peekPendingAuthRedirect()).toBe('/(app)/quiz');
+    expect(screen.getByTestId('auth-redirect-replay')).toBeTruthy();
+    expect(mockReplace).toHaveBeenLastCalledWith('/(app)/quiz');
+  });
+
+  it('clears a pending auth redirect after the target path stays stable', () => {
+    jest.useFakeTimers();
+    rememberPendingAuthRedirect('/(app)/quiz');
+    mockUsePathname.mockReturnValue('/quiz');
+
+    render(<AppLayout />);
+
+    expect(peekPendingAuthRedirect()).toBe('/(app)/quiz');
+
+    act(() => {
+      jest.advanceTimersByTime(1_000);
+    });
+
+    expect(peekPendingAuthRedirect()).toBeNull();
   });
 
   it('strips route-group segments from redirect targets for unauthenticated users', () => {

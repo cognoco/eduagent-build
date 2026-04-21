@@ -2105,9 +2105,7 @@ describe('streamMessage', () => {
       // consume
     }
 
-    const metadata = await result.onComplete(
-      'Hello world! This is the full response.'
-    );
+    const metadata = await result.onComplete();
 
     expect(metadata).toHaveProperty('exchangeCount');
     expect(metadata).toHaveProperty('escalationRung');
@@ -2176,7 +2174,7 @@ describe('streamMessage', () => {
       // consume stream
     }
 
-    const metadata = await result.onComplete('');
+    const metadata = await result.onComplete();
 
     // The returned metadata must include confidence
     expect(metadata.confidence).toBe('low');
@@ -2208,7 +2206,7 @@ describe('streamMessage', () => {
       // consume stream
     }
 
-    const metadata = await result.onComplete('');
+    const metadata = await result.onComplete();
 
     // Default mock returns no confidence field — should be absent/undefined
     expect(metadata.confidence).toBeUndefined();

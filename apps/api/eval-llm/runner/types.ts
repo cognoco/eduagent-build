@@ -92,4 +92,15 @@ export interface FlowDefinition<Input = unknown> {
    * text leave this unset.
    */
   expectedResponseSchema?: ResponseValidator;
+
+  /**
+   * Set true when this flow returns the shared LLM response envelope (the
+   * `{reply, signals, ui_hints}` shape from `@eduagent/schemas/llm-envelope`).
+   * The runner collects per-sample signal metrics for these flows during
+   * --live runs so the baseline regression guard can catch envelope drift.
+   * See `runner/metrics.ts` — complementary to expectedResponseSchema:
+   * schema validation catches per-sample breakage, metrics catch aggregate
+   * distribution drift.
+   */
+  emitsEnvelope?: boolean;
 }

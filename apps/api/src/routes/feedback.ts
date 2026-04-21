@@ -4,6 +4,7 @@ import { feedbackSubmissionSchema } from '@eduagent/schemas';
 import type { AuthUser } from '../middleware/auth';
 import type { Database } from '@eduagent/database';
 import { sendEmail } from '../services/notifications';
+import { inngest } from '../inngest/client';
 
 type FeedbackRouteEnv = {
   Bindings: {
@@ -63,6 +64,10 @@ export const feedbackRoutes = new Hono<FeedbackRouteEnv>().post(
       );
     } catch (err) {
       console.error('[feedback] sendEmail threw unexpectedly:', err);
+      void inngest.send({
+        name: 'app/feedback.delivery_failed',
+        data: { profileId, category: body.category },
+      });
     }
 
     return c.json({ success: true });

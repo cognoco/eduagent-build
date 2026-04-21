@@ -11,8 +11,15 @@
 //   pnpm eval:llm -- --flow exchanges --scenarios S1,S3  # specific scenarios
 //   pnpm eval:llm -- --max-live-calls 5         # cap live LLM calls (default 20)
 //   doppler run -- pnpm eval:llm -- --live      # tier 2 (real LLM calls)
+//
+//   doppler run -- pnpm eval:llm -- --live --check-baseline
+//     Compare envelope signal metrics against baseline.json; exit 1 on drift.
+//   doppler run -- pnpm eval:llm -- --live --update-baseline
+//     Overwrite baseline.json with the current run's metrics (commit after).
 // ---------------------------------------------------------------------------
 
+import { promises as fs } from 'node:fs';
+import * as path from 'node:path';
 import { capitalsFlow } from './flows/quiz-capitals';
 import { vocabularyFlow } from './flows/quiz-vocabulary';
 import { guessWhoFlow } from './flows/quiz-guess-who';
@@ -29,6 +36,30 @@ import {
   type RunSummary,
 } from './runner/runner';
 import type { FlowDefinition } from './runner/types';
+import {
+  buildBaseline,
+  compareAgainstBaseline,
+  formatDriftReport,
+  parseBaseline,
+  type Baseline,
+} from './runner/metrics';
+
+const BASELINE_PATH = path.resolve(__dirname, 'baseline.json');
+const DEFAULT_TOLERANCE_PP = 0.05; // 5pp — one sample of noise at N≈20
+
+async function readBaseline(): Promise<Baseline | null> {
+  try {
+    const raw = await fs.readFile(BASELINE_PATH, 'utf8');
+    return parseBaseline(raw);
+  } catch {
+    return null;
+  }
+}
+
+async function writeBaseline(baseline: Baseline): Promise<void> {
+  const body = JSON.stringify(baseline, null, 2) + '\n';
+  await fs.writeFile(BASELINE_PATH, body, 'utf8');
+}
 
 const FLOWS: FlowDefinition[] = [
   capitalsFlow as FlowDefinition,
@@ -74,6 +105,56 @@ async function main(): Promise<void> {
     }
   }
   console.log('─────────────────────────────────────────');
+
+  // Baseline regression guard — only meaningful after a live run. Tier-1
+  // runs emit an empty envelopeMetrics map and would trip the baseline for
+  // the wrong reason, so we gate explicitly on --live here.
+  if (options.updateBaseline || options.checkBaseline) {
+    if (!options.live) {
+      console.error(
+        '--check-baseline / --update-baseline require --live (envelope metrics are only collected from live LLM responses)'
+      );
+      process.exit(2);
+    }
+
+    if (options.updateBaseline) {
+      const baseline = buildBaseline(summary.envelopeMetrics, {
+        ref: process.env.GIT_COMMIT,
+      });
+      await writeBaseline(baseline);
+      console.log(`Baseline updated → ${BASELINE_PATH}`);
+      return;
+    }
+
+    const baseline = await readBaseline();
+    if (!baseline) {
+      console.error(
+        `No baseline found at ${BASELINE_PATH} — run with --update-baseline first to seed it.`
+      );
+      process.exit(2);
+    }
+
+    const tolerance = options.baselineTolerancePp ?? DEFAULT_TOLERANCE_PP;
+    const drifts = compareAgainstBaseline(
+      summary.envelopeMetrics,
+      baseline,
+      tolerance
+    );
+    if (drifts.length === 0) {
+      console.log(
+        `Baseline check passed (tolerance: ${(tolerance * 100).toFixed(1)}pp).`
+      );
+      return;
+    }
+    console.error(formatDriftReport(drifts));
+    console.error('');
+    console.error(
+      `Baseline tolerance: ${(tolerance * 100).toFixed(
+        1
+      )}pp. Inspect the drift above, then run with --update-baseline if the shift is intentional.`
+    );
+    process.exit(1);
+  }
 }
 
 main().catch((err) => {

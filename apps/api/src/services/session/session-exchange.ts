@@ -67,7 +67,12 @@ import {
   SessionExchangeLimitError,
 } from './session-crud';
 import { createLogger } from '../logger';
-import { LANGUAGE_REGEX } from './session-depth.config';
+/**
+ * English-language intent pre-classifier used to fast-path four-strands
+ * pedagogy for obvious translation / "how do you say" asks.
+ */
+const LANGUAGE_REGEX =
+  /\b(how do (you|i) say|translate|in (french|spanish|german|czech|italian|portuguese|japanese|chinese|korean|arabic|russian|hindi|dutch|polish|swedish|norwegian|danish|finnish|greek|turkish|hungarian|romanian|thai|vietnamese|indonesian|malay|tagalog|swahili|hebrew|ukrainian|croatian|serbian|slovak|slovenian|bulgarian|latvian|lithuanian|estonian)|what('s| is) .+ in \w+)\b/i;
 
 const logger = createLogger();
 
@@ -985,7 +990,7 @@ export async function streamMessage(
   }
 ): Promise<{
   stream: AsyncIterable<string>;
-  onComplete: (fullResponse: string) => Promise<{
+  onComplete: () => Promise<{
     exchangeCount: number;
     escalationRung: number;
     expectedResponseMinutes: number;
@@ -1019,12 +1024,11 @@ export async function streamMessage(
 
   return {
     stream: result.stream,
-    async onComplete(_fullResponse: string) {
-      // The client-facing `stream` yields only envelope `reply` content via
+    async onComplete() {
+      // The client-facing `stream` yields only decoded `reply` text via
       // teeEnvelopeStream. The full raw envelope (with signals + ui_hints)
       // is available through `rawResponsePromise` once the caller finishes
       // draining the stream — that's the one parseExchangeEnvelope wants.
-      // `_fullResponse` is kept for backward compat and ignored.
       const rawResponse = await result.rawResponsePromise;
       const parsed = parseExchangeEnvelope(rawResponse, {
         sessionId,

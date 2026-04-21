@@ -47,7 +47,7 @@ export const TOPICS_TAB_INITIAL_STATE: TopicsTabState = {
 interface TopicsTabProps {
   topics: EnrichedTopic[];
   subjects: Array<{ id: string; name: string }>;
-  books: Array<{ id: string; title: string }>;
+  books: Array<{ id: string; title: string; subjectName: string }>;
   noteTopicIds: Set<string>;
   state: TopicsTabState;
   onStateChange: (state: TopicsTabState) => void;
@@ -120,7 +120,14 @@ export function TopicsTab({
     {
       key: 'book',
       label: 'Book',
-      options: books.map((b) => ({ key: b.id, label: b.title })),
+      options: books.map((b) => {
+        const hasDuplicate =
+          books.filter((other) => other.title === b.title).length > 1;
+        return {
+          key: b.id,
+          label: hasDuplicate ? `${b.title} (${b.subjectName})` : b.title,
+        };
+      }),
       selected: state.filters.bookIds,
     },
     {
@@ -351,6 +358,7 @@ export function TopicsTab({
           entityName="topics"
           onClear={clearAction.handler}
           clearLabel={clearAction.label}
+          message={hasSearch ? undefined : 'No topics match your filters'}
         />
       ) : (
         <FlatList

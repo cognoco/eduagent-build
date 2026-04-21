@@ -19,7 +19,8 @@
       "mcp__24dc3c08-1f26-4def-bcab-f98cad4118b5__notion-create-pages",
       "mcp__24dc3c08-1f26-4def-bcab-f98cad4118b5__notion-update-page",
       "mcp__Windows-MCP__Wait",
-      "mcp__github__search_repositories"
+      "mcp__github__search_repositories",
+      "PowerShell(Get-NetTCPConnection -State Listen | Where-Object {$_.LocalPort -in @\\(8081,8082,8083\\)} | Select-Object LocalPort,OwningProcess)"
     ],
     "deny": [],
     "ask": []

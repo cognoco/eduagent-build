@@ -1,9 +1,39 @@
 # Playwright E2E Web Test Plan
 
-**Date:** 2026-04-19 (revised 2026-04-20 — review findings integrated)
-**Status:** Strategy agreed, Step 0 prerequisites pending, not yet scaffolded
+**Date:** 2026-04-19 (revised 2026-04-20 — implementation status refreshed)
+**Status:** Implemented and green for the originally planned lanes; now in maintenance mode
 **Source of truth:** `docs/flows/mobile-app-flow-inventory.md` (~100 flows, ~90% coverage of user-facing flows)
 **Test data source:** `apps/api/src/services/test-seed.ts` — 19 pre-built scenarios, invoked via `POST /v1/__test/seed`
+
+## Status Snapshot
+
+This document started as a forward plan. As of 2026-04-20, the planned Playwright web suite is now in place:
+
+| Area | Status | Shipped artifacts |
+|---|---|---|
+| Step 0 prerequisites | Completed | `apps/mobile/e2e-web/testid-audit.md`, dynamic profile switcher IDs, auth/redirect hardening |
+| Phase 1 smoke | Completed | `auth/auth-navigation.spec.ts`, `journeys/j01-learner-home.spec.ts`, `journeys/j03-parent-gateway.spec.ts` |
+| Phase 2 role transitions | Completed | `journeys/j04-*.spec.ts` through `j07-*.spec.ts` |
+| Phase 3 core learning journeys | Completed | `journeys/j08-*.spec.ts` through `j11-*.spec.ts` |
+| Phase 4 edge and error journeys | Completed | `journeys/j12-*.spec.ts` through `j15-*.spec.ts` |
+| Phase 5 parent drill-down journeys | Completed | `journeys/j16-*.spec.ts`, `j17-*.spec.ts` |
+| Phase 6 silent state machines | Completed | `journeys/j18-invalid-saved-profile-fallback.spec.ts` |
+| Web-specific regressions | Completed | `navigation/w01-*.spec.ts`, `w02-*.spec.ts`, `auth/w03-*.spec.ts`, `navigation/w04-*.spec.ts`, `w05-*.spec.ts` |
+| Playwright infra | Completed | `apps/mobile/playwright.config.ts`, `e2e-web/helpers/*`, `e2e-web/fixtures/scenarios.ts` |
+| CI smoke workflow | Completed | `.github/workflows/e2e-web.yml`, `pnpm run test:e2e:web:smoke` |
+| Residual mock-backed journeys | Still to retire | `journeys/j08-*.spec.ts`, `j09-*.spec.ts`, `j10-*.spec.ts` currently use `helpers/mock-api.ts` for unstable LLM-dependent paths |
+
+### Latest Verification
+
+- 2026-04-20: focused Jest coverage passed for the auth-redirect handoff in `apps/mobile/src/app/(app)/_layout.test.tsx`
+- 2026-04-20: `W-03` passed in a real browser run via `pnpm exec playwright test -c apps/mobile/playwright.config.ts --project=later-phases --output=apps/mobile/e2e-web/test-results-rerun-12 apps/mobile/e2e-web/flows/auth/w03-deep-link-auth-redirect.spec.ts`
+- 2026-04-20: the last open runtime gap from this plan, deep-link auth restoration on web (`W-03`), was fixed by keeping pending auth redirects alive through transient post-sign-in route wobble
+
+### Remaining Work
+
+No remaining phases from the original plan are still outstanding. New work should be tracked as maintenance or follow-on expansion, not under the original Step 0-Phase 6 rollout.
+
+Current maintenance policy: if a test only works because of request mocking, treat that as implementation debt and replace it with real deterministic product or backend behavior. Do not normalize mock-backed Playwright coverage as the long-term answer.
 
 ## Approach
 
@@ -34,9 +64,9 @@ Required by `~/.claude/CLAUDE.md` — every spec must enumerate failure modes an
 | `testID` missing from DOM | RN component didn't forward `testID` → `data-testid` | Playwright timeout on `getByTestId` | Step 0 audit catches this before tests are written; fallback to `getByRole`/`getByText` |
 | Expo web bundler cold-starts mid-run | First test after reboot / cache reset | 18s+ hang, tests flake on timeout | `webServer.reuseExistingServer: true` + `timeout: 60_000` on first page load |
 | Seed endpoint 500 / Doppler secret missing | Staging API down, `TEST_SEED_SECRET` rotated | `globalSetup` throws before first test | Fail fast with actionable message; CI halts whole run (don't half-seed) |
-| Orphaned test accounts accumulate | Run aborted before teardown | Clerk user count bloats; no functional break | `globalTeardown` sweeps by `integ-playwright-${runId}-*` prefix; nightly cron calls `/__test/reset` on matching prefix |
+| Orphaned test accounts accumulate | Run aborted before teardown | Clerk user count bloats; no functional break | `globalTeardown` sweeps by the runtime email prefix (default: `pw-${runId}-`); nightly cron calls `/__test/reset` on matching prefixes |
 | Port 8081 collision | Native Metro already running on dev box | `expo start --web` fails | Pin web to port 19006; kill-first check in `webServer.command` |
-| LLM endpoint returns non-deterministic content | Unmocked LLM call in asserted flow | Assertion on generated text flakes | Mock via `page.route('**/v1/llm/**')`; assert UI shape not content |
+| LLM endpoint returns non-deterministic content | Real backend response varies across runs | Assertion on generated text flakes | Add deterministic seed or server-side test mode and assert durable UI state; do not treat client-side request mocking as the long-term fix |
 | Multi-context journey (J-13) fatally interleaves | Parent and child tabs race on consent approval | Test hangs or asserts pre-approval | Use explicit `await page.waitForResponse(...)` at each sync point |
 
 ## Infrastructure
@@ -90,48 +120,31 @@ Ad-hoc scenarios (consent gates, retention queue, trial-expired) seed fresh acco
 
 **Clerk testing mode:** Clerk ships a testing-tokens API that bypasses CAPTCHA and rate limits in `test` mode. Commit to using it — set `CLERK_TESTING_TOKEN` in Doppler `stg` and wire it into `auth.setup.ts`. Don't leave this as a "may need" risk row.
 
-## Step 0: Prerequisites (Blocking)
+## Step 0: Prerequisites (Completed on 2026-04-20)
 
-These must land **before Phase 1** — Phase 1 smoke tests cannot run without them. Grepped `apps/mobile/src` on 2026-04-20 to identify gaps.
+These items were originally blocking. They are now satisfied in the shipped suite.
 
 ### 0.1 — Add Missing testIDs
 
-Present in code ✅: `parent-gateway`, `gateway-check-progress`, `gateway-learn`, `parent-dashboard-error`, `learner-screen`, `learner-back`, `profile-switcher-chip`, `profile-switcher-backdrop`, `profile-switcher-menu`, `add-first-child-screen`, `add-first-child-cta`, `home-loading-timeout`, `home-loading-retry`, `timeout-library-button`, `timeout-more-button`.
-
-**Missing — must be added before writing tests:**
-
-| testID | File | Element | Used by journey |
-|---|---|---|---|
-| `intent-continue` | [LearnerScreen.tsx](apps/mobile/src/components/home/LearnerScreen.tsx) | Continue card (all three variants — recovery, suggestion, relearn) | J-08, J-10 |
-| `intent-quiz-discovery` | [LearnerScreen.tsx](apps/mobile/src/components/home/LearnerScreen.tsx) | Quiz discovery card | J-10 |
-| `intent-learn` | [LearnerScreen.tsx](apps/mobile/src/components/home/LearnerScreen.tsx) | Learn intent card | J-09 |
-| `intent-ask` | [LearnerScreen.tsx](apps/mobile/src/components/home/LearnerScreen.tsx) | Ask intent card | J-08 |
-| `intent-practice` | [LearnerScreen.tsx](apps/mobile/src/components/home/LearnerScreen.tsx) | Practice intent card | J-10 |
-| `intent-homework` | [LearnerScreen.tsx](apps/mobile/src/components/home/LearnerScreen.tsx) | Homework intent card | (future) |
-| `profile-option-{id}` | [ProfileSwitcher.tsx](apps/mobile/src/components/common/ProfileSwitcher.tsx) | Each profile row in dropdown (dynamic — interpolate profile id) | J-04, J-05, J-06 |
-
-**Verification:** a Jest test per component asserting `getByTestId(...)` finds each element in a rendered minimal state. Commit per component.
+Completed. The originally missing IDs are now present and exercised by the current suite, including the dynamic `profile-option-{id}` selector and learner intent cards used by the later-phase journeys.
 
 ### 0.2 — react-native-web DOM audit
 
-Not every RN component forwards `testID` → `data-testid` in web. Before writing Playwright tests, run Expo web locally and open DevTools for each screen in §"Role × Action Matrix":
-
-- Confirm each `testID` appears as `data-testid` on a DOM node
-- Confirm it's on the **click target**, not a wrapper that `pointer-events: none` might swallow
-- Record exceptions in a new file `apps/mobile/e2e-web/testid-audit.md`
-
-Acceptance: every testID in §"Role × Action Matrix" has a line in `testid-audit.md` reading `✅ present` or `⚠️ fallback to getByRole(...)`.
+Completed. The audit lives at `apps/mobile/e2e-web/testid-audit.md` and now covers the smoke lane plus J-04 through J-18 selectors.
 
 ### 0.3 — Confirm Clerk testing token
 
-Provision `CLERK_TESTING_TOKEN` in Doppler `stg`, verify with a one-shot curl against Clerk's `/v1/client/sign_ins` — fail the milestone if tokens aren't available.
+Completed for the shipped flow. The current CI workflow consumes `CLERK_TESTING_TOKEN` from GitHub Actions secrets for web smoke runs.
 
 ### 0.4 — Confirm seed + reset endpoints on staging
 
-- `POST /v1/__test/seed` with scenario `onboarding-complete` should return a usable account in <10s
-- `POST /v1/__test/reset` should accept a prefix parameter and return a count of accounts deleted — if it doesn't, extend it before Phase 1
+Completed in the current helper stack:
 
-**Exit criteria for Step 0:** Phase 1 (J-01 to J-03) can be written using only testIDs that appear in `testid-audit.md` as ✅.
+- `apps/mobile/e2e-web/helpers/test-seed.ts` seeds scenarios through `POST /v1/__test/seed`
+- `apps/mobile/e2e-web/helpers/global-teardown.ts` resets seeded accounts through `POST /v1/__test/reset`
+- resets are prefix-scoped via the runtime-generated email prefix from `apps/mobile/e2e-web/helpers/runtime.ts`
+
+**Exit criteria for Step 0:** Met.
 
 ## Role × Action Matrix (Home Screens)
 
@@ -222,7 +235,7 @@ Any journey requiring a scenario not listed here must either (a) use an existing
 
 ### Per-run isolation
 
-Every Playwright run gets a unique `runId` (e.g. `playwright-${Date.now()}-${randomHex(4)}`). All emails created during the run use the prefix `integ-playwright-${runId}-<scenarioIdx>@test.invalid`. This lets `globalTeardown` (and a nightly cron fallback) sweep deterministically by prefix without touching the real `key_to@yahoo.com` account or other teams' test data.
+Every Playwright run gets a unique `runId` (e.g. `playwright-${Date.now()}-${randomHex(4)}`). All emails created during the run use the runtime prefix from `apps/mobile/e2e-web/helpers/runtime.ts` (default: `pw-${runId}-`) and currently resolve to `@example.com`. This lets `globalTeardown` (and a nightly cron fallback) sweep deterministically by prefix without touching the real `key_to@yahoo.com` account or other teams' test data.
 
 **Forbidden:** hardcoded emails like `parent-multi-child@mentomate.test`. They collide across CI parallelism and across PR branches.
 
@@ -230,9 +243,9 @@ Every Playwright run gets a unique `runId` (e.g. `playwright-${Date.now()}-${ran
 
 Three layers, in order of precedence:
 
-1. **`globalTeardown` (primary):** `POST /v1/__test/reset?prefix=integ-playwright-${runId}-` at end of every run, pass or fail.
+1. **`globalTeardown` (primary):** `POST /v1/__test/reset?prefix=<runtime email prefix>` at end of every run, pass or fail.
 2. **`afterEach` ad-hoc:** for tests that create non-account data (subjects, sessions, quizzes beyond the seed), tag each with the `runId` and let the prefix sweep pick it up.
-3. **Nightly cron (safety net):** runs `/__test/reset?prefix=integ-playwright-&olderThan=24h` — catches aborted runs whose teardown never fired.
+3. **Nightly cron (safety net):** runs `/__test/reset?prefix=pw-&olderThan=24h` (or the team’s chosen prefix family) — catches aborted runs whose teardown never fired.
 
 **Implementation note:** before Step 0 ships, verify `/__test/reset` accepts a prefix filter. Grep confirmed the endpoint exists; confirm the filter param. If missing, extend the endpoint — do not ship the suite without it.
 
@@ -333,17 +346,25 @@ For screens that vary by user state, enumerate all valid states:
 
 Every error assertion checks for at least one actionable element (retry, go back, go home).
 
+### Real Implementation Over Mocks
+
+If a Playwright flow depends on a mocked request to be stable, that is a signal to improve the real implementation, seed data, or backend test mode. Prefer real implemented behavior over `page.route(...)` interception. Existing mock-backed coverage should be retired when touched.
+
 ## Execution Order
 
-0. **Step 0 (blocking):** complete 0.1–0.4 — testIDs instrumented, DOM audit recorded, Clerk testing token provisioned, seed + reset endpoints confirmed
-1. Install `@playwright/test`, create `playwright.config.ts` (port 19006, `webServer.reuseExistingServer: true`, `runId`-based prefix)
-2. Implement `globalSetup` (invoke `POST /v1/__test/seed` per scenario) + `auth.setup.ts` for both Clerk sessions (solo-learner, owner-with-children) + `globalTeardown` (reset by prefix)
-3. J-01 through J-03 (smoke — prove infra works)
-4. J-04 through J-07 (role transitions — the primary blind spot)
-5. W-01 through W-05 (web-specific regressions)
-6. J-08 through J-17 (remaining journeys, phased)
-7. J-18 (silent state machine — auto-fallback)
-8. Wire into CI — see §"CI Integration"
+The original rollout order below has been completed:
+
+0. Step 0 prerequisites landed
+1. `@playwright/test` and `apps/mobile/playwright.config.ts` were added
+2. Auth setup, per-scenario storage state, runtime helpers, and teardown were implemented under `apps/mobile/e2e-web/helpers/`
+3. Smoke journeys landed
+4. Role-transition journeys landed
+5. Web-specific regressions landed
+6. Remaining learner and parent journeys landed
+7. Silent state-machine coverage landed
+8. CI smoke coverage landed in `.github/workflows/e2e-web.yml`
+
+The suite is now beyond rollout and should be treated as a maintained test surface.
 
 ## CI Integration
 
@@ -359,7 +380,7 @@ The suite must have a defined home, a runtime budget, and a merge-gate role, or 
 | Merge gate | **Smoke only** blocks PR merges in Phase 1. Full suite is informational until flake rate <2% over 50 consecutive runs, then promoted to required. |
 | Artifacts | Playwright HTML report, trace viewer traces for failures, screenshots on failure — uploaded to GH Actions artifacts, 14-day retention |
 | Flake policy | Any test flaking 2+ times in 7 days is auto-quarantined (`test.fixme`) and an issue is filed. No green-by-retry. |
-| Teardown verification | Post-job step asserts `POST /v1/__test/reset?prefix=integ-playwright-${runId}-` returned a non-zero delete count (proves the suite actually cleaned up) |
+| Teardown verification | Post-job step asserts `POST /v1/__test/reset?prefix=<runtime email prefix>` returned a non-zero delete count (proves the suite actually cleaned up) |
 
 ## Open Questions / Deferred
 
@@ -375,7 +396,7 @@ The suite must have a defined home, a runtime budget, and a merge-gate role, or 
 | `testID` not forwarded to DOM by some RN components | **Step 0.2 blocks Phase 1** — full DOM audit recorded in `e2e-web/testid-audit.md`. Fallback to `getByRole`/`getByText` only for components marked ⚠️ in the audit. |
 | Clerk auth on web may behave differently | **Step 0.3 blocks Phase 1** — `CLERK_TESTING_TOKEN` provisioned in Doppler `stg` and wired into `auth.setup.ts`. Not a "may need" — a committed path. |
 | Expo web Metro bundler slow cold start (~18s) | `webServer.reuseExistingServer: true`, port pinned to 19006, first page load timeout 60s. |
-| LLM-dependent flows (chat, quiz generation) non-deterministic | Build a shared `mockLLMEndpoints(page, fixtures)` helper in `helpers/` — every test that asserts flow beyond a single LLM call calls it. Assert UI shape, not content. |
+| LLM-dependent flows (chat, quiz generation) non-deterministic | Replace residual mock-backed coverage with deterministic real behavior: add seed scenarios, server-side test mode, or stable backend fixtures. Mock interception is temporary debt, not the target state. |
 | Some native-only components won't render on web | Audit produces an explicit out-of-scope list (TTS playback, camera capture, native haptics). Note in test as `test.skip` with a link to the audit entry. |
 | Staging DB is shared with other agents / manual QA | `runId` prefix on every account. `/__test/reset?prefix=` keeps isolation. Never call `/__test/reset` without a prefix. |
 | Seeded real Clerk users accumulate in Clerk's user count | Teardown includes Clerk user deletion via admin API, not just DB row removal. If `/__test/reset` doesn't do this, extend it. |

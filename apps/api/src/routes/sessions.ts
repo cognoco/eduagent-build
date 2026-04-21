@@ -224,17 +224,16 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         );
 
         return streamSSE(c, async (sseStream) => {
-          let fullResponse = '';
-
           for await (const chunk of stream) {
-            fullResponse += chunk;
             await sseStream.writeSSE({
               data: JSON.stringify({ type: 'chunk', content: chunk }),
             });
           }
 
           try {
-            const result = await onComplete(fullResponse);
+            // onComplete reads the raw envelope via rawResponsePromise internally —
+            // the clean reply text from the stream is not needed.
+            const result = await onComplete();
             await sseStream.writeSSE({
               data: JSON.stringify({
                 type: 'done',

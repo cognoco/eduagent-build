@@ -67,16 +67,15 @@ export function getAgeVoice(
   }
 
   // Fallback path — bracket-only callers (birthYear unknown).
-  // In the strict 11+ product, a null birthYear means "age unknown inside the
-  // 11-17-and-up range" — defense-in-depth requires assuming the youngest
-  // plausible learner and serving TEEN_VOICE, not adult-anchored text.
-  // Known-adult learners (age >= 18) still reach ADULT_VOICE / YOUNG_ADULT_VOICE
-  // via the `birthYear != null` branch above. [B.5]
+  // child/adolescent → TEEN_VOICE (defense-in-depth: youngest plausible).
+  // adult → ADULT_VOICE (honour explicit bracket signal from family_links etc.).
+  // Known users with birthYear still reach the fine-grained branch above. [B.5]
   switch (ageBracket) {
     case 'child':
     case 'adolescent':
-    case 'adult':
       return TEEN_VOICE;
+    case 'adult':
+      return ADULT_VOICE;
     default: {
       // Exhaustive guard — if a new AgeBracket variant is added the
       // compile will fail here rather than silently returning undefined.
@@ -211,7 +210,7 @@ function getExchangeEnvelopeInstruction(context: {
     : '  "signals": { "partial_progress": <bool>, "needs_deepening": <bool>, "understanding_check": <bool> },';
 
   const uiHints = context.isLanguageMode
-    ? '  "ui_hints": { "note_prompt": { "show": <bool>, "post_session": <bool> }, "fluency_drill": { "active": <bool>, "duration_s": <10-180>, "score": { "correct": <int>, "total": <int> } } }'
+    ? '  "ui_hints": { "note_prompt": { "show": <bool>, "post_session": <bool> }, "fluency_drill": { "active": <bool>, "duration_s": <15-90>, "score": { "correct": <int>, "total": <int> } } }'
     : '  "ui_hints": { "note_prompt": { "show": <bool>, "post_session": <bool> } }';
 
   const signalGuidance: string[] = [];
@@ -228,7 +227,7 @@ function getExchangeEnvelopeInstruction(context: {
   );
 
   const fluencyLine = context.isLanguageMode
-    ? '\n- When you start a fluency drill (rapid-fire translation, fill-blank, vocabulary recall), set `ui_hints.fluency_drill.active` to true and `ui_hints.fluency_drill.duration_s` to a value between 30 and 90. When you evaluate the drill result, set `active` to false and include `score` with `correct` and `total` integers.'
+    ? '\n- When you start a fluency drill (rapid-fire translation, fill-blank, vocabulary recall), set `ui_hints.fluency_drill.active` to true and `ui_hints.fluency_drill.duration_s` to a value between 15 and 90. When you evaluate the drill result, set `active` to false and include `score` with `correct` and `total` integers.'
     : '';
 
   return (

@@ -52,6 +52,8 @@ const FULL_SCREEN_ROUTES = new Set([
   'shelf/[subjectId]/book/[bookId]',
 ]);
 
+const PENDING_AUTH_REDIRECT_SETTLE_MS = 1_000;
+
 const iconMap: Record<
   string,
   {
@@ -1066,9 +1068,21 @@ export default function AppLayout() {
   ]);
 
   React.useEffect(() => {
-    if (pendingAuthRedirect && currentAppPath === pendingAuthRedirect) {
-      clearPendingAuthRedirect();
+    if (!pendingAuthRedirect || currentAppPath !== pendingAuthRedirect) {
+      return;
     }
+
+    // W-03: on web we can briefly land on the requested route before a later
+    // mount-time redirect snaps the tab shell back to /home. Keep the pending
+    // redirect alive until the target path stays stable for a short window so
+    // the replay effect can recover from that late navigation.
+    const clearTimer = setTimeout(() => {
+      if (peekPendingAuthRedirect() === pendingAuthRedirect) {
+        clearPendingAuthRedirect();
+      }
+    }, PENDING_AUTH_REDIRECT_SETTLE_MS);
+
+    return () => clearTimeout(clearTimer);
   }, [currentAppPath, pendingAuthRedirect]);
 
   React.useEffect(() => {

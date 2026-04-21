@@ -337,6 +337,7 @@ export default function LibraryScreen() {
     const bookList = allBooksQuery.books.map((b) => ({
       id: b.book.id,
       title: b.book.title,
+      subjectName: b.subjectName,
     }));
 
     return (
@@ -520,10 +521,22 @@ export default function LibraryScreen() {
         animationType="slide"
         onRequestClose={() => setShowManageSubjects(false)}
       >
-        <View className="flex-1 bg-black/40 justify-end">
-          <View
+        <Pressable
+          className="flex-1 bg-black/40 justify-end"
+          onPress={() => setShowManageSubjects(false)}
+          accessibilityRole="button"
+          accessibilityLabel="Close manage subjects"
+        >
+          <Pressable
             className="bg-background rounded-t-3xl px-5 pt-5"
-            style={{ paddingBottom: Math.max(insets.bottom, 24) }}
+            style={{
+              paddingBottom: Math.max(
+                insets.bottom,
+                Platform.OS === 'web' ? 80 : 24
+              ),
+            }}
+            /* Stop taps on modal content from closing the modal */
+            onPress={(e) => e.stopPropagation()}
           >
             <View className="items-center mb-4">
               <View className="w-10 h-1 rounded-full bg-text-secondary/30" />
@@ -642,8 +655,8 @@ export default function LibraryScreen() {
                 Close
               </Text>
             </Pressable>
-          </View>
-        </View>
+          </Pressable>
+        </Pressable>
       </Modal>
     </View>
   );

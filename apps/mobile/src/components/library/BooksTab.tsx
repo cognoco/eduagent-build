@@ -248,7 +248,7 @@ export function BooksTab({
         onPress={() => onBookPress(item.subjectId, book.id)}
         className={`rounded-card px-4 py-4 mb-3 ${STATUS_STYLES[status]}`}
         accessibilityRole="button"
-        accessibilityLabel={`${book.title}. ${STATUS_LABELS[status]}. ${progressLabel}.`}
+        accessibilityLabel={`${book.title}, ${subjectName}. ${STATUS_LABELS[status]}. ${progressLabel}.`}
         testID={`book-card-${book.id}`}
       >
         <View className="flex-row items-start">

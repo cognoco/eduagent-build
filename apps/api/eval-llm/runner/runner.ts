@@ -1,6 +1,12 @@
 import type { FlowDefinition, Scenario } from './types';
 import { PROFILES, type EvalProfile } from '../fixtures/profiles';
 import { writeSnapshot } from './snapshot';
+import {
+  aggregateFlowSamples,
+  extractSampleMetrics,
+  type FlowAggregate,
+  type SampleMetrics,
+} from './metrics';
 
 // ---------------------------------------------------------------------------
 // Runner — orchestrates the flow × profile matrix.
@@ -29,6 +35,23 @@ export interface RunOptions {
    * skip reason so tier-2 runs don't surprise with large bills. Default = 20.
    */
   maxLiveCalls?: number;
+  /**
+   * Baseline regression guard. When true, after the run the CLI compares
+   * `summary.envelopeMetrics` against the checked-in baseline file and
+   * exits non-zero if any metric drifts more than `baselineTolerancePp`.
+   */
+  checkBaseline?: boolean;
+  /**
+   * Overwrite the baseline file with the current run's envelope metrics.
+   * Mutually exclusive with checkBaseline — callers accept the new shape
+   * intentionally before committing the updated baseline.
+   */
+  updateBaseline?: boolean;
+  /**
+   * Allowed absolute percentage-point drift before the baseline guard
+   * flags a shift. 0.05 = 5pp. Default 0.05 matches the ~30-sample matrix.
+   */
+  baselineTolerancePp?: number;
 }
 
 export interface RunSummary {
@@ -38,6 +61,11 @@ export interface RunSummary {
   liveCallsOk: number;
   liveCallsFailed: number;
   skipped: Array<{ flowId: string; profileId: string; reason: string }>;
+  /**
+   * Per-envelope-flow signal aggregates, populated only for --live runs on
+   * flows with `emitsEnvelope: true`. Drives the baseline regression guard.
+   */
+  envelopeMetrics: Record<string, FlowAggregate>;
 }
 
 export function parseCliArgs(argv: string[]): {
@@ -85,6 +113,16 @@ export function parseCliArgs(argv: string[]): {
       if (Number.isFinite(parsed) && parsed >= 0) {
         options.maxLiveCalls = parsed;
       }
+    } else if (arg === '--check-baseline') {
+      options.checkBaseline = true;
+    } else if (arg === '--update-baseline') {
+      options.updateBaseline = true;
+    } else if (arg === '--baseline-tolerance') {
+      const next = argv[++i];
+      const parsed = next ? Number.parseFloat(next) : NaN;
+      if (Number.isFinite(parsed) && parsed >= 0 && parsed <= 1) {
+        options.baselineTolerancePp = parsed;
+      }
     }
   }
 
@@ -108,7 +146,12 @@ export async function runHarness(
     liveCallsOk: 0,
     liveCallsFailed: 0,
     skipped: [],
+    envelopeMetrics: {},
   };
+
+  // Per-flow bags of SampleMetrics — folded into aggregates at the end so we
+  // can attribute drift back to individual flows without having to re-parse.
+  const samplesByFlow = new Map<string, SampleMetrics[]>();
 
   const activeFlows = flows.filter(
     (f) => !options.flowFilter || options.flowFilter.has(f.id)
@@ -192,6 +235,14 @@ export async function runHarness(
                 liveResponse = await flow.runLive(item.input, messages);
                 summary.liveCallsOk++;
 
+                // Collect signal metrics for envelope-emitting flows so the
+                // baseline regression guard can detect drift (Layer 1).
+                if (flow.emitsEnvelope && liveResponse) {
+                  const bucket = samplesByFlow.get(flow.id) ?? [];
+                  bucket.push(extractSampleMetrics(liveResponse));
+                  samplesByFlow.set(flow.id, bucket);
+                }
+
                 if (flow.expectedResponseSchema && liveResponse) {
                   try {
                     const jsonMatch = liveResponse.match(/\{[\s\S]*\}/);
@@ -255,6 +306,12 @@ export async function runHarness(
         }
       }
     }
+  }
+
+  // Fold per-flow sample bags into the final aggregate so callers (the CLI
+  // baseline guard, tests) see a single Record<flowId, FlowAggregate>.
+  for (const [flowId, samples] of samplesByFlow.entries()) {
+    summary.envelopeMetrics[flowId] = aggregateFlowSamples(samples);
   }
 
   return summary;
