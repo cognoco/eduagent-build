@@ -157,7 +157,7 @@ describe('useBooks', () => {
   it('handles API error (404)', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
-        JSON.stringify({ error: { message: 'Subject not found' } }),
+        JSON.stringify({ code: 'NOT_FOUND', message: 'Subject not found' }),
         { status: 404 }
       )
     );
@@ -357,7 +357,10 @@ describe('useGenerateBookTopics', () => {
   it('handles API error from generate-topics endpoint', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
-        JSON.stringify({ error: { message: 'LLM service unavailable' } }),
+        JSON.stringify({
+          code: 'UPSTREAM_ERROR',
+          message: 'LLM service unavailable',
+        }),
         { status: 503 }
       )
     );

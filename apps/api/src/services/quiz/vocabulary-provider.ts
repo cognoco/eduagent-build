@@ -5,6 +5,7 @@ import {
   type VocabularyQuestion,
 } from '@eduagent/schemas';
 import { createLogger } from '../logger';
+import { VocabularyContextError } from '../../errors';
 import type { LibraryItem } from './content-resolver';
 import { describeAgeBracket, type AgeBracket, type Interest } from './config';
 import { shuffle } from './shuffle';
@@ -157,22 +158,30 @@ export function getCefrCeilingForDiscovery(
   return nextCefrLevel(getPercentileCefrLevel(masteredIndices));
 }
 
+// [BUG-543] Throws VocabularyContextError instead of plain Error so the
+// quiz route's catch block handles it as a 400, not an untyped 500.
 export function getLanguageDisplayName(code: string): string {
-  const [canonical] = Intl.getCanonicalLocales(code.trim().toLowerCase());
-  if (!canonical) {
-    throw new Error(`Unknown language code: ${code}`);
+  try {
+    const [canonical] = Intl.getCanonicalLocales(code.trim().toLowerCase());
+    if (!canonical) {
+      throw new VocabularyContextError(`Unknown language code: ${code}`);
+    }
+
+    const normalized = canonical.toLowerCase();
+    const name = new Intl.DisplayNames(['en'], { type: 'language' }).of(
+      normalized
+    );
+
+    if (!name || name.toLowerCase() === normalized) {
+      throw new VocabularyContextError(`Unknown language code: ${code}`);
+    }
+
+    return name;
+  } catch (error) {
+    if (error instanceof VocabularyContextError) throw error;
+    // Intl.getCanonicalLocales can throw RangeError for malformed codes
+    throw new VocabularyContextError(`Invalid language code: ${code}`);
   }
-
-  const normalized = canonical.toLowerCase();
-  const name = new Intl.DisplayNames(['en'], { type: 'language' }).of(
-    normalized
-  );
-
-  if (!name || name.toLowerCase() === normalized) {
-    throw new Error(`Unknown language code: ${code}`);
-  }
-
-  return name;
 }
 
 // Language pairs where L1 false-cognate distractors are especially valuable.

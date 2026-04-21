@@ -32,26 +32,27 @@ const ASSESSMENTS_USER = {
   email: 'integration-assessments@integration.test',
 };
 
-function buildLlmResult(response: string) {
-  return {
-    response,
-    provider: 'mock',
-    model: 'mock-model',
-    latencyMs: 1,
-  };
-}
+// Register controllable mock provider once — overrides setup.ts's default mock.
+// Tests control responses via mockChat.mockResolvedValue / mockResolvedValueOnce.
+beforeAll(() => {
+  registerProvider({
+    id: 'gemini',
+    chat: mockChat,
+    async *chatStream() {
+      yield* []; // no-op: streaming not used in these tests
+    },
+  });
+});
 
 function installAssessmentLlmMock(): void {
-  mockRouteAndCall.mockResolvedValue(
-    buildLlmResult(
-      JSON.stringify({
-        feedback: 'Good reasoning!',
-        passed: true,
-        shouldEscalateDepth: false,
-        rawScore: 0.45,
-        qualityRating: 4,
-      })
-    )
+  mockChat.mockResolvedValue(
+    JSON.stringify({
+      feedback: 'Good reasoning!',
+      passed: true,
+      shouldEscalateDepth: false,
+      rawScore: 0.45,
+      qualityRating: 4,
+    })
   );
 }
 
@@ -67,7 +68,6 @@ async function createOwnerProfile() {
 
 beforeEach(async () => {
   jest.clearAllMocks();
-  mockRouteAndCall.mockReset();
   installAssessmentLlmMock();
 
   await cleanupAccounts({
@@ -289,16 +289,14 @@ describe('Integration: assessment routes', () => {
       topicId,
     });
 
-    mockRouteAndCall.mockResolvedValueOnce(
-      buildLlmResult(
-        JSON.stringify({
-          feedback: 'Keep going!',
-          passed: true,
-          shouldEscalateDepth: true,
-          rawScore: 0.3,
-          qualityRating: 3,
-        })
-      )
+    mockChat.mockResolvedValueOnce(
+      JSON.stringify({
+        feedback: 'Keep going!',
+        passed: true,
+        shouldEscalateDepth: true,
+        rawScore: 0.3,
+        qualityRating: 3,
+      })
     );
 
     const res = await app.request(

@@ -81,7 +81,8 @@ export default function QuizLaunchScreen(): React.ReactElement {
         },
       }
     );
-  }, [activityType, enterPlay, generateRound, subjectId]);
+    // [BUG-542] Use .mutate (stable ref) instead of whole mutation result
+  }, [activityType, enterPlay, generateRound.mutate, subjectId]);
 
   useEffect(() => {
     if (!activityType) {

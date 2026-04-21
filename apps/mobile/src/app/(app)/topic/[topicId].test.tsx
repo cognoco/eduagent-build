@@ -193,7 +193,7 @@ describe('TopicDetailScreen action buttons', () => {
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/session',
       params: {
-        mode: 'freeform',
+        mode: 'learning',
         subjectId: 's1',
         topicId: 't1',
         topicName: 'Algebra',
@@ -214,7 +214,7 @@ describe('TopicDetailScreen action buttons', () => {
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/session',
       params: {
-        mode: 'freeform',
+        mode: 'learning',
         subjectId: 's1',
         topicId: 't1',
         topicName: 'Algebra',

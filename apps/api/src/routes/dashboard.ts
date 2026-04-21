@@ -185,6 +185,9 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
       childProfileId,
       reportId
     );
+    if (!report) {
+      return c.json({ error: 'Report not found' }, 404);
+    }
     return c.json({ report });
   })
 
@@ -224,6 +227,9 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
       childProfileId,
       reportId
     );
+    if (!report) {
+      return c.json({ error: 'Report not found' }, 404);
+    }
     return c.json({ report });
   })
 

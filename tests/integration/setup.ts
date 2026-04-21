@@ -94,6 +94,11 @@ import { clearJWKSCache } from '../../apps/api/src/middleware/jwt';
 
 // Passthrough mode: unmatched URLs fall through to real fetch so tests
 // that still use the old jest.mock('jwt') pattern continue to work.
+// TODO [INT-MIGRATION]: Remove passthrough once remaining legacy test files are
+// migrated off jest.mock('../../apps/api/src/middleware/jwt'). Remaining files:
+// account-deletion, and any others using the old jwt-mock pattern.
+// Once all files are migrated, flip to passthrough: false so stray external
+// HTTP calls fail loudly in CI.
 installFetchInterceptor({ passthrough: true });
 mockClerkJWKS();
 

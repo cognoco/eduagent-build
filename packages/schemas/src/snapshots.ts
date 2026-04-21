@@ -228,9 +228,15 @@ export type MonthlyReportSummary = z.infer<typeof monthlyReportSummarySchema>;
 export const weeklyReportDataSchema = z.object({
   childName: z.string(),
   weekStart: z.string(),
-  // NOTE: `thisWeek` stores **incremental deltas** (sessions gained, topics
-  // mastered this week) — NOT absolute snapshot values — except for
-  // `vocabularyTotal` (cumulative) and `streakBest` (absolute).
+  // NOTE: `thisWeek` uses monthMetricsSchema but fields have mixed semantics:
+  //   DELTA (incremental, this week only):
+  //     totalSessions, totalActiveMinutes, topicsMastered, topicsExplored,
+  //     streakBest (highest streak during the week, not cumulative)
+  //   CUMULATIVE (absolute snapshot at week end):
+  //     vocabularyTotal — cumulative vocabulary count so delta is computed
+  //     at display time: thisWeek.vocabularyTotal - lastWeek?.vocabularyTotal
+  // `lastWeek` holds the same mixed shape for comparison. Compute display
+  // deltas at the presentation layer, not here.
   // See `generateWeeklyReportData` in weekly-report.ts for the mapping.
   thisWeek: monthMetricsSchema,
   lastWeek: monthMetricsSchema.nullable(),

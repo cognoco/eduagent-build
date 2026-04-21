@@ -15,7 +15,7 @@ import { getRecentMissedItems, markMissedItemsSurfaced } from './queries';
 import type { ChatMessage } from '../llm';
 import { routeAndCall } from '../llm';
 import { captureException } from '../sentry';
-import { UpstreamLlmError } from '../../errors';
+import { UpstreamLlmError, VocabularyContextError } from '../../errors';
 import { getLearningProfile } from '../learner-profile';
 import { CAPITALS_BY_COUNTRY, CAPITALS_DATA } from './capitals-data';
 import { resolveRoundContent, type LibraryItem } from './content-resolver';
@@ -350,7 +350,8 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
     theme = validated.theme;
   } else if (activityType === 'vocabulary') {
     if (!languageCode || !cefrCeiling) {
-      throw new Error(
+      // [BUG-543] VocabularyContextError so the quiz route catches it as 400
+      throw new VocabularyContextError(
         'languageCode and cefrCeiling are required for vocabulary rounds'
       );
     }

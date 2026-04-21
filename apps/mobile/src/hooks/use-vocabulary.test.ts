@@ -181,7 +181,10 @@ describe('useCreateVocabulary', () => {
   it('throws when API returns non-2xx', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
-        JSON.stringify({ error: { message: 'Validation failed' } }),
+        JSON.stringify({
+          code: 'VALIDATION_ERROR',
+          message: 'Validation failed',
+        }),
         { status: 400 }
       )
     );
@@ -235,7 +238,7 @@ describe('useReviewVocabulary', () => {
   it('throws when review API returns non-2xx', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
-        JSON.stringify({ error: { message: 'Vocabulary not found' } }),
+        JSON.stringify({ code: 'NOT_FOUND', message: 'Vocabulary not found' }),
         { status: 404 }
       )
     );

@@ -359,10 +359,11 @@ export default function ProgressScreen(): React.ReactElement {
                         params: { subjectId: subject.subjectId },
                       } as never);
                     }}
-                    onAction={(action) => {
-                      const mode = action === 'review' ? 'review' : 'freeform';
+                    onAction={(_action) => {
+                      // [BUG-540] 'review' removed from SubjectCardAction;
+                      // use 'learning' mode for consistency with home screen
                       router.push(
-                        `/(app)/session?mode=${mode}&subjectId=${subject.subjectId}` as never
+                        `/(app)/session?mode=learning&subjectId=${subject.subjectId}` as never
                       );
                     }}
                     testID={`journey-subject-${subject.subjectId}`}

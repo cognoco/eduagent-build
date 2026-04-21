@@ -3,4 +3,4 @@ export { RemediationCard } from './RemediationCard';
 export { ProgressBar } from './ProgressBar';
 export { GrowthChart } from './GrowthChart';
 export { MilestoneCard } from './MilestoneCard';
-export { SubjectCard } from './SubjectCard';
+export { SubjectCard, hasSubjectActivity } from './SubjectCard';

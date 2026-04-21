@@ -1518,3 +1518,81 @@ Same pattern as BUG-54 (session close endpoint), which was fixed in Session 16.
 2. **Schema drift:** The `testing` branch client expects a different response shape from the staging API (which runs `main` branch code). Library endpoint response parsing fails silently.
 
 **Reproduction:** Run the affected tests against local API. If they pass locally, this is pure infrastructure. If they fail locally too, it's a genuine API/client incompatibility.
+
+---
+
+## BUG-74: Dev-Client APK Missing expo-clipboard and expo-sensors Native Modules (2026-04-21)
+
+**Status:** Workaround applied (lazy imports) — APK rebuild needed
+**Severity:** High — blocks app startup without workaround
+**Affects:** All E2E flows
+**Type:** Infrastructure (APK out of date)
+**Found by:** Maestro Android Session 26
+
+**What happens:** App crashes at startup with `Cannot find native module 'ExpoClipboard'`. The dev-client APK was built before `expo-clipboard` (~8.0.8, added in commit `68a2288c`) and `expo-sensors` (^55.0.13, added in commit `6462af4f`) were added to the project.
+
+**Workaround applied:**
+- `apps/mobile/src/app/(app)/child/[profileId]/session/[sessionId].tsx` — changed `import * as Clipboard from 'expo-clipboard'` to lazy `require()` with try/catch
+- `apps/mobile/src/hooks/use-shake-detector.ts` — changed `import { Accelerometer } from 'expo-sensors'` to lazy `require()` with null guard
+
+**Proper fix:** Rebuild dev-client APK from current code via WSL2 (`./gradlew assembleDebug`) or EAS Build. After rebuild, revert lazy imports back to static imports.
+
+---
+
+## BUG-75: Metro Stale Cache References Deleted homework/_helpers/ Files (2026-04-21)
+
+**Status:** FIXED
+**Severity:** Critical — blocks all E2E flows (500 error on bundle load)
+**Affects:** All E2E flows
+**Type:** Infrastructure (Metro cache)
+**Found by:** Maestro Android Session 26
+
+**What happens:** Metro returns HTTP 500 when the dev-client requests the JS bundle. Error: `ENOENT: no such file or directory, open '...src/app/(app)/homework/_helpers/camera-reducer.ts'`. The files `camera-reducer.ts` and `problem-cards.ts` were moved from `src/app/(app)/homework/_helpers/` to `src/components/homework/` in commit `d4aaf109`, but Metro's cached bundle (`.bundle2` in temp dir) still referenced the old paths.
+
+**Root cause:** Expo Router's `require.context` (in `node_modules/expo-router/_ctx.android.js`) scans `src/app/` at bundle time. The stale cache preserved old route entries. The `_ctx` regex does NOT exclude `_`-prefixed directories — only `+api`, `+html`, `+middleware` patterns are excluded.
+
+**Fix:** `npx expo start --clear` + delete `/tmp/.bundle2` (or `C:/tools/tmp/.bundle2`). Metro regenerates the route context from the current filesystem.
+
+---
+
+## BUG-76: Push Token Registration Error Toast on Emulator (2026-04-21)
+
+**Status:** Open
+**Severity:** Low — emulator-only, but may interfere with Maestro assertions
+**Affects:** All post-sign-in flows on emulator
+**Type:** App behavior (missing error suppression)
+**Found by:** Maestro Android Session 26
+
+**What happens:** After sign-in, a red error toast appears: `[Push Token] Registration failed: Error: Make sure to complete the guide at https://docs.expo.dev/push-notifications/fcm-credentials/ : Default FirebaseApp is not initialized in this process com.mentomate.app`. The toast persists on screen and may block Maestro text/element assertions.
+
+**Root cause:** The emulator has no Google Play Services / Firebase configured. The push notification registration call fails and the error is surfaced as a user-visible toast instead of being silently logged.
+
+**Recommended fix:** Suppress the push token error toast in development builds or when `FirebaseApp` is not initialized. Log to console instead.
+
+---
+
+## BUG-77: seed-and-run.sh Missing X-Test-Secret Header (2026-04-21)
+
+**Status:** FIXED
+**Severity:** High — blocks all seeded E2E flows
+**Affects:** All flows using `seed-and-run.sh`
+**Type:** Infrastructure (test tooling)
+**Found by:** Maestro Android Session 26
+
+**What happens:** The seed endpoint (`POST /v1/__test/seed`) returns 403 Forbidden: "Invalid or missing test secret". The `.dev.vars` file has `TEST_SEED_SECRET` configured and `DOPPLER_ENVIRONMENT="stg"` (not "development"), so the secret check is enforced. `seed-and-run.sh` did not pass the `X-Test-Secret` header.
+
+**Fix:** Added `TEST_SEED_SECRET` env var support to `seed-and-run.sh`. The curl call now includes `-H "X-Test-Secret: ${TEST_SECRET}"` when the env var is set. Usage: `TEST_SEED_SECRET="..." ./scripts/seed-and-run.sh ...`
+
+---
+
+## BUG-78: More Tab Missing 'Appearance' Section (2026-04-21)
+
+**Status:** Open — needs investigation
+**Severity:** Medium — E2E flow failure
+**Affects:** `flows/account/more-tab-navigation.yaml`
+**Type:** App regression (testing branch)
+**Found by:** Maestro Android Session 26
+
+**What happens:** After sign-in succeeds and home screen loads, tapping "More" tab navigates to the More screen, but `"Appearance"` text assertion fails. The section may have been renamed, removed, or moved below the fold on the `testing` branch.
+
+**Reproduction:** Run `seed-and-run.sh onboarding-complete flows/account/more-tab-navigation.yaml` — sign-in passes, More tab tap succeeds, Appearance assertion fails.

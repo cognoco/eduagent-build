@@ -53,12 +53,16 @@ export const feedbackRoutes = new Hono<FeedbackRouteEnv>().post(
   async (c) => {
     const userId = c.get('user').userId;
     if (isFeedbackRateLimited(userId)) {
+      const retryAfterSecs = Math.ceil(FEEDBACK_RATE_LIMIT_WINDOW_MS / 1000);
       return c.json(
         {
           success: false,
           error: 'Too many submissions. Please try again later.',
         },
-        429
+        {
+          status: 429,
+          headers: { 'Retry-After': String(retryAfterSecs) },
+        }
       );
     }
 

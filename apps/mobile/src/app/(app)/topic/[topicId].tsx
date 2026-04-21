@@ -214,6 +214,7 @@ export default function TopicDetailScreen() {
       };
     }
 
+    // [BUG-540] Use 'learning' mode for consistency with home screen Continue
     if (topicProgress.completionStatus === 'not_started') {
       return {
         label: 'Start learning',
@@ -221,7 +222,7 @@ export default function TopicDetailScreen() {
           router.push({
             pathname: '/(app)/session',
             params: {
-              mode: 'freeform',
+              mode: 'learning',
               subjectId,
               topicId,
               topicName,
@@ -254,13 +255,16 @@ export default function TopicDetailScreen() {
       };
     }
 
+    // [BUG-540] Use 'learning' mode to match the top-level Continue button
+    // on the home screen (LearnerScreen). Previously 'freeform' here caused
+    // different AI pedagogy for the same topic depending on entry point.
     return {
       label: 'Continue learning',
       onPress: () =>
         router.push({
           pathname: '/(app)/session',
           params: {
-            mode: 'freeform',
+            mode: 'learning',
             subjectId,
             topicId,
             topicName,

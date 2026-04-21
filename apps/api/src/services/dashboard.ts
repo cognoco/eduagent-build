@@ -702,10 +702,17 @@ export async function getChildDetail(
     (s) => s.startedAt >= startOfLastWeek && s.startedAt < startOfThisWeek
   ).length;
 
+  // Cap per session to prevent abandoned sessions from inflating the total
+  // (mirrors the same guard in getChildrenForParent).
+  const MAX_SESSION_WALL_CLOCK_SECONDS = 3 * 60 * 60; // 3 hours
   const getDisplaySeconds = (session: {
     wallClockSeconds: number | null;
     durationSeconds: number | null;
-  }): number => session.wallClockSeconds ?? session.durationSeconds ?? 0;
+  }): number =>
+    Math.min(
+      session.wallClockSeconds ?? session.durationSeconds ?? 0,
+      MAX_SESSION_WALL_CLOCK_SECONDS
+    );
 
   const totalTimeThisWeek = recentSessions
     .filter((s) => s.startedAt >= startOfThisWeek)

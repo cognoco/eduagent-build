@@ -20,21 +20,16 @@ import {
   seedCurriculum,
   seedSubject,
 } from './route-fixtures';
-
-const mockRouteAndCall = jest.fn();
-
-jest.mock('../../apps/api/src/services/llm', () => {
-  const actual = jest.requireActual(
-    '../../apps/api/src/services/llm'
-  ) as Record<string, unknown>;
-
-  return {
-    ...actual,
-    routeAndCall: (...args: unknown[]) => mockRouteAndCall(...args),
-  };
-});
-
+import { registerProvider } from '../../apps/api/src/services/llm';
 import { app } from '../../apps/api/src/index';
+
+// Controllable mock provider — overrides the default mock registered in setup.ts.
+// Avoids jest.mock on an internal service (CLAUDE.md rule: no internal mocks in
+// integration tests). Uses registerProvider so the full routeAndCall path runs.
+const mockChat = jest.fn<
+  Promise<string>,
+  [Array<{ role: string; content: string }>, unknown]
+>();
 
 const TEST_ENV = buildIntegrationEnv();
 const CURRICULUM_USER = {
@@ -42,57 +37,55 @@ const CURRICULUM_USER = {
   email: 'integration-curriculum@integration.test',
 };
 
-function buildLlmResult(response: string) {
-  return {
-    response,
-    provider: 'mock',
-    model: 'mock-model',
-    latencyMs: 1,
-  };
-}
+// Register controllable mock provider once — overrides setup.ts's default mock.
+beforeAll(() => {
+  registerProvider({
+    id: 'gemini',
+    chat: mockChat,
+    async *chatStream() {
+      yield* []; // no-op: streaming not used in these tests
+    },
+  });
+});
 
 function installCurriculumLlmMocks(): void {
-  mockRouteAndCall.mockImplementation(
+  mockChat.mockImplementation(
     async (messages: Array<{ role: string; content: string }>) => {
       const lastMessage = messages[messages.length - 1]?.content ?? '';
 
       if (lastMessage.includes('Topic idea:')) {
-        return buildLlmResult(
-          JSON.stringify({
-            title: 'Trigonometry Basics',
-            description: 'Angles and triangle relationships',
-            estimatedMinutes: 35,
-          })
-        );
+        return JSON.stringify({
+          title: 'Trigonometry Basics',
+          description: 'Angles and triangle relationships',
+          estimatedMinutes: 35,
+        });
       }
 
       if (
         lastMessage.includes('Subject: <subject_name>') &&
         lastMessage.includes('Interview Summary')
       ) {
-        return buildLlmResult(
-          JSON.stringify([
-            {
-              title: 'Quadratic Functions',
-              description: 'Model and graph parabolas',
-              relevance: 'core',
-              estimatedMinutes: 40,
-            },
-            {
-              title: 'Trigonometric Ratios',
-              description: 'Use sine, cosine, and tangent',
-              relevance: 'recommended',
-              estimatedMinutes: 35,
-            },
-          ])
-        );
+        return JSON.stringify([
+          {
+            title: 'Quadratic Functions',
+            description: 'Model and graph parabolas',
+            relevance: 'core',
+            estimatedMinutes: 40,
+          },
+          {
+            title: 'Trigonometric Ratios',
+            description: 'Use sine, cosine, and tangent',
+            relevance: 'recommended',
+            estimatedMinutes: 35,
+          },
+        ]);
       }
 
       if (lastMessage.includes('Explain why <topic_title>')) {
-        return buildLlmResult('This topic builds on fundamentals.');
+        return 'This topic builds on fundamentals.';
       }
 
-      return buildLlmResult('Unexpected curriculum LLM call');
+      return 'Unexpected curriculum LLM call';
     }
   );
 }
@@ -109,7 +102,6 @@ async function createOwnerProfile() {
 
 beforeEach(async () => {
   jest.clearAllMocks();
-  mockRouteAndCall.mockReset();
   installCurriculumLlmMocks();
 
   await cleanupAccounts({

@@ -1526,63 +1526,71 @@ feat(mobile): accordion expand/collapse shell on SubjectCard using AccordionTopi
 
 ---
 
-## Task 7: Filter empty subjects + wire accordion in parent dashboard
+## Task 8: Filter empty subjects + wire accordion in parent dashboard
 
 **Files:**
+- Modify: `apps/mobile/src/components/progress/SubjectCard.tsx` (add exported predicate)
 - Modify: `apps/mobile/src/app/(app)/child/[profileId]/index.tsx:458-482`
-- Test: `apps/mobile/src/components/progress/SubjectCard.test.tsx` (already covered)
+- Test: `apps/mobile/src/components/progress/SubjectCard.test.tsx`
 
-**Context:** In the parent dashboard, replace the `onPress` navigation prop with `childProfileId` + `subjectId` for accordion mode, and filter out subjects with zero activity.
+**Context:** In the parent dashboard, replace the `onPress` navigation prop with `childProfileId` + `subjectId` for accordion mode, and filter out subjects with zero activity. The filter predicate is extracted as a named function in SubjectCard.tsx so both the dashboard and the test use the same logic (M4 fix).
 
-- [ ] **Step 1: Write failing test for empty-subject filtering**
+- [ ] **Step 1: Add the filter predicate and write tests**
 
-Add to `SubjectCard.test.tsx`:
+Add to `apps/mobile/src/components/progress/SubjectCard.tsx`, before the `SubjectCard` function:
+
+```ts
+/** Returns true when a subject has any activity — used to hide empty subjects in parent view */
+export function hasSubjectActivity(s: SubjectInventory): boolean {
+  return (
+    s.sessionsCount > 0 ||
+    s.topics.explored > 0 ||
+    s.topics.inProgress > 0 ||
+    s.topics.mastered > 0
+  );
+}
+```
+
+Add to `apps/mobile/src/components/progress/SubjectCard.test.tsx`:
 
 ```tsx
-describe('SubjectCard empty-subject filter', () => {
-  it('filters subjects with no sessions or topics', () => {
-    // This tests the filtering logic that will live in the parent dashboard.
-    // The SubjectCard itself doesn't filter — it's the parent's job.
-    // We verify the predicate here for documentation.
-    const emptySubject = makeSubject({
+import { hasSubjectActivity } from './SubjectCard';
+
+describe('hasSubjectActivity', () => {
+  it('returns false for subjects with no sessions or topics', () => {
+    const empty = makeSubject({
       sessionsCount: 0,
       topics: { total: 13, explored: 0, mastered: 0, inProgress: 0, notStarted: 13 },
     });
-    const activeSubject = makeSubject({
-      subjectId: 'sub-2',
-      subjectName: 'Science',
-      sessionsCount: 2,
-      wallClockMinutes: 30,
-      topics: { total: 10, explored: 1, mastered: 0, inProgress: 1, notStarted: 8 },
-    });
-
-    const subjects = [emptySubject, activeSubject];
-    const filtered = subjects.filter(
-      (s) => s.sessionsCount > 0 || s.topics.explored > 0 || s.topics.inProgress > 0 || s.topics.mastered > 0
-    );
-
-    expect(filtered).toHaveLength(1);
-    expect(filtered[0].subjectName).toBe('Science');
+    expect(hasSubjectActivity(empty)).toBe(false);
   });
 
-  it('keeps subjects with only assessments (legacy data)', () => {
-    const legacySubject = makeSubject({
+  it('returns true when sessionsCount > 0', () => {
+    const active = makeSubject({ sessionsCount: 2 });
+    expect(hasSubjectActivity(active)).toBe(true);
+  });
+
+  it('returns true for legacy data with assessments only (mastered > 0)', () => {
+    const legacy = makeSubject({
       sessionsCount: 0,
       topics: { total: 13, explored: 0, mastered: 1, inProgress: 0, notStarted: 12 },
     });
+    expect(hasSubjectActivity(legacy)).toBe(true);
+  });
 
-    const filtered = [legacySubject].filter(
-      (s) => s.sessionsCount > 0 || s.topics.explored > 0 || s.topics.inProgress > 0 || s.topics.mastered > 0
-    );
-
-    expect(filtered).toHaveLength(1);
+  it('returns true when inProgress > 0', () => {
+    const inProgress = makeSubject({
+      sessionsCount: 0,
+      topics: { total: 13, explored: 0, mastered: 0, inProgress: 1, notStarted: 12 },
+    });
+    expect(hasSubjectActivity(inProgress)).toBe(true);
   });
 });
 ```
 
-- [ ] **Step 2: Run — expect PASS immediately** (pure filter logic test)
+- [ ] **Step 2: Run — expect PASS**
 
-Run: `cd apps/mobile && pnpm exec jest SubjectCard.test.tsx --no-coverage -t "empty-subject filter"`
+Run: `cd apps/mobile && pnpm exec jest SubjectCard.test.tsx --no-coverage -t "hasSubjectActivity"`
 
 - [ ] **Step 3: Update the parent dashboard rendering**
 
@@ -1616,6 +1624,22 @@ In `apps/mobile/src/app/(app)/child/[profileId]/index.tsx`, replace lines 458–
             ))}
           </>
 
+Also add `hasSubjectActivity` to the barrel export in `apps/mobile/src/components/progress/index.ts`:
+
+```ts
+export { SubjectCard, hasSubjectActivity } from './SubjectCard';
+```
+
+Then update the import at top of `index.tsx` (it already imports `SubjectCard` from the barrel — add `hasSubjectActivity`):
+
+```ts
+import {
+  SubjectCard,
+  hasSubjectActivity,
+} from '../../../../components/progress';
+```
+
+```tsx
 // After:
         ) : inventory?.subjects && inventory.subjects.length > 0 ? (
           <>
@@ -1623,13 +1647,7 @@ In `apps/mobile/src/app/(app)/child/[profileId]/index.tsx`, replace lines 458–
               Subjects
             </Text>
             {inventory.subjects
-              .filter(
-                (s) =>
-                  s.sessionsCount > 0 ||
-                  s.topics.explored > 0 ||
-                  s.topics.inProgress > 0 ||
-                  s.topics.mastered > 0
-              )
+              .filter(hasSubjectActivity)
               .map((subject) => (
                 <View key={subject.subjectId} className="mt-3">
                   <SubjectCard
@@ -1644,9 +1662,10 @@ In `apps/mobile/src/app/(app)/child/[profileId]/index.tsx`, replace lines 458–
 ```
 
 Key changes:
-1. **Filter** with the expanded predicate before `.map()`
+1. **Filter** with the extracted `hasSubjectActivity` predicate before `.map()`
 2. Replace `onPress` navigation prop with `childProfileId={profileId}` and `subjectId={subject.subjectId}`
-3. Remove the `router.push` navigation handler — topic-level navigation now happens from within the accordion's topic rows
+3. Remove the `router.push` navigation handler — topic-level navigation now happens from within `AccordionTopicList`
+4. Note: `onAction` was never passed in parent view — no change needed (L1 acknowledged)
 
 - [ ] **Step 4: Verify the child view is NOT affected**
 
@@ -1663,155 +1682,6 @@ Expected: Both pass. The parent dashboard no longer needs `router` for subject n
 
 ```
 feat(mobile): filter empty subjects + wire accordion mode in parent dashboard
-```
-
----
-
-## Task 8: Add topic row navigation from accordion
-
-**Files:**
-- Modify: `apps/mobile/src/components/progress/SubjectCard.tsx`
-- No new test file — existing accordion tests + manual verification.
-
-**Context:** Tapping a topic row inside the expanded accordion should navigate to `child/[profileId]/topic/[topicId]`. This requires `useRouter` from expo-router inside SubjectCard, and passing navigation params.
-
-- [ ] **Step 1: Write the failing test**
-
-Add to the accordion tests in `SubjectCard.test.tsx`:
-
-```tsx
-// At top of file, mock expo-router
-const mockPush = jest.fn();
-jest.mock('expo-router', () => ({
-  useRouter: () => ({ push: mockPush }),
-}));
-
-// In the accordion describe block:
-it('navigates to topic detail on topic row press', () => {
-  mockPush.mockClear();
-  mockUseChildSubjectTopics.mockReturnValue({
-    data: [
-      {
-        topicId: 't-1', title: 'Algebra basics',
-        completionStatus: 'in_progress', retentionStatus: 'strong',
-        struggleStatus: 'normal', masteryScore: 0.5,
-        summaryExcerpt: null, xpStatus: null, totalSessions: 2,
-        description: 'Intro to algebra',
-      },
-    ],
-    isLoading: false,
-    isError: false,
-    refetch: jest.fn(),
-  });
-
-  render(
-    <SubjectCard
-      subject={makeSubject({
-        topics: { total: 13, explored: 1, mastered: 0, inProgress: 1, notStarted: 11 },
-        sessionsCount: 2,
-        wallClockMinutes: 30,
-      })}
-      childProfileId="child-1"
-      subjectId="sub-1"
-      testID="card"
-    />
-  );
-
-  fireEvent.press(screen.getByTestId('card'));
-  fireEvent.press(screen.getByText('Algebra basics'));
-
-  expect(mockPush).toHaveBeenCalledWith(
-    expect.objectContaining({
-      pathname: '/(app)/child/[profileId]/topic/[topicId]',
-      params: expect.objectContaining({
-        profileId: 'child-1',
-        topicId: 't-1',
-      }),
-    })
-  );
-});
-```
-
-- [ ] **Step 2: Run test — expect FAILURE**
-
-Run: `cd apps/mobile && pnpm exec jest SubjectCard.test.tsx --no-coverage -t "navigates to topic detail"`
-
-Expected: FAIL — topic rows aren't Pressable yet.
-
-- [ ] **Step 3: Add router navigation to topic rows**
-
-In `SubjectCard.tsx`, add `useRouter` import:
-
-```ts
-import { useRouter } from 'expo-router';
-```
-
-Inside the component, add:
-
-```ts
-const router = useRouter();
-```
-
-Replace the topic row `View` with a `Pressable`:
-
-```tsx
-topics.map((topic) => (
-  <Pressable
-    key={topic.topicId}
-    onPress={(e) => {
-      e.stopPropagation?.();
-      router.push({
-        pathname: '/(app)/child/[profileId]/topic/[topicId]',
-        params: {
-          profileId: childProfileId!,
-          topicId: topic.topicId,
-          title: topic.title,
-          completionStatus: topic.completionStatus,
-          masteryScore: topic.masteryScore != null ? String(topic.masteryScore) : '',
-          retentionStatus: topic.retentionStatus ?? '',
-          totalSessions: String(topic.totalSessions ?? 0),
-          subjectId: subjectId!,
-          subjectName: subject.subjectName,
-        },
-      } as never);
-    }}
-    className="flex-row items-center justify-between py-2"
-    accessibilityRole="link"
-    accessibilityLabel={`View ${topic.title} details`}
-  >
-    <Text className="text-body-sm text-text-primary flex-1 me-3">
-      {topic.title}
-    </Text>
-    <View className="flex-row items-center gap-2">
-      <Text className="text-caption text-text-secondary">
-        {getTopicStatusLabel(topic)}
-      </Text>
-      {topic.retentionStatus &&
-      topic.totalSessions >= 1 &&
-      topic.completionStatus !== 'not_started' ? (
-        <RetentionSignal
-          status={topic.retentionStatus as RetentionStatus}
-          compact
-          parentFacing
-        />
-      ) : null}
-    </View>
-  </Pressable>
-))
-```
-
-The `e.stopPropagation?.()` prevents the topic row press from also toggling the accordion.
-
-- [ ] **Step 4: Run tests — expect PASS**
-
-Run: `cd apps/mobile && pnpm exec jest SubjectCard.test.tsx --no-coverage`
-
-Expected: ALL pass.
-
-- [ ] **Step 5: Commit**
-
-```
-feat(mobile): topic row navigation from accordion to detail screen
 ```
 
 ---
@@ -1861,3 +1731,22 @@ Start the mobile dev server and verify on the parent dashboard:
 ```
 fix(mobile): polish expandable subject cards after smoke test
 ```
+
+---
+
+## Deployment Notes
+
+**Tasks 1–3 must be deployed atomically.** Between Task 1 and Task 2 completion, `buildSubjectMetric` and `buildSubjectInventory` disagree on mastery counts — the global hero pill (from `buildSubjectMetric`) would show the tightened count while subject cards (from `buildSubjectInventory`) show the old (wider) count. During development this is fine (both are committed before any push), but never cherry-pick Task 1 without Task 2.
+
+**Mastered counts will decrease** for existing users on deploy. This is intentional — see spec § Rollout & rollback. Snapshot-backed surfaces update on next snapshot generation (triggered by session end). Already-persisted monthly reports are frozen at the old counts permanently.
+
+## Failure Modes
+
+| State | Trigger | User sees | Recovery |
+|-------|---------|-----------|----------|
+| Topic fetch fails on expand | Network error, API down | "Could not load topics. Tap to retry." inside card | Tap to retry, collapse card |
+| All subjects inactive | New child, no sessions yet | "No subjects yet" empty state (existing) | — |
+| Topic decays after expand | Retention card fails between renders | Count updates on next inventory refresh | Stale for current view, correct on re-render |
+| LayoutAnimation unavailable | Old Android, missing experimental flag | Card expands instantly (no animation) | Functional, just not animated |
+| Topic fetch slow (>10s) | Slow network | Skeleton rows persist, no hard timeout | Collapse + re-expand to retry; React Query retry handles transient failures |
+| Stale topic data in cache | User navigates away and back | Outdated topic statuses shown briefly | React Query refetch on mount (staleTime = 0) |
