@@ -81,5 +81,30 @@ import {
 // Real Gemini/OpenAI calls would be flaky and expensive in CI/local runs
 registerProvider(createMockProvider('gemini'));
 
+// ---------------------------------------------------------------------------
+// Global fetch interceptor + JWKS mock
+//
+// Direction of travel: once all test files are migrated to composable
+// interceptors, remove `passthrough: true` so unmatched URLs throw.
+// ---------------------------------------------------------------------------
+
+import { installFetchInterceptor, restoreFetch } from './fetch-interceptor';
+import { mockClerkJWKS } from './external-mocks';
+import { clearJWKSCache } from '../../apps/api/src/middleware/jwt';
+
+// Passthrough mode: unmatched URLs fall through to real fetch so tests
+// that still use the old jest.mock('jwt') pattern continue to work.
+installFetchInterceptor({ passthrough: true });
+mockClerkJWKS();
+
+// Clear the in-memory JWKS cache between test files to prevent stale keys
+beforeEach(() => {
+  clearJWKSCache();
+});
+
+afterAll(() => {
+  restoreFetch();
+});
+
 // Set a generous timeout for integration tests
 jest.setTimeout(30_000);

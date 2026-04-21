@@ -128,7 +128,12 @@ describe('CelestialCelebration', () => {
     );
 
     const element = screen.getByTestId('test-celebration');
-    expect(element.props.pointerEvents).toBe('none');
+    const styles = [element.props.style].flat(Infinity);
+    expect(styles).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ pointerEvents: 'none' }),
+      ])
+    );
   });
 });
 

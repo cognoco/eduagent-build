@@ -87,8 +87,11 @@ export function FeedbackSheet({
         // [BUG-516] RN Web's Modal sets pointer-events:none on its root
         // container and never toggles it back when visible. Force 'auto' so
         // all child elements are interactive on web.
-        pointerEvents="auto"
-        style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
+        style={{
+          pointerEvents: 'auto',
+          paddingTop: insets.top,
+          paddingBottom: insets.bottom,
+        }}
       >
         <View className="flex-row items-center justify-between px-5 pt-4 pb-2">
           <Pressable

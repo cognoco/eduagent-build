@@ -247,8 +247,8 @@ export function MagicPenAnimation({
                 backgroundColor: color,
               },
               drop1Style,
+              { pointerEvents: 'none' },
             ]}
-            pointerEvents="none"
           />
           <Animated.View
             style={[
@@ -262,8 +262,8 @@ export function MagicPenAnimation({
                 backgroundColor: color,
               },
               drop2Style,
+              { pointerEvents: 'none' },
             ]}
-            pointerEvents="none"
           />
         </>
       )}
@@ -282,8 +282,8 @@ export function MagicPenAnimation({
               backgroundColor: NIB_GLOW,
             },
             glowStyle,
+            { pointerEvents: 'none' },
           ]}
-          pointerEvents="none"
         />
       )}
 
@@ -299,8 +299,8 @@ export function MagicPenAnimation({
               height: penSize * 1.5,
             },
             penStyle,
+            { pointerEvents: 'none' },
           ]}
-          pointerEvents="none"
         >
           <Svg width={penSize} height={penSize * 1.5} viewBox="0 0 40 60">
             <Path d={PEN_BARREL} fill={color} opacity={0.85} />

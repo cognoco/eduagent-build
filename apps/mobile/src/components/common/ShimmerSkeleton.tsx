@@ -102,8 +102,7 @@ export function ShimmerSkeleton({
       {children}
       {containerWidth > 0 && (
         <Animated.View
-          style={[styles.overlay, animatedStyle]}
-          pointerEvents="none"
+          style={[styles.overlay, animatedStyle, { pointerEvents: 'none' }]}
           testID={testID ? `${testID}-shimmer` : undefined}
         >
           <Svg width={bandWidth} height="100%">

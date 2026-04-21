@@ -1,6 +1,11 @@
 import { useEffect, useRef } from 'react';
 import { Platform } from 'react-native';
-import { Accelerometer } from 'expo-sensors';
+let Accelerometer: typeof import('expo-sensors').Accelerometer | null = null;
+try {
+  Accelerometer = require('expo-sensors').Accelerometer;
+} catch {
+  // Native module unavailable (dev-client missing expo-sensors)
+}
 
 const SHAKE_THRESHOLD = 1.8;
 const SHAKE_COUNT = 3;
@@ -17,21 +22,22 @@ export function useShakeDetector(onShake: () => void): void {
   onShakeRef.current = onShake;
 
   useEffect(() => {
-    if (Platform.OS === 'web') return;
+    if (Platform.OS === 'web' || !Accelerometer) return;
 
     let subscription: { remove: () => void } | null = null;
     let cancelled = false;
+    const Accel = Accelerometer;
 
     (async () => {
-      const available = await Accelerometer.isAvailableAsync();
+      const available = await Accel.isAvailableAsync();
       if (!available || cancelled) return;
 
       const timestamps: number[] = [];
       let lastShakeTime = 0;
 
-      Accelerometer.setUpdateInterval(UPDATE_INTERVAL_MS);
+      Accel.setUpdateInterval(UPDATE_INTERVAL_MS);
 
-      subscription = Accelerometer.addListener(({ x, y, z }) => {
+      subscription = Accel.addListener(({ x, y, z }) => {
         const magnitude = Math.sqrt(x * x + y * y + z * z) - 1;
         if (magnitude < SHAKE_THRESHOLD) return;
 

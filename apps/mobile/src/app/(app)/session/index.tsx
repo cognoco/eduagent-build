@@ -1206,9 +1206,11 @@ function SessionScreenInner() {
       />
       {confirmationToast ? (
         <View
-          pointerEvents="none"
           className="absolute left-4 right-4 z-50 items-center"
-          style={{ bottom: Math.max(insets.bottom, 16) + 88 }}
+          style={{
+            pointerEvents: 'none',
+            bottom: Math.max(insets.bottom, 16) + 88,
+          }}
           testID="session-confirmation-toast"
         >
           <View className="rounded-full bg-text-primary px-4 py-3">

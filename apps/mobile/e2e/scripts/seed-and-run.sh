@@ -452,8 +452,10 @@ echo "[seed-and-run] Seeding scenario='${SCENARIO}' email='${EMAIL}' ..."
 
 # Use node to safely serialize JSON payload (prevents shell injection from EMAIL/SCENARIO)
 SEED_PAYLOAD=$(node -e "process.stdout.write(JSON.stringify({scenario: process.argv[1], email: process.argv[2]}))" "$SCENARIO" "$EMAIL")
+TEST_SECRET="${TEST_SEED_SECRET:-}"
 SEED_RESPONSE=$(curl -sf -X POST "${API_URL}/v1/__test/seed" \
   -H "Content-Type: application/json" \
+  ${TEST_SECRET:+-H "X-Test-Secret: ${TEST_SECRET}"} \
   -d "$SEED_PAYLOAD")
 
 if [ -z "$SEED_RESPONSE" ]; then

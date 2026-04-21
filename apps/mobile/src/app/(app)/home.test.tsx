@@ -54,7 +54,7 @@ jest.mock('../../components/home', () => {
       </View>
     ),
     LearnerScreen: () => (
-      <View testID="learner-screen">
+      <View testID="home-scroll-view">
         <Text>LearnerScreen</Text>
       </View>
     ),
@@ -79,7 +79,7 @@ describe('HomeScreen intent router', () => {
 
     // BUG-522: owners without children always see LearnerScreen — no forced
     // add-child gate regardless of subscription tier
-    expect(screen.getByTestId('learner-screen')).toBeTruthy();
+    expect(screen.getByTestId('home-scroll-view')).toBeTruthy();
     expect(screen.queryByTestId('parent-gateway')).toBeNull();
   });
 
@@ -93,7 +93,7 @@ describe('HomeScreen intent router', () => {
     render(<HomeScreen />);
 
     expect(screen.getByTestId('parent-gateway')).toBeTruthy();
-    expect(screen.queryByTestId('learner-screen')).toBeNull();
+    expect(screen.queryByTestId('home-scroll-view')).toBeNull();
   });
 
   it('renders LearnerScreen when active profile is a child (non-owner)', () => {
@@ -105,7 +105,7 @@ describe('HomeScreen intent router', () => {
 
     render(<HomeScreen />);
 
-    expect(screen.getByTestId('learner-screen')).toBeTruthy();
+    expect(screen.getByTestId('home-scroll-view')).toBeTruthy();
     expect(screen.queryByTestId('parent-gateway')).toBeNull();
   });
 
@@ -116,7 +116,7 @@ describe('HomeScreen intent router', () => {
 
     render(<HomeScreen />);
 
-    expect(screen.queryByTestId('learner-screen')).toBeNull();
+    expect(screen.queryByTestId('home-scroll-view')).toBeNull();
     expect(screen.queryByTestId('parent-gateway')).toBeNull();
   });
 });

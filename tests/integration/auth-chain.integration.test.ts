@@ -1,48 +1,29 @@
 /**
  * Integration: Auth middleware chain
  *
- * Exercises the real auth middleware via Hono's app.request().
- * JWT verification is the only mocked boundary in this suite.
+ * Exercises the REAL auth middleware via Hono's app.request().
+ * JWT verification runs through the actual Web Crypto path — no mocks.
+ * The only fake is the JWKS fetch, intercepted by the global fetch
+ * interceptor (setup.ts) to return test RSA public keys.
  *
  * Validates:
  * 1. Public paths (/v1/health, /v1/inngest, /v1/auth/*, /v1/stripe/*, /v1/consent/respond) skip auth
  * 2. Protected paths without Authorization header → 401 UNAUTHORIZED
  * 3. Protected paths with non-Bearer auth → 401
- * 4. Protected paths with invalid/expired JWT → 401
- * 5. Protected paths with valid JWT → passes auth (not 401)
- * 6. Missing CLERK_JWKS_URL → 401 (config error caught gracefully)
+ * 4. Protected paths with invalid/malformed JWT → 401
+ * 5. Protected paths with expired JWT → 401
+ * 6. Protected paths with valid JWT → passes auth (not 401)
+ * 7. Missing CLERK_JWKS_URL → 401 (config error caught gracefully)
  */
 
-// --- Controllable JWT mock ---
-
-import {
-  jwtMock,
-  configureValidJWT as configureValidJWTHelper,
-  configureInvalidJWT as configureInvalidJWTHelper,
-} from './mocks';
 import { buildIntegrationEnv, cleanupAccounts } from './helpers';
-
-const jwtMocks = jwtMock();
-jest.mock('../../apps/api/src/middleware/jwt', () => jwtMocks);
+import { buildAuthHeaders, signExpiredJWT } from './test-keys';
 
 import { app } from '../../apps/api/src/index';
 
 const AUTH_CLERK_USER_ID = 'integration-auth-user';
 const AUTH_EMAIL = 'integration-auth@integration.test';
 const TEST_ENV = buildIntegrationEnv();
-
-// Helper: configure JWT mock to return a valid payload
-function configureValidJWT(): void {
-  configureValidJWTHelper(jwtMocks, {
-    sub: AUTH_CLERK_USER_ID,
-    email: AUTH_EMAIL,
-  });
-}
-
-// Helper: configure JWT mock to throw (simulates invalid/expired token)
-function configureInvalidJWT(): void {
-  configureInvalidJWTHelper(jwtMocks);
-}
 
 // ---------------------------------------------------------------------------
 // Public paths — auth middleware skips these
@@ -85,7 +66,6 @@ describe('Integration: Auth chain — public paths', () => {
 
 describe('Integration: Auth chain — protected paths', () => {
   beforeEach(async () => {
-    jest.clearAllMocks();
     await cleanupAccounts({
       emails: [AUTH_EMAIL],
       clerkUserIds: [AUTH_CLERK_USER_ID],
@@ -123,9 +103,8 @@ describe('Integration: Auth chain — protected paths', () => {
     expect(body.code).toBe('UNAUTHORIZED');
   });
 
-  it('returns 401 with invalid JWT', async () => {
-    configureInvalidJWT();
-
+  it('returns 401 with malformed JWT', async () => {
+    // 'invalid.jwt.token' is not valid base64url JSON — decodeJWTHeader throws
     const res = await app.request(
       '/v1/profiles',
       {
@@ -140,37 +119,58 @@ describe('Integration: Auth chain — protected paths', () => {
     expect(body.code).toBe('UNAUTHORIZED');
   });
 
-  it('passes auth with valid JWT (response is not 401)', async () => {
-    configureValidJWT();
+  it('returns 401 with expired JWT', async () => {
+    const expiredToken = signExpiredJWT({
+      sub: AUTH_CLERK_USER_ID,
+      email: AUTH_EMAIL,
+    });
 
     const res = await app.request(
       '/v1/profiles',
       {
         method: 'GET',
         headers: {
-          Authorization: 'Bearer valid.jwt.token',
+          Authorization: `Bearer ${expiredToken}`,
           'Content-Type': 'application/json',
         },
       },
       TEST_ENV
     );
 
-    // Auth middleware passed — downstream may return any status, but NOT 401
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.code).toBe('UNAUTHORIZED');
+  });
+
+  it('passes auth with valid JWT (response is not 401)', async () => {
+    const res = await app.request(
+      '/v1/profiles',
+      {
+        method: 'GET',
+        headers: buildAuthHeaders({
+          sub: AUTH_CLERK_USER_ID,
+          email: AUTH_EMAIL,
+        }),
+      },
+      TEST_ENV
+    );
+
+    // Auth middleware passed — real JWT verified via Web Crypto
     expect(res.status).toBe(200);
-    expect(jwtMocks.verifyJWT).toHaveBeenCalled();
     const body = await res.json();
     expect(Array.isArray(body.profiles)).toBe(true);
   });
 
   it('returns 401 when CLERK_JWKS_URL is missing', async () => {
-    configureValidJWT();
-
-    // Pass env WITHOUT CLERK_JWKS_URL — verifyClerkJWT throws "not configured"
+    // verifyClerkJWT throws "CLERK_JWKS_URL is not configured" for empty string
     const res = await app.request(
       '/v1/profiles',
       {
         method: 'GET',
-        headers: { Authorization: 'Bearer valid.jwt.token' },
+        headers: buildAuthHeaders({
+          sub: AUTH_CLERK_USER_ID,
+          email: AUTH_EMAIL,
+        }),
       },
       buildIntegrationEnv({ CLERK_JWKS_URL: '' })
     );

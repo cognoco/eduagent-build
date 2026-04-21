@@ -501,9 +501,11 @@ export default function ChildMentorMemoryScreen() {
       {/* [BUG-533] Confirmation toast after Tell the Mentor / correction save */}
       {confirmationToast ? (
         <View
-          pointerEvents="none"
           className="absolute bottom-0 left-4 right-4 z-50 items-center"
-          style={{ bottom: Math.max(insets.bottom, 16) + 16 }}
+          style={{
+            pointerEvents: 'none',
+            bottom: Math.max(insets.bottom, 16) + 16,
+          }}
           testID="mentor-memory-confirmation-toast"
         >
           <View className="rounded-full bg-text-primary px-4 py-3">

@@ -150,8 +150,8 @@ export function LightBulbAnimation({
             top: size * 0.18,
           },
           glowStyle,
+          { pointerEvents: 'none' },
         ]}
-        pointerEvents="none"
       />
       {/* Bulb SVG — static shape */}
       <Svg width={size} height={size} viewBox="0 0 64 64">

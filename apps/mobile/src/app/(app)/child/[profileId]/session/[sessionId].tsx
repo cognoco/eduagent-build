@@ -5,7 +5,6 @@ import {
   Pressable,
   ActivityIndicator,
 } from 'react-native';
-import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,6 +12,12 @@ import { useEffect, useState } from 'react';
 import { useChildSessionDetail } from '../../../../../hooks/use-dashboard';
 import { goBackOrReplace } from '../../../../../lib/navigation';
 import { EngagementChip } from '../../../../../components/parent/EngagementChip';
+let Clipboard: typeof import('expo-clipboard') | null = null;
+try {
+  Clipboard = require('expo-clipboard');
+} catch {
+  // Native module unavailable (dev-client missing expo-clipboard)
+}
 
 function formatDate(iso: string): string {
   const d = new Date(iso);
@@ -64,6 +69,7 @@ export default function SessionDetailScreen() {
     if (!session?.conversationPrompt) return;
 
     try {
+      if (!Clipboard?.setStringAsync) throw new Error('Clipboard unavailable');
       await Clipboard.setStringAsync(session.conversationPrompt);
       setCopyState('copied');
     } catch {

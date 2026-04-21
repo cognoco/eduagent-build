@@ -169,9 +169,9 @@ export function CelebrationAnimation({
             opacity: 0.3,
             left: half - size * 0.075,
             top: half - size * 0.075,
+            pointerEvents: 'none',
           },
         ]}
-        pointerEvents="none"
       />
     </Animated.View>
   );

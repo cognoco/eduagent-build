@@ -1323,22 +1323,46 @@ export async function adaptCurriculumFromPerformance(
   // topics in a partially-reordered state with no rollback.
   await db.transaction(async (tx) => {
     // [CR-2B.1] Replace N individual UPDATEs with a single CASE expression to
-    // avoid N+1 round-trips. The curriculumId guard is kept in the WHERE clause
-    // so only topics belonging to this curriculum are touched.
+    // avoid N+1 round-trips. Because (curriculum_id, book_id, sort_order) is
+    // unique, swaps must happen in two phases: first move the reordered topics
+    // to temporary negative sort orders, then write the final contiguous order.
+    // This keeps every intermediate state unique while still using 2 bulk
+    // updates instead of N row-by-row updates.
     const now = new Date();
+    const topicIds = sql.join(
+      reordered.map((t) => sql`${t.id}::uuid`),
+      sql`, `
+    );
+
     await tx.execute(sql`
       UPDATE curriculum_topics
-      SET sort_order = CASE id
+      SET sort_order = CASE
         ${sql.join(
-          reordered.map((t, i) => sql`WHEN ${t.id} THEN ${i}`),
+          reordered.map(
+            (t, i) => sql`WHEN id = ${t.id}::uuid THEN ${-(i + 1)}::integer`
+          ),
           sql` `
         )}
+        ELSE sort_order
       END,
       updated_at = ${now}
-      WHERE id IN (${sql.join(
-        reordered.map((t) => sql`${t.id}`),
-        sql`, `
-      )})
+      WHERE id IN (${topicIds})
+        AND curriculum_id = ${curriculum.id}
+    `);
+
+    await tx.execute(sql`
+      UPDATE curriculum_topics
+      SET sort_order = CASE
+        ${sql.join(
+          reordered.map(
+            (t, i) => sql`WHEN id = ${t.id}::uuid THEN ${i}::integer`
+          ),
+          sql` `
+        )}
+        ELSE sort_order
+      END,
+      updated_at = ${now}
+      WHERE id IN (${topicIds})
         AND curriculum_id = ${curriculum.id}
     `);
 

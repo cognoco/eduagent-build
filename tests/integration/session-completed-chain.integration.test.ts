@@ -5,9 +5,11 @@
  * The orchestration, DB writes, retention logic, streaks, summaries, and
  * coaching-card cache stay real.
  *
+ * External boundaries intercepted via fetch interceptor:
+ * - Voyage AI embedding API (mockVoyageAI)
+ *
  * Mocked boundaries:
- * - Voyage embedding storage transport
- * - Sentry reporting
+ * - Sentry (@sentry/cloudflare SDK — not a plain HTTP call)
  */
 
 import { eq, and } from 'drizzle-orm';
@@ -30,21 +32,14 @@ import {
 } from '@eduagent/database';
 
 import { cleanupAccounts, createIntegrationDb } from './helpers';
+import {
+  clearFetchCalls,
+  getFetchCalls,
+  jsonResponse,
+} from './fetch-interceptor';
+import { mockVoyageAI, type MockHandle } from './external-mocks';
 
-const mockStoreSessionEmbedding = jest.fn();
 const mockCaptureException = jest.fn();
-
-jest.mock('../../apps/api/src/services/embeddings', () => {
-  const actual = jest.requireActual(
-    '../../apps/api/src/services/embeddings'
-  ) as Record<string, unknown>;
-
-  return {
-    ...actual,
-    storeSessionEmbedding: (...args: unknown[]) =>
-      mockStoreSessionEmbedding(...args),
-  };
-});
 
 jest.mock('../../apps/api/src/services/sentry', () => ({
   captureException: (...args: unknown[]) => mockCaptureException(...args),
@@ -55,6 +50,8 @@ import { sessionCompleted } from '../../apps/api/src/inngest/functions/session-c
 const AUTH_USER_ID = 'integration-session-completed-user';
 const AUTH_EMAIL = 'integration-session-completed@integration.test';
 const SESSION_TIMESTAMP = '2026-02-23T10:00:00.000Z';
+
+let voyageHandle: MockHandle;
 
 interface Scenario {
   profileId: string;
@@ -292,10 +289,15 @@ async function loadXpEntry(profileId: string, topicId: string) {
   });
 }
 
+beforeAll(() => {
+  // Register Voyage AI fetch interceptor — the real embeddings service
+  // calls fetch('https://api.voyageai.com/...') which we intercept
+  voyageHandle = mockVoyageAI();
+});
+
 beforeEach(async () => {
-  mockStoreSessionEmbedding.mockReset();
-  mockStoreSessionEmbedding.mockResolvedValue(undefined);
   mockCaptureException.mockReset();
+  clearFetchCalls();
   process.env['VOYAGE_API_KEY'] = 'voyage-test-key';
 
   await cleanupAccounts({
@@ -370,13 +372,18 @@ describe('Integration: Session-Completed Chain (P0-008)', () => {
     expect(xpEntry!.subjectId).toBe(scenario.subjectId);
     expect(xpEntry!.status).toBe('pending');
 
-    expect(mockStoreSessionEmbedding).toHaveBeenCalledWith(
-      expect.anything(),
-      scenario.sessionId,
-      scenario.profileId,
-      scenario.topicId,
-      expect.stringContaining('What is photosynthesis?'),
-      'voyage-test-key'
+    // Verify the REAL embeddings service called Voyage AI via fetch
+    const voyageCalls = getFetchCalls('voyageai');
+    expect(voyageCalls).toHaveLength(1);
+    expect(voyageCalls[0].method).toBe('POST');
+
+    const voyageBody = JSON.parse(voyageCalls[0].body!);
+    expect(voyageBody.model).toBe('voyage-3.5');
+    expect(voyageBody.input[0]).toContain('What is photosynthesis?');
+
+    // Verify the Authorization header used the right API key
+    expect(voyageCalls[0].headers['Authorization']).toBe(
+      'Bearer voyage-test-key'
     );
   });
 
@@ -411,14 +418,10 @@ describe('Integration: Session-Completed Chain (P0-008)', () => {
 
     const streak = await loadStreak(scenario.profileId);
     expect(streak).not.toBeNull();
-    expect(mockStoreSessionEmbedding).toHaveBeenCalledWith(
-      expect.anything(),
-      scenario.sessionId,
-      scenario.profileId,
-      null,
-      expect.any(String),
-      'voyage-test-key'
-    );
+
+    // Verify Voyage AI was called even without a topic
+    const voyageCalls = getFetchCalls('voyageai');
+    expect(voyageCalls).toHaveLength(1);
   });
 
   it('tracks skipped and accepted summaries through the real learning_modes row', async () => {
@@ -443,6 +446,7 @@ describe('Integration: Session-Completed Chain (P0-008)', () => {
       emails: [AUTH_EMAIL],
       clerkUserIds: [AUTH_USER_ID],
     });
+    clearFetchCalls();
 
     const acceptedScenario = await seedScenario({ initialSummarySkips: 3 });
 
@@ -464,8 +468,10 @@ describe('Integration: Session-Completed Chain (P0-008)', () => {
 
   it('isolates embedding failures without blocking the rest of the chain', async () => {
     const scenario = await seedScenario();
-    mockStoreSessionEmbedding.mockRejectedValueOnce(
-      new Error('Voyage AI unavailable')
+
+    // Override Voyage AI to return a 503 for the next call
+    voyageHandle.nextResponse(
+      () => new Response('Service Unavailable', { status: 503 })
     );
 
     const result = await executeChain({
@@ -484,14 +490,17 @@ describe('Integration: Session-Completed Chain (P0-008)', () => {
       result.outcomes.find((outcome) => outcome.step === 'generate-embeddings')
     ).toMatchObject({
       status: 'failed',
-      error: expect.stringContaining('Voyage AI unavailable'),
+      error: expect.stringContaining('503'),
     });
 
     expect(mockCaptureException).toHaveBeenCalledWith(
-      expect.objectContaining({ message: 'Voyage AI unavailable' }),
+      expect.objectContaining({
+        message: expect.stringContaining('503'),
+      }),
       expect.objectContaining({ profileId: scenario.profileId })
     );
 
+    // Rest of the chain still completed
     const summary = await loadSummary(scenario.sessionId);
     expect(summary).not.toBeNull();
 

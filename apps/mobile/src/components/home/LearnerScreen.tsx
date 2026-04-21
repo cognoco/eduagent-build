@@ -368,7 +368,7 @@ export function LearnerScreen({
   }
 
   return (
-    <View className="flex-1 bg-background" testID="learner-screen">
+    <View className="flex-1 bg-background" testID="home-scroll-view">
       {/* Header outside ScrollView so ProfileSwitcher dropdown isn't clipped */}
       <View
         className="flex-row items-center justify-between px-5"
