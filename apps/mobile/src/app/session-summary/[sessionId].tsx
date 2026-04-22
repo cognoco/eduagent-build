@@ -22,13 +22,16 @@ import {
   useSubmitSummary,
   useRecallBridge,
 } from '../../hooks/use-sessions';
+import { useSessionBookmarks } from '../../hooks/use-bookmarks';
 import { useDepthEvaluation } from '../../hooks/use-depth-evaluation';
+import { useProgressInventory } from '../../hooks/use-progress';
 import { goBackOrReplace } from '../../lib/navigation';
 import { platformAlert } from '../../lib/platform-alert';
 import { Sentry } from '../../lib/sentry';
 import {
   CheckmarkPopAnimation,
   BrandCelebration,
+  ShimmerSkeleton,
 } from '../../components/common';
 
 // BUG-33 Phase 1: Structured sentence starters shown as suggestion chips
@@ -72,6 +75,7 @@ export default function SessionSummaryScreen() {
   const [summaryText, setSummaryText] = useState('');
   const [aiFeedback, setAiFeedback] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const [recapTimedOut, setRecapTimedOut] = useState(false);
 
   // R-3: Ref-based locks — isPending resets before Alert callbacks fire,
   // allowing double-submission if user taps rapidly.
@@ -87,6 +91,7 @@ export default function SessionSummaryScreen() {
   const persona = personaFromBirthYear(activeProfile?.birthYear);
   const recallBridge = useRecallBridge(sessionId ?? '');
   const depthEvaluation = useDepthEvaluation();
+  const progressInventory = useProgressInventory();
   const [recallQuestions, setRecallQuestions] = useState<string[] | null>(null);
 
   // BUG-449: when the user re-enters this screen from Library → Shelf → Book →
@@ -94,7 +99,20 @@ export default function SessionSummaryScreen() {
   // of the empty "Your Words" prompt. The local `submitted` state only covers
   // the just-submitted case in the same render; persisted state comes from
   // GET /sessions/:sessionId/summary.
-  const persistedSummary = useSessionSummary(sessionId ?? '');
+  const exchangeCountForRecap =
+    parseInt(exchangeCount ?? '', 10) ||
+    transcript.data?.session.exchangeCount ||
+    0;
+  const persistedSummary = useSessionSummary(sessionId ?? '', {
+    refetchInterval: (data) => {
+      if (recapTimedOut || exchangeCountForRecap < 3) {
+        return false;
+      }
+
+      return data?.learnerRecap ? false : 2000;
+    },
+  });
+  const sessionBookmarks = useSessionBookmarks(sessionId ?? undefined);
   const persisted = persistedSummary.data ?? null;
   const isPersistedSubmitted =
     persisted?.status === 'submitted' || persisted?.status === 'accepted';
@@ -104,6 +122,9 @@ export default function SessionSummaryScreen() {
   // Fire depth evaluation for fresh sessions to trigger server-side telemetry
   // (session quality gating, topic detection). Fire-and-forget — the result
   // drives analytics, not UI. Skip for revisited/persisted sessions.
+  // Ref (not state) because the guard must be synchronous: Strict Mode and
+  // rapid rerenders can re-run this effect before a setState would flush,
+  // but the ref assignment lands immediately so the second pass short-circuits.
   const depthFiredRef = useRef(false);
   useEffect(() => {
     if (sessionId && !isAlreadyPersisted && !depthFiredRef.current) {
@@ -111,6 +132,19 @@ export default function SessionSummaryScreen() {
       depthEvaluation.mutate({ sessionId });
     }
   }, [sessionId, isAlreadyPersisted, depthEvaluation]);
+
+  useEffect(() => {
+    setRecapTimedOut(false);
+  }, [sessionId]);
+
+  useEffect(() => {
+    if (recapTimedOut || exchangeCountForRecap < 3 || persisted?.learnerRecap) {
+      return;
+    }
+
+    const timer = setTimeout(() => setRecapTimedOut(true), 15_000);
+    return () => clearTimeout(timer);
+  }, [exchangeCountForRecap, persisted?.learnerRecap, recapTimedOut]);
 
   const showSubmittedView = submitted || isPersistedSubmitted;
   const displayContent = submitted ? summaryText : persisted?.content ?? '';
@@ -513,6 +547,11 @@ export default function SessionSummaryScreen() {
         return milestone;
     }
   });
+  const effectiveSubjectId = subjectId ?? fallbackSession?.subjectId ?? null;
+  const shouldShowBookmarkPrompt =
+    exchanges >= 5 &&
+    (sessionBookmarks.data?.length ?? 0) === 0 &&
+    (progressInventory.data?.global.totalSessions ?? 0) <= 3;
 
   return (
     <KeyboardAvoidingView
@@ -556,6 +595,15 @@ export default function SessionSummaryScreen() {
         className="flex-1 px-4 pt-4"
         contentContainerStyle={{ paddingBottom: 24 }}
       >
+        {persisted?.closingLine ? (
+          <Text
+            className="text-body text-text-primary italic px-1 mb-3"
+            testID="session-closing-line"
+          >
+            {persisted.closingLine}
+          </Text>
+        ) : null}
+
         {/* Session takeaways (learner-friendly, no internal metrics) */}
         <View
           className="bg-surface rounded-card p-4 mb-4"
@@ -577,6 +625,68 @@ export default function SessionSummaryScreen() {
           </Text>
         </View>
 
+        {persisted?.learnerRecap ? (
+          <View
+            className="bg-surface rounded-card p-4 mb-4"
+            testID="session-recap-card"
+          >
+            <Text className="text-body font-semibold text-text-primary mb-2">
+              What you explored
+            </Text>
+            {persisted.learnerRecap
+              .split('\n')
+              .filter(Boolean)
+              .map((bullet, index) => (
+                <View
+                  key={`${bullet}-${index}`}
+                  className="flex-row items-start mt-1"
+                >
+                  <Text className="text-body text-text-secondary me-2">
+                    {'\u2022'}
+                  </Text>
+                  <Text className="text-body text-text-primary flex-1">
+                    {bullet.replace(/^- /, '')}
+                  </Text>
+                </View>
+              ))}
+          </View>
+        ) : exchangeCountForRecap >= 3 && recapTimedOut ? (
+          <View
+            className="bg-surface rounded-card p-4 mb-4"
+            testID="session-recap-timeout"
+          >
+            <Text className="text-body-sm text-text-secondary text-center">
+              Your learner recap is still loading.
+            </Text>
+            <Pressable
+              onPress={() => {
+                setRecapTimedOut(false);
+                void persistedSummary.refetch();
+              }}
+              className="mt-3 items-center"
+              accessibilityRole="button"
+              accessibilityLabel="Retry loading session recap"
+              testID="session-recap-retry"
+            >
+              <Text className="text-body-sm font-semibold text-primary">
+                Tap to retry
+              </Text>
+            </Pressable>
+          </View>
+        ) : exchangeCountForRecap >= 3 ? (
+          <View
+            className="bg-surface rounded-card p-4 mb-4"
+            testID="session-recap-skeleton"
+          >
+            <ShimmerSkeleton>
+              <View className="h-4 w-36 bg-surface-elevated rounded mb-3" />
+              <View className="h-3 w-full bg-surface-elevated rounded mb-2" />
+              <View className="h-3 w-5/6 bg-surface-elevated rounded mb-2" />
+              <View className="h-3 w-4/5 bg-surface-elevated rounded" />
+            </ShimmerSkeleton>
+          </View>
+        ) : null}
+
         {milestoneLabels.length > 0 ? (
           <View
             className="bg-surface rounded-card p-4 mb-4"
@@ -595,6 +705,60 @@ export default function SessionSummaryScreen() {
                 </Text>
               </View>
             ))}
+          </View>
+        ) : null}
+
+        {persisted?.nextTopicId && persisted?.nextTopicTitle ? (
+          <View
+            className="bg-surface rounded-card p-4 mb-4"
+            testID="session-next-topic-card"
+          >
+            <Text className="text-body font-semibold text-text-primary mb-1">
+              {persisted.nextTopicReason ? 'Up next' : 'You might also like'}
+            </Text>
+            {persisted.nextTopicReason ? (
+              <Text className="text-body-sm text-text-secondary mb-2">
+                {persisted.nextTopicReason}
+              </Text>
+            ) : null}
+            <Text className="text-body text-text-primary mb-3">
+              {persisted.nextTopicTitle}
+            </Text>
+            {effectiveSubjectId ? (
+              <Pressable
+                onPress={() =>
+                  router.push({
+                    pathname: '/(app)/session',
+                    params: {
+                      mode: 'learning',
+                      subjectId: effectiveSubjectId,
+                      topicId: persisted.nextTopicId,
+                      topicName: persisted.nextTopicTitle,
+                    },
+                  } as never)
+                }
+                className="bg-primary rounded-button py-3 items-center"
+                accessibilityRole="button"
+                accessibilityLabel="Continue learning"
+                testID="session-next-topic-cta"
+              >
+                <Text className="text-text-inverse text-body font-semibold">
+                  Continue learning
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
+
+        {shouldShowBookmarkPrompt ? (
+          <View
+            className="bg-surface rounded-card p-3 mb-4"
+            testID="session-bookmark-nudge"
+          >
+            <Text className="text-body-sm text-text-secondary text-center">
+              Some great explanations in this session — you can bookmark them
+              next time.
+            </Text>
           </View>
         ) : null}
 

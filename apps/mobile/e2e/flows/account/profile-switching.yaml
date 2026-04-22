@@ -19,7 +19,14 @@ tags:
       SEED_SCENARIO: "parent-with-children"
       API_URL: ${API_URL}
 
-# 2. Navigate to More tab (seed-and-sign-in lands on learner home)
+# 2. Wait for home screen — parent-with-children lands on parent-gateway (BUG-566)
+- extendedWaitUntil:
+    visible:
+      id: "parent-gateway"
+    timeout: 10000
+    optional: true
+
+# 3. Navigate to More tab
 - tapOn:
     text: "More"
 
@@ -83,7 +90,7 @@ tags:
 # Wait for the home/More screen to reappear
 - extendedWaitUntil:
     visible:
-      id: "home-scroll-view"
+      id: "learner-screen"
     timeout: 15000
     optional: true
 

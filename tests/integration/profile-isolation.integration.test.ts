@@ -15,15 +15,12 @@
 import { eq } from 'drizzle-orm';
 import { subjects, profiles, subscriptions } from '@eduagent/database';
 
-import { jwtMock, configureValidJWT } from './mocks';
 import {
   buildIntegrationEnv,
   cleanupAccounts,
   createIntegrationDb,
 } from './helpers';
-
-const jwt = jwtMock();
-jest.mock('../../apps/api/src/middleware/jwt', () => jwt);
+import { buildAuthHeaders } from './test-keys';
 
 import { app } from '../../apps/api/src/index';
 
@@ -35,21 +32,6 @@ const SECONDARY_USER_ID = 'integration-profile-secondary';
 const SECONDARY_EMAIL = 'integration-profile-secondary@integration.test';
 const FABRICATED_PROFILE_ID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
 
-function buildAuthHeaders(profileId?: string): HeadersInit {
-  return {
-    Authorization: 'Bearer valid.jwt.token',
-    'Content-Type': 'application/json',
-    ...(profileId ? { 'X-Profile-Id': profileId } : {}),
-  };
-}
-
-function setAuthUser(userId: string, email: string): void {
-  configureValidJWT(jwt, {
-    sub: userId,
-    email,
-  });
-}
-
 async function createProfile(input: {
   userId: string;
   email: string;
@@ -59,13 +41,11 @@ async function createProfile(input: {
   id: string;
   isOwner: boolean;
 }> {
-  setAuthUser(input.userId, input.email);
-
   const res = await app.request(
     '/v1/profiles',
     {
       method: 'POST',
-      headers: buildAuthHeaders(),
+      headers: buildAuthHeaders({ sub: input.userId, email: input.email }),
       body: JSON.stringify({
         displayName: input.displayName,
         birthYear: input.birthYear,
@@ -126,19 +106,20 @@ async function listSubjectsForUser(input: {
   email: string;
   profileId?: string;
 }) {
-  setAuthUser(input.userId, input.email);
   return app.request(
     '/v1/subjects',
     {
       method: 'GET',
-      headers: buildAuthHeaders(input.profileId),
+      headers: buildAuthHeaders(
+        { sub: input.userId, email: input.email },
+        input.profileId
+      ),
     },
     TEST_ENV
   );
 }
 
 beforeEach(async () => {
-  jest.clearAllMocks();
   await cleanupAccounts({
     emails: [PRIMARY_EMAIL, SECONDARY_EMAIL],
     clerkUserIds: [PRIMARY_USER_ID, SECONDARY_USER_ID],

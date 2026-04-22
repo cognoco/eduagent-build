@@ -34,6 +34,9 @@ import {
 } from '../../lib/pending-auth-redirect';
 import { platformAlert } from '../../lib/platform-alert';
 import { FeedbackProvider } from '../../components/feedback/FeedbackProvider';
+import { useSubjects } from '../../hooks/use-subjects';
+import { usePermissionSetup } from '../../hooks/use-permission-setup';
+import { PermissionSetupGate } from '../../components/PermissionSetupGate';
 
 // ─── Tab visibility whitelist ────────────────────────────────────────
 // Only these routes render a visible tab button. Every other route in
@@ -135,8 +138,16 @@ function usePostApprovalLanding(
   profileId: string | undefined,
   consentStatus: string | null | undefined
 ): [boolean, () => void] {
+  const isConsented = !!profileId && consentStatus === 'CONSENTED';
   const [shouldShow, setShouldShow] = React.useState(false);
   const [checked, setChecked] = React.useState(false);
+  // [IMP-2] Only query subjects once we know the screen should show — avoids
+  // an unnecessary network request (and loading delay) for users whose SecureStore
+  // key is already set to 'true'. For new users, the query fires after the
+  // SecureStore async read completes.
+  const subjects = useSubjects({
+    enabled: isConsented && checked && shouldShow,
+  });
 
   React.useEffect(() => {
     if (!profileId || consentStatus !== 'CONSENTED') {
@@ -165,7 +176,10 @@ function usePostApprovalLanding(
     });
   }, [profileId]);
 
-  return [checked && shouldShow, dismiss];
+  // Don't show if subjects are still loading or if user already has subjects
+  const subjectsReady = !subjects.isLoading;
+  const hasSubjects = (subjects.data?.length ?? 0) > 0;
+  return [checked && subjectsReady && shouldShow && !hasSubjects, dismiss];
 }
 
 function PostApprovalLanding({
@@ -1046,9 +1060,6 @@ export default function AppLayout() {
     acknowledgeProfileRemoval,
   } = useProfile();
 
-  // Register push token on app launch (runs once, guarded internally)
-  usePushTokenRegistration();
-
   // Sync Clerk auth state with RevenueCat identity (runs on auth change)
   useRevenueCatIdentity();
 
@@ -1099,15 +1110,11 @@ export default function AppLayout() {
     router.replace(pendingAuthRedirect as never);
   }, [currentAppPath, pendingAuthRedirect, router]);
 
-  // Show alert when a profile was removed server-side (consent denied / auto-deleted)
+  // Auto-dismiss profile-switched toast after 5 seconds
   React.useEffect(() => {
-    if (profileWasRemoved) {
-      platformAlert(
-        'Profile switched',
-        "One of your profiles is no longer available, so we've switched you to your main profile. Everything else is just as you left it.",
-        [{ text: 'OK', onPress: acknowledgeProfileRemoval }]
-      );
-    }
+    if (!profileWasRemoved) return;
+    const timer = setTimeout(acknowledgeProfileRemoval, 5_000);
+    return () => clearTimeout(timer);
   }, [profileWasRemoved, acknowledgeProfileRemoval]);
 
   // Post-approval landing: show once after parent approves GDPR/COPPA consent
@@ -1115,6 +1122,9 @@ export default function AppLayout() {
     activeProfile?.id,
     activeProfile?.consentStatus
   );
+  const [showPermSetup, dismissPermSetup, permState, requestMic, requestNotif] =
+    usePermissionSetup(activeProfile?.id);
+  usePushTokenRegistration(permState.notif === 'granted');
 
   if (__DEV__)
     console.log(
@@ -1162,8 +1172,21 @@ export default function AppLayout() {
       </View>
     );
 
+  // FeedbackProvider wraps ALL authenticated screens (including gates) so
+  // shake-to-give-feedback works everywhere after sign-in. Previously it only
+  // wrapped the tab navigator, making shake dead on gate screens.
+  //
+  // key={themeKey} removed — crashes Android Fabric (MENTOMATE-MOBILE-6).
+  // NativeWind vars() style updates propagate without remounting.
+
   // No profile exists — show gate that pushes to profile creation modal
-  if (!activeProfile) return <CreateProfileGate />;
+  if (!activeProfile) {
+    return (
+      <FeedbackProvider>
+        <CreateProfileGate />
+      </FeedbackProvider>
+    );
+  }
 
   // Linked-parent accounts intentionally enter through /(app)/home now.
   // home.tsx renders ParentGateway for owners with child profiles and routes
@@ -1175,24 +1198,44 @@ export default function AppLayout() {
     activeProfile?.consentStatus &&
     PENDING_CONSENT_STATUSES.has(activeProfile.consentStatus)
   ) {
-    return <ConsentPendingGate />;
+    return (
+      <FeedbackProvider>
+        <ConsentPendingGate />
+      </FeedbackProvider>
+    );
   }
 
   // Gate: block access when consent has been withdrawn (deletion pending)
   if (activeProfile?.consentStatus === 'WITHDRAWN') {
-    return <ConsentWithdrawnGate />;
+    return (
+      <FeedbackProvider>
+        <ConsentWithdrawnGate />
+      </FeedbackProvider>
+    );
   }
 
   // Show celebratory landing once after consent approval
   if (showPostApproval) {
-    return <PostApprovalLanding onContinue={dismissPostApproval} />;
+    return (
+      <FeedbackProvider>
+        <PostApprovalLanding onContinue={dismissPostApproval} />
+      </FeedbackProvider>
+    );
   }
 
-  // key={themeKey} removed — crashes Android Fabric (MENTOMATE-MOBILE-6).
-  // NativeWind vars() style updates propagate without remounting.
+  if (showPermSetup) {
+    return (
+      <FeedbackProvider>
+        <PermissionSetupGate
+          permState={permState}
+          onRequestMic={requestMic}
+          onRequestNotif={requestNotif}
+          onContinue={dismissPermSetup}
+        />
+      </FeedbackProvider>
+    );
+  }
 
-  // FeedbackProvider scoped here (not in root _layout) so the accelerometer
-  // only runs on authenticated screens where feedback submission actually works.
   return (
     <FeedbackProvider>
       <View style={[{ flex: 1 }, tokenVars]}>
@@ -1216,7 +1259,15 @@ export default function AppLayout() {
               // through when switching to a full-screen route (session, quiz, etc.).
               sceneStyle: { backgroundColor: colors.background },
               tabBarStyle: isFullScreen
-                ? { display: 'none' }
+                ? {
+                    display: 'none',
+                    // On some Android devices and Expo web, display:'none'
+                    // alone doesn't remove the tab bar from the touch
+                    // responder chain. Fully collapse it so it can't
+                    // intercept touches or occupy layout space.
+                    height: 0,
+                    overflow: 'hidden' as const,
+                  }
                 : {
                     backgroundColor: colors.surface,
                     borderTopColor: colors.border,
@@ -1285,6 +1336,25 @@ export default function AppLayout() {
             }}
           />
         </Tabs>
+        {profileWasRemoved && (
+          <Pressable
+            onPress={acknowledgeProfileRemoval}
+            className="absolute left-4 right-4 z-50"
+            style={{ top: insets.top + 8 }}
+            testID="profile-switched-toast"
+            accessibilityRole="alert"
+          >
+            <View className="rounded-2xl bg-surface-elevated px-5 py-4 w-full shadow-lg">
+              <Text className="text-body font-semibold text-text-primary mb-1">
+                Profile switched
+              </Text>
+              <Text className="text-body-sm text-text-secondary">
+                One of your profiles is no longer available, so we've switched
+                you to your main profile.
+              </Text>
+            </View>
+          </Pressable>
+        )}
       </View>
     </FeedbackProvider>
   );

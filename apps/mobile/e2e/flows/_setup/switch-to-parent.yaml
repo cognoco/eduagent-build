@@ -11,10 +11,10 @@ appId: com.mentomate.app
 - tapOn:
     text: "More"
 
-# 2. Wait for Appearance section
+# 2. Wait for More screen — Learning Mode is always above the fold
 - extendedWaitUntil:
     visible:
-      text: "Appearance"
+      id: "learning-mode-casual"
     timeout: 10000
 
 # 3. Tap Parent theme — triggers redirect to parent dashboard

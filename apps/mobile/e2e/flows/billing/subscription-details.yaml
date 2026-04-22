@@ -22,16 +22,16 @@ tags:
 # 2. Wait for home screen
 - extendedWaitUntil:
     visible:
-      id: "home-scroll-view"
+      id: "learner-screen"
     timeout: 15000
 
 # 3. Navigate to More tab (use accessibility label for reliable targeting)
 - tapOn: "More Tab"
 
-# 4. Wait for More screen
+# 4. Wait for More screen — Learning Mode section is always above the fold
 - extendedWaitUntil:
     visible:
-      text: "Appearance"
+      id: "learning-mode-casual"
     timeout: 10000
 
 # 5. Scroll to & tap Subscription menu item (below the fold on More screen)

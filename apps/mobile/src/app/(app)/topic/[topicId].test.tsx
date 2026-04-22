@@ -193,7 +193,7 @@ describe('TopicDetailScreen action buttons', () => {
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/session',
       params: {
-        mode: 'freeform',
+        mode: 'learning',
         subjectId: 's1',
         topicId: 't1',
         topicName: 'Algebra',
@@ -214,7 +214,7 @@ describe('TopicDetailScreen action buttons', () => {
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/session',
       params: {
-        mode: 'freeform',
+        mode: 'learning',
         subjectId: 's1',
         topicId: 't1',
         topicName: 'Algebra',
@@ -579,14 +579,14 @@ describe('TopicDetailScreen rendering details', () => {
     expect(mockGoBackOrReplace).toHaveBeenCalled();
   });
 
-  it('shows empty parking lot message when no parked questions', () => {
+  it('does not show parked questions when parking lot is empty', () => {
+    mockParkingLot.mockReset();
+    mockParkingLot.mockReturnValue({ data: [], isLoading: false });
     setupDefaults({ completionStatus: 'completed' });
 
     render(<TopicDetailScreen />);
 
-    expect(screen.getByText('Parking Lot')).toBeTruthy();
-    expect(
-      screen.getByText('No parked questions for this topic yet.')
-    ).toBeTruthy();
+    // With no parked questions, individual question text should not appear
+    expect(screen.queryByText('Why does factoring help here?')).toBeNull();
   });
 });

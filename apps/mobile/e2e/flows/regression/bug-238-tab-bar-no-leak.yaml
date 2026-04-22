@@ -24,7 +24,7 @@ tags:
 # Wait for home screen to fully load
 - extendedWaitUntil:
     visible:
-      id: "home-scroll-view"
+      id: "learner-screen"
     timeout: 15000
 
 - takeScreenshot: bug-238-01-home-loaded

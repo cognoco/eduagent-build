@@ -120,9 +120,12 @@ describe('useBookNotes', () => {
 
   it('handles API error (404)', async () => {
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ error: { message: 'Book not found' } }), {
-        status: 404,
-      })
+      new Response(
+        JSON.stringify({ code: 'NOT_FOUND', message: 'Book not found' }),
+        {
+          status: 404,
+        }
+      )
     );
 
     const { result } = renderHook(
@@ -251,9 +254,15 @@ describe('useUpsertNote', () => {
 
   it('handles API error', async () => {
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ error: { message: 'Validation error' } }), {
-        status: 422,
-      })
+      new Response(
+        JSON.stringify({
+          code: 'VALIDATION_ERROR',
+          message: 'Validation error',
+        }),
+        {
+          status: 422,
+        }
+      )
     );
 
     const { result } = renderHook(() => useUpsertNote('subject-1', 'book-1'), {

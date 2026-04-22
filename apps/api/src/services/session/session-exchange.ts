@@ -398,7 +398,29 @@ export async function prepareExchangeContext(
           : e.eventType === 'system_prompt'
           ? ('system' as const)
           : ('assistant' as const),
-      content: e.content,
+      // DB stores cleanResponse (prose only) for ai_response events, but the
+      // system prompt instructs the LLM to produce JSON envelopes. Re-wrap
+      // assistant turns in a minimal envelope so the conversation history is
+      // consistent with the format the LLM is told to produce. Without this,
+      // exchange 2+ sees contradictory history (prose vs JSON instruction) and
+      // the LLM may produce malformed output that streamEnvelopeReply can't
+      // parse — yielding empty responses.
+      //
+      // IMPORTANT: Use fully-populated default signals (not empty `{}`).
+      // Empty signal objects contradict the system prompt's signal spec and
+      // cause LLM format drift after 2+ re-wrapped turns — BUG-610.
+      content:
+        e.eventType === 'ai_response'
+          ? JSON.stringify({
+              reply: e.content,
+              signals: {
+                partial_progress: false,
+                needs_deepening: false,
+                understanding_check: false,
+              },
+              ui_hints: { note_prompt: { show: false, post_session: false } },
+            })
+          : e.content,
     }));
 
   const rawSilentClassification = sessionMeta['silentClassification'];
@@ -443,17 +465,21 @@ export async function prepareExchangeContext(
       .map((entry) => entry.content)
       .join('\n');
 
-    void inngest.send({
-      name: 'app/ask.classify_silently',
-      data: {
-        sessionId,
-        profileId,
-        classifyInput: [priorUserMessages, userMessage]
-          .filter(Boolean)
-          .join('\n'),
-        exchangeCount: session.exchangeCount + 1,
-      },
-    });
+    inngest
+      .send({
+        name: 'app/ask.classify_silently',
+        data: {
+          sessionId,
+          profileId,
+          classifyInput: [priorUserMessages, userMessage]
+            .filter(Boolean)
+            .join('\n'),
+          exchangeCount: session.exchangeCount + 1,
+        },
+      })
+      .catch((err) =>
+        logger.warn('ask.classify_silently.send_failed', { sessionId, err })
+      );
   }
 
   const [silentSubjectRows, silentTeachingPref] =
@@ -747,6 +773,8 @@ export async function prepareExchangeContext(
     // BKT-C.1 — source the profile-level tutor language + pronouns here so
     // every downstream call path (processExchange, streamExchange) receives
     // the same personalization. Defaults: 'en' (DB NOT NULL) and null.
+    // DB CHECK constraint guarantees this is a valid ConversationLanguage.
+    // Drizzle infers `string`; narrow to the union type for downstream safety.
     conversationLanguage: profile?.conversationLanguage as
       | ConversationLanguage
       | undefined,
@@ -792,6 +820,8 @@ export async function prepareExchangeContext(
     // Client-side effective mode — drives mode-specific prompt sections (e.g. recitation)
     effectiveMode: (session.metadata as Record<string, unknown> | null)
       ?.effectiveMode as string | undefined,
+    // Personalisation: learner's display name for the mentor to use naturally
+    learnerName: profile?.displayName ?? undefined,
   };
 
   return { session, context, effectiveRung, hintCount, lastAiResponseAt };

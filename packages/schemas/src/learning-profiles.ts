@@ -217,7 +217,7 @@ export type GrantMemoryConsentInput = z.infer<typeof grantMemoryConsentSchema>;
 // by the per-interest picker at the end of the onboarding interview. Writes
 // through createScopedRepository(profileId) in the onboarding service.
 export const onboardingInterestsContextPatchSchema = z.object({
-  interests: z.array(interestEntrySchema),
+  interests: z.array(interestEntrySchema).max(20),
 });
 export type OnboardingInterestsContextPatch = z.infer<
   typeof onboardingInterestsContextPatchSchema

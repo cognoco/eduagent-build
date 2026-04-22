@@ -1,0 +1,161 @@
+# Flow Q1: Quiz Full Flow
+# Validates: practice hub -> quiz index -> capitals round -> results -> history -> round detail.
+# Tags: nightly, quiz
+#
+# Journey: UX Journey 3 (Practice & Reinforcement)
+# Epics: Epic 13 (Quiz Activities)
+# Prerequisite: Seeded learner with an active subject (scenario: onboarding-complete)
+#
+# testIDs verified against:
+#   - apps/mobile/src/components/home/LearnerScreen.tsx (intent-practice)
+#   - apps/mobile/src/app/(app)/practice.tsx (practice-screen, practice-quiz)
+#   - apps/mobile/src/app/(app)/quiz/index.tsx (quiz-index-screen, quiz-capitals, quiz-back)
+#   - apps/mobile/src/app/(app)/quiz/launch.tsx (quiz-launch-loading, quiz-challenge-start)
+#   - apps/mobile/src/app/(app)/quiz/play.tsx (quiz-play-screen, quiz-option-*, quiz-dispute-button)
+#   - apps/mobile/src/app/(app)/quiz/results.tsx (quiz-results-screen, quiz-results-done, quiz-results-history)
+#   - apps/mobile/src/app/(app)/quiz/history.tsx (quiz-history-screen, quiz-history-back, quiz-history-row-*)
+#   - apps/mobile/src/app/(app)/quiz/[roundId].tsx (round-detail-screen, round-detail-back-btn)
+appId: com.mentomate.app
+tags:
+  - nightly
+  - quiz
+---
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "onboarding-complete"
+      API_URL: ${API_URL}
+
+- extendedWaitUntil:
+    visible:
+      id: "learner-screen"
+    timeout: 15000
+
+- scrollUntilVisible:
+    element:
+      id: "intent-practice"
+    direction: DOWN
+    timeout: 5000
+
+- tapOn:
+    id: "intent-practice"
+
+- extendedWaitUntil:
+    visible:
+      id: "practice-screen"
+    timeout: 10000
+
+- takeScreenshot: quiz-01-practice
+
+- tapOn:
+    id: "practice-quiz"
+
+- extendedWaitUntil:
+    visible:
+      id: "quiz-index-screen"
+    timeout: 10000
+
+- takeScreenshot: quiz-02-index
+
+- assertVisible:
+    id: "quiz-capitals"
+
+- tapOn:
+    id: "quiz-capitals"
+
+- extendedWaitUntil:
+    visible:
+      id: "quiz-challenge-start"
+    timeout: 5000
+    optional: true
+
+- tapOn:
+    id: "quiz-challenge-start"
+    optional: true
+
+- extendedWaitUntil:
+    visible:
+      id: "quiz-play-screen"
+    timeout: 30000
+
+- takeScreenshot: quiz-03-play
+
+- repeat:
+    times: 12
+    commands:
+      - extendedWaitUntil:
+          visible:
+            id: "quiz-option-0"
+          timeout: 5000
+          optional: true
+      - tapOn:
+          id: "quiz-option-0"
+          optional: true
+      - extendedWaitUntil:
+          visible:
+            id: "quiz-dispute-button"
+          timeout: 5000
+          optional: true
+      - tapOn:
+          id: "quiz-play-screen"
+          optional: true
+
+- extendedWaitUntil:
+    visible:
+      id: "quiz-results-screen"
+    timeout: 20000
+
+- takeScreenshot: quiz-04-results
+
+- assertVisible:
+    id: "quiz-results-done"
+
+- assertVisible:
+    id: "quiz-results-history"
+
+- tapOn:
+    id: "quiz-results-history"
+
+- extendedWaitUntil:
+    visible:
+      id: "quiz-history-screen"
+    timeout: 10000
+
+- takeScreenshot: quiz-05-history
+
+- scrollUntilVisible:
+    element:
+      text: "Capitals"
+    direction: DOWN
+    timeout: 10000
+
+- tapOn:
+    text: "Capitals"
+
+- extendedWaitUntil:
+    visible:
+      id: "round-detail-screen"
+    timeout: 10000
+
+- takeScreenshot: quiz-06-round-detail
+
+- assertVisible:
+    id: "round-detail-question-0"
+
+- tapOn:
+    id: "round-detail-back-btn"
+
+- extendedWaitUntil:
+    visible:
+      id: "quiz-history-screen"
+    timeout: 5000
+
+- tapOn:
+    id: "quiz-history-back"
+
+- extendedWaitUntil:
+    visible:
+      id: "practice-screen"
+    timeout: 5000
+
+- takeScreenshot: quiz-07-back-at-practice

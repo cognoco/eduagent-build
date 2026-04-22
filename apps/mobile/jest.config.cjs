@@ -23,4 +23,7 @@ module.exports = {
       require.resolve('jest-expo/src/preset/assetFileTransformer.js'),
   },
   coverageDirectory: '<rootDir>/coverage/apps/mobile',
+  // Recycle workers after each file exceeds this memory limit.
+  // Prevents OOM when the session test runs after 70+ other suites in one worker process.
+  workerIdleMemoryLimit: '512MB',
 };

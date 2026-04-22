@@ -18,15 +18,12 @@
 
 import { familyLinks, learningSessions, subjects } from '@eduagent/database';
 
-import { jwtMock, configureValidJWT, configureInvalidJWT } from './mocks';
 import {
   buildIntegrationEnv,
   cleanupAccounts,
   createIntegrationDb,
 } from './helpers';
-
-const jwt = jwtMock();
-jest.mock('../../apps/api/src/middleware/jwt', () => jwt);
+import { buildAuthHeaders } from './test-keys';
 
 import { app } from '../../apps/api/src/index';
 
@@ -37,27 +34,17 @@ const PARENT_EMAIL = 'integration-dashboard-parent@integration.test';
 const CHILD_USER_ID = 'integration-dashboard-child';
 const CHILD_EMAIL = 'integration-dashboard-child@integration.test';
 
-function buildAuthHeaders(profileId?: string): HeadersInit {
-  return {
-    Authorization: 'Bearer valid.jwt.token',
-    'Content-Type': 'application/json',
-    ...(profileId ? { 'X-Profile-Id': profileId } : {}),
-  };
-}
-
 async function createProfile(
   userId: string,
   email: string,
   displayName: string,
   birthYear: number
 ): Promise<string> {
-  configureValidJWT(jwt, { sub: userId, email });
-
   const res = await app.request(
     '/v1/profiles',
     {
       method: 'POST',
-      headers: buildAuthHeaders(),
+      headers: buildAuthHeaders({ sub: userId, email }),
       body: JSON.stringify({ displayName, birthYear }),
     },
     TEST_ENV
@@ -74,13 +61,11 @@ async function createSubjectForProfile(
   profileId: string,
   subjectName: string
 ): Promise<string> {
-  configureValidJWT(jwt, { sub: userId, email });
-
   const res = await app.request(
     '/v1/subjects',
     {
       method: 'POST',
-      headers: buildAuthHeaders(profileId),
+      headers: buildAuthHeaders({ sub: userId, email }, profileId),
       body: JSON.stringify({ name: subjectName }),
     },
     TEST_ENV
@@ -92,7 +77,6 @@ async function createSubjectForProfile(
 }
 
 beforeEach(async () => {
-  jest.clearAllMocks();
   await cleanupAccounts({
     emails: [PARENT_EMAIL, CHILD_EMAIL],
     clerkUserIds: [PARENT_USER_ID, CHILD_USER_ID],
@@ -181,10 +165,15 @@ describe('Integration: GET /v1/dashboard', () => {
     await seedSession(childProfileId, subjectId);
 
     // Now request dashboard as parent
-    configureValidJWT(jwt, { sub: PARENT_USER_ID, email: PARENT_EMAIL });
     const res = await app.request(
       '/v1/dashboard',
-      { method: 'GET', headers: buildAuthHeaders(parentProfileId) },
+      {
+        method: 'GET',
+        headers: buildAuthHeaders(
+          { sub: PARENT_USER_ID, email: PARENT_EMAIL },
+          parentProfileId
+        ),
+      },
       TEST_ENV
     );
 
@@ -207,10 +196,15 @@ describe('Integration: GET /v1/dashboard', () => {
       1985
     );
 
-    configureValidJWT(jwt, { sub: PARENT_USER_ID, email: PARENT_EMAIL });
     const res = await app.request(
       '/v1/dashboard',
-      { method: 'GET', headers: buildAuthHeaders(parentProfileId) },
+      {
+        method: 'GET',
+        headers: buildAuthHeaders(
+          { sub: PARENT_USER_ID, email: PARENT_EMAIL },
+          parentProfileId
+        ),
+      },
       TEST_ENV
     );
 
@@ -221,8 +215,6 @@ describe('Integration: GET /v1/dashboard', () => {
   });
 
   it('returns 401 without auth', async () => {
-    configureInvalidJWT(jwt);
-
     const res = await app.request('/v1/dashboard', { method: 'GET' }, TEST_ENV);
 
     expect(res.status).toBe(401);
@@ -245,10 +237,15 @@ describe('Integration: GET /v1/dashboard/children/:profileId', () => {
     );
     await seedFamilyLink(parentProfileId, childProfileId);
 
-    configureValidJWT(jwt, { sub: PARENT_USER_ID, email: PARENT_EMAIL });
     const res = await app.request(
       `/v1/dashboard/children/${childProfileId}`,
-      { method: 'GET', headers: buildAuthHeaders(parentProfileId) },
+      {
+        method: 'GET',
+        headers: buildAuthHeaders(
+          { sub: PARENT_USER_ID, email: PARENT_EMAIL },
+          parentProfileId
+        ),
+      },
       TEST_ENV
     );
 
@@ -274,10 +271,15 @@ describe('Integration: GET /v1/dashboard/children/:profileId', () => {
     );
     // No family link — assertParentAccess rejects with 403
 
-    configureValidJWT(jwt, { sub: PARENT_USER_ID, email: PARENT_EMAIL });
     const res = await app.request(
       `/v1/dashboard/children/${childProfileId}`,
-      { method: 'GET', headers: buildAuthHeaders(parentProfileId) },
+      {
+        method: 'GET',
+        headers: buildAuthHeaders(
+          { sub: PARENT_USER_ID, email: PARENT_EMAIL },
+          parentProfileId
+        ),
+      },
       TEST_ENV
     );
 
@@ -313,10 +315,15 @@ describe('Integration: GET /v1/dashboard/children/:profileId/sessions', () => {
       wallClockSeconds: 1800,
     });
 
-    configureValidJWT(jwt, { sub: PARENT_USER_ID, email: PARENT_EMAIL });
     const res = await app.request(
       `/v1/dashboard/children/${childProfileId}/sessions`,
-      { method: 'GET', headers: buildAuthHeaders(parentProfileId) },
+      {
+        method: 'GET',
+        headers: buildAuthHeaders(
+          { sub: PARENT_USER_ID, email: PARENT_EMAIL },
+          parentProfileId
+        ),
+      },
       TEST_ENV
     );
 
@@ -344,10 +351,15 @@ describe('Integration: GET /v1/dashboard/children/:profileId/sessions', () => {
     );
     // No family link — assertParentAccess rejects with 403
 
-    configureValidJWT(jwt, { sub: PARENT_USER_ID, email: PARENT_EMAIL });
     const res = await app.request(
       `/v1/dashboard/children/${childProfileId}/sessions`,
-      { method: 'GET', headers: buildAuthHeaders(parentProfileId) },
+      {
+        method: 'GET',
+        headers: buildAuthHeaders(
+          { sub: PARENT_USER_ID, email: PARENT_EMAIL },
+          parentProfileId
+        ),
+      },
       TEST_ENV
     );
 
@@ -355,8 +367,6 @@ describe('Integration: GET /v1/dashboard/children/:profileId/sessions', () => {
   });
 
   it('returns 401 without auth', async () => {
-    configureInvalidJWT(jwt);
-
     const res = await app.request(
       '/v1/dashboard/children/00000000-0000-4000-8000-000000000020/sessions',
       { method: 'GET' },
@@ -398,10 +408,15 @@ describe('Parent Visibility break tests', () => {
       exchangeCount: 2,
     });
 
-    configureValidJWT(jwt, { sub: PARENT_USER_ID, email: PARENT_EMAIL });
     const res = await app.request(
       `/v1/dashboard/children/${childProfileId}/sessions/${sessionId}/transcript`,
-      { method: 'GET', headers: buildAuthHeaders(parentProfileId) },
+      {
+        method: 'GET',
+        headers: buildAuthHeaders(
+          { sub: PARENT_USER_ID, email: PARENT_EMAIL },
+          parentProfileId
+        ),
+      },
       TEST_ENV
     );
 
@@ -423,10 +438,15 @@ describe('Parent Visibility break tests', () => {
     );
     // No family link — assertParentAccess rejects with 403
 
-    configureValidJWT(jwt, { sub: PARENT_USER_ID, email: PARENT_EMAIL });
     const res = await app.request(
       `/v1/dashboard/children/${childProfileId}/memory`,
-      { method: 'GET', headers: buildAuthHeaders(parentProfileId) },
+      {
+        method: 'GET',
+        headers: buildAuthHeaders(
+          { sub: PARENT_USER_ID, email: PARENT_EMAIL },
+          parentProfileId
+        ),
+      },
       TEST_ENV
     );
 
@@ -450,10 +470,15 @@ describe('Parent Visibility functional tests', () => {
     );
     await seedFamilyLink(parentProfileId, childProfileId);
 
-    configureValidJWT(jwt, { sub: PARENT_USER_ID, email: PARENT_EMAIL });
     const res = await app.request(
       `/v1/dashboard/children/${childProfileId}/memory`,
-      { method: 'GET', headers: buildAuthHeaders(parentProfileId) },
+      {
+        method: 'GET',
+        headers: buildAuthHeaders(
+          { sub: PARENT_USER_ID, email: PARENT_EMAIL },
+          parentProfileId
+        ),
+      },
       TEST_ENV
     );
 
@@ -486,10 +511,15 @@ describe('Parent Visibility functional tests', () => {
     );
     await seedSession(childProfileId, subjectId);
 
-    configureValidJWT(jwt, { sub: PARENT_USER_ID, email: PARENT_EMAIL });
     const res = await app.request(
       '/v1/dashboard',
-      { method: 'GET', headers: buildAuthHeaders(parentProfileId) },
+      {
+        method: 'GET',
+        headers: buildAuthHeaders(
+          { sub: PARENT_USER_ID, email: PARENT_EMAIL },
+          parentProfileId
+        ),
+      },
       TEST_ENV
     );
 
@@ -526,10 +556,15 @@ describe('Parent Visibility functional tests', () => {
       exchangeCount: 5,
     });
 
-    configureValidJWT(jwt, { sub: PARENT_USER_ID, email: PARENT_EMAIL });
     const res = await app.request(
       `/v1/dashboard/children/${childProfileId}/sessions/${sessionId}`,
-      { method: 'GET', headers: buildAuthHeaders(parentProfileId) },
+      {
+        method: 'GET',
+        headers: buildAuthHeaders(
+          { sub: PARENT_USER_ID, email: PARENT_EMAIL },
+          parentProfileId
+        ),
+      },
       TEST_ENV
     );
 
@@ -550,10 +585,15 @@ describe('Integration: GET /v1/dashboard/demo', () => {
       1985
     );
 
-    configureValidJWT(jwt, { sub: PARENT_USER_ID, email: PARENT_EMAIL });
     const res = await app.request(
       '/v1/dashboard/demo',
-      { method: 'GET', headers: buildAuthHeaders(parentProfileId) },
+      {
+        method: 'GET',
+        headers: buildAuthHeaders(
+          { sub: PARENT_USER_ID, email: PARENT_EMAIL },
+          parentProfileId
+        ),
+      },
       TEST_ENV
     );
 

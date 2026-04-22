@@ -73,10 +73,16 @@ export const reviewDueScan = inngest.createFunction(
             // Dedup: skip profiles that already received a review_reminder today
             // (using account timezone for date boundary to handle DST correctly)
             notExists(
-              sql`SELECT 1 FROM ${notificationLog} nl
-                  WHERE nl.profile_id = ${profiles.id}
-                    AND nl.type = 'review_reminder'
-                    AND nl.sent_at >= (NOW() AT TIME ZONE COALESCE(${accounts.timezone}, 'UTC'))::date`
+              db
+                .select({ _: sql`1` })
+                .from(notificationLog)
+                .where(
+                  and(
+                    eq(notificationLog.profileId, profiles.id),
+                    eq(notificationLog.type, 'review_reminder'),
+                    sql`${notificationLog.sentAt} >= (NOW() AT TIME ZONE COALESCE(${accounts.timezone}, 'UTC'))::date`
+                  )
+                )
             )
           )
         )

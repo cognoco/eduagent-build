@@ -13,7 +13,6 @@ import { hc } from 'hono/client';
 import { useMemo, useRef } from 'react';
 import { useAuth } from '@clerk/clerk-expo';
 import { getApiUrl } from './api';
-import { useProfile } from './profile';
 
 // ---------------------------------------------------------------------------
 // Typed error classes — defined in api-errors.ts (no React deps) and
@@ -60,6 +59,19 @@ export function clearOnAuthExpired(): void {
 }
 
 // ---------------------------------------------------------------------------
+// Active profile ID — set by ProfileProvider, read by customFetch.
+// [BUG-520] Decouples api-client from profile.ts to break the circular
+// dependency: api-client → profile → use-profiles → api-client.
+// ---------------------------------------------------------------------------
+
+let _activeProfileId: string | undefined;
+
+/** Called by ProfileProvider whenever the active profile changes. */
+export function setActiveProfileId(id: string | undefined): void {
+  _activeProfileId = id;
+}
+
+// ---------------------------------------------------------------------------
 // Authenticated Hono RPC client
 // ---------------------------------------------------------------------------
 
@@ -67,22 +79,22 @@ export type ApiClient = ReturnType<typeof hc<AppType>>;
 
 export function useApiClient(): ApiClient {
   const { getToken } = useAuth();
-  const { activeProfile } = useProfile();
 
   // Refs avoid recreating the client when auth state changes.
   // The custom fetch reads current values from refs on each request.
+  // [BUG-520] Profile ID is read from the module-level _activeProfileId
+  // (set by ProfileProvider) instead of calling useProfile() — this broke
+  // a circular dependency: api-client → profile → use-profiles → api-client.
   const getTokenRef = useRef(getToken);
-  const profileIdRef = useRef(activeProfile?.id);
   getTokenRef.current = getToken;
-  profileIdRef.current = activeProfile?.id;
 
   return useMemo(() => {
     const customFetch: typeof globalThis.fetch = async (input, init) => {
       const token = await getTokenRef.current();
       const headers = new Headers(init?.headers);
       if (token) headers.set('Authorization', `Bearer ${token}`);
-      if (profileIdRef.current && !headers.has('X-Profile-Id'))
-        headers.set('X-Profile-Id', profileIdRef.current);
+      if (_activeProfileId && !headers.has('X-Profile-Id'))
+        headers.set('X-Profile-Id', _activeProfileId);
 
       const res = await globalThis.fetch(input, { ...init, headers });
 

@@ -26,14 +26,10 @@ tags:
       API_URL: ${API_URL}
 
 # ── Create a new subject to enter the onboarding funnel ────────────────
-# BUG-44 fix: add-subject-button is below the fold in home ScrollView
-- scrollUntilVisible:
-    element:
-      id: "add-subject-button"
-    direction: DOWN
-    timeout: 10000
+# intent-learn card navigates directly to /create-subject (replaced add-subject-button
+# which was removed from home screen during adaptive home refactor)
 - tapOn:
-    id: "add-subject-button"
+    id: "intent-learn"
 
 # autoFocus opens keyboard, pushing "New subject" heading above fold (BUG-60 side effect)
 - extendedWaitUntil:

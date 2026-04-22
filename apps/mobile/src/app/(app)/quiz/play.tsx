@@ -45,6 +45,9 @@ export default function QuizPlayScreen(): React.ReactElement {
   // instead of silently fabricating a 0-XP "nice" result and navigating.
   // Users should always know when the server didn't accept their round.
   const [completeError, setCompleteError] = useState<string | null>(null);
+  // [IMP-7] Show non-blocking warning when answer-check API call fails so the
+  // user knows the result may be inaccurate. Cleared on each new question.
+  const [answerCheckFailed, setAnswerCheckFailed] = useState(false);
   // [BUG-469] Track which question indices the user has disputed
   const [disputedIndices, setDisputedIndices] = useState<Set<number>>(
     new Set()
@@ -106,6 +109,7 @@ export default function QuizPlayScreen(): React.ReactElement {
     setCorrectAnswer(null);
     setShowContinueHint(false);
     setFreeTextAnswer('');
+    setAnswerCheckFailed(false);
     questionStartTimeRef.current = Date.now();
     setElapsedMs(0);
 
@@ -133,10 +137,11 @@ export default function QuizPlayScreen(): React.ReactElement {
         onSuccess: (data) => setPrefetchedRoundId(data.id),
       }
     );
+    // [BUG-542] Use .mutate (stable ref) instead of whole mutation result
   }, [
     activityType,
     currentIndex,
-    prefetchRound,
+    prefetchRound.mutate,
     setPrefetchedRoundId,
     subjectId,
     totalQuestions,
@@ -172,10 +177,14 @@ export default function QuizPlayScreen(): React.ReactElement {
   // [F-Q-07] When the answer is wrong, capture correctAnswer from the server
   // response so it can be shown in the post-answer feedback panel.
   const roundId = round?.id ?? '';
+  // [BUG-542] Use checkAnswer.mutateAsync (stable ref in TanStack Query v5)
+  // instead of the whole checkAnswer object, which creates a new reference on
+  // every mutation state transition (idle → pending → success → idle).
+  const checkAnswerMutateAsync = checkAnswer.mutateAsync;
   const handleCheckGuessWhoAnswer = useCallback(
     async (answerGiven: string): Promise<boolean> => {
       try {
-        const result = await checkAnswer.mutateAsync({
+        const result = await checkAnswerMutateAsync({
           roundId,
           questionIndex: currentIndex,
           answerGiven,
@@ -186,10 +195,66 @@ export default function QuizPlayScreen(): React.ReactElement {
         }
         return result.correct;
       } catch {
+        setAnswerCheckFailed(true);
         return false;
       }
     },
-    [roundId, checkAnswer, currentIndex]
+    [roundId, checkAnswerMutateAsync, currentIndex, setAnswerCheckFailed]
+  );
+
+  // [BUG-542] Extract onResolved from inline JSX to a stable useCallback.
+  // The previous inline arrow created a new function reference every render,
+  // compounding with the unstable checkAnswer dep to trigger re-render storms.
+  const handleGuessWhoResolved = useCallback(
+    (result: GuessWhoResolvedResult) => {
+      const timeMs = Date.now() - questionStartTimeRef.current;
+      resultsRef.current = [
+        ...resultsRef.current,
+        {
+          questionIndex: currentIndex,
+          correct: result.correct,
+          answerGiven: result.answerGiven,
+          timeMs,
+          cluesUsed: result.cluesUsed,
+          answerMode: result.answerMode,
+        },
+      ];
+      setGuessWhoCluesUsed(result.cluesUsed);
+      setSelectedAnswer(result.answerGiven);
+      setAnswerState(result.correct ? 'correct' : 'wrong');
+      setShowContinueHint(false);
+      continueEnabledAtRef.current = Date.now() + 250;
+      if (continueHintTimerRef.current) {
+        clearTimeout(continueHintTimerRef.current);
+      }
+      continueHintTimerRef.current = setTimeout(() => {
+        setShowContinueHint(true);
+      }, 4000);
+      void Haptics.notificationAsync(
+        result.correct
+          ? Haptics.NotificationFeedbackType.Success
+          : Haptics.NotificationFeedbackType.Error
+      );
+      // [F-Q-07] If the answer was wrong and we don't already have the
+      // correct answer (e.g. skip path bypasses onCheckAnswer), fire a
+      // background check to get it for the feedback panel.
+      if (!result.correct && !correctAnswerCapturedRef.current) {
+        void checkAnswerMutateAsync({
+          roundId,
+          questionIndex: currentIndex,
+          answerGiven: result.answerGiven,
+        })
+          .then((checkResult) => {
+            if (checkResult.correctAnswer) {
+              setCorrectAnswer(checkResult.correctAnswer);
+            }
+          })
+          .catch(() => {
+            /* network failure — best-effort reveal */
+          });
+      }
+    },
+    [checkAnswerMutateAsync, currentIndex, roundId]
   );
 
   if (!round || !currentQuestion) {
@@ -324,6 +389,7 @@ export default function QuizPlayScreen(): React.ReactElement {
     } catch {
       // On check failure, assume wrong — server re-validates on complete
       correct = false;
+      setAnswerCheckFailed(true);
     }
 
     const nextResult: QuestionResult = {
@@ -459,6 +525,15 @@ export default function QuizPlayScreen(): React.ReactElement {
         <View className="w-[32px]" />
       </View>
 
+      {/* [IMP-7] Non-blocking warning when answer-check API fails. The quiz
+          continues with the result assumed wrong; this banner lets the user
+          know so they don't think their connection is fine. */}
+      {answerCheckFailed ? (
+        <Text className="text-caption text-warning text-center mb-2 px-5">
+          Answer check failed — result may be inaccurate
+        </Text>
+      ) : null}
+
       <View className="mb-8 px-5">
         {currentQuestion.type === 'capitals' ? (
           <>
@@ -571,55 +646,7 @@ export default function QuizPlayScreen(): React.ReactElement {
           <GuessWhoQuestion
             question={question}
             onCheckAnswer={handleCheckGuessWhoAnswer}
-            onResolved={(result: GuessWhoResolvedResult) => {
-              const timeMs = Date.now() - questionStartTimeRef.current;
-              resultsRef.current = [
-                ...resultsRef.current,
-                {
-                  questionIndex: currentIndex,
-                  correct: result.correct,
-                  answerGiven: result.answerGiven,
-                  timeMs,
-                  cluesUsed: result.cluesUsed,
-                  answerMode: result.answerMode,
-                },
-              ];
-              setGuessWhoCluesUsed(result.cluesUsed);
-              setSelectedAnswer(result.answerGiven);
-              setAnswerState(result.correct ? 'correct' : 'wrong');
-              setShowContinueHint(false);
-              continueEnabledAtRef.current = Date.now() + 250;
-              if (continueHintTimerRef.current) {
-                clearTimeout(continueHintTimerRef.current);
-              }
-              continueHintTimerRef.current = setTimeout(() => {
-                setShowContinueHint(true);
-              }, 4000);
-              void Haptics.notificationAsync(
-                result.correct
-                  ? Haptics.NotificationFeedbackType.Success
-                  : Haptics.NotificationFeedbackType.Error
-              );
-              // [F-Q-07] If the answer was wrong and we don't already have the
-              // correct answer (e.g. skip path bypasses onCheckAnswer), fire a
-              // background check to get it for the feedback panel.
-              if (!result.correct && !correctAnswerCapturedRef.current) {
-                void checkAnswer
-                  .mutateAsync({
-                    roundId: activeRound.id,
-                    questionIndex: currentIndex,
-                    answerGiven: result.answerGiven,
-                  })
-                  .then((checkResult) => {
-                    if (checkResult.correctAnswer) {
-                      setCorrectAnswer(checkResult.correctAnswer);
-                    }
-                  })
-                  .catch(() => {
-                    /* network failure — best-effort reveal */
-                  });
-              }
-            }}
+            onResolved={handleGuessWhoResolved}
           />
         </View>
       ) : null}

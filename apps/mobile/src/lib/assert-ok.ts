@@ -22,17 +22,18 @@ export async function assertOk(res: Response): Promise<void> {
 
   if (bodyText) {
     try {
+      // [BUG-543] The API returns flat { code, message, details? } via
+      // apiError() — NOT nested under an `error` key. The previous code read
+      // body.error.code which was always undefined, making every error generic.
       const body = JSON.parse(bodyText) as Record<string, unknown>;
-      if (typeof (body?.error as Record<string, unknown>)?.code === 'string') {
-        code = (body.error as Record<string, unknown>).code as string;
+      if (typeof body?.code === 'string') {
+        code = body.code as string;
       }
-      if (
-        typeof (body?.error as Record<string, unknown>)?.message === 'string'
-      ) {
-        message = (body.error as Record<string, unknown>).message as string;
+      if (typeof body?.message === 'string') {
+        message = body.message as string;
       }
-      if ((body?.error as Record<string, unknown>)?.details !== undefined) {
-        details = (body.error as Record<string, unknown>).details;
+      if (body?.details !== undefined) {
+        details = body.details;
       }
     } catch {
       // Response body isn't JSON — use raw text if short enough

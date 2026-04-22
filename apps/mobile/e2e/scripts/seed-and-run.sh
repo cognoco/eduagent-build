@@ -75,9 +75,12 @@ ADB="${ADB_PATH:-/c/Android/Sdk/platform-tools/adb.exe}"
 APP_ID="com.mentomate.app"
 
 # ── Timeouts (configurable, with FAST mode) ──
+# FAST=1 uses tighter timeouts for CI speed, but not too tight:
+# - Launcher: 35s (was 20s) — WHPX cold start after pm clear takes 20-30s
+# - Bundle:   90s (was 60s) — cached bundle ~5s, cold bundle up to 2 min on slow WHPX
 if [ "${FAST:-0}" = "1" ]; then
-  LAUNCHER_TIMEOUT="${LAUNCHER_TIMEOUT:-20}"
-  BUNDLE_TIMEOUT="${BUNDLE_TIMEOUT:-60}"
+  LAUNCHER_TIMEOUT="${LAUNCHER_TIMEOUT:-35}"
+  BUNDLE_TIMEOUT="${BUNDLE_TIMEOUT:-90}"
 else
   LAUNCHER_TIMEOUT="${LAUNCHER_TIMEOUT:-45}"
   BUNDLE_TIMEOUT="${BUNDLE_TIMEOUT:-120}"
@@ -184,7 +187,12 @@ $ADB $DEVICE_FLAG shell am kill dev.mobile.maestro.test 2>/dev/null || true
 $ADB $DEVICE_FLAG shell pm grant "$APP_ID" android.permission.POST_NOTIFICATIONS 2>/dev/null || true
 # BUG-39: Pre-grant camera permission so homework flows don't hit system dialog
 $ADB $DEVICE_FLAG shell pm grant "$APP_ID" android.permission.CAMERA 2>/dev/null || true
-sleep 1
+# BUG-549: Pre-grant microphone so the one-time permission setup gate auto-skips.
+# The gate shows when RECORD_AUDIO or POST_NOTIFICATIONS are not granted after pm clear.
+# With both pre-granted, usePermissionSetup detects 0 renderable rows and skips.
+$ADB $DEVICE_FLAG shell pm grant "$APP_ID" android.permission.RECORD_AUDIO 2>/dev/null || true
+# Give the OS time to settle after pm clear + pm grants before launching
+sleep 2
 $ADB $DEVICE_FLAG shell am start -n "$APP_ID/.MainActivity" 2>/dev/null || true
 
 # ── Pre-Maestro: Handle dev-client flow via ADB (prevents gRPC driver crash) ──
@@ -205,10 +213,32 @@ if ! wait_for_text "DEVELOPMENT" "$LAUNCHER_TIMEOUT"; then
   if echo "$LAST_DUMP" | grep -q "Reload\|Welcome back\|Welcome to MentoMate\|sign-in-button\|Connected to"; then
     echo "[seed-and-run] App auto-connected to Metro (skipped launcher). Proceeding to bundle phase."
     SKIP_TO_BUNDLE=1
+  elif echo "$LAST_DUMP" | grep -q "DEVELOPMENT"; then
+    # Launcher appeared just after the timeout — treat as normal launcher path
+    echo "[seed-and-run] Launcher appeared just after timeout window — continuing."
   else
-    echo "[seed-and-run] FATAL: Dev-client launcher never appeared. Is the APK installed?" >&2
-    echo "[seed-and-run] Dump contents: $(echo "$LAST_DUMP" | grep -oP 'text="\K[^"]+' | head -10 | tr '\n' ', ')" >&2
-    exit 1
+    # Dump is empty or shows home/crashed state: force-stop + relaunch once before giving up.
+    # This handles WHPX emulator stalls where the app silently fails to render on first launch.
+    DUMP_TEXTS=$(echo "$LAST_DUMP" | grep -oP 'text="\K[^"]+' | head -10 | tr '\n' ', ' || true)
+    echo "[seed-and-run] Launcher not found (dump: [${DUMP_TEXTS:-empty}]). Force-stopping and relaunching ..." >&2
+    $ADB $DEVICE_FLAG shell am force-stop "$APP_ID" 2>/dev/null || true
+    sleep 3
+    $ADB $DEVICE_FLAG shell am start -n "$APP_ID/.MainActivity" 2>/dev/null || true
+    if wait_for_text "DEVELOPMENT" 20; then
+      echo "[seed-and-run] Launcher appeared after relaunch — continuing."
+    else
+      sleep 2
+      $ADB $DEVICE_FLAG shell uiautomator dump /sdcard/ui_dump.xml 2>/dev/null || true
+      RETRY_DUMP=$($ADB $DEVICE_FLAG exec-out "cat /sdcard/ui_dump.xml" 2>/dev/null || echo "")
+      if echo "$RETRY_DUMP" | grep -q "Reload\|Welcome back\|Welcome to MentoMate\|sign-in-button\|Connected to"; then
+        echo "[seed-and-run] App auto-connected on relaunch. Proceeding to bundle phase."
+        SKIP_TO_BUNDLE=1
+      else
+        echo "[seed-and-run] FATAL: Dev-client launcher never appeared after relaunch. Is the APK installed?" >&2
+        echo "[seed-and-run] Dump contents: $(echo "$RETRY_DUMP" | grep -oP 'text="\K[^"]+' | head -10 | tr '\n' ', ')" >&2
+        exit 1
+      fi
+    fi
   fi
 fi
 
@@ -296,6 +326,15 @@ while [ $BUNDLE_ELAPSED -lt $BUNDLE_TIMEOUT ]; do
     if echo "$DUMP" | grep -q "Welcome back\|Welcome to MentoMate\|sign-in-button"; then
       echo "[seed-and-run] Sign-in screen reached after ${BUNDLE_ELAPSED}s!"
       break
+    fi
+
+    # Bundle is being fetched — Metro connection established, waiting for JS load.
+    # "Connecting to the development server" and "Loading from" appear OVER the
+    # launcher screen, so "DEVELOPMENT" is still in the hierarchy. Check these
+    # first to avoid misclassifying as "still on launcher".
+    if echo "$DUMP" | grep -q "Connecting to the development server\|Loading from"; then
+      echo "[seed-and-run] Bundle loading (${BUNDLE_ELAPSED}s) ..."
+      continue
     fi
 
     # Still on dev-client launcher — bundle not loaded yet
@@ -452,8 +491,10 @@ echo "[seed-and-run] Seeding scenario='${SCENARIO}' email='${EMAIL}' ..."
 
 # Use node to safely serialize JSON payload (prevents shell injection from EMAIL/SCENARIO)
 SEED_PAYLOAD=$(node -e "process.stdout.write(JSON.stringify({scenario: process.argv[1], email: process.argv[2]}))" "$SCENARIO" "$EMAIL")
+TEST_SECRET="${TEST_SEED_SECRET:-}"
 SEED_RESPONSE=$(curl -sf -X POST "${API_URL}/v1/__test/seed" \
   -H "Content-Type: application/json" \
+  ${TEST_SECRET:+-H "X-Test-Secret: ${TEST_SECRET}"} \
   -d "$SEED_PAYLOAD")
 
 if [ -z "$SEED_RESPONSE" ]; then

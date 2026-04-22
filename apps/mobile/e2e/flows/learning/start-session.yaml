@@ -22,11 +22,10 @@ tags:
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml
 
-# The coaching card's primary button starts a session.
-# Its testID is "coaching-card-primary".
+# The intent-continue card starts a session (replaced coaching-card-primary
+# in adaptive home refactor). learning-active seed → intent-continue is shown.
 - tapOn:
-    id: "coaching-card-primary"
-    optional: true
+    id: "intent-continue"
 
 # The session screen shows one of: "Learning Session", "Homework Help",
 # "Practice Session", or "Chat" in the ChatShell header.

@@ -32,14 +32,13 @@ tags:
 # 2. Wait for home screen
 - extendedWaitUntil:
     visible:
-      id: "home-scroll-view"
+      id: "learner-screen"
     timeout: 30000
 
-# 3. Navigate to the active session via the coaching card
-# The coaching card should link to the existing active session
+# 3. Navigate to the active session via intent card (replaced coaching-card-primary)
 - tapOn:
-    id: "coaching-card-primary"
-    # Coaching card may not render if precompute hasn't run
+    id: "intent-continue"
+    # Intent card may not render if no active subject
     optional: true
 
 # 3b. Fallback: if no coaching card, try to navigate via subject

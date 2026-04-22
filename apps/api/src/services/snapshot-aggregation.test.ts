@@ -24,6 +24,18 @@ jest.mock('./sentry', () => ({
 
 import type { Database } from '@eduagent/database';
 import {
+  subjects,
+  learningSessions,
+  assessments,
+  retentionCards,
+  curriculumTopics,
+  vocabulary,
+  vocabularyRetentionCards,
+  streaks,
+} from '@eduagent/database';
+import {
+  buildSubjectInventory,
+  buildSubjectMetric,
   getLatestSnapshot,
   getLatestSnapshotOnOrBefore,
   getSnapshotsInRange,
@@ -33,7 +45,20 @@ import {
 } from './snapshot-aggregation';
 import { detectMilestones, storeMilestones } from './milestone-detection';
 import { queueCelebration } from './celebrations';
-import type { ProgressMetrics } from '@eduagent/schemas';
+import type {
+  ProgressMetrics,
+  SubjectProgressMetrics,
+} from '@eduagent/schemas';
+
+type SubjectRow = typeof subjects.$inferSelect;
+type SessionRow = typeof learningSessions.$inferSelect;
+type AssessmentRow = typeof assessments.$inferSelect;
+type RetentionCardRow = typeof retentionCards.$inferSelect;
+type TopicRow = typeof curriculumTopics.$inferSelect;
+type TopicWithSubject = TopicRow & { subjectId: string };
+type VocabularyRow = typeof vocabulary.$inferSelect;
+type VocabularyRetentionCardRow = typeof vocabularyRetentionCards.$inferSelect;
+type StreakRow = typeof streaks.$inferSelect;
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -105,6 +130,175 @@ function makeMilestoneRow(
     metadata: null,
     celebratedAt: null,
     createdAt: new Date('2026-04-19T10:00:00.000Z'),
+  };
+}
+
+function makeSubjectRow(
+  id = '550e8400-e29b-41d4-a716-446655440010',
+  name = 'Mathematics'
+): SubjectRow {
+  return {
+    id,
+    profileId,
+    name,
+    rawInput: null,
+    status: 'active',
+    pedagogyMode: 'socratic',
+    languageCode: null,
+    createdAt: new Date('2026-04-01T00:00:00.000Z'),
+    updatedAt: new Date('2026-04-01T00:00:00.000Z'),
+    urgencyBoostUntil: null,
+    urgencyBoostReason: null,
+  };
+}
+
+function makeSessionRow(overrides: Partial<SessionRow> = {}): SessionRow {
+  return {
+    id: '660e8400-e29b-41d4-a716-446655440001',
+    profileId,
+    subjectId: '550e8400-e29b-41d4-a716-446655440010',
+    topicId: '770e8400-e29b-41d4-a716-446655440001',
+    sessionType: 'learning',
+    verificationType: null,
+    inputMode: 'text',
+    status: 'completed',
+    escalationRung: 1,
+    exchangeCount: 3,
+    startedAt: new Date('2026-04-20T00:00:00.000Z'),
+    lastActivityAt: new Date('2026-04-20T00:00:00.000Z'),
+    endedAt: null,
+    durationSeconds: 600,
+    wallClockSeconds: 700,
+    metadata: {},
+    rawInput: null,
+    createdAt: new Date('2026-04-20T00:00:00.000Z'),
+    updatedAt: new Date('2026-04-20T00:00:00.000Z'),
+    ...overrides,
+  };
+}
+
+function makeAssessmentRow(
+  overrides: Partial<AssessmentRow> = {}
+): AssessmentRow {
+  return {
+    id: '880e8400-e29b-41d4-a716-446655440001',
+    profileId,
+    subjectId: '550e8400-e29b-41d4-a716-446655440010',
+    topicId: '770e8400-e29b-41d4-a716-446655440001',
+    sessionId: null,
+    verificationDepth: 'recall',
+    status: 'passed',
+    masteryScore: null,
+    qualityRating: null,
+    exchangeHistory: [],
+    createdAt: new Date('2026-04-01T00:00:00.000Z'),
+    updatedAt: new Date('2026-04-01T00:00:00.000Z'),
+    ...overrides,
+  };
+}
+
+function makeRetentionCardRow(
+  overrides: Partial<RetentionCardRow> = {}
+): RetentionCardRow {
+  return {
+    id: '990e8400-e29b-41d4-a716-446655440001',
+    profileId,
+    topicId: '770e8400-e29b-41d4-a716-446655440001',
+    easeFactor: '2.50',
+    intervalDays: 1,
+    repetitions: 0,
+    lastReviewedAt: null,
+    nextReviewAt: null,
+    failureCount: 0,
+    consecutiveSuccesses: 0,
+    xpStatus: 'pending',
+    evaluateDifficultyRung: null,
+    createdAt: new Date('2026-04-01T00:00:00.000Z'),
+    updatedAt: new Date('2026-04-01T00:00:00.000Z'),
+    ...overrides,
+  };
+}
+
+function makeTopicWithSubject(
+  id = '770e8400-e29b-41d4-a716-446655440001',
+  subjectId = '550e8400-e29b-41d4-a716-446655440010',
+  filedFrom: TopicRow['filedFrom'] = 'session_filing'
+): TopicWithSubject {
+  return {
+    id,
+    subjectId,
+    filedFrom,
+    curriculumId: 'aa0e8400-e29b-41d4-a716-446655440001',
+    title: 'Test Topic',
+    description: 'Test topic description',
+    sortOrder: 1,
+    relevance: 'core',
+    source: 'generated',
+    estimatedMinutes: 30,
+    bookId: 'bb0e8400-e29b-41d4-a716-446655440001',
+    chapter: null,
+    skipped: false,
+    cefrLevel: null,
+    cefrSublevel: null,
+    targetWordCount: null,
+    targetChunkCount: null,
+    sessionId: null,
+    createdAt: new Date('2026-04-01T00:00:00.000Z'),
+    updatedAt: new Date('2026-04-01T00:00:00.000Z'),
+  };
+}
+
+interface ProgressStateFixture {
+  profileId: string;
+  subjects: SubjectRow[];
+  sessions: SessionRow[];
+  assessments: AssessmentRow[];
+  retentionCards: RetentionCardRow[];
+  streak: StreakRow | null;
+  vocabulary: VocabularyRow[];
+  vocabularyRetentionCards: VocabularyRetentionCardRow[];
+  topicsById: Map<string, TopicWithSubject>;
+  allTopicsBySubject: Map<string, TopicWithSubject[]>;
+  latestTopicsBySubject: Map<string, TopicWithSubject[]>;
+}
+
+function makeProgressState(
+  overrides: Partial<ProgressStateFixture> = {}
+): ProgressStateFixture {
+  const topic = makeTopicWithSubject();
+  return {
+    profileId,
+    subjects: [makeSubjectRow()],
+    sessions: [makeSessionRow()],
+    assessments: [],
+    retentionCards: [],
+    streak: null,
+    vocabulary: [],
+    vocabularyRetentionCards: [],
+    topicsById: new Map([[topic.id, topic]]),
+    allTopicsBySubject: new Map([[topic.subjectId, [topic]]]),
+    latestTopicsBySubject: new Map([[topic.subjectId, [topic]]]),
+    ...overrides,
+  };
+}
+
+function makeSubjectMetric(
+  subjectId = '550e8400-e29b-41d4-a716-446655440010'
+): SubjectProgressMetrics {
+  return {
+    subjectId,
+    subjectName: 'Mathematics',
+    pedagogyMode: 'socratic',
+    topicsAttempted: 0,
+    topicsMastered: 0,
+    topicsTotal: 1,
+    topicsExplored: 0,
+    vocabularyTotal: 0,
+    vocabularyMastered: 0,
+    sessionsCount: 0,
+    activeMinutes: 0,
+    wallClockMinutes: 0,
+    lastSessionAt: null,
   };
 }
 
@@ -573,7 +767,7 @@ describe('listRecentMilestones', () => {
       milestonesAll: rows,
     });
 
-    const result = await listRecentMilestones(db, profileId, 3);
+    await listRecentMilestones(db, profileId, 3);
 
     // The DB mock returns all 10 rows (limit is passed to the real DB query);
     // here we verify the function passes the limit argument through.
@@ -871,5 +1065,213 @@ describe('refreshProgressSnapshot', () => {
     expect(result.milestones).toEqual([]);
     expect(detectMilestones).not.toHaveBeenCalled();
     expect(storeMilestones).not.toHaveBeenCalled();
+  });
+});
+
+describe('buildSubjectMetric mastery', () => {
+  it('does not count assessment-only topic as attempted (no session = not started)', () => {
+    const subject = makeSubjectRow();
+    const state = makeProgressState({
+      sessions: [], // no sessions — assessment alone should not count
+      assessments: [
+        makeAssessmentRow({ topicId: '770e8400-e29b-41d4-a716-446655440001' }),
+      ],
+      retentionCards: [],
+    });
+
+    const result = buildSubjectMetric(subject, state);
+
+    expect(result.topicsMastered).toBe(0);
+    expect(result.topicsAttempted).toBe(0);
+  });
+
+  it('counts topic as mastered when retention xpStatus is verified', () => {
+    const subject = makeSubjectRow();
+    const state = makeProgressState({
+      assessments: [makeAssessmentRow()],
+      retentionCards: [
+        makeRetentionCardRow({
+          topicId: '770e8400-e29b-41d4-a716-446655440001',
+          xpStatus: 'verified',
+        }),
+      ],
+    });
+
+    const result = buildSubjectMetric(subject, state);
+
+    expect(result.topicsMastered).toBe(1);
+  });
+
+  it('does not count decayed retention cards as mastered', () => {
+    const subject = makeSubjectRow();
+    const state = makeProgressState({
+      assessments: [makeAssessmentRow()],
+      retentionCards: [
+        makeRetentionCardRow({
+          topicId: '770e8400-e29b-41d4-a716-446655440001',
+          xpStatus: 'decayed',
+        }),
+      ],
+    });
+
+    const result = buildSubjectMetric(subject, state);
+
+    expect(result.topicsMastered).toBe(0);
+  });
+});
+
+describe('buildSubjectInventory mastery', () => {
+  it('does not count assessment-only topic as in progress (no session = not started)', async () => {
+    const state = makeProgressState({
+      sessions: [], // no sessions — assessment alone should not count
+      assessments: [makeAssessmentRow()],
+      retentionCards: [],
+    });
+
+    const result = await buildSubjectInventory(
+      null as unknown as Database,
+      state,
+      makeSubjectMetric()
+    );
+
+    expect(result.topics.mastered).toBe(0);
+    expect(result.topics.inProgress).toBe(0);
+  });
+
+  it('counts topic as mastered when retention xpStatus is verified', async () => {
+    const state = makeProgressState({
+      assessments: [makeAssessmentRow()],
+      retentionCards: [
+        makeRetentionCardRow({
+          topicId: '770e8400-e29b-41d4-a716-446655440001',
+          xpStatus: 'verified',
+        }),
+      ],
+    });
+
+    const result = await buildSubjectInventory(
+      null as unknown as Database,
+      state,
+      makeSubjectMetric()
+    );
+
+    expect(result.topics.mastered).toBe(1);
+  });
+});
+
+describe('explored topic session gating', () => {
+  it('excludes orphaned topics from buildSubjectMetric explored counts', () => {
+    const subject = makeSubjectRow();
+    const topic = makeTopicWithSubject(
+      '770e8400-e29b-41d4-a716-446655440099',
+      subject.id,
+      'session_filing'
+    );
+    const state = makeProgressState({
+      subjects: [subject],
+      sessions: [],
+      topicsById: new Map([[topic.id, topic]]),
+      allTopicsBySubject: new Map([[subject.id, [topic]]]),
+      latestTopicsBySubject: new Map([[subject.id, [topic]]]),
+    });
+
+    const result = buildSubjectMetric(subject, state);
+
+    expect(result.topicsExplored).toBe(0);
+  });
+
+  it('includes topics in buildSubjectMetric explored counts when a qualifying session exists', () => {
+    const subject = makeSubjectRow();
+    const topic = makeTopicWithSubject(
+      '770e8400-e29b-41d4-a716-446655440002',
+      subject.id,
+      'session_filing'
+    );
+    const state = makeProgressState({
+      subjects: [subject],
+      sessions: [
+        makeSessionRow({
+          subjectId: subject.id,
+          topicId: topic.id,
+          exchangeCount: 3,
+        }),
+      ],
+      topicsById: new Map([[topic.id, topic]]),
+      allTopicsBySubject: new Map([[subject.id, [topic]]]),
+      latestTopicsBySubject: new Map([[subject.id, [topic]]]),
+    });
+
+    const result = buildSubjectMetric(subject, state);
+
+    expect(result.topicsExplored).toBe(1);
+  });
+
+  it('excludes orphaned topics from buildSubjectInventory explored counts', async () => {
+    const subject = makeSubjectRow();
+    const topic = makeTopicWithSubject(
+      '770e8400-e29b-41d4-a716-446655440003',
+      subject.id,
+      'session_filing'
+    );
+    const state = makeProgressState({
+      subjects: [subject],
+      sessions: [],
+      topicsById: new Map([[topic.id, topic]]),
+      allTopicsBySubject: new Map([[subject.id, [topic]]]),
+      latestTopicsBySubject: new Map([[subject.id, [topic]]]),
+    });
+
+    const result = await buildSubjectInventory(
+      null as unknown as Database,
+      state,
+      makeSubjectMetric(subject.id)
+    );
+
+    expect(result.topics.explored).toBe(0);
+  });
+});
+
+describe('buildSubjectMetric and buildSubjectInventory stay aligned', () => {
+  it('agree on mastered counts for assessment-passed-only topics', async () => {
+    const subject = makeSubjectRow();
+    const state = makeProgressState({
+      subjects: [subject],
+      assessments: [makeAssessmentRow({ subjectId: subject.id })],
+      retentionCards: [],
+    });
+
+    const metric = buildSubjectMetric(subject, state);
+    const inventory = await buildSubjectInventory(
+      null as unknown as Database,
+      state,
+      metric
+    );
+
+    expect(metric.topicsMastered).toBe(0);
+    expect(inventory.topics.mastered).toBe(metric.topicsMastered);
+  });
+
+  it('agree on mastered counts for retention-verified topics', async () => {
+    const subject = makeSubjectRow();
+    const state = makeProgressState({
+      subjects: [subject],
+      assessments: [makeAssessmentRow({ subjectId: subject.id })],
+      retentionCards: [
+        makeRetentionCardRow({
+          topicId: '770e8400-e29b-41d4-a716-446655440001',
+          xpStatus: 'verified',
+        }),
+      ],
+    });
+
+    const metric = buildSubjectMetric(subject, state);
+    const inventory = await buildSubjectInventory(
+      null as unknown as Database,
+      state,
+      metric
+    );
+
+    expect(metric.topicsMastered).toBe(1);
+    expect(inventory.topics.mastered).toBe(metric.topicsMastered);
   });
 });

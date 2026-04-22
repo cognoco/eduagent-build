@@ -22,17 +22,18 @@ tags:
 # 2. Verify home screen loaded
 - extendedWaitUntil:
     visible:
-      id: "home-scroll-view"
+      id: "learner-screen"
     timeout: 15000
 
 # 3. Navigate to More tab
 - tapOn:
     text: "More"
 
-# 4. Wait for More screen to load
+# 4. Wait for More screen content to load — Learning Mode is always above the fold.
+# Using text: "More" matched the tab label itself, resolving before ScrollView rendered.
 - extendedWaitUntil:
     visible:
-      text: "More"
+      id: "learning-mode-casual"
     timeout: 10000
 
 # 5. Scroll to Profile row
@@ -138,7 +139,7 @@ tags:
 
 - extendedWaitUntil:
     visible:
-      id: "home-scroll-view"
+      id: "learner-screen"
     timeout: 15000
     optional: true
 

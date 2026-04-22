@@ -107,7 +107,7 @@ describe('SessionDetailScreen (summary-only)', () => {
     ).toBeTruthy();
   });
 
-  it('shows recap unavailable fallback when older sessions have no recap fields', () => {
+  it('shows recap unavailable fallback when session has no recap fields', () => {
     mockUseChildSessionDetail.mockReturnValue({
       data: makeSession({ displaySummary: null }),
       isLoading: false,
@@ -117,7 +117,7 @@ describe('SessionDetailScreen (summary-only)', () => {
 
     expect(screen.getByTestId('narrative-unavailable')).toBeTruthy();
     expect(
-      screen.getByText('Session summary not available for older sessions')
+      screen.getByText('No summary available for this session.')
     ).toBeTruthy();
   });
 

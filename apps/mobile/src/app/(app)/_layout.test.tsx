@@ -1,4 +1,10 @@
-import { act, render, screen } from '@testing-library/react-native';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react-native';
 import { useAuth } from '@clerk/clerk-expo';
 import {
   clearPendingAuthRedirect,
@@ -47,6 +53,29 @@ jest.mock('@clerk/clerk-expo', () => ({
       primaryEmailAddress: { emailAddress: 'child@example.com' },
     },
   }),
+}));
+
+jest.mock('expo-notifications', () => ({
+  getPermissionsAsync: jest.fn().mockResolvedValue({ status: 'granted' }),
+  requestPermissionsAsync: jest.fn().mockResolvedValue({ status: 'granted' }),
+  getExpoPushTokenAsync: jest
+    .fn()
+    .mockResolvedValue({ data: 'ExponentPushToken[mock]' }),
+  setNotificationChannelAsync: jest.fn(),
+  AndroidImportance: { DEFAULT: 3 },
+}));
+
+const mockSpeechGetPermissions = jest
+  .fn()
+  .mockResolvedValue({ granted: true, canAskAgain: true });
+const mockSpeechRequestPermissions = jest
+  .fn()
+  .mockResolvedValue({ granted: true });
+jest.mock('expo-speech-recognition', () => ({
+  ExpoSpeechRecognitionModule: {
+    getPermissionsAsync: mockSpeechGetPermissions,
+    requestPermissionsAsync: mockSpeechRequestPermissions,
+  },
 }));
 
 jest.mock('../../lib/profile', () => ({
@@ -102,6 +131,11 @@ jest.mock('../../components/feedback/FeedbackProvider', () => ({
   FeedbackProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
 
+const mockUseSubjects = jest.fn();
+jest.mock('../../hooks/use-subjects', () => ({
+  useSubjects: () => mockUseSubjects(),
+}));
+
 const AppLayout = require('./_layout').default;
 
 describe('AppLayout', () => {
@@ -110,6 +144,22 @@ describe('AppLayout', () => {
     clearPendingAuthRedirect();
     mockReplace.mockReset();
     mockUsePathname.mockReturnValue('/home');
+    mockUseSubjects.mockReturnValue({ data: [], isLoading: false });
+    mockSpeechGetPermissions.mockResolvedValue({
+      granted: true,
+      canAskAgain: true,
+    });
+    mockSpeechRequestPermissions.mockResolvedValue({ granted: true });
+    const ExpoNotifications = require('expo-notifications');
+    (ExpoNotifications.getPermissionsAsync as jest.Mock).mockResolvedValue({
+      status: 'granted',
+    });
+    (ExpoNotifications.requestPermissionsAsync as jest.Mock).mockResolvedValue({
+      status: 'granted',
+    });
+    const SecureStoreMock = require('expo-secure-store');
+    (SecureStoreMock.getItemAsync as jest.Mock).mockResolvedValue(null);
+    (SecureStoreMock.setItemAsync as jest.Mock).mockResolvedValue(undefined);
     (useAuth as jest.Mock).mockReturnValue({
       isLoaded: true,
       isSignedIn: true,
@@ -276,6 +326,70 @@ describe('AppLayout', () => {
     expect(screen.queryByTestId('redirect')).toBeNull();
   });
 
+  it('does not show post-approval landing when user already has subjects (BUG-544)', () => {
+    mockUseProfile.mockReturnValue({
+      profiles: [
+        {
+          id: 'c1',
+          isOwner: false,
+          consentStatus: 'CONSENTED',
+          birthYear: 2014,
+        },
+      ],
+      activeProfile: {
+        id: 'c1',
+        isOwner: false,
+        consentStatus: 'CONSENTED',
+        birthYear: 2014,
+      },
+      isLoading: false,
+      profileWasRemoved: false,
+      acknowledgeProfileRemoval: jest.fn(),
+      switchProfile: jest.fn(),
+    });
+    mockUseConsentStatus.mockReturnValue({
+      data: {
+        consentStatus: 'CONSENTED',
+        parentEmail: null,
+        consentType: null,
+      },
+    });
+    // User already has a subject — post-approval screen should NOT appear
+    mockUseSubjects.mockReturnValue({
+      data: [{ id: 's1', name: 'Spanish', isActive: true }],
+      isLoading: false,
+    });
+
+    render(<AppLayout />);
+
+    expect(screen.queryByTestId('post-approval-landing')).toBeNull();
+    expect(screen.getByTestId('tabs')).toBeTruthy();
+  });
+
+  it('renders in-app toast instead of native alert when profile was removed (BUG-548)', () => {
+    const acknowledgeProfileRemoval = jest.fn();
+    mockUseProfile.mockReturnValue({
+      profiles: [
+        { id: 'p1', isOwner: true, consentStatus: null, birthYear: 1990 },
+      ],
+      activeProfile: {
+        id: 'p1',
+        isOwner: true,
+        consentStatus: null,
+        birthYear: 1990,
+      },
+      isLoading: false,
+      profileWasRemoved: true,
+      acknowledgeProfileRemoval,
+      switchProfile: jest.fn(),
+    });
+
+    render(<AppLayout />);
+
+    expect(screen.getByTestId('profile-switched-toast')).toBeTruthy();
+    expect(screen.getByText('Profile switched')).toBeTruthy();
+  });
+
   it('tells waiting learners that consent is checked automatically', () => {
     mockUseProfile.mockReturnValue({
       profiles: [
@@ -311,5 +425,136 @@ describe('AppLayout', () => {
     expect(
       screen.getByText("We'll keep checking automatically while you wait.")
     ).toBeTruthy();
+  });
+
+  it('shows permission setup gate when permissions are not granted and flag is not set', async () => {
+    const ExpoNotifications = require('expo-notifications');
+    (ExpoNotifications.getPermissionsAsync as jest.Mock).mockResolvedValue({
+      status: 'undetermined',
+    });
+    mockSpeechGetPermissions.mockResolvedValue({
+      granted: false,
+      canAskAgain: true,
+    });
+
+    const SecureStoreMock = require('expo-secure-store');
+    (SecureStoreMock.getItemAsync as jest.Mock).mockResolvedValue(null);
+
+    render(<AppLayout />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('permission-setup-gate')).toBeTruthy();
+    });
+    expect(screen.queryByTestId('tabs')).toBeNull();
+  });
+
+  it('skips permission gate when both permissions are already granted', async () => {
+    const ExpoNotifications = require('expo-notifications');
+    (ExpoNotifications.getPermissionsAsync as jest.Mock).mockResolvedValue({
+      status: 'granted',
+    });
+    mockSpeechGetPermissions.mockResolvedValue({
+      granted: true,
+      canAskAgain: true,
+    });
+
+    const SecureStoreMock = require('expo-secure-store');
+    (SecureStoreMock.getItemAsync as jest.Mock).mockResolvedValue(null);
+
+    render(<AppLayout />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('tabs')).toBeTruthy();
+    });
+    expect(screen.queryByTestId('permission-setup-gate')).toBeNull();
+  });
+
+  it('skips permission gate when SecureStore flag is already set', async () => {
+    const ExpoNotifications = require('expo-notifications');
+    (ExpoNotifications.getPermissionsAsync as jest.Mock).mockResolvedValue({
+      status: 'undetermined',
+    });
+    mockSpeechGetPermissions.mockResolvedValue({
+      granted: false,
+      canAskAgain: true,
+    });
+
+    const SecureStoreMock = require('expo-secure-store');
+    (SecureStoreMock.getItemAsync as jest.Mock).mockImplementation(
+      (key: string) => {
+        if (key.startsWith('permissionSetupSeen_'))
+          return Promise.resolve('true');
+        return Promise.resolve(null);
+      }
+    );
+
+    render(<AppLayout />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('tabs')).toBeTruthy();
+    });
+    expect(screen.queryByTestId('permission-setup-gate')).toBeNull();
+  });
+
+  it('dismisses permission gate when Continue is tapped', async () => {
+    const ExpoNotifications = require('expo-notifications');
+    (ExpoNotifications.getPermissionsAsync as jest.Mock).mockResolvedValue({
+      status: 'undetermined',
+    });
+    mockSpeechGetPermissions.mockResolvedValue({
+      granted: false,
+      canAskAgain: true,
+    });
+
+    const SecureStoreMock = require('expo-secure-store');
+    (SecureStoreMock.getItemAsync as jest.Mock).mockResolvedValue(null);
+    (SecureStoreMock.setItemAsync as jest.Mock).mockResolvedValue(undefined);
+
+    render(<AppLayout />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('permission-setup-gate')).toBeTruthy();
+    });
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('permission-continue'));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('tabs')).toBeTruthy();
+    });
+    expect(SecureStoreMock.setItemAsync).toHaveBeenCalledWith(
+      'permissionSetupSeen_p1',
+      'true'
+    );
+  });
+
+  it('dismisses permission gate when Skip is tapped', async () => {
+    const ExpoNotifications = require('expo-notifications');
+    (ExpoNotifications.getPermissionsAsync as jest.Mock).mockResolvedValue({
+      status: 'undetermined',
+    });
+    mockSpeechGetPermissions.mockResolvedValue({
+      granted: false,
+      canAskAgain: true,
+    });
+
+    const SecureStoreMock = require('expo-secure-store');
+    (SecureStoreMock.getItemAsync as jest.Mock).mockResolvedValue(null);
+    (SecureStoreMock.setItemAsync as jest.Mock).mockResolvedValue(undefined);
+
+    render(<AppLayout />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('permission-setup-gate')).toBeTruthy();
+    });
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('permission-skip'));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('tabs')).toBeTruthy();
+    });
   });
 });

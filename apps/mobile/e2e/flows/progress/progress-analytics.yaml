@@ -1,0 +1,66 @@
+# Progress analytics - index, subject detail, milestones empty state
+# Tags: nightly, progress
+# Seed: learning-active
+# Covers: progress index rendering, subject drill-down, milestones empty state
+# Usage: ./scripts/seed-and-run.sh learning-active flows/progress/progress-analytics.yaml
+appId: com.mentomate.app
+tags:
+  - nightly
+  - progress
+---
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+
+- tapOn:
+    id: "tab-progress"
+
+- extendedWaitUntil:
+    visible:
+      id: "journey-subject-${SUBJECT_ID}"
+    timeout: 15000
+
+- takeScreenshot: 01-progress-index
+
+- tapOn:
+    id: "journey-subject-${SUBJECT_ID}"
+
+- extendedWaitUntil:
+    visible:
+      id: "progress-subject-back"
+    timeout: 10000
+
+- assertVisible:
+    id: "progress-subject-bar"
+
+- takeScreenshot: 02-subject-detail
+
+- tapOn:
+    id: "progress-subject-back"
+
+- extendedWaitUntil:
+    visible:
+      id: "progress-milestones-see-all"
+    timeout: 10000
+
+- tapOn:
+    id: "progress-milestones-see-all"
+
+- extendedWaitUntil:
+    visible:
+      id: "milestones-back"
+    timeout: 10000
+
+- assertVisible:
+    id: "milestones-empty"
+
+- takeScreenshot: 03-milestones-empty
+
+- tapOn:
+    id: "milestones-back"
+
+- extendedWaitUntil:
+    visible:
+      id: "journey-subject-${SUBJECT_ID}"
+    timeout: 10000
+
+- takeScreenshot: 04-back-to-index

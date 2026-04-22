@@ -281,7 +281,7 @@ describe('Session lifecycle (integration)', () => {
     });
 
     const closeResult = await closeSession(db, profileId, session.id, {
-      reason: 'user_initiated',
+      reason: 'user_ended',
       summaryStatus: 'pending',
     });
 

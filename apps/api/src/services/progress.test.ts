@@ -531,6 +531,53 @@ describe('getTopicProgress', () => {
 
     expect(result!.struggleStatus).toBe('blocked');
   });
+
+  it('excludes ghost sessions: a topic whose only session has exchangeCount = 0 must be not_started [PROG-GHOST]', async () => {
+    // Ghost-session scenario: user tapped a topic, a learning_sessions row was
+    // created (exchangeCount=0), user abandoned before sending any message.
+    // The topic must NOT appear "started" in progress. Dashboard (dashboard.ts)
+    // and library/book status (curriculum.ts) already filter gte(exchangeCount,1);
+    // progress.ts must match.
+    //
+    // We simulate the DB doing its job — after the filter, findMany returns [].
+    // The behavioral check: completionStatus = not_started, totalSessions = 0.
+    // The structural check: sessions.findMany was called with a composite
+    // filter containing gte(exchangeCount, 1), not a bare eq(topicId).
+    const topic = mockTopicRow();
+    setupScopedRepo({
+      subjectFindFirst: mockSubjectRow(),
+      retentionCardFindFirst: undefined,
+      assessmentsFindMany: [],
+      sessionsFindMany: [], // DB filtered the ghost session out
+      needsDeepeningFindMany: [],
+      xpLedgerFindMany: [],
+    });
+    const db = {
+      query: {
+        curricula: { findFirst: jest.fn().mockResolvedValue(undefined) },
+        curriculumTopics: {
+          findFirst: jest.fn().mockResolvedValue(topic),
+          findMany: jest.fn().mockResolvedValue([]),
+        },
+      },
+    } as unknown as Database;
+
+    const result = await getTopicProgress(db, profileId, subjectId, topicId);
+
+    expect(result!.completionStatus).toBe('not_started');
+    expect(result!.totalSessions).toBe(0);
+
+    // Structural guard: verify the query filter includes the exchangeCount gate.
+    // Break test — removing gte(exchangeCount, 1) from the query will fail this.
+    // Drizzle SQL trees are circular (PgTable ⇄ PgColumn), so use util.inspect
+    // which handles cycles natively.
+    const repoMock = (createScopedRepository as jest.Mock).mock.results[0]
+      .value as { sessions: { findMany: jest.Mock } };
+    const filterArg = repoMock.sessions.findMany.mock.calls[0]?.[0];
+    const { inspect } = await import('util');
+    const rendered = inspect(filterArg, { depth: 10, breakLength: Infinity });
+    expect(rendered).toContain('exchange_count');
+  });
 });
 // ---------------------------------------------------------------------------
 // getOverallProgress

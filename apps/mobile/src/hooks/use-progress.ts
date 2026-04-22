@@ -13,6 +13,8 @@ import type {
   ProgressHistory,
   SubjectProgress,
   TopicProgress,
+  WeeklyReportRecord,
+  WeeklyReportSummary,
 } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
@@ -512,6 +514,8 @@ export function useMarkChildReportViewed(): UseMutationResult<
   const queryClient = useQueryClient();
 
   return useMutation({
+    // [BUG-550] Best-effort tracking — never retry on failure
+    retry: 0,
     mutationFn: async ({ childProfileId, reportId }) => {
       const res = await client.dashboard.children[':profileId'].reports[
         ':reportId'
@@ -531,6 +535,135 @@ export function useMarkChildReportViewed(): UseMutationResult<
           'child',
           variables.childProfileId,
           'report',
+          variables.reportId,
+        ],
+      });
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Weekly Reports [BUG-524]
+// ---------------------------------------------------------------------------
+
+export function useChildWeeklyReports(
+  childProfileId: string | undefined
+): UseQueryResult<WeeklyReportSummary[]> {
+  const client = useApiClient();
+  const { activeProfile } = useProfile();
+
+  return useQuery({
+    queryKey: ['dashboard', 'child', childProfileId, 'weekly-reports'],
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const res = await client.dashboard.children[':profileId'][
+          'weekly-reports'
+        ].$get(
+          { param: { profileId: childProfileId ?? '' } },
+          { init: { signal } }
+        );
+        // [BUG-549] New child profiles may return 403 (no family link yet)
+        // or 404. Treat these as "no data yet" rather than a hard error so
+        // the UI shows a friendly empty state instead of an error card.
+        // [IMP-7] Log the status so silent 403s don't mask real ACL bugs.
+        if (res.status === 403 || res.status === 404) {
+          console.warn(
+            `[useChildWeeklyReports] ${res.status} for child ${childProfileId} — returning empty`
+          );
+          return [];
+        }
+        await assertOk(res);
+        const data = (await res.json()) as { reports: WeeklyReportSummary[] };
+        return data.reports;
+      } finally {
+        cleanup();
+      }
+    },
+    enabled:
+      !!activeProfile && activeProfile.isOwner === true && !!childProfileId,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Weekly Report Detail + Mark-Viewed [CR-1, SUGG-1, SUGG-4]
+// ---------------------------------------------------------------------------
+
+export function useChildWeeklyReportDetail(
+  childProfileId: string | undefined,
+  reportId: string | undefined
+): UseQueryResult<WeeklyReportRecord | null> {
+  const client = useApiClient();
+  const { activeProfile } = useProfile();
+
+  return useQuery({
+    queryKey: ['dashboard', 'child', childProfileId, 'weekly-report', reportId],
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const res = await client.dashboard.children[':profileId'][
+          'weekly-reports'
+        ][':reportId'].$get(
+          {
+            param: {
+              profileId: childProfileId ?? '',
+              reportId: reportId ?? '',
+            },
+          },
+          { init: { signal } }
+        );
+        await assertOk(res);
+        const data = (await res.json()) as {
+          report: WeeklyReportRecord | null;
+        };
+        return data.report;
+      } finally {
+        cleanup();
+      }
+    },
+    enabled:
+      !!activeProfile &&
+      activeProfile.isOwner === true &&
+      !!childProfileId &&
+      !!reportId,
+  });
+}
+
+export function useMarkWeeklyReportViewed(): UseMutationResult<
+  { viewed: boolean },
+  Error,
+  { childProfileId: string; reportId: string }
+> {
+  const client = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    // [SUGG-4] Best-effort tracking — never retry on failure
+    retry: 0,
+    mutationFn: async ({ childProfileId, reportId }) => {
+      const res = await client.dashboard.children[':profileId'][
+        'weekly-reports'
+      ][':reportId'].view.$post({
+        param: { profileId: childProfileId, reportId },
+      });
+      await assertOk(res);
+      return (await res.json()) as { viewed: boolean };
+    },
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({
+        queryKey: [
+          'dashboard',
+          'child',
+          variables.childProfileId,
+          'weekly-reports',
+        ],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: [
+          'dashboard',
+          'child',
+          variables.childProfileId,
+          'weekly-report',
           variables.reportId,
         ],
       });

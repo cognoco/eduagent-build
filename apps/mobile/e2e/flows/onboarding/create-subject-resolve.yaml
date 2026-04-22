@@ -21,17 +21,12 @@ tags:
 # 2. Home screen — wait for subjects section
 - extendedWaitUntil:
     visible:
-      id: "home-scroll-view"
+      id: "learner-screen"
     timeout: 15000
 
-# 3. Navigate to create-subject via add-subject button
-- scrollUntilVisible:
-    element:
-      id: "add-subject-button"
-    direction: DOWN
-    timeout: 10000
+# 3. Navigate to create-subject via Learn intent card (replaced add-subject-button)
 - tapOn:
-    id: "add-subject-button"
+    id: "intent-learn"
 
 # 4. Wait for create-subject screen
 - extendedWaitUntil:

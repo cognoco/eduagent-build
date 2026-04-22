@@ -120,15 +120,15 @@ tags:
 # 11. Home screen reached — first-time empty state
 - extendedWaitUntil:
     visible:
-      id: "home-scroll-view"
+      id: "learner-screen"
     timeout: 15000
     optional: true
 
 - takeScreenshot: onboarding-05-home-empty-state
 
-# 12. Add first subject
+# 12. Add first subject via Learn intent card (replaced add-subject-button)
 - tapOn:
-    id: "add-subject-button"
+    id: "intent-learn"
     optional: true
 
 # 13. Subject creation modal visible

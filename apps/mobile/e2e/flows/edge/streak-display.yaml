@@ -20,7 +20,7 @@ tags:
 # 2. Verify home screen loaded
 - extendedWaitUntil:
     visible:
-      id: "home-scroll-view"
+      id: "learner-screen"
     timeout: 15000
 
 # 3. Verify streak badge is visible in header

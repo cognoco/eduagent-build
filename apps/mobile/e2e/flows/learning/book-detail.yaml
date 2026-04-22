@@ -1,0 +1,107 @@
+# Flow L1: Book Detail
+# Validates: library -> subject shelf -> book detail -> back navigation.
+# Tags: nightly, learning
+#
+# Journey: UX Journey 1 (Library & Content Discovery)
+# Epics: Epic 7 (Library)
+# Prerequisite: Seeded learner with an active curriculum book (scenario: learning-active)
+#
+# testIDs verified against:
+#   - apps/mobile/src/app/(app)/_layout.tsx (tab-library)
+#   - apps/mobile/src/components/library/ShelvesTab.tsx (shelves-list, subject-card-*)
+#   - apps/mobile/src/app/(app)/shelf/[subjectId]/index.tsx (shelf-screen, shelf-single-book, shelf-back)
+#   - apps/mobile/src/app/(app)/shelf/[subjectId]/book/[bookId].tsx (book-screen, book-back, book-notes-section, book-all-completed, book-empty-sessions, book-start-learning)
+appId: com.mentomate.app
+tags:
+  - nightly
+  - learning
+---
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "learning-active"
+      API_URL: ${API_URL}
+
+- extendedWaitUntil:
+    visible:
+      id: "learner-screen"
+    timeout: 15000
+
+- tapOn:
+    id: "tab-library"
+
+- extendedWaitUntil:
+    visible:
+      id: "shelves-list"
+    timeout: 10000
+
+- takeScreenshot: book-01-library
+
+- tapOn:
+    id: "subject-card-${SUBJECT_ID}"
+
+- extendedWaitUntil:
+    visible:
+      id: "book-screen"
+    timeout: 10000
+    optional: true
+
+- runFlow:
+    when:
+      visible:
+        id: "shelf-screen"
+    commands:
+      - takeScreenshot: book-02-shelf
+      - scrollUntilVisible:
+          element:
+            text: "World History"
+          direction: DOWN
+          timeout: 5000
+      - tapOn:
+          text: "World History"
+
+- extendedWaitUntil:
+    visible:
+      id: "book-screen"
+    timeout: 15000
+
+- takeScreenshot: book-03-book-detail
+
+- assertVisible:
+    id: "book-back"
+
+- assertVisible:
+    id: "book-start-learning"
+
+- scrollUntilVisible:
+    element:
+      id: "book-notes-section"
+    direction: DOWN
+    timeout: 5000
+    optional: true
+
+- takeScreenshot: book-04-scrolled
+
+- tapOn:
+    id: "book-back"
+
+- extendedWaitUntil:
+    visible:
+      id: "shelf-screen"
+    timeout: 5000
+    optional: true
+
+- runFlow:
+    when:
+      visible:
+        id: "shelf-screen"
+    commands:
+      - tapOn:
+          id: "shelf-back"
+
+- extendedWaitUntil:
+    visible:
+      id: "subject-card-${SUBJECT_ID}"
+    timeout: 10000
+
+- takeScreenshot: book-05-back-to-library

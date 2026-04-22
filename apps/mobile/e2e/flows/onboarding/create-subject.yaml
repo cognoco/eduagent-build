@@ -18,20 +18,16 @@ tags:
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml
 
-# The home screen should show the subjects section
-- assertVisible: "Your subjects"
+# The home screen should show the intent card stack
+- assertVisible:
+    id: "learner-intent-stack"
 
-- takeScreenshot: subject-01-home-with-subjects
+- takeScreenshot: subject-01-home-with-intent-cards
 
-# Tap "Add subject" button (testID: add-subject-button)
-# BUG-44 fix: button is below subject cards in home ScrollView
-- scrollUntilVisible:
-    element:
-      id: "add-subject-button"
-    direction: DOWN
-    timeout: 10000
+# Tap "Learn" intent card → navigates to /create-subject
+# (replaced add-subject-button which was removed from home screen)
 - tapOn:
-    id: "add-subject-button"
+    id: "intent-learn"
 
 # The create-subject screen should appear (autoFocus opens keyboard,
 # pushing "New subject" heading above fold on small screens — BUG-60 side effect).

@@ -10,7 +10,7 @@
 # Prerequisite: Seeded user with CONSENTED status (scenario: onboarding-complete)
 #
 # NOTE: This flow does NOT use runFlow seed-and-sign-in because that flow
-# waits for home-scroll-view — but the post-approval landing gate appears
+# waits for learner-screen — but the post-approval landing gate appears
 # BEFORE the tab navigator loads.
 #
 # Seeding is handled by seed-and-run.sh BEFORE Maestro starts.
@@ -83,7 +83,7 @@ tags:
 # 11. Wait for home screen — loads after dismissal
 - extendedWaitUntil:
     visible:
-      id: "home-scroll-view"
+      id: "learner-screen"
     timeout: 15000
 
 # 12. Final screenshot — home screen after post-approval

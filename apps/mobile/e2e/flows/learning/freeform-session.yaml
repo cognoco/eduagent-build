@@ -13,9 +13,8 @@
 # of session mode.
 #
 # testIDs verified against:
-#   - apps/mobile/src/app/(learner)/home.tsx (home-scroll-view, coaching-card-primary)
+#   - apps/mobile/src/components/home/LearnerScreen.tsx (learner-screen, intent-continue)
 #   - apps/mobile/src/components/session/ChatShell.tsx (chat-input, chat-messages)
-#   - apps/mobile/src/app/(learner)/session/index.tsx
 appId: com.mentomate.app
 tags:
   - nightly
@@ -31,12 +30,13 @@ tags:
 # 2. Wait for home screen
 - extendedWaitUntil:
     visible:
-      id: "home-scroll-view"
+      id: "learner-screen"
     timeout: 15000
 
-# 3. Tap coaching card primary action to start a session
+# 3. Tap intent card to start a session (replaced coaching-card-primary in adaptive home refactor)
+# learning-active seed provides an active subject → intent-continue is shown
 - tapOn:
-    id: "coaching-card-primary"
+    id: "intent-continue"
 
 # 4. Wait for session screen — chat input is always present
 - extendedWaitUntil:

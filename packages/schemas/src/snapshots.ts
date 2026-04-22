@@ -218,3 +218,49 @@ export const monthlyReportSummarySchema = z.object({
   headlineStat: monthlyReportHeadlineSchema,
 });
 export type MonthlyReportSummary = z.infer<typeof monthlyReportSummarySchema>;
+
+// ---------------------------------------------------------------------------
+// Weekly Reports [BUG-524]
+// Reuses monthMetricsSchema and monthlyReportHeadlineSchema — the metric
+// shape is the same, just aggregated over 7 days instead of ~30.
+// ---------------------------------------------------------------------------
+
+export const weeklyReportDataSchema = z.object({
+  childName: z.string(),
+  weekStart: z.string(),
+  // NOTE: `thisWeek` uses monthMetricsSchema but fields have mixed semantics:
+  //   DELTA (incremental, this week only):
+  //     totalSessions, totalActiveMinutes, topicsMastered, topicsExplored,
+  //     streakBest — all-time personal best streak from snapshot (NOT a
+  //       weekly delta; see generateWeeklyReportData in weekly-report.ts)
+  //   CUMULATIVE (absolute snapshot at week end):
+  //     vocabularyTotal — cumulative vocabulary count so delta is computed
+  //     at display time: thisWeek.vocabularyTotal - lastWeek?.vocabularyTotal
+  // `lastWeek` holds the same mixed shape for comparison. Compute display
+  // deltas at the presentation layer, not here.
+  // See `generateWeeklyReportData` in weekly-report.ts for the mapping.
+  thisWeek: monthMetricsSchema,
+  lastWeek: monthMetricsSchema.nullable(),
+  headlineStat: monthlyReportHeadlineSchema,
+});
+export type WeeklyReportData = z.infer<typeof weeklyReportDataSchema>;
+
+export const weeklyReportRecordSchema = z.object({
+  id: z.string().uuid(),
+  profileId: z.string().uuid(),
+  childProfileId: z.string().uuid(),
+  reportWeek: z.string(),
+  reportData: weeklyReportDataSchema,
+  viewedAt: z.string().datetime().nullable().optional(),
+  createdAt: z.string().datetime(),
+});
+export type WeeklyReportRecord = z.infer<typeof weeklyReportRecordSchema>;
+
+export const weeklyReportSummarySchema = z.object({
+  id: z.string().uuid(),
+  reportWeek: z.string(),
+  viewedAt: z.string().datetime().nullable().optional(),
+  createdAt: z.string().datetime(),
+  headlineStat: monthlyReportHeadlineSchema,
+});
+export type WeeklyReportSummary = z.infer<typeof weeklyReportSummarySchema>;

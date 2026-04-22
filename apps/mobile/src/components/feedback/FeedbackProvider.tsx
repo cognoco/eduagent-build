@@ -25,7 +25,8 @@ export function FeedbackProvider({
     setVisible(true);
   }, []);
 
-  useShakeDetector(openFeedback);
+  const { shakeAvailable } = useShakeDetector(openFeedback);
+  void shakeAvailable;
 
   return (
     <FeedbackContext.Provider value={{ openFeedback }}>

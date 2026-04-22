@@ -1,0 +1,64 @@
+# Parent child reports - empty state
+# Tags: nightly, parent
+# Seed: parent-multi-child
+# Covers: dashboard -> child detail -> reports empty state
+# Usage: ./scripts/seed-and-run.sh parent-multi-child flows/parent/child-reports-empty.yaml
+appId: com.mentomate.app
+tags:
+  - nightly
+  - parent
+---
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+
+- extendedWaitUntil:
+    visible:
+      id: "dashboard-scroll"
+    timeout: 15000
+
+- takeScreenshot: 01-parent-dashboard
+
+- tapOn:
+    id: "dashboard-child-${CHILD1_PROFILE_ID}-primary"
+
+- extendedWaitUntil:
+    visible:
+      id: "child-detail-scroll"
+    timeout: 10000
+
+- takeScreenshot: 02-child-detail
+
+- scrollUntilVisible:
+    element:
+      id: "child-reports-link"
+    direction: DOWN
+    timeout: 10000
+
+- tapOn:
+    id: "child-reports-link"
+
+- extendedWaitUntil:
+    visible:
+      id: "child-reports-back"
+    timeout: 10000
+
+- assertVisible:
+    id: "child-reports-empty"
+
+- assertVisible:
+    id: "child-reports-empty-time-context"
+
+- assertVisible:
+    id: "child-reports-empty-progress"
+
+- takeScreenshot: 03-reports-empty
+
+- tapOn:
+    id: "child-reports-back"
+
+- extendedWaitUntil:
+    visible:
+      id: "child-detail-scroll"
+    timeout: 10000
+
+- takeScreenshot: 04-back-to-child-detail

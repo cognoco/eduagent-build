@@ -19,15 +19,65 @@ type FeedbackRouteEnv = {
   };
 };
 
-const DEFAULT_SUPPORT_EMAIL = 'support@mentomate.app';
+const DEFAULT_SUPPORT_EMAIL = 'support@mentomate.com';
+
+// SEC-03: In-memory sliding-window rate limit for feedback submissions.
+// 5 submissions per hour per user. Resets on worker restart — acceptable
+// for a low-volume endpoint; avoids adding a DB/KV dependency.
+// NOTE: Each Cloudflare Worker isolate maintains independent Map state. The
+// effective limit per user is 5 × N (N = active isolates). For higher-volume
+// endpoints, replace with a KV-backed rate limiter for global enforcement.
+const FEEDBACK_RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
+const FEEDBACK_RATE_LIMIT_MAX = 5;
+const FEEDBACK_MAP_MAX_ENTRIES = 10_000;
+const feedbackTimestamps = new Map<string, number[]>();
+
+function isFeedbackRateLimited(userId: string): boolean {
+  const now = Date.now();
+  const cutoff = now - FEEDBACK_RATE_LIMIT_WINDOW_MS;
+  const timestamps = (feedbackTimestamps.get(userId) ?? []).filter(
+    (t) => t > cutoff
+  );
+  // Prune stale Map entry to prevent unbounded growth in long-lived isolates
+  if (timestamps.length === 0 && feedbackTimestamps.has(userId)) {
+    feedbackTimestamps.delete(userId);
+  }
+  // Evict oldest entries if the Map exceeds the size cap. Maps iterate in
+  // insertion order, so the first key is the oldest.
+  if (feedbackTimestamps.size >= FEEDBACK_MAP_MAX_ENTRIES) {
+    const oldest = feedbackTimestamps.keys().next().value;
+    if (oldest !== undefined) feedbackTimestamps.delete(oldest);
+  }
+  if (timestamps.length >= FEEDBACK_RATE_LIMIT_MAX) {
+    feedbackTimestamps.set(userId, timestamps);
+    return true;
+  }
+  timestamps.push(now);
+  feedbackTimestamps.set(userId, timestamps);
+  return false;
+}
 
 export const feedbackRoutes = new Hono<FeedbackRouteEnv>().post(
   '/feedback',
   zValidator('json', feedbackSubmissionSchema),
   async (c) => {
+    const userId = c.get('user').userId;
+    if (isFeedbackRateLimited(userId)) {
+      const retryAfterSecs = Math.ceil(FEEDBACK_RATE_LIMIT_WINDOW_MS / 1000);
+      return c.json(
+        {
+          success: false,
+          error: 'Too many submissions. Please try again later.',
+        },
+        {
+          status: 429,
+          headers: { 'Retry-After': String(retryAfterSecs) },
+        }
+      );
+    }
+
     const body = c.req.valid('json');
     const profileId = c.get('profileId') ?? 'unknown';
-    const userId = c.get('user').userId;
     const env = c.env ?? {};
     const supportTo = env.SUPPORT_EMAIL ?? DEFAULT_SUPPORT_EMAIL;
 
@@ -49,28 +99,30 @@ export const feedbackRoutes = new Hono<FeedbackRouteEnv>().post(
       .filter(Boolean)
       .join('\n');
 
-    try {
-      await sendEmail(
-        {
-          to: supportTo,
-          subject: `[MentoMate ${categoryLabel}] from ${profileId.slice(0, 8)}`,
-          body: `${body.message}\n\n---\n${metaLines}`,
-          type: 'feedback',
-        },
-        {
-          resendApiKey: env.RESEND_API_KEY,
-          emailFrom: env.EMAIL_FROM,
-        }
-      );
-    } catch (err) {
-      console.error('[feedback] sendEmail threw unexpectedly:', err);
+    // D-1: sendEmail never throws — it returns { sent: false, reason } on all
+    // failure modes. Check the return value and queue for retry when unsent.
+    const emailResult = await sendEmail(
+      {
+        to: supportTo,
+        subject: `[MentoMate ${categoryLabel}] from ${profileId.slice(0, 8)}`,
+        body: `${body.message}\n\n---\n${metaLines}`,
+        type: 'feedback',
+      },
+      {
+        resendApiKey: env.RESEND_API_KEY,
+        emailFrom: env.EMAIL_FROM,
+      }
+    );
+
+    if (!emailResult.sent) {
       // [A-1] Awaited per CLAUDE.md — no silent fire-and-forget from route handlers.
       await inngest.send({
         name: 'app/feedback.delivery_failed',
         data: { profileId, category: body.category },
       });
+      return c.json({ success: true, queued: true });
     }
 
-    return c.json({ success: true });
+    return c.json({ success: true, queued: false });
   }
 );

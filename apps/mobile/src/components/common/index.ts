@@ -9,7 +9,7 @@ export { ErrorBoundary } from './ErrorBoundary';
 export { ErrorFallback } from './ErrorFallback';
 export { OfflineBanner } from './OfflineBanner';
 export { PasswordInput } from './PasswordInput';
-export { LightBulbAnimation } from './LightBulbAnimation';
+export { DeskLampAnimation } from './DeskLampAnimation';
 export { MagicPenAnimation } from './MagicPenAnimation';
 export { ProfileSwitcher } from './ProfileSwitcher';
 export { ShimmerSkeleton } from './ShimmerSkeleton';

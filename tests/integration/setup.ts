@@ -81,5 +81,43 @@ import {
 // Real Gemini/OpenAI calls would be flaky and expensive in CI/local runs
 registerProvider(createMockProvider('gemini'));
 
+// ---------------------------------------------------------------------------
+// Global fetch interceptor + JWKS mock
+//
+// All integration tests use real JWT verification via the fetch interceptor.
+// Unmatched URLs throw — no silent external HTTP calls during tests.
+// Per-boundary mocks (mockExpoPush, mockVoyageAI, etc.) are added by
+// individual test files that touch those services.
+// ---------------------------------------------------------------------------
+
+import {
+  installFetchInterceptor,
+  restoreFetch,
+  addFetchHandler,
+} from './fetch-interceptor';
+import { mockClerkJWKS } from './external-mocks';
+import { clearJWKSCache } from '../../apps/api/src/middleware/jwt';
+
+// Capture the real fetch before installing the interceptor — Neon's
+// serverless driver uses fetch() for SQL-over-HTTP and needs passthrough.
+const nativeFetch = globalThis.fetch;
+
+installFetchInterceptor();
+mockClerkJWKS();
+
+// In dev, the database is on Neon — the HTTP driver sends SQL via fetch to
+// *.neon.tech. In CI, the pg wire-protocol driver is used instead, so this
+// handler never fires. This is the only intentional passthrough.
+addFetchHandler(/\.neon\.tech/, (url, init) => nativeFetch(url, init));
+
+// Clear the in-memory JWKS cache between test files to prevent stale keys
+beforeEach(() => {
+  clearJWKSCache();
+});
+
+afterAll(() => {
+  restoreFetch();
+});
+
 // Set a generous timeout for integration tests
 jest.setTimeout(30_000);

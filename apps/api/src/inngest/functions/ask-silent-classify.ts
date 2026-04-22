@@ -1,10 +1,18 @@
 import { and, eq, sql } from 'drizzle-orm';
+import { z } from 'zod';
 import { learningSessions } from '@eduagent/database';
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
 import { classifySubject } from '../../services/subject-classify';
 import { createLogger } from '../../services/logger';
 import { SILENT_CLASSIFY_CONFIDENCE_THRESHOLD } from '../../services/session/session-depth.config';
+
+const classifySilentlyEventDataSchema = z.object({
+  sessionId: z.string(),
+  profileId: z.string(),
+  classifyInput: z.string(),
+  exchangeCount: z.number(),
+});
 
 const logger = createLogger();
 
@@ -18,12 +26,7 @@ export const askSilentClassify = inngest.createFunction(
   { event: 'app/ask.classify_silently' },
   async ({ event, step }) => {
     const { sessionId, profileId, classifyInput, exchangeCount } =
-      event.data as {
-        sessionId: string;
-        profileId: string;
-        classifyInput: string;
-        exchangeCount: number;
-      };
+      classifySilentlyEventDataSchema.parse(event.data);
     const db = getStepDatabase();
 
     const existing = await step.run('check-existing', async () => {

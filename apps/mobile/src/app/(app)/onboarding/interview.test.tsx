@@ -9,6 +9,8 @@ import React from 'react';
 const mockReplace = jest.fn();
 const mockStream = jest.fn();
 const mockAbort = jest.fn();
+const mockStartSessionMutateAsync = jest.fn();
+const mockStreamSessionMessage = jest.fn();
 let mockSearchParams: Record<string, string> = {
   subjectId: 'subject-1',
   subjectName: 'History',
@@ -79,6 +81,17 @@ jest.mock('../../../hooks/use-interview', () => ({
   })),
 }));
 
+jest.mock('../../../hooks/use-sessions', () => ({
+  useStartSession: jest.fn(() => ({
+    mutateAsync: mockStartSessionMutateAsync,
+    isPending: false,
+  })),
+  useStreamMessage: jest.fn(() => ({
+    stream: mockStreamSessionMessage,
+    isStreaming: false,
+  })),
+}));
+
 const InterviewScreen = require('./interview').default;
 
 describe('InterviewScreen', () => {
@@ -90,6 +103,10 @@ describe('InterviewScreen', () => {
       step: '1',
       totalSteps: '4',
     };
+    // Default: session creation succeeds
+    mockStartSessionMutateAsync.mockResolvedValue({
+      session: { id: 'session-123' },
+    });
   });
 
   it('renders the onboarding step indicator', () => {
@@ -98,7 +115,7 @@ describe('InterviewScreen', () => {
     expect(screen.getByText('Step 1 of 4')).toBeTruthy();
   });
 
-  it('navigates to analogy-preference after interview completes', async () => {
+  it('transitions to session phase after interview completes (input stays enabled)', async () => {
     mockStream.mockImplementation(
       async (
         _msg: string,
@@ -113,6 +130,39 @@ describe('InterviewScreen', () => {
     render(<InterviewScreen />);
     fireEvent.press(screen.getByTestId('chat-shell-send'));
 
+    // After interview completes, session is created and input stays enabled
+    await waitFor(() => {
+      expect(mockStartSessionMutateAsync).toHaveBeenCalledWith({
+        subjectId: 'subject-1',
+        sessionType: 'learning',
+        inputMode: 'text',
+      });
+      expect(screen.getByTestId('chat-shell-input-disabled')).toHaveTextContent(
+        'false'
+      );
+    });
+  });
+
+  it('falls back to Let\'s Go card when session creation fails', async () => {
+    mockStartSessionMutateAsync.mockRejectedValueOnce(
+      new Error('Session creation failed')
+    );
+
+    mockStream.mockImplementation(
+      async (
+        _msg: string,
+        onChunk: (accumulated: string) => void,
+        onDone: (result: { isComplete: boolean; exchangeCount: number }) => void
+      ) => {
+        onChunk('Great summary!');
+        onDone({ isComplete: true, exchangeCount: 1 });
+      }
+    );
+
+    render(<InterviewScreen />);
+    fireEvent.press(screen.getByTestId('chat-shell-send'));
+
+    // Falls back to the "Let's Go" card
     await waitFor(() => {
       expect(screen.getByText('Ready to start learning!')).toBeTruthy();
       expect(screen.getByText("Let's Go")).toBeTruthy();
@@ -133,7 +183,7 @@ describe('InterviewScreen', () => {
     });
   });
 
-  it('routes language subjects to language-setup after interview completes', async () => {
+  it('routes language subjects to language-setup via fallback card', async () => {
     mockSearchParams = {
       subjectId: 'subject-1',
       subjectName: 'Spanish',
@@ -142,6 +192,10 @@ describe('InterviewScreen', () => {
       step: '1',
       totalSteps: '4',
     };
+    // Force fallback by failing session creation
+    mockStartSessionMutateAsync.mockRejectedValueOnce(
+      new Error('Session creation failed')
+    );
     mockStream.mockImplementation(
       async (
         _msg: string,

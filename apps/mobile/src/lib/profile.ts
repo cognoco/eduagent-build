@@ -11,7 +11,10 @@ import { useQueryClient } from '@tanstack/react-query';
 import * as SecureStore from './secure-storage';
 import type { Profile } from '@eduagent/schemas';
 import { useProfiles } from '../hooks/use-profiles';
-import { useApiClient } from './api-client';
+import {
+  useApiClient,
+  setActiveProfileId as pushProfileIdToApiClient,
+} from './api-client';
 
 export type { Profile };
 
@@ -142,6 +145,18 @@ export function ProfileProvider({
     [profiles, activeProfileId]
   );
 
+  // [BUG-520] Push the active profile ID to the api-client module so
+  // customFetch can attach X-Profile-Id without importing profile.ts.
+  // [BUG-528] Set synchronously during render — NOT in a useEffect.
+  // pushProfileIdToApiClient only writes to a module-level variable
+  // (_activeProfileId in api-client.ts), which has no React side-effects.
+  // The old useEffect fired *after* paint, leaving a 1-frame gap where
+  // queries were enabled (activeProfile non-null) but customFetch had no
+  // profile ID to attach.
+  // NB: imported as pushProfileIdToApiClient to avoid shadowing the local
+  // React state setter (also named setActiveProfileId on line 101).
+  pushProfileIdToApiClient(activeProfile?.id);
+
   const switchProfile = useCallback(
     async (profileId: string): Promise<SwitchProfileResult> => {
       try {
@@ -212,9 +227,17 @@ export function ProfileProvider({
   // flashing during the brief race window after profile creation, where
   // switchProfile already set activeProfileId but the invalidated profiles
   // query hasn't returned the new profile yet.
+  //
+  // [BUG-528] Also cover the gap between SecureStore restore finishing and the
+  // validation effect running: profiles arrived + isRestoringId is false, but
+  // activeProfileId is still null (initial useState value) because the
+  // validation effect hasn't fired yet.  Without this, isLoading falls to
+  // false for one render frame with activeProfile === null, causing
+  // CreateProfileGate ("Welcome!") to flash.
   const isLoading =
     isProfilesLoading ||
     isRestoringId ||
+    (!isRestoringId && profiles.length > 0 && activeProfile === null) ||
     (activeProfileId !== null && activeProfile === null && isProfilesFetching);
 
   const value = useMemo<ProfileContextValue>(

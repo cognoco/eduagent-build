@@ -200,6 +200,7 @@ jest.mock('../../../hooks/use-streaks', () => ({
 
 jest.mock('../../../hooks/use-progress', () => ({
   useOverallProgress: () => ({ data: { totalTopicsCompleted: 0 } }),
+  useProgressInventory: () => ({ data: undefined, isLoading: false }),
 }));
 
 jest.mock('../../../hooks/use-subjects', () => ({
@@ -268,6 +269,13 @@ jest.mock('../../../hooks/use-milestone-tracker', () => ({
   createMilestoneTrackerStateFromMilestones: jest.fn().mockReturnValue({}),
   normalizeMilestoneTrackerState: jest.fn().mockReturnValue({}),
   useMilestoneTracker: () => mockMilestoneTracker,
+}));
+
+const EMPTY_BOOKMARKS: never[] = [];
+jest.mock('../../../hooks/use-bookmarks', () => ({
+  useCreateBookmark: () => ({ mutateAsync: jest.fn(), isPending: false }),
+  useDeleteBookmark: () => ({ mutateAsync: jest.fn(), isPending: false }),
+  useSessionBookmarks: () => ({ data: EMPTY_BOOKMARKS, isLoading: false }),
 }));
 
 jest.mock('../../../lib/session-recovery', () => ({

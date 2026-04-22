@@ -23,9 +23,9 @@ jobs:
     timeout-minutes: 20
     env:
       CI: true
-      EXPO_PUBLIC_API_URL: https://api-stg.mentomate.com
+      EXPO_PUBLIC_API_URL: ${{ vars.E2E_API_URL || 'https://api-stg.mentomate.com' }}
       EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY_PREVIEW }}
-      PLAYWRIGHT_API_URL: https://api-stg.mentomate.com
+      PLAYWRIGHT_API_URL: ${{ vars.E2E_API_URL || 'https://api-stg.mentomate.com' }}
       PLAYWRIGHT_SKIP_LOCAL_API: '1'
       PLAYWRIGHT_TEST_SEED_SECRET: ${{ secrets.TEST_SEED_SECRET }}
       CLERK_TESTING_TOKEN: ${{ secrets.CLERK_TESTING_TOKEN }}

@@ -74,6 +74,8 @@ export {
   submitSummary,
 } from './session-summary';
 
+export { generateLearnerRecap } from '../session-recap';
+
 // Homework
 export {
   syncHomeworkState,

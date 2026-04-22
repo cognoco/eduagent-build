@@ -9,7 +9,7 @@
 # Prerequisite: Seeded user with WITHDRAWN consent status (scenario: consent-withdrawn-solo)
 #
 # NOTE: This flow does NOT use runFlow seed-and-sign-in because that flow
-# waits for home-scroll-view — but the consent-withdrawn gate appears
+# waits for learner-screen — but the consent-withdrawn gate appears
 # BEFORE the tab navigator loads, blocking all app access.
 #
 # Seeding is handled by seed-and-run.sh BEFORE Maestro starts.

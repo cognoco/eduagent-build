@@ -22,7 +22,7 @@ tags:
 # 2. Verify home screen loaded
 - extendedWaitUntil:
     visible:
-      id: "home-scroll-view"
+      id: "learner-screen"
     timeout: 15000
 
 # 3. Navigate to More tab
@@ -35,12 +35,12 @@ tags:
       text: "More"
     timeout: 10000
 
-# 5. Scroll down to find Delete account row
+# 5. Scroll down to find Delete account row (More tab has many sections now)
 - scrollUntilVisible:
     element:
       text: "Delete account"
     direction: DOWN
-    timeout: 10000
+    timeout: 15000
 
 # 6. Tap Delete account
 - tapOn:
@@ -87,9 +87,12 @@ tags:
       text: "More"
     timeout: 10000
 
-# 16. Verify account is intact — sign-out button still visible
-- assertVisible:
-    id: "sign-out-button"
+# 16. Verify account is intact — sign-out button visible (scroll needed; More tab is long)
+- scrollUntilVisible:
+    element:
+      id: "sign-out-button"
+    direction: DOWN
+    timeout: 10000
 
 # 17. Final screenshot — back to normal state
 - takeScreenshot: delete-account-cancelled

@@ -14,6 +14,7 @@ jest.mock('./api-client', () => ({
     const { hc } = require('hono/client');
     return hc('http://localhost', { fetch: mockFetch });
   },
+  setActiveProfileId: jest.fn(),
 }));
 
 const mockProfiles: Profile[] = [

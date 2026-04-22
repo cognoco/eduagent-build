@@ -69,8 +69,7 @@ export function CelestialCelebration({
 
   return (
     <Animated.View
-      style={[styles.container, animatedStyle]}
-      pointerEvents="none"
+      style={[styles.container, animatedStyle, { pointerEvents: 'none' }]}
       testID={testID}
       accessibilityRole="image"
       accessibilityLabel="Celebration animation"

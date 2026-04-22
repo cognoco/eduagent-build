@@ -16,6 +16,7 @@ import {
   assessments,
   xpLedger,
   sessionSummaries,
+  bookmarks,
   notificationPreferences,
 } from './schema/index.js';
 import type { Database } from './client.js';
@@ -134,6 +135,7 @@ describe('Profile Isolation (R-005)', () => {
       { name: 'retentionCards', table: retentionCards, hasFindMany: true },
       { name: 'assessments', table: assessments, hasFindMany: true },
       { name: 'xpLedger', table: xpLedger, hasFindMany: true },
+      { name: 'bookmarks', table: bookmarks, hasFindMany: true },
       { name: 'consentStates', table: consentStates, hasFindMany: true },
       { name: 'sessionSummaries', table: sessionSummaries, hasFindMany: false },
       {

@@ -1,0 +1,46 @@
+# Flow A2: SSO Buttons
+# Validates: the Android sign-in screen renders Google SSO plus the email sign-in fallback.
+# Tags: nightly, auth
+#
+# Journey: UX Journey 0 (Authentication)
+# Epics: Epic 1 (Auth / SSO)
+# Prerequisite: None. Run with `./scripts/seed-and-run.sh --no-seed`.
+#
+# Notes:
+#   - This Maestro lane runs on Android, so Apple SSO is intentionally not asserted here.
+#   - OpenAI SSO is feature/config dependent, so it is checked as optional.
+#
+# testIDs verified against:
+#   - apps/mobile/src/app/(auth)/sign-in.tsx (google-sso-button, openai-sso-button, sign-in-email, sign-in-password, sign-in-button)
+appId: com.mentomate.app
+tags:
+  - nightly
+  - auth
+---
+- extendedWaitUntil:
+    visible:
+      id: "sign-in-button"
+    timeout: 120000
+
+- takeScreenshot: sso-01-sign-in
+
+- assertVisible:
+    id: "google-sso-button"
+
+- assertVisible:
+    text: "Continue with Google"
+
+- assertVisible:
+    id: "sign-in-email"
+
+- assertVisible:
+    id: "sign-in-password"
+
+- assertVisible:
+    id: "sign-in-button"
+
+- assertVisible:
+    id: "openai-sso-button"
+    optional: true
+
+- takeScreenshot: sso-02-buttons-visible

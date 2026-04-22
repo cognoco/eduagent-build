@@ -36,8 +36,13 @@ export default function AuthRoutesLayout() {
     ? globalParams.redirectTo[0]
     : globalParams.redirectTo;
   const browserRedirectTarget = readWebSearchParam('redirectTo');
+  // [BUG-530] On web, prefer browserRedirectTarget (URLSearchParams.get()
+  // always percent-decodes) over Expo Router's useLocalSearchParams which
+  // may pass through raw percent-encoded values like %2F(app)%2Fquiz.
+  // normalizeRedirectPath rejects values that don't start with '/', so an
+  // un-decoded %2F... falls back to /home and the original deep-link is lost.
   const redirectTarget =
-    localRedirectTarget ?? globalRedirectTarget ?? browserRedirectTarget;
+    browserRedirectTarget ?? localRedirectTarget ?? globalRedirectTarget;
   const resolvedRedirectTarget = toInternalAppRedirectPath(
     redirectTarget ?? undefined,
     '/(app)/home'

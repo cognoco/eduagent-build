@@ -18,6 +18,7 @@ import { assertOk } from '../lib/assert-ok';
 
 interface UseSubjectsOptions {
   includeInactive?: boolean;
+  enabled?: boolean;
 }
 
 export interface CreateSubjectResponse {
@@ -33,7 +34,7 @@ export function useSubjects(
 ): UseQueryResult<Subject[]> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
-  const { includeInactive = false } = options;
+  const { includeInactive = false, enabled: callerEnabled } = options;
 
   return useQuery({
     queryKey: ['subjects', activeProfile?.id, includeInactive],
@@ -55,7 +56,7 @@ export function useSubjects(
         cleanup();
       }
     },
-    enabled: !!activeProfile,
+    enabled: !!activeProfile && callerEnabled !== false,
   });
 }
 

@@ -21,17 +21,17 @@ tags:
 # 2. Home screen
 - extendedWaitUntil:
     visible:
-      id: "home-scroll-view"
+      id: "learner-screen"
     timeout: 15000
 
 # 3. Navigate to More tab (BUG-15: use text, not testID)
 - tapOn:
     text: "More"
 
-# 4. Wait for settings/more screen
+# 4. Wait for settings/more screen — Learning Mode section is always above the fold
 - extendedWaitUntil:
     visible:
-      text: "Appearance"
+      id: "learning-mode-casual"
     timeout: 10000
 
 # 5. Look for subscription/billing option

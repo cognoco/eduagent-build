@@ -2,6 +2,7 @@ import type { InputMode } from '@eduagent/schemas';
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   AccessibilityInfo,
+  AppState,
   Image,
   Linking,
   View,
@@ -24,7 +25,7 @@ import { useTextToSpeech } from '../../hooks/use-text-to-speech';
 import { useThemeColors } from '../../lib/theme';
 import { goBackOrReplace } from '../../lib/navigation';
 import { platformAlert } from '../../lib/platform-alert';
-import { LightBulbAnimation, MagicPenAnimation } from '../common';
+import { DeskLampAnimation, MagicPenAnimation } from '../common';
 import Animated, { FadeOut } from 'react-native-reanimated';
 
 export interface ChatMessage {
@@ -73,6 +74,8 @@ interface ChatShellProps {
   belowInput?: React.ReactNode;
   /** Optional testID for the message scroll area (used by E2E flows). */
   messagesTestID?: string;
+  /** Fallback route for the back button when `canGoBack()` is false (BUG-612: web). Defaults to `/(app)/home`. */
+  backFallback?: string;
 }
 
 /**
@@ -140,6 +143,7 @@ export function ChatShell({
   textToSpeechLanguage,
   belowInput,
   messagesTestID,
+  backFallback,
 }: ChatShellProps) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -180,6 +184,7 @@ export function ChatShell({
     stopListening,
     clearTranscript,
     requestMicrophonePermission,
+    getMicrophonePermissionStatus,
   } = useSpeechRecognition({ lang: speechRecognitionLanguage });
 
   // Proactively prompt for microphone on session entry so voice input is
@@ -190,6 +195,30 @@ export function ChatShell({
   useEffect(() => {
     void requestMicrophonePermission();
   }, [requestMicrophonePermission]);
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next !== 'active') return;
+
+      void (async () => {
+        try {
+          const permissionStatus = await getMicrophonePermissionStatus();
+          const granted = permissionStatus?.granted ?? false;
+          if (
+            granted &&
+            speechStatus === 'error' &&
+            sttError?.toLowerCase().includes('permission')
+          ) {
+            clearTranscript();
+          }
+        } catch {
+          /* non-fatal */
+        }
+      })();
+    });
+
+    return () => sub.remove();
+  }, [clearTranscript, getMicrophonePermissionStatus, speechStatus, sttError]);
 
   // TTS hook
   const {
@@ -418,7 +447,11 @@ export function ChatShell({
     }
     const timer = setTimeout(() => setShowIdleAnim(true), IDLE_TIMEOUT_MS);
     return () => clearTimeout(timer);
-  }, [lastMessageIsAi, isStreaming, input, messages.length]);
+    // `lastMessageIsAi` already derives from `messages` — adding
+    // `messages.length` here caused cascading re-renders on web (Enter key
+    // with blurOnSubmit=false) because setInput + onSend + setMessages all
+    // fired in the same React batch, triggering the effect multiple times.
+  }, [lastMessageIsAi, isStreaming, input]);
 
   const headerRightContent = (
     <View className="flex-row items-center">
@@ -445,7 +478,12 @@ export function ChatShell({
       >
         <View className="flex-row items-center px-4 py-3">
           <Pressable
-            onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
+            onPress={() =>
+              goBackOrReplace(
+                router,
+                (backFallback ?? '/(app)/home') as '/(app)/home'
+              )
+            }
             className="me-3 p-2 min-h-[44px] min-w-[44px] items-center justify-center"
             accessibilityLabel="Go back"
             accessibilityRole="button"
@@ -491,53 +529,55 @@ export function ChatShell({
             </Text>
           </View>
         ) : (
-          messages.map((msg) => (
-            <View key={msg.id}>
-              {msg.imageUri && !failedImages.has(msg.id) && (
-                <View className="self-end max-w-[85%] mb-1">
-                  <Image
-                    testID={`message-image-${msg.id}`}
-                    source={{ uri: msg.imageUri }}
-                    className="w-full aspect-[4/3] rounded-lg"
-                    resizeMode="contain"
-                    accessibilityLabel="Homework image"
-                    onError={() => {
-                      setFailedImages((prev) => new Set(prev).add(msg.id));
-                    }}
-                  />
-                </View>
-              )}
-              {msg.imageUri && failedImages.has(msg.id) && (
-                <View className="self-end max-w-[85%] mb-1">
-                  <View
-                    testID={`message-image-fallback-${msg.id}`}
-                    className="w-full aspect-[4/3] rounded-lg bg-surface items-center justify-center"
-                  >
-                    <Ionicons
-                      name="camera-outline"
-                      size={32}
-                      color={colors.muted}
+          messages
+            .filter((msg) => !(msg.isSystemPrompt && !msg.kind))
+            .map((msg) => (
+              <View key={msg.id}>
+                {msg.imageUri && !failedImages.has(msg.id) && (
+                  <View className="self-end max-w-[85%] mb-1">
+                    <Image
+                      testID={`message-image-${msg.id}`}
+                      source={{ uri: msg.imageUri }}
+                      className="w-full aspect-[4/3] rounded-lg"
+                      resizeMode="contain"
+                      accessibilityLabel="Homework image"
+                      onError={() => {
+                        setFailedImages((prev) => new Set(prev).add(msg.id));
+                      }}
                     />
-                    <Text className="text-body-sm text-text-secondary mt-1">
-                      Image no longer available
-                    </Text>
                   </View>
-                </View>
-              )}
-              <MessageBubble
-                role={msg.role}
-                content={msg.content}
-                streaming={msg.streaming}
-                escalationRung={msg.escalationRung}
-                verificationBadge={msg.verificationBadge}
-                actions={renderMessageActions?.(msg)}
-              />
-            </View>
-          ))
+                )}
+                {msg.imageUri && failedImages.has(msg.id) && (
+                  <View className="self-end max-w-[85%] mb-1">
+                    <View
+                      testID={`message-image-fallback-${msg.id}`}
+                      className="w-full aspect-[4/3] rounded-lg bg-surface items-center justify-center"
+                    >
+                      <Ionicons
+                        name="camera-outline"
+                        size={32}
+                        color={colors.muted}
+                      />
+                      <Text className="text-body-sm text-text-secondary mt-1">
+                        Image no longer available
+                      </Text>
+                    </View>
+                  </View>
+                )}
+                <MessageBubble
+                  role={msg.role}
+                  content={msg.content}
+                  streaming={msg.streaming}
+                  escalationRung={msg.escalationRung}
+                  verificationBadge={msg.verificationBadge}
+                  actions={renderMessageActions?.(msg)}
+                />
+              </View>
+            ))
         )}
         {isStreaming && (
           <View className="items-center py-4" testID="thinking-bulb-animation">
-            <LightBulbAnimation size={48} color={colors.muted} />
+            <DeskLampAnimation size={48} color={colors.muted} />
           </View>
         )}
         {showIdleAnim && (

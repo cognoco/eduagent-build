@@ -21,7 +21,7 @@ tags:
 
 # 2. Wait for parent dashboard
 # BUG-33 fix: parent persona routes to (parent)/dashboard with id: dashboard-scroll,
-# NOT (learner)/home with id: home-scroll-view.
+# NOT (learner)/home with id: learner-screen.
 - extendedWaitUntil:
     visible:
       id: "dashboard-scroll"

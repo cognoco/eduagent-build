@@ -64,7 +64,10 @@ describe('useDeleteAccount', () => {
   it('throws when POST /account/delete returns non-2xx', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
-        JSON.stringify({ error: { message: 'Unable to schedule deletion' } }),
+        JSON.stringify({
+          code: 'INTERNAL_ERROR',
+          message: 'Unable to schedule deletion',
+        }),
         { status: 500 }
       )
     );
@@ -113,7 +116,10 @@ describe('useCancelDeletion', () => {
   it('throws when POST /account/cancel-deletion returns non-2xx', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
-        JSON.stringify({ error: { message: 'Unable to cancel deletion' } }),
+        JSON.stringify({
+          code: 'FORBIDDEN',
+          message: 'Unable to cancel deletion',
+        }),
         { status: 403 }
       )
     );
@@ -166,7 +172,10 @@ describe('useExportData', () => {
   it('throws when GET /account/export returns non-2xx', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
-        JSON.stringify({ error: { message: 'Unable to export data' } }),
+        JSON.stringify({
+          code: 'INTERNAL_ERROR',
+          message: 'Unable to export data',
+        }),
         { status: 500 }
       )
     );

@@ -406,7 +406,11 @@ JS-only changes can be deployed in ~5 minutes via EAS Update instead of a full n
 
 ### Runtime Version Strategy
 
-Uses Expo's **fingerprint** policy for `runtimeVersion` — auto-generates a hash of all native dependencies, plugins, and config. When native things change, the hash changes and OTA updates are ignored (preventing JS/native mismatches). No manual version management.
+Uses **`appVersion` policy** for `runtimeVersion`. The runtime version is `"<version>:<versionCode>"` (e.g. `"1.0.0:1"`), derived from `version`/`android.versionCode` in app.json.
+
+**Why not fingerprint?** Expo's fingerprint policy was originally specified but fails in this pnpm monorepo: `@expo/fingerprint` hashes `node_modules/.pnpm/` virtual-store paths that differ between Windows (local) and Linux (EAS) even when the actual packages are identical. This causes spurious runtime-version divergence and "Configure expo-updates" build errors. A `.fingerprintignore` ignores most file-type sources but cannot ignore the 76 `type: "dir"` autolinking entries — an upstream limitation in `@expo/fingerprint` ≤0.15.4.
+
+**Trade-off:** When native dependencies change (app.json, new native modules, etc.), `version` in app.json must be bumped manually to block incompatible OTA updates. If you forget, OTA could ship a JS bundle expecting a native API not present in the installed build. See the risk table below.
 
 ### Update Channels
 
@@ -450,7 +454,7 @@ push to main (native change — rare)
     "checkAutomatically": "ON_LOAD",
     "fallbackToCacheTimeout": 5000
   },
-  "runtimeVersion": { "policy": "fingerprint" }
+  "runtimeVersion": { "policy": "appVersion" }
 }
 ```
 
@@ -458,9 +462,12 @@ push to main (native change — rare)
 
 | Risk | Mitigation |
 |------|-----------|
-| JS update calls native API not in installed build | Fingerprint policy auto-detects; mismatched updates ignored |
+| JS update calls native API not in installed build | Bump `version` in app.json when native deps change — this produces a new runtime version that OTA clients won't accept, preventing mismatched updates |
 | Broken JS update shipped | Fix forward with another push; `eas update:rollback` available |
 | 5-second launch delay on slow networks | Falls back to cached bundle after timeout |
+| Native dep bump without version bump | OTA clients silently receive incompatible JS — see appVersion trade-off above |
+
+> **Restoring fingerprint policy:** Re-evaluate when `@expo/fingerprint` gains support for ignoring `type: "dir"` autolinking sources in `.fingerprintignore` (blocked in ≤0.15.4). Also blocked by the ExpoConfigLoader Unicode-path error on Windows (`ZuzanaKopečná` username). Check `docs/known-issues/` or memory `project_fingerprint_pnpm_mismatch.md` before re-attempting.
 
 ---
 

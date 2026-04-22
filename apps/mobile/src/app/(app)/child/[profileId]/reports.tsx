@@ -2,7 +2,10 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useChildDetail } from '../../../../hooks/use-dashboard';
-import { useChildReports } from '../../../../hooks/use-progress';
+import {
+  useChildReports,
+  useChildWeeklyReports,
+} from '../../../../hooks/use-progress';
 import { goBackOrReplace } from '../../../../lib/navigation';
 
 /** Returns the formatted next report date and a human-friendly time context. */
@@ -56,6 +59,12 @@ export default function ChildReportsScreen(): React.ReactElement {
     isError,
     refetch,
   } = useChildReports(profileId);
+  const {
+    data: weeklyReports,
+    isLoading: weeklyLoading,
+    isError: weeklyError,
+    refetch: weeklyRefetch,
+  } = useChildWeeklyReports(profileId);
   const childName = child?.displayName ?? 'Your child';
 
   return (
@@ -85,13 +94,120 @@ export default function ChildReportsScreen(): React.ReactElement {
           </Pressable>
           <View className="flex-1">
             <Text className="text-h2 font-bold text-text-primary">
-              Monthly reports
+              Learning reports
             </Text>
             <Text className="text-body-sm text-text-secondary mt-0.5">
-              A clear record of what your child has learned over time.
+              Weekly snapshots and monthly summaries of your child's progress.
             </Text>
           </View>
         </View>
+
+        {weeklyLoading ? (
+          <View className="bg-surface rounded-card p-4 mt-4">
+            <Text className="text-body-sm text-text-secondary">
+              Loading weekly snapshots...
+            </Text>
+          </View>
+        ) : weeklyError ? (
+          <View
+            className="bg-surface rounded-card p-4 mt-4"
+            testID="weekly-reports-error"
+          >
+            <Text className="text-body font-semibold text-text-primary">
+              Couldn't load weekly snapshots
+            </Text>
+            <Text className="text-body-sm text-text-secondary mt-1">
+              Check your connection and try again.
+            </Text>
+            <Pressable
+              onPress={() => void weeklyRefetch()}
+              className="bg-primary rounded-button px-4 py-3 mt-3 items-center min-h-[48px] justify-center"
+              accessibilityRole="button"
+              accessibilityLabel="Retry loading weekly snapshots"
+              testID="weekly-reports-error-retry"
+            >
+              <Text className="text-body font-semibold text-text-inverse">
+                Try again
+              </Text>
+            </Pressable>
+          </View>
+        ) : weeklyReports && weeklyReports.length > 0 ? (
+          <View className="mt-4">
+            <Text
+              className="text-body font-semibold text-text-primary mb-2"
+              testID="weekly-reports-heading"
+            >
+              Weekly snapshots
+            </Text>
+            {weeklyReports.map((report) => (
+              <Pressable
+                key={report.id}
+                className="bg-surface rounded-card p-4 mb-3"
+                testID={`weekly-report-card-${report.id}`}
+                onPress={() =>
+                  router.push({
+                    pathname:
+                      '/(app)/child/[profileId]/weekly-report/[weeklyReportId]',
+                    params: { profileId, weeklyReportId: report.id },
+                  } as never)
+                }
+                accessibilityRole="button"
+                accessibilityLabel={`Week of ${new Date(
+                  `${report.reportWeek}T00:00:00Z`
+                ).toLocaleDateString(undefined, {
+                  month: 'short',
+                  day: 'numeric',
+                })}. ${report.headlineStat.label}: ${
+                  report.headlineStat.value
+                }`}
+              >
+                <View className="flex-row items-start justify-between">
+                  <View className="flex-1 me-3">
+                    <Text className="text-body font-semibold text-text-primary">
+                      Week of{' '}
+                      {new Date(
+                        `${report.reportWeek}T00:00:00Z`
+                      ).toLocaleDateString(undefined, {
+                        month: 'short',
+                        day: 'numeric',
+                      })}
+                    </Text>
+                    <Text className="text-body-sm text-text-secondary mt-1">
+                      {report.headlineStat.label}: {report.headlineStat.value}
+                    </Text>
+                    <Text className="text-caption text-text-secondary mt-1">
+                      {report.headlineStat.comparison}
+                    </Text>
+                  </View>
+                  {!report.viewedAt ? (
+                    <View className="bg-accent/15 rounded-full px-3 py-1">
+                      <Text className="text-caption font-semibold text-accent">
+                        New
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+              </Pressable>
+            ))}
+          </View>
+        ) : (
+          <View
+            className="bg-surface rounded-card p-4 mt-4"
+            testID="weekly-reports-empty"
+          >
+            <Text className="text-body font-semibold text-text-primary">
+              Weekly snapshots
+            </Text>
+            <Text className="text-body-sm text-text-secondary mt-1">
+              Weekly snapshots are generated each week once {childName} starts
+              learning. Check back soon!
+            </Text>
+          </View>
+        )}
+
+        <Text className="text-body font-semibold text-text-primary mt-4 mb-2">
+          Monthly reports
+        </Text>
 
         {isLoading ? (
           <View className="bg-surface rounded-card p-4 mt-4">

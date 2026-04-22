@@ -1,9 +1,11 @@
 import { and, eq, inArray } from 'drizzle-orm';
+import { z } from 'zod';
 import {
   accounts,
   familyLinks,
   notificationPreferences,
   profiles,
+  weeklyReports,
 } from '@eduagent/database';
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
@@ -12,26 +14,18 @@ import {
   getLatestSnapshot,
   getLatestSnapshotOnOrBefore,
 } from '../../services/snapshot-aggregation';
+import { generateWeeklyReportData } from '../../services/weekly-report';
 import { captureException } from '../../services/sentry';
 
-function isoDate(date: Date): string {
-  return date.toISOString().slice(0, 10);
-}
+import {
+  isoDate,
+  subtractDays,
+  sumTopicsExplored,
+} from '../../services/progress-helpers';
 
-function subtractDays(date: Date, days: number): Date {
-  const result = new Date(date);
-  result.setUTCDate(result.getUTCDate() - days);
-  return result;
-}
-
-function sumTopicsExplored(metrics: {
-  subjects: Array<{ topicsExplored?: number }>;
-}): number {
-  return metrics.subjects.reduce(
-    (sum, subject) => sum + (subject.topicsExplored ?? 0),
-    0
-  );
-}
+const weeklyProgressPushEventSchema = z.object({
+  parentId: z.string().uuid(),
+});
 
 // [FR239.1 UX-9] Returns true when 09:00 local time matches the UTC hour of nowUtc.
 // Parents with no timezone (or an invalid one) fall back to UTC, so they are
@@ -138,7 +132,13 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
   },
   { event: 'app/weekly-progress-push.generate' },
   async ({ event, step }) => {
-    const { parentId } = event.data as { parentId: string };
+    // Validate event payload at the boundary — invalid UUIDs would otherwise
+    // produce opaque DB errors deep inside the step. Clean skip on malformed data.
+    const parsed = weeklyProgressPushEventSchema.safeParse(event.data);
+    if (!parsed.success) {
+      return { status: 'skipped', reason: 'invalid_payload' };
+    }
+    const { parentId } = parsed.data;
 
     return step.run('send-weekly-push', async () => {
       try {
@@ -151,6 +151,15 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
         if (links.length === 0) {
           return { status: 'skipped', reason: 'no_children', parentId };
         }
+
+        // [BUG-524] Compute the Monday start date for this week's report
+        const now = new Date();
+        const day = now.getUTCDay();
+        const mondayOffset = day === 0 ? -6 : 1 - day;
+        const weekStartDate = new Date(now);
+        weekStartDate.setUTCDate(weekStartDate.getUTCDate() + mondayOffset);
+        weekStartDate.setUTCHours(0, 0, 0, 0);
+        const reportWeek = isoDate(weekStartDate);
 
         const childSummaries: string[] = [];
         for (const link of links) {
@@ -165,32 +174,63 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
             )
           );
 
+          // [CR-2] Clamp: treat previous snapshot as null when the gap exceeds 14 days.
+          // A wider gap means the "delta" spans multiple weeks rather than the current
+          // 7-day window, producing inflated session and minute counts for inactive learners.
+          const MAX_SNAPSHOT_GAP_MS = 14 * 24 * 60 * 60 * 1000;
+          const snapshotGapMs =
+            previous != null
+              ? new Date(`${latest.snapshotDate}T00:00:00Z`).getTime() -
+                new Date(`${previous.snapshotDate}T00:00:00Z`).getTime()
+              : 0;
+          const cappedPrevious =
+            snapshotGapMs <= MAX_SNAPSHOT_GAP_MS ? previous : null;
+
           const child = await db.query.profiles.findFirst({
             where: eq(profiles.id, link.childProfileId),
             columns: { displayName: true },
           });
 
           const name = child?.displayName ?? 'Your learner';
-          const topicDelta = previous
+          const topicDelta = cappedPrevious
             ? Math.max(
                 0,
-                latest.metrics.topicsMastered - previous.metrics.topicsMastered
+                latest.metrics.topicsMastered -
+                  cappedPrevious.metrics.topicsMastered
               )
             : null;
-          const vocabDelta = previous
+          const vocabDelta = cappedPrevious
             ? Math.max(
                 0,
                 latest.metrics.vocabularyTotal -
-                  previous.metrics.vocabularyTotal
+                  cappedPrevious.metrics.vocabularyTotal
               )
             : null;
-          const exploredDelta = previous
+          const exploredDelta = cappedPrevious
             ? Math.max(
                 0,
                 sumTopicsExplored(latest.metrics) -
-                  sumTopicsExplored(previous.metrics)
+                  sumTopicsExplored(cappedPrevious.metrics)
               )
             : null;
+
+          // [BUG-524] Persist the weekly report before building the push summary.
+          // Uses onConflictDoNothing so re-runs for the same week are idempotent.
+          const reportData = generateWeeklyReportData(
+            name,
+            reportWeek,
+            latest.metrics,
+            cappedPrevious?.metrics ?? null
+          );
+          await db
+            .insert(weeklyReports)
+            .values({
+              profileId: parentId,
+              childProfileId: link.childProfileId,
+              reportWeek,
+              reportData,
+            })
+            .onConflictDoNothing();
 
           if (
             latest.metrics.totalSessions === 0 ||

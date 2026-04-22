@@ -16,13 +16,13 @@
 #     create-subject-cancel)
 #   - apps/mobile/src/app/(learner)/onboarding/interview.tsx (chat-input, ChatShell)
 #
-# NOTE: The seed-and-sign-in setup flow waits for id: "home-scroll-view" as its
+# NOTE: The seed-and-sign-in setup flow waits for id: "learner-screen" as its
 # final step. With 0 subjects, the home screen immediately redirects to
 # /create-subject. The setup flow's last wait may timeout — that's expected.
 # Auth is still completed by that point. We add our own extended wait for
 # the create-subject screen.
 #
-# BUG-34: onboarding-complete now includes a subject (to keep home-scroll-view
+# BUG-34: onboarding-complete now includes a subject (to keep learner-screen
 # visible for other flows). Use onboarding-no-subject for the empty-state test.
 appId: com.mentomate.app
 tags:

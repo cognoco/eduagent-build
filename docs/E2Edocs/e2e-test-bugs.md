@@ -1454,3 +1454,145 @@ Same pattern as BUG-54 (session close endpoint), which was fixed in Session 16.
 - `app/consent.revoked` → try-catch ✓ (BUG-70, this fix)
 - `app/session.completed` → try-catch ✓ (BUG-54)
 - Restore endpoint → no Inngest call ✓ (no fix needed)
+
+---
+
+## BUG-71: Web E2E — Solo Learner Sees Onboarding Instead of Home (2026-04-21)
+
+**Status:** Open — needs investigation with local API
+**Severity:** High — smoke test failure
+**Affects:** Playwright J01 (`j01-learner-home.spec.ts`)
+**Type:** App bug (web platform, likely profile loading regression)
+**Found by:** Playwright Web Session 1
+
+**What happens:** J01 smoke-learner test navigates to `/home` with valid Clerk `storageState` from the setup project. Instead of the learner home with intent cards (Continue, Learn, Ask, Practice, Homework), the app shows the "Welcome! Let's set up your profile so your mentor can get to know you." onboarding screen with Get started button.
+
+**Why it matters:** J03 (parent, same auth mechanism) PASSES with its storageState. The sole difference is account type — solo learner vs parent with children. This suggests the profile loading path diverges for learner accounts.
+
+**Suspected root cause:** BUG-520 circular dependency fix (`api-client.ts` + `profile.ts`) changed how `activeProfileId` propagates. The `setActiveProfileId()` module-level variable may not be set before the first profile-fetch API calls. Alternatively, the missing `CLERK_TESTING_TOKEN` (Doppler value: `notsetyet`) causes Clerk to rate-limit or invalidate the solo-learner session.
+
+**Files to investigate:**
+- `apps/mobile/src/lib/api-client.ts` — `_activeProfileId` module variable, `setActiveProfileId()`
+- `apps/mobile/src/lib/profile.ts` — `ProfileProvider` `useEffect` that calls `setActiveProfileId()`
+- `apps/mobile/src/hooks/use-profiles.ts` — profile fetch timing
+
+**Reproduction:** Run `pnpm test:e2e:web --project=smoke-learner` against local API to eliminate staging/Cloudflare variables.
+
+---
+
+## BUG-72: Web E2E — Deep-Link Redirect Lands on Home Instead of Original Path (2026-04-21)
+
+**Status:** Open — needs investigation
+**Severity:** Medium — web-specific navigation bug
+**Affects:** Playwright W03 (`w03-deep-link-auth-redirect.spec.ts`)
+**Type:** App bug (web redirect logic)
+**Found by:** Playwright Web Session 1
+
+**What happens:** W03 navigates to an authenticated route without auth. The app correctly redirects to sign-in. After sign-in, the user lands on the default learner home instead of being redirected back to the original deep-linked path.
+
+**Screenshot:** Learner home screen with all intent cards visible and tab bar. App is working correctly but the redirect-back logic lost the original URL.
+
+**Suspected root cause:** `normalize-redirect-path.ts` has uncommitted changes on the `testing` branch. The redirect path storage (SecureStore or query parameter) may not correctly preserve or restore the return URL after Clerk sign-in completes on web.
+
+**Files to investigate:**
+- `apps/mobile/src/lib/normalize-redirect-path.ts` — uncommitted changes
+- `apps/mobile/src/app/(auth)/sign-in.tsx` — redirect after sign-in
+- Web-specific `useURL()` or `expo-linking` handling
+
+---
+
+## BUG-73: Web E2E — Library Loading Fails ("We couldn't load your library") (2026-04-21)
+
+**Status:** Open — needs investigation with local API
+**Severity:** Medium — data loading failure on web
+**Affects:** Playwright W02, J11, J13
+**Type:** App bug or infrastructure (needs isolation)
+**Found by:** Playwright Web Session 1
+
+**What happens:** Three tests show an authenticated user with the tab bar visible (Home, Library, Progress, More) but the main content area shows "We couldn't load your library right now" with a Retry button. The user IS authenticated and the profile IS loaded (tab bar renders correctly with correct nav items).
+
+**Screenshots:** Tab bar at bottom with all 4 tabs. Center of screen: "We couldn't load your library right now" + Retry button.
+
+**Suspected root cause (two possibilities):**
+1. **Cloudflare blocking:** Intermittent Cloudflare WAF blocks data-fetch API calls from the test runner. Would NOT reproduce against local API.
+2. **Schema drift:** The `testing` branch client expects a different response shape from the staging API (which runs `main` branch code). Library endpoint response parsing fails silently.
+
+**Reproduction:** Run the affected tests against local API. If they pass locally, this is pure infrastructure. If they fail locally too, it's a genuine API/client incompatibility.
+
+---
+
+## BUG-74: Dev-Client APK Missing expo-clipboard and expo-sensors Native Modules (2026-04-21)
+
+**Status:** Workaround applied (lazy imports) — APK rebuild needed
+**Severity:** High — blocks app startup without workaround
+**Affects:** All E2E flows
+**Type:** Infrastructure (APK out of date)
+**Found by:** Maestro Android Session 26
+
+**What happens:** App crashes at startup with `Cannot find native module 'ExpoClipboard'`. The dev-client APK was built before `expo-clipboard` (~8.0.8, added in commit `68a2288c`) and `expo-sensors` (^55.0.13, added in commit `6462af4f`) were added to the project.
+
+**Workaround applied:**
+- `apps/mobile/src/app/(app)/child/[profileId]/session/[sessionId].tsx` — changed `import * as Clipboard from 'expo-clipboard'` to lazy `require()` with try/catch
+- `apps/mobile/src/hooks/use-shake-detector.ts` — changed `import { Accelerometer } from 'expo-sensors'` to lazy `require()` with null guard
+
+**Proper fix:** Rebuild dev-client APK from current code via WSL2 (`./gradlew assembleDebug`) or EAS Build. After rebuild, revert lazy imports back to static imports.
+
+---
+
+## BUG-75: Metro Stale Cache References Deleted homework/_helpers/ Files (2026-04-21)
+
+**Status:** FIXED
+**Severity:** Critical — blocks all E2E flows (500 error on bundle load)
+**Affects:** All E2E flows
+**Type:** Infrastructure (Metro cache)
+**Found by:** Maestro Android Session 26
+
+**What happens:** Metro returns HTTP 500 when the dev-client requests the JS bundle. Error: `ENOENT: no such file or directory, open '...src/app/(app)/homework/_helpers/camera-reducer.ts'`. The files `camera-reducer.ts` and `problem-cards.ts` were moved from `src/app/(app)/homework/_helpers/` to `src/components/homework/` in commit `d4aaf109`, but Metro's cached bundle (`.bundle2` in temp dir) still referenced the old paths.
+
+**Root cause:** Expo Router's `require.context` (in `node_modules/expo-router/_ctx.android.js`) scans `src/app/` at bundle time. The stale cache preserved old route entries. The `_ctx` regex does NOT exclude `_`-prefixed directories — only `+api`, `+html`, `+middleware` patterns are excluded.
+
+**Fix:** `npx expo start --clear` + delete `/tmp/.bundle2` (or `C:/tools/tmp/.bundle2`). Metro regenerates the route context from the current filesystem.
+
+---
+
+## BUG-76: Push Token Registration Error Toast on Emulator (2026-04-21)
+
+**Status:** Open
+**Severity:** Low — emulator-only, but may interfere with Maestro assertions
+**Affects:** All post-sign-in flows on emulator
+**Type:** App behavior (missing error suppression)
+**Found by:** Maestro Android Session 26
+
+**What happens:** After sign-in, a red error toast appears: `[Push Token] Registration failed: Error: Make sure to complete the guide at https://docs.expo.dev/push-notifications/fcm-credentials/ : Default FirebaseApp is not initialized in this process com.mentomate.app`. The toast persists on screen and may block Maestro text/element assertions.
+
+**Root cause:** The emulator has no Google Play Services / Firebase configured. The push notification registration call fails and the error is surfaced as a user-visible toast instead of being silently logged.
+
+**Recommended fix:** Suppress the push token error toast in development builds or when `FirebaseApp` is not initialized. Log to console instead.
+
+---
+
+## BUG-77: seed-and-run.sh Missing X-Test-Secret Header (2026-04-21)
+
+**Status:** FIXED
+**Severity:** High — blocks all seeded E2E flows
+**Affects:** All flows using `seed-and-run.sh`
+**Type:** Infrastructure (test tooling)
+**Found by:** Maestro Android Session 26
+
+**What happens:** The seed endpoint (`POST /v1/__test/seed`) returns 403 Forbidden: "Invalid or missing test secret". The `.dev.vars` file has `TEST_SEED_SECRET` configured and `DOPPLER_ENVIRONMENT="stg"` (not "development"), so the secret check is enforced. `seed-and-run.sh` did not pass the `X-Test-Secret` header.
+
+**Fix:** Added `TEST_SEED_SECRET` env var support to `seed-and-run.sh`. The curl call now includes `-H "X-Test-Secret: ${TEST_SECRET}"` when the env var is set. Usage: `TEST_SEED_SECRET="..." ./scripts/seed-and-run.sh ...`
+
+---
+
+## BUG-78: More Tab Missing 'Appearance' Section (2026-04-21)
+
+**Status:** Open — needs investigation
+**Severity:** Medium — E2E flow failure
+**Affects:** `flows/account/more-tab-navigation.yaml`
+**Type:** App regression (testing branch)
+**Found by:** Maestro Android Session 26
+
+**What happens:** After sign-in succeeds and home screen loads, tapping "More" tab navigates to the More screen, but `"Appearance"` text assertion fails. The section may have been renamed, removed, or moved below the fold on the `testing` branch.
+
+**Reproduction:** Run `seed-and-run.sh onboarding-complete flows/account/more-tab-navigation.yaml` — sign-in passes, More tab tap succeeds, Appearance assertion fails.

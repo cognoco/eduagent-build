@@ -4,7 +4,7 @@ export function normalizeRedirectPath(
 ): string {
   const safeFallback = fallback.startsWith('/') ? fallback : '/home';
 
-  if (!value || !value.startsWith('/')) {
+  if (!value || !value.startsWith('/') || value.startsWith('//')) {
     return safeFallback;
   }
 

@@ -5,19 +5,19 @@
  * Billing services and metering calculations stay real.
  *
  * Mocked boundaries:
- * - JWT verification
+ * - JWT verification — intercepted via global fetch mock in setup.ts
  * - Stripe SDK wrapper
  */
 
 import { eq } from 'drizzle-orm';
 import { accounts, quotaPools, subscriptions } from '@eduagent/database';
 
-import { jwtMock, configureValidJWT, configureInvalidJWT } from './mocks';
 import {
   buildIntegrationEnv,
   cleanupAccounts,
   createIntegrationDb,
 } from './helpers';
+import { buildAuthHeaders } from './test-keys';
 
 const mockCustomersCreate = jest.fn();
 const mockCheckoutCreate = jest.fn();
@@ -49,9 +49,6 @@ jest.mock('../../apps/api/src/services/stripe', () => ({
   })),
 }));
 
-const jwt = jwtMock();
-jest.mock('../../apps/api/src/middleware/jwt', () => jwt);
-
 import { app } from '../../apps/api/src/index';
 import { getTierConfig } from '../../apps/api/src/services/subscription';
 
@@ -70,13 +67,6 @@ const TEST_ENV = {
 const AUTH_USER_ID = 'integration-billing-user';
 const AUTH_EMAIL = 'integration-billing@integration.test';
 const STRIPE_CURRENT_PERIOD_END = 1_777_680_000;
-
-function buildAuthHeaders(): HeadersInit {
-  return {
-    Authorization: 'Bearer valid.jwt.token',
-    'Content-Type': 'application/json',
-  };
-}
 
 async function seedAccount() {
   const db = createIntegrationDb();
@@ -165,7 +155,6 @@ async function loadQuotaPool(subscriptionId: string) {
 
 beforeEach(async () => {
   jest.clearAllMocks();
-  configureValidJWT(jwt, { sub: AUTH_USER_ID, email: AUTH_EMAIL });
 
   mockCustomersCreate.mockResolvedValue({ id: 'cus_checkout' });
   mockCheckoutCreate.mockResolvedValue({
@@ -206,7 +195,7 @@ describe('Integration: billing lifecycle routes', () => {
       '/v1/subscription',
       {
         method: 'GET',
-        headers: buildAuthHeaders(),
+        headers: buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }),
       },
       TEST_ENV
     );
@@ -244,7 +233,7 @@ describe('Integration: billing lifecycle routes', () => {
       '/v1/subscription',
       {
         method: 'GET',
-        headers: buildAuthHeaders(),
+        headers: buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }),
       },
       TEST_ENV
     );
@@ -268,7 +257,7 @@ describe('Integration: billing lifecycle routes', () => {
       '/v1/subscription/checkout',
       {
         method: 'POST',
-        headers: buildAuthHeaders(),
+        headers: buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }),
         body: JSON.stringify({ tier: 'plus', interval: 'monthly' }),
       },
       TEST_ENV
@@ -319,7 +308,7 @@ describe('Integration: billing lifecycle routes', () => {
       '/v1/subscription/cancel',
       {
         method: 'POST',
-        headers: buildAuthHeaders(),
+        headers: buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }),
       },
       TEST_ENV
     );
@@ -346,7 +335,7 @@ describe('Integration: billing lifecycle routes', () => {
       '/v1/subscription/cancel',
       {
         method: 'POST',
-        headers: buildAuthHeaders(),
+        headers: buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }),
       },
       TEST_ENV
     );
@@ -372,7 +361,7 @@ describe('Integration: billing lifecycle routes', () => {
       '/v1/usage',
       {
         method: 'GET',
-        headers: buildAuthHeaders(),
+        headers: buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }),
       },
       TEST_ENV
     );
@@ -399,7 +388,7 @@ describe('Integration: billing lifecycle routes', () => {
       '/v1/subscription/portal',
       {
         method: 'POST',
-        headers: buildAuthHeaders(),
+        headers: buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }),
       },
       TEST_ENV
     );
@@ -413,8 +402,6 @@ describe('Integration: billing lifecycle routes', () => {
   });
 
   it('returns 401 without authentication', async () => {
-    configureInvalidJWT(jwt);
-
     const res = await app.request(
       '/v1/subscription',
       {

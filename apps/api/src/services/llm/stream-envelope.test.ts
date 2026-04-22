@@ -180,15 +180,24 @@ describe('teeEnvelopeStream', () => {
     expect(fullRaw).toBe(raw);
   });
 
-  it('[A-2] rejects rawResponsePromise with deadlock error when awaited before draining', async () => {
-    const { rawResponsePromise } = teeEnvelopeStream(
-      fromChunks(['{"reply":"nope"}'])
+  it('[A-2] rawResponsePromise only settles after cleanReplyStream is drained', async () => {
+    const { cleanReplyStream, rawResponsePromise } = teeEnvelopeStream(
+      fromChunks(['{"reply":"order matters","signals":{}}'])
     );
 
-    // Awaiting the raw promise without ever draining cleanReplyStream
-    // should reject with a deadlock-detection error, not hang forever.
-    await expect(rawResponsePromise).rejects.toThrow(
-      'Drain cleanReplyStream first'
+    // rawResponsePromise must NOT settle before draining cleanReplyStream.
+    // Verify by racing against a short timeout — it should time out.
+    const timedOut = Symbol('timeout');
+    const result = await Promise.race([
+      rawResponsePromise,
+      new Promise<typeof timedOut>((r) => setTimeout(() => r(timedOut), 50)),
+    ]);
+    expect(result).toBe(timedOut);
+
+    // Now drain and verify it settles correctly.
+    await drain(cleanReplyStream);
+    await expect(rawResponsePromise).resolves.toBe(
+      '{"reply":"order matters","signals":{}}'
     );
   });
 });

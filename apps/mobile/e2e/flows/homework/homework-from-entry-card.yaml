@@ -10,7 +10,7 @@
 #               (scenario: homework-ready — provides "Algebra" subject)
 #
 # testIDs verified against:
-#   - apps/mobile/src/app/(learner)/home.tsx (home-scroll-view)
+#   - apps/mobile/src/app/(learner)/home.tsx (learner-screen)
 #   - apps/mobile/src/components/coaching/AdaptiveEntryCard.tsx (coaching-card-primary)
 #   - apps/mobile/src/app/(learner)/homework/camera.tsx (grant-permission-button,
 #     close-button, manual-input, manual-continue-button)
@@ -34,13 +34,12 @@ tags:
 # 2. Wait for home screen
 - extendedWaitUntil:
     visible:
-      id: "home-scroll-view"
+      id: "learner-screen"
     timeout: 15000
 
-# 3. Tap "Homework help" — primary action on AdaptiveEntryCard (teen persona)
-#    The primary button testID is "coaching-card-primary" (from BaseCoachingCard).
+# 3. Tap homework intent card (replaced coaching-card-primary)
 - tapOn:
-    id: "coaching-card-primary"
+    id: "intent-homework"
 
 # 4. Camera permission screen may appear — grant it (optional, may not appear)
 - tapOn:

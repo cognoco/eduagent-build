@@ -9,6 +9,7 @@ import {
   streaks,
   sessionEvents,
   sessionSummaries,
+  bookmarks,
   needsDeepeningTopics,
   parkingLotItems,
   teachingPreferences,
@@ -87,6 +88,7 @@ describe('createScopedRepository', () => {
     ['assessments', assessments],
     ['retentionCards', retentionCards],
     ['xpLedger', xpLedger],
+    ['bookmarks', bookmarks],
     ['parkingLotItems', parkingLotItems],
     ['teachingPreferences', teachingPreferences],
     ['curriculumAdaptations', curriculumAdaptations],
@@ -125,6 +127,7 @@ describe('createScopedRepository', () => {
     ['assessments', assessments],
     ['retentionCards', retentionCards],
     ['xpLedger', xpLedger],
+    ['bookmarks', bookmarks],
     ['parkingLotItems', parkingLotItems],
     ['teachingPreferences', teachingPreferences],
     ['curriculumAdaptations', curriculumAdaptations],
@@ -164,6 +167,7 @@ describe('createScopedRepository', () => {
     ['assessments', assessments],
     ['retentionCards', retentionCards],
     ['xpLedger', xpLedger],
+    ['bookmarks', bookmarks],
     ['sessionSummaries', sessionSummaries],
     ['parkingLotItems', parkingLotItems],
     ['teachingPreferences', teachingPreferences],
@@ -290,6 +294,7 @@ describe('createScopedRepository', () => {
       expect(repo.streaks).toBeDefined();
       expect(repo.sessionEvents).toBeDefined();
       expect(repo.sessionSummaries).toBeDefined();
+      expect(repo.bookmarks).toBeDefined();
       expect(repo.needsDeepeningTopics).toBeDefined();
       expect(repo.parkingLotItems).toBeDefined();
       expect(repo.teachingPreferences).toBeDefined();

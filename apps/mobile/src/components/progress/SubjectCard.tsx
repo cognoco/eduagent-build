@@ -1,75 +1,88 @@
-import { Pressable, Text, View } from 'react-native';
+import { useState } from 'react';
+import { LayoutAnimation, Pressable, Text, View } from 'react-native';
 import type { SubjectInventory } from '@eduagent/schemas';
+import { AccordionTopicList } from './AccordionTopicList';
 import { ProgressBar } from './ProgressBar';
 import { formatMinutes } from '../../lib/format-relative-date';
 
-type SubjectCardAction = 'review' | 'continue' | 'explore';
+// 'review' is planned for spaced-repetition scenarios but not yet wired.
+// Add it back here and to ACTION_LABEL + getContextualAction when implemented.
+type SubjectCardAction = 'continue' | 'explore';
 
 interface SubjectCardProps {
   subject: SubjectInventory;
   onPress?: () => void;
   onAction?: (action: SubjectCardAction) => void;
+  childProfileId?: string;
+  subjectId?: string;
   testID?: string;
 }
 
 function getContextualAction(subject: SubjectInventory): SubjectCardAction {
-  if (subject.topics.notStarted > 0) return 'continue';
+  // Only show "Continue" when the user has actual progress AND still has
+  // topics left to cover. An untouched subject (all notStarted, zero
+  // activity) should invite exploration, not continuation.
+  if (hasSubjectActivity(subject) && subject.topics.notStarted > 0)
+    return 'continue';
   return 'explore';
+}
+
+function getStartedTopicsCount(subject: SubjectInventory): number {
+  // inProgress + mastered = attemptedTopicIds.size (no double-counting).
+  // DO NOT add explored — it overlaps with inProgress/mastered because
+  // exploredTopicIds seeds attemptedTopicIds in the backend.
+  return subject.topics.inProgress + subject.topics.mastered;
+}
+
+export function hasSubjectActivity(subject: SubjectInventory): boolean {
+  return (
+    subject.sessionsCount > 0 ||
+    subject.topics.explored > 0 ||
+    subject.topics.inProgress > 0 ||
+    subject.topics.mastered > 0
+  );
 }
 
 function getTopicHeadline(subject: SubjectInventory): {
   headline: string;
   progressValue: number;
   progressMax: number;
-  footnote: string;
+  subline: string;
   hideBar: boolean;
 } {
-  const hasFixedGoal = subject.topics.total != null && subject.topics.total > 0;
+  const startedCount = getStartedTopicsCount(subject);
+  const sessionsLabel = `${subject.sessionsCount} ${
+    subject.sessionsCount === 1 ? 'session' : 'sessions'
+  }`;
+  const displayMinutes = formatMinutes(
+    subject.wallClockMinutes || subject.activeMinutes
+  );
+  const subline = `${displayMinutes} · ${sessionsLabel}`;
 
-  if (!hasFixedGoal) {
-    const exploredCount = Math.max(
-      subject.topics.explored,
-      subject.topics.mastered + subject.topics.inProgress
-    );
+  if (startedCount === 0 && subject.sessionsCount > 0) {
     return {
-      headline: `${exploredCount} topics explored`,
-      progressValue: exploredCount,
-      progressMax: Math.max(1, exploredCount),
-      // [M5] || is intentional: wallClockMinutes defaults to 0 for pre-F-045
-      // snapshots, so falsy-fallback correctly shows activeMinutes instead of 0.
-      footnote: formatMinutes(
-        subject.wallClockMinutes || subject.activeMinutes
-      ),
+      headline: `${subject.sessionsCount} ${
+        subject.sessionsCount === 1 ? 'session' : 'sessions'
+      } completed`,
+      progressValue: 0,
+      progressMax: 1,
+      subline,
       hideBar: true,
     };
   }
 
-  if (subject.topics.explored > 0) {
-    return {
-      headline: `${
-        subject.topics.mastered + subject.topics.explored
-      } topics explored`,
-      progressValue: subject.topics.mastered,
-      progressMax: subject.topics.total ?? 0,
-      footnote: `${subject.topics.mastered}/${subject.topics.total} planned topics mastered`,
-      hideBar: false,
-    };
-  }
-
-  // BUG-[NOTION-3468bce9]: Label "mastered" explicitly so the Progress
-  // screen's count isn't confused with the Library's "completed" count.
   return {
-    headline: `${subject.topics.mastered}/${subject.topics.total} topics mastered`,
+    headline: `${startedCount} ${
+      startedCount === 1 ? 'topic' : 'topics'
+    } started · ${subject.topics.mastered} mastered`,
     progressValue: subject.topics.mastered,
-    progressMax: subject.topics.total ?? 0,
-    // [M5] || intentional — see open-curriculum branch comment above.
-    footnote: formatMinutes(subject.wallClockMinutes || subject.activeMinutes),
-    hideBar: false,
+    progressMax: Math.max(1, subject.topics.total ?? 1),
+    subline,
+    hideBar: subject.topics.total == null,
   };
 }
 
 const ACTION_LABEL: Record<SubjectCardAction, string> = {
-  review: 'Review',
   continue: 'Continue',
   explore: 'Explore',
 };
@@ -78,10 +91,22 @@ export function SubjectCard({
   subject,
   onPress,
   onAction,
+  childProfileId,
+  subjectId,
   testID,
 }: SubjectCardProps): React.ReactElement {
+  const [expanded, setExpanded] = useState(false);
+  const isAccordionMode = !!childProfileId && !!subjectId && !onPress;
+  const hasExpandableTopics =
+    subject.sessionsCount > 0 || getStartedTopicsCount(subject) > 0;
   const topicHeadline = getTopicHeadline(subject);
   const action = getContextualAction(subject);
+
+  const handleToggle = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setExpanded((current) => !current);
+  };
+
   const content = (
     <View className="bg-surface rounded-card p-4">
       <View className="flex-row items-start justify-between">
@@ -115,16 +140,9 @@ export function SubjectCard({
 
       <View className="flex-row items-center justify-between mt-3">
         <Text className="text-caption text-text-secondary">
-          {topicHeadline.footnote}
+          {topicHeadline.subline}
         </Text>
         <View className="flex-row items-center gap-3">
-          <Text className="text-caption text-text-secondary">
-            {subject.vocabulary.total > 0
-              ? `${subject.vocabulary.total} words`
-              : `${subject.sessionsCount} ${
-                  subject.sessionsCount === 1 ? 'session' : 'sessions'
-                }`}
-          </Text>
           {onAction ? (
             <Pressable
               onPress={(e) => {
@@ -140,10 +158,43 @@ export function SubjectCard({
               </Text>
             </Pressable>
           ) : null}
+          {isAccordionMode && hasExpandableTopics ? (
+            <Text className="text-caption text-primary">
+              {expanded ? '▴ Hide topics' : '▾ See topics'}
+            </Text>
+          ) : null}
         </View>
       </View>
+
+      {isAccordionMode && childProfileId && subjectId ? (
+        <AccordionTopicList
+          childProfileId={childProfileId}
+          subjectId={subjectId}
+          subjectName={subject.subjectName}
+          expanded={expanded}
+        />
+      ) : null}
     </View>
   );
+
+  if (isAccordionMode) {
+    return (
+      <Pressable
+        onPress={handleToggle}
+        accessibilityRole="button"
+        accessibilityState={{ expanded }}
+        accessibilityLabel={`${subject.subjectName}, ${
+          expanded ? 'expanded' : 'collapsed'
+        }`}
+        accessibilityHint={
+          expanded ? 'Tap to hide topics' : 'Tap to show topics'
+        }
+        testID={testID}
+      >
+        {content}
+      </Pressable>
+    );
+  }
 
   if (!onPress) return content;
 

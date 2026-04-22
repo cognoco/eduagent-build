@@ -1,5 +1,5 @@
-import { Alert } from 'react-native';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { Alert, AppState, type AppStateStatus } from 'react-native';
+import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import CameraScreen from './camera';
 
@@ -126,8 +126,23 @@ const mockRouter = {
 
 const { useClassifySubject } = require('../../../hooks/use-classify-subject');
 
+// Capture AppState listeners so tests can simulate foreground transitions
+const mockRemove = jest.fn();
+let appStateListeners: Array<(state: AppStateStatus) => void> = [];
+jest
+  .spyOn(AppState, 'addEventListener')
+  .mockImplementation(
+    (_event: string, handler: (state: AppStateStatus) => void) => {
+      appStateListeners.push(handler);
+      return { remove: mockRemove } as ReturnType<
+        typeof AppState.addEventListener
+      >;
+    }
+  );
+
 beforeEach(() => {
   jest.clearAllMocks();
+  appStateListeners = [];
   mockLaunchImageLibraryAsync.mockResolvedValue({
     canceled: true,
     assets: null,
@@ -165,6 +180,7 @@ beforeEach(() => {
   useCameraPermissions.mockReturnValue([
     { granted: true, canAskAgain: true },
     jest.fn(),
+    jest.fn().mockResolvedValue({ granted: true, canAskAgain: true }),
   ]);
   (useHomeworkOcr as jest.Mock).mockReturnValue({
     text: null,
@@ -183,6 +199,7 @@ describe('CameraScreen', () => {
     useCameraPermissions.mockReturnValue([
       { granted: false, canAskAgain: true },
       jest.fn(),
+      jest.fn().mockResolvedValue({ granted: false, canAskAgain: true }),
     ]);
 
     const { getByText, getByTestId } = render(<CameraScreen />);
@@ -194,6 +211,7 @@ describe('CameraScreen', () => {
     useCameraPermissions.mockReturnValue([
       { granted: false, canAskAgain: true },
       jest.fn(),
+      jest.fn().mockResolvedValue({ granted: false, canAskAgain: true }),
     ]);
 
     const { getByText, queryByText } = render(<CameraScreen />);
@@ -212,11 +230,35 @@ describe('CameraScreen', () => {
     useCameraPermissions.mockReturnValue([
       { granted: false, canAskAgain: false },
       jest.fn(),
+      jest.fn().mockResolvedValue({ granted: false, canAskAgain: false }),
     ]);
 
     const { getByTestId, getByText } = render(<CameraScreen />);
     expect(getByTestId('open-settings-button')).toBeTruthy();
     expect(getByText(/device settings/i)).toBeTruthy();
+  });
+
+  it('re-checks permission when app returns from background (e.g. after Settings)', async () => {
+    // Start with permission denied
+    const mockGetPermission = jest.fn().mockResolvedValue({
+      granted: true,
+      canAskAgain: true,
+    });
+    useCameraPermissions.mockReturnValue([
+      { granted: false, canAskAgain: false },
+      jest.fn(),
+      mockGetPermission,
+    ]);
+
+    render(<CameraScreen />);
+
+    // Simulate returning from Settings — AppState fires 'active'
+    expect(appStateListeners.length).toBeGreaterThan(0);
+    await act(async () => {
+      appStateListeners.forEach((listener) => listener('active'));
+    });
+
+    expect(mockGetPermission).toHaveBeenCalled();
   });
 
   // ---- Viewfinder phase ----

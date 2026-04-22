@@ -2,31 +2,28 @@
  * Integration: Inngest trial-expiry function
  *
  * Exercises the real trial-expiry function against a real database.
- * Trial transitions, quota updates, and owner-profile lookup stay real.
+ * Trial transitions, quota updates, owner-profile lookup, and push
+ * notification delivery all stay real.
  *
- * Mocked boundary:
- * - Push delivery transport
+ * External boundary intercepted via fetch interceptor:
+ * - Expo Push API (mockExpoPush)
  */
 
 import { eq } from 'drizzle-orm';
 import {
   accounts,
+  notificationPreferences,
   profiles,
   quotaPools,
   subscriptions,
 } from '@eduagent/database';
 
 import { cleanupAccounts, createIntegrationDb } from './helpers';
+import { clearFetchCalls, getFetchCalls } from './fetch-interceptor';
+import { mockExpoPush } from './external-mocks';
 import { trialExpiry } from '../../apps/api/src/inngest/functions/trial-expiry';
 import { getTierConfig } from '../../apps/api/src/services/subscription';
 import { EXTENDED_TRIAL_MONTHLY_EQUIVALENT } from '../../apps/api/src/services/trial';
-
-const mockSendPushNotification = jest.fn();
-
-jest.mock('../../apps/api/src/services/notifications', () => ({
-  sendPushNotification: (...args: unknown[]) =>
-    mockSendPushNotification(...args),
-}));
 
 const JUST_EXPIRED_USER_ID = 'integration-trial-expired-now';
 const JUST_EXPIRED_EMAIL = 'integration-trial-expired-now@integration.test';
@@ -58,6 +55,18 @@ async function seedAccountWithOwnerProfile(input: {
       isOwner: true,
     })
     .returning();
+
+  // Seed notification preferences with an Expo push token so the
+  // real sendPushNotification function can deliver notifications
+  await db.insert(notificationPreferences).values({
+    profileId: profile!.id,
+    pushEnabled: true,
+    expoPushToken: `ExponentPushToken[test-${input.clerkUserId}]`,
+    reviewReminders: false,
+    dailyReminders: false,
+    weeklyProgressPush: true,
+    maxDailyPush: 10,
+  });
 
   return {
     account: account!,
@@ -146,9 +155,12 @@ function dateAtUtcNoon(offsetDays: number): Date {
   return date;
 }
 
+beforeAll(() => {
+  mockExpoPush();
+});
+
 beforeEach(async () => {
-  jest.clearAllMocks();
-  mockSendPushNotification.mockResolvedValue({ sent: true });
+  clearFetchCalls();
 
   await cleanupAccounts({
     emails: [JUST_EXPIRED_EMAIL, EXTENDED_EMAIL, WARNING_EMAIL],
@@ -257,30 +269,36 @@ describe('Integration: trial-expiry Inngest function', () => {
     expect(updatedExtendedQuota!.usedThisMonth).toBe(0);
     expect(updatedExtendedQuota!.usedToday).toBe(0);
 
-    expect(mockSendPushNotification).toHaveBeenCalledTimes(3);
-    expect(mockSendPushNotification).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({
-        profileId: warning.profile.id,
-        title: 'Trial ending soon',
-        type: 'trial_expiry',
-      })
+    // Verify the REAL notifications service called Expo Push API
+    const pushCalls = getFetchCalls('exp.host');
+    expect(pushCalls).toHaveLength(3);
+
+    // Parse push payloads to verify each notification
+    const pushPayloads = pushCalls.map((call) => JSON.parse(call.body!));
+
+    // Warning notification
+    const warningPush = pushPayloads.find(
+      (p: { to: string }) =>
+        p.to === `ExponentPushToken[test-${WARNING_USER_ID}]`
     );
-    expect(mockSendPushNotification).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({
-        profileId: justExpired.profile.id,
-        title: 'Your trial has ended',
-        type: 'trial_expiry',
-      })
+    expect(warningPush).toBeDefined();
+    expect(warningPush.title).toBe('Trial ending soon');
+    expect(warningPush.data.type).toBe('trial_expiry');
+
+    // Expired notification (soft landing for justExpired)
+    const expiredPush = pushPayloads.find(
+      (p: { to: string }) =>
+        p.to === `ExponentPushToken[test-${JUST_EXPIRED_USER_ID}]`
     );
-    expect(mockSendPushNotification).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({
-        profileId: extended.profile.id,
-        title: 'Your trial has ended',
-        type: 'trial_expiry',
-      })
+    expect(expiredPush).toBeDefined();
+    expect(expiredPush.title).toBe('Your trial has ended');
+
+    // Extended-expired notification (soft landing for extended)
+    const extendedPush = pushPayloads.find(
+      (p: { to: string }) =>
+        p.to === `ExponentPushToken[test-${EXTENDED_USER_ID}]`
     );
+    expect(extendedPush).toBeDefined();
+    expect(extendedPush.title).toBe('Your trial has ended');
   });
 });

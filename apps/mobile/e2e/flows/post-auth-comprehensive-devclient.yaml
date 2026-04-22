@@ -75,7 +75,7 @@ tags:
 # Wait for home screen to load (API calls + rendering)
 - extendedWaitUntil:
     visible:
-      id: "home-scroll-view"
+      id: "learner-screen"
     timeout: 30000
 
 - takeScreenshot: 02-home-screen-loaded
@@ -93,14 +93,13 @@ tags:
     text: "Just ask something"
     optional: true
 
-# Verify the "Add subject" button exists
+# Verify the intent card stack exists (replaced add-subject-button + coaching card)
 - assertVisible:
-    id: "add-subject-button"
+    id: "learner-intent-stack"
 
-# Verify retention strip is visible (seeded user has a subject)
+# Verify "Learn" intent card is visible (always-present, replaces add-subject-button)
 - assertVisible:
-    id: "retention-strip"
-    optional: true
+    id: "intent-learn"
 
 - takeScreenshot: 03-home-subjects-visible
 
@@ -113,12 +112,12 @@ tags:
 
 - extendedWaitUntil:
     visible:
-      text: "Appearance"
+      id: "learning-mode-casual"
     timeout: 15000
 
 - takeScreenshot: 04-more-screen-top
 
-# ── Appearance section ──
+# ── Learning Mode section (was Appearance — removed in adaptive home refactor) ──
 - assertVisible:
     text: "Teen (Dark)"
 - assertVisible:
@@ -217,7 +216,7 @@ tags:
 # PHASE 5: Theme Switching
 # ═══════════════════════════════════════════════════════════════════
 
-# Scroll to top to see Appearance
+# Scroll to top to see Learning Mode section
 - swipe:
     start: "50%,30%"
     end: "50%,70%"
@@ -227,7 +226,7 @@ tags:
 
 - extendedWaitUntil:
     visible:
-      text: "Appearance"
+      id: "learning-mode-casual"
     timeout: 10000
 
 # Switch to Eager Learner theme (stays in learner route group — safe)
@@ -237,10 +236,10 @@ tags:
 # Switch back to Teen (Dark)
 # BUG-11: After theme switch, the screen re-renders with new CSS variables.
 # Maestro's text recognition can fail during the transition. Wait for the
-# Appearance section header to be visible before tapping.
+# Learning Mode section to be visible before tapping.
 - extendedWaitUntil:
     visible:
-      text: "Appearance"
+      id: "learning-mode-casual"
     timeout: 10000
 
 - tapOn: "Teen (Dark)"
@@ -256,7 +255,7 @@ tags:
 - tapOn: "More"
 - extendedWaitUntil:
     visible:
-      text: "Appearance"
+      id: "learning-mode-casual"
     timeout: 10000
 
 - tapOn: "Parent (Light)"
@@ -274,7 +273,7 @@ tags:
 
 - extendedWaitUntil:
     visible:
-      id: "home-scroll-view"
+      id: "learner-screen"
     timeout: 15000
 
 - takeScreenshot: 13-back-to-teen-home

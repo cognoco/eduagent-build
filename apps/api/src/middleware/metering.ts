@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------------
 // Metering Middleware — Sprint 9 Phase 4 + Pre-Feature Hardening + Dual-Cap
-// Enforces quota on LLM-consuming routes (session messages + streaming).
+// Enforces quota on billable LLM-consuming routes.
 // Reads from KV cache first, falls back to DB, backfills KV on miss.
 //
 // Fixes applied:
@@ -59,8 +59,9 @@ export type MeteringEnv = {
 const LLM_ROUTE_PATTERNS = [
   /\/sessions\/[^/]+\/messages\/?$/,
   /\/sessions\/[^/]+\/stream\/?$/,
-  /\/subjects\/[^/]+\/interview\/?$/,
-  /\/subjects\/[^/]+\/interview\/stream\/?$/,
+  // Onboarding interview is intentionally unmetered.
+  // It has its own server-side hard cap (4 user exchanges) and should not
+  // burn the learner's tutoring quota before regular learning even starts.
   // Quiz round generation + prefetch both call the LLM (one call per round).
   // Completion/recent/stats are DB-only and must not decrement quota.
   /\/quiz\/rounds\/?$/,
@@ -74,12 +75,12 @@ const LLM_ROUTE_PATTERNS = [
 
 function isLlmRoute(path: string, method: string): boolean {
   // GET methods never decrement quota (we only bill POST requests that
-  // trigger an LLM call). Interview + quiz have GET endpoints on the same
-  // path prefix — filter them out from the GET match list.
+  // trigger an LLM call). Quiz has GET endpoints on the same path prefix —
+  // filter them out from the GET match list.
   if (method === 'GET') {
-    return LLM_ROUTE_PATTERNS.filter(
-      (p) => !p.source.includes('interview') && !p.source.includes('quiz')
-    ).some((pattern) => pattern.test(path));
+    return LLM_ROUTE_PATTERNS.filter((p) => !p.source.includes('quiz')).some(
+      (pattern) => pattern.test(path)
+    );
   }
   return LLM_ROUTE_PATTERNS.some((pattern) => pattern.test(path));
 }

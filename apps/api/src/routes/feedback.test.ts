@@ -1,3 +1,17 @@
+// Mock Inngest client — in CI there is no Inngest dev server or event key,
+// so the real `inngest.send()` throws when the feedback route queues a
+// delivery-failed event. Every other route test follows this same pattern
+// (see account.test.ts, books.test.ts, consent.test.ts).
+jest.mock('inngest/hono', () => ({
+  serve: jest.fn().mockReturnValue(jest.fn()),
+}));
+
+jest.mock('../inngest/client', () => ({
+  inngest: {
+    send: jest.fn().mockResolvedValue(undefined),
+  },
+}));
+
 import { Hono } from 'hono';
 import { feedbackRoutes } from './feedback';
 
@@ -101,7 +115,7 @@ describe('POST /feedback', () => {
       subject: string;
       from: string;
     };
-    expect(sentBody.to).toEqual(['support@mentomate.app']);
+    expect(sentBody.to).toEqual(['support@mentomate.com']);
     expect(sentBody.subject).toContain('Bug');
     expect(sentBody.from).toBe(TEST_EMAIL_FROM);
     expect(init?.headers).toEqual(
@@ -147,7 +161,7 @@ describe('POST /feedback', () => {
       }),
     });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ success: true });
+    expect(await res.json()).toEqual({ success: true, queued: true });
   });
 
   it('returns success even if Resend fetch throws (network failure)', async () => {
@@ -164,7 +178,7 @@ describe('POST /feedback', () => {
       }),
     });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ success: true });
+    expect(await res.json()).toEqual({ success: true, queued: true });
   });
 
   it('skips email when RESEND_API_KEY is not configured', async () => {
@@ -178,7 +192,7 @@ describe('POST /feedback', () => {
       }),
     });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ success: true });
+    expect(await res.json()).toEqual({ success: true, queued: true });
 
     // Verify no fetch to Resend was attempted
     const resendCalls = fetchSpy.mock.calls.filter(([input]) => {

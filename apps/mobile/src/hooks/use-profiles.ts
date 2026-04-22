@@ -1,4 +1,9 @@
-import { useQuery, type UseQueryResult } from '@tanstack/react-query';
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  type UseQueryResult,
+} from '@tanstack/react-query';
 import { useAuth } from '@clerk/clerk-expo';
 import { useApiClient } from '../lib/api-client';
 import type { Profile } from '@eduagent/schemas';
@@ -23,5 +28,31 @@ export function useProfiles(): UseQueryResult<Profile[]> {
       }
     },
     enabled: !!isSignedIn,
+  });
+}
+
+export function useUpdateProfileName() {
+  const client = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      profileId,
+      displayName,
+    }: {
+      profileId: string;
+      displayName: string;
+    }) => {
+      const res = await client.profiles[':id'].$patch({
+        param: { id: profileId },
+        json: { displayName },
+      });
+      await assertOk(res);
+      const data = (await res.json()) as { profile: Profile };
+      return data.profile;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['profiles'] });
+    },
   });
 }

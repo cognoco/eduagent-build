@@ -42,7 +42,7 @@ tags:
 
 - extendedWaitUntil:
     visible:
-      id: "home-scroll-view"
+      id: "learner-screen"
     timeout: 15000
 
 - takeScreenshot: library-nav-01-home
@@ -53,7 +53,7 @@ tags:
 # overallProgress.totalTopicsCompleted > 0 (guaranteed by retention-due).
 
 - tapOn:
-    id: "coaching-card-primary"
+    id: "intent-continue"
 
 # 2. Session active — chat input present
 - extendedWaitUntil:

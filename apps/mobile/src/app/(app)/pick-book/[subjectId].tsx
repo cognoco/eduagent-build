@@ -1,12 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TextInput,
-  Pressable,
-  ActivityIndicator,
-} from 'react-native';
+import { View, Text, ScrollView, TextInput, Pressable } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,7 +11,19 @@ import { SuggestionCard } from '../../../components/library/SuggestionCard';
 import { useThemeColors } from '../../../lib/theme';
 import { formatApiError } from '../../../lib/format-api-error';
 import { goBackOrReplace } from '../../../lib/navigation';
+import {
+  BookPageFlipAnimation,
+  MagicPenAnimation,
+} from '../../../components/common';
 import { platformAlert } from '../../../lib/platform-alert';
+
+// [BUG-539] Cycling messages mirror the quiz/launch.tsx pattern so users
+// see visual activity during the Neon + Worker cold-start window.
+const LOADING_MESSAGES = [
+  'Finding what to explore...',
+  'Building your options...',
+  'Almost there...',
+];
 
 export default function PickBookScreen(): React.ReactElement {
   const router = useRouter();
@@ -33,6 +38,8 @@ export default function PickBookScreen(): React.ReactElement {
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [customText, setCustomText] = useState('');
   const [showSkip, setShowSkip] = useState(false);
+  const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
+  const [loadingSlow, setLoadingSlow] = useState(false);
 
   // BUG-361: Synchronous mutex — filing.isPending has React batching delay,
   // so an alert "Try again" callback and a "Go" button tap in the same frame
@@ -60,6 +67,25 @@ export default function PickBookScreen(): React.ReactElement {
     setShowSkip(false);
     return undefined;
   }, [filing.isPending]);
+
+  // [BUG-539] Cycle loading messages every 1.5s while suggestions are loading
+  useEffect(() => {
+    if (!suggestionsQuery.isLoading) return;
+    const interval = setInterval(() => {
+      setLoadingMessageIndex((i) => (i + 1) % LOADING_MESSAGES.length);
+    }, 1500);
+    return () => clearInterval(interval);
+  }, [suggestionsQuery.isLoading]);
+
+  // [BUG-539] Show "taking longer" hint after 8s of loading
+  useEffect(() => {
+    if (!suggestionsQuery.isLoading) {
+      setLoadingSlow(false);
+      return;
+    }
+    const timer = setTimeout(() => setLoadingSlow(true), 8_000);
+    return () => clearTimeout(timer);
+  }, [suggestionsQuery.isLoading]);
 
   const suggestions = suggestionsQuery.data ?? [];
   const subject = subjects?.find((s) => s.id === subjectId);
@@ -179,25 +205,33 @@ export default function PickBookScreen(): React.ReactElement {
     );
   }
 
-  // Loading state
+  // [BUG-539] Loading state with cycling messages and slow-loading hint
   if (suggestionsQuery.isLoading) {
     return (
       <View
-        className="flex-1 bg-background items-center justify-center"
+        className="flex-1 bg-background items-center justify-center px-6"
         style={{ paddingTop: insets.top }}
         testID="pick-book-loading"
       >
-        <ActivityIndicator size="large" color={colors.accent} />
-        <Text className="text-body-sm text-text-secondary mt-3">
-          Loading suggestions...
+        <MagicPenAnimation size={100} color={colors.accent} />
+        <Text className="text-body text-text-secondary mt-4">
+          {LOADING_MESSAGES[loadingMessageIndex]}
         </Text>
+        {loadingSlow ? (
+          <Text
+            className="text-body-sm text-text-secondary text-center mt-2"
+            testID="pick-book-loading-slow"
+          >
+            This is taking a bit longer than usual...
+          </Text>
+        ) : null}
         <Pressable
           onPress={handleBack}
-          className="mt-6 px-5 py-3"
+          className="mt-10 px-5 py-3 min-h-[44px] items-center justify-center"
           accessibilityLabel="Go back"
           testID="pick-book-loading-back"
         >
-          <Text className="text-body text-primary font-semibold">Go back</Text>
+          <Text className="text-body font-semibold text-primary">Go back</Text>
         </Pressable>
       </View>
     );
@@ -372,7 +406,7 @@ export default function PickBookScreen(): React.ReactElement {
           className="absolute inset-0 bg-background/80 items-center justify-center"
           testID="pick-book-filing-overlay"
         >
-          <ActivityIndicator size="large" color={colors.accent} />
+          <BookPageFlipAnimation size={80} color={colors.accent} />
           <Text className="text-body-sm text-text-secondary mt-3">
             Organizing your library...
           </Text>

@@ -82,6 +82,40 @@ export const milestones = pgTable(
   ]
 );
 
+// [BUG-524] Weekly reports — mirrors monthlyReports, keyed by report_week
+// (Monday start date) instead of report_month.
+export const weeklyReports = pgTable(
+  'weekly_reports',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .$defaultFn(() => generateUUIDv7()),
+    profileId: uuid('profile_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    childProfileId: uuid('child_profile_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    reportWeek: date('report_week').notNull(),
+    reportData: jsonb('report_data').notNull(),
+    viewedAt: timestamp('viewed_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('weekly_reports_parent_child_week_uq').on(
+      table.profileId,
+      table.childProfileId,
+      table.reportWeek
+    ),
+    index('weekly_reports_child_week_idx').on(
+      table.childProfileId,
+      table.reportWeek
+    ),
+  ]
+);
+
 export const monthlyReports = pgTable(
   'monthly_reports',
   {

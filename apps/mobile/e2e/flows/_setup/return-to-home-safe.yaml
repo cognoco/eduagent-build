@@ -1,18 +1,20 @@
 # BUG-48 fix: Return to home, but only if dashboard-scroll is also not visible.
+# BUG-566 fix: Also guard against parent-gateway (parent-with-children scenario).
 #
-# Called conditionally from seed-and-sign-in.yaml when home-scroll-view
-# is NOT visible. This file adds a second guard: if dashboard-scroll IS
-# visible, we're on the parent dashboard — don't press Back.
+# Called conditionally from seed-and-sign-in.yaml when learner-screen
+# is NOT visible. This file adds guards: if dashboard-scroll or parent-gateway
+# IS visible, we're on a valid home screen — don't press Back.
 #
-# Without this guard, parent scenarios (parent-with-children, parent-solo)
+# Without these guards, parent scenarios (parent-with-children, parent-solo)
 # would incorrectly press Back after the parent redirect replaces
-# home-scroll-view with dashboard-scroll.
+# learner-screen with dashboard-scroll or parent-gateway.
 appId: com.mentomate.app
 ---
 # If dashboard-scroll is visible, we're on parent dashboard — do nothing.
+# If parent-gateway is visible, we're on the parent gateway home — do nothing.
 # Only press Back when we're truly stuck on a session/other screen.
 - runFlow:
     when:
       notVisible:
         id: "dashboard-scroll"
-    file: return-to-home.yaml
+    file: return-to-home-check-gateway.yaml

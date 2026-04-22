@@ -2,7 +2,7 @@
  * Integration: Subject Management Endpoints
  *
  * Exercises the subject CRUD routes via the real app + real database.
- * JWT verification is the only mocked boundary.
+ * JWT verification uses the real fetch interceptor installed in setup.ts.
  *
  * Validates:
  *
@@ -17,11 +17,8 @@
  * 9. GET /v1/subjects — 401 without auth
  */
 
-import { jwtMock, configureValidJWT } from './mocks';
 import { buildIntegrationEnv, cleanupAccounts } from './helpers';
-
-const jwt = jwtMock();
-jest.mock('../../apps/api/src/middleware/jwt', () => jwt);
+import { buildAuthHeaders, createProfileViaRoute } from './route-fixtures';
 
 import { app } from '../../apps/api/src/index';
 
@@ -31,36 +28,15 @@ const SUBJECT_AUTH_EMAIL = 'integration-subjects@integration.test';
 
 const SUBJECT_ID = '00000000-0000-4000-8000-000000000040';
 
-function buildAuthHeaders(profileId?: string): HeadersInit {
-  return {
-    Authorization: 'Bearer test-token',
-    'Content-Type': 'application/json',
-    ...(profileId ? { 'X-Profile-Id': profileId } : {}),
-  };
-}
-
 async function createOwnerProfile(): Promise<string> {
-  configureValidJWT(jwt, {
-    sub: SUBJECT_AUTH_USER_ID,
-    email: SUBJECT_AUTH_EMAIL,
+  const profile = await createProfileViaRoute({
+    app,
+    env: TEST_ENV,
+    user: { userId: SUBJECT_AUTH_USER_ID, email: SUBJECT_AUTH_EMAIL },
+    displayName: 'Integration Learner',
+    birthYear: 2000,
   });
-
-  const res = await app.request(
-    '/v1/profiles',
-    {
-      method: 'POST',
-      headers: buildAuthHeaders(),
-      body: JSON.stringify({
-        displayName: 'Integration Learner',
-        birthYear: 2000,
-      }),
-    },
-    TEST_ENV
-  );
-
-  expect(res.status).toBe(201);
-  const body = await res.json();
-  return body.profile.id as string;
+  return profile.id;
 }
 
 async function createSubject(
@@ -74,7 +50,10 @@ async function createSubject(
     '/v1/subjects',
     {
       method: 'POST',
-      headers: buildAuthHeaders(profileId),
+      headers: buildAuthHeaders(
+        { sub: SUBJECT_AUTH_USER_ID, email: SUBJECT_AUTH_EMAIL },
+        profileId
+      ),
       body: JSON.stringify({ name }),
     },
     TEST_ENV
@@ -112,7 +91,13 @@ describe('Integration: GET /v1/subjects', () => {
 
     const res = await app.request(
       '/v1/subjects',
-      { method: 'GET', headers: buildAuthHeaders(profileId) },
+      {
+        method: 'GET',
+        headers: buildAuthHeaders(
+          { sub: SUBJECT_AUTH_USER_ID, email: SUBJECT_AUTH_EMAIL },
+          profileId
+        ),
+      },
       TEST_ENV
     );
 
@@ -132,7 +117,10 @@ describe('Integration: GET /v1/subjects', () => {
       `/v1/subjects/${archived.id}`,
       {
         method: 'PATCH',
-        headers: buildAuthHeaders(profileId),
+        headers: buildAuthHeaders(
+          { sub: SUBJECT_AUTH_USER_ID, email: SUBJECT_AUTH_EMAIL },
+          profileId
+        ),
         body: JSON.stringify({ status: 'archived' }),
       },
       TEST_ENV
@@ -141,7 +129,13 @@ describe('Integration: GET /v1/subjects', () => {
 
     const res = await app.request(
       '/v1/subjects?includeInactive=true',
-      { method: 'GET', headers: buildAuthHeaders(profileId) },
+      {
+        method: 'GET',
+        headers: buildAuthHeaders(
+          { sub: SUBJECT_AUTH_USER_ID, email: SUBJECT_AUTH_EMAIL },
+          profileId
+        ),
+      },
       TEST_ENV
     );
 
@@ -172,7 +166,10 @@ describe('Integration: POST /v1/subjects', () => {
       '/v1/subjects',
       {
         method: 'POST',
-        headers: buildAuthHeaders(profileId),
+        headers: buildAuthHeaders(
+          { sub: SUBJECT_AUTH_USER_ID, email: SUBJECT_AUTH_EMAIL },
+          profileId
+        ),
         body: JSON.stringify({ name: 'Mathematics' }),
       },
       TEST_ENV
@@ -192,7 +189,10 @@ describe('Integration: POST /v1/subjects', () => {
       '/v1/subjects',
       {
         method: 'POST',
-        headers: buildAuthHeaders(profileId),
+        headers: buildAuthHeaders(
+          { sub: SUBJECT_AUTH_USER_ID, email: SUBJECT_AUTH_EMAIL },
+          profileId
+        ),
         body: JSON.stringify({ name: '' }),
       },
       TEST_ENV
@@ -213,7 +213,13 @@ describe('Integration: GET /v1/subjects/:id', () => {
 
     const res = await app.request(
       `/v1/subjects/${subject.id}`,
-      { method: 'GET', headers: buildAuthHeaders(profileId) },
+      {
+        method: 'GET',
+        headers: buildAuthHeaders(
+          { sub: SUBJECT_AUTH_USER_ID, email: SUBJECT_AUTH_EMAIL },
+          profileId
+        ),
+      },
       TEST_ENV
     );
 
@@ -229,7 +235,13 @@ describe('Integration: GET /v1/subjects/:id', () => {
 
     const res = await app.request(
       `/v1/subjects/${SUBJECT_ID}`,
-      { method: 'GET', headers: buildAuthHeaders(profileId) },
+      {
+        method: 'GET',
+        headers: buildAuthHeaders(
+          { sub: SUBJECT_AUTH_USER_ID, email: SUBJECT_AUTH_EMAIL },
+          profileId
+        ),
+      },
       TEST_ENV
     );
 
@@ -252,7 +264,10 @@ describe('Integration: PATCH /v1/subjects/:id', () => {
       `/v1/subjects/${subject.id}`,
       {
         method: 'PATCH',
-        headers: buildAuthHeaders(profileId),
+        headers: buildAuthHeaders(
+          { sub: SUBJECT_AUTH_USER_ID, email: SUBJECT_AUTH_EMAIL },
+          profileId
+        ),
         body: JSON.stringify({ name: 'Advanced Mathematics' }),
       },
       TEST_ENV
@@ -271,7 +286,10 @@ describe('Integration: PATCH /v1/subjects/:id', () => {
       `/v1/subjects/${SUBJECT_ID}`,
       {
         method: 'PATCH',
-        headers: buildAuthHeaders(profileId),
+        headers: buildAuthHeaders(
+          { sub: SUBJECT_AUTH_USER_ID, email: SUBJECT_AUTH_EMAIL },
+          profileId
+        ),
         body: JSON.stringify({ name: 'Updated Name' }),
       },
       TEST_ENV

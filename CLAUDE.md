@@ -83,6 +83,13 @@ pnpm run db:migrate:dev
 # LLM Eval Harness
 pnpm eval:llm                    # Tier 1: snapshot prompts (no LLM call)
 pnpm eval:llm --live             # Tier 2: real LLM call + schema validation
+
+# Playwright E2E (web)
+# IMPORTANT: Must use Doppler with -c stg to match .dev.vars (which is generated from stg config).
+# Using default Doppler config (dev) causes TEST_SEED_SECRET mismatch → 403 on seed endpoint.
+C:/Tools/doppler/doppler.exe run -c stg -- pnpm run test:e2e:web:smoke   # smoke only (~1-2 min)
+C:/Tools/doppler/doppler.exe run -c stg -- pnpm run test:e2e:web         # full suite
+# CLERK_TESTING_TOKEN is currently a placeholder — tests work without it but Clerk may rate-limit.
 ```
 
-Last updated: 2026-04-20
+Last updated: 2026-04-22

@@ -43,7 +43,10 @@ import { useClassifySubject } from '../../../hooks/use-classify-subject';
 import { useResolveSubject } from '../../../hooks/use-resolve-subject';
 import { useFiling } from '../../../hooks/use-filing';
 import { useStreaks } from '../../../hooks/use-streaks';
-import { useOverallProgress } from '../../../hooks/use-progress';
+import {
+  useOverallProgress,
+  useProgressInventory,
+} from '../../../hooks/use-progress';
 import { useNetworkStatus } from '../../../hooks/use-network-status';
 import { useApiReachability } from '../../../hooks/use-api-reachability';
 import { useCelebrationLevel } from '../../../hooks/use-settings';
@@ -64,6 +67,11 @@ import { useUpsertNote } from '../../../hooks/use-notes';
 import { getVoiceLocaleForLanguage } from '../../../lib/language-locales';
 import { useProfile } from '../../../lib/profile';
 import {
+  useCreateBookmark,
+  useDeleteBookmark,
+  useSessionBookmarks,
+} from '../../../hooks/use-bookmarks';
+import {
   readSessionRecoveryMarker,
   writeSessionRecoveryMarker,
 } from '../../../lib/session-recovery';
@@ -81,6 +89,7 @@ import { useSessionStreaming } from '../../../components/session/use-session-str
 import { useSubjectClassification } from '../../../components/session/use-subject-classification';
 import { useSessionActions } from '../../../components/session/use-session-actions';
 import { SessionMessageActions } from '../../../components/session/SessionMessageActions';
+import { BookmarkNudgeTooltip } from '../../../components/session/BookmarkNudgeTooltip';
 import {
   SessionToolAccessory,
   SessionAccessory,
@@ -302,6 +311,7 @@ function SessionScreenInner() {
   const modeConfig = getModeConfig(effectiveMode);
   const { data: streak } = useStreaks();
   const { data: overallProgress } = useOverallProgress();
+  const progressInventory = useProgressInventory();
   const { data: celebrationLevel = 'all' } = useCelebrationLevel();
   const showBookLink =
     effectiveMode !== 'homework' &&
@@ -389,6 +399,9 @@ function SessionScreenInner() {
   const [messageFeedback, setMessageFeedback] = useState<
     Record<string, MessageFeedbackState>
   >({});
+  const [bookmarkState, setBookmarkState] = useState<
+    Record<string, string | null>
+  >({});
   const [confirmationToast, setConfirmationToast] = useState<string | null>(
     null
   );
@@ -408,6 +421,7 @@ function SessionScreenInner() {
   >(null);
 
   const sessionNoteSavedRef = useRef(false);
+  const bookmarkStateRef = useRef<Record<string, string | null>>({});
   const closedSessionRef = useRef<{
     wallClockSeconds: number;
     fastCelebrations: PendingCelebration[];
@@ -429,6 +443,11 @@ function SessionScreenInner() {
   } | null>(null);
 
   const transcript = useSessionTranscript(routeSessionId ?? '');
+  const sessionBookmarksQuery = useSessionBookmarks(
+    activeSessionId ?? routeSessionId ?? undefined
+  );
+  const createBookmark = useCreateBookmark();
+  const deleteBookmark = useDeleteBookmark();
   const recordSystemPrompt = useRecordSystemPrompt(activeSessionId ?? '');
   const recordSessionEvent = useRecordSessionEvent(activeSessionId ?? '');
   const setSessionInputMode = useSetSessionInputMode(activeSessionId ?? '');
@@ -527,6 +546,15 @@ function SessionScreenInner() {
 
     return () => clearTimeout(timer);
   }, [confirmationToast]);
+
+  useEffect(() => {
+    const activeBookmarkState: Record<string, string | null> = {};
+    for (const bookmark of sessionBookmarksQuery.data ?? []) {
+      activeBookmarkState[bookmark.eventId] = bookmark.bookmarkId;
+    }
+    bookmarkStateRef.current = activeBookmarkState;
+    setBookmarkState(activeBookmarkState);
+  }, [sessionBookmarksQuery.data, activeSessionId, routeSessionId]);
 
   const effectiveSubjectId = classifiedSubject?.subjectId ?? subjectId ?? '';
   const effectiveSubjectName = classifiedSubject?.subjectName ?? subjectName;
@@ -945,11 +973,76 @@ function SessionScreenInner() {
 
   const latestAiMessageId = useMemo(
     () =>
-      [...messages]
-        .reverse()
-        .find((message) => message.role === 'assistant' && !message.streaming)
-        ?.id ?? null,
+      isStreaming
+        ? null
+        : [...messages]
+            .reverse()
+            .find(
+              (message) => message.role === 'assistant' && !message.streaming
+            )?.id ?? null,
+    [messages, isStreaming]
+  );
+
+  const aiResponseCount = useMemo(
+    () =>
+      messages.filter(
+        (message) =>
+          message.role === 'assistant' &&
+          !message.streaming &&
+          !message.isSystemPrompt &&
+          !!message.eventId
+      ).length,
     [messages]
+  );
+
+  const updateBookmarkEntry = useCallback(
+    (eventId: string, value: string | null) => {
+      setBookmarkState((prev) => {
+        const next = { ...prev, [eventId]: value };
+        bookmarkStateRef.current = next;
+        return next;
+      });
+    },
+    []
+  );
+
+  const handleToggleBookmark = useCallback(
+    async (message: ChatMessage) => {
+      const eventId = message.eventId;
+      if (!eventId) return;
+
+      const existingBookmarkId = bookmarkStateRef.current[eventId] ?? null;
+      if (existingBookmarkId === 'pending') {
+        return;
+      }
+
+      if (existingBookmarkId) {
+        updateBookmarkEntry(eventId, null);
+        try {
+          await deleteBookmark.mutateAsync(existingBookmarkId);
+        } catch (error) {
+          updateBookmarkEntry(eventId, existingBookmarkId);
+          platformAlert(
+            'Could not remove bookmark',
+            error instanceof Error ? error.message : 'Please try again.'
+          );
+        }
+        return;
+      }
+
+      updateBookmarkEntry(eventId, 'pending');
+      try {
+        const result = await createBookmark.mutateAsync({ eventId });
+        updateBookmarkEntry(eventId, result.bookmark.id);
+      } catch (error) {
+        updateBookmarkEntry(eventId, null);
+        platformAlert(
+          'Could not save bookmark',
+          error instanceof Error ? error.message : 'Please try again.'
+        );
+      }
+    },
+    [createBookmark, deleteBookmark, updateBookmarkEntry]
   );
 
   const endSessionButton = showEndSession ? (
@@ -1057,11 +1150,13 @@ function SessionScreenInner() {
         userMessageCount={userMessageCount}
         showWrongSubjectChip={showWrongSubjectChip}
         messageFeedback={messageFeedback}
+        bookmarkState={bookmarkState}
         quotaError={quotaError}
         isOwner={activeProfile?.isOwner === true}
         stage={conversationStage}
         handleQuickChip={handleQuickChip}
         handleMessageFeedback={handleMessageFeedback}
+        onToggleBookmark={handleToggleBookmark}
         handleReconnect={handleReconnect}
       />
     );
@@ -1109,6 +1204,7 @@ function SessionScreenInner() {
         title={modeConfig.title}
         subtitle={subtitle}
         placeholder={modeConfig.placeholder}
+        backFallback={subjectId ? `/(app)/shelf/${subjectId}` : undefined}
         messages={messages}
         onSend={handleSend}
         isStreaming={isStreaming}
@@ -1152,35 +1248,44 @@ function SessionScreenInner() {
         speechRecognitionLanguage={languageVoiceLocale}
         textToSpeechLanguage={languageVoiceLocale}
         footer={
-          <SessionFooter
-            showFilingPrompt={showFilingPrompt}
-            filingDismissed={filingDismissed}
-            filing={filing}
-            activeSessionId={activeSessionId}
-            effectiveMode={effectiveMode}
-            filingTopicHint={
-              rawInput ??
-              messages
-                .find((m) => m.role === 'user' && !m.isSystemPrompt)
-                ?.content?.slice(0, 80) ??
-              undefined
-            }
-            setShowFilingPrompt={setShowFilingPrompt}
-            setFilingDismissed={setFilingDismissed}
-            navigateToSessionSummary={navigateToSessionSummary}
-            router={router}
-            sessionExpired={sessionExpired}
-            notePromptOffered={notePromptOffered}
-            showNoteInput={showNoteInput}
-            setShowNoteInput={setShowNoteInput}
-            sessionNoteSavedRef={sessionNoteSavedRef}
-            topicId={topicId ?? undefined}
-            upsertNote={upsertNote}
-            colors={colors}
-            userMessageCount={userMessageCount}
-            showQuestionCount={modeConfig.showQuestionCount}
-            showBookLink={showBookLink}
-          />
+          <>
+            <BookmarkNudgeTooltip
+              aiResponseCount={aiResponseCount}
+              isFirstSession={
+                (progressInventory.data?.global.totalSessions ?? 0) === 0
+              }
+              profileId={activeProfile?.id}
+            />
+            <SessionFooter
+              showFilingPrompt={showFilingPrompt}
+              filingDismissed={filingDismissed}
+              filing={filing}
+              activeSessionId={activeSessionId}
+              effectiveMode={effectiveMode}
+              filingTopicHint={
+                rawInput ??
+                messages
+                  .find((m) => m.role === 'user' && !m.isSystemPrompt)
+                  ?.content?.slice(0, 80) ??
+                undefined
+              }
+              setShowFilingPrompt={setShowFilingPrompt}
+              setFilingDismissed={setFilingDismissed}
+              navigateToSessionSummary={navigateToSessionSummary}
+              router={router}
+              sessionExpired={sessionExpired}
+              notePromptOffered={notePromptOffered}
+              showNoteInput={showNoteInput}
+              setShowNoteInput={setShowNoteInput}
+              sessionNoteSavedRef={sessionNoteSavedRef}
+              topicId={topicId ?? undefined}
+              upsertNote={upsertNote}
+              colors={colors}
+              userMessageCount={userMessageCount}
+              showQuestionCount={modeConfig.showQuestionCount}
+              showBookLink={showBookLink}
+            />
+          </>
         }
       />
       <ParkingLotModal
@@ -1206,9 +1311,11 @@ function SessionScreenInner() {
       />
       {confirmationToast ? (
         <View
-          pointerEvents="none"
           className="absolute left-4 right-4 z-50 items-center"
-          style={{ bottom: Math.max(insets.bottom, 16) + 88 }}
+          style={{
+            pointerEvents: 'none',
+            bottom: Math.max(insets.bottom, 16) + 88,
+          }}
           testID="session-confirmation-toast"
         >
           <View className="rounded-full bg-text-primary px-4 py-3">

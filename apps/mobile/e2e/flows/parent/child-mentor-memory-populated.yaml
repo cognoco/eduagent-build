@@ -1,0 +1,65 @@
+# Parent child mentor memory - populated categories and controls
+# Tags: nightly, parent
+# Seed: mentor-memory-populated
+# Covers: populated parent view of mentor memory
+# Usage: ./scripts/seed-and-run.sh mentor-memory-populated flows/parent/child-mentor-memory-populated.yaml
+appId: com.mentomate.app
+tags:
+  - nightly
+  - parent
+---
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+
+- extendedWaitUntil:
+    visible:
+      id: "dashboard-scroll"
+    timeout: 15000
+
+- tapOn:
+    id: "dashboard-child-${CHILD_PROFILE_ID}-primary"
+
+- extendedWaitUntil:
+    visible:
+      id: "child-detail-scroll"
+    timeout: 10000
+
+- scrollUntilVisible:
+    element:
+      id: "mentor-memory-link"
+    direction: DOWN
+    timeout: 10000
+
+- tapOn:
+    id: "mentor-memory-link"
+
+- extendedWaitUntil:
+    visible:
+      text: "What the mentor knows"
+    timeout: 10000
+
+- assertNotVisible:
+    text: "No learning observations yet."
+
+- scrollUntilVisible:
+    element:
+      text: "Interested in Soccer"
+    direction: DOWN
+    timeout: 10000
+
+- takeScreenshot: 01-parent-memory-populated
+
+- scrollUntilVisible:
+    element:
+      id: "something-wrong-button"
+    direction: DOWN
+    timeout: 10000
+
+- takeScreenshot: 02-parent-memory-controls
+
+- pressKey: back
+
+- extendedWaitUntil:
+    visible:
+      id: "child-detail-scroll"
+    timeout: 10000

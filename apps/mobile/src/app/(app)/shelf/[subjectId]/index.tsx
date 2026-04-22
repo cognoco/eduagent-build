@@ -1,15 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  Text,
-  View,
-} from 'react-native';
+import { FlatList, Pressable, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import type { BookProgressStatus, BookSuggestion } from '@eduagent/schemas';
+import { BookPageFlipAnimation } from '../../../../components/common';
 import { ErrorFallback } from '../../../../components/common/ErrorFallback';
 import { BookCard } from '../../../../components/library/BookCard';
 import { SuggestionCard } from '../../../../components/library/SuggestionCard';
@@ -100,44 +95,9 @@ export default function ShelfScreen() {
     }
   };
 
-  // Single-book auto-skip: navigate directly to the book screen
-  // BUG-354: One-shot guard — without this, every React Query refetch
-  // re-triggers the replace and bounces the user back after navigating away.
-  const autoSkippedRef = useRef(false);
-  // BUG-FIX: Reset guard when subjectId changes — Expo Router reuses the
-  // component instance across different [subjectId] navigations, so the ref
-  // would stay true from a previous subject and block auto-skip for new ones.
-  const prevSubjectIdRef = useRef(subjectId);
-  if (prevSubjectIdRef.current !== subjectId) {
-    prevSubjectIdRef.current = subjectId;
-    autoSkippedRef.current = false;
-  }
-  useEffect(() => {
-    if (autoSkippedRef.current) return;
-    if (booksQuery.data && booksQuery.data.length === 1 && subjectId) {
-      autoSkippedRef.current = true;
-      const onlyBook = booksQuery.data[0]!;
-      router.replace({
-        pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
-        params: { subjectId, bookId: onlyBook.id },
-      } as never);
-    }
-  }, [booksQuery.data, subjectId, router]);
-
-  // Single-book shelf: if auto-skip already fired, redirect to library.
-  // Without this, navigating back from the book screen can land here
-  // (router.replace doesn't reliably remove the shelf from the back stack)
-  // and autoSkippedRef blocks re-redirect → dead-end blank screen.
-  // MUST run before any early-return so rules-of-hooks are preserved.
-  useEffect(() => {
-    if (
-      booksQuery.data &&
-      booksQuery.data.length === 1 &&
-      autoSkippedRef.current
-    ) {
-      router.replace('/(app)/library' as never);
-    }
-  }, [booksQuery.data, router]);
+  // Single-book auto-skip REMOVED — user testing confirmed it was
+  // disorienting. The shelf screen always shows, even with one book.
+  // See spec flag: "if the auto-skip feels disorienting, revert."
 
   // Guard: param must exist
   if (!subjectId) {
@@ -160,17 +120,6 @@ export default function ShelfScreen() {
           </Text>
         </Pressable>
       </View>
-    );
-  }
-
-  if (booksQuery.data && booksQuery.data.length === 1) {
-    // Brief placeholder while redirect fires — never a dead-end.
-    return (
-      <View
-        className="flex-1 bg-background"
-        style={{ paddingTop: insets.top }}
-        testID="shelf-single-book"
-      />
     );
   }
 
@@ -223,7 +172,7 @@ export default function ShelfScreen() {
         style={{ paddingTop: insets.top }}
         testID="shelf-loading"
       >
-        <ActivityIndicator size="large" color={themeColors.accent} />
+        <BookPageFlipAnimation size={80} color={themeColors.accent} />
         <Text className="text-body-sm text-text-secondary mt-3">
           Loading this shelf...
         </Text>
@@ -427,7 +376,7 @@ export default function ShelfScreen() {
           className="absolute inset-0 bg-background/80 items-center justify-center"
           testID="shelf-filing-overlay"
         >
-          <ActivityIndicator size="large" color={themeColors.accent} />
+          <BookPageFlipAnimation size={80} color={themeColors.accent} />
           <Text className="text-body-sm text-text-secondary mt-3">
             Organizing your library...
           </Text>

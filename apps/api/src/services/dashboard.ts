@@ -35,6 +35,7 @@ import {
   buildProgressHistory,
   getLatestSnapshot,
   getLatestSnapshotOnOrBefore,
+  MAX_SESSION_WALL_CLOCK_SECONDS,
 } from './snapshot-aggregation';
 import {
   getMonthlyReportForParentChild,
@@ -42,6 +43,7 @@ import {
   markMonthlyReportViewed,
 } from './monthly-report';
 import { assertParentAccess } from './family-access';
+import { isoDate, subtractDays, sumTopicsExplored } from './progress-helpers';
 
 export interface DashboardInput {
   childProfileId: string;
@@ -240,34 +242,23 @@ function formatSessionDisplayTitle(
   }
 }
 
-function isoDate(date: Date): string {
-  return date.toISOString().slice(0, 10);
-}
-
-function subtractDays(date: Date, days: number): Date {
-  const result = new Date(date);
-  result.setUTCDate(result.getUTCDate() - days);
-  return result;
-}
-
-function sumTopicsExplored(metrics: {
-  subjects: Array<{ topicsExplored?: number }>;
-}): number {
-  return metrics.subjects.reduce(
-    (sum, subject) => sum + (subject.topicsExplored ?? 0),
-    0
-  );
-}
-
-function buildProgressGuidance(
+export function buildProgressGuidance(
   childName: string,
   subjectNames: string[],
   sessionsThisWeek: number,
-  previousSessions: number
+  previousSessions: number,
+  currentStreak?: number
 ): string | null {
   const primarySubject = subjectNames[0];
 
   if (sessionsThisWeek === 0 && primarySubject) {
+    // [BUG-523] A non-zero streak proves recent activity — "Quiet week" would
+    // contradict the visible streak badge. Show an encouraging nudge instead.
+    if ((currentStreak ?? 0) > 0) {
+      return `${childName} has a ${
+        currentStreak ?? 0
+      }-day streak — keep it going with ${primarySubject}!`;
+    }
     return `Quiet week — maybe suggest a quick session on ${primarySubject}?`;
   }
 
@@ -285,7 +276,8 @@ async function buildChildProgressSummary(
   sessionsThisWeek: number,
   sessionsLastWeek: number,
   totalTimeThisWeekMinutes: number,
-  subjectNames: string[]
+  subjectNames: string[],
+  currentStreak?: number
 ): Promise<{ progress: DashboardChild['progress']; totalSessions: number }> {
   // [F-PV-07] Compute totalSessions live with the same filter as getChildSessions
   // (exchangeCount >= 1) instead of reading the stale snapshot value. This
@@ -355,7 +347,8 @@ async function buildChildProgressSummary(
         childName,
         subjectNames,
         sessionsThisWeek,
-        sessionsLastWeek
+        sessionsLastWeek,
+        currentStreak
       ),
     },
     totalSessions: liveSessionCount,
@@ -510,7 +503,6 @@ export async function getChildrenForParent(
 
     // Prefer wall-clock time with active-time fallback for legacy sessions.
     // Cap per session to prevent abandoned sessions from inflating the total.
-    const MAX_SESSION_WALL_CLOCK_SECONDS = 3 * 60 * 60; // 3 hours
     const getDisplaySeconds = (session: {
       wallClockSeconds: number | null;
       durationSeconds: number | null;
@@ -589,7 +581,8 @@ export async function getChildrenForParent(
         p.sessionsThisWeek,
         p.sessionsLastWeek,
         p.totalTimeThisWeekMinutes,
-        p.subjectNames
+        p.subjectNames,
+        streaksByProfile.get(p.childProfileId)?.currentStreak ?? 0
       )
     )
   );
@@ -693,10 +686,16 @@ export async function getChildDetail(
     (s) => s.startedAt >= startOfLastWeek && s.startedAt < startOfThisWeek
   ).length;
 
+  // Cap per session to prevent abandoned sessions from inflating the total
+  // (same constant as snapshot-aggregation / getChildrenForParent).
   const getDisplaySeconds = (session: {
     wallClockSeconds: number | null;
     durationSeconds: number | null;
-  }): number => session.wallClockSeconds ?? session.durationSeconds ?? 0;
+  }): number =>
+    Math.min(
+      session.wallClockSeconds ?? session.durationSeconds ?? 0,
+      MAX_SESSION_WALL_CLOCK_SECONDS
+    );
 
   const totalTimeThisWeek = recentSessions
     .filter((s) => s.startedAt >= startOfThisWeek)
@@ -747,7 +746,8 @@ export async function getChildDetail(
       sessionsThisWeek,
       sessionsLastWeek,
       totalTimeThisWeekMinutes,
-      subjectNames
+      subjectNames,
+      streakRow?.currentStreak ?? 0
     );
 
   // Step 7: Compute all derived fields using the same helpers as getChildrenForParent
@@ -876,10 +876,14 @@ export async function getChildSubjectTopics(
   // Cloudflare Workers 50-subrequest limit for subjects with > 6 topics.
   const results = await getTopicProgressBatch(db, childProfileId, topics);
 
-  return results.map((topic) => ({
-    ...topic,
-    totalSessions: totalSessionsByTopic.get(topic.topicId) ?? 0,
-  }));
+  // Only return topics where the student had at least 1 exchange.
+  // Topics with no sessions have no connection to the student.
+  return results
+    .map((topic) => ({
+      ...topic,
+      totalSessions: totalSessionsByTopic.get(topic.topicId) ?? 0,
+    }))
+    .filter((topic) => topic.totalSessions >= 1);
 }
 
 // ---------------------------------------------------------------------------
@@ -889,7 +893,9 @@ export async function getChildSubjectTopics(
 export interface ChildSession {
   sessionId: string;
   subjectId: string;
+  subjectName: string | null;
   topicId: string | null;
+  topicTitle: string | null;
   sessionType: string;
   startedAt: string;
   endedAt: string | null;
@@ -932,19 +938,44 @@ export async function getChildSessions(
 
   // Batch-fetch highlights from session_summaries for all sessions
   const sessionIds = sessions.map((s) => s.id);
-  const summaries = await db.query.sessionSummaries.findMany({
-    where: inArray(sessionSummaries.sessionId, sessionIds),
-    columns: {
-      sessionId: true,
-      highlight: true,
-      narrative: true,
-      conversationPrompt: true,
-      engagementSignal: true,
-    },
-  });
+
+  // [BUG-526] Batch-fetch subject names and topic titles so the mobile
+  // client can render structured context instead of relying on the highlight string.
+  const uniqueSubjectIds = [...new Set(sessions.map((s) => s.subjectId))];
+  const uniqueTopicIds = [
+    ...new Set(sessions.map((s) => s.topicId).filter(Boolean) as string[]),
+  ];
+
+  const [summaries, subjectRows, topicRows] = await Promise.all([
+    db.query.sessionSummaries.findMany({
+      where: inArray(sessionSummaries.sessionId, sessionIds),
+      columns: {
+        sessionId: true,
+        highlight: true,
+        narrative: true,
+        conversationPrompt: true,
+        engagementSignal: true,
+      },
+    }),
+    uniqueSubjectIds.length > 0
+      ? db.query.subjects.findMany({
+          where: inArray(subjects.id, uniqueSubjectIds),
+          columns: { id: true, name: true },
+        })
+      : Promise.resolve([]),
+    uniqueTopicIds.length > 0
+      ? db.query.curriculumTopics.findMany({
+          where: inArray(curriculumTopics.id, uniqueTopicIds),
+          columns: { id: true, title: true },
+        })
+      : Promise.resolve([]),
+  ]);
+
   const summaryBySession = new Map(
     summaries.map((summary) => [summary.sessionId, summary])
   );
+  const subjectNameById = new Map(subjectRows.map((s) => [s.id, s.name]));
+  const topicTitleById = new Map(topicRows.map((t) => [t.id, t.title]));
 
   return sessions.map((s) => {
     const metadata = getSessionMetadata(s.metadata);
@@ -955,7 +986,9 @@ export async function getChildSessions(
     return {
       sessionId: s.id,
       subjectId: s.subjectId,
+      subjectName: subjectNameById.get(s.subjectId) ?? null,
       topicId: s.topicId,
+      topicTitle: s.topicId ? topicTitleById.get(s.topicId) ?? null : null,
       sessionType: s.sessionType,
       startedAt: s.startedAt.toISOString(),
       endedAt: s.endedAt?.toISOString() ?? null,
@@ -1001,21 +1034,35 @@ export async function getChildSessionDetail(
   const metadata = getSessionMetadata(session.metadata);
   const homeworkSummary = metadata.homeworkSummary ?? null;
 
-  // Fetch highlight for this single session
-  const summary = await db.query.sessionSummaries.findFirst({
-    where: eq(sessionSummaries.sessionId, sessionId),
-    columns: {
-      highlight: true,
-      narrative: true,
-      conversationPrompt: true,
-      engagementSignal: true,
-    },
-  });
+  // [BUG-526] Fetch highlight + structured subject/topic names in parallel
+  const [summary, subjectRow, topicRow] = await Promise.all([
+    db.query.sessionSummaries.findFirst({
+      where: eq(sessionSummaries.sessionId, sessionId),
+      columns: {
+        highlight: true,
+        narrative: true,
+        conversationPrompt: true,
+        engagementSignal: true,
+      },
+    }),
+    db.query.subjects.findFirst({
+      where: eq(subjects.id, session.subjectId),
+      columns: { name: true },
+    }),
+    session.topicId
+      ? db.query.curriculumTopics.findFirst({
+          where: eq(curriculumTopics.id, session.topicId),
+          columns: { title: true },
+        })
+      : Promise.resolve(null),
+  ]);
 
   return {
     sessionId: session.id,
     subjectId: session.subjectId,
+    subjectName: subjectRow?.name ?? null,
     topicId: session.topicId,
+    topicTitle: topicRow?.title ?? null,
     sessionType: session.sessionType,
     startedAt: session.startedAt.toISOString(),
     endedAt: session.endedAt?.toISOString() ?? null,

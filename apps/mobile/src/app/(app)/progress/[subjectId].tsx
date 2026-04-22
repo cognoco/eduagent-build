@@ -168,15 +168,20 @@ export default function ProgressSubjectScreen(): React.ReactElement {
                   ? `${subject.topics.mastered}/${subject.topics.total} planned topics mastered`
                   : subject.topics.total === 0
                   ? 'No topics planned yet'
-                  : `${Math.max(
-                      subject.topics.explored,
-                      subject.topics.mastered + subject.topics.inProgress
-                    )} topics explored`}
+                  : (() => {
+                      const n = Math.max(
+                        subject.topics.explored,
+                        subject.topics.mastered + subject.topics.inProgress
+                      );
+                      return `${n} ${n === 1 ? 'topic' : 'topics'} explored`;
+                    })()}
               </Text>
               <Text className="text-body-sm text-text-secondary mt-2">
                 {subject.vocabulary.total > 0
                   ? `${subject.vocabulary.total} words tracked in this subject`
-                  : `${subject.sessionsCount} sessions completed`}
+                  : `${subject.sessionsCount} ${
+                      subject.sessionsCount === 1 ? 'session' : 'sessions'
+                    } completed`}
               </Text>
               {subject.topics.total != null && subject.topics.total > 0 ? (
                 <View className="mt-4">
@@ -191,7 +196,7 @@ export default function ProgressSubjectScreen(): React.ReactElement {
 
             <View className="flex-row gap-3 mt-4">
               <StatCard
-                label="In progress"
+                label="Started"
                 value={String(subject.topics.inProgress)}
               />
               <StatCard

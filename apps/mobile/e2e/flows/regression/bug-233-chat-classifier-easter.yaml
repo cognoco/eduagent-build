@@ -28,12 +28,12 @@ tags:
 # 2. Wait for home screen
 - extendedWaitUntil:
     visible:
-      id: "home-scroll-view"
+      id: "learner-screen"
     timeout: 15000
 
-# 3. Start a freeform session via coaching card
+# 3. Start a freeform session via intent-ask card (replaced coaching-card-primary)
 - tapOn:
-    id: "coaching-card-primary"
+    id: "intent-ask"
 
 # 4. Wait for session chat input
 - extendedWaitUntil:

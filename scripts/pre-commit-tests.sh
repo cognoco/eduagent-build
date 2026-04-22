@@ -98,8 +98,19 @@ API_PROPAGATED="$API_FILES $SCHEMAS_FILES $DATABASE_FILES $RETENTION_FILES"
 run_jest apps/api $API_PROPAGATED
 
 # --- Mobile tests (only when mobile files are staged) ---
-# shellcheck disable=SC2086
-run_jest apps/mobile $MOBILE_FILES
+# session/index.test.tsx runs after 70+ other suites in one worker and exceeds the
+# default 4 GB V8 heap on Windows. Raise the limit to 6 GB so the worker survives.
+if [ -n "$MOBILE_FILES" ]; then
+  abs_mobile_files=""
+  for f in $MOBILE_FILES; do
+    abs_mobile_files="$abs_mobile_files $WORKSPACE_ROOT/$f"
+  done
+  echo "pre-commit-tests: [apps/mobile] jest --findRelatedTests ($MOBILE_FILES)"
+  # shellcheck disable=SC2086
+  if ! (cd "$WORKSPACE_ROOT/apps/mobile" && NODE_OPTIONS='--max-old-space-size=6144' pnpm exec jest --findRelatedTests $abs_mobile_files --no-coverage --bail --passWithNoTests --forceExit); then
+    FAILED=1
+  fi
+fi
 
 if [ "$FAILED" -ne 0 ]; then
   echo "pre-commit-tests: FAILED — fix failing tests before committing"

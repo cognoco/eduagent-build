@@ -359,7 +359,13 @@ export async function regenerateLanguageCurriculum(
 
   if (!curriculum)
     throw new Error('Insert into curricula did not return a row');
-  const bookId = await ensureDefaultBook(db, subjectId, languageCode);
+  // Resolve to a human-readable name for the book title — BUG-611:
+  // previously passed `languageCode` (e.g. "es") which became the book title.
+  const language = getLanguageByCode(languageCode);
+  const languageLabel = language
+    ? (language.names[0] ?? languageCode).replace(/^./, (c) => c.toUpperCase())
+    : languageCode;
+  const bookId = await ensureDefaultBook(db, subjectId, languageLabel);
 
   await db.insert(curriculumTopics).values(
     topics.map((topic, index) => ({

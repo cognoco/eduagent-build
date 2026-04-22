@@ -5,7 +5,6 @@ import {
   Pressable,
   ActivityIndicator,
 } from 'react-native';
-import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,6 +12,12 @@ import { useEffect, useState } from 'react';
 import { useChildSessionDetail } from '../../../../../hooks/use-dashboard';
 import { goBackOrReplace } from '../../../../../lib/navigation';
 import { EngagementChip } from '../../../../../components/parent/EngagementChip';
+let Clipboard: typeof import('expo-clipboard') | null = null;
+try {
+  Clipboard = require('expo-clipboard');
+} catch {
+  // Native module unavailable (dev-client missing expo-clipboard)
+}
 
 function formatDate(iso: string): string {
   const d = new Date(iso);
@@ -64,6 +69,7 @@ export default function SessionDetailScreen() {
     if (!session?.conversationPrompt) return;
 
     try {
+      if (!Clipboard?.setStringAsync) throw new Error('Clipboard unavailable');
       await Clipboard.setStringAsync(session.conversationPrompt);
       setCopyState('copied');
     } catch {
@@ -251,11 +257,14 @@ export default function SessionDetailScreen() {
           testID="narrative-unavailable"
         >
           <Text className="text-text-primary text-base font-semibold">
-            No recap was generated
+            No recap available
           </Text>
           <Text className="text-text-secondary mt-2 text-sm leading-relaxed">
-            This older session does not have a parent recap yet. You can go back
-            and open a newer session instead.
+            {/* [BUG-552] The recap may not exist because the session is still
+                being processed, was too short, or predates the recap feature.
+                Avoid "older session" — any session can lack a recap. */}
+            A recap for this session is not available. It may still be
+            generating, or the session may have been too short.
           </Text>
           <Pressable
             onPress={() => goBackOrReplace(router, '/(app)/more')}
@@ -280,7 +289,9 @@ export default function SessionDetailScreen() {
           </Text>
         ) : (
           <Text className="text-text-tertiary text-base italic">
-            Session summary not available for older sessions
+            {/* [BUG-552] displaySummary is only set for homework sessions,
+                so this fires for every learning session — not just old ones. */}
+            No summary available for this session.
           </Text>
         )}
       </View>

@@ -161,7 +161,7 @@ export function useCelebration(options?: {
 
     return (
       <View
-        pointerEvents="none"
+        style={{ pointerEvents: 'none' }}
         className="absolute top-24 left-0 right-0 items-center z-50"
       >
         <Component

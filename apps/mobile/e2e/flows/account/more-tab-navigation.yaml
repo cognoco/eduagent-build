@@ -29,34 +29,34 @@ tags:
 # 2. Verify home screen loaded
 - extendedWaitUntil:
     visible:
-      id: "home-scroll-view"
+      id: "learner-screen"
     timeout: 15000
 
 # 3. Navigate to More tab
 - tapOn:
     text: "More"
 
-# 4. Wait for More screen to load
+# 4. Wait for More screen to load — Learning Mode is always above the fold
 - extendedWaitUntil:
     visible:
-      text: "Appearance"
+      id: "learning-mode-casual"
     timeout: 10000
 
 # ── Visual integrity: all section headings scrollable ──────────────────
-# More screen has 4 sections: Appearance, Notifications, Learning Mode, Account.
-# Each must be reachable by scrolling. Catches layout overflow issues.
+# More screen sections: Learning Mode, Learning Accommodation, Celebrations,
+# Notifications, Account, Other. Each must be reachable by scrolling.
 - assertVisible:
-    text: "Appearance"
+    text: "Learning Mode"
 
 - scrollUntilVisible:
     element:
-      text: "Notifications"
+      text: "Celebrations"
     direction: DOWN
     timeout: 5000
 
 - scrollUntilVisible:
     element:
-      text: "Learning Mode"
+      text: "Notifications"
     direction: DOWN
     timeout: 5000
 
@@ -69,7 +69,7 @@ tags:
 # Scroll back to top for screenshot
 - scrollUntilVisible:
     element:
-      text: "Appearance"
+      text: "Learning Mode"
     direction: UP
     timeout: 10000
 

@@ -1,0 +1,124 @@
+# Flow D1: Dictation Full Flow
+# Validates: practice hub -> dictation choice -> text preview -> playback -> complete or safe exit.
+# Tags: nightly, dictation
+#
+# Journey: UX Journey 3 (Practice & Reinforcement)
+# Epics: Epic 12 (Dictation)
+# Prerequisite: Seeded learner with an active subject (scenario: onboarding-complete)
+#
+# testIDs verified against:
+#   - apps/mobile/src/components/home/LearnerScreen.tsx (intent-practice)
+#   - apps/mobile/src/app/(app)/practice.tsx (practice-screen, practice-dictation)
+#   - apps/mobile/src/app/(app)/dictation/index.tsx (dictation-choice-screen, dictation-homework)
+#   - apps/mobile/src/app/(app)/dictation/text-preview.tsx (dictation-text-preview-screen, text-preview-input, text-preview-start)
+#   - apps/mobile/src/app/(app)/dictation/playback.tsx (dictation-playback-screen, playback-progress, playback-exit)
+#   - apps/mobile/src/app/(app)/dictation/complete.tsx (dictation-complete-screen, complete-check-writing, complete-done, complete-try-again)
+appId: com.mentomate.app
+tags:
+  - nightly
+  - dictation
+---
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "onboarding-complete"
+      API_URL: ${API_URL}
+
+- extendedWaitUntil:
+    visible:
+      id: "learner-screen"
+    timeout: 15000
+
+- scrollUntilVisible:
+    element:
+      id: "intent-practice"
+    direction: DOWN
+    timeout: 5000
+
+- tapOn:
+    id: "intent-practice"
+
+- extendedWaitUntil:
+    visible:
+      id: "practice-screen"
+    timeout: 10000
+
+- takeScreenshot: dictation-01-practice
+
+- tapOn:
+    id: "practice-dictation"
+
+- extendedWaitUntil:
+    visible:
+      id: "dictation-choice-screen"
+    timeout: 10000
+
+- takeScreenshot: dictation-02-choice
+
+- tapOn:
+    id: "dictation-homework"
+
+- extendedWaitUntil:
+    visible:
+      id: "dictation-text-preview-screen"
+    timeout: 10000
+
+- takeScreenshot: dictation-03-text-preview
+
+- tapOn:
+    id: "text-preview-input"
+
+- inputText: "The sun is warm. Birds can sing."
+
+- pressKey: back
+
+- tapOn:
+    id: "text-preview-start"
+
+- extendedWaitUntil:
+    visible:
+      id: "dictation-playback-screen"
+    timeout: 15000
+
+- takeScreenshot: dictation-04-playback
+
+- assertVisible:
+    id: "playback-progress"
+
+- extendedWaitUntil:
+    visible:
+      id: "dictation-complete-screen"
+    timeout: 60000
+    optional: true
+
+- runFlow:
+    when:
+      visible:
+        id: "playback-exit"
+    commands:
+      - tapOn:
+          id: "playback-exit"
+      - tapOn:
+          text: "Leave"
+
+- runFlow:
+    when:
+      visible:
+        id: "dictation-complete-screen"
+    commands:
+      - takeScreenshot: dictation-05-complete
+      - assertVisible:
+          id: "complete-check-writing"
+      - assertVisible:
+          id: "complete-done"
+      - assertVisible:
+          id: "complete-try-again"
+      - tapOn:
+          id: "complete-done"
+
+- extendedWaitUntil:
+    visible:
+      id: "practice-screen"
+    timeout: 10000
+
+- takeScreenshot: dictation-06-back-at-practice

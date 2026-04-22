@@ -254,10 +254,10 @@ describe('ProgressSubjectScreen', () => {
       expect(screen.getByText('5 sessions completed')).toBeTruthy();
     });
 
-    it('shows stat cards — In progress, Not started, Time spent, Sessions', () => {
+    it('shows stat cards — Started, Not started, Time spent, Sessions', () => {
       mockHooks();
       render(<ProgressSubjectScreen />);
-      expect(screen.getByText('In progress')).toBeTruthy();
+      expect(screen.getByText('Started')).toBeTruthy();
       expect(screen.getByText('Not started')).toBeTruthy();
       expect(screen.getByText('Time spent')).toBeTruthy();
       expect(screen.getByText('Sessions')).toBeTruthy();

@@ -175,6 +175,12 @@ export const sessionSummaries = pgTable('session_summaries', {
   narrative: text('narrative'),
   conversationPrompt: text('conversation_prompt'),
   engagementSignal: text('engagement_signal'),
+  closingLine: text('closing_line'),
+  learnerRecap: text('learner_recap'),
+  nextTopicId: uuid('next_topic_id').references(() => curriculumTopics.id, {
+    onDelete: 'set null',
+  }),
+  nextTopicReason: text('next_topic_reason'),
   status: summaryStatusEnum('status').notNull().default('pending'),
   createdAt: timestamp('created_at', { withTimezone: true })
     .notNull()

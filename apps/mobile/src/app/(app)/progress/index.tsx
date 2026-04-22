@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { platformAlert } from '../../../lib/platform-alert';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ErrorFallback } from '../../../components/common';
 import {
@@ -359,10 +360,11 @@ export default function ProgressScreen(): React.ReactElement {
                         params: { subjectId: subject.subjectId },
                       } as never);
                     }}
-                    onAction={(action) => {
-                      const mode = action === 'review' ? 'review' : 'freeform';
+                    onAction={(_action) => {
+                      // [BUG-540] 'review' removed from SubjectCardAction;
+                      // use 'learning' mode for consistency with home screen
                       router.push(
-                        `/(app)/session?mode=${mode}&subjectId=${subject.subjectId}` as never
+                        `/(app)/session?mode=learning&subjectId=${subject.subjectId}` as never
                       );
                     }}
                     testID={`journey-subject-${subject.subjectId}`}
@@ -430,6 +432,26 @@ export default function ProgressScreen(): React.ReactElement {
                 </Text>
               </View>
             )}
+
+            <Pressable
+              onPress={() => router.push('/(app)/progress/saved' as never)}
+              className="bg-surface rounded-card p-4 mt-6 flex-row items-center justify-between"
+              accessibilityRole="button"
+              accessibilityLabel="View saved explanations"
+              testID="progress-saved-link"
+            >
+              <View className="flex-row items-center gap-3">
+                <Ionicons name="bookmark" size={20} className="text-primary" />
+                <Text className="text-body font-medium text-text-primary">
+                  Saved
+                </Text>
+              </View>
+              <Ionicons
+                name="chevron-forward"
+                size={18}
+                className="text-text-tertiary"
+              />
+            </Pressable>
 
             <Pressable
               onPress={() => router.push('/(app)/home' as never)}

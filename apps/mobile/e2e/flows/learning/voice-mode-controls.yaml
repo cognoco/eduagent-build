@@ -21,12 +21,12 @@ tags:
 # 2. Home screen visible
 - extendedWaitUntil:
     visible:
-      id: "home-scroll-view"
+      id: "learner-screen"
     timeout: 15000
 
-# 3. Start a learning session via coaching card
+# 3. Start a learning session via intent card (replaced coaching-card-primary)
 - tapOn:
-    id: "coaching-card-primary"
+    id: "intent-continue"
 
 # 4. Session screen loads
 - extendedWaitUntil:

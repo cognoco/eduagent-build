@@ -95,6 +95,14 @@ temp/*
 
 # Local Claude Code settings (personal tool permissions, output style)
 .claude/settings.local.json
+.claude/scheduled_tasks.lock
+
+# Playwright MCP session artifacts (console logs, page snapshots)
+.playwright-mcp/
+
+# E2E full-suite run logs
+apps/mobile/e2e/scripts/full-suite-*.log
+apps/mobile/e2e/scripts/full-suite-*.err.log
 
 # TestSprite AI Testing (generated tests, ephemeral results)
 testsprite_tests/

@@ -13,7 +13,7 @@ import { isNewLearner } from '../../../../../lib/progressive-disclosure';
 
 const COMPLETION_LABELS: Record<string, string> = {
   not_started: 'Not started',
-  in_progress: 'In progress',
+  in_progress: 'Started',
   completed: 'Completed',
   verified: 'Verified',
   stable: 'Stable',

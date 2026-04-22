@@ -344,6 +344,8 @@ export function useStreamMessage(sessionId: string): {
               fluencyDrill: event.fluencyDrill,
               confidence: event.confidence,
             });
+          } else if (event.type === 'error') {
+            throw new Error(event.message);
           }
         }
       } finally {
@@ -532,7 +534,12 @@ export function useAddParkingLotItem(
 }
 
 export function useSessionSummary(
-  sessionId: string
+  sessionId: string,
+  options?: {
+    refetchInterval?: (
+      data: SessionSummary | null | undefined
+    ) => number | false;
+  }
 ): UseQueryResult<SessionSummary | null> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
@@ -554,6 +561,9 @@ export function useSessionSummary(
       }
     },
     enabled: !!activeProfile && !!sessionId,
+    refetchInterval: options?.refetchInterval
+      ? (query) => options.refetchInterval?.(query.state.data ?? null) ?? false
+      : undefined,
   });
 }
 

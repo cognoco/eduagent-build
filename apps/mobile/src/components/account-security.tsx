@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { useUser } from '@clerk/clerk-expo';
-import { useProfile } from '../lib/profile';
 import { ChangePassword } from './change-password';
 
 function getSsoProviderLabel(
@@ -18,41 +17,33 @@ function getSsoProviderLabel(
 // These are independent Clerk APIs. Needs proper spec before re-implementing.
 // See: docs/superpowers/plans/2026-04-04-account-security.md
 
-export function AccountSecurity(): React.JSX.Element | null {
+export function AccountSecurity({
+  visible = true,
+}: {
+  visible?: boolean;
+}): React.JSX.Element | null {
   const { user } = useUser();
-  const { activeProfile } = useProfile();
 
   const [showPasswordForm, setShowPasswordForm] = useState(false);
 
-  const isOwner = activeProfile?.isOwner ?? false;
   const passwordEnabled = user?.passwordEnabled ?? false;
   const externalAccounts = user?.externalAccounts ?? [];
 
-  if (!isOwner) return null;
+  if (!visible) return null;
 
   if (!passwordEnabled) {
     const providerLabel = getSsoProviderLabel(externalAccounts);
     return (
-      <View className="mt-6">
-        <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2">
-          Account Security
+      <View className="bg-surface rounded-card px-4 py-3.5 mb-2">
+        <Text className="text-body text-text-secondary">
+          Secured via {providerLabel}
         </Text>
-        <View className="bg-surface rounded-card px-4 py-3.5">
-          <Text className="text-body text-text-secondary">
-            Your account is secured via {providerLabel}. Manage your security
-            settings there.
-          </Text>
-        </View>
       </View>
     );
   }
 
   return (
-    <View className="mt-6">
-      <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2">
-        Account Security
-      </Text>
-
+    <>
       {/* 2FA toggle removed — see comment at top of file */}
 
       <Pressable
@@ -73,6 +64,6 @@ export function AccountSecurity(): React.JSX.Element | null {
           <ChangePassword />
         </View>
       )}
-    </View>
+    </>
   );
 }

@@ -67,6 +67,19 @@ jest.mock('../hooks/use-subscription', () => ({
     mockUseFamilySubscription(...args),
 }));
 
+const mockMutate = jest.fn();
+jest.mock('../hooks/use-profiles', () => ({
+  useUpdateProfileName: () => ({
+    mutate: mockMutate,
+    isPending: false,
+  }),
+}));
+
+jest.mock('../lib/format-api-error', () => ({
+  formatApiError: (e: unknown) =>
+    e instanceof Error ? e.message : 'Unknown error',
+}));
+
 jest.mock('../lib/profile', () => ({
   ...jest.requireActual('../lib/profile'),
   useProfile: jest.fn().mockReturnValue({
@@ -197,5 +210,76 @@ describe('ProfilesScreen', () => {
     await waitFor(() => {
       expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
     });
+  });
+
+  it('shows edit buttons for owner on all profiles', () => {
+    useProfile.mockReturnValue({
+      profiles: [ownerProfile, childProfile],
+      activeProfile: ownerProfile,
+      switchProfile: mockSwitchProfile,
+      isLoading: false,
+    });
+
+    render(<ProfilesScreen />);
+
+    expect(screen.getByTestId('profile-rename-owner-id')).toBeTruthy();
+    expect(screen.getByTestId('profile-rename-child-id')).toBeTruthy();
+  });
+
+  it('shows edit button only on own profile for non-owner', () => {
+    useProfile.mockReturnValue({
+      profiles: [ownerProfile, childProfile],
+      activeProfile: childProfile,
+      switchProfile: mockSwitchProfile,
+      isLoading: false,
+    });
+
+    render(<ProfilesScreen />);
+
+    expect(screen.getByTestId('profile-rename-child-id')).toBeTruthy();
+    expect(screen.queryByTestId('profile-rename-owner-id')).toBeNull();
+  });
+
+  it('opens rename modal and calls mutate on save', () => {
+    useProfile.mockReturnValue({
+      profiles: [ownerProfile, childProfile],
+      activeProfile: ownerProfile,
+      switchProfile: mockSwitchProfile,
+      isLoading: false,
+    });
+
+    render(<ProfilesScreen />);
+
+    fireEvent.press(screen.getByTestId('profile-rename-child-id'));
+
+    expect(screen.getByTestId('rename-modal')).toBeTruthy();
+    expect(screen.getByTestId('rename-input')).toBeTruthy();
+
+    fireEvent.changeText(screen.getByTestId('rename-input'), 'Alexander');
+    fireEvent.press(screen.getByTestId('rename-save'));
+
+    expect(mockMutate).toHaveBeenCalledWith(
+      { profileId: 'child-id', displayName: 'Alexander' },
+      expect.objectContaining({ onSuccess: expect.any(Function) })
+    );
+  });
+
+  it('closes rename modal on cancel', () => {
+    useProfile.mockReturnValue({
+      profiles: [ownerProfile, childProfile],
+      activeProfile: ownerProfile,
+      switchProfile: mockSwitchProfile,
+      isLoading: false,
+    });
+
+    render(<ProfilesScreen />);
+
+    fireEvent.press(screen.getByTestId('profile-rename-owner-id'));
+    expect(screen.getByTestId('rename-modal')).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('rename-cancel'));
+
+    // Modal should close — rename-input gone
+    expect(screen.queryByTestId('rename-input')).toBeNull();
   });
 });

@@ -8,7 +8,7 @@ appId: com.mentomate.app
 # Wait for the dismiss to take effect (setShouldShow(false) → re-render)
 - extendedWaitUntil:
     visible:
-      id: "home-scroll-view"
+      id: "learner-screen"
     timeout: 15000
-    # Parent scenarios land on dashboard-scroll, not home-scroll-view
+    # Parent scenarios land on dashboard-scroll, not learner-screen
     optional: true

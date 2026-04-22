@@ -342,8 +342,20 @@ export const sessionSummarySchema = z.object({
   content: z.string(),
   aiFeedback: z.string().nullable(),
   status: summaryStatusSchema,
+  closingLine: z.string().nullable(),
+  learnerRecap: z.string().nullable(),
+  nextTopicId: z.string().uuid().nullable(),
+  nextTopicTitle: z.string().nullable(),
+  nextTopicReason: z.string().nullable(),
 });
 export type SessionSummary = z.infer<typeof sessionSummarySchema>;
+
+export const learnerRecapResponseSchema = z.object({
+  closingLine: z.string().min(1).max(150),
+  takeaways: z.array(z.string().min(1).max(200)).min(1).max(4),
+  nextTopicReason: z.string().min(1).max(120).nullable(),
+});
+export type LearnerRecapResponse = z.infer<typeof learnerRecapResponseSchema>;
 
 // Parking lot schemas
 
