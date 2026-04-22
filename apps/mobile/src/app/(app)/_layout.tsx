@@ -1163,8 +1163,21 @@ export default function AppLayout() {
       </View>
     );
 
+  // FeedbackProvider wraps ALL authenticated screens (including gates) so
+  // shake-to-give-feedback works everywhere after sign-in. Previously it only
+  // wrapped the tab navigator, making shake dead on gate screens.
+  //
+  // key={themeKey} removed — crashes Android Fabric (MENTOMATE-MOBILE-6).
+  // NativeWind vars() style updates propagate without remounting.
+
   // No profile exists — show gate that pushes to profile creation modal
-  if (!activeProfile) return <CreateProfileGate />;
+  if (!activeProfile) {
+    return (
+      <FeedbackProvider>
+        <CreateProfileGate />
+      </FeedbackProvider>
+    );
+  }
 
   // Linked-parent accounts intentionally enter through /(app)/home now.
   // home.tsx renders ParentGateway for owners with child profiles and routes
@@ -1176,24 +1189,31 @@ export default function AppLayout() {
     activeProfile?.consentStatus &&
     PENDING_CONSENT_STATUSES.has(activeProfile.consentStatus)
   ) {
-    return <ConsentPendingGate />;
+    return (
+      <FeedbackProvider>
+        <ConsentPendingGate />
+      </FeedbackProvider>
+    );
   }
 
   // Gate: block access when consent has been withdrawn (deletion pending)
   if (activeProfile?.consentStatus === 'WITHDRAWN') {
-    return <ConsentWithdrawnGate />;
+    return (
+      <FeedbackProvider>
+        <ConsentWithdrawnGate />
+      </FeedbackProvider>
+    );
   }
 
   // Show celebratory landing once after consent approval
   if (showPostApproval) {
-    return <PostApprovalLanding onContinue={dismissPostApproval} />;
+    return (
+      <FeedbackProvider>
+        <PostApprovalLanding onContinue={dismissPostApproval} />
+      </FeedbackProvider>
+    );
   }
 
-  // key={themeKey} removed — crashes Android Fabric (MENTOMATE-MOBILE-6).
-  // NativeWind vars() style updates propagate without remounting.
-
-  // FeedbackProvider scoped here (not in root _layout) so the accelerometer
-  // only runs on authenticated screens where feedback submission actually works.
   return (
     <FeedbackProvider>
       <View style={[{ flex: 1 }, tokenVars]}>

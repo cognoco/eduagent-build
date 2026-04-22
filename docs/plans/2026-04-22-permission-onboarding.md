@@ -661,15 +661,19 @@ Then add the gate render between the post-approval landing check and the tab nav
 // One-time permission setup: prompt for mic + notifications
 if (showPermSetup) {
   return (
-    <PermissionSetupGate
-      permState={permState}
-      onRequestMic={requestMic}
-      onRequestNotif={requestNotif}
-      onContinue={dismissPermSetup}
-    />
+    <FeedbackProvider>
+      <PermissionSetupGate
+        permState={permState}
+        onRequestMic={requestMic}
+        onRequestNotif={requestNotif}
+        onContinue={dismissPermSetup}
+      />
+    </FeedbackProvider>
   );
 }
 ```
+
+**Note:** All gate returns are now wrapped in `<FeedbackProvider>` so shake-to-give-feedback works on every authenticated screen, including gates.
 
 - [ ] **Step 3: Run tests to verify the new test passes**
 
