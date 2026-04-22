@@ -151,21 +151,81 @@ export async function matchFreeformTopic(
   subjectId: string,
   takeaways: string[]
 ): Promise<TopicSuggestion | null> {
+  // Filler/function words that survive the length>=4 filter but carry no
+  // topic signal for curriculum matching. Tokens under 4 chars (the, and,
+  // but, ...) are already dropped upstream, so only add 4+ char entries here.
   const stopWords = new Set([
     'about',
     'after',
+    'again',
+    'also',
+    'around',
     'back',
     'because',
+    'been',
+    'before',
+    'being',
+    'between',
+    'both',
     'connected',
+    'could',
+    'during',
+    'each',
+    'even',
+    'every',
     'explored',
     'figured',
     'from',
+    'good',
+    'have',
+    'here',
     'into',
     'just',
+    'know',
     'learned',
+    'like',
+    'made',
+    'make',
+    'many',
+    'more',
+    'most',
+    'much',
+    'only',
+    'over',
+    'really',
+    'said',
+    'same',
+    'should',
+    'some',
+    'still',
+    'such',
+    'than',
+    'that',
+    'them',
+    'then',
+    'there',
+    'these',
+    'they',
+    'thing',
+    'think',
+    'this',
+    'those',
     'through',
+    'today',
+    'used',
+    'very',
+    'well',
+    'went',
+    'were',
+    'what',
+    'when',
+    'where',
+    'which',
+    'while',
+    'will',
     'with',
     'worked',
+    'would',
     'your',
     'you',
   ]);
@@ -202,8 +262,12 @@ export async function matchFreeformTopic(
     )
     .limit(3);
 
+  // Only return a match when the keyword set resolves unambiguously to one
+  // topic. Multiple matches mean the takeaways were too generic to pin down
+  // a "next topic" confidently — return null so the UI falls back to the
+  // generic "You might also like..." framing instead of a misleading pick.
   if (matches.length !== 1) {
-    return matches.length > 0 ? matches[0] ?? null : null;
+    return null;
   }
 
   return matches[0] ?? null;
@@ -251,6 +315,10 @@ export async function generateLearnerRecap(
     ? await resolveNextTopic(db, input.profileId, input.topicId)
     : null;
 
+  // Pure content-generation flow: the LLM returns only recap text + next-topic
+  // reason for UI rendering. No envelope signals (close, escalate, widgets) drive
+  // any state machine here — session termination already happened. We therefore
+  // validate against learnerRecapResponseSchema directly instead of parseEnvelope.
   const result = await routeAndCall(
     [
       {

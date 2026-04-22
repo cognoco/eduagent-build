@@ -122,6 +122,9 @@ export default function SessionSummaryScreen() {
   // Fire depth evaluation for fresh sessions to trigger server-side telemetry
   // (session quality gating, topic detection). Fire-and-forget — the result
   // drives analytics, not UI. Skip for revisited/persisted sessions.
+  // Ref (not state) because the guard must be synchronous: Strict Mode and
+  // rapid rerenders can re-run this effect before a setState would flush,
+  // but the ref assignment lands immediately so the second pass short-circuits.
   const depthFiredRef = useRef(false);
   useEffect(() => {
     if (sessionId && !isAlreadyPersisted && !depthFiredRef.current) {

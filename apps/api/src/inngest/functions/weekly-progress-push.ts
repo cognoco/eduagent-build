@@ -1,4 +1,5 @@
 import { and, eq, inArray } from 'drizzle-orm';
+import { z } from 'zod';
 import {
   accounts,
   familyLinks,
@@ -21,6 +22,10 @@ import {
   subtractDays,
   sumTopicsExplored,
 } from '../../services/progress-helpers';
+
+const weeklyProgressPushEventSchema = z.object({
+  parentId: z.string().uuid(),
+});
 
 // [FR239.1 UX-9] Returns true when 09:00 local time matches the UTC hour of nowUtc.
 // Parents with no timezone (or an invalid one) fall back to UTC, so they are
@@ -127,7 +132,13 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
   },
   { event: 'app/weekly-progress-push.generate' },
   async ({ event, step }) => {
-    const { parentId } = event.data as { parentId: string };
+    // Validate event payload at the boundary — invalid UUIDs would otherwise
+    // produce opaque DB errors deep inside the step. Clean skip on malformed data.
+    const parsed = weeklyProgressPushEventSchema.safeParse(event.data);
+    if (!parsed.success) {
+      return { status: 'skipped', reason: 'invalid_payload' };
+    }
+    const { parentId } = parsed.data;
 
     return step.run('send-weekly-push', async () => {
       try {

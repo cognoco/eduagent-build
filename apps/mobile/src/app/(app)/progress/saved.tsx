@@ -12,6 +12,7 @@ import Markdown from 'react-native-markdown-display';
 import type { Bookmark } from '@eduagent/schemas';
 import { useBookmarks, useDeleteBookmark } from '../../../hooks/use-bookmarks';
 import { platformAlert } from '../../../lib/platform-alert';
+import { goBackOrReplace } from '../../../lib/navigation';
 
 function formatRelativeDate(dateStr: string): string {
   const date = new Date(dateStr);
@@ -126,7 +127,7 @@ export default function SavedBookmarksScreen() {
     <View className="flex-1 bg-background">
       <View className="px-4 pt-4 pb-2 flex-row items-center">
         <Pressable
-          onPress={() => router.back()}
+          onPress={() => goBackOrReplace(router, '/(app)/progress' as const)}
           accessibilityRole="button"
           accessibilityLabel="Go back"
           hitSlop={8}
@@ -158,7 +159,54 @@ export default function SavedBookmarksScreen() {
         }}
         onEndReachedThreshold={0.4}
         ListEmptyComponent={
-          bookmarksQuery.isLoading ? null : (
+          bookmarksQuery.isLoading ? (
+            <View
+              className="items-center justify-center py-14 px-6"
+              testID="saved-loading"
+            >
+              <ActivityIndicator />
+            </View>
+          ) : bookmarksQuery.isError ? (
+            <View
+              className="items-center justify-center py-14 px-6"
+              testID="saved-error"
+            >
+              <Ionicons
+                name="alert-circle-outline"
+                size={48}
+                className="text-text-tertiary mb-4"
+              />
+              <Text className="text-body text-text-primary text-center mb-2">
+                Couldn&apos;t load your saved responses.
+              </Text>
+              <Text className="text-body-sm text-text-secondary text-center mb-4">
+                {bookmarksQuery.error instanceof Error
+                  ? bookmarksQuery.error.message
+                  : 'Please check your connection and try again.'}
+              </Text>
+              <Pressable
+                onPress={() => void bookmarksQuery.refetch()}
+                className="bg-primary rounded-card px-5 py-3 mb-3"
+                accessibilityRole="button"
+                accessibilityLabel="Retry loading saved bookmarks"
+                testID="saved-retry"
+              >
+                <Text className="text-body font-semibold text-on-primary">
+                  Try again
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() =>
+                  goBackOrReplace(router, '/(app)/progress' as const)
+                }
+                accessibilityRole="button"
+                accessibilityLabel="Go back"
+                testID="saved-error-back"
+              >
+                <Text className="text-body-sm text-primary">Go back</Text>
+              </Pressable>
+            </View>
+          ) : (
             <View className="items-center justify-center py-14 px-6">
               <Ionicons
                 name="bookmark-outline"

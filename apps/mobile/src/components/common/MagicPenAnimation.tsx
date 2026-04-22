@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import type { ComponentType, ReactNode } from 'react';
+import type { ComponentProps, ComponentType, ReactNode } from 'react';
 import { View, useColorScheme } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -12,20 +12,25 @@ import Animated, {
   withDelay,
   cancelAnimation,
   Easing,
+  type AnimatedProps,
 } from 'react-native-reanimated';
 import Svg, { Path, Rect, Line } from 'react-native-svg';
 
 // Wrap in try-catch: on some Android release builds (Hermes + Fabric),
 // Reanimated's native module can fail to initialize, causing
 // createAnimatedComponent to throw. Same pattern as AnimatedSplash.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let AnimatedPath: ComponentType<any>;
+type AnimatedPathComponent = ComponentType<
+  AnimatedProps<ComponentProps<typeof Path>>
+>;
+let AnimatedPath: AnimatedPathComponent;
 let _penAnimationAvailable = true;
 try {
-  AnimatedPath = Animated.createAnimatedComponent(Path);
+  AnimatedPath = Animated.createAnimatedComponent(
+    Path
+  ) as AnimatedPathComponent;
 } catch {
   _penAnimationAvailable = false;
-  AnimatedPath = Path as never;
+  AnimatedPath = Path as unknown as AnimatedPathComponent;
 }
 
 interface MagicPenAnimationProps {

@@ -69,11 +69,15 @@ export default function InterviewScreen() {
   const { stream: streamSessionMessage, isStreaming: isSessionStreaming } =
     useStreamMessage(activeSessionId ?? '');
 
-  const openingMessage = bookTitle
-    ? `Hi! I'm your learning mate. Before we start — what can you tell me about ${bookTitle}? Your best understanding, even a rough guess, is a great start.`
-    : subjectName
-    ? `Hi! I'm your learning mate. Before we build your learning path — what do you already know about ${subjectName}? Even a rough sense is helpful.`
-    : OPENING_MESSAGE;
+  const openingMessage = useMemo(
+    () =>
+      bookTitle
+        ? `Hi! I'm your learning mate. Before we start — what can you tell me about ${bookTitle}? Your best understanding, even a rough guess, is a great start.`
+        : subjectName
+        ? `Hi! I'm your learning mate. Before we build your learning path — what do you already know about ${subjectName}? Even a rough sense is helpful.`
+        : OPENING_MESSAGE,
+    [bookTitle, subjectName]
+  );
 
   // BKT-C.2: Captured interest labels extracted from the interview transcript.
   // Populated by either handleSkipInterview (force-complete mutation response)
@@ -172,16 +176,11 @@ export default function InterviewScreen() {
     if (sessionCreatingRef.current || !safeSubjectId) return;
     sessionCreatingRef.current = true;
     try {
-      console.log(
-        '[Interview→Session] Creating session for subject',
-        safeSubjectId
-      );
       const result = await startSessionRef.current.mutateAsync({
         subjectId: safeSubjectId,
         sessionType: 'learning',
         inputMode: 'text',
       });
-      console.log('[Interview→Session] Session created:', result.session.id);
       setActiveSessionId(result.session.id);
       setSessionPhase(true);
     } catch (err) {

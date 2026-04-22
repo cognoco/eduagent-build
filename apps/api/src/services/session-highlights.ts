@@ -144,14 +144,28 @@ export function buildBrowseHighlight(
 ): string {
   const safeName =
     childDisplayName
-      .replace(/[^\p{L}\p{N}\s'-]/gu, '')
+      .replace(/[^\p{L}\p{N} '-]/gu, '')
       .trim()
       .slice(0, 50) || 'Learner';
   const topicList = topics.slice(0, 3).join(', ');
   const suffix = topics.length > 3 ? ` and ${topics.length - 3} more` : '';
   const mins = Math.max(1, Math.round(durationSeconds / 60));
-  // [BUG-526] Include subject name when available so parents see context
-  const subjectPrefix = subjectName ? `${subjectName}: ` : '';
+  // [BUG-526] Include subject name when available so parents see context.
+  // [CRIT-2] subjectName is user-created free text — apply the same
+  // character-class allow-list used for names so a crafted subject cannot
+  // inject prompt tokens or control characters into the parent-facing
+  // highlight (which later becomes LLM input for narrative generation).
+  // Note: we use a literal space in the allow-list rather than `\s`, so
+  // newlines/tabs/carriage returns are stripped. The `\s` class used for
+  // `safeName` above accepts newlines, which would let a multi-line subject
+  // break the parent-facing highlight into a fake instruction block.
+  const safeSubject = subjectName
+    ? subjectName
+        .replace(/[^\p{L}\p{N} '-]/gu, '')
+        .trim()
+        .slice(0, 50)
+    : '';
+  const subjectPrefix = safeSubject ? `${safeSubject}: ` : '';
   return `${safeName} browsed ${subjectPrefix}${topicList}${suffix} — ${mins} min`;
 }
 

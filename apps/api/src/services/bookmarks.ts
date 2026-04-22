@@ -145,6 +145,10 @@ export async function listBookmarks(
   }
 
   if (options.cursor) {
+    // Cursor pagination is sound only because bookmarks.id is UUIDv7 — time-
+    // ordered and lexicographically sortable. If the id generator ever changes
+    // (see generateUUIDv7 in packages/database), rewrite this to cursor on
+    // createdAt + id instead, or results will paginate in random order.
     conditions.push(lt(bookmarks.id, options.cursor));
   }
 
@@ -170,6 +174,10 @@ export async function listBookmarks(
   const hasMore = rows.length > limit;
   const page = hasMore ? rows.slice(0, limit) : rows;
 
+  // Keyset pagination: rows are ordered desc(bookmarks.id), so the last
+  // element in the page holds the *smallest* id we've emitted so far. The
+  // next request filters `lt(bookmarks.id, cursor)` to continue with older
+  // bookmarks — the cursor is an exclusive upper bound, not an offset.
   return {
     bookmarks: page.map(mapBookmarkRow),
     nextCursor: hasMore ? page[page.length - 1]?.id ?? null : null,
