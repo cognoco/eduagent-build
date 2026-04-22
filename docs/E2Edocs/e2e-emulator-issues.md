@@ -2294,3 +2294,48 @@ $ADB shell am start -n com.mentomate.app/.MainActivity
 # 4. Dev tools menu appears → press KEYCODE_BACK to dismiss
 # 5. Sign-in screen reached
 ```
+
+## Session 2026-04-22 Findings — UIAutomator Hang + Permission Gate + FAST Timeout
+
+### BUG-549: Permission Setup Gate Blocks All Flows After `pm clear`
+
+**Symptom:** Every flow fails at `return-to-home.yaml` — `home-scroll-view` not visible after sign-in. The app silently lands on `PermissionSetupGate` (testID: `permission-setup-gate`) instead of the home screen.
+
+**Root cause:** The `PermissionSetupGate` (shipped commit `0eb40b1a`) intercepts the user between sign-in and the tab navigator whenever `RECORD_AUDIO` or `POST_NOTIFICATIONS` are not granted. `pm clear` wipes all runtime permissions, so the gate fires on every E2E test setup.
+
+**Fix:**
+1. `seed-and-run.sh` — added `pm grant RECORD_AUDIO` alongside existing `POST_NOTIFICATIONS` and `CAMERA` grants. With both mic + notifications pre-granted, `usePermissionSetup` detects 0 renderable rows and auto-skips.
+2. `flows/_setup/dismiss-permission-gate.yaml` (new) — safety-net that taps `permission-skip` if the gate appears anyway (e.g., fresh emulator, OS-level revoke).
+3. `flows/_setup/seed-and-sign-in.yaml` — wired the safety-net as a conditional `runFlow` between the PostApproval dismiss and `return-to-home-safe.yaml`.
+
+**Pattern:** Any new one-time gate that reads from SecureStore (wiped by `pm clear`) will cause the same failure. Before shipping a gate, add a `pm grant` line and a `dismiss-*.yaml` safety-net.
+
+---
+
+### UIAutomator Hangs After `taskkill` on Maestro Process
+
+**Symptom:** After killing the regression suite via Windows `taskkill`, every subsequent `adb shell uiautomator dump` hangs indefinitely. Even `adb shell ps` times out. `adb get-state` still returns `device` so the emulator appears alive.
+
+**Root cause:** `taskkill` kills the Maestro JVM abruptly without releasing the UIAutomator instrumentation lock. The `am instrumentation` runner holds an exclusive handle to UIAutomator. Killing it mid-run leaves the lock permanently held until the emulator reboots.
+
+**Recovery:** `adb reboot` is the only reliable fix. The `am force-stop dev.mobile.maestro` approach in `seed-and-run.sh` only works when Maestro exits cleanly; it cannot release a lock held by a killed process.
+
+**Prevention:** When stopping a run manually, prefer `Ctrl+C` inside the terminal running the script (sends SIGINT, triggers the `cleanup()` trap) rather than killing the process from outside. The trap exits cleanly and Maestro has a chance to release its UIAutomator lock.
+
+**Post-reboot note:** The first flow after a fresh reboot tends to fail because the ART JIT cache is empty and cold-start takes longer than the launcher timeout. This is expected — from flow 2 onwards the emulator is warm.
+
+---
+
+### FAST Mode Launcher Timeout (20s) Too Tight for WHPX Cold Starts
+
+**Symptom:** Flows fail with `FATAL: Dev-client launcher never appeared. Is the APK installed?` and an empty dump, even when the emulator is healthy.
+
+**Root cause:** FAST mode used a 20s launcher timeout. After `pm clear`, the Dalvik/ART runtime has to re-JIT the app from scratch. On WHPX (Windows Hypervisor Platform), this cold start reliably takes 20–30s, so the 20s timeout races with the app rendering.
+
+**Fix applied to `seed-and-run.sh`:**
+- FAST launcher timeout: `20s → 35s`
+- FAST bundle timeout: `60s → 90s`
+- `sleep 1 → sleep 2` after `pm clear` + permission grants (gives OS time to settle before `am start`)
+- Added one relaunch retry: if the launcher doesn't appear after the timeout, force-stops and relaunches the app once, waits 20s more, before giving up
+
+**Signal for this issue:** Dump contents are empty (not the Android home screen). If the dump shows home-screen icons (`MentoMate,Chrome,Camera,...`), the app crashed rather than being slow to start — that's a different failure mode handled by `RELAUNCH_COUNT`.

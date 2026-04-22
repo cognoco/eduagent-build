@@ -145,9 +145,11 @@ export default function ChildReportsScreen(): React.ReactElement {
                 className="bg-surface rounded-card p-4 mb-3"
                 testID={`weekly-report-card-${report.id}`}
                 onPress={() =>
-                  router.push(
-                    `/(app)/child/${profileId}/report/${report.id}` as const
-                  )
+                  router.push({
+                    pathname:
+                      '/(app)/child/[profileId]/weekly-report/[weeklyReportId]',
+                    params: { profileId, weeklyReportId: report.id },
+                  } as never)
                 }
                 accessibilityRole="button"
                 accessibilityLabel={`Week of ${new Date(

@@ -231,7 +231,8 @@ export const weeklyReportDataSchema = z.object({
   // NOTE: `thisWeek` uses monthMetricsSchema but fields have mixed semantics:
   //   DELTA (incremental, this week only):
   //     totalSessions, totalActiveMinutes, topicsMastered, topicsExplored,
-  //     streakBest (highest streak during the week, not cumulative)
+  //     streakBest — all-time personal best streak from snapshot (NOT a
+  //       weekly delta; see generateWeeklyReportData in weekly-report.ts)
   //   CUMULATIVE (absolute snapshot at week end):
   //     vocabularyTotal — cumulative vocabulary count so delta is computed
   //     at display time: thisWeek.vocabularyTotal - lastWeek?.vocabularyTotal

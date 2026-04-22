@@ -57,6 +57,9 @@ const mockListWeeklyReports = jest.fn().mockResolvedValue([]);
 const mockGetWeeklyReport = jest.fn().mockResolvedValue(null);
 const mockMarkWeeklyReportViewed = jest.fn().mockResolvedValue(undefined);
 
+// NOTE: This is a route-unit test — shallow-mocking the weekly-report service
+// is intentional here. Integration coverage for the service layer lives in the
+// Inngest integration test (weekly-progress-push.integration.test.ts).
 jest.mock('../services/weekly-report', () => ({
   ...jest.requireActual('../services/weekly-report'),
   listWeeklyReportsForParentChild: (...args: unknown[]) =>

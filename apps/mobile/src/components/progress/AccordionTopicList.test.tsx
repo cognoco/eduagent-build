@@ -96,7 +96,9 @@ describe('AccordionTopicList', () => {
     fireEvent.press(screen.getByTestId('accordion-topics-retry'));
 
     expect(
-      screen.getByText('Could not load topics. Tap to retry.')
+      screen.getByText(
+        'Could not load topics. Tap to retry, or close the subject card to dismiss.'
+      )
     ).toBeTruthy();
     expect(refetch).toHaveBeenCalled();
   });

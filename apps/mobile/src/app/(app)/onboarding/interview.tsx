@@ -168,16 +168,19 @@ export default function InterviewScreen() {
     if (sessionCreatingRef.current || !safeSubjectId) return;
     sessionCreatingRef.current = true;
     try {
+      console.log('[Interview→Session] Creating session for subject', safeSubjectId);
       const result = await startSession.mutateAsync({
         subjectId: safeSubjectId,
         sessionType: 'learning',
         inputMode: 'text',
       });
+      console.log('[Interview→Session] Session created:', result.session.id);
       setActiveSessionId(result.session.id);
       setSessionPhase(true);
-    } catch {
+    } catch (err) {
       // Session creation failed — fall back to showing the "Let's Go" card
       // so the user isn't stuck on a dead screen.
+      console.error('[Interview→Session] Session creation FAILED, falling back:', err);
       setInterviewComplete(true);
       sessionCreatingRef.current = false;
     }

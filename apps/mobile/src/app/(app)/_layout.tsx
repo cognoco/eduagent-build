@@ -140,9 +140,13 @@ function usePostApprovalLanding(
   consentStatus: string | null | undefined
 ): [boolean, () => void] {
   const isConsented = !!profileId && consentStatus === 'CONSENTED';
-  const subjects = useSubjects({ enabled: isConsented });
   const [shouldShow, setShouldShow] = React.useState(false);
   const [checked, setChecked] = React.useState(false);
+  // [IMP-2] Only query subjects once we know the screen should show — avoids
+  // an unnecessary network request (and loading delay) for users whose SecureStore
+  // key is already set to 'true'. For new users, the query fires after the
+  // SecureStore async read completes.
+  const subjects = useSubjects({ enabled: isConsented && checked && shouldShow });
 
   React.useEffect(() => {
     if (!profileId || consentStatus !== 'CONSENTED') {

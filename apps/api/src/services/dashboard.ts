@@ -273,7 +273,7 @@ export function buildProgressGuidance(
     // [BUG-523] A non-zero streak proves recent activity — "Quiet week" would
     // contradict the visible streak badge. Show an encouraging nudge instead.
     if ((currentStreak ?? 0) > 0) {
-      return `${childName} has a ${currentStreak}-day streak — keep it going with ${primarySubject}!`;
+      return `${childName} has a ${currentStreak ?? 0}-day streak — keep it going with ${primarySubject}!`;
     }
     return `Quiet week — maybe suggest a quick session on ${primarySubject}?`;
   }

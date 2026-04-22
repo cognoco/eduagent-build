@@ -176,30 +176,41 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
             )
           );
 
+          // [CR-2] Clamp: treat previous snapshot as null when the gap exceeds 14 days.
+          // A wider gap means the "delta" spans multiple weeks rather than the current
+          // 7-day window, producing inflated session and minute counts for inactive learners.
+          const MAX_SNAPSHOT_GAP_MS = 14 * 24 * 60 * 60 * 1000;
+          const snapshotGapMs =
+            previous != null
+              ? new Date(`${latest.snapshotDate}T00:00:00Z`).getTime() -
+                new Date(`${previous.snapshotDate}T00:00:00Z`).getTime()
+              : 0;
+          const cappedPrevious = snapshotGapMs <= MAX_SNAPSHOT_GAP_MS ? previous : null;
+
           const child = await db.query.profiles.findFirst({
             where: eq(profiles.id, link.childProfileId),
             columns: { displayName: true },
           });
 
           const name = child?.displayName ?? 'Your learner';
-          const topicDelta = previous
+          const topicDelta = cappedPrevious
             ? Math.max(
                 0,
-                latest.metrics.topicsMastered - previous.metrics.topicsMastered
+                latest.metrics.topicsMastered - cappedPrevious.metrics.topicsMastered
               )
             : null;
-          const vocabDelta = previous
+          const vocabDelta = cappedPrevious
             ? Math.max(
                 0,
                 latest.metrics.vocabularyTotal -
-                  previous.metrics.vocabularyTotal
+                  cappedPrevious.metrics.vocabularyTotal
               )
             : null;
-          const exploredDelta = previous
+          const exploredDelta = cappedPrevious
             ? Math.max(
                 0,
                 sumTopicsExplored(latest.metrics) -
-                  sumTopicsExplored(previous.metrics)
+                  sumTopicsExplored(cappedPrevious.metrics)
               )
             : null;
 
@@ -209,7 +220,7 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
             name,
             reportWeek,
             latest.metrics,
-            previous?.metrics ?? null
+            cappedPrevious?.metrics ?? null
           );
           await db
             .insert(weeklyReports)

@@ -76,11 +76,11 @@ export function AccordionTopicList({
             void refetch();
           }}
           accessibilityRole="button"
-          accessibilityLabel="Retry loading topics"
+          accessibilityLabel="Retry loading topics. Tap here to retry, or close the subject card to dismiss."
           testID="accordion-topics-retry"
         >
           <Text className="text-caption text-text-secondary text-center py-2">
-            Could not load topics. Tap to retry.
+            Could not load topics. Tap to retry, or close the subject card to dismiss.
           </Text>
         </Pressable>
       ) : topics.length > 0 ? (

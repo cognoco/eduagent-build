@@ -214,7 +214,7 @@ describe('processInterviewExchange', () => {
   // If the LLM returns ready_to_finish: false forever, the learner would be
   // trapped in the interview. The server-side cap must force close anyway.
   it('[F-042] force-closes at MAX_INTERVIEW_EXCHANGES regardless of signal', async () => {
-    // Return a valid envelope with ready_to_finish: false on turn 4 (past cap of 3).
+    // Return a valid envelope with ready_to_finish: false on turn 5 (past cap of 4).
     (routeAndCall as jest.Mock)
       .mockResolvedValueOnce({
         response:
@@ -230,7 +230,7 @@ describe('processInterviewExchange', () => {
       });
 
     const result = await processInterviewExchange(baseContext, 'Hello', {
-      exchangeCount: 4, // past the cap of 3
+      exchangeCount: 5, // past the cap of 4
     });
 
     expect(result.isComplete).toBe(true);
@@ -389,7 +389,7 @@ describe('streamInterviewExchange', () => {
     const { stream, onComplete } = await streamInterviewExchange(
       baseContext,
       'Hi',
-      { exchangeCount: 4 } // past the cap of 3
+      { exchangeCount: 5 } // past the cap of 4
     );
     let fullText = '';
     for await (const chunk of stream) fullText += chunk;

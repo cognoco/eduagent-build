@@ -13,6 +13,7 @@ import type {
   ProgressHistory,
   SubjectProgress,
   TopicProgress,
+  WeeklyReportRecord,
   WeeklyReportSummary,
 } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
@@ -581,5 +582,91 @@ export function useChildWeeklyReports(
     },
     enabled:
       !!activeProfile && activeProfile.isOwner === true && !!childProfileId,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Weekly Report Detail + Mark-Viewed [CR-1, SUGG-1, SUGG-4]
+// ---------------------------------------------------------------------------
+
+export function useChildWeeklyReportDetail(
+  childProfileId: string | undefined,
+  reportId: string | undefined
+): UseQueryResult<WeeklyReportRecord | null> {
+  const client = useApiClient();
+  const { activeProfile } = useProfile();
+
+  return useQuery({
+    queryKey: ['dashboard', 'child', childProfileId, 'weekly-report', reportId],
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const res = await client.dashboard.children[':profileId'][
+          'weekly-reports'
+        ][':reportId'].$get(
+          {
+            param: {
+              profileId: childProfileId ?? '',
+              reportId: reportId ?? '',
+            },
+          },
+          { init: { signal } }
+        );
+        await assertOk(res);
+        const data = (await res.json()) as {
+          report: WeeklyReportRecord | null;
+        };
+        return data.report;
+      } finally {
+        cleanup();
+      }
+    },
+    enabled:
+      !!activeProfile &&
+      activeProfile.isOwner === true &&
+      !!childProfileId &&
+      !!reportId,
+  });
+}
+
+export function useMarkWeeklyReportViewed(): UseMutationResult<
+  { viewed: boolean },
+  Error,
+  { childProfileId: string; reportId: string }
+> {
+  const client = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    // [SUGG-4] Best-effort tracking — never retry on failure
+    retry: 0,
+    mutationFn: async ({ childProfileId, reportId }) => {
+      const res = await client.dashboard.children[':profileId'][
+        'weekly-reports'
+      ][':reportId'].view.$post({
+        param: { profileId: childProfileId, reportId },
+      });
+      await assertOk(res);
+      return (await res.json()) as { viewed: boolean };
+    },
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({
+        queryKey: [
+          'dashboard',
+          'child',
+          variables.childProfileId,
+          'weekly-reports',
+        ],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: [
+          'dashboard',
+          'child',
+          variables.childProfileId,
+          'weekly-report',
+          variables.reportId,
+        ],
+      });
+    },
   });
 }

@@ -238,7 +238,7 @@ export async function extractSignals(exchangeHistory: ChatExchange[]): Promise<{
  * done" case even if the LLM returns ready_to_finish: false forever.
  * [BUG-464] [BUG-470] [F-042]
  */
-const MAX_INTERVIEW_EXCHANGES = 3;
+const MAX_INTERVIEW_EXCHANGES = 4;
 
 const logger = createLogger();
 

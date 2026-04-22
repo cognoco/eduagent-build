@@ -194,8 +194,7 @@ export default function ConsentScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <Animated.View
-          style={{ opacity: fadeAnim }}
-          pointerEvents={isTransitioning ? 'none' : 'auto'}
+          style={{ opacity: fadeAnim, pointerEvents: isTransitioning ? 'none' : 'auto' }}
         >
           {phase === 'child' && (
             <View testID="consent-child-view">
