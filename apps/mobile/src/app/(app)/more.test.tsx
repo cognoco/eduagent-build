@@ -228,14 +228,16 @@ describe('MoreScreen — Learning Mode', () => {
     expect(mockLearningModeMutate).not.toHaveBeenCalled();
   });
 
-  it('renders other sections alongside learning mode', () => {
+  it('renders all section headings', () => {
     render(<MoreScreen />, { wrapper: createWrapper() });
 
     expect(screen.queryByText('Appearance')).toBeNull();
-    expect(screen.getByText('Notifications')).toBeTruthy();
     expect(screen.getByText('Learning Mode')).toBeTruthy();
+    expect(screen.getByText('Learning Accommodation')).toBeTruthy();
     expect(screen.getByText('Celebrations')).toBeTruthy();
+    expect(screen.getByText('Notifications')).toBeTruthy();
     expect(screen.getByText('Account')).toBeTruthy();
+    expect(screen.getByText('Other')).toBeTruthy();
   });
 
   it('renders celebration level options', () => {
@@ -255,14 +257,6 @@ describe('MoreScreen — Learning Mode', () => {
       'big_only',
       expect.objectContaining({ onError: expect.any(Function) })
     );
-  });
-});
-
-describe('MoreScreen — Account Security', () => {
-  it('renders Account Security section', () => {
-    render(<MoreScreen />, { wrapper: createWrapper() });
-
-    expect(screen.getByText('Account Security')).toBeTruthy();
   });
 });
 

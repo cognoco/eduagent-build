@@ -396,23 +396,8 @@ export default function MoreScreen() {
         contentContainerStyle={{ paddingBottom: 24 }}
         keyboardShouldPersistTaps="handled"
       >
+        {/* 1. Learning Mode */}
         <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2 mt-4">
-          Notifications
-        </Text>
-        <ToggleRow
-          label="Push notifications"
-          value={pushEnabled}
-          onToggle={handleTogglePush}
-          disabled={notifLoading || updateNotifications.isPending}
-        />
-        <ToggleRow
-          label="Weekly progress digest"
-          value={weeklyDigest}
-          onToggle={handleToggleDigest}
-          disabled={notifLoading || updateNotifications.isPending}
-        />
-
-        <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2 mt-6">
           Learning Mode
         </Text>
         {LEARNING_MODE_OPTIONS.map((opt) => (
@@ -427,6 +412,7 @@ export default function MoreScreen() {
           />
         ))}
 
+        {/* 2. Learning Accommodation */}
         <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2 mt-6">
           Learning Accommodation
         </Text>
@@ -444,6 +430,52 @@ export default function MoreScreen() {
           />
         ))}
 
+        {/* 3. What My Mentor Knows — shown after learning prefs, hidden for new learners */}
+        {!hideMentorMemory ? (
+          <>
+            <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2 mt-6">
+              What My Mentor Knows
+            </Text>
+            <SettingsRow
+              label="View & manage"
+              onPress={() => router.push('/(app)/mentor-memory')}
+            />
+          </>
+        ) : null}
+
+        {/* 4. Family — conditional on profile owner */}
+        {activeProfile?.isOwner && (
+          <>
+            <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2 mt-6">
+              Family
+            </Text>
+            {linkedChildren.length > 0 && (
+              <SettingsRow
+                label="Child progress"
+                value={`${linkedChildren.length} ${
+                  linkedChildren.length === 1 ? 'child' : 'children'
+                }`}
+                onPress={() => router.push('/(app)/dashboard')}
+              />
+            )}
+            <Pressable
+              onPress={handleAddChild}
+              className="bg-surface rounded-card px-4 py-3.5 mb-2"
+              accessibilityLabel="Add a child profile"
+              accessibilityRole="button"
+              testID="add-child-link"
+            >
+              <Text className="text-body font-semibold text-text-primary">
+                Add a child
+              </Text>
+              <Text className="text-body-sm text-text-secondary mt-1">
+                Create a profile so your child can learn with their own mentor
+              </Text>
+            </Pressable>
+          </>
+        )}
+
+        {/* 5. Celebrations */}
         <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2 mt-6">
           Celebrations
         </Text>
@@ -496,54 +528,24 @@ export default function MoreScreen() {
           testID="celebration-level-off"
         />
 
-        {/* Homework Help — hidden until parent-controlled toggle is implemented
-        <Pressable
-          onPress={() => router.push('/(app)/homework/camera')}
-          className="bg-surface rounded-card px-4 py-3.5 mb-2 mt-2"
-          accessibilityLabel="Start homework help session"
-          accessibilityRole="button"
-          testID="homework-help-link"
-        >
-          <Text className="text-body font-semibold text-text-primary">
-            Homework Help
-          </Text>
-          <Text className="text-body-sm text-text-secondary mt-1">
-            Snap a photo and get guided through it step by step
-          </Text>
-        </Pressable>
-        */}
+        {/* 6. Notifications */}
+        <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2 mt-6">
+          Notifications
+        </Text>
+        <ToggleRow
+          label="Push notifications"
+          value={pushEnabled}
+          onToggle={handleTogglePush}
+          disabled={notifLoading || updateNotifications.isPending}
+        />
+        <ToggleRow
+          label="Weekly progress digest"
+          value={weeklyDigest}
+          onToggle={handleToggleDigest}
+          disabled={notifLoading || updateNotifications.isPending}
+        />
 
-        {activeProfile?.isOwner && (
-          <>
-            <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2 mt-6">
-              Family
-            </Text>
-            {linkedChildren.length > 0 && (
-              <SettingsRow
-                label="Child progress"
-                value={`${linkedChildren.length} ${
-                  linkedChildren.length === 1 ? 'child' : 'children'
-                }`}
-                onPress={() => router.push('/(app)/dashboard')}
-              />
-            )}
-            <Pressable
-              onPress={handleAddChild}
-              className="bg-surface rounded-card px-4 py-3.5 mb-2"
-              accessibilityLabel="Add a child profile"
-              accessibilityRole="button"
-              testID="add-child-link"
-            >
-              <Text className="text-body font-semibold text-text-primary">
-                Add a child
-              </Text>
-              <Text className="text-body-sm text-text-secondary mt-1">
-                Create a profile so your child can learn with their own mentor
-              </Text>
-            </Pressable>
-          </>
-        )}
-
+        {/* 7. Account — identity, language, subscription only */}
         <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2 mt-6">
           Account
         </Text>
@@ -552,6 +554,7 @@ export default function MoreScreen() {
           value={displayName}
           onPress={() => router.push('/profiles')}
         />
+        <AccountSecurity visible={activeProfile?.isOwner ?? false} />
         {/* BKT-C.1 — Tutor language edit path. Launches the same picker the */}
         {/* interview onboarding uses, with returnTo=settings so the picker's */}
         {/* onSave returns here instead of forward-routing into language-setup. */}
@@ -569,12 +572,6 @@ export default function MoreScreen() {
             })
           }
         />
-        {!hideMentorMemory ? (
-          <SettingsRow
-            label="What My Mentor Knows"
-            onPress={() => router.push('/(app)/mentor-memory')}
-          />
-        ) : null}
         <SettingsRow
           label="Subscription"
           value={
@@ -586,6 +583,11 @@ export default function MoreScreen() {
           }
           onPress={() => router.push('/(app)/subscription')}
         />
+
+        {/* 8. Other — support, legal, data management */}
+        <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2 mt-6">
+          Other
+        </Text>
         <SettingsRow label="Help & Support" onPress={() => void handleHelp()} />
         <SettingsRow label="Report a Problem" onPress={openFeedback} />
         <SettingsRow
@@ -606,7 +608,22 @@ export default function MoreScreen() {
           onPress={() => router.push('/delete-account')}
         />
 
-        <AccountSecurity />
+        {/* Homework Help — hidden until parent-controlled toggle is implemented
+        <Pressable
+          onPress={() => router.push('/(app)/homework/camera')}
+          className="bg-surface rounded-card px-4 py-3.5 mb-2 mt-2"
+          accessibilityLabel="Start homework help session"
+          accessibilityRole="button"
+          testID="homework-help-link"
+        >
+          <Text className="text-body font-semibold text-text-primary">
+            Homework Help
+          </Text>
+          <Text className="text-body-sm text-text-secondary mt-1">
+            Snap a photo and get guided through it step by step
+          </Text>
+        </Pressable>
+        */}
 
         <Pressable
           onPress={async () => {
