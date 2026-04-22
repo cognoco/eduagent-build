@@ -14,8 +14,20 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
+import type { ComponentType } from 'react';
 
-const AnimatedPath = Animated.createAnimatedComponent(Path);
+// Wrap in try-catch: on some Android release builds (Hermes + Fabric),
+// Reanimated's native module can fail to initialize, causing
+// createAnimatedComponent to throw. Same pattern as AnimatedSplash.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let AnimatedPath: ComponentType<any>;
+let _penAnimationAvailable = true;
+try {
+  AnimatedPath = Animated.createAnimatedComponent(Path);
+} catch {
+  _penAnimationAvailable = false;
+  AnimatedPath = Path as never;
+}
 
 interface MagicPenAnimationProps {
   /** Overall size in pixels (default: 100) */
@@ -66,8 +78,9 @@ export function MagicPenAnimation({
   testID,
 }: MagicPenAnimationProps): ReactNode {
   const reduceMotion = useReducedMotion();
+  const animationDisabled = reduceMotion || !_penAnimationAvailable;
   const showEnhanced = size >= 80;
-  const progress = useSharedValue(0);
+  const progress = useSharedValue(animationDisabled ? 1 : 0);
   // Ink droplet shared values (only animated at >= 80px)
   const drop1Y = useSharedValue(0);
   const drop1Op = useSharedValue(0);
@@ -75,7 +88,7 @@ export function MagicPenAnimation({
   const drop2Op = useSharedValue(0);
 
   useEffect(() => {
-    if (reduceMotion) {
+    if (animationDisabled) {
       progress.value = 1;
       return;
     }
@@ -139,7 +152,15 @@ export function MagicPenAnimation({
       cancelAnimation(drop2Y);
       cancelAnimation(drop2Op);
     };
-  }, [reduceMotion, progress, showEnhanced, drop1Y, drop1Op, drop2Y, drop2Op]);
+  }, [
+    animationDisabled,
+    progress,
+    showEnhanced,
+    drop1Y,
+    drop1Op,
+    drop2Y,
+    drop2Op,
+  ]);
 
   // Ink stroke — strokeDashoffset trick (proven Fabric-safe)
   const pathAnimatedProps = useAnimatedProps(() => ({
@@ -174,7 +195,7 @@ export function MagicPenAnimation({
 
   // Nib glow — only at size >= 80px
   const glowStyle = useAnimatedStyle(() => ({
-    opacity: reduceMotion ? 0 : 0.4 * progress.value,
+    opacity: animationDisabled ? 0 : 0.4 * progress.value,
     transform: [
       {
         translateX:
@@ -233,7 +254,7 @@ export function MagicPenAnimation({
       </Svg>
 
       {/* Ink droplets — Animated.View dots (>= 80px only) */}
-      {showEnhanced && !reduceMotion && (
+      {showEnhanced && !animationDisabled && (
         <>
           <Animated.View
             style={[
@@ -269,7 +290,7 @@ export function MagicPenAnimation({
       )}
 
       {/* Nib glow — Animated.View, only at >= 80px */}
-      {showEnhanced && !reduceMotion && (
+      {showEnhanced && !animationDisabled && (
         <Animated.View
           style={[
             {
@@ -288,7 +309,7 @@ export function MagicPenAnimation({
       )}
 
       {/* Pen body — Animated.View overlay with static SVG inside */}
-      {!reduceMotion && (
+      {!animationDisabled && (
         <Animated.View
           style={[
             {

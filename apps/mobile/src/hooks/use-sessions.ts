@@ -344,6 +344,8 @@ export function useStreamMessage(sessionId: string): {
               fluencyDrill: event.fluencyDrill,
               confidence: event.confidence,
             });
+          } else if (event.type === 'error') {
+            throw new Error(event.message);
           }
         }
       } finally {

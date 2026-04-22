@@ -697,6 +697,22 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
             kind: reconnectable ? 'reconnect_prompt' : undefined,
           },
         ]);
+      } finally {
+        // Safety net: ensure isStreaming is always cleared even if onDone was
+        // never called (e.g., server sent 'error' instead of 'done', or the
+        // stream closed without either event). React ignores no-op setState.
+        setIsStreaming(false);
+        if (streamId) {
+          setMessages((prev) => {
+            const msg = prev.find((m) => m.id === streamId);
+            if (msg?.streaming) {
+              return prev.map((m) =>
+                m.id === streamId ? { ...m, streaming: false } : m
+              );
+            }
+            return prev;
+          });
+        }
       }
     },
     [

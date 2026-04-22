@@ -167,6 +167,40 @@ describe('parseSSEStream', () => {
     });
   });
 
+  it('parses error events from SSE stream (BUG-546)', async () => {
+    const stream = createMockStream([
+      'data: {"type":"chunk","content":"partial"}\n\n',
+      'data: {"type":"error","message":"Failed to save session progress. Please try again."}\n\n',
+    ]);
+
+    const events: StreamEvent[] = [];
+    for await (const event of parseSSEStream(mockResponse(stream))) {
+      events.push(event);
+    }
+
+    expect(events).toHaveLength(2);
+    expect(events[0]).toEqual({ type: 'chunk', content: 'partial' });
+    expect(events[1]).toEqual({
+      type: 'error',
+      message: 'Failed to save session progress. Please try again.',
+    });
+  });
+
+  it('skips error events missing message field (BC-07)', async () => {
+    const stream = createMockStream([
+      'data: {"type":"error"}\n\n',
+      'data: {"type":"chunk","content":"ok"}\n\n',
+    ]);
+
+    const events: StreamEvent[] = [];
+    for await (const event of parseSSEStream(mockResponse(stream))) {
+      events.push(event);
+    }
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toEqual({ type: 'chunk', content: 'ok' });
+  });
+
   it('skips events with unknown type (BC-07)', async () => {
     const stream = createMockStream([
       'data: {"type":"unknown","foo":"bar"}\n\n',

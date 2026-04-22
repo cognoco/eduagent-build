@@ -759,6 +759,43 @@ describe('ChatShell', () => {
   // Animation wiring (ANIM-IMPROVE)
   // -----------------------------------------------------------------------
 
+  // -----------------------------------------------------------------------
+  // BUG-547: internal isSystemPrompt messages must not render
+  // -----------------------------------------------------------------------
+
+  it('hides internal isSystemPrompt messages without kind (BUG-547)', () => {
+    const messages: ChatMessage[] = [
+      { id: 'u-1', role: 'user', content: 'What is ser vs estar?' },
+      {
+        id: 'sys-1',
+        role: 'assistant',
+        content: 'Looks like Spanish.',
+        isSystemPrompt: true,
+      },
+      { id: 'ai-1', role: 'assistant', content: 'Great question!' },
+    ];
+    renderChatShell({ messages });
+
+    expect(screen.queryByText('Looks like Spanish.')).toBeNull();
+    expect(screen.getByText('Great question!')).toBeTruthy();
+    expect(screen.getByText('What is ser vs estar?')).toBeTruthy();
+  });
+
+  it('shows isSystemPrompt messages that have a kind (error/reconnect)', () => {
+    const messages: ChatMessage[] = [
+      {
+        id: 'sys-1',
+        role: 'assistant',
+        content: 'Connection lost. Tap to retry.',
+        isSystemPrompt: true,
+        kind: 'reconnect_prompt',
+      },
+    ];
+    renderChatShell({ messages });
+
+    expect(screen.getByText('Connection lost. Tap to retry.')).toBeTruthy();
+  });
+
   describe('animation wiring (ANIM-IMPROVE)', () => {
     it('shows LightBulbAnimation when streaming', () => {
       renderChatShell({ isStreaming: true });

@@ -1,12 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TextInput,
-  Pressable,
-  ActivityIndicator,
-} from 'react-native';
+import { View, Text, ScrollView, TextInput, Pressable } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,6 +11,10 @@ import { SuggestionCard } from '../../../components/library/SuggestionCard';
 import { useThemeColors } from '../../../lib/theme';
 import { formatApiError } from '../../../lib/format-api-error';
 import { goBackOrReplace } from '../../../lib/navigation';
+import {
+  BookPageFlipAnimation,
+  MagicPenAnimation,
+} from '../../../components/common';
 import { platformAlert } from '../../../lib/platform-alert';
 
 // [BUG-539] Cycling messages mirror the quiz/launch.tsx pattern so users
@@ -216,7 +213,7 @@ export default function PickBookScreen(): React.ReactElement {
         style={{ paddingTop: insets.top }}
         testID="pick-book-loading"
       >
-        <ActivityIndicator size="large" color={colors.accent} />
+        <MagicPenAnimation size={100} color={colors.accent} />
         <Text className="text-body text-text-secondary mt-4">
           {LOADING_MESSAGES[loadingMessageIndex]}
         </Text>
@@ -409,7 +406,7 @@ export default function PickBookScreen(): React.ReactElement {
           className="absolute inset-0 bg-background/80 items-center justify-center"
           testID="pick-book-filing-overlay"
         >
-          <ActivityIndicator size="large" color={colors.accent} />
+          <BookPageFlipAnimation size={80} color={colors.accent} />
           <Text className="text-body-sm text-text-secondary mt-3">
             Organizing your library...
           </Text>

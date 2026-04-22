@@ -102,6 +102,11 @@ jest.mock('../../components/feedback/FeedbackProvider', () => ({
   FeedbackProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
 
+const mockUseSubjects = jest.fn();
+jest.mock('../../hooks/use-subjects', () => ({
+  useSubjects: () => mockUseSubjects(),
+}));
+
 const AppLayout = require('./_layout').default;
 
 describe('AppLayout', () => {
@@ -110,6 +115,7 @@ describe('AppLayout', () => {
     clearPendingAuthRedirect();
     mockReplace.mockReset();
     mockUsePathname.mockReturnValue('/home');
+    mockUseSubjects.mockReturnValue({ data: [], isLoading: false });
     (useAuth as jest.Mock).mockReturnValue({
       isLoaded: true,
       isSignedIn: true,
@@ -274,6 +280,70 @@ describe('AppLayout', () => {
     expect(screen.getByTestId('profile-loading')).toBeTruthy();
     expect(screen.queryByTestId('tabs')).toBeNull();
     expect(screen.queryByTestId('redirect')).toBeNull();
+  });
+
+  it('does not show post-approval landing when user already has subjects (BUG-544)', () => {
+    mockUseProfile.mockReturnValue({
+      profiles: [
+        {
+          id: 'c1',
+          isOwner: false,
+          consentStatus: 'CONSENTED',
+          birthYear: 2014,
+        },
+      ],
+      activeProfile: {
+        id: 'c1',
+        isOwner: false,
+        consentStatus: 'CONSENTED',
+        birthYear: 2014,
+      },
+      isLoading: false,
+      profileWasRemoved: false,
+      acknowledgeProfileRemoval: jest.fn(),
+      switchProfile: jest.fn(),
+    });
+    mockUseConsentStatus.mockReturnValue({
+      data: {
+        consentStatus: 'CONSENTED',
+        parentEmail: null,
+        consentType: null,
+      },
+    });
+    // User already has a subject — post-approval screen should NOT appear
+    mockUseSubjects.mockReturnValue({
+      data: [{ id: 's1', name: 'Spanish', isActive: true }],
+      isLoading: false,
+    });
+
+    render(<AppLayout />);
+
+    expect(screen.queryByTestId('post-approval-landing')).toBeNull();
+    expect(screen.getByTestId('tabs')).toBeTruthy();
+  });
+
+  it('renders in-app toast instead of native alert when profile was removed (BUG-548)', () => {
+    const acknowledgeProfileRemoval = jest.fn();
+    mockUseProfile.mockReturnValue({
+      profiles: [
+        { id: 'p1', isOwner: true, consentStatus: null, birthYear: 1990 },
+      ],
+      activeProfile: {
+        id: 'p1',
+        isOwner: true,
+        consentStatus: null,
+        birthYear: 1990,
+      },
+      isLoading: false,
+      profileWasRemoved: true,
+      acknowledgeProfileRemoval,
+      switchProfile: jest.fn(),
+    });
+
+    render(<AppLayout />);
+
+    expect(screen.getByTestId('profile-switched-toast')).toBeTruthy();
+    expect(screen.getByText('Profile switched')).toBeTruthy();
   });
 
   it('tells waiting learners that consent is checked automatically', () => {

@@ -298,6 +298,15 @@ while [ $BUNDLE_ELAPSED -lt $BUNDLE_TIMEOUT ]; do
       break
     fi
 
+    # Bundle is being fetched — Metro connection established, waiting for JS load.
+    # "Connecting to the development server" and "Loading from" appear OVER the
+    # launcher screen, so "DEVELOPMENT" is still in the hierarchy. Check these
+    # first to avoid misclassifying as "still on launcher".
+    if echo "$DUMP" | grep -q "Connecting to the development server\|Loading from"; then
+      echo "[seed-and-run] Bundle loading (${BUNDLE_ELAPSED}s) ..."
+      continue
+    fi
+
     # Still on dev-client launcher — bundle not loaded yet
     if echo "$DUMP" | grep -q "DEVELOPMENT"; then
       echo "[seed-and-run] Still on launcher (${BUNDLE_ELAPSED}s) ..."

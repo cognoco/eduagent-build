@@ -1,16 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  Text,
-  View,
-} from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Profile } from '@eduagent/schemas';
-import { ProfileSwitcher } from '../common';
+import { BookPageFlipAnimation, ProfileSwitcher } from '../common';
 import {
   useMarkQuizDiscoverySurfaced,
   useQuizDiscoveryCard,
@@ -298,7 +292,7 @@ export function LearnerScreen({
         }}
         testID="learner-loading-state"
       >
-        <ActivityIndicator size="large" />
+        <BookPageFlipAnimation size={80} />
         {loadingTimedOut && (
           <View className="mt-6 items-center" testID="learner-loading-timeout">
             <Text className="text-body text-text-secondary text-center">

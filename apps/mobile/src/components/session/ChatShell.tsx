@@ -491,49 +491,51 @@ export function ChatShell({
             </Text>
           </View>
         ) : (
-          messages.map((msg) => (
-            <View key={msg.id}>
-              {msg.imageUri && !failedImages.has(msg.id) && (
-                <View className="self-end max-w-[85%] mb-1">
-                  <Image
-                    testID={`message-image-${msg.id}`}
-                    source={{ uri: msg.imageUri }}
-                    className="w-full aspect-[4/3] rounded-lg"
-                    resizeMode="contain"
-                    accessibilityLabel="Homework image"
-                    onError={() => {
-                      setFailedImages((prev) => new Set(prev).add(msg.id));
-                    }}
-                  />
-                </View>
-              )}
-              {msg.imageUri && failedImages.has(msg.id) && (
-                <View className="self-end max-w-[85%] mb-1">
-                  <View
-                    testID={`message-image-fallback-${msg.id}`}
-                    className="w-full aspect-[4/3] rounded-lg bg-surface items-center justify-center"
-                  >
-                    <Ionicons
-                      name="camera-outline"
-                      size={32}
-                      color={colors.muted}
+          messages
+            .filter((msg) => !(msg.isSystemPrompt && !msg.kind))
+            .map((msg) => (
+              <View key={msg.id}>
+                {msg.imageUri && !failedImages.has(msg.id) && (
+                  <View className="self-end max-w-[85%] mb-1">
+                    <Image
+                      testID={`message-image-${msg.id}`}
+                      source={{ uri: msg.imageUri }}
+                      className="w-full aspect-[4/3] rounded-lg"
+                      resizeMode="contain"
+                      accessibilityLabel="Homework image"
+                      onError={() => {
+                        setFailedImages((prev) => new Set(prev).add(msg.id));
+                      }}
                     />
-                    <Text className="text-body-sm text-text-secondary mt-1">
-                      Image no longer available
-                    </Text>
                   </View>
-                </View>
-              )}
-              <MessageBubble
-                role={msg.role}
-                content={msg.content}
-                streaming={msg.streaming}
-                escalationRung={msg.escalationRung}
-                verificationBadge={msg.verificationBadge}
-                actions={renderMessageActions?.(msg)}
-              />
-            </View>
-          ))
+                )}
+                {msg.imageUri && failedImages.has(msg.id) && (
+                  <View className="self-end max-w-[85%] mb-1">
+                    <View
+                      testID={`message-image-fallback-${msg.id}`}
+                      className="w-full aspect-[4/3] rounded-lg bg-surface items-center justify-center"
+                    >
+                      <Ionicons
+                        name="camera-outline"
+                        size={32}
+                        color={colors.muted}
+                      />
+                      <Text className="text-body-sm text-text-secondary mt-1">
+                        Image no longer available
+                      </Text>
+                    </View>
+                  </View>
+                )}
+                <MessageBubble
+                  role={msg.role}
+                  content={msg.content}
+                  streaming={msg.streaming}
+                  escalationRung={msg.escalationRung}
+                  verificationBadge={msg.verificationBadge}
+                  actions={renderMessageActions?.(msg)}
+                />
+              </View>
+            ))
         )}
         {isStreaming && (
           <View className="items-center py-4" testID="thinking-bulb-animation">

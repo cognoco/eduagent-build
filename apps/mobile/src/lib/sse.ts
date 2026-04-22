@@ -45,7 +45,12 @@ export interface StreamDoneEvent {
   confidence?: 'low' | 'medium' | 'high';
 }
 
-export type StreamEvent = StreamChunkEvent | StreamDoneEvent;
+export interface StreamErrorEvent {
+  type: 'error';
+  message: string;
+}
+
+export type StreamEvent = StreamChunkEvent | StreamDoneEvent | StreamErrorEvent;
 
 /** BC-07: runtime validation for SSE events — verifies required fields exist
  * before casting, preventing malformed events from corrupting accumulated text.
@@ -54,6 +59,7 @@ export type StreamEvent = StreamChunkEvent | StreamDoneEvent;
 function isValidStreamEvent(obj: Record<string, unknown>): boolean {
   if (obj.type === 'chunk') return typeof obj.content === 'string';
   if (obj.type === 'done') return typeof obj.exchangeCount === 'number';
+  if (obj.type === 'error') return typeof obj.message === 'string';
   return false;
 }
 

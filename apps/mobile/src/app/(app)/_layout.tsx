@@ -34,6 +34,7 @@ import {
 } from '../../lib/pending-auth-redirect';
 import { platformAlert } from '../../lib/platform-alert';
 import { FeedbackProvider } from '../../components/feedback/FeedbackProvider';
+import { useSubjects } from '../../hooks/use-subjects';
 
 // ─── Tab visibility whitelist ────────────────────────────────────────
 // Only these routes render a visible tab button. Every other route in
@@ -135,6 +136,7 @@ function usePostApprovalLanding(
   profileId: string | undefined,
   consentStatus: string | null | undefined
 ): [boolean, () => void] {
+  const subjects = useSubjects();
   const [shouldShow, setShouldShow] = React.useState(false);
   const [checked, setChecked] = React.useState(false);
 
@@ -165,7 +167,10 @@ function usePostApprovalLanding(
     });
   }, [profileId]);
 
-  return [checked && shouldShow, dismiss];
+  // Don't show if subjects are still loading or if user already has subjects
+  const subjectsReady = !subjects.isLoading;
+  const hasSubjects = (subjects.data?.length ?? 0) > 0;
+  return [checked && subjectsReady && shouldShow && !hasSubjects, dismiss];
 }
 
 function PostApprovalLanding({
@@ -1099,15 +1104,11 @@ export default function AppLayout() {
     router.replace(pendingAuthRedirect as never);
   }, [currentAppPath, pendingAuthRedirect, router]);
 
-  // Show alert when a profile was removed server-side (consent denied / auto-deleted)
+  // Auto-dismiss profile-switched toast after 5 seconds
   React.useEffect(() => {
-    if (profileWasRemoved) {
-      platformAlert(
-        'Profile switched',
-        "One of your profiles is no longer available, so we've switched you to your main profile. Everything else is just as you left it.",
-        [{ text: 'OK', onPress: acknowledgeProfileRemoval }]
-      );
-    }
+    if (!profileWasRemoved) return;
+    const timer = setTimeout(acknowledgeProfileRemoval, 5_000);
+    return () => clearTimeout(timer);
   }, [profileWasRemoved, acknowledgeProfileRemoval]);
 
   // Post-approval landing: show once after parent approves GDPR/COPPA consent
@@ -1285,6 +1286,25 @@ export default function AppLayout() {
             }}
           />
         </Tabs>
+        {profileWasRemoved && (
+          <Pressable
+            onPress={acknowledgeProfileRemoval}
+            className="absolute left-4 right-4 z-50"
+            style={{ top: insets.top + 8 }}
+            testID="profile-switched-toast"
+            accessibilityRole="alert"
+          >
+            <View className="rounded-2xl bg-surface-elevated px-5 py-4 w-full shadow-lg">
+              <Text className="text-body font-semibold text-text-primary mb-1">
+                Profile switched
+              </Text>
+              <Text className="text-body-sm text-text-secondary">
+                One of your profiles is no longer available, so we've switched
+                you to your main profile.
+              </Text>
+            </View>
+          </Pressable>
+        )}
       </View>
     </FeedbackProvider>
   );

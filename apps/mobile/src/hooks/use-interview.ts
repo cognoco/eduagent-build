@@ -191,6 +191,8 @@ export function useStreamInterviewMessage(
               isComplete: event.isComplete ?? false,
               exchangeCount: event.exchangeCount,
             });
+          } else if (event.type === 'error') {
+            throw new Error(event.message);
           }
         }
       } finally {

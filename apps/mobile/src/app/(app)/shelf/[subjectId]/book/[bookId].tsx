@@ -1,16 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  Text,
-  View,
-} from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import type { CurriculumTopic } from '@eduagent/schemas';
-import { MagicPenAnimation } from '../../../../../components/common';
+import {
+  BookPageFlipAnimation,
+  MagicPenAnimation,
+} from '../../../../../components/common';
 import { SuggestionCard } from '../../../../../components/library/SuggestionCard';
 import { SessionRow } from '../../../../../components/library/SessionRow';
 import { ChapterDivider } from '../../../../../components/library/ChapterDivider';
@@ -514,7 +511,7 @@ export default function BookScreen() {
         style={{ paddingTop: insets.top }}
         testID="book-loading"
       >
-        <ActivityIndicator size="large" color={themeColors.accent} />
+        <BookPageFlipAnimation size={80} color={themeColors.accent} />
         <Text className="text-body-sm text-text-secondary mt-3">
           Loading book...
         </Text>

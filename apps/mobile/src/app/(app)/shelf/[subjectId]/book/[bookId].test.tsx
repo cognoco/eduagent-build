@@ -159,6 +159,7 @@ jest.mock('../../../../../lib/format-api-error', () => ({
 
 // --- MagicPenAnimation (simple stub) ---
 jest.mock('../../../../../components/common', () => ({
+  BookPageFlipAnimation: () => null,
   MagicPenAnimation: () => null,
 }));
 

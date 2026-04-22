@@ -945,11 +945,14 @@ function SessionScreenInner() {
 
   const latestAiMessageId = useMemo(
     () =>
-      [...messages]
-        .reverse()
-        .find((message) => message.role === 'assistant' && !message.streaming)
-        ?.id ?? null,
-    [messages]
+      isStreaming
+        ? null
+        : [...messages]
+            .reverse()
+            .find(
+              (message) => message.role === 'assistant' && !message.streaming
+            )?.id ?? null,
+    [messages, isStreaming]
   );
 
   const endSessionButton = showEndSession ? (
