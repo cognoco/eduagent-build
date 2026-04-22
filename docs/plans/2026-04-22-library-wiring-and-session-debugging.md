@@ -1,7 +1,7 @@
 # Library Wiring Fixes & Session Debugging Plan
 
 **Date:** 2026-04-22
-**Status:** In progress — library fixes applied locally, session root cause identified but not yet fixed
+**Status:** In progress — library fixes applied locally (Part 1, 2); progress ghost-session fix committed + pushed (Part 2b, `2e901ac3`); streaming root cause identified but not yet fixed (Part 3)
 **Branch:** `testing`
 
 ---
@@ -66,6 +66,51 @@ Also lowered the exchange threshold from `(exchangeCount >= 3 OR durationSeconds
 
 ---
 
+## Part 2b: Progress Screen Ghost-Session Fix (DONE — committed `2e901ac3`) [PROG-GHOST]
+
+### Finding
+
+`getTopicProgress` and `getTopicProgressBatch` in `apps/api/src/services/progress.ts` counted **every** session row when computing `completionStatus`, with no `exchangeCount` filter. A "ghost session" — created when the user tapped a topic then abandoned before sending a message (`exchangeCount = 0`, `status = 'active'`) — was enough to flip the topic to `'in_progress'`.
+
+Meanwhile `dashboard.ts:856` (parent child-view) and `curriculum.ts:248` (book status) already filtered `gte(exchangeCount, 1)`. Same topic, same profile, three different answers to "is it started?":
+
+| Surface | Before fix |
+|---|---|
+| Progress screen | "In progress" (ghost session counted) |
+| Dashboard (parent view) | "0 sessions" (topic filtered out entirely) |
+| Library / Book view | Book status NOT_STARTED (ghost session not counted) |
+
+The smoking gun was inside `progress.ts` itself: `getSubjectProgress` at line 138-143 already had the `gte(exchangeCount, 1)` filter with the comment *"only sessions with real activity"*, but the fix was never propagated to the per-topic queries 80 lines down.
+
+### Fix applied
+
+```diff
+- const topicSessions = await repo.sessions.findMany(
+-   eq(learningSessions.topicId, topicId)
+- );
++ const topicSessions = await repo.sessions.findMany(
++   and(
++     eq(learningSessions.topicId, topicId),
++     gte(learningSessions.exchangeCount, 1)
++   )
++ );
+```
+
+Applied to both `getTopicProgress` (single-topic, `progress.ts:220`) and `getTopicProgressBatch` (list-payload hot path, `progress.ts:520`).
+
+### Verification
+
+- **Behavioral test:** `progress.test.ts` [PROG-GHOST] — ghost-only topic returns `completionStatus = 'not_started'` and `totalSessions = 0`.
+- **Structural break test:** inspects the mock's filter argument and asserts it contains `exchange_count`. A future refactor that strips the filter will fail this test.
+- **Full suite:** 437 tests across 25 related test suites pass (`jest --findRelatedTests src/services/progress.ts`), including `dashboard.integration.test.ts` (real DB).
+- **Typecheck:** clean.
+
+### Relationship to the architecture observation (lines 135-145)
+
+This fix addresses another concrete instance of the "contradictory derived state" pattern the plan flagged. Where the plan called out *"topic shows Not started but has retention signal"*, this was the opposite direction: *"topic shows started but dashboard shows 0 sessions."* Same root cause — progress is computed at read time from session counts without a shared definition of which sessions count.
+
+---
+
 ## Part 3: Session Auto-Close — Root Cause (NOT YET FIXED)
 
 ### The actual problem
@@ -114,11 +159,14 @@ Streaming breaks after ~2 exchanges
 
 ## Deployment plan
 
-### Step 1: Deploy library fixes + session visibility fix
-- Commit all Part 1 + Part 2 changes
+### Step 1: Deploy library fixes + session visibility fix + progress ghost-session fix
+- Commit all Part 1 + Part 2 changes (still local per this plan)
+- Part 2b already committed + pushed: `2e901ac3` [PROG-GHOST]
 - Deploy API to staging (Cloudflare Workers)
 - OTA update mobile (if JS-only changes) or EAS build
-- Verify: Book screen shows topics, sessions appear, navigation works
+- Verify:
+  - Book screen shows topics, sessions appear, navigation works (Part 1 + 2)
+  - Topics without any real exchanges no longer appear "In progress" on the progress screen (Part 2b)
 
 ### Step 2: Debug streaming disconnect (Part 3)
 - Requires staging API logs or local reproduction
