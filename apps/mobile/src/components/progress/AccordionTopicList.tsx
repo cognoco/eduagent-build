@@ -34,7 +34,7 @@ function getTopicStatusLabel(topic: TopicProgress): string {
   }
 
   if (topic.completionStatus === 'in_progress') {
-    return 'In progress';
+    return 'Started';
   }
 
   return 'Covered';

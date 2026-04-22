@@ -51,30 +51,21 @@ describe('usePushTokenRegistration', () => {
     });
   });
 
-  it('requests permission when not already granted', async () => {
+  it('does not request permission or register when not already granted', async () => {
     (Notifications.getPermissionsAsync as jest.Mock).mockResolvedValueOnce({
       status: 'undetermined',
-    });
-    (Notifications.requestPermissionsAsync as jest.Mock).mockResolvedValueOnce({
-      status: 'granted',
     });
 
     renderHook(() => usePushTokenRegistration());
 
-    await waitFor(() => {
-      expect(Notifications.requestPermissionsAsync).toHaveBeenCalled();
-    });
+    await new Promise((r) => setTimeout(r, 50));
 
-    await waitFor(() => {
-      expect(mockMutateAsync).toHaveBeenCalled();
-    });
+    expect(Notifications.requestPermissionsAsync).not.toHaveBeenCalled();
+    expect(mockMutateAsync).not.toHaveBeenCalled();
   });
 
   it('does not register when permission is denied', async () => {
     (Notifications.getPermissionsAsync as jest.Mock).mockResolvedValueOnce({
-      status: 'denied',
-    });
-    (Notifications.requestPermissionsAsync as jest.Mock).mockResolvedValueOnce({
       status: 'denied',
     });
 
@@ -83,7 +74,34 @@ describe('usePushTokenRegistration', () => {
     // Give time for the async effect to complete
     await new Promise((r) => setTimeout(r, 50));
 
+    expect(Notifications.requestPermissionsAsync).not.toHaveBeenCalled();
     expect(mockMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('registers token when notificationGranted flips from false to true', async () => {
+    (Notifications.getPermissionsAsync as jest.Mock).mockResolvedValue({
+      status: 'undetermined',
+    });
+
+    const { rerender } = renderHook(
+      ({ granted }: { granted: boolean }) => usePushTokenRegistration(granted),
+      { initialProps: { granted: false } }
+    );
+
+    await new Promise((r) => setTimeout(r, 50));
+    expect(mockMutateAsync).not.toHaveBeenCalled();
+
+    (Notifications.getPermissionsAsync as jest.Mock).mockResolvedValue({
+      status: 'granted',
+    });
+
+    rerender({ granted: true });
+
+    await waitFor(() => {
+      expect(mockMutateAsync).toHaveBeenCalledWith(
+        'ExponentPushToken[mock-token]'
+      );
+    });
   });
 
   it('does not crash on registration error', async () => {

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -37,13 +37,21 @@ export default function ChildReportDetailScreen(): React.ReactElement {
   }>();
   const { data: report, isLoading } = useChildReportDetail(profileId, reportId);
   const markViewed = useMarkChildReportViewed();
+  const markViewedRef = useRef(markViewed);
+  markViewedRef.current = markViewed;
+  const viewedRef = useRef(false);
 
   useEffect(() => {
     if (!profileId || !reportId || !report || report.viewedAt) return;
+    // [BUG-550] Guard: fire at most once per mount to prevent retry flood.
+    // useMutation returns a new object reference each render, so we access it
+    // via a ref to keep a stable dependency array.
+    if (viewedRef.current) return;
+    viewedRef.current = true;
     // [EP15-C7] Mark-viewed is best-effort background tracking — a failure
     // should not interrupt the user's read, but we capture to Sentry for
     // observability instead of swallowing silently with `void`.
-    markViewed
+    markViewedRef.current
       .mutateAsync({ childProfileId: profileId, reportId })
       .catch((err: unknown) => {
         Sentry.captureException(err, {
@@ -51,7 +59,7 @@ export default function ChildReportDetailScreen(): React.ReactElement {
           extra: { profileId, reportId },
         });
       });
-  }, [markViewed, profileId, report, reportId]);
+  }, [profileId, report, reportId]);
 
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>

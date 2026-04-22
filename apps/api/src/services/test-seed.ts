@@ -484,7 +484,7 @@ async function seedOnboardingComplete(
 
   // BUG-34 fix: Add a subject so the home screen stays visible after sign-in.
   // Without a subject, home.tsx auto-redirects to /create-subject, breaking
-  // flows that expect home-scroll-view to remain visible.
+  // flows that expect learner-screen to remain visible.
   // NOTE: This changes the scenario's semantics — it no longer represents
   // "just finished onboarding, no subjects." A separate onboarding-no-subject
   // scenario would be needed to test the empty-state /create-subject redirect.

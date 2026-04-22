@@ -12,6 +12,7 @@ import {
   useStreamInterviewMessage,
   useForceCompleteInterview,
 } from '../../../hooks/use-interview';
+import { useStartSession, useStreamMessage } from '../../../hooks/use-sessions';
 import { formatApiError } from '../../../lib/format-api-error';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { platformAlert } from '../../../lib/platform-alert';
@@ -53,6 +54,18 @@ export default function InterviewScreen() {
     isStreaming: isStreamingSSE,
   } = useStreamInterviewMessage(safeSubjectId ?? '', bookId);
   const forceComplete = useForceCompleteInterview(safeSubjectId ?? '', bookId);
+
+  // ---------------------------------------------------------------------------
+  // Session-phase hooks: after the interview completes, the screen silently
+  // transitions into a learning session so the conversation never stops.
+  // Hooks are called unconditionally (rules of hooks).
+  // ---------------------------------------------------------------------------
+  const startSession = useStartSession(safeSubjectId ?? '');
+  const [sessionPhase, setSessionPhase] = useState(false);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const sessionCreatingRef = useRef(false);
+  const { stream: streamSessionMessage, isStreaming: isSessionStreaming } =
+    useStreamMessage(activeSessionId ?? '');
 
   const openingMessage = bookTitle
     ? `Hi! I'm your learning mate. Let's talk about ${bookTitle}! What do you already know about it, and what are you most curious to learn?`
@@ -132,7 +145,7 @@ export default function InterviewScreen() {
   const [messages, setMessages] = useState<ChatMessage[]>([
     { id: 'opening', role: 'assistant', content: openingMessage },
   ]);
-  const isStreaming = isStreamingSSE;
+  const isStreaming = isStreamingSSE || isSessionStreaming;
   const [interviewComplete, setInterviewComplete] = useState(false);
   const [restartRequired, setRestartRequired] = useState(false);
   const [streamError, setStreamError] = useState<string | null>(null);
@@ -147,12 +160,38 @@ export default function InterviewScreen() {
     [messages]
   );
 
+  // ---------------------------------------------------------------------------
+  // Session transition: silently start a learning session after interview ends.
+  // The curriculum is already persisted server-side when isComplete fires.
+  // ---------------------------------------------------------------------------
+  const transitionToSession = useCallback(async () => {
+    if (sessionCreatingRef.current || !safeSubjectId) return;
+    sessionCreatingRef.current = true;
+    try {
+      const result = await startSession.mutateAsync({
+        subjectId: safeSubjectId,
+        sessionType: 'learning',
+        inputMode: 'text',
+      });
+      setActiveSessionId(result.session.id);
+      setSessionPhase(true);
+    } catch {
+      // Session creation failed — fall back to showing the "Let's Go" card
+      // so the user isn't stuck on a dead screen.
+      setInterviewComplete(true);
+      sessionCreatingRef.current = false;
+    }
+  }, [safeSubjectId, startSession]);
+
   useEffect(() => {
     seededDraftRef.current = false;
     setMessages([
       { id: 'opening', role: 'assistant', content: openingMessage },
     ]);
     setInterviewComplete(false);
+    setSessionPhase(false);
+    setActiveSessionId(null);
+    sessionCreatingRef.current = false;
     setRestartRequired(false);
     setStreamError(null);
     setExtractedInterests(null);
@@ -245,6 +284,9 @@ export default function InterviewScreen() {
         { id: 'opening', role: 'assistant', content: openingMessage },
       ]);
       setInterviewComplete(false);
+      setSessionPhase(false);
+      setActiveSessionId(null);
+      sessionCreatingRef.current = false;
       setRestartRequired(false);
       setStreamError(null);
       seededDraftRef.current = true;
@@ -255,11 +297,10 @@ export default function InterviewScreen() {
 
   // [BUG-464] Client escape: let user skip ahead after 2+ exchanges
   const handleSkipInterview = useCallback(async () => {
-    if (interviewComplete || forceComplete.isPending) return;
+    if (interviewComplete || sessionPhase || forceComplete.isPending) return;
     try {
       abortStream();
       const result = await forceComplete.mutateAsync();
-      setInterviewComplete(true);
       // BKT-C.2: Capture freshly-extracted interests from the mutation
       // response so goToNextStep can route into the interests-context picker
       // without waiting for the invalidated state query to refetch.
@@ -269,10 +310,18 @@ export default function InterviewScreen() {
       ) {
         setExtractedInterests(result.extractedSignals.interests);
       }
+      // Seamlessly transition to learning session
+      await transitionToSession();
     } catch (err: unknown) {
       platformAlert('Could not skip ahead', formatApiError(err));
     }
-  }, [interviewComplete, forceComplete, abortStream]);
+  }, [
+    interviewComplete,
+    sessionPhase,
+    forceComplete,
+    abortStream,
+    transitionToSession,
+  ]);
 
   const handleSend = useCallback(
     async (text: string, { isRetry = false } = {}) => {
@@ -291,6 +340,54 @@ export default function InterviewScreen() {
         { id: streamMsgId, role: 'assistant', content: '', streaming: true },
       ]);
 
+      // -----------------------------------------------------------------------
+      // Session phase: route through the session streaming API.
+      // The interview is done — subsequent messages are regular learning exchanges.
+      // -----------------------------------------------------------------------
+      if (sessionPhase && activeSessionId) {
+        try {
+          await streamSessionMessage(
+            text,
+            (accumulated) => {
+              const clean = accumulated.trimEnd();
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === streamMsgId ? { ...m, content: clean } : m
+                )
+              );
+            },
+            () => {
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === streamMsgId
+                    ? {
+                        ...m,
+                        content: m.content.trimEnd(),
+                        streaming: false,
+                      }
+                    : m
+                )
+              );
+            },
+            activeSessionId
+          );
+        } catch (err: unknown) {
+          const formattedError = formatApiError(err);
+          setStreamError(formattedError);
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === streamMsgId
+                ? { ...m, content: formattedError, streaming: false }
+                : m
+            )
+          );
+        }
+        return;
+      }
+
+      // -----------------------------------------------------------------------
+      // Interview phase: use the interview streaming API.
+      // -----------------------------------------------------------------------
       try {
         await streamInterview(
           text,
@@ -315,7 +412,11 @@ export default function InterviewScreen() {
               )
             );
             if (result.isComplete) {
-              setInterviewComplete(true);
+              // Seamlessly transition to a learning session.
+              // Don't set interviewComplete — that disables input and shows
+              // the "Let's Go" card. Instead, silently start a session so the
+              // conversation continues without interruption.
+              void transitionToSession();
             }
           }
         );
@@ -332,7 +433,17 @@ export default function InterviewScreen() {
         );
       }
     },
-    [isStreaming, restartRequired, streamError, subjectId, streamInterview]
+    [
+      isStreaming,
+      restartRequired,
+      streamError,
+      subjectId,
+      streamInterview,
+      sessionPhase,
+      activeSessionId,
+      streamSessionMessage,
+      transitionToSession,
+    ]
   );
 
   // BUG-316: Show error screen when subjectId is missing — hooks already
@@ -357,29 +468,59 @@ export default function InterviewScreen() {
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // Title & header: once in session phase, drop the "Interview:" prefix and
+  // the step indicator so the screen looks like a normal learning session.
+  // ---------------------------------------------------------------------------
+  const title = sessionPhase
+    ? bookTitle ?? subjectName ?? 'Learning'
+    : bookTitle
+    ? `Interview: ${bookTitle}`
+    : `Interview: ${subjectName ?? 'New Subject'}`;
+
   return (
     <ChatShell
-      title={
-        bookTitle
-          ? `Interview: ${bookTitle}`
-          : `Interview: ${subjectName ?? 'New Subject'}`
-      }
+      title={title}
       headerBelow={
-        <OnboardingStepIndicator step={step} totalSteps={totalSteps} />
+        !sessionPhase ? (
+          <OnboardingStepIndicator step={step} totalSteps={totalSteps} />
+        ) : undefined
       }
       messages={messages}
       onSend={handleSend}
       isStreaming={isStreaming}
-      inputDisabled={interviewComplete || restartRequired || !!streamError}
+      inputDisabled={
+        // Interview phase: disable when complete (fallback), expired, or errored
+        // Session phase: briefly disable while session is being created
+        (!sessionPhase && interviewComplete) ||
+        (sessionPhase && !activeSessionId) ||
+        restartRequired ||
+        !!streamError
+      }
       rightAction={
-        <LivingBook
-          exchangeCount={exchangeCount}
-          isComplete={interviewComplete}
-          isExpressive
-          onPress={interviewComplete ? goToNextStep : undefined}
-        />
+        sessionPhase ? (
+          // Session phase: show "End session" button instead of LivingBook
+          <Pressable
+            onPress={goToNextStep}
+            className="px-3 py-2"
+            testID="end-session-button"
+            accessibilityRole="button"
+            accessibilityLabel="End session"
+          >
+            <Text className="text-body-sm text-primary font-medium">Done</Text>
+          </Pressable>
+        ) : (
+          <LivingBook
+            exchangeCount={exchangeCount}
+            isComplete={interviewComplete}
+            isExpressive
+            onPress={interviewComplete ? goToNextStep : undefined}
+          />
+        )
       }
       footer={
+        // interviewComplete is only true as a fallback (session creation failed)
+        // or when returning to an already-completed draft.
         interviewComplete ? (
           <View className="bg-coaching-card rounded-card p-4 mt-2 mb-4">
             <Text className="text-body font-semibold text-text-primary mb-2">
@@ -446,7 +587,8 @@ export default function InterviewScreen() {
               </Text>
             </Pressable>
           </View>
-        ) : !interviewComplete &&
+        ) : !sessionPhase &&
+          !interviewComplete &&
           !streamError &&
           !restartRequired &&
           exchangeCount >= 2 ? (

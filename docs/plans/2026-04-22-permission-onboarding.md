@@ -20,6 +20,9 @@
 | `apps/mobile/src/app/(app)/_layout.test.tsx` | Modify | Add tests for the permission gate |
 | `apps/mobile/src/hooks/use-push-token-registration.ts` | Modify | Remove `requestPermissionsAsync` call, only register token when already granted |
 | `apps/mobile/src/hooks/use-push-token-registration.test.ts` | Modify | Update tests for the new check-only behavior |
+| `apps/mobile/src/hooks/use-speech-recognition.ts` | Modify | Add `getPermissionsAsync` to `SpeechRecognitionModule` type (prerequisite for passive checks) |
+| ChatShell component (grep to locate) | Modify | Add AppState listener for mic permission refresh on return from Settings |
+| `apps/mobile/src/hooks/use-shake-detector.ts` | Modify | Add `__DEV__` warnings for unavailable accelerometer; expose `shakeAvailable` |
 
 ---
 
@@ -193,7 +196,47 @@ The hook only checks current status and registers the token if already granted."
 
 ---
 
-### Task 2: Add `usePermissionSetup` hook to `_layout.tsx`
+### Task 2: Extend `SpeechRecognitionModule` type to add `getPermissionsAsync`
+
+The `usePermissionSetup` hook and ChatShell's AppState listener both need to **passively check** mic permission status without prompting. The native `expo-speech-recognition` module exports `getPermissionsAsync` (confirmed at `ExpoSpeechRecognitionModule.types.d.ts:565`), but the local `SpeechRecognitionModule` type at `hooks/use-speech-recognition.ts:33` is a hand-written minimal subset that omits it. This is a prerequisite for Tasks 3 and 6.
+
+**Files:**
+- Modify: `apps/mobile/src/hooks/use-speech-recognition.ts`
+
+- [ ] **Step 1: Locate the type definition**
+
+Read `apps/mobile/src/hooks/use-speech-recognition.ts`, lines 33–45. Confirm `getPermissionsAsync` is absent from the `SpeechRecognitionModule` type.
+
+- [ ] **Step 2: Add `getPermissionsAsync` to the type**
+
+```ts
+type SpeechRecognitionModule = {
+  getPermissionsAsync: () => Promise<{ granted: boolean; canAskAgain: boolean }>;
+  requestPermissionsAsync: () => Promise<{ granted: boolean }>;
+  // ... existing fields unchanged
+};
+```
+
+- [ ] **Step 3: Run typecheck**
+
+Run: `cd C:/Dev/Projects/Products/Apps/eduagent-build/apps/mobile && pnpm exec tsc --noEmit`
+
+Expected: No new errors (additive change only).
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add apps/mobile/src/hooks/use-speech-recognition.ts
+git commit -m "fix(mobile): add getPermissionsAsync to SpeechRecognitionModule type
+
+Prerequisite for permission gate passive check and ChatShell AppState
+mic-refresh. Native module exports this method; local type was a minimal
+subset that omitted it."
+```
+
+---
+
+### Task 3: Add `usePermissionSetup` hook to `_layout.tsx`
 
 **Files:**
 - Modify: `apps/mobile/src/app/(app)/_layout.tsx` (add hook near line 135, after `usePostApprovalLanding`)
@@ -211,9 +254,11 @@ jest.mock('expo-notifications', () => ({
   AndroidImportance: { DEFAULT: 3 },
 }));
 
+const mockSpeechGetPermissions = jest.fn().mockResolvedValue({ granted: true, canAskAgain: true });
 const mockSpeechRequestPermissions = jest.fn().mockResolvedValue({ granted: true });
 jest.mock('expo-speech-recognition', () => ({
   ExpoSpeechRecognitionModule: {
+    getPermissionsAsync: mockSpeechGetPermissions,
     requestPermissionsAsync: mockSpeechRequestPermissions,
   },
 }));
@@ -229,7 +274,7 @@ it('shows permission setup gate when permissions are not granted and flag is not
     status: 'undetermined',
   });
   // Speech recognition not granted
-  mockSpeechRequestPermissions.mockResolvedValue({ granted: false });
+  mockSpeechGetPermissions.mockResolvedValue({ granted: false, canAskAgain: true });
 
   // SecureStore: no permissionSetupSeen flag
   const SecureStoreMock = require('expo-secure-store');
@@ -333,12 +378,11 @@ function usePermissionSetup(
       const mod = await import('expo-speech-recognition');
       const speechModule = mod.ExpoSpeechRecognitionModule;
       if (speechModule) {
-        const { granted } = await speechModule.requestPermissionsAsync();
+        // Passive check only — never prompt here. requestPermissionsAsync is
+        // called by the user-triggered requestMic callback below.
+        const { granted, canAskAgain } = await speechModule.getPermissionsAsync();
         micStatus = granted ? 'granted' : 'denied';
-        // expo-speech-recognition requestPermissionsAsync doesn't return
-        // canAskAgain — if not granted after calling request, treat as
-        // permanently denied (the OS won't re-prompt)
-        if (!granted) micCanAskAgain = false;
+        micCanAskAgain = canAskAgain;
       } else {
         micAvailable = false;
       }
@@ -427,10 +471,14 @@ function usePermissionSetup(
       const mod = await import('expo-speech-recognition');
       const speechModule = mod.ExpoSpeechRecognitionModule;
       if (!speechModule) return;
-      const { granted } = await speechModule.requestPermissionsAsync();
+      await speechModule.requestPermissionsAsync();
+      // Re-check with getPermissionsAsync to get the updated canAskAgain
+      // value after the OS dialog (requestPermissionsAsync doesn't return it)
+      const { granted, canAskAgain } = await speechModule.getPermissionsAsync();
       setPermState((prev) => ({
         ...prev,
         mic: granted ? 'granted' : 'denied',
+        micCanAskAgain: canAskAgain,
       }));
     } catch {
       /* non-fatal */
@@ -439,10 +487,15 @@ function usePermissionSetup(
 
   const requestNotif = React.useCallback(async () => {
     try {
-      const { status } = await Notifications.requestPermissionsAsync();
+      await Notifications.requestPermissionsAsync();
+      // Re-check with getPermissionsAsync to get the updated canAskAgain
+      // value after the OS dialog (mirrors the requestMic pattern)
+      const { status, canAskAgain } =
+        await Notifications.getPermissionsAsync();
       setPermState((prev) => ({
         ...prev,
         notif: status === 'granted' ? 'granted' : 'denied',
+        notifCanAskAgain: canAskAgain ?? false,
       }));
     } catch {
       /* non-fatal */
@@ -470,7 +523,7 @@ git commit -m "feat(mobile): add usePermissionSetup hook (red — gate UI pendin
 
 ---
 
-### Task 3: Add `PermissionSetupGate` component and wire into the gate chain
+### Task 4: Add `PermissionSetupGate` component and wire into the gate chain
 
 **Files:**
 - Modify: `apps/mobile/src/app/(app)/_layout.tsx` (add component + wire at line ~1191)
@@ -693,7 +746,7 @@ notifications upfront. Auto-skips if already granted."
 
 ---
 
-### Task 4: Add remaining tests for the permission gate
+### Task 5: Add remaining tests for the permission gate
 
 **Files:**
 - Modify: `apps/mobile/src/app/(app)/_layout.test.tsx`
@@ -706,7 +759,7 @@ it('skips permission gate when both permissions are already granted', async () =
   (ExpoNotifications.getPermissionsAsync as jest.Mock).mockResolvedValue({
     status: 'granted',
   });
-  mockSpeechRequestPermissions.mockResolvedValue({ granted: true });
+  mockSpeechGetPermissions.mockResolvedValue({ granted: true, canAskAgain: true });
 
   const SecureStoreMock = require('expo-secure-store');
   (SecureStoreMock.getItemAsync as jest.Mock).mockResolvedValue(null);
@@ -728,7 +781,7 @@ it('skips permission gate when SecureStore flag is already set', async () => {
   (ExpoNotifications.getPermissionsAsync as jest.Mock).mockResolvedValue({
     status: 'undetermined',
   });
-  mockSpeechRequestPermissions.mockResolvedValue({ granted: false });
+  mockSpeechGetPermissions.mockResolvedValue({ granted: false, canAskAgain: true });
 
   const SecureStoreMock = require('expo-secure-store');
   (SecureStoreMock.getItemAsync as jest.Mock).mockImplementation(
@@ -755,7 +808,7 @@ it('dismisses permission gate when Continue is tapped', async () => {
   (ExpoNotifications.getPermissionsAsync as jest.Mock).mockResolvedValue({
     status: 'undetermined',
   });
-  mockSpeechRequestPermissions.mockResolvedValue({ granted: false });
+  mockSpeechGetPermissions.mockResolvedValue({ granted: false, canAskAgain: true });
 
   const SecureStoreMock = require('expo-secure-store');
   (SecureStoreMock.getItemAsync as jest.Mock).mockResolvedValue(null);
@@ -789,7 +842,7 @@ it('dismisses permission gate when Skip is tapped', async () => {
   (ExpoNotifications.getPermissionsAsync as jest.Mock).mockResolvedValue({
     status: 'undetermined',
   });
-  mockSpeechRequestPermissions.mockResolvedValue({ granted: false });
+  mockSpeechGetPermissions.mockResolvedValue({ granted: false, canAskAgain: true });
 
   const SecureStoreMock = require('expo-secure-store');
   (SecureStoreMock.getItemAsync as jest.Mock).mockResolvedValue(null);
@@ -826,7 +879,141 @@ git commit -m "test(mobile): add permission setup gate tests — auto-skip, cont
 
 ---
 
-### Task 5: Run full verification
+### Task 6: Add AppState mic-permission refresh to `ChatShell`
+
+Currently, if a user denies mic in the gate, enters a session, gets the permission error alert, taps "Open Settings", grants mic, and returns — ChatShell has no AppState listener to detect the change. The `useSpeechRecognition` hook only checks permission on `startListening()` calls, not reactively. This mirrors the camera permission fix already shipped.
+
+**Files:**
+- Modify: ChatShell component — locate with:
+  `grep -r "ChatShell\|chat.shell\|chat-shell" apps/mobile/src --include="*.tsx" -l`
+
+- [ ] **Step 1: Locate the ChatShell component file**
+
+Run the grep above to find the file path. Read the file to understand the existing mic permission state variable name before making changes.
+
+- [ ] **Step 2: Add the AppState listener**
+
+Inside the ChatShell component, add an `AppState` `useEffect` that re-checks mic permission on `'active'` transition using `getPermissionsAsync` (now available via the extended type from Task 2):
+
+```ts
+// Re-check mic permission on return from Settings (same pattern as camera fix)
+useEffect(() => {
+  const sub = AppState.addEventListener('change', async (next) => {
+    if (next !== 'active') return;
+    try {
+      const mod = await import('expo-speech-recognition');
+      const speechModule = mod?.ExpoSpeechRecognitionModule;
+      if (!speechModule) return;
+      const { granted } = await speechModule.getPermissionsAsync();
+      if (granted) {
+        // Update local mic-available state so the mic button reflects
+        // the new status without requiring the user to tap it again.
+        // Use the existing state setter — do NOT introduce a new state variable.
+        setMicPermissionGranted(true); // ← match the actual variable name in ChatShell
+      }
+    } catch {
+      /* non-fatal */
+    }
+  });
+  return () => sub.remove();
+}, []);
+```
+
+**Important:** Match the exact local state variable name for mic permission in the existing ChatShell code. Do not introduce a new state variable.
+
+- [ ] **Step 3: Run related tests**
+
+Run: `cd C:/Dev/Projects/Products/Apps/eduagent-build/apps/mobile && pnpm exec jest --findRelatedTests <chatshell-path> --no-coverage`
+
+Expected: All existing tests still pass.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add <chatshell-path>
+git commit -m "fix(mobile): add AppState mic-permission refresh to ChatShell
+
+After the user grants mic in Settings and returns, ChatShell now
+re-checks permission status via getPermissionsAsync and updates the
+mic button state reactively. Mirrors the camera permission fix."
+```
+
+---
+
+### Task 7: Add `__DEV__` warnings and `shakeAvailable` to `use-shake-detector`
+
+The hook currently exits silently when the Accelerometer module is unavailable or the sensor is unsupported. This makes shake-to-feedback invisible failures on emulators and in dev-client builds without the native module.
+
+**Files:**
+- Modify: `apps/mobile/src/hooks/use-shake-detector.ts`
+
+- [ ] **Step 1: Read the hook**
+
+Read `apps/mobile/src/hooks/use-shake-detector.ts`. Identify:
+1. The `try/catch` at import time (or `null` guard on Accelerometer)
+2. The `isAvailableAsync()` check — both currently exit silently
+
+- [ ] **Step 2: Add `__DEV__` warnings**
+
+Add `console.warn` when the module is unavailable or the sensor is unsupported:
+
+```ts
+if (!Accelerometer) {
+  if (__DEV__) console.warn('[ShakeDetector] Accelerometer module not available — shake-to-feedback disabled');
+  return;
+}
+const available = await Accelerometer.isAvailableAsync();
+if (!available) {
+  if (__DEV__) console.warn('[ShakeDetector] Accelerometer sensor not supported on this device — shake-to-feedback disabled');
+  return;
+}
+```
+
+- [ ] **Step 3: Expose `shakeAvailable` from the hook**
+
+Add a `shakeAvailable: boolean` return value so `FeedbackProvider` can offer a manual feedback fallback when shake is unavailable:
+
+```ts
+// Before:
+function useShakeDetector(onShake: () => void): void { ... }
+
+// After:
+function useShakeDetector(onShake: () => void): { shakeAvailable: boolean } {
+  const [shakeAvailable, setShakeAvailable] = React.useState(false);
+  // Set true once sensor is confirmed available + subscription active
+  // Set false (+ __DEV__ warn) in unavailable branches above
+  return { shakeAvailable };
+}
+```
+
+- [ ] **Step 4: Update `FeedbackProvider` call site**
+
+Locate where `useShakeDetector` is called (likely `apps/mobile/src/providers/feedback-provider.tsx`). Update the call to destructure `shakeAvailable`. The `onShake` callback is still passed as before — only the return value changes. No immediate UI change is required — just ensure it compiles:
+
+```ts
+const { shakeAvailable } = useShakeDetector(handleShake);
+// shakeAvailable available for a future "Give Feedback" manual button (out of scope)
+```
+
+- [ ] **Step 5: Run tests and typecheck**
+
+Run: `cd C:/Dev/Projects/Products/Apps/eduagent-build/apps/mobile && pnpm exec jest --findRelatedTests src/hooks/use-shake-detector.ts --no-coverage && pnpm exec tsc --noEmit`
+
+Expected: All tests pass, no type errors.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add apps/mobile/src/hooks/use-shake-detector.ts
+git commit -m "fix(mobile): add __DEV__ warnings and shakeAvailable to use-shake-detector
+
+Silent exits on emulator/no-native-module made shake-to-feedback invisible
+failures. FeedbackProvider can now surface a manual fallback via shakeAvailable."
+```
+
+---
+
+### Task 8: Run full verification
 
 **Files:** None (verification only)
 
@@ -838,7 +1025,9 @@ Expected: No errors.
 
 - [ ] **Step 2: Run related tests for all changed files**
 
-Run: `cd C:/Dev/Projects/Products/Apps/eduagent-build/apps/mobile && pnpm exec jest --findRelatedTests "src/app/(app)/_layout.tsx" "src/hooks/use-push-token-registration.ts" --no-coverage`
+Run: `cd C:/Dev/Projects/Products/Apps/eduagent-build/apps/mobile && pnpm exec jest --findRelatedTests "src/app/(app)/_layout.tsx" "src/hooks/use-push-token-registration.ts" "src/hooks/use-speech-recognition.ts" "src/hooks/use-shake-detector.ts" --no-coverage`
+
+Also run ChatShell tests separately once you have located the file in Task 6.
 
 Expected: All tests pass.
 

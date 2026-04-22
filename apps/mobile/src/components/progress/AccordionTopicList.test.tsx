@@ -167,7 +167,7 @@ describe('AccordionTopicList', () => {
       />
     );
 
-    expect(screen.getByText('In progress')).toBeTruthy();
+    expect(screen.getByText('Started')).toBeTruthy();
     expect(screen.getByText('Mastered')).toBeTruthy();
     expect(screen.getByText('Covered')).toBeTruthy();
     expect(screen.getByText('Needs review')).toBeTruthy();

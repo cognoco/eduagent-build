@@ -1,8 +1,8 @@
-import { View, Text, Pressable, ScrollView } from 'react-native';
+import { View, Text, Pressable, ScrollView, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { platformAlert } from '../../../../lib/platform-alert';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { AccommodationMode } from '@eduagent/schemas';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useProfile } from '../../../../lib/profile';
@@ -192,30 +192,21 @@ export default function ChildDetailScreen() {
       ? getGracePeriodDaysRemaining(consentData.respondedAt)
       : 0;
 
+  // [BUG-553] Styled in-app modal replaces window.confirm() on web
+  const [withdrawConfirmVisible, setWithdrawConfirmVisible] = useState(false);
+
   const handleWithdrawConsent = useCallback(() => {
-    const childName = child?.displayName ?? 'this child';
-    platformAlert(
-      `Withdraw consent for ${childName}?`,
-      `${childName}'s account and all learning data will be deleted after a 7-day grace period.\n\nYou can reverse this within 7 days.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Withdraw',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await revokeConsent.mutateAsync();
-            } catch {
-              platformAlert(
-                'Error',
-                'Could not withdraw consent. Please try again.'
-              );
-            }
-          },
-        },
-      ]
-    );
-  }, [child?.displayName, revokeConsent]);
+    setWithdrawConfirmVisible(true);
+  }, []);
+
+  const handleConfirmWithdraw = useCallback(async () => {
+    setWithdrawConfirmVisible(false);
+    try {
+      await revokeConsent.mutateAsync();
+    } catch {
+      platformAlert('Error', 'Could not withdraw consent. Please try again.');
+    }
+  }, [revokeConsent]);
 
   const handleCancelDeletion = useCallback(async () => {
     try {
@@ -786,6 +777,60 @@ export default function ChildDetailScreen() {
         )}
       </ScrollView>
       {CelebrationOverlay}
+
+      {/* [BUG-553] Styled confirmation modal — replaces platformAlert which
+          falls back to window.confirm() on web. */}
+      <Modal
+        visible={withdrawConfirmVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setWithdrawConfirmVisible(false)}
+      >
+        <Pressable
+          className="flex-1 bg-black/40 justify-center items-center px-6"
+          onPress={() => setWithdrawConfirmVisible(false)}
+          accessibilityRole="button"
+          accessibilityLabel="Dismiss"
+        >
+          <Pressable
+            className="bg-background rounded-2xl w-full max-w-sm p-6"
+            onPress={(e) => e.stopPropagation()}
+          >
+            <Text className="text-h3 font-bold text-text-primary text-center">
+              Withdraw consent for {child?.displayName ?? 'this child'}?
+            </Text>
+            <Text className="text-body-sm text-text-secondary text-center mt-3 leading-relaxed">
+              {child?.displayName ?? 'This child'}'s account and all learning
+              data will be deleted after a 7-day grace period.{'\n\n'}You can
+              reverse this within 7 days.
+            </Text>
+            <View className="mt-5 gap-3">
+              <Pressable
+                onPress={() => void handleConfirmWithdraw()}
+                className="bg-danger rounded-button py-3 items-center min-h-[48px] justify-center"
+                accessibilityRole="button"
+                accessibilityLabel="Confirm withdraw consent"
+                testID="withdraw-consent-confirm"
+              >
+                <Text className="text-body font-semibold text-text-inverse">
+                  Withdraw
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setWithdrawConfirmVisible(false)}
+                className="bg-surface rounded-button py-3 items-center min-h-[48px] justify-center"
+                accessibilityRole="button"
+                accessibilityLabel="Cancel"
+                testID="withdraw-consent-cancel"
+              >
+                <Text className="text-body font-semibold text-text-primary">
+                  Cancel
+                </Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }

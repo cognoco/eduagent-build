@@ -19,16 +19,19 @@ interface SubjectCardProps {
 }
 
 function getContextualAction(subject: SubjectInventory): SubjectCardAction {
-  if (subject.topics.notStarted > 0) return 'continue';
+  // Only show "Continue" when the user has actual progress AND still has
+  // topics left to cover. An untouched subject (all notStarted, zero
+  // activity) should invite exploration, not continuation.
+  if (hasSubjectActivity(subject) && subject.topics.notStarted > 0)
+    return 'continue';
   return 'explore';
 }
 
-function getStudiedTopicsCount(subject: SubjectInventory): number {
-  return (
-    subject.topics.explored +
-    subject.topics.mastered +
-    subject.topics.inProgress
-  );
+function getStartedTopicsCount(subject: SubjectInventory): number {
+  // inProgress + mastered = attemptedTopicIds.size (no double-counting).
+  // DO NOT add explored — it overlaps with inProgress/mastered because
+  // exploredTopicIds seeds attemptedTopicIds in the backend.
+  return subject.topics.inProgress + subject.topics.mastered;
 }
 
 export function hasSubjectActivity(subject: SubjectInventory): boolean {
@@ -47,7 +50,7 @@ function getTopicHeadline(subject: SubjectInventory): {
   subline: string;
   hideBar: boolean;
 } {
-  const studiedCount = getStudiedTopicsCount(subject);
+  const startedCount = getStartedTopicsCount(subject);
   const sessionsLabel = `${subject.sessionsCount} ${
     subject.sessionsCount === 1 ? 'session' : 'sessions'
   }`;
@@ -56,7 +59,7 @@ function getTopicHeadline(subject: SubjectInventory): {
   );
   const subline = `${displayMinutes} · ${sessionsLabel}`;
 
-  if (studiedCount === 0 && subject.sessionsCount > 0) {
+  if (startedCount === 0 && subject.sessionsCount > 0) {
     return {
       headline: `${subject.sessionsCount} ${
         subject.sessionsCount === 1 ? 'session' : 'sessions'
@@ -69,9 +72,9 @@ function getTopicHeadline(subject: SubjectInventory): {
   }
 
   return {
-    headline: `${studiedCount} ${
-      studiedCount === 1 ? 'topic' : 'topics'
-    } studied · ${subject.topics.mastered} mastered`,
+    headline: `${startedCount} ${
+      startedCount === 1 ? 'topic' : 'topics'
+    } started · ${subject.topics.mastered} mastered`,
     progressValue: subject.topics.mastered,
     progressMax: Math.max(1, subject.topics.total ?? 1),
     subline,
@@ -95,7 +98,7 @@ export function SubjectCard({
   const [expanded, setExpanded] = useState(false);
   const isAccordionMode = !!childProfileId && !!subjectId && !onPress;
   const hasExpandableTopics =
-    subject.sessionsCount > 0 || getStudiedTopicsCount(subject) > 0;
+    subject.sessionsCount > 0 || getStartedTopicsCount(subject) > 0;
   const topicHeadline = getTopicHeadline(subject);
   const action = getContextualAction(subject);
 
@@ -183,7 +186,9 @@ export function SubjectCard({
         accessibilityLabel={`${subject.subjectName}, ${
           expanded ? 'expanded' : 'collapsed'
         }`}
-        accessibilityHint="Tap to show topics"
+        accessibilityHint={
+          expanded ? 'Tap to hide topics' : 'Tap to show topics'
+        }
         testID={testID}
       >
         {content}

@@ -24,6 +24,16 @@ jest.mock('./sentry', () => ({
 
 import type { Database } from '@eduagent/database';
 import {
+  subjects,
+  learningSessions,
+  assessments,
+  retentionCards,
+  curriculumTopics,
+  vocabulary,
+  vocabularyRetentionCards,
+  streaks,
+} from '@eduagent/database';
+import {
   buildSubjectInventory,
   buildSubjectMetric,
   getLatestSnapshot,
@@ -35,7 +45,20 @@ import {
 } from './snapshot-aggregation';
 import { detectMilestones, storeMilestones } from './milestone-detection';
 import { queueCelebration } from './celebrations';
-import type { ProgressMetrics } from '@eduagent/schemas';
+import type {
+  ProgressMetrics,
+  SubjectProgressMetrics,
+} from '@eduagent/schemas';
+
+type SubjectRow = typeof subjects.$inferSelect;
+type SessionRow = typeof learningSessions.$inferSelect;
+type AssessmentRow = typeof assessments.$inferSelect;
+type RetentionCardRow = typeof retentionCards.$inferSelect;
+type TopicRow = typeof curriculumTopics.$inferSelect;
+type TopicWithSubject = TopicRow & { subjectId: string };
+type VocabularyRow = typeof vocabulary.$inferSelect;
+type VocabularyRetentionCardRow = typeof vocabularyRetentionCards.$inferSelect;
+type StreakRow = typeof streaks.$inferSelect;
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -113,68 +136,135 @@ function makeMilestoneRow(
 function makeSubjectRow(
   id = '550e8400-e29b-41d4-a716-446655440010',
   name = 'Mathematics'
-) {
+): SubjectRow {
   return {
     id,
     profileId,
     name,
-    pedagogyMode: 'socratic' as const,
+    rawInput: null,
     status: 'active',
-  } as any;
+    pedagogyMode: 'socratic',
+    languageCode: null,
+    createdAt: new Date('2026-04-01T00:00:00.000Z'),
+    updatedAt: new Date('2026-04-01T00:00:00.000Z'),
+    urgencyBoostUntil: null,
+    urgencyBoostReason: null,
+  };
 }
 
-function makeSessionRow(overrides: Record<string, unknown> = {}) {
+function makeSessionRow(overrides: Partial<SessionRow> = {}): SessionRow {
   return {
     id: '660e8400-e29b-41d4-a716-446655440001',
     profileId,
     subjectId: '550e8400-e29b-41d4-a716-446655440010',
     topicId: '770e8400-e29b-41d4-a716-446655440001',
+    sessionType: 'learning',
+    verificationType: null,
+    inputMode: 'text',
+    status: 'completed',
+    escalationRung: 1,
     exchangeCount: 3,
+    startedAt: new Date('2026-04-20T00:00:00.000Z'),
+    lastActivityAt: new Date('2026-04-20T00:00:00.000Z'),
+    endedAt: null,
     durationSeconds: 600,
     wallClockSeconds: 700,
-    lastActivityAt: new Date('2026-04-20T00:00:00.000Z'),
-    status: 'completed',
+    metadata: {},
+    rawInput: null,
+    createdAt: new Date('2026-04-20T00:00:00.000Z'),
+    updatedAt: new Date('2026-04-20T00:00:00.000Z'),
     ...overrides,
-  } as any;
+  };
 }
 
-function makeAssessmentRow(overrides: Record<string, unknown> = {}) {
+function makeAssessmentRow(
+  overrides: Partial<AssessmentRow> = {}
+): AssessmentRow {
   return {
     id: '880e8400-e29b-41d4-a716-446655440001',
     profileId,
     subjectId: '550e8400-e29b-41d4-a716-446655440010',
     topicId: '770e8400-e29b-41d4-a716-446655440001',
+    sessionId: null,
+    verificationDepth: 'recall',
     status: 'passed',
+    masteryScore: null,
+    qualityRating: null,
+    exchangeHistory: [],
+    createdAt: new Date('2026-04-01T00:00:00.000Z'),
+    updatedAt: new Date('2026-04-01T00:00:00.000Z'),
     ...overrides,
-  } as any;
+  };
 }
 
-function makeRetentionCardRow(overrides: Record<string, unknown> = {}) {
+function makeRetentionCardRow(
+  overrides: Partial<RetentionCardRow> = {}
+): RetentionCardRow {
   return {
     id: '990e8400-e29b-41d4-a716-446655440001',
     profileId,
     topicId: '770e8400-e29b-41d4-a716-446655440001',
-    xpStatus: 'pending',
-    intervalDays: 0,
+    easeFactor: '2.50',
+    intervalDays: 1,
+    repetitions: 0,
+    lastReviewedAt: null,
     nextReviewAt: null,
+    failureCount: 0,
+    consecutiveSuccesses: 0,
+    xpStatus: 'pending',
+    evaluateDifficultyRung: null,
+    createdAt: new Date('2026-04-01T00:00:00.000Z'),
+    updatedAt: new Date('2026-04-01T00:00:00.000Z'),
     ...overrides,
-  } as any;
+  };
 }
 
 function makeTopicWithSubject(
   id = '770e8400-e29b-41d4-a716-446655440001',
   subjectId = '550e8400-e29b-41d4-a716-446655440010',
-  filedFrom = 'session_filing'
-) {
+  filedFrom: TopicRow['filedFrom'] = 'session_filing'
+): TopicWithSubject {
   return {
     id,
     subjectId,
     filedFrom,
     curriculumId: 'aa0e8400-e29b-41d4-a716-446655440001',
-  } as any;
+    title: 'Test Topic',
+    description: 'Test topic description',
+    sortOrder: 1,
+    relevance: 'core',
+    source: 'generated',
+    estimatedMinutes: 30,
+    bookId: 'bb0e8400-e29b-41d4-a716-446655440001',
+    chapter: null,
+    skipped: false,
+    cefrLevel: null,
+    cefrSublevel: null,
+    targetWordCount: null,
+    targetChunkCount: null,
+    sessionId: null,
+    createdAt: new Date('2026-04-01T00:00:00.000Z'),
+    updatedAt: new Date('2026-04-01T00:00:00.000Z'),
+  };
 }
 
-function makeProgressState(overrides: Record<string, unknown> = {}) {
+interface ProgressStateFixture {
+  profileId: string;
+  subjects: SubjectRow[];
+  sessions: SessionRow[];
+  assessments: AssessmentRow[];
+  retentionCards: RetentionCardRow[];
+  streak: StreakRow | null;
+  vocabulary: VocabularyRow[];
+  vocabularyRetentionCards: VocabularyRetentionCardRow[];
+  topicsById: Map<string, TopicWithSubject>;
+  allTopicsBySubject: Map<string, TopicWithSubject[]>;
+  latestTopicsBySubject: Map<string, TopicWithSubject[]>;
+}
+
+function makeProgressState(
+  overrides: Partial<ProgressStateFixture> = {}
+): ProgressStateFixture {
   const topic = makeTopicWithSubject();
   return {
     profileId,
@@ -189,14 +279,16 @@ function makeProgressState(overrides: Record<string, unknown> = {}) {
     allTopicsBySubject: new Map([[topic.subjectId, [topic]]]),
     latestTopicsBySubject: new Map([[topic.subjectId, [topic]]]),
     ...overrides,
-  } as any;
+  };
 }
 
-function makeSubjectMetric(subjectId = '550e8400-e29b-41d4-a716-446655440010') {
+function makeSubjectMetric(
+  subjectId = '550e8400-e29b-41d4-a716-446655440010'
+): SubjectProgressMetrics {
   return {
     subjectId,
     subjectName: 'Mathematics',
-    pedagogyMode: 'socratic' as const,
+    pedagogyMode: 'socratic',
     topicsAttempted: 0,
     topicsMastered: 0,
     topicsTotal: 1,
@@ -207,7 +299,7 @@ function makeSubjectMetric(subjectId = '550e8400-e29b-41d4-a716-446655440010') {
     activeMinutes: 0,
     wallClockMinutes: 0,
     lastSessionAt: null,
-  } as any;
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -977,9 +1069,10 @@ describe('refreshProgressSnapshot', () => {
 });
 
 describe('buildSubjectMetric mastery', () => {
-  it('counts assessment-passed-only topic as in progress, not mastered', () => {
+  it('does not count assessment-only topic as attempted (no session = not started)', () => {
     const subject = makeSubjectRow();
     const state = makeProgressState({
+      sessions: [], // no sessions — assessment alone should not count
       assessments: [
         makeAssessmentRow({ topicId: '770e8400-e29b-41d4-a716-446655440001' }),
       ],
@@ -989,7 +1082,7 @@ describe('buildSubjectMetric mastery', () => {
     const result = buildSubjectMetric(subject, state);
 
     expect(result.topicsMastered).toBe(0);
-    expect(result.topicsAttempted).toBeGreaterThanOrEqual(1);
+    expect(result.topicsAttempted).toBe(0);
   });
 
   it('counts topic as mastered when retention xpStatus is verified', () => {
@@ -1028,20 +1121,21 @@ describe('buildSubjectMetric mastery', () => {
 });
 
 describe('buildSubjectInventory mastery', () => {
-  it('counts assessment-passed-only topic as in progress, not mastered', async () => {
+  it('does not count assessment-only topic as in progress (no session = not started)', async () => {
     const state = makeProgressState({
+      sessions: [], // no sessions — assessment alone should not count
       assessments: [makeAssessmentRow()],
       retentionCards: [],
     });
 
     const result = await buildSubjectInventory(
-      null as any,
+      null as unknown as Database,
       state,
       makeSubjectMetric()
     );
 
     expect(result.topics.mastered).toBe(0);
-    expect(result.topics.inProgress).toBeGreaterThanOrEqual(1);
+    expect(result.topics.inProgress).toBe(0);
   });
 
   it('counts topic as mastered when retention xpStatus is verified', async () => {
@@ -1056,7 +1150,7 @@ describe('buildSubjectInventory mastery', () => {
     });
 
     const result = await buildSubjectInventory(
-      null as any,
+      null as unknown as Database,
       state,
       makeSubjectMetric()
     );
@@ -1128,7 +1222,7 @@ describe('explored topic session gating', () => {
     });
 
     const result = await buildSubjectInventory(
-      null as any,
+      null as unknown as Database,
       state,
       makeSubjectMetric(subject.id)
     );
@@ -1147,7 +1241,11 @@ describe('buildSubjectMetric and buildSubjectInventory stay aligned', () => {
     });
 
     const metric = buildSubjectMetric(subject, state);
-    const inventory = await buildSubjectInventory(null as any, state, metric);
+    const inventory = await buildSubjectInventory(
+      null as unknown as Database,
+      state,
+      metric
+    );
 
     expect(metric.topicsMastered).toBe(0);
     expect(inventory.topics.mastered).toBe(metric.topicsMastered);
@@ -1167,7 +1265,11 @@ describe('buildSubjectMetric and buildSubjectInventory stay aligned', () => {
     });
 
     const metric = buildSubjectMetric(subject, state);
-    const inventory = await buildSubjectInventory(null as any, state, metric);
+    const inventory = await buildSubjectInventory(
+      null as unknown as Database,
+      state,
+      metric
+    );
 
     expect(metric.topicsMastered).toBe(1);
     expect(inventory.topics.mastered).toBe(metric.topicsMastered);

@@ -6,7 +6,9 @@
  *
  * Mocked boundaries:
  * - JWT verification
- * - LLM transport (`routeAndCall` / `routeAndStream`)
+ * - LLM provider (registered via the real router's provider registry,
+ *   NOT via jest.mock — so safety preamble, circuit breaker, and routing
+ *   logic all run as normal) [IMP-6]
  */
 
 import { and, desc, eq } from 'drizzle-orm';
@@ -23,21 +25,17 @@ import {
   createIntegrationDb,
 } from './helpers';
 import { buildAuthHeaders } from './test-keys';
-
-const mockRouteAndCall = jest.fn();
-const mockRouteAndStream = jest.fn();
-
-jest.mock('../../apps/api/src/services/llm', () => {
-  const actual = jest.requireActual(
-    '../../apps/api/src/services/llm'
-  ) as Record<string, unknown>;
-
-  return {
-    ...actual,
-    routeAndCall: (...args: unknown[]) => mockRouteAndCall(...args),
-    routeAndStream: (...args: unknown[]) => mockRouteAndStream(...args),
-  };
-});
+import {
+  registerProvider,
+  _clearProviders,
+  _resetCircuits,
+  getTextContent,
+} from '../../apps/api/src/services/llm';
+import type {
+  LLMProvider,
+  ChatMessage,
+  ModelConfig,
+} from '../../apps/api/src/services/llm';
 
 import { app } from '../../apps/api/src/index';
 
@@ -45,82 +43,85 @@ const TEST_ENV = buildIntegrationEnv();
 const AUTH_USER_ID = 'integration-onboarding-user';
 const AUTH_EMAIL = 'integration-onboarding@integration.test';
 
-function buildLlmResult(response: string) {
-  return {
-    response,
-    provider: 'mock',
-    model: 'mock-model',
-    latencyMs: 1,
-  };
+// ---------------------------------------------------------------------------
+// Test LLM provider — mocks at the provider boundary (LLMProvider.chat /
+// LLMProvider.chatStream) instead of patching internal module exports.
+// Registered under 'openai' so getModelConfig's default routing finds it.
+// ---------------------------------------------------------------------------
+
+function lastMessageText(messages: ChatMessage[]): string {
+  const last = messages[messages.length - 1];
+  if (!last) return '';
+  return getTextContent(last.content);
 }
 
-function installLlmMocks(): void {
-  mockRouteAndCall.mockImplementation(
-    async (messages: Array<{ role: string; content: string }>) => {
-      const lastMessage = messages[messages.length - 1]?.content ?? '';
+const onboardingTestProvider: LLMProvider = {
+  id: 'openai',
 
-      if (lastMessage.includes('Extract signals from this interview')) {
-        return buildLlmResult(
-          JSON.stringify({
-            goals: ['learn algebra'],
-            experienceLevel: 'beginner',
-            currentKnowledge: 'basic arithmetic',
-          })
-        );
-      }
+  async chat(messages: ChatMessage[], _config: ModelConfig): Promise<string> {
+    const text = lastMessageText(messages);
 
-      if (
-        lastMessage.includes('Subject:') &&
-        lastMessage.includes('Interview Summary')
-      ) {
-        return buildLlmResult(
-          JSON.stringify([
-            {
-              title: 'Algebra Foundations',
-              description: 'Variables, expressions, and equations',
-              relevance: 'core',
-              estimatedMinutes: 30,
-            },
-            {
-              title: 'Linear Equations',
-              description: 'Solving one-step and two-step equations',
-              relevance: 'core',
-              estimatedMinutes: 40,
-            },
-          ])
-        );
-      }
-
-      if (
-        lastMessage.includes('interested in learning') ||
-        lastMessage.includes('I want to learn')
-      ) {
-        return buildLlmResult(
-          JSON.stringify({
-            reply: 'What specific topics interest you?',
-            signals: { ready_to_finish: true },
-            ui_hints: {},
-            confidence: 'high',
-          })
-        );
-      }
-
-      return buildLlmResult('Tell me more about your learning goals.');
+    if (text.includes('Extract signals from this interview')) {
+      return JSON.stringify({
+        goals: ['learn algebra'],
+        experienceLevel: 'beginner',
+        currentKnowledge: 'basic arithmetic',
+      });
     }
-  );
 
-  mockRouteAndStream.mockImplementation(async () => ({
-    provider: 'mock',
-    model: 'mock-stream',
-    stream: (async function* () {
-      yield JSON.stringify({
-        reply: 'We should start with algebra.',
+    if (text.includes('Subject:') && text.includes('Interview Summary')) {
+      return JSON.stringify([
+        {
+          title: 'Algebra Foundations',
+          description: 'Variables, expressions, and equations',
+          relevance: 'core',
+          estimatedMinutes: 30,
+        },
+        {
+          title: 'Linear Equations',
+          description: 'Solving one-step and two-step equations',
+          relevance: 'core',
+          estimatedMinutes: 40,
+        },
+      ]);
+    }
+
+    if (
+      text.includes('interested in learning') ||
+      text.includes('I want to learn')
+    ) {
+      return JSON.stringify({
+        reply: 'What specific topics interest you?',
         signals: { ready_to_finish: true },
         ui_hints: {},
         confidence: 'high',
       });
-    })(),
-  }));
+    }
+
+    return 'Tell me more about your learning goals.';
+  },
+
+  async *chatStream(
+    _messages: ChatMessage[],
+    _config: ModelConfig
+  ): AsyncIterable<string> {
+    const envelope = JSON.stringify({
+      reply: 'We should start with algebra.',
+      signals: { ready_to_finish: true },
+      ui_hints: {},
+      confidence: 'high',
+    });
+    // Chunk to exercise multi-chunk reassembly in streamEnvelopeReply
+    for (let i = 0; i < envelope.length; i += 12) {
+      yield envelope.slice(i, i + 12);
+    }
+  },
+};
+
+function installLlmProvider(): void {
+  _clearProviders();
+  _resetCircuits();
+  registerProvider(onboardingTestProvider);
 }
 
 async function createOwnerProfile(): Promise<string> {
@@ -184,13 +185,17 @@ async function loadCurriculum(subjectId: string) {
 }
 
 beforeEach(async () => {
-  jest.clearAllMocks();
-  installLlmMocks();
+  installLlmProvider();
 
   await cleanupAccounts({
     emails: [AUTH_EMAIL],
     clerkUserIds: [AUTH_USER_ID],
   });
+});
+
+afterEach(() => {
+  _clearProviders();
+  _resetCircuits();
 });
 
 afterAll(async () => {

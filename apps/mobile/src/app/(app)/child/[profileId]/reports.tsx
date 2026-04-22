@@ -140,10 +140,24 @@ export default function ChildReportsScreen(): React.ReactElement {
               Weekly snapshots
             </Text>
             {weeklyReports.map((report) => (
-              <View
+              <Pressable
                 key={report.id}
                 className="bg-surface rounded-card p-4 mb-3"
                 testID={`weekly-report-card-${report.id}`}
+                onPress={() =>
+                  router.push(
+                    `/(app)/child/${profileId}/report/${report.id}` as const
+                  )
+                }
+                accessibilityRole="button"
+                accessibilityLabel={`Week of ${new Date(
+                  `${report.reportWeek}T00:00:00Z`
+                ).toLocaleDateString(undefined, {
+                  month: 'short',
+                  day: 'numeric',
+                })}. ${report.headlineStat.label}: ${
+                  report.headlineStat.value
+                }`}
               >
                 <View className="flex-row items-start justify-between">
                   <View className="flex-1 me-3">
@@ -171,10 +185,23 @@ export default function ChildReportsScreen(): React.ReactElement {
                     </View>
                   ) : null}
                 </View>
-              </View>
+              </Pressable>
             ))}
           </View>
-        ) : null}
+        ) : (
+          <View
+            className="bg-surface rounded-card p-4 mt-4"
+            testID="weekly-reports-empty"
+          >
+            <Text className="text-body font-semibold text-text-primary">
+              Weekly snapshots
+            </Text>
+            <Text className="text-body-sm text-text-secondary mt-1">
+              Weekly snapshots are generated each week once {childName} starts
+              learning. Check back soon!
+            </Text>
+          </View>
+        )}
 
         <Text className="text-body font-semibold text-text-primary mt-4 mb-2">
           Monthly reports

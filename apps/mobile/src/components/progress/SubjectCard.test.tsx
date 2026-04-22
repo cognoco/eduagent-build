@@ -37,7 +37,7 @@ function makeSubject(
 }
 
 describe('SubjectCard headline', () => {
-  it('shows a unified studied and mastered headline for curriculum subjects', () => {
+  it('shows a unified started and mastered headline for curriculum subjects', () => {
     render(
       <SubjectCard
         subject={makeSubject({
@@ -55,7 +55,8 @@ describe('SubjectCard headline', () => {
       />
     );
 
-    expect(screen.getByText('4 topics studied · 2 mastered')).toBeTruthy();
+    // startedCount = inProgress(1) + mastered(2) = 3
+    expect(screen.getByText('3 topics started · 2 mastered')).toBeTruthy();
     expect(screen.getByText('2h · 5 sessions')).toBeTruthy();
     expect(screen.getByTestId('card-bar')).toBeTruthy();
   });
@@ -68,7 +69,7 @@ describe('SubjectCard headline', () => {
             total: 13,
             explored: 2,
             mastered: 0,
-            inProgress: 0,
+            inProgress: 2,
             notStarted: 11,
           },
           wallClockMinutes: 69,
@@ -78,7 +79,8 @@ describe('SubjectCard headline', () => {
       />
     );
 
-    expect(screen.getByText('2 topics studied · 0 mastered')).toBeTruthy();
+    // startedCount = inProgress(2) + mastered(0) = 2
+    expect(screen.getByText('2 topics started · 0 mastered')).toBeTruthy();
   });
 
   it('shows a session-based headline when sessions exist but topics are still zero', () => {
@@ -114,14 +116,15 @@ describe('SubjectCard headline', () => {
       />
     );
 
-    expect(screen.getByText('6 topics studied · 1 mastered')).toBeTruthy();
+    // startedCount = inProgress(2) + mastered(1) = 3
+    expect(screen.getByText('3 topics started · 1 mastered')).toBeTruthy();
     expect(screen.queryByTestId('card-bar')).toBeNull();
   });
 
   it('shows the unified zero-state headline when there is no activity', () => {
     render(<SubjectCard subject={makeSubject()} testID="card" />);
 
-    expect(screen.getByText('0 topics studied · 0 mastered')).toBeTruthy();
+    expect(screen.getByText('0 topics started · 0 mastered')).toBeTruthy();
     expect(screen.getByText('0 min · 0 sessions')).toBeTruthy();
     expect(screen.getByTestId('card-bar')).toBeTruthy();
   });
@@ -217,6 +220,64 @@ describe('SubjectCard accordion mode', () => {
     expect(onPress).toHaveBeenCalled();
     expect(screen.queryByText('▾ See topics')).toBeNull();
     expect(screen.queryByTestId('mock-topic-list')).toBeNull();
+  });
+});
+
+describe('SubjectCard action label [IMP-1]', () => {
+  it('shows "Explore" for an untouched subject with zero activity', () => {
+    const onAction = jest.fn();
+    render(
+      <SubjectCard subject={makeSubject()} onAction={onAction} testID="card" />
+    );
+
+    expect(screen.getByText('Explore')).toBeTruthy();
+    expect(screen.queryByText('Continue')).toBeNull();
+  });
+
+  it('shows "Continue" for a subject with activity and remaining topics', () => {
+    const onAction = jest.fn();
+    render(
+      <SubjectCard
+        subject={makeSubject({
+          sessionsCount: 3,
+          wallClockMinutes: 45,
+          topics: {
+            total: 13,
+            explored: 2,
+            mastered: 1,
+            inProgress: 1,
+            notStarted: 9,
+          },
+        })}
+        onAction={onAction}
+        testID="card"
+      />
+    );
+
+    expect(screen.getByText('Continue')).toBeTruthy();
+  });
+
+  it('shows "Explore" when all topics are completed', () => {
+    const onAction = jest.fn();
+    render(
+      <SubjectCard
+        subject={makeSubject({
+          sessionsCount: 10,
+          wallClockMinutes: 300,
+          topics: {
+            total: 13,
+            explored: 13,
+            mastered: 13,
+            inProgress: 0,
+            notStarted: 0,
+          },
+        })}
+        onAction={onAction}
+        testID="card"
+      />
+    );
+
+    expect(screen.getByText('Explore')).toBeTruthy();
   });
 });
 

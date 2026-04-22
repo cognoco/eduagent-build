@@ -4,6 +4,7 @@ import { useSpeechRecognition } from './use-speech-recognition';
 const listeners: Partial<Record<'result' | 'error', (event: unknown) => void>> =
   {};
 
+const mockGetPermissionsAsync = jest.fn();
 const mockRequestPermissionsAsync = jest.fn();
 const mockStart = jest.fn();
 const mockStop = jest.fn();
@@ -31,6 +32,10 @@ describe('useSpeechRecognition', () => {
     delete listeners.result;
     delete listeners.error;
     jest.clearAllMocks();
+    mockGetPermissionsAsync.mockResolvedValue({
+      granted: true,
+      canAskAgain: true,
+    });
     mockRequestPermissionsAsync.mockResolvedValue({ granted: true });
     mockLoadSpeechModule.mockResolvedValue(null);
   });
@@ -177,6 +182,34 @@ describe('useSpeechRecognition', () => {
     });
 
     expect(result.current.status).toBe('idle');
+  });
+
+  it('reads microphone permission state without prompting', async () => {
+    mockLoadSpeechModule.mockResolvedValue({
+      getPermissionsAsync: mockGetPermissionsAsync,
+      requestPermissionsAsync: mockRequestPermissionsAsync,
+      start: mockStart,
+      stop: mockStop,
+      addListener: mockAddListener,
+    });
+
+    const { result } = renderHook(() =>
+      useSpeechRecognition(mockLoadSpeechModule)
+    );
+
+    let permissionStatus: Awaited<
+      ReturnType<typeof result.current.getMicrophonePermissionStatus>
+    >;
+    await act(async () => {
+      permissionStatus = await result.current.getMicrophonePermissionStatus();
+    });
+
+    expect(permissionStatus!).toEqual({
+      granted: true,
+      canAskAgain: true,
+    });
+    expect(mockGetPermissionsAsync).toHaveBeenCalled();
+    expect(mockRequestPermissionsAsync).not.toHaveBeenCalled();
   });
 
   // -----------------------------------------------------------------------

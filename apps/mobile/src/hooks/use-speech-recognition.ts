@@ -28,9 +28,21 @@ export interface UseSpeechRecognitionResult {
    * Returns `true` if granted (or already granted), `false` otherwise.
    */
   requestMicrophonePermission: () => Promise<boolean>;
+  /**
+   * Read the current microphone permission state without prompting.
+   * Returns `null` when the speech module is unavailable.
+   */
+  getMicrophonePermissionStatus: () => Promise<{
+    granted: boolean;
+    canAskAgain: boolean;
+  } | null>;
 }
 
 type SpeechRecognitionModule = {
+  getPermissionsAsync: () => Promise<{
+    granted: boolean;
+    canAskAgain: boolean;
+  }>;
   requestPermissionsAsync: () => Promise<{ granted: boolean }>;
   start: (opts: {
     lang: string;
@@ -233,6 +245,16 @@ export function useSpeechRecognition(
       }
     }, [loadModule]);
 
+  const getMicrophonePermissionStatus = useCallback(async () => {
+    try {
+      const speechModule = await loadModule();
+      if (!speechModule) return null;
+      return await speechModule.getPermissionsAsync();
+    } catch {
+      return null;
+    }
+  }, [loadModule]);
+
   return {
     status,
     transcript,
@@ -242,5 +264,6 @@ export function useSpeechRecognition(
     stopListening,
     clearTranscript,
     requestMicrophonePermission,
+    getMicrophonePermissionStatus,
   };
 }

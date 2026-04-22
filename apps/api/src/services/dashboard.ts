@@ -35,6 +35,7 @@ import {
   buildProgressHistory,
   getLatestSnapshot,
   getLatestSnapshotOnOrBefore,
+  MAX_SESSION_WALL_CLOCK_SECONDS,
 } from './snapshot-aggregation';
 import {
   getMonthlyReportForParentChild,
@@ -518,7 +519,6 @@ export async function getChildrenForParent(
 
     // Prefer wall-clock time with active-time fallback for legacy sessions.
     // Cap per session to prevent abandoned sessions from inflating the total.
-    const MAX_SESSION_WALL_CLOCK_SECONDS = 3 * 60 * 60; // 3 hours
     const getDisplaySeconds = (session: {
       wallClockSeconds: number | null;
       durationSeconds: number | null;
@@ -703,8 +703,7 @@ export async function getChildDetail(
   ).length;
 
   // Cap per session to prevent abandoned sessions from inflating the total
-  // (mirrors the same guard in getChildrenForParent).
-  const MAX_SESSION_WALL_CLOCK_SECONDS = 3 * 60 * 60; // 3 hours
+  // (same constant as snapshot-aggregation / getChildrenForParent).
   const getDisplaySeconds = (session: {
     wallClockSeconds: number | null;
     durationSeconds: number | null;
@@ -893,10 +892,14 @@ export async function getChildSubjectTopics(
   // Cloudflare Workers 50-subrequest limit for subjects with > 6 topics.
   const results = await getTopicProgressBatch(db, childProfileId, topics);
 
-  return results.map((topic) => ({
-    ...topic,
-    totalSessions: totalSessionsByTopic.get(topic.topicId) ?? 0,
-  }));
+  // Only return topics where the student had at least 1 exchange.
+  // Topics with no sessions have no connection to the student.
+  return results
+    .map((topic) => ({
+      ...topic,
+      totalSessions: totalSessionsByTopic.get(topic.topicId) ?? 0,
+    }))
+    .filter((topic) => topic.totalSessions >= 1);
 }
 
 // ---------------------------------------------------------------------------

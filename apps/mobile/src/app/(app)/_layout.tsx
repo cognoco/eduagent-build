@@ -8,11 +8,14 @@ import {
   ActivityIndicator,
   ScrollView,
   Platform,
+  AppState,
+  Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth, useClerk, useUser } from '@clerk/clerk-expo';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Notifications from 'expo-notifications';
 import * as SecureStore from '../../lib/secure-storage';
 import { useProfile, personaFromBirthYear } from '../../lib/profile';
 import { useThemeColors, useTokenVars } from '../../lib/theme';
@@ -136,7 +139,8 @@ function usePostApprovalLanding(
   profileId: string | undefined,
   consentStatus: string | null | undefined
 ): [boolean, () => void] {
-  const subjects = useSubjects();
+  const isConsented = !!profileId && consentStatus === 'CONSENTED';
+  const subjects = useSubjects({ enabled: isConsented });
   const [shouldShow, setShouldShow] = React.useState(false);
   const [checked, setChecked] = React.useState(false);
 
@@ -171,6 +175,340 @@ function usePostApprovalLanding(
   const subjectsReady = !subjects.isLoading;
   const hasSubjects = (subjects.data?.length ?? 0) > 0;
   return [checked && subjectsReady && shouldShow && !hasSubjects, dismiss];
+}
+
+type PermState = {
+  mic: 'unknown' | 'granted' | 'denied';
+  notif: 'unknown' | 'granted' | 'denied';
+  micCanAskAgain: boolean;
+  notifCanAskAgain: boolean;
+  micAvailable: boolean;
+  checked: boolean;
+};
+
+/**
+ * One-time permission setup gate. Prompts for mic + notifications before
+ * the user reaches the tab navigator. Auto-skips if both are already granted.
+ * Returns [shouldShow, dismiss, permState, requestMic, requestNotif].
+ */
+function usePermissionSetup(
+  profileId: string | undefined
+): [
+  shouldShow: boolean,
+  dismiss: () => void,
+  permState: PermState,
+  requestMic: () => Promise<void>,
+  requestNotif: () => Promise<void>
+] {
+  const [shouldShow, setShouldShow] = React.useState(false);
+  const [checked, setChecked] = React.useState(false);
+  const [permState, setPermState] = React.useState<PermState>({
+    mic: 'unknown',
+    notif: 'unknown',
+    micCanAskAgain: true,
+    notifCanAskAgain: true,
+    micAvailable: true,
+    checked: false,
+  });
+
+  const checkPermissions = React.useCallback(async () => {
+    let notifStatus: 'granted' | 'denied' = 'denied';
+    let notifCanAskAgain = true;
+    try {
+      const result = await Notifications.getPermissionsAsync();
+      notifStatus = result.status === 'granted' ? 'granted' : 'denied';
+      notifCanAskAgain = result.canAskAgain ?? true;
+    } catch {
+      /* non-fatal */
+    }
+
+    let micStatus: 'granted' | 'denied' = 'denied';
+    let micCanAskAgain = true;
+    let micAvailable = true;
+    try {
+      const mod = await import('expo-speech-recognition');
+      const speechModule = mod.ExpoSpeechRecognitionModule;
+      if (speechModule) {
+        const { granted, canAskAgain } =
+          await speechModule.getPermissionsAsync();
+        micStatus = granted ? 'granted' : 'denied';
+        micCanAskAgain = canAskAgain;
+      } else {
+        micAvailable = false;
+      }
+    } catch {
+      micAvailable = false;
+    }
+
+    setPermState({
+      mic: micStatus,
+      notif: notifStatus,
+      micCanAskAgain,
+      notifCanAskAgain,
+      micAvailable,
+      checked: true,
+    });
+
+    return { micAvailable, micStatus, notifStatus };
+  }, []);
+
+  React.useEffect(() => {
+    let cancelled = false;
+
+    if (!profileId) {
+      setShouldShow(false);
+      setChecked(true);
+      return;
+    }
+
+    setChecked(false);
+
+    const key = `permissionSetupSeen_${profileId}`;
+    void (async () => {
+      try {
+        const value = await SecureStore.getItemAsync(key);
+        if (cancelled) return;
+        if (value === 'true') {
+          setShouldShow(false);
+          setChecked(true);
+          return;
+        }
+      } catch {
+        /* SecureStore failure — show gate (safe default) */
+      }
+
+      const { micStatus, notifStatus, micAvailable } = await checkPermissions();
+      if (cancelled) return;
+
+      const hasMicRow = micAvailable && micStatus !== 'granted';
+      const hasNotifRow = Platform.OS !== 'web' && notifStatus !== 'granted';
+
+      if (!hasMicRow && !hasNotifRow) {
+        setShouldShow(false);
+        void SecureStore.setItemAsync(key, 'true').catch(() => undefined);
+        setChecked(true);
+        return;
+      }
+
+      setShouldShow(true);
+      setChecked(true);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [checkPermissions, profileId]);
+
+  React.useEffect(() => {
+    if (!shouldShow) return;
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'active') {
+        void checkPermissions();
+      }
+    });
+    return () => sub.remove();
+  }, [checkPermissions, shouldShow]);
+
+  const dismiss = React.useCallback(() => {
+    if (!profileId) return;
+    setShouldShow(false);
+    const key = `permissionSetupSeen_${profileId}`;
+    void SecureStore.setItemAsync(key, 'true').catch(() => {
+      /* non-fatal */
+    });
+  }, [profileId]);
+
+  const requestMic = React.useCallback(async () => {
+    try {
+      const mod = await import('expo-speech-recognition');
+      const speechModule = mod.ExpoSpeechRecognitionModule;
+      if (!speechModule) return;
+      await speechModule.requestPermissionsAsync();
+      const { granted, canAskAgain } = await speechModule.getPermissionsAsync();
+      setPermState((prev) => ({
+        ...prev,
+        mic: granted ? 'granted' : 'denied',
+        micCanAskAgain: canAskAgain,
+      }));
+    } catch {
+      /* non-fatal */
+    }
+  }, []);
+
+  const requestNotif = React.useCallback(async () => {
+    try {
+      await Notifications.requestPermissionsAsync();
+      const { status, canAskAgain } = await Notifications.getPermissionsAsync();
+      setPermState((prev) => ({
+        ...prev,
+        notif: status === 'granted' ? 'granted' : 'denied',
+        notifCanAskAgain: canAskAgain ?? false,
+      }));
+    } catch {
+      /* non-fatal */
+    }
+  }, []);
+
+  return [checked && shouldShow, dismiss, permState, requestMic, requestNotif];
+}
+
+function PermissionSetupGate({
+  permState,
+  onRequestMic,
+  onRequestNotif,
+  onContinue,
+}: {
+  permState: PermState;
+  onRequestMic: () => Promise<void>;
+  onRequestNotif: () => Promise<void>;
+  onContinue: () => void;
+}): React.ReactElement {
+  const insets = useSafeAreaInsets();
+  const colors = useThemeColors();
+
+  const handleMicPress = React.useCallback(async () => {
+    if (permState.mic === 'granted') return;
+    if (!permState.micCanAskAgain) {
+      void Linking.openSettings();
+      return;
+    }
+    await onRequestMic();
+  }, [onRequestMic, permState.mic, permState.micCanAskAgain]);
+
+  const handleNotifPress = React.useCallback(async () => {
+    if (permState.notif === 'granted') return;
+    if (!permState.notifCanAskAgain) {
+      void Linking.openSettings();
+      return;
+    }
+    await onRequestNotif();
+  }, [onRequestNotif, permState.notif, permState.notifCanAskAgain]);
+
+  return (
+    <View
+      className="flex-1 bg-background px-6"
+      style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
+      testID="permission-setup-gate"
+    >
+      <View className="flex-1 justify-center">
+        <Text
+          className="text-h1 font-bold text-text-primary mb-2 text-center"
+          accessibilityRole="header"
+        >
+          Let&apos;s get you set up
+        </Text>
+        <Text className="text-body text-text-secondary mb-8 text-center">
+          These help your tutor work best.
+        </Text>
+
+        {permState.micAvailable && (
+          <Pressable
+            testID="permission-row-mic"
+            onPress={() => void handleMicPress()}
+            className="flex-row items-center bg-surface rounded-xl px-4 py-4 mb-3"
+            accessibilityRole="button"
+            accessibilityLabel={
+              permState.mic === 'granted'
+                ? 'Microphone enabled'
+                : 'Enable microphone'
+            }
+          >
+            <Ionicons
+              name={permState.mic === 'granted' ? 'mic' : 'mic-outline'}
+              size={24}
+              color={
+                permState.mic === 'granted' ? colors.accent : colors.textPrimary
+              }
+            />
+            <View className="flex-1 ml-3">
+              <Text className="text-body font-semibold text-text-primary">
+                Microphone
+              </Text>
+              <Text className="text-caption text-text-secondary">
+                {permState.mic !== 'granted' && !permState.micCanAskAgain
+                  ? 'Tap to open Settings'
+                  : "Voice is how you'll chat with your tutor"}
+              </Text>
+            </View>
+            {permState.mic === 'granted' && (
+              <Ionicons
+                name="checkmark-circle"
+                size={24}
+                color={colors.accent}
+                testID="mic-granted-check"
+              />
+            )}
+          </Pressable>
+        )}
+
+        <Pressable
+          testID="permission-row-notif"
+          onPress={() => void handleNotifPress()}
+          className="flex-row items-center bg-surface rounded-xl px-4 py-4 mb-8"
+          accessibilityRole="button"
+          accessibilityLabel={
+            permState.notif === 'granted'
+              ? 'Notifications enabled'
+              : 'Enable notifications'
+          }
+        >
+          <Ionicons
+            name={
+              permState.notif === 'granted'
+                ? 'notifications'
+                : 'notifications-outline'
+            }
+            size={24}
+            color={
+              permState.notif === 'granted' ? colors.accent : colors.textPrimary
+            }
+          />
+          <View className="flex-1 ml-3">
+            <Text className="text-body font-semibold text-text-primary">
+              Notifications
+            </Text>
+            <Text className="text-caption text-text-secondary">
+              {permState.notif !== 'granted' && !permState.notifCanAskAgain
+                ? 'Tap to open Settings'
+                : 'Get reminders and progress updates'}
+            </Text>
+          </View>
+          {permState.notif === 'granted' && (
+            <Ionicons
+              name="checkmark-circle"
+              size={24}
+              color={colors.accent}
+              testID="notif-granted-check"
+            />
+          )}
+        </Pressable>
+      </View>
+
+      <View style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
+        <Pressable
+          testID="permission-continue"
+          onPress={onContinue}
+          className="bg-primary rounded-button py-3.5 items-center w-full mb-3"
+          accessibilityRole="button"
+          accessibilityLabel="Continue"
+        >
+          <Text className="text-body font-semibold text-text-inverse">
+            Continue
+          </Text>
+        </Pressable>
+
+        <Pressable
+          testID="permission-skip"
+          onPress={onContinue}
+          className="py-3 items-center w-full"
+          accessibilityRole="button"
+          accessibilityLabel="Skip for now"
+        >
+          <Text className="text-body text-text-secondary">Skip for now</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
 }
 
 function PostApprovalLanding({
@@ -1051,9 +1389,6 @@ export default function AppLayout() {
     acknowledgeProfileRemoval,
   } = useProfile();
 
-  // Register push token on app launch (runs once, guarded internally)
-  usePushTokenRegistration();
-
   // Sync Clerk auth state with RevenueCat identity (runs on auth change)
   useRevenueCatIdentity();
 
@@ -1116,6 +1451,9 @@ export default function AppLayout() {
     activeProfile?.id,
     activeProfile?.consentStatus
   );
+  const [showPermSetup, dismissPermSetup, permState, requestMic, requestNotif] =
+    usePermissionSetup(activeProfile?.id);
+  usePushTokenRegistration(permState.notif === 'granted');
 
   if (__DEV__)
     console.log(
@@ -1210,6 +1548,19 @@ export default function AppLayout() {
     return (
       <FeedbackProvider>
         <PostApprovalLanding onContinue={dismissPostApproval} />
+      </FeedbackProvider>
+    );
+  }
+
+  if (showPermSetup) {
+    return (
+      <FeedbackProvider>
+        <PermissionSetupGate
+          permState={permState}
+          onRequestMic={requestMic}
+          onRequestNotif={requestNotif}
+          onContinue={dismissPermSetup}
+        />
       </FeedbackProvider>
     );
   }

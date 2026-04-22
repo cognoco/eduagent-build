@@ -19,7 +19,7 @@ type FeedbackRouteEnv = {
   };
 };
 
-const DEFAULT_SUPPORT_EMAIL = 'support@mentomate.app';
+const DEFAULT_SUPPORT_EMAIL = 'support@mentomate.com';
 
 // SEC-03: In-memory sliding-window rate limit for feedback submissions.
 // 5 submissions per hour per user. Resets on worker restart — acceptable

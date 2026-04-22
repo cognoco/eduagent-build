@@ -1,5 +1,5 @@
 import { render, screen, fireEvent, act } from '@testing-library/react-native';
-import { AccessibilityInfo } from 'react-native';
+import { AccessibilityInfo, AppState } from 'react-native';
 import { ChatShell, type ChatMessage } from './ChatShell';
 
 // ---------------------------------------------------------------------------
@@ -41,6 +41,9 @@ const mockStartListening = jest.fn().mockResolvedValue(undefined);
 const mockStopListening = jest.fn().mockResolvedValue(undefined);
 const mockClearTranscript = jest.fn();
 const mockRequestMicrophonePermission = jest.fn().mockResolvedValue(true);
+const mockGetMicrophonePermissionStatus = jest
+  .fn()
+  .mockResolvedValue({ granted: true, canAskAgain: true });
 let mockSttState = {
   status: 'idle' as string,
   transcript: '',
@@ -55,6 +58,7 @@ jest.mock('../../hooks/use-speech-recognition', () => ({
     stopListening: mockStopListening,
     clearTranscript: mockClearTranscript,
     requestMicrophonePermission: mockRequestMicrophonePermission,
+    getMicrophonePermissionStatus: mockGetMicrophonePermissionStatus,
   }),
 }));
 
@@ -77,7 +81,7 @@ jest.mock('../../hooks/use-text-to-speech', () => ({
 
 // Stub animated SVG components to avoid reanimated timer leaks in tests
 jest.mock('../common', () => ({
-  LightBulbAnimation: () => null,
+  DeskLampAnimation: () => null,
   MagicPenAnimation: () => null,
 }));
 
@@ -109,6 +113,10 @@ function renderChatShell(
 beforeEach(() => {
   jest.useFakeTimers();
   jest.clearAllMocks();
+  mockGetMicrophonePermissionStatus.mockResolvedValue({
+    granted: true,
+    canAskAgain: true,
+  });
   mockSttState = {
     status: 'idle',
     transcript: '',
@@ -729,6 +737,85 @@ describe('ChatShell', () => {
     });
   });
 
+  describe('mic permission refresh', () => {
+    let addEventListenerSpy: jest.SpiedFunction<
+      typeof AppState.addEventListener
+    >;
+    let mockAppStateRemove: jest.Mock;
+
+    beforeEach(() => {
+      mockAppStateRemove = jest.fn();
+
+      addEventListenerSpy = jest
+        .spyOn(AppState, 'addEventListener')
+        .mockImplementation((_event, _listener) => {
+          return {
+            remove: mockAppStateRemove,
+          } as ReturnType<typeof AppState.addEventListener>;
+        });
+    });
+
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
+    it('clears stale mic permission errors after returning from Settings with permission granted', async () => {
+      mockSttState = {
+        ...mockSttState,
+        status: 'error',
+        error: 'Microphone permission is required for voice input',
+      };
+      mockGetMicrophonePermissionStatus.mockResolvedValue({
+        granted: true,
+        canAskAgain: false,
+      });
+
+      renderChatShell({ verificationType: 'teach_back' });
+      const appStateChangedListener = addEventListenerSpy.mock.calls.at(
+        -1
+      )?.[1] as ((status: string) => void) | undefined;
+      expect(appStateChangedListener).toBeDefined();
+
+      await act(async () => {
+        appStateChangedListener?.('active');
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(mockGetMicrophonePermissionStatus).toHaveBeenCalled();
+      expect(mockClearTranscript).toHaveBeenCalled();
+    });
+
+    it('does not clear transcript on resume when permission is still denied', async () => {
+      mockSttState = {
+        ...mockSttState,
+        status: 'error',
+        error: 'Microphone permission is required for voice input',
+      };
+      mockGetMicrophonePermissionStatus.mockResolvedValue({
+        granted: false,
+        canAskAgain: false,
+      });
+
+      renderChatShell({ verificationType: 'teach_back' });
+      const appStateChangedListener = addEventListenerSpy.mock.calls.at(
+        -1
+      )?.[1] as ((status: string) => void) | undefined;
+      expect(appStateChangedListener).toBeDefined();
+
+      await act(async () => {
+        appStateChangedListener?.('active');
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(mockGetMicrophonePermissionStatus).toHaveBeenCalled();
+      expect(mockClearTranscript).not.toHaveBeenCalled();
+    });
+  });
+
   // -----------------------------------------------------------------------
   // Homework image rendering
   // -----------------------------------------------------------------------
@@ -797,7 +884,7 @@ describe('ChatShell', () => {
   });
 
   describe('animation wiring (ANIM-IMPROVE)', () => {
-    it('shows LightBulbAnimation when streaming', () => {
+    it('shows DeskLampAnimation when streaming', () => {
       renderChatShell({ isStreaming: true });
       expect(screen.getByTestId('thinking-bulb-animation')).toBeTruthy();
       expect(screen.queryByTestId('idle-pen-animation')).toBeNull();

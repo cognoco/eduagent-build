@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import type { ReactNode } from 'react';
-import { View } from 'react-native';
+import { View, useColorScheme } from 'react-native';
 import Animated, {
   type SharedValue,
   useSharedValue,
@@ -13,33 +13,47 @@ import Animated, {
   cancelAnimation,
   Easing,
 } from 'react-native-reanimated';
+import Svg, { Rect, Line, Path } from 'react-native-svg';
 
 interface BookPageFlipAnimationProps {
   /** Overall size in pixels (default: 120) */
   size?: number;
-  /** Primary color for covers and spine (default: brand violet #8b5cf6) */
+  /** Cover color (default: brand violet #8b5cf6) */
   color?: string;
   testID?: string;
 }
 
 // Timing
-const PAGE_FLIP_MS = 500;
-const STAGGER_MS = 300;
-const PAUSE_MS = 400;
-const RESET_MS = 300;
+const FLIP_MS = 800;
+const PAUSE_AFTER_FLIP_MS = 600;
+const STAGGER_MS = 900;
 
-const COVER_OPACITY = 0.25;
-const PAGE_OPACITY = 0.6;
-const SPINE_OPACITY = 0.5;
+// Decorative colors
+const GLOW_COLOR = '#fbbf24';
+const RIBBON_COLOR = '#d4a73a';
+
+// Paper colors by color scheme
+const PAPER_LIGHT = '#faf5eb';
+const PAPER_DARK = '#2a2520';
+const LINE_LIGHT = '#d4c4a8';
+const LINE_DARK = '#4a3f35';
+
+// Text line Y positions on the static pages (viewBox 0 0 120 120)
+const TEXT_LINES_Y = [36, 44, 52, 60, 68, 76, 84];
+
+// Text line Y positions inside the turning page (viewBox 0 0 43 70)
+const TURN_TEXT_LINES_Y = [10, 18, 26, 34, 42, 50, 58];
 
 /**
- * Looping book page-flip animation with 3D perspective. Three pages
- * stagger-flip from right to left using rotateY + perspective, then
- * reset simultaneously. Pure Animated.View — no SVG.
+ * Enchanted open book with page-turn animation, warm glow, and sparkle
+ * particles. Designed to look like a storybook, not just colored rectangles.
  *
- * Fabric safety: transformOrigin with array syntax + rotateY is used.
- * If transformOrigin doesn't cooperate with rotateY on a specific
- * Fabric build, the fallback is translate-rotate-translate.
+ * The book is an SVG illustration with detailed covers, cream pages, text
+ * hints, a bookmark ribbon, and decorative borders. Two pages take turns
+ * flipping from right to left using rotateY + perspective.
+ *
+ * 80px: basic book + page flip + glow
+ * 120px: adds sparkles, ribbon, decorative cover border
  */
 export function BookPageFlipAnimation({
   size = 120,
@@ -47,77 +61,154 @@ export function BookPageFlipAnimation({
   testID,
 }: BookPageFlipAnimationProps): ReactNode {
   const reduceMotion = useReducedMotion();
+  const isDark = useColorScheme() === 'dark';
+  const showEnhanced = size >= 100;
 
-  const page1 = useSharedValue(0);
-  const page2 = useSharedValue(0);
-  const page3 = useSharedValue(0);
+  const paperFill = isDark ? PAPER_DARK : PAPER_LIGHT;
+  const lineColor = isDark ? LINE_DARK : LINE_LIGHT;
+
+  // --- Shared values ---
+  const page1Rot = useSharedValue(0);
+  const page2Rot = useSharedValue(0);
+  const glowOp = useSharedValue(0.12);
+  // Sparkles (enhanced only)
+  const spark1 = useSharedValue(0);
+  const spark2 = useSharedValue(0);
+  const spark3 = useSharedValue(0);
 
   useEffect(() => {
     if (reduceMotion) return;
 
-    const easing = Easing.inOut(Easing.ease);
+    const easing = Easing.inOut(Easing.cubic);
 
-    function buildFlipSequence(staggerDelay: number) {
-      return withRepeat(
+    // Cycle duration must be identical for both pages so withRepeat stays in sync.
+    // Total per cycle: FLIP_MS + PAUSE_AFTER_FLIP_MS + STAGGER_MS = 2300ms
+    page1Rot.value = withRepeat(
+      withSequence(
+        withTiming(-180, { duration: FLIP_MS, easing }),
+        withDelay(PAUSE_AFTER_FLIP_MS, withTiming(0, { duration: 0 })),
+        withDelay(STAGGER_MS, withTiming(0, { duration: 0 }))
+      ),
+      -1,
+      false
+    );
+
+    page2Rot.value = withRepeat(
+      withSequence(
+        withDelay(STAGGER_MS, withTiming(-180, { duration: FLIP_MS, easing })),
+        withDelay(PAUSE_AFTER_FLIP_MS, withTiming(0, { duration: 0 })),
+        withTiming(0, { duration: 0 })
+      ),
+      -1,
+      false
+    );
+
+    // Warm glow pulsing
+    glowOp.value = withRepeat(
+      withSequence(
+        withTiming(0.28, {
+          duration: 1200,
+          easing: Easing.inOut(Easing.ease),
+        }),
+        withTiming(0.08, {
+          duration: 1200,
+          easing: Easing.inOut(Easing.ease),
+        })
+      ),
+      -1,
+      true
+    );
+
+    // Sparkles (enhanced only)
+    if (showEnhanced) {
+      spark1.value = withRepeat(
         withSequence(
-          withDelay(
-            staggerDelay,
-            withTiming(-180, { duration: PAGE_FLIP_MS, easing })
-          ),
-          withDelay(
-            2 * STAGGER_MS - staggerDelay + PAUSE_MS,
-            withTiming(-180, { duration: 0 })
-          ),
-          withTiming(0, { duration: RESET_MS }),
-          withDelay(PAUSE_MS, withTiming(0, { duration: 0 }))
+          withTiming(1, { duration: 800 }),
+          withTiming(0, { duration: 800 }),
+          withDelay(400, withTiming(0, { duration: 0 }))
+        ),
+        -1,
+        false
+      );
+      spark2.value = withRepeat(
+        withSequence(
+          withDelay(600, withTiming(1, { duration: 700 })),
+          withTiming(0, { duration: 700 }),
+          withDelay(600, withTiming(0, { duration: 0 }))
+        ),
+        -1,
+        false
+      );
+      spark3.value = withRepeat(
+        withSequence(
+          withDelay(1200, withTiming(1, { duration: 600 })),
+          withTiming(0, { duration: 600 }),
+          withDelay(600, withTiming(0, { duration: 0 }))
         ),
         -1,
         false
       );
     }
 
-    page1.value = buildFlipSequence(0);
-    page2.value = buildFlipSequence(STAGGER_MS);
-    page3.value = buildFlipSequence(STAGGER_MS * 2);
-
     return () => {
-      cancelAnimation(page1);
-      cancelAnimation(page2);
-      cancelAnimation(page3);
+      cancelAnimation(page1Rot);
+      cancelAnimation(page2Rot);
+      cancelAnimation(glowOp);
+      cancelAnimation(spark1);
+      cancelAnimation(spark2);
+      cancelAnimation(spark3);
     };
-  }, [reduceMotion, page1, page2, page3]);
+  }, [
+    reduceMotion,
+    page1Rot,
+    page2Rot,
+    glowOp,
+    spark1,
+    spark2,
+    spark3,
+    showEnhanced,
+  ]);
 
-  const scale = size / 120;
-  const bookY = 25 * scale;
-  const bookH = 70 * scale;
-  const spineX = 60 * scale;
-  const leftX = 12 * scale;
-  const leftW = 44 * scale;
-  const rightX = 64 * scale;
-  const rightW = 44 * scale;
-  const pageInset = 4 * scale;
-  const pageX = spineX + pageInset;
-  const pageY = bookY + pageInset;
-  const pageW = rightW - pageInset * 2;
-  const pageH = bookH - pageInset * 2;
+  // --- Derived layout ---
+  const s = size / 120; // viewBox → pixel scale
+  // Turning page overlay matches the right page area
+  const turnPageLeft = 62 * s; // spine right edge
+  const turnPageTop = 25 * s;
+  const turnPageW = 45 * s; // slightly wider than page to reach cover edge
+  const turnPageH = 70 * s;
 
+  // Glow dimensions
+  const glowW = size * 0.7;
+  const glowH = size * 0.55;
+
+  // Sparkle dot size
+  const dotSize = Math.max(4, size * 0.05);
+
+  // --- Animated styles ---
   function usePageStyle(sv: SharedValue<number>) {
-    return useAnimatedStyle(() => {
-      const deg = sv.value;
-      // At -90deg the page is edge-on: swap to "back" appearance
-      // Elevation increases mid-flip for depth
-      const midFlip = Math.abs(deg) > 45 && Math.abs(deg) < 135;
-      return {
-        transform: [{ perspective: 800 }, { rotateY: `${deg}deg` }],
-        transformOrigin: ['0%', '50%', 0],
-        elevation: midFlip ? 4 : 0,
-      };
-    });
+    return useAnimatedStyle(() => ({
+      transform: [{ perspective: size * 4 }, { rotateY: `${sv.value}deg` }],
+      transformOrigin: ['0%', '50%', 0],
+    }));
   }
 
-  const page1Style = usePageStyle(page1);
-  const page2Style = usePageStyle(page2);
-  const page3Style = usePageStyle(page3);
+  const page1Style = usePageStyle(page1Rot);
+  const page2Style = usePageStyle(page2Rot);
+
+  const glowStyle = useAnimatedStyle(() => ({
+    opacity: glowOp.value,
+  }));
+
+  function useSparkleStyle(sv: SharedValue<number>) {
+    return useAnimatedStyle(() => ({
+      opacity: sv.value * 0.8,
+      transform: [{ scale: 0.4 + sv.value * 0.6 }],
+    }));
+  }
+
+  const spark1Style = useSparkleStyle(spark1);
+  const spark2Style = useSparkleStyle(spark2);
+  const spark3Style = useSparkleStyle(spark3);
 
   return (
     <View
@@ -126,100 +217,238 @@ export function BookPageFlipAnimation({
       accessibilityRole="image"
       style={{ width: size, height: size }}
     >
-      {/* Left cover */}
-      <View
-        style={{
-          position: 'absolute',
-          left: leftX,
-          top: bookY,
-          width: leftW,
-          height: bookH,
-          borderRadius: 3 * scale,
-          backgroundColor: color,
-          opacity: COVER_OPACITY,
-        }}
-      />
-
-      {/* Right cover */}
-      <View
-        style={{
-          position: 'absolute',
-          left: rightX,
-          top: bookY,
-          width: rightW,
-          height: bookH,
-          borderRadius: 3 * scale,
-          backgroundColor: color,
-          opacity: COVER_OPACITY,
-        }}
-      />
-
-      {/* Page 1 — rotateY flips around the left (spine) edge via transformOrigin */}
+      {/* Warm glow behind book */}
       <Animated.View
         style={[
           {
             position: 'absolute',
-            left: pageX,
-            top: pageY,
-            width: pageW,
-            height: pageH,
-            borderRadius: 1 * scale,
-            backgroundColor: color,
-            opacity: PAGE_OPACITY,
-            backfaceVisibility: 'hidden',
+            width: glowW,
+            height: glowH,
+            borderRadius: glowH / 2,
+            backgroundColor: GLOW_COLOR,
+            left: (size - glowW) / 2,
+            top: size * 0.25,
           },
-          page1Style,
+          glowStyle,
+          { pointerEvents: 'none' },
         ]}
       />
 
-      {/* Page 2 */}
-      <Animated.View
-        style={[
-          {
-            position: 'absolute',
-            left: pageX + 2 * scale,
-            top: pageY,
-            width: pageW - 2 * scale,
-            height: pageH,
-            borderRadius: 1 * scale,
-            backgroundColor: color,
-            opacity: PAGE_OPACITY * 0.8,
-            backfaceVisibility: 'hidden',
-          },
-          page2Style,
-        ]}
-      />
+      {/* Book illustration — static SVG */}
+      <Svg width={size} height={size} viewBox="0 0 120 120">
+        {/* Left cover */}
+        <Rect
+          x={10}
+          y={22}
+          width={48}
+          height={76}
+          rx={3}
+          fill={color}
+          opacity={0.85}
+        />
+        {/* Right cover */}
+        <Rect
+          x={62}
+          y={22}
+          width={48}
+          height={76}
+          rx={3}
+          fill={color}
+          opacity={0.85}
+        />
+        {/* Spine — slightly taller for ridge effect */}
+        <Rect x={58} y={20} width={4} height={80} rx={1} fill={color} />
 
-      {/* Page 3 */}
-      <Animated.View
-        style={[
-          {
-            position: 'absolute',
-            left: pageX + 4 * scale,
-            top: pageY,
-            width: pageW - 4 * scale,
-            height: pageH,
-            borderRadius: 1 * scale,
-            backgroundColor: color,
-            opacity: PAGE_OPACITY * 0.6,
-            backfaceVisibility: 'hidden',
-          },
-          page3Style,
-        ]}
-      />
+        {/* Left page */}
+        <Rect x={13} y={25} width={43} height={70} rx={1} fill={paperFill} />
+        {/* Right page (static background underneath turning pages) */}
+        <Rect x={64} y={25} width={43} height={70} rx={1} fill={paperFill} />
 
-      {/* Spine line */}
-      <View
-        style={{
-          position: 'absolute',
-          left: spineX - 1 * scale,
-          top: bookY,
-          width: 2 * scale,
-          height: bookH,
-          backgroundColor: color,
-          opacity: SPINE_OPACITY,
-        }}
-      />
+        {/* Text lines — left page */}
+        {TEXT_LINES_Y.map((y) => (
+          <Line
+            key={`l${y}`}
+            x1={17}
+            y1={y}
+            x2={52}
+            y2={y}
+            stroke={lineColor}
+            strokeWidth={1}
+            opacity={0.4}
+          />
+        ))}
+        {/* Text lines — right page */}
+        {TEXT_LINES_Y.map((y) => (
+          <Line
+            key={`r${y}`}
+            x1={68}
+            y1={y}
+            x2={103}
+            y2={y}
+            stroke={lineColor}
+            strokeWidth={1}
+            opacity={0.4}
+          />
+        ))}
+
+        {/* Bookmark ribbon (enhanced detail) */}
+        {showEnhanced && (
+          <Path
+            d="M57 20 L57 38 L54 33 M57 38 L60 33"
+            stroke={RIBBON_COLOR}
+            strokeWidth={1.5}
+            fill="none"
+            strokeLinecap="round"
+          />
+        )}
+
+        {/* Decorative cover inset borders (enhanced detail) */}
+        {showEnhanced && (
+          <>
+            <Rect
+              x={12}
+              y={24}
+              width={45}
+              height={72}
+              rx={2}
+              fill="none"
+              stroke={color}
+              strokeWidth={0.5}
+              opacity={0.25}
+            />
+            <Rect
+              x={63}
+              y={24}
+              width={45}
+              height={72}
+              rx={2}
+              fill="none"
+              stroke={color}
+              strokeWidth={0.5}
+              opacity={0.25}
+            />
+          </>
+        )}
+      </Svg>
+
+      {/* Turning page 1 — rotateY around the spine edge */}
+      {!reduceMotion && (
+        <Animated.View
+          style={[
+            {
+              position: 'absolute',
+              left: turnPageLeft,
+              top: turnPageTop,
+              width: turnPageW,
+              height: turnPageH,
+              backfaceVisibility: 'hidden',
+            },
+            page1Style,
+            { pointerEvents: 'none' },
+          ]}
+        >
+          <Svg width={turnPageW} height={turnPageH} viewBox="0 0 45 70">
+            <Rect x={2} y={0} width={43} height={70} rx={1} fill={paperFill} />
+            {TURN_TEXT_LINES_Y.map((y) => (
+              <Line
+                key={y}
+                x1={6}
+                y1={y}
+                x2={41}
+                y2={y}
+                stroke={lineColor}
+                strokeWidth={0.8}
+                opacity={0.35}
+              />
+            ))}
+          </Svg>
+        </Animated.View>
+      )}
+
+      {/* Turning page 2 — staggered for continuous reading rhythm */}
+      {!reduceMotion && (
+        <Animated.View
+          style={[
+            {
+              position: 'absolute',
+              left: turnPageLeft,
+              top: turnPageTop,
+              width: turnPageW,
+              height: turnPageH,
+              backfaceVisibility: 'hidden',
+            },
+            page2Style,
+            { pointerEvents: 'none' },
+          ]}
+        >
+          <Svg width={turnPageW} height={turnPageH} viewBox="0 0 45 70">
+            <Rect x={2} y={0} width={43} height={70} rx={1} fill={paperFill} />
+            {TURN_TEXT_LINES_Y.map((y) => (
+              <Line
+                key={y}
+                x1={6}
+                y1={y}
+                x2={41}
+                y2={y}
+                stroke={lineColor}
+                strokeWidth={0.8}
+                opacity={0.25}
+              />
+            ))}
+          </Svg>
+        </Animated.View>
+      )}
+
+      {/* Sparkle particles (enhanced only) */}
+      {showEnhanced && !reduceMotion && (
+        <>
+          <Animated.View
+            style={[
+              {
+                position: 'absolute',
+                left: size * 0.86,
+                top: size * 0.14,
+                width: dotSize,
+                height: dotSize,
+                borderRadius: dotSize / 2,
+                backgroundColor: GLOW_COLOR,
+              },
+              spark1Style,
+              { pointerEvents: 'none' },
+            ]}
+          />
+          <Animated.View
+            style={[
+              {
+                position: 'absolute',
+                left: size * 0.06,
+                top: size * 0.2,
+                width: dotSize,
+                height: dotSize,
+                borderRadius: dotSize / 2,
+                backgroundColor: GLOW_COLOR,
+              },
+              spark2Style,
+              { pointerEvents: 'none' },
+            ]}
+          />
+          <Animated.View
+            style={[
+              {
+                position: 'absolute',
+                left: size * 0.8,
+                top: size * 0.9,
+                width: dotSize,
+                height: dotSize,
+                borderRadius: dotSize / 2,
+                backgroundColor: GLOW_COLOR,
+              },
+              spark3Style,
+              { pointerEvents: 'none' },
+            ]}
+          />
+        </>
+      )}
     </View>
   );
 }

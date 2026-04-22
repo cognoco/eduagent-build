@@ -196,7 +196,7 @@ export default function ProgressSubjectScreen(): React.ReactElement {
 
             <View className="flex-row gap-3 mt-4">
               <StatCard
-                label="In progress"
+                label="Started"
                 value={String(subject.topics.inProgress)}
               />
               <StatCard

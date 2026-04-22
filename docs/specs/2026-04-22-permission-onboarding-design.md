@@ -85,7 +85,13 @@ Defined inline in `apps/mobile/src/app/(app)/_layout.tsx`, following the same pa
 ```ts
 function usePermissionSetup(
   profileId: string | undefined
-): [shouldShow: boolean, dismiss: () => void]
+): [
+  shouldShow: boolean,
+  dismiss: () => void,
+  permState: PermState,
+  requestMic: () => Promise<void>,
+  requestNotif: () => Promise<void>,
+]
 ```
 
 Follows the same shape as `usePostApprovalLanding`:
@@ -160,6 +166,18 @@ Follows the same shape as `usePostApprovalLanding`:
 
 For microphone, use the same dynamic import pattern as `use-speech-recognition.ts` (the module is lazy-loaded). On web or devices without the native module, the mic row should be hidden (not shown with an error).
 
+**Prerequisite — add `getPermissionsAsync` to the local type:** The native `expo-speech-recognition` module exports `getPermissionsAsync` (confirmed in `ExpoSpeechRecognitionModule.types.d.ts:565`), but our local `SpeechRecognitionModule` type at `hooks/use-speech-recognition.ts:33-45` only declares `requestPermissionsAsync`. The type must be extended:
+
+```ts
+type SpeechRecognitionModule = {
+  getPermissionsAsync: () => Promise<{ granted: boolean; canAskAgain: boolean }>;
+  requestPermissionsAsync: () => Promise<{ granted: boolean }>;
+  // ... existing fields
+};
+```
+
+Without this, the gate's passive permission check (`getPermissionsAsync`) will fail at the type level. This also unblocks the ChatShell AppState refresh described below.
+
 ### Interaction with existing permission code
 
 - **`usePushTokenRegistration`**: Currently runs on `AppLayout` mount (line 1055) and immediately requests notification permission via the OS dialog — before the user has any context. After this change:
@@ -176,6 +194,25 @@ For microphone, use the same dynamic import pattern as `use-speech-recognition.t
     usePermissionSetup(activeProfile?.id);
   usePushTokenRegistration(permState.notif === 'granted');
   ```
+- **`ChatShell` mic — add AppState refresh**: Currently, if a user denies mic in the gate, enters a session, gets the permission error alert, taps "Open Settings", grants mic, and returns — ChatShell has **no AppState listener** to detect the change. The `useSpeechRecognition` hook is stateless with respect to permission: it only checks on `startListening()` or `requestMicrophonePermission()` calls, not reactively.
+
+  Add an `AppState` listener inside `ChatShell` (same pattern as the camera fix and this gate) that calls `getPermissionsAsync()` on `'active'` transition. If mic becomes granted, update local state so the mic button reflects the new status without requiring the user to tap it again. This depends on the `getPermissionsAsync` type addition described in Permission APIs above.
+
+  ```ts
+  // ChatShell — re-check mic permission on return from Settings
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', async (next) => {
+      if (next === 'active') {
+        const mod = await loadSpeechModule();
+        if (!mod) return;
+        const { granted } = await mod.getPermissionsAsync();
+        // Update local mic-available state if newly granted
+      }
+    });
+    return () => sub.remove();
+  }, []);
+  ```
+
 - **`ChatShell` mic pre-warm**: No change needed. If mic was granted in the gate, the pre-warm is a no-op. If denied, the pre-warm still fires as before.
 
 ## Failure Modes
@@ -206,10 +243,24 @@ For microphone, use the same dynamic import pattern as `use-speech-recognition.t
 9. AppState 'active' transition re-checks permission status (same pattern as camera fix)
 10. Mic row hidden when speech module is unavailable
 
+11. Gate auto-skips when zero rows are renderable (web + no speech module)
+12. Notification row hidden on web (`Platform.OS === 'web'`)
+
 ### Integration coverage
 
 - The `usePushTokenRegistration` hook registers the push token reactively when `notificationGranted` flips to `true` after the gate grants permission (same session — no cold restart needed)
+- ChatShell AppState listener re-checks mic permission on `'active'` transition and updates mic-available state when newly granted
 - Existing permission flows (camera, ChatShell mic pre-warm) work unchanged
+- Shake detector logs `__DEV__` warning when accelerometer module is missing or unavailable
+
+## Related fix: Shake detector silent failure
+
+The shake-to-feedback feature (`hooks/use-shake-detector.ts`) uses `expo-sensors` Accelerometer. It has the same silent-failure pattern this spec addresses for permissions: if the native module is missing or the sensor is unavailable, the hook exits silently with no log, no error, no user feedback. This means shake-to-feedback silently doesn't work on emulators and on any device without the dev-client native module.
+
+While not part of the permission gate itself, this should be fixed alongside:
+
+1. Add `__DEV__` console warnings when `Accelerometer` is `null` (module not available) or `isAvailableAsync()` returns `false`
+2. Consider exposing a `shakeAvailable` boolean from the hook so `FeedbackProvider` can offer a fallback (e.g., a manual "Give Feedback" button in the More tab)
 
 ## Out of Scope
 

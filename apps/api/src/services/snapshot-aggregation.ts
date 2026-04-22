@@ -55,7 +55,7 @@ type TopicWithSubject = TopicRow & { subjectId: string };
 // accumulate unreasonable wallClockSeconds when finally closed by the stale
 // cleanup.  Cap each session's contribution to prevent a single abandoned
 // session from inflating the user-facing "time spent" metric.
-const MAX_SESSION_WALL_CLOCK_SECONDS = 3 * 60 * 60; // 3 hours
+export const MAX_SESSION_WALL_CLOCK_SECONDS = 3 * 60 * 60; // 3 hours
 
 function cappedWallClock(session: {
   wallClockSeconds: number | null;
@@ -291,9 +291,6 @@ export function buildSubjectMetric(
   const subjectSessions = state.sessions.filter(
     (session) => session.subjectId === subject.id
   );
-  const subjectAssessments = state.assessments.filter(
-    (assessment) => assessment.subjectId === subject.id
-  );
   const subjectVocabulary = state.vocabulary.filter(
     (item) => item.subjectId === subject.id
   );
@@ -327,11 +324,9 @@ export function buildSubjectMetric(
     }
   }
 
-  for (const assessment of subjectAssessments) {
-    if (allTopicIds.has(assessment.topicId)) {
-      attemptedTopicIds.add(assessment.topicId);
-    }
-  }
+  // Assessments intentionally excluded from attemptedTopicIds — a topic is
+  // only "started" if the student had at least one session (already captured
+  // by exploredTopicIds + the session loop above) or a retention card exists.
 
   for (const card of state.retentionCards) {
     if (allTopicIds.has(card.topicId)) {
@@ -519,16 +514,8 @@ export async function buildSubjectInventory(
     }
   }
 
-  for (const assessment of state.assessments) {
-    if (
-      assessment.subjectId !== subject.id ||
-      !allTopicIds.has(assessment.topicId)
-    ) {
-      continue;
-    }
-
-    attemptedTopicIds.add(assessment.topicId);
-  }
+  // Assessments intentionally excluded from attemptedTopicIds — a topic is
+  // only "started" if the student had at least one session or a retention card.
 
   for (const card of state.retentionCards) {
     if (!allTopicIds.has(card.topicId)) continue;

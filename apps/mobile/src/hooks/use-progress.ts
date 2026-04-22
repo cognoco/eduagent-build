@@ -513,6 +513,8 @@ export function useMarkChildReportViewed(): UseMutationResult<
   const queryClient = useQueryClient();
 
   return useMutation({
+    // [BUG-550] Best-effort tracking — never retry on failure
+    retry: 0,
     mutationFn: async ({ childProfileId, reportId }) => {
       const res = await client.dashboard.children[':profileId'].reports[
         ':reportId'
@@ -560,6 +562,16 @@ export function useChildWeeklyReports(
           { param: { profileId: childProfileId ?? '' } },
           { init: { signal } }
         );
+        // [BUG-549] New child profiles may return 403 (no family link yet)
+        // or 404. Treat these as "no data yet" rather than a hard error so
+        // the UI shows a friendly empty state instead of an error card.
+        // [IMP-7] Log the status so silent 403s don't mask real ACL bugs.
+        if (res.status === 403 || res.status === 404) {
+          console.warn(
+            `[useChildWeeklyReports] ${res.status} for child ${childProfileId} — returning empty`
+          );
+          return [];
+        }
         await assertOk(res);
         const data = (await res.json()) as { reports: WeeklyReportSummary[] };
         return data.reports;

@@ -5,12 +5,15 @@ import { Platform } from 'react-native';
 import { useRegisterPushToken } from './use-settings';
 
 /**
- * Requests notification permissions and registers the Expo push token
- * with the API on first mount. Guarded by a ref to prevent duplicate calls.
+ * Registers the Expo push token with the API when notification permission
+ * is already granted. Does NOT prompt for permission — the permission
+ * onboarding gate owns that dialog.
  *
- * Should be called once in each persona layout (learner and parent).
+ * @param notificationGranted Reactive signal from the permission gate.
+ * When this flips from false to true, the effect re-runs and registers the
+ * token in the same session.
  */
-export function usePushTokenRegistration(): void {
+export function usePushTokenRegistration(notificationGranted = false): void {
   const hasRegistered = useRef(false);
   const registerPushToken = useRegisterPushToken();
 
@@ -19,17 +22,8 @@ export function usePushTokenRegistration(): void {
 
     async function register() {
       try {
-        // Request notification permissions
-        const { status: existingStatus } =
-          await Notifications.getPermissionsAsync();
-        let finalStatus = existingStatus;
-
-        if (existingStatus !== 'granted') {
-          const { status } = await Notifications.requestPermissionsAsync();
-          finalStatus = status;
-        }
-
-        if (finalStatus !== 'granted') return;
+        const { status } = await Notifications.getPermissionsAsync();
+        if (status !== 'granted') return;
 
         // Android requires a notification channel
         if (Platform.OS === 'android') {
@@ -58,5 +52,5 @@ export function usePushTokenRegistration(): void {
     }
 
     void register();
-  }, [registerPushToken]);
+  }, [notificationGranted, registerPushToken]);
 }

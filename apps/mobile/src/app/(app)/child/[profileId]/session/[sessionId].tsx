@@ -257,11 +257,14 @@ export default function SessionDetailScreen() {
           testID="narrative-unavailable"
         >
           <Text className="text-text-primary text-base font-semibold">
-            No recap was generated
+            No recap available
           </Text>
           <Text className="text-text-secondary mt-2 text-sm leading-relaxed">
-            This older session does not have a parent recap yet. You can go back
-            and open a newer session instead.
+            {/* [BUG-552] The recap may not exist because the session is still
+                being processed, was too short, or predates the recap feature.
+                Avoid "older session" — any session can lack a recap. */}
+            A recap for this session is not available. It may still be
+            generating, or the session may have been too short.
           </Text>
           <Pressable
             onPress={() => goBackOrReplace(router, '/(app)/more')}
@@ -286,7 +289,9 @@ export default function SessionDetailScreen() {
           </Text>
         ) : (
           <Text className="text-text-tertiary text-base italic">
-            Session summary not available for older sessions
+            {/* [BUG-552] displaySummary is only set for homework sessions,
+                so this fires for every learning session — not just old ones. */}
+            No summary available for this session.
           </Text>
         )}
       </View>
