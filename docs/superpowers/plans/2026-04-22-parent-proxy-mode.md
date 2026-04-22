@@ -50,8 +50,7 @@
 | `apps/api/src/routes/dictation.ts` | Guard 2 POST handlers |
 | `apps/api/src/routes/retention.ts` | Guard 2 POST handlers |
 | `apps/api/src/routes/assessments.ts` | Guard 1 POST handler |
-| `apps/api/src/routes/bookmarks.ts` | Guard 1 DELETE handler (symmetry with UI suppression) |
-| `apps/api/src/routes/bookmarks.integration.test.ts` | New integration break-test (proves a real route returns 403) |
+| `apps/api/src/routes/bookmarks.ts` | Guard 1 DELETE handler (symmetry with UI suppression in Task 10) |
 
 ---
 
@@ -240,7 +239,62 @@ import { assertNotProxyMode } from '../middleware/proxy-guard';
 
 Add `assertNotProxyMode(c);` as first line inside `.post('/subjects/:subjectId/topics/:topicId/assessments', ...)` handler (~line 32).
 
-- [ ] **Step 2.8: Typecheck and run API tests**
+- [ ] **Step 2.8: Guard `bookmarks.ts` (1 DELETE handler)**
+
+Add to imports at the top of `apps/api/src/routes/bookmarks.ts`:
+```typescript
+import { assertNotProxyMode } from '../middleware/proxy-guard';
+```
+
+Add `assertNotProxyMode(c);` as first line inside the `.delete('/bookmarks/:id', ...)` handler (~line 85).
+
+This closes the symmetry gap with Task 10's UI suppression: UI hides the trash icon, and the server refuses the DELETE if called anyway (deep link, stale build, third-party client).
+
+- [ ] **Step 2.9: Add a route-level break test to `proxy-guard.test.ts`**
+
+Append the following `describe` block to `apps/api/src/middleware/proxy-guard.test.ts`. This proves the guard is actually wired into a real route file — the unit tests in Task 1 only exercised a synthetic Hono app.
+
+```typescript
+// proxy-guard.test.ts — appended after the existing describe block.
+//
+// Break test: verify a real guarded route returns 403 when X-Proxy-Mode is set.
+// Targets bookmarks.delete because it is the smallest guarded handler
+// (no request body, no path-parameter coupling to a seeded DB record).
+import { Hono } from 'hono';
+import bookmarksRoute from '../routes/bookmarks';
+
+describe('assertNotProxyMode — real route integration', () => {
+  it('returns 403 from bookmarks DELETE when X-Proxy-Mode: true, without touching the DB', async () => {
+    const app = new Hono();
+    // Mock the middleware chain the route expects (db, profileId) — these
+    // should NOT be called, because the guard must short-circuit first.
+    const dbCalled = jest.fn();
+    app.use('*', async (c, next) => {
+      c.set('db', new Proxy({}, { get: () => dbCalled }));
+      c.set('profileId', 'profile-test');
+      await next();
+    });
+    app.route('/', bookmarksRoute);
+
+    const res = await app.request('/bookmarks/some-id', {
+      method: 'DELETE',
+      headers: { 'X-Proxy-Mode': 'true' },
+    });
+
+    expect(res.status).toBe(403);
+    expect(dbCalled).not.toHaveBeenCalled();
+  });
+});
+```
+
+Run the extended suite:
+```bash
+cd apps/api && pnpm exec jest --testPathPattern=proxy-guard --no-coverage
+```
+
+Expected: 4 tests PASS (3 original + 1 route-integration).
+
+- [ ] **Step 2.10: Typecheck and run API tests**
 
 ```bash
 pnpm exec nx run api:typecheck
@@ -249,11 +303,11 @@ pnpm exec nx run api:test
 
 Expected: no type errors, all existing tests pass
 
-- [ ] **Step 2.9: Commit**
+- [ ] **Step 2.11: Commit**
 
 ```bash
-git add apps/api/src/routes/interview.ts apps/api/src/routes/sessions.ts apps/api/src/routes/homework.ts apps/api/src/routes/quiz.ts apps/api/src/routes/dictation.ts apps/api/src/routes/retention.ts apps/api/src/routes/assessments.ts
-git commit -m "feat(api): guard all session-creation endpoints against proxy mode"
+git add apps/api/src/routes/interview.ts apps/api/src/routes/sessions.ts apps/api/src/routes/homework.ts apps/api/src/routes/quiz.ts apps/api/src/routes/dictation.ts apps/api/src/routes/retention.ts apps/api/src/routes/assessments.ts apps/api/src/routes/bookmarks.ts apps/api/src/middleware/proxy-guard.test.ts
+git commit -m "feat(api): guard session-creation endpoints and bookmark delete against proxy mode"
 ```
 
 ---
@@ -662,19 +716,61 @@ At the bottom of the main `return (...)` block, before the closing `</View>`, ad
 </Modal>
 ```
 
-- [ ] **Step 6.5: Typecheck and run related tests**
+- [ ] **Step 6.5: Write a test for the confirmation-sheet flow**
+
+Add or extend `apps/mobile/src/app/profiles.test.tsx` with these three cases. They lock in the routing table (parent→child shows sheet, child→parent immediate, child→child immediate) so a future rewire cannot silently bypass the confirmation.
+
+```typescript
+// apps/mobile/src/app/profiles.test.tsx — proxy confirmation sheet cases.
+// Reuse whatever mocks the existing profiles.test.tsx already sets up for
+// useProfile / useSubscription / router. The three cases below exercise
+// handleProfileTap indirectly by tapping a rendered profile row.
+
+describe('ProfilesScreen — proxy confirmation sheet', () => {
+  it('shows confirmation sheet when owner taps a child profile (does NOT switch yet)', async () => {
+    // Arrange: activeProfile = owner, profiles = [owner, child]
+    // Act: user taps the child row
+    // Assert:
+    //   - getByTestId('proxy-confirm-modal') is visible
+    //   - switchProfile mock was NOT called
+    //   - getByTestId('proxy-confirm-view') exists
+  });
+
+  it('calls switchProfile(childId) when the user confirms', async () => {
+    // Arrange: same as above
+    // Act: tap the child row, then tap 'proxy-confirm-view'
+    // Assert: switchProfile was called with the child's id exactly once
+  });
+
+  it('dismisses the sheet without switching when user taps Cancel', async () => {
+    // Arrange: same as above
+    // Act: tap the child row, then tap 'proxy-confirm-cancel'
+    // Assert: switchProfile was NOT called; modal is no longer visible
+  });
+
+  it('switches immediately (no sheet) when a child taps the owner row', async () => {
+    // Arrange: activeProfile = child, profiles = [owner, child]
+    // Act: tap the owner row
+    // Assert:
+    //   - switchProfile was called with owner.id
+    //   - queryByTestId('proxy-confirm-modal') is null
+  });
+});
+```
+
+- [ ] **Step 6.6: Typecheck and run related tests**
 
 ```bash
 cd apps/mobile && pnpm exec tsc --noEmit
 cd apps/mobile && pnpm exec jest --findRelatedTests src/app/profiles.tsx --no-coverage
 ```
 
-Expected: no type errors, all existing tests pass
+Expected: no type errors, all 4 new cases pass (plus any existing tests)
 
-- [ ] **Step 6.6: Commit**
+- [ ] **Step 6.7: Commit**
 
 ```bash
-git add apps/mobile/src/app/profiles.tsx
+git add apps/mobile/src/app/profiles.tsx apps/mobile/src/app/profiles.test.tsx
 git commit -m "feat(mobile): show confirmation sheet before parent switches into child profile"
 ```
 
@@ -695,7 +791,11 @@ import { useParentProxy } from '../../hooks/use-parent-proxy';
 
 - [ ] **Step 7.2: Add the `ProxyBanner` component**
 
-After the `TabIcon` component definition (~line 84), add:
+After the `TabIcon` component definition (~line 84), add the component below.
+
+**Important — safe-area:** the banner renders at the top of the screen, above the tab bar. It must reserve space for the status-bar / notch, otherwise on iOS with a notch it will draw underneath the system UI. We already import `useSafeAreaInsets` in this file (line 15), so the top inset is one hook call away.
+
+Icon note: we use `<Ionicons name="eye-outline" />` rather than a raw `👁` emoji to stay consistent with the rest of the tab bar's iconography (`iconMap` above uses `Ionicons` exclusively).
 
 ```typescript
 function ProxyBanner({
@@ -705,18 +805,31 @@ function ProxyBanner({
   childName: string;
   onSwitchBack: () => void;
 }): React.ReactElement {
+  const insets = useSafeAreaInsets();
+  const colors = useThemeColors();
   return (
     <View
       className="flex-row items-center justify-between px-4 bg-surface-elevated border-b border-border"
-      style={{ height: 44 }}
+      style={{
+        paddingTop: insets.top,
+        height: 44 + insets.top,
+      }}
       testID="proxy-banner"
     >
-      <Text
-        className="text-body-sm text-text-secondary flex-1"
-        numberOfLines={1}
-      >
-        {'👁'} Viewing {childName}'s account
-      </Text>
+      <View className="flex-row items-center flex-1">
+        <Ionicons
+          name="eye-outline"
+          size={16}
+          color={colors.textSecondary}
+          style={{ marginRight: 6 }}
+        />
+        <Text
+          className="text-body-sm text-text-secondary flex-1"
+          numberOfLines={1}
+        >
+          Viewing {childName}'s account
+        </Text>
+      </View>
       <Pressable
         onPress={onSwitchBack}
         hitSlop={8}
@@ -732,6 +845,8 @@ function ProxyBanner({
   );
 }
 ```
+
+Because the banner now provides its own top-inset padding, the `(app)/_layout` container's existing top-inset handling (on the `<Tabs>` navigator) is untouched — the banner sits above `<Tabs>` in the JSX tree and consumes the top inset for itself.
 
 - [ ] **Step 7.3: Call the hook in `AppLayout`**
 
@@ -1274,11 +1389,21 @@ git commit -m "feat(mobile): suppress bookmark delete affordance in parent proxy
 | §4 Redirect guards (7 routes) | Task 8 |
 | §4 Home screen card filtering + placeholder | Task 9 |
 | §5 `assertNotProxyMode` middleware | Task 1 |
-| §5 All 13 creation endpoints guarded | Task 2 |
+| §5 All 13 creation endpoints guarded | Task 2 (Steps 2.1–2.7) |
+| §5 Bookmark DELETE server guard (symmetry with §6 UI suppression) | Task 2 (Step 2.8) |
+| §5 Route-level break test (real route returns 403) | Task 2 (Step 2.9) |
 | §6 Bookmarks visible, delete suppressed | Task 10 |
 | §7 All failure modes | Covered across Tasks 4, 5, 6, 7, 8 |
+| UX: confirmation-sheet routing locked by tests | Task 6 (Step 6.5) |
+| UX: banner respects safe-area / status-bar inset | Task 7 (Step 7.2) |
 
 No gaps found.
+
+### Intentionally Deferred (explicit scope boundary)
+
+The server guard covers session creation + bookmark delete. Other destructive edits (notes PUT/DELETE, vocabulary DELETE, retention mastery PUT/DELETE, library edits, settings PUT, learner-profile PATCH/DELETE, onboarding PATCH) are UI-gated only in this phase because none of them are reachable from the proxy-visible surfaces (home / library / progress / recaps / saved bookmarks). A stricter server-enforced "all-writes-locked" mode is a separate follow-up plan.
+
+Profile rename (`profiles PATCH`) and consent management (`consent PUT`) remain available in proxy mode by design — both are legitimate parent-initiated actions.
 
 ### Type Consistency
 

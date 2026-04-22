@@ -155,10 +155,10 @@ export function buildBrowseHighlight(
   // character-class allow-list used for names so a crafted subject cannot
   // inject prompt tokens or control characters into the parent-facing
   // highlight (which later becomes LLM input for narrative generation).
-  // Note: we use a literal space in the allow-list rather than `\s`, so
-  // newlines/tabs/carriage returns are stripped. The `\s` class used for
-  // `safeName` above accepts newlines, which would let a multi-line subject
-  // break the parent-facing highlight into a fake instruction block.
+  // Note: use a literal space in the allow-list here, NOT `\s`, because `\s`
+  // also matches newlines and tabs — a multi-line subject could otherwise be
+  // broken into a fake instruction block in the parent-facing highlight. The
+  // `safeName` allow-list above follows the same rule.
   const safeSubject = subjectName
     ? subjectName
         .replace(/[^\p{L}\p{N} '-]/gu, '')

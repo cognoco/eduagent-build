@@ -1,3 +1,17 @@
+// Mock Inngest client — in CI there is no Inngest dev server or event key,
+// so the real `inngest.send()` throws when the feedback route queues a
+// delivery-failed event. Every other route test follows this same pattern
+// (see account.test.ts, books.test.ts, consent.test.ts).
+jest.mock('inngest/hono', () => ({
+  serve: jest.fn().mockReturnValue(jest.fn()),
+}));
+
+jest.mock('../inngest/client', () => ({
+  inngest: {
+    send: jest.fn().mockResolvedValue(undefined),
+  },
+}));
+
 import { Hono } from 'hono';
 import { feedbackRoutes } from './feedback';
 
