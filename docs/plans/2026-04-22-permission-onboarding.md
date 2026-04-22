@@ -47,7 +47,7 @@ it('does not request permission or register when not already granted', async () 
     status: 'undetermined',
   });
 
-  renderHook(() => usePushTokenRegistration());
+  renderHook(() => usePushTokenRegistration(false));
 
   // Give time for the async effect to complete
   await new Promise((r) => setTimeout(r, 50));
@@ -67,7 +67,7 @@ it('does not register when permission is denied', async () => {
     status: 'denied',
   });
 
-  renderHook(() => usePushTokenRegistration());
+  renderHook(() => usePushTokenRegistration(false));
 
   await new Promise((r) => setTimeout(r, 50));
 
@@ -84,10 +84,21 @@ Expected: 2 tests fail (the "not granted" and "denied" tests expect `requestPerm
 
 - [ ] **Step 5: Update the hook implementation**
 
-In `apps/mobile/src/hooks/use-push-token-registration.ts`, remove the `requestPermissionsAsync` call. The hook should only check current status and register if already granted:
+In `apps/mobile/src/hooks/use-push-token-registration.ts`, remove the `requestPermissionsAsync` call, add `notificationGranted` parameter, and include it in the dependency array:
 
 ```ts
-export function usePushTokenRegistration(): void {
+/**
+ * Registers the Expo push token with the API when notification permission
+ * is already granted. Does NOT prompt for permission — the permission
+ * onboarding gate owns that dialog.
+ *
+ * @param notificationGranted - reactive signal from the permission gate.
+ *   When this flips from false→true (gate granted permission), the effect
+ *   re-fires and registers the token in the same session.
+ */
+export function usePushTokenRegistration(
+  notificationGranted = false
+): void {
   const hasRegistered = useRef(false);
   const registerPushToken = useRegisterPushToken();
 
@@ -128,17 +139,49 @@ export function usePushTokenRegistration(): void {
     }
 
     void register();
-  }, [registerPushToken]);
+  }, [registerPushToken, notificationGranted]);
 }
 ```
 
-- [ ] **Step 6: Run tests to verify they pass**
+- [ ] **Step 6: Add test for reactive re-fire when notificationGranted flips**
+
+```ts
+it('registers token when notificationGranted flips from false to true (gate grants permission)', async () => {
+  // First render: not granted
+  (Notifications.getPermissionsAsync as jest.Mock).mockResolvedValue({
+    status: 'undetermined',
+  });
+
+  const { rerender } = renderHook(
+    ({ granted }: { granted: boolean }) => usePushTokenRegistration(granted),
+    { initialProps: { granted: false } }
+  );
+
+  await new Promise((r) => setTimeout(r, 50));
+  expect(mockMutateAsync).not.toHaveBeenCalled();
+
+  // Gate grants notification → notificationGranted flips to true
+  (Notifications.getPermissionsAsync as jest.Mock).mockResolvedValue({
+    status: 'granted',
+  });
+
+  rerender({ granted: true });
+
+  await waitFor(() => {
+    expect(mockMutateAsync).toHaveBeenCalledWith(
+      'ExponentPushToken[mock-token]'
+    );
+  });
+});
+```
+
+- [ ] **Step 7: Run tests to verify they pass**
 
 Run: `cd C:/Dev/Projects/Products/Apps/eduagent-build/apps/mobile && pnpm exec jest --findRelatedTests src/hooks/use-push-token-registration.ts --no-coverage`
 
-Expected: All 4 tests pass.
+Expected: All 5 tests pass.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
 git add apps/mobile/src/hooks/use-push-token-registration.ts apps/mobile/src/hooks/use-push-token-registration.test.ts
@@ -337,10 +380,14 @@ function usePermissionSetup(
       const { micStatus, notifStatus, micAvailable } =
         await checkPermissions();
 
-      // Auto-skip if all requestable permissions are already granted
-      const micOk = !micAvailable || micStatus === 'granted';
-      const notifOk = notifStatus === 'granted';
-      if (micOk && notifOk) {
+      // Count renderable rows — a row is renderable when the permission
+      // is not yet granted AND the platform supports prompting for it.
+      const hasMicRow = micAvailable && micStatus !== 'granted';
+      const hasNotifRow =
+        Platform.OS !== 'web' && notifStatus !== 'granted';
+
+      // Auto-skip if zero renderable rows (all granted, or unsupported)
+      if (!hasMicRow && !hasNotifRow) {
         // Write flag so we never check again
         void SecureStore.setItemAsync(
           `permissionSetupSeen_${profileId}`,
@@ -600,7 +647,13 @@ In the `AppLayout` function, add the hook call after the `usePostApprovalLanding
 ```ts
 const [showPermSetup, dismissPermSetup, permState, requestMic, requestNotif] =
   usePermissionSetup(activeProfile?.id);
+
+// Pass reactive notificationGranted signal so the hook re-fires after
+// the gate grants notification permission (Issue 1 fix — see spec).
+usePushTokenRegistration(permState.notif === 'granted');
 ```
+
+**Important:** Remove the existing `usePushTokenRegistration()` call at line ~1055 — the new call above replaces it with the reactive `notificationGranted` parameter.
 
 Then add the gate render between the post-approval landing check and the tab navigator return (after line ~1191, before the `return <FeedbackProvider>` block):
 

@@ -52,12 +52,23 @@ showPermSetup?      → PermissionSetupGate    ← NEW
 
 The gate renders when ALL of these are true:
 - `permissionSetupSeen_${profileId}` is NOT `'true'` in SecureStore
-- At least one of (mic, notifications) is not yet granted
+- At least one **renderable** permission row exists (see below)
 
-If both permissions are already granted, the gate auto-dismisses (writes the SecureStore flag and skips). This means:
+A permission row is renderable when:
+- **Mic row**: speech recognition module is available (`micAvailable`) AND mic is not yet granted
+- **Notification row**: `Platform.OS !== 'web'` AND notifications are not yet granted
+
+If zero rows are renderable, the gate auto-dismisses (writes the SecureStore flag and skips). This prevents showing an empty gate on web or when all supported permissions are already granted.
+
+Auto-skip means:
 - Users who granted permissions via the onboarding interview pre-warm never see it
 - Users who upgrade from an older app version with permissions already granted skip it
 - Second profile creations on the same device skip if permissions carry over
+- Web users never see it (no native permission APIs)
+
+### Android <33 behavior note
+
+On Android API <33 (pre-Tiramisu), notification permission is granted by default — there is no runtime prompt. The notification row shows an immediate checkmark with no user action. On these devices, the gate is effectively a mic-only prompt (or auto-skips entirely if mic is also granted).
 
 ### SecureStore key
 
@@ -67,7 +78,7 @@ If both permissions are already granted, the gate auto-dismisses (writes the Sec
 
 ### Location
 
-Defined inline in `apps/mobile/src/app/(app)/_layout.tsx`, following the same pattern as `PostApprovalLanding` and `CreateProfileGate`. No separate file needed — the component is small (~80 lines).
+Defined inline in `apps/mobile/src/app/(app)/_layout.tsx`, following the same pattern as `PostApprovalLanding` and `CreateProfileGate`. The component is ~80 lines, pushing the file to ~1360 lines total. This is consistent with the existing pattern but approaching a threshold — future gates should consider extracting to a `_gates/` directory.
 
 ### Hook: `usePermissionSetup`
 
@@ -151,7 +162,20 @@ For microphone, use the same dynamic import pattern as `use-speech-recognition.t
 
 ### Interaction with existing permission code
 
-- **`usePushTokenRegistration`**: Currently runs on `AppLayout` mount (line 1055) and immediately requests notification permission via the OS dialog — before the user has any context. After this change, remove the `Notifications.requestPermissionsAsync()` call from the hook (keep only the token registration logic). The gate handles the permission request with user education. The hook should call `getPermissionsAsync()` to check status, and only proceed with token registration if already granted. This way: (a) if the gate granted notifications, the hook registers the token, (b) if the user skipped, no surprise OS dialog fires later.
+- **`usePushTokenRegistration`**: Currently runs on `AppLayout` mount (line 1055) and immediately requests notification permission via the OS dialog — before the user has any context. After this change:
+  1. Remove the `Notifications.requestPermissionsAsync()` call from the hook (keep only the token registration logic). The gate owns the permission prompt.
+  2. Add a `notificationGranted` boolean parameter to the hook. This value comes from the gate's `permState.notif === 'granted'` and is included in the effect's dependency array.
+  3. When the gate grants notification permission, `notificationGranted` flips from `false` to `true`, causing the effect to re-fire and register the push token in the same session.
+  4. The `hasRegistered` ref guard prevents duplicate registrations on subsequent re-renders.
+
+  **Why this is necessary:** The hook mounts and fires its effect *before* the gate renders. On first fire, `getPermissionsAsync()` returns `undetermined` → the hook exits. Without the reactive `notificationGranted` signal, the effect never re-fires because its only dependency (`registerPushToken`) is a stable mutation ref. The push token would not register until the next cold app launch.
+
+  Call site in `AppLayout`:
+  ```ts
+  const [showPermSetup, dismissPermSetup, permState, requestMic, requestNotif] =
+    usePermissionSetup(activeProfile?.id);
+  usePushTokenRegistration(permState.notif === 'granted');
+  ```
 - **`ChatShell` mic pre-warm**: No change needed. If mic was granted in the gate, the pre-warm is a no-op. If denied, the pre-warm still fires as before.
 
 ## Failure Modes
@@ -161,10 +185,11 @@ For microphone, use the same dynamic import pattern as `use-speech-recognition.t
 | Both permissions already granted | Returning user / second profile | Gate auto-skips, user goes straight to tabs | N/A |
 | User denies mic via OS dialog | Taps "Don't Allow" | Row stays unchecked, subtitle changes to "Tap to open Settings" | Tap row → Linking.openSettings(), AppState refresh on return |
 | User denies notifications via OS dialog | Taps "Don't Allow" | Row stays unchecked, subtitle changes to "Tap to open Settings" | Tap row → Linking.openSettings(), AppState refresh on return |
-| User skips without granting anything | Taps "Skip for now" or "Continue" | Gate dismisses, flag written | Permissions requested just-in-time later (session mount for mic, next app launch for push) |
+| User skips without granting anything | Taps "Skip for now" or "Continue" | Gate dismisses, flag written | Mic: prompted just-in-time on session mount (ChatShell pre-warm). Notifications: **no further prompt** — user must enable manually in Settings. The gate is one-shot and the hook no longer requests. |
 | SecureStore read fails | Device storage issue | Gate shows (safe default — better to show than skip) | User taps Continue, write attempt is fire-and-forget |
 | Speech recognition module unavailable | Web or device without native module | Mic row hidden, only notifications row shown | Continue button still works |
-| Both rows hidden (web, no notification support) | Web platform without native APIs | Gate auto-skips entirely | N/A |
+| Notification API unavailable (web) | `Platform.OS === 'web'` | Notification row hidden, only mic row shown (if available) | Continue button still works |
+| Zero renderable rows | Web + no speech module, or all permissions already granted | Gate auto-skips entirely (zero renderable rows → auto-dismiss) | N/A |
 
 ## Testing
 
@@ -183,7 +208,7 @@ For microphone, use the same dynamic import pattern as `use-speech-recognition.t
 
 ### Integration coverage
 
-- The `usePushTokenRegistration` hook still registers the token when called after the gate
+- The `usePushTokenRegistration` hook registers the push token reactively when `notificationGranted` flips to `true` after the gate grants permission (same session — no cold restart needed)
 - Existing permission flows (camera, ChatShell mic pre-warm) work unchanged
 
 ## Out of Scope
