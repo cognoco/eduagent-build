@@ -17,16 +17,10 @@ import {
   weeklyReportSummarySchema,
 } from '@eduagent/schemas';
 import { assertParentAccess } from './family-access';
+import { sumTopicsExplored } from './progress-helpers';
 
 function safeDelta(current: number, previous: number | undefined): number {
   return Math.max(0, current - (previous ?? 0));
-}
-
-function subjectExploredTotal(metrics: ProgressMetrics): number {
-  return metrics.subjects.reduce(
-    (sum, subject) => sum + (subject.topicsExplored ?? 0),
-    0
-  );
 }
 
 export function generateWeeklyReportData(
@@ -40,8 +34,8 @@ export function generateWeeklyReportData(
     lastWeek?.topicsMastered
   );
   const topicsExploredDelta = safeDelta(
-    subjectExploredTotal(thisWeek),
-    lastWeek ? subjectExploredTotal(lastWeek) : undefined
+    sumTopicsExplored(thisWeek),
+    lastWeek ? sumTopicsExplored(lastWeek) : undefined
   );
   const vocabularyDelta = safeDelta(
     thisWeek.vocabularyTotal,
@@ -95,7 +89,7 @@ export function generateWeeklyReportData(
           totalSessions: lastWeek.totalSessions,
           totalActiveMinutes: lastWeek.totalActiveMinutes,
           topicsMastered: lastWeek.topicsMastered,
-          topicsExplored: subjectExploredTotal(lastWeek),
+          topicsExplored: sumTopicsExplored(lastWeek),
           vocabularyTotal: lastWeek.vocabularyTotal,
           streakBest: lastWeek.longestStreak,
         }

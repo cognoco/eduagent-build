@@ -26,9 +26,8 @@ const EXTERNAL_ID_PREFIXES = ['android:id/', 'com.android.', 'com.google.'];
 // When you fix one: remove it from this set, add/restore the testID in source,
 // and update the Maestro flow if needed.
 const KNOWN_DRIFT = new Set([
-  // Coaching card testIDs removed during adaptive home refactor
-  'coaching-card',
-  'coaching-card-primary',
+  // coaching-card + coaching-card-primary: FIXED — all E2E flows updated to intent-* cards
+  // add-subject-button: FIXED — all E2E flows updated to intent-learn
   // Tab bar IDs: now captured via tabBarButtonTestID pattern extraction
   // Profile creation persona selectors
   'persona-auto-hint',
@@ -83,8 +82,6 @@ const KNOWN_DRIFT = new Set([
   'accent-swatch-indigo',
   // Parent/teen view switcher
   'switch-to-teen',
-  // Add subject button (removed from home screen)
-  'add-subject-button',
   // Password toggle on sign-in (removed or renamed in PasswordInput)
   'sign-in-password-toggle',
 ]);

@@ -217,9 +217,47 @@ export function streamSSEViaXHR(
     }
   };
 
+  // Idle timeout: reset on each progress event. Unlike XHR's built-in timeout
+  // (which counts total request time), this only fires when the server stops
+  // sending data for IDLE_TIMEOUT_MS. The server may take 20s+ for LLM
+  // streaming then another 10s for post-stream DB writes — the total easily
+  // exceeds a fixed 30s timeout, but the stream is never truly idle.
+  const IDLE_TIMEOUT_MS = 45_000;
+  let idleTimer: ReturnType<typeof setTimeout> | null = setTimeout(() => {
+    if (done) return;
+    const timeoutError = new Error(
+      'The connection timed out while waiting for a reply'
+    ) as Error & { isTimeout: boolean };
+    timeoutError.isTimeout = true;
+    streamError = timeoutError;
+    done = true;
+    xhr.abort();
+    const r = resolve;
+    resolve = null;
+    r?.();
+  }, IDLE_TIMEOUT_MS);
+
+  const resetIdleTimer = (): void => {
+    if (idleTimer) clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => {
+      if (done) return;
+      const timeoutError = new Error(
+        'The connection timed out while waiting for a reply'
+      ) as Error & { isTimeout: boolean };
+      timeoutError.isTimeout = true;
+      streamError = timeoutError;
+      done = true;
+      xhr.abort();
+      const r = resolve;
+      resolve = null;
+      r?.();
+    }, IDLE_TIMEOUT_MS);
+  };
+
   // Progressive data — fires as responseText grows
   xhr.onprogress = () => {
     if (done) return;
+    resetIdleTimer();
 
     const newData = xhr.responseText.substring(lastIndex);
     lastIndex = xhr.responseText.length;
@@ -235,6 +273,7 @@ export function streamSSEViaXHR(
   };
 
   xhr.onerror = () => {
+    if (idleTimer) clearTimeout(idleTimer);
     streamError = new Error(
       `SSE connection failed: ${xhr.statusText || 'network error'}`
     );
@@ -245,6 +284,7 @@ export function streamSSEViaXHR(
   };
 
   xhr.onloadend = () => {
+    if (idleTimer) clearTimeout(idleTimer);
     // If headers-received handler already flagged an error, enrich it with the
     // full response body (now available) and extract any structured error code.
     if (streamError && xhr.status >= 400) {
@@ -369,19 +409,10 @@ export function streamSSEViaXHR(
 
   // Text mode — required for incremental responseText access
   xhr.responseType = '';
-  // 30s timeout — prevents indefinite hangs if server stalls mid-stream
-  xhr.timeout = 30_000;
-  xhr.ontimeout = () => {
-    const timeoutError = new Error(
-      'The connection timed out while waiting for a reply'
-    ) as Error & { isTimeout: boolean };
-    timeoutError.isTimeout = true;
-    streamError = timeoutError;
-    done = true;
-    const r = resolve;
-    resolve = null;
-    r?.();
-  };
+  // No XHR.timeout — we use the idle timer above instead, which resets on
+  // every onprogress event. XHR.timeout counts total request time and would
+  // fire prematurely when the server does post-stream work (extractSignals,
+  // DB writes) after LLM streaming finishes.
   xhr.send(options.body ?? null);
 
   async function* generateEvents(): AsyncGenerator<StreamEvent> {

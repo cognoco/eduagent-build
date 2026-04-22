@@ -24,17 +24,17 @@ tags:
       id: "learner-screen"
     timeout: 15000
 
-# 3. Coaching card present
+# 3. Intent card stack present (replaced coaching card in adaptive home refactor)
 - assertVisible:
-    id: "coaching-card"
+    id: "learner-intent-stack"
 
-# 4. Coaching card has primary action
+# 4. Continue intent card visible (learning-active seed has an active subject)
 - assertVisible:
-    id: "coaching-card-primary"
+    id: "intent-continue"
 
-# 5. Tap primary action → start session
+# 5. Tap continue → start session
 - tapOn:
-    id: "coaching-card-primary"
+    id: "intent-continue"
 
 # 6. Session screen loads (chat input visible)
 - extendedWaitUntil:

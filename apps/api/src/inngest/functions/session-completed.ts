@@ -35,6 +35,7 @@ import {
   buildBrowseHighlight,
   generateSessionInsights,
 } from '../../services/session-highlights';
+import { generateLearnerRecap } from '../../services/session-recap';
 import {
   curriculumTopics,
   learningSessions,
@@ -668,6 +669,59 @@ export const sessionCompleted = inngest.createFunction(
               narrative,
               conversationPrompt,
               engagementSignal,
+              updatedAt: new Date(),
+            })
+            .where(eq(sessionSummaries.id, summaryRow.id));
+        })
+      )
+    );
+
+    outcomes.push(
+      await step.run('generate-learner-recap', async () =>
+        runIsolated('generate-learner-recap', profileId, async () => {
+          const db = getStepDatabase();
+
+          const [summaryRow] = await db
+            .select({ id: sessionSummaries.id })
+            .from(sessionSummaries)
+            .where(
+              and(
+                eq(sessionSummaries.sessionId, sessionId),
+                eq(sessionSummaries.profileId, profileId)
+              )
+            )
+            .limit(1);
+
+          if (!summaryRow || !subjectId) {
+            return;
+          }
+
+          const [profile] = await db
+            .select({ birthYear: profiles.birthYear })
+            .from(profiles)
+            .where(eq(profiles.id, profileId))
+            .limit(1);
+
+          const recap = await generateLearnerRecap(db, {
+            sessionId,
+            profileId,
+            topicId: topicId ?? null,
+            subjectId,
+            exchangeCount: exchangeCount ?? 0,
+            birthYear: profile?.birthYear ?? null,
+          });
+
+          if (!recap) {
+            return;
+          }
+
+          await db
+            .update(sessionSummaries)
+            .set({
+              closingLine: recap.closingLine,
+              learnerRecap: recap.learnerRecap,
+              nextTopicId: recap.nextTopicId,
+              nextTopicReason: recap.nextTopicReason,
               updatedAt: new Date(),
             })
             .where(eq(sessionSummaries.id, summaryRow.id));

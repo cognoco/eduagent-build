@@ -28,10 +28,10 @@ tags:
 - tapOn:
     text: "More"
 
-# 4. Wait for settings screen
+# 4. Wait for settings screen — Learning Mode is always above the fold
 - extendedWaitUntil:
     visible:
-      text: "Appearance"
+      id: "learning-mode-casual"
     timeout: 10000
 
 # 5. Look for profile section

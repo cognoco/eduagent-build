@@ -16,24 +16,11 @@ import {
 import { generateWeeklyReportData } from '../../services/weekly-report';
 import { captureException } from '../../services/sentry';
 
-function isoDate(date: Date): string {
-  return date.toISOString().slice(0, 10);
-}
-
-function subtractDays(date: Date, days: number): Date {
-  const result = new Date(date);
-  result.setUTCDate(result.getUTCDate() - days);
-  return result;
-}
-
-function sumTopicsExplored(metrics: {
-  subjects: Array<{ topicsExplored?: number }>;
-}): number {
-  return metrics.subjects.reduce(
-    (sum, subject) => sum + (subject.topicsExplored ?? 0),
-    0
-  );
-}
+import {
+  isoDate,
+  subtractDays,
+  sumTopicsExplored,
+} from '../../services/progress-helpers';
 
 // [FR239.1 UX-9] Returns true when 09:00 local time matches the UTC hour of nowUtc.
 // Parents with no timezone (or an invalid one) fall back to UTC, so they are
@@ -185,7 +172,8 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
               ? new Date(`${latest.snapshotDate}T00:00:00Z`).getTime() -
                 new Date(`${previous.snapshotDate}T00:00:00Z`).getTime()
               : 0;
-          const cappedPrevious = snapshotGapMs <= MAX_SNAPSHOT_GAP_MS ? previous : null;
+          const cappedPrevious =
+            snapshotGapMs <= MAX_SNAPSHOT_GAP_MS ? previous : null;
 
           const child = await db.query.profiles.findFirst({
             where: eq(profiles.id, link.childProfileId),
@@ -196,7 +184,8 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
           const topicDelta = cappedPrevious
             ? Math.max(
                 0,
-                latest.metrics.topicsMastered - cappedPrevious.metrics.topicsMastered
+                latest.metrics.topicsMastered -
+                  cappedPrevious.metrics.topicsMastered
               )
             : null;
           const vocabDelta = cappedPrevious

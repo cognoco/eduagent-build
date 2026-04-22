@@ -285,15 +285,18 @@ function interpretInterviewResponse(params: {
 export async function processInterviewExchange(
   context: InterviewContext,
   userMessage: string,
-  options?: { exchangeCount?: number; profileId?: string }
+  options?: { exchangeCount?: number; profileId?: string; learnerName?: string }
 ): Promise<InterviewResult> {
   const focusLine = context.bookTitle
     ? `\nFocus area: <book_title>${context.bookTitle}</book_title>\nScope your questions to this specific focus area within the subject, not the entire subject.`
     : '';
+  const nameLine = options?.learnerName
+    ? `\nThe learner's name is ${options.learnerName}. Use it naturally — occasionally in greetings or when giving feedback, but do not overuse it.`
+    : '';
   const messages: ChatMessage[] = [
     {
       role: 'system',
-      content: `${INTERVIEW_SYSTEM_PROMPT}\n\nSubject: <subject_name>${context.subjectName}</subject_name>${focusLine}`,
+      content: `${INTERVIEW_SYSTEM_PROMPT}\n\nSubject: <subject_name>${context.subjectName}</subject_name>${focusLine}${nameLine}`,
     },
     // Re-wrap assistant turns in the interview envelope so history is
     // consistent with the JSON format the system prompt demands. DB stores
@@ -346,7 +349,7 @@ export async function processInterviewExchange(
 export async function streamInterviewExchange(
   context: InterviewContext,
   userMessage: string,
-  options?: { exchangeCount?: number; profileId?: string }
+  options?: { exchangeCount?: number; profileId?: string; learnerName?: string }
 ): Promise<{
   stream: AsyncIterable<string>;
   onComplete: (fullResponse: string) => Promise<InterviewResult>;
@@ -354,10 +357,13 @@ export async function streamInterviewExchange(
   const focusLine = context.bookTitle
     ? `\nFocus area: <book_title>${context.bookTitle}</book_title>\nScope your questions to this specific focus area within the subject, not the entire subject.`
     : '';
+  const nameLine = options?.learnerName
+    ? `\nThe learner's name is ${options.learnerName}. Use it naturally — occasionally in greetings or when giving feedback, but do not overuse it.`
+    : '';
   const messages: ChatMessage[] = [
     {
       role: 'system',
-      content: `${INTERVIEW_SYSTEM_PROMPT}\n\nSubject: <subject_name>${context.subjectName}</subject_name>${focusLine}`,
+      content: `${INTERVIEW_SYSTEM_PROMPT}\n\nSubject: <subject_name>${context.subjectName}</subject_name>${focusLine}${nameLine}`,
     },
     // Re-wrap assistant turns — same rationale as processInterviewExchange.
     ...context.exchangeHistory.map((e) => ({

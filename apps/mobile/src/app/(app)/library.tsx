@@ -263,26 +263,10 @@ export default function LibraryScreen() {
     }
   };
 
-  // BUG-342: Derive session mode from retention — forgotten/weak topics
-  // open in relearn mode so the AI uses spaced-repetition pedagogy.
-  const openTopic = (
-    topicId: string,
-    subjectId: string,
-    retention?: RetentionStatus,
-    topicName?: string
-  ): void => {
-    const mode =
-      retention === 'weak' || retention === 'forgotten'
-        ? 'relearn'
-        : 'learning';
+  const openTopic = (topicId: string, subjectId: string): void => {
     router.push({
-      pathname: '/(app)/session',
-      params: {
-        mode,
-        subjectId,
-        topicId,
-        ...(topicName ? { topicName } : {}),
-      },
+      pathname: '/(app)/topic/[topicId]',
+      params: { topicId, subjectId },
     } as never);
   };
 
@@ -407,9 +391,7 @@ export default function LibraryScreen() {
             noteTopicIds={noteIdSet}
             state={topicsTabState}
             onStateChange={setTopicsTabState}
-            onTopicPress={(topicId, subjectId, retention, topicName) =>
-              openTopic(topicId, subjectId, retention, topicName)
-            }
+            onTopicPress={(topicId, subjectId) => openTopic(topicId, subjectId)}
             onAddSubject={() => router.push('/create-subject')}
           />
         )}

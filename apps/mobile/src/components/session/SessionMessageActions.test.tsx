@@ -35,6 +35,20 @@ describe('SessionMessageActions stage gating', () => {
     expect(queryByTestId('quick-chip-too_hard')).toBeTruthy();
     // Feedback buttons render when eventId is present
     expect(queryByTestId(`message-feedback-helpful-evt-1`)).toBeTruthy();
+    expect(queryByTestId('bookmark-toggle-evt-1')).toBeNull();
+  });
+
+  it('renders bookmark toggle when bookmark props are provided', () => {
+    const { queryByTestId } = render(
+      <SessionMessageActions
+        {...defaultProps}
+        stage="teaching"
+        bookmarkState={{ 'evt-1': null }}
+        onToggleBookmark={jest.fn()}
+      />
+    );
+
+    expect(queryByTestId('bookmark-toggle-evt-1')).toBeTruthy();
   });
 
   it('hides chips and feedback when stage is greeting', () => {

@@ -33,9 +33,9 @@ tags:
       id: "learner-screen"
     timeout: 15000
 
-# 3. Navigate to freeform session (no pre-selected subject)
+# 3. Navigate to freeform session via intent-ask (replaced coaching-card-primary)
 - tapOn:
-    id: "coaching-card-primary"
+    id: "intent-ask"
 
 # 4. Wait for the chat input to be visible
 - extendedWaitUntil:

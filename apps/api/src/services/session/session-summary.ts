@@ -3,7 +3,11 @@
 // ---------------------------------------------------------------------------
 
 import { eq, and } from 'drizzle-orm';
-import { sessionSummaries, type Database } from '@eduagent/database';
+import {
+  curriculumTopics,
+  sessionSummaries,
+  type Database,
+} from '@eduagent/database';
 import type { SessionSummary, SummarySubmitInput } from '@eduagent/schemas';
 import { createPendingSessionSummary, evaluateSummary } from '../summaries';
 import { getSubject } from '../subject';
@@ -17,7 +21,25 @@ export async function getSessionSummary(
   sessionId: string
 ): Promise<SessionSummary | null> {
   const row = await findSessionSummaryRow(db, profileId, sessionId);
-  return row ? mapSummaryRow(row) : null;
+  if (!row) {
+    return null;
+  }
+
+  const summary = mapSummaryRow(row);
+  if (!row.nextTopicId) {
+    return summary;
+  }
+
+  const [topic] = await db
+    .select({ title: curriculumTopics.title })
+    .from(curriculumTopics)
+    .where(eq(curriculumTopics.id, row.nextTopicId))
+    .limit(1);
+
+  return {
+    ...summary,
+    nextTopicTitle: topic?.title ?? null,
+  };
 }
 
 export async function skipSummary(

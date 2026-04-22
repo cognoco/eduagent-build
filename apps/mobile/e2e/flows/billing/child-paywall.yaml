@@ -63,10 +63,10 @@ tags:
 # 4. Navigate to More tab
 - tapOn: "More Tab"
 
-# 5. Wait for More screen
+# 5. Wait for More screen — Learning Mode section is always above the fold
 - extendedWaitUntil:
     visible:
-      text: "Appearance"
+      id: "learning-mode-casual"
     timeout: 15000
 
 # 6. Scroll to Subscription (may be below fold after switch-to-child scrolled to Profile)

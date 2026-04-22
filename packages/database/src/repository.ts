@@ -11,6 +11,7 @@ import {
   streaks,
   sessionEvents,
   sessionSummaries,
+  bookmarks,
   needsDeepeningTopics,
   onboardingDrafts,
   parkingLotItems,
@@ -141,6 +142,19 @@ export function createScopedRepository(db: Database, profileId: string) {
       async findFirst(extraWhere?: SQL) {
         return db.query.sessionSummaries.findFirst({
           where: scopedWhere(sessionSummaries, extraWhere),
+        });
+      },
+    },
+
+    bookmarks: {
+      async findMany(extraWhere?: SQL) {
+        return db.query.bookmarks.findMany({
+          where: scopedWhere(bookmarks, extraWhere),
+        });
+      },
+      async findFirst(extraWhere?: SQL) {
+        return db.query.bookmarks.findFirst({
+          where: scopedWhere(bookmarks, extraWhere),
         });
       },
     },

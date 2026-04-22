@@ -131,6 +131,17 @@ jest.mock('../../../../../hooks/use-subjects', () => ({
   }),
 }));
 
+// --- useRetentionTopics ---
+
+const mockUseRetentionTopics = jest.fn((): any => ({
+  data: { topics: [], reviewDueCount: 0 },
+  isLoading: false,
+}));
+
+jest.mock('../../../../../hooks/use-retention', () => ({
+  useRetentionTopics: () => mockUseRetentionTopics(),
+}));
+
 // --- useCurriculum ---
 
 const mockUseCurriculum = jest.fn((): any => ({
@@ -423,12 +434,11 @@ describe('BookScreen', () => {
   // -----------------------------------------------------------------------
   it('renders suggestion cards from pre-generated topics', () => {
     // No API suggestions, but 2 uncovered topics exist
-    const { getByTestId, getByText } = render(<BookScreen />);
+    const { getByTestId } = render(<BookScreen />);
     // Topics are not yet completed so they show as suggestion cards
+    // Note: topic names also appear in the CollapsibleChapter list, so use testIDs
     expect(getByTestId('suggestion-topic-1')).toBeTruthy();
-    expect(getByText('Linear Equations')).toBeTruthy();
     expect(getByTestId('suggestion-topic-2')).toBeTruthy();
-    expect(getByText('Quadratic Equations')).toBeTruthy();
   });
 
   it('renders API suggestions ahead of pre-generated topics', () => {
@@ -739,7 +749,7 @@ describe('BookScreen', () => {
     });
   });
 
-  it('back button goes to library for single-book subjects (avoids shelf dead-end)', () => {
+  it('back button goes to shelf even for single-book subjects (auto-skip removed)', () => {
     mockCanGoBack.mockReturnValue(false);
     mockUseBooks.mockReturnValue({
       data: [{ id: 'book-1', title: 'Only Book', topicsGenerated: true }],
@@ -748,7 +758,10 @@ describe('BookScreen', () => {
 
     const { getByTestId } = render(<BookScreen />);
     fireEvent.press(getByTestId('book-back'));
-    expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
+    expect(mockReplace).toHaveBeenCalledWith({
+      pathname: '/(app)/shelf/[subjectId]',
+      params: { subjectId: 'sub-1' },
+    });
   });
 
   // -----------------------------------------------------------------------

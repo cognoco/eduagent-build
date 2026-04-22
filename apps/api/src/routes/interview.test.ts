@@ -55,6 +55,7 @@ jest.mock('../services/profile', () => ({
     location: null,
     consentStatus: 'CONSENTED',
   }),
+  getProfileDisplayName: jest.fn().mockResolvedValue('Test User'),
 }));
 
 // ---------------------------------------------------------------------------
@@ -294,6 +295,7 @@ describe('interview routes', () => {
         expect.objectContaining({
           exchangeCount: 1,
           profileId: expect.any(String),
+          learnerName: 'Test User',
         })
       );
     });
@@ -471,6 +473,7 @@ describe('interview routes', () => {
         expect.objectContaining({
           exchangeCount: 1,
           profileId: expect.any(String),
+          learnerName: 'Test User',
         })
       );
       // The non-streaming variant should not be called

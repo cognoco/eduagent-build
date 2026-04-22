@@ -169,7 +169,7 @@ export default function RelearnScreen() {
           Missing required parameters. Please go back and try again.
         </Text>
         <Pressable
-          onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
+          onPress={() => goBackOrReplace(router, '/(app)/library' as const)}
           className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center"
           accessibilityRole="button"
           accessibilityLabel="Go back"
@@ -188,7 +188,7 @@ export default function RelearnScreen() {
       {/* Header */}
       <View className="px-5 pt-4 pb-3 flex-row items-center">
         <Pressable
-          onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
+          onPress={() => goBackOrReplace(router, '/(app)/library' as const)}
           className="me-3 p-2 min-h-[44px] min-w-[44px] items-center justify-center"
           testID="relearn-back"
           accessibilityLabel="Go back"

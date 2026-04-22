@@ -9,6 +9,7 @@ import {
   MagicPenAnimation,
 } from '../../../../../components/common';
 import { SuggestionCard } from '../../../../../components/library/SuggestionCard';
+import { CollapsibleChapter } from '../../../../../components/library/CollapsibleChapter';
 import { SessionRow } from '../../../../../components/library/SessionRow';
 import { ChapterDivider } from '../../../../../components/library/ChapterDivider';
 import {
@@ -23,9 +24,11 @@ import {
 import { useMoveTopic } from '../../../../../hooks/use-move-topic';
 import { useTopicSuggestions } from '../../../../../hooks/use-topic-suggestions';
 import { useBookNotes } from '../../../../../hooks/use-notes';
+import { useRetentionTopics } from '../../../../../hooks/use-retention';
 import { useCurriculum } from '../../../../../hooks/use-curriculum';
 import { useSubjects } from '../../../../../hooks/use-subjects';
 import { InlineNoteCard } from '../../../../../components/library/InlineNoteCard';
+import type { RetentionStatus } from '../../../../../components/progress/RetentionSignal';
 import { formatApiError } from '../../../../../lib/format-api-error';
 import { formatRelativeDate } from '../../../../../lib/format-relative-date';
 import { goBackOrReplace } from '../../../../../lib/navigation';
@@ -60,6 +63,59 @@ function groupSessionsByChapter(sessions: BookSession[]): GroupedChapter[] {
   return Array.from(map.entries()).map(([chapter, items]) => ({
     chapter,
     sessions: items,
+  }));
+}
+
+// ---------------------------------------------------------------------------
+// Retention helpers
+// ---------------------------------------------------------------------------
+
+function deriveTopicRetentionStatus(
+  card:
+    | {
+        easeFactor: number;
+        repetitions: number;
+        xpStatus: string;
+        nextReviewAt?: string | null;
+        failureCount?: number;
+      }
+    | null
+    | undefined
+): RetentionStatus {
+  if (!card) return 'weak';
+  if ((card.failureCount ?? 0) >= 3 || card.xpStatus === 'decayed')
+    return 'forgotten';
+  if (card.repetitions === 0) return 'weak';
+  if (!card.nextReviewAt) return 'weak';
+  const now = Date.now();
+  const reviewAt = new Date(card.nextReviewAt).getTime();
+  const daysUntilReview = (reviewAt - now) / (1000 * 60 * 60 * 24);
+  if (daysUntilReview > 3) return 'strong';
+  if (daysUntilReview > 0) return 'fading';
+  return 'weak';
+}
+
+interface GroupedTopicChapter {
+  chapter: string;
+  topics: CurriculumTopic[];
+}
+
+function groupTopicsByChapter(
+  topics: CurriculumTopic[]
+): GroupedTopicChapter[] {
+  const map = new Map<string, CurriculumTopic[]>();
+  for (const t of topics) {
+    const key = t.chapter ?? 'Topics';
+    const group = map.get(key);
+    if (group) {
+      group.push(t);
+    } else {
+      map.set(key, [t]);
+    }
+  }
+  return Array.from(map.entries()).map(([chapter, chapterTopics]) => ({
+    chapter,
+    topics: [...chapterTopics].sort((a, b) => a.sortOrder - b.sortOrder),
   }));
 }
 
@@ -99,30 +155,18 @@ export default function BookScreen() {
   const generateMutation = useGenerateBookTopics(subjectId, bookId);
   const curriculumQuery = useCurriculum(subjectId);
   const hasCurriculum = (curriculumQuery.data?.topics?.length ?? 0) > 0;
+  const retentionTopicsQuery = useRetentionTopics(subjectId ?? '');
   const subjectsQuery = useSubjects();
   const subjectName = subjectsQuery.data?.find((s) => s.id === subjectId)?.name;
   const allBooksQuery = useBooks(subjectId);
   const moveTopic = useMoveTopic();
 
   const handleBack = useCallback(() => {
-    const books = Array.isArray(allBooksQuery.data) ? allBooksQuery.data : null;
-
-    // Single-book shelf (or books not loaded yet): go to library directly.
-    // Do NOT use router.back() — it can land on the shelf's single-book
-    // placeholder (empty View dead-end). The shelf's auto-skip used
-    // router.replace which doesn't reliably remove the shelf from the
-    // back stack, and autoSkippedRef blocks re-redirect, so back() → blank.
-    if (books === null || books.length <= 1) {
-      router.replace('/(app)/library' as never);
-      return;
-    }
-
-    // Multi-book shelf: navigate to the shelf screen to show all books.
     goBackOrReplace(router, {
       pathname: '/(app)/shelf/[subjectId]',
       params: { subjectId },
     } as never);
-  }, [router, subjectId, allBooksQuery.data]);
+  }, [router, subjectId]);
 
   // --- Generation auto-trigger ---
   const [genPhase, setGenPhase] = useState<GenerationPhase>('idle');
@@ -243,6 +287,29 @@ export default function BookScreen() {
       ),
     [notes]
   );
+  // --- Retention per topic (for chapter list retention signals) ---
+  const topicRetentionRecord = useMemo((): Record<string, RetentionStatus> => {
+    const retentionTopics = retentionTopicsQuery.data?.topics ?? [];
+    const record: Record<string, RetentionStatus> = {};
+    for (const rt of retentionTopics) {
+      record[rt.topicId] = deriveTopicRetentionStatus(rt);
+    }
+    return record;
+  }, [retentionTopicsQuery.data]);
+
+  // Topics that have been studied at least once (repetitions > 0)
+  const topicStudiedIds = useMemo((): Set<string> => {
+    const retentionTopics = retentionTopicsQuery.data?.topics ?? [];
+    const ids = new Set<string>();
+    for (const rt of retentionTopics) {
+      if (rt.repetitions > 0) ids.add(rt.topicId);
+    }
+    return ids;
+  }, [retentionTopicsQuery.data]);
+
+  // --- Topics grouped by chapter for the chapter list ---
+  const groupedChapters = useMemo(() => groupTopicsByChapter(topics), [topics]);
+
   // --- Sessions data ---
   const sessions = sessionsQuery.data ?? [];
   const sessionCount = sessions.length;
@@ -292,6 +359,23 @@ export default function BookScreen() {
     const combined = [...apiSuggestions, ...preGenerated].slice(0, 2);
     return combined;
   }, [suggestionsQuery.data, topics, completedTopicIds]);
+
+  // First pre-generated topic suggestion — used to highlight "Next" in chapter list
+  const suggestedNextId = useMemo(
+    () => suggestionCards.find((c) => c.type === 'topic')?.id,
+    [suggestionCards]
+  );
+
+  // --- Topic press: navigate to Topic Detail ---
+  const handleTopicPress = useCallback(
+    (topicId: string) => {
+      router.push({
+        pathname: '/(app)/topic/[topicId]',
+        params: { topicId, subjectId },
+      } as never);
+    },
+    [router, subjectId]
+  );
 
   // --- Session list grouped by chapter ---
   const groupedSessions = useMemo(
@@ -733,6 +817,31 @@ export default function BookScreen() {
                 />
               ))}
             </View>
+          </View>
+        )}
+
+        {/* Chapter / topic list — always visible once topics are loaded */}
+        {groupedChapters.length > 0 && !needsGeneration && (
+          <View className="px-5 mb-4">
+            <Text className="text-body-sm font-semibold text-text-secondary mb-2 uppercase tracking-wide">
+              Topics
+            </Text>
+            {groupedChapters.map((group, index) => (
+              <CollapsibleChapter
+                key={group.chapter}
+                title={group.chapter}
+                topics={group.topics}
+                completedCount={
+                  group.topics.filter((t) => topicStudiedIds.has(t.id)).length
+                }
+                initiallyExpanded={index === 0}
+                suggestedNextId={suggestedNextId}
+                onTopicPress={handleTopicPress}
+                noteTopicIds={noteTopicIds}
+                onNotePress={handleTopicPress}
+                topicRetention={topicRetentionRecord}
+              />
+            ))}
           </View>
         )}
 

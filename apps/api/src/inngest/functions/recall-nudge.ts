@@ -85,10 +85,16 @@ export const recallNudge = inngest.createFunction(
             // Prevents double fan-out if Inngest retries the step or the cron
             // fires a second run while a previous one is still in progress.
             notExists(
-              sql`SELECT 1 FROM ${notificationLog} nl
-                  WHERE nl.profile_id = ${profiles.id}
-                    AND nl.type = 'recall_nudge'
-                    AND nl.sent_at >= (NOW() AT TIME ZONE COALESCE(${accounts.timezone}, 'UTC'))::date`
+              db
+                .select({ _: sql`1` })
+                .from(notificationLog)
+                .where(
+                  and(
+                    eq(notificationLog.profileId, profiles.id),
+                    eq(notificationLog.type, 'recall_nudge'),
+                    sql`${notificationLog.sentAt} >= (NOW() AT TIME ZONE COALESCE(${accounts.timezone}, 'UTC'))::date`
+                  )
+                )
             )
           )
         )

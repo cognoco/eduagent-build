@@ -354,6 +354,21 @@ export async function getProfileAge(
 }
 
 /**
+ * Returns the learner's display name. Used to personalise LLM prompts.
+ * Returns undefined if the profile doesn't exist.
+ */
+export async function getProfileDisplayName(
+  db: Database,
+  profileId: string
+): Promise<string | undefined> {
+  const profile = await db.query.profiles.findFirst({
+    where: eq(profiles.id, profileId),
+    columns: { displayName: true },
+  });
+  return profile?.displayName;
+}
+
+/**
  * Resolves a profile's AgeBracket for passing to LLM safety-preamble calls.
  * Returns `'adult'` (the conservative minor-safe default) if birthYear is unset.
  */

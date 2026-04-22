@@ -15,22 +15,23 @@ import {
 import type { ProgressMetrics } from '@eduagent/schemas';
 import { and, eq, like, sql } from 'drizzle-orm';
 
-const mockSendPushNotification = jest.fn();
-const mockCaptureException = jest.fn();
-
-jest.mock('../../services/notifications', () => ({
-  sendPushNotification: (...args: unknown[]) =>
-    mockSendPushNotification(...args),
-}));
-
-jest.mock('../../services/sentry', () => ({
-  captureException: (...args: unknown[]) => mockCaptureException(...args),
-}));
-
 import {
   weeklyProgressPushCron,
   weeklyProgressPushGenerate,
 } from './weekly-progress-push';
+
+// ── Fetch interceptor for Expo Push API ──────────────────────────────
+// Instead of jest.mock on internal modules, intercept at the HTTP boundary.
+// This exercises the full sendPushNotification pipeline (token lookup, daily
+// cap check, notification logging) while mocking only the external Expo API.
+const EXPO_PUSH_API_URL = 'https://exp.host/--/api/v2/push/send';
+const pushApiCalls: Array<{
+  to: string;
+  title: string;
+  body: string;
+  data: unknown;
+}> = [];
+const originalFetch = globalThis.fetch;
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 
@@ -311,21 +312,40 @@ beforeAll(async () => {
 
   db = createDatabase(databaseUrl);
   await ensureWeeklyReportsTable();
-});
+
+  // Intercept Expo Push API calls at the fetch level
+  globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === 'string' ? input : input.toString();
+    if (url === EXPO_PUSH_API_URL) {
+      const body = init?.body
+        ? (JSON.parse(init.body as string) as Record<string, unknown>)
+        : {};
+      pushApiCalls.push({
+        to: body.to as string,
+        title: body.title as string,
+        body: body.body as string,
+        data: body.data,
+      });
+      return new Response(
+        JSON.stringify({ data: { id: 'ticket-integration', status: 'ok' } }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+    return originalFetch(input, init);
+  };
+}, 30_000);
 
 beforeEach(() => {
   jest.clearAllMocks();
-  mockSendPushNotification.mockResolvedValue({
-    sent: true,
-    ticketId: 'ticket-1',
-  });
+  pushApiCalls.length = 0;
 });
 
 afterAll(async () => {
+  globalThis.fetch = originalFetch;
   await db
     .delete(accounts)
     .where(like(accounts.clerkUserId, `clerk_weekly_push_${RUN_ID}%`));
-});
+}, 30_000);
 
 describe('weekly progress push integration', () => {
   it('queues only parents whose real account timezone resolves to local 9am', async () => {
@@ -347,14 +367,21 @@ describe('weekly progress push integration', () => {
 
     const { result, step } = await executeCronSteps();
 
-    expect(result).toEqual({ status: 'completed', queuedParents: 1 });
-    expect(step.sendEvent).toHaveBeenCalledTimes(1);
-    expect(step.sendEvent).toHaveBeenCalledWith('fan-out-weekly-progress-0', [
-      expect.objectContaining({
-        name: 'app/weekly-progress-push.generate',
-        data: { parentId: queuedParentId },
-      }),
-    ]);
+    // The exact count may exceed 1 when other accounts in the shared DB
+    // happen to match the 9am timezone window. Assert the test-created parent
+    // was included and the non-matching one was excluded (below).
+    expect(result.status).toBe('completed');
+    expect(result.queuedParents).toBeGreaterThanOrEqual(1);
+    expect(step.sendEvent).toHaveBeenCalled();
+    expect(step.sendEvent).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: 'app/weekly-progress-push.generate',
+          data: { parentId: queuedParentId },
+        }),
+      ])
+    );
     expect(step.sendEvent).not.toHaveBeenCalledWith(
       expect.any(String),
       expect.arrayContaining([
@@ -375,6 +402,7 @@ describe('weekly progress push integration', () => {
       timezone: 'UTC',
     });
     await seedFamilyLink(parentProfileId, childProfileId);
+    await seedWeeklyPushPrefs(parentProfileId);
 
     const today = new Date();
     const latestSnapshotDate = isoDate(today);
@@ -419,17 +447,16 @@ describe('weekly progress push integration', () => {
 
     const result = await executeGenerateHandler(parentProfileId);
 
-    expect(mockCaptureException.mock.calls[0]?.[0]).toBeUndefined();
     expect(result).toEqual({ status: 'completed', parentId: parentProfileId });
-    expect(mockSendPushNotification).toHaveBeenCalledWith(
-      expect.anything(),
+    expect(pushApiCalls).toHaveLength(1);
+    expect(pushApiCalls[0]).toEqual(
       expect.objectContaining({
-        profileId: parentProfileId,
+        to: 'ExponentPushToken[integration]',
         title: 'Weekly learning progress',
         body: expect.stringContaining(
           'Emma: +4 topics, +10 words, +2 explored'
         ),
-        type: 'weekly_progress',
+        data: { type: 'weekly_progress' },
       })
     );
 
@@ -469,7 +496,7 @@ describe('weekly progress push integration', () => {
       reason: 'no_children',
       parentId: parentProfileId,
     });
-    expect(mockSendPushNotification).not.toHaveBeenCalled();
+    expect(pushApiCalls).toHaveLength(0);
   });
 
   it('skips children with no snapshots but still pushes for children that have activity', async () => {
@@ -488,6 +515,7 @@ describe('weekly progress push integration', () => {
 
     await seedFamilyLink(parentProfileId, childWithDataId);
     await seedFamilyLink(parentProfileId, childWithoutDataId);
+    await seedWeeklyPushPrefs(parentProfileId);
 
     const today = new Date();
     const latestSnapshotDate = isoDate(today);
@@ -520,12 +548,10 @@ describe('weekly progress push integration', () => {
 
     const result = await executeGenerateHandler(parentProfileId);
 
-    expect(mockCaptureException.mock.calls[0]?.[0]).toBeUndefined();
     expect(result).toEqual({ status: 'completed', parentId: parentProfileId });
-    expect(mockSendPushNotification).toHaveBeenCalledTimes(1);
-    const body = mockSendPushNotification.mock.calls[0]?.[1]?.body as string;
-    expect(body).toContain('Alice');
-    expect(body).not.toContain('Bob');
+    expect(pushApiCalls).toHaveLength(1);
+    expect(pushApiCalls[0]!.body).toContain('Alice');
+    expect(pushApiCalls[0]!.body).not.toContain('Bob');
 
     const storedReports = await db.query.weeklyReports.findMany({
       where: eq(weeklyReports.profileId, parentProfileId),

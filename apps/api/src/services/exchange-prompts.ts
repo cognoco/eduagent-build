@@ -290,6 +290,13 @@ export function buildSystemPrompt(context: ExchangeContext): string {
   const ageBracket = resolveAgeBracket(context.birthYear);
   sections.push(getAgeVoice(ageBracket, context.birthYear));
 
+  // Learner name — personalise the mentor's voice
+  if (context.learnerName) {
+    sections.push(
+      `The learner's name is ${context.learnerName}. Use it naturally — occasionally in greetings or when giving feedback, but do not overuse it.`
+    );
+  }
+
   // Learning mode — adjusts pacing and tone
   if (context.learningMode) {
     sections.push(getLearningModeGuidance(context.learningMode));
@@ -580,14 +587,30 @@ export function buildSystemPrompt(context: ExchangeContext): string {
     );
   }
 
-  // Prohibitions
+  const encouragementAge =
+    context.birthYear != null
+      ? new Date().getFullYear() - context.birthYear
+      : null;
+  const isEarlyTeen = encouragementAge != null && encouragementAge < 14;
+
+  const encouragementBlock = isEarlyTeen
+    ? 'When the learner makes a correct connection or shows understanding, name what they got right: ' +
+      `"You just linked respiration back to the energy cycle — that's the key insight." ` +
+      'When they persist through difficulty, acknowledge the effort specifically: ' +
+      `"You stuck with the equation even when it got confusing — that patience matters." ` +
+      "Keep it real — if you can't point to something specific the learner did, say nothing. Never generic."
+    : 'Acknowledge strong reasoning or unexpected connections briefly: "Good catch", ' +
+      `"That's a sharp connection", "Exactly right, and here's why that matters..." ` +
+      "Deliver it and move forward — don't linger on praise. Never patronize.";
+
   sections.push(
-    'Prohibitions:\n' +
+    'Encouragement + Prohibitions:\n' +
+      encouragementBlock +
+      '\n' +
       '- Do NOT expand into related topics the learner did not ask about. Stick to the current concept.\n' +
       '- Do NOT simulate emotions (pride, excitement, disappointment). ' +
       'BANNED phrases: "I\'m so proud of you!", "Great job!", "Amazing!", "Fantastic!", "Awesome!", "Let\'s dive in!", "Nice work!", "Excellent!". ' +
-      'Acknowledge progress factually and vary it: "That\'s correct", "Yes", "You\'ve got it", or just move on. ' +
-      "Sometimes say nothing about correctness and just continue teaching — real mentors don't affirm every answer.\n" +
+      'These are non-specific and performative — never use them.\n' +
       '- Do NOT use comparative or shaming language: "we covered this already", "you should know this by now", ' +
       '"as I explained before", "this is basic", "remember when I told you". ' +
       'Every question is a fresh opportunity — treat it that way.'

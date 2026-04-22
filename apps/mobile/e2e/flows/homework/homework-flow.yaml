@@ -25,12 +25,10 @@ tags:
       id: "learner-screen"
     timeout: 15000
 
-# 3. Navigate to homework via coaching card primary action.
-#    The homework-ready scenario seeds an active homework coaching card.
-#    Tapping coaching-card-primary starts a homework session directly,
-#    bypassing the camera screen entirely.
+# 3. Navigate to homework via intent card (replaced coaching-card-primary).
+#    The homework-ready scenario seeds homework intent.
 - tapOn:
-    id: "coaching-card-primary"
+    id: "intent-homework"
 
 # 4. Camera permission dialog may appear — dismiss it
 - tapOn:

@@ -33,13 +33,13 @@ tags:
       id: "learner-screen"
     timeout: 60000
 
-# 3. Look for review prompt on home screen (coaching card or banner)
+# 3. Intent card stack should be visible (replaced coaching card)
 - assertVisible:
-    id: "coaching-card"
+    id: "learner-intent-stack"
 
-# 4. Tap coaching card to start review
+# 4. Tap intent-continue to start review (handles review-due topics)
 - tapOn:
-    id: "coaching-card-primary"
+    id: "intent-continue"
 
 # 5. Wait for session screen (ChatShell)
 # BUG-40 fix: The app uses ChatShell for retention reviews, not a dedicated

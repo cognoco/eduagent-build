@@ -106,6 +106,14 @@ appId: com.mentomate.app
     timeout: 5000
     optional: true
 
+# BUG-566: parent-with-children lands on ParentGateway, not learner-screen
+# or dashboard-scroll. Recognize it as a valid home screen.
+- extendedWaitUntil:
+    visible:
+      id: "parent-gateway"
+    timeout: 5000
+    optional: true
+
 # BUG-38: PostApprovalLanding intercepts users after pm clear wipes SecureStore.
 # Only dismiss when the "You're approved!" screen is actually showing — otherwise
 # the "Let's Go" text matches the coaching card's similar button and navigates

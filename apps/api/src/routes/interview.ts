@@ -10,6 +10,7 @@ import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
 import { getSubject } from '../services/subject';
+import { getProfileDisplayName } from '../services/profile';
 import {
   getBookTitle,
   processInterviewExchange,
@@ -51,7 +52,10 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
         ? await getBookTitle(db, profileId, bookId, subjectId)
         : undefined;
 
-      const draft = await getOrCreateDraft(db, profileId, subjectId);
+      const [draft, learnerName] = await Promise.all([
+        getOrCreateDraft(db, profileId, subjectId),
+        getProfileDisplayName(db, profileId),
+      ]);
 
       const context = {
         subjectName: subject.name,
@@ -65,6 +69,7 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
       const result = await processInterviewExchange(context, message, {
         exchangeCount,
         profileId,
+        learnerName,
       });
 
       const updatedHistory = [
@@ -128,7 +133,10 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
         ? await getBookTitle(db, profileId, bookId, subjectId)
         : undefined;
 
-      const draft = await getOrCreateDraft(db, profileId, subjectId);
+      const [draft, learnerName] = await Promise.all([
+        getOrCreateDraft(db, profileId, subjectId),
+        getProfileDisplayName(db, profileId),
+      ]);
 
       const context = {
         subjectName: subject.name,
@@ -146,6 +154,7 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
         const streamResult = await streamInterviewExchange(context, message, {
           exchangeCount,
           profileId,
+          learnerName,
         });
         stream = streamResult.stream;
         onComplete = streamResult.onComplete;

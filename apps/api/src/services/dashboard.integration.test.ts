@@ -789,13 +789,8 @@ describe('dashboard service integration', () => {
         totalSessions: 1,
       })
     );
-    expect(animalCells).toEqual(
-      expect.objectContaining({
-        topicId: topicId2,
-        completionStatus: 'not_started',
-        totalSessions: 0,
-      })
-    );
+    // Topics with 0 sessions are filtered out (parent only sees topics with activity)
+    expect(animalCells).toBeUndefined();
   });
 
   it('returns child sessions and a single-session detail with structured recap fields', async () => {

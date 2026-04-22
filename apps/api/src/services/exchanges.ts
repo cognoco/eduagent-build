@@ -130,6 +130,8 @@ export interface ExchangeContext {
   exchangeCount?: number;
   /** Client-side effective mode — drives mode-specific prompt sections (e.g. recitation) */
   effectiveMode?: string;
+  /** Learner's display name — used to personalise the mentor's voice */
+  learnerName?: string;
 }
 
 /** Result of processing a single exchange */

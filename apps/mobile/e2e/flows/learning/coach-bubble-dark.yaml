@@ -25,9 +25,9 @@ tags:
       id: "learner-screen"
     timeout: 15000
 
-# 3. Start session via coaching card
+# 3. Start session via intent card (replaced coaching-card-primary)
 - tapOn:
-    id: "coaching-card-primary"
+    id: "intent-continue"
 
 # 4. Session active — chat input present
 - extendedWaitUntil:

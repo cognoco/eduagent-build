@@ -205,12 +205,10 @@ describe('LibraryScreen', () => {
     fireEvent.press(screen.getByTestId('topic-row-topic-1'));
 
     expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/(app)/session',
+      pathname: '/(app)/topic/[topicId]',
       params: {
-        mode: 'learning',
         subjectId: 'sub-1',
         topicId: 'topic-1',
-        topicName: 'Fractions',
       },
     });
   });

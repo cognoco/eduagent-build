@@ -373,6 +373,7 @@ describe('sessionCompleted', () => {
       'check-milestone-completion',
       'write-coaching-card',
       'generate-session-insights',
+      'generate-learner-recap',
       'analyze-learner-profile',
       'update-dashboard',
       'generate-embeddings',
@@ -391,6 +392,7 @@ describe('sessionCompleted', () => {
       .filter((o: any) => o.status !== 'skipped')
       .map((o: any) => o.status);
     expect(statuses).toEqual([
+      'ok',
       'ok',
       'ok',
       'ok',

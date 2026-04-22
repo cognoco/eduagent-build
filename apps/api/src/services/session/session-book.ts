@@ -2,7 +2,7 @@
 // Session Book — sessions grouped by topic for the Book screen [CFLF-18]
 // ---------------------------------------------------------------------------
 
-import { eq, and, desc, or, gte } from 'drizzle-orm';
+import { eq, and, desc, gte, inArray } from 'drizzle-orm';
 import {
   learningSessions,
   curriculumTopics,
@@ -19,9 +19,11 @@ export interface BookSession {
 }
 
 /**
- * Returns completed sessions for a specific book, filtered by minimum quality:
- * at least 3 exchanges OR 60+ active seconds. Profile ownership is verified
- * through the subjects table parent chain.
+ * Returns sessions for a specific book, including both properly completed
+ * and auto-closed sessions (which had real exchanges but were killed by the
+ * stale-cleanup cron). Excludes accidental opens (requires at least 1
+ * exchange). Profile ownership is verified through the subjects table
+ * parent chain.
  *
  * Architectural exception: uses direct db.select() instead of createScopedRepository
  * because the query requires a multi-table join (learningSessions → curriculumTopics
@@ -53,11 +55,8 @@ export async function getBookSessions(
       and(
         eq(curriculumTopics.bookId, bookId),
         eq(subjects.profileId, profileId),
-        eq(learningSessions.status, 'completed'),
-        or(
-          gte(learningSessions.exchangeCount, 3),
-          gte(learningSessions.durationSeconds, 60)
-        )
+        inArray(learningSessions.status, ['completed', 'auto_closed']),
+        gte(learningSessions.exchangeCount, 1)
       )
     )
     .orderBy(desc(learningSessions.createdAt));

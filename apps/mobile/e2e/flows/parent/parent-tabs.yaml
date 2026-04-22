@@ -68,9 +68,9 @@ tags:
     direction: DOWN
     timeout: 10000
 
-# 11. Verify appearance section
+# 11. Verify learning mode section (first section in More screen)
 - assertVisible:
-    text: "Appearance"
+    text: "Learning Mode"
     optional: true
 
 # 12. Verify notifications section

@@ -570,7 +570,7 @@ describe('Integration: session service', () => {
       subjectId: subject.id,
       topicId: topics[0]!.id,
       status: 'completed',
-      exchangeCount: 2,
+      exchangeCount: 0,
       durationSeconds: 59,
       startedAt: new Date('2026-04-10T12:00:00.000Z'),
       lastActivityAt: new Date('2026-04-10T12:03:00.000Z'),

@@ -267,6 +267,13 @@
       "when": 1776779100000,
       "tag": "0037_rls_weekly_reports",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1776877543157,
+      "tag": "0038_outgoing_bulldozer",
+      "breakpoints": true
     }
   ]
 }

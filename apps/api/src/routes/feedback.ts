@@ -29,6 +29,7 @@ const DEFAULT_SUPPORT_EMAIL = 'support@mentomate.com';
 // endpoints, replace with a KV-backed rate limiter for global enforcement.
 const FEEDBACK_RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
 const FEEDBACK_RATE_LIMIT_MAX = 5;
+const FEEDBACK_MAP_MAX_ENTRIES = 10_000;
 const feedbackTimestamps = new Map<string, number[]>();
 
 function isFeedbackRateLimited(userId: string): boolean {
@@ -40,6 +41,12 @@ function isFeedbackRateLimited(userId: string): boolean {
   // Prune stale Map entry to prevent unbounded growth in long-lived isolates
   if (timestamps.length === 0 && feedbackTimestamps.has(userId)) {
     feedbackTimestamps.delete(userId);
+  }
+  // Evict oldest entries if the Map exceeds the size cap. Maps iterate in
+  // insertion order, so the first key is the oldest.
+  if (feedbackTimestamps.size >= FEEDBACK_MAP_MAX_ENTRIES) {
+    const oldest = feedbackTimestamps.keys().next().value;
+    if (oldest !== undefined) feedbackTimestamps.delete(oldest);
   }
   if (timestamps.length >= FEEDBACK_RATE_LIMIT_MAX) {
     feedbackTimestamps.set(userId, timestamps);

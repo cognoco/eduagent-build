@@ -74,6 +74,8 @@ interface ChatShellProps {
   belowInput?: React.ReactNode;
   /** Optional testID for the message scroll area (used by E2E flows). */
   messagesTestID?: string;
+  /** Fallback route for the back button when `canGoBack()` is false (BUG-612: web). Defaults to `/(app)/home`. */
+  backFallback?: string;
 }
 
 /**
@@ -141,6 +143,7 @@ export function ChatShell({
   textToSpeechLanguage,
   belowInput,
   messagesTestID,
+  backFallback,
 }: ChatShellProps) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -444,7 +447,11 @@ export function ChatShell({
     }
     const timer = setTimeout(() => setShowIdleAnim(true), IDLE_TIMEOUT_MS);
     return () => clearTimeout(timer);
-  }, [lastMessageIsAi, isStreaming, input, messages.length]);
+    // `lastMessageIsAi` already derives from `messages` — adding
+    // `messages.length` here caused cascading re-renders on web (Enter key
+    // with blurOnSubmit=false) because setInput + onSend + setMessages all
+    // fired in the same React batch, triggering the effect multiple times.
+  }, [lastMessageIsAi, isStreaming, input]);
 
   const headerRightContent = (
     <View className="flex-row items-center">
@@ -471,7 +478,12 @@ export function ChatShell({
       >
         <View className="flex-row items-center px-4 py-3">
           <Pressable
-            onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
+            onPress={() =>
+              goBackOrReplace(
+                router,
+                (backFallback ?? '/(app)/home') as '/(app)/home'
+              )
+            }
             className="me-3 p-2 min-h-[44px] min-w-[44px] items-center justify-center"
             accessibilityLabel="Go back"
             accessibilityRole="button"

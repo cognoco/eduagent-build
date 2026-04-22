@@ -30,15 +30,14 @@ tags:
       id: "learner-screen"
     timeout: 15000
 
-# 3. Coaching card should indicate recall/review is due.
-# The adaptive coaching card type will be "fading" or "review".
-# Look for the coaching card's primary action.
+# 3. Intent card stack should be visible (replaced coaching card in adaptive home refactor).
+# The intent-continue card handles recall/review when topics are due.
 - assertVisible:
-    id: "coaching-card"
+    id: "learner-intent-stack"
 
-# 4. Tap the coaching card's primary action (triggers recall)
+# 4. Tap intent-continue to start the review session
 - tapOn:
-    id: "coaching-card-primary"
+    id: "intent-continue"
 
 # 5. Recall screen loads — look for either recall-specific testIDs
 # or text indicating a recall prompt

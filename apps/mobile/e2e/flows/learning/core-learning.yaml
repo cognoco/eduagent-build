@@ -47,9 +47,10 @@ tags:
 # Tap More tab → verify it navigates
 - tapOn:
     id: "tab-more"
+# Learning Mode section is always above the fold — reliable "More loaded" landmark
 - extendedWaitUntil:
     visible:
-      id: "sign-out-button"
+      id: "learning-mode-casual"
     timeout: 5000
 
 # Return to Home tab
@@ -61,16 +62,13 @@ tags:
     timeout: 5000
 
 # ── M07 regression: home screen has real content (not empty) ──────────
-# Verify coaching card AND subject list loaded — catches blank home screen.
+# Verify intent card stack loaded — catches blank home screen.
 - assertVisible:
-    id: "coaching-card"
+    id: "learner-intent-stack"
 
-# Section heading proves the subject list rendered (not just the coaching card)
-- scrollUntilVisible:
-    element:
-      text: "Your subjects"
-    direction: DOWN
-    timeout: 5000
+# Intent-continue proves the user has an active subject (learning-active seed)
+- assertVisible:
+    id: "intent-continue"
 
 # ── Negative assertions: empty state must not appear ───────────────────
 # Full text match required — Maestro on Android can't reliably match substrings
@@ -78,16 +76,9 @@ tags:
 - assertNotVisible:
     text: "Start learning — add your first subject"
 
-# Scroll back to top so coaching card is tappable
-- scrollUntilVisible:
-    element:
-      id: "coaching-card-primary"
-    direction: UP
-    timeout: 5000
-
-# 3. Start session via coaching card
+# 3. Start session via intent-continue card (replaced coaching-card-primary)
 - tapOn:
-    id: "coaching-card-primary"
+    id: "intent-continue"
 
 # 4. Session active — chat input present
 - extendedWaitUntil:

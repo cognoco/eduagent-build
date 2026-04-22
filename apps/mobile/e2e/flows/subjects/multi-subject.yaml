@@ -35,10 +35,10 @@ tags:
 - assertVisible:
     id: "tab-more"
 
-# ── Visual integrity: coaching card ────────────────────────────────────
-# With active subjects, the coaching card must render (not loading spinner forever).
+# ── Visual integrity: intent card stack ────────────────────────────────
+# With active subjects, the intent cards must render (not loading spinner forever).
 - assertVisible:
-    id: "coaching-card"
+    id: "learner-intent-stack"
 
 # 3. Screenshot: home screen — captures what's actually rendering
 - takeScreenshot: multi-subject-01-home

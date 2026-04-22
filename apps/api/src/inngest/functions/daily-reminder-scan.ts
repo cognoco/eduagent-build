@@ -70,10 +70,16 @@ export const dailyReminderScan = inngest.createFunction(
                 AND (NOW() AT TIME ZONE COALESCE(${accounts.timezone}, 'UTC'))::time < TIME '09:30'`,
             // Dedup: skip profiles that already received a daily_reminder today
             notExists(
-              sql`SELECT 1 FROM ${notificationLog} nl
-                  WHERE nl.profile_id = ${profiles.id}
-                    AND nl.type = 'daily_reminder'
-                    AND nl.sent_at >= (NOW() AT TIME ZONE COALESCE(${accounts.timezone}, 'UTC'))::date`
+              db
+                .select({ _: sql`1` })
+                .from(notificationLog)
+                .where(
+                  and(
+                    eq(notificationLog.profileId, profiles.id),
+                    eq(notificationLog.type, 'daily_reminder'),
+                    sql`${notificationLog.sentAt} >= (NOW() AT TIME ZONE COALESCE(${accounts.timezone}, 'UTC'))::date`
+                  )
+                )
             )
           )
         );

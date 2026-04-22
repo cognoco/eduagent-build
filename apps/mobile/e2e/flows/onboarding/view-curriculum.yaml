@@ -25,11 +25,9 @@ tags:
 - assertVisible:
     id: "learner-screen"
 
-# 4. Coaching card should be present on home screen
-# optional: true — coaching card requires precomputed data which
-# may not exist in the learning-active seed scenario
+# 4. Intent card stack should be present on home screen
 - assertVisible:
-    id: "coaching-card"
+    id: "learner-intent-stack"
     optional: true
 
 # REMOVED (Rule 3): "Your coach has a plan" assertion dropped — this heading

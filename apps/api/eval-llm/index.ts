@@ -27,6 +27,7 @@ import { dictationGenerateFlow } from './flows/dictation-generate';
 import { prepareHomeworkFlow } from './flows/dictation-prepare-homework';
 import { dictationReviewFlow } from './flows/dictation-review';
 import { sessionAnalysisFlow } from './flows/session-analysis';
+import { sessionRecapFlow } from './flows/session-recap';
 import { filingPreSessionFlow } from './flows/filing-pre-session';
 import { exchangesFlow } from './flows/exchanges';
 import { interviewFlow } from './flows/interview';
@@ -70,6 +71,7 @@ const FLOWS: FlowDefinition[] = [
   prepareHomeworkFlow as FlowDefinition,
   dictationReviewFlow as FlowDefinition,
   sessionAnalysisFlow as FlowDefinition,
+  sessionRecapFlow as FlowDefinition,
   filingPreSessionFlow as FlowDefinition,
   exchangesFlow as FlowDefinition,
   interviewFlow as FlowDefinition,

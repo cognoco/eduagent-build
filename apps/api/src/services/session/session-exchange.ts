@@ -405,9 +405,21 @@ export async function prepareExchangeContext(
       // exchange 2+ sees contradictory history (prose vs JSON instruction) and
       // the LLM may produce malformed output that streamEnvelopeReply can't
       // parse — yielding empty responses.
+      //
+      // IMPORTANT: Use fully-populated default signals (not empty `{}`).
+      // Empty signal objects contradict the system prompt's signal spec and
+      // cause LLM format drift after 2+ re-wrapped turns — BUG-610.
       content:
         e.eventType === 'ai_response'
-          ? JSON.stringify({ reply: e.content, signals: {}, ui_hints: {} })
+          ? JSON.stringify({
+              reply: e.content,
+              signals: {
+                partial_progress: false,
+                needs_deepening: false,
+                understanding_check: false,
+              },
+              ui_hints: { note_prompt: { show: false, post_session: false } },
+            })
           : e.content,
     }));
 
@@ -808,6 +820,8 @@ export async function prepareExchangeContext(
     // Client-side effective mode — drives mode-specific prompt sections (e.g. recitation)
     effectiveMode: (session.metadata as Record<string, unknown> | null)
       ?.effectiveMode as string | undefined,
+    // Personalisation: learner's display name for the mentor to use naturally
+    learnerName: profile?.displayName ?? undefined,
   };
 
   return { session, context, effectiveRung, hintCount, lastAiResponseAt };

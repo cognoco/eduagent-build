@@ -377,7 +377,7 @@ export default function TopicDetailScreen() {
           This topic could not be opened. Please go back and try again.
         </Text>
         <Pressable
-          onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
+          onPress={() => goBackOrReplace(router, '/(app)/library' as const)}
           className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center"
           accessibilityRole="button"
           accessibilityLabel="Go back"
@@ -415,7 +415,7 @@ export default function TopicDetailScreen() {
           </Text>
         </Pressable>
         <Pressable
-          onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
+          onPress={() => goBackOrReplace(router, '/(app)/library' as const)}
           className="bg-surface rounded-button px-6 py-3 min-h-[48px] items-center justify-center mb-3"
           accessibilityRole="button"
           accessibilityLabel="Go back"
@@ -443,7 +443,7 @@ export default function TopicDetailScreen() {
       {/* Header */}
       <View className="px-5 pt-4 pb-3 flex-row items-center">
         <Pressable
-          onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
+          onPress={() => goBackOrReplace(router, '/(app)/library' as const)}
           className="me-3 p-2 min-h-[44px] min-w-[44px] items-center justify-center"
           testID="topic-detail-back"
           accessibilityLabel="Go back"
@@ -479,7 +479,7 @@ export default function TopicDetailScreen() {
             This topic may have been removed from your curriculum.
           </Text>
           <Pressable
-            onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
+            onPress={() => goBackOrReplace(router, '/(app)/library' as const)}
             className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center mt-6"
             testID="topic-detail-empty-back"
             accessibilityRole="button"
@@ -553,74 +553,76 @@ export default function TopicDetailScreen() {
             )}
           </View>
 
-          {/* Retention card */}
-          <View
-            className="bg-surface rounded-card p-4 mb-3"
-            testID="retention-card"
-          >
-            <Text className="text-body-sm font-semibold text-text-primary mb-3">
-              Retention
-            </Text>
-            <View className="flex-row justify-between items-center mb-2">
-              <Text className="text-body-sm text-text-secondary">
-                Memory strength
+          {/* Retention card — hide for not-started topics (no retention to show) */}
+          {topicProgress.completionStatus !== 'not_started' && (
+            <View
+              className="bg-surface rounded-card p-4 mb-3"
+              testID="retention-card"
+            >
+              <Text className="text-body-sm font-semibold text-text-primary mb-3">
+                Retention
               </Text>
-              <RetentionSignal status={retentionStatus} />
-            </View>
-            {/* FR90: Time-based decay visualization */}
-            {retentionCard && retentionCard.lastReviewedAt && (
-              <DecayBar
-                lastReviewedAt={retentionCard.lastReviewedAt}
-                intervalDays={retentionCard.intervalDays}
-                nextReviewAt={retentionCard.nextReviewAt}
-              />
-            )}
-            {nextReviewDate && (
               <View className="flex-row justify-between items-center mb-2">
                 <Text className="text-body-sm text-text-secondary">
-                  Next review
+                  Memory strength
                 </Text>
-                <Text className="text-body-sm font-medium text-text-primary">
-                  {nextReviewDate}
-                </Text>
+                <RetentionSignal status={retentionStatus} />
               </View>
-            )}
-            {retentionCard && (
-              <>
+              {/* FR90: Time-based decay visualization */}
+              {retentionCard && retentionCard.lastReviewedAt && (
+                <DecayBar
+                  lastReviewedAt={retentionCard.lastReviewedAt}
+                  intervalDays={retentionCard.intervalDays}
+                  nextReviewAt={retentionCard.nextReviewAt}
+                />
+              )}
+              {nextReviewDate && (
                 <View className="flex-row justify-between items-center mb-2">
                   <Text className="text-body-sm text-text-secondary">
-                    Interval
+                    Next review
                   </Text>
                   <Text className="text-body-sm font-medium text-text-primary">
-                    {retentionCard.intervalDays} day
-                    {retentionCard.intervalDays === 1 ? '' : 's'}
+                    {nextReviewDate}
                   </Text>
                 </View>
-                <View className="flex-row justify-between items-center mb-2">
-                  <Text className="text-body-sm text-text-secondary">
-                    Reviews
-                  </Text>
-                  <Text className="text-body-sm font-medium text-text-primary">
-                    {retentionCard.repetitions}
-                  </Text>
-                </View>
-                {failureCount > 0 && (
-                  <View className="flex-row justify-between items-center">
+              )}
+              {retentionCard && (
+                <>
+                  <View className="flex-row justify-between items-center mb-2">
                     <Text className="text-body-sm text-text-secondary">
-                      Practice rounds
+                      Interval
                     </Text>
-                    <Text
-                      className={`text-body-sm font-medium ${
-                        failureCount >= 3 ? 'text-info' : 'text-text-primary'
-                      }`}
-                    >
-                      {failureCount}
+                    <Text className="text-body-sm font-medium text-text-primary">
+                      {retentionCard.intervalDays} day
+                      {retentionCard.intervalDays === 1 ? '' : 's'}
                     </Text>
                   </View>
-                )}
-              </>
-            )}
-          </View>
+                  <View className="flex-row justify-between items-center mb-2">
+                    <Text className="text-body-sm text-text-secondary">
+                      Reviews
+                    </Text>
+                    <Text className="text-body-sm font-medium text-text-primary">
+                      {retentionCard.repetitions}
+                    </Text>
+                  </View>
+                  {failureCount > 0 && (
+                    <View className="flex-row justify-between items-center">
+                      <Text className="text-body-sm text-text-secondary">
+                        Practice rounds
+                      </Text>
+                      <Text
+                        className={`text-body-sm font-medium ${
+                          failureCount >= 3 ? 'text-info' : 'text-text-primary'
+                        }`}
+                      >
+                        {failureCount}
+                      </Text>
+                    </View>
+                  )}
+                </>
+              )}
+            </View>
+          )}
 
           {/* Summary excerpt */}
           {topicProgress.summaryExcerpt && (
@@ -652,12 +654,13 @@ export default function TopicDetailScreen() {
             </View>
           )}
 
-          <View className="bg-surface rounded-card p-4 mb-3">
-            <Text className="text-body-sm font-semibold text-text-primary mb-2">
-              Parking Lot
-            </Text>
-            {parkedQuestions && parkedQuestions.length > 0 ? (
-              parkedQuestions.map((item) => (
+          {/* Parking lot — only show when there are parked questions */}
+          {parkedQuestions && parkedQuestions.length > 0 && (
+            <View className="bg-surface rounded-card p-4 mb-3">
+              <Text className="text-body-sm font-semibold text-text-primary mb-2">
+                Parking Lot
+              </Text>
+              {parkedQuestions.map((item) => (
                 <View key={item.id} className="flex-row items-start mt-1">
                   <Text className="text-body text-text-secondary me-2">
                     {'\u2022'}
@@ -666,13 +669,9 @@ export default function TopicDetailScreen() {
                     {item.question}
                   </Text>
                 </View>
-              ))
-            ) : (
-              <Text className="text-body-sm text-text-secondary">
-                No parked questions for this topic yet.
-              </Text>
-            )}
-          </View>
+              ))}
+            </View>
+          )}
         </ScrollView>
       )}
 

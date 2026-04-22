@@ -1,6 +1,7 @@
 export * from './profiles';
 export * from './subjects';
 export * from './sessions';
+export * from './bookmarks';
 export * from './assessments';
 export * from './progress';
 export * from './snapshots';

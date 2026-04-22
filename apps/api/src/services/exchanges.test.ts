@@ -497,6 +497,20 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('MentoMate');
   });
 
+  it('includes learner name when provided', () => {
+    const prompt = buildSystemPrompt({
+      ...baseContext,
+      learnerName: 'Emma',
+    });
+    expect(prompt).toContain("The learner's name is Emma");
+    expect(prompt).toContain('do not overuse it');
+  });
+
+  it('omits learner name section when not provided', () => {
+    const prompt = buildSystemPrompt(baseContext);
+    expect(prompt).not.toContain("The learner's name is");
+  });
+
   describe('rawInput handling [CR-CFLF.2]', () => {
     it('includes rawInput in XML delimiters when provided', () => {
       const prompt = buildSystemPrompt({

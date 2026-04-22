@@ -46,9 +46,9 @@ tags:
 
 - takeScreenshot: practice-picker-01-home
 
-# ── 3. Verify coaching card is loaded (teen persona: AdaptiveEntryCard) ──
+# ── 3. Verify intent card stack is loaded (replaced coaching card) ──
 - assertVisible:
-    id: "coaching-card"
+    id: "learner-intent-stack"
 
 # ── 4. Verify both active subjects are shown in subject list ──────────
 - scrollUntilVisible:

@@ -35,13 +35,13 @@ tags:
       id: "learner-screen"
     timeout: 15000
 
-# 3. Look for recall/review prompt on home (coaching card)
+# 3. Intent card stack should be visible (replaced coaching card)
 - assertVisible:
-    id: "coaching-card"
+    id: "learner-intent-stack"
 
-# 4. Tap coaching card to start recall
+# 4. Tap intent-continue to start recall (handles review-due topics)
 - tapOn:
-    id: "coaching-card-primary"
+    id: "intent-continue"
     optional: true
 
 # 5. If coaching card didn't navigate, try direct recall prompt

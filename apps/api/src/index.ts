@@ -43,6 +43,7 @@ import { curriculumRoutes } from './routes/curriculum';
 import { bookRoutes } from './routes/books';
 import { noteRoutes } from './routes/notes';
 import { sessionRoutes } from './routes/sessions';
+import { bookmarkRoutes } from './routes/bookmarks';
 import { parkingLotRoutes } from './routes/parking-lot';
 import { homeworkRoutes } from './routes/homework';
 import { assessmentRoutes } from './routes/assessments';
@@ -196,6 +197,7 @@ const routes = api
   .route('/', bookRoutes)
   .route('/', noteRoutes)
   .route('/', sessionRoutes)
+  .route('/', bookmarkRoutes)
   .route('/', parkingLotRoutes)
   .route('/', homeworkRoutes)
   .route('/', assessmentRoutes)

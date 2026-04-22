@@ -50,7 +50,18 @@ tags:
       text: "Library"
     timeout: 10000
 
-# 5. Wait for topics to load
+# 5. Wait for library content to load
+- extendedWaitUntil:
+    notVisible:
+      id: "library-loading"
+    timeout: 10000
+    optional: true
+
+# 5b. Switch to Topics tab — Library defaults to Shelves tab which shows
+#     subject-level cards, not individual topic rows (BUG-593).
+- tapOn:
+    id: "library-tab-topics"
+
 - extendedWaitUntil:
     notVisible:
       id: "library-loading"

@@ -1,7 +1,7 @@
-# Flow N11: Settings Toggles — Theme, Accent, Notifications, Learning Mode
-# Validates: all inline settings controls on the More screen respond to taps.
-# Cycles through themes, accent color swatches, notification toggles,
-# and learning mode radio options with screenshots at each step.
+# Flow N11: Settings Toggles — Notifications & Learning Mode
+# Validates: inline settings controls on the More screen respond to taps.
+# Tests notification toggles and learning mode radio options with screenshots.
+# Note: Theme/Accent/Persona sections were removed (persona system cleanup).
 # Tags: nightly, account, settings
 #
 # Journey: UX Journey 5 (Account Management)
@@ -27,103 +27,43 @@ tags:
     timeout: 15000
 
 # 3. Navigate to More tab
-# BUG-15: tabBarTestID doesn't propagate to Android resource-id.
-# Use text matching instead.
 - tapOn:
     text: "More"
 
-# 4. Wait for More screen to load (Appearance section confirms we're on settings)
+# 4. Wait for More screen to load (Learning Mode section is always above the fold)
 - extendedWaitUntil:
     visible:
-      text: "Appearance"
+      id: "learning-mode-casual"
     timeout: 10000
-
-# ── Theme section (learner-safe themes only) ──
-# BUG-17: Parent theme redirects to /(parent)/dashboard.
-# BUG-18: switch-to-teen can crash the app (navigation race condition).
-# Test Teen ↔ Eager Learner here. Parent theme tested last (step 21).
 
 - takeScreenshot: settings-initial
 
-# 5. Tap "Teen (Dark)" theme
-- tapOn:
-    text: "Teen (Dark)"
-
-- takeScreenshot: settings-theme-teen-dark
-
-# BUG-11: Wait for theme re-render to stabilize before next tap
-- extendedWaitUntil:
-    visible:
-      text: "Appearance"
-    timeout: 10000
-
-# 6. Tap "Eager Learner (Calm)" theme (reset to default for accent tests)
-- tapOn:
-    text: "Eager Learner (Calm)"
-
-- takeScreenshot: settings-theme-learner-calm
-
-# BUG-11: stabilize
-- extendedWaitUntil:
-    visible:
-      text: "Appearance"
-    timeout: 10000
-
-# ── Accent Color section ──
-# Accent presets are persona-specific: eager-learner has indigo/teal/rose.
-# We're already on Eager Learner from step 6.
-
-# 7. Scroll to Accent Color picker
-- scrollUntilVisible:
-    element:
-      text: "Accent Color"
-    direction: DOWN
-    timeout: 10000
-
-# 8. Tap teal accent swatch
-- tapOn:
-    id: "accent-swatch-teal"
-
-- takeScreenshot: settings-accent-teal
-
-# 9. Tap rose accent swatch
-- tapOn:
-    id: "accent-swatch-rose"
-
-- takeScreenshot: settings-accent-rose
-
-# 10. Tap indigo accent swatch (reset to default)
-- tapOn:
-    id: "accent-swatch-indigo"
-
-- takeScreenshot: settings-accent-indigo
-
 # ── Notifications section ──
 
-# 11. Scroll to Notifications section
+# 5. Scroll to Notifications section
 - scrollUntilVisible:
     element:
       text: "Notifications"
     direction: DOWN
     timeout: 10000
 
-# 12. Tap "Push notifications" toggle (toggle on)
+# 6. Tap "Push notifications" toggle (toggle on)
 - tapOn:
     text: "Push notifications"
 
 - takeScreenshot: settings-push-toggled
 
-# 13. Tap "Push notifications" toggle again (toggle off)
+# 7. Tap "Push notifications" toggle again (toggle off)
 - tapOn:
     text: "Push notifications"
 
-# 14. Tap "Weekly progress digest" toggle (toggle on)
+# 8. Tap "Weekly progress digest" toggle (toggle on)
 - tapOn:
     text: "Weekly progress digest"
 
 - takeScreenshot: settings-digest-toggled
 
-# 15. Tap "Weekly progress digest" toggle again (toggle off)
+# 9. Tap "Weekly progress digest" toggle again (toggle off)
 - tapOn:
     text: "Weekly progress digest"
 
@@ -131,64 +71,24 @@ tags:
 
 # ── Learning Mode section ──
 
-# 16. Scroll until the Casual Explorer radio button is visible
+# 10. Scroll until the Casual Explorer radio button is visible
 - scrollUntilVisible:
     element:
       id: "learning-mode-casual"
-    direction: DOWN
+    direction: UP
     timeout: 10000
 
-# 17. Tap Casual Explorer mode
+# 11. Tap Casual Explorer mode
 - tapOn:
     id: "learning-mode-casual"
 
 - takeScreenshot: settings-mode-casual
 
-# 18. Tap Serious Learner mode (reset)
+# 12. Tap Serious Learner mode (reset)
 - tapOn:
     id: "learning-mode-serious"
 
 - takeScreenshot: settings-mode-serious
 
-# 19. Scroll back to top for Parent theme test
-- scrollUntilVisible:
-    element:
-      text: "Appearance"
-    direction: UP
-    timeout: 10000
-
-# ── Parent theme test (last — may crash the app via BUG-18) ──
-# BUG-17: Tapping Parent (Light) redirects to /(parent)/dashboard.
-# BUG-18: switch-to-teen crashes ~50% of the time. Placed last so
-# the core settings validations above are already captured.
-
-# 20. Tap "Parent (Light)" — triggers redirect to parent dashboard
-- tapOn:
-    text: "Parent (Light)"
-
-# Verify redirect to parent dashboard
-- extendedWaitUntil:
-    visible:
-      text: "How your children are doing"
-    timeout: 15000
-
-- takeScreenshot: settings-theme-parent-redirect
-
-# 21. Switch back to Teen via dev-only button on parent dashboard
-# The button is below the fold on parent dashboard — scroll to it first
-- scrollUntilVisible:
-    element:
-      id: "switch-to-teen"
-    direction: DOWN
-    timeout: 10000
-- tapOn:
-    id: "switch-to-teen"
-
-# Wait for learner home screen — extra time for persona switch navigation
-- extendedWaitUntil:
-    visible:
-      id: "learner-screen"
-    timeout: 30000
-
-# 22. Final screenshot — all settings fully exercised
+# 13. Final screenshot — all settings fully exercised
 - takeScreenshot: settings-toggles-complete

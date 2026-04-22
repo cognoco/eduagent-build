@@ -43,6 +43,7 @@ import {
   markMonthlyReportViewed,
 } from './monthly-report';
 import { assertParentAccess } from './family-access';
+import { isoDate, subtractDays, sumTopicsExplored } from './progress-helpers';
 
 export interface DashboardInput {
   childProfileId: string;
@@ -241,25 +242,6 @@ function formatSessionDisplayTitle(
   }
 }
 
-function isoDate(date: Date): string {
-  return date.toISOString().slice(0, 10);
-}
-
-function subtractDays(date: Date, days: number): Date {
-  const result = new Date(date);
-  result.setUTCDate(result.getUTCDate() - days);
-  return result;
-}
-
-function sumTopicsExplored(metrics: {
-  subjects: Array<{ topicsExplored?: number }>;
-}): number {
-  return metrics.subjects.reduce(
-    (sum, subject) => sum + (subject.topicsExplored ?? 0),
-    0
-  );
-}
-
 export function buildProgressGuidance(
   childName: string,
   subjectNames: string[],
@@ -273,7 +255,9 @@ export function buildProgressGuidance(
     // [BUG-523] A non-zero streak proves recent activity — "Quiet week" would
     // contradict the visible streak badge. Show an encouraging nudge instead.
     if ((currentStreak ?? 0) > 0) {
-      return `${childName} has a ${currentStreak ?? 0}-day streak — keep it going with ${primarySubject}!`;
+      return `${childName} has a ${
+        currentStreak ?? 0
+      }-day streak — keep it going with ${primarySubject}!`;
     }
     return `Quiet week — maybe suggest a quick session on ${primarySubject}?`;
   }

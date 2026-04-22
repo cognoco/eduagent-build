@@ -13,6 +13,7 @@ export * from './account.ts';
 export * from './subjects.ts';
 export * from './sessions.ts';
 export * from './language.ts';
+export * from './bookmarks.ts';
 
 // Assessment & Retention (Epic 3)
 export * from './assessments.ts';

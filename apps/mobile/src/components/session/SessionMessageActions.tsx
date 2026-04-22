@@ -1,4 +1,6 @@
 import { View, Text, Pressable } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import type { ChatMessage } from '../session';
 import { QuotaExceededCard } from '../session';
 import type { QuotaExceededDetails } from '../../lib/api-client';
@@ -18,6 +20,7 @@ export interface SessionMessageActionsProps {
   userMessageCount: number;
   showWrongSubjectChip: boolean;
   messageFeedback: Record<string, MessageFeedbackState>;
+  bookmarkState?: Record<string, string | null>;
   quotaError: QuotaExceededDetails | null;
   isOwner: boolean;
   stage: ConversationStage;
@@ -29,6 +32,7 @@ export interface SessionMessageActionsProps {
     message: ChatMessage,
     action: MessageFeedbackState
   ) => Promise<void>;
+  onToggleBookmark?: (message: ChatMessage) => Promise<void> | void;
   handleReconnect: (messageId: string) => Promise<void>;
 }
 
@@ -40,11 +44,13 @@ export function SessionMessageActions({
   userMessageCount,
   showWrongSubjectChip,
   messageFeedback,
+  bookmarkState,
   quotaError,
   isOwner,
   stage,
   handleQuickChip,
   handleMessageFeedback,
+  onToggleBookmark,
   handleReconnect,
 }: SessionMessageActionsProps) {
   if (
@@ -131,7 +137,7 @@ export function SessionMessageActions({
         </View>
       )}
       {showFeedbackButtons && (
-        <View className="flex-row flex-wrap gap-2">
+        <View className="flex-row flex-wrap gap-2 items-center">
           <Pressable
             onPress={() => void handleMessageFeedback(message, 'helpful')}
             disabled={feedbackState === 'incorrect' || isStreaming}
@@ -192,6 +198,36 @@ export function SessionMessageActions({
               That&apos;s incorrect
             </Text>
           </Pressable>
+          {message.eventId && onToggleBookmark ? (
+            <Pressable
+              onPress={() => {
+                void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                void onToggleBookmark(message);
+              }}
+              className="ms-auto p-2"
+              accessibilityRole="button"
+              accessibilityLabel={
+                bookmarkState?.[message.eventId]
+                  ? 'Remove bookmark'
+                  : 'Bookmark this response'
+              }
+              testID={`bookmark-toggle-${message.eventId}`}
+            >
+              <Ionicons
+                name={
+                  bookmarkState?.[message.eventId]
+                    ? 'bookmark'
+                    : 'bookmark-outline'
+                }
+                size={20}
+                className={
+                  bookmarkState?.[message.eventId]
+                    ? 'text-primary'
+                    : 'text-text-secondary'
+                }
+              />
+            </Pressable>
+          ) : null}
         </View>
       )}
     </View>

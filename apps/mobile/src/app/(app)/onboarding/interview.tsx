@@ -283,6 +283,11 @@ export default function InterviewScreen() {
           id: 'resume',
           role: 'assistant',
           content: `Continue your interview? ${resumePrompt}`,
+          // Mark as system prompt WITHOUT a kind so ChatShell's filter
+          // hides it from the message list. The seeded exchange history
+          // already shows the user's past messages — the resume summary
+          // was rendering as a confusing extra AI chat bubble.
+          isSystemPrompt: true,
         },
       ]);
     }
@@ -352,8 +357,24 @@ export default function InterviewScreen() {
 
       setMessages((prev) => [
         ...prev,
-        { id: `user-${Date.now()}`, role: 'user', content: text },
-        { id: streamMsgId, role: 'assistant', content: '', streaming: true },
+        // On retry, the user message is already in the list — the retry
+        // cleanup only removes the error AI bubble. Adding it again would
+        // cause a duplicate user bubble and re-send the message to the API.
+        ...(isRetry
+          ? []
+          : [
+              {
+                id: `user-${Date.now()}`,
+                role: 'user' as const,
+                content: text,
+              },
+            ]),
+        {
+          id: streamMsgId,
+          role: 'assistant' as const,
+          content: '',
+          streaming: true,
+        },
       ]);
 
       // -----------------------------------------------------------------------
@@ -571,22 +592,17 @@ export default function InterviewScreen() {
             </Text>
             <Pressable
               onPress={() => {
-                // BUG-317: Resend the orphaned message instead of just clearing
-                // the error. Remove the error AI message and the user message
-                // that triggered it, then replay.
+                // Retry the stream: remove only the error AI bubble, keep the
+                // user message in place. handleSend with isRetry=true will
+                // add only the streaming placeholder (no duplicate user bubble).
                 const lastText = lastSentTextRef.current;
                 setMessages((prev) => {
                   const len = prev.length;
-                  // Remove trailing [user, error-assistant] pair
-                  if (
-                    len >= 2 &&
-                    prev[len - 1]?.role === 'assistant' &&
-                    prev[len - 2]?.role === 'user'
-                  ) {
-                    return prev.slice(0, -2);
+                  // Remove trailing error AI message only
+                  if (len >= 1 && prev[len - 1]?.role === 'assistant') {
+                    return prev.slice(0, -1);
                   }
-                  // Fallback: just remove the error message
-                  return prev.slice(0, -1);
+                  return prev;
                 });
                 setStreamError(null);
                 if (lastText) {

@@ -408,7 +408,7 @@ describe('ShelfScreen', () => {
   // -----------------------------------------------------------------------
   // Single-book auto-skip
   // -----------------------------------------------------------------------
-  it('auto-redirects to book screen when there is only one book', async () => {
+  it('renders normally when there is only one book (no auto-skip)', () => {
     mockUseBooks.mockReturnValue({
       data: [
         {
@@ -424,19 +424,9 @@ describe('ShelfScreen', () => {
       refetch: mockBooksRefetch,
     });
 
-    render(<ShelfScreen />);
-
-    await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith(
-        expect.objectContaining({
-          pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
-          params: expect.objectContaining({
-            subjectId: 'sub-1',
-            bookId: 'book-1',
-          }),
-        })
-      );
-    });
+    const { getByTestId } = render(<ShelfScreen />);
+    expect(getByTestId('shelf-screen')).toBeTruthy();
+    expect(mockReplace).not.toHaveBeenCalled();
   });
 
   // -----------------------------------------------------------------------
@@ -482,72 +472,7 @@ describe('ShelfScreen', () => {
     });
   });
 
-  // -----------------------------------------------------------------------
-  // BUG-FIX: auto-skip must reset when subjectId changes
-  // -----------------------------------------------------------------------
-  it('auto-skip fires again when subjectId changes (component reuse)', async () => {
-    // First render: sub-1 with 1 book → auto-skip fires
-    mockSearchParams = () => ({ subjectId: 'sub-1' });
-    mockUseBooks.mockReturnValue({
-      data: [
-        {
-          id: 'book-A',
-          title: 'Book A',
-          emoji: '📗',
-          topicsGenerated: true,
-        },
-      ],
-      isLoading: false,
-      isError: false,
-      error: null,
-      refetch: mockBooksRefetch,
-    });
-
-    const { rerender } = render(<ShelfScreen />);
-
-    await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith(
-        expect.objectContaining({
-          params: expect.objectContaining({
-            subjectId: 'sub-1',
-            bookId: 'book-A',
-          }),
-        })
-      );
-    });
-
-    // Simulate Expo Router reusing the component with a different subjectId
-    mockReplace.mockClear();
-    mockSearchParams = () => ({ subjectId: 'sub-2' });
-    mockUseBooks.mockReturnValue({
-      data: [
-        {
-          id: 'book-B',
-          title: 'Book B',
-          emoji: '📘',
-          topicsGenerated: true,
-        },
-      ],
-      isLoading: false,
-      isError: false,
-      error: null,
-      refetch: mockBooksRefetch,
-    });
-
-    rerender(<ShelfScreen />);
-
-    // Auto-skip must fire again for the new subject's book
-    await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith(
-        expect.objectContaining({
-          params: expect.objectContaining({
-            subjectId: 'sub-2',
-            bookId: 'book-B',
-          }),
-        })
-      );
-    });
-  });
+  // Auto-skip was removed — single-book shelves render normally now.
 
   it('shows ErrorFallback overlay when picking a book suggestion fails', async () => {
     mockUseBookSuggestions.mockReturnValue({

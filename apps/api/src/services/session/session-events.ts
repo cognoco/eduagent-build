@@ -65,6 +65,11 @@ export function mapSummaryRow(
     content: row.content ?? '',
     aiFeedback: row.aiFeedback ?? null,
     status: row.status,
+    closingLine: row.closingLine ?? null,
+    learnerRecap: row.learnerRecap ?? null,
+    nextTopicId: row.nextTopicId ?? null,
+    nextTopicTitle: null,
+    nextTopicReason: row.nextTopicReason ?? null,
   };
 }
 
