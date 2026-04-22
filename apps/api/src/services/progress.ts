@@ -216,9 +216,14 @@ export async function getTopicProgress(
     (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
   )[0];
 
-  // Count sessions for this topic
+  // Count sessions for this topic. Only sessions with at least 1 real exchange
+  // count — ghost sessions (created but abandoned with 0 exchanges) must not
+  // make a topic appear "started". Matches dashboard.ts and curriculum.ts.
   const topicSessions = await repo.sessions.findMany(
-    eq(learningSessions.topicId, topicId)
+    and(
+      eq(learningSessions.topicId, topicId),
+      gte(learningSessions.exchangeCount, 1)
+    )
   );
 
   // Check needs-deepening status
@@ -517,7 +522,12 @@ export async function getTopicProgressBatch(
     await Promise.all([
       repo.retentionCards.findMany(inArray(retentionCards.topicId, topicIds)),
       repo.assessments.findMany(inArray(assessments.topicId, topicIds)),
-      repo.sessions.findMany(inArray(learningSessions.topicId, topicIds)),
+      repo.sessions.findMany(
+        and(
+          inArray(learningSessions.topicId, topicIds),
+          gte(learningSessions.exchangeCount, 1)
+        )
+      ),
       repo.needsDeepeningTopics.findMany(
         inArray(needsDeepeningTopics.topicId, topicIds)
       ),
