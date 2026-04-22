@@ -7,6 +7,7 @@ import {
   TextInput,
   Linking,
   ScrollView,
+  AppState,
 } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
@@ -45,7 +46,7 @@ export default function CameraScreen(): React.ReactNode {
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
 
-  const [permission, requestPermission] = useCameraPermissions();
+  const [permission, requestPermission, getPermission] = useCameraPermissions();
   const [state, dispatch] = useReducer(cameraReducer, initialCameraState);
   const ocr = useHomeworkOcr();
   const cameraRef = useRef<CameraView>(null);
@@ -101,6 +102,18 @@ export default function CameraScreen(): React.ReactNode {
       dispatch({ type: 'PERMISSION_GRANTED' });
     }
   }, [permission?.granted, state.phase]);
+
+  // Re-check permission when returning from system Settings.
+  // useCameraPermissions does not auto-refresh on app resume, so the screen
+  // gets stuck in the permission phase after the user grants access externally.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'active') {
+        void getPermission();
+      }
+    });
+    return () => sub.remove();
+  }, [getPermission]);
 
   // Sync OCR hook status into reducer
   useEffect(() => {
