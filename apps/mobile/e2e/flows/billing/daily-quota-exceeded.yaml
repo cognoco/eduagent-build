@@ -32,7 +32,7 @@ tags:
 # 2. Wait for home screen
 - extendedWaitUntil:
     visible:
-      id: "home-scroll-view"
+      id: "learner-screen"
     timeout: 30000
 
 # 3. Navigate to the active session via the coaching card

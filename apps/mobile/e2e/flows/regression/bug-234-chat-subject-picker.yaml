@@ -30,7 +30,7 @@ tags:
 # 2. Wait for home screen
 - extendedWaitUntil:
     visible:
-      id: "home-scroll-view"
+      id: "learner-screen"
     timeout: 15000
 
 # 3. Navigate to freeform session (no pre-selected subject)

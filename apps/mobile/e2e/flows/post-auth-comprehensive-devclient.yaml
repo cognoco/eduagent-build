@@ -75,7 +75,7 @@ tags:
 # Wait for home screen to load (API calls + rendering)
 - extendedWaitUntil:
     visible:
-      id: "home-scroll-view"
+      id: "learner-screen"
     timeout: 30000
 
 - takeScreenshot: 02-home-screen-loaded
@@ -274,7 +274,7 @@ tags:
 
 - extendedWaitUntil:
     visible:
-      id: "home-scroll-view"
+      id: "learner-screen"
     timeout: 15000
 
 - takeScreenshot: 13-back-to-teen-home

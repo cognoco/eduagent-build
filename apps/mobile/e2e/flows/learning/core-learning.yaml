@@ -20,7 +20,7 @@ tags:
 # 2. Home screen
 - extendedWaitUntil:
     visible:
-      id: "home-scroll-view"
+      id: "learner-screen"
     timeout: 15000
 
 # ── M05 regression: tab bar visible AND tappable ──────────────────────
@@ -57,7 +57,7 @@ tags:
     id: "tab-home"
 - extendedWaitUntil:
     visible:
-      id: "home-scroll-view"
+      id: "learner-screen"
     timeout: 5000
 
 # ── M07 regression: home screen has real content (not empty) ──────────
@@ -185,7 +185,7 @@ tags:
 # 14. Verify we can reach home
 - extendedWaitUntil:
     visible:
-      id: "home-scroll-view"
+      id: "learner-screen"
     timeout: 10000
     optional: true
 

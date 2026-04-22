@@ -31,7 +31,7 @@
 # parent dashboard, PostApprovalLanding). Maestro YAML has no OR/assertAny
 # construct. Auth success is verified by EACH CALLING FLOW, which must
 # include a mandatory wait for its expected landing screen (e.g.,
-# home-scroll-view or dashboard-scroll). If auth fails silently here,
+# learner-screen or dashboard-scroll). If auth fails silently here,
 # the calling flow's mandatory assertion will catch it with a clear error.
 appId: com.mentomate.app
 ---
@@ -87,14 +87,14 @@ appId: com.mentomate.app
 
 # ── Step 3: Wait for post-auth screen ──
 # After sign-in, the app may land on one of three screens depending on persona/state:
-#   a) Learner home (id: home-scroll-view) — most common
+#   a) Learner home (id: learner-screen) — most common
 #   b) Parent dashboard (id: dashboard-scroll) — parent persona scenarios (BUG-33)
 #   c) PostApprovalLanding ("You're approved!") — onboarding-complete scenario (BUG-38)
-# We check for home-scroll-view first (30s timeout covers most cases).
+# We check for learner-screen first (30s timeout covers most cases).
 # If it's not found, the flow continues — individual flows handle their landing screen.
 - extendedWaitUntil:
     visible:
-      id: "home-scroll-view"
+      id: "learner-screen"
     timeout: 30000
     optional: true
 
@@ -128,22 +128,22 @@ appId: com.mentomate.app
 # a Practice Session (for scenarios with active sessions like retention-due,
 # homework-ready, failed-recall-3x). The session screen hides the tab bar,
 # so we can't tap Home. Instead, conditionally press Back to return to home
-# only when NEITHER home-scroll-view NOR dashboard-scroll is visible.
+# only when NEITHER learner-screen NOR dashboard-scroll is visible.
 # BUG-48: Parent scenarios redirect from home to dashboard-scroll. The brief
-# home-scroll-view appearance followed by redirect caused the old notVisible
+# learner-screen appearance followed by redirect caused the old notVisible
 # check to fire incorrectly, pressing Back and navigating away from dashboard.
 # Fix: use return-to-home-safe.yaml which checks for dashboard-scroll first.
 - runFlow:
     when:
       notVisible:
-        id: "home-scroll-view"
+        id: "learner-screen"
     file: return-to-home-safe.yaml
 
 # After all dismiss/return logic, wait for home screen (optional — parent
 # scenarios route to dashboard-scroll which was already handled above).
 - extendedWaitUntil:
     visible:
-      id: "home-scroll-view"
+      id: "learner-screen"
     timeout: 10000
     optional: true
 

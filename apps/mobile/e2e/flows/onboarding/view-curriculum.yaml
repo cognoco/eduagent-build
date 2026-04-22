@@ -23,7 +23,7 @@ tags:
 
 # 3. Verify the home scroll view is present
 - assertVisible:
-    id: "home-scroll-view"
+    id: "learner-screen"
 
 # 4. Coaching card should be present on home screen
 # optional: true — coaching card requires precomputed data which
@@ -69,7 +69,7 @@ tags:
 # 11. Verify home screen is visible
 - extendedWaitUntil:
     visible:
-      id: "home-scroll-view"
+      id: "learner-screen"
     timeout: 10000
 
 # 12. Subjects section still visible after round-trip

@@ -22,7 +22,7 @@ tags:
 # 2. Home screen loaded
 - extendedWaitUntil:
     visible:
-      id: "home-scroll-view"
+      id: "learner-screen"
     timeout: 15000
 
 # ── Visual integrity: tab bar ──────────────────────────────────────────
@@ -84,7 +84,7 @@ tags:
 # 9. Verify home screen is visible again
 - extendedWaitUntil:
     visible:
-      id: "home-scroll-view"
+      id: "learner-screen"
     timeout: 10000
 
 # 10. Verify Physics still visible after round-trip
@@ -110,7 +110,7 @@ tags:
 # 15. Verify back on home screen after curriculum round-trip
 - extendedWaitUntil:
     visible:
-      id: "home-scroll-view"
+      id: "learner-screen"
     timeout: 10000
 
 # 16. Final screenshot

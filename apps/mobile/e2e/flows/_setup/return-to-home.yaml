@@ -1,6 +1,6 @@
 # BUG-43 fix: Return to home from auto-navigated session screen.
 #
-# Called conditionally from seed-and-sign-in.yaml when home-scroll-view
+# Called conditionally from seed-and-sign-in.yaml when learner-screen
 # is NOT visible after PostApprovalLanding dismiss. The coaching card may
 # have auto-navigated to a Practice Session (tab bar hidden).
 # Back key returns to the home screen from the session.
@@ -9,5 +9,5 @@ appId: com.mentomate.app
 - pressKey: Back
 - extendedWaitUntil:
     visible:
-      id: "home-scroll-view"
+      id: "learner-screen"
     timeout: 15000

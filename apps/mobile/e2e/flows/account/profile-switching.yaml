@@ -83,7 +83,7 @@ tags:
 # Wait for the home/More screen to reappear
 - extendedWaitUntil:
     visible:
-      id: "home-scroll-view"
+      id: "learner-screen"
     timeout: 15000
     optional: true
 

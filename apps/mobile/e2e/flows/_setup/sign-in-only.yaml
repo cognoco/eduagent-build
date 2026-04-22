@@ -1,7 +1,7 @@
 # Minimal sign-in flow — no post-auth navigation recovery.
 #
 # Use this for edge-case flows where the post-auth screen is NOT the standard
-# home-scroll-view or dashboard-scroll (e.g., 0-subjects redirect to
+# learner-screen or dashboard-scroll (e.g., 0-subjects redirect to
 # create-subject, consent-withdrawn gate, etc.).
 #
 # seed-and-run.sh handles everything before Maestro: seed, app launch,
@@ -47,7 +47,7 @@ appId: com.mentomate.app
 #    PostApprovalLanding ("You're approved!"), or parent dashboard.
 - extendedWaitUntil:
     visible:
-      id: "home-scroll-view"
+      id: "learner-screen"
     timeout: 20000
     # Post-auth screen varies by scenario — home may not appear if redirected
     # to create-subject, PostApprovalLanding, or consent gate

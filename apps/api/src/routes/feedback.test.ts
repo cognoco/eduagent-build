@@ -101,7 +101,7 @@ describe('POST /feedback', () => {
       subject: string;
       from: string;
     };
-    expect(sentBody.to).toEqual(['support@mentomate.app']);
+    expect(sentBody.to).toEqual(['support@mentomate.com']);
     expect(sentBody.subject).toContain('Bug');
     expect(sentBody.from).toBe(TEST_EMAIL_FROM);
     expect(init?.headers).toEqual(

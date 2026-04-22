@@ -120,7 +120,7 @@ tags:
 # 11. Home screen reached — first-time empty state
 - extendedWaitUntil:
     visible:
-      id: "home-scroll-view"
+      id: "learner-screen"
     timeout: 15000
     optional: true
 

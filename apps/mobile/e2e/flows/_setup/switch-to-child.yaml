@@ -9,7 +9,7 @@
 # Required env var:
 #   ${CHILD_NAME} — Display name of the child profile to switch to
 #
-# After this flow, the app is on the learner home (home-scroll-view).
+# After this flow, the app is on the learner home (learner-screen).
 appId: com.mentomate.app
 ---
 # 1. Navigate to More tab (works from both parent dashboard and learner home)
@@ -56,5 +56,5 @@ appId: com.mentomate.app
 # 8. Wait for learner home screen
 - extendedWaitUntil:
     visible:
-      id: "home-scroll-view"
+      id: "learner-screen"
     timeout: 15000

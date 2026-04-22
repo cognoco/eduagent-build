@@ -17,7 +17,7 @@
 # which has 2 active subjects so the picker modal is triggered.
 #
 # testIDs verified against:
-#   - apps/mobile/src/app/(learner)/home.tsx (home-scroll-view, practice-subject-picker,
+#   - apps/mobile/src/app/(learner)/home.tsx (learner-screen, practice-subject-picker,
 #     practice-subject-${subjectId})
 #   - apps/mobile/src/components/coaching/AdaptiveEntryCard.tsx (coaching-card)
 #   - apps/mobile/src/components/coaching/BaseCoachingCard.tsx (coaching-card-primary)
@@ -41,7 +41,7 @@ tags:
 # ── 2. Wait for home screen ───────────────────────────────────────────
 - extendedWaitUntil:
     visible:
-      id: "home-scroll-view"
+      id: "learner-screen"
     timeout: 15000
 
 - takeScreenshot: practice-picker-01-home

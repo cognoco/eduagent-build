@@ -398,7 +398,17 @@ export async function prepareExchangeContext(
           : e.eventType === 'system_prompt'
           ? ('system' as const)
           : ('assistant' as const),
-      content: e.content,
+      // DB stores cleanResponse (prose only) for ai_response events, but the
+      // system prompt instructs the LLM to produce JSON envelopes. Re-wrap
+      // assistant turns in a minimal envelope so the conversation history is
+      // consistent with the format the LLM is told to produce. Without this,
+      // exchange 2+ sees contradictory history (prose vs JSON instruction) and
+      // the LLM may produce malformed output that streamEnvelopeReply can't
+      // parse — yielding empty responses.
+      content:
+        e.eventType === 'ai_response'
+          ? JSON.stringify({ reply: e.content, signals: {}, ui_hints: {} })
+          : e.content,
     }));
 
   const rawSilentClassification = sessionMeta['silentClassification'];

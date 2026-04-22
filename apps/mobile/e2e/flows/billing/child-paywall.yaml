@@ -23,7 +23,7 @@ tags:
 # 1. Sign in only — no post-auth recovery (BUG-52 fix).
 # The trial-expired-child seed creates a parent-owned account. Sign-in lands
 # on the parent dashboard, NOT learner home. Using sign-in-only avoids the
-# 40s+ of optional home-scroll-view waits in seed-and-sign-in that are wasted
+# 40s+ of optional learner-screen waits in seed-and-sign-in that are wasted
 # for parent scenarios and risk flow timeout.
 - runFlow:
     file: ../_setup/sign-in-only.yaml
@@ -57,7 +57,7 @@ tags:
 #    may complete before layout guard fully settles on WHPX emulator
 - extendedWaitUntil:
     visible:
-      id: "home-scroll-view"
+      id: "learner-screen"
     timeout: 15000
 
 # 4. Navigate to More tab

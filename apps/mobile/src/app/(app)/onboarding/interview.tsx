@@ -18,7 +18,7 @@ import { goBackOrReplace } from '../../../lib/navigation';
 import { platformAlert } from '../../../lib/platform-alert';
 
 const OPENING_MESSAGE =
-  "Hi! I'm your learning mate. I'd like to get to know you a bit before we start. What made you interested in learning this subject?";
+  "Hi! I'm your learning mate. Before we build your learning path — what do you already know about this subject? Even a rough sense is helpful.";
 
 export default function InterviewScreen() {
   const {
@@ -61,6 +61,8 @@ export default function InterviewScreen() {
   // Hooks are called unconditionally (rules of hooks).
   // ---------------------------------------------------------------------------
   const startSession = useStartSession(safeSubjectId ?? '');
+  const startSessionRef = useRef(startSession);
+  startSessionRef.current = startSession;
   const [sessionPhase, setSessionPhase] = useState(false);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const sessionCreatingRef = useRef(false);
@@ -68,7 +70,9 @@ export default function InterviewScreen() {
     useStreamMessage(activeSessionId ?? '');
 
   const openingMessage = bookTitle
-    ? `Hi! I'm your learning mate. Let's talk about ${bookTitle}! What do you already know about it, and what are you most curious to learn?`
+    ? `Hi! I'm your learning mate. Before we start — what can you tell me about ${bookTitle}? Your best understanding, even a rough guess, is a great start.`
+    : subjectName
+    ? `Hi! I'm your learning mate. Before we build your learning path — what do you already know about ${subjectName}? Even a rough sense is helpful.`
     : OPENING_MESSAGE;
 
   // BKT-C.2: Captured interest labels extracted from the interview transcript.
@@ -168,8 +172,11 @@ export default function InterviewScreen() {
     if (sessionCreatingRef.current || !safeSubjectId) return;
     sessionCreatingRef.current = true;
     try {
-      console.log('[Interview→Session] Creating session for subject', safeSubjectId);
-      const result = await startSession.mutateAsync({
+      console.log(
+        '[Interview→Session] Creating session for subject',
+        safeSubjectId
+      );
+      const result = await startSessionRef.current.mutateAsync({
         subjectId: safeSubjectId,
         sessionType: 'learning',
         inputMode: 'text',
@@ -180,11 +187,14 @@ export default function InterviewScreen() {
     } catch (err) {
       // Session creation failed — fall back to showing the "Let's Go" card
       // so the user isn't stuck on a dead screen.
-      console.error('[Interview→Session] Session creation FAILED, falling back:', err);
+      console.error(
+        '[Interview→Session] Session creation FAILED, falling back:',
+        err
+      );
       setInterviewComplete(true);
       sessionCreatingRef.current = false;
     }
-  }, [safeSubjectId, startSession]);
+  }, [safeSubjectId]);
 
   useEffect(() => {
     seededDraftRef.current = false;
@@ -313,8 +323,11 @@ export default function InterviewScreen() {
       ) {
         setExtractedInterests(result.extractedSignals.interests);
       }
-      // Seamlessly transition to learning session
-      await transitionToSession();
+      // Advance the onboarding wizard immediately. The previous approach
+      // (transitionToSession) silently entered a session phase with no
+      // visible "continue" affordance — users got stuck at step 1 because
+      // they had to find a small "Done" button in the header.
+      goToNextStep();
     } catch (err: unknown) {
       platformAlert('Could not skip ahead', formatApiError(err));
     }
@@ -323,7 +336,7 @@ export default function InterviewScreen() {
     sessionPhase,
     forceComplete,
     abortStream,
-    transitionToSession,
+    goToNextStep,
   ]);
 
   const handleSend = useCallback(

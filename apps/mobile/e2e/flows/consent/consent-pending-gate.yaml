@@ -14,7 +14,7 @@
 # Usage: ./scripts/seed-and-run.sh consent-pending flows/consent/consent-pending-gate.yaml
 #
 # NOTE: This flow does NOT use runFlow seed-and-sign-in because that flow
-# waits for home-scroll-view — but the consent-pending gate appears BEFORE
+# waits for learner-screen — but the consent-pending gate appears BEFORE
 # the tab navigator loads, blocking all app access.
 appId: com.mentomate.app
 tags:

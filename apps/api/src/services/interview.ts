@@ -295,9 +295,19 @@ export async function processInterviewExchange(
       role: 'system',
       content: `${INTERVIEW_SYSTEM_PROMPT}\n\nSubject: <subject_name>${context.subjectName}</subject_name>${focusLine}`,
     },
+    // Re-wrap assistant turns in the interview envelope so history is
+    // consistent with the JSON format the system prompt demands. DB stores
+    // cleanResponse (prose only); without re-wrapping, the LLM sees
+    // contradictory history and may produce malformed output.
     ...context.exchangeHistory.map((e) => ({
       role: e.role as 'user' | 'assistant',
-      content: e.content,
+      content:
+        e.role === 'assistant'
+          ? JSON.stringify({
+              reply: e.content,
+              signals: { ready_to_finish: false },
+            })
+          : e.content,
     })),
     { role: 'user' as const, content: userMessage },
   ];
@@ -349,9 +359,16 @@ export async function streamInterviewExchange(
       role: 'system',
       content: `${INTERVIEW_SYSTEM_PROMPT}\n\nSubject: <subject_name>${context.subjectName}</subject_name>${focusLine}`,
     },
+    // Re-wrap assistant turns — same rationale as processInterviewExchange.
     ...context.exchangeHistory.map((e) => ({
       role: e.role as 'user' | 'assistant',
-      content: e.content,
+      content:
+        e.role === 'assistant'
+          ? JSON.stringify({
+              reply: e.content,
+              signals: { ready_to_finish: false },
+            })
+          : e.content,
     })),
     { role: 'user' as const, content: userMessage },
   ];

@@ -23,7 +23,7 @@ tags:
 # 2. Home screen
 - extendedWaitUntil:
     visible:
-      id: "home-scroll-view"
+      id: "learner-screen"
     timeout: 15000
 
 # 3. Start session via coaching card

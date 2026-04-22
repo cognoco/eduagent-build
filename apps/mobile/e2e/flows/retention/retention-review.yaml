@@ -30,7 +30,7 @@ tags:
 # 2. Home screen
 - extendedWaitUntil:
     visible:
-      id: "home-scroll-view"
+      id: "learner-screen"
     timeout: 60000
 
 # 3. Look for review prompt on home screen (coaching card or banner)

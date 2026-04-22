@@ -21,7 +21,8 @@
       "mcp__Windows-MCP__Wait",
       "mcp__github__search_repositories",
       "PowerShell(Get-NetTCPConnection -State Listen | Where-Object {$_.LocalPort -in @\\(8081,8082,8083\\)} | Select-Object LocalPort,OwningProcess)",
-      "mcp__plugin_playwright_playwright__browser_navigate"
+      "mcp__plugin_playwright_playwright__browser_navigate",
+      "mcp__Claude_in_Chrome__tabs_context_mcp"
     ],
     "deny": [],
     "ask": []

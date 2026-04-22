@@ -23,7 +23,7 @@ tags:
 # 2. Verify home screen loaded
 - extendedWaitUntil:
     visible:
-      id: "home-scroll-view"
+      id: "learner-screen"
     timeout: 15000
 
 # 3. Navigate to More tab
@@ -187,7 +187,7 @@ tags:
 # Wait for learner home screen — extra time for persona switch navigation
 - extendedWaitUntil:
     visible:
-      id: "home-scroll-view"
+      id: "learner-screen"
     timeout: 30000
 
 # 22. Final screenshot — all settings fully exercised

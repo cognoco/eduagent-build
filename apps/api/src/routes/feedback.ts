@@ -24,6 +24,9 @@ const DEFAULT_SUPPORT_EMAIL = 'support@mentomate.com';
 // SEC-03: In-memory sliding-window rate limit for feedback submissions.
 // 5 submissions per hour per user. Resets on worker restart — acceptable
 // for a low-volume endpoint; avoids adding a DB/KV dependency.
+// NOTE: Each Cloudflare Worker isolate maintains independent Map state. The
+// effective limit per user is 5 × N (N = active isolates). For higher-volume
+// endpoints, replace with a KV-backed rate limiter for global enforcement.
 const FEEDBACK_RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
 const FEEDBACK_RATE_LIMIT_MAX = 5;
 const feedbackTimestamps = new Map<string, number[]>();

@@ -17,9 +17,9 @@
 #   - apps/mobile/src/components/coaching/BaseCoachingCard.tsx
 #     (parent-dashboard-summary-primary — "View details" button)
 #
-# NOTE: The seed-and-sign-in setup flow waits for id: "home-scroll-view" as its
+# NOTE: The seed-and-sign-in setup flow waits for id: "learner-screen" as its
 # final step. Parent persona lands on /(parent)/dashboard which has testID
-# "dashboard-scroll", NOT "home-scroll-view". The setup flow's last wait may
+# "dashboard-scroll", NOT "learner-screen". The setup flow's last wait may
 # timeout — auth is still completed. We add our own wait for dashboard-scroll.
 appId: com.mentomate.app
 tags:
