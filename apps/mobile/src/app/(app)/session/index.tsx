@@ -9,6 +9,7 @@ import {
 import type { ErrorInfo, ReactNode } from 'react';
 import { AppState, View, Text, Pressable, ScrollView } from 'react-native';
 import { platformAlert } from '../../../lib/platform-alert';
+import { goBackOrReplace } from '../../../lib/navigation';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type {
@@ -966,11 +967,6 @@ function SessionScreenInner() {
     router,
   });
 
-  // BUG-358 + BUG-468: Show End Session as soon as the session exists.
-  // Previously required exchangeCount > 0 for new sessions, but per the
-  // human-override rule, users must always have an escape from AI-driven screens.
-  const showEndSession = !!activeSessionId;
-
   const latestAiMessageId = useMemo(
     () =>
       isStreaming
@@ -1045,20 +1041,26 @@ function SessionScreenInner() {
     [createBookmark, deleteBookmark, updateBookmarkEntry]
   );
 
-  const endSessionButton = showEndSession ? (
+  // [UX-DE-H5] Exit button is always rendered (no gating on session existence).
+  // Before session exists → "Exit" navigates home. After → normal "I'm Done".
+  const endSessionButton = (
     <Pressable
-      onPress={handleEndSession}
+      onPress={
+        activeSessionId
+          ? handleEndSession
+          : () => goBackOrReplace(router, '/(app)/home')
+      }
       disabled={isClosing || isStreaming}
       className="ms-2 px-3 py-2 rounded-button bg-surface-elevated min-h-[44px] items-center justify-center"
       testID="end-session-button"
-      accessibilityLabel="I'm done"
+      accessibilityLabel={activeSessionId ? "I'm done" : 'Exit'}
       accessibilityRole="button"
     >
       <Text className="text-body-sm font-semibold text-text-secondary">
-        {isClosing ? 'Wrapping up...' : "I'm Done"}
+        {isClosing ? 'Wrapping up...' : activeSessionId ? "I'm Done" : 'Exit'}
       </Text>
     </Pressable>
-  ) : null;
+  );
 
   const agencyLabel = escalationRung >= 3 ? 'Guided' : 'Independent';
   const agencyBadge = (
@@ -1103,6 +1105,28 @@ function SessionScreenInner() {
     ? 'Server unreachable - messages may fail'
     : modeConfig.subtitle;
 
+  // [M6] Retry chip shown below the header when subject classification failed.
+  const classifyErrorChip = classifyError ? (
+    <View className="flex-row items-center gap-2 px-4 pb-2">
+      <Pressable
+        onPress={() => {
+          setClassifyError(null);
+          if (lastRetryPayloadRef.current) {
+            void handleSend(lastRetryPayloadRef.current.text);
+          }
+        }}
+        className="bg-surface-elevated rounded-full px-3 py-1.5 items-center justify-center"
+        accessibilityRole="button"
+        accessibilityLabel="Retry classification"
+        testID="classify-error-retry"
+      >
+        <Text className="text-body-sm font-semibold text-text-secondary">
+          Retry classification
+        </Text>
+      </Pressable>
+    </View>
+  ) : null;
+
   const sessionToolAccessory = (
     <SessionToolAccessory
       isStreaming={isStreaming}
@@ -1141,6 +1165,36 @@ function SessionScreenInner() {
   );
 
   const renderMessageActions = (message: ChatMessage): React.ReactNode => {
+    // [M5] Session-expired message: offer escape actions instead of normal chips.
+    if (message.kind === 'session_expired') {
+      return (
+        <View className="flex-row gap-2 mt-2">
+          <Pressable
+            onPress={() => goBackOrReplace(router, '/(app)/home')}
+            className="bg-primary rounded-button px-4 py-2.5 items-center justify-center min-h-[40px]"
+            accessibilityRole="button"
+            accessibilityLabel="Start new session"
+            testID="session-expired-new-session"
+          >
+            <Text className="text-body-sm font-semibold text-text-inverse">
+              Start new session
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => goBackOrReplace(router, '/(app)/home')}
+            className="bg-surface-elevated rounded-button px-4 py-2.5 items-center justify-center min-h-[40px]"
+            accessibilityRole="button"
+            accessibilityLabel="Go Home"
+            testID="session-expired-go-home"
+          >
+            <Text className="text-body-sm font-semibold text-text-secondary">
+              Go Home
+            </Text>
+          </Pressable>
+        </View>
+      );
+    }
+
     const messageActions = (
       <SessionMessageActions
         message={message}
@@ -1203,6 +1257,7 @@ function SessionScreenInner() {
       <ChatShell
         title={modeConfig.title}
         subtitle={subtitle}
+        headerBelow={classifyErrorChip}
         placeholder={modeConfig.placeholder}
         backFallback={subjectId ? `/(app)/shelf/${subjectId}` : undefined}
         messages={messages}

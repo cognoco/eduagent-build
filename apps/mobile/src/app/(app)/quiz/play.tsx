@@ -19,6 +19,7 @@ import {
 import { goBackOrReplace } from '../../../lib/navigation';
 import { platformAlert } from '../../../lib/platform-alert';
 import { useThemeColors } from '../../../lib/theme';
+import { Sentry } from '../../../lib/sentry';
 import { useQuizFlow } from './_layout';
 import {
   GuessWhoQuestion,
@@ -249,8 +250,14 @@ export default function QuizPlayScreen(): React.ReactElement {
               setCorrectAnswer(checkResult.correctAnswer);
             }
           })
-          .catch(() => {
-            /* network failure — best-effort reveal */
+          .catch((err) => {
+            Sentry.captureException(err, {
+              tags: {
+                component: 'quiz/play',
+                action: 'background_check_answer',
+              },
+              extra: { roundId, questionIndex: currentIndex },
+            });
           });
       }
     },

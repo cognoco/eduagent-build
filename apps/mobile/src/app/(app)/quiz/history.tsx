@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { useRecentRounds } from '../../../hooks/use-quiz';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { useThemeColors } from '../../../lib/theme';
+import { ErrorFallback } from '../../../components/common/ErrorFallback';
 
 // [F-037] Friendly date label — "Today" / "Yesterday" / locale long date.
 function formatDateHeader(isoDate: string): string {
@@ -34,7 +35,7 @@ const ACTIVITY_LABELS: Record<string, string> = {
 export default function QuizHistoryScreen() {
   const router = useRouter();
   const colors = useThemeColors();
-  const { data: rounds, isLoading } = useRecentRounds();
+  const { data: rounds, isLoading, isError, refetch } = useRecentRounds();
 
   if (isLoading) {
     return (
@@ -44,6 +45,28 @@ export default function QuizHistoryScreen() {
       >
         <Text className="text-on-surface-muted">Loading history...</Text>
       </View>
+    );
+  }
+
+  // [H7] Show actionable error state instead of falling through to empty.
+  if (isError) {
+    return (
+      <ErrorFallback
+        variant="centered"
+        title="Couldn't load history"
+        message="Check your connection and try again."
+        primaryAction={{
+          label: 'Retry',
+          onPress: () => void refetch(),
+          testID: 'quiz-history-retry',
+        }}
+        secondaryAction={{
+          label: 'Go Back',
+          onPress: () => goBackOrReplace(router, '/(app)/quiz'),
+          testID: 'quiz-history-go-back',
+        }}
+        testID="quiz-history-error"
+      />
     );
   }
 
