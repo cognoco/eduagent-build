@@ -14,6 +14,7 @@ import {
   teeEnvelopeStream,
   type ChatMessage,
 } from './llm';
+import { sanitizeXmlValue } from './llm/sanitize';
 import { createLogger } from './logger';
 import {
   generateCurriculum,
@@ -282,21 +283,11 @@ function interpretInterviewResponse(params: {
   };
 }
 
-// [IMP-1 follow-up] User-created free-text values (learnerName, subjectName,
-// bookTitle) are interpolated into the interview system prompt, often inside
-// XML-style tags. A crafted value containing newlines, quotes, or angle
-// brackets could either close the wrapping tag early ("</subject_name>…")
-// or land on a new line where the model might read it as a directive.
-// Strip all such characters, collapse whitespace, and cap length. This is
-// the same discipline used for pronouns in services/llm/router.ts.
-function sanitizeXmlValue(text: string, maxLen: number): string {
-  return text
-    .trim()
-    .replace(/[\n\r\t"<>]/g, ' ')
-    .replace(/\s{2,}/g, ' ')
-    .slice(0, maxLen);
-}
-
+// [IMP-1 follow-up][PROMPT-INJECT-2] User-created free-text values
+// (learnerName, subjectName, bookTitle) are interpolated into the interview
+// system prompt, often inside XML-style tags. Sanitization now lives in
+// services/llm/sanitize.ts so it can be shared with session-recap, router,
+// and the broader prompt-injection sweep.
 function buildInterviewNameLine(learnerName: string | undefined): string {
   if (!learnerName) return '';
   const sanitized = sanitizeXmlValue(learnerName, 64);

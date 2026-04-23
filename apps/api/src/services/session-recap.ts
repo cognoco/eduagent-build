@@ -9,6 +9,7 @@ import {
 } from '@eduagent/database';
 import { learnerRecapResponseSchema } from '@eduagent/schemas';
 import { extractFirstJsonObject, routeAndCall } from './llm';
+import { sanitizeXmlValue } from './llm/sanitize';
 import { createLogger } from './logger';
 
 const logger = createLogger();
@@ -43,17 +44,9 @@ export function getAgeVoiceTierLabel(birthYear: number | null): string {
     : 'teen (14-17): peer-adjacent, brief, sharp';
 }
 
-// Scrub a free-text value before interpolating it into the system prompt.
-// Strips newlines/tabs/quotes/angle-brackets so a crafted value cannot escape
-// its wrapping tag or land on a new line that looks like a directive. Matches
-// the sanitizeXmlValue helper in services/interview.ts.
-function sanitizePromptValue(text: string, maxLen: number): string {
-  return text
-    .trim()
-    .replace(/[\n\r\t"<>]/g, ' ')
-    .replace(/\s{2,}/g, ' ')
-    .slice(0, maxLen);
-}
+// [PROMPT-INJECT-2] Prompt-value sanitization now lives in
+// services/llm/sanitize.ts as sanitizeXmlValue — shared with interview.ts,
+// the broader prompt-injection sweep, and any future consumer.
 
 export function buildRecapPrompt(
   ageVoiceTier: string,
@@ -97,7 +90,7 @@ export function buildRecapPrompt(
   // curriculum creation time). Sanitize before interpolation so a stored
   // title containing quotes or angle brackets cannot break the string
   // context or escape the wrapping tag.
-  const safeTitle = sanitizePromptValue(nextTopicTitle, 120);
+  const safeTitle = sanitizeXmlValue(nextTopicTitle, 120);
   basePrompt.push(
     '',
     `A likely next topic is <next_topic>${safeTitle}</next_topic>.`,
