@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { goBackOrReplace } from '../../../lib/navigation';
@@ -44,6 +45,17 @@ export default function ProgressSubjectScreen(): React.ReactElement {
   const isLanguageSubject =
     subject?.pedagogyMode === 'four_strands' || !!languageProgress;
 
+  // [M20] Timeout escape for the loading skeleton
+  const [skeletonTimedOut, setSkeletonTimedOut] = useState(false);
+  useEffect(() => {
+    if (!inventoryQuery.isLoading) {
+      setSkeletonTimedOut(false);
+      return;
+    }
+    const t = setTimeout(() => setSkeletonTimedOut(true), 20_000);
+    return () => clearTimeout(t);
+  }, [inventoryQuery.isLoading]);
+
   // [EP15-C6] Every state must have at least one action. The prior
   // implementation jumped straight to the render tree when `!subjectId`
   // or `!subject` with no "go back" pressable — a genuine dead-end.
@@ -79,6 +91,31 @@ export default function ProgressSubjectScreen(): React.ReactElement {
   // with `subject?.subjectName ?? 'Subject progress'` and an empty body,
   // which is indistinguishable from a "this subject is gone" state.
   if (inventoryQuery.isLoading) {
+    if (skeletonTimedOut) {
+      return (
+        <View
+          className="flex-1 bg-background"
+          style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
+        >
+          <ErrorFallback
+            variant="centered"
+            title="Loading is taking too long"
+            message="Check your connection and try again."
+            primaryAction={{
+              label: 'Retry',
+              onPress: () => void inventoryQuery.refetch(),
+              testID: 'progress-subject-skeleton-timeout-retry',
+            }}
+            secondaryAction={{
+              label: 'Go Back',
+              onPress: () => goBackOrReplace(router, '/(app)/progress'),
+              testID: 'progress-subject-skeleton-timeout-back',
+            }}
+            testID="progress-subject-skeleton-timeout"
+          />
+        </View>
+      );
+    }
     return (
       <View
         className="flex-1 bg-background"

@@ -7,7 +7,7 @@ import {
   View,
 } from 'react-native';
 import { platformAlert } from '../../lib/platform-alert';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { personaFromBirthYear, useProfile } from '../../lib/profile';
@@ -20,6 +20,7 @@ import {
 } from '../../components/mentor-memory-sections';
 import { TellMentorInput } from '../../components/tell-mentor-input';
 import { goBackOrReplace } from '../../lib/navigation';
+import { ErrorFallback } from '../../components/common';
 import { formatRelativeDate } from '../../lib/format-relative-date';
 import {
   useDeleteAllMemory,
@@ -44,6 +45,17 @@ export default function MentorMemoryScreen() {
   const unsuppress = useUnsuppressInference();
   const grantConsent = useGrantMemoryConsent();
   const [draft, setDraft] = useState('');
+
+  // [H12] Timeout escape for loading spinner
+  const [loadTimedOut, setLoadTimedOut] = useState(false);
+  useEffect(() => {
+    if (!isLoading) {
+      setLoadTimedOut(false);
+      return;
+    }
+    const t = setTimeout(() => setLoadTimedOut(true), 15_000);
+    return () => clearTimeout(t);
+  }, [isLoading]);
 
   const learningStyleRows = useMemo(
     () => getLearningStyleRows(profile?.learningStyle ?? null),
@@ -148,6 +160,31 @@ export default function MentorMemoryScreen() {
   const consentStatus = profile?.memoryConsentStatus ?? 'pending';
 
   if (isLoading) {
+    if (loadTimedOut) {
+      return (
+        <View
+          className="flex-1 bg-background"
+          style={{ paddingTop: insets.top }}
+        >
+          <ErrorFallback
+            variant="centered"
+            title="Loading is taking too long"
+            message="Check your connection and try again."
+            primaryAction={{
+              label: 'Retry',
+              onPress: () => void refetch(),
+              testID: 'mentor-memory-load-timeout-retry',
+            }}
+            secondaryAction={{
+              label: 'Go Back',
+              onPress: () => goBackOrReplace(router, '/(app)/more'),
+              testID: 'mentor-memory-load-timeout-back',
+            }}
+            testID="mentor-memory-load-timeout"
+          />
+        </View>
+      );
+    }
     return (
       <View
         className="flex-1 bg-background items-center justify-center"

@@ -34,6 +34,8 @@ import {
 } from '../../lib/pending-auth-redirect';
 import { platformAlert } from '../../lib/platform-alert';
 import { FeedbackProvider } from '../../components/feedback/FeedbackProvider';
+import { ErrorFallback } from '../../components/common';
+import { goBackOrReplace } from '../../lib/navigation';
 import { useSubjects } from '../../hooks/use-subjects';
 import { usePermissionSetup } from '../../hooks/use-permission-setup';
 import { PermissionSetupGate } from '../../components/PermissionSetupGate';
@@ -1047,6 +1049,7 @@ function ConsentPendingGate(): React.ReactElement {
 
 export default function AppLayout() {
   const { isLoaded, isSignedIn } = useAuth();
+  const { signOut: clerkSignOut } = useClerk();
   const colors = useThemeColors();
   const tokenVars = useTokenVars();
   const insets = useSafeAreaInsets();
@@ -1065,6 +1068,32 @@ export default function AppLayout() {
 
   const pendingAuthRedirect = isSignedIn ? peekPendingAuthRedirect() : null;
   const replayedAuthRedirectRef = React.useRef<string | null>(null);
+
+  // [M14] Timeout for pendingAuthRedirect spinner
+  const [pendingRedirectTimedOut, setPendingRedirectTimedOut] =
+    React.useState(false);
+  const isPendingRedirectSpinning = !!(
+    pendingAuthRedirect && currentAppPath !== pendingAuthRedirect
+  );
+  React.useEffect(() => {
+    if (!isPendingRedirectSpinning) {
+      setPendingRedirectTimedOut(false);
+      return;
+    }
+    const t = setTimeout(() => setPendingRedirectTimedOut(true), 15_000);
+    return () => clearTimeout(t);
+  }, [isPendingRedirectSpinning]);
+
+  // [M15] Timeout for isProfileLoading spinner
+  const [profileLoadTimedOut, setProfileLoadTimedOut] = React.useState(false);
+  React.useEffect(() => {
+    if (!isProfileLoading) {
+      setProfileLoadTimedOut(false);
+      return;
+    }
+    const t = setTimeout(() => setProfileLoadTimedOut(true), 20_000);
+    return () => clearTimeout(t);
+  }, [isProfileLoading]);
 
   // Age-gated Sentry: re-evaluate on profile switch (Story 10.14)
   React.useEffect(() => {
@@ -1148,6 +1177,23 @@ export default function AppLayout() {
   }
 
   if (pendingAuthRedirect && currentAppPath !== pendingAuthRedirect) {
+    if (pendingRedirectTimedOut) {
+      return (
+        <View className="flex-1 bg-background">
+          <ErrorFallback
+            variant="centered"
+            title="Couldn't finish navigating"
+            message="Tap below to go home."
+            primaryAction={{
+              label: 'Go Home',
+              onPress: () => goBackOrReplace(router, '/(app)/home'),
+              testID: 'auth-redirect-timeout-home',
+            }}
+            testID="auth-redirect-timeout"
+          />
+        </View>
+      );
+    }
     return (
       <View
         className="flex-1 bg-background items-center justify-center"
@@ -1162,7 +1208,32 @@ export default function AppLayout() {
   // screen) because the loading state also fires after switchProfile resets
   // queries.  Returning null made the entire screen disappear on every
   // profile switch and during initial load.
-  if (isProfileLoading)
+  if (isProfileLoading) {
+    if (profileLoadTimedOut) {
+      return (
+        <View className="flex-1 bg-background">
+          <ErrorFallback
+            variant="centered"
+            title="Loading your profile is taking too long"
+            message="Try again, or sign out and back in."
+            primaryAction={{
+              label: 'Retry',
+              onPress: () => setProfileLoadTimedOut(false),
+              testID: 'profile-loading-timeout-retry',
+            }}
+            secondaryAction={{
+              label: 'Sign out',
+              onPress: () => {
+                clearTransitionState();
+                void clerkSignOut();
+              },
+              testID: 'profile-loading-timeout-signout',
+            }}
+            testID="profile-loading-timeout"
+          />
+        </View>
+      );
+    }
     return (
       <View
         className="flex-1 bg-background items-center justify-center"
@@ -1171,6 +1242,7 @@ export default function AppLayout() {
         <ActivityIndicator size="large" />
       </View>
     );
+  }
 
   // FeedbackProvider wraps ALL authenticated screens (including gates) so
   // shake-to-give-feedback works everywhere after sign-in. Previously it only

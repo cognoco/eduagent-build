@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Modal,
   Platform,
   Pressable,
@@ -15,7 +16,9 @@ import type { Subject, RetentionStatus } from '@eduagent/schemas';
 import {
   BookPageFlipAnimation,
   BrandCelebration,
+  ErrorFallback,
 } from '../../components/common';
+import { goBackOrReplace } from '../../lib/navigation';
 import type {
   LibraryTab,
   ShelfItem,
@@ -132,6 +135,18 @@ export default function LibraryScreen() {
   // TanStack Query's select can be bypassed when enabled=false.
   const subjects = Array.isArray(subjectsQuery.data) ? subjectsQuery.data : [];
   const progressQuery = useOverallProgress();
+
+  // [M19] Timeout escape for subjects/progress loading spinner
+  const isSubjectsLoading = subjectsQuery.isLoading || progressQuery.isLoading;
+  const [subjectsLoadTimedOut, setSubjectsLoadTimedOut] = useState(false);
+  useEffect(() => {
+    if (!isSubjectsLoading) {
+      setSubjectsLoadTimedOut(false);
+      return;
+    }
+    const t = setTimeout(() => setSubjectsLoadTimedOut(true), 15_000);
+    return () => clearTimeout(t);
+  }, [isSubjectsLoading]);
   const updateSubject = useUpdateSubject();
   const allBooksQuery = useAllBooks();
   const noteTopicIdsQuery = useNoteTopicIds();
@@ -272,6 +287,29 @@ export default function LibraryScreen() {
 
   const renderContent = (): React.ReactElement => {
     if (subjectsQuery.isLoading || progressQuery.isLoading) {
+      if (subjectsLoadTimedOut) {
+        return (
+          <ErrorFallback
+            variant="centered"
+            title="Library is taking too long to load"
+            message="Check your connection and try again."
+            primaryAction={{
+              label: 'Retry',
+              onPress: () => {
+                void subjectsQuery.refetch();
+                void progressQuery.refetch();
+              },
+              testID: 'library-load-timeout-retry',
+            }}
+            secondaryAction={{
+              label: 'Go Home',
+              onPress: () => goBackOrReplace(router, '/(app)/home'),
+              testID: 'library-load-timeout-home',
+            }}
+            testID="library-load-timeout"
+          />
+        );
+      }
       return (
         <View className="py-8 items-center" testID="library-loading">
           <BookPageFlipAnimation size={80} color={themeColors.accent} />
@@ -368,21 +406,33 @@ export default function LibraryScreen() {
             </Pressable>
           </View>
         )}
-        {activeTab === 'books' && !allBooksQuery.isError && (
-          <BooksTab
-            books={allBooksQuery.books}
-            subjects={subjectList}
-            state={booksTabState}
-            onStateChange={setBooksTabState}
-            onBookPress={(subjectId, bookId) => {
-              router.push({
-                pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
-                params: { subjectId, bookId },
-              } as never);
-            }}
-            onAddSubject={() => router.push('/create-subject')}
-          />
-        )}
+        {activeTab === 'books' &&
+          !allBooksQuery.isError &&
+          allBooksQuery.isLoading && (
+            <View className="py-8 items-center" testID="books-tab-loading">
+              <ActivityIndicator size="small" />
+              <Text className="text-body-sm text-text-secondary mt-3">
+                Loading books...
+              </Text>
+            </View>
+          )}
+        {activeTab === 'books' &&
+          !allBooksQuery.isError &&
+          !allBooksQuery.isLoading && (
+            <BooksTab
+              books={allBooksQuery.books}
+              subjects={subjectList}
+              state={booksTabState}
+              onStateChange={setBooksTabState}
+              onBookPress={(subjectId, bookId) => {
+                router.push({
+                  pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
+                  params: { subjectId, bookId },
+                } as never);
+              }}
+              onAddSubject={() => router.push('/create-subject')}
+            />
+          )}
         {activeTab === 'topics' && (
           <TopicsTab
             topics={allTopics}
