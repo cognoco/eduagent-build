@@ -70,8 +70,8 @@ export class UpstreamLlmError extends Error {
  * letting it bubble as a 500.
  */
 export class VocabularyContextError extends Error {
-  constructor(message: string) {
-    super(message);
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
     this.name = 'VocabularyContextError';
   }
 }
