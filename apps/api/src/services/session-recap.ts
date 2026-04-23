@@ -141,6 +141,16 @@ export async function resolveNextTopic(
   );
 }
 
+/**
+ * Matches learner recap takeaways against curriculum topics inside a subject.
+ *
+ * SECURITY: `subjectId` MUST come from a server-trusted source — typically the
+ * `subjectId` column on the learning_session row being recapped — never from
+ * an event payload or client-controlled input. The scoped repo call below
+ * joins through `subjects.profileId = repo.profileId`, so ownership is
+ * enforced in SQL, but we still want callers to treat this id as trusted data
+ * so the enforcement never becomes load-bearing on a single layer.
+ */
 export async function matchFreeformTopic(
   repo: ScopedRepository,
   subjectId: string,
