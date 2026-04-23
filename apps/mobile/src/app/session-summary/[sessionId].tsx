@@ -32,6 +32,7 @@ import {
   CheckmarkPopAnimation,
   BrandCelebration,
   ShimmerSkeleton,
+  ErrorFallback,
 } from '../../components/common';
 
 // BUG-33 Phase 1: Structured sentence starters shown as suggestion chips
@@ -204,11 +205,16 @@ export default function SessionSummaryScreen() {
 
   if (!sessionId) {
     return (
-      <View className="flex-1 bg-background items-center justify-center px-6">
-        <Text className="text-text-secondary text-body text-center">
-          Session not found.
-        </Text>
-      </View>
+      <ErrorFallback
+        variant="centered"
+        title="Session not found"
+        message="We couldn't find this session. Head home to start a new one."
+        primaryAction={{
+          label: 'Go Home',
+          onPress: () => goBackOrReplace(router, '/(app)/home'),
+          testID: 'session-summary-missing-param',
+        }}
+      />
     );
   }
 

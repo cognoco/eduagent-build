@@ -2,7 +2,7 @@ import { View, Text, Pressable, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { AnalogyDomainPicker } from '../../../components/common';
+import { AnalogyDomainPicker, ErrorFallback } from '../../../components/common';
 import {
   useAnalogyDomain,
   useUpdateAnalogyDomain,
@@ -28,9 +28,16 @@ export default function SubjectSettingsScreen() {
 
   if (!subjectId) {
     return (
-      <View className="flex-1 bg-background items-center justify-center">
-        <Text className="text-text-secondary">No subject selected</Text>
-      </View>
+      <ErrorFallback
+        variant="centered"
+        title="No subject selected"
+        message="We couldn't load this subject. Head home and try again."
+        primaryAction={{
+          label: 'Go Home',
+          onPress: () => goBackOrReplace(router, '/(app)/home'),
+          testID: 'subject-missing-param',
+        }}
+      />
     );
   }
 

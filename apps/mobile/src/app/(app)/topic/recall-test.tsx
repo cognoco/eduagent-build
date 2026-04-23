@@ -12,6 +12,8 @@ import {
 } from '../../../components/progress';
 import { useSubmitRecallTest } from '../../../hooks/use-retention';
 import { formatApiError } from '../../../lib/format-api-error';
+import { ErrorFallback } from '../../../components/common';
+import { goBackOrReplace } from '../../../lib/navigation';
 
 const OPENING_MESSAGE: ChatMessage = {
   id: 'ai-opening',
@@ -192,11 +194,16 @@ export default function RecallTestScreen() {
 
   if (!topicId) {
     return (
-      <View className="flex-1 bg-background items-center justify-center px-6">
-        <Text className="text-text-secondary text-body text-center">
-          Topic not found.
-        </Text>
-      </View>
+      <ErrorFallback
+        variant="centered"
+        title="Topic not found"
+        message="We couldn't load this topic. Head to the library to pick one."
+        primaryAction={{
+          label: 'Go to Library',
+          onPress: () => goBackOrReplace(router, '/(app)/library'),
+          testID: 'recall-test-missing-topic',
+        }}
+      />
     );
   }
 
@@ -211,10 +218,21 @@ export default function RecallTestScreen() {
       onBookPress={() => router.push('/(app)/library')}
     />
   ) : inputDisabled ? (
-    <View className="mt-4 items-center">
-      <Text className="text-body-sm text-text-secondary">
+    <View className="mt-4 items-center px-4">
+      <Text className="text-body-sm text-text-secondary text-center mb-3">
         Head back to your Library whenever you're ready.
       </Text>
+      <Pressable
+        onPress={() => goBackOrReplace(router, '/(app)/library')}
+        className="bg-primary rounded-button px-6 py-3 items-center"
+        accessibilityRole="button"
+        accessibilityLabel="Go to Library"
+        testID="recall-test-success-go-library"
+      >
+        <Text className="text-body font-semibold text-text-inverse">
+          Go to Library
+        </Text>
+      </Pressable>
     </View>
   ) : undefined;
 
@@ -249,6 +267,7 @@ export default function RecallTestScreen() {
         inputAccessory={inputAccessory}
         placeholder="Explain what you remember..."
         messagesTestID="recall-messages"
+        backFallback="/(app)/library"
       />
     </View>
   );
