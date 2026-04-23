@@ -194,7 +194,10 @@ export default function ConsentScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <Animated.View
-          style={{ opacity: fadeAnim, pointerEvents: isTransitioning ? 'none' : 'auto' }}
+          style={{
+            opacity: fadeAnim,
+            pointerEvents: isTransitioning ? 'none' : 'auto',
+          }}
         >
           {phase === 'child' && (
             <View testID="consent-child-view">
@@ -355,6 +358,15 @@ export default function ConsentScreen() {
                   label="Back to child"
                   onPress={() => transitionToPhase('child')}
                   testID="consent-back-to-child"
+                />
+              </View>
+              <View className="flex-row justify-center mt-2">
+                <Button
+                  variant="tertiary"
+                  size="small"
+                  label="Go back"
+                  onPress={handleClose}
+                  testID="consent-parent-cancel"
                 />
               </View>
             </View>

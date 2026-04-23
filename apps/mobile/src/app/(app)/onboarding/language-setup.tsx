@@ -204,6 +204,30 @@ export default function LanguageSetup() {
         {error !== '' && (
           <View className="bg-danger/10 rounded-card px-4 py-3 mb-4">
             <Text className="text-danger text-body-sm">{error}</Text>
+            <View className="flex-row gap-3 mt-3">
+              <Pressable
+                onPress={() => void handleContinue()}
+                className="bg-primary rounded-button px-4 py-2.5 items-center flex-1 min-h-[44px] justify-center"
+                accessibilityRole="button"
+                accessibilityLabel="Try again"
+                testID="language-setup-error-retry"
+              >
+                <Text className="text-text-inverse text-body-sm font-semibold">
+                  Try again
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => goBackOrReplace(router, '/(app)/home')}
+                className="bg-surface rounded-button px-4 py-2.5 items-center flex-1 min-h-[44px] justify-center"
+                accessibilityRole="button"
+                accessibilityLabel="Cancel"
+                testID="language-setup-error-cancel"
+              >
+                <Text className="text-text-primary text-body-sm font-semibold">
+                  Cancel
+                </Text>
+              </Pressable>
+            </View>
           </View>
         )}
 
