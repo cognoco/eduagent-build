@@ -23,6 +23,7 @@ import {
   buildDraftResumeSummary,
 } from '../services/interview';
 import { notFound } from '../errors';
+import { captureException } from '../services/sentry';
 
 type InterviewRouteEnv = {
   Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
@@ -159,7 +160,14 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
         stream = streamResult.stream;
         onComplete = streamResult.onComplete;
       } catch (err) {
-        console.error('[interview/stream] Failed to start stream:', err);
+        captureException(err, {
+          profileId,
+          extra: {
+            route: 'interview/stream',
+            phase: 'stream_start',
+            subjectId,
+          },
+        });
         return c.json(
           {
             code: 'LLM_UNAVAILABLE',
@@ -230,7 +238,15 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
             }),
           });
         } catch (err) {
-          console.error('[interview/stream] Post-stream write failed:', err);
+          captureException(err, {
+            profileId,
+            extra: {
+              route: 'interview/stream',
+              phase: 'post_stream_write',
+              subjectId,
+              draftId: draft.id,
+            },
+          });
           await sseStream.writeSSE({
             data: JSON.stringify({
               type: 'error',

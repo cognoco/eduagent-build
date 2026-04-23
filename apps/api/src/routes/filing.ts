@@ -106,7 +106,14 @@ export const filingRoutes = new Hono<FilingRouteEnv>()
             },
           })
           .catch((retryErr) => {
-            console.error('[filing] Failed to send retry event:', retryErr);
+            captureException(retryErr, {
+              profileId,
+              extra: {
+                event: 'app/filing.retry',
+                sessionId: body.sessionId,
+                phase: 'fileToLibrary',
+              },
+            });
           });
       }
       // Pre-session fallback: file under "Uncategorized" book so the session
@@ -158,7 +165,14 @@ export const filingRoutes = new Hono<FilingRouteEnv>()
             },
           })
           .catch((retryErr) => {
-            console.error('[filing] Failed to send retry event:', retryErr);
+            captureException(retryErr, {
+              profileId,
+              extra: {
+                event: 'app/filing.retry',
+                sessionId: body.sessionId,
+                phase: 'resolveFilingResult',
+              },
+            });
           });
       }
       return c.json(

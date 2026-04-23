@@ -17,6 +17,7 @@ import { getBookSessions } from '../services/session';
 import { generateBookTopics } from '../services/book-generation';
 import { getProfileAge } from '../services/profile';
 import { inngest } from '../inngest/client';
+import { captureException } from '../services/sentry';
 
 type BooksRouteEnv = {
   Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
@@ -130,14 +131,24 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
           generated.connections
         );
 
-        // Fire-and-forget: pre-generate next books in background
+        // Fire-and-forget: pre-generate next books in background.
+        // Pre-generation is an optimization, so dispatch failure must not
+        // block the response — but it MUST be observable so we can see if
+        // the optimization silently stops working.
         inngest
           .send({
             name: 'app/book.topics-generated',
             data: { subjectId, bookId, profileId },
           })
-          .catch(() => {
-            // Non-critical — pre-generation is an optimization
+          .catch((err) => {
+            captureException(err, {
+              profileId,
+              extra: {
+                event: 'app/book.topics-generated',
+                subjectId,
+                bookId,
+              },
+            });
           });
 
         return c.json(persisted);
