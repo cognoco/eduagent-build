@@ -38,6 +38,7 @@ import {
 import { calculateMasteryScore } from './assessments';
 import { syncXpLedgerStatus } from './xp';
 import { routeAndCall, type ChatMessage } from './llm';
+import { captureException } from './sentry';
 import { escapeXml, sanitizeXmlValue } from './llm/sanitize';
 import { NotFoundError } from '../errors';
 
@@ -513,7 +514,18 @@ export async function processRecallTest(
     try {
       await syncXpLedgerStatus(db, profileId, input.topicId, result.xpChange);
     } catch (err) {
+      // [AUDIT-SILENT-FAIL] Non-fatal for the recall response, but must be
+      // visible — XP ledger drift silently accumulates across sessions if we
+      // only console.error. Escalate so the fallback is queryable in Sentry.
       console.error('[processRecallTest] XP sync failed (non-fatal):', err);
+      captureException(err, {
+        profileId,
+        extra: {
+          site: 'processRecallTest.syncXpLedgerStatus',
+          topicId: input.topicId,
+          xpChange: result.xpChange,
+        },
+      });
     }
   }
 

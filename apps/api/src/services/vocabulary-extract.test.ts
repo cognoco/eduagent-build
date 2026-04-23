@@ -6,8 +6,18 @@ jest.mock('./llm', () => ({
   routeAndCall: jest.fn(),
 }));
 
+jest.mock('./sentry', () => ({
+  captureException: jest.fn(),
+  addBreadcrumb: jest.fn(),
+}));
+
 import { extractVocabularyFromTranscript } from './vocabulary-extract';
 import { routeAndCall } from './llm';
+import { captureException } from './sentry';
+
+const mockCaptureException = captureException as jest.MockedFunction<
+  typeof captureException
+>;
 
 const mockRouteAndCall = routeAndCall as jest.MockedFunction<
   typeof routeAndCall
@@ -103,6 +113,30 @@ describe('extractVocabularyFromTranscript', () => {
     );
 
     expect(result).toEqual([]);
+  });
+
+  // [AUDIT-SILENT-FAIL] Break test — empty-on-error is indistinguishable
+  // from a genuine-empty extraction for the Inngest caller. Without Sentry
+  // escalation an LLM outage would silently skip ALL vocabulary updates
+  // with no signal.
+  it('[AUDIT-SILENT-FAIL] escalates to Sentry when extraction throws', async () => {
+    const err = new Error('LLM unavailable');
+    mockRouteAndCall.mockRejectedValueOnce(err);
+
+    await extractVocabularyFromTranscript(sampleTranscript, 'es', 'A2');
+
+    expect(mockCaptureException).toHaveBeenCalledTimes(1);
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      err,
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          site: 'extractVocabularyFromTranscript',
+          languageCode: 'es',
+          cefrLevel: 'A2',
+          transcriptTurns: sampleTranscript.length,
+        }),
+      })
+    );
   });
 
   it('handles malformed LLM JSON response — invalid JSON string', async () => {

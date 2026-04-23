@@ -2,6 +2,7 @@ import { cefrLevelSchema } from '@eduagent/schemas';
 import { getLanguageByCode } from '../data/languages';
 import { routeAndCall, type ChatMessage } from './llm';
 import { escapeXml } from './llm/sanitize';
+import { captureException } from './sentry';
 
 export interface ExtractedVocabularyItem {
   term: string;
@@ -101,11 +102,20 @@ export async function extractVocabularyFromTranscript(
         };
       });
   } catch (err) {
-    // SC-6: Log at error level for prod observability. Returning [] is intentional —
-    // the caller (session-completed Inngest fn) treats empty-on-error same as
-    // genuine-empty (skips vocabulary update), which is acceptable for this
-    // best-effort extraction step.
+    // SC-6 / [AUDIT-SILENT-FAIL]: Log AND escalate. The caller (session-
+    // completed Inngest fn) treats empty-on-error the same as genuine-empty
+    // and skips the vocabulary update — without captureException we can't
+    // distinguish "no new vocab in session" from "LLM outage suppressed all
+    // learning extraction." Escalate so the degraded path is queryable.
     console.error('[extractVocabularyFromTranscript] extraction failed:', err);
+    captureException(err, {
+      extra: {
+        site: 'extractVocabularyFromTranscript',
+        languageCode,
+        cefrLevel: cefrLevel ?? null,
+        transcriptTurns: transcript.length,
+      },
+    });
     return [];
   }
 }

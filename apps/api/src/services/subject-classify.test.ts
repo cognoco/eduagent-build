@@ -10,9 +10,19 @@ jest.mock('./subject', () => ({
   listSubjects: jest.fn(),
 }));
 
+jest.mock('./sentry', () => ({
+  captureException: jest.fn(),
+  addBreadcrumb: jest.fn(),
+}));
+
 import { classifySubject } from './subject-classify';
 import { routeAndCall } from './llm';
 import { listSubjects } from './subject';
+import { captureException } from './sentry';
+
+const mockCaptureException = captureException as jest.MockedFunction<
+  typeof captureException
+>;
 
 const mockRouteAndCall = routeAndCall as jest.MockedFunction<
   typeof routeAndCall
@@ -77,6 +87,53 @@ describe('classifySubject', () => {
     expect(result.candidates).toEqual([]);
     expect(result.needsConfirmation).toBe(true);
     expect(result.suggestedSubjectName).toBeNull();
+  });
+
+  // [AUDIT-SILENT-FAIL] Break test — a silent fallback in the zero-subject
+  // path would mask LLM outages. Sentry escalation is mandatory.
+  it('[AUDIT-SILENT-FAIL] escalates to Sentry when LLM fails on zero-subject path', async () => {
+    mockListSubjects.mockResolvedValueOnce([]);
+    const err = new Error('LLM unavailable');
+    mockRouteAndCall.mockRejectedValueOnce(err);
+
+    await classifySubject(FAKE_DB, PROFILE_ID, 'some text');
+
+    expect(mockCaptureException).toHaveBeenCalledTimes(1);
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      err,
+      expect.objectContaining({
+        profileId: PROFILE_ID,
+        extra: expect.objectContaining({
+          site: 'classifySubject.zeroSubjectPath',
+        }),
+      })
+    );
+  });
+
+  // [AUDIT-SILENT-FAIL] Break test — the multi-subject path's empty-
+  // candidates response is indistinguishable from a genuine no-match, so
+  // Sentry escalation is how we detect degraded-LLM in production.
+  it('[AUDIT-SILENT-FAIL] escalates to Sentry when LLM fails on multi-subject path', async () => {
+    mockListSubjects.mockResolvedValueOnce([
+      makeSubject('sub-001', 'Mathematics'),
+      makeSubject('sub-002', 'Physics'),
+    ]);
+    const err = new Error('LLM unavailable');
+    mockRouteAndCall.mockRejectedValueOnce(err);
+
+    await classifySubject(FAKE_DB, PROFILE_ID, 'some text');
+
+    expect(mockCaptureException).toHaveBeenCalledTimes(1);
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      err,
+      expect.objectContaining({
+        profileId: PROFILE_ID,
+        extra: expect.objectContaining({
+          site: 'classifySubject.multiSubjectPath',
+          subjectCount: 2,
+        }),
+      })
+    );
   });
 
   it('auto-matches with 0.9 confidence when learner has a single subject', async () => {
@@ -392,11 +449,7 @@ describe('classifySubject', () => {
         suggestedSubjectName: null,
       });
 
-      await classifySubject(
-        FAKE_DB,
-        PROFILE_ID,
-        'teach me about Easter'
-      );
+      await classifySubject(FAKE_DB, PROFILE_ID, 'teach me about Easter');
 
       const systemMessage = mockRouteAndCall.mock.calls[0]?.[0]?.[0];
       expect(systemMessage?.content).toContain('cross-disciplinary');
