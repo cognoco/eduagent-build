@@ -12,6 +12,18 @@ cd "$E2E_DIR" || { echo "[e2e-lib] Failed to cd into $E2E_DIR" >&2; exit 1; }
 SEED_SCRIPT="./scripts/seed-and-run.sh"
 FAST="${FAST:-1}"
 
+# Run infrastructure preflight ONCE per batch. The checks are the automated
+# form of docs/E2Edocs/e2e-session-2026-04-22-struggles.md's post-mortem —
+# they catch the cascade that produced BUG-594..622 (stale bundle proxy,
+# missing APK after -wipe-data, missing TEST_SEED_SECRET, stuck UIAutomator
+# lock) before the harness wastes 30+ min running tests doomed to fail.
+# shellcheck source=e2e-preflight.sh
+source "$SCRIPT_DIR/e2e-preflight.sh"
+if ! run_preflight; then
+  echo "[e2e-lib] Preflight failed — aborting batch. Fix the issue above and re-run." >&2
+  exit 1
+fi
+
 export TEMP="${TEMP:-/tmp}"
 export TMP="${TMP:-/tmp}"
 
