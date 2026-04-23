@@ -77,6 +77,8 @@ export default function SessionSummaryScreen() {
   const [aiFeedback, setAiFeedback] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [recapTimedOut, setRecapTimedOut] = useState(false);
+  // UX-DE-M2: timeout guard — escape from unbounded loading spinner
+  const [loadingTimedOut, setLoadingTimedOut] = useState(false);
 
   // R-3: Ref-based locks — isPending resets before Alert callbacks fire,
   // allowing double-submission if user taps rapidly.
@@ -146,6 +148,16 @@ export default function SessionSummaryScreen() {
     const timer = setTimeout(() => setRecapTimedOut(true), 15_000);
     return () => clearTimeout(timer);
   }, [exchangeCountForRecap, persisted?.learnerRecap, recapTimedOut]);
+
+  // UX-DE-M2: 15s escape from the initial loading spinner
+  useEffect(() => {
+    if (!transcript.isLoading) {
+      setLoadingTimedOut(false);
+      return;
+    }
+    const t = setTimeout(() => setLoadingTimedOut(true), 15_000);
+    return () => clearTimeout(t);
+  }, [transcript.isLoading]);
 
   const showSubmittedView = submitted || isPersistedSubmitted;
   const displayContent = submitted ? summaryText : persisted?.content ?? '';
@@ -235,7 +247,7 @@ export default function SessionSummaryScreen() {
           This session is no longer available. Head home to start a new one.
         </Text>
         <Pressable
-          onPress={() => router.replace('/(app)/home')}
+          onPress={() => goBackOrReplace(router, '/(app)/home')}
           className="bg-primary rounded-button py-3 px-8 items-center"
           testID="expired-session-go-home"
           accessibilityLabel="Go home"
@@ -261,7 +273,7 @@ export default function SessionSummaryScreen() {
           We couldn&apos;t load this session. It may no longer exist.
         </Text>
         <Pressable
-          onPress={() => router.replace('/(app)/home')}
+          onPress={() => goBackOrReplace(router, '/(app)/home')}
           className="bg-primary rounded-button py-3 px-8 items-center"
           testID="session-not-found-go-home"
           accessibilityLabel="Go home"
@@ -275,12 +287,33 @@ export default function SessionSummaryScreen() {
     );
   }
 
+  // UX-DE-M2: timeout guard + goBackOrReplace
   if (
     !exchangeCount &&
     !wallClockSeconds &&
     transcript.isLoading &&
     !transcript.data
   ) {
+    if (loadingTimedOut) {
+      return (
+        <ErrorFallback
+          variant="centered"
+          title="Taking longer than expected"
+          message="We couldn't load your session summary. Check your connection and try again."
+          primaryAction={{
+            label: 'Try Again',
+            onPress: () => {
+              setLoadingTimedOut(false);
+              void transcript.refetch();
+            },
+          }}
+          secondaryAction={{
+            label: 'Go Home',
+            onPress: () => goBackOrReplace(router, '/(app)/home'),
+          }}
+        />
+      );
+    }
     return (
       <View className="flex-1 bg-background items-center justify-center px-6">
         <ActivityIndicator />

@@ -163,7 +163,11 @@ export default function ChildDetailScreen() {
     viewer: 'parent',
   });
   const markCelebrationsSeen = useMarkCelebrationsSeen();
-  const { data: consentData } = useChildConsentStatus(profileId);
+  const {
+    data: consentData,
+    isError: isConsentError,
+    refetch: refetchConsent,
+  } = useChildConsentStatus(profileId);
   const { data: learnerProfile } = useChildLearnerProfile(profileId);
   const revokeConsent = useRevokeConsent(profileId);
   const restoreConsent = useRestoreConsent(profileId);
@@ -716,8 +720,28 @@ export default function ChildDetailScreen() {
           </Pressable>
         ))}
 
+        {/* UX-DE-L11: surface consent-query errors */}
+        {isConsentError && (
+          <View className="mt-8 mb-4 bg-surface rounded-card px-4 py-3.5">
+            <Text className="text-body text-text-secondary mb-2">
+              Consent settings couldn't be loaded
+            </Text>
+            <Pressable
+              onPress={() => void refetchConsent()}
+              className="self-start"
+              accessibilityRole="button"
+              accessibilityLabel="Retry loading consent settings"
+              testID="consent-retry"
+            >
+              <Text className="text-body text-primary font-semibold">
+                Retry
+              </Text>
+            </Pressable>
+          </View>
+        )}
+
         {/* Consent Management */}
-        {consentData?.consentStatus != null && (
+        {!isConsentError && consentData?.consentStatus != null && (
           <View className="mt-8 mb-4" testID="consent-section">
             <Text className="text-h3 font-semibold text-text-primary mb-2">
               {child?.displayName

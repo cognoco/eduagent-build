@@ -182,7 +182,8 @@ describe('PickBookScreen', () => {
 
     const { getByTestId, getByText } = render(<PickBookScreen />);
     expect(getByTestId('pick-book-error')).toBeTruthy();
-    expect(getByText('Retry')).toBeTruthy();
+    // UX-DE-M11: recoveryActions maps retry → "Try Again" label (app-wide convention)
+    expect(getByText('Try Again')).toBeTruthy();
     expect(getByTestId('pick-book-back-button')).toBeTruthy();
   });
 

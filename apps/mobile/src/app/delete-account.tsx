@@ -140,7 +140,15 @@ export default function DeleteAccountScreen() {
               )}
             </Pressable>
             <Pressable
-              onPress={() => void signOut()}
+              onPress={() =>
+                // UX-DE-H2: surface signOut failure
+                void signOut().catch(() => {
+                  platformAlert(
+                    'Sign out failed',
+                    'Please close and reopen the app, then sign in again.'
+                  );
+                })
+              }
               className="bg-surface rounded-button py-3.5 items-center mb-3"
               testID="delete-account-sign-out"
               accessibilityRole="button"

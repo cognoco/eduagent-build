@@ -102,7 +102,9 @@ export default function SessionDetailScreen() {
             action on every error state, not just Retry. */}
         <Pressable
           testID="error-go-back"
-          onPress={() => goBackOrReplace(router, '/(app)/more')}
+          onPress={() =>
+            goBackOrReplace(router, `/(app)/child/${profileId}` as const)
+          }
           className="mt-3 px-6 py-3"
           accessibilityRole="button"
           accessibilityLabel="Go back"
@@ -124,7 +126,9 @@ export default function SessionDetailScreen() {
           This session is no longer available.
         </Text>
         <Pressable
-          onPress={() => goBackOrReplace(router, '/(app)/more')}
+          onPress={() =>
+            goBackOrReplace(router, `/(app)/child/${profileId}` as const)
+          }
           className="mt-4 rounded-lg bg-primary px-6 py-3"
         >
           <Text className="text-text-inverse font-medium">Go Back</Text>
@@ -151,7 +155,9 @@ export default function SessionDetailScreen() {
       {/* Header */}
       <View className="px-4 pt-4">
         <Pressable
-          onPress={() => goBackOrReplace(router, '/(app)/more')}
+          onPress={() =>
+            goBackOrReplace(router, `/(app)/child/${profileId}` as const)
+          }
           className="mb-4 flex-row items-center"
           accessibilityRole="button"
           accessibilityLabel="Go back"
@@ -267,7 +273,9 @@ export default function SessionDetailScreen() {
             generating, or the session may have been too short.
           </Text>
           <Pressable
-            onPress={() => goBackOrReplace(router, '/(app)/more')}
+            onPress={() =>
+              goBackOrReplace(router, `/(app)/child/${profileId}` as const)
+            }
             className="mt-4 self-start rounded-lg bg-primary px-4 py-3"
             accessibilityRole="button"
             accessibilityLabel="Go back"

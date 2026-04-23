@@ -8,6 +8,8 @@ import {
   useUpdateAnalogyDomain,
 } from '../../../hooks/use-settings';
 import type { AnalogyDomain } from '@eduagent/schemas';
+import { classifyApiError } from '../../../lib/format-api-error';
+import { platformAlert } from '../../../lib/platform-alert';
 
 export default function SubjectSettingsScreen() {
   const router = useRouter();
@@ -23,7 +25,11 @@ export default function SubjectSettingsScreen() {
     useUpdateAnalogyDomain(safeSubjectId);
 
   const handleSelect = (domain: AnalogyDomain | null): void => {
-    updateAnalogyDomain(domain);
+    // UX-DE-L9: surface mutation errors
+    updateAnalogyDomain(domain, {
+      onError: (err) =>
+        platformAlert('Could not update', classifyApiError(err).message),
+    });
   };
 
   if (!subjectId) {

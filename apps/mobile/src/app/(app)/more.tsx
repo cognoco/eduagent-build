@@ -188,7 +188,7 @@ export default function MoreScreen() {
   const hideMentorMemory = isNewLearner(cachedInventory?.global.totalSessions);
   const exportData = useExportData();
   const [isSigningOut, setIsSigningOut] = useState(false);
-  const { data: subscription } = useSubscription();
+  const { data: subscription, isLoading: isSubLoading } = useSubscription();
   const { data: familyData } = useFamilySubscription(
     subscription?.tier === 'family' || subscription?.tier === 'pro'
   );
@@ -460,6 +460,9 @@ export default function MoreScreen() {
             )}
             <Pressable
               onPress={handleAddChild}
+              // UX-DE-L10: disable while loading
+              disabled={isSubLoading}
+              style={{ opacity: isSubLoading ? 0.5 : 1 }}
               className="bg-surface rounded-card px-4 py-3.5 mb-2"
               accessibilityLabel="Add a child profile"
               accessibilityRole="button"

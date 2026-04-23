@@ -5,6 +5,7 @@ import {
   waitFor,
 } from '@testing-library/react-native';
 import React from 'react';
+import { Alert } from 'react-native';
 
 const mockPush = jest.fn();
 const mockRecallMutate = jest.fn();
@@ -224,6 +225,8 @@ describe('RecallTestScreen', () => {
   });
 
   it('shows error message and rolls back count on failure', async () => {
+    // UX-DE-L8: errors are surfaced via platformAlert (not as AI chat bubble).
+    const alertSpy = jest.spyOn(Alert, 'alert').mockReturnValue(undefined);
     queuedRecallResults = [
       new Error('Network error') as unknown as Record<string, unknown>,
     ];
@@ -233,7 +236,14 @@ describe('RecallTestScreen', () => {
     fireEvent.press(screen.getByTestId('recall-dont-remember-button'));
 
     await waitFor(() => {
-      expect(screen.getByText(/offline|can't be reached/i)).toBeTruthy();
+      expect(alertSpy).toHaveBeenCalled();
     });
+    // platformAlert passes through Alert.alert(title, message, buttons?, options?),
+    // so assert positional args 0 and 1 explicitly rather than using
+    // toHaveBeenCalledWith (which enforces arity).
+    const [title, message] = alertSpy.mock.calls[0] ?? [];
+    expect(title).toBe('Something went wrong');
+    expect(message).toMatch(/offline|can't be reached/i);
+    alertSpy.mockRestore();
   });
 });

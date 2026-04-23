@@ -135,7 +135,9 @@ export default function VocabularyListScreen() {
     ]);
   };
 
-  const goBack = () => goBackOrReplace(router, '/(app)/progress' as never);
+  // UX-DE-M10: better contextual parent for deep-link entry
+  const goBack = () =>
+    goBackOrReplace(router, '/(app)/progress/vocabulary' as const);
 
   if (!subjectId) {
     return (

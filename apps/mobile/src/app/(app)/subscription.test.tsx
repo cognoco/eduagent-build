@@ -490,6 +490,12 @@ describe('SubscriptionScreen', () => {
   // -------------------------------------------------------------------------
 
   it('calls purchase.mutateAsync when a package is selected', async () => {
+    // UX-DE-L12: handlePurchase now polls the subscription API after mutateAsync
+    // (same pattern as handleRestore) to avoid the entitlement race where the
+    // webhook hasn't processed yet. Success alert fires only once polling
+    // confirms a paid tier — refetchSub is no longer called directly; instead
+    // queryClient.fetchQuery → client.subscription.$get is the canonical path.
+    jest.useFakeTimers();
     const monthlyPkg = makeMockPackage();
     mockOfferings = makeMockOfferings([monthlyPkg]);
     mockMutateAsyncPurchase.mockResolvedValue({
@@ -501,20 +507,36 @@ describe('SubscriptionScreen', () => {
         purchaseDate: '2026-03-01',
       },
     });
+    mockSubscriptionGet.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ subscription: { tier: 'plus' } }),
+    });
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
     fireEvent.press(screen.getByTestId('package-option-$rc_monthly'));
 
+    // Let purchase.mutateAsync resolve
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    // Advance past first polling delay (2 s)
+    await act(async () => {
+      jest.advanceTimersByTime(2000);
+    });
+
     await waitFor(() => {
       expect(mockMutateAsyncPurchase).toHaveBeenCalledWith(monthlyPkg);
     });
-    expect(mockRefetchSub).toHaveBeenCalled();
+    await waitFor(() => {
+      expect(Alert.alert).toHaveBeenCalledWith(
+        'Success',
+        'Your subscription is now active!'
+      );
+    });
     expect(mockRefetchUsage).toHaveBeenCalled();
-    expect(Alert.alert).toHaveBeenCalledWith(
-      'Success',
-      'Your subscription is now active!'
-    );
+    jest.useRealTimers();
   });
 
   it('silently dismisses when user cancels purchase', async () => {

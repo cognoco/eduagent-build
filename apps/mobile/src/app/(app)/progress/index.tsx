@@ -7,6 +7,7 @@ import {
   View,
 } from 'react-native';
 import { platformAlert } from '../../../lib/platform-alert';
+import { classifyApiError } from '../../../lib/format-api-error';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -414,7 +415,19 @@ export default function ProgressScreen(): React.ReactElement {
                 </Pressable>
               ) : null}
             </View>
-            {milestonesQuery.data && milestonesQuery.data.length > 0 ? (
+            {/* UX-DE-M8: isError branch — network failure shows compact error card, not empty guidance */}
+            {milestonesQuery.isError ? (
+              <ErrorFallback
+                variant="card"
+                message={classifyApiError(milestonesQuery.error).message}
+                primaryAction={{
+                  label: 'Try Again',
+                  onPress: () => void milestonesQuery.refetch(),
+                  testID: 'progress-milestones-error-retry',
+                }}
+                testID="progress-milestones-error"
+              />
+            ) : milestonesQuery.data && milestonesQuery.data.length > 0 ? (
               milestonesQuery.data.map((milestone) => (
                 <View key={milestone.id} className="mt-3">
                   <MilestoneCard milestone={milestone} />

@@ -7,6 +7,7 @@ import type { AccommodationMode } from '@eduagent/schemas';
 import { OnboardingStepIndicator } from '../../../components/onboarding/OnboardingStepIndicator';
 import { useUpdateAccommodationMode } from '../../../hooks/use-learner-profile';
 import { ACCOMMODATION_OPTIONS } from '../../../lib/accommodation-options';
+import { classifyApiError } from '../../../lib/format-api-error';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { platformAlert } from '../../../lib/platform-alert';
 import { useThemeColors } from '../../../lib/theme';
@@ -83,8 +84,12 @@ export default function AccommodationsScreen(): React.ReactElement {
       { accommodationMode: selectedMode },
       {
         onSuccess: navigateToCurriculum,
-        onError: () => {
-          platformAlert('Could not save setting', 'Please try again.');
+        onError: (err) => {
+          // UX-DE-M12: preserve server message via classifyApiError
+          platformAlert(
+            'Could not save setting',
+            classifyApiError(err).message
+          );
         },
       }
     );

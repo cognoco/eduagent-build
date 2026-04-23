@@ -4,6 +4,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Sentry from '@sentry/react-native';
 import { goBackOrReplace } from '../../../../../lib/navigation';
+import { classifyApiError } from '../../../../../lib/format-api-error';
+import { ErrorFallback } from '../../../../../components/common';
 import {
   useChildWeeklyReportDetail,
   useMarkWeeklyReportViewed,
@@ -35,10 +37,18 @@ export default function ChildWeeklyReportDetailScreen(): React.ReactElement {
     profileId: string;
     weeklyReportId: string;
   }>();
-  const { data: report, isLoading } = useChildWeeklyReportDetail(
-    profileId,
-    weeklyReportId
-  );
+  // UX-DE-M6: add isError + error + refetch so network failures do not silently render as gone state
+  const {
+    data: report,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useChildWeeklyReportDetail(profileId, weeklyReportId);
+
+  const reportsHref = profileId
+    ? (`/(app)/child/${profileId}/reports` as const)
+    : ('/(app)/dashboard' as const);
   const markViewed = useMarkWeeklyReportViewed();
   const markViewedRef = useRef(markViewed);
   markViewedRef.current = markViewed;
@@ -113,6 +123,23 @@ export default function ChildWeeklyReportDetailScreen(): React.ReactElement {
               Loading report...
             </Text>
           </View>
+        ) : isError ? (
+          // UX-DE-M6: distinct error state — network failures must not silently render as the gone state
+          <ErrorFallback
+            variant="card"
+            message={classifyApiError(error).message}
+            primaryAction={{
+              label: 'Try Again',
+              onPress: () => void refetch(),
+              testID: 'child-weekly-report-error-retry',
+            }}
+            secondaryAction={{
+              label: 'Back to reports',
+              onPress: () => goBackOrReplace(router, reportsHref),
+              testID: 'child-weekly-report-error-back',
+            }}
+            testID="child-weekly-report-error"
+          />
         ) : report ? (
           <>
             <View
@@ -174,16 +201,7 @@ export default function ChildWeeklyReportDetailScreen(): React.ReactElement {
               still safe.
             </Text>
             <Pressable
-              onPress={() => {
-                if (profileId) {
-                  router.replace({
-                    pathname: '/(app)/child/[profileId]/reports',
-                    params: { profileId },
-                  } as never);
-                } else {
-                  router.replace('/(app)/dashboard' as never);
-                }
-              }}
+              onPress={() => goBackOrReplace(router, reportsHref)}
               className="bg-primary rounded-button px-4 py-3 items-center mt-4 min-h-[48px] justify-center"
               accessibilityRole="button"
               accessibilityLabel="Back to reports"

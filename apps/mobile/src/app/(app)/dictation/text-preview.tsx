@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -17,6 +17,25 @@ export default function TextPreviewScreen(): React.ReactElement {
   const [text, setText] = useState(ocrText ?? '');
   const prepareMutation = usePrepareHomework();
   const { setData } = useDictationData();
+
+  // B1.4: 20s timeout hint for the prepare mutation — mirrors dictation/index.tsx pattern
+  const [prepareTimedOut, setPrepareTimedOut] = useState(false);
+  const prepareTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (prepareMutation.isPending) {
+      setPrepareTimedOut(false);
+      prepareTimeoutRef.current = setTimeout(
+        () => setPrepareTimedOut(true),
+        20_000
+      );
+    } else {
+      if (prepareTimeoutRef.current) clearTimeout(prepareTimeoutRef.current);
+      setPrepareTimedOut(false);
+    }
+    return () => {
+      if (prepareTimeoutRef.current) clearTimeout(prepareTimeoutRef.current);
+    };
+  }, [prepareMutation.isPending]);
 
   const handleStartDictation = async () => {
     if (!text.trim()) {
@@ -111,20 +130,30 @@ export default function TextPreviewScreen(): React.ReactElement {
       </Pressable>
 
       {prepareMutation.isPending && (
-        <Pressable
-          onPress={() => {
-            prepareMutation.reset();
-            goBackOrReplace(router, '/(app)/dictation');
-          }}
-          className="mt-3 py-2 px-4 min-h-[44px] items-center justify-center self-center"
-          accessibilityRole="button"
-          accessibilityLabel="Cancel preparing dictation"
-          testID="text-preview-cancel"
-        >
-          <Text className="text-body-sm font-semibold text-text-secondary">
-            Cancel
-          </Text>
-        </Pressable>
+        <>
+          {prepareTimedOut && (
+            <Text
+              className="text-body-sm text-danger text-center mt-3"
+              testID="text-preview-timeout-hint"
+            >
+              This is taking longer than usual — you can cancel and try again.
+            </Text>
+          )}
+          <Pressable
+            onPress={() => {
+              prepareMutation.reset();
+              goBackOrReplace(router, '/(app)/dictation');
+            }}
+            className="mt-3 py-2 px-4 min-h-[44px] items-center justify-center self-center"
+            accessibilityRole="button"
+            accessibilityLabel="Cancel preparing dictation"
+            testID="text-preview-cancel"
+          >
+            <Text className="text-body-sm font-semibold text-text-secondary">
+              Cancel
+            </Text>
+          </Pressable>
+        </>
       )}
     </ScrollView>
   );

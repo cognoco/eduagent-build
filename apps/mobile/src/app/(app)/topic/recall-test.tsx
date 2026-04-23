@@ -11,7 +11,8 @@ import {
   type RetentionStatus,
 } from '../../../components/progress';
 import { useSubmitRecallTest } from '../../../hooks/use-retention';
-import { formatApiError } from '../../../lib/format-api-error';
+import { classifyApiError } from '../../../lib/format-api-error';
+import { platformAlert } from '../../../lib/platform-alert';
 import { ErrorFallback } from '../../../components/common';
 import { goBackOrReplace } from '../../../lib/navigation';
 
@@ -107,10 +108,10 @@ export default function RecallTestScreen() {
             }
           },
           onError: (err: Error) => {
-            cleanupRef.current = animateResponse(
-              formatApiError(err),
-              setMessages,
-              setIsStreaming
+            // UX-DE-L8: error is not an AI reply
+            platformAlert(
+              'Something went wrong',
+              classifyApiError(err).message
             );
           },
         }
@@ -182,11 +183,8 @@ export default function RecallTestScreen() {
         },
         onError: (err: Error) => {
           setDontRememberCount((prev) => Math.max(prev - 1, 0));
-          cleanupRef.current = animateResponse(
-            formatApiError(err),
-            setMessages,
-            setIsStreaming
-          );
+          // UX-DE-L8: error is not an AI reply
+          platformAlert('Something went wrong', classifyApiError(err).message);
         },
       }
     );

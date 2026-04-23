@@ -111,7 +111,7 @@ import { Sentry } from '../../../lib/sentry';
  * semantic tokens.
  */
 class SessionErrorBoundary extends Component<
-  { children: ReactNode },
+  { children: ReactNode; onGoHome?: () => void },
   { hasError: boolean; error: Error | null; componentStack: string | null }
 > {
   override state = {
@@ -220,10 +220,32 @@ class SessionErrorBoundary extends Component<
               borderRadius: 12,
               paddingVertical: 14,
               alignItems: 'center',
+              marginBottom: 12,
             }}
           >
             <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>
               Try Again
+            </Text>
+          </Pressable>
+          {/* UX-DE-L7: secondary escape for deterministic crashes */}
+          <Pressable
+            onPress={() => {
+              this.setState({
+                hasError: false,
+                error: null,
+                componentStack: null,
+              });
+              this.props.onGoHome?.();
+            }}
+            style={{
+              backgroundColor: '#f3f4f6',
+              borderRadius: 12,
+              paddingVertical: 14,
+              alignItems: 'center',
+            }}
+          >
+            <Text style={{ color: '#374151', fontSize: 16, fontWeight: '600' }}>
+              Go Home
             </Text>
           </Pressable>
         </ScrollView>
@@ -246,8 +268,9 @@ function MilestoneDots({ count }: { count: number }) {
 }
 
 export default function SessionScreen() {
+  const router = useRouter();
   return (
-    <SessionErrorBoundary>
+    <SessionErrorBoundary onGoHome={() => router.replace('/(app)/home')}>
       <SessionScreenInner />
     </SessionErrorBoundary>
   );
@@ -334,6 +357,13 @@ function SessionScreenInner() {
     { id: 'opening', role: 'assistant', content: openingContent },
   ]);
   const [isStreaming, setIsStreaming] = useState(false);
+  // UX-DE-M1: enable exit before 45s watchdog — after 15s of streaming the
+  // "I'm Done" button re-enables and, when pressed, aborts the stream by
+  // clearing isStreaming before handing off to handleEndSession.
+  const [streamingTooLong, setStreamingTooLong] = useState(false);
+  const streamingTooLongTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
   const [exchangeCount, setExchangeCount] = useState(0);
   const [escalationRung, setEscalationRung] = useState(1);
   const [isClosing, setIsClosing] = useState(false);
@@ -351,6 +381,28 @@ function SessionScreenInner() {
   const [inputMode, setInputMode] = useState<InputMode>('text');
   // CR-9: Guard so profile refetches don't overwrite the user's in-session choice.
   const hasRestoredInputModeRef = useRef(false);
+
+  // UX-DE-M1: start/clear the 15s streaming-too-long timer
+  useEffect(() => {
+    if (isStreaming) {
+      setStreamingTooLong(false);
+      streamingTooLongTimerRef.current = setTimeout(
+        () => setStreamingTooLong(true),
+        15_000
+      );
+    } else {
+      if (streamingTooLongTimerRef.current) {
+        clearTimeout(streamingTooLongTimerRef.current);
+        streamingTooLongTimerRef.current = null;
+      }
+      setStreamingTooLong(false);
+    }
+    return () => {
+      if (streamingTooLongTimerRef.current) {
+        clearTimeout(streamingTooLongTimerRef.current);
+      }
+    };
+  }, [isStreaming]);
 
   // Restore the user's last-used input mode from SecureStore on mount.
   useEffect(() => {
@@ -1043,14 +1095,22 @@ function SessionScreenInner() {
 
   // [UX-DE-H5] Exit button is always rendered (no gating on session existence).
   // Before session exists → "Exit" navigates home. After → normal "I'm Done".
+  // UX-DE-M1: enable exit before 45s watchdog — after 15s of streaming the
+  // button re-enables; pressing it aborts the stream then calls handleEndSession.
   const endSessionButton = (
     <Pressable
       onPress={
         activeSessionId
-          ? handleEndSession
+          ? isStreaming && streamingTooLong
+            ? () => {
+                // Abort the hung stream so handleEndSession can proceed
+                setIsStreaming(false);
+                void handleEndSession();
+              }
+            : handleEndSession
           : () => goBackOrReplace(router, '/(app)/home')
       }
-      disabled={isClosing || isStreaming}
+      disabled={isClosing || (isStreaming && !streamingTooLong)}
       className="ms-2 px-3 py-2 rounded-button bg-surface-elevated min-h-[44px] items-center justify-center"
       testID="end-session-button"
       accessibilityLabel={activeSessionId ? "I'm done" : 'Exit'}

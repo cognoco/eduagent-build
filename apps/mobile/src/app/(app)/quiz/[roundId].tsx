@@ -8,6 +8,7 @@ import type {
 import { useRoundDetail } from '../../../hooks/use-quiz';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { useThemeColors } from '../../../lib/theme';
+import { TimeoutLoader } from '../../../components/common/TimeoutLoader';
 
 /** The completed-round shape returned by GET /quiz/rounds/:id (status=completed).
  *  Extends the base QuizRoundResponse with grading context the client needs
@@ -39,16 +40,23 @@ export default function QuizRoundDetailScreen() {
   const { roundId } = useLocalSearchParams<{ roundId: string }>();
   const router = useRouter();
   const colors = useThemeColors();
-  const { data: round, isLoading, isError } = useRoundDetail(roundId);
+  const { data: round, isLoading, isError, refetch } = useRoundDetail(roundId);
 
+  // B1.3: timeout guard — no bare loading text
   if (isLoading) {
     return (
-      <View
+      <TimeoutLoader
+        isLoading={isLoading}
         testID="round-detail-loading"
-        className="flex-1 items-center justify-center"
-      >
-        <Text className="text-on-surface-muted">Loading...</Text>
-      </View>
+        primaryAction={{
+          label: 'Try Again',
+          onPress: () => void refetch(),
+        }}
+        secondaryAction={{
+          label: 'Go Back',
+          onPress: () => goBackOrReplace(router, '/(app)/quiz'),
+        }}
+      />
     );
   }
 
