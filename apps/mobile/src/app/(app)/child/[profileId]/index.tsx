@@ -274,14 +274,27 @@ export default function ChildDetailScreen() {
           This child profile may have been removed or you may no longer have
           access to it.
         </Text>
+        {isError && (
+          <Pressable
+            onPress={() => void refetch()}
+            className="bg-primary rounded-button px-6 py-3 items-center min-h-[48px] justify-center mb-3"
+            accessibilityRole="button"
+            accessibilityLabel="Try again"
+            testID="child-profile-retry"
+          >
+            <Text className="text-body font-semibold text-text-inverse">
+              Try again
+            </Text>
+          </Pressable>
+        )}
         <Pressable
           onPress={() => router.replace('/(app)/dashboard' as never)}
-          className="bg-primary rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
+          className="bg-surface rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
           accessibilityRole="button"
           accessibilityLabel="Back to parent dashboard"
           testID="child-profile-back"
         >
-          <Text className="text-body font-semibold text-text-inverse">
+          <Text className="text-body font-semibold text-text-primary">
             Back to dashboard
           </Text>
         </Pressable>

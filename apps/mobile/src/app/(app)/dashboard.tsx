@@ -238,10 +238,31 @@ export default function DashboardScreen() {
           </>
         ) : (
           <View className="py-8 items-center" testID="dashboard-empty">
-            <Text className="text-body text-text-secondary text-center">
+            <Text className="text-body text-text-secondary text-center mb-6">
               No children linked yet. Add a child profile to see their progress
               here.
             </Text>
+            <Pressable
+              onPress={() => router.push('/(app)/more' as never)}
+              className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center mb-3"
+              accessibilityRole="button"
+              accessibilityLabel="Add a child"
+              testID="dashboard-empty-add-child"
+            >
+              <Text className="text-body font-semibold text-text-inverse">
+                Add a child
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => goBackOrReplace(router, '/(app)/home')}
+              accessibilityRole="button"
+              accessibilityLabel="Continue solo"
+              testID="dashboard-empty-solo"
+            >
+              <Text className="text-body text-primary font-semibold">
+                Continue solo
+              </Text>
+            </Pressable>
           </View>
         )}
       </ScrollView>

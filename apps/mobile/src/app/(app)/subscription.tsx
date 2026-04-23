@@ -1356,6 +1356,25 @@ export default function SubscriptionScreen() {
                 )}
               </View>
             </Pressable>
+            {restorePolling && (
+              <Pressable
+                onPress={() => {
+                  setRestorePolling(false);
+                  platformAlert(
+                    'Restore cancelled',
+                    'Restore will continue in background.'
+                  );
+                }}
+                className="mt-2 items-center py-2"
+                accessibilityRole="button"
+                accessibilityLabel="Cancel restore"
+                testID="restore-polling-cancel"
+              >
+                <Text className="text-body-sm text-primary font-semibold">
+                  Check later
+                </Text>
+              </Pressable>
+            )}
           </View>
 
           {/* Top-up */}
@@ -1394,6 +1413,25 @@ export default function SubscriptionScreen() {
                   </>
                 )}
               </Pressable>
+              {topUpPolling && (
+                <Pressable
+                  onPress={() => {
+                    setTopUpPolling(false);
+                    platformAlert(
+                      'Check later',
+                      'Credits will appear shortly — tap refresh to check.'
+                    );
+                  }}
+                  className="mt-2 items-center py-2"
+                  accessibilityRole="button"
+                  accessibilityLabel="Cancel top-up confirmation"
+                  testID="top-up-polling-cancel"
+                >
+                  <Text className="text-body-sm text-primary font-semibold">
+                    Check later
+                  </Text>
+                </Pressable>
+              )}
             </View>
           )}
 

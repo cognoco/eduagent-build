@@ -213,10 +213,25 @@ export default function SavedBookmarksScreen() {
                 size={48}
                 className="text-text-tertiary mb-4"
               />
-              <Text className="text-body text-text-secondary text-center">
-                Nothing saved yet. Tap the bookmark icon on any response during
-                a session to save it here.
+              <Text className="text-h3 font-semibold text-text-primary text-center mb-2">
+                Nothing saved yet
               </Text>
+              <Text className="text-body text-text-secondary text-center mb-6">
+                Bookmark pages during sessions to find them here.
+              </Text>
+              <Pressable
+                onPress={() =>
+                  goBackOrReplace(router, '/(app)/library' as const)
+                }
+                className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center"
+                accessibilityRole="button"
+                accessibilityLabel="Go to Library"
+                testID="saved-empty-library-cta"
+              >
+                <Text className="text-body font-semibold text-text-inverse">
+                  Go to Library
+                </Text>
+              </Pressable>
             </View>
           )
         }
