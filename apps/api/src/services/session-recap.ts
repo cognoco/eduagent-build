@@ -1,7 +1,5 @@
-import { and, asc, eq, ilike, or } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import {
-  curriculumBooks,
-  curriculumTopics,
   sessionEvents,
   createScopedRepository,
   type Database,
@@ -16,6 +14,8 @@ const logger = createLogger();
 
 /** Upper bound on candidate topics fetched when resolving the "next topic". */
 const MAX_NEXT_TOPIC_CANDIDATES = 50;
+/** Max freeform keyword matches we'll consider; >1 collapses to null intentionally. */
+const MAX_FREEFORM_MATCHES = 3;
 
 interface RecapInput {
   sessionId: string;
@@ -142,7 +142,7 @@ export async function resolveNextTopic(
 }
 
 export async function matchFreeformTopic(
-  db: Database,
+  repo: ScopedRepository,
   subjectId: string,
   takeaways: string[]
 ): Promise<TopicSuggestion | null> {
@@ -234,36 +234,18 @@ export async function matchFreeformTopic(
     ),
   ].slice(0, 5);
 
-  if (keywords.length === 0) {
-    return null;
-  }
+  if (keywords.length === 0) return null;
 
-  const matches = await db
-    .select({
-      id: curriculumTopics.id,
-      title: curriculumTopics.title,
-    })
-    .from(curriculumTopics)
-    .innerJoin(curriculumBooks, eq(curriculumBooks.id, curriculumTopics.bookId))
-    .where(
-      and(
-        eq(curriculumBooks.subjectId, subjectId),
-        or(
-          ...keywords.map((keyword) =>
-            ilike(curriculumTopics.title, `%${keyword}%`)
-          )
-        )
-      )
-    )
-    .limit(3);
+  const matches = await repo.curriculumTopics.findMatchingInSubject(
+    subjectId,
+    keywords,
+    MAX_FREEFORM_MATCHES
+  );
 
   // Only return a match when the keyword set resolves unambiguously to one
-  // topic. Multiple matches mean the takeaways were too generic to pin down
-  // a "next topic" confidently — return null so the UI falls back to the
-  // generic "You might also like..." framing instead of a misleading pick.
-  if (matches.length !== 1) {
-    return null;
-  }
+  // topic. Multiple matches mean the takeaways were too generic — return
+  // null so the UI falls back to the generic "You might also like…" framing.
+  if (matches.length !== 1) return null;
 
   return matches[0] ?? null;
 }
@@ -368,7 +350,7 @@ export async function generateLearnerRecap(
   const { closingLine, takeaways, nextTopicReason } = validated.data;
 
   if (!input.topicId && !nextTopic) {
-    nextTopic = await matchFreeformTopic(db, input.subjectId, takeaways);
+    nextTopic = await matchFreeformTopic(repo, input.subjectId, takeaways);
   }
 
   return {
