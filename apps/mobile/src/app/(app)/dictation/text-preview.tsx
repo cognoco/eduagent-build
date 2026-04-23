@@ -109,6 +109,23 @@ export default function TextPreviewScreen(): React.ReactElement {
           {prepareMutation.isPending ? 'Preparing...' : 'Start dictation'}
         </Text>
       </Pressable>
+
+      {prepareMutation.isPending && (
+        <Pressable
+          onPress={() => {
+            prepareMutation.reset();
+            goBackOrReplace(router, '/(app)/dictation');
+          }}
+          className="mt-3 py-2 px-4 min-h-[44px] items-center justify-center self-center"
+          accessibilityRole="button"
+          accessibilityLabel="Cancel preparing dictation"
+          testID="text-preview-cancel"
+        >
+          <Text className="text-body-sm font-semibold text-text-secondary">
+            Cancel
+          </Text>
+        </Pressable>
+      )}
     </ScrollView>
   );
 }

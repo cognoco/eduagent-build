@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -7,6 +7,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { platformAlert } from '../../../lib/platform-alert';
 import { useThemeColors } from '../../../lib/theme';
+import { goBackOrReplace } from '../../../lib/navigation';
 import { useDictationData } from './_layout';
 import {
   useReviewDictation,
@@ -26,6 +27,24 @@ export default function DictationCompleteScreen(): React.ReactElement {
   const recordResult = useRecordDictationResult();
 
   const isReviewing = reviewMutation.isPending;
+
+  const [reviewTimedOut, setReviewTimedOut] = useState(false);
+  const reviewTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (isReviewing) {
+      setReviewTimedOut(false);
+      reviewTimeoutRef.current = setTimeout(() => {
+        setReviewTimedOut(true);
+      }, 20_000);
+    } else {
+      if (reviewTimeoutRef.current) clearTimeout(reviewTimeoutRef.current);
+      setReviewTimedOut(false);
+    }
+    return () => {
+      if (reviewTimeoutRef.current) clearTimeout(reviewTimeoutRef.current);
+    };
+  }, [isReviewing]);
 
   // [F-031] Synchronous double-tap guard. `disabled={isPending}` relies on
   // React state which batches asynchronously — a second pointer event can
@@ -214,10 +233,53 @@ export default function DictationCompleteScreen(): React.ReactElement {
     >
       {isReviewing ? (
         <>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text className="text-body text-text-secondary mt-4 text-center">
-            Checking your writing…
-          </Text>
+          {reviewTimedOut ? (
+            <>
+              <Text
+                className="text-body text-danger text-center mb-4"
+                testID="review-timeout-error"
+              >
+                That took too long — try again
+              </Text>
+              <Pressable
+                onPress={() => {
+                  reviewMutation.reset();
+                  setReviewTimedOut(false);
+                  void handleCheckWriting();
+                }}
+                className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center mb-3"
+                accessibilityRole="button"
+                accessibilityLabel="Retry checking writing"
+                testID="review-timeout-retry"
+              >
+                <Text className="text-text-inverse font-semibold text-body">
+                  Try again
+                </Text>
+              </Pressable>
+            </>
+          ) : (
+            <>
+              <ActivityIndicator size="large" color={colors.primary} />
+              <Text className="text-body text-text-secondary mt-4 text-center">
+                Checking your writing…
+              </Text>
+            </>
+          )}
+          <Pressable
+            onPress={() => {
+              reviewMutation.reset();
+              setReviewTimedOut(false);
+              goBackOrReplace(router, '/(app)/practice');
+            }}
+            className="mt-4 py-2 px-4 min-h-[44px] items-center justify-center"
+            accessibilityRole="button"
+            accessibilityLabel="Cancel checking writing and go back"
+            testID="review-cancel"
+          >
+            <Text className="text-body-sm font-semibold text-text-secondary">
+              Cancel
+            </Text>
+          </Pressable>
         </>
       ) : (
         <>

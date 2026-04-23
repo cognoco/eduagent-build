@@ -58,10 +58,10 @@ export default function PickBookScreen(): React.ReactElement {
     goBackOrReplace(router, '/(app)/library');
   }, [router, subjectId]);
 
-  // M-9: Filing overlay timeout — show skip button after 15 seconds
+  // M12: Filing overlay timeout — show skip button after 8 seconds (was 15)
   useEffect(() => {
     if (filing.isPending) {
-      const timer = setTimeout(() => setShowSkip(true), 15_000);
+      const timer = setTimeout(() => setShowSkip(true), 8_000);
       return () => clearTimeout(timer);
     }
     setShowSkip(false);

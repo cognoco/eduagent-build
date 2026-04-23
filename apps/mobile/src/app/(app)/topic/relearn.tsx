@@ -101,10 +101,16 @@ export default function RelearnScreen() {
   const [phase, setPhase] = useState<'choice' | 'method'>('choice');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // M11: Track last attempted method for direct Retry
+  const [lastMethod, setLastMethod] = useState<{
+    method: 'same' | 'different';
+    preferredMethod?: string;
+  } | null>(null);
 
   const handleSameMethod = useCallback(() => {
     if (!topicId) return;
     setError(null);
+    setLastMethod({ method: 'same' });
     setIsSubmitting(true);
     startRelearn.mutate(
       { topicId, method: 'same' },
@@ -133,6 +139,7 @@ export default function RelearnScreen() {
     (preferredMethod: string) => {
       if (!topicId) return;
       setError(null);
+      setLastMethod({ method: 'different', preferredMethod });
       setIsSubmitting(true);
       startRelearn.mutate(
         { topicId, method: 'different', preferredMethod },
@@ -158,6 +165,16 @@ export default function RelearnScreen() {
     },
     [topicId, subjectId, startRelearn, router]
   );
+
+  // M11: Retry last attempted method without re-selecting
+  const handleRetry = useCallback(() => {
+    if (!lastMethod) return;
+    if (lastMethod.method === 'same') {
+      handleSameMethod();
+    } else if (lastMethod.preferredMethod) {
+      handleSelectMethod(lastMethod.preferredMethod);
+    }
+  }, [lastMethod, handleSameMethod, handleSelectMethod]);
 
   if (!topicId || !subjectId) {
     return (
@@ -222,6 +239,19 @@ export default function RelearnScreen() {
               testID="relearn-error"
             >
               <Text className="text-body-sm text-danger">{error}</Text>
+              {lastMethod && (
+                <Pressable
+                  onPress={handleRetry}
+                  className="mt-2 self-start"
+                  testID="relearn-retry"
+                  accessibilityLabel="Retry last action"
+                  accessibilityRole="button"
+                >
+                  <Text className="text-body-sm font-semibold text-primary">
+                    Retry
+                  </Text>
+                </Pressable>
+              )}
             </View>
           )}
           <Text className="text-body text-text-secondary mb-6">
@@ -269,6 +299,19 @@ export default function RelearnScreen() {
               testID="relearn-error"
             >
               <Text className="text-body-sm text-danger">{error}</Text>
+              {lastMethod && (
+                <Pressable
+                  onPress={handleRetry}
+                  className="mt-2 self-start"
+                  testID="relearn-retry"
+                  accessibilityLabel="Retry last action"
+                  accessibilityRole="button"
+                >
+                  <Text className="text-body-sm font-semibold text-primary">
+                    Retry
+                  </Text>
+                </Pressable>
+              )}
             </View>
           )}
           <Text className="text-body text-text-secondary mb-6">

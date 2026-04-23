@@ -880,6 +880,45 @@ export default function CameraScreen(): React.ReactNode {
           </Text>
         </Pressable>
 
+        {/* M10: Classification done but no subject resolved and picker not shown */}
+        {needsSubjectPick &&
+          !classifyMutation.isPending &&
+          !autoDetectedSubject &&
+          !showSubjectPicker &&
+          classifyMutation.isSuccess && (
+            <View
+              className="mt-4 rounded-card bg-surface p-4"
+              testID="classify-fallback"
+            >
+              <Text className="text-body-sm text-text-secondary mb-3">
+                We couldn&apos;t automatically identify the subject. Would you
+                like to select it manually or retake the photo?
+              </Text>
+              <Pressable
+                onPress={() => setShowSubjectPicker(true)}
+                className="bg-primary rounded-button py-3 mb-2 min-h-[48px] items-center justify-center"
+                accessibilityLabel="Type subject manually"
+                accessibilityRole="button"
+                testID="classify-fallback-type-subject"
+              >
+                <Text className="text-body font-semibold text-text-inverse">
+                  Type subject manually
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={handleRetake}
+                className="bg-surface-elevated rounded-button py-3 min-h-[48px] items-center justify-center"
+                accessibilityLabel="Retake photo"
+                accessibilityRole="button"
+                testID="classify-fallback-retake"
+              >
+                <Text className="text-body font-semibold text-text-primary">
+                  Retake
+                </Text>
+              </Pressable>
+            </View>
+          )}
+
         {/* Subject auto-detection loading indicator */}
         {needsSubjectPick && classifyMutation.isPending && (
           <View>
@@ -1208,30 +1247,44 @@ export default function CameraScreen(): React.ReactNode {
               </View>
             </View>
           ) : (
-            <View className="flex-row gap-4 mt-6">
+            <>
+              <View className="flex-row gap-4 mt-6">
+                <Pressable
+                  testID="retake-button"
+                  onPress={handleRetake}
+                  className="flex-1 bg-surface rounded-button py-4 min-h-[48px] items-center justify-center"
+                  accessibilityLabel="Retake photo"
+                  accessibilityRole="button"
+                >
+                  <Text className="text-body font-semibold text-text-primary">
+                    Retake
+                  </Text>
+                </Pressable>
+                <Pressable
+                  testID="retry-button"
+                  onPress={handleRetryOcr}
+                  className="flex-1 bg-primary rounded-button py-4 min-h-[48px] items-center justify-center"
+                  accessibilityLabel="Try reading again"
+                  accessibilityRole="button"
+                >
+                  <Text className="text-body font-semibold text-text-inverse">
+                    Try again
+                  </Text>
+                </Pressable>
+              </View>
+              {/* L2: Provide Go Home escape on first OCR failure */}
               <Pressable
-                testID="retake-button"
-                onPress={handleRetake}
-                className="flex-1 bg-surface rounded-button py-4 min-h-[48px] items-center justify-center"
-                accessibilityLabel="Retake photo"
+                testID="go-home-button"
+                onPress={handleClose}
+                className="mt-3 py-3 min-h-[48px] items-center justify-center"
+                accessibilityLabel="Go home"
                 accessibilityRole="button"
               >
-                <Text className="text-body font-semibold text-text-primary">
-                  Retake
+                <Text className="text-body-sm font-semibold text-text-secondary">
+                  Go Home
                 </Text>
               </Pressable>
-              <Pressable
-                testID="retry-button"
-                onPress={handleRetryOcr}
-                className="flex-1 bg-primary rounded-button py-4 min-h-[48px] items-center justify-center"
-                accessibilityLabel="Try reading again"
-                accessibilityRole="button"
-              >
-                <Text className="text-body font-semibold text-text-inverse">
-                  Try again
-                </Text>
-              </Pressable>
-            </View>
+            </>
           )}
         </View>
       </View>
