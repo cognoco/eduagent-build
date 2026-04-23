@@ -1,11 +1,11 @@
-import { and, asc, eq, gt, ilike, or, sql } from 'drizzle-orm';
+import { and, asc, eq, ilike, or } from 'drizzle-orm';
 import {
   curriculumBooks,
   curriculumTopics,
-  learningSessions,
-  retentionCards,
   sessionEvents,
+  createScopedRepository,
   type Database,
+  type ScopedRepository,
 } from '@eduagent/database';
 import { learnerRecapResponseSchema } from '@eduagent/schemas';
 import { extractFirstJsonObject, routeAndCall } from './llm';
@@ -13,6 +13,9 @@ import { sanitizeXmlValue } from './llm/sanitize';
 import { createLogger } from './logger';
 
 const logger = createLogger();
+
+/** Upper bound on candidate topics fetched when resolving the "next topic". */
+const MAX_NEXT_TOPIC_CANDIDATES = 50;
 
 interface RecapInput {
   sessionId: string;
@@ -103,58 +106,35 @@ export function buildRecapPrompt(
 }
 
 export async function resolveNextTopic(
-  db: Database,
-  profileId: string,
+  repo: ScopedRepository,
   topicId: string
 ): Promise<TopicSuggestion | null> {
-  const [currentTopic] = await db
-    .select({
-      bookId: curriculumTopics.bookId,
-      sortOrder: curriculumTopics.sortOrder,
-    })
-    .from(curriculumTopics)
-    .where(eq(curriculumTopics.id, topicId))
-    .limit(1);
-
+  const currentTopic = await repo.curriculumTopics.findById(topicId);
   if (!currentTopic) {
+    // Observability: emit a structured log so support can see how often
+    // next-topic resolution fails. We intentionally do NOT disambiguate
+    // "stale topic" from "cross-profile deny" here — detecting the latter
+    // would require a privileged unscoped read, which is what this refactor
+    // is preventing. Correlate with request logs if disambiguation is ever
+    // needed.
+    logger.info('session_recap.resolve_next_topic_miss', {
+      profileId: repo.profileId,
+      topicId,
+    });
     return null;
   }
 
-  const completedByRetention = await db
-    .select({ topicId: retentionCards.topicId })
-    .from(retentionCards)
-    .where(eq(retentionCards.profileId, profileId));
+  const [retainedIds, sessionIds] = await Promise.all([
+    repo.retentionCards.listCompletedTopicIds(),
+    repo.sessions.listCompletedTopicIds(),
+  ]);
+  const completedTopicIds = new Set([...retainedIds, ...sessionIds]);
 
-  const completedBySession = await db
-    .select({ topicId: learningSessions.topicId })
-    .from(learningSessions)
-    .where(
-      and(
-        eq(learningSessions.profileId, profileId),
-        sql`${learningSessions.topicId} IS NOT NULL`
-      )
-    );
-
-  const completedTopicIds = new Set(
-    [
-      ...completedByRetention.map((row) => row.topicId),
-      ...completedBySession.map((row) => row.topicId).filter(Boolean),
-    ].filter((value): value is string => typeof value === 'string')
+  const candidates = await repo.curriculumTopics.findLaterInBook(
+    currentTopic.bookId,
+    currentTopic.sortOrder,
+    MAX_NEXT_TOPIC_CANDIDATES
   );
-
-  const candidates = await db
-    .select({
-      id: curriculumTopics.id,
-      title: curriculumTopics.title,
-    })
-    .from(curriculumTopics)
-    .where(
-      and(
-        eq(curriculumTopics.bookId, currentTopic.bookId),
-        gt(curriculumTopics.sortOrder, currentTopic.sortOrder)
-      )
-    )
-    .orderBy(asc(curriculumTopics.sortOrder));
 
   return (
     candidates.find((candidate) => !completedTopicIds.has(candidate.id)) ?? null
@@ -326,8 +306,9 @@ export async function generateLearnerRecap(
     )
     .join('\n\n');
 
+  const repo = createScopedRepository(db, input.profileId);
   let nextTopic = input.topicId
-    ? await resolveNextTopic(db, input.profileId, input.topicId)
+    ? await resolveNextTopic(repo, input.topicId)
     : null;
 
   // Pure content-generation flow: the LLM returns only recap text + next-topic
