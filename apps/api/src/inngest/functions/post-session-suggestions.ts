@@ -9,6 +9,7 @@ import {
   subjects,
 } from '@eduagent/database';
 import { routeAndCall } from '../../services/llm';
+import { sanitizeXmlValue } from '../../services/llm/sanitize';
 
 const filingCompletedDataSchema = z.object({
   bookId: z.string(),
@@ -74,16 +75,29 @@ export const postSessionSuggestions = inngest.createFunction(
         };
       }
 
-      const topicList = existingTopics.map((t) => t.title).join(', ');
+      // [PROMPT-INJECT-8] book.title, book.description, topic titles, and
+      // completedTopicTitle are all learner- or LLM-generated stored text.
+      // Wrap each in a named tag and sanitize before interpolation.
+      const safeBookTitle = sanitizeXmlValue(book.title, 200);
+      const safeBookDescription = book.description
+        ? sanitizeXmlValue(book.description, 500)
+        : '';
+      const safeTopicList = existingTopics
+        .map((t) => sanitizeXmlValue(t.title, 200))
+        .filter((t) => t.length > 0)
+        .join(', ');
+      const safeCompletedTopicTitle = sanitizeXmlValue(topicTitle, 200);
 
       const messages = [
         {
           role: 'system' as const,
-          content: `Given a book titled "${book.title}" (${
-            book.description ?? ''
-          }) containing these topics: ${topicList}
+          content: `Given a book titled <book_title>${safeBookTitle}</book_title>${
+            safeBookDescription
+              ? ` (<book_description>${safeBookDescription}</book_description>)`
+              : ''
+          } containing these topics: ${safeTopicList}
 
-The learner just completed a session on "${topicTitle}".
+The learner just completed a session on <completed_topic>${safeCompletedTopicTitle}</completed_topic>.
 
 Suggest exactly 2 new topic titles that would be natural next steps within this book. Return ONLY valid JSON:
 { "suggestions": ["Topic A", "Topic B"] }`,

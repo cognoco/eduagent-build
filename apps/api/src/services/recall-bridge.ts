@@ -12,6 +12,7 @@ import {
 } from '@eduagent/database';
 import type { RecallBridgeResult } from '@eduagent/schemas';
 import { routeAndCall, type ChatMessage, type EscalationRung } from './llm';
+import { sanitizeXmlValue } from './llm/sanitize';
 
 // ---------------------------------------------------------------------------
 // Core function
@@ -95,8 +96,14 @@ function buildRecallBridgePrompt(
     '- Keep questions short (1-2 sentences each)\n' +
     '- Frame positively — this is a celebration of their success\n' +
     '- Questions should be answerable in 1-2 sentences\n' +
-    `- Topic: <topic_title>${topicTitle}</topic_title>\n` +
-    `- Description: <topic_description>${topicDescription}</topic_description>\n\n` +
+    `- Topic: <topic_title>${sanitizeXmlValue(
+      topicTitle,
+      200
+    )}</topic_title>\n` +
+    `- Description: <topic_description>${sanitizeXmlValue(
+      topicDescription,
+      500
+    )}</topic_description>\n\n` +
     'Return exactly 2 questions, one per line.'
   );
 }

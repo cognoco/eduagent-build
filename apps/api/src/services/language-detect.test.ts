@@ -117,7 +117,12 @@ describe('detectLanguageSubject', () => {
     expect(mockRouteAndCall).toHaveBeenCalledWith(
       expect.arrayContaining([
         expect.objectContaining({ role: 'system' }),
-        expect.objectContaining({ role: 'user', content: 'Spanish' }),
+        // [PROMPT-INJECT-8] rawInput is now wrapped in <subject_text> with
+        // entity-encoded content for prompt-injection defense.
+        expect.objectContaining({
+          role: 'user',
+          content: '<subject_text>Spanish</subject_text>',
+        }),
       ]),
       1
     );

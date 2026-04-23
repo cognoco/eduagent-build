@@ -8,6 +8,7 @@ import type { SubjectClassifyResult } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import { routeAndCall } from './llm';
 import type { ChatMessage } from './llm';
+import { sanitizeXmlValue } from './llm/sanitize';
 import { listSubjects } from './subject';
 
 const CLASSIFY_SYSTEM_PROMPT = `You are a subject classifier for a tutoring platform.
@@ -124,7 +125,12 @@ export async function classifySubject(
     };
   }
 
-  const subjectList = subjects.map((s) => `- ${s.name}`).join('\n');
+  // [PROMPT-INJECT-8] subjects.name is learner-owned text stored in DB —
+  // sanitize each entry before joining so a crafted subject name cannot
+  // inject newlines or directives into the enrolled-subject list.
+  const subjectList = subjects
+    .map((s) => `- ${sanitizeXmlValue(s.name, 200)}`)
+    .join('\n');
 
   const sanitizedText = sanitizeLlmInput(text);
 
