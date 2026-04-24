@@ -449,13 +449,12 @@ export async function prepareExchangeContext(
   if (isFreeform && session.exchangeCount === 0) {
     likelyLanguage = LANGUAGE_REGEX.test(userMessage);
     if (likelyLanguage) {
-      // Telemetry-only event — no Inngest handler; consumed by observability tooling.
-      void inngest.send({
-        name: 'app/ask.language_preclassified',
-        data: {
-          sessionId,
-          matchedPattern: userMessage.match(LANGUAGE_REGEX)?.[0] ?? '',
-        },
+      // [PR-FIX-05] Telemetry-only: no Inngest handler exists for this signal.
+      // Emit via structured logger so it is queryable in Cloudflare Logpush /
+      // wrangler tail without routing through the Inngest event queue.
+      logger.info('ask.language_preclassified', {
+        sessionId,
+        matchedPattern: userMessage.match(LANGUAGE_REGEX)?.[0] ?? '',
       });
     }
   }
