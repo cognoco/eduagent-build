@@ -210,4 +210,29 @@ describe('AccordionTopicList', () => {
 
     expect(screen.getByText('No topics yet')).toBeTruthy();
   });
+
+  it('[UX-DE-M5] empty state shows Browse topics CTA that navigates to library', () => {
+    mockUseChildSubjectTopics.mockReturnValue({
+      data: [],
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+
+    render(
+      <AccordionTopicList
+        childProfileId="child-1"
+        subjectId="subject-1"
+        subjectName="Mathematics"
+        expanded
+      />
+    );
+
+    expect(screen.getByTestId('accordion-topics-empty')).toBeTruthy();
+    expect(screen.getByTestId('accordion-topics-browse')).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('accordion-topics-browse'));
+
+    expect(mockPush).toHaveBeenCalledWith('/(app)/library');
+  });
 });

@@ -1,10 +1,14 @@
 import {
   getTextContent,
+  makeChatStreamResult,
   type LLMProvider,
   type ChatMessage,
+  type ChatResult,
+  type ChatStreamResult,
   type ModelConfig,
   type MessagePart,
 } from '../types';
+import { normalizeStopReason, type StopReason } from '../stop-reason';
 import { createLogger } from '../../logger';
 
 const logger = createLogger();
@@ -51,6 +55,7 @@ interface AnthropicResponseBlock {
 
 interface AnthropicResponse {
   content?: AnthropicResponseBlock[];
+  stop_reason?: string;
   error?: { type: string; message: string };
 }
 
@@ -110,7 +115,10 @@ export function createAnthropicProvider(apiKey: string): LLMProvider {
   return {
     id: 'anthropic',
 
-    async chat(messages: ChatMessage[], config: ModelConfig): Promise<string> {
+    async chat(
+      messages: ChatMessage[],
+      config: ModelConfig
+    ): Promise<ChatResult> {
       const { system, messages: anthropicMessages } =
         toAnthropicFormat(messages);
 
@@ -149,91 +157,118 @@ export function createAnthropicProvider(apiKey: string): LLMProvider {
       if (!text) {
         throw new Error('Anthropic returned empty response');
       }
-      return text;
+      return {
+        content: text,
+        stopReason: normalizeStopReason('anthropic', data.stop_reason),
+      };
     },
 
-    async *chatStream(
-      messages: ChatMessage[],
-      config: ModelConfig
-    ): AsyncIterable<string> {
-      const { system, messages: anthropicMessages } =
-        toAnthropicFormat(messages);
-
-      const body: AnthropicRequest = {
-        model: config.model,
-        max_tokens: config.maxTokens,
-        system: system ?? '',
-        messages: anthropicMessages,
-        stream: true,
-      };
-
-      const res = await fetch(ANTHROPIC_BASE_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': ANTHROPIC_VERSION,
-        },
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(ANTHROPIC_TIMEOUT_MS),
+    chatStream(messages: ChatMessage[], config: ModelConfig): ChatStreamResult {
+      let resolveStop!: (r: StopReason) => void;
+      const stopReasonPromise = new Promise<StopReason>((resolve) => {
+        resolveStop = resolve;
       });
 
-      if (!res.ok) {
-        const errorBody = await res.text();
-        throw new Error(
-          `Anthropic API stream failed (${res.status}): ${errorBody}`
-        );
-      }
+      async function* generate(): AsyncIterable<string> {
+        let rawStopReason: string | undefined;
+        const { system, messages: anthropicMessages } =
+          toAnthropicFormat(messages);
 
-      if (!res.body) {
-        throw new Error('Anthropic API returned no response body for stream');
-      }
+        const body: AnthropicRequest = {
+          model: config.model,
+          max_tokens: config.maxTokens,
+          system: system ?? '',
+          messages: anthropicMessages,
+          stream: true,
+        };
 
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
+        try {
+          const res = await fetch(ANTHROPIC_BASE_URL, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': apiKey,
+              'anthropic-version': ANTHROPIC_VERSION,
+            },
+            body: JSON.stringify(body),
+            signal: AbortSignal.timeout(ANTHROPIC_TIMEOUT_MS),
+          });
 
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() ?? '';
-
-          for (const line of lines) {
-            const trimmed = line.trim();
-            if (!trimmed.startsWith('data: ')) continue;
-
-            const jsonStr = trimmed.slice(6);
-            if (!jsonStr || jsonStr === '[DONE]') continue;
-
-            try {
-              const event = JSON.parse(jsonStr) as {
-                type: string;
-                delta?: { type: string; text?: string };
-              };
-
-              // Anthropic streams content_block_delta events with text
-              if (
-                event.type === 'content_block_delta' &&
-                event.delta?.type === 'text_delta' &&
-                event.delta.text
-              ) {
-                yield event.delta.text;
-              }
-            } catch {
-              // Log malformed chunks so SSE format changes are detectable
-              logger.warn('[anthropic] Malformed SSE chunk', {
-                chunk: jsonStr.slice(0, 120),
-              });
-            }
+          if (!res.ok) {
+            const errorBody = await res.text();
+            throw new Error(
+              `Anthropic API stream failed (${res.status}): ${errorBody}`
+            );
           }
+
+          if (!res.body) {
+            throw new Error(
+              'Anthropic API returned no response body for stream'
+            );
+          }
+
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = '';
+
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+
+              buffer += decoder.decode(value, { stream: true });
+              const lines = buffer.split('\n');
+              buffer = lines.pop() ?? '';
+
+              for (const line of lines) {
+                const trimmed = line.trim();
+                if (!trimmed.startsWith('data: ')) continue;
+
+                const jsonStr = trimmed.slice(6);
+                if (!jsonStr || jsonStr === '[DONE]') continue;
+
+                try {
+                  const event = JSON.parse(jsonStr) as {
+                    type: string;
+                    delta?: {
+                      type: string;
+                      text?: string;
+                      stop_reason?: string;
+                    };
+                  };
+
+                  // Anthropic streams content_block_delta events with text,
+                  // and a terminal message_delta event whose delta carries
+                  // stop_reason. Capture both.
+                  if (
+                    event.type === 'content_block_delta' &&
+                    event.delta?.type === 'text_delta' &&
+                    event.delta.text
+                  ) {
+                    yield event.delta.text;
+                  } else if (
+                    event.type === 'message_delta' &&
+                    event.delta?.stop_reason
+                  ) {
+                    rawStopReason = event.delta.stop_reason;
+                  }
+                } catch {
+                  // Log malformed chunks so SSE format changes are detectable
+                  logger.warn('[anthropic] Malformed SSE chunk', {
+                    chunk: jsonStr.slice(0, 120),
+                  });
+                }
+              }
+            }
+          } finally {
+            reader.releaseLock();
+          }
+        } finally {
+          resolveStop(normalizeStopReason('anthropic', rawStopReason));
         }
-      } finally {
-        reader.releaseLock();
       }
+
+      return makeChatStreamResult(generate(), stopReasonPromise);
     },
   };
 }

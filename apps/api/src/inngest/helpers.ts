@@ -84,6 +84,34 @@ export function getStepVoyageApiKey(): string {
 }
 
 // ---------------------------------------------------------------------------
+// Module-level APP_URL — set by Inngest middleware on CF Workers,
+// falls back to process.env for Node.js test environments.
+// ---------------------------------------------------------------------------
+
+let _appUrl: string | undefined;
+
+/** Called by Inngest middleware to inject the APP_URL binding. */
+export function setAppUrl(url: string): void {
+  _appUrl = url;
+}
+
+/** Reset the injected URL — for test cleanup only. */
+export function resetAppUrl(): void {
+  _appUrl = undefined;
+}
+
+/**
+ * Returns the public app URL for use within Inngest step functions.
+ *
+ * Prefers the URL injected via {@link setAppUrl} (set by middleware on
+ * CF Workers). Falls back to `process.env['APP_URL']` then the canonical
+ * production domain.
+ */
+export function getStepAppUrl(): string {
+  return _appUrl ?? process.env['APP_URL'] ?? 'https://www.mentomate.com';
+}
+
+// ---------------------------------------------------------------------------
 // Module-level RESEND_API_KEY — set by Inngest middleware on CF Workers,
 // falls back to process.env for Node.js test environments.
 // ---------------------------------------------------------------------------

@@ -188,7 +188,7 @@ export default function MoreScreen() {
   const hideMentorMemory = isNewLearner(cachedInventory?.global.totalSessions);
   const exportData = useExportData();
   const [isSigningOut, setIsSigningOut] = useState(false);
-  const { data: subscription, isLoading: isSubLoading } = useSubscription();
+  const { data: subscription } = useSubscription();
   const { data: familyData } = useFamilySubscription(
     subscription?.tier === 'family' || subscription?.tier === 'pro'
   );
@@ -308,10 +308,15 @@ export default function MoreScreen() {
         a.click();
         URL.revokeObjectURL(url);
       } else {
-        await Share.share({
+        const result = await Share.share({
           title: 'MentoMate account data export',
           message: jsonString,
         });
+        // [UX-DE-L4] iOS returns dismissedAction when the user cancels the
+        // share sheet — treat it as a no-op, not a success or error.
+        if (result.action === Share.dismissedAction) {
+          return;
+        }
       }
     } catch (err: unknown) {
       platformAlert('Export failed', formatApiError(err));
@@ -460,9 +465,6 @@ export default function MoreScreen() {
             )}
             <Pressable
               onPress={handleAddChild}
-              // UX-DE-L10: disable while loading
-              disabled={isSubLoading}
-              style={{ opacity: isSubLoading ? 0.5 : 1 }}
               className="bg-surface rounded-card px-4 py-3.5 mb-2"
               accessibilityLabel="Add a child profile"
               accessibilityRole="button"

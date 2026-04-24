@@ -11,6 +11,8 @@ function formatCountdown(seconds: number): string {
 export interface FluencyDrillStripProps {
   drill: FluencyDrillEvent;
   onDismissScore: () => void;
+  /** M7: Optional callback to let the user skip/dismiss an active drill early. */
+  onSkipDrill?: () => void;
 }
 
 /**
@@ -23,6 +25,7 @@ export interface FluencyDrillStripProps {
 export function FluencyDrillStrip({
   drill,
   onDismissScore,
+  onSkipDrill,
 }: FluencyDrillStripProps) {
   const [remaining, setRemaining] = useState(drill.durationSeconds ?? 60);
   const startRef = useRef(Date.now());
@@ -106,13 +109,27 @@ export function FluencyDrillStrip({
           Fluency drill
         </Text>
       </View>
-      <Text
-        className={`text-body-sm font-mono font-semibold ${
-          isUrgent ? 'text-error' : 'text-text-primary'
-        }`}
-      >
-        {formatCountdown(remaining)}
-      </Text>
+      <View className="flex-row items-center gap-3">
+        <Text
+          className={`text-body-sm font-mono font-semibold ${
+            isUrgent ? 'text-error' : 'text-text-primary'
+          }`}
+        >
+          {formatCountdown(remaining)}
+        </Text>
+        {/* M7: Skip button so users can exit a drill they don't want to complete */}
+        {onSkipDrill && (
+          <Pressable
+            onPress={onSkipDrill}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Skip drill"
+            testID="fluency-drill-skip"
+          >
+            <Text className="text-caption text-text-tertiary">Skip</Text>
+          </Pressable>
+        )}
+      </View>
     </View>
   );
 }

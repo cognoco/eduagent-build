@@ -265,9 +265,45 @@ export default function QuizPlayScreen(): React.ReactElement {
   );
 
   if (!round || !currentQuestion) {
+    // [UX-DE-H1] Render an actionable error state instead of a dead plain-text
+    // fallback. The useEffect redirect may not fire (e.g. stale router ref),
+    // so we always give the user a way out.
     return (
-      <View className="flex-1 items-center justify-center bg-background">
-        <Text className="text-body text-text-secondary">No round loaded</Text>
+      <View
+        className="flex-1 bg-background px-5 items-center justify-center"
+        testID="quiz-play-no-round"
+      >
+        <Text className="text-h3 font-semibold text-text-primary text-center mb-2">
+          No round loaded
+        </Text>
+        <Text className="text-body text-text-secondary text-center mb-6">
+          Something went wrong loading the quiz round. You can try again or go
+          back to the quiz home.
+        </Text>
+        <View className="flex-row gap-3 w-full">
+          <Pressable
+            onPress={() => router.replace('/(app)/quiz' as never)}
+            className="flex-1 bg-primary rounded-button px-4 py-3 min-h-[48px] items-center justify-center"
+            accessibilityRole="button"
+            accessibilityLabel="Retry"
+            testID="quiz-play-no-round-retry"
+          >
+            <Text className="text-body font-semibold text-text-inverse">
+              Retry
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => goBackOrReplace(router, '/(app)/quiz')}
+            className="flex-1 bg-surface-elevated rounded-button px-4 py-3 min-h-[48px] items-center justify-center"
+            accessibilityRole="button"
+            accessibilityLabel="Go Home"
+            testID="quiz-play-no-round-home"
+          >
+            <Text className="text-body font-semibold text-text-primary">
+              Go Home
+            </Text>
+          </Pressable>
+        </View>
       </View>
     );
   }

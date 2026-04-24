@@ -201,10 +201,15 @@ export default function ChildMentorMemoryScreen() {
           a.click();
           URL.revokeObjectURL(url);
         } else {
-          await Share.share({
+          const result = await Share.share({
             message: data.text,
             title: `${child?.displayName ?? 'Learner'} memory summary`,
           });
+          // [UX-DE-L5] iOS returns dismissedAction when the user cancels the
+          // share sheet — treat it as a no-op, not a success or error.
+          if (result.action === Share.dismissedAction) {
+            return;
+          }
         }
       } catch {
         platformAlert('Could not export memory', 'Please try again.');

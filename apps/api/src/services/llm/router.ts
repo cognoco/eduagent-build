@@ -1,11 +1,81 @@
-import type {
-  LLMProvider,
-  ChatMessage,
-  EscalationRung,
-  ModelConfig,
-  RouteResult,
-  StreamResult,
+import {
+  makeChatStreamResult,
+  type LLMProvider,
+  type ChatMessage,
+  type ChatResult,
+  type ChatStreamResult,
+  type EscalationRung,
+  type ModelConfig,
+  type RouteResult,
+  type StreamResult,
 } from './types';
+import type { StopReason } from './stop-reason';
+
+// ---------------------------------------------------------------------------
+// [LLM-TRUNCATE-01] llm.stop_reason metric emission (Phase 1 Task 3)
+//
+// One structured line per successful LLM call, written to the same logger
+// pipeline all other router observability goes through. Downstream dashboard
+// query (docs/superpowers/plans/2026-04-23-llm-never-truncate.md appendix A):
+//
+//   count by stop_reason, flow over 24h
+//   rate(stop_reason="length") / rate(*) by flow
+//
+// `flow` and `sessionId` are passed by callers (session-exchange.ts, interview.ts,
+// etc.); router does not fabricate them. `responseChars` is omitted for the
+// streaming path because the stream-wrapper does not materialize the reply text.
+// ---------------------------------------------------------------------------
+
+function logStopReason(fields: {
+  provider: string;
+  model: string;
+  rung: EscalationRung;
+  stopReason: StopReason;
+  flow?: string;
+  sessionId?: string;
+  responseChars?: number;
+}): void {
+  logger.info('llm.stop_reason', {
+    provider: fields.provider,
+    model: fields.model,
+    rung: fields.rung,
+    stop_reason: fields.stopReason,
+    flow: fields.flow,
+    session_id: fields.sessionId,
+    response_chars: fields.responseChars,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Backward-compat shims
+//
+// Some test-only providers pre-date the ChatResult / ChatStreamResult contract
+// and still return a bare string from chat() or a raw AsyncIterable from
+// chatStream(). Router normalizes both shapes so mock providers do not need to
+// be migrated in lockstep with production providers. stopReason defaults to
+// 'unknown' when the legacy shape is used — downstream metrics treat this
+// as a clean signal-missing case, which is the honest thing to report.
+// ---------------------------------------------------------------------------
+
+function normalizeChatResult(raw: ChatResult | string): ChatResult {
+  if (typeof raw === 'string') return { content: raw, stopReason: 'unknown' };
+  return raw;
+}
+
+function normalizeStreamResult(
+  raw: ChatStreamResult | AsyncIterable<string>
+): ChatStreamResult {
+  if (
+    raw &&
+    typeof (raw as ChatStreamResult).stopReasonPromise?.then === 'function'
+  ) {
+    return raw as ChatStreamResult;
+  }
+  return makeChatStreamResult(
+    raw as AsyncIterable<string>,
+    Promise.resolve<StopReason>('unknown')
+  );
+}
 import type { AgeBracket, ConversationLanguage } from '@eduagent/schemas';
 import type { LLMTier } from '../subscription';
 import { createLogger } from '../logger';
@@ -355,6 +425,12 @@ export async function routeAndCall(
     // profile's conversation_language and pronouns.
     conversationLanguage?: ConversationLanguage;
     pronouns?: string | null;
+    // [LLM-TRUNCATE-01] Flow label + session id — used for the llm.stop_reason
+    // metric dashboard query (count by stop_reason, flow over 24h). Optional
+    // so existing callers compile; callers wanting per-flow dashboards pass
+    // both. Phase 1 Task 3.
+    flow?: string;
+    sessionId?: string;
   }
 ): Promise<RouteResult> {
   const safeMessages = withSafetyPreamble(messages, _options?.ageBracket, {
@@ -371,16 +447,27 @@ export async function routeAndCall(
   if (canAttempt(config.provider)) {
     const start = Date.now();
     try {
-      const response = await withRetry(
+      const raw = await withRetry(
         () => provider.chat(safeMessages, config),
         config.provider
       );
+      const result = normalizeChatResult(raw);
       recordSuccess(config.provider);
+      logStopReason({
+        provider: config.provider,
+        model: config.model,
+        rung,
+        stopReason: result.stopReason,
+        flow: _options?.flow,
+        sessionId: _options?.sessionId,
+        responseChars: result.content.length,
+      });
       return {
-        response,
+        response: result.content,
         provider: config.provider,
         model: config.model,
         latencyMs: Date.now() - start,
+        stopReason: result.stopReason,
       };
     } catch (err) {
       // R-02: only count transient errors toward circuit trips
@@ -401,7 +488,10 @@ export async function routeAndCall(
           error: err instanceof Error ? err.message : String(err),
         }
       );
-      return attemptProvider(fallbackConfig, safeMessages);
+      return attemptProvider(fallbackConfig, safeMessages, rung, {
+        flow: _options?.flow,
+        sessionId: _options?.sessionId,
+      });
     }
   }
 
@@ -412,7 +502,10 @@ export async function routeAndCall(
       provider: config.provider,
       fallback: fallbackConfig.provider,
     });
-    return attemptProvider(fallbackConfig, safeMessages);
+    return attemptProvider(fallbackConfig, safeMessages, rung, {
+      flow: _options?.flow,
+      sessionId: _options?.sessionId,
+    });
   }
 
   throw new CircuitOpenError(config.provider);
@@ -421,7 +514,9 @@ export async function routeAndCall(
 /** Attempt a single provider call with retry (used by fallback path). */
 async function attemptProvider(
   config: ModelConfig,
-  messages: ChatMessage[]
+  messages: ChatMessage[],
+  rung: EscalationRung,
+  metricContext: { flow?: string; sessionId?: string }
 ): Promise<RouteResult> {
   const provider = providers.get(config.provider);
   if (!provider) {
@@ -433,16 +528,27 @@ async function attemptProvider(
 
   const start = Date.now();
   try {
-    const response = await withRetry(
+    const raw = await withRetry(
       () => provider.chat(messages, config),
       `${config.provider} (fallback)`
     );
+    const result = normalizeChatResult(raw);
     recordSuccess(config.provider);
+    logStopReason({
+      provider: config.provider,
+      model: config.model,
+      rung,
+      stopReason: result.stopReason,
+      flow: metricContext.flow,
+      sessionId: metricContext.sessionId,
+      responseChars: result.content.length,
+    });
     return {
-      response,
+      response: result.content,
       provider: config.provider,
       model: config.model,
       latencyMs: Date.now() - start,
+      stopReason: result.stopReason,
     };
   } catch (err) {
     if (isTransientError(err)) {
@@ -470,21 +576,31 @@ async function attemptProvider(
  * - On iteration error → recordFailure
  * - Pre-first-byte failure with available fallback → transparent retry
  * - Mid-stream failure → re-throw (cannot switch providers after data flows)
+ *
+ * `innerStopReasonPromise` is the promise from the wrapped provider's own
+ * ChatStreamResult. `onStopReason` is invoked with whichever stop reason
+ * ultimately drove the successful stream (primary OR fallback) so callers
+ * can thread it into their own outer stopReasonPromise.
  */
 async function* wrapStreamWithCircuitBreaker(
   source: AsyncIterable<string>,
   providerId: string,
+  innerStopReasonPromise: Promise<StopReason>,
   fallbackConfig: ModelConfig | null,
   messages: ChatMessage[],
+  onStopReason: (r: StopReason) => void,
   onFallback?: () => void
 ): AsyncIterable<string> {
   let chunksYielded = 0;
+  let forwardedStopReason = false;
   try {
     for await (const chunk of source) {
       chunksYielded++;
       yield chunk;
     }
     recordSuccess(providerId);
+    onStopReason(await innerStopReasonPromise);
+    forwardedStopReason = true;
   } catch (err) {
     if (isTransientError(err)) {
       recordFailure(providerId);
@@ -504,13 +620,16 @@ async function* wrapStreamWithCircuitBreaker(
             error: err instanceof Error ? err.message : String(err),
           }
         );
-        // Manually iterate so onFallback fires after first successful chunk,
-        // confirming the fallback provider actually works.
+        const fallbackResult = normalizeStreamResult(
+          fallbackProvider.chatStream(messages, fallbackConfig)
+        );
         const fallbackStream = wrapStreamWithCircuitBreaker(
-          fallbackProvider.chatStream(messages, fallbackConfig),
+          fallbackResult.stream,
           fallbackConfig.provider,
+          fallbackResult.stopReasonPromise,
           null, // no further fallback
-          messages
+          messages,
+          onStopReason
         );
         let signalled = false;
         for await (const chunk of fallbackStream) {
@@ -520,12 +639,18 @@ async function* wrapStreamWithCircuitBreaker(
           }
           yield chunk;
         }
+        forwardedStopReason = true;
         return;
       }
     }
 
     // Mid-stream failure or no fallback available — re-throw
     throw err;
+  } finally {
+    // Safety net: if we errored before forwarding a stop reason (mid-stream
+    // failure, no fallback available), resolve the outer promise to 'unknown'
+    // so anyone awaiting stopReasonPromise does not hang.
+    if (!forwardedStopReason) onStopReason('unknown');
   }
 }
 
@@ -547,6 +672,9 @@ export async function routeAndStream(
     // BKT-C.1 — same personalization as routeAndCall.
     conversationLanguage?: ConversationLanguage;
     pronouns?: string | null;
+    // [LLM-TRUNCATE-01] Metric labels — see routeAndCall for rationale.
+    flow?: string;
+    sessionId?: string;
   }
 ): Promise<StreamResult> {
   const safeMessages = withSafetyPreamble(messages, options?.ageBracket, {
@@ -566,19 +694,49 @@ export async function routeAndStream(
     // because chatStream() returns a lazy AsyncIterable — the actual HTTP
     // request and data flow happen in the caller's for-await loop.
     let fallbackFired = false;
+    let resolveStop!: (r: StopReason) => void;
+    const stopReasonPromise = new Promise<StopReason>((resolve) => {
+      resolveStop = resolve;
+    });
+    const primaryResult = normalizeStreamResult(
+      provider.chatStream(safeMessages, config)
+    );
     const stream = wrapStreamWithCircuitBreaker(
-      provider.chatStream(safeMessages, config),
+      primaryResult.stream,
       config.provider,
+      primaryResult.stopReasonPromise,
       fallbackConfig,
       safeMessages,
+      resolveStop,
       () => {
         fallbackFired = true;
       }
     );
+    // [LLM-TRUNCATE-01] Emit metric once stream drains. `fallbackFired` is
+    // checked so the log reports the provider that actually produced the
+    // bytes, not the originally-selected one. responseChars is omitted for
+    // streaming (wrapper does not buffer the full reply).
+    stopReasonPromise
+      .then((stopReason) => {
+        const effectiveConfig =
+          fallbackFired && fallbackConfig ? fallbackConfig : config;
+        logStopReason({
+          provider: effectiveConfig.provider,
+          model: effectiveConfig.model,
+          rung,
+          stopReason,
+          flow: options?.flow,
+          sessionId: options?.sessionId,
+        });
+      })
+      .catch(() => {
+        // stopReasonPromise never rejects by design — defensive swallow.
+      });
     return {
       stream,
       provider: config.provider,
       model: config.model,
+      stopReasonPromise,
       get fallbackUsed() {
         return fallbackFired;
       },
@@ -592,7 +750,10 @@ export async function routeAndStream(
       provider: config.provider,
       fallback: fallbackConfig.provider,
     });
-    return attemptStreamProvider(fallbackConfig, safeMessages);
+    return attemptStreamProvider(fallbackConfig, safeMessages, rung, {
+      flow: options?.flow,
+      sessionId: options?.sessionId,
+    });
   }
 
   throw new CircuitOpenError(config.provider);
@@ -601,7 +762,9 @@ export async function routeAndStream(
 /** Attempt a single provider stream (used for direct fallback when primary circuit is open). */
 async function attemptStreamProvider(
   config: ModelConfig,
-  messages: ChatMessage[]
+  messages: ChatMessage[],
+  rung: EscalationRung,
+  metricContext: { flow?: string; sessionId?: string }
 ): Promise<StreamResult> {
   const provider = providers.get(config.provider);
   if (!provider) {
@@ -614,15 +777,40 @@ async function attemptStreamProvider(
   // NOTE: recordSuccess/recordFailure fire during iteration, not here,
   // because chatStream() returns a lazy AsyncIterable — the actual HTTP
   // request and data flow happen in the caller's for-await loop.
-  const stream = wrapStreamWithCircuitBreaker(
-    provider.chatStream(messages, config),
-    config.provider,
-    null, // no further fallback
-    messages
+  let resolveStop!: (r: StopReason) => void;
+  const stopReasonPromise = new Promise<StopReason>((resolve) => {
+    resolveStop = resolve;
+  });
+  const providerResult = normalizeStreamResult(
+    provider.chatStream(messages, config)
   );
+  const stream = wrapStreamWithCircuitBreaker(
+    providerResult.stream,
+    config.provider,
+    providerResult.stopReasonPromise,
+    null, // no further fallback
+    messages,
+    resolveStop
+  );
+  // [LLM-TRUNCATE-01] Metric emission on drain.
+  stopReasonPromise
+    .then((stopReason) => {
+      logStopReason({
+        provider: config.provider,
+        model: config.model,
+        rung,
+        stopReason,
+        flow: metricContext.flow,
+        sessionId: metricContext.sessionId,
+      });
+    })
+    .catch(() => {
+      // stopReasonPromise never rejects by design — defensive swallow.
+    });
   return {
     stream,
     provider: config.provider,
     model: config.model,
+    stopReasonPromise,
   };
 }

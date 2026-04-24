@@ -3,10 +3,21 @@ const mockGetProfileConsentState = jest.fn();
 const mockDeleteProfileIfNoConsent = jest.fn().mockResolvedValue(true);
 const mockSendEmail = jest.fn();
 
+// Fake DB whose query.consentStates.findFirst returns a valid consent token.
+// All values are defined inline inside the factory to avoid Jest hoisting issues.
 jest.mock('../helpers', () => ({
-  getStepDatabase: jest.fn(() => ({})),
+  getStepDatabase: jest.fn(() => ({
+    query: {
+      consentStates: {
+        findFirst: jest
+          .fn()
+          .mockResolvedValue({ consentToken: 'test-token-abc123' }),
+      },
+    },
+  })),
   getStepResendApiKey: jest.fn(() => 're_test_key'),
   getStepEmailFrom: jest.fn(() => 'noreply@mentomate.com'),
+  getStepAppUrl: jest.fn(() => 'https://api.mentomate.com'),
 }));
 
 jest.mock('../../services/consent', () => ({
@@ -18,10 +29,10 @@ jest.mock('../../services/consent', () => ({
 jest.mock('../../services/notifications', () => ({
   sendEmail: (...args: unknown[]) => mockSendEmail(...args),
   formatConsentReminderEmail: jest.fn(
-    (_email: string, _name: string, _days: number) => ({
+    (_email: string, _name: string, _days: number, _tokenUrl: string) => ({
       to: _email,
       subject: 'Consent reminder',
-      body: `${_days} days left`,
+      body: `${_days} days left — ${_tokenUrl}`,
       type: 'consent_reminder',
     })
   ),

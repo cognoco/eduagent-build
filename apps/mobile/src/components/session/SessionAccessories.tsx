@@ -367,10 +367,22 @@ export function HomeworkModeChips({
           </Pressable>
         </View>
       ) : (
+        /* M6: Zero-problems fallback — add escape action so user isn't stuck */
         <View className="px-4 py-3" testID="homework-no-problems">
-          <Text className="text-body-sm text-text-secondary text-center">
+          <Text className="text-body-sm text-text-secondary text-center mb-2">
             No problems loaded. Type your question directly in the chat.
           </Text>
+          <Pressable
+            onPress={handleEndSession}
+            className="rounded-button bg-surface-elevated py-2 items-center min-h-[44px] justify-center"
+            accessibilityRole="button"
+            accessibilityLabel="End this session"
+            testID="homework-no-problems-end-btn"
+          >
+            <Text className="text-body-sm font-semibold text-text-secondary">
+              End session
+            </Text>
+          </Pressable>
         </View>
       )}
     </View>

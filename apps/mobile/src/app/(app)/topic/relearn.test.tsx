@@ -204,4 +204,61 @@ describe('RelearnScreen', () => {
       ).toBeTruthy();
     });
   });
+
+  // [UX-DE-L1] Retry pressable meets 44×44 tap target
+  it('retry pressable has min-h-[44px] class after an error', async () => {
+    mockMutate.mockImplementation(
+      (
+        _input: unknown,
+        callbacks?: {
+          onError?: (error: Error) => void;
+          onSettled?: () => void;
+        }
+      ) => {
+        callbacks?.onError?.(new Error('Network error'));
+        callbacks?.onSettled?.();
+      }
+    );
+
+    render(<RelearnScreen />, { wrapper: createWrapper() });
+    fireEvent.press(screen.getByTestId('relearn-same-method'));
+
+    await waitFor(() => {
+      const retryBtn = screen.getByTestId('relearn-retry');
+      expect(retryBtn.props.className).toContain('min-h-[44px]');
+    });
+  });
+
+  // [UX-DE-M1] Cancel button is visible during submit so user isn't trapped
+  it('shows a cancel button while the relearn API call is pending', async () => {
+    let resolveSubmit!: () => void;
+    mockMutate.mockImplementation(
+      (
+        _input: unknown,
+        callbacks?: {
+          onSuccess?: (result: { sessionId: string }) => void;
+          onSettled?: () => void;
+        }
+      ) => {
+        // Hang indefinitely until resolveSubmit is called
+        resolveSubmit = () => {
+          callbacks?.onSuccess?.({ sessionId: 'sess-1' });
+          callbacks?.onSettled?.();
+        };
+      }
+    );
+
+    render(<RelearnScreen />, { wrapper: createWrapper() });
+    fireEvent.press(screen.getByTestId('relearn-same-method'));
+
+    // Cancel button should appear while pending
+    expect(screen.getByTestId('relearn-cancel')).toBeTruthy();
+
+    // Tap cancel → spinner + cancel button should disappear
+    fireEvent.press(screen.getByTestId('relearn-cancel'));
+    expect(screen.queryByTestId('relearn-cancel')).toBeNull();
+
+    // Clean up hanging mock
+    resolveSubmit?.();
+  });
 });

@@ -145,6 +145,24 @@ function isPurchaseCancelledError(error: unknown): boolean {
 }
 
 /**
+ * Checks whether a RevenueCat error indicates the product has already been
+ * purchased (e.g. user already owns this entitlement on another device).
+ * When this occurs, the user should restore rather than re-purchase.
+ */
+function isProductAlreadyPurchasedError(error: unknown): boolean {
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error as PurchasesError).code ===
+      PURCHASES_ERROR_CODE.PRODUCT_ALREADY_PURCHASED_ERROR
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/**
  * Checks whether a RevenueCat error is a network error.
  */
 function isNetworkError(error: unknown): boolean {
@@ -586,7 +604,6 @@ export default function SubscriptionScreen() {
 
   // Restore-purchase polling state (BUG-397)
   const [restorePolling, setRestorePolling] = useState(false);
-  const [_purchasePolling, setPurchasePolling] = useState(false);
 
   // BUG-403: ScrollView ref so the Upgrade button can scroll to offerings
   const scrollViewRef = useRef<ScrollView>(null);
@@ -620,110 +637,11 @@ export default function SubscriptionScreen() {
   const isLoading =
     subLoading || usageLoading || offeringsLoading || customerInfoLoading;
 
-  // B1.2: 15s timeout guard for the loading body — Back button in header
-  // is always present, but the body had no escape. UX-DE-M3.
-  const [loadingTimedOut, setLoadingTimedOut] = useState(false);
-  useEffect(() => {
-    if (!isLoading) {
-      setLoadingTimedOut(false);
-      return;
-    }
-    const t = setTimeout(() => setLoadingTimedOut(true), 15_000);
-    return () => clearTimeout(t);
-  }, [isLoading]);
-
   const activeEntitlement = getActiveEntitlement(customerInfo);
   const hasActiveSubscription = activeEntitlement !== null;
 
   // ---------------------------------------------------------------------------
-  // Purchase handler — triggers native store payment sheet
-  // ---------------------------------------------------------------------------
-
-  const handlePurchase = useCallback(
-    async (pkg: PurchasesPackage) => {
-      try {
-        await purchase.mutateAsync(pkg);
-      } catch (error: unknown) {
-        if (isPurchaseCancelledError(error)) {
-          // User cancelled — not an error, just dismiss silently
-          return;
-        }
-        if (isNetworkError(error)) {
-          platformAlert(
-            'Network error',
-            'Please check your internet connection and try again.'
-          );
-          return;
-        }
-        platformAlert(
-          'Purchase failed',
-          'Something unexpected happened with your purchase. Please try again.'
-        );
-        return;
-      }
-
-      // UX-DE-L12: entitlement sync polling — RevenueCat webhook may lag
-      if (!mountedRef.current) return;
-      setPurchasePolling(true);
-
-      const maxAttempts = 15; // ~30 s at 2 s intervals
-      const pollIntervalMs = 2000;
-      let confirmed = false;
-
-      for (let attempt = 0; attempt < maxAttempts; attempt++) {
-        if (!mountedRef.current) break;
-        await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
-        if (!mountedRef.current) break;
-        try {
-          const freshSub = await queryClient.fetchQuery<{
-            tier: string;
-          }>({
-            queryKey: ['subscription', activeProfile?.id],
-            staleTime: 0,
-            queryFn: async () => {
-              const res = await client.subscription.$get({});
-              await assertOk(res);
-              const data = await res.json();
-              return data.subscription;
-            },
-          });
-          if (freshSub && freshSub.tier !== 'free') {
-            confirmed = true;
-            break;
-          }
-        } catch {
-          // Network error during poll — continue to next attempt
-          continue;
-        }
-      }
-
-      if (!mountedRef.current) return;
-      setPurchasePolling(false);
-
-      if (confirmed) {
-        await refetchUsage();
-        platformAlert('Success', 'Your subscription is now active!');
-      } else {
-        platformAlert(
-          'Processing',
-          'Your subscription will activate shortly. Pull to refresh if it does not appear.',
-          [
-            {
-              text: 'Check again',
-              onPress: () => {
-                void refetchSub();
-              },
-            },
-            { text: 'OK', style: 'cancel' },
-          ]
-        );
-      }
-    },
-    [purchase, refetchSub, refetchUsage, queryClient, activeProfile?.id, client]
-  );
-
-  // ---------------------------------------------------------------------------
-  // Restore purchases handler
+  // Restore purchases handler — declared first so handlePurchase can reference it
   // ---------------------------------------------------------------------------
 
   const handleRestore = useCallback(async () => {
@@ -803,6 +721,53 @@ export default function SubscriptionScreen() {
     refetchSub,
     refetchUsage,
   ]);
+
+  // ---------------------------------------------------------------------------
+  // Purchase handler — triggers native store payment sheet
+  // ---------------------------------------------------------------------------
+
+  const handlePurchase = useCallback(
+    async (pkg: PurchasesPackage) => {
+      try {
+        await purchase.mutateAsync(pkg);
+        await Promise.all([refetchSub(), refetchUsage()]);
+        platformAlert('Success', 'Your subscription is now active!');
+      } catch (error: unknown) {
+        if (isPurchaseCancelledError(error)) {
+          // User cancelled — not an error, just dismiss silently
+          return;
+        }
+        if (isProductAlreadyPurchasedError(error)) {
+          // [UX-DE-M8] Product already purchased — prompt restore instead of
+          // showing a generic failure. handleRestore is stable (useCallback).
+          platformAlert(
+            'Already purchased',
+            'It looks like you already own this subscription. Tap "Restore purchases" to activate it on this device.',
+            [
+              {
+                text: 'Restore purchases',
+                onPress: () => void handleRestore(),
+              },
+              { text: 'Cancel', style: 'cancel' },
+            ]
+          );
+          return;
+        }
+        if (isNetworkError(error)) {
+          platformAlert(
+            'Network error',
+            'Please check your internet connection and try again.'
+          );
+          return;
+        }
+        platformAlert(
+          'Purchase failed',
+          'Something unexpected happened with your purchase. Please try again.'
+        );
+      }
+    },
+    [purchase, refetchSub, refetchUsage, handleRestore]
+  );
 
   // ---------------------------------------------------------------------------
   // Manage billing — deep link to platform subscription management
@@ -1063,34 +1028,10 @@ export default function SubscriptionScreen() {
 
       {isLoading ? (
         <View
-          className="flex-1 items-center justify-center px-5"
+          className="flex-1 items-center justify-center"
           testID="subscription-loading"
         >
-          {loadingTimedOut ? (
-            <>
-              <Text className="text-body text-text-secondary text-center mb-4">
-                Taking longer than expected — tap Back or try again.
-              </Text>
-              <Pressable
-                onPress={() => {
-                  void refetchSub();
-                  void refetchUsage();
-                  void refetchOfferings();
-                  setLoadingTimedOut(false);
-                }}
-                className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center"
-                testID="subscription-timeout-retry"
-                accessibilityLabel="Retry loading subscription"
-                accessibilityRole="button"
-              >
-                <Text className="text-text-inverse text-body font-semibold">
-                  Retry
-                </Text>
-              </Pressable>
-            </>
-          ) : (
-            <ActivityIndicator />
-          )}
+          <ActivityIndicator />
         </View>
       ) : hasLoadError ? (
         <View

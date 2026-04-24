@@ -13,7 +13,7 @@ export { createOpenAIProvider } from './providers/openai';
 export { createAnthropicProvider } from './providers/anthropic';
 export { getTextContent } from './types';
 export { extractFirstJsonObject } from './extract-json';
-export { parseEnvelope } from './envelope';
+export { parseEnvelope, isRecognizedMarker } from './envelope';
 export { streamEnvelopeReply, teeEnvelopeStream } from './stream-envelope';
 export type {
   ParseEnvelopeResult,

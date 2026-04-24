@@ -577,7 +577,7 @@ export function ChatShell({
         )}
         {isStreaming && (
           <View className="items-center py-4" testID="thinking-bulb-animation">
-            <DeskLampAnimation size={96} color={colors.muted} />
+            <DeskLampAnimation size={48} color={colors.muted} />
           </View>
         )}
         {showIdleAnim && (
@@ -586,7 +586,7 @@ export function ChatShell({
             testID="idle-pen-animation"
             exiting={FadeOut.duration(200)}
           >
-            <MagicPenAnimation size={120} color={colors.muted} />
+            <MagicPenAnimation size={48} color={colors.muted} />
           </Animated.View>
         )}
         {footer}
@@ -636,11 +636,21 @@ export function ChatShell({
         </View>
       )}
 
-      {/* Inline STT error — shown below the mic area instead of only via Alert */}
+      {/* Inline STT error — shown below the mic area instead of only via Alert.
+          L2: Tapping the error retries STT so users can escape the error state. */}
       {isVoiceEnabled && speechStatus === 'error' && sttError && (
-        <View className="mx-4 mb-1" testID="voice-error-indicator">
-          <Text className="text-caption text-error">{sttError}</Text>
-        </View>
+        <Pressable
+          className="mx-4 mb-1 min-h-[44px] justify-center"
+          onPress={() => void startListening()}
+          testID="voice-error-indicator"
+          accessibilityRole="button"
+          accessibilityLabel={`Voice error: ${sttError}. Tap to retry.`}
+          accessibilityHint="Tap to retry voice input"
+        >
+          <Text className="text-caption text-error">
+            {sttError} — tap to retry
+          </Text>
+        </Pressable>
       )}
 
       {/* Voice transcript preview (above input, when voice enabled) */}
@@ -657,8 +667,10 @@ export function ChatShell({
           actionable even when the text input itself is disabled (BUG-234). */}
       {inputAccessory}
 
-      {/* Input — when disabled, show inline reason instead of hiding entirely */}
-      {inputDisabled && disabledReason ? (
+      {/* Input — when disabled, show inline reason instead of hiding entirely.
+          H4: Falls back to a generic message when no disabledReason is provided
+          so users are never left staring at an empty void with no explanation. */}
+      {inputDisabled ? (
         <View
           className="px-4 py-4 bg-surface border-t border-surface-elevated"
           style={{ paddingBottom: Math.max(insets.bottom, 8) }}
@@ -666,10 +678,10 @@ export function ChatShell({
           accessibilityRole="alert"
         >
           <Text className="text-body-sm text-text-secondary text-center">
-            {disabledReason}
+            {disabledReason ?? 'Input is currently unavailable'}
           </Text>
         </View>
-      ) : !inputDisabled ? (
+      ) : (
         <View>
           <View className="px-4 py-2 bg-surface border-t border-surface-elevated">
             <View
@@ -784,7 +796,7 @@ export function ChatShell({
             </Pressable>
           </View>
         </View>
-      ) : null}
+      )}
       {belowInput}
     </KeyboardAvoidingView>
   );

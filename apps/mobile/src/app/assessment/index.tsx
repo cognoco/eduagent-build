@@ -128,6 +128,9 @@ export default function AssessmentScreen() {
             primaryAction={{
               label: 'Try again',
               testID: 'assessment-error-retry',
+              // [UX-DE-H3] Disable retry while streaming to prevent double-submit
+              // on rapid taps during an in-flight answer check.
+              disabled: isStreaming,
               onPress: () => {
                 if (lastUserText) {
                   void handleSend(lastUserText);

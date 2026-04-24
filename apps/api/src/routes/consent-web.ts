@@ -17,6 +17,13 @@ type ConsentWebEnv = {
 };
 
 // ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const SUPPORT_MAILTO = 'mailto:support@mentomate.com';
+const MARKETING_HELP_URL = 'https://www.mentomate.com/help';
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -28,6 +35,20 @@ function escapeHtml(unsafe: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
+}
+
+/**
+ * Renders a consistent "get help" footer used on all error pages (invalid
+ * link, expired link) where the user cannot take any other action.
+ * Satisfies UX-DE-H7: every error state must have at least one interactive
+ * element.
+ */
+function errorActionHtml(): string {
+  return `<p class="info" style="margin-top:24px;">
+    Need help?
+    <a href="${MARKETING_HELP_URL}" style="color:#6c5ce7;">Visit our help centre</a>
+    or <a href="${SUPPORT_MAILTO}" style="color:#6c5ce7;">contact support</a>.
+  </p>`;
 }
 
 // ---------------------------------------------------------------------------
@@ -130,7 +151,8 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
         pageLayout(
           'Invalid Link',
           `<h1 class="error">Invalid link</h1>
-           <p>This consent link is missing required information. Please check your email for the correct link.</p>`
+           <p>This consent link is missing required information. Please check your email for the correct link.</p>
+           ${errorActionHtml()}`
         ),
         400
       );
@@ -145,7 +167,8 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
           'Link Expired',
           `<h1 class="error">Link expired or invalid</h1>
            <p>This consent link has expired or is no longer valid.</p>
-           <p>Ask your child to resend the consent request from the app.</p>`
+           <p>Ask your child to resend the consent request from the app.</p>
+           ${errorActionHtml()}`
         ),
         404
       );
@@ -192,7 +215,8 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
         pageLayout(
           'Invalid Link',
           `<h1 class="error">Invalid link</h1>
-           <p>This consent link is missing required information. Please check your email for the correct link.</p>`
+           <p>This consent link is missing required information. Please check your email for the correct link.</p>
+           ${errorActionHtml()}`
         ),
         400
       );
@@ -207,7 +231,8 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
           'Link Expired',
           `<h1 class="error">Link expired or invalid</h1>
            <p>This consent link has expired or is no longer valid.</p>
-           <p>Ask your child to resend the consent request from the app.</p>`
+           <p>Ask your child to resend the consent request from the app.</p>
+           ${errorActionHtml()}`
         ),
         404
       );
@@ -289,6 +314,7 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
              <div class="app-links">
                <p>Download the app for the best experience</p>
                <a href="https://play.google.com/store/apps/details?id=com.mentomate.app" class="btn btn-secondary">Google Play</a>
+               <a href="https://apps.apple.com/app/mentomate/id6741906959" class="btn btn-secondary">App Store</a>
              </div>`
           )
         );
@@ -303,6 +329,9 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
              childName
            )}'s account will be removed. Their data will not be processed.</p>
            <p class="info">If this was a mistake, your child can send a new consent request from the app.</p>
+           <a href="mentomate://home" class="btn btn-secondary">
+             Back to MentoMate
+           </a>
            <p class="info">You may now close this tab.</p>`
         )
       );
@@ -313,7 +342,8 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
             'Link Expired',
             `<h1 class="error">Link expired or invalid</h1>
              <p>This consent link has expired or has already been used.</p>
-             <p>Ask your child to resend the consent request from the app.</p>`
+             <p>Ask your child to resend the consent request from the app.</p>
+             ${errorActionHtml()}`
           ),
           404
         );

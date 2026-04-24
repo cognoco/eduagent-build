@@ -896,4 +896,62 @@ describe('ChatShell', () => {
       expect(screen.queryByTestId('idle-pen-animation')).toBeNull();
     });
   });
+
+  // -----------------------------------------------------------------------
+  // H4: inputDisabled without disabledReason must not be silent
+  // -----------------------------------------------------------------------
+
+  describe('H4: input disabled fallback message', () => {
+    it('shows generic fallback when inputDisabled=true and no disabledReason given', () => {
+      renderChatShell({ inputDisabled: true });
+
+      expect(screen.getByTestId('input-disabled-banner')).toBeTruthy();
+      expect(screen.getByText('Input is currently unavailable')).toBeTruthy();
+    });
+
+    it('shows provided disabledReason when given', () => {
+      renderChatShell({ inputDisabled: true, disabledReason: 'Session ended' });
+
+      expect(screen.getByTestId('input-disabled-banner')).toBeTruthy();
+      expect(screen.getByText('Session ended')).toBeTruthy();
+    });
+
+    it('does NOT show disabled banner when input is enabled', () => {
+      renderChatShell({ inputDisabled: false });
+
+      expect(screen.queryByTestId('input-disabled-banner')).toBeNull();
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // L2: STT error indicator is a Pressable that retries
+  // -----------------------------------------------------------------------
+
+  describe('L2: STT error retry tap target', () => {
+    it('shows voice error as a Pressable when STT is in error state', () => {
+      mockSttState = {
+        ...mockSttState,
+        status: 'error',
+        error: 'Microphone permission denied',
+      };
+      renderChatShell({ verificationType: 'teach_back' });
+
+      expect(screen.getByTestId('voice-error-indicator')).toBeTruthy();
+    });
+
+    it('retries STT when user taps the error indicator', async () => {
+      mockSttState = {
+        ...mockSttState,
+        status: 'error',
+        error: 'Network error',
+      };
+      renderChatShell({ verificationType: 'teach_back' });
+
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('voice-error-indicator'));
+      });
+
+      expect(mockStartListening).toHaveBeenCalled();
+    });
+  });
 });

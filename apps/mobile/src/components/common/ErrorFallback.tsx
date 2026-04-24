@@ -4,6 +4,8 @@ interface ErrorFallbackAction {
   label: string;
   onPress: () => void;
   testID?: string;
+  /** When true, the button is non-interactive and visually dimmed. */
+  disabled?: boolean;
 }
 
 interface ErrorFallbackProps {
@@ -66,13 +68,19 @@ export function ErrorFallback({
           {primaryAction ? (
             <Pressable
               onPress={primaryAction.onPress}
+              disabled={primaryAction.disabled}
               className={
                 isCard
-                  ? 'bg-primary rounded-button px-4 py-3 items-center flex-1 min-h-[48px] justify-center'
-                  : 'bg-primary rounded-button px-6 py-3 items-center flex-1 min-h-[48px] justify-center'
+                  ? `bg-primary rounded-button px-4 py-3 items-center flex-1 min-h-[48px] justify-center${
+                      primaryAction.disabled ? ' opacity-50' : ''
+                    }`
+                  : `bg-primary rounded-button px-6 py-3 items-center flex-1 min-h-[48px] justify-center${
+                      primaryAction.disabled ? ' opacity-50' : ''
+                    }`
               }
               accessibilityRole="button"
               accessibilityLabel={primaryAction.label}
+              accessibilityState={{ disabled: primaryAction.disabled }}
               testID={primaryAction.testID}
             >
               <Text className="text-body font-semibold text-text-inverse">

@@ -61,3 +61,46 @@ export function parseEnvelope(response: string): ParseEnvelopeResult {
 
   return { ok: true, envelope: result.data };
 }
+
+// ---------------------------------------------------------------------------
+// isRecognizedMarker — canonical detector for marker-only LLM payloads.
+//
+// A "marker" is a JSON object with structured signal fields but NO `reply`
+// text for the user. Historical examples: `{"notePrompt":true}`. These
+// shapes fail full-envelope validation (no `reply`) but are semantically
+// valid — callers should route to a dispatch handler if one applies, or
+// surface them as `orphan_marker` fallbacks otherwise.
+//
+// Consolidating detection here removes the dual-source-of-truth between
+// server-side envelope parsing and the legacy mobile regex-strip at
+// `use-session-streaming.ts:581-593` (scheduled for removal in
+// [EMPTY-REPLY-GUARD-3]).
+// ---------------------------------------------------------------------------
+
+const KNOWN_MARKER_KEYS = new Set([
+  'notePrompt',
+  'fluencyDrill',
+  'escalationHold',
+]);
+
+export function isRecognizedMarker(response: string): boolean {
+  const jsonStr = extractFirstJsonObject(response);
+  if (!jsonStr) return false;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(jsonStr);
+  } catch {
+    return false;
+  }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    return false;
+  }
+  const obj = parsed as Record<string, unknown>;
+  // An envelope (has `reply`) is not a marker even if it also contains
+  // marker-like keys — envelopes go through parseEnvelope, not here.
+  if ('reply' in obj) return false;
+  for (const key of Object.keys(obj)) {
+    if (KNOWN_MARKER_KEYS.has(key)) return true;
+  }
+  return false;
+}

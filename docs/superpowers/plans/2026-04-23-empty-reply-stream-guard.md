@@ -1,9 +1,9 @@
 # Empty-Reply Stream Guard — Freeform Chat Empty-Bubble Fix
 
-**Date:** 2026-04-23 (revised after code-grounded challenge)
-**Branch:** TBD — see Prereq 2. **Not** to be committed onto `proxy-parent-fix`.
+**Date:** 2026-04-23 (revised after code-grounded challenge) — prereqs closed 2026-04-23/24
+**Branch:** `proxy-parent-fix` (per user instruction 2026-04-23, overriding the original "not on `proxy-parent-fix`" note). **Plan file itself is LOCAL-ONLY — never staged, never committed.** Code commits land on `proxy-parent-fix` using targeted `git add <file>` per §10.
 **Related:** User-reported bug — "Ask anything" freeform chat renders AI bubble with feedback chips but zero text content, instantly, after ~2–3 exchanges.
-**Framing:** Boundary defense. The root cause lives in LLM prompt/envelope adherence and is tracked as a concrete follow-up ticket in §8 — not a "we'll look later."
+**Framing:** Boundary defense. The root cause lives in LLM prompt/envelope adherence and is tracked as a concrete follow-up ticket in §8 — not a "we'll look later." DB evidence (Prereq 1) elevates §4.1a's persistence short-circuit from hygiene to load-bearing — see the Prereq 1 answer block.
 
 ---
 
@@ -18,7 +18,7 @@ The LLM occasionally returns one of four shapes that all produce an empty visibl
 
 `SessionMessageActions.tsx:56-78` renders feedback chips on *any* finalized assistant message that isn't `streaming` or `isSystemPrompt`, producing an **empty bubble + chips dead-end** with no actionable escape.
 
-Server-side evidence: `logger.warn('exchange.envelope_parse_failed')` fires at `exchanges.ts:402`. **Which of the four shapes triggered the reported bug is not yet known** — Prereq 1 answers that.
+Server-side evidence: `logger.warn('exchange.envelope_parse_failed')` fires at `exchanges.ts:402`. **Prereq 1 answered 2026-04-23:** dominant shape is `malformed_envelope` (shape 2 above). The `empty_reply` and `orphan_marker` shapes likely exist as tail cases but were not observed in the audited sessions. `stream_abort` not observed. See §2 Prereq 1 answer block for raw evidence.
 
 ---
 
@@ -36,9 +36,30 @@ From Neon (staging or prod — whichever the user reported against), fetch the `
 
 **Why this must come first:** we may be fixing the wrong shape. If the raw is non-empty and non-marker (e.g. a stream-abort or a mobile finalizer bug), the Layer 1 design below is misaimed.
 
+#### ✅ Answered 2026-04-23 (code-read 2026-04-24 closes sub-q c)
+
+**Target:** staging Neon, account `key_to@yahoo.com` (account id `019d8728-9803-7b2a-84dd-3b64e7add866`, clerk `user_3C1oe7NtZwmuBPtThwH8T5Z6Ujl`), profile `Zuzana` (profile id `019d8b97-48ed-7924-8ae3-c5f9596109b8`). Sessions audited: `019dbaad-31e1-…` (14:10 UTC), `019dbab0-d387-…` (14:14 UTC), `019dbab5-0cd6-…` (14:18 UTC), `019dbb60-749d-…` (17:25 UTC). Reported bug time: 2026-04-23 ~16:00–17:00 local.
+
+**(a) Raw shape on the empty-bubble turn — `malformed_envelope`.** Persisted `ai_response.content` rows contain envelope JSON fragments instead of clean prose:
+- Session `019dbab0` exchange 2 (14:14:47 UTC): full envelope JSON — `{"reply":"That's a very insightful question, Zuzana!…","signals":{…},"ui_hints":{…}}` — stored verbatim in `content`.
+- Session `019dbaad` exchange 2 (14:11:07 UTC): prefix stripped by streamer, suffix leaks — content ends with `…","signals":{"partial_progress":false,"needs_deepening":false,"understanding_check":true},"ui_hints":{"note_prompt":{"show":false,"post_session":false}}}`.
+- Session `019dbb60` exchange 3 (17:26:50 UTC, matches user-reported time window): same "prefix stripped, suffix leaks" variant.
+
+Cause: `parseExchangeEnvelope` fallback at `exchanges.ts:408-416` sets `cleanResponse: response.trim()` when the streaming envelope parser fails, so the raw JSON lands as-is in the `sessionEvents.content` column via `persistExchangeResult`.
+
+**(b) Preceding assistant turn's `content` polluted?** Yes — confirmed in all three audited sessions. The pollution appears starting at exchange 2, matching the user report "after ~2–3 exchanges."
+
+**(c) Is `exchangeHistory` assembled from these rows malformed?** **Yes — cascade confirmed by code read at `apps/api/src/services/session/session-exchange.ts:388-425`.** The builder filters `sessionEvents` by type then re-wraps `ai_response` content in a minimal envelope (`{"reply": <content>, "signals": {…defaults…}, "ui_hints": {…}}`) before handing to the LLM. This re-wrap **assumes `content` is clean prose** (comment at `:402-412` explicitly cites BUG-610 as the motivation). When §4.1a's short-circuit is **not** in place and the parse-fail fallback has written raw envelope JSON into `content`, the re-wrap produces a **double-encoded envelope** — the next LLM turn sees `{"reply": "{\"reply\":\"…\",\"signals\":…}", "signals": {…}}`. This is precisely the prompt drift that causes exchanges 3+ to ship malformed output at increasing rates. §4.1a's persistence short-circuit preserves the clean-prose invariant the re-wrap depends on.
+
+**Why this changes the emphasis (not the design):** §4.1a's persistence rule was framed as hygiene. Evidence elevates it to **load-bearing root fix**. Without it, Layer 2 rescues the user-visible bubble on turn N but turn N+1 is already poisoned.
+
 ### Prereq 2 — Confirm branch
 
 Current branch is `proxy-parent-fix` (unrelated to this work). Before any code: ask the user whether to land on a dedicated branch (recommended) or on `main`. Per `feedback_never_switch_branch`, no silent switching.
+
+#### ✅ Answered 2026-04-23
+
+Landing on `proxy-parent-fix` per explicit user instruction, which supersedes the "Not to be committed onto `proxy-parent-fix`" directive in the plan header and §10. The plan file itself is **local / untracked** — never staged, never committed. Every commit uses targeted `git add <file1> <file2>…` to avoid sweeping in the plan file or any ambient WIP from other active sessions on this branch.
 
 ### Prereq 3 — Caller enumeration (COMPLETED during plan revision)
 
@@ -274,6 +295,7 @@ Layer 1 is boundary defense. The real fix is the LLM emitting malformed envelope
 - Review date: **2026-05-07** (14 calendar days post-merge assuming 2026-04-23 merge — adjust at PR time). Calendar invite on that day.
 - Trigger condition for reprioritization: if any `reason` bucket exceeds **2% of exchanges in any 24-hour window**, escalate to P1 regardless of calendar date.
 - Deliverable from the follow-up: either (a) a prompt-tuning PR backed by `pnpm eval:llm` regression fixtures, or (b) a written "no-action" memo explaining why current rates are acceptable.
+- **Added 2026-04-23 after Prereq 1 evidence review:** the follow-up ticket must also track *"harden `teeEnvelopeStream` / `parseEnvelope` against LLM outputs with unescaped newlines, unescaped quotes, or markdown special-character sequences inside reply strings."* Staging DB evidence shows the LLM emits mostly well-shaped envelopes — the streaming JSON parser is the brittle link. This is a separate workstream from prompt tuning and warrants its own bullet (candidates include an incremental JSON parser, a more tolerant reply-extraction heuristic, or stricter upstream response-format enforcement at the provider SDK layer).
 
 If the follow-up issue is not filed before merge, the plan is not done. This replaces the prior "review after 7 days of data" soft commitment.
 
@@ -325,3 +347,42 @@ Single PR for all three commits. Rationale: server-only change has no end-to-end
 10. ✅ **Persistence rule lowered to unit test.** DB round-trip integration replaced with unit test on the write site (§4.1a persistence rule; §6 row).
 11. ✅ **Cross-flow table decided.** All four flows use the guard. Interview-specific `exchangeCount` preservation specified with a concrete test (§5, §6).
 12. ✅ **Commit plan split to three.** Marker consolidation is its own atomic commit.
+
+---
+
+## 13. Spec Closure Ledger (added 2026-04-24)
+
+Snapshot of what is closed, what is prepared in-tree, and what remains for the implementation phase. This section is the hand-off from "spec" to "execution plan" — the next step is a written task-by-task plan, not code.
+
+### Closed
+
+| Item | Where |
+|---|---|
+| Prereq 1 (DB shape + cascade) | §2 Prereq 1 Answered block |
+| Prereq 2 (branch decision) | §2 Prereq 2 Answered block |
+| Prereq 3 (caller enumeration) | §2 Prereq 3 (pre-completed) |
+| §8 parser-hardening bullet | §8 (Added 2026-04-23) |
+| Plan-file-local policy | Header + §2 Prereq 2 |
+
+### Prepared in-tree (ahead of commit 1)
+
+These are additive, non-behavioral additions already on disk in `proxy-parent-fix`. They do **not** get committed in isolation — they become part of commit 1 (`[EMPTY-REPLY-GUARD-1]`) when the rest of Layer 1a lands.
+
+| File | Change | Behavior today | Test coverage today |
+|---|---|---|---|
+| `apps/api/src/services/llm/envelope.ts` | Added `isRecognizedMarker(response: string): boolean` helper. Detects `{…}` payloads with no `reply` key but containing known marker keys (`notePrompt`, `fluencyDrill`, `escalationHold`). | Unused — no caller yet. | None yet — tests land with commit 1. |
+| `apps/api/src/services/llm/index.ts` | Re-exports `isRecognizedMarker` from the barrel. | Zero behavioral impact. | N/A. |
+
+### Open for implementation phase
+
+The remaining work, in the shape the commit plan (§10) already defines. The writing-plans step will translate these into ordered, verifiable tasks with explicit dependencies and gate checks.
+
+| Commit | Scope (spec refs) | Files expected to change |
+|---|---|---|
+| `[EMPTY-REPLY-GUARD-1]` | §4.1a, §4.4, §7 | `apps/api/src/services/exchanges.ts` (add `classifyExchangeOutcome` wrapper), `apps/api/src/services/session/session-exchange.ts` (modify `streamMessage.onComplete`, add `persistFallbackUserMessage`), `apps/api/src/services/interview.ts` (modify inline `onComplete`), `apps/api/src/inngest/*` (emit `exchange.empty_reply_fallback`), `*.test.ts` for each. |
+| `[EMPTY-REPLY-GUARD-2]` | §4.1b | `apps/api/src/routes/sessions.ts`, `apps/api/src/routes/interview.ts`, route tests, `integration-tests/sessions-stream.test.ts`. |
+| `[EMPTY-REPLY-GUARD-3]` | §4.2, §4.4, §4.5 | `apps/mobile/src/components/session/use-session-streaming.ts` (finalizer + idempotency + watchdog `isSystemPrompt` removal + marker regex deletion), `apps/mobile/src/components/session/SessionMessageActions.tsx` (chip-gate), mobile tests. |
+
+### Spec Status: **DONE**
+
+All prerequisites are answered in-document. No open questions remain for the design. Implementation begins in a separate planning step (writing-plans) that sequences the three commits into verifiable tasks.

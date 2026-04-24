@@ -97,4 +97,52 @@ describe('BookmarkNudgeTooltip', () => {
       expect(secureStore['bookmark-nudge-shown:p1']).toBe('true');
     });
   });
+
+  // L3: onBookmarkNow prop tests
+  it('secondary bookmark-now button is absent when onBookmarkNow is not provided [L3]', async () => {
+    render(
+      <BookmarkNudgeTooltip aiResponseCount={3} isFirstSession profileId="p1" />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('bookmark-nudge-tooltip')).toBeTruthy();
+    });
+
+    expect(screen.queryByTestId('bookmark-nudge-bookmark-now')).toBeNull();
+  });
+
+  it('secondary bookmark-now button renders when onBookmarkNow is provided [L3]', async () => {
+    render(
+      <BookmarkNudgeTooltip
+        aiResponseCount={3}
+        isFirstSession
+        profileId="p1"
+        onBookmarkNow={jest.fn()}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('bookmark-nudge-bookmark-now')).toBeTruthy();
+    });
+  });
+
+  it('pressing bookmark-now calls onBookmarkNow and hides the tooltip [L3]', async () => {
+    const onBookmarkNow = jest.fn();
+    render(
+      <BookmarkNudgeTooltip
+        aiResponseCount={3}
+        isFirstSession
+        profileId="p1"
+        onBookmarkNow={onBookmarkNow}
+      />
+    );
+
+    const bookmarkBtn = await screen.findByTestId(
+      'bookmark-nudge-bookmark-now'
+    );
+    fireEvent.press(bookmarkBtn);
+
+    expect(onBookmarkNow).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId('bookmark-nudge-tooltip')).toBeNull();
+  });
 });

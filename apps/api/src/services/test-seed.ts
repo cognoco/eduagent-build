@@ -112,6 +112,10 @@ export interface ResetResult {
 export interface ResetOptions {
   /** Optional email prefix filter for per-run cleanup, e.g. integ-playwright-1234- */
   prefix?: string;
+  /** If provided, skip the Clerk deletion step entirely and use this list
+   * for DB cleanup. Used by scripts/clean-clerk-test-users.mjs to keep Clerk
+   * HTTP calls out of the Worker invocation (Cloudflare 50-subrequest limit). */
+  clerkUserIds?: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -1979,12 +1983,12 @@ export async function resetDatabase(
 ): Promise<ResetResult> {
   const prefix = options.prefix?.trim();
 
-  // Delete Clerk test users first (before DB cleanup removes the mapping).
-  // Collects real Clerk user IDs so we can also delete their DB accounts.
-  const { count: clerkUsersDeleted, clerkUserIds } = await deleteClerkTestUsers(
-    env,
-    { prefix }
-  );
+  // If caller supplied clerkUserIds, skip Clerk deletion (caller already did it
+  // — typically the clean-clerk-test-users.mjs script, which runs locally to
+  // avoid Cloudflare's 50-subrequest-per-Worker limit on bulk cleanup).
+  const { count: clerkUsersDeleted, clerkUserIds } = options.clerkUserIds
+    ? { count: 0, clerkUserIds: options.clerkUserIds }
+    : await deleteClerkTestUsers(env, { prefix });
 
   if (prefix) {
     const deleted = await db

@@ -12,12 +12,16 @@ interface BookmarkNudgeTooltipProps {
   aiResponseCount: number;
   isFirstSession: boolean;
   profileId: string | undefined;
+  /** L3: Optional callback to trigger the bookmark action on the latest message.
+   *  When provided, shows a secondary "Bookmark now" CTA so users can act immediately. */
+  onBookmarkNow?: () => void;
 }
 
 export function BookmarkNudgeTooltip({
   aiResponseCount,
   isFirstSession,
   profileId,
+  onBookmarkNow,
 }: BookmarkNudgeTooltipProps) {
   const [visible, setVisible] = useState(false);
   const checkedRef = useRef(false);
@@ -56,15 +60,36 @@ export function BookmarkNudgeTooltip({
       <Text className="text-body-sm text-text-primary">
         Tap the bookmark icon to save explanations you want to revisit.
       </Text>
-      <Pressable
-        onPress={dismiss}
-        className="self-start mt-2"
-        accessibilityRole="button"
-        accessibilityLabel="Dismiss bookmark tip"
-        testID="bookmark-nudge-dismiss"
-      >
-        <Text className="text-body-sm font-semibold text-primary">Got it</Text>
-      </Pressable>
+      <View className="flex-row gap-3 mt-2">
+        <Pressable
+          onPress={dismiss}
+          className="self-start"
+          accessibilityRole="button"
+          accessibilityLabel="Dismiss bookmark tip"
+          testID="bookmark-nudge-dismiss"
+        >
+          <Text className="text-body-sm font-semibold text-primary">
+            Got it
+          </Text>
+        </Pressable>
+        {/* L3: Secondary CTA so users can immediately try the feature */}
+        {onBookmarkNow && (
+          <Pressable
+            onPress={() => {
+              dismiss();
+              onBookmarkNow();
+            }}
+            className="self-start"
+            accessibilityRole="button"
+            accessibilityLabel="Bookmark the latest message now"
+            testID="bookmark-nudge-bookmark-now"
+          >
+            <Text className="text-body-sm font-semibold text-primary">
+              Bookmark now
+            </Text>
+          </Pressable>
+        )}
+      </View>
     </View>
   );
 }

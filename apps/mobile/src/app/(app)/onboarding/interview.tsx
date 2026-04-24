@@ -578,20 +578,42 @@ export default function InterviewScreen() {
             testID="session-creating-indicator"
           >
             {sessionCreationStuck ? (
-              <Pressable
-                onPress={() => {
-                  setSessionCreationStuck(false);
-                  sessionCreatingRef.current = false;
-                  void transitionToSession();
-                }}
-                testID="session-creating-retry"
-                accessibilityRole="button"
-                accessibilityLabel="Tap to try again"
-              >
-                <Text className="text-body-sm text-danger text-center">
-                  This is taking longer than expected — tap to try again
+              // [UX-DE-H2] Give the user two escapes when session creation is
+              // stuck: Retry (primary) and Go back (secondary) so they are
+              // never trapped on a spinning dead-end.
+              <View className="items-center gap-2">
+                <Text className="text-body-sm text-danger text-center mb-2">
+                  This is taking longer than expected.
                 </Text>
-              </Pressable>
+                <Pressable
+                  onPress={() => {
+                    setSessionCreationStuck(false);
+                    sessionCreatingRef.current = false;
+                    void transitionToSession();
+                  }}
+                  className="bg-primary rounded-button px-6 py-3 min-h-[44px] items-center justify-center w-full"
+                  testID="session-creating-retry"
+                  accessibilityRole="button"
+                  accessibilityLabel="Try again"
+                >
+                  <Text className="text-body font-semibold text-text-inverse">
+                    Try Again
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={() =>
+                    goBackOrReplace(router, '/(app)/home' as const)
+                  }
+                  className="bg-surface-elevated rounded-button px-6 py-3 min-h-[44px] items-center justify-center w-full"
+                  testID="session-creating-go-back"
+                  accessibilityRole="button"
+                  accessibilityLabel="Go back to home"
+                >
+                  <Text className="text-body font-semibold text-text-primary">
+                    Go Back
+                  </Text>
+                </Pressable>
+              </View>
             ) : (
               <>
                 <ActivityIndicator size="small" />

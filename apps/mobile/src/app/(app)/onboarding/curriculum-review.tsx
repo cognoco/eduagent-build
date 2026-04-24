@@ -385,7 +385,16 @@ export default function CurriculumScreen() {
                           {
                             text: 'Skip',
                             style: 'destructive',
-                            onPress: () => skipTopic.mutate(topic.id),
+                            // [UX-DE-M2] Surface skip errors — silent failure
+                            // left the UI optimistically empty with no feedback.
+                            onPress: () =>
+                              skipTopic.mutate(topic.id, {
+                                onError: (err: unknown) =>
+                                  platformAlert(
+                                    'Could not skip topic',
+                                    formatApiError(err)
+                                  ),
+                              }),
                           },
                         ]
                       )
@@ -399,7 +408,16 @@ export default function CurriculumScreen() {
                   </Pressable>
                 ) : (
                   <Pressable
-                    onPress={() => unskipTopic.mutate(topic.id)}
+                    onPress={() =>
+                      // [UX-DE-M2] Surface unskip errors via alert.
+                      unskipTopic.mutate(topic.id, {
+                        onError: (err: unknown) =>
+                          platformAlert(
+                            'Could not restore topic',
+                            formatApiError(err)
+                          ),
+                      })
+                    }
                     className="bg-surface-elevated rounded-button px-3 py-1"
                     testID={`restore-${topic.id}`}
                     accessibilityLabel={`Restore ${topic.title}`}

@@ -10,6 +10,12 @@ import type { EnrichedTopic } from '../../lib/library-filters';
 // Mocks
 // ---------------------------------------------------------------------------
 
+const mockBack = jest.fn();
+
+jest.mock('expo-router', () => ({
+  useRouter: () => ({ back: mockBack }),
+}));
+
 jest.mock('../../lib/theme', () => ({
   useThemeColors: () => ({
     accent: '#2563eb',
@@ -338,5 +344,27 @@ describe('TopicsTab', () => {
         hasNotes: false,
       },
     });
+  });
+
+  // [UX-DE-M4] Error state must always be actionable
+  it('shows Retry button when isError=true and onRetry is provided', () => {
+    const onRetry = jest.fn();
+    render(
+      <TopicsTab {...defaultProps} topics={[]} isError onRetry={onRetry} />
+    );
+
+    expect(screen.getByTestId('topics-tab-error')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('topics-tab-retry'));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it('[UX-DE-M4] shows Go Back button when isError=true and onRetry is not provided', () => {
+    render(<TopicsTab {...defaultProps} topics={[]} isError />);
+
+    expect(screen.getByTestId('topics-tab-error')).toBeTruthy();
+    expect(screen.getByTestId('topics-tab-go-back')).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('topics-tab-go-back'));
+    expect(mockBack).toHaveBeenCalledTimes(1);
   });
 });

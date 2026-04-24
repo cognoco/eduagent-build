@@ -219,14 +219,30 @@ export default function RelearnScreen() {
       </View>
 
       {isSubmitting ? (
+        // [UX-DE-M1] Keep a visible cancel affordance while the API call is
+        // in flight so the user isn't trapped if the request hangs.
         <View
-          className="flex-1 items-center justify-center"
+          className="flex-1 items-center justify-center px-6"
           testID="relearn-loading"
         >
           <ActivityIndicator size="large" />
           <Text className="text-text-secondary mt-2">
             Starting relearn session...
           </Text>
+          <Pressable
+            onPress={() => {
+              setIsSubmitting(false);
+              setError(null);
+            }}
+            className="mt-6 bg-surface-elevated rounded-button px-6 py-3 min-h-[44px] items-center justify-center"
+            accessibilityRole="button"
+            accessibilityLabel="Cancel"
+            testID="relearn-cancel"
+          >
+            <Text className="text-body font-semibold text-text-primary">
+              Cancel
+            </Text>
+          </Pressable>
         </View>
       ) : phase === 'choice' ? (
         <ScrollView
@@ -240,9 +256,10 @@ export default function RelearnScreen() {
             >
               <Text className="text-body-sm text-danger">{error}</Text>
               {lastMethod && (
+                // [UX-DE-L1] Ensure 44×44 tap target on retry link
                 <Pressable
                   onPress={handleRetry}
-                  className="mt-2 self-start"
+                  className="mt-2 self-start min-h-[44px] px-4 items-center justify-center"
                   testID="relearn-retry"
                   accessibilityLabel="Retry last action"
                   accessibilityRole="button"
@@ -300,9 +317,10 @@ export default function RelearnScreen() {
             >
               <Text className="text-body-sm text-danger">{error}</Text>
               {lastMethod && (
+                // [UX-DE-L1] Ensure 44×44 tap target on retry link
                 <Pressable
                   onPress={handleRetry}
-                  className="mt-2 self-start"
+                  className="mt-2 self-start min-h-[44px] px-4 items-center justify-center"
                   testID="relearn-retry"
                   accessibilityLabel="Retry last action"
                   accessibilityRole="button"

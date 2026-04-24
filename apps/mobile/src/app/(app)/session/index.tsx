@@ -10,7 +10,12 @@ import type { ErrorInfo, ReactNode } from 'react';
 import { AppState, View, Text, Pressable, ScrollView } from 'react-native';
 import { platformAlert } from '../../../lib/platform-alert';
 import { goBackOrReplace } from '../../../lib/navigation';
-import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
+import {
+  router,
+  useRouter,
+  useLocalSearchParams,
+  useFocusEffect,
+} from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type {
   HomeworkCaptureSource,
@@ -111,7 +116,7 @@ import { Sentry } from '../../../lib/sentry';
  * semantic tokens.
  */
 class SessionErrorBoundary extends Component<
-  { children: ReactNode; onGoHome?: () => void },
+  { children: ReactNode },
   { hasError: boolean; error: Error | null; componentStack: string | null }
 > {
   override state = {
@@ -227,7 +232,10 @@ class SessionErrorBoundary extends Component<
               Try Again
             </Text>
           </Pressable>
-          {/* UX-DE-L7: secondary escape for deterministic crashes */}
+          {/* [UX-DE-M3] Secondary escape so a crash-loop doesn't trap the user.
+              Hardcoded hex intentional — ThemeProvider may not be available.
+              Uses the imperative expo-router `router` (module-level singleton)
+              since class components cannot call the useRouter hook. */}
           <Pressable
             onPress={() => {
               this.setState({
@@ -235,14 +243,17 @@ class SessionErrorBoundary extends Component<
                 error: null,
                 componentStack: null,
               });
-              this.props.onGoHome?.();
+              router.replace('/(app)/home' as never);
             }}
             style={{
-              backgroundColor: '#f3f4f6',
+              backgroundColor: '#e5e7eb',
               borderRadius: 12,
               paddingVertical: 14,
               alignItems: 'center',
             }}
+            testID="session-error-boundary-go-home"
+            accessibilityRole="button"
+            accessibilityLabel="Go Home"
           >
             <Text style={{ color: '#374151', fontSize: 16, fontWeight: '600' }}>
               Go Home
@@ -268,9 +279,8 @@ function MilestoneDots({ count }: { count: number }) {
 }
 
 export default function SessionScreen() {
-  const router = useRouter();
   return (
-    <SessionErrorBoundary onGoHome={() => router.replace('/(app)/home')}>
+    <SessionErrorBoundary>
       <SessionScreenInner />
     </SessionErrorBoundary>
   );
@@ -357,13 +367,6 @@ function SessionScreenInner() {
     { id: 'opening', role: 'assistant', content: openingContent },
   ]);
   const [isStreaming, setIsStreaming] = useState(false);
-  // UX-DE-M1: enable exit before 45s watchdog — after 15s of streaming the
-  // "I'm Done" button re-enables and, when pressed, aborts the stream by
-  // clearing isStreaming before handing off to handleEndSession.
-  const [streamingTooLong, setStreamingTooLong] = useState(false);
-  const streamingTooLongTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null
-  );
   const [exchangeCount, setExchangeCount] = useState(0);
   const [escalationRung, setEscalationRung] = useState(1);
   const [isClosing, setIsClosing] = useState(false);
@@ -381,28 +384,6 @@ function SessionScreenInner() {
   const [inputMode, setInputMode] = useState<InputMode>('text');
   // CR-9: Guard so profile refetches don't overwrite the user's in-session choice.
   const hasRestoredInputModeRef = useRef(false);
-
-  // UX-DE-M1: start/clear the 15s streaming-too-long timer
-  useEffect(() => {
-    if (isStreaming) {
-      setStreamingTooLong(false);
-      streamingTooLongTimerRef.current = setTimeout(
-        () => setStreamingTooLong(true),
-        15_000
-      );
-    } else {
-      if (streamingTooLongTimerRef.current) {
-        clearTimeout(streamingTooLongTimerRef.current);
-        streamingTooLongTimerRef.current = null;
-      }
-      setStreamingTooLong(false);
-    }
-    return () => {
-      if (streamingTooLongTimerRef.current) {
-        clearTimeout(streamingTooLongTimerRef.current);
-      }
-    };
-  }, [isStreaming]);
 
   // Restore the user's last-used input mode from SecureStore on mount.
   useEffect(() => {
@@ -1095,22 +1076,14 @@ function SessionScreenInner() {
 
   // [UX-DE-H5] Exit button is always rendered (no gating on session existence).
   // Before session exists → "Exit" navigates home. After → normal "I'm Done".
-  // UX-DE-M1: enable exit before 45s watchdog — after 15s of streaming the
-  // button re-enables; pressing it aborts the stream then calls handleEndSession.
   const endSessionButton = (
     <Pressable
       onPress={
         activeSessionId
-          ? isStreaming && streamingTooLong
-            ? () => {
-                // Abort the hung stream so handleEndSession can proceed
-                setIsStreaming(false);
-                void handleEndSession();
-              }
-            : handleEndSession
+          ? handleEndSession
           : () => goBackOrReplace(router, '/(app)/home')
       }
-      disabled={isClosing || (isStreaming && !streamingTooLong)}
+      disabled={isClosing || isStreaming}
       className="ms-2 px-3 py-2 rounded-button bg-surface-elevated min-h-[44px] items-center justify-center"
       testID="end-session-button"
       accessibilityLabel={activeSessionId ? "I'm done" : 'Exit'}

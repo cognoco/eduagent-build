@@ -62,4 +62,37 @@ describe('FluencyDrillStrip', () => {
     fireEvent.press(screen.getByTestId('fluency-drill-dismiss'));
     expect(onDismissScore).toHaveBeenCalledTimes(1);
   });
+
+  // M7: onSkipDrill prop tests
+  it('skip button is absent when onSkipDrill is not provided', () => {
+    const drill: FluencyDrillEvent = { active: true, durationSeconds: 60 };
+    render(<FluencyDrillStrip drill={drill} onDismissScore={jest.fn()} />);
+    expect(screen.queryByTestId('fluency-drill-skip')).toBeNull();
+  });
+
+  it('skip button renders when onSkipDrill is provided and drill is active [M7]', () => {
+    const drill: FluencyDrillEvent = { active: true, durationSeconds: 60 };
+    render(
+      <FluencyDrillStrip
+        drill={drill}
+        onDismissScore={jest.fn()}
+        onSkipDrill={jest.fn()}
+      />
+    );
+    expect(screen.getByTestId('fluency-drill-skip')).toBeTruthy();
+  });
+
+  it('pressing skip button invokes onSkipDrill callback [M7]', () => {
+    const onSkipDrill = jest.fn();
+    const drill: FluencyDrillEvent = { active: true, durationSeconds: 60 };
+    render(
+      <FluencyDrillStrip
+        drill={drill}
+        onDismissScore={jest.fn()}
+        onSkipDrill={onSkipDrill}
+      />
+    );
+    fireEvent.press(screen.getByTestId('fluency-drill-skip'));
+    expect(onSkipDrill).toHaveBeenCalledTimes(1);
+  });
 });

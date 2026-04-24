@@ -168,6 +168,7 @@ jest.mock('react-native-purchases', () => ({
   default: {},
   PURCHASES_ERROR_CODE: {
     PURCHASE_CANCELLED_ERROR: '1',
+    PRODUCT_ALREADY_PURCHASED_ERROR: '6',
     NETWORK_ERROR: '10',
     OFFLINE_CONNECTION_ERROR: '35',
     UNKNOWN_ERROR: '0',
@@ -490,12 +491,6 @@ describe('SubscriptionScreen', () => {
   // -------------------------------------------------------------------------
 
   it('calls purchase.mutateAsync when a package is selected', async () => {
-    // UX-DE-L12: handlePurchase now polls the subscription API after mutateAsync
-    // (same pattern as handleRestore) to avoid the entitlement race where the
-    // webhook hasn't processed yet. Success alert fires only once polling
-    // confirms a paid tier — refetchSub is no longer called directly; instead
-    // queryClient.fetchQuery → client.subscription.$get is the canonical path.
-    jest.useFakeTimers();
     const monthlyPkg = makeMockPackage();
     mockOfferings = makeMockOfferings([monthlyPkg]);
     mockMutateAsyncPurchase.mockResolvedValue({
@@ -507,36 +502,20 @@ describe('SubscriptionScreen', () => {
         purchaseDate: '2026-03-01',
       },
     });
-    mockSubscriptionGet.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ subscription: { tier: 'plus' } }),
-    });
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
     fireEvent.press(screen.getByTestId('package-option-$rc_monthly'));
 
-    // Let purchase.mutateAsync resolve
-    await act(async () => {
-      await Promise.resolve();
-    });
-
-    // Advance past first polling delay (2 s)
-    await act(async () => {
-      jest.advanceTimersByTime(2000);
-    });
-
     await waitFor(() => {
       expect(mockMutateAsyncPurchase).toHaveBeenCalledWith(monthlyPkg);
     });
-    await waitFor(() => {
-      expect(Alert.alert).toHaveBeenCalledWith(
-        'Success',
-        'Your subscription is now active!'
-      );
-    });
+    expect(mockRefetchSub).toHaveBeenCalled();
     expect(mockRefetchUsage).toHaveBeenCalled();
-    jest.useRealTimers();
+    expect(Alert.alert).toHaveBeenCalledWith(
+      'Success',
+      'Your subscription is now active!'
+    );
   });
 
   it('silently dismisses when user cancels purchase', async () => {
@@ -586,6 +565,36 @@ describe('SubscriptionScreen', () => {
       expect(Alert.alert).toHaveBeenCalledWith(
         'Network error',
         'Please check your internet connection and try again.'
+      );
+    });
+  });
+
+  it('[UX-DE-M8] shows "Already purchased" alert with Restore action on PRODUCT_ALREADY_PURCHASED_ERROR', async () => {
+    const monthlyPkg = makeMockPackage();
+    mockOfferings = makeMockOfferings([monthlyPkg]);
+
+    const alreadyPurchasedError = {
+      code: '6', // PRODUCT_ALREADY_PURCHASED_ERROR
+      message: 'Product already purchased',
+      readableErrorCode: 'PRODUCT_ALREADY_PURCHASED_ERROR',
+      userInfo: { readableErrorCode: 'PRODUCT_ALREADY_PURCHASED_ERROR' },
+      underlyingErrorMessage: '',
+      userCancelled: false,
+    };
+    mockMutateAsyncPurchase.mockRejectedValue(alreadyPurchasedError);
+
+    render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+    fireEvent.press(screen.getByTestId('package-option-$rc_monthly'));
+
+    await waitFor(() => {
+      expect(mockPlatformAlert).toHaveBeenCalledWith(
+        'Already purchased',
+        expect.stringContaining('already own this subscription'),
+        expect.arrayContaining([
+          expect.objectContaining({ text: 'Restore purchases' }),
+          expect.objectContaining({ text: 'Cancel' }),
+        ])
       );
     });
   });

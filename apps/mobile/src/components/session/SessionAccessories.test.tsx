@@ -1,5 +1,5 @@
-import { render } from '@testing-library/react-native';
-import { SessionToolAccessory } from './SessionAccessories';
+import { render, fireEvent } from '@testing-library/react-native';
+import { SessionToolAccessory, HomeworkModeChips } from './SessionAccessories';
 
 describe('SessionToolAccessory stage gating', () => {
   const handleQuickChip = jest.fn();
@@ -38,5 +38,34 @@ describe('SessionToolAccessory stage gating', () => {
     );
     expect(queryByTestId('quick-chip-switch_topic')).toBeNull();
     expect(queryByTestId('quick-chip-park')).toBeNull();
+  });
+});
+
+// M6: Zero-problems homework fallback must have an escape action
+describe('HomeworkModeChips M6: zero-problems fallback action', () => {
+  const baseProps = {
+    effectiveMode: 'homework',
+    homeworkProblemsState: [],
+    currentProblemIndex: 0,
+    activeHomeworkProblem: undefined,
+    homeworkMode: undefined,
+    setHomeworkMode: jest.fn(),
+    handleNextProblem: jest.fn(),
+    handleEndSession: jest.fn(),
+  };
+
+  it('shows End session button when no problems are loaded [M6]', () => {
+    const { getByTestId } = render(<HomeworkModeChips {...baseProps} />);
+    expect(getByTestId('homework-no-problems')).toBeTruthy();
+    expect(getByTestId('homework-no-problems-end-btn')).toBeTruthy();
+  });
+
+  it('End session button calls handleEndSession [M6]', () => {
+    const handleEndSession = jest.fn();
+    const { getByTestId } = render(
+      <HomeworkModeChips {...baseProps} handleEndSession={handleEndSession} />
+    );
+    fireEvent.press(getByTestId('homework-no-problems-end-btn'));
+    expect(handleEndSession).toHaveBeenCalledTimes(1);
   });
 });

@@ -58,7 +58,7 @@ jest.mock('../../../hooks/use-quiz', () => ({
   }),
 }));
 
-const mockRound = {
+let mockRound: object | null = {
   id: 'round-1',
   activityType: 'capitals' as const,
   theme: 'Europe',
@@ -78,7 +78,7 @@ const mockRound = {
 jest.mock('./_layout', () => ({
   useQuizFlow: () => ({
     round: mockRound,
-    activityType: 'capitals',
+    activityType: mockRound ? 'capitals' : null,
     subjectId: null,
     setPrefetchedRoundId: mockSetPrefetchedRoundId,
     setCompletionResult: mockSetCompletionResult,
@@ -91,6 +91,23 @@ describe('QuizPlayScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockCheckAnswer.mockResolvedValue({ correct: true });
+    // Reset to a valid round for each test
+    mockRound = {
+      id: 'round-1',
+      activityType: 'capitals' as const,
+      theme: 'Europe',
+      total: 1,
+      questions: [
+        {
+          type: 'capitals' as const,
+          country: 'Slovakia',
+          options: ['Bratislava', 'Prague', 'Warsaw', 'Budapest'],
+          funFact: 'Bratislava sits on the Danube.',
+          isLibraryItem: true,
+          freeTextEligible: true,
+        },
+      ],
+    };
   });
 
   it('renders a free-text input for freeTextEligible questions', async () => {
@@ -113,5 +130,41 @@ describe('QuizPlayScreen', () => {
         answerGiven: 'Bratislava',
       });
     });
+  });
+});
+
+// [UX-DE-H1] When no round is loaded, render an error state with Retry and
+// Go Home so the user is never left on a dead plain-text screen.
+describe('QuizPlayScreen — no round loaded', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockRound = null;
+  });
+
+  afterEach(() => {
+    // Restore for other test suites
+    mockRound = {
+      id: 'round-1',
+      activityType: 'capitals' as const,
+      theme: 'Europe',
+      total: 1,
+      questions: [
+        {
+          type: 'capitals' as const,
+          country: 'Slovakia',
+          options: ['Bratislava', 'Prague', 'Warsaw', 'Budapest'],
+          funFact: 'Bratislava sits on the Danube.',
+          isLibraryItem: true,
+          freeTextEligible: true,
+        },
+      ],
+    };
+  });
+
+  it('shows Retry and Go Home buttons when round is null', () => {
+    render(<QuizPlayScreen />);
+    expect(screen.getByTestId('quiz-play-no-round')).toBeTruthy();
+    expect(screen.getByTestId('quiz-play-no-round-retry')).toBeTruthy();
+    expect(screen.getByTestId('quiz-play-no-round-home')).toBeTruthy();
   });
 });
