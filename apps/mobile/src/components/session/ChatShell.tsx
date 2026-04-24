@@ -577,7 +577,7 @@ export function ChatShell({
         )}
         {isStreaming && (
           <View className="items-center py-4" testID="thinking-bulb-animation">
-            <DeskLampAnimation size={48} color={colors.muted} />
+            <DeskLampAnimation size={96} color={colors.muted} />
           </View>
         )}
         {showIdleAnim && (
@@ -586,7 +586,7 @@ export function ChatShell({
             testID="idle-pen-animation"
             exiting={FadeOut.duration(200)}
           >
-            <MagicPenAnimation size={48} color={colors.muted} />
+            <MagicPenAnimation size={120} color={colors.muted} />
           </Animated.View>
         )}
         {footer}

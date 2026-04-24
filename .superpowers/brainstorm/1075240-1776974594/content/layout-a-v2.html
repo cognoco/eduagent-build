@@ -1,0 +1,288 @@
+<style>
+  .phone {
+    width: 320px;
+    background: #F7F1E8;
+    border-radius: 22px;
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 13px;
+    color: #1a1a1a;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+  }
+  .phone .bar {
+    background: #E9DFCF;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 0 12px;
+    font-size: 10px;
+    color: #666;
+  }
+  .phone .body { padding: 12px 14px 80px; }
+  .phone h4 { font-size: 18px; font-weight: 700; margin: 4px 0; }
+  .phone .sub { font-size: 11px; color: #666; margin-bottom: 4px; }
+  .phone .row {
+    padding: 10px 12px;
+    background: #fff;
+    border-radius: 12px;
+    margin-bottom: 5px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .phone .row.muted { background: #EFE7D9; color: #555; }
+  .phone .row.active { background: #E2F4EE; border: 1px solid #27AE85; }
+  .phone .row.next { background: #FFF5DE; border: 1px dashed #C9A24A; }
+  .phone .state {
+    width: 20px; height: 20px;
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    flex-shrink: 0;
+    font-weight: 700;
+  }
+  .phone .state.done { background: #27AE85; color: #fff; }
+  .phone .state.doing { background: #fff; border: 2px solid #2D9CDB; color: #2D9CDB; }
+  .phone .state.next { background: #FFF5DE; border: 2px dashed #C9A24A; color: #8A6D1F; }
+  .phone .state.later { background: #fff; border: 1px solid #ccc; }
+  .phone .label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: #888;
+    margin: 14px 2px 7px;
+    font-weight: 700;
+  }
+  .phone .label .count { color: #aaa; font-weight: 500; }
+  .phone .chaptername {
+    font-size: 10px;
+    color: #888;
+    display: block;
+    margin-top: 1px;
+  }
+  .phone .cta {
+    position: sticky;
+    bottom: 0;
+    margin: 0 -14px -12px;
+    padding: 14px;
+    background: linear-gradient(180deg, rgba(247,241,232,0) 0%, #F7F1E8 40%);
+  }
+  .phone .cta-btn {
+    background: #20A67A;
+    color: #fff;
+    text-align: center;
+    padding: 14px;
+    border-radius: 14px;
+    font-weight: 700;
+    font-size: 14px;
+  }
+  .phone .progress {
+    height: 6px;
+    background: #E9DFCF;
+    border-radius: 3px;
+    overflow: hidden;
+    margin: 8px 0 4px;
+  }
+  .phone .progress > div { width: 20%; height: 100%; background: #20A67A; }
+  .phone .session {
+    padding: 8px 4px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11.5px;
+    border-bottom: 1px dashed #E0D6C5;
+  }
+  .phone .session:last-child { border-bottom: none; }
+  .phone .divider {
+    font-size: 10px;
+    text-transform: uppercase;
+    color: #aaa;
+    letter-spacing: 0.6px;
+    padding: 8px 2px 4px;
+    margin-top: 6px;
+    border-top: 1px solid #E0D6C5;
+    font-weight: 600;
+  }
+  .phone .chapter-expanded {
+    padding-left: 28px;
+    margin-bottom: 6px;
+  }
+  .phone .chapter-topic {
+    font-size: 11.5px;
+    color: #555;
+    padding: 6px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 1px dotted #E0D6C5;
+  }
+  .phone .chapter-topic:last-child { border-bottom: none; }
+  .phone .tiny-state {
+    width: 14px; height: 14px; border-radius: 7px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 9px; flex-shrink: 0; border: 1px solid #ccc; background: #fff;
+  }
+
+  .card-image {
+    padding: 22px 10px !important;
+    background: linear-gradient(180deg, #EFE4D0 0%, #E3D4B8 100%) !important;
+    display: flex;
+    justify-content: center;
+  }
+  .card { min-width: 360px; }
+  .annotate {
+    background: #FFFBE0;
+    border-left: 3px solid #E0B84C;
+    padding: 8px 12px;
+    margin: 12px 0;
+    font-size: 12px;
+    color: #5A4B1A;
+    border-radius: 4px;
+  }
+</style>
+
+<h2>Option A — reordered &amp; complete</h2>
+<p class="subtitle">Order now: <b>In progress → Up next → Later → Done → Past conversations</b>. Every topic in the book is reachable.</p>
+
+<div class="cards">
+  <div class="card" data-choice="a-v2" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="phone">
+        <div class="bar">MentoMate</div>
+        <div class="body">
+
+          <!-- HEADER -->
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="color:#6B53D4;font-size:18px;">&larr;</span>
+            <div style="flex:1;">
+              <h4 style="margin:0;">Photosynthesis</h4>
+              <div class="sub">Biology · 5 sessions</div>
+            </div>
+          </div>
+          <div class="progress"><div></div></div>
+          <div style="font-size:10.5px;color:#666;">2 of 10 topics done</div>
+
+          <!-- 1. IN PROGRESS -->
+          <div class="label">In progress</div>
+          <div class="row active">
+            <span class="state doing">●</span>
+            <div style="flex:1;">
+              <div style="font-weight:700;">Nature's Energy Recipe</div>
+              <span class="chaptername">The Grand Overview · 1 session today</span>
+            </div>
+          </div>
+
+          <!-- 2. UP NEXT -->
+          <div class="label">Up next</div>
+          <div class="row next">
+            <span class="state next">→</span>
+            <div style="flex:1;">
+              <div style="font-weight:700;">What Plants Need: The Ingredients</div>
+              <span class="chaptername">The Grand Overview</span>
+            </div>
+          </div>
+
+          <!-- 3. LATER - every remaining chapter, collapsed but tappable -->
+          <div class="label">Later <span class="count">6 topics · 3 chapters</span></div>
+
+          <!-- chapter row (collapsed) -->
+          <div class="row muted" style="justify-content:space-between;">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span class="state later">○</span>
+              <div>
+                <div style="font-weight:600;">The Green Factories</div>
+                <span class="chaptername">0 / 2 topics</span>
+              </div>
+            </div>
+            <span style="color:#999;font-size:14px;">›</span>
+          </div>
+
+          <!-- chapter row (expanded example) -->
+          <div class="row muted" style="justify-content:space-between;">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span class="state later">○</span>
+              <div>
+                <div style="font-weight:600;">Energy Transformation</div>
+                <span class="chaptername">0 / 2 topics</span>
+              </div>
+            </div>
+            <span style="color:#999;font-size:14px;">▾</span>
+          </div>
+          <div class="chapter-expanded">
+            <div class="chapter-topic">
+              <span class="tiny-state">○</span>
+              <span>Light → Chemical Energy</span>
+            </div>
+            <div class="chapter-topic">
+              <span class="tiny-state">○</span>
+              <span>ATP and Sugar Production</span>
+            </div>
+          </div>
+
+          <!-- another chapter row (collapsed) -->
+          <div class="row muted" style="justify-content:space-between;">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span class="state later">○</span>
+              <div>
+                <div style="font-weight:600;">The Outcomes and Beyond</div>
+                <span class="chaptername">0 / 2 topics</span>
+              </div>
+            </div>
+            <span style="color:#999;font-size:14px;">›</span>
+          </div>
+
+          <!-- 4. DONE -->
+          <div class="label">Done <span class="count">2</span></div>
+          <div class="row" style="justify-content:space-between;">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span class="state done">✓</span>
+              <span style="opacity:0.85;">Intro to Photosynthesis</span>
+            </div>
+            <span style="color:#aaa;font-size:10px;">Grand Overview</span>
+          </div>
+          <div class="row" style="justify-content:space-between;">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span class="state done">✓</span>
+              <span style="opacity:0.85;">Why Plants Matter</span>
+            </div>
+            <span style="color:#aaa;font-size:10px;">Grand Overview</span>
+          </div>
+
+          <!-- 5. PAST CONVERSATIONS -->
+          <div class="divider">Past conversations</div>
+          <div class="session"><span>📖 Ingredients</span><span style="color:#888;">Today</span></div>
+          <div class="session"><span>📖 Energy Recipe</span><span style="color:#888;">Today</span></div>
+          <div class="session"><span>📖 Ingredients</span><span style="color:#888;">Yesterday</span></div>
+          <div class="session"><span>📖 Energy Recipe</span><span style="color:#888;">Yesterday</span></div>
+
+          <!-- CTA -->
+          <div class="cta">
+            <div class="cta-btn">▶ Continue learning</div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A · Reordered</h3>
+      <p>Order: <b>In progress → Up next → Later → Done → Past conversations</b>. Later shows every remaining chapter with its topic count; tap any chapter to expand and reveal topic titles (see Energy Transformation).</p>
+    </div>
+  </div>
+</div>
+
+<div class="annotate">
+  <b>How "Later" scales:</b> 10-topic book → ~3 chapter rows. 30-topic book → ~8-10 chapter rows. The learner never sees more than one row per chapter unless they tap to expand. Compare to a flat list of all 30 topics, which would double the scroll length for no orientation benefit.
+</div>
+
+<div style="margin-top: 22px; padding: 14px; background: #F5F5F5; border-radius: 10px; font-size: 13px;">
+  <b>Still open, in priority order:</b>
+  <ol style="margin: 6px 0 0; padding-left: 20px;">
+    <li><b>What counts as "In progress"?</b> — the top-row rule (affects the data layer)</li>
+    <li>If nothing's in progress, does that section hide or say "Ready to start"?</li>
+    <li>Should "Done" collapse to a chip after ~5 items? (Or always show everything?)</li>
+    <li>Does the sticky "Continue learning" button always resume the In-progress topic, or is it dynamic (falls back to Up next if nothing is in progress)?</li>
+  </ol>
+</div>

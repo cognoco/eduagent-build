@@ -1,0 +1,252 @@
+<style>
+  .phone {
+    width: 320px;
+    background: #F7F1E8;
+    border-radius: 22px;
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 13px;
+    color: #1a1a1a;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+  }
+  .phone .bar {
+    background: #E9DFCF;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 0 12px;
+    font-size: 10px;
+    color: #666;
+  }
+  .phone .body { padding: 12px 14px 60px; }
+  .phone h4 { font-size: 18px; font-weight: 700; margin: 4px 0; }
+  .phone .sub { font-size: 11px; color: #666; margin-bottom: 4px; }
+  .phone .row {
+    padding: 10px 12px;
+    background: #fff;
+    border-radius: 12px;
+    margin-bottom: 5px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .phone .row.muted { background: #EFE7D9; color: #555; }
+  .phone .row.active { background: #E2F4EE; border: 1px solid #27AE85; }
+  .phone .row.paused { background: #EEF1F7; border: 1px solid #C6D0E0; }
+  .phone .row.next { background: #FFF5DE; border: 1px dashed #C9A24A; }
+  .phone .state {
+    width: 20px; height: 20px;
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    flex-shrink: 0;
+    font-weight: 700;
+  }
+  .phone .state.done { background: #27AE85; color: #fff; }
+  .phone .state.doing { background: #fff; border: 2px solid #2D9CDB; color: #2D9CDB; }
+  .phone .state.paused { background: #fff; border: 2px solid #5A78A8; color: #5A78A8; }
+  .phone .state.next { background: #FFF5DE; border: 2px dashed #C9A24A; color: #8A6D1F; }
+  .phone .state.later { background: #fff; border: 1px solid #ccc; }
+  .phone .label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: #888;
+    margin: 14px 2px 7px;
+    font-weight: 700;
+  }
+  .phone .label .count { color: #aaa; font-weight: 500; }
+  .phone .chaptername {
+    font-size: 10px;
+    color: #888;
+    display: block;
+    margin-top: 1px;
+  }
+  .card-image {
+    padding: 22px 10px !important;
+    background: linear-gradient(180deg, #EFE4D0 0%, #E3D4B8 100%) !important;
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+  }
+  .card { min-width: 380px; }
+  .panel-wrap {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+  }
+  .panel-label {
+    text-align: center;
+    font-size: 11px;
+    color: #5A4B1A;
+    font-weight: 600;
+    margin-top: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .annotate {
+    background: #FFFBE0;
+    border-left: 3px solid #E0B84C;
+    padding: 10px 14px;
+    margin: 14px 0;
+    font-size: 12.5px;
+    color: #5A4B1A;
+    border-radius: 4px;
+  }
+</style>
+
+<h2>Splitting "Latest" from "Paused"</h2>
+<p class="subtitle">Three phones side-by-side: fresh book · one in progress · multiple paused. "Up next" always means <b>the next new topic</b> — independent of paused state. Sticky CTA picks what makes sense.</p>
+
+<div class="panel-wrap">
+
+  <!-- ================= SCENARIO 1: FRESH BOOK ================= -->
+  <div>
+    <div class="phone">
+      <div class="bar">MentoMate</div>
+      <div class="body">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="color:#6B53D4;font-size:18px;">&larr;</span>
+          <div style="flex:1;">
+            <h4 style="margin:0;">Photosynthesis</h4>
+            <div class="sub">Biology · 0 sessions</div>
+          </div>
+        </div>
+
+        <div class="label">Up next</div>
+        <div class="row next">
+          <span class="state next">→</span>
+          <div style="flex:1;">
+            <div style="font-weight:700;">Intro to Photosynthesis</div>
+            <span class="chaptername">The Grand Overview</span>
+          </div>
+        </div>
+
+        <div class="label">Later <span class="count">9 topics · 4 chapters</span></div>
+        <div class="row muted"><span class="state later">○</span><div>The Grand Overview</div></div>
+        <div class="row muted"><span class="state later">○</span><div>The Green Factories</div></div>
+        <div class="row muted"><span class="state later">○</span><div>Energy Transformation</div></div>
+
+        <div style="margin-top:14px;text-align:center;">
+          <div style="background:#20A67A;color:#fff;padding:12px;border-radius:12px;font-weight:700;font-size:13px;">▶ Start: Intro to Photosynthesis</div>
+        </div>
+      </div>
+    </div>
+    <div class="panel-label">Fresh book</div>
+  </div>
+
+  <!-- ================= SCENARIO 2: ONE IN PROGRESS ================= -->
+  <div>
+    <div class="phone">
+      <div class="bar">MentoMate</div>
+      <div class="body">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="color:#6B53D4;font-size:18px;">&larr;</span>
+          <div style="flex:1;">
+            <h4 style="margin:0;">Photosynthesis</h4>
+            <div class="sub">Biology · 2 sessions</div>
+          </div>
+        </div>
+
+        <div class="label">Continue now</div>
+        <div class="row active">
+          <span class="state doing">●</span>
+          <div style="flex:1;">
+            <div style="font-weight:700;">Nature's Energy Recipe</div>
+            <span class="chaptername">Grand Overview · 1 session today</span>
+          </div>
+        </div>
+
+        <div class="label">Up next</div>
+        <div class="row next">
+          <span class="state next">→</span>
+          <div style="flex:1;">
+            <div style="font-weight:700;">What Plants Need: Ingredients</div>
+            <span class="chaptername">The Grand Overview</span>
+          </div>
+        </div>
+
+        <div class="label">Later <span class="count">8 topics · 3 chapters</span></div>
+        <div class="row muted"><span class="state later">○</span><div>The Green Factories</div></div>
+        <div class="row muted"><span class="state later">○</span><div>Energy Transformation</div></div>
+
+        <div style="margin-top:14px;text-align:center;">
+          <div style="background:#20A67A;color:#fff;padding:12px;border-radius:12px;font-weight:700;font-size:13px;">▶ Continue learning</div>
+        </div>
+      </div>
+    </div>
+    <div class="panel-label">Normal case</div>
+  </div>
+
+  <!-- ================= SCENARIO 3: MULTIPLE PAUSED ================= -->
+  <div>
+    <div class="phone">
+      <div class="bar">MentoMate</div>
+      <div class="body">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="color:#6B53D4;font-size:18px;">&larr;</span>
+          <div style="flex:1;">
+            <h4 style="margin:0;">Photosynthesis</h4>
+            <div class="sub">Biology · 7 sessions</div>
+          </div>
+        </div>
+
+        <div class="label">Continue now</div>
+        <div class="row active">
+          <span class="state doing">●</span>
+          <div style="flex:1;">
+            <div style="font-weight:700;">Nature's Energy Recipe</div>
+            <span class="chaptername">Grand Overview · 1 session today</span>
+          </div>
+        </div>
+
+        <div class="label">Paused <span class="count">2</span></div>
+        <div class="row paused">
+          <span class="state paused">●</span>
+          <div style="flex:1;">
+            <div style="font-weight:600;">Light and Leaves</div>
+            <span class="chaptername">Green Factories · 3 days ago</span>
+          </div>
+        </div>
+        <div class="row paused">
+          <span class="state paused">●</span>
+          <div style="flex:1;">
+            <div style="font-weight:600;">How Chloroplasts Work</div>
+            <span class="chaptername">Green Factories · a week ago</span>
+          </div>
+        </div>
+
+        <div class="label">Up next</div>
+        <div class="row next">
+          <span class="state next">→</span>
+          <div style="flex:1;">
+            <div style="font-weight:700;">What Plants Need</div>
+            <span class="chaptername">The Grand Overview</span>
+          </div>
+        </div>
+
+        <div style="font-size:10px;color:#999;text-align:center;margin:12px 0;">· · Later · Done · Past conversations · ·</div>
+
+        <div style="margin-top:8px;text-align:center;">
+          <div style="background:#20A67A;color:#fff;padding:12px;border-radius:12px;font-weight:700;font-size:13px;">▶ Continue learning</div>
+        </div>
+      </div>
+    </div>
+    <div class="panel-label">With paused topics</div>
+  </div>
+
+</div>
+
+<div class="annotate">
+  <b>Why this works:</b> The three sections each answer one unambiguous question —<br>
+  "<b>Continue now</b>" → the thing I'm in the middle of (max 1) ·
+  "<b>Paused</b>" → threads I left hanging ·
+  "<b>Up next</b>" → the next <i>new</i> topic
+</div>
+
+<div style="margin-top: 16px; padding: 14px; background: #F5F5F5; border-radius: 10px; font-size: 13px;">
+  <b>What about recommender logic?</b> The curriculum's <code>suggestedNextId</code> stays purely forward-looking — it's always pointing at a new topic the learner hasn't started. If we later want to gently nudge learners to finish paused topics, that's a separate feature (e.g., a subtle "You have 2 paused topics — resume one?" banner near the top) — not a mutation of "Up next".
+</div>

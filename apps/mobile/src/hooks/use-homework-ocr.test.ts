@@ -2,7 +2,13 @@ import { renderHook, act } from '@testing-library/react-native';
 import { NativeModules } from 'react-native';
 import { useHomeworkOcr } from './use-homework-ocr';
 
+const NON_HOMEWORK_ERROR_MESSAGE =
+  "We couldn't find a clear homework problem in this photo. Try again or type it in.";
+
 const mockFetch = jest.fn();
+const mockTrackHomeworkOcrGateAccepted = jest.fn();
+const mockTrackHomeworkOcrGateRejected = jest.fn();
+const mockTrackHomeworkOcrGateShortcircuit = jest.fn();
 
 jest.mock('@clerk/clerk-expo', () => ({
   useAuth: () => ({
@@ -20,10 +26,18 @@ jest.mock('../lib/api', () => ({
   getApiUrl: () => 'http://localhost:8787',
 }));
 
+jest.mock('../lib/analytics', () => ({
+  trackHomeworkOcrGateAccepted: (...args: unknown[]) =>
+    mockTrackHomeworkOcrGateAccepted(...args),
+  trackHomeworkOcrGateRejected: (...args: unknown[]) =>
+    mockTrackHomeworkOcrGateRejected(...args),
+  trackHomeworkOcrGateShortcircuit: (...args: unknown[]) =>
+    mockTrackHomeworkOcrGateShortcircuit(...args),
+}));
+
 // Simulate ML Kit native module being linked
 NativeModules.TextRecognition = { recognize: jest.fn() };
 
-// Mock ML Kit
 const mockRecognize = jest.fn();
 jest.mock('@react-native-ml-kit/text-recognition', () => ({
   __esModule: true,
@@ -32,14 +46,12 @@ jest.mock('@react-native-ml-kit/text-recognition', () => ({
   },
 }));
 
-// Mock expo-image-manipulator
 const mockManipulateAsync = jest.fn();
 jest.mock('expo-image-manipulator', () => ({
   manipulateAsync: (...args: unknown[]) => mockManipulateAsync(...args),
   SaveFormat: { JPEG: 'jpeg' },
 }));
 
-// Mock expo-file-system/legacy
 const mockCopyAsync = jest.fn().mockResolvedValue(undefined);
 jest.mock('expo-file-system/legacy', () => ({
   cacheDirectory: 'file:///cache/',
@@ -55,13 +67,14 @@ beforeEach(() => {
 describe('useHomeworkOcr', () => {
   it('starts in idle status', () => {
     const { result } = renderHook(() => useHomeworkOcr());
+
     expect(result.current.status).toBe('idle');
     expect(result.current.text).toBeNull();
     expect(result.current.error).toBeNull();
     expect(result.current.failCount).toBe(0);
   });
 
-  it('processes image and returns OCR text on success', async () => {
+  it('valid OCR text reaches status=done unchanged', async () => {
     mockRecognize.mockResolvedValue({ text: 'Solve for x: 2x + 5 = 13' });
 
     const { result } = renderHook(() => useHomeworkOcr());
@@ -73,10 +86,17 @@ describe('useHomeworkOcr', () => {
     expect(result.current.status).toBe('done');
     expect(result.current.text).toBe('Solve for x: 2x + 5 = 13');
     expect(result.current.failCount).toBe(0);
+    expect(mockTrackHomeworkOcrGateAccepted).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: 'local',
+        tokens: expect.any(Number),
+        words: expect.any(Number),
+      })
+    );
   });
 
   it('copies image to stable cache path before processing', async () => {
-    mockRecognize.mockResolvedValue({ text: 'some text' });
+    mockRecognize.mockResolvedValue({ text: 'Solve for x: 2x + 5 = 13' });
 
     const { result } = renderHook(() => useHomeworkOcr());
 
@@ -91,7 +111,7 @@ describe('useHomeworkOcr', () => {
   });
 
   it('resizes cached image to 1600px width before OCR', async () => {
-    mockRecognize.mockResolvedValue({ text: 'some text' });
+    mockRecognize.mockResolvedValue({ text: 'Solve for x: 2x + 5 = 13' });
 
     const { result } = renderHook(() => useHomeworkOcr());
 
@@ -99,7 +119,6 @@ describe('useHomeworkOcr', () => {
       await result.current.process('file:///tmp/photo.jpg');
     });
 
-    // Verify resize receives the cached URI (not the original temp URI)
     expect(mockManipulateAsync).toHaveBeenCalledWith(
       expect.stringMatching(/^file:\/\/\/cache\/homework-\d+\.jpg$/),
       [{ resize: { width: 1600 } }],
@@ -107,8 +126,10 @@ describe('useHomeworkOcr', () => {
     );
   });
 
-  it('treats empty OCR result as error', async () => {
-    mockRecognize.mockResolvedValue({ text: '' });
+  it('gate-reject on local OCR does NOT invoke server fallback', async () => {
+    mockRecognize.mockResolvedValue({
+      text: Array.from({ length: 130 }, (_, index) => `word${index}`).join(' '),
+    });
 
     const { result } = renderHook(() => useHomeworkOcr());
 
@@ -116,49 +137,32 @@ describe('useHomeworkOcr', () => {
       await result.current.process('file:///tmp/photo.jpg');
     });
 
+    expect(mockFetch).not.toHaveBeenCalled();
     expect(result.current.status).toBe('error');
-    expect(result.current.error).toBe("Couldn't read any text from the image");
+    expect(result.current.error).toBe(NON_HOMEWORK_ERROR_MESSAGE);
     expect(result.current.failCount).toBe(1);
-  });
-
-  it('treats whitespace-only OCR result as error', async () => {
-    mockRecognize.mockResolvedValue({ text: '   \n  ' });
-
-    const { result } = renderHook(() => useHomeworkOcr());
-
-    await act(async () => {
-      await result.current.process('file:///tmp/photo.jpg');
-    });
-
-    expect(result.current.status).toBe('error');
-    expect(result.current.failCount).toBe(1);
-  });
-
-  it('handles ML Kit exception as error', async () => {
-    mockRecognize.mockRejectedValue(new Error('ML Kit crash'));
-    mockFetch.mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({ text: 'Fallback OCR text from server' }),
-        { status: 200 }
-      )
+    expect(mockTrackHomeworkOcrGateRejected).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: 'local',
+        droppedCount: 1,
+      })
     );
-
-    const { result } = renderHook(() => useHomeworkOcr());
-
-    await act(async () => {
-      await result.current.process('file:///tmp/photo.jpg');
-    });
-
-    expect(result.current.status).toBe('done');
-    expect(result.current.text).toBe('Fallback OCR text from server');
-    expect(result.current.failCount).toBe(0);
+    expect(mockTrackHomeworkOcrGateShortcircuit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tokens: expect.any(Number),
+        words: expect.any(Number),
+      })
+    );
   });
 
   it('falls back to server OCR when ML Kit returns no text', async () => {
     mockRecognize.mockResolvedValue({ text: '' });
     mockFetch.mockResolvedValueOnce(
       new Response(
-        JSON.stringify({ text: 'Server-side OCR rescue text' }),
+        JSON.stringify({
+          text: 'Server-side OCR rescue text',
+          confidence: 0.93,
+        }),
         { status: 200 }
       )
     );
@@ -171,15 +175,53 @@ describe('useHomeworkOcr', () => {
 
     expect(result.current.status).toBe('done');
     expect(result.current.text).toBe('Server-side OCR rescue text');
+    expect(mockTrackHomeworkOcrGateAccepted).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: 'server',
+        confidence: 0.93,
+      })
+    );
+  });
+
+  it('gate-reject on server OCR raises error phase', async () => {
+    mockRecognize.mockResolvedValue({ text: '' });
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          text: 'Solve 2x + 5 = 13',
+          confidence: 0.2,
+        }),
+        { status: 200 }
+      )
+    );
+
+    const { result } = renderHook(() => useHomeworkOcr());
+
+    await act(async () => {
+      await result.current.process('file:///tmp/photo.jpg');
+    });
+
+    expect(result.current.status).toBe('error');
+    expect(result.current.error).toBe(NON_HOMEWORK_ERROR_MESSAGE);
+    expect(mockTrackHomeworkOcrGateRejected).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: 'server',
+        confidence: 0.2,
+      })
+    );
+    expect(mockTrackHomeworkOcrGateShortcircuit).not.toHaveBeenCalled();
   });
 
   it('falls back to server OCR when the native module is unavailable', async () => {
     const originalTextRecognition = NativeModules.TextRecognition;
     NativeModules.TextRecognition = null;
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ text: 'Uploaded OCR text' }), {
-        status: 200,
-      })
+      new Response(
+        JSON.stringify({ text: 'Uploaded OCR text', confidence: 0.89 }),
+        {
+          status: 200,
+        }
+      )
     );
 
     const { result } = renderHook(() => useHomeworkOcr());
@@ -196,20 +238,38 @@ describe('useHomeworkOcr', () => {
     }
   });
 
-  it('retry() does NOT reset failCount', async () => {
-    mockRecognize
-      .mockResolvedValueOnce({ text: '' }) // First process — fail
-      .mockResolvedValueOnce({ text: '' }); // Retry — fail again
+  it('handles ML Kit exception as error when server fallback also fails', async () => {
+    mockRecognize.mockRejectedValue(new Error('ML Kit crash'));
+    mockFetch.mockRejectedValueOnce(new Error('server down'));
 
     const { result } = renderHook(() => useHomeworkOcr());
 
-    // First attempt
+    await act(async () => {
+      await result.current.process('file:///tmp/photo.jpg');
+    });
+
+    expect(result.current.status).toBe('error');
+    expect(result.current.error).toBe(
+      "We couldn't read that clearly. Try taking the photo again with better lighting."
+    );
+  });
+
+  it('retry() does NOT reset failCount', async () => {
+    mockRecognize
+      .mockResolvedValueOnce({
+        text: Array.from({ length: 130 }, () => 'word').join(' '),
+      })
+      .mockResolvedValueOnce({
+        text: Array.from({ length: 130 }, () => 'word').join(' '),
+      });
+
+    const { result } = renderHook(() => useHomeworkOcr());
+
     await act(async () => {
       await result.current.process('file:///tmp/photo.jpg');
     });
     expect(result.current.failCount).toBe(1);
 
-    // Retry same image — failCount must NOT reset
     await act(async () => {
       await result.current.retry();
     });
@@ -218,18 +278,18 @@ describe('useHomeworkOcr', () => {
 
   it('process(newUri) DOES reset failCount', async () => {
     mockRecognize
-      .mockResolvedValueOnce({ text: '' }) // First — fail
-      .mockResolvedValueOnce({ text: 'new text found' }); // Second — success
+      .mockResolvedValueOnce({
+        text: Array.from({ length: 130 }, () => 'word').join(' '),
+      })
+      .mockResolvedValueOnce({ text: 'new text found' });
 
     const { result } = renderHook(() => useHomeworkOcr());
 
-    // Fail first image
     await act(async () => {
       await result.current.process('file:///tmp/photo1.jpg');
     });
     expect(result.current.failCount).toBe(1);
 
-    // Process new image — failCount resets
     await act(async () => {
       await result.current.process('file:///tmp/photo2.jpg');
     });

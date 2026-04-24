@@ -595,7 +595,7 @@ export default function BookScreen() {
         style={{ paddingTop: insets.top }}
         testID="book-loading"
       >
-        <BookPageFlipAnimation size={80} color={themeColors.accent} />
+        <BookPageFlipAnimation size={140} color={themeColors.accent} />
         <Text className="text-body-sm text-text-secondary mt-3">
           Loading book...
         </Text>
@@ -660,7 +660,7 @@ export default function BookScreen() {
         style={{ paddingTop: insets.top }}
         testID="book-generating"
       >
-        <MagicPenAnimation size={100} color={themeColors.accent} />
+        <MagicPenAnimation size={140} color={themeColors.accent} />
         {book?.emoji && <Text className="text-3xl mt-4">{book.emoji}</Text>}
         <Text className="text-h2 font-bold text-text-primary mt-3 text-center">
           {book?.title ?? 'Writing your book...'}

@@ -55,6 +55,7 @@ export default function CameraScreen(): React.ReactNode {
 
   const [ocrText, setOcrText] = useState('');
   const [draftProblems, setDraftProblems] = useState<HomeworkProblem[]>([]);
+  const [droppedProblems, setDroppedProblems] = useState<HomeworkProblem[]>([]);
   const [manualText, setManualText] = useState('');
   const [flash, setFlash] = useState<FlashMode>('off');
   const [showCelebration, setShowCelebration] = useState(true);
@@ -86,6 +87,7 @@ export default function CameraScreen(): React.ReactNode {
       dispatch({ type: 'RESET', hasPermission: permission?.granted ?? false });
       setOcrText('');
       setDraftProblems([]);
+      setDroppedProblems([]);
       setManualText('');
       setManualSubjectName('');
       setShowCelebration(true);
@@ -118,11 +120,14 @@ export default function CameraScreen(): React.ReactNode {
   // Sync OCR hook status into reducer
   useEffect(() => {
     if (ocr.status === 'done' && ocr.text) {
+      const splitResult = splitHomeworkProblems(ocr.text);
       dispatch({ type: 'OCR_SUCCESS', text: ocr.text });
       setOcrText(ocr.text);
-      setDraftProblems(splitHomeworkProblems(ocr.text));
+      setDraftProblems(splitResult.problems);
+      setDroppedProblems(splitResult.droppedProblems);
     } else if (ocr.status === 'error' && ocr.error) {
       dispatch({ type: 'OCR_ERROR', message: ocr.error });
+      setDroppedProblems([]);
     }
   }, [ocr.status, ocr.text, ocr.error]);
 
@@ -145,11 +150,13 @@ export default function CameraScreen(): React.ReactNode {
           text: combinedProblemText,
         });
         if (!result.needsConfirmation && result.candidates.length === 1) {
-          const c = result.candidates[0]!;
-          setAutoDetectedSubject({
-            subjectId: c.subjectId,
-            subjectName: c.subjectName,
-          });
+          const candidate = result.candidates[0];
+          if (candidate) {
+            setAutoDetectedSubject({
+              subjectId: candidate.subjectId,
+              subjectName: candidate.subjectName,
+            });
+          }
         } else if (
           result.suggestedSubjectName &&
           result.candidates.length === 0
@@ -271,6 +278,15 @@ export default function CameraScreen(): React.ReactNode {
   }, [state.imageUri, ocr]);
 
   const handleRetake = useCallback(() => {
+    setOcrText('');
+    setDraftProblems([]);
+    setDroppedProblems([]);
+    setManualText('');
+    setManualSubjectName('');
+    setAutoDetectedSubject(null);
+    setShowSubjectPicker(false);
+    setShowCelebration(true);
+    classifyTriggeredRef.current = false;
     dispatch({ type: 'RETAKE' });
   }, []);
 
@@ -309,20 +325,22 @@ export default function CameraScreen(): React.ReactNode {
           serialized.length > MAX_PARAM_LENGTH &&
           truncatedProblems.length === 1
         ) {
-          const problem = truncatedProblems[0]!;
-          const maxTextLen =
-            problem.text.length - (serialized.length - MAX_PARAM_LENGTH) - 30;
-          const wordBoundary = problem.text.lastIndexOf(
-            ' ',
-            Math.max(0, maxTextLen)
-          );
-          const truncatedText =
-            problem.text.slice(
-              0,
-              wordBoundary > 0 ? wordBoundary : maxTextLen
-            ) + ' [truncated]';
-          truncatedProblems = [{ ...problem, text: truncatedText }];
-          serialized = serializeHomeworkProblems(truncatedProblems);
+          const problem = truncatedProblems[0];
+          if (problem) {
+            const maxTextLen =
+              problem.text.length - (serialized.length - MAX_PARAM_LENGTH) - 30;
+            const wordBoundary = problem.text.lastIndexOf(
+              ' ',
+              Math.max(0, maxTextLen)
+            );
+            const truncatedText =
+              problem.text.slice(
+                0,
+                wordBoundary > 0 ? wordBoundary : maxTextLen
+              ) + ' [truncated]';
+            truncatedProblems = [{ ...problem, text: truncatedText }];
+            serialized = serializeHomeworkProblems(truncatedProblems);
+          }
         }
         homeworkProblemsParam = serialized;
       }
@@ -344,7 +362,7 @@ export default function CameraScreen(): React.ReactNode {
         },
       } as never);
     },
-    [router]
+    [imageMimeType, router]
   );
 
   const handleConfirmResult = useCallback(() => {
@@ -474,15 +492,18 @@ export default function CameraScreen(): React.ReactNode {
     try {
       const result = await classifyMutation.mutateAsync({ text: manualText });
       if (!result.needsConfirmation && result.candidates.length === 1) {
-        navigateToSession(
-          result.candidates[0]!.subjectId,
-          result.candidates[0]!.subjectName,
-          manualText,
-          undefined,
-          undefined,
-          undefined,
-          homeworkCaptureSource
-        );
+        const candidate = result.candidates[0];
+        if (candidate) {
+          navigateToSession(
+            candidate.subjectId,
+            candidate.subjectName,
+            manualText,
+            undefined,
+            undefined,
+            undefined,
+            homeworkCaptureSource
+          );
+        }
       } else {
         // Multiple candidates or low confidence — show picker
         setShowSubjectPicker(true);
@@ -549,6 +570,12 @@ export default function CameraScreen(): React.ReactNode {
       createHomeworkProblem('', { source: 'manual', originalText: null }),
     ]);
   }, []);
+
+  const handleRestoreDroppedProblems = useCallback(() => {
+    if (droppedProblems.length === 0) return;
+    setDraftProblems((prev) => [...prev, ...droppedProblems]);
+    setDroppedProblems([]);
+  }, [droppedProblems]);
 
   const handleRemoveProblem = useCallback((problemId: string) => {
     setDraftProblems((prev) =>
@@ -825,6 +852,22 @@ export default function CameraScreen(): React.ReactNode {
         <Text className="text-body text-text-secondary mt-4 mb-3">
           Here are the problems I found:
         </Text>
+
+        {droppedProblems.length > 0 && (
+          <Pressable
+            testID="dropped-fragments-chip"
+            onPress={handleRestoreDroppedProblems}
+            className="mb-3 rounded-button bg-surface px-4 py-3"
+            accessibilityLabel="Add skipped fragments back"
+            accessibilityRole="button"
+          >
+            <Text className="text-body-sm font-medium text-text-primary">
+              We skipped {droppedProblems.length} unclear fragment
+              {droppedProblems.length === 1 ? '' : 's'}. Tap to add{' '}
+              {droppedProblems.length === 1 ? 'it' : 'them'} back.
+            </Text>
+          </Pressable>
+        )}
 
         <View className="gap-3">
           {draftProblems.map((problem, index) => (
@@ -1146,6 +1189,9 @@ export default function CameraScreen(): React.ReactNode {
   // ---- Error phase ----
   if (state.phase === 'error') {
     const showManualFallback = ocr.failCount >= 1;
+    const errorMessage =
+      state.errorMessage ??
+      "We couldn't read that clearly. Try taking the photo again with better lighting.";
 
     return (
       <View
@@ -1164,10 +1210,7 @@ export default function CameraScreen(): React.ReactNode {
 
         <View className="flex-1 justify-center">
           <Text className="text-h3 font-semibold text-text-primary text-center mb-2">
-            {showManualFallback
-              ? "Hmm, I'm having trouble reading that"
-              : state.errorMessage ??
-                "We couldn't read that clearly. Try taking the photo again with better lighting."}
+            {errorMessage}
           </Text>
 
           {showManualFallback ? (

@@ -1,0 +1,190 @@
+<style>
+  .phone {
+    width: 320px;
+    background: #F7F1E8;
+    border-radius: 22px;
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 13px;
+    color: #1a1a1a;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+  }
+  .phone .bar {
+    background: #E9DFCF;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 0 12px;
+    font-size: 10px;
+    color: #666;
+  }
+  .phone .body { padding: 12px 14px 60px; }
+  .phone h4 { font-size: 18px; font-weight: 700; margin: 4px 0; }
+  .phone .sub { font-size: 11px; color: #666; margin-bottom: 4px; }
+  .phone .row {
+    padding: 10px 12px;
+    background: #fff;
+    border-radius: 12px;
+    margin-bottom: 5px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .phone .row.muted { background: #EFE7D9; color: #555; }
+  .phone .row.active { background: #E2F4EE; border: 1px solid #27AE85; }
+  .phone .row.active-dim { background: #F0F8F4; border: 1px solid #A8D4C4; }
+  .phone .row.next { background: #FFF5DE; border: 1px dashed #C9A24A; }
+  .phone .state {
+    width: 20px; height: 20px;
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    flex-shrink: 0;
+    font-weight: 700;
+  }
+  .phone .state.done { background: #27AE85; color: #fff; }
+  .phone .state.doing { background: #fff; border: 2px solid #2D9CDB; color: #2D9CDB; }
+  .phone .state.paused { background: #fff; border: 2px solid #A8B8D4; color: #5A78A8; }
+  .phone .state.next { background: #FFF5DE; border: 2px dashed #C9A24A; color: #8A6D1F; }
+  .phone .state.later { background: #fff; border: 1px solid #ccc; }
+  .phone .label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: #888;
+    margin: 14px 2px 7px;
+    font-weight: 700;
+  }
+  .phone .label .count { color: #aaa; font-weight: 500; }
+  .phone .chaptername {
+    font-size: 10px;
+    color: #888;
+    display: block;
+    margin-top: 1px;
+  }
+  .phone .chip {
+    font-size: 9px;
+    padding: 2px 6px;
+    background: #E2F4EE;
+    color: #117A54;
+    border-radius: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+  .phone .chip.paused { background: #E8EEF8; color: #4A6B99; }
+  .card-image {
+    padding: 22px 10px !important;
+    background: linear-gradient(180deg, #EFE4D0 0%, #E3D4B8 100%) !important;
+    display: flex;
+    justify-content: center;
+  }
+  .card { min-width: 360px; }
+  .annotate {
+    background: #FFFBE0;
+    border-left: 3px solid #E0B84C;
+    padding: 8px 12px;
+    margin: 12px 0;
+    font-size: 12px;
+    color: #5A4B1A;
+    border-radius: 4px;
+  }
+</style>
+
+<h2>Handling multiple started-but-not-finished topics</h2>
+<p class="subtitle">Rule: <code>hasSessions &amp;&amp; !completed</code> → <b>In progress</b>. Newest first. One topic gets the "most recent" highlight; older ones show as a lighter variant with "paused" styling.</p>
+
+<div class="cards">
+  <div class="card" data-choice="yes" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="phone">
+        <div class="bar">MentoMate</div>
+        <div class="body">
+
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="color:#6B53D4;font-size:18px;">&larr;</span>
+            <div style="flex:1;">
+              <h4 style="margin:0;">Photosynthesis</h4>
+              <div class="sub">Biology · 7 sessions</div>
+            </div>
+          </div>
+
+          <!-- IN PROGRESS - 3 items shown -->
+          <div class="label">In progress <span class="count">3</span></div>
+
+          <!-- Most recent — the "active" one, highlighted -->
+          <div class="row active">
+            <span class="state doing">●</span>
+            <div style="flex:1;">
+              <div style="font-weight:700;">Nature's Energy Recipe</div>
+              <span class="chaptername">The Grand Overview · 1 session today</span>
+            </div>
+            <span class="chip">Latest</span>
+          </div>
+
+          <!-- Older, but still started -->
+          <div class="row active-dim">
+            <span class="state paused">●</span>
+            <div style="flex:1;">
+              <div style="font-weight:600;">Light and Leaves</div>
+              <span class="chaptername">Green Factories · 2 sessions · last touched 3 days ago</span>
+            </div>
+            <span class="chip paused">Paused</span>
+          </div>
+
+          <div class="row active-dim">
+            <span class="state paused">●</span>
+            <div style="flex:1;">
+              <div style="font-weight:600;">How Chloroplasts Work</div>
+              <span class="chaptername">Green Factories · 1 session · last touched a week ago</span>
+            </div>
+            <span class="chip paused">Paused</span>
+          </div>
+
+          <!-- UP NEXT -->
+          <div class="label">Up next</div>
+          <div class="row next">
+            <span class="state next">→</span>
+            <div style="flex:1;">
+              <div style="font-weight:700;">What Plants Need: The Ingredients</div>
+              <span class="chaptername">The Grand Overview</span>
+            </div>
+          </div>
+
+          <!-- ... rest of layout continues ... -->
+          <div style="text-align:center;color:#999;font-size:10px;padding:20px 0;">
+            · · · Later · Done · Past conversations · · ·
+          </div>
+
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>In progress — full transparency</h3>
+      <p>Latest gets the solid blue ring + "Latest" chip → that's what <b>Continue learning</b> resumes. Older started-but-not-finished topics appear below in a softer style with <b>Paused</b> chips + time-since-last-touched. They're still tappable.</p>
+    </div>
+  </div>
+</div>
+
+<div class="annotate">
+  <b>Why I like this rule:</b>
+  <ul style="margin: 6px 0 0; padding-left: 20px;">
+    <li><b>Honest</b> — if I started it and didn't finish, it IS in progress</li>
+    <li><b>One simple rule</b> — no fuzzy heuristics, easy to implement and easy to explain</li>
+    <li><b>Gentle nudge</b> — if I have 4 paused topics, the scroll weight makes me notice I'm leaving threads hanging. Not shaming, just visible.</li>
+    <li><b>CTA stays predictable</b> — "Continue" always resumes the Latest one. The Paused ones are tap-to-resume.</li>
+  </ul>
+</div>
+
+<div style="margin-top: 22px; padding: 14px; background: #F5F5F5; border-radius: 10px; font-size: 13px;">
+  <b>Edge cases this handles cleanly:</b>
+  <ul style="margin: 6px 0 0; padding-left: 20px;">
+    <li><b>Fresh book</b> → no In progress section. Up Next becomes the primary CTA target.</li>
+    <li><b>One in-progress</b> → exactly the previous mockup (single active row).</li>
+    <li><b>Many in-progress</b> → list grows; if more than ~4, we could add a "see all paused (N)" collapse. But 4+ is already a signal.</li>
+    <li><b>Just finished a topic</b> → it moves out of In progress (since completed), CTA auto-retargets to Up Next.</li>
+  </ul>
+</div>

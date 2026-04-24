@@ -8,6 +8,17 @@ import type {
 let homeworkProblemCounter = 0;
 
 const NUMBERED_PROBLEM_PATTERN = /^\s*(?:\d+|[A-Z])[.)]\s+/;
+const OPERATOR_RE = /[+\-−×*·÷/=<>≤≥±²³]/g;
+const MIN_MEANINGFUL_TOKENS = 3;
+const MAX_HOMEWORK_WORDS = 120;
+const MIN_AVERAGE_LETTER_RUN_LENGTH = 2.5;
+const MIN_BLOCK_CONFIDENCE = 0.55;
+
+export interface SplitHomeworkProblemsResult {
+  problems: HomeworkProblem[];
+  dropped: number;
+  droppedProblems: HomeworkProblem[];
+}
 
 function nextHomeworkProblemId(): string {
   homeworkProblemCounter += 1;
@@ -28,10 +39,106 @@ export function createHomeworkProblem(
   };
 }
 
-export function splitHomeworkProblems(rawText: string): HomeworkProblem[] {
+function countWords(text: string): number {
+  return text.trim().split(/\s+/).filter(Boolean).length;
+}
+
+function buildHomeworkShapeMetrics(text: string): {
+  tokens: number;
+  words: number;
+  averageLetterRunLength: number;
+} {
+  return {
+    tokens: countMeaningfulTokens(text),
+    words: countWords(text),
+    averageLetterRunLength: averageLetterRunLength(text),
+  };
+}
+
+export function countMeaningfulTokens(text: string): number {
+  const letters = text.match(/\p{L}+/gu) ?? [];
+  const digits = text.match(/\d+/g) ?? [];
+  const operators = text.match(OPERATOR_RE) ?? [];
+  return letters.length + digits.length + operators.length;
+}
+
+export function averageLetterRunLength(text: string): number {
+  const runs = text.match(/\p{L}+/gu) ?? [];
+  if (runs.length === 0) {
+    return 0;
+  }
+
+  return runs.reduce((sum, run) => sum + run.length, 0) / runs.length;
+}
+
+export function hasAcceptableShape(text: string): boolean {
+  const { tokens, words } = buildHomeworkShapeMetrics(text);
+
+  if (tokens < MIN_MEANINGFUL_TOKENS) {
+    return false;
+  }
+
+  if (words > MAX_HOMEWORK_WORDS) {
+    return false;
+  }
+
+  return true;
+}
+
+export function isLikelyHomework(
+  text: string,
+  blockConfidence?: number
+): boolean {
+  if (blockConfidence != null && blockConfidence < MIN_BLOCK_CONFIDENCE) {
+    return false;
+  }
+
+  if (!hasAcceptableShape(text)) {
+    return false;
+  }
+
+  const letterRuns = text.match(/\p{L}+/gu) ?? [];
+  const avgLetterRunLength = averageLetterRunLength(text);
+  if (
+    letterRuns.length >= 3 &&
+    avgLetterRunLength > 0 &&
+    avgLetterRunLength < MIN_AVERAGE_LETTER_RUN_LENGTH
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+export function filterHomeworkProblems(
+  problems: HomeworkProblem[],
+  blockConfidence?: number
+): SplitHomeworkProblemsResult {
+  const keptProblems: HomeworkProblem[] = [];
+  const droppedProblems: HomeworkProblem[] = [];
+
+  for (const problem of problems) {
+    if (isLikelyHomework(problem.text, blockConfidence)) {
+      keptProblems.push(problem);
+    } else {
+      droppedProblems.push(problem);
+    }
+  }
+
+  return {
+    problems: keptProblems,
+    dropped: droppedProblems.length,
+    droppedProblems,
+  };
+}
+
+export function splitHomeworkProblems(
+  rawText: string,
+  blockConfidence?: number
+): SplitHomeworkProblemsResult {
   const normalizedText = rawText.replace(/\r\n/g, '\n').trim();
   if (!normalizedText) {
-    return [];
+    return { problems: [], dropped: 0, droppedProblems: [] };
   }
 
   const lines = normalizedText.split('\n');
@@ -62,21 +169,22 @@ export function splitHomeworkProblems(rawText: string): HomeworkProblem[] {
     groups.push(currentGroup.join('\n').trim());
   }
 
-  if (groups.length <= 1) {
-    return [
-      createHomeworkProblem(normalizedText, {
-        source: 'ocr',
-        originalText: normalizedText,
-      }),
-    ];
-  }
+  const problems =
+    groups.length <= 1
+      ? [
+          createHomeworkProblem(normalizedText, {
+            source: 'ocr',
+            originalText: normalizedText,
+          }),
+        ]
+      : groups.map((group) =>
+          createHomeworkProblem(group, {
+            source: 'ocr',
+            originalText: group,
+          })
+        );
 
-  return groups.map((group) =>
-    createHomeworkProblem(group, {
-      source: 'ocr',
-      originalText: group,
-    })
-  );
+  return filterHomeworkProblems(problems, blockConfidence);
 }
 
 export function getHomeworkProblemText(problems: HomeworkProblem[]): string {

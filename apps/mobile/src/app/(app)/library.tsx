@@ -312,7 +312,7 @@ export default function LibraryScreen() {
       }
       return (
         <View className="py-8 items-center" testID="library-loading">
-          <BookPageFlipAnimation size={80} color={themeColors.accent} />
+          <BookPageFlipAnimation size={140} color={themeColors.accent} />
           <Text className="text-body-sm text-text-secondary mt-3">
             Loading your subjects...
           </Text>

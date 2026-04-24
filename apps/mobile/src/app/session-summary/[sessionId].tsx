@@ -29,6 +29,11 @@ import { goBackOrReplace } from '../../lib/navigation';
 import { platformAlert } from '../../lib/platform-alert';
 import { Sentry } from '../../lib/sentry';
 import {
+  readSummaryDraft,
+  writeSummaryDraft,
+  clearSummaryDraft,
+} from '../../lib/summary-draft';
+import {
   CheckmarkPopAnimation,
   BrandCelebration,
   ShimmerSkeleton,
@@ -79,6 +84,13 @@ export default function SessionSummaryScreen() {
   const [recapTimedOut, setRecapTimedOut] = useState(false);
   // UX-DE-M2: timeout guard — escape from unbounded loading spinner
   const [loadingTimedOut, setLoadingTimedOut] = useState(false);
+  // Bulletproof drafting — until this flips true, the autosave effect is
+  // gated off so it can't clobber a draft we're about to rehydrate.
+  const [draftRehydrated, setDraftRehydrated] = useState(false);
+  // Tracks whether autosave has ever written a draft for this session.
+  // Prevents a spurious "clear on empty text" fire on a fresh mount when
+  // nothing was ever stored to begin with.
+  const draftWrittenRef = useRef(false);
 
   // R-3: Ref-based locks — isPending resets before Alert callbacks fire,
   // allowing double-submission if user taps rapidly.
@@ -158,6 +170,65 @@ export default function SessionSummaryScreen() {
     const t = setTimeout(() => setLoadingTimedOut(true), 15_000);
     return () => clearTimeout(t);
   }, [transcript.isLoading]);
+
+  // Bulletproof drafting — rehydrate any persisted reflection text from
+  // SecureStore exactly once on mount. Never overwrite what the user has
+  // already typed; if they've started composing, the autosave effect below
+  // will simply replace whatever was on disk.
+  useEffect(() => {
+    if (draftRehydrated) return;
+    if (!sessionId || !activeProfile?.id) return;
+    let cancelled = false;
+    void (async () => {
+      const draft = await readSummaryDraft(activeProfile.id, sessionId);
+      if (cancelled) return;
+      if (draft) {
+        draftWrittenRef.current = true;
+        setSummaryText((prev) => (prev.length === 0 ? draft.content : prev));
+      }
+      setDraftRehydrated(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [draftRehydrated, sessionId, activeProfile?.id]);
+
+  // Debounced 300ms autosave on every keystroke. Runs only after rehydrate
+  // completes and while the session is still open for editing. All failures
+  // are swallowed inside summary-draft.ts and escalated to Sentry.
+  useEffect(() => {
+    if (!draftRehydrated) return;
+    if (!sessionId || !activeProfile?.id) return;
+    if (submitted || isPersistedSubmitted) return;
+    if (summaryText.length === 0) {
+      if (draftWrittenRef.current) {
+        void clearSummaryDraft(activeProfile.id, sessionId);
+        draftWrittenRef.current = false;
+      }
+      return;
+    }
+    const id = setTimeout(() => {
+      draftWrittenRef.current = true;
+      void writeSummaryDraft(activeProfile.id, sessionId, summaryText);
+    }, 300);
+    return () => clearTimeout(id);
+  }, [
+    summaryText,
+    draftRehydrated,
+    sessionId,
+    activeProfile?.id,
+    submitted,
+    isPersistedSubmitted,
+  ]);
+
+  // A server-confirmed terminal state (submitted/accepted) means any local
+  // draft is redundant — drop it so it can't resurface on next mount.
+  useEffect(() => {
+    if (!sessionId || !activeProfile?.id) return;
+    if (!isPersistedSubmitted) return;
+    void clearSummaryDraft(activeProfile.id, sessionId);
+    draftWrittenRef.current = false;
+  }, [isPersistedSubmitted, sessionId, activeProfile?.id]);
 
   const showSubmittedView = submitted || isPersistedSubmitted;
   const displayContent = submitted ? summaryText : persisted?.content ?? '';
@@ -356,13 +427,13 @@ export default function SessionSummaryScreen() {
     );
   }
 
-  const handleSubmit = async (): Promise<void> => {
+  const handleSubmit = async (): Promise<boolean> => {
     if (
       summaryText.trim().length < 10 ||
       submitSummary.isPending ||
       submitInFlight.current
     )
-      return;
+      return false;
     submitInFlight.current = true;
 
     try {
@@ -371,6 +442,11 @@ export default function SessionSummaryScreen() {
       });
       setAiFeedback(result.summary.aiFeedback);
       setSubmitted(true);
+      // Server accepted the reflection — the local draft is redundant.
+      if (activeProfile?.id && sessionId) {
+        void clearSummaryDraft(activeProfile.id, sessionId);
+        draftWrittenRef.current = false;
+      }
 
       // Story 10.8 Phase 0: summary_submitted event
       Sentry.addBreadcrumb({
@@ -384,19 +460,87 @@ export default function SessionSummaryScreen() {
         },
         level: 'info',
       });
+      return true;
     } catch (err) {
-      // Error state surfaced by submitSummary.isError inline in JSX [SC-1]
+      // Error state surfaced by submitSummary.isError inline in JSX [SC-1].
+      // The draft stays on disk: on retry the user's text is preserved
+      // even if the app is force-killed between attempts.
       console.error('[SessionSummary] handleSubmit failed:', err);
       platformAlert(
         'Could not save',
         'Your reflection could not be saved. Please try again.'
       );
+      return false;
     } finally {
       submitInFlight.current = false;
     }
   };
 
+  // Promise-wrapped confirmation used by every exit path when the user has
+  // typed something but not submitted. Returns the user's choice so the
+  // caller can branch without relying on React state that hasn't flushed.
+  const askDraftDecision = (): Promise<'submit' | 'discard' | 'keep'> =>
+    new Promise((resolve) => {
+      const canSubmit = summaryText.trim().length >= 10;
+      const buttons = canSubmit
+        ? [
+            {
+              text: 'Keep writing',
+              style: 'cancel' as const,
+              onPress: () => resolve('keep'),
+            },
+            { text: 'Submit now', onPress: () => resolve('submit') },
+            {
+              text: 'Discard',
+              style: 'destructive' as const,
+              onPress: () => resolve('discard'),
+            },
+          ]
+        : [
+            {
+              text: 'Keep writing',
+              style: 'cancel' as const,
+              onPress: () => resolve('keep'),
+            },
+            {
+              text: 'Discard',
+              style: 'destructive' as const,
+              onPress: () => resolve('discard'),
+            },
+          ];
+      platformAlert(
+        'Save your reflection?',
+        canSubmit
+          ? "You typed a reflection but haven't submitted it. Submit it now, discard it, or keep writing?"
+          : 'Your reflection is too short to submit (it needs at least 10 characters). Discard it or keep writing?',
+        buttons
+      );
+    });
+
   const handleContinue = async (): Promise<void> => {
+    // Bulletproof drafting — every close/continue/skip affordance routes
+    // through here, so this one gate catches every exit path. If the user
+    // has typed anything that isn't yet submitted, NEVER silently discard
+    // it: ask what to do.
+    if (!submitted && summaryText.trim().length > 0) {
+      const decision = await askDraftDecision();
+      if (decision === 'keep') return;
+      if (decision === 'submit') {
+        // Stay on screen afterwards: on success the submitted view renders
+        // AI feedback; on failure the user can retry. They tap Continue
+        // again to navigate once they're done reading.
+        await handleSubmit();
+        return;
+      }
+      // decision === 'discard' — wipe the local draft so it can't resurface,
+      // then fall through to the server-side skip + navigation flow.
+      if (activeProfile?.id && sessionId) {
+        await clearSummaryDraft(activeProfile.id, sessionId);
+        draftWrittenRef.current = false;
+      }
+      setSummaryText('');
+    }
+
     // BUG-449: Only run the skip flow for a fresh session that hasn't been
     // resolved yet. If the user is revisiting an already-submitted or
     // already-skipped summary (e.g., tapping a PAST SESSION from the book
@@ -860,10 +1004,12 @@ export default function SessionSummaryScreen() {
           </View>
         )}
 
-        {/* Your Words section — branches on three states:
+        {/* Your Words section — branches on four states:
             (a) submitted in this render OR persisted submitted/accepted → show saved content + feedback
-            (b) persisted skipped → read-only skipped-state message
-            (c) otherwise → input form with chips (happy path for just-ended sessions) */}
+            (b) persisted skipped AND no local draft → read-only skipped-state message
+            (c) persisted skipped AND local draft rehydrated → input form + resume banner
+                (lets users recover after the legacy "typed-then-closed" trap)
+            (d) otherwise → input form with chips (happy path for just-ended sessions) */}
         {showSubmittedView ? (
           <View className="mb-4">
             <Text className="text-body font-semibold text-text-primary mb-2">
@@ -895,7 +1041,7 @@ export default function SessionSummaryScreen() {
               ) : null}
             </View>
           </View>
-        ) : isPersistedSkipped ? (
+        ) : isPersistedSkipped && summaryText.length === 0 ? (
           <View className="mb-4" testID="summary-skipped-state">
             <Text className="text-body font-semibold text-text-primary mb-2">
               Your Words
@@ -911,6 +1057,17 @@ export default function SessionSummaryScreen() {
             <Text className="text-body font-semibold text-text-primary mb-2">
               Your Words
             </Text>
+            {isPersistedSkipped ? (
+              <View
+                className="bg-surface-elevated rounded-card p-3 mb-3"
+                testID="summary-resubmit-banner"
+              >
+                <Text className="text-body-sm text-text-secondary">
+                  You started a reflection but didn&apos;t submit it last time.
+                  Finish it below and submit to save your words.
+                </Text>
+              </View>
+            ) : null}
             <Text className="text-body-sm text-text-secondary mb-3">
               Write a short summary of what you learned. This helps you remember
               and helps me plan what comes next.
@@ -977,7 +1134,9 @@ export default function SessionSummaryScreen() {
             )}
 
             <Pressable
-              onPress={handleSubmit}
+              onPress={() => {
+                void handleSubmit();
+              }}
               disabled={
                 summaryText.trim().length < 10 || submitSummary.isPending
               }
