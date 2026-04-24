@@ -11,6 +11,11 @@ import {
 } from './types';
 import type { StopReason } from './stop-reason';
 import { sanitizeXmlValue } from './sanitize';
+import type { AgeBracket, ConversationLanguage } from '@eduagent/schemas';
+import type { LLMTier } from '../subscription';
+import { createLogger } from '../logger';
+
+const logger = createLogger();
 
 // ---------------------------------------------------------------------------
 // [LLM-TRUNCATE-01] llm.stop_reason metric emission (Phase 1 Task 3)
@@ -77,11 +82,6 @@ function normalizeStreamResult(
     Promise.resolve<StopReason>('unknown')
   );
 }
-import type { AgeBracket, ConversationLanguage } from '@eduagent/schemas';
-import type { LLMTier } from '../subscription';
-import { createLogger } from '../logger';
-
-const logger = createLogger();
 
 // ---------------------------------------------------------------------------
 // Content safety preamble — age-aware identity framing + personalization.

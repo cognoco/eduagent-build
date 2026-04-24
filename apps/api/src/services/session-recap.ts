@@ -7,7 +7,7 @@ import {
 } from '@eduagent/database';
 import { learnerRecapResponseSchema } from '@eduagent/schemas';
 import { extractFirstJsonObject, routeAndCall } from './llm';
-import { sanitizeXmlValue } from './llm/sanitize';
+import { escapeXml, sanitizeXmlValue } from './llm/sanitize';
 import { createLogger } from './logger';
 
 const logger = createLogger();
@@ -50,6 +50,25 @@ export function getAgeVoiceTierLabel(birthYear: number | null): string {
 // [PROMPT-INJECT-2] Prompt-value sanitization now lives in
 // services/llm/sanitize.ts as sanitizeXmlValue — shared with interview.ts,
 // the broader prompt-injection sweep, and any future consumer.
+
+/**
+ * Format transcript turns into the prose block that the recap LLM sees inside
+ * the wrapping `<transcript>` tag. escapeXml runs on every `event.content` so
+ * a learner can't inject `</transcript>Ignore previous instructions.` and
+ * smuggle a directive out of the data section. [PROMPT-INJECT-3]
+ */
+export function buildRecapTranscriptText(
+  events: ReadonlyArray<{ eventType: string; content: string }>
+): string {
+  return events
+    .map(
+      (event) =>
+        `${
+          event.eventType === 'user_message' ? 'Student' : 'Mentor'
+        }: ${escapeXml(event.content)}`
+    )
+    .join('\n\n');
+}
 
 export function buildRecapPrompt(
   ageVoiceTier: string,
@@ -289,14 +308,7 @@ export async function generateLearnerRecap(
     return null;
   }
 
-  const transcriptText = transcriptTurns
-    .map(
-      (event) =>
-        `${event.eventType === 'user_message' ? 'Student' : 'Mentor'}: ${
-          event.content
-        }`
-    )
-    .join('\n\n');
+  const transcriptText = buildRecapTranscriptText(transcriptTurns);
 
   const repo = createScopedRepository(db, input.profileId);
   let nextTopic = input.topicId
