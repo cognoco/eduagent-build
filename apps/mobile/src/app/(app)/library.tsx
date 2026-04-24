@@ -288,13 +288,16 @@ export default function LibraryScreen() {
     [retentionQueries]
   );
 
+  // Badge uses allTopics.length (not totalTopicsAcrossBooks) so the count
+  // matches what the Topics tab actually renders — including orphan topics
+  // with a null bookId, which totalTopicsAcrossBooks excludes.
   const tabCounts = useMemo(
     () => ({
       shelves: subjectsQuery.data?.length ?? 0,
       books: enrichedBooks.length,
-      topics: totalTopicsAcrossBooks,
+      topics: allTopics.length,
     }),
-    [subjectsQuery.data?.length, enrichedBooks.length, totalTopicsAcrossBooks]
+    [subjectsQuery.data?.length, enrichedBooks.length, allTopics.length]
   );
 
   const handleRetry = (): void => {

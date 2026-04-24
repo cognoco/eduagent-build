@@ -35,6 +35,11 @@ const PUBLIC_PATHS = [
   '/v1/consent/respond',
   '/v1/consent-page',
   '/v1/__test/',
+  // Stripe post-checkout landing pages [UX-DE-M10] — must be reachable by
+  // anyone holding the redirect URL, including users who let their session
+  // lapse during checkout. Body contains only static HTML + deep links.
+  '/v1/billing/success',
+  '/v1/billing/cancel',
 ];
 
 function isPublicPath(path: string): boolean {
