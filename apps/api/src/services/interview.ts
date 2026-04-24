@@ -478,11 +478,22 @@ export async function streamInterviewExchange(
           flow: 'streamInterviewExchange',
         })
       : undefined;
-    const { cleanResponse, readyToFinish } = interpretInterviewResponse({
-      rawResponse,
-      profileId: options?.profileId,
-      flow: 'streamInterviewExchange',
-    });
+
+    // Reuse the already-parsed envelope from classifyExchangeOutcome when the
+    // guard is enabled so parseEnvelope runs once per response, not twice.
+    // Fall back to interpretInterviewResponse only when the guard is disabled
+    // (its warn-log + raw-text fallback path has no equivalent on the outcome
+    // side and is still the right behavior for the legacy non-guarded flow).
+    const { cleanResponse, readyToFinish } = outcome
+      ? {
+          cleanResponse: outcome.parsed.cleanResponse,
+          readyToFinish: outcome.parsed.readyToFinish,
+        }
+      : interpretInterviewResponse({
+          rawResponse,
+          profileId: options?.profileId,
+          flow: 'streamInterviewExchange',
+        });
 
     if (outcome?.fallback) {
       await emitInterviewFallbackEvent({

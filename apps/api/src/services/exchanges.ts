@@ -388,6 +388,13 @@ export interface ParsedExchangeEnvelope {
   fluencyDrill: FluencyDrillAnnotation | null;
   /** F6: LLM self-reported confidence level. Absent means treat as 'medium'. */
   confidence?: 'low' | 'medium' | 'high';
+  /**
+   * Interview-specific: LLM signalled readiness to close the interview.
+   * False for non-interview flows and for every fallback-shaped parse result.
+   * Surfaced here so callers that already hold a `ClassifiedExchangeOutcome`
+   * don't have to re-parse the envelope a second time.
+   */
+  readyToFinish: boolean;
 }
 
 // ExchangeFallback + ExchangeFallbackReason are imported from
@@ -452,6 +459,7 @@ export function parseExchangeEnvelope(
       notePrompt: false,
       notePromptPostSession: false,
       fluencyDrill: null,
+      readyToFinish: false,
     };
   }
 
@@ -500,6 +508,7 @@ function envelopeToParsedExchange(
     notePromptPostSession: notePrompt?.post_session === true,
     fluencyDrill,
     confidence: envelope.confidence,
+    readyToFinish: signals.ready_to_finish === true,
   };
 }
 
@@ -539,6 +548,7 @@ function parseHandledMarker(response: string): ParsedExchangeEnvelope {
     notePromptPostSession: false,
     fluencyDrill: null,
     confidence: undefined,
+    readyToFinish: false,
   };
   const jsonStr = extractFirstJsonObject(response);
   if (!jsonStr) return base;
@@ -665,6 +675,7 @@ export function classifyExchangeOutcome(
       notePromptPostSession: false,
       fluencyDrill: null,
       confidence: undefined,
+      readyToFinish: false,
     };
     return {
       parsed: emptyReplyParsed,
@@ -694,6 +705,7 @@ export function classifyExchangeOutcome(
     notePromptPostSession: false,
     fluencyDrill: null,
     confidence: undefined,
+    readyToFinish: false,
   };
 
   if (markerKey === null) {

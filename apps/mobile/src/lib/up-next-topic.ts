@@ -82,8 +82,11 @@ export function computeUpNextTopic<T extends UpNextTopic>(
     }
 
     const ratio = doneCount / totalCount;
-    const minSortOrder = Math.min(
-      ...chapterTopics.map((topic) => topic.sortOrder)
+    // Use reduce instead of Math.min(...spread): spreading a large chapter's
+    // sort-orders as call arguments risks a stack overflow on low-end devices.
+    const minSortOrder = chapterTopics.reduce(
+      (min, topic) => (topic.sortOrder < min ? topic.sortOrder : min),
+      Number.POSITIVE_INFINITY
     );
 
     if (
@@ -107,8 +110,9 @@ export function computeUpNextTopic<T extends UpNextTopic>(
   let earliestChapterSortOrder = Number.POSITIVE_INFINITY;
 
   for (const [key, chapterTopics] of byChapter.entries()) {
-    const minSortOrder = Math.min(
-      ...chapterTopics.map((topic) => topic.sortOrder)
+    const minSortOrder = chapterTopics.reduce(
+      (min, topic) => (topic.sortOrder < min ? topic.sortOrder : min),
+      Number.POSITIVE_INFINITY
     );
     if (minSortOrder < earliestChapterSortOrder) {
       earliestChapterSortOrder = minSortOrder;

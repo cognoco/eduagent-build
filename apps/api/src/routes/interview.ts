@@ -31,7 +31,11 @@ type InterviewRouteEnv = {
   Bindings: {
     DATABASE_URL: string;
     CLERK_JWKS_URL?: string;
-    EMPTY_REPLY_GUARD_ENABLED?: string;
+    // Mirrors the Zod enum in config.ts (z.enum(['true', 'false'])) so the
+    // binary contract is enforced at the type level too — Cloudflare provides
+    // the binding as a raw string, but env-validation middleware guarantees
+    // it's one of these two values at runtime.
+    EMPTY_REPLY_GUARD_ENABLED?: 'true' | 'false';
   };
   Variables: {
     user: AuthUser;

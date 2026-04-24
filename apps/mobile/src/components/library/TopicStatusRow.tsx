@@ -1,5 +1,6 @@
 import { Pressable, Text, View } from 'react-native';
 import { useThemeColors } from '../../lib/theme';
+import { withOpacity } from '../../lib/color-opacity';
 
 interface TopicStatusRowProps {
   state: 'continue-now' | 'started' | 'up-next' | 'done';
@@ -43,23 +44,26 @@ export function TopicStatusRow({
     colors.primarySoft ??
     'transparent';
 
+  // Opacity byte suffixes used to resolve to 0x10 (6%) and 0x40 (25%). Kept
+  // numeric here so withOpacity works for non-hex theme tokens (oklch, rgb,
+  // named) without producing an invalid CSS color.
   const containerStyle = (() => {
     switch (state) {
       case 'continue-now':
         return {
-          backgroundColor: `${colors.primary}10`,
-          borderColor: `${colors.primary}40`,
+          backgroundColor: withOpacity(colors.primary, 0.0625),
+          borderColor: withOpacity(colors.primary, 0.25),
           borderWidth: 1,
         };
       case 'started':
         return {
-          backgroundColor: `${colors.textSecondary}10`,
-          borderColor: `${colors.textSecondary}30`,
+          backgroundColor: withOpacity(colors.textSecondary, 0.0625),
+          borderColor: withOpacity(colors.textSecondary, 0.1875),
           borderWidth: 1,
         };
       case 'up-next':
         return {
-          backgroundColor: `${accentColor}10`,
+          backgroundColor: withOpacity(accentColor, 0.0625),
           borderColor: accentColor,
           borderWidth: isHero ? 2 : 1,
           borderStyle: 'dashed' as const,
