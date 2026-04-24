@@ -28,7 +28,11 @@ import { notFound } from '../errors';
 import { captureException } from '../services/sentry';
 
 type InterviewRouteEnv = {
-  Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
+  Bindings: {
+    DATABASE_URL: string;
+    CLERK_JWKS_URL?: string;
+    EMPTY_REPLY_GUARD_ENABLED?: string;
+  };
   Variables: {
     user: AuthUser;
     db: Database;
@@ -164,9 +168,7 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
           exchangeCount,
           profileId,
           learnerName,
-          emptyReplyGuardEnabled:
-            (c.env as Record<string, string | undefined>)
-              .EMPTY_REPLY_GUARD_ENABLED !== 'false',
+          emptyReplyGuardEnabled: c.env.EMPTY_REPLY_GUARD_ENABLED !== 'false',
         });
         stream = streamResult.stream;
         onComplete = streamResult.onComplete;

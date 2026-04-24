@@ -23,6 +23,7 @@ import {
   type VerificationType,
   type ExchangeFallback,
   type ExchangeFallbackReason,
+  type LlmResponseEnvelope,
 } from '@eduagent/schemas';
 import type { LLMTier } from './subscription';
 import {
@@ -417,6 +418,12 @@ const HANDLED_MARKER_KEYS: ReadonlySet<string> = new Set([
 
 const DEFAULT_FALLBACK_TEXT = "I didn't have a reply — tap to try again.";
 
+// Shared bounds for fluency-drill duration, used by both the full-envelope
+// and bare-marker code paths so the clamp definition can't drift.
+function clampDrillDuration(seconds: number): number {
+  return Math.min(90, Math.max(15, seconds));
+}
+
 /**
  * Parse the full envelope from a (non-streaming or accumulated-stream) LLM
  * response and normalise signals + ui_hints into the flat structure exchange
@@ -448,7 +455,15 @@ export function parseExchangeEnvelope(
     };
   }
 
-  const { envelope } = parsed;
+  return envelopeToParsedExchange(parsed.envelope);
+}
+
+// Map an already-parsed (Zod-validated) envelope into the flat exchange shape.
+// Split out so callers that already hold a `LlmResponseEnvelope` (e.g.
+// classifyExchangeOutcome) don't re-run `parseEnvelope` on the raw response.
+function envelopeToParsedExchange(
+  envelope: LlmResponseEnvelope
+): ParsedExchangeEnvelope {
   const signals = envelope.signals ?? {};
   const uiHints = envelope.ui_hints ?? {};
   const cleanReply = envelope.reply.trim();
@@ -460,7 +475,7 @@ export function parseExchangeEnvelope(
         active: Boolean(drill.active),
         durationSeconds:
           typeof drill.duration_s === 'number'
-            ? Math.min(90, Math.max(15, drill.duration_s))
+            ? clampDrillDuration(drill.duration_s)
             : undefined,
         score:
           drill.score &&
@@ -549,7 +564,7 @@ function parseHandledMarker(response: string): ParsedExchangeEnvelope {
       active: drillObj['active'] === true,
       durationSeconds:
         typeof drillObj['duration_s'] === 'number'
-          ? Math.min(90, Math.max(15, drillObj['duration_s'] as number))
+          ? clampDrillDuration(drillObj['duration_s'] as number)
           : undefined,
       score:
         drillObj['score'] &&
@@ -615,8 +630,10 @@ export function classifyExchangeOutcome(
   const envelopeResult = parseEnvelope(rawResponse);
 
   // Normal envelope path — parsed cleanly; classify empty reply here.
+  // Pass the already-validated envelope to envelopeToParsedExchange so we
+  // don't redo the Zod validation a second time.
   if (envelopeResult.ok) {
-    const parsed = parseExchangeEnvelope(rawResponse, context);
+    const parsed = envelopeToParsedExchange(envelopeResult.envelope);
     if (parsed.cleanResponse.trim() === '') {
       return {
         parsed,
