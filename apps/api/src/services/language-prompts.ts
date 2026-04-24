@@ -1,4 +1,5 @@
 import { getLanguageByCode } from '../data/languages';
+import { sanitizeXmlValue } from './llm/sanitize';
 import type { ExchangeContext } from './exchanges';
 
 function formatKnownVocabulary(knownVocabulary: string[] | undefined): string {
@@ -6,9 +7,15 @@ function formatKnownVocabulary(knownVocabulary: string[] | undefined): string {
     return 'Known vocabulary list is not available yet. Start slightly easier and introduce new language gently.';
   }
 
-  return `Known vocabulary examples: ${knownVocabulary
+  // [PROMPT-INJECT-6] Vocabulary entries are stored LLM output. Sanitize each
+  // before joining so a crafted word cannot inject newlines/directives into
+  // the prompt.
+  const safe = knownVocabulary
     .slice(0, 60)
-    .join(', ')}. Prefer these when creating input passages and drills.`;
+    .map((v) => sanitizeXmlValue(v, 80))
+    .filter((v) => v.length > 0)
+    .join(', ');
+  return `Known vocabulary examples: ${safe}. Prefer these when creating input passages and drills.`;
 }
 
 export function buildFourStrandsPrompt(context: ExchangeContext): string[] {
@@ -16,17 +23,26 @@ export function buildFourStrandsPrompt(context: ExchangeContext): string[] {
     context.languageCode != null
       ? getLanguageByCode(context.languageCode)
       : null;
-  const targetLanguageName = language?.names[0] ?? context.subjectName;
+  // [PROMPT-INJECT-6] targetLanguageName falls back to subjectName (learner-
+  // owned) when the language registry has no hit. Sanitize so a crafted
+  // subject name cannot inject directives into this section.
+  const safeTargetLanguageName = sanitizeXmlValue(
+    language?.names[0] ?? context.subjectName,
+    120
+  );
+  const safeNativeLanguage = context.nativeLanguage
+    ? sanitizeXmlValue(context.nativeLanguage, 80)
+    : '';
 
   return [
-    `Role: You are a direct language teacher for ${targetLanguageName}. Do not use the default Socratic ladder for this session.`,
+    `Role: You are a direct language teacher for ${safeTargetLanguageName}. Do not use the default Socratic ladder for this session.`,
     [
       'Language pedagogy: Nation Four Strands.',
       '- Balance meaning-focused input, meaning-focused output, language-focused learning, and fluency development.',
       '- Teach directly. Correct errors clearly and immediately.',
       `- Explain grammar using the learner's native language when helpful${
-        context.nativeLanguage
-          ? ` (native language: <native_language>${context.nativeLanguage}</native_language>)`
+        safeNativeLanguage
+          ? ` (native language: <native_language>${safeNativeLanguage}</native_language>)`
           : ''
       }.`,
       '- Keep examples in the target language, but make explanations comprehensible.',

@@ -33,6 +33,7 @@ import {
   shouldApplyDifficultyBump,
 } from '../services/quiz';
 import { recordSessionActivity } from '../services/streaks';
+import { captureException } from '../services/sentry';
 
 type QuizRouteEnv = {
   Bindings: {
@@ -376,7 +377,15 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
       // should see their results without waiting for the streak write round-trip.
       const today = new Date().toISOString().slice(0, 10);
       recordSessionActivity(db, profileId, today).catch((err) => {
-        console.warn('[quiz] streak recording failed, non-blocking:', err);
+        captureException(err, {
+          profileId,
+          extra: {
+            route: 'quiz/rounds/:id/complete',
+            phase: 'streak_recording',
+            roundId,
+            date: today,
+          },
+        });
       });
 
       return c.json(result, 200);

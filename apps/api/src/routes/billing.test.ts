@@ -907,4 +907,41 @@ describe('billing routes', () => {
       expect(res.status).toBe(404);
     });
   });
+
+  // -------------------------------------------------------------------------
+  // Post-checkout landing pages [UX-DE-M10]
+  // Public HTML pages Stripe redirects to after checkout. These are
+  // high-visibility if they break (paying users land on a 500 page) so the
+  // tests lock in the contract: 200 OK, HTML content-type, mobile deep link,
+  // and brand color interpolation rendered (not the raw template literal).
+  // -------------------------------------------------------------------------
+
+  describe('GET /billing/success', () => {
+    it('returns 200 with HTML, deep link, and interpolated brand color', async () => {
+      const res = await app.request('/v1/billing/success', {}, TEST_ENV);
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get('content-type')).toMatch(/text\/html/);
+
+      const body = await res.text();
+      expect(body).toContain('mentomate://home');
+      expect(body).toContain('Subscription confirmed');
+      // Brand colour must be interpolated, not appear as a raw placeholder.
+      expect(body).not.toContain('${BRAND_COLOR_PRIMARY}');
+      expect(body).toMatch(/background:\s*#[0-9a-f]{6}/i);
+    });
+  });
+
+  describe('GET /billing/cancel', () => {
+    it('returns 200 with HTML and mobile deep link', async () => {
+      const res = await app.request('/v1/billing/cancel', {}, TEST_ENV);
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get('content-type')).toMatch(/text\/html/);
+
+      const body = await res.text();
+      expect(body).toContain('mentomate://home');
+      expect(body).not.toContain('${BRAND_COLOR_PRIMARY}');
+    });
+  });
 });

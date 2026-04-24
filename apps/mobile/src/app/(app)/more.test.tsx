@@ -294,6 +294,22 @@ describe('MoreScreen — Account Actions', () => {
     });
   });
 
+  it('[UX-DE-L4] does not show an error alert when share sheet is dismissed', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(jest.fn());
+    jest.spyOn(Share, 'share').mockResolvedValue({
+      action: 'dismissedAction',
+    } as never);
+
+    render(<MoreScreen />, { wrapper: createWrapper() });
+
+    fireEvent.press(screen.getByText('Export my data'));
+
+    await waitFor(() => {
+      expect(mockExportMutateAsync).toHaveBeenCalledTimes(1);
+    });
+    expect(alertSpy).not.toHaveBeenCalled();
+  });
+
   it('opens a support email when Help & Support is pressed', async () => {
     const openUrlSpy = jest
       .spyOn(Linking, 'openURL')

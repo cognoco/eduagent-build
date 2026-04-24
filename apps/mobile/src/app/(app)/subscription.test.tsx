@@ -168,6 +168,7 @@ jest.mock('react-native-purchases', () => ({
   default: {},
   PURCHASES_ERROR_CODE: {
     PURCHASE_CANCELLED_ERROR: '1',
+    PRODUCT_ALREADY_PURCHASED_ERROR: '6',
     NETWORK_ERROR: '10',
     OFFLINE_CONNECTION_ERROR: '35',
     UNKNOWN_ERROR: '0',
@@ -501,19 +502,28 @@ describe('SubscriptionScreen', () => {
         purchaseDate: '2026-03-01',
       },
     });
+    // PR-FIX-07: handlePurchase polls the subscription endpoint until the
+    // webhook promotes the tier away from 'free'. Return an upgraded tier
+    // on the first poll so the loop breaks and the success alert fires.
+    mockSubscriptionGet.mockResolvedValue({
+      json: async () => ({ subscription: { tier: 'plus' } }),
+    });
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
     fireEvent.press(screen.getByTestId('package-option-$rc_monthly'));
 
-    await waitFor(() => {
-      expect(mockMutateAsyncPurchase).toHaveBeenCalledWith(monthlyPkg);
-    });
-    expect(mockRefetchSub).toHaveBeenCalled();
-    expect(mockRefetchUsage).toHaveBeenCalled();
-    expect(Alert.alert).toHaveBeenCalledWith(
-      'Success',
-      'Your subscription is now active!'
+    await waitFor(
+      () => {
+        expect(mockMutateAsyncPurchase).toHaveBeenCalledWith(monthlyPkg);
+        expect(mockRefetchSub).toHaveBeenCalled();
+        expect(mockRefetchUsage).toHaveBeenCalled();
+        expect(Alert.alert).toHaveBeenCalledWith(
+          'Success',
+          'Your subscription is now active!'
+        );
+      },
+      { timeout: 5000 }
     );
   });
 
@@ -564,6 +574,36 @@ describe('SubscriptionScreen', () => {
       expect(Alert.alert).toHaveBeenCalledWith(
         'Network error',
         'Please check your internet connection and try again.'
+      );
+    });
+  });
+
+  it('[UX-DE-M8] shows "Already purchased" alert with Restore action on PRODUCT_ALREADY_PURCHASED_ERROR', async () => {
+    const monthlyPkg = makeMockPackage();
+    mockOfferings = makeMockOfferings([monthlyPkg]);
+
+    const alreadyPurchasedError = {
+      code: '6', // PRODUCT_ALREADY_PURCHASED_ERROR
+      message: 'Product already purchased',
+      readableErrorCode: 'PRODUCT_ALREADY_PURCHASED_ERROR',
+      userInfo: { readableErrorCode: 'PRODUCT_ALREADY_PURCHASED_ERROR' },
+      underlyingErrorMessage: '',
+      userCancelled: false,
+    };
+    mockMutateAsyncPurchase.mockRejectedValue(alreadyPurchasedError);
+
+    render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+    fireEvent.press(screen.getByTestId('package-option-$rc_monthly'));
+
+    await waitFor(() => {
+      expect(mockPlatformAlert).toHaveBeenCalledWith(
+        'Already purchased',
+        expect.stringContaining('already own this subscription'),
+        expect.arrayContaining([
+          expect.objectContaining({ text: 'Restore purchases' }),
+          expect.objectContaining({ text: 'Cancel' }),
+        ])
       );
     });
   });

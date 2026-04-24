@@ -55,6 +55,7 @@ export default function CameraScreen(): React.ReactNode {
 
   const [ocrText, setOcrText] = useState('');
   const [draftProblems, setDraftProblems] = useState<HomeworkProblem[]>([]);
+  const [droppedProblems, setDroppedProblems] = useState<HomeworkProblem[]>([]);
   const [manualText, setManualText] = useState('');
   const [flash, setFlash] = useState<FlashMode>('off');
   const [showCelebration, setShowCelebration] = useState(true);
@@ -86,6 +87,7 @@ export default function CameraScreen(): React.ReactNode {
       dispatch({ type: 'RESET', hasPermission: permission?.granted ?? false });
       setOcrText('');
       setDraftProblems([]);
+      setDroppedProblems([]);
       setManualText('');
       setManualSubjectName('');
       setShowCelebration(true);
@@ -118,11 +120,14 @@ export default function CameraScreen(): React.ReactNode {
   // Sync OCR hook status into reducer
   useEffect(() => {
     if (ocr.status === 'done' && ocr.text) {
+      const splitResult = splitHomeworkProblems(ocr.text);
       dispatch({ type: 'OCR_SUCCESS', text: ocr.text });
       setOcrText(ocr.text);
-      setDraftProblems(splitHomeworkProblems(ocr.text));
+      setDraftProblems(splitResult.problems);
+      setDroppedProblems(splitResult.droppedProblems);
     } else if (ocr.status === 'error' && ocr.error) {
       dispatch({ type: 'OCR_ERROR', message: ocr.error });
+      setDroppedProblems([]);
     }
   }, [ocr.status, ocr.text, ocr.error]);
 
@@ -145,11 +150,13 @@ export default function CameraScreen(): React.ReactNode {
           text: combinedProblemText,
         });
         if (!result.needsConfirmation && result.candidates.length === 1) {
-          const c = result.candidates[0]!;
-          setAutoDetectedSubject({
-            subjectId: c.subjectId,
-            subjectName: c.subjectName,
-          });
+          const candidate = result.candidates[0];
+          if (candidate) {
+            setAutoDetectedSubject({
+              subjectId: candidate.subjectId,
+              subjectName: candidate.subjectName,
+            });
+          }
         } else if (
           result.suggestedSubjectName &&
           result.candidates.length === 0
@@ -271,6 +278,15 @@ export default function CameraScreen(): React.ReactNode {
   }, [state.imageUri, ocr]);
 
   const handleRetake = useCallback(() => {
+    setOcrText('');
+    setDraftProblems([]);
+    setDroppedProblems([]);
+    setManualText('');
+    setManualSubjectName('');
+    setAutoDetectedSubject(null);
+    setShowSubjectPicker(false);
+    setShowCelebration(true);
+    classifyTriggeredRef.current = false;
     dispatch({ type: 'RETAKE' });
   }, []);
 
@@ -309,20 +325,22 @@ export default function CameraScreen(): React.ReactNode {
           serialized.length > MAX_PARAM_LENGTH &&
           truncatedProblems.length === 1
         ) {
-          const problem = truncatedProblems[0]!;
-          const maxTextLen =
-            problem.text.length - (serialized.length - MAX_PARAM_LENGTH) - 30;
-          const wordBoundary = problem.text.lastIndexOf(
-            ' ',
-            Math.max(0, maxTextLen)
-          );
-          const truncatedText =
-            problem.text.slice(
-              0,
-              wordBoundary > 0 ? wordBoundary : maxTextLen
-            ) + ' [truncated]';
-          truncatedProblems = [{ ...problem, text: truncatedText }];
-          serialized = serializeHomeworkProblems(truncatedProblems);
+          const problem = truncatedProblems[0];
+          if (problem) {
+            const maxTextLen =
+              problem.text.length - (serialized.length - MAX_PARAM_LENGTH) - 30;
+            const wordBoundary = problem.text.lastIndexOf(
+              ' ',
+              Math.max(0, maxTextLen)
+            );
+            const truncatedText =
+              problem.text.slice(
+                0,
+                wordBoundary > 0 ? wordBoundary : maxTextLen
+              ) + ' [truncated]';
+            truncatedProblems = [{ ...problem, text: truncatedText }];
+            serialized = serializeHomeworkProblems(truncatedProblems);
+          }
         }
         homeworkProblemsParam = serialized;
       }
@@ -344,7 +362,7 @@ export default function CameraScreen(): React.ReactNode {
         },
       } as never);
     },
-    [router]
+    [imageMimeType, router]
   );
 
   const handleConfirmResult = useCallback(() => {
@@ -474,15 +492,18 @@ export default function CameraScreen(): React.ReactNode {
     try {
       const result = await classifyMutation.mutateAsync({ text: manualText });
       if (!result.needsConfirmation && result.candidates.length === 1) {
-        navigateToSession(
-          result.candidates[0]!.subjectId,
-          result.candidates[0]!.subjectName,
-          manualText,
-          undefined,
-          undefined,
-          undefined,
-          homeworkCaptureSource
-        );
+        const candidate = result.candidates[0];
+        if (candidate) {
+          navigateToSession(
+            candidate.subjectId,
+            candidate.subjectName,
+            manualText,
+            undefined,
+            undefined,
+            undefined,
+            homeworkCaptureSource
+          );
+        }
       } else {
         // Multiple candidates or low confidence — show picker
         setShowSubjectPicker(true);
@@ -549,6 +570,12 @@ export default function CameraScreen(): React.ReactNode {
       createHomeworkProblem('', { source: 'manual', originalText: null }),
     ]);
   }, []);
+
+  const handleRestoreDroppedProblems = useCallback(() => {
+    if (droppedProblems.length === 0) return;
+    setDraftProblems((prev) => [...prev, ...droppedProblems]);
+    setDroppedProblems([]);
+  }, [droppedProblems]);
 
   const handleRemoveProblem = useCallback((problemId: string) => {
     setDraftProblems((prev) =>
@@ -826,6 +853,22 @@ export default function CameraScreen(): React.ReactNode {
           Here are the problems I found:
         </Text>
 
+        {droppedProblems.length > 0 && (
+          <Pressable
+            testID="dropped-fragments-chip"
+            onPress={handleRestoreDroppedProblems}
+            className="mb-3 rounded-button bg-surface px-4 py-3"
+            accessibilityLabel="Add skipped fragments back"
+            accessibilityRole="button"
+          >
+            <Text className="text-body-sm font-medium text-text-primary">
+              We skipped {droppedProblems.length} unclear fragment
+              {droppedProblems.length === 1 ? '' : 's'}. Tap to add{' '}
+              {droppedProblems.length === 1 ? 'it' : 'them'} back.
+            </Text>
+          </Pressable>
+        )}
+
         <View className="gap-3">
           {draftProblems.map((problem, index) => (
             <View
@@ -879,6 +922,45 @@ export default function CameraScreen(): React.ReactNode {
             Add another problem
           </Text>
         </Pressable>
+
+        {/* M10: Classification done but no subject resolved and picker not shown */}
+        {needsSubjectPick &&
+          !classifyMutation.isPending &&
+          !autoDetectedSubject &&
+          !showSubjectPicker &&
+          classifyMutation.isSuccess && (
+            <View
+              className="mt-4 rounded-card bg-surface p-4"
+              testID="classify-fallback"
+            >
+              <Text className="text-body-sm text-text-secondary mb-3">
+                We couldn&apos;t automatically identify the subject. Would you
+                like to select it manually or retake the photo?
+              </Text>
+              <Pressable
+                onPress={() => setShowSubjectPicker(true)}
+                className="bg-primary rounded-button py-3 mb-2 min-h-[48px] items-center justify-center"
+                accessibilityLabel="Type subject manually"
+                accessibilityRole="button"
+                testID="classify-fallback-type-subject"
+              >
+                <Text className="text-body font-semibold text-text-inverse">
+                  Type subject manually
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={handleRetake}
+                className="bg-surface-elevated rounded-button py-3 min-h-[48px] items-center justify-center"
+                accessibilityLabel="Retake photo"
+                accessibilityRole="button"
+                testID="classify-fallback-retake"
+              >
+                <Text className="text-body font-semibold text-text-primary">
+                  Retake
+                </Text>
+              </Pressable>
+            </View>
+          )}
 
         {/* Subject auto-detection loading indicator */}
         {needsSubjectPick && classifyMutation.isPending && (
@@ -1107,6 +1189,9 @@ export default function CameraScreen(): React.ReactNode {
   // ---- Error phase ----
   if (state.phase === 'error') {
     const showManualFallback = ocr.failCount >= 1;
+    const errorMessage =
+      state.errorMessage ??
+      "We couldn't read that clearly. Try taking the photo again with better lighting.";
 
     return (
       <View
@@ -1125,10 +1210,7 @@ export default function CameraScreen(): React.ReactNode {
 
         <View className="flex-1 justify-center">
           <Text className="text-h3 font-semibold text-text-primary text-center mb-2">
-            {showManualFallback
-              ? "Hmm, I'm having trouble reading that"
-              : state.errorMessage ??
-                "We couldn't read that clearly. Try taking the photo again with better lighting."}
+            {errorMessage}
           </Text>
 
           {showManualFallback ? (
@@ -1208,30 +1290,44 @@ export default function CameraScreen(): React.ReactNode {
               </View>
             </View>
           ) : (
-            <View className="flex-row gap-4 mt-6">
+            <>
+              <View className="flex-row gap-4 mt-6">
+                <Pressable
+                  testID="retake-button"
+                  onPress={handleRetake}
+                  className="flex-1 bg-surface rounded-button py-4 min-h-[48px] items-center justify-center"
+                  accessibilityLabel="Retake photo"
+                  accessibilityRole="button"
+                >
+                  <Text className="text-body font-semibold text-text-primary">
+                    Retake
+                  </Text>
+                </Pressable>
+                <Pressable
+                  testID="retry-button"
+                  onPress={handleRetryOcr}
+                  className="flex-1 bg-primary rounded-button py-4 min-h-[48px] items-center justify-center"
+                  accessibilityLabel="Try reading again"
+                  accessibilityRole="button"
+                >
+                  <Text className="text-body font-semibold text-text-inverse">
+                    Try again
+                  </Text>
+                </Pressable>
+              </View>
+              {/* L2: Provide Go Home escape on first OCR failure */}
               <Pressable
-                testID="retake-button"
-                onPress={handleRetake}
-                className="flex-1 bg-surface rounded-button py-4 min-h-[48px] items-center justify-center"
-                accessibilityLabel="Retake photo"
+                testID="go-home-button"
+                onPress={handleClose}
+                className="mt-3 py-3 min-h-[48px] items-center justify-center"
+                accessibilityLabel="Go home"
                 accessibilityRole="button"
               >
-                <Text className="text-body font-semibold text-text-primary">
-                  Retake
+                <Text className="text-body-sm font-semibold text-text-secondary">
+                  Go Home
                 </Text>
               </Pressable>
-              <Pressable
-                testID="retry-button"
-                onPress={handleRetryOcr}
-                className="flex-1 bg-primary rounded-button py-4 min-h-[48px] items-center justify-center"
-                accessibilityLabel="Try reading again"
-                accessibilityRole="button"
-              >
-                <Text className="text-body font-semibold text-text-inverse">
-                  Try again
-                </Text>
-              </Pressable>
-            </View>
+            </>
           )}
         </View>
       </View>

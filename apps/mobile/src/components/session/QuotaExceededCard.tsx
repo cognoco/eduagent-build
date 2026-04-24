@@ -75,13 +75,26 @@ export function QuotaExceededCard({
           </Text>
 
           <View
-            className="bg-surface-elevated rounded-button py-3 px-4 items-center"
+            className="bg-surface-elevated rounded-button py-3 px-4 items-center mb-2"
             testID="quota-ask-parent"
           >
             <Text className="text-body-sm text-text-secondary">
               Let your parent know to upgrade your plan
             </Text>
           </View>
+
+          {/* H5: Give child a navigation escape so they're not stuck in the locked session */}
+          <Pressable
+            onPress={() => router.push('/(app)/home' as never)}
+            className="bg-surface-elevated rounded-button py-3 items-center min-h-[44px] justify-center"
+            accessibilityRole="button"
+            accessibilityLabel="Go to home screen"
+            testID="quota-go-home-btn"
+          >
+            <Text className="text-body-sm font-semibold text-text-secondary">
+              Go home
+            </Text>
+          </Pressable>
         </>
       )}
     </View>

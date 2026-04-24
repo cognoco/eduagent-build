@@ -70,7 +70,7 @@ describe('SessionMessageActions stage gating', () => {
   it('still renders reconnect button regardless of stage', () => {
     const reconnectMessage: ChatMessage = {
       id: 'reconnect-1',
-      role: 'user',
+      role: 'assistant',
       content: 'Lost connection',
       kind: 'reconnect_prompt',
     };
@@ -82,6 +82,7 @@ describe('SessionMessageActions stage gating', () => {
       />
     );
     expect(queryByTestId('session-reconnect-reconnect-1')).toBeTruthy();
+    expect(queryByTestId('message-feedback-helpful-reconnect-1')).toBeNull();
   });
 
   it('still renders quota exceeded card regardless of stage', () => {

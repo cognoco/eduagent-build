@@ -55,7 +55,8 @@ describe('OpenAI Provider', () => {
       mockFetch.mockResolvedValueOnce(createOkResponse('Hello from GPT'));
 
       const result = await provider.chat(TEST_MESSAGES, TEST_CONFIG);
-      expect(result).toBe('Hello from GPT');
+      expect(result.content).toBe('Hello from GPT');
+      expect(result.stopReason).toBe('unknown');
 
       // Verify request structure
       const [url, opts] = mockFetch.mock.calls[0];

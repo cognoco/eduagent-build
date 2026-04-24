@@ -298,16 +298,20 @@ export function formatConsentRequestEmail(
 
 /**
  * Formats a consent reminder email for a parent who hasn't responded yet.
+ *
+ * @param tokenUrl - Direct consent page URL so the parent can act immediately.
+ *   Must be provided — every reminder must include an actionable link [UX-DE-H9].
  */
 export function formatConsentReminderEmail(
   parentEmail: string,
   childName: string,
-  daysRemaining: number
+  daysRemaining: number,
+  tokenUrl: string
 ): EmailPayload {
   return {
     to: parentEmail,
     subject: `Reminder: Consent pending for ${childName}'s MentoMate account`,
-    body: `We're still waiting for your consent for ${childName}'s MentoMate account. You have ${daysRemaining} days remaining to respond before the account is automatically removed.`,
+    body: `We're still waiting for your consent for ${childName}'s MentoMate account. You have ${daysRemaining} days remaining to respond before the account is automatically removed.\n\nClick here to approve or deny: ${tokenUrl}`,
     type: 'consent_reminder',
   };
 }

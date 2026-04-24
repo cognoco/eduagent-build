@@ -46,5 +46,8 @@ export * from './quiz-utils.ts';
 // LLM Response Envelope (shared contract for all structured-output LLM flows)
 export * from './llm-envelope.ts';
 
+// Stream fallback contract — SSE frame + typed reasons shared with mobile
+export * from './stream-fallback.ts';
+
 // Feedback (in-app feedback + shake-to-report)
 export * from './feedback.ts';

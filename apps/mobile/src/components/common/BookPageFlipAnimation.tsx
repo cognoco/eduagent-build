@@ -16,7 +16,7 @@ import Animated, {
 import Svg, { Rect, Line, Path } from 'react-native-svg';
 
 interface BookPageFlipAnimationProps {
-  /** Overall size in pixels (default: 120) */
+  /** Overall size in pixels (default: 140) */
   size?: number;
   /** Cover color (default: brand violet #8b5cf6) */
   color?: string;
@@ -56,13 +56,13 @@ const TURN_TEXT_LINES_Y = [10, 18, 26, 34, 42, 50, 58];
  * 120px: adds sparkles, ribbon, decorative cover border
  */
 export function BookPageFlipAnimation({
-  size = 120,
+  size = 140,
   color = '#8b5cf6',
   testID,
 }: BookPageFlipAnimationProps): ReactNode {
   const reduceMotion = useReducedMotion();
   const isDark = useColorScheme() === 'dark';
-  const showEnhanced = size >= 100;
+  const showEnhanced = size >= 80;
 
   const paperFill = isDark ? PAPER_DARK : PAPER_LIGHT;
   const lineColor = isDark ? LINE_DARK : LINE_LIGHT;
@@ -185,10 +185,10 @@ export function BookPageFlipAnimation({
   const dotSize = Math.max(4, size * 0.05);
 
   // --- Animated styles ---
+  // Stronger perspective (size * 2 vs * 4) gives a more dramatic 3D arc.
   function usePageStyle(sv: SharedValue<number>) {
     return useAnimatedStyle(() => ({
-      transform: [{ perspective: size * 4 }, { rotateY: `${sv.value}deg` }],
-      transformOrigin: ['0%', '50%', 0],
+      transform: [{ perspective: size * 2 }, { rotateY: `${sv.value}deg` }],
     }));
   }
 
@@ -331,7 +331,10 @@ export function BookPageFlipAnimation({
         )}
       </Svg>
 
-      {/* Turning page 1 — rotateY around the spine edge */}
+      {/* Turning page 1 — rotateY around the spine edge.
+          transformOrigin in static style (reliable on Fabric/Android).
+          No backfaceVisibility — text lines are horizontal so a mirrored
+          back face still reads as "a page," making the full 3D arc visible. */}
       {!reduceMotion && (
         <Animated.View
           style={[
@@ -341,7 +344,7 @@ export function BookPageFlipAnimation({
               top: turnPageTop,
               width: turnPageW,
               height: turnPageH,
-              backfaceVisibility: 'hidden',
+              transformOrigin: 'left center',
             },
             page1Style,
             { pointerEvents: 'none' },
@@ -375,7 +378,7 @@ export function BookPageFlipAnimation({
               top: turnPageTop,
               width: turnPageW,
               height: turnPageH,
-              backfaceVisibility: 'hidden',
+              transformOrigin: 'left center',
             },
             page2Style,
             { pointerEvents: 'none' },

@@ -7,6 +7,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useAuth } from '@clerk/clerk-expo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useDeleteAccount, useCancelDeletion } from '../hooks/use-account';
 import { useThemeColors } from '../lib/theme';
@@ -18,6 +19,7 @@ export default function DeleteAccountScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const colors = useThemeColors();
+  const { signOut } = useAuth();
   const deleteAccount = useDeleteAccount();
   const cancelDeletion = useCancelDeletion();
 
@@ -113,10 +115,13 @@ export default function DeleteAccountScreen() {
             <Text className="text-body text-text-primary mb-2">
               Your account is scheduled for deletion.
             </Text>
-            <Text className="text-body text-text-secondary mb-6">
+            <Text className="text-body text-text-secondary mb-2">
               All your data will be permanently removed on{' '}
               <Text className="font-semibold">{formattedDate}</Text>. You can
               cancel anytime before then.
+            </Text>
+            <Text className="text-body-sm text-text-tertiary mb-6">
+              Your account remains active until the grace period ends.
             </Text>
             <Pressable
               onPress={onCancel}
@@ -133,6 +138,25 @@ export default function DeleteAccountScreen() {
                   I changed my mind — keep my account
                 </Text>
               )}
+            </Pressable>
+            <Pressable
+              onPress={() =>
+                // UX-DE-H2: surface signOut failure
+                void signOut().catch(() => {
+                  platformAlert(
+                    'Sign out failed',
+                    'Please close and reopen the app, then sign in again.'
+                  );
+                })
+              }
+              className="bg-surface rounded-button py-3.5 items-center mb-3"
+              testID="delete-account-sign-out"
+              accessibilityRole="button"
+              accessibilityLabel="Sign out now"
+            >
+              <Text className="text-body font-semibold text-text-primary">
+                Sign out now
+              </Text>
             </Pressable>
             <Pressable
               onPress={handleClose}
@@ -153,8 +177,8 @@ export default function DeleteAccountScreen() {
               including profiles, learning progress, and consent records.
             </Text>
             <Text className="text-body text-text-secondary mb-6">
-              You'll have a 7-day grace period to change your mind. After that,
-              your data cannot be recovered.
+              You&apos;ll have a 7-day grace period to change your mind. After
+              that, your data cannot be recovered.
             </Text>
 
             <Pressable

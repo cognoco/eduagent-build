@@ -5,6 +5,7 @@ export default function ChildDetailLayout() {
   const colors = useThemeColors();
   return (
     <Stack
+      initialRouteName="index"
       screenOptions={{
         headerShown: false,
         contentStyle: { backgroundColor: colors.background },

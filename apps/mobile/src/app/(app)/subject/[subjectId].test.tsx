@@ -134,7 +134,11 @@ describe('SubjectSettingsScreen', () => {
     render(<SubjectSettingsScreen />, { wrapper: createWrapper() });
 
     fireEvent.press(screen.getByTestId('analogy-domain-sports'));
-    expect(mockUpdateAnalogyDomain).toHaveBeenCalledWith('sports');
+    // UX-DE-L9: mutate now includes onError to surface failures
+    expect(mockUpdateAnalogyDomain).toHaveBeenCalledWith(
+      'sports',
+      expect.objectContaining({ onError: expect.any(Function) })
+    );
   });
 
   it('calls updateAnalogyDomain with null when "No preference" pressed', () => {
@@ -143,7 +147,10 @@ describe('SubjectSettingsScreen', () => {
     render(<SubjectSettingsScreen />, { wrapper: createWrapper() });
 
     fireEvent.press(screen.getByTestId('analogy-domain-none'));
-    expect(mockUpdateAnalogyDomain).toHaveBeenCalledWith(null);
+    expect(mockUpdateAnalogyDomain).toHaveBeenCalledWith(
+      null,
+      expect.objectContaining({ onError: expect.any(Function) })
+    );
   });
 
   it('shows loading state when data is loading', () => {

@@ -3,6 +3,8 @@
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
+import { sanitizeXmlValue } from './llm/sanitize';
+
 export interface StrikeState {
   conceptId: string;
   wrongCount: number;
@@ -99,8 +101,14 @@ export function getDirectInstructionPrompt(
   topicTitle: string,
   concept: string
 ): string {
+  // [PROMPT-INJECT-9] topicTitle and concept are stored curriculum content
+  // but they reach the LLM as interpolated free text — sanitize so a crafted
+  // title cannot break out of the quoted span or inject directive-looking
+  // lines. Short attribute-like values, so sanitizeXmlValue is correct.
+  const safeTitle = sanitizeXmlValue(topicTitle, 200);
+  const safeConcept = sanitizeXmlValue(concept, 200);
   return (
-    `The learner hasn't mastered "${concept}" in "${topicTitle}" yet. ` +
+    `The learner hasn't mastered "${safeConcept}" in "${safeTitle}" yet. ` +
     `Switch to direct instruction mode:\n\n` +
     `1. Acknowledge that this concept is challenging — they haven't got it *yet*, and that is okay.\n` +
     `2. Explain the concept clearly and directly with a concrete example.\n` +

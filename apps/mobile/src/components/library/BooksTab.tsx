@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { FlatList, Pressable, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import type { BookProgressStatus } from '@eduagent/schemas';
 import { LibrarySearchBar } from './LibrarySearchBar';
 import {
@@ -98,6 +98,32 @@ export function BooksTab({
     const filtered_ = filterBooks(searched, state.filters);
     return sortBooks(filtered_, state.sortKey);
   }, [books, state.search, state.filters, state.sortKey]);
+
+  // Group filtered books by shelf (subject) so each group renders under a
+  // "shelf" header. Groups are ordered alphabetically by subject name for a
+  // stable, predictable layout; the user's chosen sort still applies to books
+  // *within* each group (sortBooks already ran above).
+  const grouped = useMemo(() => {
+    const groups = new Map<
+      string,
+      { subjectId: string; subjectName: string; books: EnrichedBook[] }
+    >();
+    for (const enriched of filtered) {
+      const existing = groups.get(enriched.subjectId);
+      if (existing) {
+        existing.books.push(enriched);
+      } else {
+        groups.set(enriched.subjectId, {
+          subjectId: enriched.subjectId,
+          subjectName: enriched.subjectName,
+          books: [enriched],
+        });
+      }
+    }
+    return Array.from(groups.values()).sort((a, b) =>
+      a.subjectName.localeCompare(b.subjectName)
+    );
+  }, [filtered]);
 
   // ---- Filter state helpers -----------------------------------------------
 
@@ -229,14 +255,12 @@ export function BooksTab({
 
   // ---- Render item --------------------------------------------------------
 
-  const renderBookCard = ({
-    item,
-  }: {
-    item: EnrichedBook;
-  }): React.ReactElement => {
+  const renderBookCard = (item: EnrichedBook): React.ReactElement => {
     const { book, subjectName, status, topicCount, completedCount } = item;
 
-    const progressLabel =
+    // Per-book topic count: scoped to this specific book, not the shelf total.
+    // Falls back to a neutral label when counts aren't available yet.
+    const topicsLabel =
       topicCount > 0
         ? `${completedCount}/${topicCount} topics`
         : book.topicsGenerated
@@ -245,10 +269,11 @@ export function BooksTab({
 
     return (
       <Pressable
+        key={book.id}
         onPress={() => onBookPress(item.subjectId, book.id)}
         className={`rounded-card px-4 py-4 mb-3 ${STATUS_STYLES[status]}`}
         accessibilityRole="button"
-        accessibilityLabel={`${book.title}, ${subjectName}. ${STATUS_LABELS[status]}. ${progressLabel}.`}
+        accessibilityLabel={`${book.title}, ${subjectName}. ${STATUS_LABELS[status]}. ${topicsLabel}.`}
         testID={`book-card-${book.id}`}
       >
         <View className="flex-row items-start">
@@ -272,12 +297,8 @@ export function BooksTab({
               </Text>
             )}
 
-            <Text className="text-caption text-primary mt-2">
-              {subjectName}
-            </Text>
-
-            <Text className="text-caption text-text-tertiary mt-1">
-              {progressLabel}
+            <Text className="text-caption text-text-tertiary mt-2">
+              {topicsLabel}
             </Text>
           </View>
         </View>
@@ -312,13 +333,43 @@ export function BooksTab({
           message={hasSearch ? undefined : `No books match your filters`}
         />
       ) : (
-        <FlatList
-          data={filtered}
-          keyExtractor={(item) => item.book.id}
-          renderItem={renderBookCard}
-          scrollEnabled={false}
-          testID="books-list"
-        />
+        <View testID="books-list">
+          {grouped.map((group) => (
+            <View
+              key={group.subjectId}
+              className="mb-4"
+              testID={`books-shelf-group-${group.subjectId}`}
+            >
+              <View className="flex-row items-end justify-between mt-1 mb-2 px-1">
+                <Text
+                  className="text-h3 font-semibold text-text-primary"
+                  accessibilityRole="header"
+                  testID={`books-shelf-heading-${group.subjectId}`}
+                >
+                  {group.subjectName}
+                </Text>
+                <Text
+                  className="text-caption text-text-secondary"
+                  testID={`books-shelf-count-${group.subjectId}`}
+                >
+                  {(() => {
+                    const bookLabel = `${group.books.length} ${
+                      group.books.length === 1 ? 'book' : 'books'
+                    }`;
+                    const topicTotal = group.books.reduce(
+                      (sum, b) => sum + b.topicCount,
+                      0
+                    );
+                    return topicTotal > 0
+                      ? `${bookLabel} · ${topicTotal} topics`
+                      : bookLabel;
+                  })()}
+                </Text>
+              </View>
+              {group.books.map((item) => renderBookCard(item))}
+            </View>
+          ))}
+        </View>
       )}
     </View>
   );

@@ -9,7 +9,7 @@ import { platformAlert } from '../../../lib/platform-alert';
 import { useThemeColors } from '../../../lib/theme';
 import { useDictationData } from './_layout';
 import { formatApiError } from '../../../lib/format-api-error';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 export default function DictationChoiceScreen(): React.ReactElement {
   const router = useRouter();
@@ -18,9 +18,28 @@ export default function DictationChoiceScreen(): React.ReactElement {
   const generateMutation = useGenerateDictation();
   const { setData } = useDictationData();
   const [lastError, setLastError] = useState<string | null>(null);
+  const [generateTimedOut, setGenerateTimedOut] = useState(false);
+  const generateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Start/clear 20s timeout whenever the pending state changes
+  useEffect(() => {
+    if (generateMutation.isPending) {
+      setGenerateTimedOut(false);
+      generateTimeoutRef.current = setTimeout(() => {
+        setGenerateTimedOut(true);
+      }, 20_000);
+    } else {
+      if (generateTimeoutRef.current) clearTimeout(generateTimeoutRef.current);
+      setGenerateTimedOut(false);
+    }
+    return () => {
+      if (generateTimeoutRef.current) clearTimeout(generateTimeoutRef.current);
+    };
+  }, [generateMutation.isPending]);
 
   const handleSurpriseMe = async () => {
     setLastError(null);
+    setGenerateTimedOut(false);
     try {
       const result = await generateMutation.mutateAsync();
       setData({
@@ -95,12 +114,50 @@ export default function DictationChoiceScreen(): React.ReactElement {
           className="items-center justify-center py-16"
           testID="dictation-loading"
         >
-          <Text className="text-body text-text-primary mb-2">
-            Picking a topic...
-          </Text>
-          <Text className="text-body-sm text-text-secondary">
-            This takes a few seconds
-          </Text>
+          {generateTimedOut ? (
+            <>
+              <Text
+                className="text-body text-danger mb-2 text-center"
+                testID="dictation-timeout-error"
+              >
+                That took too long — try again
+              </Text>
+              <Pressable
+                onPress={() => {
+                  generateMutation.reset();
+                  void handleSurpriseMe();
+                }}
+                className="mt-2 bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center"
+                accessibilityRole="button"
+                accessibilityLabel="Retry generating a dictation"
+                testID="dictation-timeout-retry"
+              >
+                <Text className="text-text-inverse font-semibold text-body">
+                  Retry
+                </Text>
+              </Pressable>
+            </>
+          ) : (
+            <>
+              <Text className="text-body text-text-primary mb-2">
+                Picking a topic...
+              </Text>
+              <Text className="text-body-sm text-text-secondary">
+                This takes a few seconds
+              </Text>
+            </>
+          )}
+          <Pressable
+            onPress={() => generateMutation.reset()}
+            className="mt-4 py-2 px-4 min-h-[44px] items-center justify-center"
+            accessibilityRole="button"
+            accessibilityLabel="Cancel generating a dictation"
+            testID="dictation-loading-cancel"
+          >
+            <Text className="text-body-sm font-semibold text-text-secondary">
+              Cancel
+            </Text>
+          </Pressable>
         </View>
       ) : (
         <View className="gap-4">

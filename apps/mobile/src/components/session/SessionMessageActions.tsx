@@ -53,28 +53,30 @@ export function SessionMessageActions({
   onToggleBookmark,
   handleReconnect,
 }: SessionMessageActionsProps) {
+  if (message.kind === 'reconnect_prompt') {
+    return (
+      <Pressable
+        onPress={() => void handleReconnect(message.id)}
+        disabled={isStreaming}
+        className="rounded-full bg-primary/15 px-3 py-1.5 self-start"
+        testID={`session-reconnect-${message.id}`}
+      >
+        <Text className="text-caption font-semibold text-primary">
+          Reconnect
+        </Text>
+      </Pressable>
+    );
+  }
+
+  if (message.kind === 'quota_exceeded' && quotaError) {
+    return <QuotaExceededCard details={quotaError} isOwner={isOwner} />;
+  }
+
   if (
     message.role !== 'assistant' ||
     message.streaming ||
     message.isSystemPrompt
   ) {
-    if (message.kind === 'reconnect_prompt') {
-      return (
-        <Pressable
-          onPress={() => void handleReconnect(message.id)}
-          disabled={isStreaming}
-          className="rounded-full bg-primary/15 px-3 py-1.5 self-start"
-          testID={`session-reconnect-${message.id}`}
-        >
-          <Text className="text-caption font-semibold text-primary">
-            Reconnect
-          </Text>
-        </Pressable>
-      );
-    }
-    if (message.kind === 'quota_exceeded' && quotaError) {
-      return <QuotaExceededCard details={quotaError} isOwner={isOwner} />;
-    }
     return null;
   }
 

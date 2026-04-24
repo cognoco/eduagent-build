@@ -34,6 +34,7 @@ import { getTierConfig } from '../services/subscription';
 import { createStripeClient } from '../services/stripe';
 import { readSubscriptionStatus } from '../services/kv';
 import { apiError, notFound } from '../errors';
+import { BRAND_COLOR_PRIMARY } from '../services/brand';
 
 type BillingRouteEnv = {
   Bindings: {
@@ -589,4 +590,119 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     await addToByokWaitlist(db, email);
 
     return c.json({ message: 'Added to BYOK waitlist', email }, 201);
+  })
+
+  // ---------------------------------------------------------------------------
+  // Stripe Checkout landing pages [UX-DE-M10]
+  // Stripe redirects to these after checkout. They are public (no auth needed
+  // here — Stripe appends session_id which is opaque) and render a minimal
+  // HTML page so the user always has at least one actionable path.
+  // ---------------------------------------------------------------------------
+
+  /**
+   * GET /billing/success
+   *
+   * Post-checkout success landing page. Stripe redirects here after a
+   * successful payment with ?session_id=... appended automatically.
+   */
+  .get('/billing/success', (c) => {
+    return c.html(
+      `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Subscription confirmed — MentoMate</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f8f9fa; color: #1a1a2e;
+      min-height: 100vh; display: flex; align-items: center;
+      justify-content: center; padding: 24px;
+    }
+    .card {
+      background: #fff; border-radius: 16px; padding: 40px 32px;
+      max-width: 440px; width: 100%;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08); text-align: center;
+    }
+    .logo { font-size: 28px; font-weight: 700; color: ${BRAND_COLOR_PRIMARY}; margin-bottom: 24px; }
+    h1 { font-size: 22px; font-weight: 700; margin-bottom: 12px; }
+    p { font-size: 16px; color: #555; line-height: 1.5; margin-bottom: 16px; }
+    .btn {
+      display: block; width: 100%; padding: 14px 24px; border-radius: 12px;
+      font-size: 16px; font-weight: 600; text-decoration: none;
+      text-align: center; cursor: pointer; border: none; margin-bottom: 12px;
+      transition: opacity 0.2s;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn-primary { background: ${BRAND_COLOR_PRIMARY}; color: #fff; }
+    .btn-secondary { background: #f0f0f0; color: #333; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">MentoMate</div>
+    <h1>Subscription confirmed!</h1>
+    <p>Your plan is now active. Open the MentoMate app to start learning.</p>
+    <a href="mentomate://home" class="btn btn-primary">Open MentoMate</a>
+    <a href="https://www.mentomate.com" class="btn btn-secondary">Back to homepage</a>
+  </div>
+</body>
+</html>`
+    );
+  })
+
+  /**
+   * GET /billing/cancel
+   *
+   * Post-checkout cancellation landing page. Stripe redirects here when the
+   * user closes or cancels the checkout flow.
+   */
+  .get('/billing/cancel', (c) => {
+    return c.html(
+      `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Checkout cancelled — MentoMate</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f8f9fa; color: #1a1a2e;
+      min-height: 100vh; display: flex; align-items: center;
+      justify-content: center; padding: 24px;
+    }
+    .card {
+      background: #fff; border-radius: 16px; padding: 40px 32px;
+      max-width: 440px; width: 100%;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08); text-align: center;
+    }
+    .logo { font-size: 28px; font-weight: 700; color: ${BRAND_COLOR_PRIMARY}; margin-bottom: 24px; }
+    h1 { font-size: 22px; font-weight: 700; margin-bottom: 12px; }
+    p { font-size: 16px; color: #555; line-height: 1.5; margin-bottom: 16px; }
+    .btn {
+      display: block; width: 100%; padding: 14px 24px; border-radius: 12px;
+      font-size: 16px; font-weight: 600; text-decoration: none;
+      text-align: center; cursor: pointer; border: none; margin-bottom: 12px;
+      transition: opacity 0.2s;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn-primary { background: ${BRAND_COLOR_PRIMARY}; color: #fff; }
+    .btn-secondary { background: #f0f0f0; color: #333; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">MentoMate</div>
+    <h1>Checkout cancelled</h1>
+    <p>No charge was made. You can upgrade any time from the MentoMate app.</p>
+    <a href="mentomate://home" class="btn btn-primary">Back to MentoMate</a>
+    <a href="https://www.mentomate.com" class="btn btn-secondary">Back to homepage</a>
+  </div>
+</body>
+</html>`
+    );
   });

@@ -67,6 +67,7 @@ import {
   SessionExchangeLimitError,
 } from './session-crud';
 import { createLogger } from '../logger';
+import { captureException } from '../sentry';
 /**
  * English-language intent pre-classifier used to fast-path four-strands
  * pedagogy for obvious translation / "how do you say" asks.
@@ -448,13 +449,12 @@ export async function prepareExchangeContext(
   if (isFreeform && session.exchangeCount === 0) {
     likelyLanguage = LANGUAGE_REGEX.test(userMessage);
     if (likelyLanguage) {
-      // Telemetry-only event — no Inngest handler; consumed by observability tooling.
-      void inngest.send({
-        name: 'app/ask.language_preclassified',
-        data: {
-          sessionId,
-          matchedPattern: userMessage.match(LANGUAGE_REGEX)?.[0] ?? '',
-        },
+      // [PR-FIX-05] Telemetry-only: no Inngest handler exists for this signal.
+      // Emit via structured logger so it is queryable in Cloudflare Logpush /
+      // wrangler tail without routing through the Inngest event queue.
+      logger.info('ask.language_preclassified', {
+        sessionId,
+        matchedPattern: userMessage.match(LANGUAGE_REGEX)?.[0] ?? '',
       });
     }
   }
@@ -477,9 +477,16 @@ export async function prepareExchangeContext(
           exchangeCount: session.exchangeCount + 1,
         },
       })
-      .catch((err) =>
-        logger.warn('ask.classify_silently.send_failed', { sessionId, err })
-      );
+      .catch((err) => {
+        logger.warn('ask.classify_silently.send_failed', { sessionId, err });
+        captureException(err, {
+          profileId,
+          extra: {
+            event: 'app/ask.classify_silently',
+            sessionId,
+          },
+        });
+      });
   }
 
   const [silentSubjectRows, silentTeachingPref] =

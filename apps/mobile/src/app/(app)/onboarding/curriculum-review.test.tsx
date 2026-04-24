@@ -88,6 +88,11 @@ jest.mock('../../../lib/navigation', () => ({
   goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
 }));
 
+const mockPlatformAlert = jest.fn();
+jest.mock('../../../lib/platform-alert', () => ({
+  platformAlert: (...args: unknown[]) => mockPlatformAlert(...args),
+}));
+
 jest.mock('../../../hooks/use-curriculum', () => ({
   useCurriculum: () => ({
     data: mockCurriculumData,
@@ -253,6 +258,72 @@ describe('CurriculumReviewScreen', () => {
       expect(screen.queryByTestId('add-topic-title-input')).toBeNull();
     });
     expect(mockAddTopicMutateAsync).not.toHaveBeenCalled();
+  });
+
+  // [UX-DE-M2] skipTopic onError — silent failure replaced with user feedback
+  it('shows an alert when skipTopic fails', async () => {
+    mockSkipMutate.mockImplementation(
+      (_topicId: unknown, callbacks?: { onError?: (err: Error) => void }) => {
+        callbacks?.onError?.(new Error('Network error'));
+      }
+    );
+
+    render(<CurriculumReviewScreen />);
+
+    // Open the skip confirmation dialog
+    fireEvent.press(screen.getByTestId('skip-topic-1'));
+
+    // platformAlert is called to show the confirmation — simulate pressing "Skip"
+    expect(mockPlatformAlert).toHaveBeenCalledWith(
+      'Skip this topic?',
+      expect.any(String),
+      expect.any(Array)
+    );
+
+    // Call the "Skip" button's onPress from the alert options
+    const [, , buttons] = mockPlatformAlert.mock.calls[0] as [
+      string,
+      string,
+      Array<{ text: string; onPress?: () => void }>
+    ];
+    const skipButton = buttons.find((b) => b.text === 'Skip');
+    skipButton?.onPress?.();
+
+    await waitFor(() => {
+      expect(mockPlatformAlert).toHaveBeenCalledWith(
+        'Could not skip topic',
+        expect.any(String)
+      );
+    });
+  });
+
+  // [UX-DE-M2] unskipTopic onError — silent failure replaced with user feedback
+  it('shows an alert when unskipTopic fails', async () => {
+    mockCurriculumData = {
+      ...mockCurriculumData,
+      topics: [
+        {
+          ...mockCurriculumData.topics[0]!,
+          skipped: true,
+        },
+      ],
+    };
+
+    mockUnskipMutate.mockImplementation(
+      (_topicId: unknown, callbacks?: { onError?: (err: Error) => void }) => {
+        callbacks?.onError?.(new Error('Server error'));
+      }
+    );
+
+    render(<CurriculumReviewScreen />);
+    fireEvent.press(screen.getByTestId('restore-topic-1'));
+
+    await waitFor(() => {
+      expect(mockPlatformAlert).toHaveBeenCalledWith(
+        'Could not restore topic',
+        expect.any(String)
+      );
+    });
   });
 
   it('offers placement actions after skipping more than 80% of topics', () => {

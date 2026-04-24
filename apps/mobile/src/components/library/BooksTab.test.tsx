@@ -262,4 +262,67 @@ describe('BooksTab', () => {
       filters: { subjectIds: [], completion: [] },
     });
   });
+
+  describe('shelf grouping', () => {
+    const geometryBook: EnrichedBook = {
+      ...algebraBook,
+      book: { ...algebraBook.book, id: 'book-3', title: 'Geometry Basics' },
+    };
+
+    it('renders a shelf heading per subject with book + topic counts', () => {
+      render(<BooksTab {...defaultProps} books={[algebraBook, egyptBook]} />);
+
+      expect(screen.getByTestId('books-shelf-heading-sub-1')).toBeTruthy();
+      expect(screen.getByTestId('books-shelf-heading-sub-2')).toBeTruthy();
+      // Per-shelf topic totals come from summing per-book counts:
+      // Mathematics shelf (algebraBook) = 8 topics; History shelf (egyptBook) = 6.
+      expect(screen.getByTestId('books-shelf-count-sub-1').props.children).toBe(
+        '1 book · 8 topics'
+      );
+      expect(screen.getByTestId('books-shelf-count-sub-2').props.children).toBe(
+        '1 book · 6 topics'
+      );
+    });
+
+    it('uses plural "books" and sums per-shelf topics when a shelf has multiple books', () => {
+      render(
+        <BooksTab
+          {...defaultProps}
+          books={[algebraBook, geometryBook, egyptBook]}
+        />
+      );
+
+      // Mathematics shelf: 2 books (algebraBook 8 + geometryBook 8) = 16 topics
+      expect(screen.getByTestId('books-shelf-count-sub-1').props.children).toBe(
+        '2 books · 16 topics'
+      );
+      // History shelf: 1 book (egyptBook) = 6 topics
+      expect(screen.getByTestId('books-shelf-count-sub-2').props.children).toBe(
+        '1 book · 6 topics'
+      );
+    });
+
+    it('falls back to book-only count when per-book topic counts are missing', () => {
+      const unbuiltBook: EnrichedBook = {
+        ...algebraBook,
+        topicCount: 0,
+        completedCount: 0,
+      };
+      render(<BooksTab {...defaultProps} books={[unbuiltBook]} />);
+
+      // No topics loaded yet → header omits the topics suffix
+      expect(screen.getByTestId('books-shelf-count-sub-1').props.children).toBe(
+        '1 book'
+      );
+    });
+
+    it('orders shelf groups alphabetically by subject name', () => {
+      render(<BooksTab {...defaultProps} books={[egyptBook, algebraBook]} />);
+
+      const groups = screen.getAllByTestId(/^books-shelf-group-/);
+      // History ("sub-2") comes before Mathematics ("sub-1") alphabetically.
+      expect(groups[0].props.testID).toBe('books-shelf-group-sub-2');
+      expect(groups[1].props.testID).toBe('books-shelf-group-sub-1');
+    });
+  });
 });

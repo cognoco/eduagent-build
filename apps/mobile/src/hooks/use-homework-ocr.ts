@@ -6,6 +6,17 @@ import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import * as FileSystem from 'expo-file-system/legacy';
 import { getApiUrl } from '../lib/api';
 import { useProfile } from '../lib/profile';
+import {
+  countMeaningfulTokens,
+  isLikelyHomework,
+  splitHomeworkProblems,
+} from '../components/homework/problem-cards';
+import {
+  trackHomeworkOcrGateAccepted,
+  trackHomeworkOcrGateRejected,
+  trackHomeworkOcrGateShortcircuit,
+  type HomeworkOcrGateSource,
+} from '../lib/analytics';
 
 /**
  * Check whether the ML Kit native module is linked in this build.
@@ -27,6 +38,14 @@ export interface UseHomeworkOcrResult {
   cancel: () => void;
 }
 
+type RecognizedTextResult = {
+  text: string | null;
+  confidence?: number;
+};
+
+export const NON_HOMEWORK_ERROR_MESSAGE =
+  "We couldn't find a clear homework problem in this photo. Try again or type it in.";
+
 async function copyToCache(tempUri: string): Promise<string> {
   const stableUri = `${FileSystem.cacheDirectory}homework-${Date.now()}.jpg`;
   await FileSystem.copyAsync({ from: tempUri, to: stableUri });
@@ -44,7 +63,59 @@ async function resizeImage(uri: string): Promise<string> {
 const OCR_DEVICE_TIMEOUT_MS = 20_000;
 const OCR_SERVER_TIMEOUT_MS = 15_000;
 
-async function recognizeText(imageUri: string): Promise<string | null> {
+function normalizeConfidence(value: unknown): number | undefined {
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    return undefined;
+  }
+
+  return Math.max(0, Math.min(1, value));
+}
+
+function getWordCount(text: string): number {
+  return text.trim().split(/\s+/).filter(Boolean).length;
+}
+
+function buildGateMetrics(
+  text: string,
+  confidence?: number
+): {
+  tokens: number;
+  words: number;
+  confidence?: number;
+} {
+  return {
+    tokens: countMeaningfulTokens(text),
+    words: getWordCount(text),
+    ...(confidence == null ? {} : { confidence }),
+  };
+}
+
+function getLocalConfidence(result: unknown): number | undefined {
+  if (!result || typeof result !== 'object') {
+    return undefined;
+  }
+
+  const candidate = result as {
+    confidence?: unknown;
+    blocks?: Array<{ confidence?: unknown }>;
+  };
+
+  const blockConfidences =
+    candidate.blocks
+      ?.map((block) => normalizeConfidence(block?.confidence))
+      .filter((value): value is number => value != null) ?? [];
+
+  if (blockConfidences.length > 0) {
+    return (
+      blockConfidences.reduce((sum, value) => sum + value, 0) /
+      blockConfidences.length
+    );
+  }
+
+  return normalizeConfidence(candidate.confidence);
+}
+
+async function recognizeText(imageUri: string): Promise<RecognizedTextResult> {
   const resizedUri = await resizeImage(imageUri);
   const result = await Promise.race([
     TextRecognition.recognize(resizedUri),
@@ -56,14 +127,17 @@ async function recognizeText(imageUri: string): Promise<string | null> {
     ),
   ]);
   const text = result.text?.trim();
-  return text || null;
+  return {
+    text: text || null,
+    confidence: getLocalConfidence(result),
+  };
 }
 
 async function recognizeTextServerSide(
   imageUri: string,
   token: string | null,
   profileId?: string
-): Promise<string | null> {
+): Promise<RecognizedTextResult> {
   const uploadUri = await resizeImage(imageUri);
   const formData = new FormData();
   formData.append('image', {
@@ -98,9 +172,15 @@ async function recognizeTextServerSide(
     throw new Error(`Server OCR failed (${response?.status ?? 'unknown'})`);
   }
 
-  const payload = (await response.json()) as { text?: string | null };
+  const payload = (await response.json()) as {
+    text?: string | null;
+    confidence?: number | null;
+  };
   const text = payload.text?.trim();
-  return text || null;
+  return {
+    text: text || null,
+    confidence: normalizeConfidence(payload.confidence),
+  };
 }
 
 export function useHomeworkOcr(): UseHomeworkOcrResult {
@@ -113,6 +193,12 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
   const currentUriRef = useRef<string | null>(null);
   const cancelRef = useRef<AbortController | null>(null);
 
+  const finishAsError = useCallback((message: string) => {
+    setFailCount((prev) => prev + 1);
+    setError(message);
+    setStatus('error');
+  }, []);
+
   const cancel = useCallback(() => {
     cancelRef.current?.abort();
     cancelRef.current = null;
@@ -120,24 +206,50 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
     setError(null);
   }, []);
 
+  const resolveSuccess = useCallback(
+    (
+      recognized: RecognizedTextResult,
+      source: HomeworkOcrGateSource
+    ): boolean => {
+      if (!recognized.text) {
+        return false;
+      }
+
+      const metrics = buildGateMetrics(recognized.text, recognized.confidence);
+      if (!isLikelyHomework(recognized.text, recognized.confidence)) {
+        const droppedCount = splitHomeworkProblems(
+          recognized.text,
+          recognized.confidence
+        ).dropped;
+        trackHomeworkOcrGateRejected({
+          source,
+          ...metrics,
+          droppedCount,
+        });
+        return false;
+      }
+
+      setText(recognized.text);
+      setError(null);
+      setStatus('done');
+      trackHomeworkOcrGateAccepted({ source, ...metrics });
+      return true;
+    },
+    []
+  );
+
   const tryServerFallback = useCallback(
-    async (uri: string): Promise<boolean> => {
+    async (uri: string): Promise<RecognizedTextResult | null> => {
       try {
         const token = await getToken();
-        const recognized = await recognizeTextServerSide(
+        return await recognizeTextServerSide(
           uri,
           token ?? null,
           activeProfile?.id
         );
-        if (!recognized) {
-          return false;
-        }
-        setText(recognized);
-        setStatus('done');
-        return true;
       } catch (err) {
         console.error('[OCR] Server fallback failed:', err);
-        return false;
+        return null;
       }
     },
     [activeProfile?.id, getToken]
@@ -156,52 +268,71 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
         setFailCount(0);
       }
 
-      if (controller.signal.aborted) return;
+      if (controller.signal.aborted) {
+        return;
+      }
 
       if (!isTextRecognitionAvailable()) {
         console.error(
           '[OCR] ML Kit TextRecognition native module is not linked. ' +
             'Rebuild the app with EAS to include @react-native-ml-kit/text-recognition.'
         );
-        if (await tryServerFallback(uri)) {
+        const serverResult = await tryServerFallback(uri);
+        if (serverResult && resolveSuccess(serverResult, 'server')) {
           return;
         }
-        setFailCount((prev) => prev + 1);
-        setError(
+        if (serverResult?.text) {
+          finishAsError(NON_HOMEWORK_ERROR_MESSAGE);
+          return;
+        }
+        finishAsError(
           Platform.OS === 'android'
             ? 'Text recognition is not available in this build. A new app build is required.'
             : 'Text recognition is not available. Please rebuild the app.'
         );
-        setStatus('error');
         return;
       }
 
       try {
         const recognized = await recognizeText(uri);
-        if (!recognized) {
-          if (await tryServerFallback(uri)) {
+        if (recognized.text) {
+          if (resolveSuccess(recognized, 'local')) {
             return;
           }
-          setFailCount((prev) => prev + 1);
-          setError("Couldn't read any text from the image");
-          setStatus('error');
+          const rejectedMetrics = buildGateMetrics(
+            recognized.text,
+            recognized.confidence
+          );
+          trackHomeworkOcrGateShortcircuit(rejectedMetrics);
+          finishAsError(NON_HOMEWORK_ERROR_MESSAGE);
           return;
         }
-        setText(recognized);
-        setStatus('done');
+
+        const serverResult = await tryServerFallback(uri);
+        if (serverResult && resolveSuccess(serverResult, 'server')) {
+          return;
+        }
+        if (serverResult?.text) {
+          finishAsError(NON_HOMEWORK_ERROR_MESSAGE);
+          return;
+        }
+        finishAsError("Couldn't read any text from the image");
       } catch (err) {
         console.error('[OCR] Text recognition failed:', err);
-        if (await tryServerFallback(uri)) {
+        const serverResult = await tryServerFallback(uri);
+        if (serverResult && resolveSuccess(serverResult, 'server')) {
           return;
         }
-        setFailCount((prev) => prev + 1);
-        setError(
+        if (serverResult?.text) {
+          finishAsError(NON_HOMEWORK_ERROR_MESSAGE);
+          return;
+        }
+        finishAsError(
           "We couldn't read that clearly. Try taking the photo again with better lighting."
         );
-        setStatus('error');
       }
     },
-    [tryServerFallback]
+    [finishAsError, resolveSuccess, tryServerFallback]
   );
 
   const process = useCallback(

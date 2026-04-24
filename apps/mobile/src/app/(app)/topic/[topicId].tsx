@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -26,6 +26,7 @@ import { useTopicParkingLot } from '../../../hooks/use-sessions';
 import { useGetTopicNote } from '../../../hooks/use-notes';
 import { useThemeColors } from '../../../lib/theme';
 import { goBackOrReplace } from '../../../lib/navigation';
+import { ErrorFallback } from '../../../components/common';
 
 function deriveRetentionStatus(
   card:
@@ -185,6 +186,18 @@ export default function TopicDetailScreen() {
   // F-4: Resume active/paused session instead of creating a new one
   const { data: activeSession } = useActiveSessionForTopic(topicId);
   const [showSecondary, setShowSecondary] = useState(false);
+
+  // [H9] Timeout escape for the deep-link resolve spinner
+  const [resolveTimedOut, setResolveTimedOut] = useState(false);
+  const isResolveSpinning = !!(needsResolve && resolveLoading);
+  useEffect(() => {
+    if (!isResolveSpinning) {
+      setResolveTimedOut(false);
+      return;
+    }
+    const t = setTimeout(() => setResolveTimedOut(true), 15_000);
+    return () => clearTimeout(t);
+  }, [isResolveSpinning]);
 
   const isLoading = progressLoading || retentionLoading || parkingLotLoading;
   // Data-critical queries only — parking lot is secondary and should not suppress errors
@@ -360,6 +373,26 @@ export default function TopicDetailScreen() {
 
   // [F-009] Show loading while resolving subjectId from deep-link
   if (needsResolve && resolveLoading) {
+    if (resolveTimedOut) {
+      return (
+        <ErrorFallback
+          variant="centered"
+          title="Taking too long to open this topic"
+          message="Check your connection and try again."
+          primaryAction={{
+            label: 'Retry',
+            onPress: () => setResolveTimedOut(false),
+            testID: 'topic-resolve-timeout-retry',
+          }}
+          secondaryAction={{
+            label: 'Go to Library',
+            onPress: () => goBackOrReplace(router, '/(app)/library'),
+            testID: 'topic-resolve-timeout-library',
+          }}
+          testID="topic-resolve-timeout"
+        />
+      );
+    }
     return (
       <View className="flex-1 bg-background items-center justify-center">
         <ActivityIndicator size="large" color={colors.primary} />

@@ -46,6 +46,15 @@ const envSchema = z.object({
 
   // RevenueCat — webhook authentication
   REVENUECAT_WEBHOOK_SECRET: z.string().min(1).optional(),
+
+  // Empty-reply stream guard — per-request kill switch for the
+  // [EMPTY-REPLY-GUARD] classifier in streamMessage.onComplete and
+  // streamInterviewExchange.onComplete. When 'false', the service skips
+  // classification and falls through to the legacy parse-and-persist path
+  // (same behavior as before [EMPTY-REPLY-GUARD-1]). Flip to 'false' in
+  // Doppler to disable the feature without redeploying if the classifier
+  // misfires in production. Default: 'true'.
+  EMPTY_REPLY_GUARD_ENABLED: z.enum(['true', 'false']).default('true'),
 });
 
 export type Env = z.infer<typeof envSchema>;

@@ -2,12 +2,14 @@ import { View, Text, Pressable, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { AnalogyDomainPicker } from '../../../components/common';
+import { AnalogyDomainPicker, ErrorFallback } from '../../../components/common';
 import {
   useAnalogyDomain,
   useUpdateAnalogyDomain,
 } from '../../../hooks/use-settings';
 import type { AnalogyDomain } from '@eduagent/schemas';
+import { classifyApiError } from '../../../lib/format-api-error';
+import { platformAlert } from '../../../lib/platform-alert';
 
 export default function SubjectSettingsScreen() {
   const router = useRouter();
@@ -23,14 +25,25 @@ export default function SubjectSettingsScreen() {
     useUpdateAnalogyDomain(safeSubjectId);
 
   const handleSelect = (domain: AnalogyDomain | null): void => {
-    updateAnalogyDomain(domain);
+    // UX-DE-L9: surface mutation errors
+    updateAnalogyDomain(domain, {
+      onError: (err) =>
+        platformAlert('Could not update', classifyApiError(err).message),
+    });
   };
 
   if (!subjectId) {
     return (
-      <View className="flex-1 bg-background items-center justify-center">
-        <Text className="text-text-secondary">No subject selected</Text>
-      </View>
+      <ErrorFallback
+        variant="centered"
+        title="No subject selected"
+        message="We couldn't load this subject. Head home and try again."
+        primaryAction={{
+          label: 'Go Home',
+          onPress: () => goBackOrReplace(router, '/(app)/home'),
+          testID: 'subject-missing-param',
+        }}
+      />
     );
   }
 

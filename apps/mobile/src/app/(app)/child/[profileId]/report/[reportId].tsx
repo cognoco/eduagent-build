@@ -4,6 +4,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Sentry from '@sentry/react-native';
 import { goBackOrReplace } from '../../../../../lib/navigation';
+import { classifyApiError } from '../../../../../lib/format-api-error';
+import { ErrorFallback } from '../../../../../components/common';
 import {
   useChildReportDetail,
   useMarkChildReportViewed,
@@ -35,7 +37,18 @@ export default function ChildReportDetailScreen(): React.ReactElement {
     profileId: string;
     reportId: string;
   }>();
-  const { data: report, isLoading } = useChildReportDetail(profileId, reportId);
+  // UX-DE-M6: isError branch + contextual back
+  const {
+    data: report,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useChildReportDetail(profileId, reportId);
+
+  const reportsHref = profileId
+    ? (`/(app)/child/${profileId}/reports` as const)
+    : ('/(app)/dashboard' as const);
   const markViewed = useMarkChildReportViewed();
   const markViewedRef = useRef(markViewed);
   markViewedRef.current = markViewed;
@@ -68,8 +81,9 @@ export default function ChildReportDetailScreen(): React.ReactElement {
         contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
       >
         <View className="flex-row items-center mt-4">
+          {/* UX-DE-M6: contextual back — was /(app)/more, now goes to child reports */}
           <Pressable
-            onPress={() => goBackOrReplace(router, '/(app)/more' as const)}
+            onPress={() => goBackOrReplace(router, reportsHref)}
             className="me-3 py-2 pe-2"
             accessibilityRole="button"
             accessibilityLabel="Go back"
@@ -95,6 +109,23 @@ export default function ChildReportDetailScreen(): React.ReactElement {
               Loading report...
             </Text>
           </View>
+        ) : isError ? (
+          // UX-DE-M6: network failures must not silently render as the gone state
+          <ErrorFallback
+            variant="card"
+            message={classifyApiError(error).message}
+            primaryAction={{
+              label: 'Try Again',
+              onPress: () => void refetch(),
+              testID: 'child-report-error-retry',
+            }}
+            secondaryAction={{
+              label: 'Back to reports',
+              onPress: () => goBackOrReplace(router, reportsHref),
+              testID: 'child-report-error-back',
+            }}
+            testID="child-report-error"
+          />
         ) : report ? (
           <>
             <View
@@ -226,16 +257,7 @@ export default function ChildReportDetailScreen(): React.ReactElement {
               still safe.
             </Text>
             <Pressable
-              onPress={() => {
-                if (profileId) {
-                  router.replace({
-                    pathname: '/(app)/child/[profileId]/reports',
-                    params: { profileId },
-                  } as never);
-                } else {
-                  router.replace('/(app)/dashboard' as never);
-                }
-              }}
+              onPress={() => goBackOrReplace(router, reportsHref)}
               className="bg-primary rounded-button px-4 py-3 items-center mt-4 min-h-[48px] justify-center"
               accessibilityRole="button"
               accessibilityLabel="Back to reports"

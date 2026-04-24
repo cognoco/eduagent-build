@@ -5,6 +5,8 @@ import {
   interviewMessageSchema,
   type InterviewResult,
   extractedInterviewSignalsSchema,
+  streamFallbackFrameSchema,
+  type ExchangeFallback,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
@@ -23,14 +25,27 @@ import {
   buildDraftResumeSummary,
 } from '../services/interview';
 import { notFound } from '../errors';
+import { captureException } from '../services/sentry';
 
 type InterviewRouteEnv = {
-  Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
+  Bindings: {
+    DATABASE_URL: string;
+    CLERK_JWKS_URL?: string;
+    // Mirrors the Zod enum in config.ts (z.enum(['true', 'false'])) so the
+    // binary contract is enforced at the type level too — Cloudflare provides
+    // the binding as a raw string, but env-validation middleware guarantees
+    // it's one of these two values at runtime.
+    EMPTY_REPLY_GUARD_ENABLED?: 'true' | 'false';
+  };
   Variables: {
     user: AuthUser;
     db: Database;
     profileId: string | undefined;
   };
+};
+
+type InterviewStreamRouteResult = InterviewResult & {
+  fallback?: ExchangeFallback;
 };
 
 export const interviewRoutes = new Hono<InterviewRouteEnv>()
@@ -149,17 +164,27 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
         draft.exchangeHistory.filter((e) => e.role === 'user').length + 1;
 
       let stream: AsyncIterable<string>;
-      let onComplete: (fullResponse: string) => Promise<InterviewResult>;
+      let onComplete: (
+        fullResponse: string
+      ) => Promise<InterviewStreamRouteResult>;
       try {
         const streamResult = await streamInterviewExchange(context, message, {
           exchangeCount,
           profileId,
           learnerName,
+          emptyReplyGuardEnabled: c.env.EMPTY_REPLY_GUARD_ENABLED !== 'false',
         });
         stream = streamResult.stream;
         onComplete = streamResult.onComplete;
       } catch (err) {
-        console.error('[interview/stream] Failed to start stream:', err);
+        captureException(err, {
+          profileId,
+          extra: {
+            route: 'interview/stream',
+            phase: 'stream_start',
+            subjectId,
+          },
+        });
         return c.json(
           {
             code: 'LLM_UNAVAILABLE',
@@ -182,6 +207,33 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
 
         try {
           const result = await onComplete(fullResponse);
+          const currentExchangeCount = draft.exchangeHistory.filter(
+            (e) => e.role === 'user'
+          ).length;
+
+          if (result.fallback) {
+            // Validate on emit so a server change that drifts from the
+            // wire schema fails loudly in tests rather than shipping an
+            // unparseable frame to mobile (which would silently re-route
+            // through the finalizer's zero-chunk branch).
+            const frame = streamFallbackFrameSchema.parse({
+              type: 'fallback',
+              reason: result.fallback.reason,
+              fallbackText: result.fallback.fallbackText,
+            });
+            await sseStream.writeSSE({ data: JSON.stringify(frame) });
+            await sseStream.writeSSE({
+              data: JSON.stringify({
+                type: 'done',
+                isComplete: false,
+                exchangeCount: currentExchangeCount,
+              }),
+            });
+            return;
+            // Interview has no paid quota today (free during onboarding),
+            // so no incrementQuota refund here. Add one if interview becomes
+            // a metered flow; mirror the quotaRefunded guard in sessions.ts.
+          }
 
           const updatedHistory = [
             ...draft.exchangeHistory,
@@ -230,7 +282,15 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
             }),
           });
         } catch (err) {
-          console.error('[interview/stream] Post-stream write failed:', err);
+          captureException(err, {
+            profileId,
+            extra: {
+              route: 'interview/stream',
+              phase: 'post_stream_write',
+              subjectId,
+              draftId: draft.id,
+            },
+          });
           await sseStream.writeSSE({
             data: JSON.stringify({
               type: 'error',

@@ -179,8 +179,13 @@ export function getLanguageDisplayName(code: string): string {
     return name;
   } catch (error) {
     if (error instanceof VocabularyContextError) throw error;
-    // Intl.getCanonicalLocales can throw RangeError for malformed codes
-    throw new VocabularyContextError(`Invalid language code: ${code}`);
+    // Intl.getCanonicalLocales can throw RangeError for malformed codes.
+    // Preserve the original error as cause so Sentry captures the root RangeError
+    // stack alongside the wrapper — without this, tickets point only at the throw
+    // site and the real parser failure is lost.
+    throw new VocabularyContextError(`Invalid language code: ${code}`, {
+      cause: error,
+    });
   }
 }
 

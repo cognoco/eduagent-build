@@ -34,7 +34,7 @@ try {
 }
 
 interface MagicPenAnimationProps {
-  /** Overall size in pixels (default: 100) */
+  /** Overall size in pixels (default: 140) */
   size?: number;
   /** Pen/ink color (default: brand teal #0d9488) */
   color?: string;
@@ -97,14 +97,14 @@ const NIB_GLOW = '#fbbf24';
  * 80px+: full effect — ink window, nib glow, ink droplets, paper fold.
  */
 export function MagicPenAnimation({
-  size = 100,
+  size = 140,
   color = '#0d9488',
   testID,
 }: MagicPenAnimationProps): ReactNode {
   const reduceMotion = useReducedMotion();
   const animationDisabled = reduceMotion || !_penAnimationAvailable;
   const isDark = useColorScheme() === 'dark';
-  const showEnhanced = size >= 80;
+  const showEnhanced = size >= 48;
 
   const paperFill = isDark ? PAPER_DARK : PAPER_LIGHT;
   const paperStroke = isDark ? PAPER_STROKE_DARK : PAPER_STROKE_LIGHT;
@@ -199,7 +199,10 @@ export function MagicPenAnimation({
 
   // Pen position — Animated.View overlay (proven Fabric-safe)
   const scale = size / 120;
-  const penSize = size * 0.25; // pen SVG = 25% of overall size
+  // Pen takes ~38% of canvas width so the barrel, grip, nib, AND ink window
+  // are all legible. At 25% the pen rendered as a 4px-wide barrel — the
+  // user only saw the nib tip.
+  const penSize = size * 0.38;
   const penScaleFactor = penSize / 40; // viewBox 0 0 40 60 → pixel
 
   const penStyle = useAnimatedStyle(() => {

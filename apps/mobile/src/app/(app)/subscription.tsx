@@ -145,6 +145,24 @@ function isPurchaseCancelledError(error: unknown): boolean {
 }
 
 /**
+ * Checks whether a RevenueCat error indicates the product has already been
+ * purchased (e.g. user already owns this entitlement on another device).
+ * When this occurs, the user should restore rather than re-purchase.
+ */
+function isProductAlreadyPurchasedError(error: unknown): boolean {
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error as PurchasesError).code ===
+      PURCHASES_ERROR_CODE.PRODUCT_ALREADY_PURCHASED_ERROR
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/**
  * Checks whether a RevenueCat error is a network error.
  */
 function isNetworkError(error: unknown): boolean {
@@ -587,6 +605,10 @@ export default function SubscriptionScreen() {
   // Restore-purchase polling state (BUG-397)
   const [restorePolling, setRestorePolling] = useState(false);
 
+  // Post-purchase polling state — shows visible feedback while the webhook
+  // confirms the new subscription tier (PR-FIX-07)
+  const [purchasePolling, setPurchasePolling] = useState(false);
+
   // BUG-403: ScrollView ref so the Upgrade button can scroll to offerings
   const scrollViewRef = useRef<ScrollView>(null);
   const offeringsYRef = useRef(0);
@@ -623,38 +645,7 @@ export default function SubscriptionScreen() {
   const hasActiveSubscription = activeEntitlement !== null;
 
   // ---------------------------------------------------------------------------
-  // Purchase handler — triggers native store payment sheet
-  // ---------------------------------------------------------------------------
-
-  const handlePurchase = useCallback(
-    async (pkg: PurchasesPackage) => {
-      try {
-        await purchase.mutateAsync(pkg);
-        await Promise.all([refetchSub(), refetchUsage()]);
-        platformAlert('Success', 'Your subscription is now active!');
-      } catch (error: unknown) {
-        if (isPurchaseCancelledError(error)) {
-          // User cancelled — not an error, just dismiss silently
-          return;
-        }
-        if (isNetworkError(error)) {
-          platformAlert(
-            'Network error',
-            'Please check your internet connection and try again.'
-          );
-          return;
-        }
-        platformAlert(
-          'Purchase failed',
-          'Something unexpected happened with your purchase. Please try again.'
-        );
-      }
-    },
-    [purchase, refetchSub, refetchUsage]
-  );
-
-  // ---------------------------------------------------------------------------
-  // Restore purchases handler
+  // Restore purchases handler — declared first so handlePurchase can reference it
   // ---------------------------------------------------------------------------
 
   const handleRestore = useCallback(async () => {
@@ -734,6 +725,111 @@ export default function SubscriptionScreen() {
     refetchSub,
     refetchUsage,
   ]);
+
+  // ---------------------------------------------------------------------------
+  // Purchase handler — triggers native store payment sheet
+  // ---------------------------------------------------------------------------
+
+  const handlePurchase = useCallback(
+    async (pkg: PurchasesPackage) => {
+      try {
+        await purchase.mutateAsync(pkg);
+      } catch (error: unknown) {
+        if (isPurchaseCancelledError(error)) {
+          // User cancelled — not an error, just dismiss silently
+          return;
+        }
+        if (isProductAlreadyPurchasedError(error)) {
+          // [UX-DE-M8] Product already purchased — prompt restore instead of
+          // showing a generic failure. handleRestore is stable (useCallback).
+          platformAlert(
+            'Already purchased',
+            'It looks like you already own this subscription. Tap "Restore purchases" to activate it on this device.',
+            [
+              {
+                text: 'Restore purchases',
+                onPress: () => void handleRestore(),
+              },
+              { text: 'Cancel', style: 'cancel' },
+            ]
+          );
+          return;
+        }
+        if (isNetworkError(error)) {
+          platformAlert(
+            'Network error',
+            'Please check your internet connection and try again.'
+          );
+          return;
+        }
+        platformAlert(
+          'Purchase failed',
+          'Something unexpected happened with your purchase. Please try again.'
+        );
+        return;
+      }
+
+      // Purchase succeeded on the store side — poll the API until the webhook
+      // confirms the new subscription tier (PR-FIX-07: was unrendered _purchasePolling)
+      if (!mountedRef.current) return;
+      setPurchasePolling(true);
+
+      const maxAttempts = 15; // ~30 s at 2 s intervals
+      const pollIntervalMs = 2000;
+      let confirmed = false;
+
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        if (!mountedRef.current) break;
+        await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+        if (!mountedRef.current) break;
+        try {
+          const freshSub = await queryClient.fetchQuery<{
+            tier: string;
+          }>({
+            queryKey: ['subscription', activeProfile?.id],
+            staleTime: 0,
+            queryFn: async () => {
+              const res = await client.subscription.$get({});
+              await assertOk(res);
+              const data = await res.json();
+              return data.subscription;
+            },
+          });
+          if (freshSub && freshSub.tier !== 'free') {
+            confirmed = true;
+            break;
+          }
+        } catch {
+          // Network error during poll — continue to next attempt
+          continue;
+        }
+      }
+
+      if (!mountedRef.current) return;
+      setPurchasePolling(false);
+
+      await Promise.all([refetchSub(), refetchUsage()]);
+
+      if (confirmed) {
+        platformAlert('Success', 'Your subscription is now active!');
+      } else {
+        platformAlert(
+          'Purchase confirmed',
+          'Your subscription is being activated. It usually appears within a minute — pull down to refresh.',
+          [{ text: 'OK' }]
+        );
+      }
+    },
+    [
+      purchase,
+      refetchSub,
+      refetchUsage,
+      handleRestore,
+      queryClient,
+      activeProfile?.id,
+      client,
+    ]
+  );
 
   // ---------------------------------------------------------------------------
   // Manage billing — deep link to platform subscription management
@@ -1240,10 +1336,25 @@ export default function SubscriptionScreen() {
                     pkg={pkg}
                     isCurrentPlan={isCurrentPlan}
                     onSelect={handlePurchase}
-                    isPurchasing={purchase.isPending}
+                    isPurchasing={purchase.isPending || purchasePolling}
                   />
                 );
               })}
+              {purchasePolling && (
+                <View
+                  className="bg-surface rounded-card px-4 py-3.5 mt-2 flex-row items-center"
+                  testID="purchase-polling-indicator"
+                >
+                  <ActivityIndicator
+                    size="small"
+                    color={colors.primary}
+                    testID="purchase-polling-spinner"
+                  />
+                  <Text className="text-body font-semibold text-primary ml-2">
+                    Confirming purchase…
+                  </Text>
+                </View>
+              )}
             </View>
           )}
 
@@ -1356,6 +1467,25 @@ export default function SubscriptionScreen() {
                 )}
               </View>
             </Pressable>
+            {restorePolling && (
+              <Pressable
+                onPress={() => {
+                  setRestorePolling(false);
+                  platformAlert(
+                    'Restore cancelled',
+                    'Restore will continue in background.'
+                  );
+                }}
+                className="mt-2 items-center py-2"
+                accessibilityRole="button"
+                accessibilityLabel="Cancel restore"
+                testID="restore-polling-cancel"
+              >
+                <Text className="text-body-sm text-primary font-semibold">
+                  Check later
+                </Text>
+              </Pressable>
+            )}
           </View>
 
           {/* Top-up */}
@@ -1394,6 +1524,25 @@ export default function SubscriptionScreen() {
                   </>
                 )}
               </Pressable>
+              {topUpPolling && (
+                <Pressable
+                  onPress={() => {
+                    setTopUpPolling(false);
+                    platformAlert(
+                      'Check later',
+                      'Credits will appear shortly — tap refresh to check.'
+                    );
+                  }}
+                  className="mt-2 items-center py-2"
+                  accessibilityRole="button"
+                  accessibilityLabel="Cancel top-up confirmation"
+                  testID="top-up-polling-cancel"
+                >
+                  <Text className="text-body-sm text-primary font-semibold">
+                    Check later
+                  </Text>
+                </Pressable>
+              )}
             </View>
           )}
 

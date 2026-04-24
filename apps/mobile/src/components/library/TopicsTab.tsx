@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { FlatList, Pressable, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { LibrarySearchBar } from './LibrarySearchBar';
 import {
   SortFilterBar,
@@ -90,6 +91,7 @@ export function TopicsTab({
   isError,
   onRetry,
 }: TopicsTabProps): React.ReactElement {
+  const router = useRouter();
   // ---- Derived data -------------------------------------------------------
 
   const filtered = useMemo(() => {
@@ -253,9 +255,16 @@ export function TopicsTab({
             </Text>
           </Pressable>
         ) : (
-          <Text className="text-body-sm text-text-tertiary text-center">
-            Pull down to refresh or go back.
-          </Text>
+          <Pressable
+            onPress={() => router.back()}
+            className="bg-surface-elevated rounded-button px-5 py-3 items-center min-h-[48px] justify-center"
+            accessibilityRole="button"
+            testID="topics-tab-go-back"
+          >
+            <Text className="text-body font-semibold text-primary">
+              Go Back
+            </Text>
+          </Pressable>
         )}
       </View>
     );

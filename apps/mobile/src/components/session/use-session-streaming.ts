@@ -417,6 +417,8 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
       }
     ) => {
       let streamId: string | null = null;
+      // [H6] SSE freeze watchdog — hoisted so finally can always clear it.
+      let sseWatchdogTimerId: ReturnType<typeof setInterval> | null = null;
       try {
         const sessionSubjectId = options?.sessionSubjectId;
         const sessionSubjectName = options?.sessionSubjectName;
@@ -498,6 +500,38 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
           { id: streamId!, role: 'assistant', content: '', streaming: true },
         ]);
         setIsStreaming(true);
+        let chunkCount = 0;
+        let watchdogConverted = false;
+
+        // [H6] SSE freeze watchdog: if no token arrives for 45s while
+        // streaming, classify as a connection drop, surface a retry card.
+        const SSE_WATCHDOG_MS = 45_000;
+        let lastSseEventAt = Date.now();
+        sseWatchdogTimerId = setInterval(() => {
+          if (Date.now() - lastSseEventAt >= SSE_WATCHDOG_MS) {
+            if (sseWatchdogTimerId !== null) {
+              clearInterval(sseWatchdogTimerId);
+              sseWatchdogTimerId = null;
+            }
+            setIsStreaming(false);
+            const frozenStreamId = streamId;
+            if (frozenStreamId) {
+              watchdogConverted = true;
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === frozenStreamId
+                    ? {
+                        ...m,
+                        content: 'Connection dropped — Try again',
+                        streaming: false,
+                        kind: 'reconnect_prompt' as const,
+                      }
+                    : m
+                )
+              );
+            }
+          }
+        }, 5_000);
 
         const streamOptions: {
           homeworkMode?: 'help_me' | 'check_answer';
@@ -518,6 +552,9 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
         await streamMessage(
           text,
           (accumulated) => {
+            // [H6] Reset watchdog timestamp on each token.
+            lastSseEventAt = Date.now();
+            chunkCount += 1;
             setMessages((prev) =>
               prev.map((m) =>
                 m.id === streamId ? { ...m, content: accumulated } : m
@@ -525,41 +562,44 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
             );
           },
           async (result) => {
-            const { triggered, trackerState: nextTrackerState } = trackExchange(
-              {
-                userMessage: text,
-                escalationRung: result.escalationRung,
-              }
-            );
-            triggered.forEach((reason) => {
-              trigger({
-                celebration: celebrationForReason(reason),
-                reason,
-                detail: null,
+            const shouldConvertToReconnect =
+              watchdogConverted || !!result.fallback || chunkCount === 0;
+            const trackedExchange = shouldConvertToReconnect
+              ? null
+              : trackExchange({
+                  userMessage: text,
+                  escalationRung: result.escalationRung,
+                });
+            const nextTrackerState =
+              trackedExchange?.trackerState ?? trackerStateRef.current;
+
+            if (trackedExchange) {
+              trackedExchange.triggered.forEach((reason) => {
+                trigger({
+                  celebration: celebrationForReason(reason),
+                  reason,
+                  detail: null,
+                });
               });
-            });
+            }
 
             setMessages((prev) =>
               prev.map((m) => {
                 if (m.id !== streamId) return m;
-                // Strip JSON annotations from visible message text
-                let content = m.content;
-                if (result.notePrompt) {
-                  content = content
-                    .replace(
-                      /\n?\{"notePrompt":\s*true(?:,\s*"postSession":\s*true)?\}\s*$/,
-                      ''
-                    )
-                    .trimEnd();
-                }
-                if (result.fluencyDrill) {
-                  content = content
-                    .replace(/\n?\{"fluencyDrill":\s*\{[^}]*\}\s*\}\s*$/, '')
-                    .trimEnd();
+                if (m.kind === 'reconnect_prompt') return m;
+                if (shouldConvertToReconnect) {
+                  return {
+                    ...m,
+                    content:
+                      result.fallback?.fallbackText ??
+                      "I didn't have a reply — tap to try again.",
+                    streaming: false,
+                    kind: 'reconnect_prompt' as const,
+                    eventId: result.aiEventId,
+                  };
                 }
                 return {
                   ...m,
-                  content,
                   streaming: false,
                   eventId: result.aiEventId,
                   escalationRung: result.escalationRung,
@@ -569,6 +609,11 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
             setIsStreaming(false);
             setExchangeCount(result.exchangeCount);
             setEscalationRung(result.escalationRung);
+
+            if (shouldConvertToReconnect) {
+              setLowConfidenceMessageId(null);
+              return;
+            }
 
             // Handle note prompt triggers
             if (result.notePrompt && !notePromptOffered) {
@@ -698,6 +743,11 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
           },
         ]);
       } finally {
+        // [H6] Always clear the SSE watchdog when the stream settles.
+        if (sseWatchdogTimerId !== null) {
+          clearInterval(sseWatchdogTimerId);
+          sseWatchdogTimerId = null;
+        }
         // Safety net: ensure isStreaming is always cleared even if onDone was
         // never called (e.g., server sent 'error' instead of 'done', or the
         // stream closed without either event). React ignores no-op setState.

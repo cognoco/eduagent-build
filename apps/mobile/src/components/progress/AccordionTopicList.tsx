@@ -80,7 +80,8 @@ export function AccordionTopicList({
           testID="accordion-topics-retry"
         >
           <Text className="text-caption text-text-secondary text-center py-2">
-            Could not load topics. Tap to retry, or close the subject card to dismiss.
+            Could not load topics. Tap to retry, or close the subject card to
+            dismiss.
           </Text>
         </Pressable>
       ) : topics.length > 0 ? (
@@ -132,9 +133,24 @@ export function AccordionTopicList({
           </Pressable>
         ))
       ) : (
-        <Text className="text-caption text-text-secondary text-center py-2">
-          No topics yet
-        </Text>
+        <View className="items-center py-2" testID="accordion-topics-empty">
+          <Text className="text-caption text-text-secondary text-center mb-2">
+            No topics yet
+          </Text>
+          <Pressable
+            onPress={(event) => {
+              event?.stopPropagation?.();
+              router.push('/(app)/library');
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Browse topics in your library"
+            testID="accordion-topics-browse"
+          >
+            <Text className="text-caption font-semibold text-primary">
+              Browse topics
+            </Text>
+          </Pressable>
+        </View>
       )}
     </View>
   );

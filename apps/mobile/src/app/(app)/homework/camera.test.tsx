@@ -380,7 +380,8 @@ describe('CameraScreen', () => {
     (useHomeworkOcr as jest.Mock).mockReturnValue({
       text: null,
       status: 'error',
-      error: "Couldn't read any text from the image",
+      error:
+        "We couldn't find a clear homework problem in this photo. Try again or type it in.",
       failCount: 1,
       process: mockProcess,
       retry: mockRetry,
@@ -391,7 +392,9 @@ describe('CameraScreen', () => {
     await waitFor(() => {
       expect(getByText(/type it out/i)).toBeTruthy();
       expect(getByTestId('manual-input')).toBeTruthy();
-      expect(getByText(/having trouble reading/i)).toBeTruthy();
+      expect(
+        getByText(/couldn't find a clear homework problem in this photo/i)
+      ).toBeTruthy();
     });
   });
 
@@ -399,7 +402,8 @@ describe('CameraScreen', () => {
     (useHomeworkOcr as jest.Mock).mockReturnValue({
       text: null,
       status: 'error',
-      error: 'Failed to read',
+      error:
+        "We couldn't find a clear homework problem in this photo. Try again or type it in.",
       failCount: 1,
       process: mockProcess,
       retry: mockRetry,
@@ -410,7 +414,9 @@ describe('CameraScreen', () => {
     await waitFor(() => {
       expect(getByText(/type it out/i)).toBeTruthy();
       expect(getByTestId('manual-input')).toBeTruthy();
-      expect(getByText(/having trouble reading/i)).toBeTruthy();
+      expect(
+        getByText(/couldn't find a clear homework problem in this photo/i)
+      ).toBeTruthy();
     });
   });
 
@@ -509,6 +515,30 @@ describe('CameraScreen', () => {
     });
   });
 
+  it('renders dropped-fragments chip and re-adds on tap', async () => {
+    (useHomeworkOcr as jest.Mock).mockReturnValue({
+      text: '1. Solve 2x + 5 = 17\n\n??\n\n2. Factor x^2 + 3x + 2',
+      status: 'done',
+      error: null,
+      failCount: 0,
+      process: mockProcess,
+      retry: mockRetry,
+    });
+
+    const { getByTestId, queryByTestId } = render(<CameraScreen />);
+
+    await waitFor(() => {
+      expect(getByTestId('dropped-fragments-chip')).toBeTruthy();
+      expect(queryByTestId('problem-card-2')).toBeNull();
+    });
+
+    fireEvent.press(getByTestId('dropped-fragments-chip'));
+
+    await waitFor(() => {
+      expect(getByTestId('problem-card-2')).toBeTruthy();
+    });
+  });
+
   it('creates a new subject before continuing when the learner types one manually', async () => {
     (useLocalSearchParams as jest.Mock).mockReturnValue({});
     mockMutateAsync.mockResolvedValueOnce({
@@ -516,7 +546,7 @@ describe('CameraScreen', () => {
       candidates: [],
     });
     (useHomeworkOcr as jest.Mock).mockReturnValue({
-      text: 'Photosynthesis worksheet',
+      text: 'Photosynthesis worksheet question',
       status: 'done',
       error: null,
       failCount: 0,

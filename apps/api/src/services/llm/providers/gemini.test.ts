@@ -93,7 +93,7 @@ describe('Gemini Provider', () => {
       ];
       const result = await provider.chat(messages, DEFAULT_CONFIG);
 
-      expect(result).toBe('Hello from Gemini!');
+      expect(result.content).toBe('Hello from Gemini!');
       expect(fetchSpy).toHaveBeenCalledTimes(1);
 
       const [url, options] = fetchSpy.mock.calls[0];

@@ -8,6 +8,23 @@
 
 ---
 
+## Automated Preflight (2026-04-23)
+
+All batch runners (`run-all-regression.sh`, `run-all-untested.sh`, anything
+that sources `e2e-lib.sh`) now invoke `e2e-preflight.sh` before the first
+test runs. The preflight catches the five infrastructure pitfalls
+post-mortem'd in `e2e-session-2026-04-22-struggles.md` — stale bundle
+proxy on :8082, missing APK after `-wipe-data`, missing
+`TEST_SEED_SECRET`, stuck UIAutomator lock, Metro/API not running — and
+fails fast with an actionable fix instead of letting the batch produce
+cascading false-positive bug reports (see Notion BUG-594..622, filed from
+exactly this cascade on 2026-04-22).
+
+Break-tests for each check: `bash apps/mobile/e2e/scripts/e2e-preflight.test.sh`.
+Emergency bypass: `E2E_PREFLIGHT_SKIP=1 bash ./scripts/run-all-regression.sh`.
+
+---
+
 ## Issue 1: Maestro CLI — Java ClassNotFoundException on Windows
 
 **What happened:** After installing Maestro 2.2.0 via the official installer (`curl -fsSL "https://get.maestro.mobile.dev" | bash`), running `maestro --version` failed with:

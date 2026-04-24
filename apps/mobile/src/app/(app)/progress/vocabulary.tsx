@@ -25,15 +25,29 @@ function SubjectVocabSection({
 }: {
   subject: SubjectInventory;
 }): React.ReactElement {
+  const router = useRouter();
   const cefrEntries = sortCefrEntries(
     Object.entries(subject.vocabulary.byCefrLevel)
   );
 
   return (
-    <View className="bg-surface rounded-card p-4 mt-4">
-      <Text className="text-h3 font-semibold text-text-primary">
-        {subject.subjectName}
-      </Text>
+    <Pressable
+      onPress={() =>
+        router.push(`/(app)/vocabulary/${subject.subjectId}` as never)
+      }
+      accessibilityRole="button"
+      accessibilityLabel={`View ${subject.subjectName} vocabulary`}
+      testID={`vocab-subject-${subject.subjectId}`}
+      className="bg-surface rounded-card p-4 mt-4"
+    >
+      <View className="flex-row items-center justify-between">
+        <Text className="text-h3 font-semibold text-text-primary flex-1">
+          {subject.subjectName}
+        </Text>
+        <Text className="text-body-sm text-primary font-semibold">
+          View all →
+        </Text>
+      </View>
       <Text className="text-body-sm text-text-secondary mt-1">
         {subject.vocabulary.total} words — {subject.vocabulary.mastered}{' '}
         mastered
@@ -53,7 +67,7 @@ function SubjectVocabSection({
           ))}
         </View>
       ) : null}
-    </View>
+    </Pressable>
   );
 }
 

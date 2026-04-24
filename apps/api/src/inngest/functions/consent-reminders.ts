@@ -3,7 +3,10 @@ import {
   getStepDatabase,
   getStepResendApiKey,
   getStepEmailFrom,
+  getStepAppUrl,
 } from '../helpers';
+import { eq, desc } from 'drizzle-orm';
+import { consentStates } from '@eduagent/database';
 import {
   getConsentStatus,
   getProfileConsentState,
@@ -27,11 +30,32 @@ export const consentReminder = inngest.createFunction(
       emailFrom: getStepEmailFrom(),
     });
 
-    /** Look up parentEmail from the DB (never from event payload — PII). */
-    async function lookupParentEmail(): Promise<string | null> {
+    /** Look up parentEmail and consentToken from the DB (never from event payload — PII). */
+    async function lookupConsentDetails(): Promise<{
+      parentEmail: string | null;
+      consentToken: string | null;
+    }> {
       const db = getStepDatabase();
       const state = await getProfileConsentState(db, profileId);
-      return state?.parentEmail ?? null;
+      if (!state?.parentEmail) return { parentEmail: null, consentToken: null };
+
+      // Fetch the live token separately — getProfileConsentState intentionally
+      // omits it to keep the return surface minimal. We need it here so every
+      // reminder email contains a direct action link [UX-DE-H9].
+      const row = await db.query.consentStates.findFirst({
+        where: eq(consentStates.profileId, profileId),
+        orderBy: desc(consentStates.requestedAt),
+        columns: { consentToken: true },
+      });
+      return {
+        parentEmail: state.parentEmail,
+        consentToken: row?.consentToken ?? null,
+      };
+    }
+
+    /** Builds the direct consent page URL from a token. */
+    function buildTokenUrl(token: string): string {
+      return `${getStepAppUrl()}/v1/consent-page?token=${token}`;
     }
 
     // Day 7 reminder
@@ -40,10 +64,15 @@ export const consentReminder = inngest.createFunction(
       const db = getStepDatabase();
       const status = await getConsentStatus(db, profileId);
       if (!status || status === 'CONSENTED' || status === 'WITHDRAWN') return;
-      const parentEmail = await lookupParentEmail();
-      if (!parentEmail) return;
+      const { parentEmail, consentToken } = await lookupConsentDetails();
+      if (!parentEmail || !consentToken) return;
       await sendEmail(
-        formatConsentReminderEmail(parentEmail, 'your child', 23),
+        formatConsentReminderEmail(
+          parentEmail,
+          'your child',
+          23,
+          buildTokenUrl(consentToken)
+        ),
         emailOpts()
       );
     });
@@ -54,10 +83,15 @@ export const consentReminder = inngest.createFunction(
       const db = getStepDatabase();
       const status = await getConsentStatus(db, profileId);
       if (!status || status === 'CONSENTED' || status === 'WITHDRAWN') return;
-      const parentEmail = await lookupParentEmail();
-      if (!parentEmail) return;
+      const { parentEmail, consentToken } = await lookupConsentDetails();
+      if (!parentEmail || !consentToken) return;
       await sendEmail(
-        formatConsentReminderEmail(parentEmail, 'your child', 16),
+        formatConsentReminderEmail(
+          parentEmail,
+          'your child',
+          16,
+          buildTokenUrl(consentToken)
+        ),
         emailOpts()
       );
     });
@@ -68,7 +102,7 @@ export const consentReminder = inngest.createFunction(
       const db = getStepDatabase();
       const status = await getConsentStatus(db, profileId);
       if (!status || status === 'CONSENTED' || status === 'WITHDRAWN') return;
-      const parentEmail = await lookupParentEmail();
+      const { parentEmail } = await lookupConsentDetails();
       if (!parentEmail) return;
       await sendEmail(
         {
@@ -82,7 +116,12 @@ export const consentReminder = inngest.createFunction(
       );
     });
 
-    // Day 30 auto-delete — GDPR requires deletion if consent not granted
+    // Day 30 auto-delete — GDPR requires deletion if consent not granted.
+    // [SUG-4] Intentionally NO reminder email at this step. The Day-25
+    // "final warning" above has already told the parent the account will
+    // be removed in 5 days; sending another email at the moment of
+    // deletion would be both redundant and unnecessarily distressing. The
+    // last actionable notice is at Day-25; Day-30 is the cutoff itself.
     await step.sleep('wait-5-more-days', '5d');
     await step.run('auto-delete-account', async () => {
       const db = getStepDatabase();

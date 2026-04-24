@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
@@ -48,6 +48,41 @@ jest.mock('../../components/progress', () => ({
 jest.mock('../../components/common', () => ({
   BookPageFlipAnimation: () => null,
   BrandCelebration: () => null,
+  ErrorFallback: ({
+    testID,
+    primaryAction,
+    secondaryAction,
+  }: {
+    testID?: string;
+    primaryAction?: { label: string; onPress: () => void; testID?: string };
+    secondaryAction?: { label: string; onPress: () => void; testID?: string };
+  }) => {
+    const { View, Text, Pressable } = require('react-native');
+    return (
+      <View testID={testID}>
+        {primaryAction && (
+          <Pressable
+            testID={primaryAction.testID}
+            onPress={primaryAction.onPress}
+          >
+            <Text>{primaryAction.label}</Text>
+          </Pressable>
+        )}
+        {secondaryAction && (
+          <Pressable
+            testID={secondaryAction.testID}
+            onPress={secondaryAction.onPress}
+          >
+            <Text>{secondaryAction.label}</Text>
+          </Pressable>
+        )}
+      </View>
+    );
+  },
+}));
+
+jest.mock('../../lib/navigation', () => ({
+  goBackOrReplace: jest.fn(),
 }));
 
 jest.mock('../../lib/theme', () => ({
@@ -166,7 +201,7 @@ describe('LibraryScreen', () => {
     expect(screen.getByText('3/12 topics started')).toBeTruthy();
   });
 
-  it('shows all topics view when the topics tab is pressed', () => {
+  it('hides the Topics tab from top-level Library navigation', () => {
     mockUseSubjects.mockReturnValue({
       data: [{ id: 'sub-1', name: 'Math', status: 'active' }],
       isLoading: false,
@@ -175,42 +210,13 @@ describe('LibraryScreen', () => {
       data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
       isLoading: false,
     });
-    mockUseQueries.mockReturnValue([
-      {
-        data: {
-          topics: [
-            {
-              topicId: 'topic-1',
-              topicTitle: 'Fractions',
-              easeFactor: 2.5,
-              repetitions: 2,
-              lastReviewedAt: null,
-              nextReviewAt: new Date(Date.now() + 7 * 86_400_000).toISOString(),
-              xpStatus: 'verified',
-              failureCount: 0,
-            },
-          ],
-          reviewDueCount: 0,
-        },
-        isLoading: false,
-      },
-    ]);
 
     render(<LibraryScreen />, { wrapper: createWrapper() });
 
-    fireEvent.press(screen.getByTestId('library-tab-topics'));
-
-    expect(screen.getByTestId('topic-row-topic-1')).toBeTruthy();
-
-    fireEvent.press(screen.getByTestId('topic-row-topic-1'));
-
-    expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/(app)/topic/[topicId]',
-      params: {
-        subjectId: 'sub-1',
-        topicId: 'topic-1',
-      },
-    });
+    // Topics tab is intentionally hidden — users reach topics by opening a
+    // book (shelf/[subjectId]/book/[bookId]) which shows its chapter/topic
+    // list. This keeps the top-level Library focused on Shelves + Books.
+    expect(screen.queryByTestId('library-tab-topics')).toBeNull();
   });
 
   it('navigates to shelf route when a subject is pressed', () => {
@@ -233,7 +239,7 @@ describe('LibraryScreen', () => {
     });
   });
 
-  it('renders three tab badges with counts', () => {
+  it('renders Shelves and Books tab badges with counts', () => {
     mockUseSubjects.mockReturnValue({
       data: [
         { id: 'sub-1', name: 'Math', status: 'active' },
@@ -298,13 +304,12 @@ describe('LibraryScreen', () => {
 
     expect(screen.getByTestId('library-tab-shelves')).toBeTruthy();
     expect(screen.getByTestId('library-tab-books')).toBeTruthy();
-    expect(screen.getByTestId('library-tab-topics')).toBeTruthy();
+    expect(screen.queryByTestId('library-tab-topics')).toBeNull();
     expect(screen.getByText('Shelves (2)')).toBeTruthy();
     expect(screen.getByText('Books (1)')).toBeTruthy();
-    expect(screen.getByText('Topics (1)')).toBeTruthy();
   });
 
-  it('shows review urgency on the topics tab and matching shelf card', () => {
+  it('shows review urgency on the matching shelf card (topics badge is hidden)', () => {
     mockUseSubjects.mockReturnValue({
       data: [{ id: 'sub-1', name: 'Math', status: 'active' }],
       isLoading: false,
@@ -340,8 +345,9 @@ describe('LibraryScreen', () => {
 
     render(<LibraryScreen />, { wrapper: createWrapper() });
 
-    expect(screen.getByTestId('library-tab-topics-review-badge')).toBeTruthy();
-    expect(screen.getByText('4')).toBeTruthy();
+    // Topics tab (and its review badge) is intentionally hidden from the
+    // top-level Library. Review urgency still surfaces on the shelf card.
+    expect(screen.queryByTestId('library-tab-topics-review-badge')).toBeNull();
     expect(screen.getByText('4 to review')).toBeTruthy();
   });
 
@@ -431,6 +437,60 @@ describe('LibraryScreen', () => {
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
       params: { subjectId: 'sub-1', bookId: 'book-1' },
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // [IMP-3] Books-tab loading timeout escape — mirrors subjects/progress pattern
+  // -----------------------------------------------------------------------
+  describe('books-tab loading timeout [IMP-3]', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('shows books-tab timeout error after 15s of loading [IMP-3]', () => {
+      mockUseSubjects.mockReturnValue({
+        data: [{ id: 'sub-1', name: 'Math', status: 'active' }],
+        isLoading: false,
+        isError: false,
+        refetch: jest.fn(),
+      });
+      mockUseOverallProgress.mockReturnValue({
+        data: { subjects: [] },
+        isLoading: false,
+        isError: false,
+        refetch: jest.fn(),
+      });
+      const mockRefetch = jest.fn();
+      mockUseAllBooks.mockReturnValue({
+        books: [],
+        isLoading: true,
+        isError: false,
+        refetch: mockRefetch,
+      });
+
+      render(<LibraryScreen />, { wrapper: createWrapper() });
+
+      // Switch to Books tab to trigger that rendering branch
+      fireEvent.press(screen.getByTestId('library-tab-books'));
+
+      // Spinner should be visible before timeout
+      expect(screen.getByTestId('books-tab-loading')).toBeTruthy();
+      expect(screen.queryByTestId('books-tab-load-timeout')).toBeNull();
+
+      // Advance timers past 15s — wrapped in act to flush state updates
+      act(() => {
+        jest.advanceTimersByTime(16_000);
+      });
+
+      // Timeout error surface must now be visible with Retry button
+      expect(screen.getByTestId('books-tab-load-timeout')).toBeTruthy();
+      expect(screen.getByTestId('books-tab-load-timeout-retry')).toBeTruthy();
+      expect(screen.getByTestId('books-tab-load-timeout-home')).toBeTruthy();
     });
   });
 

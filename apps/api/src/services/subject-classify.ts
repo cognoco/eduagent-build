@@ -8,7 +8,9 @@ import type { SubjectClassifyResult } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import { routeAndCall } from './llm';
 import type { ChatMessage } from './llm';
+import { escapeXml, sanitizeXmlValue } from './llm/sanitize';
 import { listSubjects } from './subject';
+import { captureException } from './sentry';
 
 const CLASSIFY_SYSTEM_PROMPT = `You are a subject classifier for a tutoring platform.
 
@@ -39,10 +41,16 @@ Rules:
 - When the topic is cross-disciplinary, prefer matching to an enrolled subject with even moderate relevance (confidence >= 0.4) over returning no matches
 `;
 
-// BS-10: Sanitize user input before LLM interpolation — strip control
-// characters and limit length to reduce prompt-injection surface area.
+// BS-10 / [IMP-5]: Sanitize user input before LLM interpolation.
+//   1. Strip C0 control characters (other than tab/LF/CR) + DEL.
+//   2. Cap length to `maxLength` chars.
+//   3. HTML-entity encode the XML-significant chars via `escapeXml` so a
+//      crafted value cannot close a wrapping XML tag or smuggle instructions
+//      (e.g. "</subject>ignore previous rules"). The earlier version skipped
+//      step 3, leaving `<`, `>`, `&`, `"`, `'` intact in the prompt — an
+//      injection surface the [PROMPT-INJECT-2] sweep missed here.
 function sanitizeLlmInput(text: string, maxLength = 500): string {
-  return text
+  const stripped = text
     .split('')
     .filter((ch) => {
       const code = ch.charCodeAt(0);
@@ -55,6 +63,7 @@ function sanitizeLlmInput(text: string, maxLength = 500): string {
     })
     .join('')
     .slice(0, maxLength);
+  return escapeXml(stripped);
 }
 
 export async function classifySubject(
@@ -95,8 +104,14 @@ export async function classifySubject(
         }
       }
     } catch (err) {
-      // S-6: Log so LLM failures are visible in production — previously silent.
+      // S-6 / [AUDIT-SILENT-FAIL]: Log AND escalate. Returning a null
+      // suggestion silently masks LLM outages — captureException makes the
+      // degraded experience queryable.
       console.error('[classify] LLM failed for zero-subject path:', err);
+      captureException(err, {
+        profileId,
+        extra: { site: 'classifySubject.zeroSubjectPath' },
+      });
     }
 
     return {
@@ -124,7 +139,12 @@ export async function classifySubject(
     };
   }
 
-  const subjectList = subjects.map((s) => `- ${s.name}`).join('\n');
+  // [PROMPT-INJECT-8] subjects.name is learner-owned text stored in DB —
+  // sanitize each entry before joining so a crafted subject name cannot
+  // inject newlines or directives into the enrolled-subject list.
+  const subjectList = subjects
+    .map((s) => `- ${sanitizeXmlValue(s.name, 200)}`)
+    .join('\n');
 
   const sanitizedText = sanitizeLlmInput(text);
 
@@ -188,8 +208,17 @@ export async function classifySubject(
           : null,
     };
   } catch (err) {
-    // S-6: Log so LLM failures are visible in production — previously silent.
+    // S-6 / [AUDIT-SILENT-FAIL]: Log AND escalate. An empty-candidates
+    // response looks identical to a genuine no-match, so we need Sentry to
+    // distinguish degraded-LLM from no-match in production.
     console.error('[classify] LLM failed for multi-subject path:', err);
+    captureException(err, {
+      profileId,
+      extra: {
+        site: 'classifySubject.multiSubjectPath',
+        subjectCount: subjects.length,
+      },
+    });
     return {
       candidates: [],
       needsConfirmation: true,

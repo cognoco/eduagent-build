@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Modal,
   Platform,
   Pressable,
@@ -15,7 +16,9 @@ import type { Subject, RetentionStatus } from '@eduagent/schemas';
 import {
   BookPageFlipAnimation,
   BrandCelebration,
+  ErrorFallback,
 } from '../../components/common';
+import { goBackOrReplace } from '../../lib/navigation';
 import type {
   LibraryTab,
   ShelfItem,
@@ -132,8 +135,32 @@ export default function LibraryScreen() {
   // TanStack Query's select can be bypassed when enabled=false.
   const subjects = Array.isArray(subjectsQuery.data) ? subjectsQuery.data : [];
   const progressQuery = useOverallProgress();
+
+  // [M19] Timeout escape for subjects/progress loading spinner
+  const isSubjectsLoading = subjectsQuery.isLoading || progressQuery.isLoading;
+  const [subjectsLoadTimedOut, setSubjectsLoadTimedOut] = useState(false);
+  useEffect(() => {
+    if (!isSubjectsLoading) {
+      setSubjectsLoadTimedOut(false);
+      return;
+    }
+    const t = setTimeout(() => setSubjectsLoadTimedOut(true), 15_000);
+    return () => clearTimeout(t);
+  }, [isSubjectsLoading]);
+
   const updateSubject = useUpdateSubject();
   const allBooksQuery = useAllBooks();
+
+  // [IMP-3] Timeout escape for books-tab loading spinner (mirrors subjects pattern)
+  const [booksLoadTimedOut, setBooksLoadTimedOut] = useState(false);
+  useEffect(() => {
+    if (!allBooksQuery.isLoading) {
+      setBooksLoadTimedOut(false);
+      return;
+    }
+    const t = setTimeout(() => setBooksLoadTimedOut(true), 15_000);
+    return () => clearTimeout(t);
+  }, [allBooksQuery.isLoading]);
   const noteTopicIdsQuery = useNoteTopicIds();
   const noteIdSet = useMemo(
     () => new Set(noteTopicIdsQuery.data?.topicIds ?? []),
@@ -198,6 +225,44 @@ export default function LibraryScreen() {
     [progressQuery.data?.subjects]
   );
 
+  // Per-book topic counts derived from retention data (single source of truth
+  // across book cards, shelf headers, and the library-wide total so the
+  // numbers always add up). "Completed" uses the same xpStatus=='verified'
+  // signal that BookScreen relies on for its "topics done" indicator.
+  const topicCountsByBookId = useMemo(() => {
+    const totals = new Map<string, { total: number; completed: number }>();
+    retentionQueries.forEach((q) => {
+      const topics = q.data?.topics;
+      if (!topics) return;
+      for (const t of topics) {
+        if (!t.bookId) continue;
+        const current = totals.get(t.bookId) ?? { total: 0, completed: 0 };
+        current.total += 1;
+        if (t.xpStatus === 'verified') current.completed += 1;
+        totals.set(t.bookId, current);
+      }
+    });
+    return totals;
+  }, [retentionQueries]);
+
+  const enrichedBooks = useMemo(() => {
+    return allBooksQuery.books.map((b) => {
+      const counts = topicCountsByBookId.get(b.book.id);
+      return counts
+        ? { ...b, topicCount: counts.total, completedCount: counts.completed }
+        : b;
+    });
+  }, [allBooksQuery.books, topicCountsByBookId]);
+
+  const totalTopicsAcrossBooks = useMemo(
+    () =>
+      Array.from(topicCountsByBookId.values()).reduce(
+        (sum, c) => sum + c.total,
+        0
+      ),
+    [topicCountsByBookId]
+  );
+
   const shelves = useMemo<ShelfItem[]>(() => {
     const retentionBySubjectId = new Map(
       subjects.map((subject, index) => [
@@ -223,13 +288,16 @@ export default function LibraryScreen() {
     [retentionQueries]
   );
 
+  // Badge uses allTopics.length (not totalTopicsAcrossBooks) so the count
+  // matches what the Topics tab actually renders — including orphan topics
+  // with a null bookId, which totalTopicsAcrossBooks excludes.
   const tabCounts = useMemo(
     () => ({
       shelves: subjectsQuery.data?.length ?? 0,
-      books: allBooksQuery.books.length,
+      books: enrichedBooks.length,
       topics: allTopics.length,
     }),
-    [subjectsQuery.data?.length, allBooksQuery.books.length, allTopics.length]
+    [subjectsQuery.data?.length, enrichedBooks.length, allTopics.length]
   );
 
   const handleRetry = (): void => {
@@ -272,9 +340,32 @@ export default function LibraryScreen() {
 
   const renderContent = (): React.ReactElement => {
     if (subjectsQuery.isLoading || progressQuery.isLoading) {
+      if (subjectsLoadTimedOut) {
+        return (
+          <ErrorFallback
+            variant="centered"
+            title="Library is taking too long to load"
+            message="Check your connection and try again."
+            primaryAction={{
+              label: 'Retry',
+              onPress: () => {
+                void subjectsQuery.refetch();
+                void progressQuery.refetch();
+              },
+              testID: 'library-load-timeout-retry',
+            }}
+            secondaryAction={{
+              label: 'Go Home',
+              onPress: () => goBackOrReplace(router, '/(app)/home'),
+              testID: 'library-load-timeout-home',
+            }}
+            testID="library-load-timeout"
+          />
+        );
+      }
       return (
         <View className="py-8 items-center" testID="library-loading">
-          <BookPageFlipAnimation size={80} color={themeColors.accent} />
+          <BookPageFlipAnimation size={140} color={themeColors.accent} />
           <Text className="text-body-sm text-text-secondary mt-3">
             Loading your subjects...
           </Text>
@@ -318,7 +409,7 @@ export default function LibraryScreen() {
       id: s.id,
       name: s.name,
     }));
-    const bookList = allBooksQuery.books.map((b) => ({
+    const bookList = enrichedBooks.map((b) => ({
       id: b.book.id,
       title: b.book.title,
       subjectName: b.subjectName,
@@ -368,21 +459,51 @@ export default function LibraryScreen() {
             </Pressable>
           </View>
         )}
-        {activeTab === 'books' && !allBooksQuery.isError && (
-          <BooksTab
-            books={allBooksQuery.books}
-            subjects={subjectList}
-            state={booksTabState}
-            onStateChange={setBooksTabState}
-            onBookPress={(subjectId, bookId) => {
-              router.push({
-                pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
-                params: { subjectId, bookId },
-              } as never);
-            }}
-            onAddSubject={() => router.push('/create-subject')}
-          />
-        )}
+        {activeTab === 'books' &&
+          !allBooksQuery.isError &&
+          allBooksQuery.isLoading &&
+          (booksLoadTimedOut ? (
+            <ErrorFallback
+              variant="centered"
+              title="Books are taking too long to load"
+              message="Check your connection and try again."
+              primaryAction={{
+                label: 'Retry',
+                onPress: () => allBooksQuery.refetch(),
+                testID: 'books-tab-load-timeout-retry',
+              }}
+              secondaryAction={{
+                label: 'Go Home',
+                onPress: () => goBackOrReplace(router, '/(app)/home'),
+                testID: 'books-tab-load-timeout-home',
+              }}
+              testID="books-tab-load-timeout"
+            />
+          ) : (
+            <View className="py-8 items-center" testID="books-tab-loading">
+              <ActivityIndicator size="small" />
+              <Text className="text-body-sm text-text-secondary mt-3">
+                Loading books...
+              </Text>
+            </View>
+          ))}
+        {activeTab === 'books' &&
+          !allBooksQuery.isError &&
+          !allBooksQuery.isLoading && (
+            <BooksTab
+              books={enrichedBooks}
+              subjects={subjectList}
+              state={booksTabState}
+              onStateChange={setBooksTabState}
+              onBookPress={(subjectId, bookId) => {
+                router.push({
+                  pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
+                  params: { subjectId, bookId },
+                } as never);
+              }}
+              onAddSubject={() => router.push('/create-subject')}
+            />
+          )}
         {activeTab === 'topics' && (
           <TopicsTab
             topics={allTopics}
@@ -412,8 +533,16 @@ export default function LibraryScreen() {
               {isGuardian
                 ? `Your personal library \u00B7 ${
                     subjectsQuery.data?.length ?? 0
-                  } subjects`
-                : `${subjectsQuery.data?.length ?? 0} subjects`}
+                  } subjects${
+                    totalTopicsAcrossBooks > 0
+                      ? ` · ${totalTopicsAcrossBooks} topics`
+                      : ''
+                  }`
+                : `${subjectsQuery.data?.length ?? 0} subjects${
+                    totalTopicsAcrossBooks > 0
+                      ? ` · ${totalTopicsAcrossBooks} topics`
+                      : ''
+                  }`}
             </Text>
           </View>
         </View>

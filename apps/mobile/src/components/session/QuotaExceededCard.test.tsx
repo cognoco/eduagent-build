@@ -54,4 +54,18 @@ describe('QuotaExceededCard', () => {
     expect(screen.getByText(/today's limit/i)).toBeTruthy();
     expect(screen.getByText(/used 10 of 10/i)).toBeTruthy();
   });
+
+  // H5: Child variant must have a navigation escape
+  it('child view: shows Go home button so child is not stuck [H5]', () => {
+    render(<QuotaExceededCard details={ownerDetails} isOwner={false} />);
+
+    expect(screen.getByTestId('quota-go-home-btn')).toBeTruthy();
+    expect(screen.getByText(/go home/i)).toBeTruthy();
+  });
+
+  it('child view: Go home button navigates to home screen [H5]', () => {
+    render(<QuotaExceededCard details={ownerDetails} isOwner={false} />);
+    fireEvent.press(screen.getByTestId('quota-go-home-btn'));
+    expect(mockPush).toHaveBeenCalledWith('/(app)/home');
+  });
 });

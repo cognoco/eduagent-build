@@ -1,10 +1,11 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
-import { feedbackSubmissionSchema } from '@eduagent/schemas';
+import { feedbackSubmissionSchema, ERROR_CODES } from '@eduagent/schemas';
 import type { AuthUser } from '../middleware/auth';
 import type { Database } from '@eduagent/database';
 import { sendEmail } from '../services/notifications';
 import { inngest } from '../inngest/client';
+import { apiError } from '../errors';
 
 type FeedbackRouteEnv = {
   Bindings: {
@@ -64,15 +65,12 @@ export const feedbackRoutes = new Hono<FeedbackRouteEnv>().post(
     const userId = c.get('user').userId;
     if (isFeedbackRateLimited(userId)) {
       const retryAfterSecs = Math.ceil(FEEDBACK_RATE_LIMIT_WINDOW_MS / 1000);
-      return c.json(
-        {
-          success: false,
-          error: 'Too many submissions. Please try again later.',
-        },
-        {
-          status: 429,
-          headers: { 'Retry-After': String(retryAfterSecs) },
-        }
+      c.header('Retry-After', String(retryAfterSecs));
+      return apiError(
+        c,
+        429,
+        ERROR_CODES.RATE_LIMITED,
+        'Too many submissions. Please try again later.'
       );
     }
 

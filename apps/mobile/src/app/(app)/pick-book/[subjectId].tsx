@@ -9,7 +9,11 @@ import { useFiling } from '../../../hooks/use-filing';
 import { useSubjects } from '../../../hooks/use-subjects';
 import { SuggestionCard } from '../../../components/library/SuggestionCard';
 import { useThemeColors } from '../../../lib/theme';
-import { formatApiError } from '../../../lib/format-api-error';
+import {
+  classifyApiError,
+  formatApiError,
+} from '../../../lib/format-api-error';
+import { ErrorFallback } from '../../../components/common/ErrorFallback';
 import { goBackOrReplace } from '../../../lib/navigation';
 import {
   BookPageFlipAnimation,
@@ -58,10 +62,10 @@ export default function PickBookScreen(): React.ReactElement {
     goBackOrReplace(router, '/(app)/library');
   }, [router, subjectId]);
 
-  // M-9: Filing overlay timeout — show skip button after 15 seconds
+  // M12: Filing overlay timeout — show skip button after 8 seconds (was 15)
   useEffect(() => {
     if (filing.isPending) {
-      const timer = setTimeout(() => setShowSkip(true), 15_000);
+      const timer = setTimeout(() => setShowSkip(true), 8_000);
       return () => clearTimeout(timer);
     }
     setShowSkip(false);
@@ -213,7 +217,7 @@ export default function PickBookScreen(): React.ReactElement {
         style={{ paddingTop: insets.top }}
         testID="pick-book-loading"
       >
-        <MagicPenAnimation size={100} color={colors.accent} />
+        <MagicPenAnimation size={140} color={colors.accent} />
         <Text className="text-body text-text-secondary mt-4">
           {LOADING_MESSAGES[loadingMessageIndex]}
         </Text>
@@ -238,39 +242,47 @@ export default function PickBookScreen(): React.ReactElement {
   }
 
   // Error state
+  // UX-DE-M11: classify before format — preserves 429 quota / 403 forbidden
+  // messaging and maps recovery to the right action set (no Retry on quota).
+  // For the two common recovery shapes we want a Retry + Go Back pair on this
+  // screen, so build the actions directly rather than delegating to
+  // recoveryActions (which defaults secondary to Go Home for retry cases).
   if (suggestionsQuery.isError) {
-    const errorMessage =
-      suggestionsQuery.error instanceof Error
-        ? formatApiError(suggestionsQuery.error)
-        : 'Unable to load suggestions.';
+    const classified = classifyApiError(suggestionsQuery.error);
+    const canRetry = classified.recovery === 'retry';
 
     return (
       <View
-        className="flex-1 bg-background items-center justify-center px-5"
+        className="flex-1 bg-background"
         style={{ paddingTop: insets.top }}
         testID="pick-book-error"
       >
-        <Text className="text-body text-text-secondary text-center mb-4">
-          {errorMessage}
-        </Text>
-        <Pressable
-          onPress={() => void suggestionsQuery.refetch()}
-          className="bg-primary rounded-button px-6 py-3 items-center min-h-[48px] justify-center mb-3"
-          testID="pick-book-retry-button"
-        >
-          <Text className="text-text-inverse text-body font-semibold">
-            Retry
-          </Text>
-        </Pressable>
-        <Pressable
-          onPress={handleBack}
-          className="bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
-          testID="pick-book-back-button"
-        >
-          <Text className="text-text-primary text-body font-semibold">
-            Go back
-          </Text>
-        </Pressable>
+        <ErrorFallback
+          variant="centered"
+          message={classified.message}
+          primaryAction={
+            canRetry
+              ? {
+                  label: 'Try Again',
+                  onPress: () => void suggestionsQuery.refetch(),
+                  testID: 'pick-book-retry-button',
+                }
+              : {
+                  label: 'Go Back',
+                  onPress: handleBack,
+                  testID: 'pick-book-back-button',
+                }
+          }
+          secondaryAction={
+            canRetry
+              ? {
+                  label: 'Go Back',
+                  onPress: handleBack,
+                  testID: 'pick-book-back-button',
+                }
+              : undefined
+          }
+        />
       </View>
     );
   }
@@ -406,7 +418,7 @@ export default function PickBookScreen(): React.ReactElement {
           className="absolute inset-0 bg-background/80 items-center justify-center"
           testID="pick-book-filing-overlay"
         >
-          <BookPageFlipAnimation size={80} color={colors.accent} />
+          <BookPageFlipAnimation size={140} color={colors.accent} />
           <Text className="text-body-sm text-text-secondary mt-3">
             Organizing your library...
           </Text>

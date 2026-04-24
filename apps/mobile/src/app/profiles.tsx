@@ -135,11 +135,17 @@ export default function ProfilesScreen() {
     router.push('/create-profile');
   }, [subscription, familyData, router, profiles.length]);
 
+  // UX-DE-L13: timeout on profile switch
   const handleSwitch = async (profileId: string) => {
     if (isSwitching) return;
     setIsSwitching(true);
+    const timeoutId = setTimeout(() => {
+      setIsSwitching(false);
+      platformAlert('Taking longer than expected', 'Please try again.');
+    }, 20_000);
     try {
       const result = await switchProfile(profileId);
+      clearTimeout(timeoutId);
       if (result?.success === false) {
         platformAlert(
           'Could not switch profiles',
@@ -151,7 +157,11 @@ export default function ProfilesScreen() {
       // Close modal AFTER a successful switch to avoid dismissing the screen
       // when the profile change did not actually complete.
       handleClose();
+    } catch {
+      clearTimeout(timeoutId);
+      platformAlert('Could not switch profiles', 'Please try again.');
     } finally {
+      clearTimeout(timeoutId);
       setIsSwitching(false);
     }
   };

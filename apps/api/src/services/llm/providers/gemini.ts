@@ -1,10 +1,14 @@
 import {
   getTextContent,
+  makeChatStreamResult,
   type LLMProvider,
   type ChatMessage,
+  type ChatResult,
+  type ChatStreamResult,
   type ModelConfig,
   type MessagePart,
 } from '../types';
+import { normalizeStopReason, type StopReason } from '../stop-reason';
 
 // ---------------------------------------------------------------------------
 // Gemini Provider — ARCH-8, ARCH-9
@@ -152,6 +156,10 @@ function toGeminiRequest(
   return request;
 }
 
+function extractFinishReason(data: GeminiResponse): string | undefined {
+  return data.candidates?.[0]?.finishReason;
+}
+
 function extractResponseText(data: GeminiResponse): string {
   // Prompt-level safety block — the entire input was rejected
   if (data.promptFeedback?.blockReason === 'SAFETY') {
@@ -185,7 +193,10 @@ export function createGeminiProvider(apiKey: string): LLMProvider {
   return {
     id: 'gemini',
 
-    async chat(messages: ChatMessage[], config: ModelConfig): Promise<string> {
+    async chat(
+      messages: ChatMessage[],
+      config: ModelConfig
+    ): Promise<ChatResult> {
       const body = toGeminiRequest(messages, config);
       const url = `${GEMINI_BASE_URL}/${config.model}:generateContent?key=${apiKey}`;
 
@@ -204,100 +215,122 @@ export function createGeminiProvider(apiKey: string): LLMProvider {
       }
 
       const data = (await res.json()) as GeminiResponse;
-      return extractResponseText(data);
+      const content = extractResponseText(data);
+      return {
+        content,
+        stopReason: normalizeStopReason('gemini', extractFinishReason(data)),
+      };
     },
 
-    async *chatStream(
-      messages: ChatMessage[],
-      config: ModelConfig
-    ): AsyncIterable<string> {
-      const body = toGeminiRequest(messages, config);
-      const url = `${GEMINI_BASE_URL}/${config.model}:streamGenerateContent?alt=sse&key=${apiKey}`;
-
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(20_000),
+    chatStream(messages: ChatMessage[], config: ModelConfig): ChatStreamResult {
+      let resolveStop!: (r: StopReason) => void;
+      const stopReasonPromise = new Promise<StopReason>((resolve) => {
+        resolveStop = resolve;
       });
 
-      if (!res.ok) {
-        const errorBody = await res.text();
-        throw new Error(
-          `Gemini API stream failed (${res.status}): ${errorBody}`
-        );
-      }
+      async function* generate(): AsyncIterable<string> {
+        let rawFinishReason: string | undefined;
 
-      if (!res.body) {
-        throw new Error('Gemini API returned no response body for stream');
-      }
+        try {
+          const body = toGeminiRequest(messages, config);
+          const url = `${GEMINI_BASE_URL}/${config.model}:streamGenerateContent?alt=sse&key=${apiKey}`;
 
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
+          const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+            signal: AbortSignal.timeout(20_000),
+          });
 
-      function* parseSseLines(lines: string[]): Generator<string> {
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed.startsWith('data: ')) continue;
+          if (!res.ok) {
+            const errorBody = await res.text();
+            throw new Error(
+              `Gemini API stream failed (${res.status}): ${errorBody}`
+            );
+          }
 
-          const jsonStr = trimmed.slice(6);
-          if (!jsonStr || jsonStr === '[DONE]') continue;
+          if (!res.body) {
+            throw new Error('Gemini API returned no response body for stream');
+          }
 
-          try {
-            const chunk = JSON.parse(jsonStr) as GeminiResponse;
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = '';
 
-            // Safety block during streaming
-            if (chunk.promptFeedback?.blockReason === 'SAFETY') {
-              throw new Error(
-                'Your message could not be processed due to content safety filters. Please rephrase and try again.'
-              );
-            }
-            if (chunk.candidates?.[0]?.finishReason === 'SAFETY') {
-              throw new Error(
-                'The response was blocked by content safety filters. Please try rephrasing your question.'
-              );
-            }
+          function* parseSseLines(lines: string[]): Generator<string> {
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (!trimmed.startsWith('data: ')) continue;
 
-            const text = chunk.candidates?.[0]?.content?.parts?.[0]?.text;
-            if (text) {
-              yield text;
-            }
-          } catch (e) {
-            // Re-throw safety errors; skip malformed JSON
-            if (e instanceof Error && e.message.includes('safety filters')) {
-              throw e;
+              const jsonStr = trimmed.slice(6);
+              if (!jsonStr || jsonStr === '[DONE]') continue;
+
+              try {
+                const chunk = JSON.parse(jsonStr) as GeminiResponse;
+
+                // Safety block during streaming
+                if (chunk.promptFeedback?.blockReason === 'SAFETY') {
+                  throw new Error(
+                    'Your message could not be processed due to content safety filters. Please rephrase and try again.'
+                  );
+                }
+                if (chunk.candidates?.[0]?.finishReason === 'SAFETY') {
+                  throw new Error(
+                    'The response was blocked by content safety filters. Please try rephrasing your question.'
+                  );
+                }
+
+                const finish = chunk.candidates?.[0]?.finishReason;
+                if (finish) rawFinishReason = finish;
+
+                const text = chunk.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (text) {
+                  yield text;
+                }
+              } catch (e) {
+                // Re-throw safety errors; skip malformed JSON
+                if (
+                  e instanceof Error &&
+                  e.message.includes('safety filters')
+                ) {
+                  throw e;
+                }
+              }
             }
           }
+
+          try {
+            while (true) {
+              // BUG-32: Per-chunk timeout — if Gemini stalls mid-stream (sends
+              // first bytes then goes silent), detect within 10s instead of
+              // waiting for the overall fetch AbortSignal or mobile XHR timeout.
+              const { done, value } = await readWithTimeout(
+                reader.read(),
+                CHUNK_TIMEOUT_MS
+              );
+              if (done) break;
+
+              buffer += decoder.decode(value, { stream: true });
+              const lines = buffer.split('\n');
+              // Keep the last potentially incomplete line in the buffer
+              buffer = lines.pop() ?? '';
+
+              yield* parseSseLines(lines);
+            }
+
+            // Flush any remaining data in the buffer
+            if (buffer.trim()) {
+              yield* parseSseLines([buffer]);
+            }
+          } finally {
+            reader.releaseLock();
+          }
+        } finally {
+          resolveStop(normalizeStopReason('gemini', rawFinishReason));
         }
       }
 
-      try {
-        while (true) {
-          // BUG-32: Per-chunk timeout — if Gemini stalls mid-stream (sends
-          // first bytes then goes silent), detect within 10s instead of
-          // waiting for the overall fetch AbortSignal or mobile XHR timeout.
-          const { done, value } = await readWithTimeout(
-            reader.read(),
-            CHUNK_TIMEOUT_MS
-          );
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          // Keep the last potentially incomplete line in the buffer
-          buffer = lines.pop() ?? '';
-
-          yield* parseSseLines(lines);
-        }
-
-        // Flush any remaining data in the buffer
-        if (buffer.trim()) {
-          yield* parseSseLines([buffer]);
-        }
-      } finally {
-        reader.releaseLock();
-      }
+      return makeChatStreamResult(generate(), stopReasonPromise);
     },
   };
 }

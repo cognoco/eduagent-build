@@ -9,14 +9,18 @@ describe('LibraryTabs', () => {
     counts: { shelves: 4, books: 12, topics: 87 },
   };
 
-  it('renders all three tabs with count badges', () => {
+  it('renders Shelves and Books tabs with count badges', () => {
     render(<LibraryTabs {...defaultProps} />);
     expect(screen.getByTestId('library-tab-shelves')).toBeTruthy();
     expect(screen.getByTestId('library-tab-books')).toBeTruthy();
-    expect(screen.getByTestId('library-tab-topics')).toBeTruthy();
     expect(screen.getByText('Shelves (4)')).toBeTruthy();
     expect(screen.getByText('Books (12)')).toBeTruthy();
-    expect(screen.getByText('Topics (87)')).toBeTruthy();
+  });
+
+  it('hides the Topics tab from top-level Library navigation', () => {
+    render(<LibraryTabs {...defaultProps} />);
+    expect(screen.queryByTestId('library-tab-topics')).toBeNull();
+    expect(screen.queryByText(/^Topics \(/)).toBeNull();
   });
 
   it('calls onTabChange when a tab is pressed', () => {
@@ -24,8 +28,6 @@ describe('LibraryTabs', () => {
     render(<LibraryTabs {...defaultProps} onTabChange={onTabChange} />);
     fireEvent.press(screen.getByTestId('library-tab-books'));
     expect(onTabChange).toHaveBeenCalledWith('books');
-    fireEvent.press(screen.getByTestId('library-tab-topics'));
-    expect(onTabChange).toHaveBeenCalledWith('topics');
   });
 
   it('shows zero counts', () => {
@@ -38,14 +40,12 @@ describe('LibraryTabs', () => {
     );
     expect(screen.getByText('Shelves (0)')).toBeTruthy();
     expect(screen.getByText('Books (0)')).toBeTruthy();
-    expect(screen.getByText('Topics (0)')).toBeTruthy();
   });
 
-  it('shows overdue review badge on the topics tab when provided', () => {
+  it('does not render the overdue review badge (Topics tab is hidden)', () => {
     render(<LibraryTabs {...defaultProps} reviewBadge={6} />);
 
-    expect(screen.getByTestId('library-tab-topics-review-badge')).toBeTruthy();
-    expect(screen.getByText('6')).toBeTruthy();
+    expect(screen.queryByTestId('library-tab-topics-review-badge')).toBeNull();
   });
 
   it('sets accessibilityState selected on active tab', () => {

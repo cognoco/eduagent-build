@@ -13,9 +13,10 @@ import {
 import { formatApiError } from '../../lib/format-api-error';
 import { goBackOrReplace } from '../../lib/navigation';
 import { Button } from '../../components/common/Button';
+import { ErrorFallback } from '../../components/common/ErrorFallback';
 
 const OPENING_MESSAGE =
-  "Let's see what you've picked up so far. I'll ask a few questions \u2014 just do your best, and I'll help fill in any gaps.";
+  "Let's see what you've picked up so far. I'll ask a few questions — just do your best, and I'll help fill in any gaps.";
 
 export default function AssessmentScreen() {
   const router = useRouter();
@@ -32,11 +33,15 @@ export default function AssessmentScreen() {
     { id: 'opening', role: 'assistant', content: OPENING_MESSAGE },
   ]);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [lastError, setLastError] = useState<string | null>(null);
+  const [lastUserText, setLastUserText] = useState<string | null>(null);
 
   const handleSend = useCallback(
     async (text: string) => {
       if (isStreaming || !subjectId || !topicId) return;
 
+      setLastError(null);
+      setLastUserText(text);
       setMessages((prev) => [
         ...prev,
         { id: `user-${Date.now()}`, role: 'user', content: text },
@@ -62,7 +67,7 @@ export default function AssessmentScreen() {
               {
                 id: `assessment-done-${Date.now()}`,
                 role: 'assistant',
-                content: `You've got a solid grasp of most of this \u2014 ${Math.round(
+                content: `You've got a solid grasp of most of this — ${Math.round(
                   evaluation.masteryScore * 100
                 )}% mastery! The areas to revisit will show up in your Library.`,
               },
@@ -70,7 +75,9 @@ export default function AssessmentScreen() {
           }
         });
       } catch (err: unknown) {
-        animateResponse(formatApiError(err), setMessages, setIsStreaming);
+        const errorMessage = formatApiError(err);
+        animateResponse(errorMessage, setMessages, setIsStreaming);
+        setLastError(errorMessage);
       }
     },
     [
@@ -112,6 +119,34 @@ export default function AssessmentScreen() {
       messages={messages}
       onSend={handleSend}
       isStreaming={isStreaming}
+      footer={
+        lastError ? (
+          <ErrorFallback
+            variant="card"
+            title="Something went wrong"
+            message={lastError}
+            primaryAction={{
+              label: 'Try again',
+              testID: 'assessment-error-retry',
+              // [UX-DE-H3] Disable retry while streaming to prevent double-submit
+              // on rapid taps during an in-flight answer check.
+              disabled: isStreaming,
+              onPress: () => {
+                if (lastUserText) {
+                  void handleSend(lastUserText);
+                } else {
+                  setLastError(null);
+                }
+              },
+            }}
+            secondaryAction={{
+              label: 'Go Home',
+              testID: 'assessment-error-home',
+              onPress: () => goBackOrReplace(router, '/(app)/home' as const),
+            }}
+          />
+        ) : undefined
+      }
     />
   );
 }

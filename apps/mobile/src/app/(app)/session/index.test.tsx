@@ -412,13 +412,17 @@ describe('SessionScreen homework flow', () => {
     mockStream.mockImplementation(
       async (
         _message: string,
-        _onChunk: (value: string) => void,
+        onChunk: (value: string) => void,
         onDone: (result: {
           exchangeCount: number;
           escalationRung: number;
           aiEventId?: string;
         }) => void
       ) => {
+        // Real SSE streams always emit at least one token before completion;
+        // mirror that so the streaming hook doesn't treat the response as an
+        // empty/failed stream (chunkCount === 0 → reconnect_prompt).
+        onChunk('Got it.');
         onDone({
           exchangeCount: 1,
           escalationRung: 1,
@@ -966,9 +970,10 @@ describe('voice mode persistence', () => {
     mockStream.mockImplementation(
       async (
         _msg: string,
-        _onChunk: unknown,
+        onChunk: (value: string) => void,
         onDone: (r: { exchangeCount: number; escalationRung: number }) => void
       ) => {
+        onChunk('Got it.');
         onDone({ exchangeCount: 1, escalationRung: 1 });
       }
     );

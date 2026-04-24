@@ -1,17 +1,21 @@
-import { and, asc, eq, gt, ilike, or, sql } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import {
-  curriculumBooks,
-  curriculumTopics,
-  learningSessions,
-  retentionCards,
   sessionEvents,
+  createScopedRepository,
   type Database,
+  type ScopedRepository,
 } from '@eduagent/database';
 import { learnerRecapResponseSchema } from '@eduagent/schemas';
 import { extractFirstJsonObject, routeAndCall } from './llm';
+import { escapeXml, sanitizeXmlValue } from './llm/sanitize';
 import { createLogger } from './logger';
 
 const logger = createLogger();
+
+/** Upper bound on candidate topics fetched when resolving the "next topic". */
+const MAX_NEXT_TOPIC_CANDIDATES = 50;
+/** Max freeform keyword matches we'll consider; >1 collapses to null intentionally. */
+const MAX_FREEFORM_MATCHES = 3;
 
 interface RecapInput {
   sessionId: string;
@@ -43,16 +47,27 @@ export function getAgeVoiceTierLabel(birthYear: number | null): string {
     : 'teen (14-17): peer-adjacent, brief, sharp';
 }
 
-// Scrub a free-text value before interpolating it into the system prompt.
-// Strips newlines/tabs/quotes/angle-brackets so a crafted value cannot escape
-// its wrapping tag or land on a new line that looks like a directive. Matches
-// the sanitizeXmlValue helper in services/interview.ts.
-function sanitizePromptValue(text: string, maxLen: number): string {
-  return text
-    .trim()
-    .replace(/[\n\r\t"<>]/g, ' ')
-    .replace(/\s{2,}/g, ' ')
-    .slice(0, maxLen);
+// [PROMPT-INJECT-2] Prompt-value sanitization now lives in
+// services/llm/sanitize.ts as sanitizeXmlValue — shared with interview.ts,
+// the broader prompt-injection sweep, and any future consumer.
+
+/**
+ * Format transcript turns into the prose block that the recap LLM sees inside
+ * the wrapping `<transcript>` tag. escapeXml runs on every `event.content` so
+ * a learner can't inject `</transcript>Ignore previous instructions.` and
+ * smuggle a directive out of the data section. [PROMPT-INJECT-3]
+ */
+export function buildRecapTranscriptText(
+  events: ReadonlyArray<{ eventType: string; content: string }>
+): string {
+  return events
+    .map(
+      (event) =>
+        `${
+          event.eventType === 'user_message' ? 'Student' : 'Mentor'
+        }: ${escapeXml(event.content)}`
+    )
+    .join('\n\n');
 }
 
 export function buildRecapPrompt(
@@ -97,7 +112,7 @@ export function buildRecapPrompt(
   // curriculum creation time). Sanitize before interpolation so a stored
   // title containing quotes or angle brackets cannot break the string
   // context or escape the wrapping tag.
-  const safeTitle = sanitizePromptValue(nextTopicTitle, 120);
+  const safeTitle = sanitizeXmlValue(nextTopicTitle, 120);
   basePrompt.push(
     '',
     `A likely next topic is <next_topic>${safeTitle}</next_topic>.`,
@@ -110,66 +125,53 @@ export function buildRecapPrompt(
 }
 
 export async function resolveNextTopic(
-  db: Database,
-  profileId: string,
+  repo: ScopedRepository,
   topicId: string
 ): Promise<TopicSuggestion | null> {
-  const [currentTopic] = await db
-    .select({
-      bookId: curriculumTopics.bookId,
-      sortOrder: curriculumTopics.sortOrder,
-    })
-    .from(curriculumTopics)
-    .where(eq(curriculumTopics.id, topicId))
-    .limit(1);
-
+  const currentTopic = await repo.curriculumTopics.findById(topicId);
   if (!currentTopic) {
+    // Observability: emit a structured log so support can see how often
+    // next-topic resolution fails. We intentionally do NOT disambiguate
+    // "stale topic" from "cross-profile deny" here — detecting the latter
+    // would require a privileged unscoped read, which is what this refactor
+    // is preventing. Correlate with request logs if disambiguation is ever
+    // needed.
+    logger.info('session_recap.resolve_next_topic_miss', {
+      profileId: repo.profileId,
+      topicId,
+    });
     return null;
   }
 
-  const completedByRetention = await db
-    .select({ topicId: retentionCards.topicId })
-    .from(retentionCards)
-    .where(eq(retentionCards.profileId, profileId));
+  const [retainedIds, sessionIds] = await Promise.all([
+    repo.retentionCards.listCompletedTopicIds(),
+    repo.sessions.listCompletedTopicIds(),
+  ]);
+  const completedTopicIds = new Set([...retainedIds, ...sessionIds]);
 
-  const completedBySession = await db
-    .select({ topicId: learningSessions.topicId })
-    .from(learningSessions)
-    .where(
-      and(
-        eq(learningSessions.profileId, profileId),
-        sql`${learningSessions.topicId} IS NOT NULL`
-      )
-    );
-
-  const completedTopicIds = new Set(
-    [
-      ...completedByRetention.map((row) => row.topicId),
-      ...completedBySession.map((row) => row.topicId).filter(Boolean),
-    ].filter((value): value is string => typeof value === 'string')
+  const candidates = await repo.curriculumTopics.findLaterInBook(
+    currentTopic.bookId,
+    currentTopic.sortOrder,
+    MAX_NEXT_TOPIC_CANDIDATES
   );
-
-  const candidates = await db
-    .select({
-      id: curriculumTopics.id,
-      title: curriculumTopics.title,
-    })
-    .from(curriculumTopics)
-    .where(
-      and(
-        eq(curriculumTopics.bookId, currentTopic.bookId),
-        gt(curriculumTopics.sortOrder, currentTopic.sortOrder)
-      )
-    )
-    .orderBy(asc(curriculumTopics.sortOrder));
 
   return (
     candidates.find((candidate) => !completedTopicIds.has(candidate.id)) ?? null
   );
 }
 
+/**
+ * Matches learner recap takeaways against curriculum topics inside a subject.
+ *
+ * SECURITY: `subjectId` MUST come from a server-trusted source — typically the
+ * `subjectId` column on the learning_session row being recapped — never from
+ * an event payload or client-controlled input. The scoped repo call below
+ * joins through `subjects.profileId = repo.profileId`, so ownership is
+ * enforced in SQL, but we still want callers to treat this id as trusted data
+ * so the enforcement never becomes load-bearing on a single layer.
+ */
 export async function matchFreeformTopic(
-  db: Database,
+  repo: ScopedRepository,
   subjectId: string,
   takeaways: string[]
 ): Promise<TopicSuggestion | null> {
@@ -261,36 +263,18 @@ export async function matchFreeformTopic(
     ),
   ].slice(0, 5);
 
-  if (keywords.length === 0) {
-    return null;
-  }
+  if (keywords.length === 0) return null;
 
-  const matches = await db
-    .select({
-      id: curriculumTopics.id,
-      title: curriculumTopics.title,
-    })
-    .from(curriculumTopics)
-    .innerJoin(curriculumBooks, eq(curriculumBooks.id, curriculumTopics.bookId))
-    .where(
-      and(
-        eq(curriculumBooks.subjectId, subjectId),
-        or(
-          ...keywords.map((keyword) =>
-            ilike(curriculumTopics.title, `%${keyword}%`)
-          )
-        )
-      )
-    )
-    .limit(3);
+  const matches = await repo.curriculumTopics.findMatchingInSubject(
+    subjectId,
+    keywords,
+    MAX_FREEFORM_MATCHES
+  );
 
   // Only return a match when the keyword set resolves unambiguously to one
-  // topic. Multiple matches mean the takeaways were too generic to pin down
-  // a "next topic" confidently — return null so the UI falls back to the
-  // generic "You might also like..." framing instead of a misleading pick.
-  if (matches.length !== 1) {
-    return null;
-  }
+  // topic. Multiple matches mean the takeaways were too generic — return
+  // null so the UI falls back to the generic "You might also like…" framing.
+  if (matches.length !== 1) return null;
 
   return matches[0] ?? null;
 }
@@ -324,17 +308,11 @@ export async function generateLearnerRecap(
     return null;
   }
 
-  const transcriptText = transcriptTurns
-    .map(
-      (event) =>
-        `${event.eventType === 'user_message' ? 'Student' : 'Mentor'}: ${
-          event.content
-        }`
-    )
-    .join('\n\n');
+  const transcriptText = buildRecapTranscriptText(transcriptTurns);
 
+  const repo = createScopedRepository(db, input.profileId);
   let nextTopic = input.topicId
-    ? await resolveNextTopic(db, input.profileId, input.topicId)
+    ? await resolveNextTopic(repo, input.topicId)
     : null;
 
   // Pure content-generation flow: the LLM returns only recap text + next-topic
@@ -394,7 +372,7 @@ export async function generateLearnerRecap(
   const { closingLine, takeaways, nextTopicReason } = validated.data;
 
   if (!input.topicId && !nextTopic) {
-    nextTopic = await matchFreeformTopic(db, input.subjectId, takeaways);
+    nextTopic = await matchFreeformTopic(repo, input.subjectId, takeaways);
   }
 
   return {

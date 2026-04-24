@@ -6,7 +6,9 @@ import {
   type SessionTranscript,
 } from '@eduagent/schemas';
 import { routeAndCall, type ChatMessage } from '../llm';
+import { escapeXml } from '../llm/sanitize';
 import { createLogger } from '../logger';
+import { captureException } from '../sentry';
 import {
   AUTO_MEANINGFUL_EXCHANGE_THRESHOLD,
   GATE_TIMEOUT_MS,
@@ -35,12 +37,14 @@ function countLearnerWords(transcript: SessionTranscript): number {
 }
 
 function formatTranscriptForPrompt(transcript: SessionTranscript): string {
+  // [PROMPT-INJECT-8] Entity-encode each turn's content so a crafted
+  // message cannot close the <transcript> tag or inject directives.
   const lines = transcript.exchanges
     .filter((exchange) => !exchange.isSystemPrompt)
     .map((exchange) =>
       exchange.role === 'user'
-        ? `Learner: ${exchange.content}`
-        : `Tutor: ${exchange.content}`
+        ? `Learner: ${escapeXml(exchange.content)}`
+        : `Tutor: ${escapeXml(exchange.content)}`
     )
     .join('\n');
   return `<transcript>\n${lines}\n</transcript>`;
@@ -57,8 +61,24 @@ function parseDepthResponse(
       .trim();
     const parsed = JSON.parse(cleaned);
     const result = llmDepthResponseSchema.safeParse(parsed);
-    return result.success ? result.data : null;
-  } catch {
+    if (!result.success) {
+      captureException(new Error('session-depth: schema validation failed'), {
+        extra: {
+          context: 'parseDepthResponse',
+          rawSlice: raw.slice(0, 500),
+          validationError: result.error.message,
+        },
+      });
+      return null;
+    }
+    return result.data;
+  } catch (err) {
+    captureException(err, {
+      extra: {
+        context: 'parseDepthResponse',
+        rawSlice: raw.slice(0, 500),
+      },
+    });
     return null;
   }
 }
@@ -107,6 +127,9 @@ async function detectTopicsOnly(
   } catch (error) {
     logger.warn('[session-depth] topic detection failed', {
       error: error instanceof Error ? error.message : String(error),
+    });
+    captureException(error, {
+      extra: { context: 'detectTopicsOnly' },
     });
     return [];
   }

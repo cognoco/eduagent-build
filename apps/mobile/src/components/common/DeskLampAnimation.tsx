@@ -14,7 +14,7 @@ import Animated, {
 import Svg, { Path, Circle } from 'react-native-svg';
 
 interface DeskLampAnimationProps {
-  /** Overall size in pixels (default: 48) */
+  /** Overall size in pixels (default: 96) */
   size?: number;
   /** Lamp silhouette color (default: theme muted gray) */
   color?: string;
@@ -45,12 +45,12 @@ const DESK_LINE = 'M16 60 L48 60';
  * 80px+: desk surface glow, brighter bulb dot
  */
 export function DeskLampAnimation({
-  size = 48,
+  size = 96,
   color = '#9ca3af',
   testID,
 }: DeskLampAnimationProps): ReactNode {
   const reduceMotion = useReducedMotion();
-  const showEnhanced = size >= 80;
+  const showEnhanced = size >= 48;
 
   const lightOp = useSharedValue(reduceMotion ? 0.3 : 0.06);
   const deskGlowOp = useSharedValue(0);
@@ -125,8 +125,10 @@ export function DeskLampAnimation({
         ]}
       >
         <Svg width={size} height={size} viewBox="0 0 64 64">
-          {/* Bulb glow point at shade opening */}
-          <Circle cx={40} cy={24} r={3} fill={WARM_COLOR} opacity={0.9} />
+          {/* Bulb glow halo — soft, larger outer ring */}
+          <Circle cx={40} cy={24} r={7} fill={WARM_COLOR} opacity={0.35} />
+          {/* Bulb glow core — bigger and brighter so the lamp reads as "lit" */}
+          <Circle cx={40} cy={24} r={4.5} fill={WARM_COLOR} opacity={0.95} />
           {/* Main light cone */}
           <Path d={LIGHT_CONE} fill={WARM_COLOR} />
         </Svg>

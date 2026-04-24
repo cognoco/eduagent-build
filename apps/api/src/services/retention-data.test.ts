@@ -39,6 +39,11 @@ jest.mock('./xp', () => ({
   syncXpLedgerStatus: jest.fn().mockResolvedValue(undefined),
 }));
 
+jest.mock('./sentry', () => ({
+  captureException: jest.fn(),
+  addBreadcrumb: jest.fn(),
+}));
+
 import type { Database } from '@eduagent/database';
 import { createScopedRepository } from '@eduagent/database';
 import { processRecallResult, getRetentionStatus } from './retention';
@@ -47,6 +52,11 @@ import {
   checkNeedsDeepeningCapacity,
 } from './adaptive-teaching';
 import { syncXpLedgerStatus } from './xp';
+import { captureException } from './sentry';
+
+const mockCaptureException = captureException as jest.MockedFunction<
+  typeof captureException
+>;
 import {
   registerProvider,
   createMockProvider,
@@ -680,6 +690,55 @@ describe('processRecallTest', () => {
       profileId,
       topicId,
       'decayed'
+    );
+  });
+
+  // [AUDIT-SILENT-FAIL] Break test — a silent catch on XP ledger sync
+  // failure would silently accumulate drift across sessions. Sentry
+  // escalation is how we detect this in production.
+  it('[AUDIT-SILENT-FAIL] escalates to Sentry when syncXpLedgerStatus throws', async () => {
+    const card = mockRetentionCardRow();
+    setupScopedRepo({ retentionCardFindFirst: card });
+
+    (processRecallResult as jest.Mock).mockReturnValue({
+      passed: true,
+      newState: {
+        topicId,
+        easeFactor: 2.6,
+        intervalDays: 10,
+        repetitions: 4,
+        failureCount: 0,
+        consecutiveSuccesses: 3,
+        xpStatus: 'verified',
+        nextReviewAt: '2026-02-25T10:00:00.000Z',
+        lastReviewedAt: NOW.toISOString(),
+      },
+      xpChange: 'verified',
+    });
+
+    const xpErr = new Error('XP sync DB outage');
+    (syncXpLedgerStatus as jest.Mock).mockRejectedValueOnce(xpErr);
+
+    const db = createMockDb();
+    const result = await processRecallTest(db, profileId, {
+      topicId,
+      answer: 'A detailed answer about the topic',
+    });
+
+    // Recall response itself is unaffected — XP sync is best-effort.
+    expect(result.passed).toBe(true);
+    // But the failure must be visible.
+    expect(mockCaptureException).toHaveBeenCalledTimes(1);
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      xpErr,
+      expect.objectContaining({
+        profileId,
+        extra: expect.objectContaining({
+          site: 'processRecallTest.syncXpLedgerStatus',
+          topicId,
+          xpChange: 'verified',
+        }),
+      })
     );
   });
 

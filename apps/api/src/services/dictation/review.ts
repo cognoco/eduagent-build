@@ -5,6 +5,7 @@ import {
 } from '@eduagent/schemas';
 import { routeAndCall } from '../llm';
 import type { ChatMessage, MessagePart } from '../llm';
+import { sanitizeXmlValue } from '../llm/sanitize';
 import { UpstreamLlmError } from '../../errors';
 import { captureException } from '../sentry';
 
@@ -76,9 +77,17 @@ function buildExplanationStyleGuidance(
     );
   }
 
-  const struggleHint =
+  // [PROMPT-INJECT-8] struggle topics are stored LLM output — sanitize
+  // each entry before joining so a crafted topic cannot inject directives.
+  const safeStruggles =
     recentStruggles && recentStruggles.length > 0
-      ? `\nThe learner has recently struggled with: ${recentStruggles.join(
+      ? recentStruggles
+          .map((s) => sanitizeXmlValue(s, 200))
+          .filter((s) => s.length > 0)
+      : [];
+  const struggleHint =
+    safeStruggles.length > 0
+      ? `\nThe learner has recently struggled with: ${safeStruggles.join(
           ', '
         )}. When reviewing their dictation, pay extra attention to errors related to these areas and provide targeted feedback.`
       : '';
@@ -158,15 +167,19 @@ export async function reviewDictation(
     recentStruggles,
   } = input;
 
+  // [PROMPT-INJECT-8] sentence text comes from the prepare-homework pipeline
+  // (LLM output) and `language` is an ISO code. Sanitize both to guard
+  // against stored prompt injection.
   const originalText = sentences
-    .map((s, i) => `${i + 1}. ${s.text}`)
+    .map((s, i) => `${i + 1}. ${sanitizeXmlValue(s.text, 500)}`)
     .join('\n');
+  const safeLanguage = sanitizeXmlValue(language, 40);
 
   const userContent: MessagePart[] = [
     { type: 'inline_data', mimeType: imageMimeType, data: imageBase64 },
     {
       type: 'text',
-      text: `Original sentences:\n${originalText}\n\nPlease generate all explanations in ${language}.`,
+      text: `Original sentences:\n${originalText}\n\nPlease generate all explanations in ${safeLanguage}.`,
     },
   ];
 

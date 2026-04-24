@@ -28,7 +28,11 @@ import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
 import { getApiUrl } from '../lib/api';
-import { streamSSEViaXHR, type FluencyDrillEvent } from '../lib/sse';
+import {
+  streamSSEViaXHR,
+  type FluencyDrillEvent,
+  type StreamFallbackReason,
+} from '../lib/sse';
 
 // API-route-specific response wrappers (not in schemas)
 interface SessionStartResult {
@@ -242,6 +246,10 @@ export function useStreamMessage(sessionId: string): {
       notePromptPostSession?: boolean;
       fluencyDrill?: FluencyDrillEvent;
       confidence?: 'low' | 'medium' | 'high';
+      fallback?: {
+        reason: StreamFallbackReason;
+        fallbackText: string;
+      };
     }) => void,
     overrideSessionId?: string,
     options?: {
@@ -279,6 +287,10 @@ export function useStreamMessage(sessionId: string): {
         notePromptPostSession?: boolean;
         fluencyDrill?: FluencyDrillEvent;
         confidence?: 'low' | 'medium' | 'high';
+        fallback?: {
+          reason: StreamFallbackReason;
+          fallbackText: string;
+        };
       }) => void,
       overrideSessionId?: string,
       options?: {
@@ -329,10 +341,18 @@ export function useStreamMessage(sessionId: string): {
         abortRef.current = abort;
 
         let accumulated = '';
+        let fallback:
+          | { reason: StreamFallbackReason; fallbackText: string }
+          | undefined;
         for await (const event of events) {
           if (event.type === 'chunk') {
             accumulated += event.content;
             onChunk(accumulated);
+          } else if (event.type === 'fallback') {
+            fallback = {
+              reason: event.reason,
+              fallbackText: event.fallbackText,
+            };
           } else if (event.type === 'done') {
             onDone({
               exchangeCount: event.exchangeCount,
@@ -343,6 +363,7 @@ export function useStreamMessage(sessionId: string): {
               notePromptPostSession: event.notePromptPostSession,
               fluencyDrill: event.fluencyDrill,
               confidence: event.confidence,
+              fallback,
             });
           } else if (event.type === 'error') {
             throw new Error(event.message);

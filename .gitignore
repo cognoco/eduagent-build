@@ -178,3 +178,7 @@ apps/mobile/e2e/scripts/regression-batch*.txt
 
 # Codex tool logs (local-only)
 .codex/
+
+# Superpowers brainstorm tool scratch artifacts (HTML drafts, server PIDs,
+# state files — local-only, never source of truth)
+.superpowers/

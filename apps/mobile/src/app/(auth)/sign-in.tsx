@@ -41,6 +41,7 @@ import {
   peekPendingAuthRedirect,
   rememberPendingAuthRedirect,
 } from '../../lib/pending-auth-redirect';
+import { ErrorFallback } from '../../components/common/ErrorFallback';
 
 // Use physical screen height (not window) so the content container always
 // overflows the ScrollView after adjustResize shrinks it for the keyboard.
@@ -265,6 +266,9 @@ export default function SignInScreen() {
   const [isTransitioning, setIsTransitioning] = useState(
     isWithinTransitionWindow
   );
+  // True when SESSION_TRANSITION_MS has elapsed but the auth guard still hasn't
+  // redirected — show ErrorFallback instead of bare spinner.
+  const [transitionStuck, setTransitionStuck] = useState(false);
   const { scrollRef, onFieldLayout, onFieldFocus } = useKeyboardScroll();
   const {
     scrollRef: verifyScrollRef,
@@ -283,27 +287,40 @@ export default function SignInScreen() {
     })();
   }, []);
 
-  // Safety timeout: if the auth layout guard never redirects (e.g. stale
-  // token → signOut → remount), fall back to the sign-in form with an error
-  // instead of showing a spinner forever.
+  // Safety timeouts: if the auth layout guard never redirects (e.g. stale
+  // token → signOut → remount), show ErrorFallback after SESSION_TRANSITION_MS
+  // then fall back to the sign-in form after a further 15s.
   useEffect(() => {
     if (!isTransitioning) return;
     const remaining = Math.max(
       100,
       SESSION_TRANSITION_MS - getTransitionElapsed()
     );
-    const timer = setTimeout(() => {
+    // Phase 1: SESSION_TRANSITION_MS elapsed → show ErrorFallback ("stuck")
+    const phase1 = setTimeout(() => {
       if (__DEV__)
         console.warn(
-          `[AUTH-DEBUG] transitioning TIMEOUT after ${SESSION_TRANSITION_MS}ms — falling back to sign-in form`
+          `[AUTH-DEBUG] transitioning phase-1 TIMEOUT after ${SESSION_TRANSITION_MS}ms — showing stuck fallback`
+        );
+      setTransitionStuck(true);
+    }, remaining);
+    // Phase 2: 15s after phase 1 → give up entirely and reset to sign-in form
+    const phase2 = setTimeout(() => {
+      if (__DEV__)
+        console.warn(
+          '[AUTH-DEBUG] transitioning phase-2 TIMEOUT — falling back to sign-in form'
         );
       clearTransitionState();
+      setTransitionStuck(false);
       setIsTransitioning(false);
       setError(
         'Sign-in is taking longer than expected. Please try signing in again.'
       );
-    }, remaining);
-    return () => clearTimeout(timer);
+    }, remaining + 15_000);
+    return () => {
+      clearTimeout(phase1);
+      clearTimeout(phase2);
+    };
   }, [isTransitioning]);
 
   const { startSSOFlow } = useSSO();
@@ -885,12 +902,45 @@ export default function SignInScreen() {
   // redirects to /(app)/home.  This prevents the user from ever seeing
   // a flash of the empty sign-in form during the Clerk state propagation.
   if (isTransitioning) {
+    if (transitionStuck) {
+      return (
+        <View
+          className="flex-1 bg-background"
+          testID="sign-in-transitioning-stuck"
+        >
+          <ErrorFallback
+            variant="centered"
+            title="Still signing you in"
+            message="This is taking longer than expected. Try again."
+            primaryAction={{
+              label: 'Try again',
+              testID: 'sign-in-stuck-retry',
+              onPress: () => {
+                clearTransitionState();
+                setTransitionStuck(false);
+                setIsTransitioning(false);
+              },
+            }}
+            secondaryAction={{
+              label: 'Sign up',
+              testID: 'sign-in-stuck-signup',
+              onPress: () => {
+                clearTransitionState();
+                setTransitionStuck(false);
+                setIsTransitioning(false);
+                router.replace('/(auth)/sign-up');
+              },
+            }}
+          />
+        </View>
+      );
+    }
     return (
       <View
         className="flex-1 bg-background items-center justify-center"
         testID="sign-in-transitioning"
       >
-        <ActivityIndicator size="large" />
+        <ActivityIndicator size="large" accessibilityLabel="Signing you in" />
         <Text className="text-body text-text-secondary mt-4">
           Signing you in…
         </Text>

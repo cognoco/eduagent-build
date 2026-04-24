@@ -1,10 +1,7 @@
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import { Alert } from 'react-native';
+import * as Sentry from '@sentry/react-native';
 import BookScreen from './[bookId]';
-
-// ---------------------------------------------------------------------------
-// Mocks
-// ---------------------------------------------------------------------------
 
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
@@ -25,61 +22,21 @@ jest.mock('expo-router', () => ({
   }),
 }));
 
-// Default search params — overridden per test via mockSearchParams
 let mockSearchParams = () => ({
   subjectId: 'sub-1',
   bookId: 'book-1',
 });
 
-// --- useBookWithTopics ---
 const mockBookRefetch = jest.fn();
-
-const mockUseBookWithTopics = jest.fn((): any => ({
-  data: {
-    book: {
-      id: 'book-1',
-      title: 'Algebra',
-      emoji: '📐',
-      topicsGenerated: true,
-      description: 'Basic algebra',
-    },
-    topics: [
-      {
-        id: 'topic-1',
-        title: 'Linear Equations',
-        sortOrder: 1,
-        skipped: false,
-      },
-      {
-        id: 'topic-2',
-        title: 'Quadratic Equations',
-        sortOrder: 2,
-        skipped: false,
-      },
-    ],
-    completedTopicCount: 0,
-  },
-  isLoading: false,
-  isError: false,
-  error: null,
-  refetch: mockBookRefetch,
-}));
-
-// --- useGenerateBookTopics ---
 const mockGenerateMutate = jest.fn();
 
-const mockUseGenerateBookTopics = jest.fn((): any => ({
-  mutate: mockGenerateMutate,
-  isPending: false,
-}));
-
-const mockUseBooks = jest.fn((): any => ({
-  data: [
-    { id: 'book-1', title: 'Algebra', emoji: '📐', topicsGenerated: true },
-    { id: 'book-2', title: 'Geometry', emoji: '📏', topicsGenerated: true },
-  ],
-  isLoading: false,
-}));
+const mockUseBookWithTopics = jest.fn();
+const mockUseGenerateBookTopics = jest.fn();
+const mockUseBooks = jest.fn();
+const mockUseBookSessions = jest.fn();
+const mockUseBookNotes = jest.fn();
+const mockUseRetentionTopics = jest.fn();
+const mockUseCurriculum = jest.fn();
 
 jest.mock('../../../../../hooks/use-books', () => ({
   useBookWithTopics: () => mockUseBookWithTopics(),
@@ -87,537 +44,647 @@ jest.mock('../../../../../hooks/use-books', () => ({
   useGenerateBookTopics: () => mockUseGenerateBookTopics(),
 }));
 
-jest.mock('../../../../../hooks/use-move-topic', () => ({
-  useMoveTopic: () => ({ mutate: jest.fn(), isPending: false }),
-}));
-
-// --- useBookSessions ---
-
-const mockUseBookSessions = jest.fn((): any => ({
-  data: [],
-  isLoading: false,
-}));
-
 jest.mock('../../../../../hooks/use-book-sessions', () => ({
   useBookSessions: () => mockUseBookSessions(),
-}));
-
-// --- useTopicSuggestions ---
-
-const mockUseTopicSuggestions = jest.fn((): any => ({
-  data: [],
-  isLoading: false,
-}));
-
-jest.mock('../../../../../hooks/use-topic-suggestions', () => ({
-  useTopicSuggestions: () => mockUseTopicSuggestions(),
-}));
-
-// --- useBookNotes ---
-
-const mockUseBookNotes = jest.fn((): any => ({
-  data: { notes: [] },
-  isLoading: false,
 }));
 
 jest.mock('../../../../../hooks/use-notes', () => ({
   useBookNotes: () => mockUseBookNotes(),
 }));
 
-// --- useSubjects ---
-jest.mock('../../../../../hooks/use-subjects', () => ({
-  useSubjects: () => ({
-    data: [{ id: 'sub-1', name: 'Mathematics' }],
-  }),
-}));
-
-// --- useRetentionTopics ---
-
-const mockUseRetentionTopics = jest.fn((): any => ({
-  data: { topics: [], reviewDueCount: 0 },
-  isLoading: false,
-}));
-
 jest.mock('../../../../../hooks/use-retention', () => ({
   useRetentionTopics: () => mockUseRetentionTopics(),
-}));
-
-// --- useCurriculum ---
-
-const mockUseCurriculum = jest.fn((): any => ({
-  data: null,
-  isLoading: false,
 }));
 
 jest.mock('../../../../../hooks/use-curriculum', () => ({
   useCurriculum: () => mockUseCurriculum(),
 }));
 
-// --- useThemeColors ---
-jest.mock('../../../../../lib/theme', () => ({
-  useThemeColors: () => ({
-    accent: '#00bfa5',
-    textSecondary: '#888',
-    textInverse: '#fff',
+jest.mock('../../../../../hooks/use-subjects', () => ({
+  useSubjects: () => ({
+    data: [{ id: 'sub-1', name: 'Mathematics' }],
   }),
 }));
 
-// --- formatApiError ---
-jest.mock('../../../../../lib/format-api-error', () => ({
-  formatApiError: (err: unknown) =>
-    err instanceof Error ? err.message : 'Unknown error',
+jest.mock('../../../../../hooks/use-move-topic', () => ({
+  useMoveTopic: () => ({ mutate: jest.fn(), isPending: false }),
 }));
 
-// --- MagicPenAnimation (simple stub) ---
+jest.mock('../../../../../lib/theme', () => ({
+  useThemeColors: () => ({
+    accent: '#00bfa5',
+    primary: '#0d9488',
+    success: '#22c55e',
+    danger: '#ef4444',
+    textSecondary: '#888',
+    textInverse: '#fff',
+    surface: '#fff',
+  }),
+}));
+
+jest.mock('../../../../../lib/format-api-error', () => ({
+  formatApiError: (error: unknown) =>
+    error instanceof Error ? error.message : 'Unknown error',
+}));
+
 jest.mock('../../../../../components/common', () => ({
   BookPageFlipAnimation: () => null,
   MagicPenAnimation: () => null,
 }));
 
-// --- Library components: render real implementations for text assertions ---
-// SuggestionCard, SessionRow, ChapterDivider are simple RN components that
-// render text; we let them render normally so we can assert on content.
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function makeSessions(count: number, withChapters = false) {
-  return Array.from({ length: count }, (_, i) => ({
-    id: `sess-${i + 1}`,
-    topicId: `topic-${(i % 2) + 1}`,
-    topicTitle: `Session Topic ${i + 1}`,
-    chapter: withChapters ? (i < 2 ? 'Chapter A' : 'Chapter B') : null,
-    createdAt: new Date(Date.now() - (i + 1) * 3600_000).toISOString(),
-  }));
+function makeTopic(overrides: Partial<any> = {}) {
+  return {
+    id: 'topic-1',
+    title: 'Linear Equations',
+    sortOrder: 1,
+    skipped: false,
+    chapter: null,
+    ...overrides,
+  };
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
+function baseTopics() {
+  return [
+    makeTopic({
+      id: 'topic-1',
+      title: 'Linear Equations',
+      sortOrder: 1,
+      chapter: 'Foundations',
+    }),
+    makeTopic({
+      id: 'topic-2',
+      title: 'Quadratic Equations',
+      sortOrder: 2,
+      chapter: 'Foundations',
+    }),
+  ];
+}
+
+function makeSession(overrides: Partial<any> = {}) {
+  return {
+    id: 'sess-1',
+    topicId: 'topic-1',
+    topicTitle: 'Linear Equations',
+    chapter: 'Foundations',
+    createdAt: new Date().toISOString(),
+    ...overrides,
+  };
+}
+
+function makeRetentionTopic(overrides: Partial<any> = {}) {
+  return {
+    topicId: 'topic-1',
+    repetitions: 1,
+    easeFactor: 2.5,
+    xpStatus: 'active',
+    failureCount: 0,
+    nextReviewAt: null,
+    ...overrides,
+  };
+}
+
+function makeBookQuery(overrides: Partial<any> = {}) {
+  return {
+    data: {
+      book: {
+        id: 'book-1',
+        title: 'Algebra',
+        emoji: '📐',
+        topicsGenerated: true,
+        description: 'Basic algebra',
+      },
+      topics: baseTopics(),
+      completedTopicCount: 0,
+    },
+    isLoading: false,
+    isError: false,
+    error: null,
+    refetch: mockBookRefetch,
+    ...overrides,
+  };
+}
+
+function makeSessionsQuery(overrides: Partial<any> = {}) {
+  return {
+    data: [],
+    isLoading: false,
+    isError: false,
+    refetch: jest.fn(),
+    ...overrides,
+  };
+}
+
+function makeNotesQuery(overrides: Partial<any> = {}) {
+  return {
+    data: { notes: [] },
+    isLoading: false,
+    ...overrides,
+  };
+}
+
+function makeRetentionQuery(overrides: Partial<any> = {}) {
+  return {
+    data: { topics: [], reviewDueCount: 0 },
+    isLoading: false,
+    isError: false,
+    refetch: jest.fn(),
+    ...overrides,
+  };
+}
 
 describe('BookScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockCanGoBack.mockReturnValue(true);
-    // Reset to defaults
     mockSearchParams = () => ({
       subjectId: 'sub-1',
       bookId: 'book-1',
     });
-    mockUseBookWithTopics.mockImplementation(() => ({
-      data: {
-        book: {
-          id: 'book-1',
-          title: 'Algebra',
-          emoji: '📐',
-          topicsGenerated: true,
-          description: 'Basic algebra',
-        },
-        topics: [
-          {
-            id: 'topic-1',
-            title: 'Linear Equations',
-            sortOrder: 1,
-            skipped: false,
-          },
-          {
-            id: 'topic-2',
-            title: 'Quadratic Equations',
-            sortOrder: 2,
-            skipped: false,
-          },
-        ],
-        completedTopicCount: 0,
-      },
-      isLoading: false,
-      isError: false,
-      error: null,
-      refetch: mockBookRefetch,
-    }));
-    mockUseGenerateBookTopics.mockImplementation(() => ({
+
+    mockUseBookWithTopics.mockReturnValue(makeBookQuery());
+    mockUseGenerateBookTopics.mockReturnValue({
       mutate: mockGenerateMutate,
       isPending: false,
-    }));
-    mockUseBookSessions.mockImplementation(() => ({
-      data: [],
-      isLoading: false,
-    }));
-    mockUseTopicSuggestions.mockImplementation(() => ({
-      data: [],
-      isLoading: false,
-    }));
-    mockUseBookNotes.mockImplementation(() => ({
-      data: { notes: [] },
-      isLoading: false,
-    }));
-    mockUseCurriculum.mockImplementation(() => ({
-      data: null,
-      isLoading: false,
-    }));
-    mockUseBooks.mockImplementation(() => ({
+    });
+    mockUseBooks.mockReturnValue({
       data: [
         { id: 'book-1', title: 'Algebra', emoji: '📐', topicsGenerated: true },
         { id: 'book-2', title: 'Geometry', emoji: '📏', topicsGenerated: true },
       ],
       isLoading: false,
-    }));
+    });
+    mockUseBookSessions.mockReturnValue(makeSessionsQuery());
+    mockUseBookNotes.mockReturnValue(makeNotesQuery());
+    mockUseRetentionTopics.mockReturnValue(makeRetentionQuery());
+    mockUseCurriculum.mockReturnValue({ data: null, isLoading: false });
   });
 
-  // -----------------------------------------------------------------------
-  // 1. Loading state
-  // -----------------------------------------------------------------------
-  it('renders loading indicator when book is loading', () => {
-    mockUseBookWithTopics.mockReturnValue({
-      data: undefined,
-      isLoading: true,
-      isError: false,
-      error: null,
-      refetch: mockBookRefetch,
-    });
+  it('renders the loading state', () => {
+    mockUseBookWithTopics.mockReturnValue(
+      makeBookQuery({
+        data: undefined,
+        isLoading: true,
+      })
+    );
 
     const { getByTestId, getByText } = render(<BookScreen />);
+
     expect(getByTestId('book-loading')).toBeTruthy();
     expect(getByText('Loading book...')).toBeTruthy();
   });
 
-  // -----------------------------------------------------------------------
-  // 2. Error state — retry and back buttons
-  // -----------------------------------------------------------------------
-  it('shows error state with retry and back buttons', () => {
-    mockUseBookWithTopics.mockReturnValue({
-      data: undefined,
-      isLoading: false,
-      isError: true,
-      error: new Error('Server exploded'),
-      refetch: mockBookRefetch,
-    });
+  it('shows the error state and wires retry plus back', () => {
+    mockUseBookWithTopics.mockReturnValue(
+      makeBookQuery({
+        data: undefined,
+        isError: true,
+        error: new Error('Server exploded'),
+      })
+    );
 
     const { getByTestId, getByText } = render(<BookScreen />);
+
     expect(getByTestId('book-error')).toBeTruthy();
     expect(getByText('Server exploded')).toBeTruthy();
-    expect(getByTestId('book-retry-button')).toBeTruthy();
-    expect(getByTestId('book-back-button')).toBeTruthy();
-  });
 
-  it('retry button calls refetch on error screen', () => {
-    mockUseBookWithTopics.mockReturnValue({
-      data: undefined,
-      isLoading: false,
-      isError: true,
-      error: new Error('Temporary failure'),
-      refetch: mockBookRefetch,
-    });
-
-    const { getByTestId } = render(<BookScreen />);
     fireEvent.press(getByTestId('book-retry-button'));
-    expect(mockBookRefetch).toHaveBeenCalledTimes(1);
-  });
-
-  it('back button on error screen calls router.back()', () => {
-    mockUseBookWithTopics.mockReturnValue({
-      data: undefined,
-      isLoading: false,
-      isError: true,
-      error: new Error('oops'),
-      refetch: mockBookRefetch,
-    });
-
-    const { getByTestId } = render(<BookScreen />);
     fireEvent.press(getByTestId('book-back-button'));
+
+    expect(mockBookRefetch).toHaveBeenCalledTimes(1);
     expect(mockBack).toHaveBeenCalledTimes(1);
   });
 
-  // -----------------------------------------------------------------------
-  // 3. Missing params
-  // -----------------------------------------------------------------------
-  it('shows missing-param guidance when subjectId is absent', () => {
+  it('shows missing-param guidance when route params are incomplete', () => {
     mockSearchParams = () => ({ subjectId: '', bookId: 'book-1' });
 
     const { getByTestId, getByText } = render(<BookScreen />);
+
     expect(getByTestId('book-missing-param')).toBeTruthy();
     expect(
       getByText('Missing book details. Please go back and try again.')
     ).toBeTruthy();
   });
 
-  it('shows missing-param guidance when bookId is absent', () => {
-    mockSearchParams = () => ({ subjectId: 'sub-1', bookId: '' });
-
-    const { getByTestId } = render(<BookScreen />);
-    expect(getByTestId('book-missing-param')).toBeTruthy();
-  });
-
-  it('missing-param back button calls router.back()', () => {
-    mockSearchParams = () => ({ subjectId: '', bookId: '' });
-
-    const { getByTestId } = render(<BookScreen />);
-    fireEvent.press(getByTestId('book-missing-param-back'));
-    expect(mockBack).toHaveBeenCalledTimes(1);
-  });
-
-  // -----------------------------------------------------------------------
-  // 4. Main view renders
-  // -----------------------------------------------------------------------
-  it('renders main view when book is loaded with topics', () => {
+  it('renders the compact header on the main view', () => {
     const { getByTestId, getByText } = render(<BookScreen />);
+
     expect(getByTestId('book-screen')).toBeTruthy();
     expect(getByText('Algebra')).toBeTruthy();
-    expect(getByText('📐')).toBeTruthy();
     expect(getByText('Mathematics')).toBeTruthy();
+    expect(getByText('0 sessions')).toBeTruthy();
+    expect(getByText('0 of 2 topics done')).toBeTruthy();
   });
 
-  it('displays session count stat on main view', () => {
-    mockUseBookSessions.mockReturnValue({
-      data: makeSessions(3),
-      isLoading: false,
-    });
-
-    const { getByText } = render(<BookScreen />);
-    expect(getByText('3 sessions')).toBeTruthy();
-  });
-
-  it('displays singular "session" when count is 1', () => {
-    mockUseBookSessions.mockReturnValue({
-      data: makeSessions(1),
-      isLoading: false,
-    });
-
-    const { getByText } = render(<BookScreen />);
-    expect(getByText('1 session')).toBeTruthy();
-  });
-
-  it('displays note count when notes exist', () => {
-    mockUseBookNotes.mockReturnValue({
-      data: {
-        notes: [
-          { id: 'n-1', topicId: 'topic-1', content: 'note text' },
-          { id: 'n-2', topicId: 'topic-2', content: 'note text 2' },
-        ],
-      },
-      isLoading: false,
-    });
-
-    const { getByText } = render(<BookScreen />);
-    expect(getByText('2 notes')).toBeTruthy();
-  });
-
-  it('displays completed topic progress when > 0', () => {
-    mockUseBookWithTopics.mockReturnValue({
-      data: {
-        book: {
-          id: 'book-1',
-          title: 'Algebra',
-          emoji: '📐',
-          topicsGenerated: true,
-          description: null,
+  it('derives header progress from retention topics', () => {
+    mockUseBookWithTopics.mockReturnValue(
+      makeBookQuery({
+        data: {
+          ...makeBookQuery().data,
+          topics: [
+            makeTopic({ id: 'topic-1', title: 'T1', sortOrder: 1 }),
+            makeTopic({ id: 'topic-2', title: 'T2', sortOrder: 2 }),
+            makeTopic({ id: 'topic-3', title: 'T3', sortOrder: 3 }),
+          ],
         },
-        topics: [
-          { id: 'topic-1', title: 'T1', sortOrder: 1, skipped: false },
-          { id: 'topic-2', title: 'T2', sortOrder: 2, skipped: false },
-          { id: 'topic-3', title: 'T3', sortOrder: 3, skipped: false },
-        ],
-        completedTopicCount: 2,
-      },
-      isLoading: false,
-      isError: false,
-      error: null,
-      refetch: mockBookRefetch,
-    });
+      })
+    );
+    mockUseRetentionTopics.mockReturnValue(
+      makeRetentionQuery({
+        data: {
+          topics: [
+            makeRetentionTopic({ topicId: 'topic-1' }),
+            makeRetentionTopic({ topicId: 'topic-2' }),
+          ],
+          reviewDueCount: 0,
+        },
+      })
+    );
 
     const { getByText } = render(<BookScreen />);
-    expect(getByText('2/3 topics')).toBeTruthy();
+
+    expect(getByText('2 of 3 topics done')).toBeTruthy();
   });
 
-  // -----------------------------------------------------------------------
-  // 5. Suggestion cards
-  // -----------------------------------------------------------------------
-  it('renders suggestion cards from pre-generated topics', () => {
-    // No API suggestions, but 2 uncovered topics exist
-    const { getByTestId } = render(<BookScreen />);
-    // Topics are not yet completed so they show as suggestion cards
-    // Note: topic names also appear in the CollapsibleChapter list, so use testIDs
-    expect(getByTestId('suggestion-topic-1')).toBeTruthy();
-    expect(getByTestId('suggestion-topic-2')).toBeTruthy();
-  });
+  it('renders continue now and started from in-progress sessions', () => {
+    const topics = [
+      makeTopic({ id: 'topic-1', title: 'Linear Equations', sortOrder: 1 }),
+      makeTopic({ id: 'topic-2', title: 'Quadratic Equations', sortOrder: 2 }),
+      makeTopic({ id: 'topic-3', title: 'Functions', sortOrder: 3 }),
+    ];
 
-  it('renders API suggestions ahead of pre-generated topics', () => {
-    mockUseTopicSuggestions.mockReturnValue({
-      data: [
-        { id: 'sug-1', title: 'Polynomials' },
-        { id: 'sug-2', title: 'Inequalities' },
-      ],
-      isLoading: false,
-    });
-
-    const { getByTestId, getByText, queryByTestId } = render(<BookScreen />);
-    // API suggestions take priority, max 2 total
-    expect(getByTestId('suggestion-sug-1')).toBeTruthy();
-    expect(getByText('Polynomials')).toBeTruthy();
-    expect(getByTestId('suggestion-sug-2')).toBeTruthy();
-    expect(getByText('Inequalities')).toBeTruthy();
-    // Pre-generated topics should be pushed out (max 2)
-    expect(queryByTestId('suggestion-topic-1')).toBeNull();
-  });
-
-  it('pressing a topic-type suggestion navigates with topicId', () => {
-    const { getByTestId } = render(<BookScreen />);
-    fireEvent.press(getByTestId('suggestion-topic-1'));
-
-    expect(mockPush).toHaveBeenCalledWith(
-      expect.objectContaining({
-        pathname: '/(app)/session',
-        params: expect.objectContaining({
-          mode: 'learning',
-          subjectId: 'sub-1',
-          topicId: 'topic-1',
-        }),
+    mockUseBookWithTopics.mockReturnValue(
+      makeBookQuery({
+        data: { ...makeBookQuery().data, topics },
       })
     );
-  });
-
-  it('pressing an API suggestion navigates with rawInput', () => {
-    mockUseTopicSuggestions.mockReturnValue({
-      data: [{ id: 'sug-1', title: 'Polynomials' }],
-      isLoading: false,
-    });
-
-    const { getByTestId } = render(<BookScreen />);
-    fireEvent.press(getByTestId('suggestion-sug-1'));
-
-    expect(mockPush).toHaveBeenCalledWith(
-      expect.objectContaining({
-        pathname: '/(app)/session',
-        params: expect.objectContaining({
-          mode: 'learning',
-          subjectId: 'sub-1',
-          rawInput: 'Polynomials',
-        }),
+    mockUseBookSessions.mockReturnValue(
+      makeSessionsQuery({
+        data: [
+          makeSession({
+            id: 'sess-1',
+            topicId: 'topic-1',
+            topicTitle: 'Linear Equations',
+            createdAt: '2026-04-24T12:00:00.000Z',
+          }),
+          makeSession({
+            id: 'sess-2',
+            topicId: 'topic-2',
+            topicTitle: 'Quadratic Equations',
+            createdAt: '2026-04-24T10:00:00.000Z',
+          }),
+          makeSession({
+            id: 'sess-3',
+            topicId: 'topic-2',
+            topicTitle: 'Quadratic Equations',
+            createdAt: '2026-04-24T09:00:00.000Z',
+          }),
+        ],
       })
     );
-  });
 
-  // -----------------------------------------------------------------------
-  // 6. Empty sessions guidance
-  // -----------------------------------------------------------------------
-  it('shows empty sessions guidance when no sessions exist (no curriculum)', () => {
     const { getByTestId, getByText } = render(<BookScreen />);
-    expect(getByTestId('book-empty-sessions')).toBeTruthy();
-    expect(getByText('No sessions yet')).toBeTruthy();
-    expect(
-      getByText(
-        'Start with a learning path tailored to you, or tap Start learning below to jump straight in.'
-      )
-    ).toBeTruthy();
-    // "Build my learning path" button should be visible when no curriculum
-    expect(getByTestId('book-build-learning-path')).toBeTruthy();
+
+    expect(getByTestId('continue-now-row')).toBeTruthy();
+    expect(getByTestId('started-row-topic-2')).toBeTruthy();
+    expect(getByText('2 sessions')).toBeTruthy();
+
+    fireEvent.press(getByTestId('continue-now-row'));
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/topic/[topicId]',
+      params: { topicId: 'topic-1', subjectId: 'sub-1' },
+    });
   });
 
-  it('shows "tap Start learning" guidance when curriculum exists (no dead-end)', () => {
+  it('shows and expands the started overflow control', () => {
+    const topics = Array.from({ length: 6 }, (_, index) =>
+      makeTopic({
+        id: `topic-${index + 1}`,
+        title: `Topic ${index + 1}`,
+        sortOrder: index + 1,
+      })
+    );
+    const sessions = topics.map((topic, index) =>
+      makeSession({
+        id: `sess-${index + 1}`,
+        topicId: topic.id,
+        topicTitle: topic.title,
+        createdAt: `2026-04-24T1${9 - index}:00:00.000Z`,
+      })
+    );
+
+    mockUseBookWithTopics.mockReturnValue(
+      makeBookQuery({ data: { ...makeBookQuery().data, topics } })
+    );
+    mockUseBookSessions.mockReturnValue(makeSessionsQuery({ data: sessions }));
+
+    const { getByTestId, queryByTestId } = render(<BookScreen />);
+
+    expect(getByTestId('started-show-more')).toBeTruthy();
+    expect(queryByTestId('started-row-topic-6')).toBeNull();
+
+    fireEvent.press(getByTestId('started-show-more'));
+    expect(getByTestId('started-row-topic-6')).toBeTruthy();
+  });
+
+  it('renders the hero up-next state on a fresh book and starts a session', () => {
+    const { getByTestId, getByText } = render(<BookScreen />);
+
+    expect(getByTestId('up-next-row')).toBeTruthy();
+    expect(getByText('▶ Start: Linear Equations')).toBeTruthy();
+
+    fireEvent.press(getByTestId('up-next-row'));
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/session',
+      params: {
+        mode: 'learning',
+        subjectId: 'sub-1',
+        topicId: 'topic-1',
+        topicName: 'Linear Equations',
+      },
+    });
+  });
+
+  it('shows the sessions error banner and retries while still rendering retention-driven sections', () => {
+    const refetchSpy = jest.fn();
+
+    mockUseBookSessions.mockReturnValue(
+      makeSessionsQuery({
+        data: undefined,
+        isError: true,
+        refetch: refetchSpy,
+      })
+    );
+    mockUseRetentionTopics.mockReturnValue(
+      makeRetentionQuery({
+        data: {
+          topics: [makeRetentionTopic({ topicId: 'topic-1' })],
+          reviewDueCount: 0,
+        },
+      })
+    );
+
+    const { getByTestId } = render(<BookScreen />);
+
+    expect(getByTestId('sessions-error-banner')).toBeTruthy();
+    expect(getByTestId('done-row-topic-1')).toBeTruthy();
+    expect(getByTestId('up-next-row')).toBeTruthy();
+
+    fireEvent.press(getByTestId('sessions-error-retry'));
+    expect(refetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the retention error banner and retries while keeping session-driven sections visible', () => {
+    const refetchSpy = jest.fn();
+
+    mockUseBookSessions.mockReturnValue(
+      makeSessionsQuery({
+        data: [
+          makeSession({ topicId: 'topic-1', topicTitle: 'Linear Equations' }),
+        ],
+      })
+    );
+    mockUseRetentionTopics.mockReturnValue(
+      makeRetentionQuery({
+        data: undefined,
+        isError: true,
+        refetch: refetchSpy,
+      })
+    );
+
+    const { getByTestId } = render(<BookScreen />);
+
+    expect(getByTestId('retention-error-banner')).toBeTruthy();
+    expect(getByTestId('continue-now-row')).toBeTruthy();
+
+    fireEvent.press(getByTestId('retention-error-retry'));
+    expect(refetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders the empty topics state with a build-learning-path CTA', () => {
+    mockUseBookWithTopics.mockReturnValue(
+      makeBookQuery({
+        data: {
+          book: {
+            id: 'book-1',
+            title: 'Algebra',
+            emoji: '📐',
+            topicsGenerated: true,
+            description: 'Basic algebra',
+          },
+          topics: [],
+          completedTopicCount: 0,
+        },
+      })
+    );
+
+    const { getByTestId, getByText } = render(<BookScreen />);
+
+    expect(getByTestId('topics-empty-state')).toBeTruthy();
+    expect(getByText('No topics yet')).toBeTruthy();
+
+    fireEvent.press(getByTestId('topics-empty-build'));
+    expect(mockPush).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pathname: '/(app)/onboarding/interview',
+        params: expect.objectContaining({
+          subjectId: 'sub-1',
+          bookId: 'book-1',
+          bookTitle: 'Algebra',
+        }),
+      })
+    );
+  });
+
+  it('renders the all-sections fallback when every topic is skipped', () => {
+    mockUseBookWithTopics.mockReturnValue(
+      makeBookQuery({
+        data: {
+          ...makeBookQuery().data,
+          topics: [
+            makeTopic({ id: 'topic-1', skipped: true }),
+            makeTopic({ id: 'topic-2', skipped: true, sortOrder: 2 }),
+          ],
+        },
+      })
+    );
+
+    const { getByTestId } = render(<BookScreen />);
+
+    expect(getByTestId('all-sections-fallback')).toBeTruthy();
+    expect(getByTestId('fallback-start')).toBeTruthy();
+  });
+
+  it('renders past conversations and opens session summaries', () => {
+    mockUseBookSessions.mockReturnValue(
+      makeSessionsQuery({
+        data: [
+          makeSession({ id: 'sess-1', createdAt: '2026-04-24T09:00:00.000Z' }),
+          makeSession({
+            id: 'sess-2',
+            topicId: 'topic-2',
+            topicTitle: 'Quadratic Equations',
+            createdAt: '2026-04-24T08:00:00.000Z',
+          }),
+        ],
+      })
+    );
+
+    const { getByText, getByTestId } = render(<BookScreen />);
+
+    expect(getByText('Past conversations')).toBeTruthy();
+
+    fireEvent.press(getByTestId('session-sess-1'));
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/session-summary/[sessionId]',
+      params: {
+        sessionId: 'sess-1',
+        subjectId: 'sub-1',
+        topicId: 'topic-1',
+      },
+    });
+  });
+
+  it('shows chapter dividers when there are 4 or more sessions across chapters', () => {
+    mockUseBookSessions.mockReturnValue(
+      makeSessionsQuery({
+        data: [
+          makeSession({ id: 'sess-1', chapter: 'Chapter A' }),
+          makeSession({
+            id: 'sess-2',
+            topicId: 'topic-2',
+            topicTitle: 'Quadratic Equations',
+            chapter: 'Chapter A',
+          }),
+          makeSession({
+            id: 'sess-3',
+            topicId: 'topic-3',
+            topicTitle: 'Functions',
+            chapter: 'Chapter B',
+          }),
+          makeSession({
+            id: 'sess-4',
+            topicId: 'topic-4',
+            topicTitle: 'Inequalities',
+            chapter: 'Chapter B',
+          }),
+        ],
+      })
+    );
+
+    const { getByText } = render(<BookScreen />);
+
+    expect(getByText('Chapter A')).toBeTruthy();
+    expect(getByText('Chapter B')).toBeTruthy();
+  });
+
+  it('shows the book complete card and routes review to the relearn flow', () => {
+    const topics = [
+      makeTopic({ id: 'topic-1', title: 'Linear Equations', sortOrder: 1 }),
+      makeTopic({ id: 'topic-2', title: 'Quadratics', sortOrder: 2 }),
+    ];
+
+    mockUseBookWithTopics.mockReturnValue(
+      makeBookQuery({
+        data: { ...makeBookQuery().data, topics },
+      })
+    );
+    mockUseRetentionTopics.mockReturnValue(
+      makeRetentionQuery({
+        data: {
+          topics: [
+            makeRetentionTopic({
+              topicId: 'topic-1',
+              nextReviewAt: '2026-04-26T00:00:00.000Z',
+            }),
+            makeRetentionTopic({
+              topicId: 'topic-2',
+              nextReviewAt: '2026-04-25T00:00:00.000Z',
+            }),
+          ],
+          reviewDueCount: 0,
+        },
+      })
+    );
+
+    const { getByTestId, queryByTestId } = render(<BookScreen />);
+
+    expect(getByTestId('book-complete-card')).toBeTruthy();
+    expect(queryByTestId('book-start-learning')).toBeNull();
+
+    fireEvent.press(getByTestId('book-complete-review'));
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/topic/relearn',
+      params: {
+        topicId: 'topic-2',
+        subjectId: 'sub-1',
+        topicName: 'Quadratics',
+      },
+    });
+
+    fireEvent.press(getByTestId('book-complete-next'));
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/shelf/[subjectId]',
+      params: { subjectId: 'sub-1' },
+    });
+  });
+
+  it('does not render the completion card when one topic is still unstarted', () => {
+    mockUseRetentionTopics.mockReturnValue(
+      makeRetentionQuery({
+        data: {
+          topics: [makeRetentionTopic({ topicId: 'topic-1' })],
+          reviewDueCount: 0,
+        },
+      })
+    );
+
+    const { queryByTestId } = render(<BookScreen />);
+
+    expect(queryByTestId('book-complete-card')).toBeNull();
+  });
+
+  it('shows the continue-learning sticky CTA when a continue topic exists', () => {
+    mockUseBookSessions.mockReturnValue(
+      makeSessionsQuery({
+        data: [
+          makeSession({ topicId: 'topic-1', topicTitle: 'Linear Equations' }),
+        ],
+      })
+    );
+
+    const { getByText } = render(<BookScreen />);
+
+    expect(getByText('▶ Continue learning')).toBeTruthy();
+  });
+
+  it('shows and wires the build-learning-path link when no curriculum exists', () => {
+    const { getByTestId } = render(<BookScreen />);
+
+    fireEvent.press(getByTestId('book-build-path-link'));
+    expect(mockPush).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pathname: '/(app)/onboarding/interview',
+        params: expect.objectContaining({
+          subjectId: 'sub-1',
+          bookId: 'book-1',
+          bookTitle: 'Algebra',
+        }),
+      })
+    );
+  });
+
+  it('hides the build-learning-path link when curriculum already exists', () => {
     mockUseCurriculum.mockReturnValue({
-      data: { topics: [{ id: 't1' }] },
+      data: { topics: [{ id: 'ctopic-1' }] },
       isLoading: false,
     });
 
-    const { getByTestId, getByText, queryByTestId } = render(<BookScreen />);
-    expect(getByTestId('book-empty-sessions')).toBeTruthy();
-    expect(getByText('No sessions yet')).toBeTruthy();
-    expect(
-      getByText(
-        'Tap Start learning below to jump in — a topic will be picked for you automatically.'
-      )
-    ).toBeTruthy();
-    // "Build my learning path" button should NOT appear when curriculum exists
-    expect(queryByTestId('book-build-learning-path')).toBeNull();
-    // But the floating "Start learning" button must still be present
-    expect(getByTestId('book-start-learning')).toBeTruthy();
+    const { queryByTestId } = render(<BookScreen />);
+
+    expect(queryByTestId('book-build-path-link')).toBeNull();
   });
 
-  // -----------------------------------------------------------------------
-  // 7. Start learning button
-  // -----------------------------------------------------------------------
-  it('renders start learning button when topics exist', () => {
-    const { getByTestId, getByText } = render(<BookScreen />);
-    expect(getByTestId('book-start-learning')).toBeTruthy();
-    expect(getByText('Start learning')).toBeTruthy();
-  });
-
-  it('start learning navigates using first suggestion card (topic type)', () => {
-    const { getByTestId } = render(<BookScreen />);
-    fireEvent.press(getByTestId('book-start-learning'));
-
-    expect(mockPush).toHaveBeenCalledWith(
-      expect.objectContaining({
-        pathname: '/(app)/session',
-        params: expect.objectContaining({
-          mode: 'learning',
-          subjectId: 'sub-1',
-          topicId: 'topic-1',
-        }),
-      })
-    );
-  });
-
-  it('start learning uses rawInput when first card is an API suggestion', () => {
-    mockUseTopicSuggestions.mockReturnValue({
-      data: [{ id: 'sug-1', title: 'Polynomials' }],
-      isLoading: false,
-    });
-
-    const { getByTestId } = render(<BookScreen />);
-    fireEvent.press(getByTestId('book-start-learning'));
-
-    expect(mockPush).toHaveBeenCalledWith(
-      expect.objectContaining({
-        pathname: '/(app)/session',
-        params: expect.objectContaining({
-          mode: 'learning',
-          subjectId: 'sub-1',
-          rawInput: 'Polynomials',
-        }),
-      })
-    );
-  });
-
-  it('start learning falls back to first uncovered topic when no suggestions', () => {
-    // All topics completed → no suggestion cards
-    mockUseBookSessions.mockReturnValue({
-      data: [
-        {
-          id: 'sess-1',
-          topicId: 'topic-1',
-          topicTitle: 'Linear',
-          chapter: null,
-          createdAt: new Date().toISOString(),
-        },
-        {
-          id: 'sess-2',
-          topicId: 'topic-2',
-          topicTitle: 'Quadratic',
-          chapter: null,
-          createdAt: new Date().toISOString(),
-        },
-      ],
-      isLoading: false,
-    });
-
-    const { getByTestId } = render(<BookScreen />);
-    fireEvent.press(getByTestId('book-start-learning'));
-
-    // All topics covered, falls back to first topic
-    expect(mockPush).toHaveBeenCalledWith(
-      expect.objectContaining({
-        pathname: '/(app)/session',
-        params: expect.objectContaining({
-          mode: 'learning',
-          subjectId: 'sub-1',
-          topicId: 'topic-1',
-        }),
-      })
-    );
-  });
-
-  it('hides start learning button in readOnly mode', () => {
+  it('hides the sticky CTA in read-only mode', () => {
     mockSearchParams = () => ({
       subjectId: 'sub-1',
       bookId: 'book-1',
@@ -625,297 +692,11 @@ describe('BookScreen', () => {
     });
 
     const { queryByTestId } = render(<BookScreen />);
+
     expect(queryByTestId('book-start-learning')).toBeNull();
   });
 
-  // -----------------------------------------------------------------------
-  // 8. Session list renders session rows
-  // -----------------------------------------------------------------------
-  it('renders session rows when sessions exist', () => {
-    const sessions = makeSessions(3);
-    mockUseBookSessions.mockReturnValue({
-      data: sessions,
-      isLoading: false,
-    });
-
-    const { getByTestId, getByText } = render(<BookScreen />);
-    expect(getByTestId('session-sess-1')).toBeTruthy();
-    expect(getByTestId('session-sess-2')).toBeTruthy();
-    expect(getByTestId('session-sess-3')).toBeTruthy();
-    expect(getByText('Session Topic 1')).toBeTruthy();
-    expect(getByText('Session Topic 2')).toBeTruthy();
-    expect(getByText('Session Topic 3')).toBeTruthy();
-  });
-
-  it('pressing a session row navigates to session summary', () => {
-    mockUseBookSessions.mockReturnValue({
-      data: makeSessions(1),
-      isLoading: false,
-    });
-
-    const { getByTestId } = render(<BookScreen />);
-    fireEvent.press(getByTestId('session-sess-1'));
-
-    expect(mockPush).toHaveBeenCalledWith(
-      expect.objectContaining({
-        pathname: '/session-summary/[sessionId]',
-        params: { sessionId: 'sess-1', subjectId: 'sub-1', topicId: 'topic-1' },
-      })
-    );
-  });
-
-  it('long-pressing a session row shows context menu', () => {
-    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(jest.fn());
-    mockUseBookSessions.mockReturnValue({
-      data: makeSessions(1),
-      isLoading: false,
-    });
-
-    const { getByTestId } = render(<BookScreen />);
-    fireEvent(getByTestId('session-sess-1'), 'longPress');
-
-    // Alert offers to move topic to another book (default mock has 2 books)
-    expect(alertSpy).toHaveBeenCalledWith(
-      'Session Topic 1',
-      expect.any(String),
-      expect.any(Array),
-      undefined
-    );
-  });
-
-  it('shows "Past sessions" heading when sessions exist', () => {
-    mockUseBookSessions.mockReturnValue({
-      data: makeSessions(2),
-      isLoading: false,
-    });
-
-    const { getByText } = render(<BookScreen />);
-    expect(getByText('Past sessions')).toBeTruthy();
-  });
-
-  // -----------------------------------------------------------------------
-  // 9. Chapter dividers
-  // -----------------------------------------------------------------------
-  it('shows chapter dividers when 4+ sessions with chapters', () => {
-    const sessions = makeSessions(5, true); // withChapters=true
-    mockUseBookSessions.mockReturnValue({
-      data: sessions,
-      isLoading: false,
-    });
-
-    const { getByText } = render(<BookScreen />);
-    // ChapterDivider renders chapter name text — CSS uppercase is visual only
-    expect(getByText('Chapter A')).toBeTruthy();
-    expect(getByText('Chapter B')).toBeTruthy();
-    // All 5 sessions should still render under their respective chapters
-    expect(getByText('Session Topic 1')).toBeTruthy();
-    expect(getByText('Session Topic 5')).toBeTruthy();
-  });
-
-  it('does not show chapter dividers when fewer than 4 sessions', () => {
-    const sessions = makeSessions(3, true);
-    mockUseBookSessions.mockReturnValue({
-      data: sessions,
-      isLoading: false,
-    });
-
-    const { queryByText, getByText } = render(<BookScreen />);
-    // With < 4 sessions, no ChapterDivider components are rendered,
-    // so the chapter group names should not appear as separate text
-    expect(queryByText('Chapter A')).toBeNull();
-    expect(queryByText('Chapter B')).toBeNull();
-    // But sessions themselves still render (flat list, no grouping)
-    expect(getByText('Session Topic 1')).toBeTruthy();
-    expect(getByText('Session Topic 3')).toBeTruthy();
-  });
-
-  // -----------------------------------------------------------------------
-  // 10. Back button on main view
-  // -----------------------------------------------------------------------
-  it('back button on main view calls router.back()', () => {
-    const { getByTestId } = render(<BookScreen />);
-    fireEvent.press(getByTestId('book-back'));
-    expect(mockBack).toHaveBeenCalledTimes(1);
-  });
-
-  it('back button replaces shelf when there is no back history (multi-book)', () => {
-    mockCanGoBack.mockReturnValue(false);
-
-    const { getByTestId } = render(<BookScreen />);
-    fireEvent.press(getByTestId('book-back'));
-    expect(mockReplace).toHaveBeenCalledWith({
-      pathname: '/(app)/shelf/[subjectId]',
-      params: { subjectId: 'sub-1' },
-    });
-  });
-
-  it('back button goes to shelf even for single-book subjects (auto-skip removed)', () => {
-    mockCanGoBack.mockReturnValue(false);
-    mockUseBooks.mockReturnValue({
-      data: [{ id: 'book-1', title: 'Only Book', topicsGenerated: true }],
-      isLoading: false,
-    });
-
-    const { getByTestId } = render(<BookScreen />);
-    fireEvent.press(getByTestId('book-back'));
-    expect(mockReplace).toHaveBeenCalledWith({
-      pathname: '/(app)/shelf/[subjectId]',
-      params: { subjectId: 'sub-1' },
-    });
-  });
-
-  // -----------------------------------------------------------------------
-  // Generation state
-  // -----------------------------------------------------------------------
-  it('shows generating screen when topics not yet generated', () => {
-    mockUseBookWithTopics.mockReturnValue({
-      data: {
-        book: {
-          id: 'book-1',
-          title: 'Algebra',
-          emoji: '📐',
-          topicsGenerated: false,
-          description: 'Basic algebra',
-        },
-        topics: [],
-        completedTopicCount: 0,
-      },
-      isLoading: false,
-      isError: false,
-      error: null,
-      refetch: mockBookRefetch,
-    });
-
-    const { getByTestId, getByText } = render(<BookScreen />);
-    expect(getByTestId('book-generating')).toBeTruthy();
-    expect(getByText('Algebra')).toBeTruthy();
-    expect(getByText('Basic algebra')).toBeTruthy();
-    expect(getByText('📐')).toBeTruthy();
-  });
-
-  it('shows generating screen when mutation is pending', () => {
-    mockUseGenerateBookTopics.mockReturnValue({
-      mutate: mockGenerateMutate,
-      isPending: true,
-    });
-
-    const { getByTestId } = render(<BookScreen />);
-    expect(getByTestId('book-generating')).toBeTruthy();
-  });
-
-  it('generating screen shows back button in idle/slow phase', () => {
-    mockUseBookWithTopics.mockReturnValue({
-      data: {
-        book: {
-          id: 'book-1',
-          title: 'Algebra',
-          emoji: null,
-          topicsGenerated: false,
-          description: null,
-        },
-        topics: [],
-        completedTopicCount: 0,
-      },
-      isLoading: false,
-      isError: false,
-      error: null,
-      refetch: mockBookRefetch,
-    });
-
-    const { getByTestId } = render(<BookScreen />);
-    expect(getByTestId('book-gen-back-idle')).toBeTruthy();
-    fireEvent.press(getByTestId('book-gen-back-idle'));
-    expect(mockBack).toHaveBeenCalledTimes(1);
-  });
-
-  // -----------------------------------------------------------------------
-  // Empty topics state
-  // -----------------------------------------------------------------------
-  it('shows empty topics state when book has no topics and generation is done', () => {
-    mockUseBookWithTopics.mockReturnValue({
-      data: {
-        book: {
-          id: 'book-1',
-          title: 'Algebra',
-          emoji: '📐',
-          topicsGenerated: true,
-          description: null,
-        },
-        topics: [],
-        completedTopicCount: 0,
-      },
-      isLoading: false,
-      isError: false,
-      error: null,
-      refetch: mockBookRefetch,
-    });
-
-    const { getByTestId, getByText } = render(<BookScreen />);
-    expect(getByTestId('book-empty-topics')).toBeTruthy();
-    expect(getByText(/doesn't have any topics yet/)).toBeTruthy();
-  });
-
-  it('hides start learning button when no topics exist', () => {
-    mockUseBookWithTopics.mockReturnValue({
-      data: {
-        book: {
-          id: 'book-1',
-          title: 'Algebra',
-          emoji: null,
-          topicsGenerated: true,
-          description: null,
-        },
-        topics: [],
-        completedTopicCount: 0,
-      },
-      isLoading: false,
-      isError: false,
-      error: null,
-      refetch: mockBookRefetch,
-    });
-
-    const { queryByTestId } = render(<BookScreen />);
-    expect(queryByTestId('book-start-learning')).toBeNull();
-  });
-
-  // -----------------------------------------------------------------------
-  // "Study next" header
-  // -----------------------------------------------------------------------
-  it('shows "Study next" section heading when suggestions exist', () => {
-    const { getByText } = render(<BookScreen />);
-    expect(getByText('Study next')).toBeTruthy();
-  });
-
-  it('hides "Study next" when all topics are completed', () => {
-    // Both topics covered by sessions
-    mockUseBookSessions.mockReturnValue({
-      data: [
-        {
-          id: 's1',
-          topicId: 'topic-1',
-          topicTitle: 'T1',
-          chapter: null,
-          createdAt: new Date().toISOString(),
-        },
-        {
-          id: 's2',
-          topicId: 'topic-2',
-          topicTitle: 'T2',
-          chapter: null,
-          createdAt: new Date().toISOString(),
-        },
-      ],
-      isLoading: false,
-    });
-
-    const { queryByText } = render(<BookScreen />);
-    expect(queryByText('Study next')).toBeNull();
-  });
-
-  // -----------------------------------------------------------------------
-  // Auto-start
-  // -----------------------------------------------------------------------
-  it('auto-starts session when autoStart=true and topics available', async () => {
+  it('auto-starts the up-next topic when autoStart is true', async () => {
     mockSearchParams = () => ({
       subjectId: 'sub-1',
       bookId: 'book-1',
@@ -925,52 +706,61 @@ describe('BookScreen', () => {
     render(<BookScreen />);
 
     await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith(
-        expect.objectContaining({
-          pathname: '/(app)/session',
-          params: expect.objectContaining({
-            mode: 'learning',
-            subjectId: 'sub-1',
-          }),
-        })
-      );
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: '/(app)/session',
+        params: {
+          mode: 'learning',
+          subjectId: 'sub-1',
+          topicId: 'topic-1',
+          topicName: 'Linear Equations',
+        },
+      });
     });
   });
 
-  it('does not auto-start when autoStart param is absent', () => {
-    render(<BookScreen />);
-    // Push should not be called automatically (no interaction)
-    expect(mockPush).not.toHaveBeenCalled();
+  it('shows the generating state while topics are being created', () => {
+    mockUseBookWithTopics.mockReturnValue(
+      makeBookQuery({
+        data: {
+          book: {
+            id: 'book-1',
+            title: 'Algebra',
+            emoji: '📐',
+            topicsGenerated: false,
+            description: 'Basic algebra',
+          },
+          topics: [],
+          completedTopicCount: 0,
+        },
+      })
+    );
+
+    const { getByTestId, getByText } = render(<BookScreen />);
+
+    expect(getByTestId('book-generating')).toBeTruthy();
+    expect(getByText('Algebra')).toBeTruthy();
   });
 
-  // -----------------------------------------------------------------------
-  // BUG-81: initial generation failure shows user-visible Alert [BUG-81]
-  // -----------------------------------------------------------------------
-  it('shows Alert when initial book topic generation fails', async () => {
+  it('shows an alert when the initial generation request fails', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(jest.fn());
 
-    // Book needs generation (topicsGenerated: false)
-    mockUseBookWithTopics.mockReturnValue({
-      data: {
-        book: {
-          id: 'book-1',
-          title: 'Algebra',
-          emoji: '📐',
-          topicsGenerated: false,
-          description: null,
+    mockUseBookWithTopics.mockReturnValue(
+      makeBookQuery({
+        data: {
+          book: {
+            id: 'book-1',
+            title: 'Algebra',
+            emoji: '📐',
+            topicsGenerated: false,
+            description: null,
+          },
+          topics: [],
+          completedTopicCount: 0,
         },
-        topics: [],
-        completedTopicCount: 0,
-      },
-      isLoading: false,
-      isError: false,
-      error: null,
-      refetch: mockBookRefetch,
-    });
-
-    // Simulate mutate calling its onError callback
+      })
+    );
     mockGenerateMutate.mockImplementation(
-      (_input: unknown, callbacks: { onError: (e: Error) => void }) => {
+      (_input: unknown, callbacks: { onError: (error: Error) => void }) => {
         callbacks.onError(new Error('LLM service unavailable'));
       }
     );
@@ -987,136 +777,25 @@ describe('BookScreen', () => {
     });
   });
 
-  // -----------------------------------------------------------------------
-  // Loading back button
-  // -----------------------------------------------------------------------
-  it('loading state has a back button that navigates away', () => {
-    mockUseBookWithTopics.mockReturnValue({
-      data: undefined,
-      isLoading: true,
-      isError: false,
-      error: null,
-      refetch: mockBookRefetch,
-    });
-
-    const { getByTestId } = render(<BookScreen />);
-    fireEvent.press(getByTestId('book-loading-back'));
-    expect(mockBack).toHaveBeenCalledTimes(1);
-  });
-
-  // -----------------------------------------------------------------------
-  // Build learning path button
-  // -----------------------------------------------------------------------
-  it('shows build learning path button in empty state when no curriculum exists', () => {
-    // No curriculum (default mock returns null)
-    const { getByTestId } = render(<BookScreen />);
-    expect(getByTestId('book-build-learning-path')).toBeTruthy();
-  });
-
-  it('hides build learning path button in empty state when curriculum already exists', () => {
-    mockUseCurriculum.mockReturnValue({
-      data: {
-        id: 'cur-1',
-        subjectId: 'sub-1',
-        version: 1,
-        generatedAt: new Date().toISOString(),
-        topics: [
-          {
-            id: 'ctopic-1',
-            title: 'Topic A',
-            description: '',
-            sortOrder: 1,
-            relevance: 'core',
-            estimatedMinutes: 10,
-            bookId: 'book-1',
-            skipped: false,
+  it('fires retry generation only once after the timed-out state', async () => {
+    mockUseBookWithTopics.mockReturnValue(
+      makeBookQuery({
+        data: {
+          book: {
+            id: 'book-1',
+            title: 'Algebra',
+            emoji: '📐',
+            topicsGenerated: false,
+            description: 'Basic algebra',
           },
-        ],
-      },
-      isLoading: false,
-    });
-
-    const { queryByTestId } = render(<BookScreen />);
-    expect(queryByTestId('book-build-learning-path')).toBeNull();
-  });
-
-  it('shows floating bar link when no curriculum exists', () => {
-    const { getByTestId } = render(<BookScreen />);
-    expect(getByTestId('book-build-path-link')).toBeTruthy();
-  });
-
-  it('hides floating bar link when curriculum exists', () => {
-    mockUseCurriculum.mockReturnValue({
-      data: {
-        id: 'cur-1',
-        subjectId: 'sub-1',
-        version: 1,
-        generatedAt: new Date().toISOString(),
-        topics: [
-          {
-            id: 'ctopic-1',
-            title: 'Topic A',
-            description: '',
-            sortOrder: 1,
-            relevance: 'core',
-            estimatedMinutes: 10,
-            bookId: 'book-1',
-            skipped: false,
-          },
-        ],
-      },
-      isLoading: false,
-    });
-
-    const { queryByTestId } = render(<BookScreen />);
-    expect(queryByTestId('book-build-path-link')).toBeNull();
-  });
-
-  it('pressing build learning path navigates to onboarding interview', () => {
-    const { getByTestId } = render(<BookScreen />);
-    fireEvent.press(getByTestId('book-build-learning-path'));
-
-    expect(mockPush).toHaveBeenCalledWith(
-      expect.objectContaining({
-        pathname: '/(app)/onboarding/interview',
-        params: expect.objectContaining({
-          subjectId: 'sub-1',
-          bookId: 'book-1',
-          bookTitle: 'Algebra',
-        }),
+          topics: [],
+          completedTopicCount: 0,
+        },
       })
     );
-  });
 
-  // -----------------------------------------------------------------------
-  // RT-1: useRef lock prevents double-fire on retry button
-  // -----------------------------------------------------------------------
-  it('pressing retry generation fires mutate exactly once [RT-1]', async () => {
-    // Set up book needing generation
-    mockUseBookWithTopics.mockReturnValue({
-      data: {
-        book: {
-          id: 'book-1',
-          title: 'Algebra',
-          emoji: '📐',
-          topicsGenerated: false, // triggers auto-generation
-          description: 'Basic algebra',
-        },
-        topics: [],
-        completedTopicCount: 0,
-      },
-      isLoading: false,
-      isError: false,
-      error: null,
-      refetch: mockBookRefetch,
-    });
-
-    // Initial auto-trigger fires onError to put us in timed_out phase
     mockGenerateMutate.mockImplementationOnce(
-      (
-        _input: unknown,
-        callbacks: { onSuccess: () => void; onError: (e: Error) => void }
-      ) => {
+      (_input: unknown, callbacks: { onError: (error: Error) => void }) => {
         callbacks.onError(new Error('initial failure'));
       }
     );
@@ -1127,19 +806,52 @@ describe('BookScreen', () => {
       expect(getByTestId('book-gen-retry')).toBeTruthy();
     });
 
-    // Reset mock before testing retry — capture pending retry call
-    let mutateCallCount = 0;
+    let retryCallCount = 0;
     mockGenerateMutate.mockImplementation(() => {
-      mutateCallCount++;
-      // Do NOT call callbacks — leave retryInFlight locked
+      retryCallCount += 1;
     });
 
-    // First press: should trigger mutate and lock retryInFlight
     fireEvent.press(getByTestId('book-gen-retry'));
+    expect(retryCallCount).toBe(1);
+  });
 
-    // Mutate was called once and retryInFlight.current is now true.
-    // The retry button is hidden because genPhase was set to 'idle',
-    // so a second press is naturally impossible after state update.
-    expect(mutateCallCount).toBe(1);
+  it('replaces back navigation with the shelf when there is no history', () => {
+    mockCanGoBack.mockReturnValue(false);
+
+    const { getByTestId } = render(<BookScreen />);
+
+    fireEvent.press(getByTestId('book-back'));
+    expect(mockReplace).toHaveBeenCalledWith({
+      pathname: '/(app)/shelf/[subjectId]',
+      params: { subjectId: 'sub-1' },
+    });
+  });
+
+  it('logs a breadcrumb and falls back to up next when the latest session topic no longer exists', () => {
+    (Sentry.addBreadcrumb as jest.Mock).mockClear();
+
+    mockUseBookSessions.mockReturnValue(
+      makeSessionsQuery({
+        data: [
+          makeSession({
+            id: 'sess-1',
+            topicId: 'missing-topic',
+            topicTitle: 'Deleted Topic',
+            chapter: null,
+            createdAt: '2026-04-24T12:00:00.000Z',
+          }),
+        ],
+      })
+    );
+
+    const { getByTestId, queryByTestId } = render(<BookScreen />);
+
+    expect(Sentry.addBreadcrumb).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'continueNowTopicId references missing topic',
+      })
+    );
+    expect(queryByTestId('continue-now-row')).toBeNull();
+    expect(getByTestId('up-next-row')).toBeTruthy();
   });
 });

@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -75,7 +75,29 @@ export default function CreateSubjectScreen() {
   const [resolveRounds, setResolveRounds] = useState(0);
   const [showClarifyInput, setShowClarifyInput] = useState(false);
   const [clarificationInput, setClarificationInput] = useState('');
+  const [resolveTimedOut, setResolveTimedOut] = useState(false);
+  const resolveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { scrollRef, onFieldLayout, onFieldFocus } = useKeyboardScroll();
+
+  // [M4] 30s timeout on resolve phase — show error + retry
+  useEffect(() => {
+    if (resolveState.phase === 'resolving') {
+      setResolveTimedOut(false);
+      resolveTimeoutRef.current = setTimeout(() => {
+        setResolveTimedOut(true);
+        setResolveState({ phase: 'idle' });
+        setError('Check took too long — try again');
+      }, 30_000);
+      return () => {
+        if (resolveTimeoutRef.current) clearTimeout(resolveTimeoutRef.current);
+      };
+    }
+    if (resolveTimeoutRef.current) {
+      clearTimeout(resolveTimeoutRef.current);
+      resolveTimeoutRef.current = null;
+    }
+    return undefined;
+  }, [resolveState.phase]);
 
   const isBusy =
     resolveState.phase === 'resolving' || resolveState.phase === 'creating';
@@ -408,6 +430,24 @@ export default function CreateSubjectScreen() {
               {error}
               {subjectLimitGuidance}
             </Text>
+            {/* M4: Retry Pressable when resolve timed out */}
+            {resolveTimedOut && (
+              <Pressable
+                onPress={() => {
+                  setResolveTimedOut(false);
+                  setError('');
+                  void onSubmit();
+                }}
+                className="mt-2 self-start"
+                accessibilityRole="button"
+                accessibilityLabel="Retry checking subject name"
+                testID="resolve-timeout-retry"
+              >
+                <Text className="text-body-sm font-semibold text-primary">
+                  Retry
+                </Text>
+              </Pressable>
+            )}
             {/* BUG-116: Actionable navigation to manage existing subjects */}
             {isSubjectLimitError && (
               <Pressable

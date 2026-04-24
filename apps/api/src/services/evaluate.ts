@@ -6,6 +6,7 @@
 
 import type { EvaluateAssessment } from '@eduagent/schemas';
 import { createLogger } from './logger';
+import { captureException } from './sentry';
 
 const logger = createLogger();
 
@@ -163,6 +164,12 @@ export function parseEvaluateAssessment(
   } catch (err) {
     logger.warn('Failed to parse evaluate assessment', {
       error: err instanceof Error ? err.message : String(err),
+    });
+    captureException(err, {
+      extra: {
+        context: 'parseEvaluateAssessment',
+        rawSlice: llmResponse.slice(0, 500),
+      },
     });
     return null;
   }

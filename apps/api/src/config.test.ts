@@ -161,4 +161,34 @@ describe('validateEnv', () => {
 
     expect(env.ENVIRONMENT).toBe('production');
   });
+
+  // [EMPTY-REPLY-GUARD-0] Kill-switch coverage — the flag must default ON
+  // and parse both 'true' and 'false' verbatim. Any change to the default
+  // needs to update both this test and the Doppler config.
+  it('EMPTY_REPLY_GUARD_ENABLED defaults to "true" when unset', () => {
+    const env = validateEnv({
+      ENVIRONMENT: 'development',
+      DATABASE_URL: 'postgresql://localhost/test',
+    });
+    expect(env.EMPTY_REPLY_GUARD_ENABLED).toBe('true');
+  });
+
+  it('EMPTY_REPLY_GUARD_ENABLED parses "false" for the ops kill switch', () => {
+    const env = validateEnv({
+      ENVIRONMENT: 'development',
+      DATABASE_URL: 'postgresql://localhost/test',
+      EMPTY_REPLY_GUARD_ENABLED: 'false',
+    });
+    expect(env.EMPTY_REPLY_GUARD_ENABLED).toBe('false');
+  });
+
+  it('rejects invalid EMPTY_REPLY_GUARD_ENABLED values', () => {
+    expect(() =>
+      validateEnv({
+        ENVIRONMENT: 'development',
+        DATABASE_URL: 'postgresql://localhost/test',
+        EMPTY_REPLY_GUARD_ENABLED: 'yes',
+      })
+    ).toThrow('Invalid environment');
+  });
 });

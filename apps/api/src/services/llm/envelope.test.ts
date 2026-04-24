@@ -1,4 +1,4 @@
-import { parseEnvelope } from './envelope';
+import { isRecognizedMarker, parseEnvelope } from './envelope';
 
 describe('parseEnvelope', () => {
   it('parses a minimal valid envelope', () => {
@@ -90,5 +90,45 @@ describe('parseEnvelope', () => {
     if (result.ok) {
       expect(result.envelope.ui_hints?.note_prompt?.show).toBe(true);
     }
+  });
+});
+
+describe('isRecognizedMarker', () => {
+  it('returns true for a bare notePrompt marker', () => {
+    expect(isRecognizedMarker('{"notePrompt":true}')).toBe(true);
+  });
+
+  it('returns true for a bare fluencyDrill marker', () => {
+    expect(isRecognizedMarker('{"fluencyDrill":{"active":true}}')).toBe(true);
+  });
+
+  it('returns true for a bare escalationHold marker', () => {
+    expect(isRecognizedMarker('{"escalationHold":true}')).toBe(true);
+  });
+
+  it('returns false for a full envelope with a reply', () => {
+    expect(isRecognizedMarker('{"reply":"hi","notePrompt":true}')).toBe(false);
+  });
+
+  it('returns false for unknown single-key JSON', () => {
+    expect(isRecognizedMarker('{"randomField":true}')).toBe(false);
+  });
+
+  it('returns false for non-object JSON', () => {
+    expect(isRecognizedMarker('"just a string"')).toBe(false);
+    expect(isRecognizedMarker('["array"]')).toBe(false);
+    expect(isRecognizedMarker('42')).toBe(false);
+  });
+
+  it('returns false for malformed JSON', () => {
+    expect(isRecognizedMarker('{"notePrompt":')).toBe(false);
+  });
+
+  it('returns false for plain prose', () => {
+    expect(isRecognizedMarker('Hello, how are you?')).toBe(false);
+  });
+
+  it('returns false for empty string', () => {
+    expect(isRecognizedMarker('')).toBe(false);
   });
 });

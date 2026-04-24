@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { View, Text, Pressable } from 'react-native';
+import { View, Text, Pressable, ActivityIndicator } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
   ChatShell,
@@ -66,6 +66,8 @@ export default function InterviewScreen() {
   const [sessionPhase, setSessionPhase] = useState(false);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const sessionCreatingRef = useRef(false);
+  // True when sessionPhase is set but activeSessionId has not arrived within 20s
+  const [sessionCreationStuck, setSessionCreationStuck] = useState(false);
   const { stream: streamSessionMessage, isStreaming: isSessionStreaming } =
     useStreamMessage(activeSessionId ?? '');
 
@@ -207,7 +209,21 @@ export default function InterviewScreen() {
     setRestartRequired(false);
     setStreamError(null);
     setExtractedInterests(null);
+    setSessionCreationStuck(false);
   }, [subjectId, openingMessage]);
+
+  // 20s timeout: if sessionPhase is set but activeSessionId hasn't arrived,
+  // surface a tap-to-retry inline error so the user isn't silently stuck.
+  useEffect(() => {
+    if (!sessionPhase || activeSessionId) {
+      setSessionCreationStuck(false);
+      return;
+    }
+    const timer = setTimeout(() => {
+      setSessionCreationStuck(true);
+    }, 20_000);
+    return () => clearTimeout(timer);
+  }, [sessionPhase, activeSessionId]);
 
   useEffect(() => {
     return () => {
@@ -555,7 +571,59 @@ export default function InterviewScreen() {
         )
       }
       footer={
-        // interviewComplete is only true as a fallback (session creation failed)
+        // Session phase: show loading indicator while activeSessionId is pending
+        sessionPhase && !activeSessionId ? (
+          <View
+            className="items-center px-4 py-3"
+            testID="session-creating-indicator"
+          >
+            {sessionCreationStuck ? (
+              // [UX-DE-H2] Give the user two escapes when session creation is
+              // stuck: Retry (primary) and Go back (secondary) so they are
+              // never trapped on a spinning dead-end.
+              <View className="items-center gap-2">
+                <Text className="text-body-sm text-danger text-center mb-2">
+                  This is taking longer than expected.
+                </Text>
+                <Pressable
+                  onPress={() => {
+                    setSessionCreationStuck(false);
+                    sessionCreatingRef.current = false;
+                    void transitionToSession();
+                  }}
+                  className="bg-primary rounded-button px-6 py-3 min-h-[44px] items-center justify-center w-full"
+                  testID="session-creating-retry"
+                  accessibilityRole="button"
+                  accessibilityLabel="Try again"
+                >
+                  <Text className="text-body font-semibold text-text-inverse">
+                    Try Again
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={() =>
+                    goBackOrReplace(router, '/(app)/home' as const)
+                  }
+                  className="bg-surface-elevated rounded-button px-6 py-3 min-h-[44px] items-center justify-center w-full"
+                  testID="session-creating-go-back"
+                  accessibilityRole="button"
+                  accessibilityLabel="Go back to home"
+                >
+                  <Text className="text-body font-semibold text-text-primary">
+                    Go Back
+                  </Text>
+                </Pressable>
+              </View>
+            ) : (
+              <>
+                <ActivityIndicator size="small" />
+                <Text className="text-body-sm text-text-secondary mt-2">
+                  Setting things up…
+                </Text>
+              </>
+            )}
+          </View>
+        ) : // interviewComplete is only true as a fallback (session creation failed)
         // or when returning to an already-completed draft.
         interviewComplete ? (
           <View className="bg-coaching-card rounded-card p-4 mt-2 mb-4">

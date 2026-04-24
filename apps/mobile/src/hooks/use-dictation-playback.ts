@@ -172,6 +172,14 @@ export function useDictationPlayback(config: PlaybackConfig): PlaybackControls {
             pauseTimerRef.current = setTimeout(action, chunkPause);
           }
         },
+        // H6: Reset state on TTS failure so playback never stays frozen in 'speaking'.
+        // onStopped fires when Speech.stop() is called externally (pause/skip),
+        // which is already handled by the pause/skip callbacks, so no extra reset needed there.
+        onError: () => {
+          if (stateRef.current !== 'paused') {
+            setState('idle');
+          }
+        },
       });
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps

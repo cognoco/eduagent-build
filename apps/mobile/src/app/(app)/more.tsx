@@ -308,10 +308,15 @@ export default function MoreScreen() {
         a.click();
         URL.revokeObjectURL(url);
       } else {
-        await Share.share({
+        const result = await Share.share({
           title: 'MentoMate account data export',
           message: jsonString,
         });
+        // [UX-DE-L4] iOS returns dismissedAction when the user cancels the
+        // share sheet — treat it as a no-op, not a success or error.
+        if (result.action === Share.dismissedAction) {
+          return;
+        }
       }
     } catch (err: unknown) {
       platformAlert('Export failed', formatApiError(err));

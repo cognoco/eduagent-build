@@ -19,6 +19,17 @@ export interface StreamChunkEvent {
   content: string;
 }
 
+export type StreamFallbackReason =
+  | 'empty_reply'
+  | 'malformed_envelope'
+  | 'orphan_marker';
+
+export interface StreamFallbackEvent {
+  type: 'fallback';
+  reason: StreamFallbackReason;
+  fallbackText: string;
+}
+
 /** Fluency drill annotation surfaced via SSE done event */
 export interface FluencyDrillEvent {
   active: boolean;
@@ -50,7 +61,11 @@ export interface StreamErrorEvent {
   message: string;
 }
 
-export type StreamEvent = StreamChunkEvent | StreamDoneEvent | StreamErrorEvent;
+export type StreamEvent =
+  | StreamChunkEvent
+  | StreamFallbackEvent
+  | StreamDoneEvent
+  | StreamErrorEvent;
 
 /** BC-07: runtime validation for SSE events — verifies required fields exist
  * before casting, preventing malformed events from corrupting accumulated text.
@@ -58,6 +73,11 @@ export type StreamEvent = StreamChunkEvent | StreamDoneEvent | StreamErrorEvent;
  * interview done events carry `isComplete` instead. Both are valid. */
 function isValidStreamEvent(obj: Record<string, unknown>): boolean {
   if (obj.type === 'chunk') return typeof obj.content === 'string';
+  if (obj.type === 'fallback') {
+    return (
+      typeof obj.reason === 'string' && typeof obj.fallbackText === 'string'
+    );
+  }
   if (obj.type === 'done') return typeof obj.exchangeCount === 'number';
   if (obj.type === 'error') return typeof obj.message === 'string';
   return false;

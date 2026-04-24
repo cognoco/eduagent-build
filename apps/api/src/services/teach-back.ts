@@ -6,6 +6,7 @@
 
 import type { TeachBackAssessment } from '@eduagent/schemas';
 import { createLogger } from './logger';
+import { captureException } from './sentry';
 
 const logger = createLogger();
 
@@ -119,6 +120,9 @@ export function parseTeachBackAssessment(
   } catch (err) {
     logger.warn('Failed to parse teach-back assessment', {
       error: err instanceof Error ? err.message : String(err),
+    });
+    captureException(err, {
+      extra: { context: 'parseTeachBackAssessment' },
     });
     return null;
   }

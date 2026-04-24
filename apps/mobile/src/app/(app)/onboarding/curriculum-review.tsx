@@ -23,6 +23,7 @@ import {
   useExplainTopic,
 } from '../../../hooks/use-curriculum';
 import { formatApiError } from '../../../lib/format-api-error';
+import { ErrorFallback } from '../../../components/common/ErrorFallback';
 
 const RELEVANCE_BG: Record<string, string> = {
   core: 'bg-primary/20',
@@ -292,16 +293,25 @@ export default function CurriculumScreen() {
           </Pressable>
         </View>
       ) : !curriculum ? (
-        <View className="flex-1 items-center justify-center px-8">
-          <Text
-            className="text-h3 font-semibold text-text-primary text-center mb-2"
-            testID="curriculum-empty"
-          >
-            No curriculum yet
-          </Text>
-          <Text className="text-body text-text-secondary text-center">
-            Complete the assessment interview to generate your learning path.
-          </Text>
+        <View
+          className="flex-1 items-center justify-center px-8"
+          testID="curriculum-empty"
+        >
+          <ErrorFallback
+            variant="card"
+            title="No curriculum yet"
+            message="Complete the assessment interview to generate your learning path."
+            primaryAction={{
+              label: 'Retry',
+              testID: 'curriculum-empty-retry',
+              onPress: () => void refetch(),
+            }}
+            secondaryAction={{
+              label: 'Go Home',
+              testID: 'curriculum-empty-home',
+              onPress: () => goBackOrReplace(router, '/(app)/home'),
+            }}
+          />
         </View>
       ) : (
         <ScrollView
@@ -375,7 +385,16 @@ export default function CurriculumScreen() {
                           {
                             text: 'Skip',
                             style: 'destructive',
-                            onPress: () => skipTopic.mutate(topic.id),
+                            // [UX-DE-M2] Surface skip errors — silent failure
+                            // left the UI optimistically empty with no feedback.
+                            onPress: () =>
+                              skipTopic.mutate(topic.id, {
+                                onError: (err: unknown) =>
+                                  platformAlert(
+                                    'Could not skip topic',
+                                    formatApiError(err)
+                                  ),
+                              }),
                           },
                         ]
                       )
@@ -389,7 +408,16 @@ export default function CurriculumScreen() {
                   </Pressable>
                 ) : (
                   <Pressable
-                    onPress={() => unskipTopic.mutate(topic.id)}
+                    onPress={() =>
+                      // [UX-DE-M2] Surface unskip errors via alert.
+                      unskipTopic.mutate(topic.id, {
+                        onError: (err: unknown) =>
+                          platformAlert(
+                            'Could not restore topic',
+                            formatApiError(err)
+                          ),
+                      })
+                    }
                     className="bg-surface-elevated rounded-button px-3 py-1"
                     testID={`restore-${topic.id}`}
                     accessibilityLabel={`Restore ${topic.title}`}

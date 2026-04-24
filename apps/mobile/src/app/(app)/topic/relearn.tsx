@@ -101,10 +101,16 @@ export default function RelearnScreen() {
   const [phase, setPhase] = useState<'choice' | 'method'>('choice');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // M11: Track last attempted method for direct Retry
+  const [lastMethod, setLastMethod] = useState<{
+    method: 'same' | 'different';
+    preferredMethod?: string;
+  } | null>(null);
 
   const handleSameMethod = useCallback(() => {
     if (!topicId) return;
     setError(null);
+    setLastMethod({ method: 'same' });
     setIsSubmitting(true);
     startRelearn.mutate(
       { topicId, method: 'same' },
@@ -133,6 +139,7 @@ export default function RelearnScreen() {
     (preferredMethod: string) => {
       if (!topicId) return;
       setError(null);
+      setLastMethod({ method: 'different', preferredMethod });
       setIsSubmitting(true);
       startRelearn.mutate(
         { topicId, method: 'different', preferredMethod },
@@ -158,6 +165,16 @@ export default function RelearnScreen() {
     },
     [topicId, subjectId, startRelearn, router]
   );
+
+  // M11: Retry last attempted method without re-selecting
+  const handleRetry = useCallback(() => {
+    if (!lastMethod) return;
+    if (lastMethod.method === 'same') {
+      handleSameMethod();
+    } else if (lastMethod.preferredMethod) {
+      handleSelectMethod(lastMethod.preferredMethod);
+    }
+  }, [lastMethod, handleSameMethod, handleSelectMethod]);
 
   if (!topicId || !subjectId) {
     return (
@@ -202,14 +219,30 @@ export default function RelearnScreen() {
       </View>
 
       {isSubmitting ? (
+        // [UX-DE-M1] Keep a visible cancel affordance while the API call is
+        // in flight so the user isn't trapped if the request hangs.
         <View
-          className="flex-1 items-center justify-center"
+          className="flex-1 items-center justify-center px-6"
           testID="relearn-loading"
         >
           <ActivityIndicator size="large" />
           <Text className="text-text-secondary mt-2">
             Starting relearn session...
           </Text>
+          <Pressable
+            onPress={() => {
+              setIsSubmitting(false);
+              setError(null);
+            }}
+            className="mt-6 bg-surface-elevated rounded-button px-6 py-3 min-h-[44px] items-center justify-center"
+            accessibilityRole="button"
+            accessibilityLabel="Cancel"
+            testID="relearn-cancel"
+          >
+            <Text className="text-body font-semibold text-text-primary">
+              Cancel
+            </Text>
+          </Pressable>
         </View>
       ) : phase === 'choice' ? (
         <ScrollView
@@ -222,6 +255,20 @@ export default function RelearnScreen() {
               testID="relearn-error"
             >
               <Text className="text-body-sm text-danger">{error}</Text>
+              {lastMethod && (
+                // [UX-DE-L1] Ensure 44×44 tap target on retry link
+                <Pressable
+                  onPress={handleRetry}
+                  className="mt-2 self-start min-h-[44px] px-4 items-center justify-center"
+                  testID="relearn-retry"
+                  accessibilityLabel="Retry last action"
+                  accessibilityRole="button"
+                >
+                  <Text className="text-body-sm font-semibold text-primary">
+                    Retry
+                  </Text>
+                </Pressable>
+              )}
             </View>
           )}
           <Text className="text-body text-text-secondary mb-6">
@@ -269,6 +316,20 @@ export default function RelearnScreen() {
               testID="relearn-error"
             >
               <Text className="text-body-sm text-danger">{error}</Text>
+              {lastMethod && (
+                // [UX-DE-L1] Ensure 44×44 tap target on retry link
+                <Pressable
+                  onPress={handleRetry}
+                  className="mt-2 self-start min-h-[44px] px-4 items-center justify-center"
+                  testID="relearn-retry"
+                  accessibilityLabel="Retry last action"
+                  accessibilityRole="button"
+                >
+                  <Text className="text-body-sm font-semibold text-primary">
+                    Retry
+                  </Text>
+                </Pressable>
+              )}
             </View>
           )}
           <Text className="text-body text-text-secondary mb-6">

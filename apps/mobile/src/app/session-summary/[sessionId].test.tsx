@@ -111,6 +111,28 @@ jest.mock('../../lib/platform-alert', () => ({
   platformAlert: jest.fn(),
 }));
 
+jest.mock('../../lib/profile', () => ({
+  useProfile: () => ({
+    activeProfile: { id: 'p-1', birthYear: 2012 },
+    profiles: [{ id: 'p-1', birthYear: 2012 }],
+    setActiveProfileId: jest.fn(),
+    isRestoringId: false,
+  }),
+  personaFromBirthYear: () => 'learner',
+  isGuardianProfile: () => false,
+}));
+
+const mockReadSummaryDraft = jest.fn();
+const mockWriteSummaryDraft = jest.fn();
+const mockClearSummaryDraft = jest.fn();
+
+jest.mock('../../lib/summary-draft', () => ({
+  readSummaryDraft: (...args: unknown[]) => mockReadSummaryDraft(...args),
+  writeSummaryDraft: (...args: unknown[]) => mockWriteSummaryDraft(...args),
+  clearSummaryDraft: (...args: unknown[]) => mockClearSummaryDraft(...args),
+  DRAFT_TTL_MS: 7 * 24 * 60 * 60 * 1000,
+}));
+
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false, gcTime: 0 } },
 });
@@ -127,6 +149,9 @@ describe('SessionSummaryScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (platformAlert as jest.Mock).mockClear();
+    mockReadSummaryDraft.mockResolvedValue(null);
+    mockWriteSummaryDraft.mockResolvedValue(undefined);
+    mockClearSummaryDraft.mockResolvedValue(undefined);
     mockSubmitIsError = false;
     mockSubmitError = null;
     mockSkipMutateAsync.mockResolvedValue({
@@ -650,6 +675,205 @@ describe('SessionSummaryScreen', () => {
       });
       expect(mockReplace).not.toHaveBeenCalledWith('/(app)/home');
       expect(mockSkipMutateAsync).not.toHaveBeenCalled();
+    });
+  });
+
+  // Bulletproof drafting — the user must never lose typed text. These tests
+  // cover: autosave to SecureStore, rehydrate on mount, confirm-before-skip
+  // on every exit path, and draft recovery on a previously-skipped session.
+  describe('bulletproof drafting [DRAFT-BULLETPROOF-01]', () => {
+    it('autosaves the draft after the user types (debounced)', async () => {
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      fireEvent.changeText(
+        screen.getByTestId('summary-input'),
+        'I learned about plants making their own food'
+      );
+
+      await waitFor(
+        () => {
+          expect(mockWriteSummaryDraft).toHaveBeenCalledWith(
+            expect.any(String),
+            '660e8400-e29b-41d4-a716-446655440000',
+            'I learned about plants making their own food'
+          );
+        },
+        { timeout: 1500 }
+      );
+    });
+
+    it('rehydrates a stored draft into the input on mount', async () => {
+      mockReadSummaryDraft.mockResolvedValue({
+        profileId: 'p-1',
+        sessionId: '660e8400-e29b-41d4-a716-446655440000',
+        content: 'unfinished thought about autotrophs',
+        updatedAt: new Date().toISOString(),
+      });
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      await waitFor(() => {
+        expect(
+          screen.getByDisplayValue('unfinished thought about autotrophs')
+        ).toBeTruthy();
+      });
+    });
+
+    it('a typed-but-unsubmitted draft opens a confirm dialog on close, not a silent skip', async () => {
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      fireEvent.changeText(
+        screen.getByTestId('summary-input'),
+        'Some partial reflection text that is long enough'
+      );
+
+      fireEvent.press(screen.getByTestId('summary-close-button'));
+
+      await waitFor(() => {
+        expect(platformAlert).toHaveBeenCalled();
+      });
+      // Critical: we do NOT call skipSummary until the user chooses Discard.
+      expect(mockSkipMutateAsync).not.toHaveBeenCalled();
+    });
+
+    it('"Discard" in the confirm dialog clears the draft and then skips the server record', async () => {
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      fireEvent.changeText(
+        screen.getByTestId('summary-input'),
+        'Some partial reflection text that is long enough'
+      );
+      fireEvent.press(screen.getByTestId('summary-close-button'));
+
+      await waitFor(() => {
+        expect(platformAlert).toHaveBeenCalled();
+      });
+
+      const [, , buttons] = (platformAlert as jest.Mock).mock.calls[0];
+      const discard = buttons.find(
+        (b: { text: string }) => b.text === 'Discard'
+      );
+      await discard.onPress();
+
+      await waitFor(() => {
+        expect(mockClearSummaryDraft).toHaveBeenCalled();
+      });
+      await waitFor(() => {
+        expect(mockSkipMutateAsync).toHaveBeenCalled();
+      });
+    });
+
+    it('"Keep writing" in the confirm dialog does NOT call skip or clear', async () => {
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      fireEvent.changeText(
+        screen.getByTestId('summary-input'),
+        'Some partial reflection text that is long enough'
+      );
+      fireEvent.press(screen.getByTestId('summary-close-button'));
+
+      await waitFor(() => {
+        expect(platformAlert).toHaveBeenCalled();
+      });
+
+      const [, , buttons] = (platformAlert as jest.Mock).mock.calls[0];
+      const keep = buttons.find(
+        (b: { text: string }) => b.text === 'Keep writing'
+      );
+      await keep.onPress();
+
+      // Yield one microtask to let any erroneous downstream calls land.
+      await Promise.resolve();
+      expect(mockSkipMutateAsync).not.toHaveBeenCalled();
+    });
+
+    it('"Submit now" in the confirm dialog submits the summary instead of skipping', async () => {
+      mockSubmitMutateAsync.mockResolvedValue({
+        summary: {
+          id: 'summary-1',
+          sessionId: '660e8400-e29b-41d4-a716-446655440000',
+          content: 'Some partial reflection text that is long enough',
+          aiFeedback: 'Great reflection.',
+          status: 'accepted',
+        },
+      });
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      fireEvent.changeText(
+        screen.getByTestId('summary-input'),
+        'Some partial reflection text that is long enough'
+      );
+      fireEvent.press(screen.getByTestId('summary-close-button'));
+
+      await waitFor(() => {
+        expect(platformAlert).toHaveBeenCalled();
+      });
+
+      const [, , buttons] = (platformAlert as jest.Mock).mock.calls[0];
+      const submit = buttons.find(
+        (b: { text: string }) => b.text === 'Submit now'
+      );
+      await submit.onPress();
+
+      await waitFor(() => {
+        expect(mockSubmitMutateAsync).toHaveBeenCalled();
+      });
+      expect(mockSkipMutateAsync).not.toHaveBeenCalled();
+    });
+
+    it('empty input + close still performs the silent skip (no dialog)', async () => {
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      // User types nothing, just taps X.
+      fireEvent.press(screen.getByTestId('summary-close-button'));
+
+      await waitFor(() => {
+        expect(mockSkipMutateAsync).toHaveBeenCalled();
+      });
+      expect(platformAlert).not.toHaveBeenCalled();
+    });
+
+    it('rehydrated draft on a previously-skipped session shows the resubmit banner, not the read-only message', async () => {
+      mockSessionSummaryData = {
+        id: 'summary-1',
+        sessionId: '660e8400-e29b-41d4-a716-446655440000',
+        content: '',
+        aiFeedback: null,
+        status: 'skipped',
+      };
+      mockReadSummaryDraft.mockResolvedValue({
+        profileId: 'p-1',
+        sessionId: '660e8400-e29b-41d4-a716-446655440000',
+        content: 'text I started last time but never submitted',
+        updatedAt: new Date().toISOString(),
+      });
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('summary-resubmit-banner')).toBeTruthy();
+      });
+      expect(screen.queryByTestId('summary-skipped-state')).toBeNull();
+      expect(
+        screen.getByDisplayValue('text I started last time but never submitted')
+      ).toBeTruthy();
+    });
+
+    it('clears the stale draft when the session is already submitted server-side', async () => {
+      mockSessionSummaryData = {
+        id: 'summary-1',
+        sessionId: '660e8400-e29b-41d4-a716-446655440000',
+        content: 'Already submitted on the server.',
+        aiFeedback: 'Nice.',
+        status: 'submitted',
+      };
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      await waitFor(() => {
+        expect(mockClearSummaryDraft).toHaveBeenCalled();
+      });
     });
   });
 });

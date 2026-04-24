@@ -28,6 +28,7 @@ import {
   type LibraryIndex,
 } from '@eduagent/schemas';
 import type { ChatMessage, RouteResult } from './llm/types';
+import { escapeXml } from './llm/sanitize';
 
 const MAX_TOPIC_SUMMARIES = 50;
 
@@ -195,20 +196,6 @@ export function formatLibraryIndexForPrompt(index: LibraryIndex): string {
 // ---------------------------------------------------------------------------
 // LLM filing call
 // ---------------------------------------------------------------------------
-
-/**
- * Escape XML-significant characters to prevent prompt injection.
- * Raw user input (rawInput, sessionTranscript) is interpolated inside
- * XML tags — without escaping, a user can close the tag and inject instructions.
- */
-function escapeXml(str: string): string {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
-}
 
 export type LLMCaller = (
   messages: ChatMessage[],

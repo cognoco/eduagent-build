@@ -1,4 +1,16 @@
-import { eq, and, desc, lte, sql, type SQL, type Column } from 'drizzle-orm';
+import {
+  eq,
+  and,
+  asc,
+  desc,
+  gt,
+  ilike,
+  lte,
+  or,
+  sql,
+  type SQL,
+  type Column,
+} from 'drizzle-orm';
 import type { Database } from './client';
 import {
   profiles,
@@ -23,6 +35,7 @@ import {
   bookSuggestions,
   topicSuggestions,
   curriculumBooks,
+  curriculumTopics,
   learningProfiles,
   vocabulary,
   vocabularyRetentionCards,
@@ -33,6 +46,11 @@ import {
 } from './schema/index';
 
 export function createScopedRepository(db: Database, profileId: string) {
+  if (!profileId || profileId.trim() === '') {
+    throw new Error(
+      'createScopedRepository: profileId must be a non-empty string'
+    );
+  }
   function scopedWhere(
     table: { profileId: Column },
     extraWhere?: SQL
@@ -62,6 +80,24 @@ export function createScopedRepository(db: Database, profileId: string) {
         return db.query.learningSessions.findFirst({
           where: scopedWhere(learningSessions, extraWhere),
         });
+      },
+      /**
+       * Return every non-null topicId this profile has a learning session
+       * for. Matches the behavior previously inlined in resolveNextTopic.
+       */
+      async listCompletedTopicIds(): Promise<string[]> {
+        const rows = await db
+          .select({ topicId: learningSessions.topicId })
+          .from(learningSessions)
+          .where(
+            and(
+              eq(learningSessions.profileId, profileId),
+              sql`${learningSessions.topicId} IS NOT NULL`
+            )
+          );
+        return rows
+          .map((row) => row.topicId)
+          .filter((id): id is string => typeof id === 'string');
       },
     },
 
@@ -101,6 +137,19 @@ export function createScopedRepository(db: Database, profileId: string) {
         return db.query.retentionCards.findFirst({
           where: scopedWhere(retentionCards, extraWhere),
         });
+      },
+      /**
+       * Return every topicId this profile has ever retained a card for.
+       * Ordering is unspecified; caller is responsible for dedup/Set usage.
+       */
+      async listCompletedTopicIds(): Promise<string[]> {
+        const rows = await db
+          .select({ topicId: retentionCards.topicId })
+          .from(retentionCards)
+          .where(eq(retentionCards.profileId, profileId));
+        return rows
+          .map((row) => row.topicId)
+          .filter((id): id is string => typeof id === 'string');
       },
     },
 
@@ -340,6 +389,103 @@ export function createScopedRepository(db: Database, profileId: string) {
         return db.query.topicSuggestions.findMany({
           where: eq(topicSuggestions.bookId, bookId),
         });
+      },
+    },
+
+    curriculumTopics: {
+      /**
+       * Return a single topic iff it belongs to a book whose subject is
+       * owned by this profile. Returns null for unknown topicIds and for
+       * cross-profile topicIds — the caller cannot distinguish, by design.
+       * Callers that want to observe deny events should log at the service
+       * layer where the project logger is available (see resolveNextTopic).
+       */
+      async findById(topicId: string): Promise<CurriculumTopicRow | null> {
+        const [row] = await db
+          .select({
+            id: curriculumTopics.id,
+            bookId: curriculumTopics.bookId,
+            sortOrder: curriculumTopics.sortOrder,
+            title: curriculumTopics.title,
+          })
+          .from(curriculumTopics)
+          .innerJoin(
+            curriculumBooks,
+            eq(curriculumBooks.id, curriculumTopics.bookId)
+          )
+          .innerJoin(subjects, eq(subjects.id, curriculumBooks.subjectId))
+          .where(
+            and(
+              eq(curriculumTopics.id, topicId),
+              eq(subjects.profileId, profileId)
+            )
+          )
+          .limit(1);
+        return row ?? null;
+      },
+
+      /**
+       * Return up to `limit` topics inside `bookId` with sortOrder greater
+       * than `minSortOrder`, ordered ascending. Ownership enforced via the
+       * books→subjects join chain. The limit is caller-supplied so product
+       * policy (how many candidates is "enough") stays in the service layer.
+       */
+      async findLaterInBook(
+        bookId: string,
+        minSortOrder: number,
+        limit: number
+      ): Promise<Array<{ id: string; title: string }>> {
+        return db
+          .select({ id: curriculumTopics.id, title: curriculumTopics.title })
+          .from(curriculumTopics)
+          .innerJoin(
+            curriculumBooks,
+            eq(curriculumBooks.id, curriculumTopics.bookId)
+          )
+          .innerJoin(subjects, eq(subjects.id, curriculumBooks.subjectId))
+          .where(
+            and(
+              eq(curriculumTopics.bookId, bookId),
+              gt(curriculumTopics.sortOrder, minSortOrder),
+              eq(subjects.profileId, profileId)
+            )
+          )
+          .orderBy(asc(curriculumTopics.sortOrder))
+          .limit(limit);
+      },
+
+      /**
+       * Return topics whose title matches any of `keywords` (case-insensitive
+       * substring), scoped to a subject this profile owns. Returns at most
+       * `limit` rows. Callers are expected to short-circuit on empty keyword
+       * arrays — this method does not defend against that case because the
+       * call never happens in production.
+       */
+      async findMatchingInSubject(
+        subjectId: string,
+        keywords: string[],
+        limit: number
+      ): Promise<Array<{ id: string; title: string }>> {
+        return db
+          .select({ id: curriculumTopics.id, title: curriculumTopics.title })
+          .from(curriculumTopics)
+          .innerJoin(
+            curriculumBooks,
+            eq(curriculumBooks.id, curriculumTopics.bookId)
+          )
+          .innerJoin(subjects, eq(subjects.id, curriculumBooks.subjectId))
+          .where(
+            and(
+              eq(curriculumBooks.subjectId, subjectId),
+              eq(subjects.profileId, profileId),
+              or(
+                ...keywords.map((keyword) =>
+                  ilike(curriculumTopics.title, `%${keyword}%`)
+                )
+              )
+            )
+          )
+          .limit(limit);
       },
     },
 
@@ -675,3 +821,10 @@ export function createScopedRepository(db: Database, profileId: string) {
 }
 
 export type ScopedRepository = ReturnType<typeof createScopedRepository>;
+
+export interface CurriculumTopicRow {
+  id: string;
+  bookId: string;
+  sortOrder: number;
+  title: string;
+}
