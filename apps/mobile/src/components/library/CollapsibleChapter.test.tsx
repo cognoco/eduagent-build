@@ -3,105 +3,128 @@ import { CollapsibleChapter } from './CollapsibleChapter';
 
 jest.mock('../../lib/theme', () => ({
   useThemeColors: () => ({
-    textSecondary: '#999',
-    success: '#0f0',
-    primary: '#00bcd4',
+    success: '#22c55e',
+    textSecondary: '#6b7280',
+    primary: '#0088cc',
   }),
 }));
 
-jest.mock('../progress/RetentionSignal', () => ({
-  RetentionSignal: () => null,
-}));
+const onTopicPress = jest.fn();
 
-const mockTopics = [
-  { id: 'topic-1', title: 'The Nile', sortOrder: 0, skipped: false },
-  { id: 'topic-2', title: 'Geography', sortOrder: 1, skipped: false },
-  { id: 'topic-3', title: 'Climate', sortOrder: 2, skipped: true },
+const topics = [
+  { id: 't1', title: 'Cell Walls', sortOrder: 1, skipped: false },
+  { id: 't2', title: 'Chloroplasts', sortOrder: 2, skipped: false },
 ];
 
-describe('CollapsibleChapter', () => {
-  it('renders chapter header with title and count', () => {
+describe('CollapsibleChapter (Later section)', () => {
+  it('renders chapter name and not-started subtitle', () => {
     const { getByText } = render(
       <CollapsibleChapter
-        title="The Land"
-        topics={mockTopics}
-        completedCount={1}
-        initiallyExpanded
-        onTopicPress={jest.fn()}
+        title="Green Factories"
+        topics={topics}
+        totalTopicCount={5}
+        chapterState="partial"
+        initiallyExpanded={false}
+        onTopicPress={onTopicPress}
       />
     );
-    expect(getByText(/The Land/)).toBeTruthy();
-    expect(getByText(/1\/3/)).toBeTruthy();
+
+    expect(getByText('Green Factories')).toBeTruthy();
+    expect(getByText('2 / 5 not started')).toBeTruthy();
   });
 
-  it('shows topics when expanded', () => {
+  it('shows the untouched chapter glyph', () => {
     const { getByText } = render(
       <CollapsibleChapter
-        title="The Land"
-        topics={mockTopics}
-        completedCount={0}
-        initiallyExpanded
-        onTopicPress={jest.fn()}
+        title="Chapter A"
+        topics={topics}
+        totalTopicCount={2}
+        chapterState="untouched"
+        initiallyExpanded={false}
+        onTopicPress={onTopicPress}
       />
     );
-    expect(getByText('The Nile')).toBeTruthy();
-    expect(getByText('Geography')).toBeTruthy();
+
+    expect(getByText('○')).toBeTruthy();
   });
 
-  it('hides topics when collapsed', () => {
+  it('shows the partial-progress chapter glyph', () => {
+    const { getByText } = render(
+      <CollapsibleChapter
+        title="Chapter B"
+        topics={topics}
+        totalTopicCount={4}
+        chapterState="partial"
+        initiallyExpanded={false}
+        onTopicPress={onTopicPress}
+      />
+    );
+
+    expect(getByText('◐')).toBeTruthy();
+  });
+
+  it('is collapsed by default when initiallyExpanded is false', () => {
     const { queryByText } = render(
       <CollapsibleChapter
-        title="The Land"
-        topics={mockTopics}
-        completedCount={0}
+        title="Chapter C"
+        topics={topics}
+        totalTopicCount={3}
+        chapterState="untouched"
         initiallyExpanded={false}
-        onTopicPress={jest.fn()}
+        onTopicPress={onTopicPress}
       />
     );
-    expect(queryByText('The Nile')).toBeNull();
+
+    expect(queryByText('Cell Walls')).toBeNull();
   });
 
-  it('toggles on header press', () => {
-    const { getByTestId, queryByText } = render(
+  it('expands when the header is pressed', () => {
+    const { getByTestId, getByText } = render(
       <CollapsibleChapter
-        title="The Land"
-        topics={mockTopics}
-        completedCount={0}
+        title="Chapter D"
+        topics={topics}
+        totalTopicCount={2}
+        chapterState="untouched"
         initiallyExpanded={false}
-        onTopicPress={jest.fn()}
+        onTopicPress={onTopicPress}
       />
     );
-    fireEvent.press(getByTestId('chapter-header-The Land'));
-    expect(queryByText('The Nile')).toBeTruthy();
+
+    fireEvent.press(getByTestId('chapter-header-Chapter D'));
+    expect(getByText('Cell Walls')).toBeTruthy();
+    expect(getByText('Chloroplasts')).toBeTruthy();
   });
 
-  it('calls onTopicPress with topic id', () => {
-    const onPress = jest.fn();
+  it('calls onTopicPress with topic id and title', () => {
+    onTopicPress.mockClear();
+
     const { getByText } = render(
       <CollapsibleChapter
-        title="The Land"
-        topics={mockTopics}
-        completedCount={0}
+        title="Chapter E"
+        topics={topics}
+        totalTopicCount={2}
+        chapterState="untouched"
         initiallyExpanded
-        onTopicPress={onPress}
+        onTopicPress={onTopicPress}
       />
     );
-    fireEvent.press(getByText('The Nile'));
-    expect(onPress).toHaveBeenCalledWith('topic-1', 'The Nile');
+
+    fireEvent.press(getByText('Cell Walls'));
+    expect(onTopicPress).toHaveBeenCalledWith('t1', 'Cell Walls');
   });
 
-  it('shows note icon when topic has a note', () => {
-    const { getByTestId } = render(
+  it('auto-expands when initiallyExpanded is true', () => {
+    const { getByText } = render(
       <CollapsibleChapter
-        title="The Land"
-        topics={mockTopics}
-        completedCount={0}
+        title="Chapter F"
+        topics={topics}
+        totalTopicCount={2}
+        chapterState="untouched"
         initiallyExpanded
-        onTopicPress={jest.fn()}
-        noteTopicIds={new Set(['topic-1'])}
-        onNotePress={jest.fn()}
+        onTopicPress={onTopicPress}
       />
     );
-    expect(getByTestId('note-icon-topic-1')).toBeTruthy();
+
+    expect(getByText('Cell Walls')).toBeTruthy();
   });
 });

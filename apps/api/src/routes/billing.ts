@@ -34,6 +34,7 @@ import { getTierConfig } from '../services/subscription';
 import { createStripeClient } from '../services/stripe';
 import { readSubscriptionStatus } from '../services/kv';
 import { apiError, notFound } from '../errors';
+import { BRAND_COLOR_PRIMARY } from '../services/brand';
 
 type BillingRouteEnv = {
   Bindings: {
@@ -625,7 +626,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       max-width: 440px; width: 100%;
       box-shadow: 0 2px 12px rgba(0,0,0,0.08); text-align: center;
     }
-    .logo { font-size: 28px; font-weight: 700; color: #6c5ce7; margin-bottom: 24px; }
+    .logo { font-size: 28px; font-weight: 700; color: ${BRAND_COLOR_PRIMARY}; margin-bottom: 24px; }
     h1 { font-size: 22px; font-weight: 700; margin-bottom: 12px; }
     p { font-size: 16px; color: #555; line-height: 1.5; margin-bottom: 16px; }
     .btn {
@@ -635,7 +636,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       transition: opacity 0.2s;
     }
     .btn:hover { opacity: 0.85; }
-    .btn-primary { background: #6c5ce7; color: #fff; }
+    .btn-primary { background: ${BRAND_COLOR_PRIMARY}; color: #fff; }
     .btn-secondary { background: #f0f0f0; color: #333; }
   </style>
 </head>
@@ -679,7 +680,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       max-width: 440px; width: 100%;
       box-shadow: 0 2px 12px rgba(0,0,0,0.08); text-align: center;
     }
-    .logo { font-size: 28px; font-weight: 700; color: #6c5ce7; margin-bottom: 24px; }
+    .logo { font-size: 28px; font-weight: 700; color: ${BRAND_COLOR_PRIMARY}; margin-bottom: 24px; }
     h1 { font-size: 22px; font-weight: 700; margin-bottom: 12px; }
     p { font-size: 16px; color: #555; line-height: 1.5; margin-bottom: 16px; }
     .btn {
@@ -689,7 +690,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       transition: opacity 0.2s;
     }
     .btn:hover { opacity: 0.85; }
-    .btn-primary { background: #6c5ce7; color: #fff; }
+    .btn-primary { background: ${BRAND_COLOR_PRIMARY}; color: #fff; }
     .btn-secondary { background: #f0f0f0; color: #333; }
   </style>
 </head>

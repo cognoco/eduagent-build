@@ -7,7 +7,13 @@ import {
   _resetCircuits,
 } from './router';
 import { createMockProvider } from './providers/mock';
-import type { LLMProvider, ChatMessage } from './types';
+import type { LLMProvider, ChatMessage, ChatResult } from './types';
+
+// [IMP-1] Test helper — returns a ChatResult matching the LLMProvider
+// interface. Spies must not rely on the `normalizeChatResult` back-compat
+// shim in router.ts; doing so makes the test a type lie that hides
+// regressions in the real ChatResult shape.
+const okResult: ChatResult = { content: 'ok', stopReason: 'stop' };
 
 /** Mock provider whose chatStream always throws (for testing stream fallback). */
 function createFailingStreamProvider(id: string): LLMProvider {
@@ -39,7 +45,9 @@ function createTransientFailProvider(
     get callCount() {
       return calls;
     },
-    async chat(...args: Parameters<LLMProvider['chat']>): Promise<string> {
+    async chat(
+      ...args: Parameters<LLMProvider['chat']>
+    ): ReturnType<LLMProvider['chat']> {
       calls++;
       if (calls <= failCount) {
         throw new Error(`Transient failure #${calls}`);
@@ -318,7 +326,7 @@ describe('LLM Router', () => {
         id: 'gemini',
         async chat(messages) {
           receivedMessages.push(messages);
-          return 'ok';
+          return okResult;
         },
         async *chatStream(messages) {
           receivedMessages.push(messages);
@@ -343,7 +351,7 @@ describe('LLM Router', () => {
         id: 'gemini',
         async chat(messages) {
           receivedMessages.push(messages);
-          return 'ok';
+          return okResult;
         },
         async *chatStream() {
           yield 'ok';
@@ -366,7 +374,7 @@ describe('LLM Router', () => {
         id: 'gemini',
         async chat(messages) {
           receivedMessages.push(messages);
-          return 'ok';
+          return okResult;
         },
         async *chatStream() {
           yield 'ok';
@@ -389,7 +397,7 @@ describe('LLM Router', () => {
         id: 'gemini',
         async chat(messages) {
           receivedMessages.push(messages);
-          return 'ok';
+          return okResult;
         },
         async *chatStream() {
           yield 'ok';
@@ -418,7 +426,7 @@ describe('LLM Router', () => {
         id: 'gemini',
         async chat(messages) {
           receivedMessages.push(messages);
-          return 'ok';
+          return okResult;
         },
         async *chatStream() {
           yield 'ok';
@@ -455,7 +463,7 @@ describe('LLM Router', () => {
         id: 'gemini',
         async chat(messages) {
           receivedMessages.push(messages);
-          return 'ok';
+          return okResult;
         },
         async *chatStream() {
           yield 'ok';
@@ -477,7 +485,7 @@ describe('LLM Router', () => {
         id: 'gemini',
         async chat(messages) {
           receivedMessages.push(messages);
-          return 'ok';
+          return okResult;
         },
         async *chatStream() {
           yield 'ok';
@@ -501,7 +509,7 @@ describe('LLM Router', () => {
         id: 'gemini',
         async chat(messages) {
           receivedMessages.push(messages);
-          return 'ok';
+          return okResult;
         },
         async *chatStream() {
           yield 'ok';
@@ -533,7 +541,7 @@ describe('LLM Router', () => {
         id: 'gemini',
         async chat(messages) {
           receivedMessages.push(messages);
-          return 'ok';
+          return okResult;
         },
         async *chatStream() {
           yield 'ok';
@@ -554,7 +562,7 @@ describe('LLM Router', () => {
         id: 'gemini',
         async chat(messages) {
           receivedMessages.push(messages);
-          return 'ok';
+          return okResult;
         },
         async *chatStream() {
           yield 'ok';
@@ -579,7 +587,7 @@ describe('LLM Router', () => {
         id: 'gemini',
         async chat(messages) {
           receivedMessages.push(messages);
-          return 'ok';
+          return okResult;
         },
         async *chatStream() {
           yield 'ok';

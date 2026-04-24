@@ -2,6 +2,8 @@ import {
   routeAndCall,
   routeAndStream,
   parseEnvelope,
+  extractFirstJsonObject,
+  KNOWN_MARKER_KEYS,
   teeEnvelopeStream,
 } from './llm';
 import type {
@@ -19,6 +21,8 @@ import {
   type SessionType,
   type ConversationLanguage,
   type VerificationType,
+  type ExchangeFallback,
+  type ExchangeFallbackReason,
 } from '@eduagent/schemas';
 import type { LLMTier } from './subscription';
 import {
@@ -385,6 +389,34 @@ export interface ParsedExchangeEnvelope {
   confidence?: 'low' | 'medium' | 'high';
 }
 
+// ExchangeFallback + ExchangeFallbackReason are imported from
+// @eduagent/schemas so the wire contract for the SSE `fallback` frame is
+// shared with the mobile client. Do not redefine them here.
+export type { ExchangeFallback, ExchangeFallbackReason };
+
+export interface ClassifiedExchangeOutcome {
+  parsed: ParsedExchangeEnvelope;
+  fallback?: ExchangeFallback;
+}
+
+// Markers that have a live UI consumer in mobile. A "handled marker" is NOT
+// an orphan_marker fallback — parseExchangeEnvelope already extracts it into
+// parsed.notePrompt / parsed.fluencyDrill, the route forwards these on the
+// `done` frame, and mobile dispatches the corresponding widget. Audit
+// (2026-04-24): use-session-streaming.ts reads notePrompt + fluencyDrill +
+// notePromptPostSession via the done frame; no consumer for escalationHold
+// today, so it remains an orphan_marker (loud so missing wiring surfaces).
+//
+// Update this set when a new marker handler is wired. Adding a key here
+// without wiring the handler will silently suppress the orphan_marker
+// fallback — guard with an integration test that exercises the dispatch.
+const HANDLED_MARKER_KEYS: ReadonlySet<string> = new Set([
+  'notePrompt',
+  'fluencyDrill',
+]);
+
+const DEFAULT_FALLBACK_TEXT = "I didn't have a reply — tap to try again.";
+
 /**
  * Parse the full envelope from a (non-streaming or accumulated-stream) LLM
  * response and normalise signals + ui_hints into the flat structure exchange
@@ -453,6 +485,218 @@ export function parseExchangeEnvelope(
     notePromptPostSession: notePrompt?.post_session === true,
     fluencyDrill,
     confidence: envelope.confidence,
+  };
+}
+
+// Reads the raw `reply` string out of the first JSON object without going
+// through Zod, so we can distinguish "schema violation due to empty reply"
+// (→ empty_reply) from "schema violation due to missing reply field"
+// (→ marker or malformed). Returns undefined when no `reply` key is
+// present or the JSON can't be extracted.
+function extractReplyCandidate(response: string): string | undefined {
+  const jsonStr = extractFirstJsonObject(response);
+  if (!jsonStr) return undefined;
+  try {
+    const parsed = JSON.parse(jsonStr);
+    if (
+      typeof parsed === 'object' &&
+      parsed !== null &&
+      !Array.isArray(parsed) &&
+      typeof (parsed as { reply?: unknown }).reply === 'string'
+    ) {
+      return (parsed as { reply: string }).reply;
+    }
+  } catch {
+    return undefined;
+  }
+  return undefined;
+}
+
+// Pulls handled-marker values out of a bare-marker payload (no `reply`).
+// Only reads HANDLED_MARKER_KEYS so an unexpected key never sneaks through.
+function parseHandledMarker(response: string): ParsedExchangeEnvelope {
+  const base: ParsedExchangeEnvelope = {
+    cleanResponse: '',
+    understandingCheck: false,
+    partialProgress: false,
+    needsDeepening: false,
+    notePrompt: false,
+    notePromptPostSession: false,
+    fluencyDrill: null,
+    confidence: undefined,
+  };
+  const jsonStr = extractFirstJsonObject(response);
+  if (!jsonStr) return base;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(jsonStr);
+  } catch {
+    return base;
+  }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    return base;
+  }
+  const obj = parsed as Record<string, unknown>;
+
+  if (obj['notePrompt'] === true) {
+    base.notePrompt = true;
+  }
+
+  const drill = obj['fluencyDrill'];
+  if (drill && typeof drill === 'object' && !Array.isArray(drill)) {
+    const drillObj = drill as Record<string, unknown>;
+    base.fluencyDrill = {
+      active: drillObj['active'] === true,
+      durationSeconds:
+        typeof drillObj['duration_s'] === 'number'
+          ? Math.min(90, Math.max(15, drillObj['duration_s'] as number))
+          : undefined,
+      score:
+        drillObj['score'] &&
+        typeof drillObj['score'] === 'object' &&
+        typeof (drillObj['score'] as { correct?: unknown }).correct ===
+          'number' &&
+        typeof (drillObj['score'] as { total?: unknown }).total === 'number'
+          ? {
+              correct: (drillObj['score'] as { correct: number }).correct,
+              total: (drillObj['score'] as { total: number }).total,
+            }
+          : undefined,
+    };
+  }
+
+  return base;
+}
+
+// Returns the first matching known-marker key, or null if not marker-shaped.
+// Shares KNOWN_MARKER_KEYS with isRecognizedMarker so the two views of
+// "what counts as a marker" never drift.
+function extractKnownMarkerKey(response: string): string | null {
+  const jsonStr = extractFirstJsonObject(response);
+  if (!jsonStr) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(jsonStr);
+  } catch {
+    return null;
+  }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    return null;
+  }
+  const obj = parsed as Record<string, unknown>;
+  if ('reply' in obj) return null; // a full envelope, not a marker
+  for (const key of Object.keys(obj)) {
+    if (KNOWN_MARKER_KEYS.has(key)) return key;
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// classifyExchangeOutcome — wraps parseExchangeEnvelope and classifies the
+// outcome into a fallback bucket per spec §4.1a. Used by streamMessage and
+// streamInterviewExchange onComplete to decide whether to persist the
+// ai_response row, refund quota, and emit a dedicated SSE `fallback` event
+// in the route layer.
+//
+// The three reason buckets are distinct on purpose (spec §7): they let
+// triage separate "LLM format drift" (malformed_envelope) from
+// "widget-trigger without handler" (orphan_marker) from "LLM refused to
+// answer" (empty_reply) without parsing Inngest event names.
+//
+// Handled markers (notePrompt, fluencyDrill) do NOT trigger a fallback —
+// they route through the normal envelope-parse pipeline so the mobile
+// dispatch path still runs. Guarded by the regression test
+// "NO fallback for known dispatched markers" in exchanges.test.ts.
+// ---------------------------------------------------------------------------
+export function classifyExchangeOutcome(
+  rawResponse: string,
+  context?: { sessionId?: string; profileId?: string; flow?: string }
+): ClassifiedExchangeOutcome {
+  const envelopeResult = parseEnvelope(rawResponse);
+
+  // Normal envelope path — parsed cleanly; classify empty reply here.
+  if (envelopeResult.ok) {
+    const parsed = parseExchangeEnvelope(rawResponse, context);
+    if (parsed.cleanResponse.trim() === '') {
+      return {
+        parsed,
+        fallback: {
+          reason: 'empty_reply',
+          fallbackText: DEFAULT_FALLBACK_TEXT,
+        },
+      };
+    }
+    return { parsed };
+  }
+
+  // Envelope parse failed. Two sub-cases need separate treatment before
+  // declaring the response malformed:
+  //   1. Payload has a reply field but it's empty/whitespace → empty_reply
+  //      (schema violation: reply: z.string().min(1)). Semantically the LLM
+  //      refused to answer, not a format drift.
+  //   2. Marker-shaped payloads with no `reply` field → HANDLED markers
+  //      pass through, unhandled markers become orphan_marker.
+  // Anything else is genuine garbage (malformed_envelope).
+  const replyCandidate = extractReplyCandidate(rawResponse);
+  if (replyCandidate !== undefined && replyCandidate.trim().length === 0) {
+    const emptyReplyParsed: ParsedExchangeEnvelope = {
+      cleanResponse: '',
+      understandingCheck: false,
+      partialProgress: false,
+      needsDeepening: false,
+      notePrompt: false,
+      notePromptPostSession: false,
+      fluencyDrill: null,
+      confidence: undefined,
+    };
+    return {
+      parsed: emptyReplyParsed,
+      fallback: {
+        reason: 'empty_reply',
+        fallbackText: DEFAULT_FALLBACK_TEXT,
+      },
+    };
+  }
+
+  const markerKey = extractKnownMarkerKey(rawResponse);
+
+  if (markerKey !== null && HANDLED_MARKER_KEYS.has(markerKey)) {
+    // Marker has a downstream handler. Do NOT fallback — surface the
+    // marker's value into the `parsed` shape directly so the route
+    // forwards it on the `done` frame. parseExchangeEnvelope only reads
+    // full envelopes; bare markers need targeted extraction here.
+    return { parsed: parseHandledMarker(rawResponse) };
+  }
+
+  const emptyParsed: ParsedExchangeEnvelope = {
+    cleanResponse: '',
+    understandingCheck: false,
+    partialProgress: false,
+    needsDeepening: false,
+    notePrompt: false,
+    notePromptPostSession: false,
+    fluencyDrill: null,
+    confidence: undefined,
+  };
+
+  if (markerKey === null) {
+    return {
+      parsed: emptyParsed,
+      fallback: {
+        reason: 'malformed_envelope',
+        fallbackText: DEFAULT_FALLBACK_TEXT,
+      },
+    };
+  }
+
+  // Marker-shaped but no live handler — orphan. Surfaces missing wiring
+  // loudly so a new marker key without a UI consumer can't ship silently.
+  return {
+    parsed: emptyParsed,
+    fallback: {
+      reason: 'orphan_marker',
+      fallbackText: DEFAULT_FALLBACK_TEXT,
+    },
   };
 }
 

@@ -31,6 +31,24 @@ jest.mock('../../hooks/use-milestone-tracker', () => ({
   celebrationForReason: jest.fn((reason: string) => reason),
 }));
 
+const WATCHDOG_RECONNECT_TEXT = 'Connection dropped — Try again';
+
+function applyMessageUpdates(
+  calls: Array<[unknown]>,
+  initialState: Array<Record<string, unknown>>
+) {
+  return calls.reduce<Array<Record<string, unknown>>>((state, [update]) => {
+    if (typeof update === 'function') {
+      return (
+        update as (
+          prev: Array<Record<string, unknown>>
+        ) => Array<Record<string, unknown>>
+      )(state);
+    }
+    return update as Array<Record<string, unknown>>;
+  }, initialState);
+}
+
 // ---------------------------------------------------------------------------
 // Options factory — builds the ~30-field dependency bag for useSessionStreaming.
 // Declared at module scope for brevity but silenceTimerRef cleanup is handled
@@ -134,10 +152,11 @@ function createMockOpts(overrides: Record<string, unknown> = {}) {
     streamMessage: jest.fn(
       async (
         _text: string,
-        _onChunk: (accumulated: string) => void,
+        onChunk: (accumulated: string) => void,
         onComplete: (result: Record<string, unknown>) => Promise<void>,
         _sessionId: string
       ) => {
+        onChunk('Helpful answer');
         await onComplete({
           aiEventId: 'ai-event-1',
           exchangeCount: 1,
@@ -411,6 +430,159 @@ describe('useSessionStreaming', () => {
 
       expect(mockWriteRecoveryMarker).toHaveBeenCalled();
     });
+
+    it('converts explicit fallback completions into reconnect prompts', async () => {
+      const opts = makeOpts({
+        streamMessage: jest.fn(
+          async (
+            _text: string,
+            _onChunk: (accumulated: string) => void,
+            onComplete: (result: Record<string, unknown>) => Promise<void>,
+            _sessionId: string
+          ) => {
+            await onComplete({
+              aiEventId: 'ai-event-fallback',
+              exchangeCount: 1,
+              escalationRung: 0,
+              fallback: {
+                reason: 'empty_reply',
+                fallbackText: "I didn't have a reply — tap to try again.",
+              },
+            });
+          }
+        ),
+      });
+      const { result } = renderHook(() => useSessionStreaming(opts as any));
+
+      await act(async () => {
+        await result.current.continueWithMessage('What happened?');
+      });
+
+      const finalMessages = applyMessageUpdates(
+        (opts.setMessages as jest.Mock).mock.calls,
+        []
+      );
+
+      expect(finalMessages).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            role: 'assistant',
+            kind: 'reconnect_prompt',
+            content: "I didn't have a reply — tap to try again.",
+            streaming: false,
+          }),
+        ])
+      );
+      expect(opts.trackExchange).not.toHaveBeenCalled();
+      expect(mockWriteRecoveryMarker).toHaveBeenCalledTimes(1);
+    });
+
+    it('converts zero-chunk completions into reconnect prompts', async () => {
+      const opts = makeOpts({
+        streamMessage: jest.fn(
+          async (
+            _text: string,
+            _onChunk: (accumulated: string) => void,
+            onComplete: (result: Record<string, unknown>) => Promise<void>,
+            _sessionId: string
+          ) => {
+            await onComplete({
+              aiEventId: 'ai-event-empty',
+              exchangeCount: 1,
+              escalationRung: 0,
+            });
+          }
+        ),
+      });
+      const { result } = renderHook(() => useSessionStreaming(opts as any));
+
+      await act(async () => {
+        await result.current.continueWithMessage('Anyone there?');
+      });
+
+      const finalMessages = applyMessageUpdates(
+        (opts.setMessages as jest.Mock).mock.calls,
+        []
+      );
+
+      expect(finalMessages).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            role: 'assistant',
+            kind: 'reconnect_prompt',
+            content: "I didn't have a reply — tap to try again.",
+          }),
+        ])
+      );
+      expect(opts.trackExchange).not.toHaveBeenCalled();
+    });
+
+    it('does not overwrite watchdog reconnect prompts during finalization', async () => {
+      jest.useFakeTimers();
+
+      let finishStream:
+        | ((result?: Record<string, unknown>) => Promise<void>)
+        | undefined;
+
+      const opts = makeOpts({
+        streamMessage: jest.fn(
+          (
+            _text: string,
+            _onChunk: (accumulated: string) => void,
+            onComplete: (result: Record<string, unknown>) => Promise<void>,
+            _sessionId: string
+          ) =>
+            new Promise<void>((resolve) => {
+              finishStream = async (
+                result = {
+                  aiEventId: 'ai-event-late',
+                  exchangeCount: 1,
+                  escalationRung: 0,
+                }
+              ) => {
+                await onComplete(result);
+                resolve();
+              };
+            })
+        ),
+      });
+      const { result } = renderHook(() => useSessionStreaming(opts as any));
+
+      try {
+        let pending: Promise<void> | undefined;
+        await act(async () => {
+          pending = result.current.continueWithMessage('retry later');
+        });
+
+        await act(async () => {
+          jest.advanceTimersByTime(45_000);
+          await Promise.resolve();
+        });
+
+        await act(async () => {
+          await finishStream?.();
+          await pending;
+        });
+
+        const finalMessages = applyMessageUpdates(
+          (opts.setMessages as jest.Mock).mock.calls,
+          []
+        );
+
+        expect(finalMessages).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              role: 'assistant',
+              kind: 'reconnect_prompt',
+              content: WATCHDOG_RECONNECT_TEXT,
+            }),
+          ])
+        );
+        expect(finalMessages[0]).not.toHaveProperty('isSystemPrompt');
+      } finally {
+        jest.useRealTimers();
+      }
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -606,10 +778,15 @@ describe('useSessionStreaming', () => {
         streamMessage: jest.fn(
           async (
             _text: string,
-            _onChunk: (accumulated: string) => void,
+            onChunk: (accumulated: string) => void,
             onComplete: (result: Record<string, unknown>) => Promise<void>,
             _sessionId: string
           ) => {
+            // Deliver at least one chunk — post-[EMPTY-REPLY-GUARD-3] a
+            // zero-chunk stream routes to the reconnect-prompt branch and
+            // short-circuits the confidence handler. The low-confidence
+            // indicator only makes sense for a real reply.
+            onChunk('Yes, that is right.');
             await onComplete({
               aiEventId: 'ai-event-2',
               exchangeCount: 1,

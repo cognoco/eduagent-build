@@ -9,10 +9,12 @@ interface LibraryTabsProps {
   reviewBadge?: number;
 }
 
+// Topics tab intentionally omitted from top-level Library navigation.
+// Topics are reached by drilling into a book (shelf/[subjectId]/book/[bookId]),
+// which matches the user's mental model: pick a book, then view its topics.
 const TAB_CONFIG: Array<{ key: LibraryTab; label: string }> = [
   { key: 'shelves', label: 'Shelves' },
   { key: 'books', label: 'Books' },
-  { key: 'topics', label: 'Topics' },
 ];
 
 export function LibraryTabs({

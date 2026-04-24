@@ -158,11 +158,16 @@ describe('Integration: quota-reset Inngest function', () => {
     expect(result).toEqual(
       expect.objectContaining({
         status: 'completed',
-        dailyResetCount: 2,
-        monthlyResetCount: 1,
         timestamp: expect.any(String),
       })
     );
+    // resetDailyQuotas/resetExpiredQuotaCycles operate on ALL pools in the DB
+    // (they're daily crons, not scoped to our seed). With parallel Jest workers,
+    // concurrent test files may have pools contributing to these counts too.
+    // We must see AT LEAST our seeded pools reset; downstream per-pool
+    // assertions below prove correctness for the seeded rows.
+    expect(result.dailyResetCount).toBeGreaterThanOrEqual(2);
+    expect(result.monthlyResetCount).toBeGreaterThanOrEqual(1);
 
     const reloadedFreePool = await loadQuotaPool(freePool.quotaPool.id);
     expect(reloadedFreePool!.usedToday).toBe(0);

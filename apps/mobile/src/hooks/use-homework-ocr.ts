@@ -43,7 +43,7 @@ type RecognizedTextResult = {
   confidence?: number;
 };
 
-const NON_HOMEWORK_ERROR_MESSAGE =
+export const NON_HOMEWORK_ERROR_MESSAGE =
   "We couldn't find a clear homework problem in this photo. Try again or type it in.";
 
 async function copyToCache(tempUri: string): Promise<string> {

@@ -14,8 +14,10 @@ import {
   teeEnvelopeStream,
   type ChatMessage,
 } from './llm';
+import { classifyExchangeOutcome, type ExchangeFallback } from './exchanges';
 import { sanitizeXmlValue, escapeXml } from './llm/sanitize';
 import { createLogger } from './logger';
+import { captureException } from './sentry';
 import {
   generateCurriculum,
   ensureCurriculum,
@@ -33,6 +35,7 @@ import {
   INTERVIEW_SYSTEM_PROMPT,
   SIGNAL_EXTRACTION_PROMPT,
 } from './interview-prompts';
+import { inngest } from '../inngest/client';
 
 // ---------------------------------------------------------------------------
 // Interview service — pure business logic, no Hono imports
@@ -68,6 +71,46 @@ export {
 } from './interview-prompts';
 
 const DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+type InterviewStreamCompletionResult = InterviewResult & {
+  fallback?: ExchangeFallback;
+};
+
+async function emitInterviewFallbackEvent(params: {
+  profileId: string | undefined;
+  exchangeCount: number;
+  rawResponse: string;
+  fallback: ExchangeFallback;
+}): Promise<void> {
+  try {
+    await inngest.send({
+      name: 'app/exchange.empty_reply_fallback',
+      data: {
+        sessionId: undefined,
+        profileId: params.profileId,
+        flow: 'streamInterviewExchange',
+        exchangeCount: params.exchangeCount,
+        reason: params.fallback.reason,
+        rawResponsePreview: params.rawResponse.slice(0, 200),
+      },
+    });
+  } catch (err) {
+    logger.warn('exchange.empty_reply_fallback.send_failed', {
+      flow: 'streamInterviewExchange',
+      profileId: params.profileId ?? 'unknown',
+      reason: params.fallback.reason,
+      err,
+    });
+    captureException(err, {
+      profileId: params.profileId,
+      extra: {
+        event: 'app/exchange.empty_reply_fallback',
+        flow: 'streamInterviewExchange',
+        reason: params.fallback.reason,
+      },
+    });
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Row mapper — Drizzle Date → API ISO string
@@ -373,10 +416,23 @@ export async function processInterviewExchange(
 export async function streamInterviewExchange(
   context: InterviewContext,
   userMessage: string,
-  options?: { exchangeCount?: number; profileId?: string; learnerName?: string }
+  options?: {
+    exchangeCount?: number;
+    profileId?: string;
+    learnerName?: string;
+    /**
+     * Per-request kill switch for the empty-reply classifier. Default ON.
+     * When false, onComplete takes the legacy interpretInterviewResponse
+     * path and returns without a fallback frame — behavior matches
+     * pre-[EMPTY-REPLY-GUARD-1].
+     */
+    emptyReplyGuardEnabled?: boolean;
+  }
 ): Promise<{
   stream: AsyncIterable<string>;
-  onComplete: (fullResponse: string) => Promise<InterviewResult>;
+  onComplete: (
+    fullResponse: string
+  ) => Promise<InterviewStreamCompletionResult>;
 }> {
   const safeSubjectName = sanitizeXmlValue(context.subjectName, 200);
   const focusLine = buildFocusLine(context.bookTitle);
@@ -410,15 +466,37 @@ export async function streamInterviewExchange(
     streamResult.stream
   );
 
+  const guardEnabled = options?.emptyReplyGuardEnabled ?? true;
+
   const onComplete = async (
     _fullResponse: string
-  ): Promise<InterviewResult> => {
+  ): Promise<InterviewStreamCompletionResult> => {
     const rawResponse = await rawResponsePromise;
+    const outcome = guardEnabled
+      ? classifyExchangeOutcome(rawResponse, {
+          profileId: options?.profileId,
+          flow: 'streamInterviewExchange',
+        })
+      : undefined;
     const { cleanResponse, readyToFinish } = interpretInterviewResponse({
       rawResponse,
       profileId: options?.profileId,
       flow: 'streamInterviewExchange',
     });
+
+    if (outcome?.fallback) {
+      await emitInterviewFallbackEvent({
+        profileId: options?.profileId,
+        exchangeCount: Math.max(0, currentExchangeCount - 1),
+        rawResponse,
+        fallback: outcome.fallback,
+      });
+      return {
+        response: cleanResponse,
+        isComplete: false,
+        fallback: outcome.fallback,
+      };
+    }
 
     const isComplete =
       readyToFinish || currentExchangeCount >= MAX_INTERVIEW_EXCHANGES;

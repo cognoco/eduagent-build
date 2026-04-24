@@ -2,6 +2,14 @@ const mockGetConsentStatus = jest.fn();
 const mockGetProfileConsentState = jest.fn();
 const mockDeleteProfileIfNoConsent = jest.fn().mockResolvedValue(true);
 const mockSendEmail = jest.fn();
+const mockFormatConsentReminderEmail = jest.fn(
+  (_email: string, _name: string, _days: number, _tokenUrl: string) => ({
+    to: _email,
+    subject: 'Consent reminder',
+    body: `${_days} days left — ${_tokenUrl}`,
+    type: 'consent_reminder' as const,
+  })
+);
 
 // Fake DB whose query.consentStates.findFirst returns a valid consent token.
 // All values are defined inline inside the factory to avoid Jest hoisting issues.
@@ -28,14 +36,10 @@ jest.mock('../../services/consent', () => ({
 
 jest.mock('../../services/notifications', () => ({
   sendEmail: (...args: unknown[]) => mockSendEmail(...args),
-  formatConsentReminderEmail: jest.fn(
-    (_email: string, _name: string, _days: number, _tokenUrl: string) => ({
-      to: _email,
-      subject: 'Consent reminder',
-      body: `${_days} days left — ${_tokenUrl}`,
-      type: 'consent_reminder',
-    })
-  ),
+  formatConsentReminderEmail: (...args: unknown[]) =>
+    mockFormatConsentReminderEmail(
+      ...(args as [string, string, number, string])
+    ),
 }));
 
 jest.mock('../../services/deletion', () => ({
@@ -129,6 +133,34 @@ describe('consentReminder', () => {
     // 3 reminder emails + 1 atomic delete via db.execute
     expect(mockSendEmail).toHaveBeenCalledTimes(3);
     expect(mockDeleteProfileIfNoConsent).toHaveBeenCalled();
+  });
+
+  // [IMP-2] Token URL must reach the email body, not just the format call
+  // — the original test only proved sendEmail was called, which would have
+  // passed even if buildTokenUrl were silently broken.
+  it('passes the built tokenUrl into both the formatter and the email body', async () => {
+    await executeHandler(['PENDING', 'PENDING', 'PENDING', 'PENDING']);
+
+    const expectedTokenUrl =
+      'https://api.mentomate.com/v1/consent-page?token=test-token-abc123';
+
+    // Day 7 + Day 14 reminders go through formatConsentReminderEmail —
+    // each call must receive the built tokenUrl as its 4th arg.
+    expect(mockFormatConsentReminderEmail).toHaveBeenCalledTimes(2);
+    for (const call of mockFormatConsentReminderEmail.mock.calls) {
+      expect(call[3]).toBe(expectedTokenUrl);
+    }
+
+    // sendEmail must be invoked with an EmailOptions whose body contains the
+    // tokenUrl — proves the URL actually lands in what the parent receives.
+    const day7Email = mockSendEmail.mock.calls[0]?.[0] as
+      | { body?: string }
+      | undefined;
+    const day14Email = mockSendEmail.mock.calls[1]?.[0] as
+      | { body?: string }
+      | undefined;
+    expect(day7Email?.body).toContain(expectedTokenUrl);
+    expect(day14Email?.body).toContain(expectedTokenUrl);
   });
 
   it('stops sending when consent is granted mid-sequence', async () => {

@@ -605,6 +605,10 @@ export default function SubscriptionScreen() {
   // Restore-purchase polling state (BUG-397)
   const [restorePolling, setRestorePolling] = useState(false);
 
+  // Post-purchase polling state — shows visible feedback while the webhook
+  // confirms the new subscription tier (PR-FIX-07)
+  const [purchasePolling, setPurchasePolling] = useState(false);
+
   // BUG-403: ScrollView ref so the Upgrade button can scroll to offerings
   const scrollViewRef = useRef<ScrollView>(null);
   const offeringsYRef = useRef(0);
@@ -730,8 +734,6 @@ export default function SubscriptionScreen() {
     async (pkg: PurchasesPackage) => {
       try {
         await purchase.mutateAsync(pkg);
-        await Promise.all([refetchSub(), refetchUsage()]);
-        platformAlert('Success', 'Your subscription is now active!');
       } catch (error: unknown) {
         if (isPurchaseCancelledError(error)) {
           // User cancelled — not an error, just dismiss silently
@@ -764,9 +766,69 @@ export default function SubscriptionScreen() {
           'Purchase failed',
           'Something unexpected happened with your purchase. Please try again.'
         );
+        return;
+      }
+
+      // Purchase succeeded on the store side — poll the API until the webhook
+      // confirms the new subscription tier (PR-FIX-07: was unrendered _purchasePolling)
+      if (!mountedRef.current) return;
+      setPurchasePolling(true);
+
+      const maxAttempts = 15; // ~30 s at 2 s intervals
+      const pollIntervalMs = 2000;
+      let confirmed = false;
+
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        if (!mountedRef.current) break;
+        await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+        if (!mountedRef.current) break;
+        try {
+          const freshSub = await queryClient.fetchQuery<{
+            tier: string;
+          }>({
+            queryKey: ['subscription', activeProfile?.id],
+            staleTime: 0,
+            queryFn: async () => {
+              const res = await client.subscription.$get({});
+              await assertOk(res);
+              const data = await res.json();
+              return data.subscription;
+            },
+          });
+          if (freshSub && freshSub.tier !== 'free') {
+            confirmed = true;
+            break;
+          }
+        } catch {
+          // Network error during poll — continue to next attempt
+          continue;
+        }
+      }
+
+      if (!mountedRef.current) return;
+      setPurchasePolling(false);
+
+      await Promise.all([refetchSub(), refetchUsage()]);
+
+      if (confirmed) {
+        platformAlert('Success', 'Your subscription is now active!');
+      } else {
+        platformAlert(
+          'Purchase confirmed',
+          'Your subscription is being activated. It usually appears within a minute — pull down to refresh.',
+          [{ text: 'OK' }]
+        );
       }
     },
-    [purchase, refetchSub, refetchUsage, handleRestore]
+    [
+      purchase,
+      refetchSub,
+      refetchUsage,
+      handleRestore,
+      queryClient,
+      activeProfile?.id,
+      client,
+    ]
   );
 
   // ---------------------------------------------------------------------------
@@ -1274,10 +1336,25 @@ export default function SubscriptionScreen() {
                     pkg={pkg}
                     isCurrentPlan={isCurrentPlan}
                     onSelect={handlePurchase}
-                    isPurchasing={purchase.isPending}
+                    isPurchasing={purchase.isPending || purchasePolling}
                   />
                 );
               })}
+              {purchasePolling && (
+                <View
+                  className="bg-surface rounded-card px-4 py-3.5 mt-2 flex-row items-center"
+                  testID="purchase-polling-indicator"
+                >
+                  <ActivityIndicator
+                    size="small"
+                    color={colors.primary}
+                    testID="purchase-polling-spinner"
+                  />
+                  <Text className="text-body font-semibold text-primary ml-2">
+                    Confirming purchase…
+                  </Text>
+                </View>
+              )}
             </View>
           )}
 

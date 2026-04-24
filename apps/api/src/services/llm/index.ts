@@ -15,7 +15,11 @@ export { getTextContent } from './types';
 export { extractFirstJsonObject } from './extract-json';
 export { normalizeStopReason } from './stop-reason';
 export type { StopReason, StopReasonProvider } from './stop-reason';
-export { parseEnvelope, isRecognizedMarker } from './envelope';
+export {
+  parseEnvelope,
+  isRecognizedMarker,
+  KNOWN_MARKER_KEYS,
+} from './envelope';
 export { streamEnvelopeReply, teeEnvelopeStream } from './stream-envelope';
 export type {
   ParseEnvelopeResult,

@@ -56,6 +56,26 @@ Before merging, open a follow-up ticket to either:
 
 Add the ticket URL here before checking this gate: `<TICKET-URL>`.
 
+If you reach Task 8 without a ticket URL recorded above, **stop and file the ticket** — placeholders that survive merge become permanent debt. The ticket can be a one-line "follow-up: lift `computeUpNextTopic` rule into shared package or replace with backend endpoint" in your normal tracker.
+
+### Gate E — Sentry Import + Cache Invalidation
+
+Step 5.2 calls `Sentry.addBreadcrumb(...)` for the stale-topic-id failure mode. Confirm the import exists or add it before Task 5:
+
+```bash
+grep -n "@sentry/react-native\|from '@sentry" apps/mobile/src/app/\(app\)/shelf/\[subjectId\]/book/\[bookId\].tsx
+```
+
+If zero matches: add `import * as Sentry from '@sentry/react-native';` to the imports during Step 4.1 alongside the other new imports.
+
+Cache invalidation: when a session completes, both `useBookSessions` and `useRetentionTopics` must invalidate so a topic transitions Continue now → Done without an app restart. Verify the session-completion mutation already does this:
+
+```bash
+grep -rn "invalidateQueries.*\(sessions\|retention\)" apps/mobile/src/hooks/ apps/mobile/src/app/
+```
+
+Expected: at least one match wiring both query keys to the session-completion mutation. If neither is wired, file a follow-up before merge — the redesign will look broken on first session completion (state is stale until refetch). This is a pre-existing concern, not introduced by this plan, but it's load-bearing for the redesign's perceived correctness.
+
 ---
 
 ## Failure Modes
@@ -64,10 +84,10 @@ Per global `~/.claude/CLAUDE.md` "Spec Failure Modes Before Coding," every scree
 
 | State | Trigger | User sees | Recovery | Verified by |
 |---|---|---|---|---|
-| Sessions fetch fails | `useBookSessions` returns error | Inline banner: "Couldn't load your history. Retry." | Retry button + Later/Done still visible from retention data | Task 8 break test — mock `useBookSessions` as error, assert banner rendered |
-| Retention fetch fails | `useRetentionTopics` returns error | Inline banner: "Couldn't load progress. Retry." | Retry button + Continue now/Started still visible from session data | Task 8 break test — mock `useRetentionTopics` as error, assert banner rendered |
-| Topics array empty after filter | `topics.length === 0` but `topicsGenerated === true` | Empty state with CTA: "Generate learning path" | `handleBuildLearningPath` | Task 8 break test — topics=[], assert empty state + CTA visible |
-| All sections short-circuit | Every section's gate evaluates false | Fallback card: "Nothing to show yet. Start your first session." | Primary CTA = `handleStartLearning` with fallback topic = first in book | Task 8 break test — simulate edge case, assert fallback visible |
+| Sessions fetch fails | `useBookSessions` returns error | Inline banner: "Couldn't load your history. Retry." | Retry button + Later/Done still visible from retention data | Task 5b Step 5b.2 (`sessions-error-banner` JSX) + Task 8 Step 8.6b (`sessions-error-banner` test) |
+| Retention fetch fails | `useRetentionTopics` returns error | Inline banner: "Couldn't load progress. Retry." | Retry button + Continue now/Started still visible from session data | Task 5b Step 5b.2 (`retention-error-banner` JSX) + Task 8 Step 8.6b (`retention-error-banner` test) |
+| Topics array empty after filter | `topics.length === 0` but `topicsGenerated === true` | Empty state with CTA: "Build learning path" | `handleBuildLearningPath` | Task 5b Step 5b.3 (`topics-empty-state` JSX) + Task 8 Step 8.6b (`topics-empty-state` test) |
+| All sections short-circuit | Every section's gate evaluates false (topics exist but no sessions, no retention, no upNext) | Fallback card: "Nothing to show yet. Start your first session." | Primary CTA starts session for first topic in book via `handleTopicStart` | Task 5b Step 5b.4 (`all-sections-fallback` JSX) + Task 8 Step 8.6b (`all-sections-fallback` test) |
 | Stale `continueNowTopicId` | Topic referenced by session was deleted | Continue now section hidden, no error | Log to Sentry (not a user-facing fallback); user still sees Up next | Task 8 break test — session.topicId not in topics[], assert no crash + Sentry logged |
 | Offline | `NetInfo.useNetInfo()` reports offline | Top banner: "You're offline — showing cached data" | Dismiss + retry on reconnect | Existing global offline banner (verify it's not masked by new sticky CTA) |
 | Fully done, no Up next | All topics in `topicStudiedIds`, `upNextTopic === null` | "🎉 Book complete" card with "Start review" (primary) and "Back to shelf" (secondary); sticky CTA hidden so the card owns the action | "Start review" routes to spaced-repetition flow; "Back to shelf" routes to shelf screen (which handles next-book selection) | Task 4 `isBookComplete` memo + Task 6 Step 6.0 card + Task 7 `isBookComplete` CTA guard + Task 8 Step 8.8a break tests (card renders, card hides when incomplete, review-mode route) |
@@ -1405,6 +1425,175 @@ Expected: fewer errors than before — `suggestionCards`, `groupedChapters`, `su
 
 ---
 
+## Task 5b: Error Banners + Empty/Fallback States
+
+**Files:**
+- Modify: `apps/mobile/src/app/(app)/shelf/[subjectId]/book/[bookId].tsx`
+
+This task implements the four failure-mode rows from the table that earlier drafts only listed without code: sessions error, retention error, empty topics, all-sections-short-circuit. Without these, the Self-Review's "Verified by" cells lie.
+
+- [ ] **Step 5b.1: Expose `isError` + `refetch` from existing query objects**
+
+The existing `sessionsQuery` and `retentionTopicsQuery` already carry these — they just aren't destructured. Find the lines that read sessions / retention data (around the existing `sessionsQuery.data` / `retentionTopicsQuery.data` usage) and add bindings near the top of the component, after the existing query declarations:
+
+```tsx
+  const sessionsError = sessionsQuery.isError;
+  const retentionError = retentionTopicsQuery.isError;
+  const refetchSessions = sessionsQuery.refetch;
+  const refetchRetention = retentionTopicsQuery.refetch;
+```
+
+Verify with:
+```bash
+grep -n "sessionsQuery\.\|retentionTopicsQuery\." apps/mobile/src/app/\(app\)/shelf/\[subjectId\]/book/\[bookId\].tsx
+```
+
+- [ ] **Step 5b.2: Insert the two error banners**
+
+Insert immediately after the header block (after Step 5.1's "Compact stats row" closes), **before** the Continue now section. Banners are sticky-positioned in scroll order, not at the top of the viewport — they stay attached to the data they describe so users see Later/Done first when sessions fail (and vice-versa).
+
+```tsx
+        {/* ── Error banners — surface fetch failures inline ── */}
+        {sessionsError && (
+          <View className="px-5 mb-3" testID="sessions-error-banner">
+            <View
+              className="rounded-card p-3 flex-row items-center justify-between"
+              style={{
+                backgroundColor: `${themeColors.error}10`,
+                borderColor: themeColors.error,
+                borderWidth: 1,
+              }}
+            >
+              <Text className="text-body-sm text-text-primary flex-1 me-3">
+                Couldn't load your history.
+              </Text>
+              <Pressable
+                onPress={() => refetchSessions()}
+                testID="sessions-error-retry"
+                accessibilityRole="button"
+                accessibilityLabel="Retry loading session history"
+                className="px-3 py-1"
+              >
+                <Text className="text-body-sm font-semibold text-primary">Retry</Text>
+              </Pressable>
+            </View>
+          </View>
+        )}
+
+        {retentionError && (
+          <View className="px-5 mb-3" testID="retention-error-banner">
+            <View
+              className="rounded-card p-3 flex-row items-center justify-between"
+              style={{
+                backgroundColor: `${themeColors.error}10`,
+                borderColor: themeColors.error,
+                borderWidth: 1,
+              }}
+            >
+              <Text className="text-body-sm text-text-primary flex-1 me-3">
+                Couldn't load progress.
+              </Text>
+              <Pressable
+                onPress={() => refetchRetention()}
+                testID="retention-error-retry"
+                accessibilityRole="button"
+                accessibilityLabel="Retry loading progress"
+                className="px-3 py-1"
+              >
+                <Text className="text-body-sm font-semibold text-primary">Retry</Text>
+              </Pressable>
+            </View>
+          </View>
+        )}
+```
+
+These banners render in addition to whatever sections still have data. Per the Failure Modes recovery column: when sessions fail, Later + Done still render from retention; when retention fails, Continue now + Started still render from sessions. **Do not** swap them for a full-screen error — degraded data is more useful than no data.
+
+- [ ] **Step 5b.3: Insert the empty-topics state**
+
+Insert after the error banners and **before** Continue now. This handles `topicsGenerated === true && topics.length === 0` — the path where generation succeeded but produced nothing usable (rare but possible after a curriculum reset).
+
+```tsx
+        {/* ── Empty state: topics generated but array is empty ── */}
+        {topics.length === 0 && book?.topicsGenerated && !needsGeneration && (
+          <View className="px-5 py-8" testID="topics-empty-state">
+            <Text className="text-h3 font-semibold text-text-primary text-center mb-2">
+              No topics yet
+            </Text>
+            <Text className="text-body-sm text-text-secondary text-center mb-4">
+              This book doesn't have any learning topics. Build a learning path to get started.
+            </Text>
+            <Pressable
+              onPress={handleBuildLearningPath}
+              className="bg-primary rounded-button px-5 py-3 self-center min-h-[48px] items-center justify-center"
+              testID="topics-empty-build"
+              accessibilityRole="button"
+              accessibilityLabel="Build a learning path"
+            >
+              <Text className="text-body font-semibold text-text-inverse">
+                Build learning path
+              </Text>
+            </Pressable>
+          </View>
+        )}
+```
+
+The existing `needsGeneration` branch (which prompts to generate from scratch) takes precedence — this empty state only fires when generation already ran but yielded zero topics.
+
+- [ ] **Step 5b.4: Insert the all-sections-fallback card**
+
+Insert after the Up next section (Step 5.2) and **before** the Done section (Task 6, Step 6.1). This catches the corner case where topics exist, none are done, none are in-progress, and `upNextTopic` somehow returned null (e.g., all topics filtered out by `skipped`).
+
+```tsx
+        {/* ── Fallback: every section short-circuited but topics exist ── */}
+        {topics.length > 0 &&
+          !isBookComplete &&
+          !continueNowTopic &&
+          startedTopicIds.length === 0 &&
+          !upNextTopic &&
+          doneTopics.length === 0 &&
+          laterChapters.length === 0 && (
+            <View className="px-5 mb-3" testID="all-sections-fallback">
+              <View className="rounded-card p-5 bg-surface-elevated">
+                <Text className="text-body font-semibold text-text-primary mb-2">
+                  Nothing to show yet.
+                </Text>
+                <Text className="text-body-sm text-text-secondary mb-3">
+                  Start your first session to see your progress here.
+                </Text>
+                <Pressable
+                  onPress={() => {
+                    const fallback = topics[0];
+                    if (fallback) handleTopicStart(fallback.id, fallback.title);
+                  }}
+                  className="bg-primary rounded-button px-5 py-3 flex-row items-center justify-center min-h-[48px]"
+                  testID="fallback-start"
+                  accessibilityRole="button"
+                  accessibilityLabel="Start first session"
+                >
+                  <Text className="text-body font-semibold text-text-inverse">
+                    ▶ Start first session
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+          )}
+```
+
+This block guards against logic drift in `computeUpNextTopic` — if a future edit makes Up next return null in cases the spec didn't anticipate, the user still has a tap-target instead of a blank screen.
+
+- [ ] **Step 5b.5: Typecheck**
+
+```bash
+cd apps/mobile && pnpm exec tsc --noEmit 2>&1 | head -20
+```
+
+Expected: zero new errors from Task 5b. Pre-existing errors from old CollapsibleChapter call sites still present (fixed in Task 6).
+
+- [ ] **Step 5b.6: Do not commit** — same constraint as Task 4 / 5: working tree commits at end of Task 7.
+
+---
+
 ## Task 6: Book-Complete Card + Done + Later Sections
 
 **Files:**
@@ -1428,7 +1617,7 @@ This renders only when `isBookComplete` is true. It takes the visual slot that C
           <View className="px-5 mb-3" testID="book-complete-card">
             <View
               className="rounded-card p-5 bg-surface-elevated"
-              style={{ borderColor: colors.success, borderWidth: 1 }}
+              style={{ borderColor: themeColors.success, borderWidth: 1 }}
               accessibilityRole="summary"
               accessibilityLabel={`${book?.title ?? 'Book'} complete. ${topics.length} topics studied.`}
             >
@@ -1967,7 +2156,155 @@ describe('Later section', () => {
 });
 ```
 
-- [ ] **Step 8.8a: Add Book-complete card tests**
+- [ ] **Step 8.7b: Add failure-mode tests (Task 5b coverage)**
+
+These tests prove the four Failure Modes table rows that earlier drafts only listed. Without these, the Self-Review's "Verified by" cells are aspirational.
+
+```typescript
+describe('Failure modes (Task 5b)', () => {
+  function baseTopics() {
+    return [makeTopic({ id: 'topic-1', title: 'Linear Equations' })];
+  }
+
+  it('renders sessions error banner with retry when useBookSessions fails', () => {
+    const refetchSpy = jest.fn();
+    mockUseBookWithTopics.mockReturnValue({
+      data: {
+        book: { id: 'book-1', title: 'Algebra', emoji: '📐', topicsGenerated: true },
+        topics: baseTopics(),
+        completedTopicCount: 0,
+      },
+      isLoading: false, isError: false, error: null, refetch: jest.fn(),
+    });
+    mockUseBookSessions.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      refetch: refetchSpy,
+    });
+    mockUseRetentionTopics.mockReturnValue({
+      data: { topics: [], reviewDueCount: 0 }, isLoading: false, isError: false, refetch: jest.fn(),
+    });
+
+    const { getByTestId, getByText } = render(<BookScreen />);
+    expect(getByTestId('sessions-error-banner')).toBeTruthy();
+    expect(getByText("Couldn't load your history.")).toBeTruthy();
+    fireEvent.press(getByTestId('sessions-error-retry'));
+    expect(refetchSpy).toHaveBeenCalledTimes(1);
+    // Degraded data still rendered: Up next computes from retention-only state
+    expect(getByTestId('up-next-row')).toBeTruthy();
+  });
+
+  it('renders retention error banner with retry when useRetentionTopics fails', () => {
+    const refetchSpy = jest.fn();
+    mockUseBookWithTopics.mockReturnValue({
+      data: {
+        book: { id: 'book-1', title: 'Algebra', emoji: '📐', topicsGenerated: true },
+        topics: baseTopics(),
+        completedTopicCount: 0,
+      },
+      isLoading: false, isError: false, error: null, refetch: jest.fn(),
+    });
+    mockUseBookSessions.mockReturnValue({
+      data: [makeSession({ topicId: 'topic-1' })],
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+    mockUseRetentionTopics.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      refetch: refetchSpy,
+    });
+
+    const { getByTestId, getByText } = render(<BookScreen />);
+    expect(getByTestId('retention-error-banner')).toBeTruthy();
+    expect(getByText("Couldn't load progress.")).toBeTruthy();
+    fireEvent.press(getByTestId('retention-error-retry'));
+    expect(refetchSpy).toHaveBeenCalledTimes(1);
+    // Degraded data: Continue now still renders from sessions-only state
+    expect(getByTestId('continue-now-row')).toBeTruthy();
+  });
+
+  it('renders empty-topics state with build-path CTA when topicsGenerated but topics=[]', () => {
+    mockUseBookWithTopics.mockReturnValue({
+      data: {
+        book: { id: 'book-1', title: 'Algebra', emoji: '📐', topicsGenerated: true },
+        topics: [],
+        completedTopicCount: 0,
+      },
+      isLoading: false, isError: false, error: null, refetch: jest.fn(),
+    });
+    mockUseBookSessions.mockReturnValue({ data: [], isLoading: false, isError: false, refetch: jest.fn() });
+    mockUseRetentionTopics.mockReturnValue({
+      data: { topics: [], reviewDueCount: 0 }, isLoading: false, isError: false, refetch: jest.fn(),
+    });
+
+    const { getByTestId, getByText } = render(<BookScreen />);
+    expect(getByTestId('topics-empty-state')).toBeTruthy();
+    expect(getByText('No topics yet')).toBeTruthy();
+    expect(getByTestId('topics-empty-build')).toBeTruthy();
+  });
+
+  it('renders all-sections-fallback when every section short-circuits but topics exist', () => {
+    // Construct a state where:
+    // - topics exist but all are skipped (so laterChapters and upNextTopic are empty)
+    // - no sessions (no continueNow / Started)
+    // - no retention (no Done)
+    // This is an unlikely but possible state if someone skips every topic.
+    const skippedTopics = [
+      makeTopic({ id: 'topic-1', title: 'A', skipped: true }),
+      makeTopic({ id: 'topic-2', title: 'B', skipped: true, sortOrder: 2 }),
+    ];
+    mockUseBookWithTopics.mockReturnValue({
+      data: {
+        book: { id: 'book-1', title: 'Algebra', emoji: '📐', topicsGenerated: true },
+        topics: skippedTopics,
+        completedTopicCount: 0,
+      },
+      isLoading: false, isError: false, error: null, refetch: jest.fn(),
+    });
+    mockUseBookSessions.mockReturnValue({ data: [], isLoading: false, isError: false, refetch: jest.fn() });
+    mockUseRetentionTopics.mockReturnValue({
+      data: { topics: [], reviewDueCount: 0 }, isLoading: false, isError: false, refetch: jest.fn(),
+    });
+
+    const { getByTestId } = render(<BookScreen />);
+    // NOTE: If `computeUpNextTopic` returns a topic even when all are skipped,
+    // this test will fail because the fallback gate is exclusive. In that case,
+    // either tighten `computeUpNextTopic` to filter `skipped`, or change this
+    // test to inject a state where all 6 gates are genuinely false (e.g.,
+    // monkey-patch via dependency injection — currently not exposed). The test
+    // failing is itself information: it tells you the fallback is unreachable
+    // through public APIs and should be deleted (per simpler-is-better).
+    expect(getByTestId('all-sections-fallback')).toBeTruthy();
+  });
+
+  it('does not render error banners when both queries succeed', () => {
+    mockUseBookWithTopics.mockReturnValue({
+      data: {
+        book: { id: 'book-1', title: 'Algebra', emoji: '📐', topicsGenerated: true },
+        topics: baseTopics(),
+        completedTopicCount: 0,
+      },
+      isLoading: false, isError: false, error: null, refetch: jest.fn(),
+    });
+    mockUseBookSessions.mockReturnValue({ data: [], isLoading: false, isError: false, refetch: jest.fn() });
+    mockUseRetentionTopics.mockReturnValue({
+      data: { topics: [], reviewDueCount: 0 }, isLoading: false, isError: false, refetch: jest.fn(),
+    });
+
+    const { queryByTestId } = render(<BookScreen />);
+    expect(queryByTestId('sessions-error-banner')).toBeNull();
+    expect(queryByTestId('retention-error-banner')).toBeNull();
+  });
+});
+```
+
+> **Heads-up on the existing mocks:** every other test in this file currently returns `mockUseBookSessions.mockReturnValue({ data: [...], isLoading: false })` — without `isError` or `refetch`. These older tests still pass because the screen reads `sessionsQuery.isError` (undefined → falsy → banner hidden). But the new failure-mode tests above add `isError: true/false` explicitly. **Don't retrofit the older tests** — leaving them minimal is the documented convention. Just be aware the difference is intentional.
+
+
 
 ```typescript
 describe('Book-complete card', () => {
@@ -2032,9 +2369,14 @@ describe('Book-complete card', () => {
 
   it('tapping "Start review" routes to review mode, not learning mode', () => {
     const pushSpy = jest.fn();
-    // Wire the router mock — the existing mock setup at the top of this file
-    // likely exports a mutable `mockRouterPush`; if yours is named differently,
-    // adapt this setup to the actual mock surface.
+    // Wire the router mock — the actual mock variable name varies per test file.
+    // BEFORE WRITING THIS TEST, run:
+    //   grep -nE "mockRouter|router.push|jest.mock\(.*expo-router" \
+    //     apps/mobile/src/app/\(app\)/shelf/\[subjectId\]/book/\[bookId\].test.tsx
+    // and adapt the line below to whatever symbol is exposed (mockRouter,
+    // mockRouterPush, mockedRouter, etc.). If the file mocks expo-router with
+    // a hoisted factory (jest.mock('expo-router', ...)), you may need to
+    // import the mocked module and reach into its `useRouter` return value.
     mockRouter.push = pushSpy;
 
     const topicsData = [makeTopic({ id: 'topic-1' })];
@@ -2168,7 +2510,11 @@ Seed four scenarios on one profile:
 1. **Zero sessions** — fresh book. Expect: no Continue now, no Started, hero Up next, Later expanded, CTA = "▶ Start: <title>".
 2. **Mid-progress** — 1 continueNow, 2–3 Started, 1 Up next, 2 Done. Expect: all six sections visible, CTA = "▶ Continue learning".
 3. **Fully done** — all topics in topicStudiedIds. Expect: Book-complete card at top with "Start review" + "Back to shelf" buttons; Done section populated; no Continue now/Started/Up next/Later; sticky CTA hidden. Tap "Start review" and confirm it routes to review mode (not learning mode).
-4. **Sessions-fetch-fails** — force the sessions query into error state (devtools network throttle or mock). Expect: inline banner per Failure Modes row, retry works.
+4. **Sessions-fetch-fails** — force the sessions query into error state (devtools network throttle, airplane mode, or temporarily corrupt the auth token). Expect: `sessions-error-banner` visible with Retry button; Later + Done still render from retention data; Continue now + Started + Up next hidden. Tap Retry while still offline → still shows banner. Restore network → tap Retry → banner disappears, full screen renders.
+
+5. **Retention-fetch-fails** — same forced-error approach for the retention query. Expect: `retention-error-banner` visible; Continue now + Started still render from sessions; Done + Later hidden. Retry behavior mirrors scenario 4.
+
+6. **Empty-topics edge case** — seed a book where `topicsGenerated === true` but the topics array is empty (manually clear via test-seed endpoint). Expect: `topics-empty-state` with "Build learning path" CTA. Tap CTA → routes to learning-path builder.
 
 - [ ] **Step 9.2: Small-screen screenshot audit**
 
@@ -2206,10 +2552,10 @@ If Task 9 revealed code issues, fix them and commit. Otherwise, append the scree
 | Remove Study next cards, flame icons, "Next" chip, "Latest"/"Paused" chips | Task 5 (old blocks deleted) + Task 3 (CollapsibleChapter) |
 | Compact header: progress bar + "N of M topics done" | Task 5 |
 | Past conversations heading rename | Task 6 |
-| Failure mode: sessions API fails → banner + retry, Later/Done still visible | Failure Modes table + Task 8 break test (explicit, not implicit) |
-| Failure mode: retention API fails → banner + retry, Continue/Started still visible | Failure Modes table + Task 8 break test |
-| Failure mode: topics empty but generated → empty-state CTA | Failure Modes table + Task 8 break test |
-| Failure mode: all sections short-circuit → fallback card | Failure Modes table + Task 8 break test |
+| Failure mode: sessions API fails → banner + retry, Later/Done still visible | Task 5b Step 5b.2 (JSX) + Task 8 Step 8.7b (test, including degraded-data assertion) |
+| Failure mode: retention API fails → banner + retry, Continue/Started still visible | Task 5b Step 5b.2 (JSX) + Task 8 Step 8.7b (test, including degraded-data assertion) |
+| Failure mode: topics empty but generated → empty-state CTA | Task 5b Step 5b.3 (JSX) + Task 8 Step 8.7b (test) |
+| Failure mode: all sections short-circuit → fallback card | Task 5b Step 5b.4 (JSX) + Task 8 Step 8.7b (test, with documented unreachability caveat) |
 | Failure mode: stale continueNowTopicId → hidden + Sentry breadcrumb | Failure Modes table + Task 8 break test + `continueNowTopic` memo breadcrumb |
 | Failure mode: all done + no suggestion → Book-complete card + review CTA, sticky CTA hidden | Task 4 (`isBookComplete`) + Task 6 Step 6.0 + Task 7 guard + Task 8 Step 8.8a |
 | Up next — null-chapter topics don't conflate in momentum | Task 1 (`chapterKey` sentinel) + new null-chapter test |

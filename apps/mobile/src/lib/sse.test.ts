@@ -167,6 +167,25 @@ describe('parseSSEStream', () => {
     });
   });
 
+  it('parses fallback events from SSE stream', async () => {
+    const stream = createMockStream([
+      'data: {"type":"fallback","reason":"empty_reply","fallbackText":"Try again"}\n\n',
+      'data: {"type":"done","exchangeCount":1,"escalationRung":1}\n\n',
+    ]);
+
+    const events: StreamEvent[] = [];
+    for await (const event of parseSSEStream(mockResponse(stream))) {
+      events.push(event);
+    }
+
+    expect(events).toHaveLength(2);
+    expect(events[0]).toEqual({
+      type: 'fallback',
+      reason: 'empty_reply',
+      fallbackText: 'Try again',
+    });
+  });
+
   it('parses error events from SSE stream (BUG-546)', async () => {
     const stream = createMockStream([
       'data: {"type":"chunk","content":"partial"}\n\n',

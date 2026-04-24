@@ -28,7 +28,7 @@ interface ErrorFallbackProps {
 
 export function ErrorFallback({
   title = 'Something went wrong',
-  message = 'Check your connection and try again.',
+  message = 'An unexpected error occurred.',
   primaryAction,
   secondaryAction,
   variant = 'card',

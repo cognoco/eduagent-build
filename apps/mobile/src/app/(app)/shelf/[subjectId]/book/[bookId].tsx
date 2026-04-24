@@ -4,14 +4,15 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import type { CurriculumTopic } from '@eduagent/schemas';
+import * as Sentry from '@sentry/react-native';
 import {
   BookPageFlipAnimation,
   MagicPenAnimation,
 } from '../../../../../components/common';
-import { SuggestionCard } from '../../../../../components/library/SuggestionCard';
 import { CollapsibleChapter } from '../../../../../components/library/CollapsibleChapter';
 import { SessionRow } from '../../../../../components/library/SessionRow';
 import { ChapterDivider } from '../../../../../components/library/ChapterDivider';
+import { TopicStatusRow } from '../../../../../components/library/TopicStatusRow';
 import {
   useBookWithTopics,
   useBooks,
@@ -22,18 +23,17 @@ import {
   type BookSession,
 } from '../../../../../hooks/use-book-sessions';
 import { useMoveTopic } from '../../../../../hooks/use-move-topic';
-import { useTopicSuggestions } from '../../../../../hooks/use-topic-suggestions';
 import { useBookNotes } from '../../../../../hooks/use-notes';
 import { useRetentionTopics } from '../../../../../hooks/use-retention';
 import { useCurriculum } from '../../../../../hooks/use-curriculum';
 import { useSubjects } from '../../../../../hooks/use-subjects';
 import { InlineNoteCard } from '../../../../../components/library/InlineNoteCard';
-import type { RetentionStatus } from '../../../../../components/progress/RetentionSignal';
 import { formatApiError } from '../../../../../lib/format-api-error';
 import { formatRelativeDate } from '../../../../../lib/format-relative-date';
 import { goBackOrReplace } from '../../../../../lib/navigation';
 import { platformAlert } from '../../../../../lib/platform-alert';
 import { useThemeColors } from '../../../../../lib/theme';
+import { computeUpNextTopic } from '../../../../../lib/up-next-topic';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -64,35 +64,6 @@ function groupSessionsByChapter(sessions: BookSession[]): GroupedChapter[] {
     chapter,
     sessions: items,
   }));
-}
-
-// ---------------------------------------------------------------------------
-// Retention helpers
-// ---------------------------------------------------------------------------
-
-function deriveTopicRetentionStatus(
-  card:
-    | {
-        easeFactor: number;
-        repetitions: number;
-        xpStatus: string;
-        nextReviewAt?: string | null;
-        failureCount?: number;
-      }
-    | null
-    | undefined
-): RetentionStatus {
-  if (!card) return 'weak';
-  if ((card.failureCount ?? 0) >= 3 || card.xpStatus === 'decayed')
-    return 'forgotten';
-  if (card.repetitions === 0) return 'weak';
-  if (!card.nextReviewAt) return 'weak';
-  const now = Date.now();
-  const reviewAt = new Date(card.nextReviewAt).getTime();
-  const daysUntilReview = (reviewAt - now) / (1000 * 60 * 60 * 24);
-  if (daysUntilReview > 3) return 'strong';
-  if (daysUntilReview > 0) return 'fading';
-  return 'weak';
 }
 
 interface GroupedTopicChapter {
@@ -127,6 +98,8 @@ type GenerationPhase = 'idle' | 'slow' | 'timed_out';
 
 const SLOW_THRESHOLD_MS = 30_000;
 const TIMEOUT_THRESHOLD_MS = 60_000;
+const DONE_COLLAPSE_THRESHOLD = 8;
+const STARTED_COLLAPSE_THRESHOLD = 4;
 
 // ---------------------------------------------------------------------------
 // Book Screen
@@ -150,7 +123,6 @@ export default function BookScreen() {
   // --- Data queries (called unconditionally for rules-of-hooks) ---
   const bookQuery = useBookWithTopics(subjectId, bookId);
   const sessionsQuery = useBookSessions(subjectId, bookId);
-  const suggestionsQuery = useTopicSuggestions(subjectId, bookId);
   const notesQuery = useBookNotes(subjectId, bookId);
   const generateMutation = useGenerateBookTopics(subjectId, bookId);
   const curriculumQuery = useCurriculum(subjectId);
@@ -173,8 +145,14 @@ export default function BookScreen() {
   const alreadyPending = useRef(false);
 
   const book = bookQuery.data?.book ?? null;
-  const topics = bookQuery.data?.topics ?? [];
-  const completedTopicCount = bookQuery.data?.completedTopicCount ?? 0;
+  const topics = useMemo(
+    () => bookQuery.data?.topics ?? [],
+    [bookQuery.data?.topics]
+  );
+  const activeTopics = useMemo(
+    () => topics.filter((topic) => !topic.skipped),
+    [topics]
+  );
 
   const needsGeneration = book !== null && !book.topicsGenerated;
 
@@ -270,7 +248,10 @@ export default function BookScreen() {
   }, []);
 
   // --- Notes ---
-  const notes = notesQuery.data?.notes ?? [];
+  const notes = useMemo(
+    () => notesQuery.data?.notes ?? [],
+    [notesQuery.data?.notes]
+  );
   const noteTopicIds = useMemo(
     () => new Set(notes.map((n) => n.topicId)),
     [notes]
@@ -287,15 +268,6 @@ export default function BookScreen() {
       ),
     [notes]
   );
-  // --- Retention per topic (for chapter list retention signals) ---
-  const topicRetentionRecord = useMemo((): Record<string, RetentionStatus> => {
-    const retentionTopics = retentionTopicsQuery.data?.topics ?? [];
-    const record: Record<string, RetentionStatus> = {};
-    for (const rt of retentionTopics) {
-      record[rt.topicId] = deriveTopicRetentionStatus(rt);
-    }
-    return record;
-  }, [retentionTopicsQuery.data]);
 
   // Topics that have been studied at least once (repetitions > 0)
   const topicStudiedIds = useMemo((): Set<string> => {
@@ -307,64 +279,211 @@ export default function BookScreen() {
     return ids;
   }, [retentionTopicsQuery.data]);
 
-  // --- Topics grouped by chapter for the chapter list ---
-  const groupedChapters = useMemo(() => groupTopicsByChapter(topics), [topics]);
-
   // --- Sessions data ---
-  const sessions = sessionsQuery.data ?? [];
+  const sessions = useMemo(
+    () => sessionsQuery.data ?? [],
+    [sessionsQuery.data]
+  );
+  const sessionsError = sessionsQuery.isError;
+  const retentionError = retentionTopicsQuery.isError;
+  const refetchSessions = sessionsQuery.refetch;
+  const refetchRetention = retentionTopicsQuery.refetch;
   const sessionCount = sessions.length;
-  const noteCount = notes.length;
 
-  // --- Completed topic IDs (derived from sessions) ---
-  const completedTopicIds = useMemo(() => {
+  const activeTopicIds = useMemo(
+    () => new Set(activeTopics.map((topic) => topic.id)),
+    [activeTopics]
+  );
+
+  // --- New status-first state derivation ---
+  const inProgressTopicIds = useMemo((): Set<string> => {
     const ids = new Set<string>();
-    for (const s of sessions) {
-      if (s.topicId) ids.add(s.topicId);
+    for (const session of sessions) {
+      if (session.topicId && !topicStudiedIds.has(session.topicId)) {
+        ids.add(session.topicId);
+      }
     }
     return ids;
-  }, [sessions]);
+  }, [sessions, topicStudiedIds]);
 
-  // --- Suggestion cards: combine API suggestions + pre-generated uncovered topics, max 2 ---
-  const suggestionCards = useMemo(() => {
-    const apiSuggestions: Array<{
-      id: string;
-      title: string;
-      type: 'suggestion';
-    }> = [];
-    if (Array.isArray(suggestionsQuery.data)) {
-      for (const s of suggestionsQuery.data as Array<{
-        id: string;
-        title: string;
-      }>) {
-        apiSuggestions.push({ id: s.id, title: s.title, type: 'suggestion' });
+  const continueNowTopicId = useMemo((): string | null => {
+    const candidates = [...sessions]
+      .filter(
+        (session) =>
+          !!session.topicId && inProgressTopicIds.has(session.topicId)
+      )
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+    return candidates[0]?.topicId ?? null;
+  }, [sessions, inProgressTopicIds]);
+
+  const startedTopicIds = useMemo((): string[] => {
+    const lastSessionByTopicId = new Map<string, string>();
+    for (const session of sessions) {
+      if (!session.topicId) continue;
+      const existing = lastSessionByTopicId.get(session.topicId);
+      if (!existing || session.createdAt > existing) {
+        lastSessionByTopicId.set(session.topicId, session.createdAt);
       }
     }
 
-    const preGenerated: Array<{
-      id: string;
-      title: string;
-      type: 'topic';
-    }> = topics
-      .filter(
-        (t: CurriculumTopic) => !completedTopicIds.has(t.id) && !t.skipped
-      )
-      .slice(0, 2)
-      .map((t: CurriculumTopic) => ({
-        id: t.id,
-        title: t.title,
-        type: 'topic' as const,
-      }));
+    return [...inProgressTopicIds]
+      .filter((topicId) => topicId !== continueNowTopicId)
+      .sort((a, b) =>
+        (lastSessionByTopicId.get(b) ?? '').localeCompare(
+          lastSessionByTopicId.get(a) ?? ''
+        )
+      );
+  }, [sessions, inProgressTopicIds, continueNowTopicId]);
 
-    // API suggestions first, then pre-generated, max 2 total
-    const combined = [...apiSuggestions, ...preGenerated].slice(0, 2);
-    return combined;
-  }, [suggestionsQuery.data, topics, completedTopicIds]);
+  const sessionCountByTopicId = useMemo((): Map<string, number> => {
+    const counts = new Map<string, number>();
+    for (const session of sessions) {
+      if (!session.topicId) continue;
+      counts.set(session.topicId, (counts.get(session.topicId) ?? 0) + 1);
+    }
+    return counts;
+  }, [sessions]);
 
-  // First pre-generated topic suggestion — used to highlight "Next" in chapter list
-  const suggestedNextId = useMemo(
-    () => suggestionCards.find((c) => c.type === 'topic')?.id,
-    [suggestionCards]
+  const topicById = useMemo((): Map<string, CurriculumTopic> => {
+    const map = new Map<string, CurriculumTopic>();
+    for (const topic of topics) {
+      map.set(topic.id, topic);
+    }
+    return map;
+  }, [topics]);
+
+  const doneTopics = useMemo((): CurriculumTopic[] => {
+    const lastSessionByTopicId = new Map<string, string>();
+    for (const session of sessions) {
+      if (!session.topicId) continue;
+      const existing = lastSessionByTopicId.get(session.topicId);
+      if (!existing || session.createdAt > existing) {
+        lastSessionByTopicId.set(session.topicId, session.createdAt);
+      }
+    }
+
+    return activeTopics
+      .filter((topic) => topicStudiedIds.has(topic.id))
+      .sort(
+        (a, b) =>
+          (lastSessionByTopicId.get(b.id) ?? '').localeCompare(
+            lastSessionByTopicId.get(a.id) ?? ''
+          ) || a.sortOrder - b.sortOrder
+      );
+  }, [activeTopics, topicStudiedIds, sessions]);
+
+  const upNextTopic = useMemo(
+    () =>
+      computeUpNextTopic(
+        activeTopics,
+        topicStudiedIds,
+        inProgressTopicIds,
+        sessions
+      ),
+    [activeTopics, topicStudiedIds, inProgressTopicIds, sessions]
   );
+
+  const laterChapters = useMemo(() => {
+    return groupTopicsByChapter(activeTopics)
+      .map((group) => {
+        const unstartedTopics = group.topics.filter(
+          (topic) =>
+            !topicStudiedIds.has(topic.id) &&
+            !inProgressTopicIds.has(topic.id) &&
+            !topic.skipped
+        );
+
+        if (unstartedTopics.length === 0) {
+          return null;
+        }
+
+        const hasProgress = group.topics.some(
+          (topic) =>
+            topicStudiedIds.has(topic.id) || inProgressTopicIds.has(topic.id)
+        );
+
+        return {
+          chapter: group.chapter,
+          unstartedTopics,
+          totalTopicCount: group.topics.length,
+          chapterState: hasProgress
+            ? ('partial' as const)
+            : ('untouched' as const),
+        };
+      })
+      .filter((group): group is NonNullable<typeof group> => group !== null);
+  }, [activeTopics, topicStudiedIds, inProgressTopicIds]);
+
+  const totalLaterTopics = laterChapters.reduce(
+    (sum, chapter) => sum + chapter.unstartedTopics.length,
+    0
+  );
+  const autoExpandLater = laterChapters.length <= 3 && totalLaterTopics <= 12;
+
+  const isBookComplete = useMemo(
+    () =>
+      activeTopics.length > 0 &&
+      activeTopics.every((topic) => topicStudiedIds.has(topic.id)),
+    [activeTopics, topicStudiedIds]
+  );
+
+  const continueNowTopic = useMemo(() => {
+    if (!continueNowTopicId) {
+      return null;
+    }
+    return topicById.get(continueNowTopicId) ?? null;
+  }, [continueNowTopicId, topicById]);
+
+  const visibleStartedTopicIds = useMemo(
+    () => startedTopicIds.filter((topicId) => topicById.has(topicId)),
+    [startedTopicIds, topicById]
+  );
+
+  useEffect(() => {
+    if (continueNowTopicId && !continueNowTopic) {
+      Sentry.addBreadcrumb({
+        category: 'topic-screen',
+        level: 'warning',
+        message: 'continueNowTopicId references missing topic',
+        data: { topicId: continueNowTopicId },
+      });
+    }
+  }, [continueNowTopicId, continueNowTopic]);
+
+  const reviewTopic = useMemo(() => {
+    const retentionTopics = retentionTopicsQuery.data?.topics ?? [];
+    const dueTopicId = [...retentionTopics]
+      .filter(
+        (topic) =>
+          topicStudiedIds.has(topic.topicId) &&
+          activeTopicIds.has(topic.topicId)
+      )
+      .sort((a, b) => {
+        const aTime = a.nextReviewAt
+          ? new Date(a.nextReviewAt).getTime()
+          : Number.POSITIVE_INFINITY;
+        const bTime = b.nextReviewAt
+          ? new Date(b.nextReviewAt).getTime()
+          : Number.POSITIVE_INFINITY;
+        return aTime - bTime;
+      })[0]?.topicId;
+
+    if (dueTopicId) {
+      return topicById.get(dueTopicId) ?? null;
+    }
+
+    return doneTopics[0] ?? null;
+  }, [
+    retentionTopicsQuery.data,
+    topicStudiedIds,
+    activeTopicIds,
+    topicById,
+    doneTopics,
+  ]);
+
+  const [showAllDone, setShowAllDone] = useState(false);
+  const [showAllStarted, setShowAllStarted] = useState(false);
 
   // --- Topic press: navigate to Topic Detail ---
   const handleTopicPress = useCallback(
@@ -454,62 +573,63 @@ export default function BookScreen() {
     [subjectId, bookId, isReadOnly, allBooksQuery.data, moveTopic]
   );
 
-  // --- Start learning: navigate to session with first suggestion or first uncovered topic ---
+  // --- Start learning: follow the status-first CTA priority ---
   const handleStartLearning = useCallback(() => {
-    // Try first suggestion card (which may be a pre-generated topic)
-    if (suggestionCards.length > 0) {
-      const first = suggestionCards[0]!;
-      if (first.type === 'topic') {
+    if (continueNowTopicId) {
+      const topic = topicById.get(continueNowTopicId);
+      if (topic) {
         router.push({
-          pathname: '/(app)/session',
-          params: {
-            mode: 'learning',
-            subjectId,
-            topicId: first.id,
-            topicName: first.title,
-          },
+          pathname: '/(app)/topic/[topicId]',
+          params: { topicId: topic.id, subjectId },
         } as never);
         return;
       }
-      // API-generated suggestion — pass title as rawInput for contextual opening
-      router.push({
-        pathname: '/(app)/session',
-        params: { mode: 'learning', subjectId, rawInput: first.title },
-      } as never);
-      return;
     }
-    // Fallback: find first uncovered topic
-    const sorted = [...topics].sort(
-      (a: CurriculumTopic, b: CurriculumTopic) => a.sortOrder - b.sortOrder
-    );
-    const next = sorted.find(
-      (t: CurriculumTopic) => !completedTopicIds.has(t.id) && !t.skipped
-    );
-    if (next) {
+
+    if (upNextTopic) {
       router.push({
         pathname: '/(app)/session',
         params: {
           mode: 'learning',
           subjectId,
-          topicId: next.id,
-          topicName: next.title,
+          topicId: upNextTopic.id,
+          topicName: upNextTopic.title,
         },
       } as never);
       return;
     }
-    // All topics covered — start a new session on the first topic
-    if (sorted.length > 0) {
+
+    if (startedTopicIds.length > 0) {
+      const newestStartedId = startedTopicIds[0];
+      if (!newestStartedId) {
+        return;
+      }
+      const topic = topicById.get(newestStartedId);
+      if (topic) {
+        router.push({
+          pathname: '/(app)/topic/[topicId]',
+          params: { topicId: topic.id, subjectId },
+        } as never);
+      }
+    }
+  }, [
+    continueNowTopicId,
+    topicById,
+    upNextTopic,
+    startedTopicIds,
+    router,
+    subjectId,
+  ]);
+
+  const handleTopicStart = useCallback(
+    (topicId: string, topicTitle: string) => {
       router.push({
         pathname: '/(app)/session',
-        params: {
-          mode: 'learning',
-          subjectId,
-          topicId: sorted[0]!.id,
-          topicName: sorted[0]!.title,
-        },
+        params: { mode: 'learning', subjectId, topicId, topicName: topicTitle },
       } as never);
-    }
-  }, [suggestionCards, topics, completedTopicIds, router, subjectId]);
+    },
+    [router, subjectId]
+  );
 
   const handleBuildLearningPath = useCallback(() => {
     router.push({
@@ -521,6 +641,26 @@ export default function BookScreen() {
       },
     } as never);
   }, [router, subjectId, bookId, book?.title]);
+
+  const handleStartReview = useCallback(() => {
+    if (!reviewTopic) return;
+
+    router.push({
+      pathname: '/(app)/topic/relearn',
+      params: {
+        topicId: reviewTopic.id,
+        subjectId,
+        topicName: reviewTopic.title,
+      },
+    } as never);
+  }, [reviewTopic, router, subjectId]);
+
+  const handleNextBook = useCallback(() => {
+    router.push({
+      pathname: '/(app)/shelf/[subjectId]',
+      params: { subjectId },
+    } as never);
+  }, [router, subjectId]);
 
   // --- Auto-start session when navigated with autoStart=true (M-12) ---
   const autoStartTriggered = useRef(false);
@@ -535,31 +675,13 @@ export default function BookScreen() {
       autoStartTriggered.current = true;
       handleStartLearning();
     }
-  }, [autoStart, topics, handleStartLearning]);
-
-  // --- Suggestion press ---
-  const handleSuggestionPress = useCallback(
-    (card: { id: string; title: string; type: string }) => {
-      if (card.type === 'topic') {
-        router.push({
-          pathname: '/(app)/session',
-          params: {
-            mode: 'learning',
-            subjectId,
-            topicId: card.id,
-            topicName: card.title,
-          },
-        } as never);
-      } else {
-        // For API-generated suggestions, pass title as rawInput for contextual session
-        router.push({
-          pathname: '/(app)/session',
-          params: { mode: 'learning', subjectId, rawInput: card.title },
-        } as never);
-      }
-    },
-    [router, subjectId]
-  );
+  }, [
+    autoStart,
+    topics,
+    needsGeneration,
+    generateMutation.isPending,
+    handleStartLearning,
+  ]);
 
   // --- Screen states ---
 
@@ -750,10 +872,12 @@ export default function BookScreen() {
           </Pressable>
         </View>
 
-        {/* Book info */}
-        <View className="px-5 pb-4">
+        {/* Book info - compact header */}
+        <View className="px-5 pb-3">
           <View className="flex-row items-center mb-1">
-            {book?.emoji && <Text className="text-3xl me-3">{book.emoji}</Text>}
+            {book?.emoji ? (
+              <Text className="text-3xl me-3">{book.emoji}</Text>
+            ) : null}
             <View className="flex-1">
               <Text
                 className="text-h2 font-bold text-text-primary"
@@ -761,161 +885,413 @@ export default function BookScreen() {
               >
                 {book?.title ?? 'Book'}
               </Text>
-              {subjectName && (
-                <Text className="text-body-sm text-text-secondary mt-0.5">
+              {subjectName ? (
+                <Text className="mt-0.5 text-body-sm text-text-secondary">
                   {subjectName}
                 </Text>
-              )}
+              ) : null}
             </View>
           </View>
 
-          {/* Stats row */}
-          <View className="flex-row items-center mt-3 gap-4">
-            <View className="flex-row items-center">
-              <Ionicons
-                name="chatbubbles-outline"
-                size={14}
-                color={themeColors.textSecondary}
-              />
-              <Text className="text-caption text-text-secondary ms-1">
-                {sessionCount} {sessionCount === 1 ? 'session' : 'sessions'}
+          <Text className="mt-2 text-caption text-text-secondary">
+            {sessionCount} {sessionCount === 1 ? 'session' : 'sessions'}
+          </Text>
+
+          {activeTopics.length > 0 ? (
+            <View className="mt-2">
+              <View className="h-1.5 overflow-hidden rounded-full bg-surface-elevated">
+                <View
+                  className="h-full rounded-full bg-success"
+                  style={{
+                    width: `${Math.min(
+                      100,
+                      (doneTopics.length / activeTopics.length) * 100
+                    )}%`,
+                  }}
+                />
+              </View>
+              <Text className="mt-1 text-caption text-text-secondary">
+                {doneTopics.length} of {activeTopics.length} topics done
               </Text>
             </View>
-            {noteCount > 0 && (
-              <View className="flex-row items-center">
-                <Ionicons
-                  name="document-text-outline"
-                  size={14}
-                  color={themeColors.textSecondary}
-                />
-                <Text className="text-caption text-text-secondary ms-1">
-                  {noteCount} {noteCount === 1 ? 'note' : 'notes'}
-                </Text>
-              </View>
-            )}
-            {completedTopicCount > 0 && topics.length > 0 && (
-              <Text className="text-caption text-text-secondary">
-                {completedTopicCount}/{topics.length} topics
-              </Text>
-            )}
-          </View>
+          ) : null}
         </View>
 
-        {/* Study next suggestions — max 2 cards */}
-        {suggestionCards.length > 0 && (
-          <View className="px-5 mb-4">
-            <Text className="text-body-sm font-semibold text-text-secondary mb-2 uppercase tracking-wide">
-              Study next
-            </Text>
-            <View className="flex-row gap-3">
-              {suggestionCards.map((card) => (
-                <SuggestionCard
-                  key={card.id}
-                  title={card.title}
-                  onPress={() => handleSuggestionPress(card)}
-                  testID={`suggestion-${card.id}`}
-                />
-              ))}
+        {/* Error banners */}
+        {sessionsError ? (
+          <View className="px-5 mb-3" testID="sessions-error-banner">
+            <View
+              className="flex-row items-center justify-between rounded-card p-3"
+              style={{
+                backgroundColor: `${themeColors.danger}10`,
+                borderColor: themeColors.danger,
+                borderWidth: 1,
+              }}
+            >
+              <Text className="me-3 flex-1 text-body-sm text-text-primary">
+                Couldn't load your history.
+              </Text>
+              <Pressable
+                onPress={() => void refetchSessions()}
+                testID="sessions-error-retry"
+                accessibilityRole="button"
+                accessibilityLabel="Retry loading session history"
+                className="px-3 py-1"
+              >
+                <Text className="text-body-sm font-semibold text-primary">
+                  Retry
+                </Text>
+              </Pressable>
             </View>
           </View>
-        )}
+        ) : null}
 
-        {/* Chapter / topic list — always visible once topics are loaded */}
-        {groupedChapters.length > 0 && !needsGeneration && (
-          <View className="px-5 mb-4">
-            <Text className="text-body-sm font-semibold text-text-secondary mb-2 uppercase tracking-wide">
-              Topics
-            </Text>
-            {groupedChapters.map((group, index) => (
-              <CollapsibleChapter
-                key={group.chapter}
-                title={group.chapter}
-                topics={group.topics}
-                completedCount={
-                  group.topics.filter((t) => topicStudiedIds.has(t.id)).length
-                }
-                initiallyExpanded={index === 0}
-                suggestedNextId={suggestedNextId}
-                onTopicPress={handleTopicPress}
-                noteTopicIds={noteTopicIds}
-                onNotePress={handleTopicPress}
-                topicRetention={topicRetentionRecord}
-              />
-            ))}
+        {retentionError ? (
+          <View className="px-5 mb-3" testID="retention-error-banner">
+            <View
+              className="flex-row items-center justify-between rounded-card p-3"
+              style={{
+                backgroundColor: `${themeColors.danger}10`,
+                borderColor: themeColors.danger,
+                borderWidth: 1,
+              }}
+            >
+              <Text className="me-3 flex-1 text-body-sm text-text-primary">
+                Couldn't load progress.
+              </Text>
+              <Pressable
+                onPress={() => void refetchRetention()}
+                testID="retention-error-retry"
+                accessibilityRole="button"
+                accessibilityLabel="Retry loading progress"
+                className="px-3 py-1"
+              >
+                <Text className="text-body-sm font-semibold text-primary">
+                  Retry
+                </Text>
+              </Pressable>
+            </View>
           </View>
-        )}
+        ) : null}
 
-        {/* Session list error state [SQ-3] */}
-        {sessionsQuery.isError && (
-          <View
-            className="mx-5 mb-4 rounded-card bg-surface-elevated p-4"
-            testID="sessions-error"
-          >
-            <Text className="text-body-sm text-danger mb-2">
-              Could not load session history.
+        {/* Empty state: topics generated but array is empty */}
+        {topics.length === 0 && book?.topicsGenerated && !needsGeneration ? (
+          <View className="px-5 py-8" testID="topics-empty-state">
+            <Text className="mb-2 text-center text-h3 font-semibold text-text-primary">
+              No topics yet
+            </Text>
+            <Text className="mb-4 text-center text-body-sm text-text-secondary">
+              This book doesn't have any learning topics. Build a learning path
+              to get started.
             </Text>
             <Pressable
-              onPress={() => void sessionsQuery.refetch()}
-              className="self-start"
+              onPress={handleBuildLearningPath}
+              className="min-h-[48px] self-center items-center justify-center rounded-button bg-primary px-5 py-3"
+              testID="topics-empty-build"
               accessibilityRole="button"
-              testID="sessions-retry-button"
+              accessibilityLabel="Build a learning path"
             >
-              <Text className="text-body-sm text-primary font-semibold">
-                Retry
+              <Text className="text-body font-semibold text-text-inverse">
+                Build learning path
               </Text>
             </Pressable>
           </View>
-        )}
+        ) : null}
 
-        {/* Session list */}
-        {!sessionsQuery.isError && sessions.length > 0 && (
+        {/* Section 2: Continue now */}
+        {continueNowTopic ? (
+          <View className="px-5 mb-1">
+            <Text className="mb-2 text-body-sm font-semibold text-text-secondary">
+              Continue now
+            </Text>
+            <TopicStatusRow
+              state="continue-now"
+              title={continueNowTopic.title}
+              chapterName={continueNowTopic.chapter ?? undefined}
+              onPress={() => handleTopicPress(continueNowTopic.id)}
+              testID="continue-now-row"
+            />
+          </View>
+        ) : null}
+
+        {/* Section 3: Started */}
+        {visibleStartedTopicIds.length > 0 ? (
+          <View className="px-5 mb-1">
+            <Text className="mb-2 text-body-sm font-semibold text-text-secondary">
+              Started
+            </Text>
+            {(showAllStarted
+              ? visibleStartedTopicIds
+              : visibleStartedTopicIds.slice(0, STARTED_COLLAPSE_THRESHOLD)
+            ).map((topicId) => {
+              const topic = topicById.get(topicId);
+              if (!topic) return null;
+
+              return (
+                <TopicStatusRow
+                  key={topicId}
+                  state="started"
+                  title={topic.title}
+                  chapterName={topic.chapter ?? undefined}
+                  sessionCount={sessionCountByTopicId.get(topicId) ?? 0}
+                  onPress={() => handleTopicPress(topicId)}
+                  testID={`started-row-${topicId}`}
+                />
+              );
+            })}
+            {!showAllStarted &&
+            visibleStartedTopicIds.length > STARTED_COLLAPSE_THRESHOLD ? (
+              <Pressable
+                onPress={() => setShowAllStarted(true)}
+                className="items-center py-2"
+                testID="started-show-more"
+                accessibilityRole="button"
+              >
+                <Text className="text-body-sm font-semibold text-primary">
+                  Show{' '}
+                  {visibleStartedTopicIds.length - STARTED_COLLAPSE_THRESHOLD}{' '}
+                  more started
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
+
+        {/* Section 4: Up next */}
+        {upNextTopic ? (
+          <View className="px-5 mb-1">
+            <Text className="mb-2 text-body-sm font-semibold text-text-secondary">
+              Up next
+            </Text>
+            {(() => {
+              const distinctChapters = new Set(
+                activeTopics
+                  .map((topic) => topic.chapter)
+                  .filter((chapter): chapter is string => !!chapter)
+              );
+              const isSingleChapterBook = distinctChapters.size <= 1;
+
+              return (
+                <TopicStatusRow
+                  state="up-next"
+                  variant={sessionCount === 0 ? 'hero' : undefined}
+                  title={upNextTopic.title}
+                  chapterName={
+                    isSingleChapterBook
+                      ? undefined
+                      : upNextTopic.chapter ?? undefined
+                  }
+                  onPress={() =>
+                    handleTopicStart(upNextTopic.id, upNextTopic.title)
+                  }
+                  testID="up-next-row"
+                />
+              );
+            })()}
+          </View>
+        ) : null}
+
+        {/* Fallback: every section short-circuited but topics exist */}
+        {topics.length > 0 &&
+        !isBookComplete &&
+        !continueNowTopic &&
+        visibleStartedTopicIds.length === 0 &&
+        !upNextTopic &&
+        doneTopics.length === 0 &&
+        laterChapters.length === 0 ? (
+          <View className="px-5 mb-3" testID="all-sections-fallback">
+            <View className="rounded-card bg-surface-elevated p-5">
+              <Text className="mb-2 text-body font-semibold text-text-primary">
+                Nothing to show yet.
+              </Text>
+              <Text className="mb-3 text-body-sm text-text-secondary">
+                Start your first session to see your progress here.
+              </Text>
+              <Pressable
+                onPress={() => {
+                  const fallbackTopic =
+                    activeTopics[0] ??
+                    topics.find((topic) => !topic.skipped) ??
+                    topics[0];
+                  if (fallbackTopic) {
+                    handleTopicStart(fallbackTopic.id, fallbackTopic.title);
+                  }
+                }}
+                className="min-h-[48px] flex-row items-center justify-center rounded-button bg-primary px-5 py-3"
+                testID="fallback-start"
+                accessibilityRole="button"
+                accessibilityLabel="Start first session"
+              >
+                <Text className="text-body font-semibold text-text-inverse">
+                  ▶ Start first session
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : null}
+
+        {/* Book complete */}
+        {isBookComplete ? (
+          <View className="px-5 mb-3" testID="book-complete-card">
+            <View
+              className="rounded-card bg-surface-elevated p-5"
+              style={{ borderColor: themeColors.success, borderWidth: 1 }}
+              accessible
+              accessibilityLabel={`${book?.title ?? 'Book'} complete. ${
+                activeTopics.length
+              } topics studied.`}
+            >
+              <Text
+                className="mb-2 text-3xl"
+                accessible={false}
+                importantForAccessibility="no"
+              >
+                🎉
+              </Text>
+              <Text className="mb-1 text-h3 font-bold text-text-primary">
+                Book complete
+              </Text>
+              <Text className="mb-4 text-body-sm text-text-secondary">
+                You've studied all {activeTopics.length} topics in this book.
+                Keep them fresh with review, or move on to the next book.
+              </Text>
+
+              <Pressable
+                onPress={handleStartReview}
+                className="mb-2 min-h-[48px] flex-row items-center justify-center rounded-button bg-primary px-5 py-3"
+                testID="book-complete-review"
+                accessibilityRole="button"
+                accessibilityLabel="Start spaced-repetition review"
+              >
+                <Text className="text-body font-semibold text-text-inverse">
+                  ▶ Start review
+                </Text>
+              </Pressable>
+
+              <Pressable
+                onPress={handleNextBook}
+                className="items-center py-2"
+                testID="book-complete-next"
+                accessibilityRole="button"
+                accessibilityLabel="Back to shelf to pick next book"
+              >
+                <Text className="text-body-sm font-semibold text-primary">
+                  Back to shelf →
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : null}
+
+        {/* Section 5: Done */}
+        {doneTopics.length > 0 ? (
+          <View className="px-5 mb-1">
+            <Text className="mb-2 text-body-sm font-semibold text-text-secondary">
+              Done
+            </Text>
+            {(doneTopics.length <= DONE_COLLAPSE_THRESHOLD || showAllDone
+              ? doneTopics
+              : doneTopics.slice(0, DONE_COLLAPSE_THRESHOLD)
+            ).map((topic) => (
+              <TopicStatusRow
+                key={topic.id}
+                state="done"
+                title={topic.title}
+                chapterName={topic.chapter ?? undefined}
+                onPress={() => handleTopicPress(topic.id)}
+                testID={`done-row-${topic.id}`}
+              />
+            ))}
+            {doneTopics.length > DONE_COLLAPSE_THRESHOLD && !showAllDone ? (
+              <Pressable
+                onPress={() => setShowAllDone(true)}
+                className="items-center py-2"
+                testID="done-show-all"
+                accessibilityRole="button"
+              >
+                <Text className="text-body-sm font-semibold text-primary">
+                  Show all {doneTopics.length} done
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
+
+        {/* Section 6: Later */}
+        {laterChapters.length > 0 ? (
+          <View className="px-5 mb-1">
+            <Text className="mb-2 text-body-sm font-semibold text-text-secondary">
+              Later
+            </Text>
+            {laterChapters.map((group) => (
+              <CollapsibleChapter
+                key={group.chapter}
+                title={group.chapter}
+                topics={group.unstartedTopics}
+                totalTopicCount={group.totalTopicCount}
+                chapterState={group.chapterState}
+                initiallyExpanded={autoExpandLater}
+                onTopicPress={handleTopicPress}
+              />
+            ))}
+          </View>
+        ) : null}
+
+        {/* Section 7: Past conversations */}
+        {sessions.length > 0 ? (
           <View className="mb-4">
-            <Text className="text-body-sm font-semibold text-text-secondary mb-1 px-5 uppercase tracking-wide">
-              Past sessions
+            <Text className="mb-1 px-5 text-body-sm font-semibold text-text-secondary">
+              Past conversations
             </Text>
             {showChapterDividers
               ? groupedSessions.map((group) => (
                   <View key={group.chapter}>
                     <ChapterDivider name={group.chapter} />
-                    {group.sessions.map((s) => (
+                    {group.sessions.map((session) => (
                       <SessionRow
-                        key={s.id}
-                        title={s.topicTitle}
-                        relativeDate={formatRelativeDate(s.createdAt)}
+                        key={session.id}
+                        title={session.topicTitle}
+                        relativeDate={formatRelativeDate(session.createdAt)}
                         hasNote={
-                          s.topicId != null && noteTopicIds.has(s.topicId)
+                          session.topicId != null &&
+                          noteTopicIds.has(session.topicId)
                         }
-                        onPress={() => handleSessionPress(s)}
+                        onPress={() => handleSessionPress(session)}
                         onLongPress={
-                          s.topicId
-                            ? () => handleSessionLongPress(s)
+                          session.topicId
+                            ? () => handleSessionLongPress(session)
                             : undefined
                         }
-                        testID={`session-${s.id}`}
+                        testID={`session-${session.id}`}
                       />
                     ))}
                   </View>
                 ))
-              : sessions.map((s) => (
+              : sessions.map((session) => (
                   <SessionRow
-                    key={s.id}
-                    title={s.topicTitle}
-                    relativeDate={formatRelativeDate(s.createdAt)}
-                    hasNote={s.topicId != null && noteTopicIds.has(s.topicId)}
-                    onPress={() => handleSessionPress(s)}
-                    onLongPress={
-                      s.topicId ? () => handleSessionLongPress(s) : undefined
+                    key={session.id}
+                    title={session.topicTitle}
+                    relativeDate={formatRelativeDate(session.createdAt)}
+                    hasNote={
+                      session.topicId != null &&
+                      noteTopicIds.has(session.topicId)
                     }
-                    testID={`session-${s.id}`}
+                    onPress={() => handleSessionPress(session)}
+                    onLongPress={
+                      session.topicId
+                        ? () => handleSessionLongPress(session)
+                        : undefined
+                    }
+                    testID={`session-${session.id}`}
                   />
                 ))}
           </View>
-        )}
+        ) : null}
 
         {/* Inline notes */}
         {sortedNotes.length > 0 && (
           <View className="mb-4" testID="book-notes-section">
-            <Text className="text-body-sm font-semibold text-text-secondary mb-1 px-5 uppercase tracking-wide">
+            <Text className="mb-1 px-5 text-body-sm font-semibold text-text-secondary">
               My notes
             </Text>
             {(() => {
@@ -943,156 +1319,79 @@ export default function BookScreen() {
             })()}
           </View>
         )}
-
-        {/* [BUG-28] All topics completed — distinct from "no sessions" */}
-        {completedTopicCount > 0 &&
-          completedTopicCount >= topics.length &&
-          topics.length > 0 &&
-          !needsGeneration && (
-            <View
-              className="px-5 py-6 items-center"
-              testID="book-all-completed"
-            >
-              <Ionicons
-                name="checkmark-circle"
-                size={40}
-                color={themeColors.primary}
-              />
-              <Text className="text-body text-text-primary text-center mt-3 mb-1 font-semibold">
-                You finished this book!
-              </Text>
-              <Text className="text-body-sm text-text-secondary text-center">
-                All {topics.length} topics covered. Review any topic to
-                strengthen your understanding.
-              </Text>
-            </View>
-          )}
-
-        {/* Empty state — no sessions yet (only when no topics completed) */}
-        {sessions.length === 0 &&
-          !sessionsQuery.isError &&
-          !needsGeneration &&
-          topics.length > 0 &&
-          completedTopicCount === 0 && (
-            <View
-              className="px-5 py-8 items-center"
-              testID="book-empty-sessions"
-            >
-              <Ionicons
-                name="book-outline"
-                size={40}
-                color={themeColors.textSecondary}
-              />
-              <Text className="text-body text-text-secondary text-center mt-3 mb-1">
-                No sessions yet
-              </Text>
-              {hasCurriculum ? (
-                <Text className="text-body-sm text-text-secondary text-center mb-4">
-                  Tap Start learning below to jump in — a topic will be picked
-                  for you automatically.
-                </Text>
-              ) : (
-                <>
-                  <Text className="text-body-sm text-text-secondary text-center mb-4">
-                    Start with a learning path tailored to you, or tap Start
-                    learning below to jump straight in.
-                  </Text>
-                  <Pressable
-                    onPress={handleBuildLearningPath}
-                    className="bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
-                    testID="book-build-learning-path"
-                    accessibilityLabel="Build my learning path"
-                  >
-                    <Text className="text-text-primary text-body font-semibold">
-                      Build my learning path
-                    </Text>
-                  </Pressable>
-                </>
-              )}
-            </View>
-          )}
-
-        {/* Empty topics state — BUG-487: provide actionable escape, not just Go back */}
-        {topics.length === 0 && !needsGeneration && (
-          <View className="px-5 py-8 items-center" testID="book-empty-topics">
-            <Text className="text-body text-text-secondary text-center mb-2">
-              This book doesn't have any topics yet. Start a learning session to
-              add topics, or go back to the library.
-            </Text>
-            <Pressable
-              onPress={() => router.replace('/(app)/library' as never)}
-              className="bg-primary rounded-button px-6 py-3 items-center min-h-[48px] justify-center mb-3"
-              testID="book-empty-go-library"
-              accessibilityRole="button"
-              accessibilityLabel="Go to Library"
-            >
-              <Text className="text-text-inverse text-body font-semibold">
-                Go to Library
-              </Text>
-            </Pressable>
-            <Pressable
-              onPress={handleBack}
-              className="bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
-              testID="book-empty-back"
-              accessibilityRole="button"
-              accessibilityLabel="Go back"
-            >
-              <Text className="text-text-primary text-body font-semibold">
-                Go back
-              </Text>
-            </Pressable>
-          </View>
-        )}
       </ScrollView>
 
-      {/* Floating "Start learning" button — hidden in read-only mode */}
-      {topics.length > 0 && !isReadOnly && (
-        <View
-          className="absolute bottom-0 left-0 right-0 px-5 bg-background border-t border-border"
-          style={{ paddingBottom: Math.max(insets.bottom, 16), paddingTop: 12 }}
-        >
-          <Pressable
-            onPress={handleStartLearning}
-            className="bg-primary rounded-button px-5 py-4 flex-row items-center justify-center min-h-[48px]"
-            testID="book-start-learning"
-            accessibilityRole="button"
-            accessibilityLabel={
-              completedTopicCount >= topics.length && topics.length > 0
-                ? 'Review a topic'
-                : 'Start learning'
+      {/* Sticky CTA - adapts to learner state */}
+      {activeTopics.length > 0 && !isReadOnly
+        ? (() => {
+            const hasContinue = !!continueNowTopic;
+            const hasUpNext = !!upNextTopic;
+            const hasStarted = visibleStartedTopicIds.length > 0;
+
+            if (isBookComplete) {
+              return null;
             }
-          >
-            <Ionicons
-              name={
-                completedTopicCount >= topics.length && topics.length > 0
-                  ? 'refresh-outline'
-                  : 'add-circle-outline'
-              }
-              size={20}
-              color={themeColors.textInverse}
-              style={{ marginRight: 8 }}
-            />
-            <Text className="text-body font-semibold text-text-inverse">
-              {completedTopicCount >= topics.length && topics.length > 0
-                ? 'Review a topic'
-                : 'Start learning'}
-            </Text>
-          </Pressable>
-          {!hasCurriculum && !isReadOnly && (
-            <Pressable
-              onPress={handleBuildLearningPath}
-              className="mt-2 py-2 items-center"
-              testID="book-build-path-link"
-              accessibilityRole="button"
-              accessibilityLabel="Build a learning path"
-            >
-              <Text className="text-body-sm text-text-secondary underline">
-                Build a learning path
-              </Text>
-            </Pressable>
-          )}
-        </View>
-      )}
+
+            if (!hasContinue && !hasUpNext && !hasStarted) {
+              return null;
+            }
+
+            let label: string;
+            if (hasContinue) {
+              label = '▶ Continue learning';
+            } else if (hasUpNext) {
+              const truncatedTitle =
+                upNextTopic.title.length > 25
+                  ? `${upNextTopic.title.slice(0, 24)}...`
+                  : upNextTopic.title;
+              label = `▶ Start: ${truncatedTitle}`;
+            } else {
+              const newestStartedId = visibleStartedTopicIds[0];
+              const newestStartedTopic = newestStartedId
+                ? topicById.get(newestStartedId)
+                : null;
+              const title = newestStartedTopic?.title ?? '';
+              const truncatedTitle =
+                title.length > 25 ? `${title.slice(0, 24)}...` : title;
+              label = `▶ Resume: ${truncatedTitle}`;
+            }
+
+            return (
+              <View
+                className="absolute bottom-0 left-0 right-0 border-t border-border bg-background px-5"
+                style={{
+                  paddingBottom: Math.max(insets.bottom, 16),
+                  paddingTop: 12,
+                }}
+              >
+                <Pressable
+                  onPress={handleStartLearning}
+                  className="min-h-[48px] flex-row items-center justify-center rounded-button bg-primary px-5 py-4"
+                  testID="book-start-learning"
+                  accessibilityRole="button"
+                  accessibilityLabel={label}
+                >
+                  <Text className="text-body font-semibold text-text-inverse">
+                    {label}
+                  </Text>
+                </Pressable>
+                {!hasCurriculum ? (
+                  <Pressable
+                    onPress={handleBuildLearningPath}
+                    className="mt-2 items-center py-2"
+                    testID="book-build-path-link"
+                    accessibilityRole="button"
+                    accessibilityLabel="Build a learning path"
+                  >
+                    <Text className="text-body-sm text-text-secondary underline">
+                      Build a learning path
+                    </Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            );
+          })()
+        : null}
     </View>
   );
 }

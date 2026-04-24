@@ -17,4 +17,8 @@ module.exports = {
   },
   moduleFileExtensions: ['ts', 'js'],
   testMatch: ['<rootDir>/**/*.integration.test.ts'],
+  // Integration tests share a Neon database. Global-scope operations like
+  // quota-reset and concurrent session writes race across parallel workers,
+  // so serial execution is required for deterministic runs.
+  maxWorkers: 1,
 };

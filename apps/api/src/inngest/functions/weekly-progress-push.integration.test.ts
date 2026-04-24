@@ -40,35 +40,40 @@ let db: Database;
 const RUN_ID = generateUUIDv7();
 let seedCounter = 0;
 
+// Fixed-offset IANA zones — immune to DST shifts. Covers every hour offset
+// from UTC-12 to UTC+14, guaranteeing that at any moment of the year every
+// local hour 0-23 is represented by at least one candidate. Previous list
+// relied on civil zones (Atlantic/Azores etc.) whose DST transitions left
+// gaps, producing `Could not find timezone matching local hour N` flakes.
+// Note: POSIX sign convention inverts — Etc/GMT+1 == UTC-1.
 const TIMEZONE_CANDIDATES = [
-  'Pacific/Kiritimati',
-  'UTC',
-  'Atlantic/Azores',
-  'America/Noronha',
-  'Europe/Berlin',
-  'Europe/Oslo',
-  'Europe/London',
-  'Europe/Athens',
-  'Europe/Moscow',
-  'Asia/Dubai',
-  'Asia/Karachi',
-  'Asia/Kolkata',
-  'Asia/Dhaka',
-  'Asia/Bangkok',
-  'Asia/Shanghai',
-  'Asia/Tokyo',
-  'Asia/Singapore',
-  'Australia/Sydney',
-  'Pacific/Auckland',
-  'America/New_York',
-  'America/Chicago',
-  'America/Denver',
-  'America/Los_Angeles',
-  'America/Anchorage',
-  'Pacific/Gambier',
-  'America/Sao_Paulo',
-  'Pacific/Honolulu',
-  'Pacific/Pago_Pago',
+  'Etc/GMT+12', // UTC-12
+  'Etc/GMT+11',
+  'Etc/GMT+10',
+  'Etc/GMT+9',
+  'Etc/GMT+8',
+  'Etc/GMT+7',
+  'Etc/GMT+6',
+  'Etc/GMT+5',
+  'Etc/GMT+4',
+  'Etc/GMT+3',
+  'Etc/GMT+2',
+  'Etc/GMT+1',
+  'Etc/GMT', // UTC
+  'Etc/GMT-1',
+  'Etc/GMT-2',
+  'Etc/GMT-3',
+  'Etc/GMT-4',
+  'Etc/GMT-5',
+  'Etc/GMT-6',
+  'Etc/GMT-7',
+  'Etc/GMT-8',
+  'Etc/GMT-9',
+  'Etc/GMT-10',
+  'Etc/GMT-11',
+  'Etc/GMT-12',
+  'Etc/GMT-13',
+  'Etc/GMT-14', // UTC+14
 ] as const;
 
 function isoDate(date: Date): string {

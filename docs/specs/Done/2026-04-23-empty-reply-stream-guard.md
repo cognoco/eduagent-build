@@ -1,7 +1,7 @@
 # Empty-Reply Stream Guard — Freeform Chat Empty-Bubble Fix
 
-**Date:** 2026-04-23 (revised after code-grounded challenge) — prereqs closed 2026-04-23/24
-**Branch:** `proxy-parent-fix` (per user instruction 2026-04-23, overriding the original "not on `proxy-parent-fix`" note). **Plan file itself is LOCAL-ONLY — never staged, never committed.** Code commits land on `proxy-parent-fix` using targeted `git add <file>` per §10.
+**Date:** 2026-04-23 (revised after code-grounded challenge) — prereqs closed 2026-04-23/24; LOCAL-ONLY policy retracted 2026-04-24
+**Branch:** `proxy-parent-fix` (per user instruction 2026-04-23, overriding the original "not on `proxy-parent-fix`" note). **Spec and execution plan are both committed to git** — earlier "LOCAL-ONLY / never staged" framing contradicted the project rule that commit messages link to readable design rationale. Code commits land on `proxy-parent-fix` using targeted `git add <file>` per §10.
 **Related:** User-reported bug — "Ask anything" freeform chat renders AI bubble with feedback chips but zero text content, instantly, after ~2–3 exchanges.
 **Framing:** Boundary defense. The root cause lives in LLM prompt/envelope adherence and is tracked as a concrete follow-up ticket in §8 — not a "we'll look later." DB evidence (Prereq 1) elevates §4.1a's persistence short-circuit from hygiene to load-bearing — see the Prereq 1 answer block.
 
@@ -38,7 +38,29 @@ From Neon (staging or prod — whichever the user reported against), fetch the `
 
 #### ✅ Answered 2026-04-23 (code-read 2026-04-24 closes sub-q c)
 
-**Target:** staging Neon, account `key_to@yahoo.com` (account id `019d8728-9803-7b2a-84dd-3b64e7add866`, clerk `user_3C1oe7NtZwmuBPtThwH8T5Z6Ujl`), profile `Zuzana` (profile id `019d8b97-48ed-7924-8ae3-c5f9596109b8`). Sessions audited: `019dbaad-31e1-…` (14:10 UTC), `019dbab0-d387-…` (14:14 UTC), `019dbab5-0cd6-…` (14:18 UTC), `019dbb60-749d-…` (17:25 UTC). Reported bug time: 2026-04-23 ~16:00–17:00 local.
+**Target:** staging Neon, account `key_to@yahoo.com` (account id `019d8728-9803-7b2a-84dd-3b64e7add866`, clerk `user_3C1oe7NtZwmuBPtThwH8T5Z6Ujl`), profile `Zuzana` (profile id `019d8b97-48ed-7924-8ae3-c5f9596109b8`). Sessions audited: `019dbaad-31e1-…` (14:10 UTC), `019dbab0-d387-…` (14:14 UTC), `019dbab5-0cd6-…` (14:18 UTC), `019dbb60-749d-…` (17:25 UTC). Reported bug time: 2026-04-23 ~16:00–17:00 local (user timezone: Europe/Prague, UTC+2 at that date → 14:00–15:00 UTC). Sessions `019dbaad` and `019dbab0` fall inside the reported window; `019dbb60` (17:25 UTC = 19:25 local) is a later reproduction of the same shape confirmed by the user, not the originally reported session.
+
+**Reproducible query (run against staging Neon to re-verify):**
+
+```sql
+-- Dominant raw-response shape for the reported profile, last 48h
+SELECT
+  event_type,
+  COUNT(*)                                                           AS total,
+  COUNT(*) FILTER (WHERE content LIKE '{"reply":%')                  AS full_envelope,
+  COUNT(*) FILTER (WHERE content LIKE '%"signals"%' AND content NOT LIKE '{"reply":%')
+                                                                     AS envelope_suffix_leak,
+  COUNT(*) FILTER (WHERE content = '')                               AS empty,
+  COUNT(*) FILTER (WHERE content LIKE '{"notePrompt"%' OR content LIKE '{"fluencyDrill"%')
+                                                                     AS marker_only
+FROM session_events
+WHERE profile_id = '019d8b97-48ed-7924-8ae3-c5f9596109b8'
+  AND event_type = 'ai_response'
+  AND created_at > NOW() - INTERVAL '48 hours'
+GROUP BY event_type;
+```
+
+Expected shape at capture time: `envelope_suffix_leak` > `full_envelope` > `empty` > `marker_only`. If the distribution has shifted by the time the plan executes, re-evaluate Prereq 1c's cascade claim before proceeding.
 
 **(a) Raw shape on the empty-bubble turn — `malformed_envelope`.** Persisted `ai_response.content` rows contain envelope JSON fragments instead of clean prose:
 - Session `019dbab0` exchange 2 (14:14:47 UTC): full envelope JSON — `{"reply":"That's a very insightful question, Zuzana!…","signals":{…},"ui_hints":{…}}` — stored verbatim in `content`.
@@ -57,9 +79,9 @@ Cause: `parseExchangeEnvelope` fallback at `exchanges.ts:408-416` sets `cleanRes
 
 Current branch is `proxy-parent-fix` (unrelated to this work). Before any code: ask the user whether to land on a dedicated branch (recommended) or on `main`. Per `feedback_never_switch_branch`, no silent switching.
 
-#### ✅ Answered 2026-04-23
+#### ✅ Answered 2026-04-23 (LOCAL-ONLY policy retracted 2026-04-24)
 
-Landing on `proxy-parent-fix` per explicit user instruction, which supersedes the "Not to be committed onto `proxy-parent-fix`" directive in the plan header and §10. The plan file itself is **local / untracked** — never staged, never committed. Every commit uses targeted `git add <file1> <file2>…` to avoid sweeping in the plan file or any ambient WIP from other active sessions on this branch.
+Landing on `proxy-parent-fix` per explicit user instruction, which supersedes the "Not to be committed onto `proxy-parent-fix`" directive in the plan header and §10. **Spec and execution plan are both committed to git** in the first execution commit (`[EMPTY-REPLY-GUARD-0]`) — the earlier "local / untracked / never staged" directive contradicted the project rule that `[FINDING-ID]`-tagged commits link to readable design rationale, and made the spec unreviewable post-merge. Every commit still uses targeted `git add <file1> <file2>…` to avoid sweeping in ambient WIP from other active sessions on this branch.
 
 ### Prereq 3 — Caller enumeration (COMPLETED during plan revision)
 
@@ -314,13 +336,14 @@ No DB migration, no schema change, no exchange-history shape change. Deploy orde
 
 ## 10. Commit Plan
 
-Three commits (not two — the marker consolidation warrants its own atomic change):
+Four commits (execution plan split — `[EMPTY-REPLY-GUARD-0]` added 2026-04-24 to land preflight/schema/flag ahead of behavioral change):
 
-1. `fix(api): return fallback signal from streamMessage.onComplete on empty/malformed envelope [EMPTY-REPLY-GUARD-1]` — Layer 1a (detection + quota refund + persist short-circuit) in `session-exchange.ts` and `interview.ts` + unit tests + Inngest emit
-2. `fix(api): emit fallback SSE event from session/interview routes [EMPTY-REPLY-GUARD-2]` — Layer 1b (SSE wiring in `routes/sessions.ts` and `routes/interview.ts`) + route tests + integration test
-3. `fix(mobile): convert empty/fallback stream completion to reconnect prompt + drop mobile marker regex [EMPTY-REPLY-GUARD-3]` — Layer 2 (finalizer branch, idempotency, chip-gate, watchdog `isSystemPrompt` removal, mobile regex deletion) + mobile tests
+0. `feat(schemas,api): wire-schema + EMPTY_REPLY_GUARD_ENABLED flag for stream fallback [EMPTY-REPLY-GUARD-0]` — `@eduagent/schemas` `streamFallbackFrameSchema` + typed-config `EMPTY_REPLY_GUARD_ENABLED` flag + spec/plan commit. No runtime behavior change.
+1. `fix(api): return fallback signal from streamMessage.onComplete on empty/malformed envelope [EMPTY-REPLY-GUARD-1]` — Layer 1a (detection + persist short-circuit) in `session-exchange.ts` and `interview.ts` + unit tests + Inngest emit. Quota refund lives in commit 2 (route layer), not here.
+2. `fix(api): emit fallback SSE event from session/interview routes [EMPTY-REPLY-GUARD-2]` — Layer 1b (SSE wiring in `routes/sessions.ts` and `routes/interview.ts`) + route-level quota refund + route tests + integration test.
+3. `fix(mobile): convert empty/fallback stream completion to reconnect prompt + drop mobile marker regex [EMPTY-REPLY-GUARD-3]` — Layer 2 (finalizer branch, idempotency, chip-gate, watchdog `isSystemPrompt` removal, mobile regex deletion) + mobile tests.
 
-Single PR for all three commits. Rationale: server-only change has no end-to-end benefit (old clients still show empty bubble); mobile-only change has no backend to trigger the new path. Land together, revert independently.
+Single PR for all four commits. Rationale: server-only change has no end-to-end benefit (old clients still show empty bubble); mobile-only change has no backend to trigger the new path. Land together, revert independently. Commit 0 is a safe pre-revert point if Layer 1/2 need to be unwound without losing the wire contract or kill switch.
 
 ---
 

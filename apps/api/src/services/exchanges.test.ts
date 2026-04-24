@@ -8,6 +8,7 @@ import {
 } from './llm';
 import {
   buildSystemPrompt,
+  classifyExchangeOutcome,
   processExchange,
   streamExchange,
 } from './exchanges';
@@ -724,6 +725,78 @@ describe('streamExchange', () => {
     const result = await streamExchange(context, 'Help');
 
     expect(result.newEscalationRung).toBe(4);
+  });
+});
+
+describe('classifyExchangeOutcome', () => {
+  const ctx = { sessionId: 's1', profileId: 'p1', flow: 'streamMessage' };
+
+  it('does not return fallback when reply is non-empty', () => {
+    const raw = JSON.stringify({
+      reply: 'hello',
+      signals: {
+        partial_progress: false,
+        needs_deepening: false,
+        understanding_check: false,
+      },
+    });
+
+    const result = classifyExchangeOutcome(raw, ctx);
+
+    expect(result.fallback).toBeUndefined();
+    expect(result.parsed.cleanResponse).toBe('hello');
+  });
+
+  it.each(['', '   \n\t  '])(
+    'returns empty_reply fallback for empty reply %p',
+    (reply) => {
+      const raw = JSON.stringify({
+        reply,
+        signals: {
+          partial_progress: false,
+          needs_deepening: false,
+          understanding_check: false,
+        },
+      });
+
+      const result = classifyExchangeOutcome(raw, ctx);
+
+      expect(result.fallback?.reason).toBe('empty_reply');
+      expect(result.fallback?.fallbackText).toMatch(/try again/i);
+    }
+  );
+
+  it('returns malformed_envelope fallback on parse failure', () => {
+    const result = classifyExchangeOutcome('plain text, no json', ctx);
+
+    expect(result.fallback?.reason).toBe('malformed_envelope');
+  });
+
+  // REGRESSION GUARD: notePrompt is a live UI signal dispatched by the
+  // mobile streaming hook via the `done` frame. Treating it as orphan_marker
+  // would suppress post-session note prompts and refund quota on every turn
+  // that emits {"notePrompt":true}. The classifier MUST route handled
+  // markers through parseExchangeEnvelope, not into fallback.
+  it('NO fallback for handled markers (notePrompt) — mobile dispatch runs', () => {
+    const result = classifyExchangeOutcome('{"notePrompt":true}', ctx);
+    expect(result.fallback).toBeUndefined();
+    expect(result.parsed.notePrompt).toBe(true);
+  });
+
+  it('NO fallback for handled markers (fluencyDrill) — mobile dispatch runs', () => {
+    const raw = '{"fluencyDrill":{"active":true}}';
+    const result = classifyExchangeOutcome(raw, ctx);
+    expect(result.fallback).toBeUndefined();
+    expect(result.parsed.fluencyDrill?.active).toBe(true);
+  });
+
+  it('returns orphan_marker fallback for marker keys with no live handler', () => {
+    // escalationHold is parser-recognized as a marker but has no UI
+    // dispatch wired today — firing the orphan branch loudly means a new
+    // marker key without a handler surfaces instead of silently swallowing
+    // the turn.
+    const result = classifyExchangeOutcome('{"escalationHold":true}', ctx);
+    expect(result.fallback?.reason).toBe('orphan_marker');
   });
 });
 

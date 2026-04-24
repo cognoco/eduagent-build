@@ -77,7 +77,7 @@ export function parseEnvelope(response: string): ParseEnvelopeResult {
 // [EMPTY-REPLY-GUARD-3]).
 // ---------------------------------------------------------------------------
 
-const KNOWN_MARKER_KEYS = new Set([
+export const KNOWN_MARKER_KEYS: ReadonlySet<string> = new Set([
   'notePrompt',
   'fluencyDrill',
   'escalationHold',

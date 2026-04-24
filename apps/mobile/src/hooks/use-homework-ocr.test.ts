@@ -1,9 +1,6 @@
 import { renderHook, act } from '@testing-library/react-native';
 import { NativeModules } from 'react-native';
-import { useHomeworkOcr } from './use-homework-ocr';
-
-const NON_HOMEWORK_ERROR_MESSAGE =
-  "We couldn't find a clear homework problem in this photo. Try again or type it in.";
+import { useHomeworkOcr, NON_HOMEWORK_ERROR_MESSAGE } from './use-homework-ocr';
 
 const mockFetch = jest.fn();
 const mockTrackHomeworkOcrGateAccepted = jest.fn();

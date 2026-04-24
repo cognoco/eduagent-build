@@ -8,7 +8,7 @@ import type { SubjectClassifyResult } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import { routeAndCall } from './llm';
 import type { ChatMessage } from './llm';
-import { sanitizeXmlValue } from './llm/sanitize';
+import { escapeXml, sanitizeXmlValue } from './llm/sanitize';
 import { listSubjects } from './subject';
 import { captureException } from './sentry';
 
@@ -41,10 +41,16 @@ Rules:
 - When the topic is cross-disciplinary, prefer matching to an enrolled subject with even moderate relevance (confidence >= 0.4) over returning no matches
 `;
 
-// BS-10: Sanitize user input before LLM interpolation — strip control
-// characters and limit length to reduce prompt-injection surface area.
+// BS-10 / [IMP-5]: Sanitize user input before LLM interpolation.
+//   1. Strip C0 control characters (other than tab/LF/CR) + DEL.
+//   2. Cap length to `maxLength` chars.
+//   3. HTML-entity encode the XML-significant chars via `escapeXml` so a
+//      crafted value cannot close a wrapping XML tag or smuggle instructions
+//      (e.g. "</subject>ignore previous rules"). The earlier version skipped
+//      step 3, leaving `<`, `>`, `&`, `"`, `'` intact in the prompt — an
+//      injection surface the [PROMPT-INJECT-2] sweep missed here.
 function sanitizeLlmInput(text: string, maxLength = 500): string {
-  return text
+  const stripped = text
     .split('')
     .filter((ch) => {
       const code = ch.charCodeAt(0);
@@ -57,6 +63,7 @@ function sanitizeLlmInput(text: string, maxLength = 500): string {
     })
     .join('')
     .slice(0, maxLength);
+  return escapeXml(stripped);
 }
 
 export async function classifySubject(

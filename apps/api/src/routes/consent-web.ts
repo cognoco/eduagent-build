@@ -4,6 +4,7 @@ import {
   processConsentResponse,
   getChildNameByToken,
 } from '../services/consent';
+import { BRAND_COLOR_PRIMARY } from '../services/brand';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -46,8 +47,8 @@ function escapeHtml(unsafe: string): string {
 function errorActionHtml(): string {
   return `<p class="info" style="margin-top:24px;">
     Need help?
-    <a href="${MARKETING_HELP_URL}" style="color:#6c5ce7;">Visit our help centre</a>
-    or <a href="${SUPPORT_MAILTO}" style="color:#6c5ce7;">contact support</a>.
+    <a href="${MARKETING_HELP_URL}" style="color:${BRAND_COLOR_PRIMARY};">Visit our help centre</a>
+    or <a href="${SUPPORT_MAILTO}" style="color:${BRAND_COLOR_PRIMARY};">contact support</a>.
   </p>`;
 }
 
@@ -83,7 +84,7 @@ function pageLayout(title: string, body: string): string {
       box-shadow: 0 2px 12px rgba(0,0,0,0.08);
       text-align: center;
     }
-    .logo { font-size: 28px; font-weight: 700; color: #6c5ce7; margin-bottom: 24px; }
+    .logo { font-size: 28px; font-weight: 700; color: ${BRAND_COLOR_PRIMARY}; margin-bottom: 24px; }
     h1 { font-size: 22px; font-weight: 700; margin-bottom: 12px; }
     p { font-size: 16px; color: #555; line-height: 1.5; margin-bottom: 16px; }
     .btn {
@@ -101,7 +102,7 @@ function pageLayout(title: string, body: string): string {
       transition: opacity 0.2s;
     }
     .btn:hover { opacity: 0.85; }
-    .btn-primary { background: #6c5ce7; color: #fff; }
+    .btn-primary { background: ${BRAND_COLOR_PRIMARY}; color: #fff; }
     .btn-secondary { background: #f0f0f0; color: #333; }
     .btn-danger { background: #e74c3c; color: #fff; }
     .btn-outline { background: transparent; border: 2px solid #ddd; color: #555; }

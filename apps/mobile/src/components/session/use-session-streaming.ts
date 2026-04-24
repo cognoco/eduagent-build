@@ -500,6 +500,8 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
           { id: streamId!, role: 'assistant', content: '', streaming: true },
         ]);
         setIsStreaming(true);
+        let chunkCount = 0;
+        let watchdogConverted = false;
 
         // [H6] SSE freeze watchdog: if no token arrives for 45s while
         // streaming, classify as a connection drop, surface a retry card.
@@ -514,6 +516,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
             setIsStreaming(false);
             const frozenStreamId = streamId;
             if (frozenStreamId) {
+              watchdogConverted = true;
               setMessages((prev) =>
                 prev.map((m) =>
                   m.id === frozenStreamId
@@ -522,7 +525,6 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
                         content: 'Connection dropped — Try again',
                         streaming: false,
                         kind: 'reconnect_prompt' as const,
-                        isSystemPrompt: true,
                       }
                     : m
                 )
@@ -552,6 +554,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
           (accumulated) => {
             // [H6] Reset watchdog timestamp on each token.
             lastSseEventAt = Date.now();
+            chunkCount += 1;
             setMessages((prev) =>
               prev.map((m) =>
                 m.id === streamId ? { ...m, content: accumulated } : m
@@ -559,41 +562,44 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
             );
           },
           async (result) => {
-            const { triggered, trackerState: nextTrackerState } = trackExchange(
-              {
-                userMessage: text,
-                escalationRung: result.escalationRung,
-              }
-            );
-            triggered.forEach((reason) => {
-              trigger({
-                celebration: celebrationForReason(reason),
-                reason,
-                detail: null,
+            const shouldConvertToReconnect =
+              watchdogConverted || !!result.fallback || chunkCount === 0;
+            const trackedExchange = shouldConvertToReconnect
+              ? null
+              : trackExchange({
+                  userMessage: text,
+                  escalationRung: result.escalationRung,
+                });
+            const nextTrackerState =
+              trackedExchange?.trackerState ?? trackerStateRef.current;
+
+            if (trackedExchange) {
+              trackedExchange.triggered.forEach((reason) => {
+                trigger({
+                  celebration: celebrationForReason(reason),
+                  reason,
+                  detail: null,
+                });
               });
-            });
+            }
 
             setMessages((prev) =>
               prev.map((m) => {
                 if (m.id !== streamId) return m;
-                // Strip JSON annotations from visible message text
-                let content = m.content;
-                if (result.notePrompt) {
-                  content = content
-                    .replace(
-                      /\n?\{"notePrompt":\s*true(?:,\s*"postSession":\s*true)?\}\s*$/,
-                      ''
-                    )
-                    .trimEnd();
-                }
-                if (result.fluencyDrill) {
-                  content = content
-                    .replace(/\n?\{"fluencyDrill":\s*\{[^}]*\}\s*\}\s*$/, '')
-                    .trimEnd();
+                if (m.kind === 'reconnect_prompt') return m;
+                if (shouldConvertToReconnect) {
+                  return {
+                    ...m,
+                    content:
+                      result.fallback?.fallbackText ??
+                      "I didn't have a reply — tap to try again.",
+                    streaming: false,
+                    kind: 'reconnect_prompt' as const,
+                    eventId: result.aiEventId,
+                  };
                 }
                 return {
                   ...m,
-                  content,
                   streaming: false,
                   eventId: result.aiEventId,
                   escalationRung: result.escalationRung,
@@ -603,6 +609,11 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
             setIsStreaming(false);
             setExchangeCount(result.exchangeCount);
             setEscalationRung(result.escalationRung);
+
+            if (shouldConvertToReconnect) {
+              setLowConfidenceMessageId(null);
+              return;
+            }
 
             // Handle note prompt triggers
             if (result.notePrompt && !notePromptOffered) {

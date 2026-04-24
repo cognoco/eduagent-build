@@ -627,6 +627,43 @@ describe('useStreamMessage', () => {
       escalationRung: 1,
     });
   });
+
+  it('forwards fallback SSE events into onDone', async () => {
+    const { streamSSEViaXHR } = require('../lib/sse') as {
+      streamSSEViaXHR: jest.Mock;
+    };
+
+    streamSSEViaXHR.mockReturnValueOnce({
+      events: (async function* () {
+        yield {
+          type: 'fallback',
+          reason: 'empty_reply',
+          fallbackText: 'Try again',
+        };
+        yield { type: 'done', exchangeCount: 1, escalationRung: 1 };
+      })(),
+      abort: jest.fn(),
+    });
+
+    const { result } = renderHook(() => useStreamMessage('session-1'), {
+      wrapper: createWrapper(),
+    });
+
+    const onDone = jest.fn();
+
+    await act(async () => {
+      await result.current.stream('Hello', jest.fn(), onDone, 'session-1');
+    });
+
+    expect(onDone).toHaveBeenCalledWith({
+      exchangeCount: 1,
+      escalationRung: 1,
+      fallback: {
+        reason: 'empty_reply',
+        fallbackText: 'Try again',
+      },
+    });
+  });
 });
 
 describe('useTopicParkingLot', () => {

@@ -502,19 +502,28 @@ describe('SubscriptionScreen', () => {
         purchaseDate: '2026-03-01',
       },
     });
+    // PR-FIX-07: handlePurchase polls the subscription endpoint until the
+    // webhook promotes the tier away from 'free'. Return an upgraded tier
+    // on the first poll so the loop breaks and the success alert fires.
+    mockSubscriptionGet.mockResolvedValue({
+      json: async () => ({ subscription: { tier: 'plus' } }),
+    });
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
     fireEvent.press(screen.getByTestId('package-option-$rc_monthly'));
 
-    await waitFor(() => {
-      expect(mockMutateAsyncPurchase).toHaveBeenCalledWith(monthlyPkg);
-    });
-    expect(mockRefetchSub).toHaveBeenCalled();
-    expect(mockRefetchUsage).toHaveBeenCalled();
-    expect(Alert.alert).toHaveBeenCalledWith(
-      'Success',
-      'Your subscription is now active!'
+    await waitFor(
+      () => {
+        expect(mockMutateAsyncPurchase).toHaveBeenCalledWith(monthlyPkg);
+        expect(mockRefetchSub).toHaveBeenCalled();
+        expect(mockRefetchUsage).toHaveBeenCalled();
+        expect(Alert.alert).toHaveBeenCalledWith(
+          'Success',
+          'Your subscription is now active!'
+        );
+      },
+      { timeout: 5000 }
     );
   });
 

@@ -116,7 +116,12 @@ export const consentReminder = inngest.createFunction(
       );
     });
 
-    // Day 30 auto-delete — GDPR requires deletion if consent not granted
+    // Day 30 auto-delete — GDPR requires deletion if consent not granted.
+    // [SUG-4] Intentionally NO reminder email at this step. The Day-25
+    // "final warning" above has already told the parent the account will
+    // be removed in 5 days; sending another email at the moment of
+    // deletion would be both redundant and unnecessarily distressing. The
+    // last actionable notice is at Day-25; Day-30 is the cutoff itself.
     await step.sleep('wait-5-more-days', '5d');
     await step.run('auto-delete-account', async () => {
       const db = getStepDatabase();
