@@ -62,17 +62,37 @@ const RULED_LINES_Y = [40, 55, 70, 85, 98];
 const WRITING_PATH = 'M 16 82 C 30 50, 48 94, 62 60 S 90 44, 108 74';
 const PATH_LENGTH = 160; // overestimate is safe
 
-// Pen body SVG paths (viewBox 0 0 40 60, pen points downward at ~35deg)
-const PEN_BARREL =
-  'M8 0 L32 0 C34 0 36 2 36 4 L36 38 C36 40 34 42 32 42 L8 42 C6 42 4 40 4 38 L4 4 C4 2 6 0 8 0 Z';
-const PEN_GRIP = 'M10 42 L30 42 L26 52 L14 52 Z';
-const PEN_NIB = 'M14 52 L26 52 L20 60 Z';
+// Pen body SVG paths (viewBox 0 0 40 60, pen points downward; rotated 35deg
+// in the parent View). The body is drawn slim (x=14..26, 12 wide) so the
+// silhouette reads as a tall roller-pen rather than a stubby pencil.
+//
+// Anatomy (top → bottom in pre-rotation viewBox coords):
+//   y= 2..22  cap (rounded top)
+//   y=22..24  chrome ring (cap-to-barrel join)
+//   y=24..40  upper barrel (solid)
+//   y=40..50  ink window (translucent — animated fill rendered here)
+//   y=50..52  chrome grip ring
+//   y=52..56  section cone (taper)
+//   y=56..60  metallic nib tip
+const PEN_CAP =
+  'M16 4 Q20 1 24 4 L26 22 L14 22 Z';
+const PEN_BARREL = 'M14 24 L26 24 L26 40 L14 40 Z';
+const PEN_SECTION = 'M14 52 L26 52 L22 56 L18 56 Z';
+const PEN_NIB = 'M18 56 L22 56 L20 60 Z';
+// Chrome clip silhouette on the cap (right side, with characteristic fold)
+const PEN_CLIP = 'M23 5 L23 17 L24 19 L23 21';
 
-// Ink window inside barrel (viewBox coords)
-const INK_WIN_X = 12;
-const INK_WIN_Y = 6;
-const INK_WIN_W = 16;
-const INK_WIN_H = 28;
+// Chrome accents (fixed metallic tone — independent of pen color so cap clip
+// and grip rings still read as metal in any theme).
+const CHROME_FILL = '#cbd5e1';
+const CHROME_STROKE = '#475569';
+
+// Ink window inside barrel (viewBox coords) — middle of the pen body so the
+// depleting ink level is visible right where the user expects on a roller pen.
+const INK_WIN_X = 15;
+const INK_WIN_Y = 40;
+const INK_WIN_W = 10;
+const INK_WIN_H = 10;
 
 // Pen follower endpoints (start/end of writing path)
 const PEN_START_X = 16;
@@ -89,12 +109,13 @@ const RESET_MS = 300;
 const NIB_GLOW = '#fbbf24';
 
 /**
- * Magic pen animation: a cartoon fountain pen writes on a sheet of paper.
+ * Magic pen animation: a slim roller-pen writes on a sheet of paper.
  * The ink stroke appears on the paper as the pen moves, and the ink level
- * inside the pen barrel visibly depletes.
+ * inside the pen barrel visibly depletes from ~95% → ~25%.
  *
- * 48px: paper + pen + stroke (no droplets, no ink window, no glow).
- * 80px+: full effect — ink window, nib glow, ink droplets, paper fold.
+ * <48px: paper + minimal pen body (no enhanced details).
+ * 48px+: full effect — chrome cap clip, ink window with depleting level,
+ *        chrome grip ring, metallic nib, droplets, nib glow, paper fold.
  */
 export function MagicPenAnimation({
   size = 140,
@@ -217,9 +238,11 @@ export function MagicPenAnimation({
     };
   });
 
-  // Ink level inside barrel — depletes as pen writes (80px+ only)
+  // Ink level inside barrel — depletes as pen writes. Drains from 95% → 25%
+  // so the falling ink line is clearly visible even at the small (48px) idle
+  // size where the window is only ~4px tall on screen.
   const inkLevelStyle = useAnimatedStyle(() => {
-    const inkPercent = 1 - progress.value * 0.6; // 100% → 40%
+    const inkPercent = 0.95 - progress.value * 0.7;
     return {
       height: INK_WIN_H * penScaleFactor * inkPercent,
       top: (INK_WIN_Y + INK_WIN_H * (1 - inkPercent)) * penScaleFactor,
@@ -406,40 +429,106 @@ export function MagicPenAnimation({
           ]}
         >
           <Svg width={penSize} height={penSize * 1.5} viewBox="0 0 40 60">
-            <Path d={PEN_BARREL} fill={color} opacity={0.85} />
-            {/* Ink window — lighter rect inside barrel (>= 80px) */}
-            {showEnhanced && (
-              <Rect
-                x={INK_WIN_X}
-                y={INK_WIN_Y}
-                width={INK_WIN_W}
-                height={INK_WIN_H}
-                rx={2}
-                fill={color}
-                opacity={0.3}
-              />
-            )}
-            <Path d={PEN_GRIP} fill={color} opacity={0.65} />
-            <Path d={PEN_NIB} fill={color} />
+            {/* Cap — darker shade of pen color (top of pen, before chrome ring) */}
+            <Path d={PEN_CAP} fill={color} opacity={0.95} />
+            {/* Chrome clip on cap (right side) */}
+            <Path
+              d={PEN_CLIP}
+              fill="none"
+              stroke={CHROME_FILL}
+              strokeWidth={1.5}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            {/* Chrome ring at cap-barrel join */}
+            <Rect
+              x={14}
+              y={22}
+              width={12}
+              height={2}
+              fill={CHROME_FILL}
+              stroke={CHROME_STROKE}
+              strokeWidth={0.3}
+            />
+            {/* Upper barrel — main pen body color */}
+            <Path d={PEN_BARREL} fill={color} opacity={0.9} />
+            {/* Ink window background — translucent so ink fill below shows. */}
+            <Rect
+              x={INK_WIN_X}
+              y={INK_WIN_Y}
+              width={INK_WIN_W}
+              height={INK_WIN_H}
+              rx={1}
+              fill={color}
+              opacity={0.18}
+            />
+            {/* Window outline ridges — top + bottom thin rings give the
+                window a "tube" feel and frame the ink level. */}
+            <Line
+              x1={14}
+              y1={40}
+              x2={26}
+              y2={40}
+              stroke={color}
+              strokeWidth={0.6}
+              opacity={0.6}
+            />
+            <Line
+              x1={14}
+              y1={50}
+              x2={26}
+              y2={50}
+              stroke={color}
+              strokeWidth={0.6}
+              opacity={0.6}
+            />
+            {/* Chrome grip ring below the ink window */}
+            <Rect
+              x={14}
+              y={50}
+              width={12}
+              height={2}
+              fill={CHROME_FILL}
+              stroke={CHROME_STROKE}
+              strokeWidth={0.3}
+            />
+            {/* Section cone tapering to nib */}
+            <Path d={PEN_SECTION} fill={color} opacity={0.85} />
+            {/* Metallic nib tip */}
+            <Path d={PEN_NIB} fill={CHROME_FILL} stroke={CHROME_STROKE} strokeWidth={0.3} />
           </Svg>
 
-          {/* Ink level fill overlay — animated height (>= 80px) */}
-          {showEnhanced && (
-            <Animated.View
-              style={[
-                {
-                  position: 'absolute',
-                  left: INK_WIN_X * penScaleFactor,
-                  width: INK_WIN_W * penScaleFactor,
-                  borderRadius: 1,
-                  backgroundColor: color,
-                  opacity: 0.7,
-                },
-                inkLevelStyle,
-                { pointerEvents: 'none' },
-              ]}
-            />
-          )}
+          {/* Ink level fill overlay — animated height. Always rendered (the
+              depleting level is the signature behavior of the pen). Higher
+              opacity than before so the falling level reads at 48px. */}
+          <Animated.View
+            style={[
+              {
+                position: 'absolute',
+                left: INK_WIN_X * penScaleFactor,
+                width: INK_WIN_W * penScaleFactor,
+                borderRadius: 1,
+                backgroundColor: color,
+                opacity: 0.85,
+              },
+              inkLevelStyle,
+              { pointerEvents: 'none' },
+            ]}
+          />
+          {/* Subtle highlight on the ink fill (mimics liquid meniscus) */}
+          <View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              left: (INK_WIN_X + 0.5) * penScaleFactor,
+              width: (INK_WIN_W - 1) * penScaleFactor,
+              top: (INK_WIN_Y + 0.5) * penScaleFactor,
+              height: 0.6 * penScaleFactor,
+              backgroundColor: '#ffffff',
+              opacity: 0.25,
+              borderRadius: 1,
+            }}
+          />
         </Animated.View>
       )}
     </View>

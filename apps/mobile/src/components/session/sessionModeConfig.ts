@@ -141,7 +141,7 @@ export function getOpeningMessage(
   rawInput?: string
 ): string {
   if (problemText) {
-    return "Got it. Let's work through this together. I'll keep it brief and clear.";
+    return "Got it — I can see your problem. Want me to walk you through how to solve it, or have you got an answer you'd like me to check?";
   }
 
   if (rawInput && topicName) {

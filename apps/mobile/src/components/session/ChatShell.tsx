@@ -586,7 +586,7 @@ export function ChatShell({
             testID="idle-pen-animation"
             exiting={FadeOut.duration(200)}
           >
-            <MagicPenAnimation size={48} color={colors.muted} />
+            <MagicPenAnimation size={48} color={colors.primary} />
           </Animated.View>
         )}
         {footer}

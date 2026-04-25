@@ -248,6 +248,43 @@ describe('buildSystemPrompt', () => {
     expect(prompt).not.toContain('Teens want speed');
   });
 
+  // Regression: a homework problem about Spain loaded inside a Geography-of-Africa
+  // subject must not trigger a "this is outside our current focus" redirect.
+  // The bound subject is routing metadata, not a content gate.
+  describe('homework scope guard', () => {
+    it('uses homework-specific scope language for homework sessions', () => {
+      const prompt = buildSystemPrompt({
+        ...baseContext,
+        sessionType: 'homework',
+      });
+      expect(prompt).toContain('Scope (homework)');
+      expect(prompt).toContain(
+        'The homework problem the learner is working on IS the scope'
+      );
+      expect(prompt).toContain('routing metadata, not a content gate');
+    });
+
+    it('does NOT emit the curriculum scope guard for homework sessions', () => {
+      const prompt = buildSystemPrompt({
+        ...baseContext,
+        sessionType: 'homework',
+      });
+      expect(prompt).not.toContain('Stay within the loaded topic and subject');
+      expect(prompt).not.toContain(
+        "that's a different topic. Let's finish this one first"
+      );
+    });
+
+    it('still emits the curriculum scope guard for learning sessions', () => {
+      const prompt = buildSystemPrompt({
+        ...baseContext,
+        sessionType: 'learning',
+      });
+      expect(prompt).toContain('Stay within the loaded topic and subject');
+      expect(prompt).not.toContain('Scope (homework)');
+    });
+  });
+
   it('includes escalation guidance for the current rung', () => {
     const prompt = buildSystemPrompt(baseContext);
     expect(prompt).toContain('Rung 1');

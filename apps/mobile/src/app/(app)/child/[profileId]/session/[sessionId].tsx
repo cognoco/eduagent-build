@@ -150,7 +150,10 @@ export default function SessionDetailScreen() {
   return (
     <ScrollView
       className="flex-1 bg-background"
-      contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}
+      contentContainerStyle={{
+        paddingTop: insets.top,
+        paddingBottom: insets.bottom + 16,
+      }}
     >
       {/* Header */}
       <View className="px-4 pt-4">

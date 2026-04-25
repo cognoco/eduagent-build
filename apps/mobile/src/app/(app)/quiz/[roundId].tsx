@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { View, Text, ScrollView, Pressable } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import type {
   ClientQuizQuestion,
@@ -41,6 +42,7 @@ export default function QuizRoundDetailScreen() {
   const { roundId } = useLocalSearchParams<{ roundId: string }>();
   const router = useRouter();
   const colors = useThemeColors();
+  const insets = useSafeAreaInsets();
   const { data: round, isLoading, isError, refetch } = useRoundDetail(roundId);
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
 
@@ -102,7 +104,7 @@ export default function QuizRoundDetailScreen() {
 
   return (
     <ScrollView testID="round-detail-screen" className="flex-1">
-      <View className="p-4">
+      <View className="px-4 pb-4" style={{ paddingTop: insets.top + 16 }}>
         <Pressable
           testID="round-detail-back-btn"
           onPress={() => goBackOrReplace(router, '/(app)/quiz/history')}
