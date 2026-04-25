@@ -72,6 +72,17 @@ export function setActiveProfileId(id: string | undefined): void {
 }
 
 // ---------------------------------------------------------------------------
+// Proxy mode flag — set by useParentProxy hook, read by customFetch.
+// ---------------------------------------------------------------------------
+
+let _proxyMode = false;
+
+/** Called by useParentProxy hook whenever proxy state changes. */
+export function setProxyMode(enabled: boolean): void {
+  _proxyMode = enabled;
+}
+
+// ---------------------------------------------------------------------------
 // Authenticated Hono RPC client
 // ---------------------------------------------------------------------------
 
@@ -95,6 +106,7 @@ export function useApiClient(): ApiClient {
       if (token) headers.set('Authorization', `Bearer ${token}`);
       if (_activeProfileId && !headers.has('X-Profile-Id'))
         headers.set('X-Profile-Id', _activeProfileId);
+      if (_proxyMode) headers.set('X-Proxy-Mode', 'true');
 
       const res = await globalThis.fetch(input, { ...init, headers });
 
