@@ -15,6 +15,7 @@ jest.mock('./api-client', () => ({
     return hc('http://localhost', { fetch: mockFetch });
   },
   setActiveProfileId: jest.fn(),
+  setProxyMode: jest.fn(),
 }));
 
 const mockProfiles: Profile[] = [
