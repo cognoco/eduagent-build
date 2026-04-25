@@ -9,6 +9,7 @@ import {
 } from '@eduagent/schemas';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
+import { assertNotProxyMode } from '../middleware/proxy-guard';
 import {
   createBookmark,
   deleteBookmark,
@@ -83,6 +84,7 @@ export const bookmarkRoutes = new Hono<BookmarkRouteEnv>()
     '/bookmarks/:id',
     zValidator('param', bookmarkIdParamSchema),
     async (c) => {
+      assertNotProxyMode(c);
       await deleteBookmark(
         c.get('db'),
         requireProfileId(c.get('profileId')),
