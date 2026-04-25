@@ -97,6 +97,15 @@ temp/*
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
 
+# Local Claude Code session data and tool extensions (per-machine)
+.claude/data/
+.claude/zdx-tts/
+apps/mobile/.claude/
+
+# Hook log output (Claude Code session_start / user_prompt_submit / session_end)
+/logs/
+apps/mobile/logs/
+
 # Playwright MCP session artifacts (console logs, page snapshots)
 .playwright-mcp/
 
