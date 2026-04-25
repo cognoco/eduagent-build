@@ -140,7 +140,12 @@ api.use(
       }
       return '';
     },
-    allowHeaders: ['Content-Type', 'Authorization', 'X-Profile-Id'],
+    allowHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Profile-Id',
+      'X-Proxy-Mode',
+    ],
     allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     exposeHeaders: [
       'Content-Type',

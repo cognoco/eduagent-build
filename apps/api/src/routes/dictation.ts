@@ -10,6 +10,7 @@ import type { AuthUser } from '../middleware/auth';
 import type { Account } from '../services/account';
 import type { ProfileMeta } from '../middleware/profile-scope';
 import { requireProfileId } from '../middleware/profile-scope';
+import { assertNotProxyMode } from '../middleware/proxy-guard';
 import { apiError, validationError } from '../errors';
 import {
   prepareHomework,
@@ -107,6 +108,7 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
   // Generates age-appropriate dictation content from the learner's study context.
   // -------------------------------------------------------------------------
   .post('/dictation/generate', async (c) => {
+    assertNotProxyMode(c);
     const profileId = requireProfileId(c.get('profileId'));
     const db = c.get('db');
     const profileMeta = c.get('profileMeta');
@@ -126,6 +128,7 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
   // Records a completed dictation session result (RF-04: accepts localDate from client).
   // -------------------------------------------------------------------------
   .post('/dictation/result', async (c) => {
+    assertNotProxyMode(c);
     const profileId = requireProfileId(c.get('profileId'));
     const db = c.get('db');
 

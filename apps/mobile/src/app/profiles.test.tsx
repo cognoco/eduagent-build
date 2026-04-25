@@ -135,7 +135,7 @@ describe('ProfilesScreen', () => {
     expect(screen.getByTestId('profile-active-check')).toBeTruthy();
   });
 
-  it('calls switchProfile on profile tap and navigates back', async () => {
+  it('shows confirmation before switching from owner to child', async () => {
     useProfile.mockReturnValue({
       profiles: [ownerProfile, childProfile],
       activeProfile: ownerProfile,
@@ -147,6 +147,12 @@ describe('ProfilesScreen', () => {
 
     fireEvent.press(screen.getByTestId('profile-row-child-id'));
 
+    expect(screen.getByTestId('proxy-confirm-modal')).toBeTruthy();
+    expect(screen.getByText("Viewing Alex's account")).toBeTruthy();
+    expect(mockSwitchProfile).not.toHaveBeenCalled();
+
+    fireEvent.press(screen.getByTestId('proxy-confirm-view'));
+
     await waitFor(() => {
       expect(mockSwitchProfile).toHaveBeenCalledWith('child-id');
     });
@@ -154,6 +160,43 @@ describe('ProfilesScreen', () => {
     await waitFor(() => {
       expect(mockBack).toHaveBeenCalled();
     });
+  });
+
+  it('cancels parent-to-child proxy confirmation without switching', () => {
+    useProfile.mockReturnValue({
+      profiles: [ownerProfile, childProfile],
+      activeProfile: ownerProfile,
+      switchProfile: mockSwitchProfile,
+      isLoading: false,
+    });
+
+    render(<ProfilesScreen />);
+
+    fireEvent.press(screen.getByTestId('profile-row-child-id'));
+    expect(screen.getByTestId('proxy-confirm-modal')).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('proxy-confirm-cancel'));
+
+    expect(mockSwitchProfile).not.toHaveBeenCalled();
+    expect(screen.queryByText("Viewing Alex's account")).toBeNull();
+  });
+
+  it('switches immediately when a child taps the owner row', async () => {
+    useProfile.mockReturnValue({
+      profiles: [ownerProfile, childProfile],
+      activeProfile: childProfile,
+      switchProfile: mockSwitchProfile,
+      isLoading: false,
+    });
+
+    render(<ProfilesScreen />);
+
+    fireEvent.press(screen.getByTestId('profile-row-owner-id'));
+
+    await waitFor(() => {
+      expect(mockSwitchProfile).toHaveBeenCalledWith('owner-id');
+    });
+    expect(screen.queryByTestId('proxy-confirm-modal')).toBeNull();
   });
 
   it('navigates to create-profile on add button for family tier', () => {
@@ -202,6 +245,7 @@ describe('ProfilesScreen', () => {
     render(<ProfilesScreen />);
 
     fireEvent.press(screen.getByTestId('profile-row-child-id'));
+    fireEvent.press(screen.getByTestId('proxy-confirm-view'));
 
     await waitFor(() => {
       expect(mockSwitchProfile).toHaveBeenCalledWith('child-id');

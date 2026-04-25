@@ -9,6 +9,7 @@ import {
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
+import { assertNotProxyMode } from '../middleware/proxy-guard';
 import {
   getSubjectRetention,
   getTopicRetention,
@@ -74,6 +75,7 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
     '/retention/recall-test',
     zValidator('json', recallTestSubmitSchema),
     async (c) => {
+      assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const input = c.req.valid('json');
@@ -88,6 +90,7 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
     '/retention/relearn',
     zValidator('json', relearnTopicSchema),
     async (c) => {
+      assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const input = c.req.valid('json');

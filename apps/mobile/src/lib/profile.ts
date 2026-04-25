@@ -14,6 +14,7 @@ import { useProfiles } from '../hooks/use-profiles';
 import {
   useApiClient,
   setActiveProfileId as pushProfileIdToApiClient,
+  setProxyMode,
 } from './api-client';
 
 export type { Profile };
@@ -119,6 +120,18 @@ export function ProfileProvider({
       setIsRestoringId(false);
     };
     void restore();
+  }, []);
+
+  // Seed the API client's proxy flag from the last app session. The
+  // useParentProxy hook corrects the flag once the active profile is known.
+  useEffect(() => {
+    void SecureStore.getItemAsync('parent-proxy-active')
+      .then((value) => {
+        setProxyMode(value === 'true');
+      })
+      .catch(() => {
+        /* SecureStore unavailable */
+      });
   }, []);
 
   // Once profiles arrive, validate that saved ID exists in the list.

@@ -11,6 +11,7 @@ import {
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
+import { assertNotProxyMode } from '../middleware/proxy-guard';
 import { getSubject } from '../services/subject';
 import { getProfileDisplayName } from '../services/profile';
 import {
@@ -54,6 +55,7 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
     '/subjects/:subjectId/interview',
     zValidator('json', interviewMessageSchema),
     async (c) => {
+      assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const subjectId = c.req.param('subjectId');
@@ -135,6 +137,7 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
     '/subjects/:subjectId/interview/stream',
     zValidator('json', interviewMessageSchema),
     async (c) => {
+      assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const subjectId = c.req.param('subjectId');
@@ -303,6 +306,7 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
   )
   // [BUG-464] Force-complete: client escape button triggers this to skip ahead
   .post('/subjects/:subjectId/interview/complete', async (c) => {
+    assertNotProxyMode(c);
     const db = c.get('db');
     const profileId = requireProfileId(c.get('profileId'));
     const subjectId = c.req.param('subjectId');

@@ -37,7 +37,10 @@ jest.mock('../../../hooks/use-retention', () => ({
 let mockPersona = 'teen';
 
 jest.mock('../../../lib/profile', () => ({
-  useProfile: () => ({ activeProfile: { birthYear: null } }),
+  useProfile: () => ({
+    profiles: [{ id: 'owner-id', isOwner: true, birthYear: null }],
+    activeProfile: { id: 'owner-id', isOwner: true, birthYear: null },
+  }),
   personaFromBirthYear: () => mockPersona,
 }));
 

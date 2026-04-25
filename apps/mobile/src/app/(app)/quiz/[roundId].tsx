@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { View, Text, ScrollView, Pressable } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -41,6 +42,19 @@ export default function QuizRoundDetailScreen() {
   const router = useRouter();
   const colors = useThemeColors();
   const { data: round, isLoading, isError, refetch } = useRoundDetail(roundId);
+  const [expanded, setExpanded] = useState<Set<number>>(new Set());
+
+  const toggleExpanded = (index: number) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) {
+        next.delete(index);
+      } else {
+        next.add(index);
+      }
+      return next;
+    });
+  };
 
   // B1.3: timeout guard — no bare loading text
   if (isLoading) {
@@ -112,17 +126,42 @@ export default function QuizRoundDetailScreen() {
       </View>
       {questions.map((q, i: number) => {
         const result = results.find((r) => r.questionIndex === i);
+        const isExpanded = expanded.has(i);
+        const hasHints = q.type === 'guess_who' || !!q.funFact;
         return (
-          <View
+          <Pressable
             key={i}
             testID={`round-detail-question-${i}`}
+            onPress={hasHints ? () => toggleExpanded(i) : undefined}
+            disabled={!hasHints}
+            accessibilityRole={hasHints ? 'button' : undefined}
+            accessibilityState={hasHints ? { expanded: isExpanded } : undefined}
+            accessibilityLabel={
+              hasHints
+                ? `Q${i + 1}, ${result?.correct ? 'correct' : 'wrong'}, ${
+                    isExpanded ? 'tap to hide hints' : 'tap to see hints'
+                  }`
+                : undefined
+            }
             className="bg-surface-elevated mx-4 mb-3 rounded-xl p-4"
           >
             <View className="flex-row items-center justify-between">
               <Text className="text-on-surface font-semibold">Q{i + 1}</Text>
-              <Text className={result?.correct ? 'text-success' : 'text-error'}>
-                {result?.correct ? 'Correct' : 'Wrong'}
-              </Text>
+              <View className="flex-row items-center gap-2">
+                <Text
+                  className={result?.correct ? 'text-success' : 'text-error'}
+                >
+                  {result?.correct ? 'Correct' : 'Wrong'}
+                </Text>
+                {hasHints && (
+                  <Ionicons
+                    testID={`round-detail-question-${i}-chevron`}
+                    name={isExpanded ? 'chevron-up' : 'chevron-down'}
+                    size={18}
+                    color={colors.textPrimary}
+                  />
+                )}
+              </View>
             </View>
             {q.type === 'capitals' && (
               <Text className="text-on-surface mt-1">
@@ -145,7 +184,63 @@ export default function QuizRoundDetailScreen() {
                 Correct answer: {q.correctAnswer}
               </Text>
             )}
-          </View>
+            {isExpanded && hasHints && (
+              <View
+                testID={`round-detail-question-${i}-hints`}
+                className="border-on-surface-muted/20 mt-3 border-t pt-3"
+              >
+                {q.type === 'guess_who' && (
+                  <View className="mb-2">
+                    <Text className="text-on-surface mb-2 text-sm font-semibold">
+                      Clues
+                    </Text>
+                    {q.clues.map((clue, ci) => {
+                      const wasShown =
+                        result?.cluesUsed === undefined ||
+                        ci < result.cluesUsed;
+                      return (
+                        <View
+                          key={ci}
+                          className="mb-1 flex-row"
+                          testID={`round-detail-question-${i}-clue-${ci}`}
+                        >
+                          <Text
+                            className={
+                              wasShown
+                                ? 'text-on-surface-muted mr-2 text-sm'
+                                : 'text-on-surface-muted/50 mr-2 text-sm'
+                            }
+                          >
+                            {ci + 1}.
+                          </Text>
+                          <Text
+                            className={
+                              wasShown
+                                ? 'text-on-surface flex-1 text-sm'
+                                : 'text-on-surface-muted/50 flex-1 text-sm italic'
+                            }
+                          >
+                            {clue}
+                            {!wasShown && '  (not needed)'}
+                          </Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+                )}
+                {q.funFact && (
+                  <View>
+                    <Text className="text-on-surface mb-1 text-sm font-semibold">
+                      Did you know?
+                    </Text>
+                    <Text className="text-on-surface-muted text-sm">
+                      {q.funFact}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
+          </Pressable>
         );
       })}
     </ScrollView>

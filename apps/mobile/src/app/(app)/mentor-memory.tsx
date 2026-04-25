@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { platformAlert } from '../../lib/platform-alert';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { personaFromBirthYear, useProfile } from '../../lib/profile';
 import {
@@ -32,6 +32,7 @@ import {
   useUnsuppressInference,
 } from '../../hooks/use-learner-profile';
 import { MemoryConsentPrompt } from '../../components/memory-consent-prompt';
+import { useParentProxy } from '../../hooks/use-parent-proxy';
 
 export default function MentorMemoryScreen() {
   const insets = useSafeAreaInsets();
@@ -44,6 +45,7 @@ export default function MentorMemoryScreen() {
   const toggleInjection = useToggleMemoryInjection();
   const unsuppress = useUnsuppressInference();
   const grantConsent = useGrantMemoryConsent();
+  const { isParentProxy } = useParentProxy();
   const [draft, setDraft] = useState('');
 
   // [H12] Timeout escape for loading spinner
@@ -158,6 +160,8 @@ export default function MentorMemoryScreen() {
   );
 
   const consentStatus = profile?.memoryConsentStatus ?? 'pending';
+
+  if (isParentProxy) return <Redirect href="/(app)/home" />;
 
   if (isLoading) {
     if (loadTimedOut) {

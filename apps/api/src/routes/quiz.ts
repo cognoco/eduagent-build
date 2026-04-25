@@ -14,6 +14,7 @@ import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import type { ProfileMeta } from '../middleware/profile-scope';
 import { requireProfileId } from '../middleware/profile-scope';
+import { assertNotProxyMode } from '../middleware/proxy-guard';
 import { validationError, VocabularyContextError } from '../errors';
 import {
   checkQuizAnswerWithCorrect,
@@ -230,6 +231,7 @@ async function parseAndGenerate(c: import('hono').Context<QuizRouteEnv>) {
 
 export const quizRoutes = new Hono<QuizRouteEnv>()
   .post('/quiz/rounds', async (c) => {
+    assertNotProxyMode(c);
     const result = await parseAndGenerate(c);
     if ('error' in result) return result.error;
 
@@ -248,6 +250,7 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
     );
   })
   .post('/quiz/rounds/prefetch', async (c) => {
+    assertNotProxyMode(c);
     const result = await parseAndGenerate(c);
     if ('error' in result) return result.error;
 

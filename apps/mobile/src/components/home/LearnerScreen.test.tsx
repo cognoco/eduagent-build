@@ -124,6 +124,51 @@ describe('LearnerScreen', () => {
     ]);
   });
 
+  it('filters session-starting intent cards in parent proxy mode', () => {
+    mockUseContinueSuggestion.mockReturnValue({
+      data: {
+        subjectId: 's1',
+        subjectName: 'Math',
+        topicId: 't1',
+        topicTitle: 'Fractions',
+      },
+    });
+    mockUseQuizDiscoveryCard.mockReturnValue({
+      data: {
+        id: 'quiz-card-1',
+        type: 'quiz_discovery',
+        title: 'Discover more',
+        body: 'Try a capitals quiz',
+        activityType: 'capitals',
+      },
+    });
+
+    render(
+      <LearnerScreen
+        {...defaultProps}
+        profiles={[
+          { id: 'owner-id', displayName: 'Parent', isOwner: true },
+          { id: 'child-id', displayName: 'Alex', isOwner: false },
+        ]}
+        activeProfile={{
+          id: 'child-id',
+          displayName: 'Alex',
+          isOwner: false,
+        }}
+      />
+    );
+
+    const cardIds = within(screen.getByTestId('learner-intent-stack'))
+      .getAllByRole('button')
+      .map((card) => card.props.testID);
+
+    expect(cardIds).toEqual(['intent-learn', 'intent-proxy-placeholder']);
+    expect(screen.queryByTestId('intent-continue')).toBeNull();
+    expect(screen.queryByTestId('intent-quiz-discovery')).toBeNull();
+    expect(screen.queryByTestId('intent-ask')).toBeNull();
+    expect(screen.getByText('Sessions are private to Alex')).toBeTruthy();
+  });
+
   it('navigates to create-subject on the Learn card', () => {
     render(<LearnerScreen {...defaultProps} />);
 

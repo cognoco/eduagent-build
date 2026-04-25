@@ -20,7 +20,12 @@ describe('CORS middleware', () => {
     'http://app.mentomate.com', // http rejected for production
   ];
 
-  const REQUIRED_HEADERS = ['Authorization', 'Content-Type', 'X-Profile-Id'];
+  const REQUIRED_HEADERS = [
+    'Authorization',
+    'Content-Type',
+    'X-Profile-Id',
+    'X-Proxy-Mode',
+  ];
 
   describe('preflight OPTIONS requests', () => {
     it.each(LOCALHOST_ORIGINS)('allows preflight from %s', async (origin) => {

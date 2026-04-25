@@ -37,6 +37,8 @@ export default function ProfilesScreen() {
     currentName: string;
   } | null>(null);
   const [renameValue, setRenameValue] = useState('');
+  const [pendingChildId, setPendingChildId] = useState<string | null>(null);
+  const [pendingChildName, setPendingChildName] = useState('');
   const renameInputRef = useRef<TextInput>(null);
 
   const canEditProfile = (profileId: string) => {
@@ -166,6 +168,29 @@ export default function ProfilesScreen() {
     }
   };
 
+  const handleProfileTap = (profile: (typeof profiles)[number]) => {
+    if (activeProfile?.isOwner && !profile.isOwner) {
+      setPendingChildName(profile.displayName);
+      setPendingChildId(profile.id);
+      return;
+    }
+
+    void handleSwitch(profile.id);
+  };
+
+  const handleConfirmProxySwitch = () => {
+    if (!pendingChildId) return;
+    const id = pendingChildId;
+    setPendingChildId(null);
+    setPendingChildName('');
+    void handleSwitch(id);
+  };
+
+  const handleCancelProxySwitch = () => {
+    setPendingChildId(null);
+    setPendingChildName('');
+  };
+
   return (
     <View
       className="flex-1 bg-background"
@@ -222,7 +247,7 @@ export default function ProfilesScreen() {
             return (
               <Pressable
                 key={profile.id}
-                onPress={() => handleSwitch(profile.id)}
+                onPress={() => handleProfileTap(profile)}
                 disabled={isSwitching}
                 className="flex-row items-center bg-surface rounded-card px-4 py-3.5 mb-2"
                 style={isSwitching ? { opacity: 0.6 } : undefined}
@@ -280,6 +305,48 @@ export default function ProfilesScreen() {
           </Pressable>
         </ScrollView>
       )}
+      <Modal
+        visible={pendingChildId !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={handleCancelProxySwitch}
+        testID="proxy-confirm-modal"
+      >
+        <View className="flex-1 justify-end bg-black/50">
+          <View
+            className="bg-surface rounded-t-2xl px-6 pt-6"
+            style={{ paddingBottom: Math.max(insets.bottom + 16, 32) }}
+          >
+            <Text className="text-h2 font-bold text-text-primary mb-3">
+              Viewing {pendingChildName}&apos;s account
+            </Text>
+            <Text className="text-body text-text-secondary mb-6">
+              You&apos;ll see their library, progress, recaps and saved
+              bookmarks. Chats are private to {pendingChildName}.
+            </Text>
+            <Pressable
+              onPress={handleConfirmProxySwitch}
+              className="bg-primary rounded-button py-3.5 items-center mb-3"
+              accessibilityRole="button"
+              accessibilityLabel={`View ${pendingChildName}'s account`}
+              testID="proxy-confirm-view"
+            >
+              <Text className="text-body font-semibold text-text-inverse">
+                View account
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={handleCancelProxySwitch}
+              className="py-3.5 items-center"
+              accessibilityRole="button"
+              accessibilityLabel="Cancel"
+              testID="proxy-confirm-cancel"
+            >
+              <Text className="text-body text-text-secondary">Cancel</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
       <Modal
         visible={renaming !== null}
         transparent

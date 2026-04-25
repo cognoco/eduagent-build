@@ -1,13 +1,14 @@
 import React from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IntentCard } from '../../components/home/IntentCard';
 import { useQuizStats } from '../../hooks/use-quiz';
 import { goBackOrReplace } from '../../lib/navigation';
 import { useReviewSummary } from '../../hooks/use-progress';
 import { useThemeColors } from '../../lib/theme';
+import { useParentProxy } from '../../hooks/use-parent-proxy';
 
 function formatTimeUntil(isoDate: string): string {
   const diff = new Date(isoDate).getTime() - Date.now();
@@ -26,6 +27,7 @@ export default function PracticeScreen(): React.ReactElement {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
+  const { isParentProxy } = useParentProxy();
   const { data: reviewSummary, isError: reviewError } = useReviewSummary();
   const { data: quizStats, isError: statsError } = useQuizStats();
 
@@ -83,6 +85,8 @@ export default function PracticeScreen(): React.ReactElement {
   const handleBack = () => {
     goBackOrReplace(router, '/(app)/home');
   };
+
+  if (isParentProxy) return <Redirect href="/(app)/home" />;
 
   return (
     <ScrollView

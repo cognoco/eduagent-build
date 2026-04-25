@@ -14,7 +14,7 @@ interface IntentCardProps {
   badge?: number;
   variant?: 'default' | 'highlight';
   icon?: React.ComponentProps<typeof Ionicons>['name'];
-  onPress: () => void;
+  onPress?: () => void;
   onDismiss?: () => void;
   dismissLabel?: string;
   testID?: string;
@@ -38,18 +38,26 @@ export function IntentCard({
     onDismiss?.();
   }
 
+  const containerClassName = `rounded-card border-l-4 border-primary flex-row items-center px-5 py-5 min-h-[112px] ${
+    variant === 'highlight' ? 'bg-primary-soft' : 'bg-surface-elevated'
+  }${onPress ? ' active:opacity-80' : ''}`;
+
+  const Wrapper = onPress ? Pressable : View;
+  const wrapperProps = onPress
+    ? {
+        onPress,
+        accessibilityRole: 'button' as const,
+        accessibilityLabel: badge != null ? `${title}, ${badge} items` : title,
+        accessibilityHint: 'Opens this activity',
+        style:
+          Platform.OS === 'web' ? ({ cursor: 'pointer' } as const) : undefined,
+      }
+    : {
+        accessibilityLabel: badge != null ? `${title}, ${badge} items` : title,
+      };
+
   return (
-    <Pressable
-      onPress={onPress}
-      className={`rounded-card border-l-4 border-primary flex-row items-center px-5 py-5 active:opacity-80 min-h-[112px] ${
-        variant === 'highlight' ? 'bg-primary-soft' : 'bg-surface-elevated'
-      }`}
-      style={Platform.OS === 'web' ? { cursor: 'pointer' } : undefined}
-      accessibilityRole="button"
-      accessibilityLabel={badge != null ? `${title}, ${badge} items` : title}
-      accessibilityHint="Opens this activity"
-      testID={testID}
-    >
+    <Wrapper {...wrapperProps} className={containerClassName} testID={testID}>
       <View className="flex-1 flex-row items-center">
         {icon ? (
           <View
@@ -94,11 +102,13 @@ export function IntentCard({
           >
             <Ionicons name="close" size={18} color={colors.textPrimary} />
           </Pressable>
-          <Ionicons name="chevron-forward" size={22} color={colors.primary} />
+          {onPress ? (
+            <Ionicons name="chevron-forward" size={22} color={colors.primary} />
+          ) : null}
         </View>
-      ) : (
+      ) : onPress ? (
         <Ionicons name="chevron-forward" size={22} color={colors.primary} />
-      )}
-    </Pressable>
+      ) : null}
+    </Wrapper>
   );
 }

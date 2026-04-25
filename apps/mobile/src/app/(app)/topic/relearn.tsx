@@ -6,13 +6,14 @@ import {
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useStartRelearn } from '../../../hooks/use-retention';
 // Persona-conditional copy — documented exception, same pattern as (app)/home.tsx
 import { useProfile, personaFromBirthYear } from '../../../lib/profile';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { formatApiError } from '../../../lib/format-api-error';
+import { useParentProxy } from '../../../hooks/use-parent-proxy';
 
 const TEACHING_METHODS = [
   {
@@ -92,6 +93,7 @@ export default function RelearnScreen() {
 
   const startRelearn = useStartRelearn();
   const { activeProfile } = useProfile();
+  const { isParentProxy } = useParentProxy();
   const persona = personaFromBirthYear(activeProfile?.birthYear);
 
   const isLearner = persona === 'learner';
@@ -175,6 +177,8 @@ export default function RelearnScreen() {
       handleSelectMethod(lastMethod.preferredMethod);
     }
   }, [lastMethod, handleSameMethod, handleSelectMethod]);
+
+  if (isParentProxy) return <Redirect href="/(app)/home" />;
 
   if (!topicId || !subjectId) {
     return (

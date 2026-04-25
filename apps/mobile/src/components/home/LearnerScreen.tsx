@@ -56,6 +56,9 @@ export function LearnerScreen({
   const [dismissedQuizDiscoveryId, setDismissedQuizDiscoveryId] = useState<
     string | null
   >(null);
+  const isParentProxy = Boolean(
+    activeProfile && !activeProfile.isOwner && profiles.some((p) => p.isOwner)
+  );
 
   // [F-044] Loading timeout — show fallback after 15s so users aren't
   // stuck on a bare spinner with no escape.
@@ -131,91 +134,97 @@ export function LearnerScreen({
       subtitle?: string;
       icon: React.ComponentProps<typeof Ionicons>['name'];
       variant?: 'default' | 'highlight';
-      onPress: () => void;
+      onPress?: () => void;
       onDismiss?: () => void;
     }> = [];
 
-    if (recoveryMarker) {
-      cards.push({
-        testID: 'intent-continue',
-        title: 'Continue',
-        subtitle: `${recoveryMarker.subjectName ?? 'Session'} \u00b7 resume`,
-        icon: 'play-circle-outline',
-        variant: 'highlight',
-        onPress: () => {
-          void clearSessionRecoveryMarker(activeProfile?.id).catch((err) =>
-            console.error(
-              '[LearnerScreen] clearSessionRecoveryMarker failed:',
-              err
-            )
-          );
-          router.push({
-            pathname: '/(app)/session',
-            params: {
-              sessionId: recoveryMarker.sessionId,
-              ...(recoveryMarker.subjectId && {
-                subjectId: recoveryMarker.subjectId,
-              }),
-              ...(recoveryMarker.subjectName && {
-                subjectName: recoveryMarker.subjectName,
-              }),
-              ...(recoveryMarker.mode && { mode: recoveryMarker.mode }),
-              ...(recoveryMarker.topicId && {
-                topicId: recoveryMarker.topicId,
-              }),
-              ...(recoveryMarker.topicName && {
-                topicName: recoveryMarker.topicName,
-              }),
-            },
-          } as never);
-        },
-      });
-    } else if (continueSuggestion) {
-      cards.push({
-        testID: 'intent-continue',
-        title: 'Continue',
-        subtitle: `Pick up ${continueSuggestion.topicTitle}`,
-        icon: 'play-circle-outline',
-        onPress: () =>
-          router.push({
-            pathname: '/(app)/session',
-            params: {
-              ...(continueSuggestion.lastSessionId && {
-                sessionId: continueSuggestion.lastSessionId,
-              }),
-              subjectId: continueSuggestion.subjectId,
-              subjectName: continueSuggestion.subjectName,
-              topicId: continueSuggestion.topicId,
-              topicName: continueSuggestion.topicTitle,
-              mode: 'learning',
-            },
-          } as never),
-      });
-    } else if (
-      reviewSummary &&
-      reviewSummary.totalOverdue > 0 &&
-      reviewSummary.nextReviewTopic
-    ) {
-      cards.push({
-        testID: 'intent-continue',
-        title: 'Continue',
-        subtitle: `${reviewSummary.nextReviewTopic.subjectName} \u00b7 ${
-          reviewSummary.totalOverdue
-        } topic${reviewSummary.totalOverdue === 1 ? '' : 's'} to review`,
-        icon: 'play-circle-outline',
-        onPress: () =>
-          router.push({
-            pathname: '/(app)/topic/relearn',
-            params: {
-              topicId: reviewSummary.nextReviewTopic?.topicId,
-              subjectId: reviewSummary.nextReviewTopic?.subjectId,
-              topicName: reviewSummary.nextReviewTopic?.topicTitle,
-            },
-          } as never),
-      });
+    if (!isParentProxy) {
+      if (recoveryMarker) {
+        cards.push({
+          testID: 'intent-continue',
+          title: 'Continue',
+          subtitle: `${recoveryMarker.subjectName ?? 'Session'} \u00b7 resume`,
+          icon: 'play-circle-outline',
+          variant: 'highlight',
+          onPress: () => {
+            void clearSessionRecoveryMarker(activeProfile?.id).catch((err) =>
+              console.error(
+                '[LearnerScreen] clearSessionRecoveryMarker failed:',
+                err
+              )
+            );
+            router.push({
+              pathname: '/(app)/session',
+              params: {
+                sessionId: recoveryMarker.sessionId,
+                ...(recoveryMarker.subjectId && {
+                  subjectId: recoveryMarker.subjectId,
+                }),
+                ...(recoveryMarker.subjectName && {
+                  subjectName: recoveryMarker.subjectName,
+                }),
+                ...(recoveryMarker.mode && { mode: recoveryMarker.mode }),
+                ...(recoveryMarker.topicId && {
+                  topicId: recoveryMarker.topicId,
+                }),
+                ...(recoveryMarker.topicName && {
+                  topicName: recoveryMarker.topicName,
+                }),
+              },
+            } as never);
+          },
+        });
+      } else if (continueSuggestion) {
+        cards.push({
+          testID: 'intent-continue',
+          title: 'Continue',
+          subtitle: `Pick up ${continueSuggestion.topicTitle}`,
+          icon: 'play-circle-outline',
+          onPress: () =>
+            router.push({
+              pathname: '/(app)/session',
+              params: {
+                ...(continueSuggestion.lastSessionId && {
+                  sessionId: continueSuggestion.lastSessionId,
+                }),
+                subjectId: continueSuggestion.subjectId,
+                subjectName: continueSuggestion.subjectName,
+                topicId: continueSuggestion.topicId,
+                topicName: continueSuggestion.topicTitle,
+                mode: 'learning',
+              },
+            } as never),
+        });
+      } else if (
+        reviewSummary &&
+        reviewSummary.totalOverdue > 0 &&
+        reviewSummary.nextReviewTopic
+      ) {
+        cards.push({
+          testID: 'intent-continue',
+          title: 'Continue',
+          subtitle: `${reviewSummary.nextReviewTopic.subjectName} \u00b7 ${
+            reviewSummary.totalOverdue
+          } topic${reviewSummary.totalOverdue === 1 ? '' : 's'} to review`,
+          icon: 'play-circle-outline',
+          onPress: () =>
+            router.push({
+              pathname: '/(app)/topic/relearn',
+              params: {
+                topicId: reviewSummary.nextReviewTopic?.topicId,
+                subjectId: reviewSummary.nextReviewTopic?.subjectId,
+                topicName: reviewSummary.nextReviewTopic?.topicTitle,
+              },
+            } as never),
+        });
+      }
     }
 
-    if (quizDiscovery && dismissedQuizDiscoveryId !== quizDiscovery.id) {
+    if (
+      !isParentProxy &&
+      quizDiscovery &&
+      dismissedQuizDiscoveryId !== quizDiscovery.id
+    ) {
       cards.push({
         testID: 'intent-quiz-discovery',
         title: quizDiscovery.title,
@@ -235,42 +244,55 @@ export function LearnerScreen({
       });
     }
 
-    cards.push(
-      {
-        testID: 'intent-learn',
-        title: 'Learn',
-        subtitle: 'Start a new subject or pick one',
-        icon: 'book-outline',
-        onPress: () => router.push('/create-subject' as never),
-      },
-      {
+    cards.push({
+      testID: 'intent-learn',
+      title: 'Learn',
+      subtitle: 'Start a new subject or pick one',
+      icon: 'book-outline',
+      onPress: () => router.push('/create-subject' as never),
+    });
+
+    if (!isParentProxy) {
+      cards.push({
         testID: 'intent-ask',
         title: 'Ask',
         subtitle: 'Get answers to any question',
         icon: 'chatbubble-ellipses-outline',
         onPress: () => router.push('/(app)/session?mode=freeform' as never),
-      },
-      {
+      });
+      cards.push({
         testID: 'intent-practice',
         title: 'Practice',
         subtitle: 'Games and reviews to sharpen what you know',
         icon: 'game-controller-outline',
         onPress: () => router.push('/(app)/practice' as never),
-      },
-      {
+      });
+      cards.push({
         testID: 'intent-homework',
         title: 'Homework',
         subtitle: 'Snap a photo, get help',
         icon: 'camera-outline',
         onPress: () => router.push('/(app)/homework/camera' as never),
-      }
-    );
+      });
+    }
+
+    if (isParentProxy) {
+      cards.push({
+        testID: 'intent-proxy-placeholder',
+        title: `Sessions are private to ${
+          activeProfile?.displayName ?? 'this learner'
+        }`,
+        icon: 'lock-closed-outline',
+      });
+    }
 
     return cards;
   }, [
     activeProfile?.id,
+    activeProfile?.displayName,
     continueSuggestion,
     dismissedQuizDiscoveryId,
+    isParentProxy,
     markQuizDiscoveryHandled,
     quizDiscovery,
     recoveryMarker,
