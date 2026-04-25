@@ -135,7 +135,7 @@ describe('ProfilesScreen', () => {
     expect(screen.getByTestId('profile-active-check')).toBeTruthy();
   });
 
-  it('calls switchProfile on profile tap and navigates back', async () => {
+  it('calls switchProfile on profile tap and navigates back (after proxy confirmation)', async () => {
     useProfile.mockReturnValue({
       profiles: [ownerProfile, childProfile],
       activeProfile: ownerProfile,
@@ -146,6 +146,7 @@ describe('ProfilesScreen', () => {
     render(<ProfilesScreen />);
 
     fireEvent.press(screen.getByTestId('profile-row-child-id'));
+    fireEvent.press(screen.getByTestId('proxy-confirm-view'));
 
     await waitFor(() => {
       expect(mockSwitchProfile).toHaveBeenCalledWith('child-id');
@@ -202,6 +203,7 @@ describe('ProfilesScreen', () => {
     render(<ProfilesScreen />);
 
     fireEvent.press(screen.getByTestId('profile-row-child-id'));
+    fireEvent.press(screen.getByTestId('proxy-confirm-view'));
 
     await waitFor(() => {
       expect(mockSwitchProfile).toHaveBeenCalledWith('child-id');
@@ -281,5 +283,84 @@ describe('ProfilesScreen', () => {
 
     // Modal should close — rename-input gone
     expect(screen.queryByTestId('rename-input')).toBeNull();
+  });
+});
+
+describe('ProfilesScreen — proxy confirmation sheet', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCanGoBack.mockReturnValue(true);
+  });
+
+  it('shows confirmation sheet when owner taps a child profile (does NOT switch yet)', () => {
+    useProfile.mockReturnValue({
+      profiles: [ownerProfile, childProfile],
+      activeProfile: ownerProfile,
+      switchProfile: mockSwitchProfile,
+      isLoading: false,
+    });
+
+    render(<ProfilesScreen />);
+
+    fireEvent.press(screen.getByTestId('profile-row-child-id'));
+
+    expect(screen.getByTestId('proxy-confirm-view')).toBeTruthy();
+    expect(mockSwitchProfile).not.toHaveBeenCalled();
+  });
+
+  it('calls switchProfile(childId) when the user confirms', async () => {
+    useProfile.mockReturnValue({
+      profiles: [ownerProfile, childProfile],
+      activeProfile: ownerProfile,
+      switchProfile: mockSwitchProfile,
+      isLoading: false,
+    });
+
+    render(<ProfilesScreen />);
+
+    fireEvent.press(screen.getByTestId('profile-row-child-id'));
+    fireEvent.press(screen.getByTestId('proxy-confirm-view'));
+
+    await waitFor(() => {
+      expect(mockSwitchProfile).toHaveBeenCalledWith('child-id');
+    });
+    expect(mockSwitchProfile).toHaveBeenCalledTimes(1);
+  });
+
+  it('dismisses the sheet without switching when user taps Cancel', () => {
+    useProfile.mockReturnValue({
+      profiles: [ownerProfile, childProfile],
+      activeProfile: ownerProfile,
+      switchProfile: mockSwitchProfile,
+      isLoading: false,
+    });
+
+    render(<ProfilesScreen />);
+
+    fireEvent.press(screen.getByTestId('profile-row-child-id'));
+    expect(screen.getByTestId('proxy-confirm-view')).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('proxy-confirm-cancel'));
+
+    expect(mockSwitchProfile).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('proxy-confirm-view')).toBeNull();
+  });
+
+  it('switches immediately (no sheet) when a child taps the owner row', async () => {
+    useProfile.mockReturnValue({
+      profiles: [ownerProfile, childProfile],
+      activeProfile: childProfile,
+      switchProfile: mockSwitchProfile,
+      isLoading: false,
+    });
+
+    render(<ProfilesScreen />);
+
+    fireEvent.press(screen.getByTestId('profile-row-owner-id'));
+
+    await waitFor(() => {
+      expect(mockSwitchProfile).toHaveBeenCalledWith('owner-id');
+    });
+    expect(screen.queryByTestId('proxy-confirm-view')).toBeNull();
   });
 });

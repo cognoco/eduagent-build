@@ -38,6 +38,8 @@ export default function ProfilesScreen() {
   } | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const renameInputRef = useRef<TextInput>(null);
+  const [pendingChildId, setPendingChildId] = useState<string | null>(null);
+  const [pendingChildName, setPendingChildName] = useState('');
 
   const canEditProfile = (profileId: string) => {
     if (!activeProfile) return false;
@@ -135,6 +137,28 @@ export default function ProfilesScreen() {
     router.push('/create-profile');
   }, [subscription, familyData, router, profiles.length]);
 
+  const handleProfileTap = (profile: (typeof profiles)[0]) => {
+    // Parent → child: show confirmation sheet first
+    if (activeProfile?.isOwner && !profile.isOwner) {
+      setPendingChildName(profile.displayName);
+      setPendingChildId(profile.id);
+      return;
+    }
+    // Child → parent, child → child: switch immediately
+    void handleSwitch(profile.id);
+  };
+
+  const handleConfirmProxySwitch = () => {
+    if (!pendingChildId) return;
+    const id = pendingChildId;
+    setPendingChildId(null);
+    void handleSwitch(id);
+  };
+
+  const handleCancelProxySwitch = () => {
+    setPendingChildId(null);
+  };
+
   // UX-DE-L13: timeout on profile switch
   const handleSwitch = async (profileId: string) => {
     if (isSwitching) return;
@@ -222,7 +246,7 @@ export default function ProfilesScreen() {
             return (
               <Pressable
                 key={profile.id}
-                onPress={() => handleSwitch(profile.id)}
+                onPress={() => handleProfileTap(profile)}
                 disabled={isSwitching}
                 className="flex-row items-center bg-surface rounded-card px-4 py-3.5 mb-2"
                 style={isSwitching ? { opacity: 0.6 } : undefined}
@@ -355,6 +379,48 @@ export default function ProfilesScreen() {
             </Pressable>
           </KeyboardAvoidingView>
         </Pressable>
+      </Modal>
+      <Modal
+        visible={pendingChildId !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={handleCancelProxySwitch}
+        testID="proxy-confirm-modal"
+      >
+        <View className="flex-1 justify-end bg-black/50">
+          <View
+            className="bg-surface rounded-t-2xl px-6 pt-6"
+            style={{ paddingBottom: Math.max(insets.bottom + 16, 32) }}
+          >
+            <Text className="text-h2 font-bold text-text-primary mb-3">
+              Viewing {pendingChildName}'s account
+            </Text>
+            <Text className="text-body text-text-secondary mb-6">
+              You'll see their library, progress, recaps and saved bookmarks.
+              Chats are private to {pendingChildName}.
+            </Text>
+            <Pressable
+              onPress={handleConfirmProxySwitch}
+              className="bg-primary rounded-button py-3.5 items-center mb-3"
+              accessibilityRole="button"
+              accessibilityLabel={`View ${pendingChildName}'s account`}
+              testID="proxy-confirm-view"
+            >
+              <Text className="text-body font-semibold text-text-inverse">
+                View account
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={handleCancelProxySwitch}
+              className="py-3.5 items-center"
+              accessibilityRole="button"
+              accessibilityLabel="Cancel"
+              testID="proxy-confirm-cancel"
+            >
+              <Text className="text-body text-text-secondary">Cancel</Text>
+            </Pressable>
+          </View>
+        </View>
       </Modal>
     </View>
   );
