@@ -105,6 +105,7 @@ import {
   TopicSwitcherModal,
 } from '../../../components/session/SessionModals';
 import { SessionFooter } from '../../../components/session/SessionFooter';
+import { SessionTopicHeader } from '../../../components/session/SessionTopicHeader';
 import { getResumeBannerCopy } from '../../../components/session/resume-banner-copy';
 import { Sentry } from '../../../lib/sentry';
 
@@ -514,12 +515,20 @@ function SessionScreenInner() {
   useFocusEffect(
     useCallback(() => {
       animationCleanupRef.current?.();
-      setMessages([
-        { id: 'opening', role: 'assistant', content: openingContent },
-      ]);
+      // When resuming a session (routeSessionId set), leave messages,
+      // exchangeCount, and escalationRung alone — the transcript hydration
+      // useEffect below owns them. Blanking here on every focus would race
+      // the cached-transcript path: React Query returns the same data ref,
+      // so the hydration effect's deps don't change and it never re-fires,
+      // leaving the user staring at just the opening greeting.
+      if (!routeSessionId) {
+        setMessages([
+          { id: 'opening', role: 'assistant', content: openingContent },
+        ]);
+        setExchangeCount(0);
+        setEscalationRung(1);
+      }
       setIsStreaming(false);
-      setExchangeCount(0);
-      setEscalationRung(1);
       setIsClosing(false);
       setActiveSessionId(routeSessionId ?? null);
       setPendingClassification(false);
@@ -1160,6 +1169,21 @@ function SessionScreenInner() {
     </View>
   ) : null;
 
+  const topicHeaderStrip = topicName ? (
+    <SessionTopicHeader
+      topicName={topicName}
+      onChangeTopic={() => setShowTopicSwitcher(true)}
+    />
+  ) : null;
+
+  const headerBelow =
+    topicHeaderStrip || classifyErrorChip ? (
+      <View className="gap-2">
+        {topicHeaderStrip}
+        {classifyErrorChip}
+      </View>
+    ) : null;
+
   const sessionToolAccessory = (
     <SessionToolAccessory
       isStreaming={isStreaming}
@@ -1290,7 +1314,7 @@ function SessionScreenInner() {
       <ChatShell
         title={modeConfig.title}
         subtitle={subtitle}
-        headerBelow={classifyErrorChip}
+        headerBelow={headerBelow}
         placeholder={modeConfig.placeholder}
         backFallback={subjectId ? `/(app)/shelf/${subjectId}` : undefined}
         messages={messages}
