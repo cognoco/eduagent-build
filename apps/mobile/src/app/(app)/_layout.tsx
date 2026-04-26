@@ -15,6 +15,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as SecureStore from '../../lib/secure-storage';
 import { useProfile, personaFromBirthYear } from '../../lib/profile';
+import { useParentProxy } from '../../hooks/use-parent-proxy';
 import { useThemeColors, useTokenVars } from '../../lib/theme';
 import { useConsentStatus, useRequestConsent } from '../../hooks/use-consent';
 import { usePushTokenRegistration } from '../../hooks/use-push-token-registration';
@@ -83,6 +84,53 @@ function TabIcon({ name, focused }: { name: string; focused: boolean }) {
       size={22}
       color={focused ? colors.accent : colors.textSecondary}
     />
+  );
+}
+
+function ProxyBanner({
+  childName,
+  onSwitchBack,
+}: {
+  childName: string;
+  onSwitchBack: () => void;
+}): React.ReactElement {
+  const insets = useSafeAreaInsets();
+  const colors = useThemeColors();
+  return (
+    <View
+      className="flex-row items-center justify-between px-4 bg-surface-elevated border-b border-border"
+      style={{
+        paddingTop: insets.top,
+        height: 44 + insets.top,
+      }}
+      testID="proxy-banner"
+    >
+      <View className="flex-row items-center flex-1">
+        <Ionicons
+          name="eye-outline"
+          size={16}
+          color={colors.textSecondary}
+          style={{ marginRight: 6 }}
+        />
+        <Text
+          className="text-body-sm text-text-secondary flex-1"
+          numberOfLines={1}
+        >
+          Viewing {childName}'s account
+        </Text>
+      </View>
+      <Pressable
+        onPress={onSwitchBack}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel="Switch back to your account"
+        testID="proxy-banner-switch-back"
+      >
+        <Text className="text-body-sm font-semibold text-primary">
+          Switch back
+        </Text>
+      </Pressable>
+    </View>
   );
 }
 
@@ -1061,7 +1109,9 @@ export default function AppLayout() {
     isLoading: isProfileLoading,
     profileWasRemoved,
     acknowledgeProfileRemoval,
+    switchProfile,
   } = useProfile();
+  const { isParentProxy, childProfile, parentProfile } = useParentProxy();
 
   // Sync Clerk auth state with RevenueCat identity (runs on auth change)
   useRevenueCatIdentity();
@@ -1311,6 +1361,12 @@ export default function AppLayout() {
   return (
     <FeedbackProvider>
       <View style={[{ flex: 1 }, tokenVars]}>
+        {isParentProxy && parentProfile && (
+          <ProxyBanner
+            childName={childProfile?.displayName ?? ''}
+            onSwitchBack={() => void switchProfile(parentProfile.id)}
+          />
+        )}
         {/* ─── Whitelist tab pattern ────────────────────────────────────
            Only routes listed in VISIBLE_TABS render a tab button.
            Everything else is auto-hidden via screenOptions defaults.

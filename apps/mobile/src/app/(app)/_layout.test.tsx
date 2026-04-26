@@ -125,6 +125,7 @@ jest.mock('../../lib/sentry', () => ({
 jest.mock('expo-secure-store', () => ({
   getItemAsync: jest.fn(),
   setItemAsync: jest.fn(),
+  deleteItemAsync: jest.fn(),
 }));
 
 jest.mock('../../components/feedback/FeedbackProvider', () => ({
