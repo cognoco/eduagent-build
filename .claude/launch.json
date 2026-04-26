@@ -17,9 +17,9 @@
       "runtimeExecutable": "node",
       "runtimeArgs": [
         "-e",
-        "process.chdir('apps/mobile'); require('child_process').execFileSync(process.execPath, ['../../node_modules/@expo/cli/build/bin/cli', 'start', '--web', '--port', '8082'], {stdio: 'inherit'})"
+        "process.chdir('apps/mobile'); require('child_process').execFileSync(process.execPath, ['../../node_modules/@expo/cli/build/bin/cli', 'start', '--web', '--port', '8089'], {stdio: 'inherit', env: {...process.env, CI: '1', RCT_METRO_PORT: '19000'}})"
       ],
-      "port": 8082
+      "port": 8089
     }
   ]
 }
