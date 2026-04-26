@@ -815,16 +815,18 @@ describe('BookScreen', () => {
     expect(retryCallCount).toBe(1);
   });
 
-  it('replaces back navigation with the shelf when there is no history', () => {
+  // Back button trusts the navigator: the shelf/[subjectId] layout exports
+  // unstable_settings.initialRouteName = 'index', so a cross-tab deep push
+  // synthesizes shelf-index underneath this screen. router.back() always has
+  // the shelf to return to, no manual replace fallback needed.
+  it('calls router.back() on back press without a manual shelf fallback', () => {
     mockCanGoBack.mockReturnValue(false);
 
     const { getByTestId } = render(<BookScreen />);
 
     fireEvent.press(getByTestId('book-back'));
-    expect(mockReplace).toHaveBeenCalledWith({
-      pathname: '/(app)/shelf/[subjectId]',
-      params: { subjectId: 'sub-1' },
-    });
+    expect(mockBack).toHaveBeenCalledTimes(1);
+    expect(mockReplace).not.toHaveBeenCalled();
   });
 
   it('logs a breadcrumb and falls back to up next when the latest session topic no longer exists', () => {

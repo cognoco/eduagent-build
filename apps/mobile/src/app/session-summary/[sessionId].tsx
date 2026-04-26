@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '../../lib/theme';
 import { useProfile, personaFromBirthYear } from '../../lib/profile';
+import { useParentProxy } from '../../hooks/use-parent-proxy';
 import { useUpdateLearningMode } from '../../hooks/use-settings';
 import { useRatingPrompt } from '../../hooks/use-rating-prompt';
 import {
@@ -103,6 +104,7 @@ export default function SessionSummaryScreen() {
   const transcript = useSessionTranscript(sessionId ?? '');
   const { onSuccessfulRecall } = useRatingPrompt();
   const { activeProfile } = useProfile();
+  const { isParentProxy } = useParentProxy();
   const persona = personaFromBirthYear(activeProfile?.birthYear);
   const recallBridge = useRecallBridge(sessionId ?? '');
   const depthEvaluation = useDepthEvaluation();
@@ -807,6 +809,41 @@ export default function SessionSummaryScreen() {
             I'll check in with you soon
           </Text>
         </View>
+
+        {/*
+          Resume-this-session entry point. When the learner revisits a past
+          session from Library \u2192 Book \u2192 past conversation, they expect to be
+          able to re-open the chat itself, not just read the summary.
+          Hidden in parent-proxy mode: parents must not access learner chat
+          content (the (app)/session route also redirects parents away as a
+          server-side belt-and-suspenders, but we hide the affordance here too
+          so it never appears on the parent UI).
+        */}
+        {!isParentProxy && sessionId ? (
+          <Pressable
+            onPress={() => {
+              const resumeTopicId = topicId ?? fallbackSession?.topicId;
+              const resumeSubjectId = subjectId ?? fallbackSession?.subjectId;
+              router.push({
+                pathname: '/(app)/session',
+                params: {
+                  mode: 'learning',
+                  sessionId,
+                  ...(resumeSubjectId ? { subjectId: resumeSubjectId } : {}),
+                  ...(resumeTopicId ? { topicId: resumeTopicId } : {}),
+                },
+              } as never);
+            }}
+            className="bg-primary rounded-button py-3 items-center mb-4"
+            accessibilityRole="button"
+            accessibilityLabel="Resume this session"
+            testID="resume-session-cta"
+          >
+            <Text className="text-text-inverse text-body font-semibold">
+              Resume this session
+            </Text>
+          </Pressable>
+        ) : null}
 
         {persisted?.learnerRecap ? (
           <View

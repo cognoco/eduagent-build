@@ -52,6 +52,7 @@ import { useStreaks } from '../../../hooks/use-streaks';
 import {
   useOverallProgress,
   useProgressInventory,
+  useActiveSessionForTopic,
 } from '../../../hooks/use-progress';
 import { useNetworkStatus } from '../../../hooks/use-network-status';
 import { useApiReachability } from '../../../hooks/use-api-reachability';
@@ -478,6 +479,31 @@ function SessionScreenInner() {
   } | null>(null);
 
   const transcript = useSessionTranscript(routeSessionId ?? '');
+
+  // Auto-resume the latest active/paused session when the user re-enters a
+  // learning topic (e.g. tapping "Continue learning" on the topic screen,
+  // selecting a topic from the bookshelf, etc.) without an explicit sessionId.
+  // We look up the existing session for the topic and backfill `sessionId`
+  // into the route params via setParams — that triggers the existing transcript
+  // hydration path the same way the home-screen Continue card does, so chat
+  // history loads everywhere instead of dropping the learner into a blank chat.
+  // Scoped to learning mode only: review/practice/homework/freeform intentionally
+  // start fresh.
+  const shouldLookupActiveSession =
+    effectiveMode === 'learning' && !!topicId && !routeSessionId;
+  const activeSessionLookup = useActiveSessionForTopic(
+    shouldLookupActiveSession ? topicId : undefined
+  );
+  const hasResolvedActiveSessionRef = useRef(false);
+  useEffect(() => {
+    if (hasResolvedActiveSessionRef.current) return;
+    if (!shouldLookupActiveSession) return;
+    const resumedSessionId = activeSessionLookup.data?.sessionId;
+    if (!resumedSessionId) return;
+    hasResolvedActiveSessionRef.current = true;
+    router.setParams({ sessionId: resumedSessionId });
+  }, [activeSessionLookup.data?.sessionId, shouldLookupActiveSession, router]);
+
   const sessionBookmarksQuery = useSessionBookmarks(
     activeSessionId ?? routeSessionId ?? undefined
   );

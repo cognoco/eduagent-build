@@ -1,6 +1,6 @@
 import React from 'react';
 import { render } from '@testing-library/react-native';
-import SubjectShelfLayout from './_layout';
+import SubjectShelfLayout, { unstable_settings } from './_layout';
 
 // ---------------------------------------------------------------------------
 // Mock expo-router's Stack — capture Stack.Screen props
@@ -61,5 +61,12 @@ describe('shelf/[subjectId]/_layout.tsx', () => {
     const idB = screen.getId!({ params: { bookId: 'book-B' } });
 
     expect(idA).not.toBe(idB);
+  });
+
+  // Cross-tab deep pushes (e.g. Library → shelf/[subjectId]/book/[bookId])
+  // must land with `index` underneath `book/[bookId]` so router.back() returns
+  // to the shelf instead of falling through to the Tabs first-route.
+  it('exports unstable_settings.initialRouteName = "index"', () => {
+    expect(unstable_settings).toEqual({ initialRouteName: 'index' });
   });
 });

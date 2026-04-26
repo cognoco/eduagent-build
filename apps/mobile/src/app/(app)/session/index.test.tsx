@@ -7,6 +7,7 @@ import {
   waitFor,
   act,
   screen,
+  within,
 } from '@testing-library/react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import SessionScreen from './index';
@@ -20,6 +21,7 @@ const mockRecordSessionEvent = jest.fn();
 const mockSetSessionInputMode = jest.fn();
 const mockFlagSessionContent = jest.fn();
 const mockReplace = jest.fn();
+const mockSetParams = jest.fn();
 const mockClassifySubject = jest.fn();
 const mockDirectStartSession = jest.fn();
 
@@ -203,9 +205,12 @@ jest.mock('../../../hooks/use-streaks', () => ({
   useStreaks: () => ({ data: { longestStreak: 1 } }),
 }));
 
+const mockUseActiveSessionForTopic = jest.fn(() => ({ data: null }));
 jest.mock('../../../hooks/use-progress', () => ({
   useOverallProgress: () => ({ data: { totalTopicsCompleted: 0 } }),
   useProgressInventory: () => ({ data: undefined, isLoading: false }),
+  useActiveSessionForTopic: (topicId: string | undefined) =>
+    mockUseActiveSessionForTopic(topicId),
 }));
 
 jest.mock('../../../hooks/use-subjects', () => ({
@@ -379,11 +384,13 @@ describe('SessionScreen homework flow', () => {
     jest.clearAllMocks();
     jest.useFakeTimers();
     mockUseSessionTranscript.mockReturnValue({ data: null });
+    mockUseActiveSessionForTopic.mockReturnValue({ data: null });
     // Clear SecureStore mock data
     Object.keys(secureStore).forEach((key) => delete secureStore[key]);
     let aiEventCount = 0;
     (useRouter as jest.Mock).mockReturnValue({
       replace: mockReplace,
+      setParams: mockSetParams,
     });
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       mode: 'homework',
@@ -762,6 +769,62 @@ describe('SessionScreen homework flow', () => {
     });
   });
 
+  it('auto-resumes the active session for a learning topic when no sessionId is in the route', async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'learning',
+      subjectId: 'subject-1',
+      subjectName: 'Geography',
+      topicId: 'topic-1',
+      topicName: 'Continents',
+    });
+    mockUseActiveSessionForTopic.mockReturnValue({
+      data: { sessionId: 'session-resumed' },
+    });
+
+    render(<SessionScreen />);
+    await flushAsyncWork();
+
+    await waitFor(() => {
+      expect(mockSetParams).toHaveBeenCalledWith({
+        sessionId: 'session-resumed',
+      });
+    });
+  });
+
+  it('does not auto-resume when entering a topic in practice/review mode', async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'practice',
+      subjectId: 'subject-1',
+      subjectName: 'Geography',
+      topicId: 'topic-1',
+      topicName: 'Continents',
+    });
+    mockUseActiveSessionForTopic.mockReturnValue({
+      data: { sessionId: 'session-shouldnt-resume' },
+    });
+
+    render(<SessionScreen />);
+    await flushAsyncWork();
+
+    expect(mockSetParams).not.toHaveBeenCalled();
+  });
+
+  it('does not call setParams when the topic has no active session', async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'learning',
+      subjectId: 'subject-1',
+      subjectName: 'Geography',
+      topicId: 'topic-1',
+      topicName: 'Continents',
+    });
+    mockUseActiveSessionForTopic.mockReturnValue({ data: null });
+
+    render(<SessionScreen />);
+    await flushAsyncWork();
+
+    expect(mockSetParams).not.toHaveBeenCalled();
+  });
+
   it('shows the topic header and opens the topic switcher when "Change topic" is tapped', async () => {
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       mode: 'learning',
@@ -786,8 +849,9 @@ describe('SessionScreen homework flow', () => {
     const screen = render(<SessionScreen />);
     await flushAsyncWork();
 
-    expect(screen.getByTestId('session-topic-header')).toBeTruthy();
-    expect(screen.getByText(/Continents/)).toBeTruthy();
+    const header = screen.getByTestId('session-topic-header');
+    expect(within(header).getByText(/Continents/)).toBeTruthy();
+    expect(within(header).getByText(/Current topic/)).toBeTruthy();
 
     fireEvent.press(screen.getByTestId('session-topic-header-change'));
     await flushAsyncWork();
@@ -1040,8 +1104,12 @@ describe('voice mode persistence', () => {
     jest.clearAllMocks();
     jest.useFakeTimers();
     mockUseSessionTranscript.mockReturnValue({ data: null });
+    mockUseActiveSessionForTopic.mockReturnValue({ data: null });
     Object.keys(secureStore).forEach((key) => delete secureStore[key]);
-    (useRouter as jest.Mock).mockReturnValue({ replace: mockReplace });
+    (useRouter as jest.Mock).mockReturnValue({
+      replace: mockReplace,
+      setParams: mockSetParams,
+    });
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       mode: 'homework',
       subjectId: 'subject-1',

@@ -30,7 +30,6 @@ import { useSubjects } from '../../../../../hooks/use-subjects';
 import { InlineNoteCard } from '../../../../../components/library/InlineNoteCard';
 import { formatApiError } from '../../../../../lib/format-api-error';
 import { formatRelativeDate } from '../../../../../lib/format-relative-date';
-import { goBackOrReplace } from '../../../../../lib/navigation';
 import { platformAlert } from '../../../../../lib/platform-alert';
 import { useThemeColors } from '../../../../../lib/theme';
 import { computeUpNextTopic } from '../../../../../lib/up-next-topic';
@@ -134,11 +133,8 @@ export default function BookScreen() {
   const moveTopic = useMoveTopic();
 
   const handleBack = useCallback(() => {
-    goBackOrReplace(router, {
-      pathname: '/(app)/shelf/[subjectId]',
-      params: { subjectId },
-    } as never);
-  }, [router, subjectId]);
+    router.back();
+  }, [router]);
 
   // --- Generation auto-trigger ---
   const [genPhase, setGenPhase] = useState<GenerationPhase>('idle');

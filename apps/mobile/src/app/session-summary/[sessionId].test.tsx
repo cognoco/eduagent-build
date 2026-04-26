@@ -9,6 +9,7 @@ import { platformAlert } from '../../lib/platform-alert';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const mockReplace = jest.fn();
+const mockPush = jest.fn();
 const mockBack = jest.fn();
 const mockCanGoBack = jest.fn(() => false);
 const mockParams = {
@@ -21,6 +22,7 @@ const mockParams = {
 jest.mock('expo-router', () => ({
   useRouter: () => ({
     replace: mockReplace,
+    push: mockPush,
     back: mockBack,
     canGoBack: mockCanGoBack,
   }),
@@ -122,6 +124,15 @@ jest.mock('../../lib/profile', () => ({
   isGuardianProfile: () => false,
 }));
 
+const mockUseParentProxy = jest.fn(() => ({
+  isParentProxy: false,
+  childProfile: null,
+  parentProfile: null,
+}));
+jest.mock('../../hooks/use-parent-proxy', () => ({
+  useParentProxy: () => mockUseParentProxy(),
+}));
+
 const mockReadSummaryDraft = jest.fn();
 const mockWriteSummaryDraft = jest.fn();
 const mockClearSummaryDraft = jest.fn();
@@ -152,6 +163,11 @@ describe('SessionSummaryScreen', () => {
     mockReadSummaryDraft.mockResolvedValue(null);
     mockWriteSummaryDraft.mockResolvedValue(undefined);
     mockClearSummaryDraft.mockResolvedValue(undefined);
+    mockUseParentProxy.mockReturnValue({
+      isParentProxy: false,
+      childProfile: null,
+      parentProfile: null,
+    });
     mockSubmitIsError = false;
     mockSubmitError = null;
     mockSkipMutateAsync.mockResolvedValue({
@@ -171,6 +187,8 @@ describe('SessionSummaryScreen', () => {
     mockParams.milestones = undefined;
     mockParams.fastCelebrations = undefined;
     mockParams.sessionType = undefined;
+    mockParams.subjectId = undefined;
+    mockParams.topicId = undefined;
     mockTranscriptData = null;
     mockSessionSummaryData = null;
     mockSessionSummaryIsLoading = false;
@@ -547,6 +565,42 @@ describe('SessionSummaryScreen', () => {
     expect(screen.getByTestId('fast-celebrations')).toBeTruthy();
     expect(screen.getByText('Quadratic Equations')).toBeTruthy();
     expect(screen.getByText(/15 minutes - great session!/)).toBeTruthy();
+  });
+
+  describe('resume-this-session CTA', () => {
+    it('renders the Resume CTA for learners and navigates back into the session with the sessionId', () => {
+      mockParams.subjectId = 'subject-1';
+      mockParams.topicId = 'topic-1';
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      const cta = screen.getByTestId('resume-session-cta');
+      expect(cta).toBeTruthy();
+
+      fireEvent.press(cta);
+
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: '/(app)/session',
+        params: {
+          mode: 'learning',
+          sessionId: '660e8400-e29b-41d4-a716-446655440000',
+          subjectId: 'subject-1',
+          topicId: 'topic-1',
+        },
+      });
+    });
+
+    it('hides the Resume CTA in parent-proxy mode so parents cannot open the learner chat', () => {
+      mockUseParentProxy.mockReturnValue({
+        isParentProxy: true,
+        childProfile: { id: 'p-1', birthYear: 2012 } as never,
+        parentProfile: { id: 'parent-1', isOwner: true } as never,
+      });
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      expect(screen.queryByTestId('resume-session-cta')).toBeNull();
+    });
   });
 
   // BUG-449: revisiting a past session (Library → Shelf → Book → tap session)
