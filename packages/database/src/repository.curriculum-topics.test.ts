@@ -112,9 +112,26 @@ describe('createScopedRepository → curriculumTopics', () => {
       expect(calls.limit).toEqual([[3]]);
     });
 
-    // NOTE: The "empty keywords" short-circuit lives in matchFreeformTopic,
-    // not in the repo method — the repo method does not need a defensive
-    // guard for a call that never happens in production.
+    // BUG-643 [P-3]: empty keywords used to crash at the driver because
+    // `or(...[])` produces invalid drizzle SQL. The helper now short-circuits
+    // before hitting the DB so any future caller that forgets to filter
+    // upstream is safe.
+    it('returns [] without hitting the DB when keywords is empty (BUG-643 [P-3])', async () => {
+      const { chain, calls } = createRecordingChain([
+        { id: 'should-never-be-returned', title: 'leaked' },
+      ]);
+      const repo = createScopedRepository(chain as never, profileId);
+      const rows = await repo.curriculumTopics.findMatchingInSubject(
+        's1',
+        [],
+        3
+      );
+      expect(rows).toEqual([]);
+      // Proof we short-circuited — none of the chain methods were called.
+      expect(calls.select).toHaveLength(0);
+      expect(calls.where).toHaveLength(0);
+      expect(calls.limit).toHaveLength(0);
+    });
   });
 });
 

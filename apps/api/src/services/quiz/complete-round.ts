@@ -361,7 +361,7 @@ export async function completeQuizRound(
         if (existing) {
           const sm2Result = applyQuizSm2(
             {
-              easeFactor: String(existing.easeFactor),
+              easeFactor: existing.easeFactor,
               interval: existing.interval,
               repetitions: existing.repetitions,
               lastReviewedAt: existing.updatedAt,

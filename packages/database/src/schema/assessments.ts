@@ -5,13 +5,13 @@ import {
   text,
   timestamp,
   jsonb,
-  numeric,
   pgEnum,
   unique,
   index,
   check,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
+import { numericAsNumber } from './_numeric-as-number';
 import { profiles } from './profiles';
 import { subjects, curriculumTopics } from './subjects';
 import { learningSessions } from './sessions';
@@ -67,7 +67,7 @@ export const assessments = pgTable('assessments', {
     .notNull()
     .default('recall'),
   status: assessmentStatusEnum('status').notNull().default('in_progress'),
-  masteryScore: numeric('mastery_score', { precision: 3, scale: 2 }),
+  masteryScore: numericAsNumber('mastery_score', { precision: 3, scale: 2 }),
   qualityRating: integer('quality_rating'),
   exchangeHistory: jsonb('exchange_history').notNull().default([]),
   createdAt: timestamp('created_at', { withTimezone: true })
@@ -90,9 +90,9 @@ export const retentionCards = pgTable(
     topicId: uuid('topic_id')
       .notNull()
       .references(() => curriculumTopics.id, { onDelete: 'cascade' }),
-    easeFactor: numeric('ease_factor', { precision: 4, scale: 2 })
+    easeFactor: numericAsNumber('ease_factor', { precision: 4, scale: 2 })
       .notNull()
-      .default('2.50'),
+      .default(2.5),
     intervalDays: integer('interval_days').notNull().default(1),
     repetitions: integer('repetitions').notNull().default(0),
     lastReviewedAt: timestamp('last_reviewed_at', { withTimezone: true }),

@@ -204,7 +204,7 @@ function makeRetentionCardRow(
     id: '990e8400-e29b-41d4-a716-446655440001',
     profileId,
     topicId: '770e8400-e29b-41d4-a716-446655440001',
-    easeFactor: '2.50',
+    easeFactor: 2.5,
     intervalDays: 1,
     repetitions: 0,
     lastReviewedAt: null,

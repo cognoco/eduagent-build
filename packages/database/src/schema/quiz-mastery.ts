@@ -1,7 +1,6 @@
 import {
   index,
   integer,
-  numeric,
   pgTable,
   text,
   timestamp,
@@ -9,6 +8,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import { generateUUIDv7 } from '../utils/uuid';
+import { numericAsNumber } from './_numeric-as-number';
 import { profiles } from './profiles';
 import { quizActivityTypeEnum } from './quiz';
 
@@ -24,9 +24,9 @@ export const quizMasteryItems = pgTable(
     activityType: quizActivityTypeEnum('activity_type').notNull(),
     itemKey: text('item_key').notNull(),
     itemAnswer: text('item_answer').notNull(),
-    easeFactor: numeric('ease_factor', { precision: 4, scale: 2 })
+    easeFactor: numericAsNumber('ease_factor', { precision: 4, scale: 2 })
       .notNull()
-      .default('2.5'),
+      .default(2.5),
     interval: integer('interval').notNull().default(1),
     repetitions: integer('repetitions').notNull().default(0),
     nextReviewAt: timestamp('next_review_at', { withTimezone: true }).notNull(),

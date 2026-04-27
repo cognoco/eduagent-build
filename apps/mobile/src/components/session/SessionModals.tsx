@@ -66,6 +66,8 @@ export function ParkingLotModal({
             className="bg-surface rounded-input px-4 py-3 text-body text-text-primary"
             multiline
             testID="parking-lot-input"
+            accessibilityLabel="Parking lot note"
+            accessibilityHint="Type a question or idea you want to come back to later"
           />
 
           <Pressable

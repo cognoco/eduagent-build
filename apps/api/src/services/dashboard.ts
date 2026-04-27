@@ -182,25 +182,34 @@ export async function countGuidedMetrics(
   childProfileId: string,
   startDate: Date
 ): Promise<{ guidedCount: number; totalProblemCount: number }> {
-  const events = await db.query.sessionEvents.findMany({
-    where: and(
-      eq(sessionEvents.profileId, childProfileId),
-      eq(sessionEvents.eventType, 'ai_response'),
-      gte(sessionEvents.createdAt, startDate)
-    ),
-  });
+  // BUG-731 [PERF-1]: previously loaded every ai_response event into JS to
+  // count one JSONB field. Now aggregated in SQL: a single round-trip
+  // returns COUNT(*) plus a conditional COUNT for rung >= 3.
+  //
+  // Rungs are stored on `metadata->>'escalationRung'` as JSON-encoded
+  // numbers; the `->>` operator returns text, which casts cleanly to int
+  // (Postgres rejects non-numeric text and we filter to ai_response rows
+  // that always set the field, so the cast is safe in practice).
+  const [row] = await db
+    .select({
+      guidedCount: sql<number>`COUNT(*) FILTER (WHERE (${sessionEvents.metadata}->>'escalationRung')::int >= 3)`,
+      totalProblemCount: sql<number>`COUNT(*)`,
+    })
+    .from(sessionEvents)
+    .where(
+      and(
+        eq(sessionEvents.profileId, childProfileId),
+        eq(sessionEvents.eventType, 'ai_response'),
+        gte(sessionEvents.createdAt, startDate)
+      )
+    );
 
-  let guidedCount = 0;
-  for (const event of events) {
-    const meta = event.metadata as Record<string, unknown> | null;
-    const rung =
-      typeof meta?.escalationRung === 'number' ? meta.escalationRung : 0;
-    if (rung >= 3) {
-      guidedCount++;
-    }
-  }
-
-  return { guidedCount, totalProblemCount: events.length };
+  // drizzle returns aggregate counts as string from the pg driver. Coerce
+  // to number so callers stay JSON-clean.
+  return {
+    guidedCount: Number(row?.guidedCount ?? 0),
+    totalProblemCount: Number(row?.totalProblemCount ?? 0),
+  };
 }
 
 // ---------------------------------------------------------------------------

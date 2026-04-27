@@ -397,5 +397,60 @@ describe('dashboard routes', () => {
       // 200 or 404 (profile not found) — either way not 403
       expect(res.status).not.toBe(403);
     });
+
+    // [BREAK / BUG-744] getChildDetail is the service-layer guard for the
+    // child-detail endpoint. If the assertParentAccess call inside the
+    // service were removed, an unlinked parent would get 200 with another
+    // family's data. This test mocks the service to throw ForbiddenError —
+    // proving the route's error middleware translates it to a 403.
+    it('[BREAK] GET /dashboard/children/:id returns 403 when service rejects unlinked parent', async () => {
+      mockGetChildDetail.mockRejectedValueOnce(
+        new ForbiddenError('You do not have access to this child profile.')
+      );
+
+      const res = await app.request(
+        `/v1/dashboard/children/${PROFILE_ID}`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(403);
+      expect(mockGetChildDetail).toHaveBeenCalledTimes(1);
+    });
+
+    // [BREAK / BUG-744] getChildSubjectTopics is the service-layer guard
+    // for the subject-detail endpoint. Same break pattern: forced
+    // ForbiddenError must surface as 403, not 200 with mixed-tenant data.
+    it('[BREAK] GET /dashboard/children/:id/subjects/:subjectId returns 403 when service rejects unlinked parent', async () => {
+      mockGetChildSubjectTopics.mockRejectedValueOnce(
+        new ForbiddenError('You do not have access to this child profile.')
+      );
+
+      const res = await app.request(
+        `/v1/dashboard/children/${PROFILE_ID}/subjects/${SUBJECT_ID}`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(403);
+      expect(mockGetChildSubjectTopics).toHaveBeenCalledTimes(1);
+    });
+
+    // [BREAK / BUG-744] Weekly-report list/detail go through their own
+    // service module. Both must surface ForbiddenError as 403.
+    it('[BREAK] GET /dashboard/children/:id/weekly-reports returns 403 when service rejects unlinked parent', async () => {
+      mockListWeeklyReports.mockRejectedValueOnce(
+        new ForbiddenError('You do not have access to this child profile.')
+      );
+
+      const res = await app.request(
+        `/v1/dashboard/children/${PROFILE_ID}/weekly-reports`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(403);
+      expect(mockListWeeklyReports).toHaveBeenCalledTimes(1);
+    });
   });
 });

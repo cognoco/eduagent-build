@@ -140,7 +140,7 @@ async function seedVocabularyBank(profileId: string, subjectId: string) {
     await db.insert(vocabularyRetentionCards).values({
       profileId,
       vocabularyId: item.id,
-      easeFactor: '2.50',
+      easeFactor: 2.5,
       intervalDays: 6,
       repetitions: 3,
       lastReviewedAt,
@@ -154,7 +154,7 @@ async function seedVocabularyBank(profileId: string, subjectId: string) {
     await db.insert(vocabularyRetentionCards).values({
       profileId,
       vocabularyId: item.id,
-      easeFactor: '2.50',
+      easeFactor: 2.5,
       intervalDays: 6,
       repetitions: 3,
       lastReviewedAt,

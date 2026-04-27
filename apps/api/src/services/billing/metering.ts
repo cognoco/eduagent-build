@@ -120,14 +120,42 @@ export async function decrementQuota(
       .returning();
 
     if (updatedTopUp) {
-      // Also increment usedToday since we consumed a question
-      await db
+      // [S-2 / BUG-627] Atomically increment usedToday WITH a daily-limit
+      // guard. The previous unguarded UPDATE allowed two concurrent top-up
+      // consumers to both pass the line-91 snapshot check at usedToday=
+      // dailyLimit-1, both decrement a top-up credit, then both add +1 to
+      // usedToday — ending at dailyLimit+1 and silently bypassing the cap.
+      const [updatedPool] = await db
         .update(quotaPools)
         .set({
           usedToday: sql`${quotaPools.usedToday} + 1`,
           updatedAt: new Date(),
         })
-        .where(eq(quotaPools.subscriptionId, subscriptionId));
+        .where(
+          and(
+            eq(quotaPools.subscriptionId, subscriptionId),
+            sql`(${quotaPools.dailyLimit} IS NULL OR ${quotaPools.usedToday} < ${quotaPools.dailyLimit})`
+          )
+        )
+        .returning();
+
+      if (!updatedPool) {
+        // Daily cap was reached between the snapshot check and this UPDATE
+        // (concurrent top-up race). Roll back the top-up decrement so the
+        // user is not charged for a request that did not go through.
+        await db
+          .update(topUpCredits)
+          .set({ remaining: sql`${topUpCredits.remaining} + 1` })
+          .where(eq(topUpCredits.id, updatedTopUp.id));
+
+        return {
+          success: false,
+          source: 'daily_exceeded',
+          remainingMonthly: Math.max(0, pool.monthlyLimit - pool.usedThisMonth),
+          remainingTopUp: 0,
+          remainingDaily: 0,
+        };
+      }
 
       return {
         success: true,
@@ -135,8 +163,8 @@ export async function decrementQuota(
         remainingMonthly: 0,
         remainingTopUp: updatedTopUp.remaining,
         remainingDaily:
-          pool.dailyLimit !== null
-            ? pool.dailyLimit - pool.usedToday - 1
+          updatedPool.dailyLimit !== null
+            ? updatedPool.dailyLimit - updatedPool.usedToday
             : null,
       };
     }

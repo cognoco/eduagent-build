@@ -13,9 +13,10 @@ import type { FlowDefinition, PromptMessages } from '../runner/types';
 
 type CapitalsBuilderInput = Parameters<typeof buildCapitalsPrompt>[0];
 
-// Local mirror of AgeBracket — avoids importing from a non-barrel file.
-function ageYearsToBracket(ageYears: number): 'child' | 'adolescent' | 'adult' {
-  if (ageYears <= 9) return 'child';
+// Local mirror of quiz AgeBracket — avoids importing from a non-barrel file.
+// Product is 11+ only, so the historical 'child' branch was removed in
+// BUG-642 [P-2]. Eval profiles never include ages below 11.
+function ageYearsToBracket(ageYears: number): 'adolescent' | 'adult' {
   if (ageYears <= 13) return 'adolescent';
   return 'adult';
 }

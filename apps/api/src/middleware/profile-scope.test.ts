@@ -12,6 +12,7 @@ jest.mock('../services/profile', () => ({
         birthYear: 2014,
         location: 'EU',
         consentStatus: 'CONSENTED',
+        isOwner: true,
       });
     }
     return Promise.resolve(null);
@@ -25,6 +26,7 @@ jest.mock('../services/profile', () => ({
         birthYear: 2014,
         location: 'EU',
         consentStatus: 'CONSENTED',
+        isOwner: true,
       });
     }
     return Promise.resolve(null);
@@ -63,6 +65,7 @@ describe('profileScopeMiddleware', () => {
       location: 'EU',
       consentStatus: 'CONSENTED',
       hasPremiumLlm: false,
+      isOwner: true,
     });
   });
 
@@ -78,6 +81,7 @@ describe('profileScopeMiddleware', () => {
       location: 'EU',
       consentStatus: 'CONSENTED',
       hasPremiumLlm: false,
+      isOwner: true,
     });
   });
 

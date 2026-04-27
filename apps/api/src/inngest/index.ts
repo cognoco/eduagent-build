@@ -7,6 +7,7 @@ import { sessionStaleCleanup } from './functions/session-stale-cleanup';
 import { trialExpiry } from './functions/trial-expiry';
 import { quotaReset } from './functions/quota-reset';
 import { topupExpiryReminder } from './functions/topup-expiry-reminder';
+import { topupExpiryReminderSend } from './functions/topup-expiry-reminder-send';
 import { subjectAutoArchive } from './functions/subject-auto-archive';
 import { bookPreGeneration } from './functions/book-pre-generation';
 import { recallNudge } from './functions/recall-nudge';
@@ -48,6 +49,7 @@ export {
   trialExpiry,
   quotaReset,
   topupExpiryReminder,
+  topupExpiryReminderSend,
   subjectAutoArchive,
   bookPreGeneration,
   recallNudge,
@@ -80,6 +82,7 @@ export const functions = [
   trialExpiry,
   quotaReset,
   topupExpiryReminder,
+  topupExpiryReminderSend,
   subjectAutoArchive,
   bookPreGeneration,
   recallNudge,

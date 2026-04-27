@@ -289,7 +289,7 @@ function mapAssessmentRow(
     sessionId: row.sessionId ?? null,
     verificationDepth: row.verificationDepth,
     status: row.status,
-    masteryScore: row.masteryScore !== null ? Number(row.masteryScore) : null,
+    masteryScore: row.masteryScore ?? null,
     qualityRating: row.qualityRating ?? null,
     exchangeHistory: (row.exchangeHistory ??
       []) as AssessmentRecord['exchangeHistory'],
@@ -379,7 +379,7 @@ export async function updateAssessment(
     setValues.status = updates.status;
   }
   if (updates.masteryScore !== undefined) {
-    setValues.masteryScore = String(updates.masteryScore);
+    setValues.masteryScore = updates.masteryScore;
   }
   if (updates.qualityRating !== undefined) {
     setValues.qualityRating = updates.qualityRating;

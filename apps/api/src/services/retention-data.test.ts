@@ -100,7 +100,7 @@ function mockRetentionCardRow(
     id: 'card-1',
     profileId,
     topicId: overrides?.topicId ?? topicId,
-    easeFactor: '2.50',
+    easeFactor: 2.5,
     intervalDays: 7,
     repetitions: 3,
     lastReviewedAt: NOW,
@@ -294,7 +294,7 @@ describe('processRecallTest', () => {
     Object.assign(newCard, {
       repetitions: 0,
       intervalDays: 1,
-      easeFactor: '2.50',
+      easeFactor: 2.5,
     });
 
     const db = createMockDb({ retentionCardFindFirstQuery: newCard });
@@ -377,7 +377,7 @@ describe('processRecallTest', () => {
     Object.assign(newCard, {
       repetitions: 0,
       intervalDays: 1,
-      easeFactor: '2.50',
+      easeFactor: 2.5,
     });
     const db = createMockDb({ retentionCardFindFirstQuery: newCard });
 
@@ -891,7 +891,7 @@ describe('startRelearn', () => {
     expect(db.update).toHaveBeenCalled();
     const setArg = (db.update as jest.Mock).mock.results[0].value.set.mock
       .calls[0][0];
-    expect(setArg.easeFactor).toBe('2.50');
+    expect(setArg.easeFactor).toBe(2.5);
     expect(setArg.intervalDays).toBe(1);
     expect(setArg.repetitions).toBe(0);
     expect(setArg.failureCount).toBe(0);
@@ -1442,7 +1442,7 @@ describe('updateRetentionFromSession', () => {
     Object.assign(newCard, {
       repetitions: 0,
       intervalDays: 1,
-      easeFactor: '2.50',
+      easeFactor: 2.5,
     });
 
     const db = createMockDb({ retentionCardFindFirstQuery: newCard });

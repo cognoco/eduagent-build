@@ -8,8 +8,8 @@ import {
   pgEnum,
   index,
   unique,
-  numeric,
 } from 'drizzle-orm/pg-core';
+import { numericAsNumber } from './_numeric-as-number';
 import { profiles } from './profiles';
 import { subjects, curriculumTopics } from './subjects';
 import { generateUUIDv7 } from '../utils/uuid';
@@ -69,9 +69,9 @@ export const vocabularyRetentionCards = pgTable(
     vocabularyId: uuid('vocabulary_id')
       .notNull()
       .references(() => vocabulary.id, { onDelete: 'cascade' }),
-    easeFactor: numeric('ease_factor', { precision: 4, scale: 2 })
+    easeFactor: numericAsNumber('ease_factor', { precision: 4, scale: 2 })
       .notNull()
-      .default('2.50'),
+      .default(2.5),
     intervalDays: integer('interval_days').notNull().default(0),
     repetitions: integer('repetitions').notNull().default(0),
     lastReviewedAt: timestamp('last_reviewed_at', { withTimezone: true }),

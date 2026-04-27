@@ -265,6 +265,84 @@ describe('Session lifecycle (integration)', () => {
   });
 
   // -------------------------------------------------------------------------
+  // [BREAK / S-1 / BUG-626] Concurrent persistExchangeResult must NOT leave
+  // orphan events when one call loses the exchange-count race.
+  //
+  // Pre-fix: events were inserted BEFORE the atomic UPDATE on exchangeCount.
+  // Two concurrent calls at exchangeCount=49 both inserted user_message +
+  // ai_response, then raced UPDATE; the loser threw SessionExchangeLimitError
+  // but its events stayed in the DB — visible as ghost turns in subsequent
+  // exchangeHistory loads. Post-fix: events + UPDATE are wrapped in a single
+  // transaction so the loser's events roll back.
+  // -------------------------------------------------------------------------
+
+  it('[BREAK] concurrent exchanges at the cap do not leave orphan events', async () => {
+    const { profileId } = await seedProfile();
+    const subjectId = await seedSubject(profileId);
+
+    const session = await startSession(db, profileId, subjectId, {
+      sessionType: 'learning',
+    });
+
+    // Push to one exchange below the 50-cap.
+    await db
+      .update(learningSessions)
+      .set({ exchangeCount: 49 })
+      .where(eq(learningSessions.id, session.id));
+
+    // Fire 2 concurrent processMessage calls. Exactly one should succeed.
+    const settled = await Promise.allSettled([
+      processMessage(db, profileId, session.id, {
+        message: 'concurrent A',
+      }),
+      processMessage(db, profileId, session.id, {
+        message: 'concurrent B',
+      }),
+    ]);
+
+    const fulfilled = settled.filter((r) => r.status === 'fulfilled');
+    const rejected = settled.filter((r) => r.status === 'rejected');
+
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected).toHaveLength(1);
+
+    // The loser's rejection must be SessionExchangeLimitError, not a DB error.
+    const rejection = (rejected[0] as PromiseRejectedResult).reason;
+    expect(rejection).toBeInstanceOf(SessionExchangeLimitError);
+
+    // exchangeCount must be exactly 50 — never 51.
+    const [row] = await db
+      .select({ exchangeCount: learningSessions.exchangeCount })
+      .from(learningSessions)
+      .where(eq(learningSessions.id, session.id))
+      .limit(1);
+    expect(row!.exchangeCount).toBe(50);
+
+    // Loser's events must have rolled back. The single winning exchange writes
+    // ONE user_message + ONE ai_response. Without the transaction fix, both
+    // calls would have persisted user_message events ('concurrent A' AND
+    // 'concurrent B') even though only one UPDATE landed → 2 user_message
+    // events but exchangeCount=50.
+    const userMessages = await db.query.sessionEvents.findMany({
+      where: and(
+        eq(sessionEvents.sessionId, session.id),
+        eq(sessionEvents.profileId, profileId),
+        eq(sessionEvents.eventType, 'user_message')
+      ),
+    });
+    expect(userMessages).toHaveLength(1);
+
+    const aiResponses = await db.query.sessionEvents.findMany({
+      where: and(
+        eq(sessionEvents.sessionId, session.id),
+        eq(sessionEvents.profileId, profileId),
+        eq(sessionEvents.eventType, 'ai_response')
+      ),
+    });
+    expect(aiResponses).toHaveLength(1);
+  });
+
+  // -------------------------------------------------------------------------
   // Test 5: closes a session and creates a summary row
   // -------------------------------------------------------------------------
 

@@ -457,15 +457,19 @@ export function createScopedRepository(db: Database, profileId: string) {
       /**
        * Return topics whose title matches any of `keywords` (case-insensitive
        * substring), scoped to a subject this profile owns. Returns at most
-       * `limit` rows. Callers are expected to short-circuit on empty keyword
-       * arrays — this method does not defend against that case because the
-       * call never happens in production.
+       * `limit` rows.
+       *
+       * BUG-643 [P-3]: empty keyword arrays return [] without hitting the DB —
+       * `or(...[])` is invalid drizzle SQL and would have thrown at the
+       * driver layer. Callers may still short-circuit upstream, but this
+       * helper is now safe to call directly.
        */
       async findMatchingInSubject(
         subjectId: string,
         keywords: string[],
         limit: number
       ): Promise<Array<{ id: string; title: string }>> {
+        if (keywords.length === 0) return [];
         return db
           .select({ id: curriculumTopics.id, title: curriculumTopics.title })
           .from(curriculumTopics)
@@ -716,7 +720,7 @@ export function createScopedRepository(db: Database, profileId: string) {
             activityType: values.activityType,
             itemKey: values.itemKey,
             itemAnswer: values.itemAnswer,
-            easeFactor: '2.5',
+            easeFactor: 2.5,
             interval: 1,
             repetitions: 0,
             nextReviewAt: nextReview,
@@ -736,7 +740,7 @@ export function createScopedRepository(db: Database, profileId: string) {
         itemKey: string,
         activityType: 'capitals' | 'guess_who',
         values: {
-          easeFactor: string;
+          easeFactor: number;
           interval: number;
           repetitions: number;
           nextReviewAt: Date;

@@ -31,6 +31,12 @@ export interface ProfileMeta {
     | 'WITHDRAWN'
     | null;
   hasPremiumLlm: boolean;
+  // [SEC-2 / BUG-718] Server-derived flag indicating whether the resolved
+  // X-Profile-Id is the owner profile for the authenticated account.
+  // assertNotProxyMode reads this instead of trusting the client-supplied
+  // X-Proxy-Mode header. A non-owner profile being accessed via a parent's
+  // account session is treated as a proxy session regardless of any header.
+  isOwner: boolean;
 }
 
 export type ProfileScopeEnv = {
@@ -83,6 +89,8 @@ export const profileScopeMiddleware = createMiddleware<ProfileScopeEnv>(
               location: owner.location,
               consentStatus: owner.consentStatus,
               hasPremiumLlm: owner.hasPremiumLlm ?? false,
+              // The auto-resolve path always returns the owner profile.
+              isOwner: true,
             });
           }
         } catch (err) {
@@ -113,6 +121,7 @@ export const profileScopeMiddleware = createMiddleware<ProfileScopeEnv>(
       location: profile.location,
       consentStatus: profile.consentStatus,
       hasPremiumLlm: profile.hasPremiumLlm ?? false,
+      isOwner: profile.isOwner,
     });
     await next();
     return;

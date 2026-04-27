@@ -383,7 +383,7 @@ describe('LLM Router', () => {
       registerProvider(spy);
 
       await routeAndCall([{ role: 'user', content: 'Hello' }], 1, {
-        ageBracket: 'child',
+        ageBracket: 'adolescent',
       });
 
       const msgs = receivedMessages[0]!;

@@ -314,7 +314,7 @@ async function seedAssessment(input: {
   subjectId: string;
   topicId: string;
   status?: 'in_progress' | 'passed' | 'failed';
-  masteryScore?: string | null;
+  masteryScore?: number | null;
 }): Promise<void> {
   await db.insert(assessments).values({
     profileId: input.profileId,
@@ -322,7 +322,7 @@ async function seedAssessment(input: {
     topicId: input.topicId,
     status: input.status ?? 'passed',
     verificationDepth: 'recall',
-    masteryScore: input.masteryScore ?? '0.80',
+    masteryScore: input.masteryScore ?? 0.8,
     exchangeHistory: [],
   });
 }

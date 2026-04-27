@@ -897,7 +897,47 @@ export async function persistExchangeResult(
     }),
   };
 
-  // Persist events: user_message + ai_response (with behavioral metadata)
+  // [S-1 / BUG-626] Run the atomic exchange-count UPDATE FIRST and only
+  // insert events if it succeeded. Pre-fix: events were inserted BEFORE the
+  // UPDATE — two concurrent requests at exchangeCount=MAX-1 both inserted
+  // user_message + ai_response, then raced UPDATE; the loser threw
+  // SessionExchangeLimitError but its events stayed in the DB as orphans
+  // (visible as ghost turns in subsequent exchangeHistory loads).
+  //
+  // Why reorder instead of wrap in a transaction: the production driver is
+  // neon-http (packages/database/src/client.ts), which does NOT support
+  // multi-statement transactions — db.transaction silently degrades to
+  // sequential statements with only a console.warn. A transaction wrap
+  // would NOT roll back orphan events in production. Reordering makes the
+  // guarantee independent of transaction support.
+  //
+  // Trade-off: if the post-UPDATE INSERTs fail (e.g., connection drop)
+  // we get a counter increment without events. This is rare and recoverable
+  // (user retries, sees fresh state) — strictly less harmful than orphan
+  // events polluting history permanently.
+  const now = new Date();
+  const [updated] = await db
+    .update(learningSessions)
+    .set({
+      exchangeCount: sql`${learningSessions.exchangeCount} + 1`,
+      escalationRung: effectiveRung,
+      lastActivityAt: now,
+      updatedAt: now,
+    })
+    .where(
+      and(
+        eq(learningSessions.id, sessionId),
+        eq(learningSessions.profileId, profileId),
+        lt(learningSessions.exchangeCount, MAX_EXCHANGES_PER_SESSION)
+      )
+    )
+    .returning({ exchangeCount: learningSessions.exchangeCount });
+
+  if (!updated) {
+    throw new SessionExchangeLimitError(session.exchangeCount);
+  }
+
+  // Atomic guard passed — now persist the events.
   const insertedEvents = await db
     .insert(sessionEvents)
     .values([
@@ -922,7 +962,6 @@ export async function persistExchangeResult(
       eventType: sessionEvents.eventType,
     });
 
-  // Record escalation event if rung changed
   if (previousRung !== effectiveRung) {
     await db.insert(sessionEvents).values({
       sessionId,
@@ -932,30 +971,6 @@ export async function persistExchangeResult(
       content: `Escalated from rung ${previousRung} to ${effectiveRung}`,
       metadata: { fromRung: previousRung, toRung: effectiveRung },
     });
-  }
-
-  // D-03: atomic conditional increment — prevents concurrent requests from
-  // both passing the exchange-limit check and double-incrementing past the cap.
-  const now = new Date();
-  const [updated] = await db
-    .update(learningSessions)
-    .set({
-      exchangeCount: sql`${learningSessions.exchangeCount} + 1`,
-      escalationRung: effectiveRung,
-      lastActivityAt: now,
-      updatedAt: now,
-    })
-    .where(
-      and(
-        eq(learningSessions.id, sessionId),
-        eq(learningSessions.profileId, profileId),
-        lt(learningSessions.exchangeCount, MAX_EXCHANGES_PER_SESSION)
-      )
-    )
-    .returning({ exchangeCount: learningSessions.exchangeCount });
-
-  if (!updated) {
-    throw new SessionExchangeLimitError(session.exchangeCount);
   }
 
   return {

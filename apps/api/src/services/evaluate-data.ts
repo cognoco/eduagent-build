@@ -68,7 +68,7 @@ export async function checkEvaluateEligibility(
     };
   }
 
-  const easeFactor = Number(card.easeFactor);
+  const easeFactor = card.easeFactor;
   const { repetitions } = card;
   const eligible = shouldTriggerEvaluate(easeFactor, repetitions);
   const currentRung = (card.evaluateDifficultyRung ?? 1) as 1 | 2 | 3 | 4;

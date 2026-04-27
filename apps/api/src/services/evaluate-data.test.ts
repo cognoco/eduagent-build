@@ -105,7 +105,7 @@ describe('checkEvaluateEligibility', () => {
     const card = {
       topicId,
       profileId,
-      easeFactor: '2.70',
+      easeFactor: 2.7,
       repetitions: 3,
       evaluateDifficultyRung: 2,
     };
@@ -128,7 +128,7 @@ describe('checkEvaluateEligibility', () => {
     const card = {
       topicId,
       profileId,
-      easeFactor: '2.20',
+      easeFactor: 2.2,
       repetitions: 5,
       evaluateDifficultyRung: null,
     };
@@ -148,7 +148,7 @@ describe('checkEvaluateEligibility', () => {
     const card = {
       topicId,
       profileId,
-      easeFactor: '2.50',
+      easeFactor: 2.5,
       repetitions: 0,
       evaluateDifficultyRung: null,
     };
@@ -170,7 +170,7 @@ describe('checkEvaluateEligibility', () => {
     const card = {
       topicId,
       profileId,
-      easeFactor: '2.60',
+      easeFactor: 2.6,
       repetitions: 2,
       evaluateDifficultyRung: null,
     };

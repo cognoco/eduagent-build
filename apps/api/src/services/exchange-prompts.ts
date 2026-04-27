@@ -68,11 +68,10 @@ export function getAgeVoice(
   }
 
   // Fallback path — bracket-only callers (birthYear unknown).
-  // child/adolescent → TEEN_VOICE (defense-in-depth: youngest plausible).
+  // adolescent → TEEN_VOICE (defense-in-depth: youngest plausible).
   // adult → ADULT_VOICE (honour explicit bracket signal from family_links etc.).
   // Known users with birthYear still reach the fine-grained branch above. [B.5]
   switch (ageBracket) {
-    case 'child':
     case 'adolescent':
       return TEEN_VOICE;
     case 'adult':
@@ -92,7 +91,7 @@ export function getSessionTypeGuidance(
   ageBracket: AgeBracket = 'adult'
 ): string {
   if (sessionType === 'homework') {
-    const isYouth = ageBracket === 'child' || ageBracket === 'adolescent';
+    const isYouth = ageBracket === 'adolescent';
     const brevity = isYouth
       ? 'Be very brief: 1-2 sentences plus an example. Teens want speed, not essays.'
       : 'Be brief: usually 2-6 sentences, focused on the exact problem in front of the learner.';

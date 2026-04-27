@@ -76,7 +76,7 @@ function mockRetentionCard(
     id: 'card-1',
     profileId,
     topicId: overrides?.topicId ?? topicId,
-    easeFactor: '2.50',
+    easeFactor: 2.5,
     intervalDays: 7,
     repetitions: 3,
     lastReviewedAt: NOW,
@@ -94,7 +94,7 @@ function mockAssessmentRow(
   overrides?: Partial<{
     topicId: string;
     status: string;
-    masteryScore: string | null;
+    masteryScore: number | null;
   }>
 ) {
   return {
@@ -436,7 +436,7 @@ describe('getTopicProgress', () => {
       subjectFindFirst: mockSubjectRow(),
       retentionCardFindFirst: mockRetentionCard(),
       assessmentsFindMany: [
-        mockAssessmentRow({ status: 'passed', masteryScore: '0.85' }),
+        mockAssessmentRow({ status: 'passed', masteryScore: 0.85 }),
       ],
       sessionsFindMany: [mockSessionRow({ topicId })],
       needsDeepeningFindMany: [],

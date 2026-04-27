@@ -57,7 +57,7 @@ function computeAggregateRetentionStatus(
 
 function computeCompletionStatus(
   sessionCount: number,
-  assessment: { status: string; masteryScore: string | null } | undefined,
+  assessment: { status: string; masteryScore: number | null } | undefined,
   retentionCard: { xpStatus: string; nextReviewAt: Date | null } | undefined
 ): 'not_started' | 'in_progress' | 'completed' | 'verified' | 'stable' {
   if (retentionCard?.xpStatus === 'verified') return 'verified';

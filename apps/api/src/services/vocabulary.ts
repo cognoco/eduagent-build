@@ -205,7 +205,7 @@ export async function ensureVocabularyRetentionCard(
     .values({
       profileId,
       vocabularyId,
-      easeFactor: '2.50',
+      easeFactor: 2.5,
       intervalDays: 0,
       repetitions: 0,
       failureCount: 0,
@@ -286,7 +286,7 @@ export async function reviewVocabulary(
     const [updatedCard] = await txDb
       .update(vocabularyRetentionCards)
       .set({
-        easeFactor: String(result.card.easeFactor),
+        easeFactor: result.card.easeFactor,
         intervalDays: result.card.interval,
         repetitions: result.card.repetitions,
         lastReviewedAt: new Date(result.card.lastReviewedAt),

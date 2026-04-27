@@ -529,11 +529,17 @@ describe('decrementQuota', () => {
     const topUp = mockTopUpRow({ remaining: 100 });
     const updatedTopUp = mockTopUpRow({ remaining: 99 });
 
-    // First update (monthly) returns empty, second update (top-up) returns result
+    // [S-2/BUG-627] mock chain in order: (1) monthly atomic UPDATE returns
+    // empty → fall through to top-up, (2) top-up credit decrement succeeds,
+    // (3) daily-counter UPDATE returns the updated pool. The third UPDATE
+    // is guarded by `usedToday < dailyLimit OR dailyLimit IS NULL`; when the
+    // guard fails the call site rolls the top-up credit back. dailyLimit
+    // is null in this fixture so the guard always passes.
     const updateReturningFn = jest
       .fn()
       .mockResolvedValueOnce([]) // monthly: WHERE used < limit fails
-      .mockResolvedValueOnce([updatedTopUp]); // top-up: succeeds
+      .mockResolvedValueOnce([updatedTopUp]) // top-up: succeeds
+      .mockResolvedValueOnce([{ dailyLimit: null, usedToday: 1 }]); // daily counter increment
     const updateWhere = jest
       .fn()
       .mockReturnValue({ returning: updateReturningFn });
@@ -1934,7 +1940,7 @@ describe('decrementQuota — concurrent over-decrement [4C.2]', () => {
       .fn()
       .mockResolvedValueOnce([]) // monthly: WHERE used < limit fails (concurrently consumed)
       .mockResolvedValueOnce([updatedTopUp]) // top-up: succeeds
-      .mockResolvedValueOnce([]); // daily counter increment
+      .mockResolvedValueOnce([{ dailyLimit: null, usedToday: 6 }]); // daily counter increment (guard passes; dailyLimit null)
 
     const updateWhere = jest
       .fn()

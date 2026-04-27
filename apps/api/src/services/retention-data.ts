@@ -163,7 +163,7 @@ export async function ensureRetentionCard(
     .values({
       profileId,
       topicId,
-      easeFactor: '2.50',
+      easeFactor: 2.5,
       intervalDays: 1,
       repetitions: 0,
       failureCount: 0,
@@ -462,7 +462,7 @@ export async function processRecallTest(
   const [persisted] = await db
     .update(retentionCards)
     .set({
-      easeFactor: String(result.newState.easeFactor),
+      easeFactor: result.newState.easeFactor,
       intervalDays: result.newState.intervalDays,
       repetitions: result.newState.repetitions,
       failureCount: result.newState.failureCount,
@@ -653,7 +653,7 @@ export async function startRelearn(
   const resetRows = await db
     .update(retentionCards)
     .set({
-      easeFactor: '2.50',
+      easeFactor: 2.5,
       intervalDays: 1,
       repetitions: 0,
       failureCount: 0,
@@ -1053,7 +1053,7 @@ export async function updateRetentionFromSession(
   const updateResult = await db
     .update(retentionCards)
     .set({
-      easeFactor: String(result.card.easeFactor),
+      easeFactor: result.card.easeFactor,
       intervalDays: result.card.interval,
       repetitions: result.card.repetitions,
       lastReviewedAt: new Date(result.card.lastReviewedAt),

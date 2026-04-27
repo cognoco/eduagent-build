@@ -39,6 +39,7 @@ const CHILD_PENDING_META: ProfileMeta = {
   location: null,
   consentStatus: 'PENDING',
   hasPremiumLlm: false,
+  isOwner: false,
 };
 
 const CHILD_REQUESTED_META: ProfileMeta = {
@@ -46,6 +47,7 @@ const CHILD_REQUESTED_META: ProfileMeta = {
   location: null,
   consentStatus: 'PARENTAL_CONSENT_REQUESTED',
   hasPremiumLlm: false,
+  isOwner: false,
 };
 
 const WITHDRAWN_CHILD_META: ProfileMeta = {
@@ -53,6 +55,7 @@ const WITHDRAWN_CHILD_META: ProfileMeta = {
   location: null,
   consentStatus: 'WITHDRAWN',
   hasPremiumLlm: false,
+  isOwner: false,
 };
 
 const CONSENTED_CHILD_META: ProfileMeta = {
@@ -60,6 +63,7 @@ const CONSENTED_CHILD_META: ProfileMeta = {
   location: null,
   consentStatus: 'CONSENTED',
   hasPremiumLlm: false,
+  isOwner: false,
 };
 
 const ADULT_META: ProfileMeta = {
@@ -67,6 +71,7 @@ const ADULT_META: ProfileMeta = {
   location: null,
   consentStatus: null,
   hasPremiumLlm: false,
+  isOwner: true,
 };
 
 // ---------------------------------------------------------------------------

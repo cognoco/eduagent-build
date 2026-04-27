@@ -53,6 +53,7 @@ const TEST_ACCOUNTS = [
   { clerkUserId: `${PREFIX}-03`, email: `${PREFIX}-03@integration.test` },
   { clerkUserId: `${PREFIX}-04`, email: `${PREFIX}-04@integration.test` },
   { clerkUserId: `${PREFIX}-05`, email: `${PREFIX}-05@integration.test` },
+  { clerkUserId: `${PREFIX}-06`, email: `${PREFIX}-06@integration.test` },
 ];
 
 const ALL_EMAILS = TEST_ACCOUNTS.map((a) => a.email);
@@ -273,6 +274,51 @@ describe('Quota metering (integration)', () => {
     const pool = await loadQuotaPool(seeded.subscription.id);
     expect(pool!.usedThisMonth).toBe(0);
     expect(pool!.usedToday).toBe(0);
+  });
+
+  // [BREAK / S-2 / BUG-627] Concurrent top-up decrements MUST NOT bypass the
+  // daily cap. Pre-fix: two concurrent calls both passed the snapshot check
+  // at usedToday=dailyLimit-1, both consumed a top-up credit, both unguarded-
+  // updated usedToday +1 — ending at dailyLimit+1 (silent cap bypass).
+  // Post-fix: only one succeeds; the others get daily_exceeded and their
+  // top-up decrements are rolled back.
+  it('[BREAK] concurrent top-up consumers do not bypass daily cap', async () => {
+    const account = await seedAccount(5);
+    const seeded = await seedSubscriptionWithQuota({
+      accountId: account.id,
+      tier: 'plus',
+      monthlyLimit: 10,
+      usedThisMonth: 10, // monthly exhausted — forces top-up path
+      dailyLimit: 2,
+      usedToday: 1, // one slot left under daily cap
+    });
+    await seedTopUpCredit({
+      subscriptionId: seeded.subscription.id,
+      amount: 5,
+      remaining: 5,
+    });
+
+    // Fire 3 concurrent decrements. With usedToday=1 / dailyLimit=2 only
+    // ONE should be admitted before the cap is hit.
+    const results = await Promise.all(
+      Array.from({ length: 3 }, () =>
+        decrementQuota(createIntegrationDb(), seeded.subscription.id)
+      )
+    );
+
+    const successes = results.filter((r) => r.success);
+    const dailyExceeded = results.filter((r) => r.source === 'daily_exceeded');
+
+    expect(successes).toHaveLength(1);
+    expect(dailyExceeded).toHaveLength(2);
+
+    // usedToday must be exactly dailyLimit (2), not dailyLimit+N.
+    const pool = await loadQuotaPool(seeded.subscription.id);
+    expect(pool!.usedToday).toBe(2);
+
+    // Top-up was rolled back for the 2 losers — only 1 credit consumed.
+    const topUps = await loadTopUps(seeded.subscription.id);
+    expect(topUps[0]!.remaining).toBe(4);
   });
 
   it('concurrent decrements do not over-consume', async () => {
