@@ -191,11 +191,15 @@ async function handleEmailBounced(
   });
 
   // Telemetry-only event — no Inngest handler registered; consumed by observability tooling.
+  // [SEC-6 / BUG-722] Inngest event payloads are persisted in the Inngest
+  // dashboard (third-party processor). Recipient email is bystander PII for
+  // bounce/complaint observability — mask it before crossing the trust boundary.
+  // emailId still uniquely identifies the message for support investigation.
   await inngest.send({
     name: 'app/email.bounced',
     data: {
       type: eventType,
-      to: data.to,
+      to: maskEmail(data.to),
       emailId: data.email_id ?? null,
       timestamp: new Date().toISOString(),
     },

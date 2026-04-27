@@ -323,11 +323,14 @@ describe('email.bounced', () => {
     });
 
     expect(res.status).toBe(200);
+    // [SEC-6 / BUG-722] Inngest event payloads are persisted in the Inngest
+    // dashboard (third-party). Recipient email must be masked at this trust
+    // boundary even though the surrounding code paths log a masked form.
     expect(inngest.send).toHaveBeenCalledWith({
       name: 'app/email.bounced',
       data: expect.objectContaining({
         type: 'email.bounced',
-        to: 'parent@example.com',
+        to: 'p***@example.com',
         emailId: 'email_abc123',
         timestamp: expect.any(String),
       }),
@@ -350,10 +353,31 @@ describe('email.bounced', () => {
       name: 'app/email.bounced',
       data: expect.objectContaining({
         type: 'email.complained',
-        to: 'user@example.com',
+        to: 'u***@example.com',
         emailId: 'email_def456',
       }),
     });
+  });
+
+  // [SEC-6 / BUG-722] Break test — explicit guarantee that no Inngest event
+  // payload ever contains the raw recipient address. If this fails, recipient
+  // PII is being persisted to the Inngest dashboard.
+  it('[SEC-6 / BUG-722] never sends raw recipient email to Inngest', async () => {
+    (inngest.send as jest.Mock).mockClear();
+
+    const RAW = 'sensitive.target@victim.example.com';
+    const res = await makeRequest({
+      type: 'email.bounced',
+      data: { email_id: 'email_xyz', to: RAW },
+    });
+
+    expect(res.status).toBe(200);
+    expect(inngest.send).toHaveBeenCalledTimes(1);
+    const sent = (inngest.send as jest.Mock).mock.calls[0][0];
+    const serialized = JSON.stringify(sent);
+    expect(serialized).not.toContain(RAW);
+    // And the sanitized form must still preserve the domain for triage.
+    expect(sent.data.to).toBe('s***@victim.example.com');
   });
 
   it('handles missing email_id gracefully', async () => {

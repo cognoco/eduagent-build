@@ -3,7 +3,7 @@
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
-import { eq, and, gte } from 'drizzle-orm';
+import { eq, and, gte, sql } from 'drizzle-orm';
 import {
   notificationPreferences,
   notificationLog,
@@ -562,6 +562,15 @@ export async function checkAndLogRateLimit(
 ): Promise<boolean> {
   await verifyProfileOwnership(db, profileId, accountId);
   return db.transaction(async (tx) => {
+    // Advisory lock per (profileId, notificationKey) — serializes concurrent
+    // rate-limit checks for the same bucket without blocking unrelated ones.
+    // Lock is released automatically on commit/rollback. [BUG-861]
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtextextended(${
+        'rate-limit:' + profileId + ':' + type
+      }, 0))`
+    );
+
     const since = new Date(Date.now() - opts.hours * 60 * 60 * 1000);
     const rows = await tx
       .select()

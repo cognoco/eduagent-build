@@ -59,7 +59,16 @@ export function useRatingPrompt(): {
   const onSuccessfulRecall = useCallback(async () => {
     if (!activeProfile) return;
 
-    if (computeAgeBracket(activeProfile.birthYear) === 'adult') return;
+    // [BUG-680 / I-14] activeProfile.birthYear is typed `number | null`.
+    // Passing null to computeAgeBracket(birthYear: number) silently returns
+    // `year - null = year` → 'adult', masking unknown-age users as adults
+    // and skipping the prompt for the wrong reason. If we don't know the
+    // age, we should NOT prompt — same outcome but with explicit intent.
+    if (
+      activeProfile.birthYear == null ||
+      computeAgeBracket(activeProfile.birthYear) === 'adult'
+    )
+      return;
 
     try {
       const profileId = activeProfile.id;

@@ -33,11 +33,24 @@ import { generateRecallBridge } from './recall-bridge';
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 
 // ---------------------------------------------------------------------------
-// Conditionally skip when DATABASE_URL is not available
+// [T-5 / BUG-749] Require DATABASE_URL — never silently skip.
+//
+// The previous `describe.skip` fallback hid integration regressions whenever
+// the env file was missing or misnamed: the suite would record "0 failures"
+// despite running zero assertions. Failing loudly matches the rest of the
+// integration suite (see metering.integration.test.ts:31) and ensures CI
+// fails fast if the secret pipeline ever drops DATABASE_URL.
 // ---------------------------------------------------------------------------
 
-const dbUrl = process.env.DATABASE_URL;
-const describeIf = dbUrl ? describe : describe.skip;
+function requireDatabaseUrl(): string {
+  const url = process.env.DATABASE_URL;
+  if (!url) {
+    throw new Error(
+      'DATABASE_URL is not set. Create .env.test.local or .env.development.local at the workspace root, or supply it via Doppler in CI.'
+    );
+  }
+  return url;
+}
 
 // ---------------------------------------------------------------------------
 // Unique test-run prefix to avoid collisions between concurrent test runs
@@ -144,9 +157,9 @@ async function seedSession(
 // Global setup / teardown
 // ---------------------------------------------------------------------------
 
-describeIf('generateRecallBridge (integration)', () => {
+describe('generateRecallBridge (integration)', () => {
   beforeAll(async () => {
-    db = createDatabase(dbUrl!);
+    db = createDatabase(requireDatabaseUrl());
 
     // Register mock LLM provider — the ONLY mocked external boundary
     _clearProviders();

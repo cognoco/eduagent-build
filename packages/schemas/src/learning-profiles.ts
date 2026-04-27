@@ -111,7 +111,13 @@ export const learningProfileSchema = z.object({
   struggles: z.array(struggleEntrySchema),
   communicationNotes: z.array(z.string()),
   suppressedInferences: z.array(z.string()),
-  interestTimestamps: z.record(z.string(), z.string()).optional(),
+  // [BUG-705 / P-9] DB column `interest_timestamps` is jsonb NOT NULL DEFAULT
+  // '{}' (database/src/schema/learning-profiles.ts:30). Previously `.optional()`
+  // here let the Zod schema accept undefined, masking real shape violations
+  // and drifting from the row that actually comes back from the DB. Use
+  // `.default({})` so reads tolerate missing keys (legacy rows from before
+  // the DEFAULT was added) and writes still produce a valid object.
+  interestTimestamps: z.record(z.string(), z.string()).default({}),
   effectivenessSessionCount: z.number().int().default(0),
   memoryEnabled: z.boolean(),
   memoryConsentStatus: memoryConsentStatusSchema.default('pending'),

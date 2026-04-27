@@ -187,28 +187,16 @@ async function buildAndGenerateRound(
 }
 
 /**
- * Shared parsing + round generation used by both /quiz/rounds and
- * /quiz/rounds/prefetch. Returns the parsed input and generated round, or
- * an early validation-error Response if the request is malformed.
+ * Shared round generation used by both /quiz/rounds and /quiz/rounds/prefetch.
+ * Schema validation now lives in the per-route zValidator middleware (BUG-833),
+ * so this helper only handles the post-parse generation step plus the
+ * VocabularyContextError → 400 translation that depends on runtime context
+ * fetched mid-generation.
  */
-async function parseAndGenerate(c: import('hono').Context<QuizRouteEnv>) {
-  let body: unknown;
-  try {
-    body = await c.req.json();
-  } catch {
-    return { error: validationError(c, 'Request body must be valid JSON') };
-  }
-
-  const parsed = generateRoundInputSchema.safeParse(body);
-  if (!parsed.success) {
-    return {
-      error: validationError(
-        c,
-        `Invalid input: ${parsed.error.issues[0]?.message ?? 'unknown'}`
-      ),
-    };
-  }
-
+async function generateRoundFromInput(
+  c: import('hono').Context<QuizRouteEnv>,
+  input: GenerateRoundInput
+) {
   const profileId = requireProfileId(c.get('profileId'));
   const db = c.get('db');
   const profileMeta = c.get('profileMeta');
@@ -218,9 +206,9 @@ async function parseAndGenerate(c: import('hono').Context<QuizRouteEnv>) {
       db,
       profileId,
       profileMeta,
-      parsed.data
+      input
     );
-    return { round, input: parsed.data };
+    return { round, input };
   } catch (error) {
     if (error instanceof VocabularyContextError) {
       return { error: validationError(c, error.message) };
@@ -230,32 +218,56 @@ async function parseAndGenerate(c: import('hono').Context<QuizRouteEnv>) {
 }
 
 export const quizRoutes = new Hono<QuizRouteEnv>()
-  .post('/quiz/rounds', async (c) => {
-    assertNotProxyMode(c);
-    const result = await parseAndGenerate(c);
-    if ('error' in result) return result.error;
+  // [BUG-833] zValidator middleware replaces manual c.req.json() + safeParse.
+  .post(
+    '/quiz/rounds',
+    zValidator('json', generateRoundInputSchema, (result, c) => {
+      if (result.success) return;
+      return validationError(
+        c,
+        `Invalid input: ${result.error.issues[0]?.message ?? 'unknown'}`
+      );
+    }),
+    async (c) => {
+      assertNotProxyMode(c);
+      const input = c.req.valid('json');
+      const result = await generateRoundFromInput(c, input);
+      if ('error' in result) return result.error;
 
-    return c.json(
-      {
-        id: result.round.id,
-        activityType: result.input.activityType,
-        theme: result.round.theme,
-        questions: toClientSafeQuestions(
-          result.round.questions as QuizQuestion[]
-        ),
-        total: result.round.total,
-        difficultyBump: result.round.difficultyBump,
-      },
-      200
-    );
-  })
-  .post('/quiz/rounds/prefetch', async (c) => {
-    assertNotProxyMode(c);
-    const result = await parseAndGenerate(c);
-    if ('error' in result) return result.error;
+      return c.json(
+        {
+          id: result.round.id,
+          activityType: result.input.activityType,
+          theme: result.round.theme,
+          questions: toClientSafeQuestions(
+            result.round.questions as QuizQuestion[]
+          ),
+          total: result.round.total,
+          difficultyBump: result.round.difficultyBump,
+        },
+        200
+      );
+    }
+  )
+  // [BUG-833] zValidator middleware replaces manual c.req.json() + safeParse.
+  .post(
+    '/quiz/rounds/prefetch',
+    zValidator('json', generateRoundInputSchema, (result, c) => {
+      if (result.success) return;
+      return validationError(
+        c,
+        `Invalid input: ${result.error.issues[0]?.message ?? 'unknown'}`
+      );
+    }),
+    async (c) => {
+      assertNotProxyMode(c);
+      const input = c.req.valid('json');
+      const result = await generateRoundFromInput(c, input);
+      if ('error' in result) return result.error;
 
-    return c.json({ id: result.round.id }, 200);
-  })
+      return c.json({ id: result.round.id }, 200);
+    }
+  )
   .get('/quiz/rounds/recent', async (c) => {
     const profileId = requireProfileId(c.get('profileId'));
     const db = c.get('db');
@@ -394,33 +406,30 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
       return c.json(result, 200);
     }
   )
-  .post('/quiz/missed-items/mark-surfaced', async (c) => {
-    const profileId = requireProfileId(c.get('profileId'));
-    const db = c.get('db');
-
-    let body: unknown;
-    try {
-      body = await c.req.json();
-    } catch {
-      return validationError(c, 'Request body must be valid JSON');
-    }
-
-    const parsed = markSurfacedInputSchema.safeParse(body);
-    if (!parsed.success) {
+  // [BUG-833] zValidator middleware replaces manual c.req.json() + safeParse.
+  .post(
+    '/quiz/missed-items/mark-surfaced',
+    zValidator('json', markSurfacedInputSchema, (result, c) => {
+      if (result.success) return;
       return validationError(
         c,
-        `Invalid input: ${parsed.error.issues[0]?.message ?? 'unknown'}`
+        `Invalid input: ${result.error.issues[0]?.message ?? 'unknown'}`
       );
+    }),
+    async (c) => {
+      const profileId = requireProfileId(c.get('profileId'));
+      const db = c.get('db');
+      const { activityType } = c.req.valid('json');
+
+      const markedCount = await markMissedItemsSurfaced(
+        db,
+        profileId,
+        activityType
+      );
+
+      return c.json({ markedCount }, 200);
     }
-
-    const markedCount = await markMissedItemsSurfaced(
-      db,
-      profileId,
-      parsed.data.activityType
-    );
-
-    return c.json({ markedCount }, 200);
-  })
+  )
   .get('/quiz/stats', async (c) => {
     const profileId = requireProfileId(c.get('profileId'));
     const db = c.get('db');

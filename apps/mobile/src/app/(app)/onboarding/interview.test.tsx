@@ -143,7 +143,12 @@ describe('InterviewScreen', () => {
     });
   });
 
-  it('falls back to Let\'s Go card when session creation fails', async () => {
+  it('surfaces retry UX when session creation fails [BUG-803]', async () => {
+    // [BUG-803] Pre-fix: failure silently swapped to a "Let's Go" card,
+    // making the user think the interview succeeded when no session ever
+    // started — and there was no retry path. Post-fix: failure surfaces
+    // the existing session-creation-stuck retry UX (Try Again + Go Back)
+    // so the user can recover.
     mockStartSessionMutateAsync.mockRejectedValueOnce(
       new Error('Session creation failed')
     );
@@ -162,28 +167,21 @@ describe('InterviewScreen', () => {
     render(<InterviewScreen />);
     fireEvent.press(screen.getByTestId('chat-shell-send'));
 
-    // Falls back to the "Let's Go" card
     await waitFor(() => {
-      expect(screen.getByText('Ready to start learning!')).toBeTruthy();
-      expect(screen.getByText("Let's Go")).toBeTruthy();
-      expect(screen.getByTestId('chat-shell-input-disabled')).toHaveTextContent(
-        'true'
-      );
+      expect(screen.getByTestId('session-creating-retry')).toBeTruthy();
+      expect(screen.getByTestId('session-creating-go-back')).toBeTruthy();
     });
 
-    fireEvent.press(screen.getByTestId('view-curriculum-button'));
-    expect(mockReplace).toHaveBeenCalledWith({
-      pathname: '/(app)/onboarding/analogy-preference',
-      params: {
-        subjectId: 'subject-1',
-        subjectName: 'History',
-        step: '2',
-        totalSteps: '4',
-      },
-    });
+    // Pre-fix Let's Go card must NOT appear — it is the regressed behavior.
+    expect(screen.queryByTestId('view-curriculum-button')).toBeNull();
+    expect(screen.queryByText("Let's Go")).toBeNull();
   });
 
-  it('routes language subjects to language-setup via fallback card', async () => {
+  it('surfaces retry UX on session failure for language subjects too [BUG-803]', async () => {
+    // [BUG-803] Same retry-UX guarantee regardless of subject language —
+    // the failure path is language-agnostic; routing to language-setup vs
+    // analogy-preference happens only on the success path via extracted
+    // interests, not via the (now-removed) fallback card.
     mockSearchParams = {
       subjectId: 'subject-1',
       subjectName: 'Spanish',
@@ -192,7 +190,6 @@ describe('InterviewScreen', () => {
       step: '1',
       totalSteps: '4',
     };
-    // Force fallback by failing session creation
     mockStartSessionMutateAsync.mockRejectedValueOnce(
       new Error('Session creation failed')
     );
@@ -211,21 +208,12 @@ describe('InterviewScreen', () => {
     fireEvent.press(screen.getByTestId('chat-shell-send'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('view-curriculum-button')).toBeTruthy();
+      expect(screen.getByTestId('session-creating-retry')).toBeTruthy();
+      expect(screen.getByTestId('session-creating-go-back')).toBeTruthy();
     });
 
-    fireEvent.press(screen.getByTestId('view-curriculum-button'));
-    expect(mockReplace).toHaveBeenCalledWith({
-      pathname: '/(app)/onboarding/language-setup',
-      params: {
-        subjectId: 'subject-1',
-        subjectName: 'Spanish',
-        languageCode: 'es',
-        languageName: 'Spanish',
-        step: '2',
-        totalSteps: '4',
-      },
-    });
+    expect(screen.queryByTestId('view-curriculum-button')).toBeNull();
+    expect(mockReplace).not.toHaveBeenCalled();
   });
 
   it('disables input after a stream error and lets the learner retry', async () => {

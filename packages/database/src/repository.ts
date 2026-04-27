@@ -45,6 +45,16 @@ import {
   quizMasteryItems,
 } from './schema/index';
 
+// [BUG-704 / P-8] Single source of truth for the runtime DB enum
+// (quizActivityTypeEnum at schema/quiz.ts:15-19 = ['capitals', 'vocabulary',
+// 'guess_who']). Each repository method below previously redeclared a narrower
+// `'capitals' | 'guess_who'` literal, silently excluding 'vocabulary' from
+// the type system even though the DB column accepts it. Vocabulary mastery
+// rows could be inserted via raw SQL but couldn't be queried/updated through
+// the repository — a TypeScript-level data lockout. Widened here so all six
+// signatures stay aligned with the DB enum.
+type QuizActivityType = 'capitals' | 'vocabulary' | 'guess_who';
+
 export function createScopedRepository(db: Database, profileId: string) {
   if (!profileId || profileId.trim() === '') {
     throw new Error(
@@ -688,10 +698,7 @@ export function createScopedRepository(db: Database, profileId: string) {
     },
 
     quizMasteryItems: {
-      async findDueByActivity(
-        activityType: 'capitals' | 'guess_who',
-        limit: number
-      ) {
+      async findDueByActivity(activityType: QuizActivityType, limit: number) {
         return db.query.quizMasteryItems.findMany({
           where: scopedWhere(
             quizMasteryItems,
@@ -706,7 +713,7 @@ export function createScopedRepository(db: Database, profileId: string) {
       },
 
       async upsertFromCorrectAnswer(values: {
-        activityType: 'capitals' | 'guess_who';
+        activityType: QuizActivityType;
         itemKey: string;
         itemAnswer: string;
       }) {
@@ -738,7 +745,7 @@ export function createScopedRepository(db: Database, profileId: string) {
 
       async updateSm2(
         itemKey: string,
-        activityType: 'capitals' | 'guess_who',
+        activityType: QuizActivityType,
         values: {
           easeFactor: number;
           interval: number;
@@ -765,7 +772,7 @@ export function createScopedRepository(db: Database, profileId: string) {
           .returning({ id: quizMasteryItems.id });
       },
 
-      async findByKey(activityType: 'capitals' | 'guess_who', itemKey: string) {
+      async findByKey(activityType: QuizActivityType, itemKey: string) {
         return db.query.quizMasteryItems.findFirst({
           where: scopedWhere(
             quizMasteryItems,
@@ -779,7 +786,7 @@ export function createScopedRepository(db: Database, profileId: string) {
 
       async incrementMcSuccessCount(
         itemKey: string,
-        activityType: 'capitals' | 'guess_who'
+        activityType: QuizActivityType
       ) {
         return db
           .update(quizMasteryItems)
@@ -802,7 +809,7 @@ export function createScopedRepository(db: Database, profileId: string) {
 
       async resetMcSuccessCount(
         itemKey: string,
-        activityType: 'capitals' | 'guess_who',
+        activityType: QuizActivityType,
         resetTo: number
       ) {
         return db

@@ -3,8 +3,8 @@ import type {
   PrepareHomeworkInput,
   PrepareHomeworkOutput,
   GenerateDictationOutput,
-  DictationSentence,
   DictationMode,
+  DictationReviewInput,
   DictationReviewResult,
 } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
@@ -52,12 +52,9 @@ export function useReviewDictation() {
   const client = useApiClient();
 
   return useMutation({
-    mutationFn: async (input: {
-      imageBase64: string;
-      imageMimeType: string;
-      sentences: DictationSentence[];
-      language: string;
-    }): Promise<DictationReviewResult> => {
+    mutationFn: async (
+      input: DictationReviewInput
+    ): Promise<DictationReviewResult> => {
       const res = await client.dictation.review.$post({ json: input });
       await assertOk(res);
       return (await res.json()) as DictationReviewResult;
