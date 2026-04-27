@@ -60,15 +60,26 @@ const envSchema = z.object({
 export type Env = z.infer<typeof envSchema>;
 
 // ---------------------------------------------------------------------------
+// Auth keys — required in BOTH staging and production.
+// [SEC-1 / BUG-717] CLERK_AUDIENCE must be present whenever the API handles
+// real traffic. A missing audience silently disables JWT audience validation,
+// allowing tokens minted for one Clerk application to authenticate to another
+// sharing the same JWKS endpoint (cross-app token reuse).
+// ---------------------------------------------------------------------------
+
+const STAGING_AND_PRODUCTION_REQUIRED_KEYS: readonly (keyof Env)[] = [
+  'CLERK_SECRET_KEY',
+  'CLERK_JWKS_URL',
+  'CLERK_AUDIENCE',
+] as const;
+
+// ---------------------------------------------------------------------------
 // Production-critical keys — must be present when ENVIRONMENT === 'production'
 // Stripe secrets optional — dormant until web client added.
 // Mobile billing uses native IAP via RevenueCat (Apple/Google handle payments).
 // ---------------------------------------------------------------------------
 
 const PRODUCTION_REQUIRED_KEYS: readonly (keyof Env)[] = [
-  'CLERK_SECRET_KEY',
-  'CLERK_JWKS_URL',
-  'CLERK_AUDIENCE',
   'GEMINI_API_KEY',
   'VOYAGE_API_KEY',
   'RESEND_API_KEY',
@@ -77,18 +88,33 @@ const PRODUCTION_REQUIRED_KEYS: readonly (keyof Env)[] = [
 ] as const;
 
 /**
- * Validates that all production-critical keys are present.
+ * Validates that all environment-tier-critical keys are present.
  * Returns an array of missing key names (empty if all present).
+ *
+ * - Staging + production: Clerk auth keys (CLERK_AUDIENCE required for
+ *   JWT audience validation — prevents cross-app token reuse).
+ * - Production only: LLM providers, email, RevenueCat.
  */
 export function validateProductionKeys(env: Env): string[] {
-  if (env.ENVIRONMENT !== 'production') {
+  if (env.ENVIRONMENT === 'development') {
     return [];
   }
 
   const missing: string[] = [];
-  for (const key of PRODUCTION_REQUIRED_KEYS) {
+
+  // Auth keys required for staging and production
+  for (const key of STAGING_AND_PRODUCTION_REQUIRED_KEYS) {
     if (!env[key]) {
       missing.push(key);
+    }
+  }
+
+  // Additional keys required only in production
+  if (env.ENVIRONMENT === 'production') {
+    for (const key of PRODUCTION_REQUIRED_KEYS) {
+      if (!env[key]) {
+        missing.push(key);
+      }
     }
   }
 

@@ -36,15 +36,24 @@ jest.mock('../services/session', () => ({
   processMessage: jest
     .fn()
     .mockResolvedValue({ reply: 'test', exchangeCount: 1 }),
-  getSession: jest
-    .fn()
-    .mockResolvedValue({ id: 'session-1', status: 'active' }),
+  getSession: jest.fn().mockResolvedValue({
+    id: 'session-1',
+    status: 'active',
+    sessionType: 'homework',
+  }),
   streamMessage: jest.fn(),
   startSession: jest.fn(),
   closeSession: jest.fn(),
   flagContent: jest.fn(),
   getSessionSummary: jest.fn(),
   submitSummary: jest.fn(),
+}));
+
+// Mock recall bridge service so we can exercise the route without an LLM call.
+jest.mock('../services/recall-bridge', () => ({
+  generateRecallBridge: jest
+    .fn()
+    .mockResolvedValue({ questions: ['Q?'], generated: true }),
 }));
 
 // Mock profile service
@@ -142,6 +151,7 @@ import { app } from '../index';
 const TEST_ENV = {
   DATABASE_URL: 'postgresql://test:test@localhost:5432/test',
   CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',
+  CLERK_AUDIENCE: 'test-audience',
 };
 
 const SUBJECT_ID = 'subject-1';
@@ -288,6 +298,64 @@ describe('metering middleware', () => {
   // -----------------------------------------------------------------------
 
   describe('LLM routes with quota available', () => {
+    it('[BUG-623 / A-6] decrements quota for POST /sessions/:id/recall-bridge', async () => {
+      mockEnsureFreeSubscription.mockResolvedValue(mockSubscription());
+      mockGetQuotaPool.mockResolvedValue(mockQuota({ usedThisMonth: 100 }));
+      mockDecrementQuota.mockResolvedValue({
+        success: true,
+        source: 'monthly',
+        remainingMonthly: 399,
+        remainingTopUp: 0,
+        remainingDaily: null,
+      });
+
+      const res = await app.request(
+        '/v1/sessions/session-1/recall-bridge',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({}),
+        },
+        TEST_ENV
+      );
+
+      // Critical: regardless of route response code, the metering middleware
+      // must have run BEFORE the handler — proving recall-bridge is metered.
+      expect(mockDecrementQuota).toHaveBeenCalledWith(
+        expect.anything(),
+        'sub-1'
+      );
+      expect(res.status).toBe(200);
+    });
+
+    it('[BUG-623 / A-6] returns 402 when quota exhausted on POST /sessions/:id/recall-bridge', async () => {
+      mockEnsureFreeSubscription.mockResolvedValue(mockSubscription());
+      mockGetQuotaPool.mockResolvedValue(
+        mockQuota({ usedThisMonth: 500, monthlyLimit: 500 })
+      );
+      mockDecrementQuota.mockResolvedValue({
+        success: false,
+        reason: 'monthly_exhausted',
+        remainingMonthly: 0,
+        remainingTopUp: 0,
+        remainingDaily: null,
+      });
+
+      const res = await app.request(
+        '/v1/sessions/session-1/recall-bridge',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({}),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(402);
+      // The recall-bridge handler must NOT have been called — quota gate stopped it.
+      // (route-side handler is mocked; the 402 implies middleware short-circuited.)
+    });
+
     it('allows session messages when quota is under limit (DB path)', async () => {
       mockEnsureFreeSubscription.mockResolvedValue(mockSubscription());
       mockGetQuotaPool.mockResolvedValue(mockQuota({ usedThisMonth: 100 }));

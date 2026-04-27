@@ -59,6 +59,11 @@ export type MeteringEnv = {
 const LLM_ROUTE_PATTERNS = [
   /\/sessions\/[^/]+\/messages\/?$/,
   /\/sessions\/[^/]+\/stream\/?$/,
+  // [BUG-623 / A-6] generateRecallBridge calls the LLM but was missing from
+  // this list, so any authenticated user could call recall-bridge in a tight
+  // loop and burn unlimited LLM capacity at zero cost. Meter it like any
+  // other LLM-driven session endpoint.
+  /\/sessions\/[^/]+\/recall-bridge\/?$/,
   // Onboarding interview is intentionally unmetered.
   // It has its own server-side hard cap (4 user exchanges) and should not
   // burn the learner's tutoring quota before regular learning even starts.
