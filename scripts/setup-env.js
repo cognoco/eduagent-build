@@ -4,8 +4,12 @@
  * Generates local env files from Doppler for local development,
  * and syncs EXPO_PUBLIC_* vars into eas.json build profiles.
  *
- * This script runs during `pnpm install` but gracefully skips if:
- * - Running in CI environment
+ * Run explicitly via `pnpm env:sync`. NOT a postinstall hook — auto-running on every
+ * `pnpm install` risks writing staging secrets to disk where a careless `git add .`
+ * can expose them (CFG-1). Run manually after cloning or when secrets change.
+ *
+ * Gracefully skips if:
+ * - Running in CI environment (set CI=true)
  * - Doppler CLI is not installed
  * - Doppler is not configured for this project
  *

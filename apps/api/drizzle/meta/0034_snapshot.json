@@ -1,6 +1,6 @@
 {
-  "id": "59af189c-5a36-4f6a-a56c-844b46dbc2bc",
-  "prevId": "0035b2c3-d4e5-4f6a-7b8c-9d0e1f2a3b4c",
+  "id": "0034a1b2-c3d4-4e5f-6a7b-8c9d0e1f2a3b",
+  "prevId": "c2b3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1380,19 +1380,6 @@
           "notNull": true,
           "default": false
         },
-        "conversation_language": {
-          "name": "conversation_language",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'en'"
-        },
-        "pronouns": {
-          "name": "pronouns",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -1448,12 +1435,7 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {
-        "profiles_conversation_language_check": {
-          "name": "profiles_conversation_language_check",
-          "value": "\"profiles\".\"conversation_language\" IN ('en','cs','es','fr','de','it','pt','pl')"
-        }
-      },
+      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.book_suggestions": {
@@ -2772,24 +2754,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "narrative": {
-          "name": "narrative",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "conversation_prompt": {
-          "name": "conversation_prompt",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "engagement_signal": {
-          "name": "engagement_signal",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "status": {
           "name": "status",
           "type": "summary_status",
@@ -2811,6 +2775,24 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "narrative": {
+          "name": "narrative",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "conversation_prompt": {
+          "name": "conversation_prompt",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "engagement_signal": {
+          "name": "engagement_signal",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {},
@@ -3783,130 +3765,6 @@
           "tableFrom": "progress_snapshots",
           "tableTo": "profiles",
           "columnsFrom": ["profile_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.weekly_reports": {
-      "name": "weekly_reports",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "profile_id": {
-          "name": "profile_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "child_profile_id": {
-          "name": "child_profile_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "report_week": {
-          "name": "report_week",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "report_data": {
-          "name": "report_data",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "viewed_at": {
-          "name": "viewed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "weekly_reports_parent_child_week_uq": {
-          "name": "weekly_reports_parent_child_week_uq",
-          "columns": [
-            {
-              "expression": "profile_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "child_profile_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "report_week",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "weekly_reports_child_week_idx": {
-          "name": "weekly_reports_child_week_idx",
-          "columns": [
-            {
-              "expression": "child_profile_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "report_week",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "weekly_reports_profile_id_profiles_id_fk": {
-          "name": "weekly_reports_profile_id_profiles_id_fk",
-          "tableFrom": "weekly_reports",
-          "tableTo": "profiles",
-          "columnsFrom": ["profile_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "weekly_reports_child_profile_id_profiles_id_fk": {
-          "name": "weekly_reports_child_profile_id_profiles_id_fk",
-          "tableFrom": "weekly_reports",
-          "tableTo": "profiles",
-          "columnsFrom": ["child_profile_id"],
           "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"

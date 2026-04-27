@@ -1,2 +1,3 @@
 please select 10 bugs from Notion and address them. No shortcuts, all must be production ready, please. Be sure that the bug is fixed before you mark it complete.   
-  Please put the status to be in progress while you work on them so that other agents do not pick the same bugs. 
+  Please put the status to be in progress while you work on them so that other agents do not pick the same bugs. Not all items in notion are up to date, if a bug is already fixed please run tests to verify it is fixed and update the status. If there is no test to verify, then write a test. 
+  Work locally only, do not commit
