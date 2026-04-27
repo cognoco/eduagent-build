@@ -27,7 +27,6 @@
     "test:e2e:web": "pnpm exec playwright test -c apps/mobile/playwright.config.ts",
     "test:e2e:web:smoke": "pnpm exec playwright test -c apps/mobile/playwright.config.ts --project=smoke-auth --project=smoke-learner --project=smoke-parent",
     "test:e2e:record": "maestro record apps/mobile/e2e/flows/",
-    "postinstall": "node scripts/setup-env.js",
     "env:sync": "node scripts/setup-env.js",
     "secrets:sync": "node scripts/sync-secrets.js",
     "eval:llm": "tsx apps/api/eval-llm/index.ts"

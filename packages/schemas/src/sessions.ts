@@ -166,6 +166,9 @@ export const sessionMetadataSchema = z
     /** F-10: UI mode stored at session creation so pipeline can distinguish
      *  practice/review from regular learning without a schema migration. */
     effectiveMode: z.string().optional(),
+    /** Session this learning chat is continuing from. Stored in metadata so
+     *  completed-session handoffs do not require a migration. */
+    resumeFromSessionId: z.string().uuid().optional(),
   })
   .strip();
 export type SessionMetadata = z.infer<typeof sessionMetadataSchema>;
