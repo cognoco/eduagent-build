@@ -28,6 +28,7 @@ import {
   validateVocabularyRound,
 } from './vocabulary-provider';
 import {
+  appendSurnameAlias,
   buildGuessWhoDiscoveryQuestions,
   buildGuessWhoMasteryCluePrompt,
   buildGuessWhoPrompt,
@@ -513,7 +514,10 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
               type: 'guess_who',
               canonicalName: item.answer,
               correctAnswer: item.answer,
-              acceptedAliases: parsed.acceptedAliases,
+              acceptedAliases: appendSurnameAlias(
+                item.answer,
+                parsed.acceptedAliases
+              ),
               clues: parsed.clues,
               mcFallbackOptions: parsed.mcFallbackOptions,
               funFact: '',

@@ -17,7 +17,12 @@ import {
   createScopedRepository,
   type Database,
 } from '@eduagent/database';
-import type { SubjectProgress, TopicProgress } from '@eduagent/schemas';
+import type {
+  LearningResumeScope,
+  LearningResumeTarget,
+  SubjectProgress,
+  TopicProgress,
+} from '@eduagent/schemas';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -737,6 +742,277 @@ export async function resolveTopicSubject(
     subjectName: subject.name,
     topicTitle: topic.title,
   };
+}
+
+function sortByLatestActivity<T extends { lastActivityAt: Date }>(
+  rows: T[]
+): T[] {
+  return [...rows].sort(
+    (a, b) => b.lastActivityAt.getTime() - a.lastActivityAt.getTime()
+  );
+}
+
+function isRealLearningSession(
+  session: typeof learningSessions.$inferSelect
+): boolean {
+  return session.sessionType === 'learning' && session.exchangeCount >= 1;
+}
+
+function subjectActivityOrder(
+  activeSubjects: Array<typeof subjects.$inferSelect>,
+  sessions: Array<typeof learningSessions.$inferSelect>
+): Array<typeof subjects.$inferSelect> {
+  const lastActivityBySubject = new Map<string, number>();
+  for (const session of sessions) {
+    const ts = session.lastActivityAt.getTime();
+    const current = lastActivityBySubject.get(session.subjectId) ?? 0;
+    if (ts > current) lastActivityBySubject.set(session.subjectId, ts);
+  }
+
+  return [...activeSubjects].sort((a, b) => {
+    const aTime = lastActivityBySubject.get(a.id) ?? 0;
+    const bTime = lastActivityBySubject.get(b.id) ?? 0;
+    return bTime - aTime;
+  });
+}
+
+export async function getLearningResumeTarget(
+  db: Database,
+  profileId: string,
+  scope: LearningResumeScope = {}
+): Promise<LearningResumeTarget | null> {
+  const repo = createScopedRepository(db, profileId);
+  let activeSubjects = (await repo.subjects.findMany()).filter(
+    (subject) => subject.status === 'active'
+  );
+  if (scope.subjectId) {
+    activeSubjects = activeSubjects.filter(
+      (subject) => subject.id === scope.subjectId
+    );
+  }
+  if (activeSubjects.length === 0) return null;
+
+  const subjectIds = activeSubjects.map((subject) => subject.id);
+  const subjectById = new Map(
+    activeSubjects.map((subject) => [subject.id, subject])
+  );
+  const allSessions = (
+    await repo.sessions.findMany(
+      and(
+        inArray(learningSessions.subjectId, subjectIds),
+        gte(learningSessions.exchangeCount, 1)
+      )
+    )
+  ).filter(isRealLearningSession);
+
+  const curriculumRows = await db
+    .select({
+      id: curricula.id,
+      subjectId: curricula.subjectId,
+      version: curricula.version,
+    })
+    .from(curricula)
+    .where(inArray(curricula.subjectId, subjectIds))
+    .orderBy(desc(curricula.version));
+
+  const latestCurriculumBySubject = new Map<string, string>();
+  for (const curriculum of curriculumRows) {
+    if (!latestCurriculumBySubject.has(curriculum.subjectId)) {
+      latestCurriculumBySubject.set(curriculum.subjectId, curriculum.id);
+    }
+  }
+
+  const curriculumIds = curriculumRows.map((curriculum) => curriculum.id);
+  if (curriculumIds.length === 0) {
+    if (scope.topicId || scope.bookId) return null;
+
+    const session =
+      sortByLatestActivity(
+        allSessions.filter(
+          (candidate) =>
+            candidate.status === 'active' || candidate.status === 'paused'
+        )
+      )[0] ??
+      sortByLatestActivity(
+        allSessions.filter(
+          (candidate) =>
+            candidate.status === 'completed' ||
+            candidate.status === 'auto_closed'
+        )
+      )[0];
+    if (!session) return null;
+
+    const subject = subjectById.get(session.subjectId);
+    if (!subject) return null;
+    return {
+      subjectId: subject.id,
+      subjectName: subject.name,
+      topicId: null,
+      topicTitle: null,
+      sessionId:
+        session.status === 'active' || session.status === 'paused'
+          ? session.id
+          : null,
+      resumeFromSessionId:
+        session.status === 'completed' || session.status === 'auto_closed'
+          ? session.id
+          : null,
+      resumeKind:
+        session.status === 'active'
+          ? 'active_session'
+          : session.status === 'paused'
+          ? 'paused_session'
+          : 'subject_freeform',
+      lastActivityAt: session.lastActivityAt.toISOString(),
+      reason:
+        session.status === 'active' || session.status === 'paused'
+          ? `Resume your ${subject.name} session`
+          : `Pick up your latest ${subject.name} session`,
+    };
+  }
+
+  const topics = await db.query.curriculumTopics.findMany({
+    where: and(
+      inArray(curriculumTopics.curriculumId, curriculumIds),
+      eq(curriculumTopics.skipped, false)
+    ),
+    orderBy: asc(curriculumTopics.sortOrder),
+  });
+  const topicsById = new Map(topics.map((topic) => [topic.id, topic]));
+
+  if (scope.topicId && !topicsById.has(scope.topicId)) return null;
+
+  const scopedTopicIds = new Set(
+    topics
+      .filter((topic) => {
+        if (scope.topicId && topic.id !== scope.topicId) return false;
+        if (scope.bookId && topic.bookId !== scope.bookId) return false;
+        return true;
+      })
+      .map((topic) => topic.id)
+  );
+
+  if ((scope.topicId || scope.bookId) && scopedTopicIds.size === 0) {
+    return null;
+  }
+
+  const scopedSessions = allSessions.filter((session) => {
+    if (scope.topicId) return session.topicId === scope.topicId;
+    if (scope.bookId) {
+      return !!session.topicId && scopedTopicIds.has(session.topicId);
+    }
+    return true;
+  });
+
+  const resumable = sortByLatestActivity(
+    scopedSessions.filter(
+      (session) => session.status === 'active' || session.status === 'paused'
+    )
+  )[0];
+  if (resumable) {
+    const subject = subjectById.get(resumable.subjectId);
+    if (!subject) return null;
+    const topic = resumable.topicId
+      ? topicsById.get(resumable.topicId)
+      : undefined;
+    return {
+      subjectId: subject.id,
+      subjectName: subject.name,
+      topicId: resumable.topicId ?? null,
+      topicTitle: topic?.title ?? null,
+      sessionId: resumable.id,
+      resumeFromSessionId: null,
+      resumeKind:
+        resumable.status === 'paused' ? 'paused_session' : 'active_session',
+      lastActivityAt: resumable.lastActivityAt.toISOString(),
+      reason: topic
+        ? `Resume ${topic.title}`
+        : `Resume your ${subject.name} session`,
+    };
+  }
+
+  const recentCompleted = sortByLatestActivity(
+    scopedSessions.filter(
+      (session) =>
+        session.status === 'completed' || session.status === 'auto_closed'
+    )
+  )[0];
+  if (recentCompleted) {
+    const subject = subjectById.get(recentCompleted.subjectId);
+    if (!subject) return null;
+    const topic = recentCompleted.topicId
+      ? topicsById.get(recentCompleted.topicId)
+      : undefined;
+    return {
+      subjectId: subject.id,
+      subjectName: subject.name,
+      topicId: recentCompleted.topicId ?? null,
+      topicTitle: topic?.title ?? null,
+      sessionId: null,
+      resumeFromSessionId: recentCompleted.id,
+      resumeKind: topic ? 'recent_topic' : 'subject_freeform',
+      lastActivityAt: recentCompleted.lastActivityAt.toISOString(),
+      reason: topic
+        ? `Pick up ${topic.title}`
+        : `Pick up your latest ${subject.name} session`,
+    };
+  }
+
+  const latestCurriculumIds = [...new Set(latestCurriculumBySubject.values())];
+  const latestTopics = topics.filter((topic) =>
+    latestCurriculumIds.includes(topic.curriculumId)
+  );
+  const latestTopicIds = latestTopics.map((topic) => topic.id);
+  if (latestTopicIds.length === 0) return null;
+
+  const [cards, topicAssessments] = await Promise.all([
+    repo.retentionCards.findMany(
+      inArray(retentionCards.topicId, latestTopicIds)
+    ),
+    repo.assessments.findMany(inArray(assessments.topicId, latestTopicIds)),
+  ]);
+  const verifiedTopicIds = new Set(
+    cards
+      .filter((card) => card.xpStatus === 'verified')
+      .map((card) => card.topicId)
+  );
+  const passedTopicIds = new Set(
+    topicAssessments
+      .filter((assessment) => assessment.status === 'passed')
+      .map((assessment) => assessment.topicId)
+  );
+
+  const latestTopicsByCurriculum = new Map<string, typeof latestTopics>();
+  for (const topic of latestTopics) {
+    if (scope.topicId && topic.id !== scope.topicId) continue;
+    if (scope.bookId && topic.bookId !== scope.bookId) continue;
+    const list = latestTopicsByCurriculum.get(topic.curriculumId) ?? [];
+    list.push(topic);
+    latestTopicsByCurriculum.set(topic.curriculumId, list);
+  }
+
+  for (const subject of subjectActivityOrder(activeSubjects, allSessions)) {
+    const curriculumId = latestCurriculumBySubject.get(subject.id);
+    if (!curriculumId) continue;
+    const nextTopic = (latestTopicsByCurriculum.get(curriculumId) ?? []).find(
+      (topic) =>
+        !passedTopicIds.has(topic.id) && !verifiedTopicIds.has(topic.id)
+    );
+    if (!nextTopic) continue;
+    return {
+      subjectId: subject.id,
+      subjectName: subject.name,
+      topicId: nextTopic.id,
+      topicTitle: nextTopic.title,
+      sessionId: null,
+      resumeFromSessionId: null,
+      resumeKind: 'next_topic',
+      lastActivityAt: null,
+      reason: `Start ${nextTopic.title}`,
+    };
+  }
+
+  return null;
 }
 
 export async function getContinueSuggestion(

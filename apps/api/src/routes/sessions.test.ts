@@ -355,6 +355,7 @@ import { app } from '../index';
 const TEST_ENV = {
   DATABASE_URL: 'postgresql://test:test@localhost:5432/test',
   CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',
+  CLERK_AUDIENCE: 'test-audience',
 };
 
 const AUTH_HEADERS = {

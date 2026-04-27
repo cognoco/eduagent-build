@@ -84,12 +84,15 @@ ENVIRONMENT = "development"
 [[kv_namespaces]]
 binding = "SUBSCRIPTION_KV"
 id = "3510a1174e454e66a169a519c9c996f7"
-preview_id = "3510a1174e454e66a169a519c9c996f7"
+# TODO [CFG-4]: Create a dedicated dev-preview KV namespace in Cloudflare dashboard
+# (Workers & Pages → KV → Create → "SUBSCRIPTION_KV_preview") and add:
+#   preview_id = "<new-namespace-id>"
+# Until then, use `wrangler dev --local` (default) — never `wrangler dev --remote`.
 
 [[kv_namespaces]]
 binding = "COACHING_KV"
 id = "db6f91e2639e44ce931f63f858593f3c"
-preview_id = "db6f91e2639e44ce931f63f858593f3c"
+# TODO [CFG-4]: Same — create "COACHING_KV_preview" namespace and add preview_id.
 
 # =============================================================================
 # Staging Environment
@@ -131,7 +134,7 @@ id = "cbed5036c909416487c3b9362da521d0"
 name = "mentomate-api-prd"
 compatibility_date = "2025-12-01"
 compatibility_flags = ["nodejs_compat"]
-workers_dev = true
+workers_dev = false
 routes = [
   { pattern = "api.mentomate.com/*", zone_name = "mentomate.com" },
 ]

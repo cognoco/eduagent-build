@@ -111,6 +111,7 @@ import {
 
 const TEST_ENV = {
   CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',
+  CLERK_AUDIENCE: 'test-audience',
   // DATABASE_URL is needed so databaseMiddleware sets c.get('db') via the mocked createDatabase
   DATABASE_URL: 'postgresql://test:test@localhost/test',
 };

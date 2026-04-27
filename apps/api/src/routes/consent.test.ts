@@ -141,6 +141,7 @@ import { app } from '../index';
 
 const TEST_ENV = {
   CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',
+  CLERK_AUDIENCE: 'test-audience',
   API_ORIGIN: 'https://api.test.mentomate.com',
 };
 
@@ -478,7 +479,7 @@ describe('consent routes', () => {
       expect(body.parentEmail).toBeNull();
     });
 
-    it('returns 200 with consent status and parentEmail when consent exists', async () => {
+    it('returns 200 with consent status and masked parentEmail when consent exists', async () => {
       const { getProfileConsentState: mockGetState } = jest.requireMock(
         '../services/consent'
       ) as { getProfileConsentState: jest.Mock };
@@ -502,7 +503,53 @@ describe('consent routes', () => {
 
       const body = await res.json();
       expect(body.consentStatus).toBe('PARENTAL_CONSENT_REQUESTED');
-      expect(body.parentEmail).toBe('parent@example.com');
+      // [BUG-625 / A-10] parentEmail is masked to avoid leaking parent PII to
+      // child profile sessions. UI keeps verification UX via masked form.
+      expect(body.parentEmail).toBe('p***t@example.com');
+    });
+
+    it('[BUG-625 / A-10] does NOT leak full parent email to child profile session', async () => {
+      const { getProfileConsentState: mockGetState } = jest.requireMock(
+        '../services/consent'
+      ) as { getProfileConsentState: jest.Mock };
+      mockGetState.mockResolvedValueOnce({
+        status: 'PARENTAL_CONSENT_REQUESTED',
+        parentEmail: 'sensitive.parent.email@example.com',
+        consentType: 'PARENTAL',
+      });
+
+      const res = await app.request(
+        '/v1/consent/my-status',
+        {
+          headers: { ...AUTH_HEADERS, 'X-Profile-Id': 'child-profile-id' },
+        },
+        TEST_ENV
+      );
+
+      const body = await res.json();
+      // The full local part must not appear in the response.
+      expect(JSON.stringify(body)).not.toContain('sensitive.parent.email');
+      // Domain may remain (low-entropy, e.g. gmail.com).
+      expect(body.parentEmail).toBe('s***l@example.com');
+    });
+
+    it('[BUG-625 / A-10] returns null when no parentEmail set', async () => {
+      const { getProfileConsentState: mockGetState } = jest.requireMock(
+        '../services/consent'
+      ) as { getProfileConsentState: jest.Mock };
+      mockGetState.mockResolvedValueOnce({
+        status: 'PARENTAL_CONSENT_REQUESTED',
+        parentEmail: null,
+      });
+
+      const res = await app.request(
+        '/v1/consent/my-status',
+        { headers: { ...AUTH_HEADERS, 'X-Profile-Id': 'test-profile-id' } },
+        TEST_ENV
+      );
+
+      const body = await res.json();
+      expect(body.parentEmail).toBeNull();
     });
 
     it('returns 401 without auth header', async () => {

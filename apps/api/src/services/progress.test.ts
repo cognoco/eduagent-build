@@ -16,6 +16,7 @@ import {
   getTopicProgress,
   getOverallProgress,
   getContinueSuggestion,
+  getLearningResumeTarget,
   getActiveSessionForTopic,
   resolveTopicSubject,
 } from './progress';
@@ -40,13 +41,20 @@ function mockSubjectRow(
 }
 
 function mockTopicRow(
-  overrides?: Partial<{ id: string; title: string; sortOrder: number }>
+  overrides?: Partial<{
+    id: string;
+    title: string;
+    sortOrder: number;
+    curriculumId: string;
+    bookId: string | null;
+  }>
 ) {
   return {
     id: overrides?.id ?? topicId,
-    curriculumId,
+    curriculumId: overrides?.curriculumId ?? curriculumId,
     title: overrides?.title ?? 'Algebra Basics',
     description: 'Introduction to algebra',
+    bookId: overrides?.bookId ?? null,
     sortOrder: overrides?.sortOrder ?? 1,
     relevance: 'core' as const,
     estimatedMinutes: 30,
@@ -111,6 +119,8 @@ function mockSessionRow(
     subjectId: string;
     topicId: string | null;
     status: 'active' | 'paused' | 'completed' | 'auto_closed';
+    exchangeCount: number;
+    lastActivityAt: Date;
   }>
 ) {
   return {
@@ -121,9 +131,9 @@ function mockSessionRow(
     sessionType: 'learning' as const,
     status: overrides?.status ?? ('completed' as const),
     escalationRung: 1,
-    exchangeCount: 5,
+    exchangeCount: overrides?.exchangeCount ?? 5,
     startedAt: NOW,
-    lastActivityAt: NOW,
+    lastActivityAt: overrides?.lastActivityAt ?? NOW,
     endedAt: NOW,
     durationSeconds: 300,
     metadata: {},
@@ -738,6 +748,260 @@ describe('getOverallProgress', () => {
       expect(result.subjects[0].topicsCompleted).toBe(1);
       expect(result.subjects[0].topicsVerified).toBe(1);
       expect(result.totalTopicsCompleted).toBe(1);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getLearningResumeTarget
+// ---------------------------------------------------------------------------
+
+describe('getLearningResumeTarget', () => {
+  it('returns the newest active session as the global resume target', async () => {
+    const subject = mockSubjectRow();
+    const topic = mockTopicRow({ id: 'topic-1', title: 'Algebra' });
+    setupScopedRepo({
+      subjectsFindMany: [subject],
+      sessionsFindMany: [
+        {
+          ...mockSessionRow({
+            id: 'completed-session',
+            topicId: 'topic-1',
+            status: 'completed',
+            lastActivityAt: new Date('2026-02-14T10:00:00.000Z'),
+          }),
+        },
+        {
+          ...mockSessionRow({
+            id: 'active-session',
+            topicId: 'topic-1',
+            status: 'active',
+            lastActivityAt: new Date('2026-02-15T09:00:00.000Z'),
+          }),
+        },
+      ],
+    });
+    const db = createMockDb({
+      curriculumSelectRows: [{ id: curriculumId, subjectId, version: 1 }],
+      topicsFindMany: [topic],
+    });
+
+    const result = await getLearningResumeTarget(db, profileId);
+
+    expect(result).toMatchObject({
+      subjectId,
+      subjectName: 'Mathematics',
+      topicId: 'topic-1',
+      topicTitle: 'Algebra',
+      sessionId: 'active-session',
+      resumeFromSessionId: null,
+      resumeKind: 'active_session',
+    });
+  });
+
+  it('uses the newest meaningful subject-scoped conversation, not the first incomplete topic', async () => {
+    const subject = mockSubjectRow({ id: 'biology-sub', name: 'Biology' });
+    const olderTopic = mockTopicRow({
+      id: 'cells-topic',
+      title: 'Cells',
+      sortOrder: 1,
+    });
+    const newerTopic = mockTopicRow({
+      id: 'photosynthesis-topic',
+      title: 'Photosynthesis',
+      sortOrder: 2,
+    });
+    setupScopedRepo({
+      subjectsFindMany: [subject],
+      sessionsFindMany: [
+        mockSessionRow({
+          id: 'old-bio-chat',
+          subjectId: 'biology-sub',
+          topicId: 'cells-topic',
+          status: 'completed',
+          lastActivityAt: new Date('2026-02-12T09:00:00.000Z'),
+        }),
+        mockSessionRow({
+          id: 'new-bio-chat',
+          subjectId: 'biology-sub',
+          topicId: 'photosynthesis-topic',
+          status: 'completed',
+          lastActivityAt: new Date('2026-02-15T09:00:00.000Z'),
+        }),
+      ],
+    });
+    const db = createMockDb({
+      curriculumSelectRows: [
+        { id: curriculumId, subjectId: 'biology-sub', version: 1 },
+      ],
+      topicsFindMany: [olderTopic, newerTopic],
+    });
+
+    const result = await getLearningResumeTarget(db, profileId, {
+      subjectId: 'biology-sub',
+    });
+
+    expect(result).toMatchObject({
+      subjectId: 'biology-sub',
+      subjectName: 'Biology',
+      topicId: 'photosynthesis-topic',
+      topicTitle: 'Photosynthesis',
+      sessionId: null,
+      resumeFromSessionId: 'new-bio-chat',
+      resumeKind: 'recent_topic',
+    });
+  });
+
+  it('picks the newest meaningful thread across active subjects', async () => {
+    const biology = mockSubjectRow({ id: 'biology-sub', name: 'Biology' });
+    const maths = mockSubjectRow({ id: 'maths-sub', name: 'Maths' });
+    const bioTopic = mockTopicRow({
+      id: 'bio-topic',
+      title: 'DNA',
+      curriculumId: 'bio-curriculum',
+    });
+    const mathsTopic = mockTopicRow({
+      id: 'maths-topic',
+      title: 'Fractions',
+      curriculumId: 'maths-curriculum',
+    });
+    setupScopedRepo({
+      subjectsFindMany: [biology, maths],
+      sessionsFindMany: [
+        mockSessionRow({
+          id: 'bio-chat',
+          subjectId: 'biology-sub',
+          topicId: 'bio-topic',
+          status: 'completed',
+          lastActivityAt: new Date('2026-02-14T09:00:00.000Z'),
+        }),
+        mockSessionRow({
+          id: 'maths-chat',
+          subjectId: 'maths-sub',
+          topicId: 'maths-topic',
+          status: 'completed',
+          lastActivityAt: new Date('2026-02-15T09:00:00.000Z'),
+        }),
+      ],
+    });
+    const db = createMockDb({
+      curriculumSelectRows: [
+        { id: 'bio-curriculum', subjectId: 'biology-sub', version: 1 },
+        { id: 'maths-curriculum', subjectId: 'maths-sub', version: 1 },
+      ],
+      topicsFindMany: [bioTopic, mathsTopic],
+    });
+
+    const result = await getLearningResumeTarget(db, profileId);
+
+    expect(result).toMatchObject({
+      subjectId: 'maths-sub',
+      subjectName: 'Maths',
+      topicId: 'maths-topic',
+      topicTitle: 'Fractions',
+      resumeFromSessionId: 'maths-chat',
+    });
+  });
+
+  it('ignores ghost sessions and falls back to the next topic', async () => {
+    const subject = mockSubjectRow();
+    const topic = mockTopicRow({ id: 'topic-1', title: 'Algebra' });
+    setupScopedRepo({
+      subjectsFindMany: [subject],
+      retentionCardsFindMany: [],
+      assessmentsFindMany: [],
+      sessionsFindMany: [
+        mockSessionRow({
+          id: 'ghost-session',
+          topicId: 'topic-1',
+          status: 'active',
+          exchangeCount: 0,
+        }),
+      ],
+    });
+    const db = createMockDb({
+      curriculumSelectRows: [{ id: curriculumId, subjectId, version: 1 }],
+      topicsFindMany: [topic],
+    });
+
+    const result = await getLearningResumeTarget(db, profileId);
+
+    expect(result).toMatchObject({
+      topicId: 'topic-1',
+      sessionId: null,
+      resumeFromSessionId: null,
+      resumeKind: 'next_topic',
+    });
+  });
+
+  it('resumes a subject-level session even when no curriculum exists yet', async () => {
+    const subject = mockSubjectRow({ name: 'Biography' });
+    setupScopedRepo({
+      subjectsFindMany: [subject],
+      sessionsFindMany: [
+        mockSessionRow({
+          id: 'biography-chat',
+          topicId: null,
+          status: 'completed',
+          lastActivityAt: new Date('2026-02-15T09:00:00.000Z'),
+        }),
+      ],
+    });
+    const db = createMockDb({ curriculumSelectRows: [] });
+
+    const result = await getLearningResumeTarget(db, profileId);
+
+    expect(result).toMatchObject({
+      subjectId,
+      subjectName: 'Biography',
+      topicId: null,
+      sessionId: null,
+      resumeFromSessionId: 'biography-chat',
+      resumeKind: 'subject_freeform',
+    });
+  });
+
+  it('limits book-scoped resume to topics in that book', async () => {
+    const subject = mockSubjectRow();
+    const otherBookTopic = mockTopicRow({
+      id: 'other-topic',
+      title: 'Other book',
+      bookId: 'other-book',
+    });
+    const targetTopic = mockTopicRow({
+      id: 'book-topic',
+      title: 'Target book',
+      bookId: 'book-1',
+    });
+    setupScopedRepo({
+      subjectsFindMany: [subject],
+      sessionsFindMany: [
+        mockSessionRow({
+          id: 'other-book-chat',
+          topicId: 'other-topic',
+          status: 'completed',
+          lastActivityAt: new Date('2026-02-15T09:30:00.000Z'),
+        }),
+        mockSessionRow({
+          id: 'target-book-chat',
+          topicId: 'book-topic',
+          status: 'completed',
+          lastActivityAt: new Date('2026-02-15T09:00:00.000Z'),
+        }),
+      ],
+    });
+    const db = createMockDb({
+      curriculumSelectRows: [{ id: curriculumId, subjectId, version: 1 }],
+      topicsFindMany: [otherBookTopic, targetTopic],
+    });
+
+    const result = await getLearningResumeTarget(db, profileId, {
+      bookId: 'book-1',
+    });
+
+    expect(result).toMatchObject({
+      topicId: 'book-topic',
+      resumeFromSessionId: 'target-book-chat',
     });
   });
 });

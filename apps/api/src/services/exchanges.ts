@@ -80,6 +80,8 @@ export interface ExchangeContext {
   /** Cross-subject learning highlights — recent topics from other subjects (Story 16.0) */
   crossSubjectContext?: string;
   learningHistoryContext?: string;
+  /** Compact handoff from a previous completed session when learner taps Continue */
+  resumeContext?: string;
   embeddingMemoryContext?: string;
   /** Accommodation mode preamble — injected before learner memory (FR254) */
   accommodationContext?: string;

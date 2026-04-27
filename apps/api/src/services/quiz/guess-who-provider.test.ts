@@ -1,4 +1,5 @@
 import {
+  appendSurnameAlias,
   buildGuessWhoDiscoveryQuestions,
   buildGuessWhoPrompt,
   clueMentionsGuessWhoName,
@@ -218,6 +219,75 @@ describe('validateGuessWhoRound', () => {
     expect(validated.questions).toEqual([]);
   });
 
+  it('auto-aliases the surname so a learner typing only the last name is accepted [BUG-541]', () => {
+    // Repro: LLM emits a multi-word canonicalName but omits the surname from
+    // acceptedAliases. Without the auto-alias guard, a learner typing only
+    // "Bell" cannot match "Alexander Graham Bell" via Levenshtein.
+    const validated = validateGuessWhoRound({
+      theme: 'Scientists',
+      questions: [
+        {
+          canonicalName: 'Alexander Graham Bell',
+          acceptedAliases: ['Mr. Bell'],
+          clues: [
+            'He was born in Edinburgh.',
+            'He emigrated to the United States.',
+            'He worked with the deaf community.',
+            'He patented an invention that changed long-distance communication.',
+            'You probably hold the descendant of his invention every day.',
+          ],
+          mcFallbackOptions: [
+            'Alexander Graham Bell',
+            'Thomas Edison',
+            'Nikola Tesla',
+            'Guglielmo Marconi',
+          ],
+          funFact: 'Fact.',
+        },
+      ],
+    });
+
+    expect(validated.questions).toHaveLength(1);
+    const aliases = validated.questions[0]?.acceptedAliases ?? [];
+    // Bare surname "Bell" must be present even though the LLM omitted it.
+    expect(aliases.some((alias) => alias.trim().toLowerCase() === 'bell')).toBe(
+      true
+    );
+  });
+
+  it('does not duplicate the surname when LLM already supplied it [BUG-541]', () => {
+    const validated = validateGuessWhoRound({
+      theme: 'Scientists',
+      questions: [
+        {
+          canonicalName: 'Marie Curie',
+          acceptedAliases: ['Curie', 'Madame Curie'],
+          clues: [
+            'Born in Warsaw.',
+            'Won two Nobel Prizes.',
+            'Pioneered research on radioactivity.',
+            'Discovered polonium.',
+            'First woman to win a Nobel Prize.',
+          ],
+          mcFallbackOptions: [
+            'Marie Curie',
+            'Rosalind Franklin',
+            'Ada Lovelace',
+            'Emmy Noether',
+          ],
+          funFact: 'Fact.',
+        },
+      ],
+    });
+
+    expect(validated.questions).toHaveLength(1);
+    const aliases = validated.questions[0]?.acceptedAliases ?? [];
+    const curieCount = aliases.filter(
+      (alias) => alias.trim().toLowerCase() === 'curie'
+    ).length;
+    expect(curieCount).toBe(1);
+  });
+
   it('keeps valid persons through validation', () => {
     const validated = validateGuessWhoRound({
       theme: 'Scientists',
@@ -245,6 +315,70 @@ describe('validateGuessWhoRound', () => {
 
     expect(validated.questions).toHaveLength(1);
     expect(validated.questions[0]?.canonicalName).toBe('Marie Curie');
+  });
+});
+
+describe('appendSurnameAlias [BUG-541]', () => {
+  it('appends surname when canonical name is multi-word and surname missing', () => {
+    expect(
+      appendSurnameAlias('Alexander Graham Bell', ['inventor of the phone'])
+    ).toEqual(['inventor of the phone', 'Bell']);
+  });
+
+  it('does not duplicate surname when already present (case-insensitive)', () => {
+    expect(
+      appendSurnameAlias('Marie Curie', ['curie', 'Madame Curie'])
+    ).toEqual(['curie', 'Madame Curie']);
+  });
+
+  it('is a no-op for single-word names', () => {
+    expect(appendSurnameAlias('Plato', ['the philosopher'])).toEqual([
+      'the philosopher',
+    ]);
+  });
+
+  it('handles extra whitespace in canonical name', () => {
+    expect(appendSurnameAlias('  Isaac   Newton  ', [])).toEqual(['Newton']);
+  });
+
+  it('returns a fresh array (does not mutate the input)', () => {
+    const input = ['Newton'];
+    const result = appendSurnameAlias('Isaac Newton', input);
+    expect(input).toEqual(['Newton']);
+    expect(result).not.toBe(input);
+  });
+});
+
+describe('validateGuessWhoRound — surname inclusion [BUG-541]', () => {
+  it('appends surname to acceptedAliases when LLM omits it (discovery path)', () => {
+    const validated = validateGuessWhoRound({
+      theme: 'Inventors',
+      questions: [
+        {
+          canonicalName: 'Alexander Graham Bell',
+          acceptedAliases: ['inventor of the telephone'],
+          clues: [
+            'He was born in Scotland.',
+            'He worked with the deaf community.',
+            'He patented an iconic communication device.',
+            'His invention transformed long-distance talking.',
+            'He moved to Canada and the US.',
+          ],
+          mcFallbackOptions: [
+            'Alexander Graham Bell',
+            'Thomas Edison',
+            'Nikola Tesla',
+            'Guglielmo Marconi',
+          ],
+          funFact: 'He never called his mother on his invention.',
+        },
+      ],
+    });
+
+    expect(validated.questions).toHaveLength(1);
+    expect(validated.questions[0]?.acceptedAliases).toEqual(
+      expect.arrayContaining(['inventor of the telephone', 'Bell'])
+    );
   });
 });
 

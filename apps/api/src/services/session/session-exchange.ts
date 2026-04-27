@@ -68,6 +68,7 @@ import {
 } from './session-crud';
 import { createLogger } from '../logger';
 import { captureException } from '../sentry';
+import { buildResumeContext } from './session-context-builders';
 /**
  * English-language intent pre-classifier used to fast-path four-strands
  * pedagogy for obvious translation / "how do you say" asks.
@@ -155,6 +156,58 @@ export function mergeMemoryContexts(
   // The prompt builder already handles a single embeddingMemoryContext block,
   // so we merge here to avoid duplicating the header text.
   return `${messageMemory}\n\n---\nAdditional context from the learner's original question:\n${rawInputMemory}`;
+}
+
+/**
+ * Builds the exchangeHistory array passed to the LLM from raw session events.
+ *
+ * Filters to user_message / ai_response / system_prompt and re-wraps prior
+ * assistant turns in the JSON envelope format the LLM is instructed to emit.
+ * The DB stores cleanResponse (prose only) for ai_response events, but the
+ * system prompt instructs the LLM to produce envelopes — so without re-wrapping,
+ * the model sees contradictory history (prose vs. JSON) and may produce
+ * malformed output that streamEnvelopeReply cannot parse, yielding empty
+ * responses on exchange 2+ (BUG-560).
+ *
+ * BUG-610: signal objects MUST be fully populated. Empty `signals: {}`
+ * contradicts the system prompt's signal spec and triggers LLM format drift
+ * after 2+ re-wrapped turns. Always emit explicit `false` for every signal.
+ */
+export interface ExchangeHistoryEvent {
+  eventType: string | null;
+  content: string;
+}
+
+export function buildExchangeHistory(
+  events: ExchangeHistoryEvent[]
+): Array<{ role: 'user' | 'system' | 'assistant'; content: string }> {
+  return events
+    .filter(
+      (e) =>
+        e.eventType === 'user_message' ||
+        e.eventType === 'ai_response' ||
+        e.eventType === 'system_prompt'
+    )
+    .map((e) => ({
+      role:
+        e.eventType === 'user_message'
+          ? ('user' as const)
+          : e.eventType === 'system_prompt'
+          ? ('system' as const)
+          : ('assistant' as const),
+      content:
+        e.eventType === 'ai_response'
+          ? JSON.stringify({
+              reply: e.content,
+              signals: {
+                partial_progress: false,
+                needs_deepening: false,
+                understanding_check: false,
+              },
+              ui_hints: { note_prompt: { show: false, post_session: false } },
+            })
+          : e.content,
+    }));
 }
 
 export async function prepareExchangeContext(
@@ -385,44 +438,7 @@ export async function prepareExchangeContext(
       ? 'fading'
       : 'problem_first'
     : 'full'; // default for new topics
-  const exchangeHistory = events
-    .filter(
-      (e) =>
-        e.eventType === 'user_message' ||
-        e.eventType === 'ai_response' ||
-        e.eventType === 'system_prompt'
-    )
-    .map((e) => ({
-      role:
-        e.eventType === 'user_message'
-          ? ('user' as const)
-          : e.eventType === 'system_prompt'
-          ? ('system' as const)
-          : ('assistant' as const),
-      // DB stores cleanResponse (prose only) for ai_response events, but the
-      // system prompt instructs the LLM to produce JSON envelopes. Re-wrap
-      // assistant turns in a minimal envelope so the conversation history is
-      // consistent with the format the LLM is told to produce. Without this,
-      // exchange 2+ sees contradictory history (prose vs JSON instruction) and
-      // the LLM may produce malformed output that streamEnvelopeReply can't
-      // parse — yielding empty responses.
-      //
-      // IMPORTANT: Use fully-populated default signals (not empty `{}`).
-      // Empty signal objects contradict the system prompt's signal spec and
-      // cause LLM format drift after 2+ re-wrapped turns — BUG-610.
-      content:
-        e.eventType === 'ai_response'
-          ? JSON.stringify({
-              reply: e.content,
-              signals: {
-                partial_progress: false,
-                needs_deepening: false,
-                understanding_check: false,
-              },
-              ui_hints: { note_prompt: { show: false, post_session: false } },
-            })
-          : e.content,
-    }));
+  const exchangeHistory = buildExchangeHistory(events);
 
   const rawSilentClassification = sessionMeta['silentClassification'];
   const silentClassification =
@@ -662,6 +678,14 @@ export async function prepareExchangeContext(
     learningHistoryParts.length > 0
       ? learningHistoryParts.join('\n\n')
       : undefined;
+  const sessionMetadata = session.metadata as Record<string, unknown> | null;
+  const resumeFromSessionId =
+    typeof sessionMetadata?.resumeFromSessionId === 'string'
+      ? sessionMetadata.resumeFromSessionId
+      : undefined;
+  const resumeContext = resumeFromSessionId
+    ? await buildResumeContext(db, profileId, resumeFromSessionId)
+    : undefined;
   // Amendment 2: load ALL well-retained topic titles for this profile so
   // buildMemoryBlock can filter struggles on any topic the learner has
   // mastered, not just the current session topic. Uses intervalDays >= 21
@@ -790,6 +814,7 @@ export async function prepareExchangeContext(
     priorLearningContext: priorLearning.contextText || undefined,
     crossSubjectContext,
     learningHistoryContext,
+    resumeContext,
     accommodationContext,
     learnerMemoryContext,
     // CFLF-23: Merge per-message memory with rawInput-based pre-session memory

@@ -29,6 +29,21 @@ import {
 import { notFound, forbidden, apiError } from '../errors';
 import { inngest } from '../inngest/client';
 
+// [BUG-625 / A-10] Mask third-party PII before returning to a profile that
+// may not own the address. Format: keep first character + last character of
+// the local part, replace middle with "***", keep domain. Empty/short locals
+// fall back to "***@domain". Returns null for null/undefined input.
+function maskEmail(email: string | null): string | null {
+  if (!email) return null;
+  const atIdx = email.lastIndexOf('@');
+  if (atIdx <= 0) return null; // malformed — don't echo
+  const local = email.slice(0, atIdx);
+  const domain = email.slice(atIdx + 1);
+  if (!domain) return null;
+  if (local.length <= 2) return `***@${domain}`;
+  return `${local[0]}***${local[local.length - 1]}@${domain}`;
+}
+
 type ConsentRouteEnv = {
   Bindings: {
     DATABASE_URL: string;
@@ -180,7 +195,12 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
     const state = await getProfileConsentState(db, profileId);
     return c.json({
       consentStatus: state?.status ?? null,
-      parentEmail: state?.parentEmail ?? null,
+      // [BUG-625 / A-10] parentEmail is third-party PII (the parent's address,
+      // not the requesting profile's). The mobile reminder banner needs *some*
+      // identifier to confirm "consent request sent to <X>", but returning the
+      // full address lets a child session enumerate the parent's email.
+      // Mask to "p***@example.com" — preserves verification UX, reduces leak.
+      parentEmail: maskEmail(state?.parentEmail ?? null),
       consentType: state?.consentType ?? null,
     });
   })

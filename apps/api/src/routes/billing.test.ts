@@ -129,6 +129,7 @@ import { app } from '../index';
 const TEST_ENV = {
   DATABASE_URL: 'postgresql://test:test@localhost:5432/test',
   CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',
+  CLERK_AUDIENCE: 'test-audience',
   STRIPE_SECRET_KEY: 'sk_test_123',
   STRIPE_PRICE_PLUS_MONTHLY: 'price_plus_monthly',
   STRIPE_PRICE_PLUS_YEARLY: 'price_plus_yearly',

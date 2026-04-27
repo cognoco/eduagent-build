@@ -121,6 +121,7 @@ import { app } from '../index';
 
 const TEST_ENV = {
   CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',
+  CLERK_AUDIENCE: 'test-audience',
   DATABASE_URL: 'postgresql://mock/test',
 };
 

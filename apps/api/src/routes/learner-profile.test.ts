@@ -125,6 +125,7 @@ import { app } from '../index';
 
 const TEST_ENV = {
   CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',
+  CLERK_AUDIENCE: 'test-audience',
 };
 
 const PARENT_PROFILE_ID = '770e8400-e29b-41d4-a716-446655440000';

@@ -547,6 +547,7 @@ export const revenuecatWebhookRoute = new Hono<{
   Bindings: {
     REVENUECAT_WEBHOOK_SECRET?: string;
     SUBSCRIPTION_KV?: KVNamespace;
+    ENVIRONMENT?: string;
   };
   Variables: {
     db: Database;
@@ -645,9 +646,28 @@ export const revenuecatWebhookRoute = new Hono<{
   // Ensure free subscription exists for the account (auto-provisioning)
   await ensureFreeSubscription(db, accountId);
 
-  // Warn in non-production environments when RevenueCat sends sandbox events.
-  // Sandbox webhooks from test purchases should not mutate production data.
+  // [BUG-624 / A-8] In production, sandbox events MUST NOT mutate state.
+  // The previous implementation only warned and fell through, so a single
+  // RevenueCat sandbox INITIAL_PURCHASE could activate a paid subscription on
+  // a real production account. Reject sandbox events outright in production;
+  // accept them in non-prod environments so QA can drive flows from sandbox
+  // purchases against staging/dev data.
   if (event.environment === 'SANDBOX') {
+    if (c.env.ENVIRONMENT === 'production') {
+      logger.warn(
+        '[revenuecat] Rejected SANDBOX webhook event in production environment',
+        {
+          eventType: event.type,
+          eventId: event.id,
+          accountId,
+        }
+      );
+      return c.json({
+        received: true,
+        skipped: true,
+        reason: 'sandbox_in_production',
+      });
+    }
     logger.warn(
       '[revenuecat] Received SANDBOX webhook event — verify this is intentional',
       {

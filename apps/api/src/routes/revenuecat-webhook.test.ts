@@ -1117,3 +1117,54 @@ describe('NON_RENEWING_PURCHASE', () => {
     expect(purchaseTopUpCredits).not.toHaveBeenCalled();
   });
 });
+
+// ---------------------------------------------------------------------------
+// [BUG-624 / A-8] Sandbox-events-in-production guard
+// ---------------------------------------------------------------------------
+
+describe('sandbox events [BUG-624 / A-8]', () => {
+  it('rejects SANDBOX events in production environment without invoking handlers', async () => {
+    const payload = makeWebhookPayload('INITIAL_PURCHASE', {
+      environment: 'SANDBOX',
+    });
+    const res = await makeRequest(payload, {
+      ...TEST_ENV,
+      ENVIRONMENT: 'production',
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toEqual({
+      received: true,
+      skipped: true,
+      reason: 'sandbox_in_production',
+    });
+    // Critical: the sandbox event must NOT have activated a subscription on a
+    // production account. activateSubscriptionFromRevenuecat is the side-effect
+    // we are guarding against.
+    expect(activateSubscriptionFromRevenuecat).not.toHaveBeenCalled();
+  });
+
+  it('accepts SANDBOX events in non-production (staging/dev) so QA can drive flows', async () => {
+    const payload = makeWebhookPayload('INITIAL_PURCHASE', {
+      environment: 'SANDBOX',
+    });
+    const res = await makeRequest(payload, {
+      ...TEST_ENV,
+      ENVIRONMENT: 'staging',
+    });
+    expect(res.status).toBe(200);
+    expect(activateSubscriptionFromRevenuecat).toHaveBeenCalled();
+  });
+
+  it('accepts PRODUCTION events in production (no regression)', async () => {
+    const payload = makeWebhookPayload('INITIAL_PURCHASE', {
+      environment: 'PRODUCTION',
+    });
+    const res = await makeRequest(payload, {
+      ...TEST_ENV,
+      ENVIRONMENT: 'production',
+    });
+    expect(res.status).toBe(200);
+    expect(activateSubscriptionFromRevenuecat).toHaveBeenCalled();
+  });
+});

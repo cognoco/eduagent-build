@@ -53,6 +53,17 @@ jest.mock('../services/dashboard', () => ({
     mockGetChildSubjectTopics(...args),
 }));
 
+// [T-3 / BUG-744] Mock assertParentAccess so IDOR break tests can force 403.
+// The default mock succeeds (returns void). Individual break tests override it
+// to throw ForbiddenError — proving the route handles the error as 403.
+const mockAssertParentAccess = jest.fn().mockResolvedValue(undefined);
+
+jest.mock('../services/family-access', () => ({
+  ...jest.requireActual('../services/family-access'),
+  assertParentAccess: (...args: unknown[]) => mockAssertParentAccess(...args),
+  hasParentAccess: jest.fn().mockResolvedValue(true),
+}));
+
 const mockListWeeklyReports = jest.fn().mockResolvedValue([]);
 const mockGetWeeklyReport = jest.fn().mockResolvedValue(null);
 const mockMarkWeeklyReportViewed = jest.fn().mockResolvedValue(undefined);
@@ -71,9 +82,11 @@ jest.mock('../services/weekly-report', () => ({
 }));
 
 import { app } from '../index';
+import { ForbiddenError } from '../errors';
 
 const TEST_ENV = {
   CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',
+  CLERK_AUDIENCE: 'test-audience',
 };
 
 const AUTH_HEADERS = {
@@ -338,6 +351,51 @@ describe('dashboard routes', () => {
       );
 
       expect(res.status).toBe(401);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // [T-3 / BUG-744] IDOR break tests — assertParentAccess must block
+  // mismatched parent/child pairs across all child-scoped endpoints.
+  //
+  // Pre-fix: no test exercised the ForbiddenError path, leaving the guard
+  // invisible — a removed or short-circuited assertParentAccess would return
+  // 200 with another user's data instead of 403.
+  // Post-fix: each endpoint here proves the 403 path is wired.
+  // -------------------------------------------------------------------------
+
+  describe('[BUG-744] IDOR: assertParentAccess rejects mismatched parent/child', () => {
+    beforeEach(() => {
+      // Default: access granted. Override in individual break tests.
+      mockAssertParentAccess.mockResolvedValue(undefined);
+    });
+
+    // [BREAK] memory endpoint calls assertParentAccess directly in the route
+    it('[BREAK] GET /dashboard/children/:id/memory returns 403 for unlinked parent', async () => {
+      mockAssertParentAccess.mockRejectedValueOnce(
+        new ForbiddenError('You do not have access to this child profile.')
+      );
+
+      const res = await app.request(
+        `/v1/dashboard/children/${PROFILE_ID}/memory`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(403);
+      expect(mockAssertParentAccess).toHaveBeenCalledTimes(1);
+    });
+
+    it('GET /dashboard/children/:id/memory returns 200 for linked parent', async () => {
+      // assertParentAccess succeeds (default mock)
+      const res = await app.request(
+        `/v1/dashboard/children/${PROFILE_ID}/memory`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      // 200 or 404 (profile not found) — either way not 403
+      expect(res.status).not.toBe(403);
     });
   });
 });

@@ -180,6 +180,7 @@ import {
 
 const TEST_ENV = {
   CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',
+  CLERK_AUDIENCE: 'test-audience',
 };
 
 const AUTH_HEADERS = {
@@ -538,6 +539,55 @@ describe('interview routes', () => {
       );
 
       expect(res.status).toBe(400);
+    });
+
+    it('emits a structured fallback frame when the LLM produces an empty reply [BUG-555]', async () => {
+      // Repro: BUG-555 user-visible symptom was "That reply took too long"
+      // appearing repeatedly during the interview because the LLM occasionally
+      // returned empty/malformed envelopes that the mobile client treated as
+      // a stream timeout. After the stream-fallback guard (commit 855a632f)
+      // the route MUST emit a typed `fallback` SSE frame with a usable
+      // fallbackText so the mobile bubble shows recovery copy + Try Again,
+      // not an opaque timeout footer. This test pins that contract.
+      (streamInterviewExchange as jest.Mock).mockResolvedValue({
+        // Empty stream — no chunks ever arrive, mimicking an LLM that emits
+        // a malformed envelope.
+        stream: (async function* () {
+          // intentionally yields nothing
+        })(),
+        onComplete: jest.fn().mockResolvedValue({
+          response: '',
+          isComplete: false,
+          fallback: {
+            reason: 'empty_reply',
+            fallbackText: "I didn't have a reply — tap Try Again.",
+          },
+        }),
+      });
+
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/interview/stream`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'Anything' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.text();
+      // The route must emit a typed `fallback` frame (not a generic error /
+      // timeout). The frame carries the user-facing copy + reason classifier.
+      expect(body).toContain('"type":"fallback"');
+      expect(body).toContain('"reason":"empty_reply"');
+      expect(body).toContain('Try Again');
+      // Followed by a non-completing `done` frame so the mobile finalizer
+      // settles isStreaming and renders the fallback bubble.
+      expect(body).toContain('"type":"done"');
+      expect(body).toContain('"isComplete":false');
+      // CRITICAL: the route must NOT mark the draft completed on a fallback.
+      expect(persistCurriculum).not.toHaveBeenCalled();
     });
 
     it('calls persistCurriculum when interview completes during stream', async () => {
