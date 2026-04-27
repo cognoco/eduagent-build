@@ -66,7 +66,10 @@ export function createDatabase(
     return drizzleNeon(pool, { schema });
   }
   const pool = new PgPool({ connectionString: databaseUrl });
-  return drizzlePg(pool, { schema }) as unknown as ReturnType<
+  // drizzle-orm/node-postgres accepts a Pool through its config-object
+  // overload (`{ client: pool }`); the positional `drizzle(pool, options)`
+  // form expects `NodePgClient` and pg's Pool does not satisfy that overload.
+  return drizzlePg({ client: pool, schema }) as unknown as ReturnType<
     typeof drizzleNeon<typeof schema>
   >;
 }
