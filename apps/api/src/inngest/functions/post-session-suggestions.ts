@@ -113,7 +113,21 @@ Suggest exactly 2 new topic titles that would be natural next steps within this 
           .replace(/\n?```$/, '');
       }
 
-      const parsed = suggestionsResponseSchema.safeParse(JSON.parse(jsonStr));
+      // [BUG-639 / J-3] JSON.parse throws SyntaxError on truncated/non-JSON
+      // LLM output. Without this guard the SyntaxError propagates out of
+      // step.run and Inngest retries 4 more times — each retry burns another
+      // LLM call (cost waste) for a structurally permanent failure.
+      let raw: unknown;
+      try {
+        raw = JSON.parse(jsonStr);
+      } catch {
+        return {
+          status: 'skipped' as const,
+          reason: 'invalid_json',
+        };
+      }
+
+      const parsed = suggestionsResponseSchema.safeParse(raw);
       if (!parsed.success) {
         return {
           status: 'skipped' as const,

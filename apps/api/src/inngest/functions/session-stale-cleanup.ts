@@ -34,6 +34,10 @@ export const sessionStaleCleanup = inngest.createFunction(
             verificationType: session.verificationType,
             interleavedTopicIds: session.interleavedTopicIds,
             summaryStatus: 'auto_closed',
+            // [BUG-637 / J-1] Mark as silence-timeout so session-completed
+            // honors UNATTENDED_REASONS and skips SM-2 retention/streak credit
+            // for sessions where the user wasn't actually present.
+            reason: 'silence_timeout',
             timestamp: now.toISOString(),
           },
         });

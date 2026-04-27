@@ -292,6 +292,26 @@ describe('session-stale-cleanup Inngest function', () => {
     await expect(executeHandler()).rejects.toThrow('Connection refused');
   });
 
+  it('[BUG-637 / J-1] dispatches reason:silence_timeout so session-completed skips SM-2 retention/streak credit for unattended closes', async () => {
+    // Without reason:'silence_timeout' the session-completed handler treats
+    // the auto-close as a user-ended session and applies fallback quality=3,
+    // advancing SM-2 cards for sessions where the user wasn't present.
+    const session = createClosedSession();
+    mockCloseStaleSessions.mockResolvedValue([session]);
+
+    await executeHandler();
+
+    expect(mockInngestSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'app/session.completed',
+        data: expect.objectContaining({
+          reason: 'silence_timeout',
+          summaryStatus: 'auto_closed',
+        }),
+      })
+    );
+  });
+
   it('handles concurrent closures on same profile', async () => {
     // Two sessions from the same profile can be stale simultaneously.
     // Both should get separate session.completed events.

@@ -30,7 +30,14 @@ const weeklyProgressPushEventSchema = z.object({
 // [FR239.1 UX-9] Returns true when 09:00 local time matches the UTC hour of nowUtc.
 // Parents with no timezone (or an invalid one) fall back to UTC, so they are
 // processed in the 09:00 UTC run.
-function isLocalHour9(timezone: string | null, nowUtc: Date): boolean {
+//
+// [BUG-640 / J-4] The cron schedule `0 * * * 1` is hourly-on-Monday by design.
+// It is paired with this filter so each parent fires on exactly one of the 24
+// hourly invocations — the one where their local time hits 09:00. Changing the
+// cron to `0 9 * * 1` would constrain delivery to UTC parents only and break
+// timezone-aware morning delivery for everyone else. See test:
+// "fires for each parent exactly once across the 24 Monday-UTC hours".
+export function isLocalHour9(timezone: string | null, nowUtc: Date): boolean {
   if (!timezone) return nowUtc.getUTCHours() === 9;
   try {
     const localTimeStr = nowUtc.toLocaleString('en-US', {
