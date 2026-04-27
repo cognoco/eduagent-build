@@ -249,6 +249,31 @@ describe('SessionSummaryScreen', () => {
     expect(screen.queryByText(/worked through 10 exchanges/)).toBeNull();
   });
 
+  // [BREAK / BUG-805] When the URL param wallClockSeconds is missing AND the
+  // transcript hasn't loaded yet, Math.max(1, ...) used to mask the unknown
+  // duration as "1 minute - great session!". Then once the transcript arrived
+  // it would snap to the real duration — readable as a flicker. The fix
+  // suppresses the duration takeaway until verified non-zero data is available.
+  it('[BREAK / BUG-805] does not flash a duration takeaway while data is missing', () => {
+    mockParams.wallClockSeconds = undefined;
+    mockTranscriptData = null;
+
+    render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+    // No "minute - great session!" copy must appear when duration is unknown.
+    expect(screen.queryByText(/minute.*great session/i)).toBeNull();
+    // Other takeaways still render so the user isn't stuck on a blank section.
+    expect(screen.getByTestId('session-takeaways')).toBeTruthy();
+  });
+
+  it('[BUG-805] renders the duration takeaway once wallClockSeconds is known', () => {
+    mockParams.wallClockSeconds = '900';
+
+    render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+    expect(screen.getByText(/15 minutes - great session!/)).toBeTruthy();
+  });
+
   it('renders summary input', () => {
     render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
@@ -645,6 +670,23 @@ describe('SessionSummaryScreen', () => {
     expect(screen.getByTestId('fast-celebrations')).toBeTruthy();
     expect(screen.getByText('Quadratic Equations')).toBeTruthy();
     expect(screen.getByText(/15 minutes - great session!/)).toBeTruthy();
+  });
+
+  // [BREAK / BUG-825] Malformed milestones param (non-string array values) must
+  // be filtered out by the type-guard. Without it, milestoneLabels would render
+  // numbers/objects and the switch fallthrough would produce garbage.
+  it('[BREAK / BUG-825] filters out non-string milestone values', () => {
+    mockParams.wallClockSeconds = '900';
+    mockParams.milestones = encodeURIComponent(
+      JSON.stringify([1, 2, 'polar_star', null, { foo: 'bar' }, 'persistent'])
+    );
+
+    render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+    expect(screen.getByTestId('milestone-recap')).toBeTruthy();
+    expect(screen.getByText(/Polar Star/)).toBeTruthy();
+    expect(screen.getByText(/Persistent/)).toBeTruthy();
+    expect(screen.queryByText(/\[object Object\]/)).toBeNull();
   });
 
   describe('resume-this-session CTA', () => {

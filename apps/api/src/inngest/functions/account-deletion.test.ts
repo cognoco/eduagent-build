@@ -1,6 +1,7 @@
 import { scheduledDeletion } from './account-deletion';
 
 const mockGetStepDatabase = jest.fn();
+const mockAccountExists = jest.fn();
 const mockIsDeletionCancelled = jest.fn();
 const mockExecuteDeletion = jest.fn();
 
@@ -9,6 +10,7 @@ jest.mock('../helpers', () => ({
 }));
 
 jest.mock('../../services/deletion', () => ({
+  accountExists: (...args: unknown[]) => mockAccountExists(...args),
   isDeletionCancelled: (...args: unknown[]) => mockIsDeletionCancelled(...args),
   executeDeletion: (...args: unknown[]) => mockExecuteDeletion(...args),
 }));
@@ -26,6 +28,8 @@ describe('scheduledDeletion', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetStepDatabase.mockReturnValue(mockDb);
+    // Default: account still exists at end of grace period (happy path)
+    mockAccountExists.mockResolvedValue(true);
   });
 
   it('should be defined as an Inngest function', () => {
@@ -101,7 +105,46 @@ describe('scheduledDeletion', () => {
       step,
     });
 
-    // getStepDatabase called once for check-cancellation, once for delete-account-data
-    expect(mockGetStepDatabase).toHaveBeenCalledTimes(2);
+    // getStepDatabase called once each for check-account-exists,
+    // check-cancellation, delete-account-data ([BUG-844] adds the new step).
+    expect(mockGetStepDatabase).toHaveBeenCalledTimes(3);
+  });
+
+  // [BREAK / BUG-844] If the account was removed during the 7-day sleep
+  // (admin manual deletion, GC, restore-from-backup gone wrong), the
+  // function must NOT proceed to executeDeletion — it should return
+  // 'already_deleted' so on-call telemetry distinguishes it from happy-path
+  // completions, and so we don't issue a no-op DELETE that misleadingly
+  // reports 'deleted'.
+  it('[BREAK / BUG-844] returns already_deleted without running cancellation/deletion when account is gone', async () => {
+    const step = createMockStep();
+    mockAccountExists.mockResolvedValue(false);
+
+    const handler = (scheduledDeletion as any).fn;
+    const result = await handler({
+      event: { data: { accountId: 'acc-gone' } },
+      step,
+    });
+
+    expect(result).toEqual({
+      status: 'already_deleted',
+      accountId: 'acc-gone',
+    });
+    expect(mockIsDeletionCancelled).not.toHaveBeenCalled();
+    expect(mockExecuteDeletion).not.toHaveBeenCalled();
+  });
+
+  it('[BUG-844] still sleeps 7d before checking accountExists (no instant fast-path)', async () => {
+    const step = createMockStep();
+    mockAccountExists.mockResolvedValue(false);
+
+    const handler = (scheduledDeletion as any).fn;
+    await handler({ event: { data: { accountId: 'acc-1' } }, step });
+
+    expect(step.sleep).toHaveBeenCalledWith('grace-period', '7d');
+    // Order check: sleep must have been called before any step.run.
+    const sleepOrder = step.sleep.mock.invocationCallOrder[0]!;
+    const firstRunOrder = step.run.mock.invocationCallOrder[0]!;
+    expect(sleepOrder).toBeLessThan(firstRunOrder);
   });
 });

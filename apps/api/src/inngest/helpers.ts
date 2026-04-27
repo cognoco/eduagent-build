@@ -1,5 +1,4 @@
 import { createDatabase, type Database } from '@eduagent/database';
-import { captureException } from '../services/sentry';
 
 // ---------------------------------------------------------------------------
 // Module-level DATABASE_URL — set by Inngest middleware on CF Workers,
@@ -45,15 +44,9 @@ export function getStepDatabase(): Database {
     return _cachedDb;
   }
 
-  // [P-6] Pass captureException as onTransactionFallback so the neon-http
-  // transaction fallback is reported to Sentry from Inngest steps too.
-  _cachedDb = createDatabase(url, {
-    onTransactionFallback: (error) => {
-      captureException(error, {
-        extra: { context: 'neon-http.transaction-fallback.inngest-step' },
-      });
-    },
-  });
+  // Phase 0.0 (RLS plan 2026-04-27): neon-serverless WS driver — real ACID
+  // transactions; onTransactionFallback is no longer needed.
+  _cachedDb = createDatabase(url);
   _cachedDbUrl = url;
   return _cachedDb;
 }

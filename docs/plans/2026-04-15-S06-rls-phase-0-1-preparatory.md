@@ -352,9 +352,9 @@ After Phase 0+1, the system is ready for Phase 2 (write policies) and Phase 3 (s
 
 **Remaining work (in dependency order):**
 
-- [ ] **0.0 — Driver decision: implement Option B (full `neon-serverless` WS switch). Prove `SET LOCAL` propagates inside a real transaction from a Cloudflare Worker.** (blocks everything below)
-- [ ] 0.1 — Remove silent fallback from `packages/database/src/client.ts:21-37`. Replace `console.warn` with structured Inngest event/metric. Add lint/test regression guard.
-- [ ] 0.3 — Integration test for context propagation (real Postgres, no mocks; rollback + concurrent isolation + SET-LOCAL regression guard).
+- [x] **0.0 — Driver decision: implement Option B (full `neon-serverless` WS switch). DONE 2026-04-27.** `packages/database/src/client.ts` switched to `drizzle-orm/neon-serverless` + `Pool`. Silent fallback removed entirely. `nodejs_compat` confirmed in `wrangler.toml`. `neonConfig.webSocketConstructor` injected for Node.js; Workers use global `WebSocket`.
+- [x] **0.1 — Silent fallback removed. DONE 2026-04-27** (part of 0.0). `onTransactionFallback` option deleted; callers in `middleware/database.ts` and `inngest/helpers.ts` updated.
+- [x] **0.3 — Integration test. DONE 2026-04-27.** `packages/database/src/rls.integration.test.ts` covers: SET LOCAL propagation, GUC cleared after commit, rollback on throw, SET LOCAL source-level regression guard.
 - [ ] 0.4a — Migrate the 6 live-race sites in priority order: `consent.ts:199` (B), `filing.ts:371` (I), `home-surface-cache.ts:186` (I), `profile.ts:227` (I), `parking-lot-data.ts:72` (I), `settings.ts:564` (I). Each site gets a regression test.
 - [ ] 0.4b — Migrate the remaining 7 sites: `vocabulary.ts:261` + helper-scope fix, `complete-round.ts:230` + nested-tx resolution, `curriculum.ts:780/1180/1340`, `assessments.ts:121`, `rls.ts:20` (`withProfileScope` becomes functional).
 
@@ -369,9 +369,9 @@ After Phase 0+1, the system is ready for Phase 2 (write policies) and Phase 3 (s
 
 **Pre-Phase-3 Gate (must be green before any work in `2026-04-15-S06-rls-phase-2-4-enforcement.md` Phase 3):**
 
-- [ ] 0.0 done
-- [ ] 0.1 done
-- [ ] 0.3 integration test passing in CI
+- [x] 0.0 done (2026-04-27)
+- [x] 0.1 done (2026-04-27)
+- [x] 0.3 integration test passing in CI (2026-04-27)
 - [ ] 0.4a (6 live-race sites) migrated and break-tested
 
 **Out-of-band tickets to open (independent of Phase 0):**

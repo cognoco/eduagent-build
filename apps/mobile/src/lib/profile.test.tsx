@@ -204,6 +204,43 @@ describe('ProfileProvider', () => {
     expect(queryClient.getQueryData(['profiles'])).toBeTruthy();
   });
 
+  // [BREAK / BUG-828] If SecureStore.setItemAsync rejects (e.g., Keychain
+  // unavailable, disk full, OS-level Keychain reset), the in-memory switch
+  // must still go through so the user isn't stuck mid-flow, BUT the result
+  // must report persistenceFailed: true so the caller can warn the user that
+  // the change won't survive an app restart. Previously the failure was
+  // silently swallowed and callers had no way to know.
+  it('[BREAK / BUG-828] returns persistenceFailed when SecureStore write fails', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ ok: true }), { status: 200 })
+    );
+
+    const { result } = renderHook(() => useProfile(), {
+      wrapper: createWrapper(),
+    });
+
+    // Wait for mount to settle so the auto-save effect (line 166) has fired
+    // with the default resolved mock — only THEN inject the rejection so it
+    // hits switchProfile's setItemAsync, not the on-mount one.
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+    (SecureStore.setItemAsync as jest.Mock).mockRejectedValueOnce(
+      new Error('SecureStore unavailable')
+    );
+
+    let switchResult: Awaited<
+      ReturnType<typeof result.current.switchProfile>
+    > | null = null;
+    await act(async () => {
+      switchResult = await result.current.switchProfile('child-id');
+    });
+
+    expect(switchResult).toEqual({ success: true, persistenceFailed: true });
+    // In-memory switch still proceeds so navigation isn't dead-ended.
+    expect(result.current.activeProfile?.id).toBe('child-id');
+  });
+
   it('returns empty profiles when API returns none', async () => {
     mockFetch.mockReset();
     mockFetch.mockResolvedValueOnce(

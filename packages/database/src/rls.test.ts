@@ -1,15 +1,14 @@
 // Unit tests only — these verify call order and error propagation using mocks.
-//
-// DEFERRED: Integration test against a real Postgres database that verifies:
-//   1. current_setting('app.current_profile_id') returns the expected value inside the transaction
-//   2. The setting is NULL / reverted after commit or rollback
-//   3. SET LOCAL does not leak across connections
-//
-// This requires switching from neon-http (stateless HTTP) to neon-ws or node-postgres
-// for the test database connection, since neon-http doesn't support real transactions.
-// Tracked as RLS Phase 0.0 prerequisite in docs/plans/2026-04-15-S06-rls-phase-0-1-preparatory.md.
+// Integration tests (context propagation, rollback, SET LOCAL guard) live in
+// rls.integration.test.ts — Phase 0.3, docs/plans/2026-04-15-S06-rls-phase-0-1-preparatory.md.
 
 import { withProfileScope } from './rls.js';
+
+// Fixed-format UUIDs for all unit test assertions (withProfileScope validates UUID format).
+const UUID_A = '11111111-1111-1111-1111-111111111111';
+const UUID_B = '22222222-2222-2222-2222-222222222222';
+const UUID_C = '33333333-3333-3333-3333-333333333333';
+const UUID_D = '44444444-4444-4444-4444-444444444444';
 
 function createMockDb() {
   return {
@@ -29,7 +28,7 @@ describe('withProfileScope', () => {
       return fn(tx);
     });
 
-    const result = await withProfileScope(db, 'profile-123', callback);
+    const result = await withProfileScope(db, UUID_A, callback);
 
     expect(db.transaction).toHaveBeenCalledTimes(1);
     expect(callback).toHaveBeenCalledTimes(1);
@@ -49,7 +48,7 @@ describe('withProfileScope', () => {
       return fn(tx);
     });
 
-    await withProfileScope(db, 'profile-456', async () => {
+    await withProfileScope(db, UUID_B, async () => {
       callOrder.push('callback');
       return 'done';
     });
@@ -66,7 +65,7 @@ describe('withProfileScope', () => {
     });
 
     await expect(
-      withProfileScope(db, 'profile-789', async () => {
+      withProfileScope(db, UUID_C, async () => {
         throw new Error('callback error');
       })
     ).rejects.toThrow('callback error');
@@ -80,7 +79,14 @@ describe('withProfileScope', () => {
     );
 
     await expect(
-      withProfileScope(db, 'profile-000', async () => 'unreachable')
+      withProfileScope(db, UUID_D, async () => 'unreachable')
     ).rejects.toThrow('transaction failed');
+  });
+
+  it('rejects non-UUID profileIds', async () => {
+    const db = createMockDb();
+    await expect(
+      withProfileScope(db, 'not-a-uuid', async () => 'unreachable')
+    ).rejects.toThrow('profileId must be a UUID');
   });
 });

@@ -196,6 +196,11 @@ export async function createGrantedConsentState(
   // Wrap consent state + family link in a transaction so they succeed or
   // fail atomically. Without this, a familyLinks failure would leave the
   // child CONSENTED but with no parent link for revocation/management.
+  //
+  // [BUG-863] The old neon-http driver silently fell back to non-atomic
+  // execution inside db.transaction(). The driver was migrated to
+  // neon-serverless (WebSocket Pool) in Phase 0.0 — db.transaction() now
+  // opens a genuine Postgres BEGIN/COMMIT and is fully ACID.
   const row = await db.transaction(async (tx) => {
     const [consentRow] = await tx
       .insert(consentStates)

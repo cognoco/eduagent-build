@@ -445,7 +445,9 @@ export function parseExchangeEnvelope(
   response: string,
   context?: { sessionId?: string; profileId?: string; flow?: string }
 ): ParsedExchangeEnvelope {
-  const parsed = parseEnvelope(response);
+  // [BUG-847] Tag the surface so parser-side telemetry can distinguish
+  // session-flow parse failures from silent_classify ones below.
+  const parsed = parseEnvelope(response, 'exchange.session');
   if (!parsed.ok) {
     logger.warn('exchange.envelope_parse_failed', {
       flow: context?.flow,
@@ -639,7 +641,9 @@ export function classifyExchangeOutcome(
   rawResponse: string,
   context?: { sessionId?: string; profileId?: string; flow?: string }
 ): ClassifiedExchangeOutcome {
-  const envelopeResult = parseEnvelope(rawResponse);
+  // [BUG-847] Distinct surface tag — silent_classify is the marker-only
+  // fallback path, expected to fail full envelope validation more often.
+  const envelopeResult = parseEnvelope(rawResponse, 'exchange.silent_classify');
 
   // Normal envelope path — parsed cleanly; classify empty reply here.
   // Pass the already-validated envelope to envelopeToParsedExchange so we

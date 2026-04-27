@@ -653,6 +653,57 @@ describe('CameraScreen', () => {
     alertSpy.mockRestore();
   });
 
+  // [BREAK / BUG-807] Server response shape is not perfectly trusted.
+  // candidates.length === 1 does NOT guarantee candidates[0] is well-formed —
+  // a malformed entry like `{ subjectName: 'Math' }` (missing subjectId) would
+  // previously pass the `if (candidate)` truthy check and propagate
+  // `subjectId: undefined` into the auto-detected state, breaking downstream
+  // routing. The fix at camera.tsx requires both subjectId and subjectName
+  // truthy, and falls through to the manual subject picker when malformed.
+  it('[BREAK / BUG-807] falls back to manual picker when candidate is missing subjectId', async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({});
+    mockMutateAsync.mockResolvedValueOnce({
+      needsConfirmation: false,
+      candidates: [{ subjectName: 'Math', confidence: 0.95 }],
+    });
+    (useHomeworkOcr as jest.Mock).mockReturnValue({
+      text: 'Some homework problem',
+      status: 'done',
+      error: null,
+      failCount: 0,
+      process: mockProcess,
+      retry: mockRetry,
+    });
+
+    const { getByTestId } = render(<CameraScreen />);
+
+    await waitFor(() => {
+      expect(getByTestId('subject-picker')).toBeTruthy();
+    });
+  });
+
+  it('[BREAK / BUG-807] falls back to manual picker when candidates contains a null entry', async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({});
+    mockMutateAsync.mockResolvedValueOnce({
+      needsConfirmation: false,
+      candidates: [null],
+    });
+    (useHomeworkOcr as jest.Mock).mockReturnValue({
+      text: 'Some homework problem',
+      status: 'done',
+      error: null,
+      failCount: 0,
+      process: mockProcess,
+      retry: mockRetry,
+    });
+
+    const { getByTestId } = render(<CameraScreen />);
+
+    await waitFor(() => {
+      expect(getByTestId('subject-picker')).toBeTruthy();
+    });
+  });
+
   // [BUG-824] classifyTriggeredRef must reset when the captured image changes,
   // so a fresh photo is always re-classified. The historical bug: ref stayed
   // `true` from the previous photo, skipping classification on the next one.

@@ -35,7 +35,7 @@ jest.mock('../../hooks/use-notes', () => ({
 
 jest.mock('@tanstack/react-query', () => {
   const actual = jest.requireActual('@tanstack/react-query');
-  return { ...actual, useQueries: jest.fn() };
+  return { ...actual, useQueries: jest.fn(), useQuery: jest.fn() };
 });
 
 jest.mock('../../components/progress', () => ({
@@ -109,9 +109,28 @@ jest.mock('../../lib/profile', () => ({
   isGuardianProfile: () => false,
 }));
 
-const { useQueries: mockUseQueries } = require('@tanstack/react-query') as {
-  useQueries: jest.Mock;
-};
+const { useQueries: mockUseQueries, useQuery: mockUseQuery } =
+  require('@tanstack/react-query') as {
+    useQueries: jest.Mock;
+    useQuery: jest.Mock;
+  };
+
+interface AggregateLibRetention {
+  subjects: Array<{
+    subjectId: string;
+    topics: unknown[];
+    reviewDueCount: number;
+  }>;
+}
+
+function setLibraryRetention(payload: AggregateLibRetention | undefined) {
+  mockUseQuery.mockReturnValue({
+    data: payload,
+    isLoading: false,
+    isError: false,
+    refetch: jest.fn(),
+  });
+}
 
 function createWrapper() {
   const queryClient = new QueryClient({
@@ -130,6 +149,7 @@ describe('LibraryScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUseQueries.mockReturnValue([]);
+    setLibraryRetention({ subjects: [] });
     mockUseAllBooks.mockReturnValue({
       books: [],
       isLoading: false,
@@ -205,9 +225,15 @@ describe('LibraryScreen', () => {
       data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
       isLoading: false,
     });
-    mockUseQueries.mockReturnValue([
-      { data: { topics: undefined, reviewDueCount: 0 }, isLoading: false },
-    ]);
+    setLibraryRetention({
+      subjects: [
+        {
+          subjectId: 'sub-1',
+          topics: undefined as unknown as never,
+          reviewDueCount: 0,
+        },
+      ],
+    });
 
     expect(() =>
       render(<LibraryScreen />, { wrapper: createWrapper() })
@@ -229,12 +255,15 @@ describe('LibraryScreen', () => {
       data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
       isLoading: false,
     });
-    mockUseQueries.mockReturnValue([
-      {
-        data: { topics: 'unexpected' as unknown as never, reviewDueCount: 0 },
-        isLoading: false,
-      },
-    ]);
+    setLibraryRetention({
+      subjects: [
+        {
+          subjectId: 'sub-1',
+          topics: 'unexpected' as unknown as never,
+          reviewDueCount: 0,
+        },
+      ],
+    });
 
     expect(() =>
       render(<LibraryScreen />, { wrapper: createWrapper() })
@@ -355,9 +384,10 @@ describe('LibraryScreen', () => {
       data: { subjects: [] },
       isLoading: false,
     });
-    mockUseQueries.mockReturnValue([
-      {
-        data: {
+    setLibraryRetention({
+      subjects: [
+        {
+          subjectId: 'sub-1',
           topics: [
             {
               topicId: 't1',
@@ -371,13 +401,9 @@ describe('LibraryScreen', () => {
           ],
           reviewDueCount: 0,
         },
-        isLoading: false,
-      },
-      {
-        data: { topics: [], reviewDueCount: 0 },
-        isLoading: false,
-      },
-    ]);
+        { subjectId: 'sub-2', topics: [], reviewDueCount: 0 },
+      ],
+    });
     mockUseAllBooks.mockReturnValue({
       books: [
         {
@@ -437,15 +463,9 @@ describe('LibraryScreen', () => {
       },
       isLoading: false,
     });
-    mockUseQueries.mockReturnValue([
-      {
-        data: {
-          topics: [],
-          reviewDueCount: 4,
-        },
-        isLoading: false,
-      },
-    ]);
+    setLibraryRetention({
+      subjects: [{ subjectId: 'sub-1', topics: [], reviewDueCount: 4 }],
+    });
 
     render(<LibraryScreen />, { wrapper: createWrapper() });
 

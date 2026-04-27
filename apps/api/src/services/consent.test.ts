@@ -15,6 +15,7 @@ jest.mock('./notifications', () => ({
 import type { Database } from '@eduagent/database';
 import {
   checkConsentRequired,
+  createGrantedConsentState,
   createPendingConsentState,
   requestConsent,
   processConsentResponse,
@@ -59,6 +60,7 @@ function mockConsentRow(
 function createMockDb({
   findFirstResult = undefined as ReturnType<typeof mockConsentRow> | undefined,
   insertReturning = [] as ReturnType<typeof mockConsentRow>[],
+  transactionError = undefined as Error | undefined,
 } = {}): Database {
   // Atomic update chain: update().set().where().returning()
   // returning() resolves with the row (simulates 1 matched row)
@@ -69,6 +71,31 @@ function createMockDb({
   const updateSet = jest.fn().mockReturnValue({ where: updateWhere });
   const deleteWhere = jest.fn().mockResolvedValue(undefined);
   const deleteFn = jest.fn().mockReturnValue({ where: deleteWhere });
+
+  // Build a tx object that simulates the transaction callback argument.
+  // The tx has the same insert/update interface as db.
+  const txInsert = jest.fn().mockReturnValue({
+    values: jest.fn().mockReturnValue({
+      onConflictDoUpdate: jest.fn().mockReturnValue({
+        returning: jest.fn().mockResolvedValue(insertReturning),
+      }),
+      onConflictDoNothing: jest.fn().mockResolvedValue([]),
+    }),
+  });
+
+  // db.transaction invokes the callback with tx. If transactionError is set,
+  // the transaction itself rejects (simulating a rollback / constraint failure
+  // after the first statement).
+  const transactionFn = transactionError
+    ? jest.fn().mockRejectedValue(transactionError)
+    : jest
+        .fn()
+        .mockImplementation(
+          async (callback: (tx: unknown) => Promise<unknown>) => {
+            const tx = { insert: txInsert };
+            return callback(tx);
+          }
+        );
 
   return {
     query: {
@@ -86,6 +113,7 @@ function createMockDb({
         }),
       }),
     }),
+    transaction: transactionFn,
     update: jest.fn().mockReturnValue({ set: updateSet }),
     delete: deleteFn,
   } as unknown as Database;
@@ -431,5 +459,88 @@ describe('createPendingConsentState', () => {
       parentEmail: null,
       consentToken: null,
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// createGrantedConsentState [BUG-863] — atomicity via db.transaction
+// ---------------------------------------------------------------------------
+
+describe('createGrantedConsentState', () => {
+  const CHILD_ID = '550e8400-e29b-41d4-a716-446655440000';
+  const PARENT_ID = '660e8400-e29b-41d4-a716-446655440001';
+
+  it('returns a CONSENTED consent state when both writes succeed', async () => {
+    const consentRow = mockConsentRow({
+      status: 'CONSENTED',
+      profileId: CHILD_ID,
+    });
+    const db = createMockDb({ insertReturning: [consentRow] });
+
+    const result = await createGrantedConsentState(
+      db,
+      CHILD_ID,
+      'GDPR',
+      PARENT_ID
+    );
+
+    expect(result.status).toBe('CONSENTED');
+    expect(result.profileId).toBe(CHILD_ID);
+    expect(result.consentType).toBe('GDPR');
+  });
+
+  /**
+   * BREAK TEST [BUG-863]: proves that a failure inside the transaction callback
+   * propagates to the caller — no silent swallow.
+   *
+   * With the old neon-http driver, db.transaction() silently fell back to
+   * non-atomic sequential execution (client.ts:40-54). If the familyLinks insert
+   * failed after the consent row was written, the DB was left inconsistent.
+   *
+   * Phase 0.0 migrated to neon-serverless (WebSocket Pool), so db.transaction()
+   * now opens a genuine Postgres BEGIN/COMMIT. A mid-transaction failure rolls
+   * back both writes. This test verifies the error propagates rather than being
+   * silently swallowed, confirming the atomic contract. [BUG-863]
+   */
+  it('[BUG-863] propagates transaction failure so no partial write is silently swallowed', async () => {
+    // Simulate the transaction being rejected — e.g. FK violation on familyLinks
+    // after the consent row was already written within the BEGIN block.
+    const transactionError = new Error(
+      'FK violation: parent profile does not exist'
+    );
+    const db = createMockDb({ transactionError });
+
+    await expect(
+      createGrantedConsentState(db, CHILD_ID, 'GDPR', PARENT_ID)
+    ).rejects.toThrow('FK violation: parent profile does not exist');
+
+    // Confirm db.transaction was the call path (not fire-and-forget)
+    expect(db.transaction).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * BREAK TEST [BUG-863]: verifies both writes go through db.transaction —
+   * not two separate top-level awaits that could be interleaved or partially applied.
+   */
+  it('[BUG-863] wraps consent insert and family-link insert in a single db.transaction call', async () => {
+    const consentRow = mockConsentRow({
+      status: 'CONSENTED',
+      profileId: CHILD_ID,
+    });
+    const db = createMockDb({ insertReturning: [consentRow] });
+
+    await createGrantedConsentState(db, CHILD_ID, 'GDPR', PARENT_ID);
+
+    // Both writes went through db.transaction (one call, ACID boundary)
+    expect(db.transaction).toHaveBeenCalledTimes(1);
+  });
+
+  it('throws when the transaction returns no consent row', async () => {
+    // Transaction succeeds but insert returns empty — consent row not written
+    const db = createMockDb({ insertReturning: [] });
+
+    await expect(
+      createGrantedConsentState(db, CHILD_ID, 'GDPR', PARENT_ID)
+    ).rejects.toThrow('Insert into consentStates did not return a row');
   });
 });

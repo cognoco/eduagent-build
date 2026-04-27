@@ -1,62 +1,48 @@
-import { neon } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-http';
+import { Pool, neonConfig } from '@neondatabase/serverless';
+import { drizzle } from 'drizzle-orm/neon-serverless';
 import * as schema from './schema/index';
 
-function isUnsupportedTransactionError(error: unknown): boolean {
-  return (
-    error instanceof Error &&
-    error.message.includes('No transactions support in neon-http driver')
-  );
+// ---------------------------------------------------------------------------
+// WebSocket constructor — Node.js vs Cloudflare Workers
+//
+// @neondatabase/serverless uses WebSockets for interactive transactions.
+// - Cloudflare Workers: `WebSocket` is a global — no configuration needed.
+// - Node.js (tests, local scripts): no global `WebSocket`; inject the `ws`
+//   package so the Pool can open the WebSocket tunnel to Neon.
+//
+// We detect Node.js by checking `typeof WebSocket === 'undefined'`, which is
+// false inside Workers (where the runtime provides a native WebSocket) and
+// true inside Jest / Node.js processes.
+//
+// Ref: docs/plans/2026-04-15-S06-rls-phase-0-1-preparatory.md — Phase 0.0
+// ---------------------------------------------------------------------------
+if (typeof WebSocket === 'undefined') {
+  neonConfig.webSocketConstructor = require('ws');
 }
 
-export interface CreateDatabaseOptions {
-  /**
-   * [P-6] Callback invoked when the neon-http transaction fallback fires.
-   * Callers should pass their structured telemetry function (e.g. captureException)
-   * here so the fallback is queryable in production monitoring.
-   * If omitted, a console.warn is emitted (dev/test only behaviour).
-   */
-  onTransactionFallback?: (error: unknown) => void;
-}
+/**
+ * Options accepted by createDatabase. Currently unused — kept for backward
+ * compatibility with callers that pass an empty options object.
+ */
+export type CreateDatabaseOptions = Record<string, never>;
 
+/**
+ * Create a Drizzle database client backed by @neondatabase/serverless (WebSocket
+ * driver). Unlike the previous neon-http driver, this client supports real
+ * ACID interactive transactions — `db.transaction(async (tx) => { ... })` opens
+ * a genuine Postgres BEGIN/COMMIT and guarantees atomicity and rollback.
+ *
+ * Phase 0.0 of the RLS preparatory plan switches from neon-http to this driver.
+ * The silent non-atomic fallback that was present in the old client has been
+ * removed — if `db.transaction` throws, the error propagates to the caller.
+ */
 export function createDatabase(
   databaseUrl: string,
-  options: CreateDatabaseOptions = {}
+  // options parameter kept for backward-compatibility; currently unused
+  _options: CreateDatabaseOptions = {}
 ) {
-  const sql = neon(databaseUrl);
-  const db = drizzle(sql, { schema });
-  const originalTransaction = db.transaction.bind(db);
-  const { onTransactionFallback } = options;
-
-  return Object.assign(db, {
-    // Neon HTTP does not support multi-statement transactions.
-    // Fall back to executing the callback on the base DB so background
-    // pipelines degrade gracefully instead of failing outright.
-    async transaction(...args: Parameters<typeof originalTransaction>) {
-      try {
-        return await originalTransaction(...args);
-      } catch (error) {
-        const fn = args[0];
-        if (isUnsupportedTransactionError(error) && typeof fn === 'function') {
-          // Neon HTTP lacks transactions — pass base DB cast as PgTransaction
-          // so service functions that accept Database | PgTransaction still work.
-          // Statements execute individually; no atomicity or rollback.
-          //
-          // [P-6] Emit structured telemetry so this is queryable in production.
-          // console.warn alone is not queryable — callers inject captureException.
-          if (onTransactionFallback) {
-            onTransactionFallback(error);
-          } else {
-            console.warn(
-              '[db] neon-http transaction fallback — running without atomicity'
-            );
-          }
-          return fn(db as unknown as Parameters<typeof fn>[0]);
-        }
-        throw error;
-      }
-    },
-  });
+  const pool = new Pool({ connectionString: databaseUrl });
+  return drizzle(pool, { schema });
 }
 
 export type Database = ReturnType<typeof createDatabase>;

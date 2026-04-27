@@ -15,6 +15,7 @@ jest.mock('../lib/api-client', () => ({
 jest.mock('../lib/secure-storage', () => ({
   setItemAsync: jest.fn().mockResolvedValue(undefined),
   deleteItemAsync: jest.fn().mockResolvedValue(undefined),
+  sanitizeSecureStoreKey: (k: string) => k,
 }));
 
 const ownerProfile = {

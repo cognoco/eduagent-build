@@ -726,12 +726,25 @@ export default function SessionSummaryScreen() {
     }
   };
 
+  // [BUG-805] Suppress the duration takeaway until we have a verified non-zero
+  // wall-clock value. Math.max(1, ...) above masks missing data as "1 minute",
+  // so without this guard the screen would briefly render "1 minute - great
+  // session!" while the transcript loads and snap to "15 minutes" once data
+  // arrives — readable as a glitch by learners. With the guard the takeaway
+  // simply doesn't appear until duration is real.
+  const hasResolvedDuration =
+    (Number.isFinite(parsedWallClockSeconds) && parsedWallClockSeconds > 0) ||
+    (fallbackSession?.wallClockSeconds != null &&
+      fallbackSession.wallClockSeconds > 0);
+
   const takeaways: string[] = [];
-  takeaways.push(
-    `${wallClockMinutes} minute${
-      wallClockMinutes === 1 ? '' : 's'
-    } - great session!`
-  );
+  if (hasResolvedDuration) {
+    takeaways.push(
+      `${wallClockMinutes} minute${
+        wallClockMinutes === 1 ? '' : 's'
+      } - great session!`
+    );
+  }
   if (exchanges > 0) {
     takeaways.push(
       `You worked through ${exchanges} exchange${exchanges === 1 ? '' : 's'}`

@@ -162,11 +162,22 @@ export default function CameraScreen(): React.ReactNode {
         });
         if (!result.needsConfirmation && result.candidates.length === 1) {
           const candidate = result.candidates[0];
-          if (candidate) {
+          // [BUG-807] Server response may be malformed — `length === 1` does
+          // not guarantee a non-null entry, and even a non-null entry might
+          // be missing subjectId/subjectName. Validate before destructuring,
+          // otherwise we'd setAutoDetectedSubject({ subjectId: undefined })
+          // and downstream navigation would crash on the empty route param.
+          if (candidate?.subjectId && candidate?.subjectName) {
             setAutoDetectedSubject({
               subjectId: candidate.subjectId,
               subjectName: candidate.subjectName,
             });
+          } else {
+            Sentry.captureMessage(
+              'Homework auto-detect: malformed candidate (missing subjectId/Name)',
+              { level: 'warning', extra: { candidate } }
+            );
+            setShowSubjectPicker(true);
           }
         } else if (
           result.suggestedSubjectName &&

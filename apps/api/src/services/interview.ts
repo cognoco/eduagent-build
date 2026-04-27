@@ -12,6 +12,7 @@ import {
   routeAndStream,
   parseEnvelope,
   teeEnvelopeStream,
+  extractFirstJsonObject,
   type ChatMessage,
 } from './llm';
 import { classifyExchangeOutcome, type ExchangeFallback } from './exchanges';
@@ -238,44 +239,74 @@ export async function extractSignals(exchangeHistory: ChatExchange[]): Promise<{
 
   const result = await routeAndCall(messages, 2);
 
-  try {
-    const jsonMatch = result.response.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]) as Record<string, unknown>;
-      // Coerce and dedupe interests defensively — the LLM occasionally emits
-      // duplicates with different capitalization. Per-label length-cap at 60.
-      const rawInterests = Array.isArray(parsed.interests)
-        ? (parsed.interests as unknown[])
-            .map((v) => String(v).trim())
-            .filter((v) => v.length > 0 && v.length <= 60)
-        : [];
-      const seen = new Set<string>();
-      const interests: string[] = [];
-      for (const label of rawInterests) {
-        const key = label.toLowerCase();
-        if (seen.has(key)) continue;
-        seen.add(key);
-        interests.push(label);
-        if (interests.length >= MAX_EXTRACTED_INTERESTS) break;
+  // [BUG-842 / F-SVC-009] Use extractFirstJsonObject (brace-depth walker) over
+  // the greedy /\{[\s\S]*\}/ regex — the regex grabs everything between the
+  // first `{` and the LAST `}`, which fails when the LLM emits prose containing
+  // braces around the real envelope. Log structured failures so signal-extract
+  // regressions surface in telemetry instead of being swallowed and degrading
+  // onboarding quality silently.
+  const jsonStr = extractFirstJsonObject(result.response);
+  if (!jsonStr) {
+    captureException(
+      new Error('interview signal extraction: no JSON object found'),
+      {
+        extra: {
+          surface: 'interview-signal-extraction',
+          reason: 'no_json_found',
+          rawResponseLength: result.response.length,
+        },
       }
-      return {
-        goals: Array.isArray(parsed.goals)
-          ? (parsed.goals as unknown[]).map(String)
-          : [],
-        experienceLevel: String(parsed.experienceLevel ?? 'beginner'),
-        currentKnowledge: String(parsed.currentKnowledge ?? ''),
-        interests,
-      };
-    }
-  } catch {
-    // Fall through to default
+    );
+    return {
+      goals: [],
+      experienceLevel: 'beginner',
+      currentKnowledge: '',
+      interests: [],
+    };
   }
 
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(jsonStr) as Record<string, unknown>;
+  } catch (err) {
+    captureException(err, {
+      extra: {
+        surface: 'interview-signal-extraction',
+        reason: 'invalid_json',
+        jsonStrSample: jsonStr.slice(0, 200),
+      },
+    });
+    return {
+      goals: [],
+      experienceLevel: 'beginner',
+      currentKnowledge: '',
+      interests: [],
+    };
+  }
+
+  // Coerce and dedupe interests defensively — the LLM occasionally emits
+  // duplicates with different capitalization. Per-label length-cap at 60.
+  const rawInterests = Array.isArray(parsed.interests)
+    ? (parsed.interests as unknown[])
+        .map((v) => String(v).trim())
+        .filter((v) => v.length > 0 && v.length <= 60)
+    : [];
+  const seen = new Set<string>();
+  const interests: string[] = [];
+  for (const label of rawInterests) {
+    const key = label.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    interests.push(label);
+    if (interests.length >= MAX_EXTRACTED_INTERESTS) break;
+  }
   return {
-    goals: [],
-    experienceLevel: 'beginner',
-    currentKnowledge: '',
-    interests: [],
+    goals: Array.isArray(parsed.goals)
+      ? (parsed.goals as unknown[]).map(String)
+      : [],
+    experienceLevel: String(parsed.experienceLevel ?? 'beginner'),
+    currentKnowledge: String(parsed.currentKnowledge ?? ''),
+    interests,
   };
 }
 
@@ -312,7 +343,9 @@ function interpretInterviewResponse(params: {
 } {
   const { rawResponse, profileId, flow } = params;
 
-  const parse = parseEnvelope(rawResponse);
+  // [BUG-847] Pass call-site surface so parser-side telemetry can attribute
+  // failures without each caller re-implementing logging.
+  const parse = parseEnvelope(rawResponse, 'interview');
   if (parse.ok) {
     return {
       cleanResponse: parse.envelope.reply.trim(),
@@ -355,7 +388,11 @@ function buildFocusLine(bookTitle: string | undefined): string {
 export async function processInterviewExchange(
   context: InterviewContext,
   userMessage: string,
-  options?: { exchangeCount?: number; profileId?: string; learnerName?: string }
+  // [BUG-839] exchangeCount is REQUIRED — the server-side hard cap
+  // (MAX_INTERVIEW_EXCHANGES) is the only fail-safe when the model never
+  // emits readyToFinish. Making it optional previously meant a future caller
+  // could silently default to 0 and let the interview loop indefinitely.
+  options: { exchangeCount: number; profileId?: string; learnerName?: string }
 ): Promise<InterviewResult> {
   const safeSubjectName = sanitizeXmlValue(context.subjectName, 200);
   const focusLine = buildFocusLine(context.bookTitle);
@@ -393,7 +430,7 @@ export async function processInterviewExchange(
   // `exchangeCount` from the route is the 1-indexed number of the current
   // user turn (including this one). [F-042] This is belt + suspenders: even
   // if the LLM returns ready_to_finish: false forever, the interview ends.
-  const currentExchangeCount = options?.exchangeCount ?? 0;
+  const currentExchangeCount = options.exchangeCount;
   const isComplete =
     readyToFinish || currentExchangeCount >= MAX_INTERVIEW_EXCHANGES;
 
@@ -416,8 +453,11 @@ export async function processInterviewExchange(
 export async function streamInterviewExchange(
   context: InterviewContext,
   userMessage: string,
-  options?: {
-    exchangeCount?: number;
+  // [BUG-839] exchangeCount is REQUIRED — see processInterviewExchange for
+  // rationale. The hard cap is what guarantees termination; making it
+  // optional was an invitation for a future caller to skip the check.
+  options: {
+    exchangeCount: number;
     profileId?: string;
     learnerName?: string;
     /**
@@ -457,7 +497,7 @@ export async function streamInterviewExchange(
   ];
 
   const streamResult = await routeAndStream(messages, 1);
-  const currentExchangeCount = options?.exchangeCount ?? 0;
+  const currentExchangeCount = options.exchangeCount;
 
   // Tee the provider stream: mobile sees only the envelope `reply` chars,
   // while the accumulator captures the full raw envelope for signal parsing

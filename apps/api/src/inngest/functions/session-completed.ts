@@ -134,11 +134,28 @@ export const sessionCompleted = inngest.createFunction(
     // as a separate async step; we give it up to 60 s to land.
     const isAbandoned = summaryStatus === 'auto_closed';
     if ((sessionType === 'homework' || !topicId) && !isAbandoned) {
-      await step.waitForEvent('wait-for-filing', {
+      const filingEvent = await step.waitForEvent('wait-for-filing', {
         event: 'app/filing.completed',
         match: 'data.sessionId',
         timeout: '60s',
       });
+      // [BUG-852] Inngest returns null on timeout. We intentionally do NOT
+      // fail the step here — filing may have completed via DB write even if
+      // the event was missed (the re-read below covers that). But silent
+      // proceed-with-stale-placement was invisible in observability, so
+      // escalate to Sentry + structured warn so we can quantify how often
+      // the 60s window is too short.
+      if (filingEvent == null) {
+        const timeoutErr = new Error(
+          'session-completed: filing waitForEvent timed out after 60s'
+        );
+        captureException(timeoutErr, { profileId });
+        console.warn(
+          `[session-completed] filing waitForEvent timed out for session=${sessionId}, profileId=${profileId}, sessionType=${
+            sessionType ?? 'unknown'
+          } — proceeding with stale topic placement`
+        );
+      }
     }
 
     // F-6: Filing may have backfilled topicId even if the event didn't arrive

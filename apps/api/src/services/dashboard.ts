@@ -170,6 +170,11 @@ export function calculateGuidedRatio(guided: number, total: number): number {
   return Math.min(1, Math.max(0, guided / total));
 }
 
+export interface GuidedMetrics {
+  guidedCount: number;
+  totalProblemCount: number;
+}
+
 /**
  * Counts AI-response events in sessionEvents for a child within a date range,
  * classifying those with escalationRung >= 3 as "guided".
@@ -181,7 +186,7 @@ export async function countGuidedMetrics(
   db: Database,
   childProfileId: string,
   startDate: Date
-): Promise<{ guidedCount: number; totalProblemCount: number }> {
+): Promise<GuidedMetrics> {
   // BUG-731 [PERF-1]: previously loaded every ai_response event into JS to
   // count one JSONB field. Now aggregated in SQL: a single round-trip
   // returns COUNT(*) plus a conditional COUNT for rung >= 3.
@@ -210,6 +215,55 @@ export async function countGuidedMetrics(
     guidedCount: Number(row?.guidedCount ?? 0),
     totalProblemCount: Number(row?.totalProblemCount ?? 0),
   };
+}
+
+/**
+ * Batched variant of countGuidedMetrics for dashboards covering multiple
+ * children. Replaces N parallel round-trips (one per child) with a single
+ * GROUP BY query.
+ *
+ * [BUG-734 / PERF-4] The parent dashboard previously called
+ * countGuidedMetrics inside Promise.all over every child link, which made
+ * one connection-bound round-trip per child. For a parent of 4 children
+ * that is 4× the latency tax with identical SQL shape on every call. This
+ * variant collapses them into a single aggregate query keyed by profileId
+ * and returns a Map so callers can index by child ID without losing the
+ * "0 events" case (children with no events appear in the map with zeros).
+ */
+export async function countGuidedMetricsBatch(
+  db: Database,
+  childProfileIds: string[],
+  startDate: Date
+): Promise<Map<string, GuidedMetrics>> {
+  const result = new Map<string, GuidedMetrics>();
+  for (const id of childProfileIds) {
+    result.set(id, { guidedCount: 0, totalProblemCount: 0 });
+  }
+  if (childProfileIds.length === 0) return result;
+
+  const rows = await db
+    .select({
+      profileId: sessionEvents.profileId,
+      guidedCount: sql<number>`COUNT(*) FILTER (WHERE (${sessionEvents.metadata}->>'escalationRung')::int >= 3)`,
+      totalProblemCount: sql<number>`COUNT(*)`,
+    })
+    .from(sessionEvents)
+    .where(
+      and(
+        inArray(sessionEvents.profileId, childProfileIds),
+        eq(sessionEvents.eventType, 'ai_response'),
+        gte(sessionEvents.createdAt, startDate)
+      )
+    )
+    .groupBy(sessionEvents.profileId);
+
+  for (const row of rows) {
+    result.set(row.profileId, {
+      guidedCount: Number(row.guidedCount ?? 0),
+      totalProblemCount: Number(row.totalProblemCount ?? 0),
+    });
+  }
+  return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -440,16 +494,28 @@ export async function getChildrenForParent(
   // `totalTimeThisWeekMinutes`/`subjectNames`, which are computed inside
   // the for-loop below. We therefore do the parallel fan-out AFTER we've
   // precomputed those inputs per child in a first pass.
-  const [progressResults, guidedMetricsResults] = await Promise.all([
+  // [BUG-734 / PERF-4] countGuidedMetrics was previously called once per
+  // child via Promise.all — N parallel round-trips with identical SQL
+  // shape. Replaced with a single GROUP BY aggregate that returns a Map
+  // keyed by profileId, dropping the dashboard-build cost from O(N) to
+  // O(1) on this segment.
+  const [progressResults, guidedMetricsByProfile] = await Promise.all([
     Promise.all(
       validLinks.map((l) => getOverallProgress(db, l.childProfileId))
     ),
-    Promise.all(
-      validLinks.map((l) =>
-        countGuidedMetrics(db, l.childProfileId, startOfLastWeek)
-      )
+    countGuidedMetricsBatch(
+      db,
+      validLinks.map((l) => l.childProfileId),
+      startOfLastWeek
     ),
   ]);
+  const guidedMetricsResults = validLinks.map(
+    (l) =>
+      guidedMetricsByProfile.get(l.childProfileId) ?? {
+        guidedCount: 0,
+        totalProblemCount: 0,
+      }
+  );
 
   // Batch streaks + XP for all children (reuse childProfileIds from links)
   const [streakResults, xpResults] = await Promise.all([

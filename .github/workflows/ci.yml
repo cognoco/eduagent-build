@@ -22,6 +22,14 @@ permissions:
   actions: read
   contents: read
 
+# [BUG-787 / CFG-7] Cancel duplicate runs on rapid pushes to the same ref.
+# PRs use the PR number to ensure each push to the PR cancels the prior run;
+# pushes to main fall through to the ref so concurrent merges queue but do
+# not cancel each other (we still want every main commit's CI to run).
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   main:
     runs-on: ubuntu-latest

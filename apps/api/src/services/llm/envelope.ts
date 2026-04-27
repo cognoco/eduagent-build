@@ -3,6 +3,9 @@ import {
   type LlmResponseEnvelope,
 } from '@eduagent/schemas';
 import { extractFirstJsonObject } from './extract-json';
+import { createLogger } from '../logger';
+
+const logger = createLogger();
 
 // ---------------------------------------------------------------------------
 // parseEnvelope — shared helper for all LLM flows migrating to the structured
@@ -15,6 +18,11 @@ import { extractFirstJsonObject } from './extract-json';
 // Callers MUST NOT treat a parse failure as "no signals" silently — they
 // should either fail the flow, fall back to a safe default, or log the raw
 // text for triage. See docs/specs/2026-04-18-llm-response-envelope.md.
+//
+// [BUG-847] Every parse FAILURE emits a structured `llm.envelope.parse_failed`
+// log entry with the call-site `surface` so we can query "how many envelopes
+// failed schema validation in the last 24h, on which surface" without relying
+// on each caller to remember to log. Successful parses are silent.
 // ---------------------------------------------------------------------------
 
 export type ParseEnvelopeSuccess = {
@@ -36,7 +44,19 @@ export type ParseEnvelopeFailure = {
 
 export type ParseEnvelopeResult = ParseEnvelopeSuccess | ParseEnvelopeFailure;
 
-export function parseEnvelope(response: string): ParseEnvelopeResult {
+/**
+ * Identifies the call-site so triage can answer "where is this failure coming
+ * from?" without re-reading the stack trace. Add a new value here when a new
+ * envelope-consuming flow lands; never pass a free-form string.
+ */
+export type EnvelopeSurface =
+  | 'interview'
+  | 'exchange.session'
+  | 'exchange.silent_classify'
+  | 'filing'
+  | 'unknown';
+
+function parseEnvelopeRaw(response: string): ParseEnvelopeResult {
   const jsonStr = extractFirstJsonObject(response);
   if (!jsonStr) {
     return { ok: false, reason: 'no_json_found', raw: response };
@@ -60,6 +80,24 @@ export function parseEnvelope(response: string): ParseEnvelopeResult {
   }
 
   return { ok: true, envelope: result.data };
+}
+
+export function parseEnvelope(
+  response: string,
+  surface: EnvelopeSurface = 'unknown'
+): ParseEnvelopeResult {
+  const result = parseEnvelopeRaw(response);
+  if (!result.ok) {
+    logger.warn('llm.envelope.parse_failed', {
+      surface,
+      reason: result.reason,
+      // 200-char snippet keeps log volume bounded while still giving a triage
+      // hand-hold; full raw response is in `result.raw` for callers that need
+      // it but is too noisy to ship to log aggregation by default.
+      rawSnippet: response.slice(0, 200),
+    });
+  }
+  return result;
 }
 
 // ---------------------------------------------------------------------------

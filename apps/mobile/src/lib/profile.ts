@@ -11,6 +11,7 @@ import { createElement, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import * as SecureStore from './secure-storage';
 import { sanitizeSecureStoreKey } from './secure-storage';
+import { Sentry } from './sentry';
 import type { Profile } from '@eduagent/schemas';
 import { useProfiles } from '../hooks/use-profiles';
 import {
@@ -62,6 +63,11 @@ export function isGuardianProfile(
 export interface SwitchProfileResult {
   success: boolean;
   error?: string;
+  // [BUG-828] True when the in-memory switch succeeded but the SecureStore
+  // write failed — the change won't survive an app restart. Callers should
+  // surface a non-blocking warning so the user knows they may need to re-pick
+  // the profile after relaunching.
+  persistenceFailed?: boolean;
 }
 
 export interface ProfileContextValue {
@@ -197,10 +203,22 @@ export function ProfileProvider({
           error: 'Network error while switching profile',
         };
       }
+      let persistenceFailed = false;
       try {
         await SecureStore.setItemAsync(ACTIVE_PROFILE_KEY, profileId);
-      } catch {
-        /* SecureStore write failed — profile switch proceeds in-memory */
+      } catch (storageErr) {
+        // [BUG-828] Silent recovery ban — the in-memory switch will still
+        // succeed below so navigation does not get stuck, but if SecureStore
+        // failed the change won't persist past the next app launch. Capture
+        // for telemetry and signal to the caller via persistenceFailed so a
+        // non-blocking warning can be shown.
+        persistenceFailed = true;
+        Sentry.captureException(storageErr, {
+          tags: {
+            component: 'ProfileProvider',
+            action: 'switch-profile-securestore',
+          },
+        });
       }
       // State update LAST — triggers re-renders that change themeKey and
       // remount the navigation tree.  Callers should close modals before
@@ -237,7 +255,9 @@ export function ProfileProvider({
         predicate: (query) =>
           PROFILE_SCOPED_KEYS.includes(String(query.queryKey[0])),
       });
-      return { success: true };
+      return persistenceFailed
+        ? { success: true, persistenceFailed: true }
+        : { success: true };
     },
     [client, queryClient]
   );

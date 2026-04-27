@@ -1,5 +1,26 @@
 import { isRecognizedMarker, parseEnvelope } from './envelope';
 
+// [BUG-847] Telemetry helper — the structured logger writes JSON entries to
+// `console.warn`, so we spy on that and parse the captured JSON to assert
+// against `message`, `context.surface`, and `context.reason`.
+function captureLoggerWarns(): {
+  spy: jest.SpyInstance;
+  entries: () => Array<{ message: string; context?: Record<string, unknown> }>;
+} {
+  const spy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+  return {
+    spy,
+    entries: () =>
+      spy.mock.calls.map(([raw]) => {
+        try {
+          return JSON.parse(String(raw));
+        } catch {
+          return { message: String(raw) };
+        }
+      }),
+  };
+}
+
 describe('parseEnvelope', () => {
   it('parses a minimal valid envelope', () => {
     const result = parseEnvelope('{"reply": "hello"}');
@@ -90,6 +111,82 @@ describe('parseEnvelope', () => {
     if (result.ok) {
       expect(result.envelope.ui_hints?.note_prompt?.show).toBe(true);
     }
+  });
+
+  // ---- [BUG-847] Telemetry on parse failures ------------------------------
+
+  it('[BUG-847] emits llm.envelope.parse_failed on no_json_found, tagged with surface', () => {
+    const { spy, entries } = captureLoggerWarns();
+    parseEnvelope('just prose, no JSON', 'interview');
+    const [entry] = entries();
+    expect(entry?.message).toBe('llm.envelope.parse_failed');
+    expect(entry?.context).toEqual(
+      expect.objectContaining({
+        surface: 'interview',
+        reason: 'no_json_found',
+        rawSnippet: 'just prose, no JSON',
+      })
+    );
+    spy.mockRestore();
+  });
+
+  it('[BUG-847] emits llm.envelope.parse_failed on invalid_json', () => {
+    const { spy, entries } = captureLoggerWarns();
+    parseEnvelope('{"reply": "x",}', 'exchange.session');
+    const [entry] = entries();
+    expect(entry?.message).toBe('llm.envelope.parse_failed');
+    expect(entry?.context).toEqual(
+      expect.objectContaining({
+        surface: 'exchange.session',
+        reason: 'invalid_json',
+      })
+    );
+    spy.mockRestore();
+  });
+
+  it('[BUG-847] emits llm.envelope.parse_failed on schema_violation', () => {
+    const { spy, entries } = captureLoggerWarns();
+    parseEnvelope(
+      '{"signals": {"ready_to_finish": true}}',
+      'exchange.silent_classify'
+    );
+    const [entry] = entries();
+    expect(entry?.message).toBe('llm.envelope.parse_failed');
+    expect(entry?.context).toEqual(
+      expect.objectContaining({
+        surface: 'exchange.silent_classify',
+        reason: 'schema_violation',
+      })
+    );
+    spy.mockRestore();
+  });
+
+  it('[BUG-847] does NOT emit telemetry on a successful parse', () => {
+    const { spy, entries } = captureLoggerWarns();
+    parseEnvelope('{"reply": "all good"}', 'interview');
+    expect(entries()).toHaveLength(0);
+    spy.mockRestore();
+  });
+
+  it('[BUG-847] defaults surface to "unknown" when caller omits it', () => {
+    const { spy, entries } = captureLoggerWarns();
+    parseEnvelope('not json');
+    const [entry] = entries();
+    expect(entry?.context).toEqual(
+      expect.objectContaining({ surface: 'unknown' })
+    );
+    spy.mockRestore();
+  });
+
+  it('[BUG-847] truncates the raw snippet at 200 chars to bound log volume', () => {
+    const { spy, entries } = captureLoggerWarns();
+    const long = 'x'.repeat(500);
+    parseEnvelope(long, 'filing');
+    const [entry] = entries();
+    expect(
+      (entry?.context as { rawSnippet?: string })?.rawSnippet?.length
+    ).toBe(200);
+    spy.mockRestore();
   });
 });
 
