@@ -12,6 +12,54 @@
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
 import { getTierConfig } from '../../services/subscription';
+import { captureException } from '../../services/sentry';
+import { createLogger } from '../../services/logger';
+
+const logger = createLogger();
+
+// [BUG-843 / F-SVC-011] Per-trial errors used to silently `console.error`
+// inside the loop, so the cron reported a lower count and stuck trials
+// accumulated invisibly. Each per-trial failure now (a) emits a structured
+// error log via the canonical logger, and (b) dispatches this event so the
+// `trialExpiryFailureObserve` handler is the queryable terminus and a
+// future on-call rule can page on rate spikes. captureException is kept
+// alongside both so Sentry sees the raw stack.
+const TRIAL_EXPIRY_FAILURE_EVENT = 'app/billing.trial_expiry_failed' as const;
+
+async function escalateTrialExpiryFailure(params: {
+  step: 'process-expired-trials' | 'process-extended-trial-expiry';
+  trialId: string;
+  err: unknown;
+}): Promise<void> {
+  const reason =
+    params.err instanceof Error ? params.err.message : String(params.err);
+  logger.error('billing.trial_expiry_failed', {
+    step: params.step,
+    trialId: params.trialId,
+    reason,
+  });
+  try {
+    await inngest.send({
+      name: TRIAL_EXPIRY_FAILURE_EVENT,
+      data: {
+        step: params.step,
+        trialId: params.trialId,
+        reason,
+        timestamp: new Date().toISOString(),
+      },
+    });
+  } catch (sendError) {
+    // Inngest dispatch must not crash the cron — the structured log + Sentry
+    // capture already persist the failure. A separate observability rule on
+    // *_dispatch_failed catches the dispatch failure itself.
+    logger.error('billing.trial_expiry_failed_dispatch_failed', {
+      step: params.step,
+      trialId: params.trialId,
+      sendError:
+        sendError instanceof Error ? sendError.message : String(sendError),
+    });
+  }
+}
 import {
   findExpiredTrials,
   findSubscriptionsByTrialDateRange,
@@ -73,7 +121,21 @@ export const trialExpiry = inngest.createFunction(
           );
           count++;
         } catch (err) {
-          console.error(`Failed to transition trial ${trial.id}:`, err);
+          // [J-5] captureException keeps the raw stack queryable in Sentry.
+          captureException(err, {
+            extra: {
+              context: 'trial-expiry.transition',
+              subscriptionId: trial.id,
+            },
+          });
+          // [BUG-843 / F-SVC-011] Also escalate via structured log + Inngest
+          // event so the failure isn't invisible in non-Sentry observability
+          // and a follow-up retry/alert handler has a real listener.
+          await escalateTrialExpiryFailure({
+            step: 'process-expired-trials',
+            trialId: trial.id,
+            err,
+          });
         }
       }
 
@@ -106,7 +168,20 @@ export const trialExpiry = inngest.createFunction(
             );
             count++;
           } catch (err) {
-            console.error(`Failed to downgrade trial ${trial.id}:`, err);
+            // [J-5] captureException keeps the raw stack queryable in Sentry.
+            captureException(err, {
+              extra: {
+                context: 'trial-expiry.downgrade',
+                subscriptionId: trial.id,
+              },
+            });
+            // [BUG-843 / F-SVC-011] Per-trial structured escalation —
+            // see the helper for the rationale.
+            await escalateTrialExpiryFailure({
+              step: 'process-extended-trial-expiry',
+              trialId: trial.id,
+              err,
+            });
           }
         }
 

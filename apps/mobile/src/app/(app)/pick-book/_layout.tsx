@@ -1,6 +1,13 @@
 import { Stack } from 'expo-router';
 import { useThemeColors } from '../../../lib/theme';
 
+// Seed this nested stack with `index` so a cross-tab deep push to
+// /pick-book/[subjectId] synthesizes a 2-deep stack instead of a 1-deep stack.
+// Without this, router.back() falls through to the Tabs first-route (Home).
+export const unstable_settings = {
+  initialRouteName: 'index',
+};
+
 export default function PickBookLayout(): React.JSX.Element {
   const colors = useThemeColors();
   return (

@@ -24,6 +24,7 @@ import {
 } from '../services/weekly-report';
 import { buildCuratedMemoryView } from '../services/curated-memory';
 import { assertParentAccess } from '../services/family-access';
+import { notFound } from '../errors';
 
 type DashboardRouteEnv = {
   Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
@@ -50,6 +51,12 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     const parentProfileId = requireProfileId(c.get('profileId'));
     const childProfileId = c.req.param('profileId');
 
+    // [BUG-834] Defense-in-depth: assert parent→child link at route entry.
+    // Service-layer guard exists, but a route-entry guard guarantees that
+    // any future refactor (or a service that forgets the check) cannot
+    // become an IDOR. 404 vs 403 are no longer indistinguishable.
+    await assertParentAccess(db, parentProfileId, childProfileId);
+
     const child = await getChildDetail(db, parentProfileId, childProfileId);
     return c.json({ child });
   })
@@ -58,6 +65,9 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     const db = c.get('db');
     const parentProfileId = requireProfileId(c.get('profileId'));
     const childProfileId = c.req.param('profileId');
+
+    // [BUG-834] Defense-in-depth at route entry.
+    await assertParentAccess(db, parentProfileId, childProfileId);
 
     const inventory = await getChildInventory(
       db,
@@ -76,6 +86,9 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
       const childProfileId = c.req.param('profileId');
       const query = c.req.valid('query');
 
+      // [BUG-834] Defense-in-depth at route entry.
+      await assertParentAccess(db, parentProfileId, childProfileId);
+
       const history = await getChildProgressHistory(
         db,
         parentProfileId,
@@ -93,6 +106,9 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     const childProfileId = c.req.param('profileId');
     const subjectId = c.req.param('subjectId');
 
+    // [BUG-834] Defense-in-depth at route entry.
+    await assertParentAccess(db, parentProfileId, childProfileId);
+
     const topics = await getChildSubjectTopics(
       db,
       parentProfileId,
@@ -107,6 +123,9 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     const db = c.get('db');
     const parentProfileId = requireProfileId(c.get('profileId'));
     const childProfileId = c.req.param('profileId');
+
+    // [BUG-834] Defense-in-depth at route entry.
+    await assertParentAccess(db, parentProfileId, childProfileId);
 
     const sessions = await getChildSessions(
       db,
@@ -123,6 +142,11 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     const childProfileId = c.req.param('profileId');
     const sessionId = c.req.param('sessionId');
 
+    // [BUG-834] Defense-in-depth at route entry. Without this, getChildSessionDetail
+    // returning null for "not found" is indistinguishable from "forbidden" — a future
+    // refactor of the service could leak cross-family session IDs as 404 (enumeration).
+    await assertParentAccess(db, parentProfileId, childProfileId);
+
     const session = await getChildSessionDetail(
       db,
       parentProfileId,
@@ -130,7 +154,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
       sessionId
     );
     if (!session) {
-      return c.json({ error: 'Session not found' }, 404);
+      return notFound(c, 'Session not found');
     }
     return c.json({ session });
   })
@@ -169,6 +193,9 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     const parentProfileId = requireProfileId(c.get('profileId'));
     const childProfileId = c.req.param('profileId');
 
+    // [BUG-834] Defense-in-depth at route entry.
+    await assertParentAccess(db, parentProfileId, childProfileId);
+
     const reports = await getChildReports(db, parentProfileId, childProfileId);
     return c.json({ reports });
   })
@@ -179,6 +206,9 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     const childProfileId = c.req.param('profileId');
     const reportId = c.req.param('reportId');
 
+    // [BUG-834] Defense-in-depth at route entry.
+    await assertParentAccess(db, parentProfileId, childProfileId);
+
     const report = await getChildReportDetail(
       db,
       parentProfileId,
@@ -186,7 +216,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
       reportId
     );
     if (!report) {
-      return c.json({ error: 'Report not found' }, 404);
+      return notFound(c, 'Report not found');
     }
     return c.json({ report });
   })
@@ -197,6 +227,9 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     const childProfileId = c.req.param('profileId');
     const reportId = c.req.param('reportId');
 
+    // [BUG-834] Defense-in-depth at route entry.
+    await assertParentAccess(db, parentProfileId, childProfileId);
+
     await markChildReportViewed(db, parentProfileId, childProfileId, reportId);
     return c.json({ viewed: true });
   })
@@ -206,6 +239,9 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     const db = c.get('db');
     const parentProfileId = requireProfileId(c.get('profileId'));
     const childProfileId = c.req.param('profileId');
+
+    // [BUG-834] Defense-in-depth at route entry.
+    await assertParentAccess(db, parentProfileId, childProfileId);
 
     const reports = await listWeeklyReportsForParentChild(
       db,
@@ -221,6 +257,9 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     const childProfileId = c.req.param('profileId');
     const reportId = c.req.param('reportId');
 
+    // [BUG-834] Defense-in-depth at route entry.
+    await assertParentAccess(db, parentProfileId, childProfileId);
+
     const report = await getWeeklyReportForParentChild(
       db,
       parentProfileId,
@@ -228,7 +267,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
       reportId
     );
     if (!report) {
-      return c.json({ error: 'Report not found' }, 404);
+      return notFound(c, 'Report not found');
     }
     return c.json({ report });
   })
@@ -240,6 +279,9 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
       const parentProfileId = requireProfileId(c.get('profileId'));
       const childProfileId = c.req.param('profileId');
       const reportId = c.req.param('reportId');
+
+      // [BUG-834] Defense-in-depth at route entry.
+      await assertParentAccess(db, parentProfileId, childProfileId);
 
       await markWeeklyReportViewed(
         db,

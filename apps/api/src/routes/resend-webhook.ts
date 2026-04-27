@@ -125,34 +125,42 @@ function bufferToBase64(buffer: ArrayBuffer): string {
 }
 
 /**
- * [CR-2] Constant-time base64 string comparison via direct byte XOR.
- * Both inputs are base64-encoded HMAC-SHA256 digests (always 44 chars / 32
- * bytes decoded), so the lengths always match. The XOR loop runs all 32
- * iterations regardless of where (or whether) the strings differ.
+ * [SEC-4] Constant-time base64 string comparison.
  *
- * Previous implementation wrapped inputs in an unnecessary inner HMAC with
- * a hardcoded static key. Removed because the HMAC added no security — its
- * only purpose was length normalisation, which is guaranteed by the inputs.
+ * `expectedSig` is our HMAC-SHA256 output (always 44 base64 chars / 32 bytes).
+ * `providedSig` is attacker-controlled input from the webhook header, so its
+ * length can differ. An early `if (a.length !== b.length) return false` leaks
+ * the length of the expected signature via timing.
+ *
+ * Fix: decode both to byte arrays, then XOR over the LONGER of the two lengths.
+ * The length difference is folded into `diff` so different-length inputs always
+ * fail without short-circuiting.
  */
 function timingSafeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
   const bytesA = base64ToBytes(a);
   const bytesB = base64ToBytes(b);
-  if (bytesA.length !== bytesB.length) return false;
-  let diff = 0;
-  for (let i = 0; i < bytesA.length; i++) {
+  const len = Math.max(bytesA.length, bytesB.length);
+  // Fold length mismatch into diff so arrays of different lengths always fail.
+  let diff = bytesA.length ^ bytesB.length;
+  for (let i = 0; i < len; i++) {
     diff |= (bytesA[i] ?? 0) ^ (bytesB[i] ?? 0);
   }
   return diff === 0;
 }
 
 function base64ToBytes(b64: string): Uint8Array {
-  const binary = atob(b64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
+  try {
+    const binary = atob(b64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes;
+  } catch {
+    // Invalid base64 (attacker-controlled input) — return empty array.
+    // timingSafeEqual will treat it as a 0-byte array and the comparison will fail.
+    return new Uint8Array(0);
   }
-  return bytes;
 }
 
 // ---------------------------------------------------------------------------

@@ -9,10 +9,24 @@ function isUnsupportedTransactionError(error: unknown): boolean {
   );
 }
 
-export function createDatabase(databaseUrl: string) {
+export interface CreateDatabaseOptions {
+  /**
+   * [P-6] Callback invoked when the neon-http transaction fallback fires.
+   * Callers should pass their structured telemetry function (e.g. captureException)
+   * here so the fallback is queryable in production monitoring.
+   * If omitted, a console.warn is emitted (dev/test only behaviour).
+   */
+  onTransactionFallback?: (error: unknown) => void;
+}
+
+export function createDatabase(
+  databaseUrl: string,
+  options: CreateDatabaseOptions = {}
+) {
   const sql = neon(databaseUrl);
   const db = drizzle(sql, { schema });
   const originalTransaction = db.transaction.bind(db);
+  const { onTransactionFallback } = options;
 
   return Object.assign(db, {
     // Neon HTTP does not support multi-statement transactions.
@@ -27,9 +41,16 @@ export function createDatabase(databaseUrl: string) {
           // Neon HTTP lacks transactions — pass base DB cast as PgTransaction
           // so service functions that accept Database | PgTransaction still work.
           // Statements execute individually; no atomicity or rollback.
-          console.warn(
-            '[db] neon-http transaction fallback — running without atomicity'
-          );
+          //
+          // [P-6] Emit structured telemetry so this is queryable in production.
+          // console.warn alone is not queryable — callers inject captureException.
+          if (onTransactionFallback) {
+            onTransactionFallback(error);
+          } else {
+            console.warn(
+              '[db] neon-http transaction fallback — running without atomicity'
+            );
+          }
           return fn(db as unknown as Parameters<typeof fn>[0]);
         }
         throw error;

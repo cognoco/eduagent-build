@@ -597,12 +597,39 @@ describe('decrementQuota', () => {
 // ---------------------------------------------------------------------------
 
 describe('incrementQuota', () => {
-  it('calls update on quota pool to decrement usedThisMonth', async () => {
+  // [T-2] Strengthen: verify the SET payload includes both usage counters
+  // and the WHERE clause targets the correct table and subscription.
+  it('issues an UPDATE that decrements both usedThisMonth and usedToday with GREATEST guard', async () => {
     const db = createMockDb();
 
     await incrementQuota(db, subscriptionId);
 
-    expect(db.update).toHaveBeenCalled();
+    // update() must be called exactly once
+    expect(db.update).toHaveBeenCalledTimes(1);
+
+    // .set() payload must include both counters and updatedAt
+    const updateSetMock = (db.update as jest.Mock).mock.results[0].value
+      .set as jest.Mock;
+    expect(updateSetMock).toHaveBeenCalledTimes(1);
+    const setPayload = updateSetMock.mock.calls[0][0] as Record<
+      string,
+      unknown
+    >;
+    // Both counter fields must be present — they carry GREATEST(... - 1, 0) SQL
+    expect(setPayload).toHaveProperty('usedThisMonth');
+    expect(setPayload).toHaveProperty('usedToday');
+    expect(setPayload).toHaveProperty('updatedAt');
+
+    // .where() must be called — ensures the update is scoped to the subscription
+    const whereMock = updateSetMock.mock.results[0].value.where as jest.Mock;
+    expect(whereMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not throw when quota pool does not exist (UPDATE affects 0 rows — safe no-op)', async () => {
+    // incrementQuota is a best-effort refund: if the row doesn't exist, it's
+    // a no-op. The test verifies no exception is thrown.
+    const db = createMockDb({ updateReturning: [] });
+    await expect(incrementQuota(db, subscriptionId)).resolves.toBeUndefined();
   });
 });
 

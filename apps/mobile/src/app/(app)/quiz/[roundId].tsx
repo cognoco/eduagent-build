@@ -85,7 +85,7 @@ export default function QuizRoundDetailScreen() {
         <Text className="text-on-surface">Could not load round details</Text>
         <Pressable
           testID="round-detail-back"
-          className="mt-4 min-h-[32px] min-w-[32px] items-center justify-center"
+          className="mt-4 min-h-[44px] min-w-[44px] items-center justify-center"
           onPress={() => goBackOrReplace(router, '/(app)/quiz/history')}
           accessibilityRole="button"
           accessibilityLabel="Go back"
@@ -108,7 +108,7 @@ export default function QuizRoundDetailScreen() {
         <Pressable
           testID="round-detail-back-btn"
           onPress={() => goBackOrReplace(router, '/(app)/quiz/history')}
-          className="min-h-[32px] min-w-[32px] items-center justify-center self-start"
+          className="min-h-[44px] min-w-[44px] items-center justify-center self-start"
           accessibilityRole="button"
           accessibilityLabel="Go back"
         >

@@ -9,7 +9,9 @@ import {
   subjects,
 } from '@eduagent/database';
 import { routeAndCall } from '../../services/llm';
+import { extractFirstJsonObject } from '../../services/llm/extract-json';
 import { sanitizeXmlValue } from '../../services/llm/sanitize';
+import { captureException } from '../../services/sentry';
 
 const filingCompletedDataSchema = z.object({
   bookId: z.string(),
@@ -106,11 +108,26 @@ Suggest exactly 2 new topic titles that would be natural next steps within this 
 
       const llmResult = await routeAndCall(messages, 1);
 
-      let jsonStr = llmResult.response.trim();
-      if (jsonStr.startsWith('```')) {
-        jsonStr = jsonStr
-          .replace(/^```(?:json)?\n?/, '')
-          .replace(/\n?```$/, '');
+      // [BUG-842 / F-SVC-009] Use canonical extractFirstJsonObject helper
+      // (handles markdown fences AND brace-depth walking) instead of ad-hoc
+      // fence stripping. Log parse failures with metrics so silent skips
+      // surface in telemetry.
+      const jsonStr = extractFirstJsonObject(llmResult.response);
+      if (!jsonStr) {
+        captureException(
+          new Error('post-session-suggestions: no JSON in LLM response'),
+          {
+            extra: {
+              surface: 'post-session-suggestions',
+              reason: 'no_json_found',
+              rawResponseLength: llmResult.response.length,
+            },
+          }
+        );
+        return {
+          status: 'skipped' as const,
+          reason: 'invalid_json',
+        };
       }
 
       // [BUG-639 / J-3] JSON.parse throws SyntaxError on truncated/non-JSON
@@ -120,7 +137,14 @@ Suggest exactly 2 new topic titles that would be natural next steps within this 
       let raw: unknown;
       try {
         raw = JSON.parse(jsonStr);
-      } catch {
+      } catch (err) {
+        captureException(err, {
+          extra: {
+            surface: 'post-session-suggestions',
+            reason: 'invalid_json',
+            jsonStrSample: jsonStr.slice(0, 200),
+          },
+        });
         return {
           status: 'skipped' as const,
           reason: 'invalid_json',

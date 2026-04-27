@@ -8,6 +8,11 @@ import { accounts, type Database } from '@eduagent/database';
 import { createSubscription } from './billing';
 import { computeTrialEndDate } from './trial';
 import { getTierConfig } from './subscription';
+import { createLogger } from './logger';
+import { captureException } from './sentry';
+import { inngest } from '../inngest/client';
+
+const logger = createLogger();
 
 // ---------------------------------------------------------------------------
 // Types
@@ -122,11 +127,47 @@ export async function findOrCreateAccount(
       trialEndsAt: trialEndsAt.toISOString(),
     });
   } catch (error) {
-    // Log but don't fail account creation — subscription can be retried
-    console.error(
-      'Failed to create trial subscription for new account:',
-      error
-    );
+    // [BUG-837 / F-SVC-003] Don't fail account creation — but billing-adjacent
+    // catches MUST escalate per CLAUDE.md ("Silent recovery without
+    // escalation is banned in billing/auth/webhook code"). Emit:
+    //   1. Structured error log so it's queryable via observability.
+    //   2. Sentry capture so on-call gets paged on aggregate spikes.
+    //   3. Inngest event so a follow-up handler can retry/alert without
+    //      coupling to the lazy-provision path.
+    logger.error('billing.trial_subscription_creation_failed', {
+      accountId: row.id,
+      clerkUserId,
+      reason: error instanceof Error ? error.message : String(error),
+    });
+    captureException(error, {
+      profileId: undefined,
+      extra: {
+        flow: 'findOrCreateAccount.trialSubscription',
+        accountId: row.id,
+        clerkUserId,
+      },
+    });
+    try {
+      await inngest.send({
+        name: 'app/billing.trial_subscription_failed',
+        data: {
+          accountId: row.id,
+          clerkUserId,
+          reason: error instanceof Error ? error.message : String(error),
+          timestamp: new Date().toISOString(),
+        },
+      });
+    } catch (sendError) {
+      // Inngest failure must not mask the primary error path — log and
+      // continue. The structured log + Sentry capture above already cover
+      // the primary failure; the missed Inngest dispatch is itself logged
+      // here so a separate observability rule can alert on it.
+      logger.error('billing.trial_subscription_failed_dispatch_failed', {
+        accountId: row.id,
+        sendError:
+          sendError instanceof Error ? sendError.message : String(sendError),
+      });
+    }
   }
 
   return mapAccountRow(row);

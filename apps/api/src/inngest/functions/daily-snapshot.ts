@@ -55,16 +55,19 @@ export const dailySnapshotRefresh = inngest.createFunction(
     const { profileId } = event.data;
 
     return step.run('refresh-snapshot', async () => {
-      try {
-        const db = getStepDatabase();
-        const profile = await db.query.profiles.findFirst({
-          where: eq(profiles.id, profileId),
-          columns: { id: true },
-        });
-        if (!profile) {
-          return { status: 'skipped', reason: 'profile_missing' };
-        }
+      // [J-11] Do NOT catch-and-return-failed here. Returning { status: 'failed' }
+      // resolves the step successfully — Inngest only retries on thrown errors.
+      // captureException + re-throw lets Inngest retry while still reporting to Sentry.
+      const db = getStepDatabase();
+      const profile = await db.query.profiles.findFirst({
+        where: eq(profiles.id, profileId),
+        columns: { id: true },
+      });
+      if (!profile) {
+        return { status: 'skipped', reason: 'profile_missing' };
+      }
 
+      try {
         const snapshot = await refreshProgressSnapshot(db, profileId);
         return {
           status: 'completed',
@@ -74,7 +77,7 @@ export const dailySnapshotRefresh = inngest.createFunction(
         };
       } catch (error) {
         captureException(error, { profileId });
-        return { status: 'failed', profileId };
+        throw error; // re-throw so Inngest retries this step
       }
     });
   }

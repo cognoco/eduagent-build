@@ -253,6 +253,11 @@ export default function MoreScreen() {
 
   const handleSelectMode = useCallback(
     (mode: LearningMode) => {
+      // [BUG-814] In addition to the JSX `disabled={updateLearningMode.isPending}`
+      // guard, fail closed at the handler level. A rapid double-tap can fire
+      // before React processes the disabled re-render, so the JSX guard is
+      // necessary but not sufficient.
+      if (updateLearningMode.isPending) return;
       if (mode !== learningMode) {
         updateLearningMode.mutate(mode, {
           onError: () => {

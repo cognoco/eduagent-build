@@ -46,8 +46,13 @@ export default function InterviewScreen() {
 
   // BUG-316: Guard against empty/missing subjectId — hooks receive empty string
   // which triggers a 404 API call. Show error state instead.
+  // [BUG-810] Explicitly disable the query when safeSubjectId is undefined so
+  // the gate is visible at the call site (defence-in-depth — the hook also
+  // enforces `!!subjectId` internally).
   const safeSubjectId = subjectId && subjectId.trim() ? subjectId : undefined;
-  const interviewState = useInterviewState(safeSubjectId ?? '');
+  const interviewState = useInterviewState(safeSubjectId ?? '', {
+    enabled: !!safeSubjectId,
+  });
   const {
     stream: streamInterview,
     abort: abortStream,

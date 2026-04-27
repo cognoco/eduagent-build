@@ -21,6 +21,10 @@ export const ERROR_CODES = {
   NOT_IMPLEMENTED: 'NOT_IMPLEMENTED',
   ENV_VALIDATION_ERROR: 'ENV_VALIDATION_ERROR',
   UPSTREAM_ERROR: 'UPSTREAM_ERROR',
+  // Subset of UPSTREAM_ERROR specifically for LLM provider outages so the
+  // mobile error classifier can offer "try again" copy instead of the
+  // generic upstream-failure messaging. [BUG-832 / F-API-03]
+  LLM_UNAVAILABLE: 'LLM_UNAVAILABLE',
   RATE_LIMITED: 'RATE_LIMITED',
 } as const;
 

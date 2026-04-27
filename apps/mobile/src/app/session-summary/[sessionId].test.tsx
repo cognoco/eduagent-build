@@ -113,6 +113,13 @@ jest.mock('../../lib/platform-alert', () => ({
   platformAlert: jest.fn(),
 }));
 
+// [BUG-800] formatApiError stub: returns Error.message verbatim so tests can
+// assert the typed server reason reaches platformAlert.
+jest.mock('../../lib/format-api-error', () => ({
+  formatApiError: (e: unknown) =>
+    e instanceof Error ? e.message : 'Unknown error',
+}));
+
 jest.mock('../../lib/profile', () => ({
   useProfile: () => ({
     activeProfile: { id: 'p-1', birthYear: 2012 },
@@ -214,6 +221,32 @@ describe('SessionSummaryScreen', () => {
     // 5 exchanges, rung 2 → "strong independent thinking"
     expect(screen.getByText(/worked through 5 exchanges/)).toBeTruthy();
     expect(screen.getByText(/strong independent thinking/)).toBeTruthy();
+  });
+
+  // [BUG-801] When the URL passes exchangeCount='0' (legitimate value for
+  // a session that ended before any exchanges), the screen must honor it
+  // rather than silently fall back to the server's transcript count.
+  // Repro: parseInt('0') = 0, which `||` treated as falsy and replaced
+  // with the server count, hiding the actual session state from the user.
+  it('[BUG-801] honors explicit exchangeCount=0 over server fallback', () => {
+    mockParams.exchangeCount = '0';
+    mockTranscriptData = {
+      session: {
+        id: '660e8400-e29b-41d4-a716-446655440000',
+        sessionType: 'general',
+        exchangeCount: 10,
+        wallClockSeconds: 600,
+      },
+      messages: [],
+    } as unknown as never;
+
+    render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+    // The takeaways block is only rendered when exchanges > 0, so with an
+    // explicit 0 the "worked through ... exchanges" copy must NOT appear.
+    expect(screen.queryByText(/worked through \d+ exchange/)).toBeNull();
+    // And the server-side 10 must NOT leak through as a takeaway.
+    expect(screen.queryByText(/worked through 10 exchanges/)).toBeNull();
   });
 
   it('renders summary input', () => {
@@ -472,6 +505,53 @@ describe('SessionSummaryScreen', () => {
 
     // Error text tells user what happened
     expect(screen.getByText(/Couldn't save your summary/)).toBeTruthy();
+  });
+
+  // [BUG-800] When submitSummary rejects, the alert must surface the server's
+  // typed reason (word-limit exceeded, too short, etc.) — not the generic
+  // "Please try again." which hides actionable info from the user.
+  it('[BREAK / BUG-800] alert uses formatApiError so typed server reason reaches user', async () => {
+    mockSubmitMutateAsync.mockRejectedValue(
+      new Error('Reflection too short — needs at least 30 characters')
+    );
+
+    render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+    fireEvent.changeText(
+      screen.getByTestId('summary-input'),
+      'I learned about photosynthesis and chlorophyll absorption'
+    );
+    fireEvent.press(screen.getByTestId('submit-summary-button'));
+
+    await waitFor(() => {
+      expect(platformAlert).toHaveBeenCalledWith(
+        'Could not save',
+        'Reflection too short — needs at least 30 characters'
+      );
+    });
+  });
+
+  it('[BUG-800] non-Error rejection does not crash the alert', async () => {
+    mockSubmitMutateAsync.mockRejectedValue({
+      code: 'WORD_LIMIT',
+      maxWords: 200,
+    });
+
+    render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+    fireEvent.changeText(
+      screen.getByTestId('summary-input'),
+      'I explored gravity and Newtons three laws of motion today'
+    );
+    fireEvent.press(screen.getByTestId('submit-summary-button'));
+
+    await waitFor(() => {
+      // Stub returns 'Unknown error' for non-Error inputs.
+      expect(platformAlert).toHaveBeenCalledWith(
+        'Could not save',
+        'Unknown error'
+      );
+    });
   });
 
   // BUG-33 Phase 1: Structured sentence starter prompt chips

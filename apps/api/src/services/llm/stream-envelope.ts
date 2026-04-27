@@ -91,15 +91,25 @@ export function teeEnvelopeStream(source: AsyncIterable<string>): {
   });
 
   async function* accumulatedSource(): AsyncGenerator<string> {
+    // [BUG-628] Use try/catch/finally so rawResponsePromise ALWAYS settles —
+    // either resolving with whatever was accumulated before early termination,
+    // or rejecting on a source error. Without finally, if the caller stops
+    // consuming cleanReplyStream before the source is exhausted (e.g. client
+    // disconnect, SSE write error), the generator suspends forever and
+    // rawResponsePromise never settles — causing the Cloudflare Worker request
+    // to time out.
     try {
       for await (const chunk of source) {
         raw += chunk;
         yield chunk;
       }
-      resolveRaw(raw);
     } catch (err) {
       rejectRaw(err);
       throw err;
+    } finally {
+      // Resolve with whatever was accumulated. If we already called rejectRaw
+      // above, this resolve is a no-op (Promise settlement is idempotent).
+      resolveRaw(raw);
     }
   }
 

@@ -81,9 +81,15 @@ export default function TopicDetailScreen() {
   const subjectName = Array.isArray(rawSubjectName)
     ? rawSubjectName[0]
     : rawSubjectName;
-  const totalSessions = Array.isArray(rawTotalSessions)
+  // [BUG-813] Guard against NaN from malformed query params (e.g.
+  // `?totalSessions=abc`). Without the isNaN check the UI renders
+  // "NaN sessions" and downstream Number formatting breaks.
+  const parsedTotalSessions = Array.isArray(rawTotalSessions)
     ? Number(rawTotalSessions[0] ?? 0)
     : Number(rawTotalSessions ?? 0);
+  const totalSessions = Number.isFinite(parsedTotalSessions)
+    ? parsedTotalSessions
+    : 0;
 
   const mastery =
     masteryScore !== undefined && masteryScore !== ''

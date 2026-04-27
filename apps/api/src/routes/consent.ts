@@ -28,6 +28,7 @@ import {
 } from '../services/consent';
 import { notFound, forbidden, apiError } from '../errors';
 import { inngest } from '../inngest/client';
+import { captureException } from '../services/sentry';
 
 // [BUG-625 / A-10] Mask third-party PII before returning to a profile that
 // may not own the address. Format: keep first character + last character of
@@ -138,10 +139,18 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
             timestamp: new Date().toISOString(),
           },
         });
-      } catch {
+      } catch (err) {
+        // [A-23] logger.warn alone is invisible in prod — escalate to Sentry so
+        // we can query how often the GDPR reminder workflow is permanently skipped.
         logger.warn(
           '[consent] Failed to dispatch Inngest event — reminder workflow skipped'
         );
+        captureException(err, {
+          extra: {
+            context: 'consent.requested.inngest_dispatch',
+            profileId: result.consentState.profileId,
+          },
+        });
       }
 
       return c.json(
@@ -258,10 +267,18 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
             timestamp: new Date().toISOString(),
           },
         });
-      } catch {
+      } catch (err) {
+        // [A-23] logger.warn alone is invisible in prod — escalate to Sentry so
+        // we can query how often the GDPR 7-day deletion grace period is skipped.
         logger.warn(
           '[consent] Failed to dispatch Inngest revocation event — grace period job skipped'
         );
+        captureException(err, {
+          extra: {
+            context: 'consent.revoked.inngest_dispatch',
+            childProfileId,
+          },
+        });
       }
 
       return c.json({

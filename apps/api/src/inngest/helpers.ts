@@ -1,4 +1,5 @@
 import { createDatabase, type Database } from '@eduagent/database';
+import { captureException } from '../services/sentry';
 
 // ---------------------------------------------------------------------------
 // Module-level DATABASE_URL — set by Inngest middleware on CF Workers,
@@ -44,7 +45,15 @@ export function getStepDatabase(): Database {
     return _cachedDb;
   }
 
-  _cachedDb = createDatabase(url);
+  // [P-6] Pass captureException as onTransactionFallback so the neon-http
+  // transaction fallback is reported to Sentry from Inngest steps too.
+  _cachedDb = createDatabase(url, {
+    onTransactionFallback: (error) => {
+      captureException(error, {
+        extra: { context: 'neon-http.transaction-fallback.inngest-step' },
+      });
+    },
+  });
   _cachedDbUrl = url;
   return _cachedDb;
 }

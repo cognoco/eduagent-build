@@ -1,6 +1,13 @@
 import { Stack } from 'expo-router';
 import { useThemeColors } from '../../../lib/theme';
 
+// Onboarding has multiple sequential screens; seed with `index` so a cross-tab
+// deep push to any onboarding step (e.g. /onboarding/interview from a
+// notification) does not synthesize a 1-deep stack that pops back to Home.
+export const unstable_settings = {
+  initialRouteName: 'index',
+};
+
 export default function OnboardingLayout() {
   const colors = useThemeColors();
   return (

@@ -189,7 +189,9 @@ export default function InterestsContextScreen(): React.ReactElement {
         <Pressable
           testID="interests-context-back"
           onPress={handleBack}
-          className="py-2"
+          className="min-h-[44px] min-w-[44px] items-center justify-center self-start"
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
         >
           <Ionicons name="arrow-back" size={24} color={colors.primary} />
         </Pressable>

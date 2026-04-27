@@ -392,7 +392,11 @@ export default function MentorMemoryScreen() {
 
         <MemorySection title="Interests">
           {(profile?.interests ?? []).length > 0 ? (
-            profile?.interests.map((interest) => {
+            // [BUG-815] Use the same `?? []` guard inside the map call so
+            // the lookup is safe even when profile is undefined or interests
+            // is null (legacy profile rows). The outer length-check already
+            // routes empty arrays to "Nothing saved yet."
+            (profile?.interests ?? []).map((interest) => {
               // BKT-C.2 — interests are now InterestEntry { label, context };
               // read .label for display and keying. Context-aware rendering
               // (school vs free-time chips) lands in the mobile context-picker

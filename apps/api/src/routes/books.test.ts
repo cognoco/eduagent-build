@@ -88,9 +88,11 @@ const mockBookWithTopics = {
 
 jest.mock('../services/curriculum', () => ({
   getBooks: jest.fn().mockResolvedValue([]),
+  getAllProfileBooks: jest.fn().mockResolvedValue({ subjects: [] }),
   getBookWithTopics: jest.fn().mockResolvedValue(null),
   persistBookTopics: jest.fn().mockResolvedValue(mockBookWithTopics),
   claimBookForGeneration: jest.fn().mockResolvedValue(null),
+  moveTopicToBook: jest.fn().mockResolvedValue({ ok: true }),
 }));
 
 jest.mock('../services/book-generation', () => ({
@@ -126,25 +128,29 @@ jest.mock('../inngest/client', () => ({
 import { app } from '../index';
 import {
   getBooks,
+  getAllProfileBooks,
   getBookWithTopics,
   claimBookForGeneration,
 } from '../services/curriculum';
+import {
+  AUTH_HEADERS as BASE_AUTH_HEADERS,
+  BASE_AUTH_ENV,
+} from '../test-utils/test-env';
 
 const mockGetBooks = getBooks as jest.MockedFunction<typeof getBooks>;
+const mockGetAllProfileBooks = getAllProfileBooks as jest.MockedFunction<
+  typeof getAllProfileBooks
+>;
 const mockGetBookWithTopics = getBookWithTopics as jest.MockedFunction<
   typeof getBookWithTopics
 >;
 const mockClaimBookForGeneration =
   claimBookForGeneration as jest.MockedFunction<typeof claimBookForGeneration>;
 
-const TEST_ENV = {
-  CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',
-  CLERK_AUDIENCE: 'test-audience',
-};
+const TEST_ENV = { ...BASE_AUTH_ENV };
 
 const AUTH_HEADERS = {
-  Authorization: 'Bearer valid.jwt.token',
-  'Content-Type': 'application/json',
+  ...BASE_AUTH_HEADERS,
   'X-Profile-Id': 'test-profile-id',
 };
 
@@ -158,6 +164,61 @@ const BOOK_ID = '550e8400-e29b-41d4-a716-446655440001';
 describe('book routes', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+
+  // ---- [BUG-733 / PERF-3] GET /v1/library/books ----
+
+  describe('GET /v1/library/books', () => {
+    it('returns aggregated books across all subjects', async () => {
+      mockGetAllProfileBooks.mockResolvedValueOnce({
+        subjects: [
+          {
+            subjectId: SUBJECT_ID,
+            subjectName: 'History',
+            books: [mockBook as never],
+          },
+        ],
+      });
+
+      const res = await app.request(
+        '/v1/library/books',
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.subjects).toHaveLength(1);
+      expect(body.subjects[0].subjectId).toBe(SUBJECT_ID);
+      expect(body.subjects[0].books).toHaveLength(1);
+      expect(mockGetAllProfileBooks).toHaveBeenCalledTimes(1);
+      // Second arg must be the profile ID — proves the route passes scope.
+      expect((mockGetAllProfileBooks as jest.Mock).mock.calls[0]?.[1]).toBe(
+        'test-profile-id'
+      );
+    });
+
+    it('returns 400 when authenticated but missing X-Profile-Id header', async () => {
+      const res = await app.request(
+        '/v1/library/books',
+        {
+          headers: {
+            Authorization: 'Bearer valid.jwt.token',
+            'Content-Type': 'application/json',
+          },
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(400);
+      expect(mockGetAllProfileBooks).not.toHaveBeenCalled();
+    });
+
+    it('returns 401 without auth header', async () => {
+      const res = await app.request('/v1/library/books', {}, TEST_ENV);
+      expect(res.status).toBe(401);
+      expect(mockGetAllProfileBooks).not.toHaveBeenCalled();
+    });
   });
 
   // ---- GET /v1/subjects/:subjectId/books ----

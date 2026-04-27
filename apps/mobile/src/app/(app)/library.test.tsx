@@ -186,6 +186,61 @@ describe('LibraryScreen', () => {
     ).not.toThrow();
   });
 
+  // [BUG-818] Repro: server returned a partial-success payload where
+  // `topics` was undefined or a non-array value (schema drift, error
+  // payload). Without an Array.isArray guard, `data.topics.map` threw and
+  // white-screened the Library tab.
+  it('[BUG-818] does not crash when retentionQuery.data.topics is undefined', () => {
+    mockUseSubjects.mockReturnValue({
+      data: [
+        {
+          id: 'sub-1',
+          name: 'Math',
+          status: 'IN_PROGRESS',
+        },
+      ] as never,
+      isLoading: false,
+    });
+    mockUseOverallProgress.mockReturnValue({
+      data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
+      isLoading: false,
+    });
+    mockUseQueries.mockReturnValue([
+      { data: { topics: undefined, reviewDueCount: 0 }, isLoading: false },
+    ]);
+
+    expect(() =>
+      render(<LibraryScreen />, { wrapper: createWrapper() })
+    ).not.toThrow();
+  });
+
+  it('[BUG-818] does not crash when retentionQuery.data.topics is a non-array shape', () => {
+    mockUseSubjects.mockReturnValue({
+      data: [
+        {
+          id: 'sub-1',
+          name: 'Math',
+          status: 'IN_PROGRESS',
+        },
+      ] as never,
+      isLoading: false,
+    });
+    mockUseOverallProgress.mockReturnValue({
+      data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
+      isLoading: false,
+    });
+    mockUseQueries.mockReturnValue([
+      {
+        data: { topics: 'unexpected' as unknown as never, reviewDueCount: 0 },
+        isLoading: false,
+      },
+    ]);
+
+    expect(() =>
+      render(<LibraryScreen />, { wrapper: createWrapper() })
+    ).not.toThrow();
+  });
+
   it('shows empty state when there are no subjects', () => {
     mockUseSubjects.mockReturnValue({ data: [], isLoading: false });
     mockUseOverallProgress.mockReturnValue({

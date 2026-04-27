@@ -403,7 +403,10 @@ export default function CreateSubjectScreen() {
   return (
     <KeyboardAvoidingView
       className="flex-1 bg-background items-center"
-      behavior="padding"
+      // [BUG-829] `padding` works on iOS but pushes the input off-screen on
+      // Android (especially with prediction-bar keyboards). `height` is the
+      // documented Android-correct value; web doesn't need either.
+      behavior={Platform.select({ ios: 'padding', android: 'height' })}
     >
       <ScrollView
         ref={scrollRef}

@@ -652,6 +652,105 @@ export async function getBooks(
   });
 }
 
+/**
+ * [BUG-733 / PERF-3] Aggregate books across ALL of a profile's subjects in
+ * a single round-trip. Replaces the per-subject fan-out from `useAllBooks`
+ * where N subjects produced N parallel /subjects/:id/books HTTP calls.
+ *
+ * Returns one entry per subject with its book list, preserving the
+ * shape callers expect (each book carries its computed status and
+ * completedTopicCount). Inactive subjects are included so the Library
+ * Books tab can still render archived/paused subjects' books.
+ */
+export async function getAllProfileBooks(
+  db: Database,
+  profileId: string
+): Promise<{
+  subjects: Array<{
+    subjectId: string;
+    subjectName: string;
+    books: CurriculumBook[];
+  }>;
+}> {
+  const repo = createScopedRepository(db, profileId);
+  const profileSubjects = await repo.subjects.findMany();
+  if (profileSubjects.length === 0) {
+    return { subjects: [] };
+  }
+  const subjectIds = profileSubjects.map((s) => s.id);
+
+  // 1. All books across all subjects in a single query.
+  const bookRows = await db.query.curriculumBooks.findMany({
+    where: inArray(curriculumBooks.subjectId, subjectIds),
+    orderBy: [asc(curriculumBooks.sortOrder), asc(curriculumBooks.createdAt)],
+  });
+
+  if (bookRows.length === 0) {
+    return {
+      subjects: profileSubjects.map((s) => ({
+        subjectId: s.id,
+        subjectName: s.name,
+        books: [],
+      })),
+    };
+  }
+
+  // 2. All non-skipped topic IDs for those books in a single query.
+  const allTopicRows = await db
+    .select({ id: curriculumTopics.id, bookId: curriculumTopics.bookId })
+    .from(curriculumTopics)
+    .where(
+      and(
+        inArray(
+          curriculumTopics.bookId,
+          bookRows.map((b) => b.id)
+        ),
+        eq(curriculumTopics.skipped, false)
+      )
+    );
+
+  const topicsByBook = new Map<string, string[]>();
+  for (const t of allTopicRows) {
+    const existing = topicsByBook.get(t.bookId) ?? [];
+    existing.push(t.id);
+    topicsByBook.set(t.bookId, existing);
+  }
+
+  // 3. Reuse the existing batch-status helper — it already operates over a
+  // pre-grouped Map<bookId, topicIds>, so passing the cross-subject map gives
+  // us the same one-shot retention join that getBooks() does per subject.
+  const statusMap = await computeBookStatusesBatch(db, profileId, topicsByBook);
+
+  // Group books back by subjectId, preserving original order from the SQL
+  // ORDER BY clause (sortOrder, createdAt).
+  const booksBySubject = new Map<string, CurriculumBook[]>();
+  for (const subject of profileSubjects) {
+    booksBySubject.set(subject.id, []);
+  }
+  for (const book of bookRows) {
+    const list = booksBySubject.get(book.subjectId);
+    if (!list) continue;
+    const progress = statusMap.get(book.id) ?? {
+      status: 'NOT_STARTED' as const,
+      completedTopicCount: 0,
+    };
+    list.push({
+      ...mapBookRow(book),
+      status: progress.status,
+      topicCount: (topicsByBook.get(book.id) ?? []).length,
+      completedTopicCount: progress.completedTopicCount,
+    });
+  }
+
+  return {
+    subjects: profileSubjects.map((s) => ({
+      subjectId: s.id,
+      subjectName: s.name,
+      books: booksBySubject.get(s.id) ?? [],
+    })),
+  };
+}
+
 export async function getBookWithTopics(
   db: Database,
   profileId: string,
@@ -1273,7 +1372,9 @@ export async function explainTopicOrdering(
     },
     {
       role: 'user',
-      content: `Subject: <subject_name>${safeSubjectName}</subject_name>\nCurriculum order:\n${topicList}\n\nExplain why <topic_title>${safeTopicTitle}</topic_title> (position ${topic.sortOrder + 1}) is placed where it is.`,
+      content: `Subject: <subject_name>${safeSubjectName}</subject_name>\nCurriculum order:\n${topicList}\n\nExplain why <topic_title>${safeTopicTitle}</topic_title> (position ${
+        topic.sortOrder + 1
+      }) is placed where it is.`,
     },
   ];
 

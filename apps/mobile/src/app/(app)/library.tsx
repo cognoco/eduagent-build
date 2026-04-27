@@ -8,7 +8,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { useQueries } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { platformAlert } from '../../lib/platform-alert';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -66,6 +66,14 @@ interface SubjectRetentionTopic {
 interface SubjectRetentionResponse {
   topics: SubjectRetentionTopic[];
   reviewDueCount: number;
+}
+
+interface LibraryRetentionResponse {
+  subjects: Array<{
+    subjectId: string;
+    topics: SubjectRetentionTopic[];
+    reviewDueCount: number;
+  }>;
 }
 
 function getTopicRetention(topic: SubjectRetentionTopic): RetentionStatus {
@@ -167,26 +175,50 @@ export default function LibraryScreen() {
     [noteTopicIdsQuery.data]
   );
 
-  const retentionQueries = useQueries({
-    queries: subjects.map((subject) => ({
-      queryKey: ['retention', 'subject', subject.id, activeProfile?.id],
-      queryFn: async ({ signal: querySignal }: { signal?: AbortSignal }) => {
-        const { signal, cleanup } = combinedSignal(querySignal);
-        try {
-          const res = await apiClient.subjects[':subjectId'].retention.$get(
-            { param: { subjectId: subject.id } },
-            { init: { signal } }
-          );
-          await assertOk(res);
-          return (await res.json()) as SubjectRetentionResponse;
-        } finally {
-          cleanup();
-        }
-      },
-      enabled: !!activeProfile && !!subject.id,
-      retry: false,
-    })),
+  // [BUG-732 / PERF-2] Single aggregate /library/retention call instead of
+  // N parallel /subjects/:id/retention calls. The mapping below preserves
+  // the per-subject array shape so the existing index-based consumers
+  // (`retentionQueries[index]?.data`) keep working without churn.
+  const libraryRetentionQuery = useQuery({
+    queryKey: ['library', 'retention', activeProfile?.id],
+    queryFn: async ({ signal: querySignal }: { signal?: AbortSignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const res = await apiClient.library.retention.$get(
+          {},
+          { init: { signal } }
+        );
+        await assertOk(res);
+        return (await res.json()) as LibraryRetentionResponse;
+      } finally {
+        cleanup();
+      }
+    },
+    enabled: !!activeProfile,
+    retry: false,
   });
+
+  const retentionDataBySubjectId = useMemo(() => {
+    const map = new Map<string, SubjectRetentionResponse>();
+    for (const s of libraryRetentionQuery.data?.subjects ?? []) {
+      map.set(s.subjectId, {
+        topics: s.topics,
+        reviewDueCount: s.reviewDueCount,
+      });
+    }
+    return map;
+  }, [libraryRetentionQuery.data]);
+
+  const retentionQueries = useMemo(
+    () =>
+      subjects.map((subject) => ({
+        data: retentionDataBySubjectId.get(subject.id),
+        isLoading: libraryRetentionQuery.isLoading,
+        isError: libraryRetentionQuery.isError,
+        refetch: () => libraryRetentionQuery.refetch(),
+      })),
+    [subjects, retentionDataBySubjectId, libraryRetentionQuery]
+  );
 
   // BUG-486: Build bookId→title lookup from already-fetched books data
   const bookTitleMap = useMemo(
@@ -202,7 +234,12 @@ export default function LibraryScreen() {
     if (!Array.isArray(subjectsQuery.data)) return [];
     return subjectsQuery.data.flatMap((subject, index) => {
       const data = retentionQueries[index]?.data;
-      if (!data?.topics) return [];
+      // [BUG-818] Defensive guard: an absent or non-array `topics` field
+      // (e.g. partial-success payload, schema drift, `topics:null`) must
+      // skip this subject rather than crash on `.map`. The previous
+      // truthiness check already covered null/undefined; tightening to
+      // Array.isArray also catches stale {} or string payloads.
+      if (!Array.isArray(data?.topics)) return [];
       return data.topics.map((topic) => ({
         topicId: topic.topicId,
         subjectId: subject.id,
@@ -308,7 +345,10 @@ export default function LibraryScreen() {
     void subjectsQuery.refetch();
     void progressQuery.refetch();
     allBooksQuery.refetch();
-    retentionQueries.forEach((query) => void query.refetch());
+    // [BUG-732] Single retention refetch — the aggregate endpoint covers
+    // all subjects in one call, so per-subject refetches would just
+    // duplicate work.
+    void libraryRetentionQuery.refetch();
   };
 
   const handleTabChange = (tab: LibraryTab): void => {

@@ -8,6 +8,7 @@ import { requireProfileId } from '../middleware/profile-scope';
 import { notFound, NotFoundError } from '../errors';
 import {
   getBooks,
+  getAllProfileBooks,
   getBookWithTopics,
   persistBookTopics,
   claimBookForGeneration,
@@ -38,6 +39,15 @@ const bookParamSchema = z.object({
 });
 
 export const bookRoutes = new Hono<BooksRouteEnv>()
+  // [BUG-733 / PERF-3] Aggregate all-subjects books in a single round-trip.
+  // Replaces useAllBooks N-fanout. Registered first so /library/books does
+  // not collide with the param-matching /subjects/:subjectId/books handler.
+  .get('/library/books', async (c) => {
+    const db = c.get('db');
+    const profileId = requireProfileId(c.get('profileId'));
+    const result = await getAllProfileBooks(db, profileId);
+    return c.json(result);
+  })
   .get(
     '/subjects/:subjectId/books',
     zValidator('param', subjectParamSchema),

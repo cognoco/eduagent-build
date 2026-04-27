@@ -9,6 +9,39 @@ import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
 
+// Mirror of api/services/dashboard.ts:ChildSession used by the
+// `/dashboard/children/:profileId/sessions/:sessionId` route response. Hono's
+// `InferResponseType` collapses to `{}` for this chain, so we pin the shape
+// here. Keep this in sync with the api ChildSession interface — drift would
+// surface as missing-property errors in `child/[profileId]/session/[sessionId].tsx`.
+interface ChildSessionDetail {
+  sessionId: string;
+  subjectId: string;
+  subjectName: string | null;
+  topicId: string | null;
+  topicTitle: string | null;
+  sessionType: string;
+  startedAt: string;
+  endedAt: string | null;
+  exchangeCount: number;
+  escalationRung: number;
+  durationSeconds: number | null;
+  wallClockSeconds: number | null;
+  displayTitle: string;
+  displaySummary: string | null;
+  homeworkSummary: { summary: string } | null;
+  highlight: string | null;
+  narrative: string | null;
+  conversationPrompt: string | null;
+  engagementSignal:
+    | 'curious'
+    | 'stuck'
+    | 'breezing'
+    | 'focused'
+    | 'scattered'
+    | null;
+}
+
 export function useDashboard(): UseQueryResult<DashboardData> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
@@ -157,7 +190,7 @@ export function useChildSessionDetail(
         );
         if (res.status === 404) return null;
         await assertOk(res);
-        const data = await res.json();
+        const data = (await res.json()) as { session: ChildSessionDetail };
         return data.session;
       } finally {
         cleanup();

@@ -42,6 +42,7 @@ jest.mock('../services/profile', () => ({
 
 jest.mock('../services/retention-data', () => ({
   getSubjectRetention: jest.fn(),
+  getAllSubjectsRetention: jest.fn(),
   getTopicRetention: jest.fn(),
   processRecallTest: jest.fn(),
   startRelearn: jest.fn(),
@@ -49,11 +50,13 @@ jest.mock('../services/retention-data', () => ({
   getTeachingPreference: jest.fn(),
   setTeachingPreference: jest.fn(),
   deleteTeachingPreference: jest.fn(),
+  getStableTopics: jest.fn(),
 }));
 
 import { app } from '../index';
 import {
   getSubjectRetention,
+  getAllSubjectsRetention,
   getTopicRetention,
   processRecallTest,
   startRelearn,
@@ -61,17 +64,18 @@ import {
   getTeachingPreference,
   setTeachingPreference,
   deleteTeachingPreference,
+  getStableTopics,
 } from '../services/retention-data';
 import { NotFoundError } from '../errors';
+import {
+  AUTH_HEADERS as BASE_AUTH_HEADERS,
+  BASE_AUTH_ENV,
+} from '../test-utils/test-env';
 
-const TEST_ENV = {
-  CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',
-  CLERK_AUDIENCE: 'test-audience',
-};
+const TEST_ENV = { ...BASE_AUTH_ENV };
 
 const AUTH_HEADERS = {
-  Authorization: 'Bearer valid.jwt.token',
-  'Content-Type': 'application/json',
+  ...BASE_AUTH_HEADERS,
   'X-Profile-Id': 'test-profile-id',
 };
 
@@ -154,6 +158,80 @@ describe('retention routes', () => {
 
       expect(res.status).toBe(400);
       expect(getTopicRetention).not.toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // [BUG-732 / PERF-2] GET /v1/library/retention — aggregate across subjects
+  // -------------------------------------------------------------------------
+
+  describe('GET /v1/library/retention', () => {
+    it('returns 200 with aggregated retention across subjects', async () => {
+      (getAllSubjectsRetention as jest.Mock).mockResolvedValue({
+        subjects: [
+          {
+            subjectId: SUBJECT_ID,
+            topics: [
+              {
+                topicId: TOPIC_ID,
+                easeFactor: 2.5,
+                intervalDays: 7,
+                repetitions: 3,
+                nextReviewAt: '2026-02-22T10:00:00.000Z',
+                lastReviewedAt: null,
+                xpStatus: 'pending',
+                failureCount: 0,
+                evaluateDifficultyRung: null,
+                topicTitle: 'Limits',
+                bookId: 'book-1',
+              },
+            ],
+            reviewDueCount: 0,
+          },
+        ],
+      });
+
+      const res = await app.request(
+        '/v1/library/retention',
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.subjects).toHaveLength(1);
+      expect(body.subjects[0].subjectId).toBe(SUBJECT_ID);
+      expect(body.subjects[0].topics).toHaveLength(1);
+      expect(getAllSubjectsRetention).toHaveBeenCalledTimes(1);
+      // Second arg must be the profile ID — proves the route passes scope.
+      expect((getAllSubjectsRetention as jest.Mock).mock.calls[0]?.[1]).toBe(
+        'test-profile-id'
+      );
+    });
+
+    // Break test: aggregate route MUST require X-Profile-Id, otherwise it
+    // would leak retention rows across profiles. [Verified-by: 400 status]
+    it('returns 400 when authenticated but missing X-Profile-Id header', async () => {
+      const res = await app.request(
+        '/v1/library/retention',
+        {
+          headers: {
+            Authorization: 'Bearer valid.jwt.token',
+            'Content-Type': 'application/json',
+          },
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(400);
+      expect(getAllSubjectsRetention).not.toHaveBeenCalled();
+    });
+
+    // Break test: aggregate route MUST require auth.
+    it('returns 401 without auth header', async () => {
+      const res = await app.request('/v1/library/retention', {}, TEST_ENV);
+      expect(res.status).toBe(401);
+      expect(getAllSubjectsRetention).not.toHaveBeenCalled();
     });
   });
 
@@ -655,6 +733,87 @@ describe('retention routes', () => {
       const res = await app.request(
         `/v1/subjects/${SUBJECT_ID}/teaching-preference`,
         { method: 'DELETE' },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(401);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // GET /v1/retention/stability  [BUG-831]
+  // -------------------------------------------------------------------------
+
+  describe('GET /v1/retention/stability', () => {
+    it('returns 200 and forwards parsed UUID to service', async () => {
+      (getStableTopics as jest.Mock).mockResolvedValue([
+        { topicId: TOPIC_ID, status: 'stable' },
+      ]);
+
+      const res = await app.request(
+        `/v1/retention/stability?subjectId=${SUBJECT_ID}`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.topics).toHaveLength(1);
+      // Service receives the parsed (valid) UUID, not raw query string.
+      expect(getStableTopics).toHaveBeenCalledTimes(1);
+      const args = (getStableTopics as jest.Mock).mock.calls[0];
+      expect(args[1]).toBe('test-profile-id');
+      expect(args[2]).toBe(SUBJECT_ID);
+    });
+
+    it('returns 200 when subjectId is omitted (optional)', async () => {
+      (getStableTopics as jest.Mock).mockResolvedValue([]);
+
+      const res = await app.request(
+        '/v1/retention/stability',
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      // undefined when omitted — service may apply its own scope.
+      expect(getStableTopics).toHaveBeenCalledTimes(1);
+      const args = (getStableTopics as jest.Mock).mock.calls[0];
+      expect(args[1]).toBe('test-profile-id');
+      expect(args[2]).toBeUndefined();
+    });
+
+    // [BREAK / BUG-831] A malformed subjectId must be rejected at the boundary
+    // (400) — never forwarded to the service. Pre-fix the route accepted any
+    // string, allowing untrusted input to reach downstream queries.
+    it('[BREAK] returns 400 when subjectId is not a UUID', async () => {
+      const res = await app.request(
+        '/v1/retention/stability?subjectId=not-a-uuid',
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(400);
+      expect(getStableTopics).not.toHaveBeenCalled();
+    });
+
+    it('[BREAK] returns 400 on SQL-shaped subjectId payload', async () => {
+      const res = await app.request(
+        `/v1/retention/stability?subjectId=${encodeURIComponent(
+          "' OR 1=1 --"
+        )}`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(400);
+      expect(getStableTopics).not.toHaveBeenCalled();
+    });
+
+    it('returns 401 without auth header', async () => {
+      const res = await app.request(
+        `/v1/retention/stability?subjectId=${SUBJECT_ID}`,
+        {},
         TEST_ENV
       );
 

@@ -26,10 +26,17 @@ interface InterviewResponse {
 }
 
 export function useInterviewState(
-  subjectId: string
+  subjectId: string,
+  options?: { enabled?: boolean }
 ): UseQueryResult<InterviewState | null> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
+
+  // [BUG-810] Always AND with the internal sanity check so callers can pass
+  // `{ enabled: !!safeSubjectId }` without losing the !!activeProfile guard.
+  // A previous shape allowed empty-string subjectIds through, producing a
+  // GET /subjects//interview call → 404 + Sentry noise on every onboarding load.
+  const callerEnabled = options?.enabled ?? true;
 
   return useQuery({
     queryKey: ['interview', subjectId, activeProfile?.id],
@@ -47,7 +54,7 @@ export function useInterviewState(
         cleanup();
       }
     },
-    enabled: !!activeProfile && !!subjectId,
+    enabled: !!activeProfile && !!subjectId && callerEnabled,
   });
 }
 

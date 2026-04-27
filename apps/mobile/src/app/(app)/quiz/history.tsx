@@ -117,7 +117,7 @@ export default function QuizHistoryScreen() {
         <Pressable
           testID="quiz-history-back"
           onPress={() => goBackOrReplace(router, '/(app)/practice')}
-          className="min-h-[32px] min-w-[32px] items-center justify-center"
+          className="min-h-[44px] min-w-[44px] items-center justify-center"
           accessibilityRole="button"
           accessibilityLabel="Go back"
         >

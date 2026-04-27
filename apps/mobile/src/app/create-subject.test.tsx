@@ -727,3 +727,46 @@ describe('CreateSubjectScreen', () => {
     expect(screen.queryByTestId('not-sure-hint')).toBeNull();
   });
 });
+
+// [BUG-829] KeyboardAvoidingView behavior prop must use Platform.select
+// rather than a hardcoded "padding" value. On Android, "padding" pushes the
+// input off-screen with prediction-bar keyboards; "height" is the documented
+// Android-correct value.
+describe('CreateSubjectScreen — keyboard avoiding behavior', () => {
+  const { KeyboardAvoidingView } = require('react-native');
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockSearchParams = {};
+    mockExistingSubjects = [];
+  });
+
+  it('uses platform-correct KeyboardAvoidingView behavior (ios → padding)', () => {
+    // jest-expo defaults Platform.OS to 'ios' in test, so Platform.select
+    // returns the ios branch. The bug was a hardcoded "padding" — fix uses
+    // Platform.select with both keys so Android resolves to "height".
+    render(<CreateSubjectScreen />);
+    const kav = screen.UNSAFE_getByType(KeyboardAvoidingView);
+    expect(kav.props.behavior).toBe('padding');
+  });
+
+  it('does not hardcode behavior — uses Platform.select for both platforms', () => {
+    // Static guard against a future regression: ensure the source uses
+    // Platform.select with ios+android keys instead of hardcoding "padding".
+    // jest-expo locks Platform.OS to 'ios' for the runtime test above; a
+    // source-level assertion is the safest cross-platform regression guard.
+    const fs = require('fs');
+    const path = require('path');
+    const src = fs.readFileSync(
+      path.join(__dirname, 'create-subject.tsx'),
+      'utf8'
+    );
+    // The KeyboardAvoidingView block must contain Platform.select with
+    // both ios and android keys.
+    const kavBlock = src.match(/<KeyboardAvoidingView[\s\S]+?>/);
+    expect(kavBlock).toBeTruthy();
+    expect(kavBlock?.[0]).toMatch(/Platform\.select/);
+    expect(kavBlock?.[0]).toMatch(/ios:\s*['"]padding['"]/);
+    expect(kavBlock?.[0]).toMatch(/android:\s*['"]height['"]/);
+  });
+});

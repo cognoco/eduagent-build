@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -25,6 +25,13 @@ export default function DeleteAccountScreen() {
 
   const [gracePeriodEnds, setGracePeriodEnds] = useState<string | null>(null);
   const [error, setError] = useState('');
+  // [BUG-820] Ref-based guard against double-submission. The outer Pressable
+  // is disabled while `deleteAccount.isPending`, but the alert button lives
+  // outside the React tree (native modal) and the mutation's isPending flips
+  // a tick after we call mutateAsync — so a fast double-tap on the alert's
+  // destructive button could fire two requests. A ref toggled synchronously
+  // around the mutation closes that race.
+  const submittingRef = useRef(false);
 
   const handleClose = useCallback(() => {
     goBackOrReplace(router, '/(app)/more');
@@ -40,12 +47,16 @@ export default function DeleteAccountScreen() {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
+            if (submittingRef.current) return;
+            submittingRef.current = true;
             setError('');
             try {
               const result = await deleteAccount.mutateAsync();
               setGracePeriodEnds(result.gracePeriodEnds);
             } catch (err: unknown) {
               setError(formatApiError(err));
+            } finally {
+              submittingRef.current = false;
             }
           },
         },

@@ -102,7 +102,7 @@ export default function PracticeScreen(): React.ReactElement {
       <View className="flex-row items-center mb-6">
         <Pressable
           onPress={handleBack}
-          className="mr-3 min-h-[32px] min-w-[32px] items-center justify-center"
+          className="mr-3 min-h-[44px] min-w-[44px] items-center justify-center"
           accessibilityRole="button"
           accessibilityLabel="Go back"
           testID="practice-back"

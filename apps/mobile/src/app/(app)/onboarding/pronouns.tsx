@@ -164,7 +164,13 @@ export default function PronounsScreen(): React.ReactElement {
       style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
     >
       <View className="px-5 pt-2">
-        <Pressable testID="pronouns-back" onPress={handleBack} className="py-2">
+        <Pressable
+          testID="pronouns-back"
+          onPress={handleBack}
+          className="min-h-[44px] min-w-[44px] items-center justify-center self-start"
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
           <Ionicons name="arrow-back" size={24} color={colors.primary} />
         </Pressable>
         {returnTo === 'settings' ? null : (

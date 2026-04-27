@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { authMiddleware } from './auth';
 import type { AuthEnv } from './auth';
+import { BASE_AUTH_ENV } from '../test-utils/test-env';
 
 // ---------------------------------------------------------------------------
 // Mock jwt.ts — avoids real Web Crypto / JWKS calls in unit tests
@@ -31,10 +32,7 @@ const jwtMock = require('./jwt') as {
 // Test app
 // ---------------------------------------------------------------------------
 
-const TEST_ENV = {
-  CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',
-  CLERK_AUDIENCE: 'test-audience',
-};
+const TEST_ENV = { ...BASE_AUTH_ENV };
 
 function createTestApp() {
   const app = new Hono<AuthEnv>().basePath('/v1');

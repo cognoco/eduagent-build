@@ -524,17 +524,18 @@ describe('INITIAL_PURCHASE', () => {
     expect(activateSubscriptionFromRevenuecat).not.toHaveBeenCalled();
 
     // Must report to Sentry so the event drop is alertable [1B.3]
+    // [SEC-11] appUserId must NOT appear in Sentry extras (GDPR data minimisation)
     expect(mockCaptureException).toHaveBeenCalledWith(
-      expect.objectContaining({
-        message: expect.stringContaining('Unresolvable RevenueCat app_user_id'),
-      }),
+      expect.any(Error),
       expect.objectContaining({
         extra: expect.objectContaining({
           eventType: 'INITIAL_PURCHASE',
-          appUserId: expect.any(String),
         }),
       })
     );
+    // [SEC-11] Verify appUserId is not leaked to Sentry
+    const callArgs = (mockCaptureException as jest.Mock).mock.calls[0];
+    expect(callArgs[1]?.extra).not.toHaveProperty('appUserId');
   });
 
   it('sets trial status when period_type is TRIAL', async () => {

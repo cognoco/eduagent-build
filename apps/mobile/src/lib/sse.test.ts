@@ -1,4 +1,4 @@
-import { parseSSEStream, type StreamEvent } from './sse';
+import { parseSSEStream, streamSSEViaXHR, type StreamEvent } from './sse';
 
 function createMockStream(events: string[]): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();
@@ -263,5 +263,109 @@ describe('parseSSEStream', () => {
 
     expect(events).toHaveLength(1);
     expect(events[0]).toEqual({ type: 'chunk', content: 'ok' });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// streamSSEViaXHR — XHR-based SSE consumer used at runtime in React Native.
+// ---------------------------------------------------------------------------
+
+interface FakeXhrInstance {
+  open: jest.Mock;
+  send: jest.Mock;
+  setRequestHeader: jest.Mock;
+  abort: jest.Mock;
+  onreadystatechange: (() => void) | null;
+  onprogress: (() => void) | null;
+  onerror: (() => void) | null;
+  onloadend: (() => void) | null;
+  readyState: number;
+  status: number;
+  statusText: string;
+  responseText: string;
+  responseType: string;
+  // Helpers for tests
+  _emitProgress(text: string): void;
+  _emitError(status: number, body: string): void;
+}
+
+function installFakeXhr(): FakeXhrInstance {
+  const instance: FakeXhrInstance = {
+    open: jest.fn(),
+    send: jest.fn(),
+    setRequestHeader: jest.fn(),
+    abort: jest.fn(),
+    onreadystatechange: null,
+    onprogress: null,
+    onerror: null,
+    onloadend: null,
+    readyState: 0,
+    status: 0,
+    statusText: '',
+    responseText: '',
+    responseType: '',
+    _emitProgress(text: string) {
+      this.responseText += text;
+      this.onprogress?.();
+    },
+    _emitError(status: number, body: string) {
+      this.readyState = 2;
+      this.status = status;
+      this.statusText = 'error';
+      this.onreadystatechange?.();
+      this.responseText = body;
+      this.onloadend?.();
+    },
+  };
+  (global as unknown as { XMLHttpRequest: unknown }).XMLHttpRequest = jest.fn(
+    () => instance
+  ) as unknown;
+  return instance;
+}
+
+describe('streamSSEViaXHR', () => {
+  let originalXhr: unknown;
+
+  beforeEach(() => {
+    originalXhr = (global as unknown as { XMLHttpRequest?: unknown })
+      .XMLHttpRequest;
+  });
+
+  afterEach(() => {
+    (global as unknown as { XMLHttpRequest: unknown }).XMLHttpRequest =
+      originalXhr;
+  });
+
+  // [BUG-632 / I-21] When the server flushes a few SSE frames before returning
+  // a 4xx error body, the buffered events must be DISCARDED — not yielded to
+  // the consumer ahead of the thrown error. Otherwise the consumer accumulates
+  // partial reply text from a request that ultimately failed.
+  it('[BUG-632] discards buffered events when stream errors, throws without yielding partials', async () => {
+    const xhr = installFakeXhr();
+
+    const { events } = streamSSEViaXHR('https://example.test/stream', {
+      method: 'POST',
+    });
+
+    // Server flushes two chunks of partial reply text...
+    xhr._emitProgress('data: {"type":"chunk","content":"partial 1"}\n\n');
+    xhr._emitProgress('data: {"type":"chunk","content":"partial 2"}\n\n');
+    // ...then returns a 500 error before the consumer pulls.
+    xhr._emitError(500, 'internal server error');
+
+    const collected: StreamEvent[] = [];
+    let caught: unknown = null;
+    try {
+      for await (const ev of events) {
+        collected.push(ev);
+      }
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(caught).toBeInstanceOf(Error);
+    expect((caught as Error).message).toMatch(/500/);
+    // Crucial: the partial chunks must NOT have been yielded.
+    expect(collected).toEqual([]);
   });
 });

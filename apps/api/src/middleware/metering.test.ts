@@ -147,19 +147,14 @@ jest.mock('../services/kv', () => ({
 }));
 
 import { app } from '../index';
+import { AUTH_HEADERS, BASE_AUTH_ENV } from '../test-utils/test-env';
 
 const TEST_ENV = {
   DATABASE_URL: 'postgresql://test:test@localhost:5432/test',
-  CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',
-  CLERK_AUDIENCE: 'test-audience',
+  ...BASE_AUTH_ENV,
 };
 
 const SUBJECT_ID = 'subject-1';
-
-const AUTH_HEADERS = {
-  Authorization: 'Bearer valid.jwt.token',
-  'Content-Type': 'application/json',
-};
 
 function mockSubscription(overrides?: Record<string, unknown>) {
   return {

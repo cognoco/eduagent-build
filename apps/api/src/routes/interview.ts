@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import { zValidator } from '@hono/zod-validator';
 import {
+  ERROR_CODES,
   interviewMessageSchema,
   type InterviewResult,
   extractedInterviewSignalsSchema,
@@ -190,7 +191,7 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
         });
         return c.json(
           {
-            code: 'LLM_UNAVAILABLE',
+            code: ERROR_CODES.LLM_UNAVAILABLE,
             message:
               'Interview service is temporarily unavailable. Please try again.',
           },

@@ -198,3 +198,16 @@ apps/mobile/e2e/scripts/regression-batch*.txt
 .tmp/
 .tmp_notion/
 /results.json
+/.bug-bodies/
+/.bug-pages.txt
+/.bug-selection.json
+/.bugfix-tmp/
+/.notion-bug-bodies/
+/.notion-bugs.json
+/.notion-inprogress.json
+/.notion-not-started.json
+/.notion-query.json
+/.notion-selected.json
+/.notion-status-update.json
+apps/api/.notion-*.json
+.claude/notion_bugs.json

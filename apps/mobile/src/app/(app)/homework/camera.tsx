@@ -118,6 +118,16 @@ export default function CameraScreen(): React.ReactNode {
     return () => sub.remove();
   }, [getPermission]);
 
+  // [BUG-824] Reset the classify trigger whenever the captured image changes,
+  // so a fresh photo is always re-classified. Without this, a user whose
+  // image source changes in place (different photo, same screen) would skip
+  // classification because the ref was still `true` from the previous image.
+  // Retake and focus paths already reset it explicitly, but those don't
+  // cover the image-source-changed case.
+  useEffect(() => {
+    classifyTriggeredRef.current = false;
+  }, [state.imageUri]);
+
   // Sync OCR hook status into reducer
   useEffect(() => {
     if (ocr.status === 'done' && ocr.text) {
@@ -182,9 +192,15 @@ export default function CameraScreen(): React.ReactNode {
                 action: 'auto-create-subject',
               },
             });
+            // [BUG-809] Surface the actual server error to the user instead
+            // of a generic "select your subject manually." line. formatApiError
+            // distinguishes quota / forbidden / network errors from each other,
+            // which is precisely the information the user needs to react.
             platformAlert(
               'Could not detect subject',
-              'Please select your subject manually.'
+              `${formatApiError(
+                autoCreateErr
+              )} Please select your subject manually.`
             );
             setShowSubjectPicker(true);
           }
@@ -192,7 +208,19 @@ export default function CameraScreen(): React.ReactNode {
           setShowSubjectPicker(true);
         }
       } catch (err) {
-        console.error('[Homework] Subject classification failed:', err);
+        // [BUG-802] Silent fallback ban — Sentry capture + user-visible alert
+        // explaining why the subject picker appeared. Without this, the user
+        // lands on the picker with no idea their photo failed to classify.
+        Sentry.captureException(err, {
+          tags: {
+            component: 'HomeworkCamera',
+            action: 'auto-classify-subject',
+          },
+        });
+        platformAlert(
+          "Couldn't identify the subject",
+          `${formatApiError(err)} Please pick the subject manually.`
+        );
         setShowSubjectPicker(true);
       }
     }
@@ -309,6 +337,8 @@ export default function CameraScreen(): React.ReactNode {
       const MAX_PARAM_LENGTH = 8000; // safe URL param budget
 
       let homeworkProblemsParam: string | undefined;
+      let droppedProblemCount = 0;
+      let singleProblemTruncated = false;
       if (problems && problems.length > 0) {
         // Drop trailing problems until the serialized string fits.
         let truncatedProblems = [...problems];
@@ -320,6 +350,7 @@ export default function CameraScreen(): React.ReactNode {
           truncatedProblems = truncatedProblems.slice(0, -1);
           serialized = serializeHomeworkProblems(truncatedProblems);
         }
+        droppedProblemCount = problems.length - truncatedProblems.length;
         // If a single problem still exceeds the budget, truncate its text
         // at a word boundary as a last resort.
         if (
@@ -341,9 +372,37 @@ export default function CameraScreen(): React.ReactNode {
               ) + ' [truncated]';
             truncatedProblems = [{ ...problem, text: truncatedText }];
             serialized = serializeHomeworkProblems(truncatedProblems);
+            singleProblemTruncated = true;
           }
         }
         homeworkProblemsParam = serialized;
+      }
+
+      // [BUG-823 / F-MOB-25] Surface truncation to the user instead of
+      // silently dropping problems. Without this, a learner who imports 10
+      // problems can lose 9 of them with no indication. We alert (non-blocking
+      // toast/dialog) and log to Sentry so we can monitor frequency and
+      // decide whether to raise MAX_PARAM_LENGTH or migrate off URL params.
+      if (droppedProblemCount > 0 || singleProblemTruncated) {
+        const alertMessage = singleProblemTruncated
+          ? droppedProblemCount > 0
+            ? `Some problems were too long to fit. Only the first ${
+                (problems?.length ?? 0) - droppedProblemCount
+              } were saved, and the last one was shortened.`
+            : 'This problem was too long to send in full and was shortened.'
+          : `Some problems were too long; only the first ${
+              (problems?.length ?? 0) - droppedProblemCount
+            } of ${problems?.length ?? 0} are saved.`;
+        platformAlert('Heads up', alertMessage);
+        Sentry.captureMessage('homework problems truncated for URL budget', {
+          level: 'warning',
+          extra: {
+            inputCount: problems?.length ?? 0,
+            droppedProblemCount,
+            singleProblemTruncated,
+            maxParamLength: MAX_PARAM_LENGTH,
+          },
+        });
       }
 
       router.replace({

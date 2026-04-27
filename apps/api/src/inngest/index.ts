@@ -8,6 +8,14 @@ import { trialExpiry } from './functions/trial-expiry';
 import { quotaReset } from './functions/quota-reset';
 import { topupExpiryReminder } from './functions/topup-expiry-reminder';
 import { topupExpiryReminderSend } from './functions/topup-expiry-reminder-send';
+import { billingTrialSubscriptionFailed } from './functions/billing-trial-subscription-failed';
+import { trialExpiryFailureObserve } from './functions/trial-expiry-failure-observe';
+import { exchangeEmptyReplyFallback } from './functions/exchange-empty-reply-fallback';
+import {
+  askClassificationCompletedObserve,
+  askClassificationSkippedObserve,
+  askClassificationFailedObserve,
+} from './functions/ask-classification-observe';
 import { subjectAutoArchive } from './functions/subject-auto-archive';
 import { bookPreGeneration } from './functions/book-pre-generation';
 import { recallNudge } from './functions/recall-nudge';
@@ -38,9 +46,11 @@ import {
   monthlyReportCron,
   monthlyReportGenerate,
 } from './functions/monthly-report-cron';
+import { feedbackDeliveryFailed } from './functions/feedback-delivery-failed';
 
 export {
   inngest,
+  feedbackDeliveryFailed,
   consentReminder,
   consentRevocation,
   scheduledDeletion,
@@ -50,6 +60,12 @@ export {
   quotaReset,
   topupExpiryReminder,
   topupExpiryReminderSend,
+  billingTrialSubscriptionFailed,
+  trialExpiryFailureObserve,
+  exchangeEmptyReplyFallback,
+  askClassificationCompletedObserve,
+  askClassificationSkippedObserve,
+  askClassificationFailedObserve,
   subjectAutoArchive,
   bookPreGeneration,
   recallNudge,
@@ -74,6 +90,7 @@ export {
 
 // All Inngest functions to register with the serve handler
 export const functions = [
+  feedbackDeliveryFailed,
   consentReminder,
   consentRevocation,
   scheduledDeletion,
@@ -83,6 +100,12 @@ export const functions = [
   quotaReset,
   topupExpiryReminder,
   topupExpiryReminderSend,
+  billingTrialSubscriptionFailed,
+  trialExpiryFailureObserve,
+  exchangeEmptyReplyFallback,
+  askClassificationCompletedObserve,
+  askClassificationSkippedObserve,
+  askClassificationFailedObserve,
   subjectAutoArchive,
   bookPreGeneration,
   recallNudge,

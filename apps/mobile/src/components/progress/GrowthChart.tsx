@@ -14,6 +14,24 @@ interface GrowthChartProps {
   emptyMessage?: string;
 }
 
+/**
+ * [BUG-649 / ACC-5] Build a screen-reader summary of the chart data so users
+ * with visual impairments hear the trend instead of an opaque bar grid.
+ */
+function buildChartA11yLabel(title: string, data: GrowthChartDatum[]): string {
+  const points = data
+    .map((item) => {
+      const primary = `${item.value} topics mastered`;
+      const secondary =
+        item.secondaryValue != null
+          ? `, ${item.secondaryValue} vocabulary growth`
+          : '';
+      return `${item.label}: ${primary}${secondary}`;
+    })
+    .join('. ');
+  return `Growth chart. ${title}. ${points}`;
+}
+
 export function GrowthChart({
   title,
   subtitle,
@@ -41,40 +59,57 @@ export function GrowthChart({
         </Text>
       ) : (
         <View className="mt-4">
-          <View className="flex-row items-end gap-3 h-28">
-            {data.map((item) => {
-              const primaryHeight = Math.max(
-                10,
-                Math.round((item.value / maxValue) * 96)
-              );
-              const secondaryHeight =
-                item.secondaryValue != null
-                  ? Math.max(
-                      6,
-                      Math.round((item.secondaryValue / maxValue) * 72)
-                    )
-                  : 0;
+          {/*
+           * [BUG-649 / ACC-5] Bar chart is opaque to screen readers — provide
+           * a single accessible summary that VoiceOver/TalkBack reads aloud,
+           * and hide the decorative bars from the a11y tree. Format:
+           * "Growth chart. <title>. Apr: 4 topics mastered, 12 vocabulary growth.
+           * May: 6 topics mastered, 18 vocabulary growth..."
+           */}
+          <View
+            accessible
+            accessibilityRole="text"
+            accessibilityLabel={buildChartA11yLabel(title, data)}
+          >
+            <View
+              className="flex-row items-end gap-3 h-28"
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+            >
+              {data.map((item) => {
+                const primaryHeight = Math.max(
+                  10,
+                  Math.round((item.value / maxValue) * 96)
+                );
+                const secondaryHeight =
+                  item.secondaryValue != null
+                    ? Math.max(
+                        6,
+                        Math.round((item.secondaryValue / maxValue) * 72)
+                      )
+                    : 0;
 
-              return (
-                <View key={item.label} className="flex-1 items-center">
-                  <View className="w-full items-center justify-end h-24">
-                    {item.secondaryValue != null ? (
+                return (
+                  <View key={item.label} className="flex-1 items-center">
+                    <View className="w-full items-center justify-end h-24">
+                      {item.secondaryValue != null ? (
+                        <View
+                          className="w-3 rounded-t-full bg-accent/35 mb-1"
+                          style={{ height: secondaryHeight }}
+                        />
+                      ) : null}
                       <View
-                        className="w-3 rounded-t-full bg-accent/35 mb-1"
-                        style={{ height: secondaryHeight }}
+                        className="w-5 rounded-t-full bg-primary"
+                        style={{ height: primaryHeight }}
                       />
-                    ) : null}
-                    <View
-                      className="w-5 rounded-t-full bg-primary"
-                      style={{ height: primaryHeight }}
-                    />
+                    </View>
+                    <Text className="text-caption text-text-secondary mt-2">
+                      {item.label}
+                    </Text>
                   </View>
-                  <Text className="text-caption text-text-secondary mt-2">
-                    {item.label}
-                  </Text>
-                </View>
-              );
-            })}
+                );
+              })}
+            </View>
           </View>
 
           <View className="flex-row flex-wrap gap-4 mt-4">

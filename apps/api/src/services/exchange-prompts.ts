@@ -1,4 +1,10 @@
-import { computeAgeBracket, type AgeBracket } from '@eduagent/schemas';
+import {
+  computeAgeBracket,
+  type AgeBracket,
+  type SessionType,
+  type HomeworkMode,
+  type LearningMode,
+} from '@eduagent/schemas';
 import { getEscalationPromptGuidance } from './escalation';
 import { getEvaluateRungDescription } from './evaluate';
 import { buildFourStrandsPrompt } from './language-prompts';
@@ -86,8 +92,8 @@ export function getAgeVoice(
 }
 
 export function getSessionTypeGuidance(
-  sessionType: import('@eduagent/schemas').SessionType,
-  homeworkMode?: import('@eduagent/schemas').HomeworkMode,
+  sessionType: SessionType,
+  homeworkMode?: HomeworkMode,
   ageBracket: AgeBracket = 'adult'
 ): string {
   if (sessionType === 'homework') {
@@ -180,9 +186,7 @@ export function getWorkedExampleGuidance(
   }
 }
 
-export function getLearningModeGuidance(
-  mode: import('@eduagent/schemas').LearningMode
-): string {
+export function getLearningModeGuidance(mode: LearningMode): string {
   if (mode === 'casual') {
     return (
       'Learning mode: CASUAL EXPLORER\n' +

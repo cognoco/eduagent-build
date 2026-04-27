@@ -28,6 +28,7 @@ import { useDepthEvaluation } from '../../hooks/use-depth-evaluation';
 import { useProgressInventory } from '../../hooks/use-progress';
 import { goBackOrReplace } from '../../lib/navigation';
 import { platformAlert } from '../../lib/platform-alert';
+import { formatApiError } from '../../lib/format-api-error';
 import { Sentry } from '../../lib/sentry';
 import {
   readSummaryDraft,
@@ -116,10 +117,16 @@ export default function SessionSummaryScreen() {
   // of the empty "Your Words" prompt. The local `submitted` state only covers
   // the just-submitted case in the same render; persisted state comes from
   // GET /sessions/:sessionId/summary.
-  const exchangeCountForRecap =
-    parseInt(exchangeCount ?? '', 10) ||
-    transcript.data?.session.exchangeCount ||
-    0;
+  // [BUG-801] Use Number.isFinite + ?? rather than `||` to preserve an
+  // explicit 0 from the URL param. parseInt(...,'') returned NaN which
+  // chained into `||` and silently fell back to the server count, but a
+  // legitimate 0-exchange session was indistinguishable from missing data.
+  const trimmedExchangeCount = (exchangeCount ?? '').trim();
+  const parsedExchangeCount =
+    trimmedExchangeCount === '' ? NaN : Number(trimmedExchangeCount);
+  const exchangeCountForRecap = Number.isFinite(parsedExchangeCount)
+    ? parsedExchangeCount
+    : transcript.data?.session.exchangeCount ?? 0;
   const persistedSummary = useSessionSummary(sessionId ?? '', {
     refetchInterval: (data) => {
       if (recapTimedOut || exchangeCountForRecap < 3) {
@@ -243,15 +250,24 @@ export default function SessionSummaryScreen() {
     transcript.data?.session.sessionType === 'homework';
 
   const fallbackSession = transcript.data?.session;
-  const exchanges =
-    parseInt(exchangeCount ?? '', 10) || fallbackSession?.exchangeCount || 0;
+  // [BUG-801] Same parseInt-||-fallback anti-pattern as exchangeCountForRecap
+  // above. An explicit "0" param must be honored, not silently overridden by
+  // the server count. Reuses the trimmed/parsed result from line 124-126.
+  const exchanges = Number.isFinite(parsedExchangeCount)
+    ? parsedExchangeCount
+    : fallbackSession?.exchangeCount ?? 0;
   const rung = parseInt(escalationRung ?? '1', 10) || 1;
+  // [BUG-801] Same fix for wallClockSeconds: parseInt('0') yields 0 which is
+  // truthy-falsy in `||`. Use Number.isFinite to preserve a legitimate 0.
+  const trimmedWallClockSeconds = (wallClockSeconds ?? '').trim();
+  const parsedWallClockSeconds =
+    trimmedWallClockSeconds === '' ? NaN : Number(trimmedWallClockSeconds);
   const wallClockMinutes = Math.max(
     1,
     Math.round(
-      (parseInt(wallClockSeconds ?? '', 10) ||
-        fallbackSession?.wallClockSeconds ||
-        0) / 60
+      (Number.isFinite(parsedWallClockSeconds)
+        ? parsedWallClockSeconds
+        : fallbackSession?.wallClockSeconds ?? 0) / 60
     )
   );
   const parsedMilestones = (() => {
@@ -260,8 +276,24 @@ export default function SessionSummaryScreen() {
     }
 
     try {
-      return JSON.parse(decodeURIComponent(milestones)) as string[];
-    } catch {
+      // [BUG-821 / F-MOB-23] Type-guard parsed values are strings before
+      // render so a malformed param can't crash the celebration list.
+      const raw = JSON.parse(decodeURIComponent(milestones)) as unknown;
+      if (!Array.isArray(raw)) {
+        Sentry.captureMessage(
+          'session-summary milestone param parsed to non-array',
+          { level: 'warning', extra: { milestonesParam: milestones } }
+        );
+        return fallbackSession?.milestonesReached ?? [];
+      }
+      return raw.filter((v): v is string => typeof v === 'string');
+    } catch (err) {
+      // [BUG-821 / F-MOB-23] Surface parse failures to telemetry — silent
+      // fallback was hiding both URL-corruption and prod regressions.
+      Sentry.captureException(err, {
+        tags: { surface: 'session-summary', field: 'milestones' },
+        extra: { milestonesParam: milestones },
+      });
       return fallbackSession?.milestonesReached ?? [];
     }
   })();
@@ -468,10 +500,10 @@ export default function SessionSummaryScreen() {
       // The draft stays on disk: on retry the user's text is preserved
       // even if the app is force-killed between attempts.
       console.error('[SessionSummary] handleSubmit failed:', err);
-      platformAlert(
-        'Could not save',
-        'Your reflection could not be saved. Please try again.'
-      );
+      // [BUG-800] Use formatApiError so typed server errors (400 word-limit,
+      // 422 too-short, etc.) reach the user verbatim. The previous generic
+      // 'Please try again.' hid actionable reasons — user could not self-correct.
+      platformAlert('Could not save', formatApiError(err));
       return false;
     } finally {
       submitInFlight.current = false;

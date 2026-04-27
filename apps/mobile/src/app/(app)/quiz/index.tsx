@@ -111,7 +111,7 @@ export default function QuizIndexScreen(): React.ReactElement {
       <View className="mb-6 flex-row items-center">
         <Pressable
           onPress={handleBack}
-          className="mr-3 min-h-[32px] min-w-[32px] items-center justify-center"
+          className="mr-3 min-h-[44px] min-w-[44px] items-center justify-center"
           accessibilityRole="button"
           accessibilityLabel="Go back"
           testID="quiz-back"

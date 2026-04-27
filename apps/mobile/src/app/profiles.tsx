@@ -159,9 +159,13 @@ export default function ProfilesScreen() {
       // Close modal AFTER a successful switch to avoid dismissing the screen
       // when the profile change did not actually complete.
       handleClose();
-    } catch {
+    } catch (err) {
+      // [BUG-822] switchProfile may throw (network failure, Clerk error, etc.)
+      // instead of returning {success:false}. Surface the typed server reason
+      // when available rather than a generic "Please try again." per CLAUDE.md
+      // rule: never replace specific server errors with generic messages.
       clearTimeout(timeoutId);
-      platformAlert('Could not switch profiles', 'Please try again.');
+      platformAlert('Could not switch profiles', formatApiError(err));
     } finally {
       clearTimeout(timeoutId);
       setIsSwitching(false);

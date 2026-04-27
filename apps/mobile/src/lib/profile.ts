@@ -10,6 +10,7 @@ import {
 import { createElement, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import * as SecureStore from './secure-storage';
+import { sanitizeSecureStoreKey } from './secure-storage';
 import type { Profile } from '@eduagent/schemas';
 import { useProfiles } from '../hooks/use-profiles';
 import {
@@ -74,7 +75,15 @@ export interface ProfileContextValue {
   acknowledgeProfileRemoval: () => void;
 }
 
-const ACTIVE_PROFILE_KEY = 'mentomate_active_profile_id';
+// [BUG-827 / F-CMP-003] Run keys through sanitizeSecureStoreKey so that any
+// future change introducing a dynamic segment (profileId, etc.) doesn't
+// silently break on iOS — the iOS Keychain rejects keys with characters
+// outside [a-zA-Z0-9._-]. The current literals are already safe; this is
+// belt-and-suspenders and matches summary-draft.ts / session-recovery.ts.
+const ACTIVE_PROFILE_KEY = sanitizeSecureStoreKey(
+  'mentomate_active_profile_id'
+);
+const PARENT_PROXY_KEY = sanitizeSecureStoreKey('parent-proxy-active');
 
 export const ProfileContext = createContext<ProfileContextValue>({
   profiles: [],
@@ -126,7 +135,7 @@ export function ProfileProvider({
   // Seed the API client's proxy flag from the last app session. The
   // useParentProxy hook corrects the flag once the active profile is known.
   useEffect(() => {
-    void SecureStore.getItemAsync('parent-proxy-active')
+    void SecureStore.getItemAsync(PARENT_PROXY_KEY)
       .then((value) => {
         setProxyMode(value === 'true');
       })

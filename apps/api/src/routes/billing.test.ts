@@ -125,11 +125,11 @@ jest.mock('../services/stripe', () => ({
 }));
 
 import { app } from '../index';
+import { AUTH_HEADERS, BASE_AUTH_ENV } from '../test-utils/test-env';
 
 const TEST_ENV = {
   DATABASE_URL: 'postgresql://test:test@localhost:5432/test',
-  CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',
-  CLERK_AUDIENCE: 'test-audience',
+  ...BASE_AUTH_ENV,
   STRIPE_SECRET_KEY: 'sk_test_123',
   STRIPE_PRICE_PLUS_MONTHLY: 'price_plus_monthly',
   STRIPE_PRICE_PLUS_YEARLY: 'price_plus_yearly',
@@ -138,11 +138,6 @@ const TEST_ENV = {
   STRIPE_PRICE_PRO_MONTHLY: 'price_pro_monthly',
   STRIPE_PRICE_PRO_YEARLY: 'price_pro_yearly',
   APP_URL: 'https://www.mentomate.com',
-};
-
-const AUTH_HEADERS = {
-  Authorization: 'Bearer valid.jwt.token',
-  'Content-Type': 'application/json',
 };
 
 function mockSubscription(overrides?: Record<string, unknown>) {

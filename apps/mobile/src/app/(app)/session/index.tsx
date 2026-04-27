@@ -10,6 +10,7 @@ import type { ErrorInfo, ReactNode } from 'react';
 import { AppState, View, Text, Pressable, ScrollView } from 'react-native';
 import { platformAlert } from '../../../lib/platform-alert';
 import { goBackOrReplace, homeHrefForReturnTo } from '../../../lib/navigation';
+import { firstParam } from '../../../lib/route-params';
 import {
   router,
   useRouter,
@@ -271,10 +272,27 @@ class SessionErrorBoundary extends Component<
 function MilestoneDots({ count }: { count: number }) {
   if (count <= 0) return null;
 
+  // [BUG-645 / ACC-1] Bare colored dots are invisible to screen readers.
+  // The aggregate View carries the label so VoiceOver/TalkBack reads
+  // "3 milestones reached" instead of skipping the indicator entirely.
+  const accessibilityLabel =
+    count === 1 ? '1 milestone reached' : `${count} milestones reached`;
+
   return (
-    <View className="ms-2 flex-row items-center gap-1" testID="milestone-dots">
+    <View
+      className="ms-2 flex-row items-center gap-1"
+      testID="milestone-dots"
+      accessible
+      accessibilityRole="text"
+      accessibilityLabel={accessibilityLabel}
+    >
       {Array.from({ length: Math.min(count, 6) }).map((_, index) => (
-        <View key={index} className="w-2 h-2 rounded-full bg-primary" />
+        <View
+          key={index}
+          className="w-2 h-2 rounded-full bg-primary"
+          importantForAccessibility="no"
+          accessibilityElementsHidden
+        />
       ))}
     </View>
   );
@@ -304,8 +322,8 @@ function SessionScreenInner() {
     resumeFromSessionId,
     returnTo,
     verificationType: routeVerificationType,
-    imageUri,
-    imageMimeType,
+    imageUri: rawImageUri,
+    imageMimeType: rawImageMimeType,
   } = useLocalSearchParams<{
     mode?: string;
     subjectId?: string;
@@ -324,6 +342,9 @@ function SessionScreenInner() {
     imageUri?: string;
     imageMimeType?: string;
   }>();
+  // [BUG-635] Coerce Expo Router's `string | string[]` to a single string.
+  const imageUri = firstParam(rawImageUri);
+  const imageMimeType = firstParam(rawImageMimeType);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { activeProfile } = useProfile();

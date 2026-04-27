@@ -66,4 +66,27 @@ describe('TopicDetailScreen', () => {
 
     expect(screen.queryByTestId('topic-retention-card')).toBeNull();
   });
+
+  // [BUG-813] Repro: a malformed `totalSessions` URL param (e.g. "abc")
+  // produced NaN when piped through Number(). The screen rendered
+  // "NaN sessions" and downstream comparisons (totalSessions >= 1) treated
+  // NaN as falsy, hiding the review card with no signal that the value was
+  // bad. Fix uses Number.isFinite to fall back to 0.
+  it('[BUG-813] falls back to 0 when totalSessions param is non-numeric', () => {
+    mockUseLocalSearchParams.mockReturnValue({
+      topicId: 'topic-1',
+      profileId: 'child-1',
+      title: 'Fractions',
+      completionStatus: 'not_started',
+      masteryScore: '0.2',
+      retentionStatus: 'strong',
+      totalSessions: 'abc',
+      subjectId: 'subject-1',
+      subjectName: 'Mathematics',
+    });
+
+    expect(() => render(<TopicDetailScreen />)).not.toThrow();
+    // The screen should render normally; "NaN" must not appear anywhere.
+    expect(screen.queryByText(/NaN/)).toBeNull();
+  });
 });

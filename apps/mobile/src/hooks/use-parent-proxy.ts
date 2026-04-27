@@ -2,6 +2,13 @@ import { useEffect, useMemo } from 'react';
 import { useProfile, type Profile } from '../lib/profile';
 import { setProxyMode } from '../lib/api-client';
 import * as SecureStore from '../lib/secure-storage';
+import { sanitizeSecureStoreKey } from '../lib/secure-storage';
+
+// [BUG-827 / F-CMP-003] Mirror the sanitized constant in profile.ts so reads
+// and writes share the same shape. The literal is currently identity-safe,
+// but wrapping defends against future refactors that interpolate a dynamic
+// segment (which would be silently rejected by iOS Keychain).
+const PARENT_PROXY_KEY = sanitizeSecureStoreKey('parent-proxy-active');
 
 export interface ParentProxyState {
   isParentProxy: boolean;
@@ -27,9 +34,9 @@ export function useParentProxy(): ParentProxyState {
 
     setProxyMode(isParentProxy);
     if (isParentProxy) {
-      void SecureStore.setItemAsync('parent-proxy-active', 'true');
+      void SecureStore.setItemAsync(PARENT_PROXY_KEY, 'true');
     } else {
-      void SecureStore.deleteItemAsync('parent-proxy-active');
+      void SecureStore.deleteItemAsync(PARENT_PROXY_KEY);
     }
   }, [activeProfile, isParentProxy]);
 
