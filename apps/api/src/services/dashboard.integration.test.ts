@@ -49,6 +49,24 @@ function subtractDays(date: Date, days: number): Date {
   return result;
 }
 
+/**
+ * Returns Wednesday noon UTC of the current ISO week.
+ *
+ * The dashboard service uses Monday-start ISO weeks (see
+ * `getStartOfWeek` in dashboard.ts). When tests use `new Date()` and
+ * offset by ±1 day to seed "this week" / "last week" sessions, those
+ * offsets cross the Monday boundary on Mon/Sun and silently misclassify.
+ * Anchoring to mid-week makes ±1 / ±8 day offsets always land in the
+ * intended week.
+ */
+function getStableMidWeekNow(): Date {
+  const d = new Date();
+  const day = d.getUTCDay() || 7; // Sun=0 → treat as 7 so Mon=1
+  d.setUTCDate(d.getUTCDate() - day + 3); // shift to Wednesday (day 3)
+  d.setUTCHours(12, 0, 0, 0);
+  return d;
+}
+
 function buildSubjectMetrics(
   input: Partial<ProgressMetrics['subjects'][number]> & {
     subjectId: string;
@@ -444,7 +462,7 @@ describe('dashboard service integration', () => {
       'Photosynthesis',
     ]);
     const [topicId1, topicId2] = topicIds;
-    const now = new Date();
+    const now = getStableMidWeekNow();
     const currentSession1StartedAt = now;
     const currentSession2StartedAt = subtractDays(now, 1);
     const lastWeekStartedAt = subtractDays(now, 8);
@@ -688,7 +706,7 @@ describe('dashboard service integration', () => {
     await seedSession({
       profileId: childProfileId,
       subjectId,
-      startedAt: subtractDays(new Date(), 1),
+      startedAt: subtractDays(getStableMidWeekNow(), 1),
       exchangeCount: 4,
       durationSeconds: 480,
       wallClockSeconds: 540,
