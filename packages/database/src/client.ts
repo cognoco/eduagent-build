@@ -1,5 +1,7 @@
-import { Pool, neonConfig } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-serverless';
+import { Pool as NeonPool, neonConfig } from '@neondatabase/serverless';
+import { drizzle as drizzleNeon } from 'drizzle-orm/neon-serverless';
+import { Pool as PgPool } from 'pg';
+import { drizzle as drizzlePg } from 'drizzle-orm/node-postgres';
 import * as schema from './schema/index';
 
 // ---------------------------------------------------------------------------
@@ -26,23 +28,47 @@ if (typeof WebSocket === 'undefined') {
  */
 export type CreateDatabaseOptions = Record<string, never>;
 
+// [BUG-MIGRATE-0014 / RLS-PHASE-0] CI runs integration tests against a vanilla
+// Postgres container at localhost:5432 (cheap, fast, in-job). Production runs
+// against Neon, which requires a WebSocket tunnel. @neondatabase/serverless's
+// Pool only speaks Neon's WebSocket protocol, so it errors with "Received
+// network error or non-101 status code" against vanilla Postgres.
+//
+// Pick the driver based on the URL: Neon's serverless Pool for *.neon.tech (or
+// any URL that has explicit `sslmode=require` flagging a managed Neon-style
+// endpoint), and node-postgres's plain TCP Pool for everything else. Both
+// drizzle wrappers expose the same PgDatabase interface, so callers see
+// identical typings — only the runtime transport differs.
+function looksLikeNeon(url: string): boolean {
+  return /\.neon\.tech\b/.test(url) || /\bneon(\.tech)?\b/.test(url);
+}
+
 /**
- * Create a Drizzle database client backed by @neondatabase/serverless (WebSocket
- * driver). Unlike the previous neon-http driver, this client supports real
- * ACID interactive transactions — `db.transaction(async (tx) => { ... })` opens
- * a genuine Postgres BEGIN/COMMIT and guarantees atomicity and rollback.
+ * Create a Drizzle database client. Production (Neon) gets the WebSocket-based
+ * neon-serverless driver; non-Neon URLs (CI's localhost Postgres, local dev
+ * docker) get the plain pg driver. Both support real ACID interactive
+ * transactions — `db.transaction(async (tx) => { ... })` opens a genuine
+ * Postgres BEGIN/COMMIT and guarantees atomicity and rollback.
  *
- * Phase 0.0 of the RLS preparatory plan switches from neon-http to this driver.
- * The silent non-atomic fallback that was present in the old client has been
- * removed — if `db.transaction` throws, the error propagates to the caller.
+ * Phase 0.0 of the RLS preparatory plan switched the production driver from
+ * neon-http to neon-serverless so transactions are no longer silently
+ * non-atomic. The silent non-atomic fallback that was present in the old
+ * client has been removed — if `db.transaction` throws, the error propagates
+ * to the caller.
  */
 export function createDatabase(
   databaseUrl: string,
   // options parameter kept for backward-compatibility; currently unused
   _options: CreateDatabaseOptions = {}
 ) {
-  const pool = new Pool({ connectionString: databaseUrl });
-  return drizzle(pool, { schema });
+  if (looksLikeNeon(databaseUrl)) {
+    const pool = new NeonPool({ connectionString: databaseUrl });
+    return drizzleNeon(pool, { schema });
+  }
+  const pool = new PgPool({ connectionString: databaseUrl });
+  return drizzlePg(pool, { schema }) as unknown as ReturnType<
+    typeof drizzleNeon<typeof schema>
+  >;
 }
 
 export type Database = ReturnType<typeof createDatabase>;
