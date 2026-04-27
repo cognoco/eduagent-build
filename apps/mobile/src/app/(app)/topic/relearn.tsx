@@ -11,7 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useStartRelearn } from '../../../hooks/use-retention';
 // Persona-conditional copy — documented exception, same pattern as (app)/home.tsx
 import { useProfile, personaFromBirthYear } from '../../../lib/profile';
-import { goBackOrReplace } from '../../../lib/navigation';
+import { goBackOrReplace, homeHrefForReturnTo } from '../../../lib/navigation';
 import { formatApiError } from '../../../lib/format-api-error';
 import { useParentProxy } from '../../../hooks/use-parent-proxy';
 
@@ -85,10 +85,11 @@ const COPY_LEARNER = {
 export default function RelearnScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { topicId, subjectId, topicName } = useLocalSearchParams<{
+  const { topicId, subjectId, topicName, returnTo } = useLocalSearchParams<{
     topicId: string;
     subjectId: string;
     topicName?: string;
+    returnTo?: string;
   }>();
 
   const startRelearn = useStartRelearn();
@@ -109,6 +110,15 @@ export default function RelearnScreen() {
     preferredMethod?: string;
   } | null>(null);
 
+  const handleBack = useCallback(() => {
+    if (returnTo) {
+      router.replace(homeHrefForReturnTo(returnTo) as never);
+      return;
+    }
+
+    goBackOrReplace(router, '/(app)/library' as const);
+  }, [returnTo, router]);
+
   const handleSameMethod = useCallback(() => {
     if (!topicId) return;
     setError(null);
@@ -126,6 +136,7 @@ export default function RelearnScreen() {
               topicId,
               ...(topicName ? { topicName } : {}),
               mode: 'relearn',
+              ...(returnTo ? { returnTo } : {}),
             },
           });
         },
@@ -135,7 +146,7 @@ export default function RelearnScreen() {
         onSettled: () => setIsSubmitting(false),
       }
     );
-  }, [topicId, topicName, subjectId, startRelearn, router]);
+  }, [topicId, topicName, subjectId, returnTo, startRelearn, router]);
 
   const handleSelectMethod = useCallback(
     (preferredMethod: string) => {
@@ -155,6 +166,7 @@ export default function RelearnScreen() {
                 topicId,
                 ...(topicName ? { topicName } : {}),
                 mode: 'relearn',
+                ...(returnTo ? { returnTo } : {}),
               },
             });
           },
@@ -165,7 +177,7 @@ export default function RelearnScreen() {
         }
       );
     },
-    [topicId, subjectId, startRelearn, router]
+    [topicId, topicName, subjectId, returnTo, startRelearn, router]
   );
 
   // M11: Retry last attempted method without re-selecting
@@ -190,7 +202,7 @@ export default function RelearnScreen() {
           Missing required parameters. Please go back and try again.
         </Text>
         <Pressable
-          onPress={() => goBackOrReplace(router, '/(app)/library' as const)}
+          onPress={handleBack}
           className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center"
           accessibilityRole="button"
           accessibilityLabel="Go back"
@@ -209,7 +221,7 @@ export default function RelearnScreen() {
       {/* Header */}
       <View className="px-5 pt-4 pb-3 flex-row items-center">
         <Pressable
-          onPress={() => goBackOrReplace(router, '/(app)/library' as const)}
+          onPress={handleBack}
           className="me-3 p-2 min-h-[44px] min-w-[44px] items-center justify-center"
           testID="relearn-back"
           accessibilityLabel="Go back"

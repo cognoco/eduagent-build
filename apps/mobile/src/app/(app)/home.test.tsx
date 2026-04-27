@@ -13,6 +13,7 @@ let mockActiveProfile: {
 let mockIsLoading = false;
 let mockMarkCelebrationsSeen = { mutateAsync: jest.fn() };
 let mockOnAllComplete: (() => void) | null = null;
+let mockSearchParams: Record<string, string> = {};
 
 jest.mock('../../lib/profile', () => ({
   useProfile: () => ({
@@ -43,6 +44,7 @@ const mockRouterPush = jest.fn();
 const mockRouterReplace = jest.fn();
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockRouterPush, replace: mockRouterReplace }),
+  useLocalSearchParams: () => mockSearchParams,
 }));
 
 jest.mock('../../components/home', () => {
@@ -67,6 +69,7 @@ describe('HomeScreen intent router', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockIsLoading = false;
+    mockSearchParams = {};
     mockMarkCelebrationsSeen = { mutateAsync: jest.fn() };
     mockOnAllComplete = null;
   });
@@ -94,6 +97,20 @@ describe('HomeScreen intent router', () => {
 
     expect(screen.getByTestId('parent-gateway')).toBeTruthy();
     expect(screen.queryByTestId('learner-screen')).toBeNull();
+  });
+
+  it('restores the parent learner view when view=learner is in the route', () => {
+    mockProfiles = [
+      { id: 'p1', displayName: 'Maria', isOwner: true },
+      { id: 'c1', displayName: 'Emma', isOwner: false },
+    ];
+    mockActiveProfile = mockProfiles[0] ?? null;
+    mockSearchParams = { view: 'learner' };
+
+    render(<HomeScreen />);
+
+    expect(screen.getByTestId('learner-screen')).toBeTruthy();
+    expect(screen.queryByTestId('parent-gateway')).toBeNull();
   });
 
   it('renders LearnerScreen when active profile is a child (non-owner)', () => {
@@ -125,6 +142,7 @@ describe('HomeScreen 3B.11: timeout error state secondary navigation', () => {
   beforeEach(() => {
     jest.useFakeTimers();
     jest.clearAllMocks();
+    mockSearchParams = {};
     mockIsLoading = true;
     mockProfiles = [];
     mockActiveProfile = null;
@@ -190,6 +208,7 @@ describe('HomeScreen SF-1: markCelebrationsSeen error handling', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockIsLoading = false;
+    mockSearchParams = {};
     mockProfiles = [{ id: 'p1', displayName: 'Alex', isOwner: true }];
     mockActiveProfile = mockProfiles[0] ?? null;
     mockOnAllComplete = null;

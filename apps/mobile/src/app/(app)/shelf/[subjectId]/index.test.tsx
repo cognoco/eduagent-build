@@ -14,17 +14,13 @@ jest.mock('../../../../components/common', () => ({
 }));
 
 const mockPush = jest.fn();
-const mockBack = jest.fn();
 const mockReplace = jest.fn();
-const mockCanGoBack = jest.fn();
 
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockSearchParams(),
   useRouter: () => ({
     push: mockPush,
-    back: mockBack,
     replace: mockReplace,
-    canGoBack: mockCanGoBack,
   }),
 }));
 
@@ -167,7 +163,6 @@ describe('ShelfScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockSearchParams = () => ({ subjectId: 'sub-1' });
-    mockCanGoBack.mockReturnValue(true);
 
     mockUseBooks.mockImplementation(() => ({
       data: [
@@ -219,12 +214,12 @@ describe('ShelfScreen', () => {
     ).toBeTruthy();
   });
 
-  it('missing-param back button calls router.back()', () => {
+  it('missing-param back button returns to library', () => {
     mockSearchParams = () => ({ subjectId: '' });
 
     const { getByTestId } = render(<ShelfScreen />);
     fireEvent.press(getByTestId('shelf-missing-param-back'));
-    expect(mockBack).toHaveBeenCalledTimes(1);
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
   });
 
   // -----------------------------------------------------------------------
@@ -255,7 +250,7 @@ describe('ShelfScreen', () => {
 
     const { getByTestId } = render(<ShelfScreen />);
     fireEvent.press(getByTestId('shelf-loading-back'));
-    expect(mockBack).toHaveBeenCalledTimes(1);
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
   });
 
   // -----------------------------------------------------------------------
@@ -291,7 +286,7 @@ describe('ShelfScreen', () => {
     expect(mockBooksRefetch).toHaveBeenCalledTimes(1);
   });
 
-  it('back button on error screen calls router.back() [BUG-82]', () => {
+  it('go-home button on error screen returns to home [BUG-82]', () => {
     mockUseBooks.mockReturnValue({
       data: undefined,
       isLoading: false,
@@ -346,15 +341,13 @@ describe('ShelfScreen', () => {
     expect(getByText('Geometry')).toBeTruthy();
   });
 
-  it('back button on main view calls router.back()', () => {
+  it('back button on main view returns to library', () => {
     const { getByTestId } = render(<ShelfScreen />);
     fireEvent.press(getByTestId('shelf-back'));
-    expect(mockBack).toHaveBeenCalledTimes(1);
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
   });
 
-  it('back button replaces library when there is no back history', () => {
-    mockCanGoBack.mockReturnValue(false);
-
+  it('back button replaces library without relying on back history', () => {
     const { getByTestId } = render(<ShelfScreen />);
     fireEvent.press(getByTestId('shelf-back'));
     expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
@@ -391,7 +384,7 @@ describe('ShelfScreen', () => {
     expect(getByText('No books on this shelf yet.')).toBeTruthy();
   });
 
-  it('empty state back button calls router.back()', () => {
+  it('empty state back button returns to library', () => {
     mockUseBooks.mockReturnValue({
       data: [],
       isLoading: false,
@@ -402,7 +395,7 @@ describe('ShelfScreen', () => {
 
     const { getByTestId } = render(<ShelfScreen />);
     fireEvent.press(getByTestId('shelf-empty-back'));
-    expect(mockBack).toHaveBeenCalledTimes(1);
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
   });
 
   // -----------------------------------------------------------------------

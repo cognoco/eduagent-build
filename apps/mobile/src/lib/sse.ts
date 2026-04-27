@@ -442,7 +442,14 @@ export function streamSSEViaXHR(
         if (event) yield event;
       }
       if (done) {
-        if (streamError) throw streamError;
+        if (streamError) {
+          // [I-21] Discard any partial SSE events that were buffered before
+          // a 4xx error arrived. Without this, the consumer would receive
+          // stale/incomplete chunks before the error is thrown, corrupting
+          // the accumulated response text.
+          eventQueue.length = 0;
+          throw streamError;
+        }
         return;
       }
       await new Promise<void>((r) => {

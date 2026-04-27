@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { AppState, Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import * as SecureStore from '../lib/secure-storage';
+import { sanitizeSecureStoreKey } from '../lib/secure-storage';
 
 export type PermState = {
   mic: 'unknown' | 'granted' | 'denied';
@@ -89,7 +90,8 @@ export function usePermissionSetup(
 
     setChecked(false);
 
-    const key = `permissionSetupSeen_${profileId}`;
+    // [I-4] Sanitize profileId before interpolating into a SecureStore key.
+    const key = sanitizeSecureStoreKey(`permissionSetupSeen_${profileId}`);
     void (async () => {
       try {
         const value = await SecureStore.getItemAsync(key);
@@ -138,7 +140,8 @@ export function usePermissionSetup(
   const dismiss = useCallback(() => {
     if (!profileId) return;
     setShouldShow(false);
-    const key = `permissionSetupSeen_${profileId}`;
+    // [I-4] Sanitize profileId before interpolating into a SecureStore key.
+    const key = sanitizeSecureStoreKey(`permissionSetupSeen_${profileId}`);
     void SecureStore.setItemAsync(key, 'true').catch(() => {
       /* non-fatal */
     });

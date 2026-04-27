@@ -3,13 +3,18 @@ import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const mockBack = jest.fn();
+const mockReplace = jest.fn();
 
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => ({
     subjectId: 'subject-1',
     subjectName: 'Mathematics',
   }),
-  useRouter: () => ({ back: mockBack, canGoBack: jest.fn(() => true) }),
+  useRouter: () => ({
+    back: mockBack,
+    replace: mockReplace,
+    canGoBack: jest.fn(() => true),
+  }),
 }));
 
 jest.mock('react-native-safe-area-context', () => {
@@ -161,10 +166,13 @@ describe('SubjectSettingsScreen', () => {
     expect(screen.getByTestId('analogy-domain-loading')).toBeTruthy();
   });
 
-  it('navigates back when back button is pressed', () => {
+  it('returns to the subject shelf when back button is pressed', () => {
     render(<SubjectSettingsScreen />, { wrapper: createWrapper() });
 
     fireEvent.press(screen.getByTestId('subject-settings-back'));
-    expect(mockBack).toHaveBeenCalled();
+    expect(mockReplace).toHaveBeenCalledWith({
+      pathname: '/(app)/shelf/[subjectId]',
+      params: { subjectId: 'subject-1' },
+    });
   });
 });

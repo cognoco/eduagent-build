@@ -1,4 +1,5 @@
 import * as SecureStore from './secure-storage';
+import { sanitizeSecureStoreKey } from './secure-storage';
 import type { MilestoneTrackerState } from '../hooks/use-milestone-tracker';
 
 const RECOVERY_KEY = 'session-recovery-marker';
@@ -17,7 +18,10 @@ export interface SessionRecoveryMarker {
 }
 
 function getRecoveryKey(profileId?: string | null): string {
-  return profileId ? `${RECOVERY_KEY}-${profileId}` : RECOVERY_KEY;
+  // [I-4] Sanitize profileId before interpolating into a SecureStore key.
+  return profileId
+    ? sanitizeSecureStoreKey(`${RECOVERY_KEY}-${profileId}`)
+    : RECOVERY_KEY;
 }
 
 export async function writeSessionRecoveryMarker(

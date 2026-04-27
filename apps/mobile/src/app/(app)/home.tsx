@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { View, ActivityIndicator, Text, Pressable } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ParentGateway, LearnerScreen } from '../../components/home';
 import { useCelebration } from '../../hooks/use-celebration';
 import {
@@ -25,6 +25,7 @@ function hasLinkedChildren(
 
 export default function HomeScreen(): React.ReactElement {
   const router = useRouter();
+  const { view } = useLocalSearchParams<{ view?: string }>();
   const { profiles, activeProfile, switchProfile, isLoading } = useProfile();
   const { data: celebrationLevel = 'all' } = useCelebrationLevel();
   const { data: pendingCelebrations } = usePendingCelebrations();
@@ -66,6 +67,12 @@ export default function HomeScreen(): React.ReactElement {
   useEffect(() => {
     setShowLearnerView(false);
   }, [activeProfile?.id]);
+
+  useEffect(() => {
+    if (view === 'learner' && isParentGatewayEligible) {
+      setShowLearnerView(true);
+    }
+  }, [isParentGatewayEligible, view]);
 
   // Neutral placeholder while profiles load — prevents flash of wrong content
   // (e.g. parent briefly seeing LearnerScreen before ParentGateway renders).

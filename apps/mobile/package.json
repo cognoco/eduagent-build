@@ -20,7 +20,6 @@
     "@react-native-ml-kit/text-recognition": "^2.0.0",
     "@sentry/react-native": "^8.1.0",
     "@tanstack/react-query": "^5.90.21",
-    "@testing-library/react-native": "^13.2.2",
     "expo": "~54.0.29",
     "expo-build-properties": "~1.0.10",
     "expo-camera": "^17.0.10",
@@ -45,9 +44,6 @@
     "expo-system-ui": "~6.0.9",
     "expo-updates": "~0.28.18",
     "expo-web-browser": "^15.0.10",
-    "jest-expo": "~54.0.16",
-    "metro-config": "^0.83.3",
-    "metro-resolver": "^0.83.3",
     "nativewind": "^4.2.1",
     "react": "19.1.0",
     "react-dom": "19.1.0",
@@ -65,6 +61,10 @@
   },
   "devDependencies": {
     "@eduagent/api": "workspace:*",
-    "hono": "^4.11.0"
+    "@testing-library/react-native": "^13.2.2",
+    "hono": "^4.11.0",
+    "jest-expo": "~54.0.16",
+    "metro-config": "^0.83.3",
+    "metro-resolver": "^0.83.3"
   }
 }

@@ -9,18 +9,21 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const mockBack = jest.fn();
 const mockPush = jest.fn();
+const mockReplace = jest.fn();
 const mockMutate = jest.fn();
+let mockSearchParams: Record<string, string> = {
+  topicId: 'topic-1',
+  subjectId: 'sub-1',
+};
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({
     back: mockBack,
     push: mockPush,
+    replace: mockReplace,
     canGoBack: jest.fn(() => true),
   }),
-  useLocalSearchParams: () => ({
-    topicId: 'topic-1',
-    subjectId: 'sub-1',
-  }),
+  useLocalSearchParams: () => mockSearchParams,
 }));
 
 jest.mock('react-native-safe-area-context', () => ({
@@ -63,6 +66,10 @@ describe('RelearnScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockPersona = 'teen';
+    mockSearchParams = {
+      topicId: 'topic-1',
+      subjectId: 'sub-1',
+    };
   });
 
   // ---------------------------------------------------------------------------
@@ -205,6 +212,60 @@ describe('RelearnScreen', () => {
       expect(
         screen.getByText('Could not start relearn right now')
       ).toBeTruthy();
+    });
+  });
+
+  it('returns to the learner home view when opened from learner home', () => {
+    mockSearchParams = {
+      topicId: 'topic-1',
+      subjectId: 'sub-1',
+      returnTo: 'learner-home',
+    };
+
+    render(<RelearnScreen />, { wrapper: createWrapper() });
+
+    fireEvent.press(screen.getByTestId('relearn-back'));
+
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/home?view=learner');
+    expect(mockBack).not.toHaveBeenCalled();
+  });
+
+  it('keeps the learner home return target when starting a relearn session', async () => {
+    mockSearchParams = {
+      topicId: 'topic-1',
+      subjectId: 'sub-1',
+      topicName: 'Algebra',
+      returnTo: 'learner-home',
+    };
+    mockMutate.mockImplementation(
+      (
+        _input: unknown,
+        callbacks?: {
+          onSuccess?: (result: { sessionId: string }) => void;
+          onSettled?: () => void;
+        }
+      ) => {
+        callbacks?.onSuccess?.({ sessionId: 'sess-1' });
+        callbacks?.onSettled?.();
+      }
+    );
+
+    render(<RelearnScreen />, { wrapper: createWrapper() });
+
+    fireEvent.press(screen.getByTestId('relearn-same-method'));
+
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: '/(app)/session',
+        params: {
+          sessionId: 'sess-1',
+          subjectId: 'sub-1',
+          topicId: 'topic-1',
+          topicName: 'Algebra',
+          mode: 'relearn',
+          returnTo: 'learner-home',
+        },
+      });
     });
   });
 

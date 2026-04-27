@@ -78,3 +78,17 @@ export async function deleteItemAsync(
     await ExpoSecureStore.deleteItemAsync(key);
   }
 }
+
+/**
+ * [I-4 / I-5] Sanitize a raw string so it is safe to use as an iOS/Android
+ * SecureStore key. iOS Keychain only allows [a-zA-Z0-9._-] — characters like
+ * `+`, `/`, `=`, `:`, and Unicode letters crash setItemAsync on iOS.
+ *
+ * Replace every forbidden character with `_`. This is a lossy transform
+ * (two different raw strings may produce the same key), but profileId and
+ * sessionId values are UUID-like and only contain alphanumeric + hyphens, so
+ * collisions are not a concern in practice.
+ */
+export function sanitizeSecureStoreKey(raw: string): string {
+  return raw.replace(/[^a-zA-Z0-9._-]/g, '_');
+}

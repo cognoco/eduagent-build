@@ -58,6 +58,18 @@ export function clearOnAuthExpired(): void {
   _authExpiredFiring = false;
 }
 
+/**
+ * [BUG-630 / I-2] Reset the "auth-expired in progress" flag.
+ * Must be called by the registered onAuthExpired callback after signOut
+ * resolves (success or failure). Without this reset the flag stays true
+ * permanently — the second and any subsequent 401s are silently swallowed
+ * (e.g. a fresh expired token during a re-sign-in flow), and the user has
+ * no feedback that they need to authenticate again.
+ */
+export function resetAuthExpiredGuard(): void {
+  _authExpiredFiring = false;
+}
+
 // ---------------------------------------------------------------------------
 // Active profile ID — set by ProfileProvider, read by customFetch.
 // [BUG-520] Decouples api-client from profile.ts to break the circular
@@ -82,6 +94,15 @@ export function setProxyMode(enabled: boolean): void {
   _proxyMode = enabled;
 }
 
+/**
+ * [I-1] Read the current proxy-mode flag from outside this module.
+ * Used by useStreamMessage which builds its own XHR headers and cannot
+ * rely on customFetch to inject X-Proxy-Mode automatically.
+ */
+export function getProxyMode(): boolean {
+  return _proxyMode;
+}
+
 // ---------------------------------------------------------------------------
 // Authenticated Hono RPC client
 // ---------------------------------------------------------------------------
@@ -101,12 +122,19 @@ export function useApiClient(): ApiClient {
 
   return useMemo(() => {
     const customFetch: typeof globalThis.fetch = async (input, init) => {
+      // [I-3] Snapshot identity before the async getToken() call to prevent a
+      // profile-switch race: if the user switches profiles between when we read
+      // the module vars and when we attach headers, we'd send mismatched
+      // X-Profile-Id / X-Proxy-Mode for the wrong profile. Snapshotting here
+      // ties both values to the same moment in time.
+      const snapshotProfileId = _activeProfileId;
+      const snapshotProxyMode = _proxyMode;
       const token = await getTokenRef.current();
       const headers = new Headers(init?.headers);
       if (token) headers.set('Authorization', `Bearer ${token}`);
-      if (_activeProfileId && !headers.has('X-Profile-Id'))
-        headers.set('X-Profile-Id', _activeProfileId);
-      if (_proxyMode) headers.set('X-Proxy-Mode', 'true');
+      if (snapshotProfileId && !headers.has('X-Profile-Id'))
+        headers.set('X-Profile-Id', snapshotProfileId);
+      if (snapshotProxyMode) headers.set('X-Proxy-Mode', 'true');
 
       const res = await globalThis.fetch(input, { ...init, headers });
 

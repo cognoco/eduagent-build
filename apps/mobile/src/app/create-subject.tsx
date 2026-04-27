@@ -19,7 +19,7 @@ import { useThemeColors } from '../lib/theme';
 import { Button } from '../components/common/Button';
 import { useKeyboardScroll } from '../hooks/use-keyboard-scroll';
 import { formatApiError } from '../lib/format-api-error';
-import { goBackOrReplace } from '../lib/navigation';
+import { homeHrefForReturnTo, goBackOrReplace } from '../lib/navigation';
 import type { SubjectResolveResult } from '@eduagent/schemas';
 
 /** Strip markdown bold markers so `**Science**` renders as plain "Science". */
@@ -345,12 +345,26 @@ export default function CreateSubjectScreen() {
   );
 
   const handleCancel = useCallback(() => {
-    goBackOrReplace(router, '/(app)/home' as const);
-  }, [router]);
+    if (returnTo === 'chat') {
+      // [BUG-633 / M-1] Bare router.back() silently no-ops when the modal was
+      // opened via deep link / push notification — no prior stack entry to go
+      // back to. Fall back to the home tab so cancel is never a dead button.
+      goBackOrReplace(router, '/(app)/home' as never);
+      return;
+    }
+
+    if (returnTo === 'library') {
+      router.replace('/(app)/library' as never);
+      return;
+    }
+
+    router.replace(homeHrefForReturnTo(returnTo) as never);
+  }, [returnTo, router]);
 
   const handleSubjectLimitPress = useCallback(() => {
     if (returnTo === 'chat') {
-      router.back();
+      // [BUG-633 / M-1] Same defensive fallback as handleCancel.
+      goBackOrReplace(router, '/(app)/home' as never);
     } else {
       router.replace('/(app)/library' as never);
     }

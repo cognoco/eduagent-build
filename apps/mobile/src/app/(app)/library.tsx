@@ -195,7 +195,11 @@ export default function LibraryScreen() {
   );
 
   const allTopics = useMemo<LibFilterEnrichedTopic[]>(() => {
-    if (!subjectsQuery.data) return [];
+    // [BUG-634 / M-2] Same Array.isArray guard as line 136. TanStack Query's
+    // select transform is bypassed when enabled=false, so the raw cache value
+    // can be a non-array (stale shape, undefined, prior error payload).
+    // flatMap on a non-array throws TypeError and crashes the Library screen.
+    if (!Array.isArray(subjectsQuery.data)) return [];
     return subjectsQuery.data.flatMap((subject, index) => {
       const data = retentionQueries[index]?.data;
       if (!data?.topics) return [];
@@ -428,7 +432,12 @@ export default function LibraryScreen() {
                 params: { subjectId },
               } as never);
             }}
-            onAddSubject={() => router.push('/create-subject')}
+            onAddSubject={() =>
+              router.push({
+                pathname: '/create-subject',
+                params: { returnTo: 'library' },
+              } as never)
+            }
           />
         )}
         {activeTab === 'books' && allBooksQuery.isError && (
@@ -501,7 +510,12 @@ export default function LibraryScreen() {
                   params: { subjectId, bookId },
                 } as never);
               }}
-              onAddSubject={() => router.push('/create-subject')}
+              onAddSubject={() =>
+                router.push({
+                  pathname: '/create-subject',
+                  params: { returnTo: 'library' },
+                } as never)
+              }
             />
           )}
         {activeTab === 'topics' && (
@@ -513,7 +527,12 @@ export default function LibraryScreen() {
             state={topicsTabState}
             onStateChange={setTopicsTabState}
             onTopicPress={(topicId, subjectId) => openTopic(topicId, subjectId)}
-            onAddSubject={() => router.push('/create-subject')}
+            onAddSubject={() =>
+              router.push({
+                pathname: '/create-subject',
+                params: { returnTo: 'library' },
+              } as never)
+            }
           />
         )}
       </>
@@ -612,7 +631,12 @@ export default function LibraryScreen() {
                 </View>
               </View>
               <Pressable
-                onPress={() => router.push('/create-subject')}
+                onPress={() =>
+                  router.push({
+                    pathname: '/create-subject',
+                    params: { returnTo: 'library' },
+                  } as never)
+                }
                 className="bg-primary rounded-button py-3 mt-4 items-center"
                 testID="library-add-subject"
               >
@@ -637,6 +661,7 @@ export default function LibraryScreen() {
           onPress={() => setShowManageSubjects(false)}
           accessibilityRole="button"
           accessibilityLabel="Close manage subjects"
+          testID="manage-subjects-backdrop"
         >
           <Pressable
             className="bg-background rounded-t-3xl px-5 pt-5"

@@ -202,9 +202,7 @@ describe('PickBookScreen', () => {
     expect(getByTestId('pick-book-custom-input')).toBeTruthy();
   });
 
-  it('back button replaces shelf when there is no back history', () => {
-    mockCanGoBack.mockReturnValue(false);
-
+  it('back button replaces shelf without relying on back history', () => {
     const { getByTestId } = render(<PickBookScreen />);
     fireEvent.press(getByTestId('pick-book-back'));
 

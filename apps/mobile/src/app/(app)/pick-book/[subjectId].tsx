@@ -14,7 +14,6 @@ import {
   formatApiError,
 } from '../../../lib/format-api-error';
 import { ErrorFallback } from '../../../components/common/ErrorFallback';
-import { goBackOrReplace } from '../../../lib/navigation';
 import {
   BookPageFlipAnimation,
   MagicPenAnimation,
@@ -52,14 +51,14 @@ export default function PickBookScreen(): React.ReactElement {
 
   const handleBack = useCallback(() => {
     if (subjectId) {
-      goBackOrReplace(router, {
+      router.replace({
         pathname: '/(app)/shelf/[subjectId]',
         params: { subjectId },
       } as never);
       return;
     }
 
-    goBackOrReplace(router, '/(app)/library');
+    router.replace('/(app)/library' as never);
   }, [router, subjectId]);
 
   // M12: Filing overlay timeout — show skip button after 8 seconds (was 15)

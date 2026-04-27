@@ -25,7 +25,7 @@ import { useCreateSubject, useSubjects } from '../../../hooks/use-subjects';
 import { useClassifySubject } from '../../../hooks/use-classify-subject';
 import { CelebrationAnimation } from '../../../components/common';
 import { formatApiError } from '../../../lib/format-api-error';
-import { goBackOrReplace } from '../../../lib/navigation';
+import { goBackOrReplace, homeHrefForReturnTo } from '../../../lib/navigation';
 import { platformAlert } from '../../../lib/platform-alert';
 import { Sentry } from '../../../lib/sentry';
 import {
@@ -39,9 +39,10 @@ type FlashMode = 'off' | 'on' | 'auto';
 
 export default function CameraScreen(): React.ReactNode {
   const router = useRouter();
-  const { subjectId, subjectName } = useLocalSearchParams<{
+  const { subjectId, subjectName, returnTo } = useLocalSearchParams<{
     subjectId?: string;
     subjectName?: string;
+    returnTo?: string;
   }>();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
@@ -359,10 +360,11 @@ export default function CameraScreen(): React.ReactNode {
           ...(imageUri ? { imageUri } : {}),
           ...(imageMimeType ? { imageMimeType } : {}),
           ...(captureSource ? { captureSource } : {}),
+          ...(returnTo ? { returnTo } : {}),
         },
       } as never);
     },
-    [imageMimeType, router]
+    [imageMimeType, returnTo, router]
   );
 
   const handleConfirmResult = useCallback(() => {
@@ -546,8 +548,8 @@ export default function CameraScreen(): React.ReactNode {
   );
 
   const handleClose = useCallback(() => {
-    goBackOrReplace(router, '/(app)/home' as const);
-  }, [router]);
+    goBackOrReplace(router, homeHrefForReturnTo(returnTo));
+  }, [returnTo, router]);
 
   const toggleFlash = useCallback(() => {
     setFlash((prev) => (prev === 'off' ? 'on' : 'off'));

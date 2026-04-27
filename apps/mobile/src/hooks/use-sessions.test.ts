@@ -37,6 +37,8 @@ jest.mock('../lib/api-client', () => ({
       },
     });
   },
+  // [I-1] getProxyMode is called by useStreamMessage to inject X-Proxy-Mode.
+  getProxyMode: jest.fn().mockReturnValue(false),
 }));
 
 jest.mock('../lib/api', () => ({

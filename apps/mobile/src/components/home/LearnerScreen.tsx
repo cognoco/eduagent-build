@@ -10,11 +10,15 @@ import {
   useQuizDiscoveryCard,
 } from '../../hooks/use-coaching-card';
 import {
-  useContinueSuggestion,
+  useLearningResumeTarget,
   useReviewSummary,
 } from '../../hooks/use-progress';
 import { useSubjects } from '../../hooks/use-subjects';
 import { getGreeting } from '../../lib/greeting';
+import {
+  LEARNER_HOME_RETURN_TO,
+  pushLearningResumeTarget,
+} from '../../lib/navigation';
 import {
   clearSessionRecoveryMarker,
   isRecoveryMarkerFresh,
@@ -24,6 +28,8 @@ import {
 import { useThemeColors } from '../../lib/theme';
 import { IntentCard } from './IntentCard';
 import { EarlyAdopterCard } from './EarlyAdopterCard';
+
+const HOME_RETURN_PARAMS = { returnTo: LEARNER_HOME_RETURN_TO } as const;
 
 export interface LearnerScreenProps {
   profiles: Profile[];
@@ -47,7 +53,7 @@ export function LearnerScreen({
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
   const { data: subjects, isLoading, isError, refetch } = useSubjects();
-  const { data: continueSuggestion } = useContinueSuggestion();
+  const { data: resumeTarget } = useLearningResumeTarget();
   const { data: reviewSummary } = useReviewSummary();
   const { data: quizDiscovery } = useQuizDiscoveryCard();
   const markQuizDiscoverySurfaced = useMarkQuizDiscoverySurfaced();
@@ -170,30 +176,25 @@ export function LearnerScreen({
                 ...(recoveryMarker.topicName && {
                   topicName: recoveryMarker.topicName,
                 }),
+                ...HOME_RETURN_PARAMS,
               },
             } as never);
           },
         });
-      } else if (continueSuggestion) {
+      } else if (resumeTarget) {
         cards.push({
           testID: 'intent-continue',
           title: 'Continue',
-          subtitle: `Pick up ${continueSuggestion.topicTitle}`,
+          subtitle: resumeTarget.topicTitle
+            ? `Pick up ${resumeTarget.topicTitle}`
+            : `Pick up ${resumeTarget.subjectName}`,
           icon: 'play-circle-outline',
           onPress: () =>
-            router.push({
-              pathname: '/(app)/session',
-              params: {
-                ...(continueSuggestion.lastSessionId && {
-                  sessionId: continueSuggestion.lastSessionId,
-                }),
-                subjectId: continueSuggestion.subjectId,
-                subjectName: continueSuggestion.subjectName,
-                topicId: continueSuggestion.topicId,
-                topicName: continueSuggestion.topicTitle,
-                mode: 'learning',
-              },
-            } as never),
+            pushLearningResumeTarget(
+              router,
+              resumeTarget,
+              LEARNER_HOME_RETURN_TO
+            ),
         });
       } else if (
         reviewSummary &&
@@ -214,6 +215,7 @@ export function LearnerScreen({
                 topicId: reviewSummary.nextReviewTopic?.topicId,
                 subjectId: reviewSummary.nextReviewTopic?.subjectId,
                 topicName: reviewSummary.nextReviewTopic?.topicTitle,
+                ...HOME_RETURN_PARAMS,
               },
             } as never),
         });
@@ -238,7 +240,10 @@ export function LearnerScreen({
           markQuizDiscoveryHandled();
           router.push({
             pathname: '/(app)/quiz',
-            params: { activityType: quizDiscovery.activityType },
+            params: {
+              activityType: quizDiscovery.activityType,
+              ...HOME_RETURN_PARAMS,
+            },
           } as never);
         },
       });
@@ -249,7 +254,11 @@ export function LearnerScreen({
       title: 'Learn',
       subtitle: 'Start a new subject or pick one',
       icon: 'book-outline',
-      onPress: () => router.push('/create-subject' as never),
+      onPress: () =>
+        router.push({
+          pathname: '/create-subject',
+          params: HOME_RETURN_PARAMS,
+        } as never),
     });
 
     if (!isParentProxy) {
@@ -258,21 +267,33 @@ export function LearnerScreen({
         title: 'Ask',
         subtitle: 'Get answers to any question',
         icon: 'chatbubble-ellipses-outline',
-        onPress: () => router.push('/(app)/session?mode=freeform' as never),
+        onPress: () =>
+          router.push({
+            pathname: '/(app)/session',
+            params: { mode: 'freeform', ...HOME_RETURN_PARAMS },
+          } as never),
       });
       cards.push({
         testID: 'intent-practice',
         title: 'Practice',
         subtitle: 'Games and reviews to sharpen what you know',
         icon: 'game-controller-outline',
-        onPress: () => router.push('/(app)/practice' as never),
+        onPress: () =>
+          router.push({
+            pathname: '/(app)/practice',
+            params: HOME_RETURN_PARAMS,
+          } as never),
       });
       cards.push({
         testID: 'intent-homework',
         title: 'Homework',
         subtitle: 'Snap a photo, get help',
         icon: 'camera-outline',
-        onPress: () => router.push('/(app)/homework/camera' as never),
+        onPress: () =>
+          router.push({
+            pathname: '/(app)/homework/camera',
+            params: HOME_RETURN_PARAMS,
+          } as never),
       });
     }
 
@@ -290,12 +311,12 @@ export function LearnerScreen({
   }, [
     activeProfile?.id,
     activeProfile?.displayName,
-    continueSuggestion,
     dismissedQuizDiscoveryId,
     isParentProxy,
     markQuizDiscoveryHandled,
     quizDiscovery,
     recoveryMarker,
+    resumeTarget,
     reviewSummary,
     router,
   ]);

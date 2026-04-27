@@ -3,6 +3,7 @@ import {
   useContext,
   useState,
   useEffect,
+  useLayoutEffect,
   useCallback,
   useMemo,
 } from 'react';
@@ -160,15 +161,17 @@ export function ProfileProvider({
 
   // [BUG-520] Push the active profile ID to the api-client module so
   // customFetch can attach X-Profile-Id without importing profile.ts.
-  // [BUG-528] Set synchronously during render — NOT in a useEffect.
-  // pushProfileIdToApiClient only writes to a module-level variable
-  // (_activeProfileId in api-client.ts), which has no React side-effects.
-  // The old useEffect fired *after* paint, leaving a 1-frame gap where
-  // queries were enabled (activeProfile non-null) but customFetch had no
-  // profile ID to attach.
+  // [BUG-528 / I-17] Use useLayoutEffect (fires synchronously after DOM
+  // mutations, before paint) instead of calling during render. The old
+  // render-time call caused React Strict Mode to double-invoke the write,
+  // producing a transient stale `undefined` during the second (discarded)
+  // render pass of profile-switch. useLayoutEffect fires once per committed
+  // render, keeping the module variable consistent with the committed tree.
   // NB: imported as pushProfileIdToApiClient to avoid shadowing the local
   // React state setter (also named setActiveProfileId on line 101).
-  pushProfileIdToApiClient(activeProfile?.id);
+  useLayoutEffect(() => {
+    pushProfileIdToApiClient(activeProfile?.id);
+  }, [activeProfile?.id]);
 
   const switchProfile = useCallback(
     async (profileId: string): Promise<SwitchProfileResult> => {

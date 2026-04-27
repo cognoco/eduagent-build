@@ -13,12 +13,15 @@ const mockResolveSubjectMutateAsync = jest.fn();
 let mockSearchParams: Record<string, string> = {};
 let mockExistingSubjects: Array<{ id: string; name: string }> = [];
 
+let mockCanGoBackValue = true;
+const mockCanGoBack = jest.fn(() => mockCanGoBackValue);
+
 jest.mock('expo-router', () => ({
   useRouter: () => ({
     back: mockBack,
     replace: mockReplace,
     push: mockPush,
-    canGoBack: jest.fn(() => true),
+    canGoBack: mockCanGoBack,
   }),
   useLocalSearchParams: () => mockSearchParams,
 }));
@@ -67,6 +70,7 @@ describe('CreateSubjectScreen', () => {
     jest.clearAllMocks();
     mockSearchParams = {};
     mockExistingSubjects = [];
+    mockCanGoBackValue = true;
   });
 
   it('renders starter chips and fills the input on tap', () => {
@@ -438,6 +442,68 @@ describe('CreateSubjectScreen', () => {
 
     expect(mockBack).toHaveBeenCalled();
     expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('[BUG-633 / M-1] Cancel falls back to home when returnTo=chat AND no back stack (deep link entry)', () => {
+    // Repro: user opens the create-subject modal via deep link / push notification
+    // with returnTo=chat. There is no prior stack entry — bare router.back()
+    // would silently no-op and the user would be stuck on the modal.
+    mockSearchParams = { returnTo: 'chat' };
+    mockCanGoBackValue = false;
+
+    render(<CreateSubjectScreen />);
+
+    fireEvent.press(screen.getByTestId('create-subject-cancel'));
+
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
+  });
+
+  it('[BUG-633 / M-1] subject-limit Manage falls back to home when returnTo=chat AND no back stack', async () => {
+    mockSearchParams = { returnTo: 'chat' };
+    mockCanGoBackValue = false;
+
+    mockResolveSubjectMutateAsync.mockResolvedValueOnce({
+      status: 'direct_match',
+      resolvedName: 'Math',
+      suggestions: [],
+      displayMessage: 'Math works.',
+    });
+    mockCreateSubjectMutateAsync.mockRejectedValueOnce(
+      new Error('You have reached the subject limit for your plan')
+    );
+
+    render(<CreateSubjectScreen />);
+    fireEvent.changeText(screen.getByTestId('create-subject-name'), 'Math');
+    fireEvent.press(screen.getByTestId('create-subject-submit'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('manage-subjects-button')).toBeTruthy();
+    });
+    fireEvent.press(screen.getByTestId('manage-subjects-button'));
+
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
+  });
+
+  it('Cancel button returns to library when returnTo=library', () => {
+    mockSearchParams = { returnTo: 'library' };
+
+    render(<CreateSubjectScreen />);
+
+    fireEvent.press(screen.getByTestId('create-subject-cancel'));
+
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
+    expect(mockBack).not.toHaveBeenCalled();
+  });
+
+  it('Cancel button returns to the learner home view when opened from learner home', () => {
+    mockSearchParams = { returnTo: 'learner-home' };
+
+    render(<CreateSubjectScreen />);
+
+    fireEvent.press(screen.getByTestId('create-subject-cancel'));
+
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/home?view=learner');
+    expect(mockBack).not.toHaveBeenCalled();
   });
 
   it('[BUG-3] subject-limit "Manage" button calls router.back() when returnTo=chat', async () => {

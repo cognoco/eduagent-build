@@ -9,7 +9,7 @@ import {
 import type { ErrorInfo, ReactNode } from 'react';
 import { AppState, View, Text, Pressable, ScrollView } from 'react-native';
 import { platformAlert } from '../../../lib/platform-alert';
-import { goBackOrReplace } from '../../../lib/navigation';
+import { goBackOrReplace, homeHrefForReturnTo } from '../../../lib/navigation';
 import {
   router,
   useRouter,
@@ -301,6 +301,8 @@ function SessionScreenInner() {
     ocrText,
     captureSource,
     rawInput,
+    resumeFromSessionId,
+    returnTo,
     verificationType: routeVerificationType,
     imageUri,
     imageMimeType,
@@ -316,6 +318,8 @@ function SessionScreenInner() {
     ocrText?: string;
     captureSource?: HomeworkCaptureSource;
     rawInput?: string;
+    resumeFromSessionId?: string;
+    returnTo?: string;
     verificationType?: string;
     imageUri?: string;
     imageMimeType?: string;
@@ -326,6 +330,20 @@ function SessionScreenInner() {
   const colors = useThemeColors();
 
   const effectiveMode = mode ?? 'freeform';
+  const homeBackHref = homeHrefForReturnTo(returnTo);
+  const chatBackFallback = returnTo
+    ? (homeBackHref as string)
+    : subjectId
+    ? `/(app)/shelf/${subjectId}`
+    : undefined;
+  const handleHomeBack = useCallback(() => {
+    if (returnTo) {
+      router.replace(homeBackHref as never);
+      return;
+    }
+
+    goBackOrReplace(router, homeBackHref);
+  }, [homeBackHref, returnTo, router]);
   const normalizedOcrText = Array.isArray(ocrText) ? ocrText[0] : ocrText;
   const normalizedCaptureSource = Array.isArray(captureSource)
     ? captureSource[0]
@@ -361,6 +379,12 @@ function SessionScreenInner() {
     subjectName ?? undefined,
     rawInput ?? undefined
   );
+  // [M-7] Capture openingContent in a ref at render time so the transcript
+  // hydration effect can use a stable reference. Without this, streak data
+  // arriving asynchronously after the first render causes openingContent to
+  // change, which triggers the hydration effect to re-run mid-conversation
+  // and re-inject the opening greeting, wiping out any user messages.
+  const openingContentRef = useRef<string>(openingContent);
 
   const { isOffline } = useNetworkStatus();
   const { isApiReachable, isChecked: apiChecked } = useApiReachability();
@@ -548,6 +572,10 @@ function SessionScreenInner() {
       // so the hydration effect's deps don't change and it never re-fires,
       // leaving the user staring at just the opening greeting.
       if (!routeSessionId) {
+        // [M-7] Refresh the ref for new sessions so the opening message is
+        // always current. Resuming sessions skip this because hydration owns
+        // the message list via transcript.data.
+        openingContentRef.current = openingContent;
         setMessages([
           { id: 'opening', role: 'assistant', content: openingContent },
         ]);
@@ -695,7 +723,16 @@ function SessionScreenInner() {
     setMessages(
       transcriptMessages.length > 0
         ? transcriptMessages
-        : [{ id: 'opening', role: 'assistant', content: openingContent }]
+        : // [M-7] Use the ref so late-arriving streak data (which changes
+          // openingContent reactively) doesn't re-trigger this effect and
+          // wipe out in-progress conversation messages.
+          [
+            {
+              id: 'opening',
+              role: 'assistant',
+              content: openingContentRef.current,
+            },
+          ]
     );
     setExchangeCount(transcript.data.session.exchangeCount);
     setEscalationRung(
@@ -706,7 +743,7 @@ function SessionScreenInner() {
     setInputMode(transcript.data.session.inputMode ?? 'text');
     setActiveSessionId(routeSessionId);
     setResumedBanner(true);
-  }, [openingContent, routeSessionId, transcript.data]);
+  }, [routeSessionId, transcript.data]);
 
   useEffect(() => {
     if (!sessionExpired) return;
@@ -853,6 +890,7 @@ function SessionScreenInner() {
     topicName: topicName ?? undefined,
     inputMode,
     rawInput: rawInput ?? undefined,
+    resumeFromSessionId: resumeFromSessionId ?? undefined,
     verificationType: routeVerificationType ?? undefined,
     normalizedOcrText,
     homeworkCaptureSource,
@@ -1113,11 +1151,7 @@ function SessionScreenInner() {
   // Before session exists → "Exit" navigates home. After → normal "I'm Done".
   const endSessionButton = (
     <Pressable
-      onPress={
-        activeSessionId
-          ? handleEndSession
-          : () => goBackOrReplace(router, '/(app)/home')
-      }
+      onPress={activeSessionId ? handleEndSession : handleHomeBack}
       disabled={isClosing || isStreaming}
       className="ms-2 px-3 py-2 rounded-button bg-surface-elevated min-h-[44px] items-center justify-center"
       testID="end-session-button"
@@ -1253,7 +1287,7 @@ function SessionScreenInner() {
       return (
         <View className="flex-row gap-2 mt-2">
           <Pressable
-            onPress={() => goBackOrReplace(router, '/(app)/home')}
+            onPress={handleHomeBack}
             className="bg-primary rounded-button px-4 py-2.5 items-center justify-center min-h-[40px]"
             accessibilityRole="button"
             accessibilityLabel="Start new session"
@@ -1264,7 +1298,7 @@ function SessionScreenInner() {
             </Text>
           </Pressable>
           <Pressable
-            onPress={() => goBackOrReplace(router, '/(app)/home')}
+            onPress={handleHomeBack}
             className="bg-surface-elevated rounded-button px-4 py-2.5 items-center justify-center min-h-[40px]"
             accessibilityRole="button"
             accessibilityLabel="Go Home"
@@ -1342,7 +1376,8 @@ function SessionScreenInner() {
         subtitle={subtitle}
         headerBelow={headerBelow}
         placeholder={modeConfig.placeholder}
-        backFallback={subjectId ? `/(app)/shelf/${subjectId}` : undefined}
+        backFallback={chatBackFallback}
+        backBehavior={chatBackFallback ? 'replace' : undefined}
         messages={messages}
         onSend={handleSend}
         isStreaming={isStreaming}

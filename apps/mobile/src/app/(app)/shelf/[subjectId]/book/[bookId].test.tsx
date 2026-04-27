@@ -37,6 +37,7 @@ const mockUseBookSessions = jest.fn();
 const mockUseBookNotes = jest.fn();
 const mockUseRetentionTopics = jest.fn();
 const mockUseCurriculum = jest.fn();
+const mockUseLearningResumeTarget = jest.fn();
 
 jest.mock('../../../../../hooks/use-books', () => ({
   useBookWithTopics: () => mockUseBookWithTopics(),
@@ -58,6 +59,10 @@ jest.mock('../../../../../hooks/use-retention', () => ({
 
 jest.mock('../../../../../hooks/use-curriculum', () => ({
   useCurriculum: () => mockUseCurriculum(),
+}));
+
+jest.mock('../../../../../hooks/use-progress', () => ({
+  useLearningResumeTarget: () => mockUseLearningResumeTarget(),
 }));
 
 jest.mock('../../../../../hooks/use-subjects', () => ({
@@ -217,6 +222,7 @@ describe('BookScreen', () => {
     mockUseBookNotes.mockReturnValue(makeNotesQuery());
     mockUseRetentionTopics.mockReturnValue(makeRetentionQuery());
     mockUseCurriculum.mockReturnValue({ data: null, isLoading: false });
+    mockUseLearningResumeTarget.mockReturnValue({ data: null });
   });
 
   it('renders the loading state', () => {
@@ -251,7 +257,10 @@ describe('BookScreen', () => {
     fireEvent.press(getByTestId('book-back-button'));
 
     expect(mockBookRefetch).toHaveBeenCalledTimes(1);
-    expect(mockBack).toHaveBeenCalledTimes(1);
+    expect(mockReplace).toHaveBeenCalledWith({
+      pathname: '/(app)/shelf/[subjectId]',
+      params: { subjectId: 'sub-1' },
+    });
   });
 
   it('shows missing-param guidance when route params are incomplete', () => {
@@ -263,6 +272,25 @@ describe('BookScreen', () => {
     expect(
       getByText('Missing book details. Please go back and try again.')
     ).toBeTruthy();
+  });
+
+  it('[BUG-636 / M-4] missing-param "Go back" button navigates somewhere instead of being a silent no-op', () => {
+    // Before the fix, handleBack early-returned when subjectId was missing,
+    // leaving the user trapped on the error screen with a button that did
+    // nothing.
+    mockSearchParams = () => ({ subjectId: '', bookId: 'book-1' });
+    mockCanGoBack.mockReturnValue(false);
+
+    const { getByTestId } = render(<BookScreen />);
+    fireEvent.press(getByTestId('book-missing-param-back'));
+
+    // Either back() or replace() must have been invoked — anything other than
+    // a silent no-op. With canGoBack=false (deep-link entry), goBackOrReplace
+    // falls back to /(app)/library.
+    const totalNavCalls =
+      mockBack.mock.calls.length + mockReplace.mock.calls.length;
+    expect(totalNavCalls).toBeGreaterThan(0);
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
   });
 
   it('renders the compact header on the main view', () => {
@@ -392,7 +420,7 @@ describe('BookScreen', () => {
     expect(getByTestId('up-next-row')).toBeTruthy();
     expect(getByText('▶ Start: Linear Equations')).toBeTruthy();
 
-    fireEvent.press(getByTestId('up-next-row'));
+    fireEvent.press(getByTestId('book-start-learning'));
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/session',
       params: {
@@ -400,6 +428,37 @@ describe('BookScreen', () => {
         subjectId: 'sub-1',
         topicId: 'topic-1',
         topicName: 'Linear Equations',
+      },
+    });
+  });
+
+  it('starts from the shared resume target when available', () => {
+    mockUseLearningResumeTarget.mockReturnValue({
+      data: {
+        subjectId: 'sub-1',
+        subjectName: 'Mathematics',
+        topicId: 'topic-2',
+        topicTitle: 'Quadratic Equations',
+        sessionId: null,
+        resumeFromSessionId: 'sess-previous',
+        resumeKind: 'recent_topic',
+        lastActivityAt: '2026-04-24T12:00:00.000Z',
+        reason: 'Continue Quadratic Equations',
+      },
+    });
+
+    const { getByTestId } = render(<BookScreen />);
+
+    fireEvent.press(getByTestId('book-start-learning'));
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/session',
+      params: {
+        mode: 'learning',
+        subjectId: 'sub-1',
+        subjectName: 'Mathematics',
+        topicId: 'topic-2',
+        topicName: 'Quadratic Equations',
+        resumeFromSessionId: 'sess-previous',
       },
     });
   });
@@ -815,18 +874,19 @@ describe('BookScreen', () => {
     expect(retryCallCount).toBe(1);
   });
 
-  // Back button trusts the navigator: the shelf/[subjectId] layout exports
-  // unstable_settings.initialRouteName = 'index', so a cross-tab deep push
-  // synthesizes shelf-index underneath this screen. router.back() always has
-  // the shelf to return to, no manual replace fallback needed.
-  it('calls router.back() on back press without a manual shelf fallback', () => {
-    mockCanGoBack.mockReturnValue(false);
-
+  // Back button explicitly replaces with the shelf grid (one screen up).
+  // router.back() falls through to the Tabs navigator's `firstRoute` (Home)
+  // when the inner stack lacks a sibling `index` — common after cross-tab
+  // direct pushes to this leaf route.
+  it('replaces with the shelf grid on back press', () => {
     const { getByTestId } = render(<BookScreen />);
 
     fireEvent.press(getByTestId('book-back'));
-    expect(mockBack).toHaveBeenCalledTimes(1);
-    expect(mockReplace).not.toHaveBeenCalled();
+    expect(mockReplace).toHaveBeenCalledWith({
+      pathname: '/(app)/shelf/[subjectId]',
+      params: { subjectId: 'sub-1' },
+    });
+    expect(mockBack).not.toHaveBeenCalled();
   });
 
   it('logs a breadcrumb and falls back to up next when the latest session topic no longer exists', () => {

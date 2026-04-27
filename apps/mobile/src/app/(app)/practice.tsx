@@ -1,11 +1,11 @@
 import React from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Redirect, useRouter } from 'expo-router';
+import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IntentCard } from '../../components/home/IntentCard';
 import { useQuizStats } from '../../hooks/use-quiz';
-import { goBackOrReplace } from '../../lib/navigation';
+import { goBackOrReplace, homeHrefForReturnTo } from '../../lib/navigation';
 import { useReviewSummary } from '../../hooks/use-progress';
 import { useThemeColors } from '../../lib/theme';
 import { useParentProxy } from '../../hooks/use-parent-proxy';
@@ -25,6 +25,7 @@ function formatTimeUntil(isoDate: string): string {
 
 export default function PracticeScreen(): React.ReactElement {
   const router = useRouter();
+  const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
   const { isParentProxy } = useParentProxy();
@@ -83,7 +84,7 @@ export default function PracticeScreen(): React.ReactElement {
     : 'Test yourself with multiple choice questions';
 
   const handleBack = () => {
-    goBackOrReplace(router, '/(app)/home');
+    goBackOrReplace(router, homeHrefForReturnTo(returnTo));
   };
 
   if (isParentProxy) return <Redirect href="/(app)/home" />;
@@ -128,6 +129,7 @@ export default function PracticeScreen(): React.ReactElement {
                   topicId: nextReviewTopic.topicId,
                   subjectId: nextReviewTopic.subjectId,
                   topicName: nextReviewTopic.topicTitle,
+                  ...(returnTo ? { returnTo } : {}),
                 },
               } as never);
             }

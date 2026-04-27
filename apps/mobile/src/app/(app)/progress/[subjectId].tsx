@@ -1,12 +1,16 @@
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { goBackOrReplace } from '../../../lib/navigation';
+import {
+  goBackOrReplace,
+  pushLearningResumeTarget,
+} from '../../../lib/navigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ErrorFallback } from '../../../components/common';
 import { ProgressBar } from '../../../components/progress';
 import {
   useProgressInventory,
+  useLearningResumeTarget,
   useSubjectProgress,
 } from '../../../hooks/use-progress';
 import { useLanguageProgress } from '../../../hooks/use-language-progress';
@@ -35,6 +39,9 @@ export default function ProgressSubjectScreen(): React.ReactElement {
   const { subjectId } = useLocalSearchParams<{ subjectId: string }>();
   const inventoryQuery = useProgressInventory();
   const subjectProgressQuery = useSubjectProgress(subjectId ?? '');
+  const resumeTargetQuery = useLearningResumeTarget({
+    subjectId: subjectId ?? undefined,
+  });
   const languageProgressQuery = useLanguageProgress(subjectId ?? '');
   const languageProgress = languageProgressQuery.data;
 
@@ -418,11 +425,15 @@ export default function ProgressSubjectScreen(): React.ReactElement {
 
             <View className="flex-row gap-3 mt-6">
               <Pressable
-                onPress={() =>
+                onPress={() => {
+                  if (resumeTargetQuery.data) {
+                    pushLearningResumeTarget(router, resumeTargetQuery.data);
+                    return;
+                  }
                   router.push(
-                    `/(app)/session?mode=freeform&subjectId=${subject.subjectId}` as never
-                  )
-                }
+                    `/(app)/session?mode=learning&subjectId=${subject.subjectId}` as never
+                  );
+                }}
                 className="bg-primary rounded-button px-4 py-3 items-center flex-1"
                 accessibilityRole="button"
                 accessibilityLabel="Continue learning"

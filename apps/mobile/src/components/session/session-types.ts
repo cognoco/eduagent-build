@@ -1,5 +1,6 @@
 import type { PendingCelebration } from '@eduagent/schemas';
 import type { ChatMessage } from '../session';
+import { sanitizeSecureStoreKey } from '../../lib/secure-storage';
 
 export function computePaceMultiplier(
   history: Array<{ actualSeconds: number; expectedMinutes: number }>
@@ -18,9 +19,10 @@ export function computePaceMultiplier(
   return Math.min(3, Math.max(0.5, Number(median.toFixed(2))));
 }
 
-/** SecureStore key for persisting voice/text input mode preference per profile. */
+/** SecureStore key for persisting voice/text input mode preference per profile.
+ *  [I-4] profileId is sanitized so iOS doesn't crash on unsafe characters. */
 export const getInputModeKey = (profileId: string) =>
-  `voice-input-mode-${profileId}`;
+  sanitizeSecureStoreKey(`voice-input-mode-${profileId}`);
 
 export function serializeMilestones(milestones: string[]): string {
   return encodeURIComponent(JSON.stringify(milestones));

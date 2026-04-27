@@ -149,7 +149,28 @@ jest.mock('../../../components/session', () => ({
   },
 }));
 
-const mockUseSessionTranscript = jest.fn(() => ({ data: null }));
+type TranscriptMockReturn = {
+  data: null | {
+    session: {
+      sessionId: string;
+      exchangeCount: number;
+      inputMode: string;
+      milestonesReached: unknown[];
+      verificationType?: unknown;
+    };
+    exchanges: Array<{
+      role: string;
+      content: string;
+      timestamp: string;
+      eventId: string;
+      isSystemPrompt: boolean;
+      escalationRung: number;
+    }>;
+  };
+};
+const mockUseSessionTranscript = jest.fn<TranscriptMockReturn, [string?]>(
+  () => ({ data: null })
+);
 jest.mock('../../../hooks/use-sessions', () => ({
   useStartSession: () => ({
     mutateAsync: mockStartSession,
@@ -205,7 +226,10 @@ jest.mock('../../../hooks/use-streaks', () => ({
   useStreaks: () => ({ data: { longestStreak: 1 } }),
 }));
 
-const mockUseActiveSessionForTopic = jest.fn(() => ({ data: null }));
+const mockUseActiveSessionForTopic = jest.fn<
+  { data: null | { sessionId: string } },
+  [string | undefined]
+>(() => ({ data: null }));
 jest.mock('../../../hooks/use-progress', () => ({
   useOverallProgress: () => ({ data: { totalTopicsCompleted: 0 } }),
   useProgressInventory: () => ({ data: undefined, isLoading: false }),
@@ -303,6 +327,9 @@ jest.mock('../../../lib/secure-storage', () => ({
     secureStore[key] = value;
     return Promise.resolve();
   }),
+  // [I-4] sanitizeSecureStoreKey is a pure string function — no mock needed,
+  // but the module mock must export it or callers get "not a function".
+  sanitizeSecureStoreKey: (raw: string) => raw.replace(/[^a-zA-Z0-9._-]/g, '_'),
 }));
 
 const { readSessionRecoveryMarker: mockReadSessionRecoveryMarker } =

@@ -32,8 +32,15 @@ import { useAuth } from '@clerk/clerk-expo';
 import { ThemeContext, useThemeColors, useTokenVars } from '../lib/theme';
 import type { ColorScheme } from '../lib/design-tokens';
 import { ProfileProvider, useProfile } from '../lib/profile';
-import { setOnAuthExpired, clearOnAuthExpired } from '../lib/api-client';
+import {
+  setOnAuthExpired,
+  clearOnAuthExpired,
+  resetAuthExpiredGuard,
+} from '../lib/api-client';
 import { markSessionExpired } from '../lib/auth-expiry';
+import { clearTransitionState } from '../lib/auth-transition';
+import { clearPendingAuthRedirect } from '../lib/pending-auth-redirect';
+import { sanitizeSecureStoreKey } from '../lib/secure-storage';
 import { ErrorBoundary, OfflineBanner } from '../components/common';
 import { useNetworkStatus } from '../hooks/use-network-status';
 import { Sentry } from '../lib/sentry';
@@ -113,7 +120,10 @@ function ThemedApp() {
     if (!activeProfile?.id) return;
     let cancelled = false;
     setAccentPresetIdState(null); // reset immediately
-    const key = `${ACCENT_STORE_PREFIX}${activeProfile.id}`;
+    // [I-4] Sanitize profileId before constructing the SecureStore key.
+    const key = sanitizeSecureStoreKey(
+      `${ACCENT_STORE_PREFIX}${activeProfile.id}`
+    );
     (async () => {
       try {
         const stored = await SecureStore.getItemAsync(key);
@@ -143,12 +153,26 @@ function ThemedApp() {
       void SecureStore.deleteItemAsync('hasSignedInBefore').catch(
         () => undefined
       );
-      void signOut().catch(() => {
-        platformAlert(
-          'Could not sign you out',
-          'Please close and reopen the app, then sign in again.'
-        );
-      });
+      // [I-18] Clear auth-transition timestamp so a force-sign-out within
+      // the 8s window doesn't leave the sign-in screen stuck on the
+      // "Signing you in…" spinner instead of showing the login form.
+      clearTransitionState();
+      // [I-12] Clear pending redirect so user-A's saved path can't redirect
+      // user-B after a sign-out and re-sign-in in the same process.
+      clearPendingAuthRedirect();
+      // [BUG-630 / I-2] Reset the auth-expired guard *after* signOut resolves
+      // (success or failure). Without this, _authExpiredFiring stays true
+      // forever and any subsequent 401 is silently swallowed.
+      void signOut()
+        .catch(() => {
+          platformAlert(
+            'Could not sign you out',
+            'Please close and reopen the app, then sign in again.'
+          );
+        })
+        .finally(() => {
+          resetAuthExpiredGuard();
+        });
     });
     return () => clearOnAuthExpired();
   }, [signOut]);
@@ -157,7 +181,10 @@ function ThemedApp() {
     (id: string | null) => {
       setAccentPresetIdState(id);
       if (!activeProfile?.id) return;
-      const key = `${ACCENT_STORE_PREFIX}${activeProfile.id}`;
+      // [I-4] Sanitize profileId before constructing the SecureStore key.
+      const key = sanitizeSecureStoreKey(
+        `${ACCENT_STORE_PREFIX}${activeProfile.id}`
+      );
       if (id) {
         SecureStore.setItemAsync(key, id).catch(Sentry.captureException);
       } else {

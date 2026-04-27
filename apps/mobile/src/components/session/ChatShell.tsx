@@ -76,6 +76,8 @@ interface ChatShellProps {
   messagesTestID?: string;
   /** Fallback route for the back button when `canGoBack()` is false (BUG-612: web). Defaults to `/(app)/home`. */
   backFallback?: string;
+  /** Use the fallback route directly when the parent route is known. */
+  backBehavior?: 'history' | 'replace';
 }
 
 /**
@@ -144,6 +146,7 @@ export function ChatShell({
   belowInput,
   messagesTestID,
   backFallback,
+  backBehavior = 'history',
 }: ChatShellProps) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -478,12 +481,15 @@ export function ChatShell({
       >
         <View className="flex-row items-center px-4 py-3">
           <Pressable
-            onPress={() =>
-              goBackOrReplace(
-                router,
-                (backFallback ?? '/(app)/home') as '/(app)/home'
-              )
-            }
+            onPress={() => {
+              const fallback = (backFallback ?? '/(app)/home') as '/(app)/home';
+              if (backBehavior === 'replace') {
+                router.replace(fallback as never);
+                return;
+              }
+
+              goBackOrReplace(router, fallback);
+            }}
             className="me-3 p-2 min-h-[44px] min-w-[44px] items-center justify-center"
             accessibilityLabel="Go back"
             accessibilityRole="button"

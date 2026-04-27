@@ -7,6 +7,8 @@ import {
 } from '@tanstack/react-query';
 import type {
   KnowledgeInventory,
+  LearningResumeScope,
+  LearningResumeTarget,
   MilestoneRecord,
   MonthlyReportRecord,
   MonthlyReportSummary,
@@ -110,6 +112,64 @@ export function useContinueSuggestion() {
       }
     },
     enabled: !!activeProfile,
+  });
+}
+
+export async function fetchLearningResumeTarget(
+  client: ReturnType<typeof useApiClient>,
+  scope: LearningResumeScope = {},
+  signal?: AbortSignal
+): Promise<LearningResumeTarget | null> {
+  const query = Object.fromEntries(
+    Object.entries(scope).filter(
+      (entry): entry is [string, string] =>
+        typeof entry[1] === 'string' && entry[1].length > 0
+    )
+  );
+  const resumeTargetClient = (
+    client.progress as unknown as {
+      'resume-target': {
+        $get: (
+          args: { query: Record<string, string> },
+          options?: { init?: RequestInit }
+        ) => Promise<Response>;
+      };
+    }
+  )['resume-target'];
+  const res = await resumeTargetClient.$get(
+    { query },
+    { init: signal ? { signal } : undefined }
+  );
+  await assertOk(res);
+  const data = (await res.json()) as { target: LearningResumeTarget | null };
+  return data.target;
+}
+
+export function useLearningResumeTarget(
+  scope: LearningResumeScope = {}
+): UseQueryResult<LearningResumeTarget | null> {
+  const client = useApiClient();
+  const { activeProfile } = useProfile();
+
+  return useQuery({
+    queryKey: [
+      'progress',
+      'resume-target',
+      activeProfile?.id,
+      scope.subjectId ?? null,
+      scope.bookId ?? null,
+      scope.topicId ?? null,
+    ],
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        return await fetchLearningResumeTarget(client, scope, signal);
+      } finally {
+        cleanup();
+      }
+    },
+    enabled: !!activeProfile,
+    staleTime: 60 * 1000,
   });
 }
 

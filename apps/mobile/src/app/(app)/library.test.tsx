@@ -154,6 +154,38 @@ describe('LibraryScreen', () => {
     expect(screen.getByTestId('library-loading')).toBeTruthy();
   });
 
+  it('[BUG-634 / M-2] does not crash when subjectsQuery.data is a non-array (stale shape / error payload)', () => {
+    // Repro: TanStack Query select transform is bypassed when enabled=false,
+    // so the cached value can be a non-array. Without the Array.isArray guard
+    // the allTopics flatMap throws TypeError and the screen white-screens.
+    mockUseSubjects.mockReturnValue({
+      data: { unexpected: 'shape' } as unknown as never,
+      isLoading: false,
+    });
+    mockUseOverallProgress.mockReturnValue({
+      data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
+      isLoading: false,
+    });
+
+    expect(() =>
+      render(<LibraryScreen />, { wrapper: createWrapper() })
+    ).not.toThrow();
+  });
+
+  it('[BUG-634 / M-2] does not crash when subjectsQuery.data is null', () => {
+    mockUseSubjects.mockReturnValue({
+      data: null as unknown as never,
+      isLoading: false,
+    });
+    mockUseOverallProgress.mockReturnValue({
+      data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
+      isLoading: false,
+    });
+    expect(() =>
+      render(<LibraryScreen />, { wrapper: createWrapper() })
+    ).not.toThrow();
+  });
+
   it('shows empty state when there are no subjects', () => {
     mockUseSubjects.mockReturnValue({ data: [], isLoading: false });
     mockUseOverallProgress.mockReturnValue({
@@ -167,6 +199,23 @@ describe('LibraryScreen', () => {
     expect(
       screen.getByText('Add a subject to start building your library')
     ).toBeTruthy();
+  });
+
+  it('opens create-subject with a library return target from the empty state', () => {
+    mockUseSubjects.mockReturnValue({ data: [], isLoading: false });
+    mockUseOverallProgress.mockReturnValue({
+      data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
+      isLoading: false,
+    });
+
+    render(<LibraryScreen />, { wrapper: createWrapper() });
+
+    fireEvent.press(screen.getByTestId('library-add-subject-empty'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/create-subject',
+      params: { returnTo: 'library' },
+    });
   });
 
   it('renders subject cards as shelves by default', () => {
@@ -525,5 +574,52 @@ describe('LibraryScreen', () => {
     // Library renders normally — tabs and header are visible
     expect(screen.queryByTestId('library-error')).toBeNull();
     expect(screen.getByTestId('library-tab-shelves')).toBeTruthy();
+  });
+
+  describe('Manage Subjects modal — backdrop close [BUG-510]', () => {
+    function arrangeWithOneSubject() {
+      mockUseSubjects.mockReturnValue({
+        data: [{ id: 'sub-1', name: 'Math', status: 'active' }],
+        isLoading: false,
+        isError: false,
+        refetch: jest.fn(),
+      });
+      mockUseOverallProgress.mockReturnValue({
+        data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
+        isLoading: false,
+        isError: false,
+        refetch: jest.fn(),
+      });
+    }
+
+    it('closes when the backdrop (outside the sheet) is tapped [BUG-510]', () => {
+      // Repro: on web the Close button sits behind the bottom tab bar so
+      // pointer events never reach it; the modal had no other dismiss path
+      // because the backdrop was a plain View with no onPress.
+      arrangeWithOneSubject();
+      render(<LibraryScreen />, { wrapper: createWrapper() });
+
+      fireEvent.press(screen.getByTestId('manage-subjects-button'));
+      expect(screen.getByTestId('manage-subjects-backdrop')).toBeTruthy();
+
+      act(() => {
+        fireEvent.press(screen.getByTestId('manage-subjects-backdrop'));
+      });
+
+      // Modal contents disappear — backdrop tap dismissed the modal.
+      expect(screen.queryByTestId('manage-subjects-backdrop')).toBeNull();
+      expect(screen.queryByTestId('manage-subjects-close')).toBeNull();
+    });
+
+    it('exposes an accessible label so assistive tech can dismiss the modal [BUG-510]', () => {
+      arrangeWithOneSubject();
+      render(<LibraryScreen />, { wrapper: createWrapper() });
+
+      fireEvent.press(screen.getByTestId('manage-subjects-button'));
+
+      const backdrop = screen.getByTestId('manage-subjects-backdrop');
+      expect(backdrop.props.accessibilityRole).toBe('button');
+      expect(backdrop.props.accessibilityLabel).toBe('Close manage subjects');
+    });
   });
 });

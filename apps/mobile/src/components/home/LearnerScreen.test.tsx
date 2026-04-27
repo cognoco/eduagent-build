@@ -10,7 +10,7 @@ const mockPush = jest.fn();
 const mockReadSessionRecoveryMarker = jest.fn();
 const mockClearSessionRecoveryMarker = jest.fn();
 const mockIsRecoveryMarkerFresh = jest.fn();
-const mockUseContinueSuggestion = jest.fn();
+const mockUseLearningResumeTarget = jest.fn();
 const mockUseReviewSummary = jest.fn();
 const mockMarkQuizDiscoverySurfaced = jest.fn();
 
@@ -53,7 +53,7 @@ jest.mock('../../hooks/use-subjects', () => ({
 }));
 
 jest.mock('../../hooks/use-progress', () => ({
-  useContinueSuggestion: () => mockUseContinueSuggestion(),
+  useLearningResumeTarget: () => mockUseLearningResumeTarget(),
   useReviewSummary: () => mockUseReviewSummary(),
 }));
 
@@ -79,6 +79,8 @@ jest.mock('../../lib/session-recovery', () => ({
 
 const { LearnerScreen } = require('./LearnerScreen');
 
+const HOME_RETURN_PARAMS = { returnTo: 'learner-home' };
+
 const defaultProps = {
   profiles: [{ id: 'p1', displayName: 'Alex', isOwner: true }],
   activeProfile: { id: 'p1', displayName: 'Alex', isOwner: true },
@@ -94,7 +96,7 @@ describe('LearnerScreen', () => {
     mockReadSessionRecoveryMarker.mockResolvedValue(null);
     mockClearSessionRecoveryMarker.mockResolvedValue(undefined);
     mockIsRecoveryMarkerFresh.mockReturnValue(true);
-    mockUseContinueSuggestion.mockReturnValue({ data: null });
+    mockUseLearningResumeTarget.mockReturnValue({ data: null });
     mockUseReviewSummary.mockReturnValue({ data: null });
     mockUseQuizDiscoveryCard.mockReturnValue({ data: undefined });
     mockUseMarkQuizDiscoverySurfaced.mockReturnValue({
@@ -125,12 +127,17 @@ describe('LearnerScreen', () => {
   });
 
   it('filters session-starting intent cards in parent proxy mode', () => {
-    mockUseContinueSuggestion.mockReturnValue({
+    mockUseLearningResumeTarget.mockReturnValue({
       data: {
         subjectId: 's1',
         subjectName: 'Math',
         topicId: 't1',
         topicTitle: 'Fractions',
+        sessionId: null,
+        resumeFromSessionId: null,
+        resumeKind: 'next_topic',
+        lastActivityAt: null,
+        reason: 'Start Fractions',
       },
     });
     mockUseQuizDiscoveryCard.mockReturnValue({
@@ -162,10 +169,11 @@ describe('LearnerScreen', () => {
       .getAllByRole('button')
       .map((card) => card.props.testID);
 
-    expect(cardIds).toEqual(['intent-learn', 'intent-proxy-placeholder']);
+    expect(cardIds).toEqual(['intent-learn']);
     expect(screen.queryByTestId('intent-continue')).toBeNull();
     expect(screen.queryByTestId('intent-quiz-discovery')).toBeNull();
     expect(screen.queryByTestId('intent-ask')).toBeNull();
+    expect(screen.getByTestId('intent-proxy-placeholder')).toBeTruthy();
     expect(screen.getByText('Sessions are private to Alex')).toBeTruthy();
   });
 
@@ -173,38 +181,54 @@ describe('LearnerScreen', () => {
     render(<LearnerScreen {...defaultProps} />);
 
     fireEvent.press(screen.getByTestId('intent-learn'));
-    expect(mockPush).toHaveBeenCalledWith('/create-subject');
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/create-subject',
+      params: HOME_RETURN_PARAMS,
+    });
   });
 
   it('navigates to freeform session on the Ask card', () => {
     render(<LearnerScreen {...defaultProps} />);
 
     fireEvent.press(screen.getByTestId('intent-ask'));
-    expect(mockPush).toHaveBeenCalledWith('/(app)/session?mode=freeform');
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/session',
+      params: { mode: 'freeform', ...HOME_RETURN_PARAMS },
+    });
   });
 
   it('navigates to practice on the Practice card', () => {
     render(<LearnerScreen {...defaultProps} />);
 
     fireEvent.press(screen.getByTestId('intent-practice'));
-    expect(mockPush).toHaveBeenCalledWith('/(app)/practice');
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/practice',
+      params: HOME_RETURN_PARAMS,
+    });
   });
 
   it('navigates to homework camera on the Homework card', () => {
     render(<LearnerScreen {...defaultProps} />);
 
     fireEvent.press(screen.getByTestId('intent-homework'));
-    expect(mockPush).toHaveBeenCalledWith('/(app)/homework/camera');
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/homework/camera',
+      params: HOME_RETURN_PARAMS,
+    });
   });
 
   it('shows continue card from continue suggestion when available', () => {
-    mockUseContinueSuggestion.mockReturnValue({
+    mockUseLearningResumeTarget.mockReturnValue({
       data: {
         subjectId: 's1',
         subjectName: 'Math',
         topicId: 't1',
         topicTitle: 'Fractions',
-        lastSessionId: 'session-1',
+        sessionId: 'session-1',
+        resumeFromSessionId: null,
+        resumeKind: 'active_session',
+        lastActivityAt: '2026-02-15T09:00:00.000Z',
+        reason: 'Resume Fractions',
       },
     });
 
@@ -226,6 +250,7 @@ describe('LearnerScreen', () => {
         topicId: 't1',
         topicName: 'Fractions',
         mode: 'learning',
+        ...HOME_RETURN_PARAMS,
       },
     });
   });
@@ -256,17 +281,23 @@ describe('LearnerScreen', () => {
         topicId: 't1',
         subjectId: 's1',
         topicName: 'Algebra',
+        ...HOME_RETURN_PARAMS,
       },
     });
   });
 
   it('shows recovery continue card first and clears the marker before resuming', async () => {
-    mockUseContinueSuggestion.mockReturnValue({
+    mockUseLearningResumeTarget.mockReturnValue({
       data: {
         subjectId: 's1',
         subjectName: 'Math',
         topicId: 't1',
         topicTitle: 'Fractions',
+        sessionId: null,
+        resumeFromSessionId: null,
+        resumeKind: 'next_topic',
+        lastActivityAt: null,
+        reason: 'Start Fractions',
       },
     });
     mockReadSessionRecoveryMarker.mockResolvedValue({
@@ -306,6 +337,7 @@ describe('LearnerScreen', () => {
         subjectName: 'Physics',
         mode: 'learning',
         topicId: 't1',
+        ...HOME_RETURN_PARAMS,
       },
     });
   });
@@ -373,7 +405,7 @@ describe('LearnerScreen', () => {
     expect(mockMarkQuizDiscoverySurfaced).toHaveBeenCalledWith('capitals');
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/quiz',
-      params: { activityType: 'capitals' },
+      params: { activityType: 'capitals', ...HOME_RETURN_PARAMS },
     });
   });
 
