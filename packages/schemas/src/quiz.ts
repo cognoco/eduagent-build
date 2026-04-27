@@ -199,6 +199,9 @@ export const validatedQuestionResultSchema = z.object({
   // server's correctness judgment for this question. Enables analytics
   // review of disputed answers.
   disputed: z.boolean().optional(),
+  // Persisted from the in-progress submission so the round-detail screen
+  // can dim clues the user never revealed. Optional for backward compat.
+  cluesUsed: z.number().int().min(0).max(5).optional(),
 });
 export type ValidatedQuestionResult = z.infer<
   typeof validatedQuestionResultSchema

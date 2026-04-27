@@ -480,6 +480,9 @@ export async function completeQuizRound(
         if (result.disputed) {
           entry.disputed = true;
         }
+        if (result.cluesUsed != null) {
+          entry.cluesUsed = result.cluesUsed;
+        }
         return entry;
       }
     );
