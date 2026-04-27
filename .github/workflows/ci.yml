@@ -92,9 +92,12 @@ jobs:
       - name: Enable pgvector extension
         run: psql "$DATABASE_URL" -c 'CREATE EXTENSION IF NOT EXISTS vector;'
 
-      # Push database schema to test postgres (Drizzle push for CI)
-      - name: Apply database schema
-        run: pnpm --filter @eduagent/database db:push
+      # Run migration SQL against CI postgres — this validates committed SQL files end-to-end.
+      # CFG-12: replaced db:push with db:migrate so that broken migration SQL is caught in CI,
+      # not silently skipped. db:push only diffs schema; migrate runs the actual SQL files.
+      - name: Apply database migrations
+        working-directory: packages/database
+        run: pnpm exec drizzle-kit migrate
 
       # Clean stale build artifacts — composite mode (tsconfig.base.json) uses dist/*.d.ts
       # to verify source-output consistency. Nx remote cache can restore stale dist/ and

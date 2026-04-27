@@ -156,6 +156,10 @@ jobs:
       - name: Enable pgvector extension
         run: psql "$DATABASE_URL" -c 'CREATE EXTENSION IF NOT EXISTS vector;'
 
+      # CFG-12: Intentionally using db:push here (not migrate). Reason: this is the
+      # scheduled/manual E2E suite; migration validation is covered by ci.yml on every PR.
+      # db:push is also required here because pnpm strict isolation prevents drizzle-kit
+      # from finding @neondatabase/serverless — falling back to its built-in pg driver via push.
       - name: Apply database schema
         run: pnpm --filter @eduagent/database db:push
 

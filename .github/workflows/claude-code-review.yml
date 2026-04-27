@@ -10,6 +10,10 @@ on:
       - '.idea/**'
       - '.claude/**'
 
+# Deny all permissions at workflow level; only the job-level grants below apply.
+# CFG-16: without this, future jobs inherit repo default token permissions (potentially write-all).
+permissions: {}
+
 jobs:
   claude-review:
     runs-on: ubuntu-latest
