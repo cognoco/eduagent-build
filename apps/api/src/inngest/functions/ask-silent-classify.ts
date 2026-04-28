@@ -25,8 +25,54 @@ export const askSilentClassify = inngest.createFunction(
   },
   { event: 'app/ask.classify_silently' },
   async ({ event, step }) => {
+    // [BUG-697 / J-8] Use safeParse so a malformed event payload does NOT
+    // throw. The previous .parse(event.data) at the top of the handler
+    // executed BEFORE any step.run, so Inngest treated the ZodError as a
+    // transient function failure and retried 2× — burning quota on a
+    // permanently-bad payload that will never become valid. With safeParse,
+    // we record the issue and exit cleanly so retries do not fire.
+    const validated = classifySilentlyEventDataSchema.safeParse(event.data);
+    if (!validated.success) {
+      const issues = validated.error.issues.map((issue) => ({
+        path: issue.path.join('.'),
+        message: issue.message,
+      }));
+      logger.warn('[ask-silent-classify] invalid payload — skipping retries', {
+        issues,
+      });
+      // [BUG-697 / J-8] Emit a structured failure event so the invalid-payload
+      // branch is queryable, not invisible. Mirrors askSilentClassifyOnFailure's
+      // emit shape and is consumed by ask-classification-observe.ts. Without
+      // this, returning `{ skipped: true }` makes Inngest mark the run as
+      // succeeded — the onFailure handler never fires and there is no metric
+      // counting how often this fallback ran. Best-effort extract sessionId /
+      // exchangeCount from the raw payload so dashboards have something to key
+      // on even when the rest of the payload is malformed.
+      const rawData = (event.data ?? {}) as Record<string, unknown>;
+      const rawSessionId =
+        typeof rawData.sessionId === 'string' ? rawData.sessionId : undefined;
+      const rawExchangeCount =
+        typeof rawData.exchangeCount === 'number'
+          ? rawData.exchangeCount
+          : undefined;
+      await step.sendEvent('classification-invalid-payload', {
+        name: 'app/ask.classification_failed',
+        data: {
+          sessionId: rawSessionId,
+          exchangeCount: rawExchangeCount,
+          error: `invalid_payload: ${issues
+            .map((i) => `${i.path}: ${i.message}`)
+            .join('; ')}`,
+        },
+      });
+      return {
+        skipped: true,
+        reason: 'invalid_payload',
+        issues,
+      };
+    }
     const { sessionId, profileId, classifyInput, exchangeCount } =
-      classifySilentlyEventDataSchema.parse(event.data);
+      validated.data;
     const db = getStepDatabase();
 
     const existing = await step.run('check-existing', async () => {

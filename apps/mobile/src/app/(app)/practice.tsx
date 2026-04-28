@@ -119,7 +119,17 @@ export default function PracticeScreen(): React.ReactElement {
           title="Review topics"
           subtitle={reviewSubtitle}
           icon="refresh-outline"
-          badge={!reviewError && hasOverdue ? reviewDueCount : undefined}
+          // [BUG-686 / M-6] Only show the badge when the action will actually
+          // do something. Previously the badge could read "5 overdue" while
+          // nextReviewTopic was null (e.g., server returned counts but no
+          // resolvable next topic), so tapping the card was a silent no-op.
+          // Tying the badge to nextReviewTopic existence aligns the UI
+          // promise with the action.
+          badge={
+            !reviewError && hasOverdue && reviewSummary?.nextReviewTopic
+              ? reviewDueCount
+              : undefined
+          }
           onPress={() => {
             const nextReviewTopic = reviewSummary?.nextReviewTopic ?? null;
             if (nextReviewTopic) {

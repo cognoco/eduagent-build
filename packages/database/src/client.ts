@@ -1,6 +1,5 @@
 import { Pool as NeonPool, neonConfig } from '@neondatabase/serverless';
 import { drizzle as drizzleNeon } from 'drizzle-orm/neon-serverless';
-import { Pool as PgPool } from 'pg';
 import { drizzle as drizzlePg } from 'drizzle-orm/node-postgres';
 import * as schema from './schema/index';
 
@@ -65,13 +64,22 @@ export function createDatabase(
     const pool = new NeonPool({ connectionString: databaseUrl });
     return drizzleNeon(pool, { schema });
   }
-  const pool = new PgPool({ connectionString: databaseUrl });
-  // drizzle-orm/node-postgres accepts a Pool through its config-object
-  // overload (`{ client: pool }`); the positional `drizzle(pool, options)`
-  // form expects `NodePgClient` and pg's Pool does not satisfy that overload.
-  return drizzlePg({ client: pool, schema }) as unknown as ReturnType<
-    typeof drizzleNeon<typeof schema>
-  >;
+  // drizzle-orm/node-postgres builds the underlying pg Pool internally when
+  // given a connection string via the config-object form, avoiding the need
+  // to import pg's Pool just to construct one and cast it to NodePgClient.
+  //
+  // The `as unknown as` cast below is REQUIRED — and not removable on a
+  // drizzle upgrade. NodePgDatabase and NeonHttpDatabase / NeonDatabase are
+  // structurally distinct: their transaction signatures, types, and runtime
+  // semantics differ (e.g., neon-http's transactions are not interactive,
+  // node-postgres's are; the result row prototypes differ). We unify them
+  // behind a single Database type so callers don't have to branch on driver,
+  // but the type unification is intentionally a cast — TypeScript will not
+  // assign one to the other structurally.
+  return drizzlePg({
+    connection: databaseUrl,
+    schema,
+  }) as unknown as ReturnType<typeof drizzleNeon<typeof schema>>;
 }
 
 export type Database = ReturnType<typeof createDatabase>;
