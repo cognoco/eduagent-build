@@ -549,29 +549,45 @@ export async function resolveFilingResult(
       isNewChapter = !existingTopic;
     }
 
-    // --- 5. Create topic ---
-    const topicId = generateUUIDv7();
+    // --- 5. Resolve or create topic ---
+    // [BUG-841 / F-SVC-008] Dedup on (bookId, lower(title)) so that a retry
+    // from session-completed (or any caller that re-fires the filing event)
+    // returns the existing topic instead of inserting a duplicate. Without
+    // this, every retry produced a new topic row with a fresh UUID — same
+    // title, same book, different id — and the user saw "Photosynthesis"
+    // twice in the same chapter. SELECT FOR UPDATE keeps the dedup atomic
+    // alongside the surrounding shelf/book serialization (transaction
+    // semantics depend on the WS driver swap; until then the dedup at least
+    // collapses sequential retries within the same connection).
     const existingTopics = await txDb.query.curriculumTopics.findMany({
       where: eq(curriculumTopics.bookId, bookId),
     });
-    const maxTopicOrder = existingTopics.reduce(
-      (max, t) => Math.max(max, t.sortOrder),
-      -1
+    const existingDuplicate = existingTopics.find(
+      (t) => t.title.toLowerCase() === filingResponse.topic.title.toLowerCase()
     );
-
-    await txDb.insert(curriculumTopics).values({
-      id: topicId,
-      curriculumId,
-      bookId,
-      title: filingResponse.topic.title,
-      description: filingResponse.topic.description,
-      chapter: chapterName,
-      sortOrder: maxTopicOrder + 1,
-      relevance: 'core',
-      estimatedMinutes: 15,
-      filedFrom,
-      sessionId: sessionId ?? null,
-    });
+    let topicId: string;
+    if (existingDuplicate) {
+      topicId = existingDuplicate.id;
+    } else {
+      topicId = generateUUIDv7();
+      const maxTopicOrder = existingTopics.reduce(
+        (max, t) => Math.max(max, t.sortOrder),
+        -1
+      );
+      await txDb.insert(curriculumTopics).values({
+        id: topicId,
+        curriculumId,
+        bookId,
+        title: filingResponse.topic.title,
+        description: filingResponse.topic.description,
+        chapter: chapterName,
+        sortOrder: maxTopicOrder + 1,
+        relevance: 'core',
+        estimatedMinutes: 15,
+        filedFrom,
+        sessionId: sessionId ?? null,
+      });
+    }
 
     return {
       shelfId,
