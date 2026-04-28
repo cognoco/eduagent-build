@@ -95,9 +95,11 @@ describe('test-keys', () => {
     });
 
     it('omits undefined claims rather than serializing them as null', () => {
-      const token = signTestJWT();
+      // Pass an explicit undefined override so the strip-loop has something to
+      // remove. (The aud claim has a non-undefined default for [SEC-1 / BUG-717]
+      // so we set it back to undefined here to drive the strip behavior.)
+      const token = signTestJWT({ aud: undefined });
       const payload = decodeJWTPayload(token);
-      // aud is undefined by default — should not appear in payload
       expect(payload).not.toHaveProperty('aud');
     });
   });

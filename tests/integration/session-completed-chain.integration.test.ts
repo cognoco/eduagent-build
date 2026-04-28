@@ -77,6 +77,10 @@ async function executeChain(
     run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
     sleep: jest.fn(),
     waitForEvent: jest.fn().mockResolvedValue(null),
+    // [SWEEP-SILENT-RECOVERY] session-completed dispatches an
+    // 'app/session.filing_timed_out' event when waitForEvent returns null
+    // for freeform/homework sessions; mock must accept the call.
+    sendEvent: jest.fn().mockResolvedValue({ ids: [] }),
   };
 
   const handler = (sessionCompleted as any).fn;
