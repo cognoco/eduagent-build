@@ -10,6 +10,7 @@ import {
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
 import { sendPushNotification } from '../../services/notifications';
+import { getRecentNotificationCount } from '../../services/settings';
 import {
   getLatestSnapshot,
   getLatestSnapshotOnOrBefore,
@@ -295,6 +296,22 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
 
         if (childSummaries.length === 0) {
           return { status: 'skipped', reason: 'no_activity', parentId };
+        }
+
+        // [BUG-699-FOLLOWUP] 24h dedup gate, scoped to the push only — the
+        // weeklyReports insert above is idempotent via onConflictDoNothing,
+        // so a duplicate `app/weekly-progress-push.generate` event leaves the
+        // report row intact but must NOT re-push the parent. Cron cadence
+        // (weekly) makes the read-then-write race window irrelevant; promote
+        // to a unique index on notificationLog if duplicates ever surface.
+        const recentCount = await getRecentNotificationCount(
+          db,
+          parentId,
+          'weekly_progress',
+          24
+        );
+        if (recentCount > 0) {
+          return { status: 'throttled', reason: 'dedup_24h', parentId };
         }
 
         const result = await sendPushNotification(db, {

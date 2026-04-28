@@ -233,7 +233,19 @@ export const trialExpiry = inngest.createFunction(
     }
     const extendedExpiredCount = extendedResult.count;
 
-    // Step 3: Send warning notifications for trials ending in 3 days, 1 day, last day
+    // Step 3: Send warning notifications for trials ending in 3 days, 1 day, last day.
+    //
+    // [BUG-699-FOLLOWUP] Both `send-trial-warnings` (Step 3) and
+    // `send-soft-landing-messages` (Step 4) write to the SAME notificationLog
+    // bucket — `type: 'trial_expiry'` — and rely on the shared 24h dedup in
+    // `sendTrialNotificationToAccountOwner`. This is intentional, not a copy-
+    // paste oversight: a single subscription is `status: 'trial'` XOR
+    // `status: 'expired'` at any moment, so a given account can never qualify
+    // for both warnings AND soft-landing within the same 24h window. Splitting
+    // into two notificationType enum values would force a Drizzle migration
+    // for a race that cannot occur in production. If this premise ever
+    // changes (e.g. trial pause/unpause flows, retroactive status edits),
+    // promote to distinct enum values rather than broaden the dedup window.
     const warningsSent = await step.run('send-trial-warnings', async () => {
       const db = getStepDatabase();
       let sent = 0;

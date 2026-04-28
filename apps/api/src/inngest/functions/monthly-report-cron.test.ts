@@ -114,6 +114,15 @@ jest.mock('../../services/notifications', () => ({
     mockSendPushNotification(...args),
 }));
 
+// [BUG-699-FOLLOWUP] 24h dedup gate. Default 0 so existing tests keep sending;
+// individual tests override to simulate a prior successful send (replay path).
+const mockGetRecentNotificationCount = jest.fn().mockResolvedValue(0);
+
+jest.mock('../../services/settings', () => ({
+  getRecentNotificationCount: (...args: unknown[]) =>
+    mockGetRecentNotificationCount(...args),
+}));
+
 const mockCaptureException = jest.fn();
 
 jest.mock('../../services/sentry', () => ({
@@ -692,6 +701,56 @@ describe('monthlyReportGenerate', () => {
         expect.any(String),
         SAMPLE_METRICS,
         null
+      );
+    });
+  });
+
+  describe('[BUG-699-FOLLOWUP] 24h push dedup', () => {
+    beforeEach(() => {
+      (
+        mockMonthlyReportDb.query.profiles.findFirst as jest.Mock
+      ).mockResolvedValue({ displayName: 'Emma' });
+      mockGetSnapshotsInRange
+        .mockResolvedValueOnce([
+          { snapshotDate: '2026-03-29', metrics: SAMPLE_METRICS },
+        ])
+        .mockResolvedValueOnce([]);
+    });
+
+    it('skips sendPushNotification when a monthly_report was sent in last 24h', async () => {
+      mockGetRecentNotificationCount.mockResolvedValueOnce(1);
+
+      await executeGenerateSteps(makeGenerateEvent());
+
+      expect(mockGetRecentNotificationCount).toHaveBeenCalledWith(
+        expect.anything(),
+        'parent-001',
+        'monthly_report',
+        24
+      );
+      expect(mockSendPushNotification).not.toHaveBeenCalled();
+    });
+
+    it('still sends when no recent monthly_report notification exists', async () => {
+      mockGetRecentNotificationCount.mockResolvedValueOnce(0);
+
+      await executeGenerateSteps(makeGenerateEvent());
+
+      expect(mockSendPushNotification).toHaveBeenCalled();
+    });
+
+    it('runs the dedup check against the parentId, not the childId', async () => {
+      mockGetRecentNotificationCount.mockResolvedValueOnce(0);
+
+      await executeGenerateSteps(
+        makeGenerateEvent({ parentId: 'parent-XYZ', childId: 'child-XYZ' })
+      );
+
+      expect(mockGetRecentNotificationCount).toHaveBeenCalledWith(
+        expect.anything(),
+        'parent-XYZ',
+        'monthly_report',
+        24
       );
     });
   });

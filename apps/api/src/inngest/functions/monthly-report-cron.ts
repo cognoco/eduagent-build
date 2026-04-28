@@ -12,6 +12,7 @@ import {
 } from '../../services/monthly-report';
 import { getSnapshotsInRange } from '../../services/snapshot-aggregation';
 import { sendPushNotification } from '../../services/notifications';
+import { getRecentNotificationCount } from '../../services/settings';
 import { captureException } from '../../services/sentry';
 import { progressMetricsSchema } from '@eduagent/schemas';
 
@@ -274,14 +275,32 @@ export const monthlyReportGenerate = inngest.createFunction(
 
     // [J-6] Step 2: Send push notification in a separate step so that
     // a push failure only retries the push — not the LLM + DB insert above.
+    //
+    // [BUG-699-FOLLOWUP] 24h notification-log dedup — same shape as the
+    // trial-expiry fix. Inngest's step.run memoizes within one run, but a
+    // duplicate `app/monthly-report.generate` event (cron edge re-fire,
+    // operator replay) creates a new run that would re-push the parent
+    // without this guard. The cadence (monthly cron) makes the read-then-
+    // write race window irrelevant in practice; if duplicates ever surface,
+    // promote to a (profile_id, type, day) unique index on notificationLog.
     await step.run('send-push-notification', async () => {
       const db = getStepDatabase();
+      const recentCount = await getRecentNotificationCount(
+        db,
+        parentId,
+        'monthly_report',
+        24
+      );
+      if (recentCount > 0) {
+        return { sent: false, reason: 'dedup_24h' };
+      }
       await sendPushNotification(db, {
         profileId: parentId,
         title: `${reportResult.childDisplayName}'s monthly report is ready`,
         body: 'Open the app to see what they learned this month.',
         type: 'monthly_report',
       });
+      return { sent: true };
     });
 
     return { status: 'completed', parentId, childId };
