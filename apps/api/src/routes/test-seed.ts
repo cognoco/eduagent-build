@@ -38,6 +38,13 @@ type TestEnv = {
     CLERK_SECRET_KEY?: string;
     TEST_SEED_SECRET?: string;
     SEED_PASSWORD?: string;
+    /**
+     * [BUG-725 / SEC-9] Opt-in flag for /__test/llm-ping. Defaults to disabled
+     * even when TEST_SEED_SECRET is configured, so an exposed seed secret
+     * cannot be used to burn LLM tokens. Set to 'true' explicitly when you
+     * need the diagnostic in staging.
+     */
+    LLM_PING_ENABLED?: string;
   };
   Variables: { db: Database };
 };
@@ -205,6 +212,24 @@ testSeedRoutes.get('/__test/debug-subjects/:clerkUserId', async (c) => {
  * GET /__test/llm-ping?stream=1 — tests streaming via routeAndStream.
  */
 testSeedRoutes.get('/__test/llm-ping', async (c) => {
+  // [BUG-725 / SEC-9] Opt-in environment guard layered on top of the existing
+  // shared-secret check. The shared secret alone is not enough because anyone
+  // with the secret could burn LLM tokens at will (cost-DoS). Default-deny in
+  // non-development environments unless `LLM_PING_ENABLED='true'` is set.
+  // Production is already blocked at the route-level middleware above.
+  const isDev = c.env.ENVIRONMENT === 'development';
+  const explicitlyEnabled = c.env.LLM_PING_ENABLED === 'true';
+  if (!isDev && !explicitlyEnabled) {
+    return c.json(
+      {
+        code: ERROR_CODES.FORBIDDEN,
+        message:
+          'LLM ping is dev-only by default. Set LLM_PING_ENABLED=true to opt in on this environment.',
+      },
+      403
+    );
+  }
+
   const providers = getRegisteredProviders();
   const useStream = c.req.query('stream') === '1';
 

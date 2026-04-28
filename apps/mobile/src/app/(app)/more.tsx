@@ -9,9 +9,9 @@ import {
   Share,
 } from 'react-native';
 import { useState, useCallback } from 'react';
-import * as SecureStore from '../../lib/secure-storage';
 import { platformAlert } from '../../lib/platform-alert';
 import { clearTransitionState } from '../../lib/auth-transition';
+import { clearProfileSecureStorageOnSignOut } from '../../lib/sign-out-cleanup';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth, useUser } from '@clerk/clerk-expo';
@@ -641,10 +641,15 @@ export default function MoreScreen() {
             setIsSigningOut(true);
             try {
               clearTransitionState();
-              void SecureStore.deleteItemAsync('hasSignedInBefore').catch(
-                () => {
-                  /* non-fatal */
-                }
+              // [BUG-723 / SEC-7] Wipe per-profile + global SecureStore keys
+              // before signing out so the next signed-in user on a shared
+              // device does not inherit bookmark prompts, dictation prefs,
+              // rating-prompt counters, etc. Includes all known profileIds
+              // (owner + linked children) so child-profile keys are cleared
+              // too. Best-effort: per-key failure is swallowed inside the
+              // helper so cleanup never blocks sign-out.
+              await clearProfileSecureStorageOnSignOut(
+                profiles.map((p) => p.id)
               );
               await signOut();
             } catch {

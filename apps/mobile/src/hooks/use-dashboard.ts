@@ -74,8 +74,15 @@ export function useDashboard(): UseQueryResult<DashboardData> {
       }
     },
     enabled: !!activeProfile,
-    staleTime: 30_000,
-    refetchInterval: 60_000,
+    // [BUG-738 / PERF-8] Dashboard aggregate is heavy (children + sessions +
+    // metrics joins). The previous 60s timer hammered the API on every parent
+    // who left the dashboard tab open, regardless of focus. Tune to: stale
+    // after 2 minutes, background refetch every 5 minutes, and skip refetch
+    // when the app is backgrounded so the timer pauses off-tab. Window-focus
+    // refetch is unchanged for snappy "I just came back" UX.
+    staleTime: 2 * 60_000,
+    refetchInterval: 5 * 60_000,
+    refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
   });
 }
