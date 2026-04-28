@@ -105,6 +105,48 @@ describe('CreateProfileScreen', () => {
     expect(screen.queryByTestId('persona-parent')).toBeNull();
   });
 
+  // [BUG-900] When a parent (account owner with existing profile) opens the
+  // create-profile screen, the copy must address the child, not the parent.
+  describe('isParentAddingChild copy [BUG-900]', () => {
+    beforeEach(() => {
+      mockUseProfile.mockReturnValue({
+        switchProfile: mockSwitchProfile,
+        activeProfile: { id: 'parent-1', isOwner: true },
+        profiles: [{ id: 'parent-1', isOwner: true }],
+      });
+    });
+
+    it('uses child-referent copy on the explanatory line', () => {
+      render(<CreateProfileScreen />, { wrapper: Wrapper });
+      expect(
+        screen.getByText(/personalise how their mentor talks to them/)
+      ).toBeTruthy();
+      // Original first-person copy must NOT appear when adding a child
+      expect(
+        screen.queryByText(/personalise how your mentor talks to you/)
+      ).toBeNull();
+    });
+
+    it('shows minimum age 11 hint up front', () => {
+      render(<CreateProfileScreen />, { wrapper: Wrapper });
+      expect(screen.getByText(/Minimum age is 11/)).toBeTruthy();
+    });
+
+    it('uses "Add a child" as the page title', () => {
+      render(<CreateProfileScreen />, { wrapper: Wrapper });
+      expect(screen.getByText('Add a child')).toBeTruthy();
+      expect(screen.queryByText('New profile')).toBeNull();
+    });
+
+    it("uses Child's display name + child-referent placeholder", () => {
+      render(<CreateProfileScreen />, { wrapper: Wrapper });
+      expect(screen.getByText("Child's display name")).toBeTruthy();
+      expect(
+        screen.getByPlaceholderText("Enter your child's name")
+      ).toBeTruthy();
+    });
+  });
+
   it('disables submit when name is empty', () => {
     render(<CreateProfileScreen />, { wrapper: Wrapper });
 

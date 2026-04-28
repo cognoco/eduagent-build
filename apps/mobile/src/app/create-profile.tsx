@@ -250,7 +250,7 @@ export default function CreateProfileScreen() {
       >
         <View className="flex-row items-center justify-between mb-8">
           <Text className="text-h1 font-bold text-text-primary">
-            New profile
+            {isParentAddingChild ? 'Add a child' : 'New profile'}
           </Text>
           <Button
             variant="tertiary"
@@ -277,11 +277,13 @@ export default function CreateProfileScreen() {
 
         <View onLayout={onFieldLayout('name')}>
           <Text className="text-body-sm font-semibold text-text-secondary mb-1">
-            Display name
+            {isParentAddingChild ? "Child's display name" : 'Display name'}
           </Text>
           <TextInput
             className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-4"
-            placeholder="Enter name"
+            placeholder={
+              isParentAddingChild ? "Enter your child's name" : 'Enter name'
+            }
             placeholderTextColor={colors.muted}
             value={displayName}
             onChangeText={(value: string) => {
@@ -296,11 +298,12 @@ export default function CreateProfileScreen() {
         </View>
 
         <Text className="text-body-sm font-semibold text-text-secondary mb-1">
-          Birth date
+          {isParentAddingChild ? "Child's birth date" : 'Birth date'}
         </Text>
         <Text className="text-body-sm text-text-secondary mb-2">
-          We use your age to personalise how your mentor talks to you and to
-          comply with privacy laws.
+          {isParentAddingChild
+            ? "We use your child's age to personalise how their mentor talks to them and to comply with privacy laws. Minimum age is 11."
+            : 'We use your age to personalise how your mentor talks to you and to comply with privacy laws. Minimum age is 11.'}
         </Text>
         {Platform.OS === 'web' ? (
           <View className="mb-2" onLayout={onFieldLayout('birthdate')}>
@@ -313,11 +316,15 @@ export default function CreateProfileScreen() {
               editable={!loading}
               autoComplete="birthdate-full"
               testID="create-profile-birthdate-input"
-              accessibilityLabel="Birth date"
+              accessibilityLabel={
+                isParentAddingChild ? "Child's birth date" : 'Birth date'
+              }
               onFocus={onFieldFocus('birthdate')}
             />
             <Text className="text-caption text-text-secondary mt-2">
-              Enter your birth date as YYYY-MM-DD.
+              {isParentAddingChild
+                ? "Enter your child's birth date as YYYY-MM-DD."
+                : 'Enter your birth date as YYYY-MM-DD.'}
             </Text>
           </View>
         ) : (
@@ -325,7 +332,11 @@ export default function CreateProfileScreen() {
             onPress={() => setShowDatePicker(true)}
             className="bg-surface rounded-input px-4 py-3 mb-2"
             disabled={loading}
-            accessibilityLabel="Select birth date"
+            accessibilityLabel={
+              isParentAddingChild
+                ? "Select child's birth date"
+                : 'Select birth date'
+            }
             testID="create-profile-birthdate"
           >
             <Text
@@ -336,6 +347,8 @@ export default function CreateProfileScreen() {
             >
               {birthDate
                 ? formatDateForDisplay(birthDate)
+                : isParentAddingChild
+                ? "Select your child's date of birth"
                 : 'Select date of birth'}
             </Text>
           </Pressable>

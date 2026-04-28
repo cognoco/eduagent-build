@@ -211,4 +211,6 @@ apps/mobile/e2e/scripts/regression-batch*.txt
 /.notion-status-update.json
 apps/api/.notion-*.json
 .claude/notion_bugs.json
+/notion_bugs_tmp.json
+/bug_ids.json
 .scratch/

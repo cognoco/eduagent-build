@@ -49,7 +49,10 @@ import {
   shouldPromptCasualSwitch,
   getSkipWarningFlags,
 } from '../services/settings';
-import { startInterleavedSession } from '../services/interleaved';
+import {
+  startInterleavedSession,
+  NoInterleavedTopicsError,
+} from '../services/interleaved';
 import { generateRecallBridge } from '../services/recall-bridge';
 import { getProfileAgeBracket } from '../services/profile';
 
@@ -572,10 +575,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         const result = await startInterleavedSession(db, profileId, input);
         return c.json(result, 201);
       } catch (err) {
-        if (
-          err instanceof Error &&
-          err.message === 'No topics available for interleaved retrieval'
-        ) {
+        if (err instanceof NoInterleavedTopicsError) {
           return apiError(c, 400, ERROR_CODES.VALIDATION_ERROR, err.message);
         }
         throw err;

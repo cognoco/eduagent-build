@@ -339,6 +339,49 @@ describe('metering middleware', () => {
       expect(mockEnsureFreeSubscription).not.toHaveBeenCalled();
       expect(mockDecrementQuota).not.toHaveBeenCalled();
     });
+
+    // [BUG-763] GET /v1/quiz/* is DB-only and must not decrement quota.
+    // Before fix: classifier did `LLM_ROUTE_PATTERNS.filter(p => !p.source.includes('quiz'))`
+    // — fragile; renaming any quiz route would silently flip the filter. The
+    // typed grouping splits LLM_ROUTE_PATTERNS_ANY_METHOD vs _POST_ONLY so
+    // the dispatcher never inspects regex.source.
+    it('[BUG-763] does NOT meter GET /v1/quiz/rounds (DB-only listing)', async () => {
+      const res = await app.request(
+        '/v1/quiz/rounds',
+        { method: 'GET', headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(mockDecrementQuota).not.toHaveBeenCalled();
+      expect(mockEnsureFreeSubscription).not.toHaveBeenCalled();
+      // Status may be 404/501 depending on route registration; what matters
+      // is that the metering middleware is bypassed.
+      expect([200, 400, 401, 404, 405, 500].includes(res.status)).toBe(true);
+    });
+
+    it('[BUG-763] does NOT meter GET /v1/quiz/rounds/prefetch', async () => {
+      const res = await app.request(
+        '/v1/quiz/rounds/prefetch',
+        { method: 'GET', headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(mockDecrementQuota).not.toHaveBeenCalled();
+      expect(mockEnsureFreeSubscription).not.toHaveBeenCalled();
+      expect([200, 400, 401, 404, 405, 500].includes(res.status)).toBe(true);
+    });
+
+    it('[BUG-763] does NOT meter GET /v1/dictation/generate', async () => {
+      const res = await app.request(
+        '/v1/dictation/generate',
+        { method: 'GET', headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(mockDecrementQuota).not.toHaveBeenCalled();
+      expect(mockEnsureFreeSubscription).not.toHaveBeenCalled();
+      expect([200, 400, 401, 404, 405, 500].includes(res.status)).toBe(true);
+    });
   });
 
   // -----------------------------------------------------------------------

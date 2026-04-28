@@ -13,6 +13,7 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Vibration,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -86,6 +87,13 @@ interface ChatShellProps {
    * resolve cleanly on web, so the parent supplies the navigation.
    */
   onBackPress?: () => void;
+  /**
+   * [BUG-887] Hide the Text/Voice mode toggle above the composer. Useful for
+   * onboarding-style screens where voice is not offered yet — saves ~50px of
+   * vertical space so the composer stays comfortably visible on small phones
+   * (Galaxy S10e ~5.8" with the soft keyboard open).
+   */
+  hideInputModeToggle?: boolean;
 }
 
 /**
@@ -156,6 +164,7 @@ export function ChatShell({
   backFallback,
   backBehavior = 'history',
   onBackPress,
+  hideInputModeToggle = false,
 }: ChatShellProps) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -483,7 +492,10 @@ export function ChatShell({
   return (
     <KeyboardAvoidingView
       className="flex-1 bg-background"
-      behavior="padding"
+      // [BUG-887] iOS responds best to "padding"; Android relies on the OS-level
+      // adjustResize behaviour (the default in app.json), so passing a behaviour
+      // there can fight the resize and leave the composer offscreen.
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={0}
     >
       {/* Header */}
@@ -728,62 +740,64 @@ export function ChatShell({
         </View>
       ) : (
         <View>
-          <View className="px-4 py-2 bg-surface border-t border-surface-elevated">
-            <View
-              className="flex-row rounded-full bg-surface-elevated p-1"
-              testID="input-mode-toggle"
-            >
-              <Pressable
-                onPress={() => void handleSelectInputMode('text')}
-                className={
-                  !isVoiceEnabled
-                    ? 'flex-1 rounded-full bg-background px-4 py-2 items-center'
-                    : 'flex-1 rounded-full px-4 py-2 items-center'
-                }
-                accessibilityRole="button"
-                accessibilityState={{ selected: !isVoiceEnabled }}
-                accessibilityLabel="Switch to text mode"
-                testID="input-mode-text"
+          {!hideInputModeToggle && (
+            <View className="px-4 py-2 bg-surface border-t border-surface-elevated">
+              <View
+                className="flex-row rounded-full bg-surface-elevated p-1"
+                testID="input-mode-toggle"
               >
-                <Text
+                <Pressable
+                  onPress={() => void handleSelectInputMode('text')}
                   className={
                     !isVoiceEnabled
-                      ? 'text-body-sm font-semibold text-text-primary'
-                      : 'text-body-sm font-semibold text-text-secondary'
+                      ? 'flex-1 rounded-full bg-background px-4 py-2 items-center'
+                      : 'flex-1 rounded-full px-4 py-2 items-center'
                   }
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: !isVoiceEnabled }}
+                  accessibilityLabel="Switch to text mode"
+                  testID="input-mode-text"
                 >
-                  Text mode
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={() => void handleSelectInputMode('voice')}
-                className={
-                  isVoiceEnabled
-                    ? 'flex-1 rounded-full bg-background px-4 py-2 items-center'
-                    : 'flex-1 rounded-full px-4 py-2 items-center'
-                }
-                accessibilityRole="button"
-                accessibilityState={{ selected: isVoiceEnabled }}
-                accessibilityLabel="Switch to voice mode"
-                testID="input-mode-voice"
-              >
-                <Text
+                  <Text
+                    className={
+                      !isVoiceEnabled
+                        ? 'text-body-sm font-semibold text-text-primary'
+                        : 'text-body-sm font-semibold text-text-secondary'
+                    }
+                  >
+                    Text mode
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => void handleSelectInputMode('voice')}
                   className={
                     isVoiceEnabled
-                      ? 'text-body-sm font-semibold text-text-primary'
-                      : 'text-body-sm font-semibold text-text-secondary'
+                      ? 'flex-1 rounded-full bg-background px-4 py-2 items-center'
+                      : 'flex-1 rounded-full px-4 py-2 items-center'
                   }
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: isVoiceEnabled }}
+                  accessibilityLabel="Switch to voice mode"
+                  testID="input-mode-voice"
                 >
-                  Voice mode
+                  <Text
+                    className={
+                      isVoiceEnabled
+                        ? 'text-body-sm font-semibold text-text-primary'
+                        : 'text-body-sm font-semibold text-text-secondary'
+                    }
+                  >
+                    Voice mode
+                  </Text>
+                </Pressable>
+              </View>
+              {screenReaderEnabled && isVoiceEnabled ? (
+                <Text className="text-caption text-text-secondary mt-2">
+                  Screen reader is on, so voice mode keeps manual playback only.
                 </Text>
-              </Pressable>
+              ) : null}
             </View>
-            {screenReaderEnabled && isVoiceEnabled ? (
-              <Text className="text-caption text-text-secondary mt-2">
-                Screen reader is on, so voice mode keeps manual playback only.
-              </Text>
-            ) : null}
-          </View>
+          )}
           <View
             className="flex-row items-end px-4 py-3 bg-surface border-t border-surface-elevated"
             style={{ paddingBottom: Math.max(insets.bottom, 8) }}

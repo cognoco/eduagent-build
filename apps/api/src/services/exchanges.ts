@@ -481,9 +481,11 @@ function envelopeToParsedExchange(
   const signals = envelope.signals ?? {};
   const uiHints = envelope.ui_hints ?? {};
   // [BUG-865] Phonetic hints like "de-nom-i-nay-tor" coach the TTS path
-  // but render verbatim in chat bubbles. Sanitize here so every consumer
-  // of the parsed envelope (text + audio paths) sees the same clean reply
-  // and the audio path can re-add pronunciation through SSML when needed.
+  // but render verbatim in chat bubbles. Strip them here so every consumer
+  // (text + audio) sees the same clean reply. There is no SSML re-emission
+  // pipeline today — the LLM hint is dropped on the floor for TTS too. If
+  // pronunciation regresses on long words, restore via SSML at the audio
+  // boundary, not by passing the dashed form through.
   const cleanReply = stripPhoneticHints(envelope.reply.trim());
 
   const notePrompt = uiHints.note_prompt;

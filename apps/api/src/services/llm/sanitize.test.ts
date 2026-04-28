@@ -310,4 +310,14 @@ describe('stripPhoneticHints [BUG-865]', () => {
       '"denominaytor", got it?'
     );
   });
+
+  it('strips the phonetic word but keeps the apostrophe-s possessive intact', () => {
+    // The apostrophe is a non-word char, so \b matches between `r` and `'`.
+    // Pin the behavior — a future regex tweak that drops \b at the right edge
+    // (e.g. switching to greedier matching) would silently break this case
+    // and make possessives render as "de-nom-i-nay-tor's" again.
+    expect(stripPhoneticHints("the de-nom-i-nay-tor's value is two")).toBe(
+      "the denominaytor's value is two"
+    );
+  });
 });

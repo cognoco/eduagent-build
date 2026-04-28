@@ -360,9 +360,11 @@ export function BooksTab({
                       (sum, b) => sum + b.topicCount,
                       0
                     );
-                    return topicTotal > 0
-                      ? `${bookLabel} · ${topicTotal} topics`
-                      : bookLabel;
+                    if (topicTotal === 0) return bookLabel;
+                    const topicLabel = `${topicTotal} ${
+                      topicTotal === 1 ? 'topic' : 'topics'
+                    }`;
+                    return `${bookLabel} · ${topicLabel}`;
                   })()}
                 </Text>
               </View>

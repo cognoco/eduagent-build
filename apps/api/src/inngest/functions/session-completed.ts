@@ -32,8 +32,6 @@ import {
 import { captureException } from '../../services/sentry';
 import { createLogger } from '../../services/logger';
 import { queueCelebration } from '../../services/celebrations';
-
-const logger = createLogger();
 import {
   buildBrowseHighlight,
   FREEFORM_TOPIC_SENTINEL,
@@ -58,6 +56,8 @@ import {
   type StruggleNotification,
 } from '../../services/learner-profile';
 import { sendStruggleNotification } from '../../services/notifications';
+
+const logger = createLogger();
 
 // ---------------------------------------------------------------------------
 // Step error isolation — each step catches its own errors so that a failure

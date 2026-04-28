@@ -25,6 +25,7 @@ import {
   ensureDefaultBook,
 } from './curriculum';
 import { getProfileAge } from './profile';
+import type { LLMTier } from './subscription';
 import type {
   InterviewContext,
   InterviewResult,
@@ -221,7 +222,7 @@ const MAX_TRANSCRIPT_CHARS = 12000;
 
 export async function extractSignals(
   exchangeHistory: ChatExchange[],
-  options?: { llmTier?: import('./subscription').LLMTier }
+  options?: { llmTier?: LLMTier }
 ): Promise<{
   goals: string[];
   experienceLevel: string;
@@ -435,7 +436,7 @@ export async function processInterviewExchange(
     // [BUG-771] Caller's subscription tier. Threaded into routeAndCall AND
     // extractSignals so premium users stay on Sonnet for both steps instead
     // of degrading to Flash for signal extraction.
-    llmTier?: import('./subscription').LLMTier;
+    llmTier?: LLMTier;
   }
 ): Promise<InterviewResult> {
   const safeSubjectName = sanitizeXmlValue(context.subjectName, 200);
@@ -518,7 +519,7 @@ export async function streamInterviewExchange(
     emptyReplyGuardEnabled?: boolean;
     // [BUG-771] Caller's subscription tier. Threaded through routeAndStream
     // and extractSignals.
-    llmTier?: import('./subscription').LLMTier;
+    llmTier?: LLMTier;
   }
 ): Promise<{
   stream: AsyncIterable<string>;

@@ -33,10 +33,23 @@ function listIntegrationTests(): string[] {
 
 function fileMocksInternalLlm(absPath: string): boolean {
   const source = readFileSync(absPath, 'utf-8');
-  // Match jest.mock('./llm', ...), jest.mock('../llm'...), jest.mock('../../services/llm'...)
-  return /jest\.mock\(\s*['"](?:\.\.?\/)+(?:[^'"]*\/)?llm(?:['"/])/m.test(
-    source
-  );
+  // Catches all internal-LLM mock forms:
+  //   jest.mock('./llm', ...)
+  //   jest.mock('../../services/llm/router', ...)
+  //   jest.mock('@eduagent/llm-router', ...)        ← package name
+  //   jest.mock('@/services/llm', ...)              ← TS path alias
+  // A specifier is internal-LLM if any '/'-separated segment is `llm` or
+  // contains `llm` as a hyphen-or-edge token (`llm-router`, `eval-llm`).
+  const matches = source.matchAll(/jest\.mock\(\s*['"]([^'"]+)['"]/g);
+  for (const match of matches) {
+    const specifier = match[1];
+    if (!specifier) continue;
+    const segments = specifier.split('/');
+    if (segments.some((seg) => /(?:^|-)llm(?:-|$)/.test(seg))) {
+      return true;
+    }
+  }
+  return false;
 }
 
 describe('integration tests — BUG-743 internal LLM mock guard', () => {

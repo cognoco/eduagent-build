@@ -25,6 +25,8 @@ import {
   ConsentTokenNotFoundError,
   ConsentAlreadyProcessedError,
   ConsentTokenExpiredError,
+  ConsentNotAuthorizedError,
+  ConsentRecordNotFoundError,
 } from '../services/consent';
 import { notFound, forbidden, apiError } from '../errors';
 import { inngest } from '../inngest/client';
@@ -59,6 +61,10 @@ function isConsentRespondRateLimited(ipKey: string): boolean {
     consentRespondTimestamps.delete(ipKey);
   }
   if (consentRespondTimestamps.size >= CONSENT_RESPOND_MAP_MAX_ENTRIES) {
+    // FIFO eviction (Maps preserve insertion order; `keys().next()` returns
+    // the first-inserted key). This is NOT LRU — we don't re-insert on access
+    // — but for an abuse-prevention rate limiter the difference is harmless:
+    // a victim of eviction has been quiet long enough to age past the head.
     const oldest = consentRespondTimestamps.keys().next().value;
     if (oldest !== undefined) consentRespondTimestamps.delete(oldest);
   }
@@ -303,8 +309,8 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
         consentType: state.consentType,
       });
     } catch (error) {
-      if (error instanceof Error && error.message.includes('Not authorized')) {
-        return forbidden(c, 'Not authorized to view consent for this profile');
+      if (error instanceof ConsentNotAuthorizedError) {
+        return forbidden(c, error.message);
       }
       throw error;
     }
@@ -351,17 +357,11 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
         consentStatus: state.status,
       });
     } catch (error) {
-      if (error instanceof Error && error.message.includes('Not authorized')) {
-        return forbidden(
-          c,
-          'Not authorized to revoke consent for this profile'
-        );
+      if (error instanceof ConsentNotAuthorizedError) {
+        return forbidden(c, error.message);
       }
-      if (
-        error instanceof Error &&
-        error.message.includes('No consent record')
-      ) {
-        return notFound(c, 'No consent record found');
+      if (error instanceof ConsentRecordNotFoundError) {
+        return notFound(c, error.message);
       }
       throw error;
     }
@@ -380,17 +380,11 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
         consentStatus: state.status,
       });
     } catch (error) {
-      if (error instanceof Error && error.message.includes('Not authorized')) {
-        return forbidden(
-          c,
-          'Not authorized to restore consent for this profile'
-        );
+      if (error instanceof ConsentNotAuthorizedError) {
+        return forbidden(c, error.message);
       }
-      if (
-        error instanceof Error &&
-        error.message.includes('No consent record')
-      ) {
-        return notFound(c, 'No consent record found');
+      if (error instanceof ConsentRecordNotFoundError) {
+        return notFound(c, error.message);
       }
       throw error;
     }

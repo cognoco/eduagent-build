@@ -115,8 +115,11 @@ function renderChatShell(
 // Tests
 // ---------------------------------------------------------------------------
 
+// [BUG-759] No test in this file calls jest.advanceTimersByTime / runAllTimers
+// / etc., so the previous global jest.useFakeTimers() / useRealTimers() pair
+// was dead scaffolding that risked deadlocking RN async work (state updates,
+// microtasks) under fake-time. Removed.
 beforeEach(() => {
-  jest.useFakeTimers();
   jest.clearAllMocks();
   mockGetMicrophonePermissionStatus.mockResolvedValue({
     granted: true,
@@ -130,14 +133,26 @@ beforeEach(() => {
   };
 });
 
-afterEach(() => {
-  jest.useRealTimers();
-});
-
 describe('ChatShell', () => {
   // -----------------------------------------------------------------------
   // Basic rendering (regression — existing behaviour)
   // -----------------------------------------------------------------------
+
+  // [BUG-887] On small phones (Galaxy S10e ~5.8") the Text/Voice mode
+  // toggle eats vertical space the composer needs when the soft keyboard
+  // opens. Onboarding interview opts in to hide the toggle.
+  it('renders the input mode toggle by default [BUG-887]', () => {
+    renderChatShell();
+    expect(screen.getByTestId('input-mode-toggle')).toBeTruthy();
+  });
+
+  it('hides the input mode toggle when hideInputModeToggle is true [BUG-887]', () => {
+    renderChatShell({ hideInputModeToggle: true });
+    expect(screen.queryByTestId('input-mode-toggle')).toBeNull();
+    // Composer itself is still rendered.
+    expect(screen.getByTestId('chat-input')).toBeTruthy();
+    expect(screen.getByTestId('send-button')).toBeTruthy();
+  });
 
   it('uses the explicit fallback route when backBehavior is replace', () => {
     renderChatShell({

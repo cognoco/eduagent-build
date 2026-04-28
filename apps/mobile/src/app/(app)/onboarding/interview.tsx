@@ -612,6 +612,10 @@ export default function InterviewScreen() {
       messages={messages}
       onSend={handleSend}
       isStreaming={isStreaming}
+      // [BUG-887] Voice is not wired in onboarding interview yet, and the
+      // mode toggle eats vertical space that pushes the composer offscreen
+      // on small phones (Galaxy S10e ~5.8" with the soft keyboard open).
+      hideInputModeToggle={!sessionPhase}
       inputDisabled={
         // Interview phase: disable when complete (fallback), expired, or errored
         // Session phase: briefly disable while session is being created

@@ -123,12 +123,16 @@ export const filingRoutes = new Hono<FilingRouteEnv>()
             });
           });
       }
-      // Pre-session fallback: file under "Uncategorized" book so the session
-      // can start immediately. The user can move the topic later via long-press.
+      // [BUG-871] Pre-session fallback: when the LLM filing call fails we
+      // forward the user's `selectedSuggestion` so the fallback book is
+      // named after the topic the user actually picked (e.g. "Geometry
+      // Foundations") rather than always landing under "Uncategorized".
+      // The user can still move/rename the topic later via long-press.
       if (body.subjectId && body.rawInput) {
         filingResponse = buildFallbackFilingResponse(
           body.subjectId,
-          body.rawInput
+          body.rawInput,
+          body.selectedSuggestion
         );
         usedFallback = true;
       } else {

@@ -370,18 +370,52 @@ export async function fileToLibrary(
 // Fallback — used when the LLM filing call fails but subjectId is known
 // ---------------------------------------------------------------------------
 
+// [BUG-871] When the LLM filing call fails, we used to lose the only signal
+// of user intent we had — the title of the topic / suggestion they just
+// picked — by always falling back to a generic "Uncategorized" book. If the
+// caller passes the suggestion or raw input as `selectedSuggestion` (or it
+// is at least 3 chars long, matching the bookRefSchema floor), use that as
+// the book name so the Library reflects the user's choice rather than
+// looking auto-generated.
+const MIN_BOOK_NAME_LENGTH = 3;
+const MAX_BOOK_NAME_LENGTH = 200;
+
+function pickFallbackBookName(
+  selectedSuggestion: string | null | undefined,
+  rawInput: string
+): { name: string; isSpecific: boolean } {
+  const candidates = [selectedSuggestion, rawInput];
+  for (const candidate of candidates) {
+    const trimmed = candidate?.trim() ?? '';
+    if (
+      trimmed.length >= MIN_BOOK_NAME_LENGTH &&
+      trimmed.length <= MAX_BOOK_NAME_LENGTH
+    ) {
+      return { name: trimmed, isSpecific: true };
+    }
+  }
+  return { name: 'Uncategorized', isSpecific: false };
+}
+
 export function buildFallbackFilingResponse(
   subjectId: string,
-  rawInput: string
+  rawInput: string,
+  selectedSuggestion?: string | null
 ): FilingResponse {
+  const { name: bookName, isSpecific } = pickFallbackBookName(
+    selectedSuggestion,
+    rawInput
+  );
   return {
     shelf: { id: subjectId },
     book: {
-      name: 'Uncategorized',
-      emoji: '📂',
-      description: 'Topics to be organized',
+      name: bookName,
+      emoji: isSpecific ? '📚' : '📂',
+      description: isSpecific
+        ? `Learn about ${bookName}`
+        : 'Topics to be organized',
     },
-    chapter: { name: 'General' },
+    chapter: { name: isSpecific ? bookName : 'General' },
     topic: {
       title: rawInput,
       description: `Topic about ${rawInput}`,

@@ -621,9 +621,26 @@ export async function buildKnowledgeInventory(
   profileId: string
 ): Promise<KnowledgeInventory> {
   const latestSnapshot = await getLatestSnapshot(db, profileId);
-  const metrics =
+  let metrics =
     latestSnapshot?.metrics ?? (await computeProgressMetrics(db, profileId));
   const state = await loadProgressState(db, profileId);
+
+  // [BUG-872] When the cached snapshot's subject set diverges from live
+  // state.subjects (e.g., a subject was added after the last snapshot was
+  // persisted), the Progress tab silently drops the new subject because it
+  // iterates `metrics.subjects` rather than `state.subjects`. Detect that
+  // divergence and recompute live so newly-added subjects appear immediately
+  // — the next session-completed pipeline tick will refresh the snapshot.
+  if (latestSnapshot) {
+    const cachedSubjectIds = new Set(metrics.subjects.map((s) => s.subjectId));
+    const hasMissingLiveSubject = state.subjects.some(
+      (s) => !cachedSubjectIds.has(s.id)
+    );
+    if (hasMissingLiveSubject) {
+      metrics = await computeProgressMetrics(db, profileId);
+    }
+  }
+
   const subjectInventories = await Promise.all(
     metrics.subjects.map((subject) => buildSubjectInventory(db, state, subject))
   );

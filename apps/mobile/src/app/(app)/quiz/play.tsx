@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Modal,
   Pressable,
   Text,
   TextInput,
@@ -18,6 +19,9 @@ import {
 } from '../../../hooks/use-quiz';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { platformAlert } from '../../../lib/platform-alert';
+// platformAlert maps to window.confirm on web for 2-button prompts, which
+// blocks the renderer (BUG-892). For the quit-quiz confirmation we use a
+// styled in-app Modal — same pattern as parent withdraw-consent (BUG-553).
 import { formatApiError } from '../../../lib/format-api-error';
 import { useThemeColors } from '../../../lib/theme';
 import { Sentry } from '../../../lib/sentry';
@@ -54,6 +58,9 @@ export default function QuizPlayScreen(): React.ReactElement {
   const [disputedIndices, setDisputedIndices] = useState<Set<number>>(
     new Set()
   );
+  // [BUG-892] Quit confirmation rendered as an in-app Modal so web doesn't
+  // hit window.confirm via Alert.alert mapping (which blocks the renderer).
+  const [quitConfirmVisible, setQuitConfirmVisible] = useState(false);
 
   const questions = (round?.questions ?? []) as ClientQuizQuestion[];
   const totalQuestions = round?.total ?? 0;
@@ -163,15 +170,14 @@ export default function QuizPlayScreen(): React.ReactElement {
   // rules-of-hooks invariant (no conditional hooks) is respected even though
   // this particular handler is a plain function.
   // [F-Q-08] Show a confirmation dialog before discarding in-progress answers.
+  // [BUG-892] On web, platformAlert with 2 buttons falls back to window.confirm
+  // which blocks the renderer. Render a styled in-app Modal instead.
   const handleQuit = () => {
-    platformAlert('Quit this round?', 'Your progress will not be saved.', [
-      { text: 'Keep playing', style: 'cancel' },
-      {
-        text: 'Quit',
-        style: 'destructive',
-        onPress: () => goBackOrReplace(router, '/(app)/quiz'),
-      },
-    ]);
+    setQuitConfirmVisible(true);
+  };
+  const handleConfirmQuit = () => {
+    setQuitConfirmVisible(false);
+    goBackOrReplace(router, '/(app)/quiz');
   };
 
   // [CR-1] Callback for server-side answer checking, declared before the
@@ -837,6 +843,60 @@ export default function QuizPlayScreen(): React.ReactElement {
           </View>
         ) : null}
       </Pressable>
+
+      {/* [BUG-892] Quit confirmation rendered as an in-app Modal so web does
+          not hit window.confirm via Alert.alert mapping (which freezes the
+          renderer). Mirrors the BUG-553 withdraw-consent pattern. */}
+      <Modal
+        visible={quitConfirmVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setQuitConfirmVisible(false)}
+      >
+        <Pressable
+          className="flex-1 bg-black/40 justify-center items-center px-6"
+          onPress={() => setQuitConfirmVisible(false)}
+          accessibilityRole="button"
+          accessibilityLabel="Dismiss"
+          testID="quiz-quit-modal-backdrop"
+        >
+          <Pressable
+            className="bg-background rounded-2xl w-full max-w-sm p-6"
+            onPress={(e) => e.stopPropagation()}
+          >
+            <Text className="text-h3 font-bold text-text-primary text-center">
+              Quit this round?
+            </Text>
+            <Text className="text-body-sm text-text-secondary text-center mt-3 leading-relaxed">
+              Your progress will not be saved.
+            </Text>
+            <View className="mt-5 gap-3">
+              <Pressable
+                onPress={handleConfirmQuit}
+                className="bg-danger rounded-button py-3 items-center min-h-[48px] justify-center"
+                accessibilityRole="button"
+                accessibilityLabel="Confirm quit round"
+                testID="quiz-quit-confirm"
+              >
+                <Text className="text-body font-semibold text-text-inverse">
+                  Quit
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setQuitConfirmVisible(false)}
+                className="bg-surface rounded-button py-3 items-center min-h-[48px] justify-center"
+                accessibilityRole="button"
+                accessibilityLabel="Keep playing"
+                testID="quiz-quit-cancel"
+              >
+                <Text className="text-body font-semibold text-text-primary">
+                  Keep playing
+                </Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }

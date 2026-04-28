@@ -83,13 +83,26 @@ describe('ChildReportsScreen', () => {
       );
     });
 
-    it('shows push notification subtext', () => {
+    // [BUG-904] The empty state previously stacked four near-duplicate
+    // copies of "first report coming soon". Collapse to one heading + one
+    // body line + one CTA. The push-notification claim was removed because
+    // it isn't accurate when push notifications are disabled in More.
+    it('renders a single condensed empty state — no duplicate copy [BUG-904]', () => {
       render(<ChildReportsScreen />);
 
+      // Push-notification claim removed
       expect(
-        screen.getByText(
+        screen.queryByText(
           "You'll get a push notification when the report is ready."
         )
+      ).toBeNull();
+      // Long "Reports are generated on the 1st…" preamble removed
+      expect(
+        screen.queryByText(/Reports are generated on the 1st of each month/)
+      ).toBeNull();
+      // Single body sentence remains — testID survives so other tests can find it
+      expect(
+        screen.getByTestId('child-reports-empty-time-context')
       ).toBeTruthy();
     });
 

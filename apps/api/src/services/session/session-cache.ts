@@ -2,10 +2,10 @@
 // Session Static Context Cache — in-process LRU cache for per-session data
 // ---------------------------------------------------------------------------
 
-import { eq } from 'drizzle-orm';
-import { profiles, type Database } from '@eduagent/database';
+import { type profiles, type Database } from '@eduagent/database';
 import type { LearningSession } from '@eduagent/schemas';
 import { getSubject } from '../subject';
+import { loadProfileRowById } from '../profile';
 import { fetchPriorTopics } from '../prior-learning';
 import { getTeachingPreference } from '../retention-data';
 import { getLearningMode } from '../settings';
@@ -137,9 +137,9 @@ export async function getSessionStaticContext(
     return touchSessionStaticContextCacheEntry(key, cached);
   }
 
-  const [subject, profileRows] = await Promise.all([
+  const [subject, profile] = await Promise.all([
     getSubject(db, profileId, session.subjectId),
-    db.select().from(profiles).where(eq(profiles.id, profileId)).limit(1),
+    loadProfileRowById(db, profileId),
   ]);
 
   const entry: SessionStaticContextCacheEntry = {
@@ -148,7 +148,7 @@ export async function getSessionStaticContext(
     subjectId: session.subjectId,
     topicId: session.topicId ?? null,
     expiresAt: now + SESSION_STATIC_CONTEXT_TTL_MS,
-    profile: profileRows[0] ?? null,
+    profile,
     subject,
     homeworkLibraryContextLoaded: false,
     homeworkLibraryContext: undefined,

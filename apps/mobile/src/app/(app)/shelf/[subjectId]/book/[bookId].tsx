@@ -1023,21 +1023,10 @@ export default function BookScreen() {
           </View>
         ) : null}
 
-        {/* Section 2: Continue now */}
-        {continueNowTopic ? (
-          <View className="px-5 mb-1">
-            <Text className="mb-2 text-body-sm font-semibold text-text-secondary">
-              Continue now
-            </Text>
-            <TopicStatusRow
-              state="continue-now"
-              title={continueNowTopic.title}
-              chapterName={continueNowTopic.chapter ?? undefined}
-              onPress={() => handleTopicPress(continueNowTopic.id)}
-              testID="continue-now-row"
-            />
-          </View>
-        ) : null}
+        {/* [BUG-895] "Continue now" section removed — the sticky CTA at the
+            bottom of the screen already exposes the same action and now
+            includes the topic title (▶ Continue: {title}). Keeping both
+            duplicated the affordance and bloated decision time. */}
 
         {/* Section 3: Started */}
         {visibleStartedTopicIds.length > 0 ? (
@@ -1363,7 +1352,19 @@ export default function BookScreen() {
 
             let label: string;
             if (hasContinue) {
-              label = '▶ Continue learning';
+              // [BUG-895] Surface the topic title in the sticky CTA so the
+              // user knows exactly which topic they're resuming. Previously
+              // this was a generic "Continue learning" alongside an in-list
+              // "Continue now" section that named the topic — which made the
+              // page show two affordances for the same action.
+              const continueTitle = continueNowTopic?.title ?? '';
+              const truncatedContinueTitle =
+                continueTitle.length > 25
+                  ? `${continueTitle.slice(0, 24)}...`
+                  : continueTitle;
+              label = truncatedContinueTitle
+                ? `▶ Continue: ${truncatedContinueTitle}`
+                : '▶ Continue learning';
             } else if (hasUpNext) {
               const truncatedTitle =
                 upNextTopic.title.length > 25

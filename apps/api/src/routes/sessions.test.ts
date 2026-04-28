@@ -329,10 +329,18 @@ const mockStartInterleavedSession = jest.fn().mockResolvedValue({
   ],
 });
 
-jest.mock('../services/interleaved', () => ({
-  startInterleavedSession: (...args: unknown[]) =>
-    mockStartInterleavedSession(...args),
-}));
+jest.mock('../services/interleaved', () => {
+  const actual = jest.requireActual('../services/interleaved') as Record<
+    string,
+    unknown
+  >;
+  return {
+    // Preserve the real error class so route-layer instanceof checks work.
+    NoInterleavedTopicsError: actual.NoInterleavedTopicsError,
+    startInterleavedSession: (...args: unknown[]) =>
+      mockStartInterleavedSession(...args),
+  };
+});
 
 jest.mock('../services/recall-bridge', () => ({
   generateRecallBridge: jest.fn().mockResolvedValue({
@@ -1397,9 +1405,13 @@ describe('session routes', () => {
       );
     });
 
-    it('returns 400 when no topics are available', async () => {
+    // [BUG-764] Route classifies by typed error, not by err.message string.
+    it('returns 400 when service throws NoInterleavedTopicsError', async () => {
+      const interleavedMock = jest.requireMock('../services/interleaved') as {
+        NoInterleavedTopicsError: new () => Error;
+      };
       mockStartInterleavedSession.mockRejectedValueOnce(
-        new Error('No topics available for interleaved retrieval')
+        new interleavedMock.NoInterleavedTopicsError()
       );
 
       const res = await app.request(
@@ -1418,6 +1430,31 @@ describe('session routes', () => {
       expect(body.message).toBe(
         'No topics available for interleaved retrieval'
       );
+    });
+
+    // [BUG-764] Negative path: a generic Error with the same message must NOT
+    // be silently classified as a 400. This is what prevents the regression
+    // where any random error containing the right phrase was silently
+    // remapped to a 400 — typed instanceof breaks that string-coupling.
+    it('[BUG-764] does NOT classify a generic Error as 400 even when its message matches', async () => {
+      mockStartInterleavedSession.mockRejectedValueOnce(
+        new Error('No topics available for interleaved retrieval')
+      );
+
+      const res = await app.request(
+        '/v1/sessions/interleaved',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({}),
+        },
+        TEST_ENV
+      );
+
+      // Must NOT be 400 — only NoInterleavedTopicsError should map to 400.
+      // Generic errors fall through to 500 via the global handler.
+      expect(res.status).not.toBe(400);
+      expect(res.status).toBe(500);
     });
 
     it('returns 400 with invalid subjectId', async () => {

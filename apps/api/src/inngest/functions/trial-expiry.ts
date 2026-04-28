@@ -95,13 +95,12 @@ async function sendTrialNotificationToAccountOwner(
     return { sent: false, reason: 'no_owner_profile' };
   }
 
-  // [BUG-699-FOLLOWUP] Dedup by notification log: if this owner profile
-  // already received a trial_expiry push today (e.g. a previous step.run
-  // invocation succeeded before an Inngest retry), skip the send rather
-  // than deliver a duplicate. sendPushNotification writes to notificationLog
-  // on success, so the second pass finds count > 0 and returns early.
-  // 24h window matches the daily cron cadence — one trial_expiry push per
-  // owner per day is the intended maximum.
+  // [BUG-699-FOLLOWUP] Best-effort dedup by notification log. Read-then-write
+  // is NOT atomic: two concurrent step.run invocations (Inngest retry racing
+  // a fresh daily cron run) could both see count===0 and both send. The daily
+  // cron cadence + retries=2 keeps the race window narrow in practice; if
+  // duplicate sends are ever observed, promote to a (profile_id, type, day)
+  // unique constraint on notificationLog so the DB rejects the race loser.
   const recentCount = await getRecentNotificationCount(
     db,
     ownerProfile.id,

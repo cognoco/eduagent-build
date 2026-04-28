@@ -40,8 +40,9 @@ jest.mock('../../../lib/theme', () => ({
   }),
 }));
 
+const mockGoBackOrReplace = jest.fn();
 jest.mock('../../../lib/navigation', () => ({
-  goBackOrReplace: jest.fn(),
+  goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
 }));
 
 jest.mock('../../../components/quiz/GuessWhoQuestion', () => ({
@@ -450,14 +451,62 @@ describe('QuizPlayScreen — error feedback [BUG-799 / BUG-806]', () => {
     );
     await new Promise((r) => setTimeout(r, 280));
 
-    // Press the Quit button. This must show a confirm alert and must NOT
-    // submit the round (which would mean handleContinue also fired).
+    // [BUG-892] Press the Quit button. This must open the styled in-app
+    // confirmation modal (NOT call platformAlert/window.confirm) and must
+    // NOT submit the round (which would mean handleContinue also fired).
     fireEvent.press(screen.getByTestId('quiz-play-quit'));
-    expect(mockPlatformAlert).toHaveBeenCalledWith(
+    expect(screen.getByTestId('quiz-quit-confirm')).toBeTruthy();
+    expect(mockPlatformAlert).not.toHaveBeenCalledWith(
       'Quit this round?',
       expect.any(String),
       expect.any(Array)
     );
     expect(mockCompleteRoundMutate).not.toHaveBeenCalled();
+  });
+
+  // [BUG-892] On Expo Web, platformAlert routes through window.confirm for
+  // 2-button prompts which freezes the renderer. The quit confirmation must
+  // be a styled in-app Modal instead.
+  it('[BUG-892] Quit opens an in-app modal, not platformAlert', () => {
+    render(<QuizPlayScreen />);
+
+    // Modal is hidden initially — confirm button is rendered inside the Modal,
+    // which only mounts its children when visible=true.
+    expect(screen.queryByTestId('quiz-quit-confirm')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('quiz-play-quit'));
+
+    expect(screen.getByTestId('quiz-quit-confirm')).toBeTruthy();
+    expect(screen.getByTestId('quiz-quit-cancel')).toBeTruthy();
+    // Critically: platformAlert (which would hit window.confirm on web) is NOT
+    // invoked for the quit-confirm flow.
+    expect(mockPlatformAlert).not.toHaveBeenCalledWith(
+      'Quit this round?',
+      expect.any(String),
+      expect.any(Array)
+    );
+  });
+
+  it('[BUG-892] Cancelling the quit modal keeps the user on the quiz', () => {
+    render(<QuizPlayScreen />);
+
+    fireEvent.press(screen.getByTestId('quiz-play-quit'));
+    fireEvent.press(screen.getByTestId('quiz-quit-cancel'));
+
+    // After dismiss the modal hides (children unmount).
+    expect(screen.queryByTestId('quiz-quit-confirm')).toBeNull();
+    expect(mockGoBackOrReplace).not.toHaveBeenCalled();
+  });
+
+  it('[BUG-892] Confirming the quit modal navigates back to /quiz', () => {
+    render(<QuizPlayScreen />);
+
+    fireEvent.press(screen.getByTestId('quiz-play-quit'));
+    fireEvent.press(screen.getByTestId('quiz-quit-confirm'));
+
+    expect(mockGoBackOrReplace).toHaveBeenCalledWith(
+      expect.anything(),
+      '/(app)/quiz'
+    );
   });
 });

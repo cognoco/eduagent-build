@@ -59,18 +59,13 @@ function getTopicHeadline(subject: SubjectInventory): {
   );
   const subline = `${displayMinutes} · ${sessionsLabel}`;
 
-  if (startedCount === 0 && subject.sessionsCount > 0) {
-    return {
-      headline: `${subject.sessionsCount} ${
-        subject.sessionsCount === 1 ? 'session' : 'sessions'
-      } completed`,
-      progressValue: 0,
-      progressMax: 1,
-      subline,
-      hideBar: true,
-    };
-  }
-
+  // [BUG-880] Always use the same headline schema across rows. Previously
+  // a subject with sessions but no started topic surfaced "X sessions
+  // completed" while peers showed "X topics started · Y mastered" — making
+  // it look as if some subjects had richer tracking when they were just at
+  // a different stage. Using a single schema everywhere keeps the metric
+  // alphabet stable and lets users compare subjects at a glance. Time and
+  // session count remain in the subline for both branches.
   return {
     headline: `${startedCount} ${
       startedCount === 1 ? 'topic' : 'topics'

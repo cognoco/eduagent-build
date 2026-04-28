@@ -465,7 +465,9 @@ export default function MoreScreen() {
                 value={`${linkedChildren.length} ${
                   linkedChildren.length === 1 ? 'child' : 'children'
                 }`}
-                onPress={() => router.push('/(app)/dashboard')}
+                onPress={() =>
+                  router.push('/(app)/dashboard?returnTo=more' as never)
+                }
               />
             )}
             <Pressable

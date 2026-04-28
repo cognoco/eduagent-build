@@ -402,13 +402,18 @@ describe('BookScreen', () => {
       })
     );
 
-    const { getByTestId, getByText } = render(<BookScreen />);
+    const { getByTestId, queryByTestId, getByText } = render(<BookScreen />);
 
-    expect(getByTestId('continue-now-row')).toBeTruthy();
+    // [BUG-895] The "Continue now" in-list row was removed in favour of the
+    // sticky "▶ Continue: <title>" CTA at the bottom of the screen. The
+    // started topic still surfaces in its own section.
+    expect(queryByTestId('continue-now-row')).toBeNull();
     expect(getByTestId('started-row-topic-2')).toBeTruthy();
     expect(getByText('2 sessions')).toBeTruthy();
+    // Sticky CTA names the continue topic explicitly.
+    expect(getByText('▶ Continue: Linear Equations')).toBeTruthy();
 
-    fireEvent.press(getByTestId('continue-now-row'));
+    fireEvent.press(getByTestId('book-start-learning'));
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/topic/[topicId]',
       params: { topicId: 'topic-1', subjectId: 'sub-1' },
@@ -545,7 +550,9 @@ describe('BookScreen', () => {
     const { getByTestId } = render(<BookScreen />);
 
     expect(getByTestId('retention-error-banner')).toBeTruthy();
-    expect(getByTestId('continue-now-row')).toBeTruthy();
+    // [BUG-895] continue-now-row removed; the sticky CTA still surfaces a
+    // way to resume the topic, so the page stays actionable on retention error.
+    expect(getByTestId('book-start-learning')).toBeTruthy();
 
     fireEvent.press(getByTestId('retention-error-retry'));
     expect(refetchSpy).toHaveBeenCalledTimes(1);
@@ -734,7 +741,7 @@ describe('BookScreen', () => {
     expect(queryByTestId('book-complete-card')).toBeNull();
   });
 
-  it('shows the continue-learning sticky CTA when a continue topic exists', () => {
+  it('shows the continue-learning sticky CTA naming the topic when a continue topic exists [BUG-895]', () => {
     mockUseBookSessions.mockReturnValue(
       makeSessionsQuery({
         data: [
@@ -743,9 +750,41 @@ describe('BookScreen', () => {
       })
     );
 
+    const { getByText, queryByTestId } = render(<BookScreen />);
+
+    // [BUG-895] Sticky CTA names the topic so the duplicated "Continue now"
+    // section in-list could be removed without losing context.
+    expect(getByText('▶ Continue: Linear Equations')).toBeTruthy();
+    expect(queryByTestId('continue-now-row')).toBeNull();
+  });
+
+  it('truncates a long continue-topic title in the sticky CTA [BUG-895]', () => {
+    const longTitle = 'A very long continuing topic title that exceeds limits';
+    mockUseBookSessions.mockReturnValue(
+      makeSessionsQuery({
+        data: [makeSession({ topicId: 'topic-1', topicTitle: longTitle })],
+      })
+    );
+    mockUseBookWithTopics.mockReturnValue(
+      makeBookQuery({
+        data: {
+          book: {
+            id: 'book-1',
+            title: 'Algebra',
+            emoji: '📐',
+            topicsGenerated: true,
+          },
+          topics: [
+            makeTopic({ id: 'topic-1', title: longTitle, sortOrder: 1 }),
+          ],
+        },
+      })
+    );
+
     const { getByText } = render(<BookScreen />);
 
-    expect(getByText('▶ Continue learning')).toBeTruthy();
+    const truncated = `▶ Continue: ${longTitle.slice(0, 24)}...`;
+    expect(getByText(truncated)).toBeTruthy();
   });
 
   it('shows and wires the build-learning-path link when no curriculum exists', () => {

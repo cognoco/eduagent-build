@@ -57,9 +57,16 @@ export type MeteringEnv = {
 // LLM-consuming route patterns
 // The middleware only applies to routes that consume LLM exchanges.
 // I6 fix: optional trailing slash (/?)
+//
+// [BUG-763] Routes are split by HTTP method-eligibility instead of relying on
+// a `regex.source.includes('quiz')` string match in the dispatcher. Renaming
+// or restructuring the quiz routes (e.g. adding a /quiz/rounds/coaching path)
+// would silently break the previous filter — typed grouping prevents that.
 // ---------------------------------------------------------------------------
 
-const LLM_ROUTE_PATTERNS = [
+// Routes that consume LLM exchanges on BOTH GET and POST. Currently every
+// session-scoped LLM endpoint that may be invoked via SSE/GET counts here.
+const LLM_ROUTE_PATTERNS_ANY_METHOD = [
   /\/sessions\/[^/]+\/messages\/?$/,
   /\/sessions\/[^/]+\/stream\/?$/,
   // [BUG-623 / A-6] generateRecallBridge calls the LLM but was missing from
@@ -71,11 +78,16 @@ const LLM_ROUTE_PATTERNS = [
   // topic detection). Without metering, an authenticated client could
   // spam this endpoint and burn unbounded LLM capacity at zero cost.
   /\/sessions\/[^/]+\/evaluate-depth\/?$/,
-  // Onboarding interview is intentionally unmetered.
-  // It has its own server-side hard cap (4 user exchanges) and should not
-  // burn the learner's tutoring quota before regular learning even starts.
-  // Quiz round generation + prefetch both call the LLM (one call per round).
-  // Completion/recent/stats are DB-only and must not decrement quota.
+];
+
+// Routes that consume LLM exchanges only on POST. Quiz round generation and
+// dictation are billable on POST; their GET counterparts (history, stats,
+// completion) are DB-only and must NOT decrement quota.
+//
+// Onboarding interview is intentionally unmetered. It has its own server-side
+// hard cap (4 user exchanges) and should not burn the learner's tutoring
+// quota before regular learning even starts.
+const LLM_ROUTE_PATTERNS_POST_ONLY = [
   /\/quiz\/rounds\/?$/,
   /\/quiz\/rounds\/prefetch\/?$/,
   // [CRIT-1] Dictation LLM-consuming routes — all POST-only.
@@ -86,15 +98,15 @@ const LLM_ROUTE_PATTERNS = [
 ];
 
 function isLlmRoute(path: string, method: string): boolean {
-  // GET methods never decrement quota (we only bill POST requests that
-  // trigger an LLM call). Quiz has GET endpoints on the same path prefix —
-  // filter them out from the GET match list.
+  // GET methods never decrement quota for POST-only endpoints. The any-method
+  // list is what bills GET requests (SSE streams, recall-bridge, etc.).
   if (method === 'GET') {
-    return LLM_ROUTE_PATTERNS.filter((p) => !p.source.includes('quiz')).some(
-      (pattern) => pattern.test(path)
-    );
+    return LLM_ROUTE_PATTERNS_ANY_METHOD.some((pattern) => pattern.test(path));
   }
-  return LLM_ROUTE_PATTERNS.some((pattern) => pattern.test(path));
+  return (
+    LLM_ROUTE_PATTERNS_ANY_METHOD.some((pattern) => pattern.test(path)) ||
+    LLM_ROUTE_PATTERNS_POST_ONLY.some((pattern) => pattern.test(path))
+  );
 }
 
 // ---------------------------------------------------------------------------

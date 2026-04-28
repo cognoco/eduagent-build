@@ -60,6 +60,8 @@ export function SessionMessageActions({
         disabled={isStreaming}
         className="rounded-full bg-primary/15 px-3 py-1.5 self-start"
         testID={`session-reconnect-${message.id}`}
+        accessibilityRole="button"
+        accessibilityLabel="Reconnect to the conversation"
       >
         <Text className="text-caption font-semibold text-primary">
           Reconnect
@@ -129,6 +131,11 @@ export function SessionMessageActions({
                 disabled={isStreaming}
                 className="rounded-full bg-surface-elevated px-3 py-1.5"
                 testID={`quick-chip-${chip.id}`}
+                // [BUG-874] Without an explicit role + label, screen readers
+                // and keyboard users hear plain text for these chips. RN's
+                // accessibilityRole="button" maps to role="button" on web.
+                accessibilityRole="button"
+                accessibilityLabel={chip.label}
               >
                 <Text className="text-caption font-semibold text-text-secondary">
                   {chip.label}
@@ -140,6 +147,10 @@ export function SessionMessageActions({
       )}
       {showFeedbackButtons && (
         <View className="flex-row flex-wrap gap-2 items-center">
+          {/* [BUG-874] Each feedback chip needs explicit role + label so
+              screen readers announce them as interactive buttons rather than
+              plain text. accessibilityState.selected reflects the toggle
+              state for assistive tech. */}
           <Pressable
             onPress={() => void handleMessageFeedback(message, 'helpful')}
             disabled={feedbackState === 'incorrect' || isStreaming}
@@ -149,6 +160,12 @@ export function SessionMessageActions({
                 : 'rounded-full bg-surface-elevated px-3 py-1.5'
             }
             testID={`message-feedback-helpful-${feedbackTestIdSuffix}`}
+            accessibilityRole="button"
+            accessibilityLabel="Helpful — mark this reply helpful"
+            accessibilityState={{
+              selected: feedbackState === 'helpful',
+              disabled: feedbackState === 'incorrect' || isStreaming,
+            }}
           >
             <Text
               className={
@@ -169,6 +186,12 @@ export function SessionMessageActions({
                 : 'rounded-full bg-surface-elevated px-3 py-1.5'
             }
             testID={`message-feedback-not-helpful-${feedbackTestIdSuffix}`}
+            accessibilityRole="button"
+            accessibilityLabel="Not helpful — mark this reply not helpful"
+            accessibilityState={{
+              selected: feedbackState === 'not_helpful',
+              disabled: feedbackState === 'incorrect' || isStreaming,
+            }}
           >
             <Text
               className={
@@ -189,6 +212,12 @@ export function SessionMessageActions({
                 : 'rounded-full bg-surface-elevated px-3 py-1.5'
             }
             testID={`message-feedback-incorrect-${feedbackTestIdSuffix}`}
+            accessibilityRole="button"
+            accessibilityLabel="Mark this reply as incorrect"
+            accessibilityState={{
+              selected: feedbackState === 'incorrect',
+              disabled: isStreaming,
+            }}
           >
             <Text
               className={

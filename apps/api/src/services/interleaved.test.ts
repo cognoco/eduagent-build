@@ -28,6 +28,7 @@ jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 import {
   selectInterleavedTopics,
   startInterleavedSession,
+  NoInterleavedTopicsError,
 } from './interleaved';
 
 const PROFILE_ID = 'profile-001';
@@ -340,13 +341,15 @@ describe('startInterleavedSession', () => {
     expect(mockInsert).toHaveBeenCalled();
   });
 
-  it('throws when no topics are available', async () => {
+  it('[BUG-764] throws NoInterleavedTopicsError when no topics are available', async () => {
     mockFindMany.mockResolvedValue([]);
 
     const db = createMockDb();
 
-    await expect(startInterleavedSession(db, PROFILE_ID)).rejects.toThrow(
-      'No topics available for interleaved retrieval'
-    );
+    // Assert on the typed class — not on the message text. The route layer
+    // classifies via instanceof; this test pins the contract.
+    await expect(
+      startInterleavedSession(db, PROFILE_ID)
+    ).rejects.toBeInstanceOf(NoInterleavedTopicsError);
   });
 });

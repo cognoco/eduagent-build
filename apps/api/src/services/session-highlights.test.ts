@@ -1,5 +1,6 @@
 import {
   buildBrowseHighlight,
+  FREEFORM_TOPIC_SENTINEL,
   validateSessionInsights,
 } from './session-highlights';
 
@@ -184,19 +185,20 @@ describe('buildBrowseHighlight', () => {
     // awkwardly. The freeform sentinel must produce active engagement copy.
     const result = buildBrowseHighlight(
       'Alex',
-      ['a freeform session'],
+      [FREEFORM_TOPIC_SENTINEL],
       300,
       'Mathematics'
     );
     expect(result).toBe('Alex had a learning session on Mathematics — 5 min');
     expect(result).not.toContain('browsed');
     expect(result).not.toContain('a freeform session');
+    expect(result).not.toContain(FREEFORM_TOPIC_SENTINEL);
   });
 
   it('omits the subject clause for freeform sessions with no subject [BUG-878]', () => {
-    expect(buildBrowseHighlight('Alex', ['a freeform session'], 60, null)).toBe(
-      'Alex had a learning session — 1 min'
-    );
+    expect(
+      buildBrowseHighlight('Alex', [FREEFORM_TOPIC_SENTINEL], 60, null)
+    ).toBe('Alex had a learning session — 1 min');
   });
 
   it('uses active "studied" verb instead of passive "browsed" [BUG-878]', () => {
