@@ -293,6 +293,38 @@ describe('BookScreen', () => {
     expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
   });
 
+  it('[BUG-798 / F-NAV-05] missing bookId only — fallback navigates to subject shelf', () => {
+    // Symmetry test for BUG-798: the missing-param guard is `!subjectId ||
+    // !bookId`, but handleBack branches on subjectId. When ONLY bookId is
+    // missing (subjectId still present), the user must reach the subject
+    // shelf, not be left stranded. The previous bug report flagged that
+    // bookId was "not equally guarded" — this locks the symmetric path.
+    mockSearchParams = () => ({ subjectId: 'sub-1', bookId: '' });
+
+    const { getByTestId } = render(<BookScreen />);
+    fireEvent.press(getByTestId('book-missing-param-back'));
+
+    expect(mockReplace).toHaveBeenCalledWith({
+      pathname: '/(app)/shelf/[subjectId]',
+      params: { subjectId: 'sub-1' },
+    });
+  });
+
+  it('[BUG-798 / F-NAV-05] missing both params — fallback to library, never silent no-op', () => {
+    // Worst case: deep link drops both segments. Must still escape to a
+    // working surface (library), not the dreaded silent dead-end.
+    mockSearchParams = () => ({ subjectId: '', bookId: '' });
+    mockCanGoBack.mockReturnValue(false);
+
+    const { getByTestId } = render(<BookScreen />);
+    fireEvent.press(getByTestId('book-missing-param-back'));
+
+    const totalNavCalls =
+      mockBack.mock.calls.length + mockReplace.mock.calls.length;
+    expect(totalNavCalls).toBeGreaterThan(0);
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
+  });
+
   it('renders the compact header on the main view', () => {
     const { getByTestId, getByText } = render(<BookScreen />);
 

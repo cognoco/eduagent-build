@@ -216,6 +216,46 @@ describe('InterviewScreen', () => {
     expect(mockReplace).not.toHaveBeenCalled();
   });
 
+  it('[BUG-817 / F-MOB-19] retry button actually re-attempts session creation', async () => {
+    // BUG-817 acceptance criterion: the failure path is recoverable. Tapping
+    // "Try Again" must call startSession again — not just show a button that
+    // looks actionable. Pre-fix the catch silently set interviewComplete and
+    // there was no retry path at all.
+    mockStartSessionMutateAsync
+      .mockRejectedValueOnce(new Error('Network blip'))
+      .mockResolvedValueOnce({ session: { id: 'sess-recovered' } });
+
+    mockStream.mockImplementation(
+      async (
+        _msg: string,
+        onChunk: (accumulated: string) => void,
+        onDone: (result: { isComplete: boolean; exchangeCount: number }) => void
+      ) => {
+        onChunk('All done!');
+        onDone({ isComplete: true, exchangeCount: 1 });
+      }
+    );
+
+    render(<InterviewScreen />);
+    fireEvent.press(screen.getByTestId('chat-shell-send'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('session-creating-retry')).toBeTruthy();
+    });
+
+    // First attempt failed.
+    expect(mockStartSessionMutateAsync).toHaveBeenCalledTimes(1);
+
+    // Tap retry.
+    fireEvent.press(screen.getByTestId('session-creating-retry'));
+
+    // Retry must trigger a SECOND startSession call. If the retry button is
+    // wired to a no-op (the regression we are guarding against), this fails.
+    await waitFor(() => {
+      expect(mockStartSessionMutateAsync).toHaveBeenCalledTimes(2);
+    });
+  });
+
   it('disables input after a stream error and lets the learner retry', async () => {
     mockStream
       .mockRejectedValueOnce(new Error('Network request failed'))
