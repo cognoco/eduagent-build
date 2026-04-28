@@ -1,5 +1,12 @@
 import { Hono } from 'hono';
+
+jest.mock('../services/sentry', () => ({
+  captureException: jest.fn(),
+  addBreadcrumb: jest.fn(),
+}));
+
 import { profileScopeMiddleware } from './profile-scope';
+import { captureException } from '../services/sentry';
 
 jest.mock('../services/profile', () => ({
   getProfile: jest.fn().mockImplementation((_db, profileId, accountId) => {
@@ -99,12 +106,19 @@ describe('profileScopeMiddleware', () => {
     });
   });
 
-  it('continues without profileId when findOwnerProfile throws', async () => {
+  // [CR-SILENT-RECOVERY-1] Break test: verifies the auto-resolve catch block
+  // emits BOTH a structured log (queryable observability) AND a Sentry capture
+  // (aggregate alerting) — not just a raw console.error. The rule "silent
+  // recovery without escalation is banned" requires both signals in
+  // auth-scoping code paths.
+  it('escalates via logger.error + captureException when findOwnerProfile throws', async () => {
     const { findOwnerProfile } = jest.requireMock('../services/profile');
     // eslint-disable-next-line @typescript-eslint/no-empty-function
     const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    (captureException as jest.Mock).mockClear();
 
-    findOwnerProfile.mockRejectedValueOnce(new Error('DB connection lost'));
+    const dbError = new Error('DB connection lost');
+    findOwnerProfile.mockRejectedValueOnce(dbError);
 
     const app = createApp();
     const res = await app.request('/test');
@@ -113,10 +127,26 @@ describe('profileScopeMiddleware', () => {
     expect(res.status).toBe(200);
     expect(body.profileId).toBeNull();
     expect(body.profileMeta).toBeNull();
-    expect(errorSpy).toHaveBeenCalledWith(
-      '[profile-scope] Failed to auto-resolve owner profile:',
-      expect.any(Error)
-    );
+
+    // Structured log: JSON-encoded entry with the documented event name
+    expect(errorSpy).toHaveBeenCalledTimes(1);
+    const loggedJson = errorSpy.mock.calls[0][0] as string;
+    const logged = JSON.parse(loggedJson);
+    expect(logged.level).toBe('error');
+    expect(logged.message).toBe('profile_scope.auto_resolve_failed');
+    expect(logged.context).toMatchObject({
+      accountId: 'test-account-id',
+      error: 'DB connection lost',
+    });
+
+    // Sentry escalation: real exception object + queryable context tag
+    expect(captureException).toHaveBeenCalledTimes(1);
+    expect(captureException).toHaveBeenCalledWith(dbError, {
+      extra: {
+        context: 'profile-scope.auto_resolve_owner',
+        accountId: 'test-account-id',
+      },
+    });
 
     errorSpy.mockRestore();
   });

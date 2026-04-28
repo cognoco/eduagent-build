@@ -9,6 +9,10 @@ import type { Account } from '../services/account';
 import { getProfile, findOwnerProfile } from '../services/profile';
 import type { Database } from '@eduagent/database';
 import { forbidden } from '../errors';
+import { createLogger } from '../services/logger';
+import { captureException } from '../services/sentry';
+
+const logger = createLogger();
 
 /**
  * Profile metadata injected into Hono context by profileScopeMiddleware.
@@ -74,8 +78,9 @@ export const profileScopeMiddleware = createMiddleware<ProfileScopeEnv>(
     //
     // Auto-resolve is try/catch guarded because this middleware runs on ALL routes
     // including account-level ones. If the DB is down, profile-scoped route handlers
-    // will also fail on their own queries (producing 500). The error log below
-    // ensures the failure is observable in monitoring.
+    // will also fail on their own queries (producing 500). The structured log +
+    // Sentry capture below escalate per the "no silent recovery without escalation"
+    // rule for auth-scoping code (CR-SILENT-RECOVERY-1).
     if (!profileIdHeader) {
       const db = c.get('db');
       const account = c.get('account');
@@ -94,10 +99,16 @@ export const profileScopeMiddleware = createMiddleware<ProfileScopeEnv>(
             });
           }
         } catch (err) {
-          console.error(
-            '[profile-scope] Failed to auto-resolve owner profile:',
-            err
-          );
+          logger.error('profile_scope.auto_resolve_failed', {
+            accountId: account.id,
+            error: err instanceof Error ? err.message : String(err),
+          });
+          captureException(err, {
+            extra: {
+              context: 'profile-scope.auto_resolve_owner',
+              accountId: account.id,
+            },
+          });
         }
       }
       await next();
