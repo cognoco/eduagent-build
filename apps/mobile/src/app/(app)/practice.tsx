@@ -1,13 +1,14 @@
 import React from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IntentCard } from '../../components/home/IntentCard';
 import { useQuizStats } from '../../hooks/use-quiz';
-import { goBackOrReplace } from '../../lib/navigation';
+import { goBackOrReplace, homeHrefForReturnTo } from '../../lib/navigation';
 import { useReviewSummary } from '../../hooks/use-progress';
 import { useThemeColors } from '../../lib/theme';
+import { useParentProxy } from '../../hooks/use-parent-proxy';
 
 function formatTimeUntil(isoDate: string): string {
   const diff = new Date(isoDate).getTime() - Date.now();
@@ -24,8 +25,10 @@ function formatTimeUntil(isoDate: string): string {
 
 export default function PracticeScreen(): React.ReactElement {
   const router = useRouter();
+  const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
+  const { isParentProxy } = useParentProxy();
   const { data: reviewSummary, isError: reviewError } = useReviewSummary();
   const { data: quizStats, isError: statsError } = useQuizStats();
 
@@ -81,8 +84,10 @@ export default function PracticeScreen(): React.ReactElement {
     : 'Test yourself with multiple choice questions';
 
   const handleBack = () => {
-    goBackOrReplace(router, '/(app)/home');
+    goBackOrReplace(router, homeHrefForReturnTo(returnTo));
   };
+
+  if (isParentProxy) return <Redirect href="/(app)/home" />;
 
   return (
     <ScrollView
@@ -97,7 +102,7 @@ export default function PracticeScreen(): React.ReactElement {
       <View className="flex-row items-center mb-6">
         <Pressable
           onPress={handleBack}
-          className="mr-3 min-h-[32px] min-w-[32px] items-center justify-center"
+          className="mr-3 min-h-[44px] min-w-[44px] items-center justify-center"
           accessibilityRole="button"
           accessibilityLabel="Go back"
           testID="practice-back"
@@ -114,7 +119,17 @@ export default function PracticeScreen(): React.ReactElement {
           title="Review topics"
           subtitle={reviewSubtitle}
           icon="refresh-outline"
-          badge={!reviewError && hasOverdue ? reviewDueCount : undefined}
+          // [BUG-686 / M-6] Only show the badge when the action will actually
+          // do something. Previously the badge could read "5 overdue" while
+          // nextReviewTopic was null (e.g., server returned counts but no
+          // resolvable next topic), so tapping the card was a silent no-op.
+          // Tying the badge to nextReviewTopic existence aligns the UI
+          // promise with the action.
+          badge={
+            !reviewError && hasOverdue && reviewSummary?.nextReviewTopic
+              ? reviewDueCount
+              : undefined
+          }
           onPress={() => {
             const nextReviewTopic = reviewSummary?.nextReviewTopic ?? null;
             if (nextReviewTopic) {
@@ -124,6 +139,7 @@ export default function PracticeScreen(): React.ReactElement {
                   topicId: nextReviewTopic.topicId,
                   subjectId: nextReviewTopic.subjectId,
                   topicName: nextReviewTopic.topicTitle,
+                  ...(returnTo ? { returnTo } : {}),
                 },
               } as never);
             }

@@ -28,7 +28,9 @@ import {
   type LibraryIndex,
 } from '@eduagent/schemas';
 import type { ChatMessage, RouteResult } from './llm/types';
+import { extractFirstJsonObject } from './llm/extract-json';
 import { escapeXml } from './llm/sanitize';
+import { captureException } from './sentry';
 
 const MAX_TOPIC_SUMMARIES = 50;
 
@@ -314,16 +316,54 @@ export async function fileToLibrary(
 
   const llmResult = await routeAndCall(messages, 1);
 
-  // Parse JSON from LLM response — strip markdown fences if present
-  let jsonStr = llmResult.response.trim();
-  if (jsonStr.startsWith('```')) {
-    jsonStr = jsonStr.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
+  // [BUG-842 / F-SVC-009] Use the canonical extractFirstJsonObject helper
+  // (handles markdown fences AND prose-wrapped JSON via brace-depth walking)
+  // instead of ad-hoc fence stripping. Log structured failures so filing
+  // regressions surface in telemetry instead of bubbling up as opaque
+  // SyntaxError stacks.
+  const jsonStr = extractFirstJsonObject(llmResult.response);
+  if (!jsonStr) {
+    const err = new Error('filing: no JSON object found in LLM response');
+    captureException(err, {
+      extra: {
+        surface: 'filing',
+        reason: 'no_json_found',
+        rawResponseLength: llmResult.response.length,
+      },
+    });
+    throw err;
   }
 
-  const parsed = JSON.parse(jsonStr);
-  const validated = filingResponseSchema.parse(parsed);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(jsonStr);
+  } catch (err) {
+    captureException(err, {
+      extra: {
+        surface: 'filing',
+        reason: 'invalid_json',
+        jsonStrSample: jsonStr.slice(0, 200),
+      },
+    });
+    throw err;
+  }
 
-  return validated;
+  const result = filingResponseSchema.safeParse(parsed);
+  if (!result.success) {
+    captureException(result.error, {
+      extra: {
+        surface: 'filing',
+        reason: 'schema_violation',
+        parsedKeys:
+          parsed && typeof parsed === 'object'
+            ? Object.keys(parsed as Record<string, unknown>).join(',')
+            : 'not-object',
+      },
+    });
+    throw result.error;
+  }
+
+  return result.data;
 }
 
 // ---------------------------------------------------------------------------

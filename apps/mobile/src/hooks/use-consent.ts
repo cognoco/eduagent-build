@@ -56,9 +56,12 @@ export interface ConsentStatusData {
  */
 export function useConsentStatus(): UseQueryResult<ConsentStatusData> {
   const client = useApiClient();
+  // [I-19] Scope the query key to activeProfile so switching child↔owner
+  // doesn't flash the previous profile's consent state.
+  const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['consent-status'],
+    queryKey: ['consent-status', activeProfile?.id],
     queryFn: async ({ signal: querySignal }): Promise<ConsentStatusData> => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -72,6 +75,7 @@ export function useConsentStatus(): UseQueryResult<ConsentStatusData> {
         cleanup();
       }
     },
+    enabled: !!activeProfile?.id,
   });
 }
 

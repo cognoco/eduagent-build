@@ -57,7 +57,7 @@ function mockRetentionCardRow(
   overrides: Partial<{
     vocabularyId: string;
     profileId: string;
-    easeFactor: string;
+    easeFactor: number;
     intervalDays: number;
     repetitions: number;
     lastReviewedAt: Date | null;
@@ -389,7 +389,7 @@ describe('reviewVocabulary', () => {
     const vocabRow = mockVocabRow();
     const cardRow = mockRetentionCardRow();
     const updatedCardRow = mockRetentionCardRow({
-      easeFactor: '2.60',
+      easeFactor: 2.6,
       intervalDays: 1,
       repetitions: 1,
       lastReviewedAt: NOW,

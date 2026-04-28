@@ -34,6 +34,9 @@ import {
   writeSubscriptionStatus,
   type CachedSubscriptionStatus,
 } from '../services/kv';
+import { createLogger } from '../services/logger';
+
+const logger = createLogger();
 
 // ---------------------------------------------------------------------------
 // Types
@@ -59,6 +62,11 @@ export type MeteringEnv = {
 const LLM_ROUTE_PATTERNS = [
   /\/sessions\/[^/]+\/messages\/?$/,
   /\/sessions\/[^/]+\/stream\/?$/,
+  // [BUG-623 / A-6] generateRecallBridge calls the LLM but was missing from
+  // this list, so any authenticated user could call recall-bridge in a tight
+  // loop and burn unlimited LLM capacity at zero cost. Meter it like any
+  // other LLM-driven session endpoint.
+  /\/sessions\/[^/]+\/recall-bridge\/?$/,
   // Onboarding interview is intentionally unmetered.
   // It has its own server-side hard cap (4 user exchanges) and should not
   // burn the learner's tutoring quota before regular learning even starts.
@@ -111,13 +119,24 @@ function buildUpgradeOptions(currentTier: SubscriptionTier): Array<{
 // KV helpers with error resilience (I4 fix)
 // ---------------------------------------------------------------------------
 
+// [T-11 / BUG-753] Silent recovery is banned by project policy: any catch
+// block in billing/auth code that swallows an error must emit a structured
+// log line so the failure rate is queryable. Without this, a sustained KV
+// outage manifests only as elevated DB load — invisible to oncall.
+//
+// `event` field is the metric name; downstream log pipeline aggregates by it.
 async function safeReadKV(
   kv: KVNamespace,
   accountId: string
 ): Promise<CachedSubscriptionStatus | null> {
   try {
     return await readSubscriptionStatus(kv, accountId);
-  } catch {
+  } catch (error) {
+    logger.warn('[metering] KV read failed — falling back to DB', {
+      event: 'metering.kv_read_failed',
+      accountId,
+      error: error instanceof Error ? error.message : String(error),
+    });
     return null; // KV unavailable — fall through to DB
   }
 }
@@ -129,8 +148,12 @@ async function safeWriteKV(
 ): Promise<void> {
   try {
     await writeSubscriptionStatus(kv, accountId, status);
-  } catch {
-    // KV unavailable — ignore, DB is source of truth
+  } catch (error) {
+    logger.warn('[metering] KV write failed — DB remains source of truth', {
+      event: 'metering.kv_write_failed',
+      accountId,
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 }
 

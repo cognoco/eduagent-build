@@ -44,6 +44,8 @@ export function getStepDatabase(): Database {
     return _cachedDb;
   }
 
+  // Phase 0.0 (RLS plan 2026-04-27): neon-serverless WS driver — real ACID
+  // transactions; onTransactionFallback is no longer needed.
   _cachedDb = createDatabase(url);
   _cachedDbUrl = url;
   return _cachedDb;

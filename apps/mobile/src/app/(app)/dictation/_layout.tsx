@@ -1,8 +1,9 @@
 import React, { createContext, useCallback, useContext, useState } from 'react';
-import { Stack } from 'expo-router';
+import { Redirect, Stack } from 'expo-router';
 import type { DictationSentence, DictationMode } from '@eduagent/schemas';
 import type { DictationReviewResult } from '../../../hooks/use-dictation-api';
 import { useThemeColors } from '../../../lib/theme';
+import { useParentProxy } from '../../../hooks/use-parent-proxy';
 
 // ---------------------------------------------------------------------------
 // DictationData context — RF-03: data flows through context, not route params
@@ -57,6 +58,10 @@ function DictationDataProvider({
 
 export default function DictationLayout(): React.ReactElement {
   const colors = useThemeColors();
+  const { isParentProxy } = useParentProxy();
+
+  if (isParentProxy) return <Redirect href="/(app)/home" />;
+
   return (
     <DictationDataProvider>
       <Stack

@@ -97,6 +97,15 @@ temp/*
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
 
+# Local Claude Code session data and tool extensions (per-machine)
+.claude/data/
+.claude/zdx-tts/
+apps/mobile/.claude/
+
+# Hook log output (Claude Code session_start / user_prompt_submit / session_end)
+/logs/
+apps/mobile/logs/
+
 # Playwright MCP session artifacts (console logs, page snapshots)
 .playwright-mcp/
 
@@ -182,3 +191,24 @@ apps/mobile/e2e/scripts/regression-batch*.txt
 # Superpowers brainstorm tool scratch artifacts (HTML drafts, server PIDs,
 # state files — local-only, never source of truth)
 .superpowers/
+
+# Notion bug-fix scratch artifacts (Notion API dumps, ad-hoc python/js
+# scripts, raw response bodies, the script's results.json output). Some
+# entries here have historically held a Notion API key — keep gitignored.
+.tmp/
+.tmp_notion/
+/results.json
+/.bug-bodies/
+/.bug-pages.txt
+/.bug-selection.json
+/.bugfix-tmp/
+/.notion-bug-bodies/
+/.notion-bugs.json
+/.notion-inprogress.json
+/.notion-not-started.json
+/.notion-query.json
+/.notion-selected.json
+/.notion-status-update.json
+apps/api/.notion-*.json
+.claude/notion_bugs.json
+.scratch/

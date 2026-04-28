@@ -38,16 +38,6 @@ function getCopy(
   const bracket =
     birthYear == null ? 'adolescent' : computeAgeBracket(birthYear);
 
-  if (bracket === 'child') {
-    return {
-      title: 'Tell Your Mentor Something About You!',
-      description:
-        'Share what you like, what helps, or what still feels tricky.',
-      placeholder: 'I like stories about space.',
-      suggestions: ['I like dinosaurs', 'I like stories', 'Please be funny'],
-    };
-  }
-
   if (bracket === 'adult') {
     return {
       title: 'Add a Note for Your Mentor',

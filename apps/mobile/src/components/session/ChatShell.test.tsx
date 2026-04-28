@@ -7,8 +7,13 @@ import { ChatShell, type ChatMessage } from './ChatShell';
 // ---------------------------------------------------------------------------
 
 const mockBack = jest.fn();
+const mockReplace = jest.fn();
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ back: mockBack, canGoBack: jest.fn(() => true) }),
+  useRouter: () => ({
+    back: mockBack,
+    replace: mockReplace,
+    canGoBack: jest.fn(() => true),
+  }),
 }));
 
 jest.mock('react-native-safe-area-context', () => ({
@@ -133,6 +138,18 @@ describe('ChatShell', () => {
   // -----------------------------------------------------------------------
   // Basic rendering (regression — existing behaviour)
   // -----------------------------------------------------------------------
+
+  it('uses the explicit fallback route when backBehavior is replace', () => {
+    renderChatShell({
+      backFallback: '/(app)/library',
+      backBehavior: 'replace',
+    });
+
+    fireEvent.press(screen.getByLabelText('Go back'));
+
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
+    expect(mockBack).not.toHaveBeenCalled();
+  });
 
   it('renders title, subtitle, and messages', () => {
     renderChatShell({ title: 'Learning Session', subtitle: 'Math' });

@@ -1,6 +1,6 @@
 import React from 'react';
 import { render } from '@testing-library/react-native';
-import TopicLayout from './_layout';
+import TopicLayout, { unstable_settings } from './_layout';
 
 // ---------------------------------------------------------------------------
 // Mock expo-router's Stack — capture Stack.Screen props
@@ -61,5 +61,12 @@ describe('topic/_layout.tsx', () => {
     const idB = screen.getId!({ params: { topicId: 'topic-B' } });
 
     expect(idA).not.toBe(idB);
+  });
+
+  // [BUG-797] Cross-tab deep pushes (e.g. push notification → /topic/recall-test)
+  // must land with `index` underneath the leaf so router.back() returns to topic
+  // instead of falling through to the Tabs first-route.
+  it('exports unstable_settings.initialRouteName = "index"', () => {
+    expect(unstable_settings).toEqual({ initialRouteName: 'index' });
   });
 });

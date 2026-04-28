@@ -13,6 +13,7 @@ import type { Bookmark } from '@eduagent/schemas';
 import { useBookmarks, useDeleteBookmark } from '../../../hooks/use-bookmarks';
 import { platformAlert } from '../../../lib/platform-alert';
 import { goBackOrReplace } from '../../../lib/navigation';
+import { useParentProxy } from '../../../hooks/use-parent-proxy';
 
 function formatRelativeDate(dateStr: string): string {
   const date = new Date(dateStr);
@@ -31,9 +32,11 @@ function formatRelativeDate(dateStr: string): string {
 function BookmarkRow({
   bookmark,
   onDelete,
+  isParentProxy,
 }: {
   bookmark: Bookmark;
   onDelete: (bookmark: Bookmark) => void;
+  isParentProxy: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -55,19 +58,21 @@ function BookmarkRow({
             {formatRelativeDate(bookmark.createdAt)}
           </Text>
         </View>
-        <Pressable
-          onPress={() => onDelete(bookmark)}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel="Remove bookmark"
-          testID={`bookmark-delete-${bookmark.id}`}
-        >
-          <Ionicons
-            name="trash-outline"
-            size={18}
-            className="text-text-tertiary"
-          />
-        </Pressable>
+        {!isParentProxy && (
+          <Pressable
+            onPress={() => onDelete(bookmark)}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Remove bookmark"
+            testID={`bookmark-delete-${bookmark.id}`}
+          >
+            <Ionicons
+              name="trash-outline"
+              size={18}
+              className="text-text-tertiary"
+            />
+          </Pressable>
+        )}
       </View>
 
       <View className="mt-3">
@@ -89,6 +94,7 @@ function BookmarkRow({
 
 export default function SavedBookmarksScreen() {
   const router = useRouter();
+  const { isParentProxy } = useParentProxy();
   const bookmarksQuery = useBookmarks();
   const deleteBookmark = useDeleteBookmark();
 
@@ -142,7 +148,11 @@ export default function SavedBookmarksScreen() {
         data={bookmarks}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <BookmarkRow bookmark={item} onDelete={handleDelete} />
+          <BookmarkRow
+            bookmark={item}
+            onDelete={handleDelete}
+            isParentProxy={isParentProxy}
+          />
         )}
         contentContainerStyle={{
           paddingHorizontal: 16,

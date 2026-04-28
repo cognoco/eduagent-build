@@ -33,6 +33,11 @@ SKIP_COUNT=0
 PARTIAL_COUNT=0
 TOTAL=0
 
+# Hard cap on per-flow runtime. Without this a single hung adb/Maestro can
+# silently consume hours (observed 2026-04-25: 23h hang on flow [1] with no
+# output). 10 min is generous: cold bundle ~2 min + Maestro flow up to 5 min.
+: "${PER_FLOW_TIMEOUT:=600}"
+
 # ── Logging ──────────────────────────────────────────────────────────────
 
 # log_result STATUS FLOW [NOTE]
@@ -65,10 +70,15 @@ run_seeded() {
   echo "=========================================="
   echo "[$((TOTAL+1))] SEEDED: $scenario → $flow (FAST=$fast)"
   echo "=========================================="
-  if FAST=$fast "$SEED_SCRIPT" "$scenario" "$flow"; then
+  if FAST=$fast timeout --signal=TERM --kill-after=15 "$PER_FLOW_TIMEOUT" "$SEED_SCRIPT" "$scenario" "$flow"; then
     log_result "PASS" "$flow"
   else
-    log_result "FAIL" "$flow" "(scenario: $scenario)"
+    rc=$?
+    if [ $rc -eq 124 ] || [ $rc -eq 137 ]; then
+      log_result "FAIL" "$flow" "(scenario: $scenario, TIMEOUT after ${PER_FLOW_TIMEOUT}s)"
+    else
+      log_result "FAIL" "$flow" "(scenario: $scenario)"
+    fi
   fi
 }
 
@@ -81,9 +91,14 @@ run_noseed() {
   echo "=========================================="
   echo "[$((TOTAL+1))] NO-SEED: $flow (FAST=$fast)"
   echo "=========================================="
-  if FAST=$fast "$SEED_SCRIPT" --no-seed "$flow"; then
+  if FAST=$fast timeout --signal=TERM --kill-after=15 "$PER_FLOW_TIMEOUT" "$SEED_SCRIPT" --no-seed "$flow"; then
     log_result "PASS" "$flow"
   else
-    log_result "FAIL" "$flow" "(no-seed)"
+    rc=$?
+    if [ $rc -eq 124 ] || [ $rc -eq 137 ]; then
+      log_result "FAIL" "$flow" "(no-seed, TIMEOUT after ${PER_FLOW_TIMEOUT}s)"
+    else
+      log_result "FAIL" "$flow" "(no-seed)"
+    fi
   fi
 }

@@ -49,6 +49,11 @@ import { sessionStaleCleanup } from './session-stale-cleanup';
 async function executeHandler() {
   const mockStep = {
     run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
+    // [BUG-696 / J-7] sendEvent must be a jest.fn — production now dispatches
+    // the per-session events via a single step.sendEvent('name', array) call
+    // (memoized atomically) instead of bare inngest.send loops. A missing
+    // sendEvent on the mock would surface as `step.sendEvent is not a function`.
+    sendEvent: jest.fn().mockResolvedValue(undefined),
     sleep: jest.fn(),
     waitForEvent: jest.fn().mockResolvedValue(null),
   };
@@ -147,29 +152,32 @@ describe('session-stale-cleanup Inngest function', () => {
     });
     mockCloseStaleSessions.mockResolvedValue([session1, session2]);
 
-    await executeHandler();
+    const { mockStep } = await executeHandler();
 
-    expect(mockInngestSend).toHaveBeenCalledTimes(2);
-    expect(mockInngestSend).toHaveBeenCalledWith(
-      expect.objectContaining({
-        name: 'app/session.completed',
-        data: expect.objectContaining({
-          profileId: 'profile-1',
-          sessionId: 'session-1',
-          topicId: 'topic-1',
-          subjectId: 'subject-1',
-          summaryStatus: 'auto_closed',
+    // [BUG-696 / J-7] One memoized step.sendEvent call carrying the array of
+    // per-session payloads — NOT N separate inngest.send calls.
+    expect(mockStep.sendEvent).toHaveBeenCalledTimes(1);
+    expect(mockStep.sendEvent).toHaveBeenCalledWith(
+      'dispatch-session-completed',
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: 'app/session.completed',
+          data: expect.objectContaining({
+            profileId: 'profile-1',
+            sessionId: 'session-1',
+            topicId: 'topic-1',
+            subjectId: 'subject-1',
+            summaryStatus: 'auto_closed',
+          }),
         }),
-      })
-    );
-    expect(mockInngestSend).toHaveBeenCalledWith(
-      expect.objectContaining({
-        name: 'app/session.completed',
-        data: expect.objectContaining({
-          profileId: 'profile-2',
-          sessionId: 'session-2',
+        expect.objectContaining({
+          name: 'app/session.completed',
+          data: expect.objectContaining({
+            profileId: 'profile-2',
+            sessionId: 'session-2',
+          }),
         }),
-      })
+      ])
     );
   });
 
@@ -180,15 +188,18 @@ describe('session-stale-cleanup Inngest function', () => {
     });
     mockCloseStaleSessions.mockResolvedValue([session]);
 
-    await executeHandler();
+    const { mockStep } = await executeHandler();
 
-    expect(mockInngestSend).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          sessionType: 'homework',
-          verificationType: 'teach_back',
+    expect(mockStep.sendEvent).toHaveBeenCalledWith(
+      'dispatch-session-completed',
+      expect.arrayContaining([
+        expect.objectContaining({
+          data: expect.objectContaining({
+            sessionType: 'homework',
+            verificationType: 'teach_back',
+          }),
         }),
-      })
+      ])
     );
   });
 
@@ -200,24 +211,27 @@ describe('session-stale-cleanup Inngest function', () => {
     });
     mockCloseStaleSessions.mockResolvedValue([session]);
 
-    await executeHandler();
+    const { mockStep } = await executeHandler();
 
-    expect(mockInngestSend).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          topicId: null,
-          interleavedTopicIds: ['topic-a', 'topic-b'],
+    expect(mockStep.sendEvent).toHaveBeenCalledWith(
+      'dispatch-session-completed',
+      expect.arrayContaining([
+        expect.objectContaining({
+          data: expect.objectContaining({
+            topicId: null,
+            interleavedTopicIds: ['topic-a', 'topic-b'],
+          }),
         }),
-      })
+      ])
     );
   });
 
   it('dispatches no events when no sessions are stale', async () => {
     mockCloseStaleSessions.mockResolvedValue([]);
 
-    const { result } = await executeHandler();
+    const { result, mockStep } = await executeHandler();
 
-    expect(mockInngestSend).not.toHaveBeenCalled();
+    expect(mockStep.sendEvent).not.toHaveBeenCalled();
     expect(result.closedCount).toBe(0);
   });
 
@@ -227,10 +241,10 @@ describe('session-stale-cleanup Inngest function', () => {
     // included in the result array. The function should handle this gracefully.
     mockCloseStaleSessions.mockResolvedValue([]);
 
-    const { result } = await executeHandler();
+    const { result, mockStep } = await executeHandler();
 
     // No events dispatched for resumed sessions
-    expect(mockInngestSend).not.toHaveBeenCalled();
+    expect(mockStep.sendEvent).not.toHaveBeenCalled();
     expect(result.status).toBe('completed');
     expect(result.closedCount).toBe(0);
   });
@@ -242,10 +256,12 @@ describe('session-stale-cleanup Inngest function', () => {
     const closed2 = createClosedSession({ sessionId: 'session-3' });
     mockCloseStaleSessions.mockResolvedValue([closed1, closed2]);
 
-    const { result } = await executeHandler();
+    const { result, mockStep } = await executeHandler();
 
-    // Only 2 events dispatched — the resumed session is not in the result
-    expect(mockInngestSend).toHaveBeenCalledTimes(2);
+    // One step.sendEvent call carrying both payloads in the array.
+    expect(mockStep.sendEvent).toHaveBeenCalledTimes(1);
+    const dispatched = mockStep.sendEvent.mock.calls[0][1] as unknown[];
+    expect(dispatched).toHaveLength(2);
     expect(result.closedCount).toBe(2);
   });
 
@@ -292,9 +308,32 @@ describe('session-stale-cleanup Inngest function', () => {
     await expect(executeHandler()).rejects.toThrow('Connection refused');
   });
 
+  it('[BUG-637 / J-1] dispatches reason:silence_timeout so session-completed skips SM-2 retention/streak credit for unattended closes', async () => {
+    // Without reason:'silence_timeout' the session-completed handler treats
+    // the auto-close as a user-ended session and applies fallback quality=3,
+    // advancing SM-2 cards for sessions where the user wasn't present.
+    const session = createClosedSession();
+    mockCloseStaleSessions.mockResolvedValue([session]);
+
+    const { mockStep } = await executeHandler();
+
+    expect(mockStep.sendEvent).toHaveBeenCalledWith(
+      'dispatch-session-completed',
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: 'app/session.completed',
+          data: expect.objectContaining({
+            reason: 'silence_timeout',
+            summaryStatus: 'auto_closed',
+          }),
+        }),
+      ])
+    );
+  });
+
   it('handles concurrent closures on same profile', async () => {
     // Two sessions from the same profile can be stale simultaneously.
-    // Both should get separate session.completed events.
+    // Both should appear in the same memoized step.sendEvent dispatch.
     const session1 = createClosedSession({
       profileId: 'profile-1',
       sessionId: 'session-1',
@@ -307,14 +346,30 @@ describe('session-stale-cleanup Inngest function', () => {
     });
     mockCloseStaleSessions.mockResolvedValue([session1, session2]);
 
-    await executeHandler();
+    const { mockStep } = await executeHandler();
 
-    expect(mockInngestSend).toHaveBeenCalledTimes(2);
-    // Both events have the same profileId but different sessionIds
-    const calls = mockInngestSend.mock.calls.map(
-      (call) => (call[0] as { data: { sessionId: string } }).data.sessionId
-    );
-    expect(calls).toContain('session-1');
-    expect(calls).toContain('session-2');
+    expect(mockStep.sendEvent).toHaveBeenCalledTimes(1);
+    const dispatched = mockStep.sendEvent.mock.calls[0][1] as Array<{
+      data: { sessionId: string };
+    }>;
+    expect(dispatched).toHaveLength(2);
+    const ids = dispatched.map((event) => event.data.sessionId);
+    expect(ids).toContain('session-1');
+    expect(ids).toContain('session-2');
+  });
+
+  // [BUG-696 / J-7] BREAK TEST — guards the regression that motivated J-7.
+  // Bare inngest.send inside step.run was the duplicate-event source: if the
+  // step throws midway, retry replays from the start and re-emits already-sent
+  // events. The fix mandates step.sendEvent (memoized) for ALL outbound events
+  // from this handler. If anyone reverts to inngest.send, this test fires.
+  it('[BUG-696 / J-7] never calls bare inngest.send — uses memoized step.sendEvent only', async () => {
+    const session = createClosedSession();
+    mockCloseStaleSessions.mockResolvedValue([session]);
+
+    const { mockStep } = await executeHandler();
+
+    expect(mockInngestSend).not.toHaveBeenCalled();
+    expect(mockStep.sendEvent).toHaveBeenCalledTimes(1);
   });
 });

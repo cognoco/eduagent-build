@@ -1,6 +1,7 @@
 import { View, Text, Pressable, FlatList } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRecentRounds } from '../../../hooks/use-quiz';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { useThemeColors } from '../../../lib/theme';
@@ -35,6 +36,7 @@ const ACTIVITY_LABELS: Record<string, string> = {
 export default function QuizHistoryScreen() {
   const router = useRouter();
   const colors = useThemeColors();
+  const insets = useSafeAreaInsets();
   const { data: rounds, isLoading, isError, refetch } = useRecentRounds();
 
   if (isLoading) {
@@ -108,11 +110,14 @@ export default function QuizHistoryScreen() {
 
   return (
     <View testID="quiz-history-screen" className="flex-1">
-      <View className="flex-row items-center p-4">
+      <View
+        className="flex-row items-center px-4 pb-4"
+        style={{ paddingTop: insets.top + 16 }}
+      >
         <Pressable
           testID="quiz-history-back"
           onPress={() => goBackOrReplace(router, '/(app)/practice')}
-          className="min-h-[32px] min-w-[32px] items-center justify-center"
+          className="min-h-[44px] min-w-[44px] items-center justify-center"
           accessibilityRole="button"
           accessibilityLabel="Go back"
         >

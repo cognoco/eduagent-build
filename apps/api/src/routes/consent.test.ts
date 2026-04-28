@@ -13,6 +13,12 @@ jest.mock('../inngest/client', () => ({
   },
 }));
 
+const mockCaptureException = jest.fn();
+
+jest.mock('../services/sentry', () => ({
+  captureException: (...args: unknown[]) => mockCaptureException(...args),
+}));
+
 jest.mock('../services/notifications', () => ({
   sendEmail: jest.fn().mockResolvedValue({ sent: true }),
   formatConsentRequestEmail: jest.fn().mockReturnValue({
@@ -132,21 +138,26 @@ jest.mock('../services/consent', () => {
           respondedAt: new Date().toISOString(),
         })
       ),
+    revokeConsent: jest.fn().mockResolvedValue({
+      id: 'consent-1',
+      profileId: '550e8400-e29b-41d4-a716-446655440000',
+      consentType: 'GDPR',
+      status: 'WITHDRAWN',
+      parentEmail: 'parent@example.com',
+      requestedAt: new Date().toISOString(),
+      respondedAt: new Date().toISOString(),
+    }),
     getConsentStatus: jest.fn().mockResolvedValue(null),
     getProfileConsentState: jest.fn().mockResolvedValue(null),
   };
 });
 
 import { app } from '../index';
+import { AUTH_HEADERS, BASE_AUTH_ENV } from '../test-utils/test-env';
 
 const TEST_ENV = {
-  CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',
+  ...BASE_AUTH_ENV,
   API_ORIGIN: 'https://api.test.mentomate.com',
-};
-
-const AUTH_HEADERS = {
-  Authorization: 'Bearer valid.jwt.token',
-  'Content-Type': 'application/json',
 };
 
 describe('consent routes', () => {
@@ -478,7 +489,7 @@ describe('consent routes', () => {
       expect(body.parentEmail).toBeNull();
     });
 
-    it('returns 200 with consent status and parentEmail when consent exists', async () => {
+    it('returns 200 with consent status and masked parentEmail when consent exists', async () => {
       const { getProfileConsentState: mockGetState } = jest.requireMock(
         '../services/consent'
       ) as { getProfileConsentState: jest.Mock };
@@ -502,7 +513,53 @@ describe('consent routes', () => {
 
       const body = await res.json();
       expect(body.consentStatus).toBe('PARENTAL_CONSENT_REQUESTED');
-      expect(body.parentEmail).toBe('parent@example.com');
+      // [BUG-625 / A-10] parentEmail is masked to avoid leaking parent PII to
+      // child profile sessions. UI keeps verification UX via masked form.
+      expect(body.parentEmail).toBe('p***t@example.com');
+    });
+
+    it('[BUG-625 / A-10] does NOT leak full parent email to child profile session', async () => {
+      const { getProfileConsentState: mockGetState } = jest.requireMock(
+        '../services/consent'
+      ) as { getProfileConsentState: jest.Mock };
+      mockGetState.mockResolvedValueOnce({
+        status: 'PARENTAL_CONSENT_REQUESTED',
+        parentEmail: 'sensitive.parent.email@example.com',
+        consentType: 'PARENTAL',
+      });
+
+      const res = await app.request(
+        '/v1/consent/my-status',
+        {
+          headers: { ...AUTH_HEADERS, 'X-Profile-Id': 'child-profile-id' },
+        },
+        TEST_ENV
+      );
+
+      const body = await res.json();
+      // The full local part must not appear in the response.
+      expect(JSON.stringify(body)).not.toContain('sensitive.parent.email');
+      // Domain may remain (low-entropy, e.g. gmail.com).
+      expect(body.parentEmail).toBe('s***l@example.com');
+    });
+
+    it('[BUG-625 / A-10] returns null when no parentEmail set', async () => {
+      const { getProfileConsentState: mockGetState } = jest.requireMock(
+        '../services/consent'
+      ) as { getProfileConsentState: jest.Mock };
+      mockGetState.mockResolvedValueOnce({
+        status: 'PARENTAL_CONSENT_REQUESTED',
+        parentEmail: null,
+      });
+
+      const res = await app.request(
+        '/v1/consent/my-status',
+        { headers: { ...AUTH_HEADERS, 'X-Profile-Id': 'test-profile-id' } },
+        TEST_ENV
+      );
+
+      const body = await res.json();
+      expect(body.parentEmail).toBeNull();
     });
 
     it('returns 401 without auth header', async () => {
@@ -510,5 +567,82 @@ describe('consent routes', () => {
 
       expect(res.status).toBe(401);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [A-23] Inngest dispatch failure must escalate to Sentry, not just logger.warn
+// ---------------------------------------------------------------------------
+
+describe('consent Inngest dispatch observability [A-23]', () => {
+  beforeEach(() => {
+    // Clear only the exception spy — clearAllMocks() would wipe mock implementations.
+    mockCaptureException.mockClear();
+  });
+
+  it('captures exception in Sentry when consent.requested Inngest dispatch fails', async () => {
+    const { inngest: mockInngest } = jest.requireMock('../inngest/client') as {
+      inngest: { send: jest.Mock };
+    };
+    // First call = normal auth/account setup; second call = Inngest.send fails
+    mockInngest.send.mockRejectedValueOnce(new Error('Inngest unreachable'));
+
+    const res = await app.request(
+      '/v1/consent/request',
+      {
+        method: 'POST',
+        headers: AUTH_HEADERS,
+        body: JSON.stringify({
+          childProfileId: '550e8400-e29b-41d4-a716-446655440000',
+          parentEmail: 'parent@example.com',
+          consentType: 'GDPR',
+        }),
+      },
+      TEST_ENV
+    );
+
+    // Consent request must succeed even when Inngest is unreachable
+    expect(res.status).toBe(201);
+
+    // [A-23] Must escalate to Sentry — not just logger.warn — so we can query
+    // how often the GDPR reminder workflow is permanently skipped.
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          context: 'consent.requested.inngest_dispatch',
+        }),
+      })
+    );
+  });
+
+  it('captures exception in Sentry when consent.revoked Inngest dispatch fails', async () => {
+    const { inngest: mockInngest } = jest.requireMock('../inngest/client') as {
+      inngest: { send: jest.Mock };
+    };
+    mockInngest.send.mockRejectedValueOnce(new Error('Inngest unreachable'));
+
+    const res = await app.request(
+      '/v1/consent/550e8400-e29b-41d4-a716-446655440000/revoke',
+      {
+        method: 'PUT',
+        headers: { ...AUTH_HEADERS, 'X-Profile-Id': 'test-profile-id' },
+      },
+      TEST_ENV
+    );
+
+    // Revocation must succeed even when Inngest is unreachable
+    expect(res.status).toBe(200);
+
+    // [A-23] Must escalate to Sentry so we can query how often the 7-day
+    // GDPR deletion grace period job is permanently skipped.
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          context: 'consent.revoked.inngest_dispatch',
+        }),
+      })
+    );
   });
 });

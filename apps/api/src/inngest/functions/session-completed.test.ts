@@ -271,6 +271,11 @@ async function executeSteps(
       steps[name] = fn;
       return fn();
     }),
+    // [SWEEP-SILENT-RECOVERY] Production now dispatches a queryable
+    // app/session.filing_timed_out event via step.sendEvent when the
+    // 60s wait-for-filing window expires. Stub here so the handler
+    // doesn't TypeError on `step.sendEvent is not a function`.
+    sendEvent: jest.fn().mockResolvedValue(undefined),
     sleep: jest.fn(),
     waitForEvent: jest.fn().mockResolvedValue(null),
   };
@@ -349,6 +354,82 @@ describe('sessionCompleted', () => {
     )) as any;
 
     expect(mockStep.waitForEvent).not.toHaveBeenCalled();
+  });
+
+  // [BUG-852] When step.waitForEvent('wait-for-filing') returns null (60s
+  // timeout fired), we previously proceeded silently with stale topic
+  // placement — invisible in production observability. The fix escalates
+  // via Sentry so we can quantify how often the window is too short.
+  it('[BUG-852] escalates via Sentry when filing waitForEvent times out', async () => {
+    // Default mockStep.waitForEvent already returns null (= timeout). Use a
+    // homework-type session with no topicId so the if-branch is entered.
+    const consoleWarnSpy = jest
+      .spyOn(console, 'warn')
+      .mockImplementation(() => undefined);
+
+    const { mockStep } = (await executeSteps(
+      createEventData({ topicId: null, sessionType: 'homework' })
+    )) as any;
+
+    expect(mockStep.waitForEvent).toHaveBeenCalledWith(
+      'wait-for-filing',
+      expect.objectContaining({ event: 'app/filing.completed' })
+    );
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.stringContaining('waitForEvent timed out'),
+      }),
+      expect.objectContaining({ profileId: 'profile-001' })
+    );
+    expect(consoleWarnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('filing waitForEvent timed out')
+    );
+    // [SWEEP-SILENT-RECOVERY] Filing-timeout must also dispatch an Inngest
+    // event for non-Sentry observability (oncall pages on rate spikes).
+    expect(mockStep.sendEvent).toHaveBeenCalledWith(
+      'filing-timed-out',
+      expect.objectContaining({
+        name: 'app/session.filing_timed_out',
+        data: expect.objectContaining({
+          sessionId: 'session-001',
+          profileId: 'profile-001',
+          sessionType: 'homework',
+          timeoutMs: 60000,
+        }),
+      })
+    );
+
+    consoleWarnSpy.mockRestore();
+  });
+
+  // [BUG-852] Complement test — when filing event arrives in time (non-null),
+  // no Sentry escalation should fire. Guards against over-reporting that
+  // would drown out real timeouts in alerting.
+  it('[BUG-852] does NOT escalate when filing waitForEvent returns an event', async () => {
+    mockCaptureException.mockClear();
+    const localMockStep = {
+      run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
+      sleep: jest.fn(),
+      waitForEvent: jest
+        .fn()
+        .mockResolvedValue({ data: { sessionId: 'session-001' } }),
+    };
+    const handler = (sessionCompleted as unknown as { fn: any }).fn;
+    await handler({
+      event: {
+        data: createEventData({ topicId: null, sessionType: 'homework' }),
+        name: 'app/session.completed',
+      },
+      step: localMockStep,
+    });
+
+    expect(localMockStep.waitForEvent).toHaveBeenCalled();
+    expect(mockCaptureException).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.stringContaining('waitForEvent timed out'),
+      }),
+      expect.anything()
+    );
   });
 
   it('returns completed status with sessionId and outcomes', async () => {

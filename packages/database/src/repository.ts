@@ -45,6 +45,16 @@ import {
   quizMasteryItems,
 } from './schema/index';
 
+// [BUG-704 / P-8] Single source of truth for the runtime DB enum
+// (quizActivityTypeEnum at schema/quiz.ts:15-19 = ['capitals', 'vocabulary',
+// 'guess_who']). Each repository method below previously redeclared a narrower
+// `'capitals' | 'guess_who'` literal, silently excluding 'vocabulary' from
+// the type system even though the DB column accepts it. Vocabulary mastery
+// rows could be inserted via raw SQL but couldn't be queried/updated through
+// the repository — a TypeScript-level data lockout. Widened here so all six
+// signatures stay aligned with the DB enum.
+type QuizActivityType = 'capitals' | 'vocabulary' | 'guess_who';
+
 export function createScopedRepository(db: Database, profileId: string) {
   if (!profileId || profileId.trim() === '') {
     throw new Error(
@@ -457,15 +467,19 @@ export function createScopedRepository(db: Database, profileId: string) {
       /**
        * Return topics whose title matches any of `keywords` (case-insensitive
        * substring), scoped to a subject this profile owns. Returns at most
-       * `limit` rows. Callers are expected to short-circuit on empty keyword
-       * arrays — this method does not defend against that case because the
-       * call never happens in production.
+       * `limit` rows.
+       *
+       * BUG-643 [P-3]: empty keyword arrays return [] without hitting the DB —
+       * `or(...[])` is invalid drizzle SQL and would have thrown at the
+       * driver layer. Callers may still short-circuit upstream, but this
+       * helper is now safe to call directly.
        */
       async findMatchingInSubject(
         subjectId: string,
         keywords: string[],
         limit: number
       ): Promise<Array<{ id: string; title: string }>> {
+        if (keywords.length === 0) return [];
         return db
           .select({ id: curriculumTopics.id, title: curriculumTopics.title })
           .from(curriculumTopics)
@@ -684,10 +698,7 @@ export function createScopedRepository(db: Database, profileId: string) {
     },
 
     quizMasteryItems: {
-      async findDueByActivity(
-        activityType: 'capitals' | 'guess_who',
-        limit: number
-      ) {
+      async findDueByActivity(activityType: QuizActivityType, limit: number) {
         return db.query.quizMasteryItems.findMany({
           where: scopedWhere(
             quizMasteryItems,
@@ -702,7 +713,7 @@ export function createScopedRepository(db: Database, profileId: string) {
       },
 
       async upsertFromCorrectAnswer(values: {
-        activityType: 'capitals' | 'guess_who';
+        activityType: QuizActivityType;
         itemKey: string;
         itemAnswer: string;
       }) {
@@ -716,7 +727,7 @@ export function createScopedRepository(db: Database, profileId: string) {
             activityType: values.activityType,
             itemKey: values.itemKey,
             itemAnswer: values.itemAnswer,
-            easeFactor: '2.5',
+            easeFactor: 2.5,
             interval: 1,
             repetitions: 0,
             nextReviewAt: nextReview,
@@ -734,9 +745,9 @@ export function createScopedRepository(db: Database, profileId: string) {
 
       async updateSm2(
         itemKey: string,
-        activityType: 'capitals' | 'guess_who',
+        activityType: QuizActivityType,
         values: {
-          easeFactor: string;
+          easeFactor: number;
           interval: number;
           repetitions: number;
           nextReviewAt: Date;
@@ -761,7 +772,7 @@ export function createScopedRepository(db: Database, profileId: string) {
           .returning({ id: quizMasteryItems.id });
       },
 
-      async findByKey(activityType: 'capitals' | 'guess_who', itemKey: string) {
+      async findByKey(activityType: QuizActivityType, itemKey: string) {
         return db.query.quizMasteryItems.findFirst({
           where: scopedWhere(
             quizMasteryItems,
@@ -775,7 +786,7 @@ export function createScopedRepository(db: Database, profileId: string) {
 
       async incrementMcSuccessCount(
         itemKey: string,
-        activityType: 'capitals' | 'guess_who'
+        activityType: QuizActivityType
       ) {
         return db
           .update(quizMasteryItems)
@@ -798,7 +809,7 @@ export function createScopedRepository(db: Database, profileId: string) {
 
       async resetMcSuccessCount(
         itemKey: string,
-        activityType: 'capitals' | 'guess_who',
+        activityType: QuizActivityType,
         resetTo: number
       ) {
         return db

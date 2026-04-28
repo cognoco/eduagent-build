@@ -79,7 +79,7 @@ export default function TextPreviewScreen(): React.ReactElement {
       <View className="flex-row items-center mb-6">
         <Pressable
           onPress={() => goBackOrReplace(router, '/(app)/dictation')}
-          className="mr-3 min-h-[32px] min-w-[32px] items-center justify-center"
+          className="mr-3 min-h-[44px] min-w-[44px] items-center justify-center"
           accessibilityRole="button"
           accessibilityLabel="Go back"
           testID="text-preview-back"

@@ -1,4 +1,5 @@
 import * as SecureStore from './secure-storage';
+import { sanitizeSecureStoreKey } from './secure-storage';
 import { Sentry } from './sentry';
 
 const KEY_PREFIX = 'summary-draft';
@@ -16,7 +17,10 @@ export interface SummaryDraft {
 }
 
 function getDraftKey(profileId: string, sessionId: string): string {
-  return `${KEY_PREFIX}-${profileId}-${sessionId}`;
+  // [I-5] Sanitize both components — iOS SecureStore keys must only contain
+  // [a-zA-Z0-9._-]. Future sessionId formats (base64, timestamp+uuid) may
+  // include characters that crash setItemAsync on iOS.
+  return sanitizeSecureStoreKey(`${KEY_PREFIX}-${profileId}-${sessionId}`);
 }
 
 function reportDraftFailure(

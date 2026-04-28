@@ -9,7 +9,12 @@ import {
   subjects,
 } from '@eduagent/database';
 import { routeAndCall } from '../../services/llm';
+import { extractFirstJsonObject } from '../../services/llm/extract-json';
 import { sanitizeXmlValue } from '../../services/llm/sanitize';
+import { captureException } from '../../services/sentry';
+import { createLogger } from '../../services/logger';
+
+const logger = createLogger();
 
 const filingCompletedDataSchema = z.object({
   bookId: z.string(),
@@ -30,9 +35,42 @@ export const postSessionSuggestions = inngest.createFunction(
   },
   { event: 'app/filing.completed' },
   async ({ event, step }) => {
-    const { bookId, topicTitle, profileId } = filingCompletedDataSchema.parse(
-      event.data
-    );
+    // [SWEEP-J8] safeParse so a malformed event payload doesn't throw before
+    // the first step.run — bare .parse() would surface as a transient
+    // function failure and Inngest would retry on a permanently-bad payload.
+    // Same class as BUG-697/J-8 in ask-silent-classify.
+    const validated = filingCompletedDataSchema.safeParse(event.data);
+    if (!validated.success) {
+      const issues = validated.error.issues.map((issue) => ({
+        path: issue.path.join('.'),
+        message: issue.message,
+      }));
+      logger.warn(
+        '[post-session-suggestions] invalid payload — skipping retries',
+        {
+          issues,
+        }
+      );
+      // Structured escalation per global "no silent recovery" rule —
+      // captureException keeps the case in Sentry for queryable counts.
+      captureException(
+        new Error('post-session-suggestions: invalid event payload'),
+        {
+          extra: {
+            surface: 'post-session-suggestions',
+            reason: 'invalid_payload',
+            issues,
+          },
+        }
+      );
+      return {
+        status: 'skipped' as const,
+        reason: 'invalid_payload',
+        issues,
+        timestamp: new Date().toISOString(),
+      };
+    }
+    const { bookId, topicTitle, profileId } = validated.data;
 
     const result = await step.run('generate-suggestions', async () => {
       const db = getStepDatabase();
@@ -106,14 +144,50 @@ Suggest exactly 2 new topic titles that would be natural next steps within this 
 
       const llmResult = await routeAndCall(messages, 1);
 
-      let jsonStr = llmResult.response.trim();
-      if (jsonStr.startsWith('```')) {
-        jsonStr = jsonStr
-          .replace(/^```(?:json)?\n?/, '')
-          .replace(/\n?```$/, '');
+      // [BUG-842 / F-SVC-009] Use canonical extractFirstJsonObject helper
+      // (handles markdown fences AND brace-depth walking) instead of ad-hoc
+      // fence stripping. Log parse failures with metrics so silent skips
+      // surface in telemetry.
+      const jsonStr = extractFirstJsonObject(llmResult.response);
+      if (!jsonStr) {
+        captureException(
+          new Error('post-session-suggestions: no JSON in LLM response'),
+          {
+            extra: {
+              surface: 'post-session-suggestions',
+              reason: 'no_json_found',
+              rawResponseLength: llmResult.response.length,
+            },
+          }
+        );
+        return {
+          status: 'skipped' as const,
+          reason: 'invalid_json',
+        };
       }
 
-      const parsed = suggestionsResponseSchema.safeParse(JSON.parse(jsonStr));
+      // [BUG-639 / J-3] JSON.parse throws SyntaxError on truncated/non-JSON
+      // LLM output. Without this guard the SyntaxError propagates out of
+      // step.run and Inngest retries 4 more times — each retry burns another
+      // LLM call (cost waste) for a structurally permanent failure.
+      let raw: unknown;
+      try {
+        raw = JSON.parse(jsonStr);
+      } catch (err) {
+        captureException(err, {
+          extra: {
+            surface: 'post-session-suggestions',
+            reason: 'invalid_json',
+            jsonStrSample: jsonStr.slice(0, 200),
+          },
+        });
+        return {
+          status: 'skipped' as const,
+          reason: 'invalid_json',
+        };
+      }
+
+      const parsed = suggestionsResponseSchema.safeParse(raw);
       if (!parsed.success) {
         return {
           status: 'skipped' as const,

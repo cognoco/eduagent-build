@@ -66,6 +66,8 @@ export function ParkingLotModal({
             className="bg-surface rounded-input px-4 py-3 text-body text-text-primary"
             multiline
             testID="parking-lot-input"
+            accessibilityLabel="Parking lot note"
+            accessibilityHint="Type a question or idea you want to come back to later"
           />
 
           <Pressable
@@ -191,28 +193,34 @@ export function TopicSwitcherModal({
             contentContainerStyle={{ gap: 8 }}
             className="mb-4"
           >
-            {availableSubjects.map((subject) => (
-              <Pressable
-                key={subject.id}
-                onPress={() => setTopicSwitcherSubjectId(subject.id)}
-                className={
-                  switcherSubjectId === subject.id
-                    ? 'rounded-full bg-primary px-4 py-2'
-                    : 'rounded-full bg-surface-elevated px-4 py-2'
-                }
-                testID={`switch-subject-${subject.id}`}
-              >
-                <Text
+            {availableSubjects.map((subject) => {
+              const isSelected = switcherSubjectId === subject.id;
+              return (
+                <Pressable
+                  key={subject.id}
+                  onPress={() => setTopicSwitcherSubjectId(subject.id)}
                   className={
-                    switcherSubjectId === subject.id
-                      ? 'text-body-sm font-semibold text-text-inverse'
-                      : 'text-body-sm font-semibold text-text-secondary'
+                    isSelected
+                      ? 'rounded-full bg-primary px-4 py-2'
+                      : 'rounded-full bg-surface-elevated px-4 py-2'
                   }
+                  testID={`switch-subject-${subject.id}`}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Filter by subject ${subject.name}`}
+                  accessibilityState={{ selected: isSelected }}
                 >
-                  {subject.name}
-                </Text>
-              </Pressable>
-            ))}
+                  <Text
+                    className={
+                      isSelected
+                        ? 'text-body-sm font-semibold text-text-inverse'
+                        : 'text-body-sm font-semibold text-text-secondary'
+                    }
+                  >
+                    {subject.name}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </ScrollView>
 
           <ScrollView style={{ maxHeight: 280 }}>

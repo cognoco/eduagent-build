@@ -46,10 +46,13 @@ function createMockDb(): Database {
         returning: jest.fn().mockResolvedValue([mockParkingLotRow()]),
       }),
     }),
-    // D-04: addParkingLotItem now wraps count+insert in a transaction
+    // D-04: addParkingLotItem now wraps count+insert in a transaction.
+    // [BUG-860] addParkingLotItem also issues a pg_advisory_xact_lock via
+    // tx.execute(sql`...`) before the count check; mock returns void.
     transaction: jest
       .fn()
       .mockImplementation((cb: (tx: unknown) => unknown) => cb(db)),
+    execute: jest.fn().mockResolvedValue(undefined),
   } as unknown as Database;
   return db;
 }

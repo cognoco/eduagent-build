@@ -1,0 +1,152 @@
+// ---------------------------------------------------------------------------
+// Ask Silent Classify — Tests
+//
+// Co-located with ask-silent-classify.ts. Focus is on the [BUG-697 / J-8]
+// safeParse-fail branch: a malformed event payload must NOT throw (which
+// burns Inngest retries on a permanently-bad input) and MUST emit a
+// structured `app/ask.classification_failed` event so the case is queryable.
+//
+// Manual step-executor pattern matches session-stale-cleanup.test.ts —
+// InngestTestEngine is incompatible with this codebase's per-step error
+// isolation patterns.
+// ---------------------------------------------------------------------------
+
+const mockClassifySubject = jest.fn();
+const mockGetStepDatabase = jest.fn();
+
+jest.mock('../../services/subject-classify', () => ({
+  classifySubject: (...args: unknown[]) => mockClassifySubject(...args),
+}));
+
+jest.mock('../helpers', () => ({
+  getStepDatabase: () => mockGetStepDatabase(),
+}));
+
+const mockInngestSend = jest.fn().mockResolvedValue(undefined);
+
+jest.mock('../client', () => ({
+  inngest: {
+    createFunction: jest.fn((_config, _trigger, handler) => {
+      return { fn: handler, _config, _trigger };
+    }),
+    send: (...args: unknown[]) => mockInngestSend(...args),
+  },
+}));
+
+// Import AFTER mocks
+import { askSilentClassify } from './ask-silent-classify';
+
+async function executeHandler(eventData: unknown) {
+  const mockStep = {
+    run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
+    sendEvent: jest.fn().mockResolvedValue(undefined),
+    sleep: jest.fn(),
+    waitForEvent: jest.fn().mockResolvedValue(null),
+  };
+  const handler = (askSilentClassify as any).fn;
+  const result = await handler({ event: { data: eventData }, step: mockStep });
+  return { result, mockStep };
+}
+
+describe('ask-silent-classify Inngest function', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockGetStepDatabase.mockReturnValue({});
+  });
+
+  describe('[BUG-697 / J-8] invalid payload handling', () => {
+    // The pre-fix code called classifySilentlyEventDataSchema.parse() OUTSIDE
+    // any step.run. The ZodError surfaced as a function-level throw, so
+    // Inngest treated it as transient and retried 2× — burning quota on a
+    // payload that would never become valid. The fix uses safeParse and
+    // returns { skipped: true, reason: 'invalid_payload' } cleanly.
+
+    it('does NOT throw when event.data is missing required fields', async () => {
+      // No sessionId / profileId / classifyInput / exchangeCount — the legacy
+      // .parse() path threw ZodError here. Now we expect a clean resolve.
+      await expect(executeHandler({})).resolves.toBeDefined();
+    });
+
+    it('returns skipped:true with reason:invalid_payload', async () => {
+      const { result } = await executeHandler({});
+
+      expect(result).toMatchObject({
+        skipped: true,
+        reason: 'invalid_payload',
+      });
+      expect(Array.isArray(result.issues)).toBe(true);
+      expect(result.issues.length).toBeGreaterThan(0);
+    });
+
+    it('does not call classifySubject — short-circuits before any work', async () => {
+      // The fix's whole point is to AVOID expensive work on a bad payload.
+      // If anyone moves the safeParse below classify, this test fires.
+      await executeHandler({ sessionId: 123 /* wrong type */ });
+
+      expect(mockClassifySubject).not.toHaveBeenCalled();
+      expect(mockGetStepDatabase).not.toHaveBeenCalled();
+    });
+
+    it('emits app/ask.classification_failed for observability', async () => {
+      // Per global CLAUDE.md "Silent Recovery Without Escalation is Banned":
+      // the safeParse-fail path must emit a structured event so the case is
+      // queryable via dashboards / metrics, not buried in logger.warn.
+      // ask-classification-observe.ts:38-66 is the consumer that turns this
+      // event into a structured log line.
+      const { mockStep } = await executeHandler({
+        sessionId: 'sess-1',
+        // Missing the rest — partial payloads still emit best-effort sessionId.
+      });
+
+      expect(mockStep.sendEvent).toHaveBeenCalledWith(
+        'classification-invalid-payload',
+        expect.objectContaining({
+          name: 'app/ask.classification_failed',
+          data: expect.objectContaining({
+            sessionId: 'sess-1',
+            error: expect.stringContaining('invalid_payload'),
+          }),
+        })
+      );
+    });
+
+    it('emits failure event even when sessionId itself is invalid', async () => {
+      const { mockStep } = await executeHandler(null);
+
+      expect(mockStep.sendEvent).toHaveBeenCalledWith(
+        'classification-invalid-payload',
+        expect.objectContaining({
+          name: 'app/ask.classification_failed',
+          data: expect.objectContaining({
+            sessionId: undefined,
+            error: expect.stringContaining('invalid_payload'),
+          }),
+        })
+      );
+    });
+  });
+
+  describe('valid payload — happy path proxies', () => {
+    // Smoke checks that the safeParse fix did not regress the happy path —
+    // a fully-valid payload must still pass through to classifySubject.
+    it('invokes classifySubject when payload validates', async () => {
+      mockClassifySubject.mockResolvedValue({ candidates: [] });
+      mockGetStepDatabase.mockReturnValue({
+        select: () => ({
+          from: () => ({
+            where: () => ({ limit: async () => [{ metadata: {} }] }),
+          }),
+        }),
+      });
+
+      await executeHandler({
+        sessionId: '00000000-0000-0000-0000-000000000001',
+        profileId: '00000000-0000-0000-0000-000000000002',
+        classifyInput: 'photosynthesis basics',
+        exchangeCount: 1,
+      });
+
+      expect(mockClassifySubject).toHaveBeenCalled();
+    });
+  });
+});

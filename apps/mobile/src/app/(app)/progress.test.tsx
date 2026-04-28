@@ -1,5 +1,7 @@
 import { render, screen, fireEvent } from '@testing-library/react-native';
 import {
+  fetchLearningResumeTarget,
+  useLearningResumeTarget,
   useProgressInventory,
   useProgressHistory,
   useProgressMilestones,
@@ -8,6 +10,9 @@ import {
 import ProgressScreen from './progress/index';
 
 jest.mock('../../hooks/use-progress');
+jest.mock('../../lib/api-client', () => ({
+  useApiClient: () => ({}),
+}));
 jest.mock('expo-router', () => {
   const push = jest.fn();
   return { useRouter: () => ({ push, back: jest.fn(), replace: jest.fn() }) };
@@ -79,6 +84,10 @@ function mockHooks(
     mutateAsync: jest.fn(),
     isPending: false,
   });
+  (useLearningResumeTarget as jest.Mock).mockReturnValue({
+    data: null,
+  });
+  (fetchLearningResumeTarget as jest.Mock).mockResolvedValue(null);
 }
 
 describe('ProgressScreen — progressive disclosure', () => {
@@ -172,6 +181,44 @@ describe('ProgressScreen — progressive disclosure', () => {
 
     const { useRouter } = require('expo-router');
     expect(useRouter().push).toHaveBeenCalledWith('/(app)/home');
+  });
+
+  it('resumes the shared target when Start learning pressed in teaser', () => {
+    mockHooks({
+      inventory: {
+        global: { ...baseGlobal, totalSessions: 2 },
+        subjects: [fullSubject],
+      },
+    });
+    (useLearningResumeTarget as jest.Mock).mockReturnValue({
+      data: {
+        subjectId: 's1',
+        subjectName: 'Math',
+        topicId: 't1',
+        topicTitle: 'Fractions',
+        sessionId: 'session-1',
+        resumeFromSessionId: null,
+        resumeKind: 'active_session',
+        lastActivityAt: '2026-02-15T09:00:00.000Z',
+        reason: 'Resume Fractions',
+      },
+    });
+    render(<ProgressScreen />);
+
+    fireEvent.press(screen.getByTestId('progress-new-learner-start'));
+
+    const { useRouter } = require('expo-router');
+    expect(useRouter().push).toHaveBeenCalledWith({
+      pathname: '/(app)/session',
+      params: {
+        mode: 'learning',
+        subjectId: 's1',
+        subjectName: 'Math',
+        topicId: 't1',
+        topicName: 'Fractions',
+        sessionId: 'session-1',
+      },
+    });
   });
 
   it('does not gate when inventory is undefined (loading resolved with no data)', () => {

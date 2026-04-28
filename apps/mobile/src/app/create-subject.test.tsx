@@ -13,12 +13,15 @@ const mockResolveSubjectMutateAsync = jest.fn();
 let mockSearchParams: Record<string, string> = {};
 let mockExistingSubjects: Array<{ id: string; name: string }> = [];
 
+let mockCanGoBackValue = true;
+const mockCanGoBack = jest.fn(() => mockCanGoBackValue);
+
 jest.mock('expo-router', () => ({
   useRouter: () => ({
     back: mockBack,
     replace: mockReplace,
     push: mockPush,
-    canGoBack: jest.fn(() => true),
+    canGoBack: mockCanGoBack,
   }),
   useLocalSearchParams: () => mockSearchParams,
 }));
@@ -67,6 +70,7 @@ describe('CreateSubjectScreen', () => {
     jest.clearAllMocks();
     mockSearchParams = {};
     mockExistingSubjects = [];
+    mockCanGoBackValue = true;
   });
 
   it('renders starter chips and fills the input on tap', () => {
@@ -440,6 +444,68 @@ describe('CreateSubjectScreen', () => {
     expect(mockReplace).not.toHaveBeenCalled();
   });
 
+  it('[BUG-633 / M-1] Cancel falls back to home when returnTo=chat AND no back stack (deep link entry)', () => {
+    // Repro: user opens the create-subject modal via deep link / push notification
+    // with returnTo=chat. There is no prior stack entry — bare router.back()
+    // would silently no-op and the user would be stuck on the modal.
+    mockSearchParams = { returnTo: 'chat' };
+    mockCanGoBackValue = false;
+
+    render(<CreateSubjectScreen />);
+
+    fireEvent.press(screen.getByTestId('create-subject-cancel'));
+
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
+  });
+
+  it('[BUG-633 / M-1] subject-limit Manage falls back to home when returnTo=chat AND no back stack', async () => {
+    mockSearchParams = { returnTo: 'chat' };
+    mockCanGoBackValue = false;
+
+    mockResolveSubjectMutateAsync.mockResolvedValueOnce({
+      status: 'direct_match',
+      resolvedName: 'Math',
+      suggestions: [],
+      displayMessage: 'Math works.',
+    });
+    mockCreateSubjectMutateAsync.mockRejectedValueOnce(
+      new Error('You have reached the subject limit for your plan')
+    );
+
+    render(<CreateSubjectScreen />);
+    fireEvent.changeText(screen.getByTestId('create-subject-name'), 'Math');
+    fireEvent.press(screen.getByTestId('create-subject-submit'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('manage-subjects-button')).toBeTruthy();
+    });
+    fireEvent.press(screen.getByTestId('manage-subjects-button'));
+
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
+  });
+
+  it('Cancel button returns to library when returnTo=library', () => {
+    mockSearchParams = { returnTo: 'library' };
+
+    render(<CreateSubjectScreen />);
+
+    fireEvent.press(screen.getByTestId('create-subject-cancel'));
+
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
+    expect(mockBack).not.toHaveBeenCalled();
+  });
+
+  it('Cancel button returns to the learner home view when opened from learner home', () => {
+    mockSearchParams = { returnTo: 'learner-home' };
+
+    render(<CreateSubjectScreen />);
+
+    fireEvent.press(screen.getByTestId('create-subject-cancel'));
+
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/home?view=learner');
+    expect(mockBack).not.toHaveBeenCalled();
+  });
+
   it('[BUG-3] subject-limit "Manage" button calls router.back() when returnTo=chat', async () => {
     mockSearchParams = { returnTo: 'chat' };
 
@@ -659,5 +725,48 @@ describe('CreateSubjectScreen', () => {
     fireEvent.changeText(screen.getByTestId('create-subject-name'), 'Art');
 
     expect(screen.queryByTestId('not-sure-hint')).toBeNull();
+  });
+});
+
+// [BUG-829] KeyboardAvoidingView behavior prop must use Platform.select
+// rather than a hardcoded "padding" value. On Android, "padding" pushes the
+// input off-screen with prediction-bar keyboards; "height" is the documented
+// Android-correct value.
+describe('CreateSubjectScreen — keyboard avoiding behavior', () => {
+  const { KeyboardAvoidingView } = require('react-native');
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockSearchParams = {};
+    mockExistingSubjects = [];
+  });
+
+  it('uses platform-correct KeyboardAvoidingView behavior (ios → padding)', () => {
+    // jest-expo defaults Platform.OS to 'ios' in test, so Platform.select
+    // returns the ios branch. The bug was a hardcoded "padding" — fix uses
+    // Platform.select with both keys so Android resolves to "height".
+    render(<CreateSubjectScreen />);
+    const kav = screen.UNSAFE_getByType(KeyboardAvoidingView);
+    expect(kav.props.behavior).toBe('padding');
+  });
+
+  it('does not hardcode behavior — uses Platform.select for both platforms', () => {
+    // Static guard against a future regression: ensure the source uses
+    // Platform.select with ios+android keys instead of hardcoding "padding".
+    // jest-expo locks Platform.OS to 'ios' for the runtime test above; a
+    // source-level assertion is the safest cross-platform regression guard.
+    const fs = require('fs');
+    const path = require('path');
+    const src = fs.readFileSync(
+      path.join(__dirname, 'create-subject.tsx'),
+      'utf8'
+    );
+    // The KeyboardAvoidingView block must contain Platform.select with
+    // both ios and android keys.
+    const kavBlock = src.match(/<KeyboardAvoidingView[\s\S]+?>/);
+    expect(kavBlock).toBeTruthy();
+    expect(kavBlock?.[0]).toMatch(/Platform\.select/);
+    expect(kavBlock?.[0]).toMatch(/ios:\s*['"]padding['"]/);
+    expect(kavBlock?.[0]).toMatch(/android:\s*['"]height['"]/);
   });
 });

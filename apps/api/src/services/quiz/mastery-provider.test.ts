@@ -29,7 +29,7 @@ describe('mastery-provider', () => {
 
   describe('applyQuizSm2', () => {
     const baseInput = {
-      easeFactor: '2.5',
+      easeFactor: 2.5,
       interval: 1,
       repetitions: 0,
       lastReviewedAt: new Date('2026-04-18T10:00:00Z'),
@@ -40,7 +40,7 @@ describe('mastery-provider', () => {
       const result = applyQuizSm2(baseInput, 3);
       expect(result.interval).toBe(1);
       expect(result.repetitions).toBe(1);
-      expect(Number(result.easeFactor)).toBeCloseTo(2.36, 1);
+      expect(result.easeFactor).toBeCloseTo(2.36, 1);
     });
 
     it('resets on quality < 3', () => {

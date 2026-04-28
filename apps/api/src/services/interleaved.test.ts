@@ -37,7 +37,7 @@ function createMockCard(overrides: Record<string, unknown> = {}) {
     id: 'card-001',
     profileId: PROFILE_ID,
     topicId: 'topic-001',
-    easeFactor: '2.50',
+    easeFactor: 2.5,
     intervalDays: 1,
     repetitions: 1,
     lastReviewedAt: new Date('2026-02-10'),

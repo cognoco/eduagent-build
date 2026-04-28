@@ -15,12 +15,36 @@ describe('validateProductionKeys', () => {
     EMAIL_FROM: 'noreply@mentomate.com',
   };
 
-  it('returns empty array for non-production environments', () => {
+  it('returns empty array for development environment', () => {
     expect(
       validateProductionKeys({ ...BASE_ENV, ENVIRONMENT: 'development' })
     ).toEqual([]);
+  });
+
+  // [SEC-1 / BUG-717] Auth keys (CLERK_AUDIENCE, CLERK_JWKS_URL,
+  // CLERK_SECRET_KEY) are required in staging too — not just production.
+  it('returns missing Clerk auth keys for staging when absent', () => {
+    const missing = validateProductionKeys({
+      ...BASE_ENV,
+      ENVIRONMENT: 'staging',
+    });
+    expect(missing).toContain('CLERK_SECRET_KEY');
+    expect(missing).toContain('CLERK_JWKS_URL');
+    expect(missing).toContain('CLERK_AUDIENCE');
+    // Production-only keys not required in staging
+    expect(missing).not.toContain('GEMINI_API_KEY');
+    expect(missing).not.toContain('VOYAGE_API_KEY');
+  });
+
+  it('returns empty array for staging with all required Clerk keys present', () => {
     expect(
-      validateProductionKeys({ ...BASE_ENV, ENVIRONMENT: 'staging' })
+      validateProductionKeys({
+        ...BASE_ENV,
+        ENVIRONMENT: 'staging',
+        CLERK_SECRET_KEY: 'sk_test_xxx',
+        CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',
+        CLERK_AUDIENCE: 'eduagent-api-staging',
+      })
     ).toEqual([]);
   });
 
@@ -123,14 +147,27 @@ describe('validateEnv', () => {
     ).toThrow('Invalid environment');
   });
 
-  it('parses valid staging env without API_ORIGIN', () => {
+  // [SEC-1 / BUG-717] Staging now requires Clerk auth keys.
+  it('parses valid staging env with required Clerk keys (API_ORIGIN optional)', () => {
     const env = validateEnv({
       ENVIRONMENT: 'staging',
       DATABASE_URL: 'postgresql://staging/db',
+      CLERK_SECRET_KEY: 'sk_test_xxx',
+      CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',
+      CLERK_AUDIENCE: 'eduagent-api-staging',
     });
 
     expect(env.ENVIRONMENT).toBe('staging');
     expect(env.API_ORIGIN).toBeUndefined();
+  });
+
+  it('throws when staging env is missing required Clerk keys', () => {
+    expect(() =>
+      validateEnv({
+        ENVIRONMENT: 'staging',
+        DATABASE_URL: 'postgresql://staging/db',
+      })
+    ).toThrow('Production environment missing required keys');
   });
 
   it('throws when production env is missing required keys', () => {

@@ -38,6 +38,12 @@ permissions:
   actions: read
   contents: read
 
+# Prevent redundant EAS builds when multiple pushes land in quick succession.
+# cancel-in-progress: false because EAS builds cannot be cancelled mid-build via GH Actions.
+concurrency:
+  group: mobile-ci-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   # Check if mobile is actually affected by the changes
   check-affected:

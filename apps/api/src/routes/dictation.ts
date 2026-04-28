@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { zValidator } from '@hono/zod-validator';
 import {
   prepareHomeworkInputSchema,
   recordDictationResultInputSchema,
@@ -10,6 +11,7 @@ import type { AuthUser } from '../middleware/auth';
 import type { Account } from '../services/account';
 import type { ProfileMeta } from '../middleware/profile-scope';
 import { requireProfileId } from '../middleware/profile-scope';
+import { assertNotProxyMode } from '../middleware/proxy-guard';
 import { apiError, validationError } from '../errors';
 import {
   prepareHomework,
@@ -80,33 +82,30 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
   // POST /dictation/prepare-homework
   // Splits raw homework text into dictation sentences with punctuation variants.
   // -------------------------------------------------------------------------
-  .post('/dictation/prepare-homework', async (c) => {
-    requireProfileId(c.get('profileId'));
-
-    let body: unknown;
-    try {
-      body = await c.req.json();
-    } catch {
-      return validationError(c, 'Request body must be valid JSON');
-    }
-
-    const parsed = prepareHomeworkInputSchema.safeParse(body);
-    if (!parsed.success) {
+  // [BUG-833] zValidator middleware replaces manual c.req.json() + safeParse.
+  .post(
+    '/dictation/prepare-homework',
+    zValidator('json', prepareHomeworkInputSchema, (result, c) => {
+      if (result.success) return;
       return validationError(
         c,
         'text is required and must be between 1 and 10000 characters'
       );
+    }),
+    async (c) => {
+      requireProfileId(c.get('profileId'));
+      const { text } = c.req.valid('json');
+      const result = await prepareHomework(text);
+      return c.json(result, 200);
     }
-
-    const result = await prepareHomework(parsed.data.text);
-    return c.json(result, 200);
-  })
+  )
 
   // -------------------------------------------------------------------------
   // POST /dictation/generate
   // Generates age-appropriate dictation content from the learner's study context.
   // -------------------------------------------------------------------------
   .post('/dictation/generate', async (c) => {
+    assertNotProxyMode(c);
     const profileId = requireProfileId(c.get('profileId'));
     const db = c.get('db');
     const profileMeta = c.get('profileMeta');
@@ -125,126 +124,121 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
   // POST /dictation/result
   // Records a completed dictation session result (RF-04: accepts localDate from client).
   // -------------------------------------------------------------------------
-  .post('/dictation/result', async (c) => {
-    const profileId = requireProfileId(c.get('profileId'));
-    const db = c.get('db');
-
-    let body: unknown;
-    try {
-      body = await c.req.json();
-    } catch {
-      return validationError(c, 'Request body must be valid JSON');
-    }
-
-    const parsed = recordDictationResultInputSchema.safeParse(body);
-    if (!parsed.success) {
+  // [BUG-833] zValidator middleware replaces manual c.req.json() + safeParse.
+  .post(
+    '/dictation/result',
+    zValidator('json', recordDictationResultInputSchema, (result, c) => {
+      if (result.success) return;
       return validationError(
         c,
         'Invalid input: localDate, sentenceCount, and mode are required'
       );
+    }),
+    async (c) => {
+      assertNotProxyMode(c);
+      const profileId = requireProfileId(c.get('profileId'));
+      const db = c.get('db');
+      const input = c.req.valid('json');
+
+      // RF-04: Validate client-supplied date is within ±1 day of server UTC
+      const dateError = validateLocalDate(input.localDate);
+      if (dateError) {
+        return apiError(c, 400, ERROR_CODES.VALIDATION_ERROR, dateError);
+      }
+
+      const row = await recordDictationResult(db, profileId, {
+        localDate: input.localDate,
+        sentenceCount: input.sentenceCount,
+        mistakeCount: input.mistakeCount ?? null,
+        mode: input.mode,
+        reviewed: input.reviewed,
+      });
+
+      return c.json({ result: row }, 201);
     }
-
-    // RF-04: Validate client-supplied date is within ±1 day of server UTC
-    const dateError = validateLocalDate(parsed.data.localDate);
-    if (dateError) {
-      return apiError(c, 400, ERROR_CODES.VALIDATION_ERROR, dateError);
-    }
-
-    const row = await recordDictationResult(db, profileId, {
-      localDate: parsed.data.localDate,
-      sentenceCount: parsed.data.sentenceCount,
-      mistakeCount: parsed.data.mistakeCount ?? null,
-      mode: parsed.data.mode,
-      reviewed: parsed.data.reviewed,
-    });
-
-    return c.json({ result: row }, 201);
-  })
+  )
 
   // -------------------------------------------------------------------------
   // POST /dictation/review
   // Accepts a photo of handwritten dictation and original sentences, returns
   // an AI-powered review of spelling/punctuation mistakes.
   // -------------------------------------------------------------------------
-  .post('/dictation/review', async (c) => {
-    const profileId = requireProfileId(c.get('profileId'));
-    const db = c.get('db');
-
-    let body: unknown;
-    try {
-      body = await c.req.json();
-    } catch {
-      return validationError(c, 'Request body must be valid JSON');
-    }
-
-    const parsed = dictationReviewInputSchema.safeParse(body);
-    if (!parsed.success) {
+  // [BUG-833] zValidator middleware replaces manual c.req.json() + safeParse.
+  .post(
+    '/dictation/review',
+    zValidator('json', dictationReviewInputSchema, (result, c) => {
+      if (result.success) return;
       return validationError(
         c,
         'imageBase64 (max 2MB), imageMimeType (jpeg/png/webp), sentences (min 1), and language are required'
       );
-    }
+    }),
+    async (c) => {
+      const profileId = requireProfileId(c.get('profileId'));
+      const db = c.get('db');
+      const input = c.req.valid('json');
 
-    // [CR-4] Per-profile rate limit: 10 requests per minute.
-    // Placed after validation so invalid input gets 400, not a DB hit.
-    // Placed before the LLM call so the expensive operation is gated.
-    // Atomic check-and-log avoids TOCTOU where two concurrent requests
-    // both read count=9, both pass, and both fire the expensive LLM call.
-    const rateLimited = await checkAndLogRateLimit(
-      db,
-      profileId,
-      c.get('account').id,
-      'dictation_review',
-      { hours: 1 / 60, maxCount: 10 }
-    );
-    if (rateLimited) {
-      return apiError(
-        c,
-        429,
-        ERROR_CODES.RATE_LIMITED,
-        'Dictation review is limited to 10 requests per minute.'
+      // [CR-4] Per-profile rate limit: 10 requests per minute.
+      // Placed after validation so invalid input gets 400, not a DB hit.
+      // Placed before the LLM call so the expensive operation is gated.
+      // Atomic check-and-log avoids TOCTOU where two concurrent requests
+      // both read count=9, both pass, and both fire the expensive LLM call.
+      const rateLimited = await checkAndLogRateLimit(
+        db,
+        profileId,
+        c.get('account').id,
+        'dictation_review',
+        { hours: 1 / 60, maxCount: 10 }
       );
-    }
-
-    // Derive ageYears from profileMeta birthYear (same pattern as generate route).
-    const profileMeta = c.get('profileMeta');
-    const currentYear = new Date().getFullYear();
-    const ageYears =
-      profileMeta?.birthYear != null
-        ? currentYear - profileMeta.birthYear
-        : undefined;
-
-    // Fetch struggles best-effort — if DB fails, review proceeds without them.
-    let recentStruggles: string[] = [];
-    try {
-      const profile = await getLearningProfile(db, profileId);
-      if (profile && Array.isArray(profile.struggles)) {
-        recentStruggles = (profile.struggles as unknown[])
-          .filter(
-            (entry): entry is { topic: string; confidence?: string } =>
-              typeof entry === 'object' &&
-              entry !== null &&
-              typeof (entry as { topic?: unknown }).topic === 'string'
-          )
-          .filter((entry) => entry.confidence !== 'low')
-          .slice(0, 10)
-          .map((entry) => entry.topic);
+      if (rateLimited) {
+        return apiError(
+          c,
+          429,
+          ERROR_CODES.RATE_LIMITED,
+          'Dictation review is limited to 10 requests per minute.'
+        );
       }
-    } catch {
-      // Graceful degradation — review proceeds without struggle-aware feedback.
+
+      // Derive ageYears from profileMeta birthYear (same pattern as generate route).
+      const profileMeta = c.get('profileMeta');
+      const currentYear = new Date().getFullYear();
+      const ageYears =
+        profileMeta?.birthYear != null
+          ? currentYear - profileMeta.birthYear
+          : undefined;
+
+      // Fetch struggles best-effort — if DB fails, review proceeds without them.
+      let recentStruggles: string[] = [];
+      try {
+        const profile = await getLearningProfile(db, profileId);
+        if (profile && Array.isArray(profile.struggles)) {
+          recentStruggles = (profile.struggles as unknown[])
+            .filter(
+              (entry): entry is { topic: string; confidence?: string } =>
+                typeof entry === 'object' &&
+                entry !== null &&
+                typeof (entry as { topic?: unknown }).topic === 'string'
+            )
+            .filter((entry) => entry.confidence !== 'low')
+            .slice(0, 10)
+            .map((entry) => entry.topic);
+        }
+      } catch {
+        // Graceful degradation — review proceeds without struggle-aware feedback.
+      }
+
+      const result = await reviewDictation({
+        sentences: input.sentences,
+        imageBase64: input.imageBase64,
+        imageMimeType: input.imageMimeType,
+        language: input.language,
+        ageYears,
+        recentStruggles,
+      });
+
+      return c.json(result, 200);
     }
-
-    const result = await reviewDictation({
-      sentences: parsed.data.sentences,
-      imageBase64: parsed.data.imageBase64,
-      imageMimeType: parsed.data.imageMimeType,
-      language: parsed.data.language,
-      ageYears,
-      recentStruggles,
-    });
-
-    return c.json(result, 200);
-  })
+  )
 
   // -------------------------------------------------------------------------
   // GET /dictation/streak

@@ -524,17 +524,18 @@ describe('INITIAL_PURCHASE', () => {
     expect(activateSubscriptionFromRevenuecat).not.toHaveBeenCalled();
 
     // Must report to Sentry so the event drop is alertable [1B.3]
+    // [SEC-11] appUserId must NOT appear in Sentry extras (GDPR data minimisation)
     expect(mockCaptureException).toHaveBeenCalledWith(
-      expect.objectContaining({
-        message: expect.stringContaining('Unresolvable RevenueCat app_user_id'),
-      }),
+      expect.any(Error),
       expect.objectContaining({
         extra: expect.objectContaining({
           eventType: 'INITIAL_PURCHASE',
-          appUserId: expect.any(String),
         }),
       })
     );
+    // [SEC-11] Verify appUserId is not leaked to Sentry
+    const callArgs = (mockCaptureException as jest.Mock).mock.calls[0];
+    expect(callArgs[1]?.extra).not.toHaveProperty('appUserId');
   });
 
   it('sets trial status when period_type is TRIAL', async () => {
@@ -1115,5 +1116,56 @@ describe('NON_RENEWING_PURCHASE', () => {
     const res = await makeRequest(payload);
     expect(res.status).toBe(200);
     expect(purchaseTopUpCredits).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [BUG-624 / A-8] Sandbox-events-in-production guard
+// ---------------------------------------------------------------------------
+
+describe('sandbox events [BUG-624 / A-8]', () => {
+  it('rejects SANDBOX events in production environment without invoking handlers', async () => {
+    const payload = makeWebhookPayload('INITIAL_PURCHASE', {
+      environment: 'SANDBOX',
+    });
+    const res = await makeRequest(payload, {
+      ...TEST_ENV,
+      ENVIRONMENT: 'production',
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toEqual({
+      received: true,
+      skipped: true,
+      reason: 'sandbox_in_production',
+    });
+    // Critical: the sandbox event must NOT have activated a subscription on a
+    // production account. activateSubscriptionFromRevenuecat is the side-effect
+    // we are guarding against.
+    expect(activateSubscriptionFromRevenuecat).not.toHaveBeenCalled();
+  });
+
+  it('accepts SANDBOX events in non-production (staging/dev) so QA can drive flows', async () => {
+    const payload = makeWebhookPayload('INITIAL_PURCHASE', {
+      environment: 'SANDBOX',
+    });
+    const res = await makeRequest(payload, {
+      ...TEST_ENV,
+      ENVIRONMENT: 'staging',
+    });
+    expect(res.status).toBe(200);
+    expect(activateSubscriptionFromRevenuecat).toHaveBeenCalled();
+  });
+
+  it('accepts PRODUCTION events in production (no regression)', async () => {
+    const payload = makeWebhookPayload('INITIAL_PURCHASE', {
+      environment: 'PRODUCTION',
+    });
+    const res = await makeRequest(payload, {
+      ...TEST_ENV,
+      ENVIRONMENT: 'production',
+    });
+    expect(res.status).toBe(200);
+    expect(activateSubscriptionFromRevenuecat).toHaveBeenCalled();
   });
 });

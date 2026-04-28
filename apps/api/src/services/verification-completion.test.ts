@@ -130,7 +130,7 @@ describe('processEvaluateCompletion', () => {
             topicId,
             profileId,
             evaluateDifficultyRung: 2,
-            easeFactor: '2.70',
+            easeFactor: 2.7,
             repetitions: 3,
           },
         ],

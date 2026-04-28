@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 
 const mockPush = jest.fn();
 const mockGoBackOrReplace = jest.fn();
+const mockPushLearningResumeTarget = jest.fn();
 const mockUseLocalSearchParams = jest.fn(() => ({
   subjectId: 's1',
   topicId: 't1',
@@ -12,6 +13,7 @@ const mockTopicRetention = jest.fn();
 const mockEvaluateEligibility = jest.fn();
 const mockParkingLot = jest.fn();
 const mockTopicNote = jest.fn();
+const mockLearningResumeTarget = jest.fn();
 const mockResolveTopicSubject = jest.fn<
   {
     data:
@@ -51,12 +53,15 @@ jest.mock('../../../lib/theme', () => ({
 
 jest.mock('../../../lib/navigation', () => ({
   goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
+  pushLearningResumeTarget: (...args: unknown[]) =>
+    mockPushLearningResumeTarget(...args),
 }));
 
 jest.mock('../../../hooks/use-progress', () => ({
   useTopicProgress: () => mockTopicProgress(),
   useActiveSessionForTopic: () => mockActiveSession(),
   useResolveTopicSubject: () => mockResolveTopicSubject(),
+  useLearningResumeTarget: () => mockLearningResumeTarget(),
 }));
 
 jest.mock('../../../hooks/use-retention', () => ({
@@ -139,6 +144,7 @@ function setupDefaults(overrides?: {
   mockActiveSession.mockReturnValue({
     data: activeSessionId ? { sessionId: activeSessionId } : null,
   });
+  mockLearningResumeTarget.mockReturnValue({ data: null });
   mockParkingLot.mockReturnValue({ data: [], isLoading: false });
   mockTopicNote.mockReturnValue({ data: null });
 }
@@ -150,6 +156,7 @@ describe('TopicDetailScreen action buttons', () => {
       subjectId: 's1',
       topicId: 't1',
     });
+    mockLearningResumeTarget.mockReturnValue({ data: null });
   });
 
   it('shows loading state while the topic is loading', () => {
@@ -221,6 +228,34 @@ describe('TopicDetailScreen action buttons', () => {
         sessionId: 'session-123',
       },
     });
+  });
+
+  it('uses the shared topic resume target for in-progress topics', () => {
+    const target = {
+      subjectId: 's1',
+      subjectName: 'Math',
+      topicId: 't1',
+      topicTitle: 'Algebra',
+      sessionId: null,
+      resumeFromSessionId: 'old-session',
+      resumeKind: 'recent_topic',
+      lastActivityAt: '2026-02-15T09:00:00.000Z',
+      reason: 'Continue Algebra',
+    };
+    setupDefaults({
+      completionStatus: 'in_progress',
+      activeSessionId: 'session-123',
+    });
+    mockLearningResumeTarget.mockReturnValue({ data: target });
+
+    render(<TopicDetailScreen />);
+
+    fireEvent.press(screen.getByTestId('primary-action-button'));
+    expect(mockPushLearningResumeTarget).toHaveBeenCalledWith(
+      expect.anything(),
+      target
+    );
+    expect(mockPush).not.toHaveBeenCalled();
   });
 
   it('shows "Relearn" as primary when the learner is struggling', () => {
@@ -309,6 +344,7 @@ describe('TopicDetailScreen error / empty / missing-params states', () => {
       subjectId: 's1',
       topicId: 't1',
     });
+    mockLearningResumeTarget.mockReturnValue({ data: null });
   });
 
   it('shows missing-params state when route params are absent', () => {
@@ -329,6 +365,7 @@ describe('TopicDetailScreen error / empty / missing-params states', () => {
     });
     mockEvaluateEligibility.mockReturnValue({ data: undefined });
     mockActiveSession.mockReturnValue({ data: null });
+    mockLearningResumeTarget.mockReturnValue({ data: null });
     mockParkingLot.mockReturnValue({ data: [], isLoading: false });
     mockTopicNote.mockReturnValue({ data: null });
 
@@ -356,6 +393,7 @@ describe('TopicDetailScreen error / empty / missing-params states', () => {
     });
     mockEvaluateEligibility.mockReturnValue({ data: undefined });
     mockActiveSession.mockReturnValue({ data: null });
+    mockLearningResumeTarget.mockReturnValue({ data: null });
     mockParkingLot.mockReturnValue({ data: [], isLoading: false });
     mockTopicNote.mockReturnValue({ data: null });
 
@@ -384,6 +422,7 @@ describe('TopicDetailScreen error / empty / missing-params states', () => {
     });
     mockEvaluateEligibility.mockReturnValue({ data: undefined });
     mockActiveSession.mockReturnValue({ data: null });
+    mockLearningResumeTarget.mockReturnValue({ data: null });
     mockParkingLot.mockReturnValue({ data: [], isLoading: false });
     mockTopicNote.mockReturnValue({ data: null });
 
@@ -469,6 +508,7 @@ describe('TopicDetailScreen rendering details', () => {
       subjectId: 's1',
       topicId: 't1',
     });
+    mockLearningResumeTarget.mockReturnValue({ data: null });
   });
 
   it('renders retention card with interval, repetitions, and next review', () => {

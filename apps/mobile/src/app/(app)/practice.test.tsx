@@ -4,9 +4,11 @@ const mockPush = jest.fn();
 const mockGoBackOrReplace = jest.fn();
 const mockUseReviewSummary = jest.fn();
 const mockUseQuizStats = jest.fn();
+let mockSearchParams: Record<string, string> = {};
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
+  useLocalSearchParams: () => mockSearchParams,
 }));
 
 jest.mock('react-native-safe-area-context', () => ({
@@ -22,6 +24,8 @@ jest.mock('../../lib/theme', () => ({
 
 jest.mock('../../lib/navigation', () => ({
   goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
+  homeHrefForReturnTo: (returnTo: unknown) =>
+    returnTo === 'learner-home' ? '/(app)/home?view=learner' : '/(app)/home',
 }));
 
 jest.mock('../../hooks/use-progress', () => ({
@@ -37,6 +41,7 @@ const PracticeScreen = require('./practice').default;
 describe('PracticeScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockSearchParams = {};
     jest
       .spyOn(Date, 'now')
       .mockReturnValue(new Date('2026-04-18T12:00:00.000Z').getTime());
@@ -70,6 +75,18 @@ describe('PracticeScreen', () => {
     );
   });
 
+  it('routes the back button to the learner home view when launched from learner home', () => {
+    mockSearchParams = { returnTo: 'learner-home' };
+
+    render(<PracticeScreen />);
+
+    fireEvent.press(screen.getByTestId('practice-back'));
+    expect(mockGoBackOrReplace).toHaveBeenCalledWith(
+      expect.anything(),
+      '/(app)/home?view=learner'
+    );
+  });
+
   it('navigates to the next overdue review topic when available', () => {
     render(<PracticeScreen />);
 
@@ -80,6 +97,23 @@ describe('PracticeScreen', () => {
         topicId: 'topic-1',
         subjectId: 'subject-1',
         topicName: 'Algebra',
+      },
+    });
+  });
+
+  it('keeps the learner home return target when opening an overdue review topic', () => {
+    mockSearchParams = { returnTo: 'learner-home' };
+
+    render(<PracticeScreen />);
+
+    fireEvent.press(screen.getByTestId('practice-review'));
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/topic/relearn',
+      params: {
+        topicId: 'topic-1',
+        subjectId: 'subject-1',
+        topicName: 'Algebra',
+        returnTo: 'learner-home',
       },
     });
   });

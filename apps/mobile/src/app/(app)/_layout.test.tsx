@@ -120,11 +120,16 @@ jest.mock('../../hooks/use-revenuecat', () => ({
 
 jest.mock('../../lib/sentry', () => ({
   evaluateSentryForProfile: jest.fn(),
+  // useParentProxy (rendered inside _layout) catches SecureStore failures
+  // with Sentry.captureException — provide a no-op so the hook doesn't crash
+  // during _layout rendering.
+  Sentry: { captureException: jest.fn() },
 }));
 
 jest.mock('expo-secure-store', () => ({
   getItemAsync: jest.fn(),
   setItemAsync: jest.fn(),
+  deleteItemAsync: jest.fn(),
 }));
 
 jest.mock('../../components/feedback/FeedbackProvider', () => ({
@@ -160,6 +165,7 @@ describe('AppLayout', () => {
     const SecureStoreMock = require('expo-secure-store');
     (SecureStoreMock.getItemAsync as jest.Mock).mockResolvedValue(null);
     (SecureStoreMock.setItemAsync as jest.Mock).mockResolvedValue(undefined);
+    (SecureStoreMock.deleteItemAsync as jest.Mock).mockResolvedValue(undefined);
     (useAuth as jest.Mock).mockReturnValue({
       isLoaded: true,
       isSignedIn: true,
@@ -388,6 +394,36 @@ describe('AppLayout', () => {
 
     expect(screen.getByTestId('profile-switched-toast')).toBeTruthy();
     expect(screen.getByText('Profile switched')).toBeTruthy();
+  });
+
+  it('shows proxy banner and switches back to the owner profile', () => {
+    const switchProfile = jest.fn();
+    mockUseProfile.mockReturnValue({
+      profiles: [
+        { id: 'p1', displayName: 'Parent', isOwner: true, birthYear: 1990 },
+        { id: 'c1', displayName: 'Alex', isOwner: false, birthYear: 2014 },
+      ],
+      activeProfile: {
+        id: 'c1',
+        displayName: 'Alex',
+        isOwner: false,
+        consentStatus: null,
+        birthYear: 2014,
+      },
+      isLoading: false,
+      profileWasRemoved: false,
+      acknowledgeProfileRemoval: jest.fn(),
+      switchProfile,
+    });
+
+    render(<AppLayout />);
+
+    expect(screen.getByTestId('proxy-banner')).toBeTruthy();
+    expect(screen.getByText("Viewing Alex's account")).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('proxy-banner-switch-back'));
+
+    expect(switchProfile).toHaveBeenCalledWith('p1');
   });
 
   it('tells waiting learners that consent is checked automatically', () => {

@@ -9,11 +9,18 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-// Navigation patterns that count as "has an exit"
+// Navigation patterns that count as "has an exit".
+//
+// [T-4 / BUG-748] router.push(...) was previously treated as an exit, but
+// router.push is a forward navigation primitive — a screen can call
+// router.push without ever offering the user a way *back*, so its presence
+// gives a false-positive pass. The audit must only credit primitives that
+// actually move the user off the current screen toward a known prior
+// location: back/replace, the goBackOrReplace helper, the ChatShell which
+// renders its own back chevron, or visible back/close affordances.
 const EXIT_PATTERNS = [
   /router\.back\(\)/, // router.back()
-  /router\.push\(/, // router.push(...)
-  /router\.replace\(/, // router.replace(...)
+  /router\.replace\(/, // router.replace(...) — replaces current entry
   /goBackOrReplace\(/, // goBackOrReplace helper (wraps router.back/replace)
   /ChatShell/, // ChatShell component has built-in back button
   /name="close"/, // Ionicons close button
@@ -30,6 +37,7 @@ const EXEMPT_SCREENS: string[] = [
   '(app)/home.tsx',
   '(app)/library.tsx',
   '(app)/more.tsx',
+  '(app)/progress/index.tsx', // Visible bottom tab (see (app)/_layout.tsx VISIBLE_TABS)
   // Sign-in is the auth entry point — no "back" since there's nowhere
   // to go when unauthenticated. Has links to sign-up and forgot-password.
   '(auth)/sign-in.tsx',
@@ -92,5 +100,31 @@ describe('Screen navigation audit', () => {
           'Every screen must have a visible way for the user to navigate away.'
       );
     }
+  });
+
+  // [T-4 / BUG-748] Break test: a synthetic screen whose ONLY navigation
+  // primitive is `router.push(...)` must NOT count as having an exit.
+  // This pins the audit's stricter contract introduced by removing
+  // /router\.push\(/ from EXIT_PATTERNS — preventing accidental
+  // re-introduction in a future cleanup.
+  it('[BUG-748] router.push alone is not credited as an exit', () => {
+    const fakeScreen = `
+      import { useRouter } from 'expo-router';
+      export default function Forward() {
+        const router = useRouter();
+        return <Pressable onPress={() => router.push('/somewhere')} />;
+      }
+    `;
+    const hasExit = EXIT_PATTERNS.some((pattern) => pattern.test(fakeScreen));
+    expect(hasExit).toBe(false);
+  });
+
+  it('[BUG-748] router.back legitimately credited as an exit', () => {
+    const fakeScreen = `
+      const router = useRouter();
+      <Pressable onPress={() => router.back()} />
+    `;
+    const hasExit = EXIT_PATTERNS.some((pattern) => pattern.test(fakeScreen));
+    expect(hasExit).toBe(true);
   });
 });

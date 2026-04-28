@@ -1,0 +1,129 @@
+import {
+  buildExchangeHistory,
+  mergeMemoryContexts,
+  type ExchangeHistoryEvent,
+} from './session-exchange';
+
+describe('buildExchangeHistory', () => {
+  it('filters out non-conversational event types', () => {
+    const events: ExchangeHistoryEvent[] = [
+      { eventType: 'user_message', content: 'hello' },
+      { eventType: 'ai_response', content: 'hi back' },
+      { eventType: 'escalation', content: 'rung change' },
+      { eventType: 'silence_prompt', content: 'still there?' },
+      { eventType: 'system_prompt', content: 'sys note' },
+    ];
+
+    const history = buildExchangeHistory(events);
+
+    expect(history.map((h) => h.role)).toEqual(['user', 'assistant', 'system']);
+  });
+
+  it('re-wraps every prior assistant turn in a JSON envelope with FULL default signals [BUG-560 / BUG-610]', () => {
+    // Repro: empty `signals: {}` contradicts the system prompt's signal spec
+    // and triggers LLM format drift after 2+ re-wrapped turns, leaving the
+    // SSE stream with no parseable `reply` field — the user sees an empty
+    // bubble after the first exchange. The fix is to emit explicit `false`
+    // for every signal so the conversation history matches the expected
+    // envelope shape exactly.
+    const events: ExchangeHistoryEvent[] = [
+      { eventType: 'user_message', content: 'first question' },
+      { eventType: 'ai_response', content: 'first reply prose' },
+      { eventType: 'user_message', content: 'second question' },
+      { eventType: 'ai_response', content: 'second reply prose' },
+    ];
+
+    const history = buildExchangeHistory(events);
+    const assistantTurns = history.filter((h) => h.role === 'assistant');
+    expect(assistantTurns).toHaveLength(2);
+
+    for (const turn of assistantTurns) {
+      const envelope = JSON.parse(turn.content) as {
+        reply: string;
+        signals: {
+          partial_progress: boolean;
+          needs_deepening: boolean;
+          understanding_check: boolean;
+        };
+        ui_hints: { note_prompt: { show: boolean; post_session: boolean } };
+      };
+
+      // Reply text is preserved verbatim.
+      expect(typeof envelope.reply).toBe('string');
+      expect(envelope.reply.length).toBeGreaterThan(0);
+
+      // Every signal is present with an explicit boolean — never missing,
+      // never empty `{}`. This is the BUG-610 invariant.
+      expect(envelope.signals).toEqual({
+        partial_progress: false,
+        needs_deepening: false,
+        understanding_check: false,
+      });
+      expect(Object.keys(envelope.signals).sort()).toEqual([
+        'needs_deepening',
+        'partial_progress',
+        'understanding_check',
+      ]);
+
+      // ui_hints.note_prompt also fully populated — same drift class.
+      expect(envelope.ui_hints).toEqual({
+        note_prompt: { show: false, post_session: false },
+      });
+    }
+  });
+
+  it('preserves user_message content as plain text (no envelope wrapping)', () => {
+    const events: ExchangeHistoryEvent[] = [
+      { eventType: 'user_message', content: 'plain text question' },
+    ];
+
+    const history = buildExchangeHistory(events);
+
+    expect(history[0]).toEqual({
+      role: 'user',
+      content: 'plain text question',
+    });
+  });
+
+  it('preserves system_prompt content as plain text', () => {
+    const events: ExchangeHistoryEvent[] = [
+      { eventType: 'system_prompt', content: 'silence nudge' },
+    ];
+
+    const history = buildExchangeHistory(events);
+
+    expect(history[0]).toEqual({ role: 'system', content: 'silence nudge' });
+  });
+
+  it('produces empty history when no events', () => {
+    expect(buildExchangeHistory([])).toEqual([]);
+  });
+});
+
+describe('mergeMemoryContexts', () => {
+  it('returns empty when both inputs are empty', () => {
+    expect(mergeMemoryContexts('', '')).toBe('');
+  });
+
+  it('returns the non-empty side when only one has content', () => {
+    expect(mergeMemoryContexts('per-message', '')).toBe('per-message');
+    expect(mergeMemoryContexts('', 'raw-input')).toBe('raw-input');
+  });
+
+  it('deduplicates identical inputs', () => {
+    expect(mergeMemoryContexts('same', 'same')).toBe('same');
+  });
+
+  it('keeps the longer side when one fully contains the other', () => {
+    const longer = 'shared prefix and extra context';
+    expect(mergeMemoryContexts(longer, 'shared prefix')).toBe(longer);
+    expect(mergeMemoryContexts('shared prefix', longer)).toBe(longer);
+  });
+
+  it('concatenates with a separator when both have unique content', () => {
+    const merged = mergeMemoryContexts('A unique', 'B unique');
+    expect(merged).toContain('A unique');
+    expect(merged).toContain('B unique');
+    expect(merged).toContain("learner's original question");
+  });
+});

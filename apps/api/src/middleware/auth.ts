@@ -67,6 +67,19 @@ async function verifyClerkJWT(
     throw new Error('CLERK_JWKS_URL is not configured');
   }
 
+  // [SEC-1 / BUG-717] Audience validation MUST be enforced. When audience is
+  // undefined the underlying verifyJWT() silently skips the aud claim check —
+  // allowing a token minted for app-A to authenticate to app-B if both share
+  // the same Clerk instance (shared JWKS). Reject the token immediately here
+  // so misconfiguration is visible as a 401 rather than a silent bypass.
+  // Note: env-validation (config.ts STAGING_AND_PRODUCTION_REQUIRED_KEYS)
+  // also hard-fails at startup for staging+production to catch this earlier.
+  if (!audience) {
+    throw new Error(
+      'CLERK_AUDIENCE is not configured — JWT audience validation is disabled'
+    );
+  }
+
   // Decode header to find the signing key ID
   const header = decodeJWTHeader(token);
   if (!header.kid) {
@@ -80,7 +93,7 @@ async function verifyClerkJWT(
     throw new Error(`No matching JWK found for kid: ${header.kid}`);
   }
 
-  // Verify signature and validate claims (issuer + optional audience)
+  // Verify signature and validate claims (issuer + audience)
   const issuer = deriveIssuerFromJwksUrl(jwksUrl);
   const payload = await verifyJWT(token, jwk, { issuer, audience });
 

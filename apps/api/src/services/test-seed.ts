@@ -510,7 +510,7 @@ async function seedOnboardingComplete(
     id: generateUUIDv7(),
     profileId,
     topicId,
-    easeFactor: '2.50',
+    easeFactor: 2.5,
     intervalDays: i < 2 ? 7 : 1,
     repetitions: i < 2 ? 3 : 0,
     failureCount: 0,
@@ -624,7 +624,7 @@ async function seedRetentionDue(
     id: generateUUIDv7(),
     profileId,
     topicId,
-    easeFactor: '2.50',
+    easeFactor: 2.5,
     intervalDays: 7,
     repetitions: 2,
     nextReviewAt: pastDate(1), // Due yesterday
@@ -672,7 +672,7 @@ async function seedFailedRecall3x(
     id: generateUUIDv7(),
     profileId,
     topicId: targetTopicId,
-    easeFactor: '1.30',
+    easeFactor: 1.3,
     intervalDays: 1,
     repetitions: 5,
     nextReviewAt: pastDate(1),
@@ -688,7 +688,7 @@ async function seedFailedRecall3x(
     topicId: targetTopicId,
     verificationDepth: 'recall' as const,
     status: 'failed' as const,
-    masteryScore: '0.20',
+    masteryScore: 0.2,
     qualityRating: 1,
   }));
 

@@ -37,6 +37,19 @@ jest.mock('./subscription', () => ({
   }),
 }));
 
+// [BUG-837 / F-SVC-003] The trial-creation catch path now escalates via
+// inngest event + sentry capture + structured log. Mock the dispatch
+// surfaces so tests can assert escalation without a real Inngest client.
+const mockInngestSend = jest.fn().mockResolvedValue(undefined);
+jest.mock('../inngest/client', () => ({
+  inngest: { send: (...args: unknown[]) => mockInngestSend(...args) },
+}));
+
+const mockCaptureException = jest.fn();
+jest.mock('./sentry', () => ({
+  captureException: (...args: unknown[]) => mockCaptureException(...args),
+}));
+
 const NOW = new Date('2025-01-15T10:00:00.000Z');
 
 function mockAccountRow(
@@ -303,6 +316,120 @@ describe('findOrCreateAccount', () => {
     expect(() => new Date(result.updatedAt)).not.toThrow();
     expect(result.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     expect(result.updatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+
+  // [BUG-837 / F-SVC-003] When createSubscription throws, account creation
+  // must still succeed (lazy-provision contract) — but the failure MUST
+  // escalate per CLAUDE.md ("Silent recovery without escalation is banned in
+  // billing/auth/webhook code"). Three escalation surfaces required:
+  // structured log, Sentry capture, Inngest event.
+  describe('[BUG-837] trial subscription failure escalation', () => {
+    it('[BREAK] account is still returned when createSubscription throws (lazy-provision contract)', async () => {
+      mockCreateSubscription.mockRejectedValueOnce(
+        new Error('DB constraint violation')
+      );
+      const newRow = mockAccountRow({
+        id: 'new-acc',
+        clerkUserId: 'clerk_user_789',
+        email: 'new@example.com',
+      });
+      const db = createMockDb({
+        findFirstResult: undefined,
+        insertReturning: [newRow],
+      });
+
+      const result = await findOrCreateAccount(
+        db,
+        'clerk_user_789',
+        'new@example.com'
+      );
+
+      expect(result.id).toBe('new-acc');
+    });
+
+    it('[BREAK] silent recovery is banned: subscription failure dispatches app/billing.trial_subscription_failed', async () => {
+      mockCreateSubscription.mockRejectedValueOnce(
+        new Error('DB constraint violation')
+      );
+      const newRow = mockAccountRow({
+        id: 'new-acc',
+        clerkUserId: 'clerk_user_789',
+        email: 'new@example.com',
+      });
+      const db = createMockDb({
+        findFirstResult: undefined,
+        insertReturning: [newRow],
+      });
+
+      await findOrCreateAccount(db, 'clerk_user_789', 'new@example.com');
+
+      expect(mockInngestSend).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'app/billing.trial_subscription_failed',
+          data: expect.objectContaining({
+            accountId: 'new-acc',
+            clerkUserId: 'clerk_user_789',
+            reason: 'DB constraint violation',
+            timestamp: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+          }),
+        })
+      );
+    });
+
+    it('[BREAK] subscription failure also calls captureException with billing context', async () => {
+      mockCreateSubscription.mockRejectedValueOnce(
+        new Error('DB constraint violation')
+      );
+      const newRow = mockAccountRow({
+        id: 'new-acc',
+        clerkUserId: 'clerk_user_789',
+        email: 'new@example.com',
+      });
+      const db = createMockDb({
+        findFirstResult: undefined,
+        insertReturning: [newRow],
+      });
+
+      await findOrCreateAccount(db, 'clerk_user_789', 'new@example.com');
+
+      expect(mockCaptureException).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({
+          extra: expect.objectContaining({
+            flow: 'findOrCreateAccount.trialSubscription',
+            accountId: 'new-acc',
+            clerkUserId: 'clerk_user_789',
+          }),
+        })
+      );
+    });
+
+    it('account creation still succeeds when the inngest dispatch itself fails (defense-in-depth)', async () => {
+      mockCreateSubscription.mockRejectedValueOnce(
+        new Error('DB constraint violation')
+      );
+      mockInngestSend.mockRejectedValueOnce(new Error('Inngest unavailable'));
+      const newRow = mockAccountRow({
+        id: 'new-acc',
+        clerkUserId: 'clerk_user_789',
+        email: 'new@example.com',
+      });
+      const db = createMockDb({
+        findFirstResult: undefined,
+        insertReturning: [newRow],
+      });
+
+      // Must not throw — primary lazy-provision contract is preserved even
+      // when escalation can't be dispatched.
+      const result = await findOrCreateAccount(
+        db,
+        'clerk_user_789',
+        'new@example.com'
+      );
+
+      expect(result.id).toBe('new-acc');
+      expect(mockCaptureException).toHaveBeenCalled(); // primary capture still ran
+    });
   });
 
   it('reclaims account when email exists with a different clerkUserId', async () => {

@@ -367,7 +367,7 @@ function mockAssessmentRow(
     sessionId: string | null;
     verificationDepth: 'recall' | 'explain' | 'transfer';
     status: 'in_progress' | 'passed' | 'failed';
-    masteryScore: string | null;
+    masteryScore: number | null;
     qualityRating: number | null;
     exchangeHistory: unknown[];
   }>
@@ -497,8 +497,11 @@ describe('getAssessment', () => {
     expect(result).toBeNull();
   });
 
-  it('maps masteryScore from string to number', async () => {
-    const row = mockAssessmentRow({ masteryScore: '0.75' });
+  it('returns masteryScore as number from the row (BUG-641 [P-1])', async () => {
+    // BUG-641: masteryScore is now declared as `number` end-to-end via
+    // numericAsNumber customType — the driver does the string→number
+    // conversion at column read time, not the service layer.
+    const row = mockAssessmentRow({ masteryScore: 0.75 });
     const db = createAssessmentMockDb({ findFirstResult: row });
 
     const result = await getAssessment(db, testProfileId, testAssessmentId);
@@ -544,7 +547,9 @@ describe('updateAssessment', () => {
     expect(setValues).not.toHaveProperty('masteryScore');
   });
 
-  it('converts masteryScore to string for decimal storage', async () => {
+  it('passes masteryScore as number to update (BUG-641 [P-1])', async () => {
+    // BUG-641: numericAsNumber customType handles number→string conversion
+    // at the driver, so the service no longer needs `String(score)`.
     const db = createAssessmentMockDb();
 
     await updateAssessment(db, testProfileId, testAssessmentId, {
@@ -554,6 +559,6 @@ describe('updateAssessment', () => {
     const updateCall = (db.update as jest.Mock).mock.results[0].value;
     const setCall = updateCall.set as jest.Mock;
     const setValues = setCall.mock.calls[0][0];
-    expect(setValues.masteryScore).toBe('0.65');
+    expect(setValues.masteryScore).toBe(0.65);
   });
 });

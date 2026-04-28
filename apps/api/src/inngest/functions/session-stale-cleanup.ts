@@ -21,10 +21,18 @@ export const sessionStaleCleanup = inngest.createFunction(
       return closeStaleSessions(db, cutoff);
     });
 
-    await step.run('dispatch-session-completed', async () => {
-      for (const session of closedSessions) {
-        await inngest.send({
-          name: 'app/session.completed',
+    // [BUG-696 / J-7] Use a SINGLE step.sendEvent call with an array payload
+    // instead of a `for` loop of bare `inngest.send` calls inside one
+    // step.run. Inngest treats step.sendEvent as memoized — if the step
+    // throws partway through (network blip on the 6th of 10 sends), the
+    // retry replays this single call atomically rather than re-emitting
+    // the first 5 events that already succeeded. Bare inngest.send inside
+    // step.run was the duplicate-event source.
+    if (closedSessions.length > 0) {
+      await step.sendEvent(
+        'dispatch-session-completed',
+        closedSessions.map((session) => ({
+          name: 'app/session.completed' as const,
           data: {
             profileId: session.profileId,
             sessionId: session.sessionId,
@@ -34,11 +42,19 @@ export const sessionStaleCleanup = inngest.createFunction(
             verificationType: session.verificationType,
             interleavedTopicIds: session.interleavedTopicIds,
             summaryStatus: 'auto_closed',
+            // [BUG-637 / J-1] Mark as silence-timeout so session-completed
+            // honors UNATTENDED_REASONS (session-completed.ts:88, 345, 916)
+            // and skips SM-2 retention/streak credit for sessions where the
+            // user wasn't actually present. Removing this field would cause
+            // the auto-close to be treated as a user-ended session, applying
+            // a fallback quality=3 and advancing review intervals for
+            // unattended time — silently corrupting forgetting-curve data.
+            reason: 'silence_timeout',
             timestamp: now.toISOString(),
           },
-        });
-      }
-    });
+        }))
+      );
+    }
 
     // [CRIT-2] Abandon quiz rounds that have been active for too long.
     // Prefetched rounds the user never completed stay 'active' forever and

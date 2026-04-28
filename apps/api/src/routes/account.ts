@@ -3,6 +3,7 @@ import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import type { Account } from '../services/account';
 import { createLogger } from '../services/logger';
+import { captureException } from '../services/sentry';
 
 const logger = createLogger();
 import {
@@ -36,9 +37,18 @@ export const accountRoutes = new Hono<AccountRouteEnv>()
         },
       });
     } catch (err) {
+      // [CR-SILENT-RECOVERY-2] Account deletion is GDPR-relevant — escalate to
+      // Sentry alongside structured log so on-call gets paged on aggregate
+      // dispatch-failure spikes. Mirrors the consent.ts:142,270 [A-23] pattern.
       logger.warn('[account] Failed to dispatch deletion event', {
         accountId: account.id,
         error: err instanceof Error ? err.message : String(err),
+      });
+      captureException(err, {
+        extra: {
+          context: 'account.deletion.inngest_dispatch',
+          accountId: account.id,
+        },
       });
     }
 

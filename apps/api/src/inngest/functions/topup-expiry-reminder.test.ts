@@ -62,6 +62,9 @@ async function executeSteps(): Promise<Record<string, unknown>> {
       stepResults[name] = result;
       return result;
     }),
+    // [SWEEP-J7] Production now dispatches reminder events via memoized
+    // step.sendEvent instead of bare inngest.send inside step.run.
+    sendEvent: jest.fn().mockResolvedValue(undefined),
     sleep: jest.fn(),
   };
 
@@ -124,10 +127,16 @@ describe('topupExpiryReminder', () => {
       .mockResolvedValueOnce([]) // 2-month milestone
       .mockResolvedValueOnce([]); // 0-month (expiring today)
 
-    const { result } = await executeSteps();
+    const { result, mockStep } = (await executeSteps()) as unknown as {
+      result: { totalReminders: number };
+      mockStep: { sendEvent: jest.Mock };
+    };
 
     expect(result.totalReminders).toBe(1);
-    expect(mockInngestSend).toHaveBeenCalledWith(
+    // [SWEEP-J7] Memoized step.sendEvent carrying the array of per-credit
+    // payloads — bare inngest.send is forbidden inside step.run.
+    expect(mockStep.sendEvent).toHaveBeenCalledWith(
+      'queue-reminders-expiring-in-6-months',
       expect.arrayContaining([
         expect.objectContaining({
           name: 'app/topup.expiry-reminder',
@@ -139,6 +148,7 @@ describe('topupExpiryReminder', () => {
         }),
       ])
     );
+    expect(mockInngestSend).not.toHaveBeenCalled();
   });
 
   it('handles multiple expiring credits across milestones', async () => {
@@ -167,10 +177,15 @@ describe('topupExpiryReminder', () => {
       .mockResolvedValueOnce([credit2]) // 2-month milestone
       .mockResolvedValueOnce([]); // 0-month
 
-    const { result } = await executeSteps();
+    const { result, mockStep } = (await executeSteps()) as unknown as {
+      result: { totalReminders: number };
+      mockStep: { sendEvent: jest.Mock };
+    };
 
     expect(result.totalReminders).toBe(2);
-    expect(mockInngestSend).toHaveBeenCalledTimes(2);
+    // Two milestones produced credits → two memoized step.sendEvent calls.
+    expect(mockStep.sendEvent).toHaveBeenCalledTimes(2);
+    expect(mockInngestSend).not.toHaveBeenCalled();
   });
 
   it('checks all four reminder milestones', async () => {

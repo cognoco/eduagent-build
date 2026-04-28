@@ -7,6 +7,7 @@ import {
   getTopicProgress,
   getOverallProgress,
   getContinueSuggestion,
+  getLearningResumeTarget,
   getActiveSessionForTopic,
   resolveTopicSubject,
 } from '../services/progress';
@@ -88,6 +89,22 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
     const result = await resolveTopicSubject(db, profileId, topicId);
     if (!result) return notFound(c, 'Topic not found');
     return c.json(result);
+  })
+
+  // Get unified "continue learning" target for Home/Library/Progress.
+  .get('/progress/resume-target', async (c) => {
+    const db = c.get('db');
+    const profileId = requireProfileId(c.get('profileId'));
+    const subjectId = c.req.query('subjectId');
+    const bookId = c.req.query('bookId');
+    const topicId = c.req.query('topicId');
+
+    const target = await getLearningResumeTarget(db, profileId, {
+      ...(subjectId ? { subjectId } : {}),
+      ...(bookId ? { bookId } : {}),
+      ...(topicId ? { topicId } : {}),
+    });
+    return c.json({ target });
   })
 
   // Get "continue where I left off" suggestion

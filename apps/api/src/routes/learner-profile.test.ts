@@ -122,10 +122,9 @@ jest.mock('../services/learner-input', () => ({
 }));
 
 import { app } from '../index';
+import { BASE_AUTH_ENV } from '../test-utils/test-env';
 
-const TEST_ENV = {
-  CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',
-};
+const TEST_ENV = { ...BASE_AUTH_ENV };
 
 const PARENT_PROFILE_ID = '770e8400-e29b-41d4-a716-446655440000';
 const OWN_CHILD_PROFILE_ID = '770e8400-e29b-41d4-a716-446655440001';

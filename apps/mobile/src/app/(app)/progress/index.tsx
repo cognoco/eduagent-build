@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import {
   Pressable,
   RefreshControl,
@@ -23,11 +23,15 @@ import {
   SubjectCard,
 } from '../../../components/progress';
 import {
+  fetchLearningResumeTarget,
+  useLearningResumeTarget,
   useProgressHistory,
   useProgressInventory,
   useProgressMilestones,
   useRefreshProgressSnapshot,
 } from '../../../hooks/use-progress';
+import { useApiClient } from '../../../lib/api-client';
+import { pushLearningResumeTarget } from '../../../lib/navigation';
 
 function heroCopy(input: {
   topicsMastered: number;
@@ -136,7 +140,9 @@ function LoadingBlock(): React.ReactElement {
 export default function ProgressScreen(): React.ReactElement {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const apiClient = useApiClient();
   const inventoryQuery = useProgressInventory();
+  const resumeTargetQuery = useLearningResumeTarget();
   const historyQuery = useProgressHistory({ granularity: 'weekly' });
   const milestonesQuery = useProgressMilestones(5);
   const refreshSnapshot = useRefreshProgressSnapshot();
@@ -174,6 +180,34 @@ export default function ProgressScreen(): React.ReactElement {
       milestonesQuery.refetch(),
     ]);
   };
+
+  const handleGlobalResume = useCallback(() => {
+    if (resumeTargetQuery.data) {
+      pushLearningResumeTarget(router, resumeTargetQuery.data);
+      return;
+    }
+    router.push('/(app)/home' as never);
+  }, [resumeTargetQuery.data, router]);
+
+  const handleSubjectResume = useCallback(
+    async (subjectId: string) => {
+      try {
+        const target = await fetchLearningResumeTarget(apiClient, {
+          subjectId,
+        });
+        if (target) {
+          pushLearningResumeTarget(router, target);
+          return;
+        }
+      } catch {
+        // Fall through to a subject-scoped learning session.
+      }
+      router.push(
+        `/(app)/session?mode=learning&subjectId=${subjectId}` as never
+      );
+    },
+    [apiClient, router]
+  );
 
   // [EP15-M2] Gate on primary query only so secondary queries don't cause
   // partial-load flicker when history lands before inventory (or vice versa).
@@ -247,7 +281,7 @@ export default function ProgressScreen(): React.ReactElement {
               Start your first session to see your progress here
             </Text>
             <Pressable
-              onPress={() => router.push('/(app)/home' as never)}
+              onPress={handleGlobalResume}
               className="bg-primary rounded-button px-4 py-3 mt-4 items-center"
               accessibilityRole="button"
               accessibilityLabel="Start learning"
@@ -276,7 +310,7 @@ export default function ProgressScreen(): React.ReactElement {
               learning journey!
             </Text>
             <Pressable
-              onPress={() => router.push('/(app)/home' as never)}
+              onPress={handleGlobalResume}
               className="bg-primary rounded-button px-4 py-3 mt-4 items-center"
               accessibilityRole="button"
               accessibilityLabel="Start learning"
@@ -364,9 +398,7 @@ export default function ProgressScreen(): React.ReactElement {
                     onAction={(_action) => {
                       // [BUG-540] 'review' removed from SubjectCardAction;
                       // use 'learning' mode for consistency with home screen
-                      router.push(
-                        `/(app)/session?mode=learning&subjectId=${subject.subjectId}` as never
-                      );
+                      void handleSubjectResume(subject.subjectId);
                     }}
                     testID={`journey-subject-${subject.subjectId}`}
                   />
@@ -467,7 +499,7 @@ export default function ProgressScreen(): React.ReactElement {
             </Pressable>
 
             <Pressable
-              onPress={() => router.push('/(app)/home' as never)}
+              onPress={handleGlobalResume}
               className="bg-primary rounded-button px-4 py-3 mt-6 items-center"
               accessibilityRole="button"
               accessibilityLabel="Keep learning"

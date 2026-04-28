@@ -13,7 +13,19 @@ import {
 import { getSnapshotsInRange } from '../../services/snapshot-aggregation';
 import { sendPushNotification } from '../../services/notifications';
 import { captureException } from '../../services/sentry';
-import type { ProgressMetrics } from '@eduagent/schemas';
+import { progressMetricsSchema } from '@eduagent/schemas';
+
+// [BUG-848] Validate the JSONB `metrics` column at runtime instead of casting.
+// Older snapshot rows may have a different shape from what current code
+// expects, and `as ProgressMetrics` would silently produce a malformed object
+// that crashes the report generator with a non-actionable error. safeParse
+// keeps the cron resilient: bad rows are skipped per-pair and reported, the
+// rest of the batch still completes.
+function safeParseMetrics(raw: unknown) {
+  if (raw == null) return null;
+  const result = progressMetricsSchema.safeParse(raw);
+  return result.success ? result.data : null;
+}
 
 function isoDate(date: Date): string {
   return date.toISOString().slice(0, 10);
@@ -101,7 +113,11 @@ export const monthlyReportGenerate = inngest.createFunction(
   async ({ event, step }) => {
     const { parentId, childId } = event.data;
 
-    return step.run('generate-monthly-report', async () => {
+    // [J-6] Step 1: Generate and persist report data.
+    // The DB insert uses onConflictDoNothing, so retries are idempotent.
+    // Push notification is in a SEPARATE step so that if push throws,
+    // retry only re-runs the push (not the expensive LLM generation + insert).
+    const reportResult = await step.run('generate-monthly-report', async () => {
       try {
         const db = getStepDatabase();
         const child = await db.query.profiles.findFirst({
@@ -109,7 +125,7 @@ export const monthlyReportGenerate = inngest.createFunction(
           columns: { displayName: true },
         });
         if (!child) {
-          return { status: 'skipped', reason: 'child_missing' };
+          return { status: 'skipped' as const, reason: 'child_missing' };
         }
 
         const lastMonthStart = monthRangeStart(new Date(), -1);
@@ -133,16 +149,38 @@ export const monthlyReportGenerate = inngest.createFunction(
           isoDate(previousMonthEnd)
         );
 
-        const thisMonthMetrics = currentSnapshots.at(-1)?.metrics as
-          | ProgressMetrics
-          | undefined;
+        const thisMonthMetrics = safeParseMetrics(
+          currentSnapshots.at(-1)?.metrics
+        );
         if (!thisMonthMetrics) {
-          return { status: 'skipped', reason: 'no_snapshot' };
+          // Either no snapshot at all, or the snapshot row is from older
+          // code and no longer matches the schema. Either way we cannot
+          // generate a useful report — skip with a structured reason so on-
+          // call has a queryable signal rather than discovering the drift
+          // from a parent's missing report.
+          if (currentSnapshots.at(-1)?.metrics != null) {
+            captureException(
+              new Error('monthly-report metrics shape mismatch'),
+              {
+                extra: {
+                  parentId,
+                  childId,
+                  context: 'monthly-report-generate',
+                  reason: 'progress_metrics_shape_mismatch',
+                },
+              }
+            );
+            return {
+              status: 'skipped' as const,
+              reason: 'metrics_shape_mismatch',
+            };
+          }
+          return { status: 'skipped' as const, reason: 'no_snapshot' };
         }
 
-        const previousMetrics =
-          (previousSnapshots.at(-1)?.metrics as ProgressMetrics | undefined) ??
-          null;
+        const previousMetrics = safeParseMetrics(
+          previousSnapshots.at(-1)?.metrics
+        );
 
         let reportData = generateMonthlyReportData(
           child.displayName ?? 'Your child',
@@ -177,20 +215,48 @@ export const monthlyReportGenerate = inngest.createFunction(
           })
           .onConflictDoNothing();
 
-        await sendPushNotification(db, {
-          profileId: parentId,
-          title: `${child.displayName}'s monthly report is ready`,
-          body: 'Open the app to see what they learned this month.',
-          type: 'monthly_report',
-        });
-
-        return { status: 'completed', parentId, childId };
+        return {
+          status: 'completed' as const,
+          childDisplayName: child.displayName ?? 'Your child',
+        };
       } catch (error) {
         captureException(error, {
           extra: { parentId, childId, context: 'monthly-report-generate' },
         });
-        return { status: 'failed', parentId, childId };
+        // [SWEEP-SILENT-RECOVERY / J-11] Returning { status: 'failed' } here
+        // resolves the step as a success — Inngest only retries on thrown
+        // errors. Without re-throw, transient LLM/DB errors are absorbed and
+        // a parent/child pair quietly never gets their monthly report while
+        // the dashboard counts the run as completed. Re-throw lets Inngest
+        // retry and surface a real failure. See daily-snapshot.ts:78-80.
+        throw error;
       }
     });
+
+    if (reportResult.status !== 'completed') {
+      return {
+        status: reportResult.status,
+        parentId,
+        childId,
+        // Preserve skip reason for observability (child_missing, no_snapshot)
+        ...(reportResult.status === 'skipped' && 'reason' in reportResult
+          ? { reason: reportResult.reason }
+          : {}),
+      };
+    }
+
+    // [J-6] Step 2: Send push notification in a separate step so that
+    // a push failure only retries the push — not the LLM + DB insert above.
+    await step.run('send-push-notification', async () => {
+      const db = getStepDatabase();
+      await sendPushNotification(db, {
+        profileId: parentId,
+        title: `${reportResult.childDisplayName}'s monthly report is ready`,
+        body: 'Open the app to see what they learned this month.',
+        type: 'monthly_report',
+      });
+    });
+
+    return { status: 'completed', parentId, childId };
   }
 );

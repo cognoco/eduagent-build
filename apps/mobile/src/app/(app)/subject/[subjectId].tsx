@@ -52,7 +52,12 @@ export default function SubjectSettingsScreen() {
       {/* Header */}
       <View className="px-5 pt-4 pb-3 flex-row items-center">
         <Pressable
-          onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
+          onPress={() =>
+            router.replace({
+              pathname: '/(app)/shelf/[subjectId]',
+              params: { subjectId },
+            } as never)
+          }
           className="me-3 p-2 min-h-[44px] min-w-[44px] items-center justify-center"
           testID="subject-settings-back"
           accessibilityLabel="Go back"

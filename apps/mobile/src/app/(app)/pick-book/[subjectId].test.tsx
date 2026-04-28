@@ -57,9 +57,13 @@ jest.mock('../../../hooks/use-book-suggestions', () => ({
   useBookSuggestions: () => mockUseBookSuggestions(),
 }));
 
+let mockSubjectsData: Array<{ id: string; name: string }> | undefined = [
+  { id: 'sub-1', name: 'Geography' },
+];
+
 jest.mock('../../../hooks/use-subjects', () => ({
   useSubjects: () => ({
-    data: [{ id: 'sub-1', name: 'Geography' }],
+    data: mockSubjectsData,
   }),
 }));
 
@@ -202,15 +206,56 @@ describe('PickBookScreen', () => {
     expect(getByTestId('pick-book-custom-input')).toBeTruthy();
   });
 
-  it('back button replaces shelf when there is no back history', () => {
-    mockCanGoBack.mockReturnValue(false);
-
+  it('back button replaces shelf without relying on back history', () => {
     const { getByTestId } = render(<PickBookScreen />);
     fireEvent.press(getByTestId('pick-book-back'));
 
     expect(mockReplace).toHaveBeenCalledWith({
       pathname: '/(app)/shelf/[subjectId]',
       params: { subjectId: 'sub-1' },
+    });
+  });
+
+  // [BUG-808] When the URL subjectId is malformed or stale (i.e. subjects
+  // does not contain a row with that id), the screen must NOT crash — it
+  // should fall back to the "Subject" generic heading and stay usable.
+  // Previously a `subject!.id` non-null assertion in this flow would throw.
+  describe('— stale subjectId regression', () => {
+    afterEach(() => {
+      mockSubjectsData = [{ id: 'sub-1', name: 'Geography' }];
+    });
+
+    it('renders fallback heading when subject lookup misses', () => {
+      mockSubjectsData = []; // simulates fresh app launch / cache miss
+      const { getByText, getByTestId } = render(<PickBookScreen />);
+      expect(getByText('Subject')).toBeTruthy();
+      expect(getByTestId('pick-book-screen')).toBeTruthy();
+    });
+
+    it('still allows filing a suggestion when subject is undefined', async () => {
+      mockSubjectsData = undefined;
+      mockMutateAsync.mockResolvedValueOnce({
+        shelfId: 'shelf-2',
+        bookId: 'book-2',
+        shelfName: 'Geography',
+        bookName: 'Europe',
+        chapter: 'Western Europe',
+        topicId: 'topic-2',
+        topicTitle: 'France',
+        isNew: { shelf: false, book: true, chapter: true },
+      });
+
+      const { getByText } = render(<PickBookScreen />);
+      fireEvent.press(getByText('Europe'));
+
+      await waitFor(() => {
+        expect(mockMutateAsync).toHaveBeenCalledWith(
+          expect.objectContaining({
+            rawInput: 'Europe',
+            pickedSuggestionId: 'sug-1',
+          })
+        );
+      });
     });
   });
 });

@@ -8,6 +8,28 @@ const mockDatabaseModule = createDatabaseModuleMock();
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
+// [BUG-843] Mock the inngest client + sentry capture so per-trial failures
+// can assert on escalation surfaces without a real network round-trip. Use
+// jest.requireActual for createFunction so the function-definition shape
+// stays identical to production.
+const mockInngestSend = jest.fn().mockResolvedValue(undefined);
+jest.mock('../client', () => {
+  const realInngest = jest.requireActual('inngest').Inngest;
+  const realInstance = new realInngest({ id: 'eduagent-test' });
+  return {
+    inngest: {
+      // Preserve createFunction so trialExpiry registers correctly.
+      createFunction: realInstance.createFunction.bind(realInstance),
+      send: (...args: unknown[]) => mockInngestSend(...args),
+    },
+  };
+});
+
+const mockCaptureException = jest.fn();
+jest.mock('../../services/sentry', () => ({
+  captureException: (...args: unknown[]) => mockCaptureException(...args),
+}));
+
 jest.mock('../../services/subscription', () => ({
   getTierConfig: jest.fn().mockReturnValue({
     monthlyQuota: 100,
@@ -72,6 +94,10 @@ const NOW = new Date('2025-01-15T00:00:00.000Z');
 async function executeSteps(): Promise<Record<string, unknown>> {
   const mockStep = {
     run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
+    // [SWEEP-J7] Per-trial escalation events now batched and dispatched via
+    // memoized step.sendEvent OUTSIDE the per-trial step.run loop. Bare
+    // inngest.send inside step.run is the forbidden duplicate-event source.
+    sendEvent: jest.fn().mockResolvedValue(undefined),
     sleep: jest.fn(),
   };
 
@@ -175,6 +201,146 @@ describe('trialExpiry', () => {
       100,
       10
     );
+  });
+
+  // [BUG-843 / F-SVC-011] Per-trial errors must escalate, not silently
+  // depress the count. Force one trial to fail and assert that:
+  //   - the cron still completes
+  //   - count reflects the survivors
+  //   - sentry capture fired (existing [J-5] guarantee)
+  //   - logger.error fired (new structured log)
+  //   - inngest.send fired with the failure event (new escalation channel)
+  describe('[BUG-843] per-trial failure escalation', () => {
+    let consoleErrorSpy: jest.SpyInstance;
+
+    beforeEach(() => {
+      consoleErrorSpy = jest
+        .spyOn(console, 'error')
+        .mockImplementation(() => undefined);
+    });
+
+    afterEach(() => {
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('[BREAK] dispatches app/billing.trial_expiry_failed when transitionToExtendedTrial throws on a single trial', async () => {
+      const okTrial = {
+        id: 'sub-ok',
+        accountId: 'acc-ok',
+        status: 'trial',
+        trialEndsAt: '2025-01-15T00:00:00.000Z',
+      };
+      const failingTrial = {
+        id: 'sub-fail',
+        accountId: 'acc-fail',
+        status: 'trial',
+        trialEndsAt: '2025-01-15T00:00:00.000Z',
+      };
+
+      mockFindExpiredTrials.mockResolvedValueOnce([okTrial, failingTrial]);
+      mockTransitionToExtendedTrial
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(new Error('DB constraint violation'));
+
+      const { result, mockStep } = (await executeSteps()) as unknown as {
+        result: { expiredCount: number };
+        mockStep: { sendEvent: jest.Mock };
+      };
+
+      // Survivor counted; failing trial dropped from the count.
+      expect(result.expiredCount).toBe(1);
+
+      // Sentry capture (existing [J-5] guarantee).
+      expect(mockCaptureException).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({
+          extra: expect.objectContaining({
+            context: 'trial-expiry.transition',
+            subscriptionId: 'sub-fail',
+          }),
+        })
+      );
+
+      // [SWEEP-J7] Escalation event now dispatched via memoized step.sendEvent
+      // OUTSIDE the per-trial step.run loop, carrying the array of failure
+      // payloads. Bare inngest.send is forbidden — assert it never fires.
+      expect(mockStep.sendEvent).toHaveBeenCalledWith(
+        'escalate-process-expired-trials',
+        expect.arrayContaining([
+          expect.objectContaining({
+            name: 'app/billing.trial_expiry_failed',
+            data: expect.objectContaining({
+              step: 'process-expired-trials',
+              trialId: 'sub-fail',
+              reason: 'DB constraint violation',
+              timestamp: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+            }),
+          }),
+        ])
+      );
+      expect(mockInngestSend).not.toHaveBeenCalled();
+
+      // Structured warn-or-error log — the JSON line must include the failure context.
+      const errorEntries = consoleErrorSpy.mock.calls
+        .map((call) => call[0])
+        .filter((arg): arg is string => typeof arg === 'string')
+        .map((s) => {
+          try {
+            return JSON.parse(s) as Record<string, unknown>;
+          } catch {
+            return null;
+          }
+        })
+        .filter((e): e is Record<string, unknown> => e !== null)
+        .filter((e) => e.message === 'billing.trial_expiry_failed');
+      expect(errorEntries).toHaveLength(1);
+      const ctx = errorEntries[0].context as Record<string, unknown>;
+      expect(ctx).toMatchObject({
+        step: 'process-expired-trials',
+        trialId: 'sub-fail',
+        reason: 'DB constraint violation',
+      });
+    });
+
+    it('[SWEEP-J7] step.sendEvent dispatch failure surfaces to Inngest for retry — no silent eat', async () => {
+      // [SWEEP-J7] Architecture changed: per-trial escalation is dispatched
+      // via memoized step.sendEvent OUTSIDE the per-trial loop. The previous
+      // contract ("cron survives even if escalation dispatch fails") was
+      // itself a silent-eat anti-pattern — losing the only structured signal
+      // for trial-expiry failure rates. New contract: a step.sendEvent
+      // failure throws out of the handler so Inngest retries the cron, which
+      // is the correct behaviour for a memoized step that did not complete.
+      // Sentry capture for the primary failure still happens before dispatch.
+      mockFindExpiredTrials.mockResolvedValueOnce([
+        { id: 'sub-fail', accountId: 'acc' },
+      ]);
+      mockTransitionToExtendedTrial.mockRejectedValueOnce(
+        new Error('Primary failure')
+      );
+
+      const failingExecuteSteps = async () => {
+        const mockStep = {
+          run: jest.fn(async (_name: string, fn: () => Promise<unknown>) =>
+            fn()
+          ),
+          sendEvent: jest
+            .fn()
+            .mockRejectedValueOnce(new Error('Inngest unavailable')),
+          sleep: jest.fn(),
+        };
+        const handler = (trialExpiry as any).fn;
+        return handler({
+          event: { name: 'inngest/function.invoked' },
+          step: mockStep,
+        });
+      };
+
+      await expect(failingExecuteSteps()).rejects.toThrow(
+        'Inngest unavailable'
+      );
+      // Sentry capture for the primary failure ran before the dispatch attempt.
+      expect(mockCaptureException).toHaveBeenCalled();
+    });
   });
 
   it('sends push notification for trials ending in 3 days', async () => {

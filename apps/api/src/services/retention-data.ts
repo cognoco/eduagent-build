@@ -163,7 +163,7 @@ export async function ensureRetentionCard(
     .values({
       profileId,
       topicId,
-      easeFactor: '2.50',
+      easeFactor: 2.5,
       intervalDays: 1,
       repetitions: 0,
       failureCount: 0,
@@ -269,6 +269,138 @@ export async function getSubjectRetention(
     topics: allTopics,
     reviewDueCount,
   };
+}
+
+/**
+ * [BUG-732 / PERF-2] Aggregate retention status across ALL subjects for a
+ * profile in a single round-trip. Replaces the per-subject fan-out from
+ * Library mount where N subjects produced N parallel HTTP requests, each
+ * doing its own subject + curriculum + topic + retention queries.
+ *
+ * Implementation: 4 batched DB queries total (subjects, curricula, topics,
+ * retention cards) instead of 4 per subject. Caller-side semantics match
+ * getSubjectRetention so the existing client renderer is unchanged.
+ */
+export async function getAllSubjectsRetention(
+  db: Database,
+  profileId: string
+): Promise<{
+  subjects: Array<{
+    subjectId: string;
+    topics: (RetentionCardResponse & { topicTitle: string; bookId: string })[];
+    reviewDueCount: number;
+  }>;
+}> {
+  const repo = createScopedRepository(db, profileId);
+
+  // 1. All subjects for the profile (any status — Library shows paused/archived).
+  const profileSubjects = await repo.subjects.findMany();
+  if (profileSubjects.length === 0) {
+    return { subjects: [] };
+  }
+  const subjectIds = profileSubjects.map((s) => s.id);
+
+  // 2. Latest curricula for those subjects (one query, IN clause).
+  const allCurricula = await db.query.curricula.findMany({
+    where: inArray(curricula.subjectId, subjectIds),
+  });
+  // Pick latest per subject — same shape as the per-subject path
+  // (which uses findFirst — Drizzle returns the first row encountered).
+  const curriculumBySubject = new Map<string, (typeof allCurricula)[number]>();
+  for (const c of allCurricula) {
+    if (!curriculumBySubject.has(c.subjectId)) {
+      curriculumBySubject.set(c.subjectId, c);
+    }
+  }
+  const curriculumIds = Array.from(curriculumBySubject.values()).map(
+    (c) => c.id
+  );
+
+  // 3. All curriculum topics across all subjects (one query).
+  const allTopics =
+    curriculumIds.length > 0
+      ? await db.query.curriculumTopics.findMany({
+          where: inArray(curriculumTopics.curriculumId, curriculumIds),
+        })
+      : [];
+  const topicIds = allTopics.map((t) => t.id);
+  const topicTitleMap = new Map(allTopics.map((t) => [t.id, t.title]));
+  const topicBookIdMap = new Map(allTopics.map((t) => [t.id, t.bookId]));
+  // curriculumId → subjectId reverse lookup
+  const curriculumToSubject = new Map(
+    Array.from(curriculumBySubject.values()).map((c) => [c.id, c.subjectId])
+  );
+  const topicToSubject = new Map(
+    allTopics.map((t) => [t.id, curriculumToSubject.get(t.curriculumId) ?? ''])
+  );
+
+  // 4. All retention cards for those topics (one scoped query — RLS-aware).
+  const allCards =
+    topicIds.length > 0
+      ? await repo.retentionCards.findMany(
+          inArray(retentionCards.topicId, topicIds)
+        )
+      : [];
+
+  const cardByTopicId = new Map(allCards.map((c) => [c.topicId, c]));
+  const now = new Date();
+
+  // Group results by subjectId in the same shape the per-subject route returns.
+  const bySubject = new Map<
+    string,
+    {
+      subjectId: string;
+      topics: (RetentionCardResponse & {
+        topicTitle: string;
+        bookId: string;
+      })[];
+      reviewDueCount: number;
+    }
+  >();
+  for (const subject of profileSubjects) {
+    bySubject.set(subject.id, {
+      subjectId: subject.id,
+      topics: [],
+      reviewDueCount: 0,
+    });
+  }
+  for (const tid of topicIds) {
+    const subjectId = topicToSubject.get(tid);
+    if (!subjectId) continue;
+    const bucket = bySubject.get(subjectId);
+    if (!bucket) continue;
+    const bookId = topicBookIdMap.get(tid) ?? '';
+    const card = cardByTopicId.get(tid);
+    const topicTitle = topicTitleMap.get(tid) ?? tid;
+    if (card) {
+      bucket.topics.push({
+        ...mapRetentionCardRow(card),
+        topicTitle,
+        bookId,
+      });
+      if (card.nextReviewAt && card.nextReviewAt.getTime() <= now.getTime()) {
+        bucket.reviewDueCount += 1;
+      }
+    } else {
+      // Synthesize zero-state for never-started topics — matches per-subject
+      // path so the Library Topics tab shows the full curriculum.
+      bucket.topics.push({
+        topicId: tid,
+        easeFactor: 2.5,
+        intervalDays: 0,
+        repetitions: 0,
+        nextReviewAt: null,
+        lastReviewedAt: null,
+        xpStatus: 'pending' as const,
+        failureCount: 0,
+        evaluateDifficultyRung: null,
+        topicTitle,
+        bookId,
+      });
+    }
+  }
+
+  return { subjects: Array.from(bySubject.values()) };
 }
 
 /**
@@ -462,7 +594,7 @@ export async function processRecallTest(
   const [persisted] = await db
     .update(retentionCards)
     .set({
-      easeFactor: String(result.newState.easeFactor),
+      easeFactor: result.newState.easeFactor,
       intervalDays: result.newState.intervalDays,
       repetitions: result.newState.repetitions,
       failureCount: result.newState.failureCount,
@@ -653,7 +785,7 @@ export async function startRelearn(
   const resetRows = await db
     .update(retentionCards)
     .set({
-      easeFactor: '2.50',
+      easeFactor: 2.5,
       intervalDays: 1,
       repetitions: 0,
       failureCount: 0,
@@ -1053,7 +1185,7 @@ export async function updateRetentionFromSession(
   const updateResult = await db
     .update(retentionCards)
     .set({
-      easeFactor: String(result.card.easeFactor),
+      easeFactor: result.card.easeFactor,
       intervalDays: result.card.interval,
       repetitions: result.card.repetitions,
       lastReviewedAt: new Date(result.card.lastReviewedAt),

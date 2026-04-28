@@ -80,6 +80,11 @@ jest.mock('../lib/format-api-error', () => ({
     e instanceof Error ? e.message : 'Unknown error',
 }));
 
+const mockPlatformAlert = jest.fn();
+jest.mock('../lib/platform-alert', () => ({
+  platformAlert: (...args: unknown[]) => mockPlatformAlert(...args),
+}));
+
 jest.mock('../lib/profile', () => ({
   ...jest.requireActual('../lib/profile'),
   useProfile: jest.fn().mockReturnValue({
@@ -135,7 +140,7 @@ describe('ProfilesScreen', () => {
     expect(screen.getByTestId('profile-active-check')).toBeTruthy();
   });
 
-  it('calls switchProfile on profile tap and navigates back', async () => {
+  it('shows confirmation before switching from owner to child', async () => {
     useProfile.mockReturnValue({
       profiles: [ownerProfile, childProfile],
       activeProfile: ownerProfile,
@@ -147,6 +152,12 @@ describe('ProfilesScreen', () => {
 
     fireEvent.press(screen.getByTestId('profile-row-child-id'));
 
+    expect(screen.getByTestId('proxy-confirm-modal')).toBeTruthy();
+    expect(screen.getByText("Viewing Alex's account")).toBeTruthy();
+    expect(mockSwitchProfile).not.toHaveBeenCalled();
+
+    fireEvent.press(screen.getByTestId('proxy-confirm-view'));
+
     await waitFor(() => {
       expect(mockSwitchProfile).toHaveBeenCalledWith('child-id');
     });
@@ -154,6 +165,43 @@ describe('ProfilesScreen', () => {
     await waitFor(() => {
       expect(mockBack).toHaveBeenCalled();
     });
+  });
+
+  it('cancels parent-to-child proxy confirmation without switching', () => {
+    useProfile.mockReturnValue({
+      profiles: [ownerProfile, childProfile],
+      activeProfile: ownerProfile,
+      switchProfile: mockSwitchProfile,
+      isLoading: false,
+    });
+
+    render(<ProfilesScreen />);
+
+    fireEvent.press(screen.getByTestId('profile-row-child-id'));
+    expect(screen.getByTestId('proxy-confirm-modal')).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('proxy-confirm-cancel'));
+
+    expect(mockSwitchProfile).not.toHaveBeenCalled();
+    expect(screen.queryByText("Viewing Alex's account")).toBeNull();
+  });
+
+  it('switches immediately when a child taps the owner row', async () => {
+    useProfile.mockReturnValue({
+      profiles: [ownerProfile, childProfile],
+      activeProfile: childProfile,
+      switchProfile: mockSwitchProfile,
+      isLoading: false,
+    });
+
+    render(<ProfilesScreen />);
+
+    fireEvent.press(screen.getByTestId('profile-row-owner-id'));
+
+    await waitFor(() => {
+      expect(mockSwitchProfile).toHaveBeenCalledWith('owner-id');
+    });
+    expect(screen.queryByTestId('proxy-confirm-modal')).toBeNull();
   });
 
   it('navigates to create-profile on add button for family tier', () => {
@@ -202,6 +250,7 @@ describe('ProfilesScreen', () => {
     render(<ProfilesScreen />);
 
     fireEvent.press(screen.getByTestId('profile-row-child-id'));
+    fireEvent.press(screen.getByTestId('proxy-confirm-view'));
 
     await waitFor(() => {
       expect(mockSwitchProfile).toHaveBeenCalledWith('child-id');
@@ -262,6 +311,71 @@ describe('ProfilesScreen', () => {
       { profileId: 'child-id', displayName: 'Alexander' },
       expect.objectContaining({ onSuccess: expect.any(Function) })
     );
+  });
+
+  // -------------------------------------------------------------------------
+  // [BUG-822 / BREAK] handleSwitch must catch thrown errors from switchProfile
+  // and surface the typed server reason — not silently swallow + generic toast.
+  // -------------------------------------------------------------------------
+
+  it('[BREAK / BUG-822] surfaces thrown switchProfile error in alert', async () => {
+    const switchProfileThatThrows = jest
+      .fn()
+      .mockRejectedValue(new Error('Network unreachable'));
+
+    useProfile.mockReturnValue({
+      profiles: [ownerProfile, childProfile],
+      activeProfile: childProfile,
+      switchProfile: switchProfileThatThrows,
+      isLoading: false,
+    });
+
+    render(<ProfilesScreen />);
+
+    fireEvent.press(screen.getByTestId('profile-row-owner-id'));
+
+    await waitFor(() => {
+      expect(switchProfileThatThrows).toHaveBeenCalledWith('owner-id');
+    });
+
+    await waitFor(() => {
+      expect(mockPlatformAlert).toHaveBeenCalledWith(
+        'Could not switch profiles',
+        'Network unreachable'
+      );
+    });
+
+    // Promise rejection must not bubble out — UI stays interactive.
+    expect(mockBack).not.toHaveBeenCalled();
+  });
+
+  it('[BREAK / BUG-822] handles non-Error rejection without crashing', async () => {
+    const switchProfileThatThrowsString = jest
+      .fn()
+      .mockRejectedValue('string-error');
+
+    useProfile.mockReturnValue({
+      profiles: [ownerProfile, childProfile],
+      activeProfile: childProfile,
+      switchProfile: switchProfileThatThrowsString,
+      isLoading: false,
+    });
+
+    render(<ProfilesScreen />);
+
+    fireEvent.press(screen.getByTestId('profile-row-owner-id'));
+
+    await waitFor(() => {
+      expect(switchProfileThatThrowsString).toHaveBeenCalled();
+    });
+
+    // formatApiError stub returns 'Unknown error' for non-Error.
+    await waitFor(() => {
+      expect(mockPlatformAlert).toHaveBeenCalledWith(
+        'Could not switch profiles',
+        'Unknown error'
+      );
+    });
   });
 
   it('closes rename modal on cancel', () => {

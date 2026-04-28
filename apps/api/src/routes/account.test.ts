@@ -25,6 +25,11 @@ jest.mock('../inngest/client', () => ({
   },
 }));
 
+jest.mock('../services/sentry', () => ({
+  captureException: jest.fn(),
+  addBreadcrumb: jest.fn(),
+}));
+
 // ---------------------------------------------------------------------------
 // Mock database module — middleware creates a stub db per request
 // ---------------------------------------------------------------------------
@@ -84,15 +89,12 @@ jest.mock('../services/export', () => ({
 
 import { app } from '../index';
 import { inngest } from '../inngest/client';
+import { captureException } from '../services/sentry';
+import { AUTH_HEADERS, BASE_AUTH_ENV } from '../test-utils/test-env';
 
 const TEST_ENV = {
-  CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',
+  ...BASE_AUTH_ENV,
   DATABASE_URL: 'postgresql://test:test@localhost/test',
-};
-
-const AUTH_HEADERS = {
-  Authorization: 'Bearer valid.jwt.token',
-  'Content-Type': 'application/json',
 };
 
 describe('account routes', () => {
@@ -123,12 +125,17 @@ describe('account routes', () => {
       expect(() => new Date(body.gracePeriodEnds)).not.toThrow();
     });
 
-    it('still returns 200 when deletion event dispatch fails', async () => {
+    // [CR-SILENT-RECOVERY-2] Break test: deletion-event dispatch failure must
+    // be escalated via BOTH a structured log AND a Sentry capture. logger.warn
+    // alone is not sufficient for a GDPR-relevant action — on-call needs
+    // aggregate spike alerting (mirrors consent.ts:142,270 [A-23]).
+    it('still returns 200 and escalates via logger.warn + captureException when dispatch fails', async () => {
       // eslint-disable-next-line @typescript-eslint/no-empty-function
       const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
-      (inngest.send as jest.Mock).mockRejectedValueOnce(
-        new Error('Inngest unavailable')
-      );
+      (captureException as jest.Mock).mockClear();
+
+      const dispatchError = new Error('Inngest unavailable');
+      (inngest.send as jest.Mock).mockRejectedValueOnce(dispatchError);
 
       const res = await app.request(
         '/v1/account/delete',
@@ -146,6 +153,19 @@ describe('account routes', () => {
       expect(warnSpy).toHaveBeenCalledWith(
         expect.stringContaining('Failed to dispatch deletion event')
       );
+
+      // Sentry escalation: assert the deliberate call from this catch block
+      // happened with the raw error and a queryable context tag. (Other
+      // middleware in the request path may also call captureException — e.g.
+      // profile-scope middleware itself escalates if findOwnerProfile fails
+      // against the stubbed DB. We only care that our specific call is one
+      // of them.)
+      expect(captureException).toHaveBeenCalledWith(dispatchError, {
+        extra: {
+          context: 'account.deletion.inngest_dispatch',
+          accountId: 'test-account-id',
+        },
+      });
 
       warnSpy.mockRestore();
     });

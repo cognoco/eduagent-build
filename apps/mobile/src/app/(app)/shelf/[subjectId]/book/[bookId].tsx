@@ -26,14 +26,18 @@ import { useMoveTopic } from '../../../../../hooks/use-move-topic';
 import { useBookNotes } from '../../../../../hooks/use-notes';
 import { useRetentionTopics } from '../../../../../hooks/use-retention';
 import { useCurriculum } from '../../../../../hooks/use-curriculum';
+import { useLearningResumeTarget } from '../../../../../hooks/use-progress';
 import { useSubjects } from '../../../../../hooks/use-subjects';
 import { InlineNoteCard } from '../../../../../components/library/InlineNoteCard';
 import { formatApiError } from '../../../../../lib/format-api-error';
 import { formatRelativeDate } from '../../../../../lib/format-relative-date';
-import { goBackOrReplace } from '../../../../../lib/navigation';
 import { platformAlert } from '../../../../../lib/platform-alert';
 import { useThemeColors } from '../../../../../lib/theme';
 import { computeUpNextTopic } from '../../../../../lib/up-next-topic';
+import {
+  goBackOrReplace,
+  pushLearningResumeTarget,
+} from '../../../../../lib/navigation';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -118,6 +122,7 @@ export default function BookScreen() {
   const subjectId = params.subjectId;
   const bookId = params.bookId;
   const isReadOnly = params.readOnly === 'true';
+  const resumeTargetQuery = useLearningResumeTarget({ subjectId, bookId });
   const autoStart = params.autoStart;
 
   // --- Data queries (called unconditionally for rules-of-hooks) ---
@@ -133,11 +138,25 @@ export default function BookScreen() {
   const allBooksQuery = useBooks(subjectId);
   const moveTopic = useMoveTopic();
 
+  // One screen up = the per-subject shelf grid. router.back() falls through
+  // to the Tabs navigator's `firstRoute` (Home) when the inner stack is empty
+  // (cross-tab pushes to this leaf route synthesize a 1-deep stack), so we
+  // navigate explicitly instead.
+  //
+  // [BUG-636 / M-4] On a malformed deep link (subjectId missing) the previous
+  // implementation early-returned, leaving the user stuck on the missing-param
+  // error screen with a "Go back" button that silently did nothing. Fall back
+  // to the library tab when subjectId is unavailable so the error state always
+  // has a working exit.
   const handleBack = useCallback(() => {
-    goBackOrReplace(router, {
-      pathname: '/(app)/shelf/[subjectId]',
-      params: { subjectId },
-    } as never);
+    if (subjectId) {
+      router.replace({
+        pathname: '/(app)/shelf/[subjectId]',
+        params: { subjectId },
+      } as never);
+      return;
+    }
+    goBackOrReplace(router, '/(app)/library' as never);
   }, [router, subjectId]);
 
   // --- Generation auto-trigger ---
@@ -575,6 +594,11 @@ export default function BookScreen() {
 
   // --- Start learning: follow the status-first CTA priority ---
   const handleStartLearning = useCallback(() => {
+    if (resumeTargetQuery.data) {
+      pushLearningResumeTarget(router, resumeTargetQuery.data);
+      return;
+    }
+
     if (continueNowTopicId) {
       const topic = topicById.get(continueNowTopicId);
       if (topic) {
@@ -617,6 +641,7 @@ export default function BookScreen() {
     topicById,
     upNextTopic,
     startedTopicIds,
+    resumeTargetQuery.data,
     router,
     subjectId,
   ]);

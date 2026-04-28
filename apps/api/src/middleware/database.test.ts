@@ -33,6 +33,8 @@ describe('databaseMiddleware', () => {
 
     await app.request('/test', {}, TEST_ENV);
 
+    // Phase 0.0: neon-serverless driver — createDatabase only needs the URL.
+    // onTransactionFallback no longer exists; the WS driver throws natively.
     expect(createDatabase).toHaveBeenCalledWith(TEST_ENV.DATABASE_URL);
   });
 

@@ -173,6 +173,26 @@ describe('classifyApiError', () => {
     expect(result.recovery).toBe('retry');
     expect(result.message).toBe('Profile name must be at least 2 characters');
   });
+
+  // --- SSE idle timeout (interview / chat) [BUG-555] ---
+
+  it('classifies SSE idle-timeout error as network / retry with reconnect message [BUG-555]', () => {
+    // Repro: apps/mobile/src/lib/sse.ts emits this exact message + isTimeout
+    // when the 45s IDLE_TIMEOUT_MS fires because no chunk arrived. The error
+    // surfaces in the interview phase as "That reply took too long" and the
+    // retry recovery converts the failed bubble into a reconnect_prompt.
+    const err = new Error(
+      'The connection timed out while waiting for a reply'
+    ) as Error & { isTimeout: boolean };
+    err.isTimeout = true;
+
+    const result = classifyApiError(err);
+    expect(result.category).toBe('network');
+    expect(result.recovery).toBe('retry');
+    expect(result.message).toBe(
+      'That reply took too long. Tap reconnect to try again.'
+    );
+  });
 });
 
 describe('formatApiError', () => {
@@ -351,6 +371,16 @@ describe('formatApiError', () => {
   it('returns default for empty object', () => {
     expect(formatApiError({})).toBe(
       'Something unexpected happened. Please try again.'
+    );
+  });
+
+  it('returns SSE reconnect message for idle-timeout error [BUG-555]', () => {
+    // The 45s SSE idle timer in apps/mobile/src/lib/sse.ts emits this exact
+    // error when the LLM never produces a chunk; the format-api-error layer
+    // is what surfaces "That reply took too long" in the interview UI.
+    const err = new Error('The connection timed out while waiting for a reply');
+    expect(formatApiError(err)).toBe(
+      'That reply took too long. Tap reconnect to try again.'
     );
   });
 });

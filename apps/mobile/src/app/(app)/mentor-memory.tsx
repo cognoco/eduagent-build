@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { platformAlert } from '../../lib/platform-alert';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { personaFromBirthYear, useProfile } from '../../lib/profile';
 import {
@@ -32,6 +32,7 @@ import {
   useUnsuppressInference,
 } from '../../hooks/use-learner-profile';
 import { MemoryConsentPrompt } from '../../components/memory-consent-prompt';
+import { useParentProxy } from '../../hooks/use-parent-proxy';
 
 export default function MentorMemoryScreen() {
   const insets = useSafeAreaInsets();
@@ -44,6 +45,7 @@ export default function MentorMemoryScreen() {
   const toggleInjection = useToggleMemoryInjection();
   const unsuppress = useUnsuppressInference();
   const grantConsent = useGrantMemoryConsent();
+  const { isParentProxy } = useParentProxy();
   const [draft, setDraft] = useState('');
 
   // [H12] Timeout escape for loading spinner
@@ -158,6 +160,8 @@ export default function MentorMemoryScreen() {
   );
 
   const consentStatus = profile?.memoryConsentStatus ?? 'pending';
+
+  if (isParentProxy) return <Redirect href="/(app)/home" />;
 
   if (isLoading) {
     if (loadTimedOut) {
@@ -388,7 +392,11 @@ export default function MentorMemoryScreen() {
 
         <MemorySection title="Interests">
           {(profile?.interests ?? []).length > 0 ? (
-            profile?.interests.map((interest) => {
+            // [BUG-815] Use the same `?? []` guard inside the map call so
+            // the lookup is safe even when profile is undefined or interests
+            // is null (legacy profile rows). The outer length-check already
+            // routes empty arrays to "Nothing saved yet."
+            (profile?.interests ?? []).map((interest) => {
               // BKT-C.2 — interests are now InterestEntry { label, context };
               // read .label for display and keying. Context-aware rendering
               // (school vs free-time chips) lands in the mobile context-picker

@@ -16,7 +16,6 @@ import {
   classifyApiError,
   recoveryActions,
 } from '../../../../lib/format-api-error';
-import { goBackOrReplace } from '../../../../lib/navigation';
 import { useThemeColors } from '../../../../lib/theme';
 
 export default function ShelfScreen() {
@@ -40,7 +39,7 @@ export default function ShelfScreen() {
   const filing = useFiling();
 
   const handleBack = useCallback(() => {
-    goBackOrReplace(router, '/(app)/library');
+    router.replace('/(app)/library' as never);
   }, [router]);
 
   // Filing overlay: show spinner + skip button after 15s (same pattern as pick-book)

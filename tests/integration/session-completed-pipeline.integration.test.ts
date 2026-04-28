@@ -99,6 +99,9 @@ async function executeChain(
     run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
     sleep: jest.fn(),
     waitForEvent: jest.fn().mockResolvedValue(null),
+    // [SWEEP-SILENT-RECOVERY] session-completed dispatches a filing_timed_out
+    // event when waitForEvent returns null — mock must accept the call.
+    sendEvent: jest.fn().mockResolvedValue({ ids: [] }),
   };
 
   // Access the raw handler (.fn is the Inngest-internal property set by createFunction)

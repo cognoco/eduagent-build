@@ -289,28 +289,29 @@ describe('dailySnapshotRefresh', () => {
     expect(result).toEqual({ status: 'skipped', reason: 'profile_missing' });
   });
 
-  it('calls captureException and returns failed status when refreshProgressSnapshot throws', async () => {
+  // [J-11] After fix: errors must be re-thrown so Inngest retries the step.
+  // The old pattern (catch + return { status: 'failed' }) resolved the step
+  // successfully, which permanently suppressed Inngest retries.
+  it('[J-11] re-throws after captureException so Inngest retries', async () => {
     const error = new Error('Snapshot computation failed');
     mockRefreshProgressSnapshot.mockRejectedValue(error);
 
-    const { result } = await executeRefreshSteps({ profileId: 'profile-001' });
+    await expect(
+      executeRefreshSteps({ profileId: 'profile-001' })
+    ).rejects.toThrow('Snapshot computation failed');
 
     expect(mockCaptureException).toHaveBeenCalledWith(error, {
       profileId: 'profile-001',
     });
-    expect(result).toEqual({ status: 'failed', profileId: 'profile-001' });
   });
 
-  it('calls captureException and returns failed status when DB lookup throws', async () => {
+  it('propagates DB lookup errors so Inngest retries (no silent swallow)', async () => {
     const error = new Error('DB connection error');
     mockSnapshotDb.query.profiles.findFirst.mockRejectedValue(error);
 
-    const { result } = await executeRefreshSteps({ profileId: 'profile-001' });
-
-    expect(mockCaptureException).toHaveBeenCalledWith(error, {
-      profileId: 'profile-001',
-    });
-    expect(result).toEqual({ status: 'failed', profileId: 'profile-001' });
+    await expect(
+      executeRefreshSteps({ profileId: 'profile-001' })
+    ).rejects.toThrow('DB connection error');
   });
 
   it('runs refresh logic inside a named step', async () => {

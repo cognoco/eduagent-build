@@ -12,6 +12,58 @@
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
 import { getTierConfig } from '../../services/subscription';
+import { captureException } from '../../services/sentry';
+import { createLogger } from '../../services/logger';
+
+const logger = createLogger();
+
+// [BUG-843 / F-SVC-011] Per-trial errors used to silently `console.error`
+// inside the loop, so the cron reported a lower count and stuck trials
+// accumulated invisibly. Each per-trial failure now (a) emits a structured
+// error log via the canonical logger, and (b) is collected for batch
+// dispatch via step.sendEvent so the `trialExpiryFailureObserve` handler is
+// the queryable terminus and a future on-call rule can page on rate spikes.
+// captureException is kept alongside both so Sentry sees the raw stack.
+//
+// [SWEEP-J7] The escalation event is dispatched OUTSIDE the per-trial
+// step.run via step.sendEvent (memoized atomically). Bare inngest.send
+// inside step.run loops was the duplicate-event source — same class as
+// BUG-696/J-7 in session-stale-cleanup. The build-helper now just returns
+// the event payload; the caller accumulates and the outer flow dispatches.
+const TRIAL_EXPIRY_FAILURE_EVENT = 'app/billing.trial_expiry_failed' as const;
+
+type TrialExpiryFailureEvent = {
+  name: typeof TRIAL_EXPIRY_FAILURE_EVENT;
+  data: {
+    step: 'process-expired-trials' | 'process-extended-trial-expiry';
+    trialId: string;
+    reason: string;
+    timestamp: string;
+  };
+};
+
+function buildTrialExpiryFailureEvent(params: {
+  step: 'process-expired-trials' | 'process-extended-trial-expiry';
+  trialId: string;
+  err: unknown;
+}): TrialExpiryFailureEvent {
+  const reason =
+    params.err instanceof Error ? params.err.message : String(params.err);
+  logger.error('billing.trial_expiry_failed', {
+    step: params.step,
+    trialId: params.trialId,
+    reason,
+  });
+  return {
+    name: TRIAL_EXPIRY_FAILURE_EVENT,
+    data: {
+      step: params.step,
+      trialId: params.trialId,
+      reason,
+      timestamp: new Date().toISOString(),
+    },
+  };
+}
 import {
   findExpiredTrials,
   findSubscriptionsByTrialDateRange,
@@ -59,11 +111,12 @@ export const trialExpiry = inngest.createFunction(
 
     // Step 1: Transition trials that just ended → extended trial (soft landing)
     // Instead of going directly to free, users get 15 questions/day for 14 more days.
-    const expiredCount = await step.run('process-expired-trials', async () => {
+    const expiredResult = await step.run('process-expired-trials', async () => {
       const db = getStepDatabase();
       const expiredTrials = await findExpiredTrials(db, now);
 
       let count = 0;
+      const failures: TrialExpiryFailureEvent[] = [];
       for (const trial of expiredTrials) {
         try {
           await transitionToExtendedTrial(
@@ -73,15 +126,39 @@ export const trialExpiry = inngest.createFunction(
           );
           count++;
         } catch (err) {
-          console.error(`Failed to transition trial ${trial.id}:`, err);
+          // [J-5] captureException keeps the raw stack queryable in Sentry.
+          captureException(err, {
+            extra: {
+              context: 'trial-expiry.transition',
+              subscriptionId: trial.id,
+            },
+          });
+          // [BUG-843 / F-SVC-011] Build escalation event for batch dispatch
+          // outside step.run — see [SWEEP-J7] note on the helper.
+          failures.push(
+            buildTrialExpiryFailureEvent({
+              step: 'process-expired-trials',
+              trialId: trial.id,
+              err,
+            })
+          );
         }
       }
 
-      return count;
+      return { count, failures };
     });
 
+    // [SWEEP-J7] Memoized batch dispatch outside step.run.
+    if (expiredResult.failures.length > 0) {
+      await step.sendEvent(
+        'escalate-process-expired-trials',
+        expiredResult.failures
+      );
+    }
+    const expiredCount = expiredResult.count;
+
     // Step 2: Transition extended trials that have ended (day 28+) → free tier
-    const extendedExpiredCount = await step.run(
+    const extendedResult = await step.run(
       'process-extended-trial-expiry',
       async () => {
         const db = getStepDatabase();
@@ -94,6 +171,7 @@ export const trialExpiry = inngest.createFunction(
         );
 
         let count = 0;
+        const failures: TrialExpiryFailureEvent[] = [];
         const freeTier = getTierConfig('free');
 
         for (const trial of extendedTrials) {
@@ -106,13 +184,37 @@ export const trialExpiry = inngest.createFunction(
             );
             count++;
           } catch (err) {
-            console.error(`Failed to downgrade trial ${trial.id}:`, err);
+            // [J-5] captureException keeps the raw stack queryable in Sentry.
+            captureException(err, {
+              extra: {
+                context: 'trial-expiry.downgrade',
+                subscriptionId: trial.id,
+              },
+            });
+            // [BUG-843 / F-SVC-011] Per-trial escalation collected for batch
+            // dispatch outside step.run — see [SWEEP-J7] note on the helper.
+            failures.push(
+              buildTrialExpiryFailureEvent({
+                step: 'process-extended-trial-expiry',
+                trialId: trial.id,
+                err,
+              })
+            );
           }
         }
 
-        return count;
+        return { count, failures };
       }
     );
+
+    // [SWEEP-J7] Memoized batch dispatch outside step.run.
+    if (extendedResult.failures.length > 0) {
+      await step.sendEvent(
+        'escalate-process-extended-trial-expiry',
+        extendedResult.failures
+      );
+    }
+    const extendedExpiredCount = extendedResult.count;
 
     // Step 3: Send warning notifications for trials ending in 3 days, 1 day, last day
     const warningsSent = await step.run('send-trial-warnings', async () => {

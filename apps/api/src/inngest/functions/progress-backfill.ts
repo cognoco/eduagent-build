@@ -57,22 +57,25 @@ export const progressBackfillProfile = inngest.createFunction(
     const { profileId } = event.data;
 
     return step.run('backfill-snapshot', async () => {
+      // [J-11] Do NOT catch-and-return-failed here. Returning { status: 'failed' }
+      // resolves the step successfully — Inngest only retries on thrown errors.
+      // captureException + re-throw lets Inngest retry while still reporting to Sentry.
+      const db = getStepDatabase();
+
+      const existing = await db.query.progressSnapshots.findFirst({
+        where: eq(progressSnapshots.profileId, profileId),
+        columns: { profileId: true },
+      });
+
+      if (existing) {
+        return {
+          status: 'skipped',
+          reason: 'snapshots_already_exist',
+          profileId,
+        };
+      }
+
       try {
-        const db = getStepDatabase();
-
-        const existing = await db.query.progressSnapshots.findFirst({
-          where: eq(progressSnapshots.profileId, profileId),
-          columns: { profileId: true },
-        });
-
-        if (existing) {
-          return {
-            status: 'skipped',
-            reason: 'snapshots_already_exist',
-            profileId,
-          };
-        }
-
         const snapshot = await refreshProgressSnapshot(db, profileId);
         return {
           status: 'completed',
@@ -81,7 +84,7 @@ export const progressBackfillProfile = inngest.createFunction(
         };
       } catch (error) {
         captureException(error, { profileId });
-        return { status: 'failed', profileId };
+        throw error; // re-throw so Inngest retries this step
       }
     });
   }

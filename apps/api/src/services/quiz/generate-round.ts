@@ -28,6 +28,7 @@ import {
   validateVocabularyRound,
 } from './vocabulary-provider';
 import {
+  appendSurnameAlias,
   buildGuessWhoDiscoveryQuestions,
   buildGuessWhoMasteryCluePrompt,
   buildGuessWhoPrompt,
@@ -203,12 +204,11 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
     recentAnswers,
     libraryItems,
   });
-  // Map the shared schemas AgeBracket (which has 'child' for COPPA consent
-  // gating at <13) into the quiz-local AgeBracket (product is 11+, so 'child'
-  // is unreachable in practice — any such value is treated as 'adolescent').
-  const rawBracket = birthYear == null ? 'adult' : computeAgeBracket(birthYear);
+  // Shared schemas AgeBracket is now { 'adolescent' | 'adult' } and matches
+  // the quiz-local AgeBracket exactly (product is 11+, so the historical
+  // 'child' member was removed in BUG-642 [P-2]).
   const ageBracket: AgeBracket =
-    rawBracket === 'child' ? 'adolescent' : rawBracket;
+    birthYear == null ? 'adult' : computeAgeBracket(birthYear);
 
   // Compute fine-grained ageYears from birthYear when available.
   const currentYear = new Date().getFullYear();
@@ -513,7 +513,10 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
               type: 'guess_who',
               canonicalName: item.answer,
               correctAnswer: item.answer,
-              acceptedAliases: parsed.acceptedAliases,
+              acceptedAliases: appendSurnameAlias(
+                item.answer,
+                parsed.acceptedAliases
+              ),
               clues: parsed.clues,
               mcFallbackOptions: parsed.mcFallbackOptions,
               funFact: '',

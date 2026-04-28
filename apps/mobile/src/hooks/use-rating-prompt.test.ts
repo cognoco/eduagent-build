@@ -87,6 +87,27 @@ describe('useRatingPrompt', () => {
     expect(mockRequestReview).not.toHaveBeenCalled();
   });
 
+  // [BREAK / BUG-680] computeAgeBracket(null) silently treats null birthYear
+  // as adult (year - null = year → 'adult'), so the previous code skipped
+  // the prompt for the wrong reason. The fix returns early on null birthYear
+  // explicitly. We assert the prompt is NOT shown AND the recall count is
+  // NOT incremented (the early return must happen before SecureStore writes).
+  it('[BREAK / BUG-680] does not prompt or increment count when birthYear is null', async () => {
+    const originalBirthYear = mockProfile.birthYear;
+    (mockProfile as { birthYear: number | null }).birthYear = null;
+    secureStore['rating-recall-success-count-profile-1'] = '10';
+
+    const { result } = renderHook(() => useRatingPrompt());
+    await act(async () => {
+      await result.current.onSuccessfulRecall();
+    });
+
+    expect(mockRequestReview).not.toHaveBeenCalled();
+    // Recall count must NOT have been bumped — guard fires before SecureStore.
+    expect(secureStore['rating-recall-success-count-profile-1']).toBe('10');
+    mockProfile.birthYear = originalBirthYear;
+  });
+
   it('does not prompt for new profiles (< 7 days old)', async () => {
     mockProfile.createdAt = new Date(
       Date.now() - 3 * 24 * 60 * 60 * 1000

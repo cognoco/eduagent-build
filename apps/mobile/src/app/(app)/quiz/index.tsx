@@ -1,12 +1,12 @@
 import React from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IntentCard } from '../../../components/home/IntentCard';
 import { useQuizStats } from '../../../hooks/use-quiz';
 import { useSubjects } from '../../../hooks/use-subjects';
-import { goBackOrReplace } from '../../../lib/navigation';
+import { goBackOrReplace, homeHrefForReturnTo } from '../../../lib/navigation';
 import { useThemeColors } from '../../../lib/theme';
 import { useQuizFlow } from './_layout';
 
@@ -28,6 +28,7 @@ function getLanguageDisplayName(
 
 export default function QuizIndexScreen(): React.ReactElement {
   const router = useRouter();
+  const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
   const {
@@ -88,6 +89,14 @@ export default function QuizIndexScreen(): React.ReactElement {
     setCompletionResult(null);
     router.push('/(app)/quiz/launch' as never);
   };
+  const handleBack = () => {
+    if (returnTo) {
+      router.replace(homeHrefForReturnTo(returnTo) as never);
+      return;
+    }
+
+    goBackOrReplace(router, '/(app)/practice');
+  };
 
   return (
     <ScrollView
@@ -101,8 +110,8 @@ export default function QuizIndexScreen(): React.ReactElement {
     >
       <View className="mb-6 flex-row items-center">
         <Pressable
-          onPress={() => goBackOrReplace(router, '/(app)/practice')}
-          className="mr-3 min-h-[32px] min-w-[32px] items-center justify-center"
+          onPress={handleBack}
+          className="mr-3 min-h-[44px] min-w-[44px] items-center justify-center"
           accessibilityRole="button"
           accessibilityLabel="Go back"
           testID="quiz-back"
@@ -130,7 +139,7 @@ export default function QuizIndexScreen(): React.ReactElement {
             </Text>
           </Pressable>
           <Pressable
-            onPress={() => goBackOrReplace(router, '/(app)/practice')}
+            onPress={handleBack}
             className="min-h-[44px] items-center justify-center rounded-button bg-surface-elevated px-4 py-3"
             accessibilityRole="button"
             accessibilityLabel="Go back"

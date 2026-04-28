@@ -127,6 +127,44 @@ describe('useInterviewState', () => {
     expect(result.current.fetchStatus).toBe('idle');
     expect(mockFetch).not.toHaveBeenCalled();
   });
+
+  // [BUG-810] Caller-side gate. The previous shape forced callers to pass an
+  // empty-string subjectId fallback; that worked because of the internal
+  // !!subjectId check, but only as a coincidence. Make the gate explicit so
+  // a future caller cannot accidentally enable the query with '' anymore.
+  it('[BREAK / BUG-810] respects caller `enabled: false` even with valid subjectId', () => {
+    const { result } = renderHook(
+      () => useInterviewState('subject-1', { enabled: false }),
+      { wrapper: createWrapper() }
+    );
+
+    expect(result.current.fetchStatus).toBe('idle');
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('[BUG-810] caller `enabled: true` re-enables the query (default behaviour)', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          state: {
+            draftId: 'draft-2',
+            status: 'in_progress',
+            exchangeCount: 0,
+            subjectName: 'Math',
+          },
+        }),
+        { status: 200 }
+      )
+    );
+
+    const { result } = renderHook(
+      () => useInterviewState('subject-1', { enabled: true }),
+      { wrapper: createWrapper() }
+    );
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('useSendInterviewMessage', () => {

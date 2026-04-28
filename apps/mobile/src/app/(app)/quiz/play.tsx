@@ -18,6 +18,7 @@ import {
 } from '../../../hooks/use-quiz';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { platformAlert } from '../../../lib/platform-alert';
+import { formatApiError } from '../../../lib/format-api-error';
 import { useThemeColors } from '../../../lib/theme';
 import { Sentry } from '../../../lib/sentry';
 import { useQuizFlow } from './_layout';
@@ -195,8 +196,14 @@ export default function QuizPlayScreen(): React.ReactElement {
           setCorrectAnswer(result.correctAnswer);
         }
         return result.correct;
-      } catch {
+      } catch (err) {
+        // [BUG-799] State-flag-only feedback is invisible if the JSX consumer
+        // misses it (unmount during failure, flag cleared by another render).
+        // Surface the failure visibly + capture for triage. Without this, the
+        // user thinks their answer was validated when in fact it never was.
         setAnswerCheckFailed(true);
+        Sentry.captureException(err);
+        platformAlert("Couldn't check your answer", formatApiError(err));
         return false;
       }
     },
@@ -318,9 +325,14 @@ export default function QuizPlayScreen(): React.ReactElement {
   // or empty (e.g. because a stale API version stripped the wrong fields),
   // we must never silently render a dead-end with no choices — every state
   // must have an action per the UX resilience rules.
+  // [BUG-812] Account for de-duplication: server-side options may contain
+  // duplicates (e.g. an LLM produced the same distractor twice). After
+  // `new Set(options)` the playable count can drop below 2 even when the
+  // raw array length is >=2. Treat that as a malformed round so the user
+  // sees an actionable fallback instead of a single-button "MC" question.
   const isMalformedMcQuestion =
     (question.type === 'capitals' || question.type === 'vocabulary') &&
-    (!Array.isArray(question.options) || question.options.length < 2);
+    (!Array.isArray(question.options) || new Set(question.options).size < 2);
 
   if (isMalformedMcQuestion) {
     return (
@@ -335,7 +347,7 @@ export default function QuizPlayScreen(): React.ReactElement {
         <View className="flex-row items-center justify-between mb-6">
           <Pressable
             onPress={handleQuit}
-            className="min-h-[32px] min-w-[32px] items-center justify-center"
+            className="min-h-[44px] min-w-[44px] items-center justify-center"
             accessibilityRole="button"
             accessibilityLabel="Quit quiz"
             testID="quiz-play-quit"
@@ -392,11 +404,12 @@ export default function QuizPlayScreen(): React.ReactElement {
           router.replace('/(app)/quiz/results' as never);
         },
         onError: (err) => {
-          setCompleteError(
-            err instanceof Error
-              ? err.message
-              : "We couldn't save your round. Please try again."
-          );
+          // [BUG-806] formatApiError handles all shapes (typed envelope, Error,
+          // string, network failure) — `err instanceof Error` returns false for
+          // server-typed error envelopes, hiding the actionable reason behind
+          // the generic fallback.
+          setCompleteError(formatApiError(err));
+          Sentry.captureException(err);
         },
       }
     );
@@ -412,6 +425,14 @@ export default function QuizPlayScreen(): React.ReactElement {
     if (answerState !== 'unanswered' || answerSubmittedRef.current) return;
     answerSubmittedRef.current = true;
 
+    // [BUG-819] Capture questionIndex synchronously at call-time and use the
+    // local instead of the closure variable everywhere downstream. The
+    // mutation `await` and any subsequent state updates run on a separate
+    // tick from React render commits, so reading `currentIndex` after the
+    // await would risk recording the result against the wrong question if
+    // the index has advanced.
+    const questionIndex = currentIndex;
+
     const timeMs = Date.now() - questionStartTimeRef.current;
     setSelectedAnswer(answer);
     setAnswerState('checking');
@@ -420,7 +441,7 @@ export default function QuizPlayScreen(): React.ReactElement {
     try {
       const result = await checkAnswer.mutateAsync({
         roundId: activeRound.id,
-        questionIndex: currentIndex,
+        questionIndex,
         answerGiven: answer,
       });
       correct = result.correct;
@@ -429,14 +450,18 @@ export default function QuizPlayScreen(): React.ReactElement {
       if (!correct && result.correctAnswer) {
         setCorrectAnswer(result.correctAnswer);
       }
-    } catch {
-      // On check failure, assume wrong — server re-validates on complete
+    } catch (err) {
+      // [BUG-799] On check failure, assume wrong — server re-validates on
+      // complete. But surface the network/server reason so the user knows
+      // the answer wasn't validated, instead of silently flipping the flag.
       correct = false;
       setAnswerCheckFailed(true);
+      Sentry.captureException(err);
+      platformAlert("Couldn't check your answer", formatApiError(err));
     }
 
     const nextResult: QuestionResult = {
-      questionIndex: currentIndex,
+      questionIndex,
       correct,
       answerGiven: answer,
       timeMs,
@@ -529,7 +554,7 @@ export default function QuizPlayScreen(): React.ReactElement {
       <View className="mb-6 flex-row items-center justify-between px-5">
         <Pressable
           onPress={handleQuit}
-          className="min-h-[32px] min-w-[32px] items-center justify-center"
+          className="min-h-[44px] min-w-[44px] items-center justify-center"
           accessibilityRole="button"
           accessibilityLabel="Quit quiz"
           testID="quiz-play-quit"

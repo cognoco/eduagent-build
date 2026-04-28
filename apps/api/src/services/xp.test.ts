@@ -153,7 +153,7 @@ describe('insertSessionXpEntry', () => {
       profileId: 'profile-001',
       topicId: 'topic-001',
       status: 'passed',
-      masteryScore: '0.80',
+      masteryScore: 0.8,
       verificationDepth: 'explain',
     });
 
@@ -218,7 +218,7 @@ describe('insertSessionXpEntry', () => {
       profileId: 'profile-001',
       topicId: 'topic-001',
       status: 'passed',
-      masteryScore: '0.90',
+      masteryScore: 0.9,
       verificationDepth: 'recall',
     });
 
@@ -246,7 +246,7 @@ describe('insertSessionXpEntry', () => {
       profileId: 'profile-001',
       topicId: 'topic-001',
       status: 'passed',
-      masteryScore: '0.75',
+      masteryScore: 0.75,
       verificationDepth: 'transfer',
     });
 
@@ -280,7 +280,7 @@ describe('insertSessionXpEntry', () => {
       profileId: 'profile-001',
       topicId: 'topic-001',
       status: 'passed',
-      masteryScore: '0.80',
+      masteryScore: 0.8,
       verificationDepth: 'recall',
     });
 
@@ -306,7 +306,7 @@ describe('insertSessionXpEntry', () => {
       profileId: 'profile-001',
       topicId: 'topic-001',
       status: 'passed',
-      masteryScore: '0.80',
+      masteryScore: 0.8,
       verificationDepth: 'recall',
     });
 

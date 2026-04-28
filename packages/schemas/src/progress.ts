@@ -122,6 +122,37 @@ export const topicProgressSchema = z.object({
 });
 export type TopicProgress = z.infer<typeof topicProgressSchema>;
 
+export const learningResumeScopeSchema = z.object({
+  subjectId: z.string().uuid().optional(),
+  bookId: z.string().uuid().optional(),
+  topicId: z.string().uuid().optional(),
+});
+export type LearningResumeScope = z.infer<typeof learningResumeScopeSchema>;
+
+export const learningResumeKindSchema = z.enum([
+  'active_session',
+  'paused_session',
+  'recent_topic',
+  'next_topic',
+  'subject_freeform',
+]);
+export type LearningResumeKind = z.infer<typeof learningResumeKindSchema>;
+
+export const learningResumeTargetSchema = z.object({
+  subjectId: z.string().uuid(),
+  subjectName: z.string(),
+  topicId: z.string().uuid().nullable(),
+  topicTitle: z.string().nullable(),
+  sessionId: z.string().uuid().nullable(),
+  resumeFromSessionId: z.string().uuid().nullable(),
+  resumeKind: learningResumeKindSchema,
+  lastActivityAt: z.string().datetime().nullable(),
+  reason: z.string(),
+});
+export type LearningResumeTarget = z.infer<
+  typeof learningResumeTargetSchema
+>;
+
 export const dashboardChildProgressSchema = z.object({
   snapshotDate: z.string(),
   topicsMastered: z.number().int(),

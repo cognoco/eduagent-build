@@ -392,7 +392,7 @@ export default function SignUpScreen() {
               variant="tertiary"
               size="small"
               label="Back to sign in"
-              onPress={() => router.push('/(auth)/sign-in')}
+              onPress={() => router.replace('/(auth)/sign-in')}
               testID="verify-back-to-sign-in"
             />
           </View>
@@ -601,7 +601,7 @@ export default function SignUpScreen() {
             variant="tertiary"
             size="small"
             label="Sign in"
-            onPress={() => router.push('/(auth)/sign-in')}
+            onPress={() => router.replace('/(auth)/sign-in')}
             testID="sign-in-link"
           />
         </View>

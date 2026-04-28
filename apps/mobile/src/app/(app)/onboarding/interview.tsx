@@ -16,6 +16,7 @@ import { useStartSession, useStreamMessage } from '../../../hooks/use-sessions';
 import { formatApiError } from '../../../lib/format-api-error';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { platformAlert } from '../../../lib/platform-alert';
+import { Sentry } from '../../../lib/sentry';
 
 const OPENING_MESSAGE =
   "Hi! I'm your learning mate. Before we build your learning path — what do you already know about this subject? Even a rough sense is helpful.";
@@ -46,8 +47,13 @@ export default function InterviewScreen() {
 
   // BUG-316: Guard against empty/missing subjectId — hooks receive empty string
   // which triggers a 404 API call. Show error state instead.
+  // [BUG-810] Explicitly disable the query when safeSubjectId is undefined so
+  // the gate is visible at the call site (defence-in-depth — the hook also
+  // enforces `!!subjectId` internally).
   const safeSubjectId = subjectId && subjectId.trim() ? subjectId : undefined;
-  const interviewState = useInterviewState(safeSubjectId ?? '');
+  const interviewState = useInterviewState(safeSubjectId ?? '', {
+    enabled: !!safeSubjectId,
+  });
   const {
     stream: streamInterview,
     abort: abortStream,
@@ -103,9 +109,15 @@ export default function InterviewScreen() {
     // interests-context picker before the language/analogy fork. The picker
     // owns the downstream routing to language-setup or analogy-preference,
     // so we only need to forward the fork inputs + extracted labels.
+    // [BUG-804] Read server-side state first; local extractedInterests is a
+    // safety net for the force-complete path (which seeds it from the
+    // mutation response) but server data is canonical. The previous order
+    // (`extractedInterests ?? query.data ?? []`) would silently mask a stale
+    // local-state value if a future caller forgot to clear it on subjectId
+    // change.
     const interests =
-      extractedInterests ??
       interviewState.data?.extractedSignals?.interests ??
+      extractedInterests ??
       [];
     if (interests.length > 0) {
       router.replace({
@@ -186,17 +198,36 @@ export default function InterviewScreen() {
       setActiveSessionId(result.session.id);
       setSessionPhase(true);
     } catch (err) {
-      // Session creation failed — fall back to showing the "Let's Go" card
-      // so the user isn't stuck on a dead screen.
+      // [BUG-803] Surface the failure via the existing
+      // session-creation-stuck retry UX (Try Again + Go Back) instead of
+      // silently swapping to the "Let's Go" card — which made it look like
+      // the interview succeeded when in reality the session never started
+      // and there was no retry path. Sentry capture replaces the prior
+      // console.error-only logging so failures are observable in production.
+      Sentry.captureException(err, {
+        tags: {
+          component: 'InterviewScreen',
+          action: 'transition-to-session',
+        },
+      });
       console.error(
-        '[Interview→Session] Session creation FAILED, falling back:',
+        '[Interview→Session] Session creation FAILED, surfacing retry:',
         err
       );
-      setInterviewComplete(true);
+      setSessionPhase(true);
+      setSessionCreationStuck(true);
       sessionCreatingRef.current = false;
     }
   }, [safeSubjectId]);
 
+  // [BUG-816 / F-MOB-18] If router pushes the screen with a different
+  // subjectId while it's still mounted, every piece of interview-screen-local
+  // state must reset — otherwise messages from the previous interview, the
+  // session-phase flag, or extracted interests would leak across subjects and
+  // corrupt onboarding. Watching `subjectId` (and `openingMessage`, which is
+  // tied to subjectName/bookTitle) makes the reset explicit and exhaustive
+  // rather than relying on remount. Refs are reset alongside state to keep
+  // the in-flight session-creation guard in sync.
   useEffect(() => {
     seededDraftRef.current = false;
     setMessages([

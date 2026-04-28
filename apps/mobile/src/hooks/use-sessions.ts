@@ -23,7 +23,7 @@ import type {
   RecallBridgeResult,
   VerificationType,
 } from '@eduagent/schemas';
-import { useApiClient } from '../lib/api-client';
+import { useApiClient, getProxyMode } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
@@ -308,14 +308,21 @@ export function useStreamMessage(sessionId: string): {
         // Build URL and auth headers manually — React Native's fetch does NOT
         // support ReadableStream on response.body (Hermes returns null), so we
         // bypass the Hono RPC client and use XHR-based streaming instead.
+        // [I-1 / BUG-629] [I-3 / BUG-631] Snapshot BOTH proxyMode and
+        // profileId BEFORE the async getToken() call so a concurrent
+        // profile-switch can't produce a mismatched header pair.
+        const proxyMode = getProxyMode();
+        const snapshotProfileId = profileIdRef.current;
         const token = await getTokenRef.current();
         const headers: Record<string, string> = {
           'Content-Type': 'application/json',
           Accept: 'text/event-stream',
         };
         if (token) headers['Authorization'] = `Bearer ${token}`;
-        if (profileIdRef.current)
-          headers['X-Profile-Id'] = profileIdRef.current;
+        if (snapshotProfileId) headers['X-Profile-Id'] = snapshotProfileId;
+        // [I-1] SSE path builds headers manually so X-Proxy-Mode must be
+        // injected here — customFetch is bypassed for the stream request.
+        if (proxyMode) headers['X-Proxy-Mode'] = 'true';
 
         const url = `${getApiUrl()}/v1/sessions/${effectiveSessionId}/stream`;
         const body: SessionMessageInput = {

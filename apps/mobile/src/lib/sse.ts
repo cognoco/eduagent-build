@@ -437,12 +437,25 @@ export function streamSSEViaXHR(
 
   async function* generateEvents(): AsyncGenerator<StreamEvent> {
     while (true) {
+      // [BUG-632 / I-21] Check streamError BEFORE draining the queue. If a
+      // 4xx response arrived alongside buffered SSE chunks (server may flush
+      // headers + a few `data:` frames before returning the error body), the
+      // consumer must not see those stale chunks — they would corrupt the
+      // accumulated response text before the error surfaces. Discard the
+      // queue and throw immediately.
+      if (done && streamError) {
+        eventQueue.length = 0;
+        throw streamError;
+      }
       while (eventQueue.length > 0) {
         const event = eventQueue.shift();
         if (event) yield event;
       }
       if (done) {
-        if (streamError) throw streamError;
+        if (streamError) {
+          eventQueue.length = 0;
+          throw streamError;
+        }
         return;
       }
       await new Promise<void>((r) => {

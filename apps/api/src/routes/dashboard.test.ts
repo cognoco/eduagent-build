@@ -53,6 +53,17 @@ jest.mock('../services/dashboard', () => ({
     mockGetChildSubjectTopics(...args),
 }));
 
+// [T-3 / BUG-744] Mock assertParentAccess so IDOR break tests can force 403.
+// The default mock succeeds (returns void). Individual break tests override it
+// to throw ForbiddenError — proving the route handles the error as 403.
+const mockAssertParentAccess = jest.fn().mockResolvedValue(undefined);
+
+jest.mock('../services/family-access', () => ({
+  ...jest.requireActual('../services/family-access'),
+  assertParentAccess: (...args: unknown[]) => mockAssertParentAccess(...args),
+  hasParentAccess: jest.fn().mockResolvedValue(true),
+}));
+
 const mockListWeeklyReports = jest.fn().mockResolvedValue([]);
 const mockGetWeeklyReport = jest.fn().mockResolvedValue(null);
 const mockMarkWeeklyReportViewed = jest.fn().mockResolvedValue(undefined);
@@ -71,14 +82,16 @@ jest.mock('../services/weekly-report', () => ({
 }));
 
 import { app } from '../index';
+import { ForbiddenError } from '../errors';
+import {
+  AUTH_HEADERS as BASE_AUTH_HEADERS,
+  BASE_AUTH_ENV,
+} from '../test-utils/test-env';
 
-const TEST_ENV = {
-  CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',
-};
+const TEST_ENV = { ...BASE_AUTH_ENV };
 
 const AUTH_HEADERS = {
-  Authorization: 'Bearer valid.jwt.token',
-  'Content-Type': 'application/json',
+  ...BASE_AUTH_HEADERS,
   'X-Profile-Id': 'test-profile-id',
 };
 
@@ -338,6 +351,285 @@ describe('dashboard routes', () => {
       );
 
       expect(res.status).toBe(401);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // [T-3 / BUG-744] IDOR break tests — assertParentAccess must block
+  // mismatched parent/child pairs across all child-scoped endpoints.
+  //
+  // Pre-fix: no test exercised the ForbiddenError path, leaving the guard
+  // invisible — a removed or short-circuited assertParentAccess would return
+  // 200 with another user's data instead of 403.
+  // Post-fix: each endpoint here proves the 403 path is wired.
+  // -------------------------------------------------------------------------
+
+  describe('[BUG-744] IDOR: assertParentAccess rejects mismatched parent/child', () => {
+    beforeEach(() => {
+      // Default: access granted. Override in individual break tests.
+      mockAssertParentAccess.mockResolvedValue(undefined);
+    });
+
+    // [BREAK] memory endpoint calls assertParentAccess directly in the route
+    it('[BREAK] GET /dashboard/children/:id/memory returns 403 for unlinked parent', async () => {
+      mockAssertParentAccess.mockRejectedValueOnce(
+        new ForbiddenError('You do not have access to this child profile.')
+      );
+
+      const res = await app.request(
+        `/v1/dashboard/children/${PROFILE_ID}/memory`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(403);
+      expect(mockAssertParentAccess).toHaveBeenCalledTimes(1);
+    });
+
+    it('GET /dashboard/children/:id/memory returns 200 for linked parent', async () => {
+      // assertParentAccess succeeds (default mock)
+      const res = await app.request(
+        `/v1/dashboard/children/${PROFILE_ID}/memory`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      // 200 or 404 (profile not found) — either way not 403
+      expect(res.status).not.toBe(403);
+    });
+
+    // [BREAK / BUG-744] getChildDetail is the service-layer guard for the
+    // child-detail endpoint. If the assertParentAccess call inside the
+    // service were removed, an unlinked parent would get 200 with another
+    // family's data. This test mocks the service to throw ForbiddenError —
+    // proving the route's error middleware translates it to a 403.
+    it('[BREAK] GET /dashboard/children/:id returns 403 when service rejects unlinked parent', async () => {
+      mockGetChildDetail.mockRejectedValueOnce(
+        new ForbiddenError('You do not have access to this child profile.')
+      );
+
+      const res = await app.request(
+        `/v1/dashboard/children/${PROFILE_ID}`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(403);
+      expect(mockGetChildDetail).toHaveBeenCalledTimes(1);
+    });
+
+    // [BREAK / BUG-744] getChildSubjectTopics is the service-layer guard
+    // for the subject-detail endpoint. Same break pattern: forced
+    // ForbiddenError must surface as 403, not 200 with mixed-tenant data.
+    it('[BREAK] GET /dashboard/children/:id/subjects/:subjectId returns 403 when service rejects unlinked parent', async () => {
+      mockGetChildSubjectTopics.mockRejectedValueOnce(
+        new ForbiddenError('You do not have access to this child profile.')
+      );
+
+      const res = await app.request(
+        `/v1/dashboard/children/${PROFILE_ID}/subjects/${SUBJECT_ID}`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(403);
+      expect(mockGetChildSubjectTopics).toHaveBeenCalledTimes(1);
+    });
+
+    // [BREAK / BUG-744] Weekly-report list/detail go through their own
+    // service module. Both must surface ForbiddenError as 403.
+    it('[BREAK] GET /dashboard/children/:id/weekly-reports returns 403 when service rejects unlinked parent', async () => {
+      mockListWeeklyReports.mockRejectedValueOnce(
+        new ForbiddenError('You do not have access to this child profile.')
+      );
+
+      const res = await app.request(
+        `/v1/dashboard/children/${PROFILE_ID}/weekly-reports`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(403);
+      expect(mockListWeeklyReports).toHaveBeenCalledTimes(1);
+    });
+
+    // -----------------------------------------------------------------------
+    // [BUG-834] Defense-in-depth: every :profileId-scoped dashboard route now
+    // calls assertParentAccess at route entry, *before* the service. The
+    // following break tests prove the route-entry guard short-circuits to 403
+    // — the service is never invoked when assertParentAccess rejects.
+    // -----------------------------------------------------------------------
+
+    const dashboardRouteFixtures: Array<{
+      label: string;
+      method?: 'GET' | 'POST';
+      path: string;
+    }> = [
+      {
+        label: 'GET /dashboard/children/:id',
+        path: `/v1/dashboard/children/${PROFILE_ID}`,
+      },
+      {
+        label: 'GET /dashboard/children/:id/inventory',
+        path: `/v1/dashboard/children/${PROFILE_ID}/inventory`,
+      },
+      {
+        label: 'GET /dashboard/children/:id/progress-history',
+        path: `/v1/dashboard/children/${PROFILE_ID}/progress-history`,
+      },
+      {
+        label: 'GET /dashboard/children/:id/subjects/:subjectId',
+        path: `/v1/dashboard/children/${PROFILE_ID}/subjects/${SUBJECT_ID}`,
+      },
+      {
+        label: 'GET /dashboard/children/:id/sessions',
+        path: `/v1/dashboard/children/${PROFILE_ID}/sessions`,
+      },
+      {
+        label: 'GET /dashboard/children/:id/sessions/:sessionId',
+        path: `/v1/dashboard/children/${PROFILE_ID}/sessions/${SUBJECT_ID}`,
+      },
+      {
+        label: 'GET /dashboard/children/:id/reports',
+        path: `/v1/dashboard/children/${PROFILE_ID}/reports`,
+      },
+      {
+        label: 'GET /dashboard/children/:id/reports/:reportId',
+        path: `/v1/dashboard/children/${PROFILE_ID}/reports/${SUBJECT_ID}`,
+      },
+      {
+        label: 'POST /dashboard/children/:id/reports/:reportId/view',
+        method: 'POST',
+        path: `/v1/dashboard/children/${PROFILE_ID}/reports/${SUBJECT_ID}/view`,
+      },
+      {
+        label: 'GET /dashboard/children/:id/weekly-reports',
+        path: `/v1/dashboard/children/${PROFILE_ID}/weekly-reports`,
+      },
+      {
+        label: 'GET /dashboard/children/:id/weekly-reports/:reportId',
+        path: `/v1/dashboard/children/${PROFILE_ID}/weekly-reports/${SUBJECT_ID}`,
+      },
+      {
+        label: 'POST /dashboard/children/:id/weekly-reports/:reportId/view',
+        method: 'POST',
+        path: `/v1/dashboard/children/${PROFILE_ID}/weekly-reports/${SUBJECT_ID}/view`,
+      },
+    ];
+
+    for (const fixture of dashboardRouteFixtures) {
+      it(`[BREAK / BUG-834] ${fixture.label} returns 403 when route-entry assertParentAccess rejects`, async () => {
+        mockAssertParentAccess.mockRejectedValueOnce(
+          new ForbiddenError('You do not have access to this child profile.')
+        );
+
+        const res = await app.request(
+          fixture.path,
+          { method: fixture.method ?? 'GET', headers: AUTH_HEADERS },
+          TEST_ENV
+        );
+
+        expect(res.status).toBe(403);
+        // Route-entry guard fired — service should not have been called.
+        // (We can't assert "no service called" universally, but for the
+        // child-detail route the service mock is observable.)
+      });
+    }
+
+    // [BUG-834] Specifically verify the child-detail route does NOT invoke
+    // its service when route-entry assertParentAccess rejects. This is the
+    // tightest "defense-in-depth" assertion: the route-layer guard fires
+    // before the service is even reached.
+    it('[BREAK / BUG-834] route-entry guard short-circuits — service not called', async () => {
+      mockAssertParentAccess.mockRejectedValueOnce(
+        new ForbiddenError('You do not have access to this child profile.')
+      );
+
+      const res = await app.request(
+        `/v1/dashboard/children/${PROFILE_ID}`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(403);
+      expect(mockGetChildDetail).not.toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // [BUG-830 / F-API-01] Error envelope contract — every dashboard 404 must
+  // emit the canonical { code, message } shape so mobile error classifiers
+  // bucket dashboard misses the same way they bucket every other route.
+  // Pre-fix: routes returned { error: 'X' } which silently fell through the
+  // ERROR_CODES enum and made observability blind to dashboard 404s.
+  // -------------------------------------------------------------------------
+
+  describe('[BUG-830] Dashboard 404s use the typed apiError envelope', () => {
+    const SESSION_ID = '660e8400-e29b-41d4-a716-446655440000';
+    const REPORT_ID = '880e8400-e29b-41d4-a716-446655440000';
+
+    it('[BREAK] GET /dashboard/children/:id/sessions/:sessionId — 404 has { code: NOT_FOUND, message }', async () => {
+      const sessionsModule = jest.requireMock(
+        '../services/dashboard'
+      ) as Record<string, jest.Mock>;
+      sessionsModule.getChildSessionDetail = jest
+        .fn()
+        .mockResolvedValueOnce(null);
+
+      const res = await app.request(
+        `/v1/dashboard/children/${PROFILE_ID}/sessions/${SESSION_ID}`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(404);
+      const body = (await res.json()) as Record<string, unknown>;
+      expect(body).toEqual({
+        code: 'NOT_FOUND',
+        message: 'Session not found',
+      });
+      expect(body).not.toHaveProperty('error');
+    });
+
+    it('[BREAK] GET /dashboard/children/:id/reports/:reportId — 404 has { code: NOT_FOUND, message }', async () => {
+      const dashboardModule = jest.requireMock(
+        '../services/dashboard'
+      ) as Record<string, jest.Mock>;
+      dashboardModule.getChildReportDetail = jest
+        .fn()
+        .mockResolvedValueOnce(null);
+
+      const res = await app.request(
+        `/v1/dashboard/children/${PROFILE_ID}/reports/${REPORT_ID}`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(404);
+      const body = (await res.json()) as Record<string, unknown>;
+      expect(body).toEqual({
+        code: 'NOT_FOUND',
+        message: 'Report not found',
+      });
+      expect(body).not.toHaveProperty('error');
+    });
+
+    it('[BREAK] GET /dashboard/children/:id/weekly-reports/:reportId — 404 has { code: NOT_FOUND, message }', async () => {
+      mockGetWeeklyReport.mockResolvedValueOnce(null);
+
+      const res = await app.request(
+        `/v1/dashboard/children/${PROFILE_ID}/weekly-reports/${REPORT_ID}`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(404);
+      const body = (await res.json()) as Record<string, unknown>;
+      expect(body).toEqual({
+        code: 'NOT_FOUND',
+        message: 'Report not found',
+      });
+      expect(body).not.toHaveProperty('error');
     });
   });
 });

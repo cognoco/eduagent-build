@@ -25,6 +25,7 @@ import { eq, like } from 'drizzle-orm';
 import { ForbiddenError } from '../errors';
 import {
   countGuidedMetrics,
+  countGuidedMetricsBatch,
   getChildDetail,
   getChildSessionDetail,
   getChildSessions,
@@ -47,6 +48,24 @@ function subtractDays(date: Date, days: number): Date {
   const result = new Date(date);
   result.setUTCDate(result.getUTCDate() - days);
   return result;
+}
+
+/**
+ * Returns Wednesday noon UTC of the current ISO week.
+ *
+ * The dashboard service uses Monday-start ISO weeks (see
+ * `getStartOfWeek` in dashboard.ts). When tests use `new Date()` and
+ * offset by ±1 day to seed "this week" / "last week" sessions, those
+ * offsets cross the Monday boundary on Mon/Sun and silently misclassify.
+ * Anchoring to mid-week makes ±1 / ±8 day offsets always land in the
+ * intended week.
+ */
+function getStableMidWeekNow(): Date {
+  const d = new Date();
+  const day = d.getUTCDay() || 7; // Sun=0 → treat as 7 so Mon=1
+  d.setUTCDate(d.getUTCDate() - day + 3); // shift to Wednesday (day 3)
+  d.setUTCHours(12, 0, 0, 0);
+  return d;
 }
 
 function buildSubjectMetrics(
@@ -296,7 +315,7 @@ async function seedAssessment(input: {
   subjectId: string;
   topicId: string;
   status?: 'in_progress' | 'passed' | 'failed';
-  masteryScore?: string | null;
+  masteryScore?: number | null;
 }): Promise<void> {
   await db.insert(assessments).values({
     profileId: input.profileId,
@@ -304,7 +323,7 @@ async function seedAssessment(input: {
     topicId: input.topicId,
     status: input.status ?? 'passed',
     verificationDepth: 'recall',
-    masteryScore: input.masteryScore ?? '0.80',
+    masteryScore: input.masteryScore ?? 0.8,
     exchangeHistory: [],
   });
 }
@@ -423,6 +442,98 @@ describe('dashboard service integration', () => {
     expect(result).toEqual({ guidedCount: 2, totalProblemCount: 3 });
   });
 
+  // [BUG-734 / PERF-4] Verify the batched variant returns the same metrics
+  // for each child as the per-child query, in a single round-trip, including
+  // the "child with zero events" case which must still appear in the map.
+  it('countGuidedMetricsBatch aggregates per child and includes zero-event children', async () => {
+    const { profileId: childA } = await seedProfile({
+      displayName: 'BatchChildA',
+    });
+    const { profileId: childB } = await seedProfile({
+      displayName: 'BatchChildB',
+    });
+    const { profileId: childZero } = await seedProfile({
+      displayName: 'BatchChildZero',
+    });
+
+    const subjectA = await seedSubject({ profileId: childA, name: 'Math' });
+    const subjectB = await seedSubject({ profileId: childB, name: 'Science' });
+
+    const sessionA = await seedSession({
+      profileId: childA,
+      subjectId: subjectA,
+      startedAt: subtractDays(new Date(), 1),
+      exchangeCount: 2,
+    });
+    const sessionB = await seedSession({
+      profileId: childB,
+      subjectId: subjectB,
+      startedAt: subtractDays(new Date(), 1),
+      exchangeCount: 2,
+    });
+
+    // child A: 1 guided (rung 4) + 1 non-guided (rung 1) → guided=1 total=2
+    await seedSessionEvent({
+      sessionId: sessionA,
+      profileId: childA,
+      subjectId: subjectA,
+      eventType: 'ai_response',
+      content: 'A1',
+      createdAt: subtractDays(new Date(), 1),
+      metadata: { escalationRung: 4 },
+    });
+    await seedSessionEvent({
+      sessionId: sessionA,
+      profileId: childA,
+      subjectId: subjectA,
+      eventType: 'ai_response',
+      content: 'A2',
+      createdAt: subtractDays(new Date(), 1),
+      metadata: { escalationRung: 1 },
+    });
+
+    // child B: 2 guided (rung 3, rung 5) → guided=2 total=2
+    await seedSessionEvent({
+      sessionId: sessionB,
+      profileId: childB,
+      subjectId: subjectB,
+      eventType: 'ai_response',
+      content: 'B1',
+      createdAt: subtractDays(new Date(), 1),
+      metadata: { escalationRung: 3 },
+    });
+    await seedSessionEvent({
+      sessionId: sessionB,
+      profileId: childB,
+      subjectId: subjectB,
+      eventType: 'ai_response',
+      content: 'B2',
+      createdAt: subtractDays(new Date(), 1),
+      metadata: { escalationRung: 5 },
+    });
+
+    const result = await countGuidedMetricsBatch(
+      db,
+      [childA, childB, childZero],
+      subtractDays(new Date(), 2)
+    );
+
+    expect(result.get(childA)).toEqual({
+      guidedCount: 1,
+      totalProblemCount: 2,
+    });
+    expect(result.get(childB)).toEqual({
+      guidedCount: 2,
+      totalProblemCount: 2,
+    });
+    // childZero has no events but must still be in the map with zeros so
+    // the dashboard does not silently drop children from the iteration.
+    expect(result.get(childZero)).toEqual({
+      guidedCount: 0,
+      totalProblemCount: 0,
+    });
+  });
+
   it('returns aggregated children with real progress, snapshots, streaks, and XP', async () => {
     const { profileId: parentProfileId } = await seedProfile({
       displayName: 'Parent',
@@ -444,7 +555,7 @@ describe('dashboard service integration', () => {
       'Photosynthesis',
     ]);
     const [topicId1, topicId2] = topicIds;
-    const now = new Date();
+    const now = getStableMidWeekNow();
     const currentSession1StartedAt = now;
     const currentSession2StartedAt = subtractDays(now, 1);
     const lastWeekStartedAt = subtractDays(now, 8);
@@ -688,7 +799,7 @@ describe('dashboard service integration', () => {
     await seedSession({
       profileId: childProfileId,
       subjectId,
-      startedAt: subtractDays(new Date(), 1),
+      startedAt: subtractDays(getStableMidWeekNow(), 1),
       exchangeCount: 4,
       durationSeconds: 480,
       wallClockSeconds: 540,

@@ -12,14 +12,14 @@ describe('getOpeningMessage', () => {
   it('returns problem-text override regardless of experience', () => {
     const msg = getOpeningMessage('homework', 0, 'Solve 2+2');
     expect(msg).toBe(
-      "Got it. Let's work through this together. I'll keep it brief and clear."
+      "Got it — I can see your problem. Want me to walk you through how to solve it, or have you got an answer you'd like me to check?"
     );
   });
 
   it('returns problem-text override for experienced users too', () => {
     const msg = getOpeningMessage('learning', 10, 'Help with this');
     expect(msg).toBe(
-      "Got it. Let's work through this together. I'll keep it brief and clear."
+      "Got it — I can see your problem. Want me to walk you through how to solve it, or have you got an answer you'd like me to check?"
     );
   });
 
@@ -115,7 +115,7 @@ describe('getOpeningMessage', () => {
         'The Nile River'
       );
       expect(msg).not.toContain('The Nile River');
-      expect(msg).toContain('work through this together');
+      expect(msg).toContain('walk you through');
     });
   });
 
@@ -174,7 +174,7 @@ describe('getOpeningMessage', () => {
         'Biology — Botany'
       );
       expect(msg).not.toContain('Biology — Botany');
-      expect(msg).toContain('work through this together');
+      expect(msg).toContain('walk you through');
     });
   });
 
@@ -213,7 +213,7 @@ describe('getOpeningMessage', () => {
         'help with homework'
       );
       expect(msg).not.toContain('homework');
-      expect(msg).toContain('work through');
+      expect(msg).toContain('walk you through');
     });
   });
 

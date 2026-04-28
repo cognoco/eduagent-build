@@ -177,14 +177,16 @@ import {
   updateDraft,
   persistCurriculum,
 } from '../services/interview';
+import {
+  AUTH_HEADERS as BASE_AUTH_HEADERS,
+  BASE_AUTH_ENV,
+} from '../test-utils/test-env';
+import { ERROR_CODES, errorCodeSchema } from '@eduagent/schemas';
 
-const TEST_ENV = {
-  CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',
-};
+const TEST_ENV = { ...BASE_AUTH_ENV };
 
 const AUTH_HEADERS = {
-  Authorization: 'Bearer valid.jwt.token',
-  'Content-Type': 'application/json',
+  ...BASE_AUTH_HEADERS,
   'X-Profile-Id': 'test-profile-id',
 };
 
@@ -538,6 +540,83 @@ describe('interview routes', () => {
       );
 
       expect(res.status).toBe(400);
+    });
+
+    // [BUG-832 / F-API-03] The 503 LLM-unavailable response MUST emit the
+    // canonical typed envelope using ERROR_CODES.LLM_UNAVAILABLE so the
+    // mobile error classifier matches it against the enum (not a stringly-
+    // typed code that drifts from the schema).
+    it('[BREAK] returns 503 with ERROR_CODES.LLM_UNAVAILABLE when streamInterviewExchange throws at start', async () => {
+      (streamInterviewExchange as jest.Mock).mockRejectedValueOnce(
+        new Error('LLM provider down')
+      );
+
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/interview/stream`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'Hello' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(503);
+      const body = (await res.json()) as Record<string, unknown>;
+      expect(body.code).toBe('LLM_UNAVAILABLE');
+      // Cross-check against the schema enum so the test fails if either side
+      // drifts (e.g. a refactor renames the enum without updating the route).
+      expect(body.code).toBe(ERROR_CODES.LLM_UNAVAILABLE);
+      expect(() => errorCodeSchema.parse(body.code)).not.toThrow();
+    });
+
+    it('emits a structured fallback frame when the LLM produces an empty reply [BUG-555]', async () => {
+      // Repro: BUG-555 user-visible symptom was "That reply took too long"
+      // appearing repeatedly during the interview because the LLM occasionally
+      // returned empty/malformed envelopes that the mobile client treated as
+      // a stream timeout. After the stream-fallback guard (commit 855a632f)
+      // the route MUST emit a typed `fallback` SSE frame with a usable
+      // fallbackText so the mobile bubble shows recovery copy + Try Again,
+      // not an opaque timeout footer. This test pins that contract.
+      (streamInterviewExchange as jest.Mock).mockResolvedValue({
+        // Empty stream — no chunks ever arrive, mimicking an LLM that emits
+        // a malformed envelope.
+        stream: (async function* () {
+          // intentionally yields nothing
+        })(),
+        onComplete: jest.fn().mockResolvedValue({
+          response: '',
+          isComplete: false,
+          fallback: {
+            reason: 'empty_reply',
+            fallbackText: "I didn't have a reply — tap Try Again.",
+          },
+        }),
+      });
+
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/interview/stream`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'Anything' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.text();
+      // The route must emit a typed `fallback` frame (not a generic error /
+      // timeout). The frame carries the user-facing copy + reason classifier.
+      expect(body).toContain('"type":"fallback"');
+      expect(body).toContain('"reason":"empty_reply"');
+      expect(body).toContain('Try Again');
+      // Followed by a non-completing `done` frame so the mobile finalizer
+      // settles isStreaming and renders the fallback bubble.
+      expect(body).toContain('"type":"done"');
+      expect(body).toContain('"isComplete":false');
+      // CRITICAL: the route must NOT mark the draft completed on a fallback.
+      expect(persistCurriculum).not.toHaveBeenCalled();
     });
 
     it('calls persistCurriculum when interview completes during stream', async () => {

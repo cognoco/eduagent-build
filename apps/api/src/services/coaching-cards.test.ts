@@ -42,14 +42,14 @@ function mockRetentionCardRow(
     topicId: string;
     xpStatus: string;
     nextReviewAt: Date | null;
-    easeFactor: string;
+    easeFactor: number;
   }>
 ) {
   return {
     id: 'card-1',
     profileId,
     topicId: overrides?.topicId ?? topicId,
-    easeFactor: overrides?.easeFactor ?? '2.50',
+    easeFactor: overrides?.easeFactor ?? 2.5,
     intervalDays: 7,
     repetitions: 3,
     lastReviewedAt: NOW,

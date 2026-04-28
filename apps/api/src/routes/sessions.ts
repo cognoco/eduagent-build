@@ -16,6 +16,7 @@ import {
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
+import { assertNotProxyMode } from '../middleware/proxy-guard';
 import { streamSSE } from 'hono/streaming';
 import { captureException } from '../services/sentry';
 import { createLogger } from '../services/logger';
@@ -81,6 +82,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     '/subjects/:subjectId/sessions',
     zValidator('json', sessionStartSchema),
     async (c) => {
+      assertNotProxyMode(c);
       const db = c.get('db');
       const subjectId = c.req.param('subjectId');
       const input = c.req.valid('json');
@@ -530,6 +532,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     '/sessions/interleaved',
     zValidator('json', interleavedSessionStartSchema),
     async (c) => {
+      assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const input = c.req.valid('json');

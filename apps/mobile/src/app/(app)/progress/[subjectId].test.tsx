@@ -5,6 +5,7 @@ import ProgressSubjectScreen from './[subjectId]';
 const mockReplace = jest.fn();
 const mockPush = jest.fn();
 const mockGoBackOrReplace = jest.fn();
+const mockPushLearningResumeTarget = jest.fn();
 const mockLocalSearchParams = jest.fn(() => ({ subjectId: 's1' }));
 
 jest.mock('expo-router', () => ({
@@ -18,6 +19,8 @@ jest.mock('react-native-safe-area-context', () => ({
 
 jest.mock('../../../lib/navigation', () => ({
   goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
+  pushLearningResumeTarget: (...args: unknown[]) =>
+    mockPushLearningResumeTarget(...args),
 }));
 
 jest.mock('../../../components/common', () => {
@@ -60,10 +63,13 @@ jest.mock('../../../components/progress', () => ({
 
 const mockUseProgressInventory = jest.fn();
 const mockUseSubjectProgress = jest.fn();
+const mockUseLearningResumeTarget = jest.fn();
 jest.mock('../../../hooks/use-progress', () => ({
   useProgressInventory: (...args: unknown[]) =>
     mockUseProgressInventory(...args),
   useSubjectProgress: (...args: unknown[]) => mockUseSubjectProgress(...args),
+  useLearningResumeTarget: (...args: unknown[]) =>
+    mockUseLearningResumeTarget(...args),
 }));
 
 const mockUseLanguageProgress = jest.fn();
@@ -120,6 +126,10 @@ function mockHooks({
     isError: subjectProgressIsError,
     error: subjectProgressIsError ? new Error('retention fail') : null,
     refetch: subjectProgressRefetch,
+  });
+
+  mockUseLearningResumeTarget.mockReturnValue({
+    data: null,
   });
 
   mockUseLanguageProgress.mockReturnValue({
@@ -282,7 +292,34 @@ describe('ProgressSubjectScreen', () => {
       render(<ProgressSubjectScreen />);
       fireEvent.press(screen.getByText('Keep learning'));
       expect(mockPush).toHaveBeenCalledWith(
-        '/(app)/session?mode=freeform&subjectId=s1'
+        '/(app)/session?mode=learning&subjectId=s1'
+      );
+    });
+
+    it('resumes the shared subject target on "Keep learning" press', () => {
+      const target = {
+        subjectId: 's1',
+        subjectName: 'Math',
+        topicId: 't1',
+        topicTitle: 'Fractions',
+        sessionId: null,
+        resumeFromSessionId: 'prev-session',
+        resumeKind: 'recent_topic',
+        lastActivityAt: '2026-02-15T09:00:00.000Z',
+        reason: 'Continue Fractions',
+      };
+      mockHooks();
+      mockUseLearningResumeTarget.mockReturnValue({ data: target });
+
+      render(<ProgressSubjectScreen />);
+      fireEvent.press(screen.getByText('Keep learning'));
+
+      expect(mockPushLearningResumeTarget).toHaveBeenCalledWith(
+        expect.anything(),
+        target
+      );
+      expect(mockPush).not.toHaveBeenCalledWith(
+        '/(app)/session?mode=learning&subjectId=s1'
       );
     });
 

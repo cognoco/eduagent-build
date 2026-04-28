@@ -49,6 +49,23 @@ export async function isDeletionCancelled(
   );
 }
 
+// [BUG-844] Tells the scheduled-deletion Inngest function whether the
+// account still exists after the 7-day sleep. The grace-period flow assumes
+// the account is queryable on resume; if an admin or GC removed it during
+// the sleep, both isDeletionCancelled() and executeDeletion() are still
+// safe (the former returns false, the latter is idempotent), but the
+// caller should NOT enter the delete branch — return early as
+// 'already_deleted' so telemetry distinguishes it from a normal completion.
+export async function accountExists(
+  db: Database,
+  accountId: string
+): Promise<boolean> {
+  const row = await db.query.accounts.findFirst({
+    where: eq(accounts.id, accountId),
+  });
+  return !!row;
+}
+
 export async function getProfileIdsForAccount(
   db: Database,
   accountId: string

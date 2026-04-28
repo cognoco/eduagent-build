@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { View, Text, Pressable, ScrollView } from 'react-native';
 import type { HomeworkProblem } from '@eduagent/schemas';
 import type { Router } from 'expo-router';
@@ -260,24 +261,45 @@ export function HomeworkModeChips({
   handleNextProblem,
   handleEndSession,
 }: HomeworkModeChipsProps) {
+  const [problemExpanded, setProblemExpanded] = useState(true);
+
   if (effectiveMode !== 'homework') return null;
 
   return (
     <View className="bg-surface border-t border-surface-elevated">
       {homeworkProblemsState.length > 0 && (
         <View className="flex-row items-center justify-between px-4 pt-3">
-          <View>
-            <Text
-              className="text-body-sm font-semibold text-text-primary"
-              testID="homework-problem-progress"
-            >
-              Problem {currentProblemIndex + 1} of{' '}
-              {homeworkProblemsState.length}
-            </Text>
-            <Text className="text-caption text-text-secondary mt-0.5">
-              {activeHomeworkProblem?.text.slice(0, 70) ?? ''}
-            </Text>
-          </View>
+          <Pressable
+            onPress={() => setProblemExpanded((v) => !v)}
+            className="flex-1 pr-2"
+            accessibilityRole="button"
+            accessibilityLabel={
+              problemExpanded ? 'Hide problem text' : 'Show problem text'
+            }
+            accessibilityState={{ expanded: problemExpanded }}
+            testID="homework-problem-toggle"
+          >
+            <View className="flex-row items-center gap-1">
+              <Text
+                className="text-body-sm font-semibold text-text-primary"
+                testID="homework-problem-progress"
+              >
+                Problem {currentProblemIndex + 1} of{' '}
+                {homeworkProblemsState.length}
+              </Text>
+              <Text className="text-body-sm text-text-secondary">
+                {problemExpanded ? '▾' : '▸'}
+              </Text>
+            </View>
+            {problemExpanded && (
+              <Text
+                className="text-caption text-text-secondary mt-0.5"
+                testID="homework-problem-text"
+              >
+                {activeHomeworkProblem?.text.slice(0, 70) ?? ''}
+              </Text>
+            )}
+          </Pressable>
           <View className="flex-row items-center gap-2">
             {currentProblemIndex < homeworkProblemsState.length - 1 ? (
               <>
@@ -330,7 +352,7 @@ export function HomeworkModeChips({
             }`}
             testID="homework-mode-help-me"
             accessibilityRole="button"
-            accessibilityLabel="Help me solve it"
+            accessibilityLabel="Walk me through it"
             accessibilityState={{ selected: homeworkMode === 'help_me' }}
           >
             <Text
@@ -340,7 +362,7 @@ export function HomeworkModeChips({
                   : 'text-text-primary'
               }`}
             >
-              Help me solve it
+              Walk me through it
             </Text>
           </Pressable>
           <Pressable

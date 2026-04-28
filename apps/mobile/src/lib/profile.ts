@@ -3,17 +3,21 @@ import {
   useContext,
   useState,
   useEffect,
+  useLayoutEffect,
   useCallback,
   useMemo,
 } from 'react';
 import { createElement, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import * as SecureStore from './secure-storage';
+import { sanitizeSecureStoreKey } from './secure-storage';
+import { Sentry } from './sentry';
 import type { Profile } from '@eduagent/schemas';
 import { useProfiles } from '../hooks/use-profiles';
 import {
   useApiClient,
   setActiveProfileId as pushProfileIdToApiClient,
+  setProxyMode,
 } from './api-client';
 
 export type { Profile };
@@ -59,6 +63,11 @@ export function isGuardianProfile(
 export interface SwitchProfileResult {
   success: boolean;
   error?: string;
+  // [BUG-828] True when the in-memory switch succeeded but the SecureStore
+  // write failed — the change won't survive an app restart. Callers should
+  // surface a non-blocking warning so the user knows they may need to re-pick
+  // the profile after relaunching.
+  persistenceFailed?: boolean;
 }
 
 export interface ProfileContextValue {
@@ -72,7 +81,15 @@ export interface ProfileContextValue {
   acknowledgeProfileRemoval: () => void;
 }
 
-const ACTIVE_PROFILE_KEY = 'mentomate_active_profile_id';
+// [BUG-827 / F-CMP-003] Run keys through sanitizeSecureStoreKey so that any
+// future change introducing a dynamic segment (profileId, etc.) doesn't
+// silently break on iOS — the iOS Keychain rejects keys with characters
+// outside [a-zA-Z0-9._-]. The current literals are already safe; this is
+// belt-and-suspenders and matches summary-draft.ts / session-recovery.ts.
+const ACTIVE_PROFILE_KEY = sanitizeSecureStoreKey(
+  'mentomate_active_profile_id'
+);
+const PARENT_PROXY_KEY = sanitizeSecureStoreKey('parent-proxy-active');
 
 export const ProfileContext = createContext<ProfileContextValue>({
   profiles: [],
@@ -121,6 +138,18 @@ export function ProfileProvider({
     void restore();
   }, []);
 
+  // Seed the API client's proxy flag from the last app session. The
+  // useParentProxy hook corrects the flag once the active profile is known.
+  useEffect(() => {
+    void SecureStore.getItemAsync(PARENT_PROXY_KEY)
+      .then((value) => {
+        setProxyMode(value === 'true');
+      })
+      .catch(() => {
+        /* SecureStore unavailable */
+      });
+  }, []);
+
   // Once profiles arrive, validate that saved ID exists in the list.
   // Fall back to owner profile if saved ID is stale or missing.
   useEffect(() => {
@@ -147,15 +176,17 @@ export function ProfileProvider({
 
   // [BUG-520] Push the active profile ID to the api-client module so
   // customFetch can attach X-Profile-Id without importing profile.ts.
-  // [BUG-528] Set synchronously during render — NOT in a useEffect.
-  // pushProfileIdToApiClient only writes to a module-level variable
-  // (_activeProfileId in api-client.ts), which has no React side-effects.
-  // The old useEffect fired *after* paint, leaving a 1-frame gap where
-  // queries were enabled (activeProfile non-null) but customFetch had no
-  // profile ID to attach.
+  // [BUG-528 / I-17] Use useLayoutEffect (fires synchronously after DOM
+  // mutations, before paint) instead of calling during render. The old
+  // render-time call caused React Strict Mode to double-invoke the write,
+  // producing a transient stale `undefined` during the second (discarded)
+  // render pass of profile-switch. useLayoutEffect fires once per committed
+  // render, keeping the module variable consistent with the committed tree.
   // NB: imported as pushProfileIdToApiClient to avoid shadowing the local
   // React state setter (also named setActiveProfileId on line 101).
-  pushProfileIdToApiClient(activeProfile?.id);
+  useLayoutEffect(() => {
+    pushProfileIdToApiClient(activeProfile?.id);
+  }, [activeProfile?.id]);
 
   const switchProfile = useCallback(
     async (profileId: string): Promise<SwitchProfileResult> => {
@@ -172,10 +203,22 @@ export function ProfileProvider({
           error: 'Network error while switching profile',
         };
       }
+      let persistenceFailed = false;
       try {
         await SecureStore.setItemAsync(ACTIVE_PROFILE_KEY, profileId);
-      } catch {
-        /* SecureStore write failed — profile switch proceeds in-memory */
+      } catch (storageErr) {
+        // [BUG-828] Silent recovery ban — the in-memory switch will still
+        // succeed below so navigation does not get stuck, but if SecureStore
+        // failed the change won't persist past the next app launch. Capture
+        // for telemetry and signal to the caller via persistenceFailed so a
+        // non-blocking warning can be shown.
+        persistenceFailed = true;
+        Sentry.captureException(storageErr, {
+          tags: {
+            component: 'ProfileProvider',
+            action: 'switch-profile-securestore',
+          },
+        });
       }
       // State update LAST — triggers re-renders that change themeKey and
       // remount the navigation tree.  Callers should close modals before
@@ -212,7 +255,9 @@ export function ProfileProvider({
         predicate: (query) =>
           PROFILE_SCOPED_KEYS.includes(String(query.queryKey[0])),
       });
-      return { success: true };
+      return persistenceFailed
+        ? { success: true, persistenceFailed: true }
+        : { success: true };
     },
     [client, queryClient]
   );

@@ -37,6 +37,8 @@ jest.mock('../lib/api-client', () => ({
       },
     });
   },
+  // [I-1] getProxyMode is called by useStreamMessage to inject X-Proxy-Mode.
+  getProxyMode: jest.fn().mockReturnValue(false),
 }));
 
 jest.mock('../lib/api', () => ({
@@ -626,6 +628,112 @@ describe('useStreamMessage', () => {
       exchangeCount: 1,
       escalationRung: 1,
     });
+  });
+
+  // [BREAK / BUG-629 / I-1] If useStreamMessage stops injecting X-Proxy-Mode
+  // on the SSE call, parent-proxy sessions silently bypass server proxy
+  // enforcement. Asserts the header is present when getProxyMode returns true.
+  it('[BREAK] injects X-Proxy-Mode:true header when proxy mode is on', async () => {
+    const apiClient = require('../lib/api-client') as {
+      getProxyMode: jest.Mock;
+    };
+    apiClient.getProxyMode.mockReturnValueOnce(true);
+
+    const { streamSSEViaXHR } = require('../lib/sse') as {
+      streamSSEViaXHR: jest.Mock;
+    };
+    streamSSEViaXHR.mockReturnValueOnce({
+      events: (async function* () {
+        yield { type: 'done', exchangeCount: 1, escalationRung: 1 };
+      })(),
+      abort: jest.fn(),
+    });
+
+    const { result } = renderHook(() => useStreamMessage('session-x'), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await result.current.stream('hi', jest.fn(), jest.fn(), 'session-x');
+    });
+
+    const [, init] = streamSSEViaXHR.mock.calls[0] as [
+      string,
+      { headers: Record<string, string> }
+    ];
+    expect(init.headers['X-Proxy-Mode']).toBe('true');
+  });
+
+  // [BREAK / BUG-631 / I-3] Snapshot semantics: proxyMode must be read BEFORE
+  // the async getToken() call so a profile-switch race during the await cannot
+  // produce a mismatched header pair. We simulate the race by flipping
+  // getProxyMode's return value while getToken is pending.
+  it('[BREAK] snapshots proxy mode before async getToken resolves', async () => {
+    const apiClient = require('../lib/api-client') as {
+      getProxyMode: jest.Mock;
+    };
+    // Initial read returns true; any read AFTER snapshot would get false.
+    apiClient.getProxyMode.mockReturnValue(true);
+
+    // Make getToken a controllable deferred so we can flip getProxyMode mid-await.
+    let resolveToken!: (value: string) => void;
+    const tokenPromise = new Promise<string>((r) => {
+      resolveToken = r;
+    });
+    const clerk = require('@clerk/clerk-expo') as {
+      useAuth: () => { getToken: jest.Mock };
+    };
+    const useAuthBefore = clerk.useAuth;
+    clerk.useAuth = () =>
+      ({
+        getToken: jest.fn(() => tokenPromise),
+      } as never);
+
+    try {
+      const { streamSSEViaXHR } = require('../lib/sse') as {
+        streamSSEViaXHR: jest.Mock;
+      };
+      streamSSEViaXHR.mockReturnValueOnce({
+        events: (async function* () {
+          yield { type: 'done', exchangeCount: 1, escalationRung: 1 };
+        })(),
+        abort: jest.fn(),
+      });
+
+      const { result } = renderHook(() => useStreamMessage('session-x'), {
+        wrapper: createWrapper(),
+      });
+
+      // Kick off stream — it will await getToken
+      let streamPromise!: Promise<unknown>;
+      await act(async () => {
+        streamPromise = result.current.stream(
+          'hi',
+          jest.fn(),
+          jest.fn(),
+          'session-x'
+        );
+        // Yield so the synchronous prefix (snapshot) executes.
+        await Promise.resolve();
+      });
+
+      // Now flip the underlying value — if the implementation reads AFTER
+      // await, this regresses the header.
+      apiClient.getProxyMode.mockReturnValue(false);
+
+      await act(async () => {
+        resolveToken('test-token');
+        await streamPromise;
+      });
+
+      const [, init] = streamSSEViaXHR.mock.calls[0] as [
+        string,
+        { headers: Record<string, string> }
+      ];
+      expect(init.headers['X-Proxy-Mode']).toBe('true');
+    } finally {
+      clerk.useAuth = useAuthBefore;
+    }
   });
 
   it('forwards fallback SSE events into onDone', async () => {

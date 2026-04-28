@@ -7,6 +7,7 @@ import {
   waitFor,
   act,
   screen,
+  within,
 } from '@testing-library/react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import SessionScreen from './index';
@@ -20,6 +21,7 @@ const mockRecordSessionEvent = jest.fn();
 const mockSetSessionInputMode = jest.fn();
 const mockFlagSessionContent = jest.fn();
 const mockReplace = jest.fn();
+const mockSetParams = jest.fn();
 const mockClassifySubject = jest.fn();
 const mockDirectStartSession = jest.fn();
 
@@ -39,6 +41,7 @@ jest.mock('expo-router', () => ({
 jest.mock('../../../components/session', () => ({
   ChatShell: ({
     subtitle,
+    headerBelow,
     messages,
     inputAccessory,
     belowInput,
@@ -52,6 +55,7 @@ jest.mock('../../../components/session', () => ({
     disabledReason,
   }: {
     subtitle?: string;
+    headerBelow?: React.ReactNode;
     messages?: Array<{ id: string; content: string }>;
     inputAccessory?: React.ReactNode;
     belowInput?: React.ReactNode;
@@ -76,6 +80,7 @@ jest.mock('../../../components/session', () => ({
       <View>
         <Text testID="session-subtitle">{subtitle}</Text>
         <Text testID="mock-input-mode">{inputMode ?? 'text'}</Text>
+        {headerBelow}
         {inputDisabled && disabledReason ? (
           <View testID="input-disabled-banner">
             <Text>{disabledReason}</Text>
@@ -144,6 +149,28 @@ jest.mock('../../../components/session', () => ({
   },
 }));
 
+type TranscriptMockReturn = {
+  data: null | {
+    session: {
+      sessionId: string;
+      exchangeCount: number;
+      inputMode: string;
+      milestonesReached: unknown[];
+      verificationType?: unknown;
+    };
+    exchanges: Array<{
+      role: string;
+      content: string;
+      timestamp: string;
+      eventId: string;
+      isSystemPrompt: boolean;
+      escalationRung: number;
+    }>;
+  };
+};
+const mockUseSessionTranscript = jest.fn<TranscriptMockReturn, [string?]>(
+  () => ({ data: null })
+);
 jest.mock('../../../hooks/use-sessions', () => ({
   useStartSession: () => ({
     mutateAsync: mockStartSession,
@@ -154,7 +181,8 @@ jest.mock('../../../hooks/use-sessions', () => ({
   useStreamMessage: () => ({
     stream: mockStream,
   }),
-  useSessionTranscript: () => ({ data: null }),
+  useSessionTranscript: (sessionId: string) =>
+    mockUseSessionTranscript(sessionId),
   useRecordSystemPrompt: () => ({ mutateAsync: mockRecordSystemPrompt }),
   useRecordSessionEvent: () => ({ mutateAsync: mockRecordSessionEvent }),
   useSetSessionInputMode: () => ({ mutateAsync: mockSetSessionInputMode }),
@@ -198,9 +226,15 @@ jest.mock('../../../hooks/use-streaks', () => ({
   useStreaks: () => ({ data: { longestStreak: 1 } }),
 }));
 
+const mockUseActiveSessionForTopic = jest.fn<
+  { data: null | { sessionId: string } },
+  [string | undefined]
+>(() => ({ data: null }));
 jest.mock('../../../hooks/use-progress', () => ({
   useOverallProgress: () => ({ data: { totalTopicsCompleted: 0 } }),
   useProgressInventory: () => ({ data: undefined, isLoading: false }),
+  useActiveSessionForTopic: (topicId: string | undefined) =>
+    mockUseActiveSessionForTopic(topicId),
 }));
 
 jest.mock('../../../hooks/use-subjects', () => ({
@@ -293,6 +327,9 @@ jest.mock('../../../lib/secure-storage', () => ({
     secureStore[key] = value;
     return Promise.resolve();
   }),
+  // [I-4] sanitizeSecureStoreKey is a pure string function — no mock needed,
+  // but the module mock must export it or callers get "not a function".
+  sanitizeSecureStoreKey: (raw: string) => raw.replace(/[^a-zA-Z0-9._-]/g, '_'),
 }));
 
 const { readSessionRecoveryMarker: mockReadSessionRecoveryMarker } =
@@ -373,11 +410,14 @@ describe('SessionScreen homework flow', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers();
+    mockUseSessionTranscript.mockReturnValue({ data: null });
+    mockUseActiveSessionForTopic.mockReturnValue({ data: null });
     // Clear SecureStore mock data
     Object.keys(secureStore).forEach((key) => delete secureStore[key]);
     let aiEventCount = 0;
     (useRouter as jest.Mock).mockReturnValue({
       replace: mockReplace,
+      setParams: mockSetParams,
     });
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       mode: 'homework',
@@ -706,6 +746,146 @@ describe('SessionScreen homework flow', () => {
     });
   });
 
+  it('renders prior chat history when resuming a session with cached transcript', async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'learning',
+      sessionId: 'session-1',
+      subjectId: 'subject-1',
+      subjectName: 'Geography',
+      topicId: 'topic-1',
+      topicName: 'Continents',
+    });
+    mockUseSessionTranscript.mockReturnValue({
+      data: {
+        session: {
+          sessionId: 'session-1',
+          exchangeCount: 2,
+          inputMode: 'text',
+          milestonesReached: [],
+          verificationType: undefined,
+        },
+        exchanges: [
+          {
+            role: 'user',
+            content: 'Tell me about Africa',
+            timestamp: '2026-04-25T10:00:00Z',
+            eventId: 'evt-1',
+            isSystemPrompt: false,
+            escalationRung: 1,
+          },
+          {
+            role: 'assistant',
+            content: 'Africa is the second-largest continent.',
+            timestamp: '2026-04-25T10:00:05Z',
+            eventId: 'evt-2',
+            isSystemPrompt: false,
+            escalationRung: 1,
+          },
+        ],
+      },
+    });
+
+    const screen = render(<SessionScreen />);
+    await flushAsyncWork();
+
+    await waitFor(() => {
+      expect(screen.queryByText('Tell me about Africa')).toBeTruthy();
+      expect(
+        screen.queryByText('Africa is the second-largest continent.')
+      ).toBeTruthy();
+    });
+  });
+
+  it('auto-resumes the active session for a learning topic when no sessionId is in the route', async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'learning',
+      subjectId: 'subject-1',
+      subjectName: 'Geography',
+      topicId: 'topic-1',
+      topicName: 'Continents',
+    });
+    mockUseActiveSessionForTopic.mockReturnValue({
+      data: { sessionId: 'session-resumed' },
+    });
+
+    render(<SessionScreen />);
+    await flushAsyncWork();
+
+    await waitFor(() => {
+      expect(mockSetParams).toHaveBeenCalledWith({
+        sessionId: 'session-resumed',
+      });
+    });
+  });
+
+  it('does not auto-resume when entering a topic in practice/review mode', async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'practice',
+      subjectId: 'subject-1',
+      subjectName: 'Geography',
+      topicId: 'topic-1',
+      topicName: 'Continents',
+    });
+    mockUseActiveSessionForTopic.mockReturnValue({
+      data: { sessionId: 'session-shouldnt-resume' },
+    });
+
+    render(<SessionScreen />);
+    await flushAsyncWork();
+
+    expect(mockSetParams).not.toHaveBeenCalled();
+  });
+
+  it('does not call setParams when the topic has no active session', async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'learning',
+      subjectId: 'subject-1',
+      subjectName: 'Geography',
+      topicId: 'topic-1',
+      topicName: 'Continents',
+    });
+    mockUseActiveSessionForTopic.mockReturnValue({ data: null });
+
+    render(<SessionScreen />);
+    await flushAsyncWork();
+
+    expect(mockSetParams).not.toHaveBeenCalled();
+  });
+
+  it('shows the topic header and opens the topic switcher when "Change topic" is tapped', async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'learning',
+      sessionId: 'session-1',
+      subjectId: 'subject-1',
+      subjectName: 'Geography',
+      topicId: 'topic-1',
+      topicName: 'Continents',
+    });
+    mockUseSessionTranscript.mockReturnValue({
+      data: {
+        session: {
+          sessionId: 'session-1',
+          exchangeCount: 0,
+          inputMode: 'text',
+          milestonesReached: [],
+        },
+        exchanges: [],
+      },
+    });
+
+    const screen = render(<SessionScreen />);
+    await flushAsyncWork();
+
+    const header = screen.getByTestId('session-topic-header');
+    expect(within(header).getByText(/Continents/)).toBeTruthy();
+    expect(within(header).getByText(/Current topic/)).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('session-topic-header-change'));
+    await flushAsyncWork();
+
+    expect(screen.getByTestId('switch-topic-topic-1')).toBeTruthy();
+  });
+
   it('persists input-mode changes once the session exists', async () => {
     const screen = render(<SessionScreen />);
 
@@ -950,8 +1130,13 @@ describe('voice mode persistence', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers();
+    mockUseSessionTranscript.mockReturnValue({ data: null });
+    mockUseActiveSessionForTopic.mockReturnValue({ data: null });
     Object.keys(secureStore).forEach((key) => delete secureStore[key]);
-    (useRouter as jest.Mock).mockReturnValue({ replace: mockReplace });
+    (useRouter as jest.Mock).mockReturnValue({
+      replace: mockReplace,
+      setParams: mockSetParams,
+    });
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       mode: 'homework',
       subjectId: 'subject-1',

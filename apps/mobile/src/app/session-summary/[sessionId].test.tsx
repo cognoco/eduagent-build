@@ -9,6 +9,7 @@ import { platformAlert } from '../../lib/platform-alert';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const mockReplace = jest.fn();
+const mockPush = jest.fn();
 const mockBack = jest.fn();
 const mockCanGoBack = jest.fn(() => false);
 const mockParams = {
@@ -21,6 +22,7 @@ const mockParams = {
 jest.mock('expo-router', () => ({
   useRouter: () => ({
     replace: mockReplace,
+    push: mockPush,
     back: mockBack,
     canGoBack: mockCanGoBack,
   }),
@@ -111,6 +113,13 @@ jest.mock('../../lib/platform-alert', () => ({
   platformAlert: jest.fn(),
 }));
 
+// [BUG-800] formatApiError stub: returns Error.message verbatim so tests can
+// assert the typed server reason reaches platformAlert.
+jest.mock('../../lib/format-api-error', () => ({
+  formatApiError: (e: unknown) =>
+    e instanceof Error ? e.message : 'Unknown error',
+}));
+
 jest.mock('../../lib/profile', () => ({
   useProfile: () => ({
     activeProfile: { id: 'p-1', birthYear: 2012 },
@@ -120,6 +129,15 @@ jest.mock('../../lib/profile', () => ({
   }),
   personaFromBirthYear: () => 'learner',
   isGuardianProfile: () => false,
+}));
+
+const mockUseParentProxy = jest.fn(() => ({
+  isParentProxy: false,
+  childProfile: null,
+  parentProfile: null,
+}));
+jest.mock('../../hooks/use-parent-proxy', () => ({
+  useParentProxy: () => mockUseParentProxy(),
 }));
 
 const mockReadSummaryDraft = jest.fn();
@@ -152,6 +170,11 @@ describe('SessionSummaryScreen', () => {
     mockReadSummaryDraft.mockResolvedValue(null);
     mockWriteSummaryDraft.mockResolvedValue(undefined);
     mockClearSummaryDraft.mockResolvedValue(undefined);
+    mockUseParentProxy.mockReturnValue({
+      isParentProxy: false,
+      childProfile: null,
+      parentProfile: null,
+    });
     mockSubmitIsError = false;
     mockSubmitError = null;
     mockSkipMutateAsync.mockResolvedValue({
@@ -171,6 +194,8 @@ describe('SessionSummaryScreen', () => {
     mockParams.milestones = undefined;
     mockParams.fastCelebrations = undefined;
     mockParams.sessionType = undefined;
+    mockParams.subjectId = undefined;
+    mockParams.topicId = undefined;
     mockTranscriptData = null;
     mockSessionSummaryData = null;
     mockSessionSummaryIsLoading = false;
@@ -196,6 +221,57 @@ describe('SessionSummaryScreen', () => {
     // 5 exchanges, rung 2 → "strong independent thinking"
     expect(screen.getByText(/worked through 5 exchanges/)).toBeTruthy();
     expect(screen.getByText(/strong independent thinking/)).toBeTruthy();
+  });
+
+  // [BUG-801] When the URL passes exchangeCount='0' (legitimate value for
+  // a session that ended before any exchanges), the screen must honor it
+  // rather than silently fall back to the server's transcript count.
+  // Repro: parseInt('0') = 0, which `||` treated as falsy and replaced
+  // with the server count, hiding the actual session state from the user.
+  it('[BUG-801] honors explicit exchangeCount=0 over server fallback', () => {
+    mockParams.exchangeCount = '0';
+    mockTranscriptData = {
+      session: {
+        id: '660e8400-e29b-41d4-a716-446655440000',
+        sessionType: 'general',
+        exchangeCount: 10,
+        wallClockSeconds: 600,
+      },
+      messages: [],
+    } as unknown as never;
+
+    render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+    // The takeaways block is only rendered when exchanges > 0, so with an
+    // explicit 0 the "worked through ... exchanges" copy must NOT appear.
+    expect(screen.queryByText(/worked through \d+ exchange/)).toBeNull();
+    // And the server-side 10 must NOT leak through as a takeaway.
+    expect(screen.queryByText(/worked through 10 exchanges/)).toBeNull();
+  });
+
+  // [BREAK / BUG-805] When the URL param wallClockSeconds is missing AND the
+  // transcript hasn't loaded yet, Math.max(1, ...) used to mask the unknown
+  // duration as "1 minute - great session!". Then once the transcript arrived
+  // it would snap to the real duration — readable as a flicker. The fix
+  // suppresses the duration takeaway until verified non-zero data is available.
+  it('[BREAK / BUG-805] does not flash a duration takeaway while data is missing', () => {
+    mockParams.wallClockSeconds = undefined;
+    mockTranscriptData = null;
+
+    render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+    // No "minute - great session!" copy must appear when duration is unknown.
+    expect(screen.queryByText(/minute.*great session/i)).toBeNull();
+    // Other takeaways still render so the user isn't stuck on a blank section.
+    expect(screen.getByTestId('session-takeaways')).toBeTruthy();
+  });
+
+  it('[BUG-805] renders the duration takeaway once wallClockSeconds is known', () => {
+    mockParams.wallClockSeconds = '900';
+
+    render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+    expect(screen.getByText(/15 minutes - great session!/)).toBeTruthy();
   });
 
   it('renders summary input', () => {
@@ -456,6 +532,53 @@ describe('SessionSummaryScreen', () => {
     expect(screen.getByText(/Couldn't save your summary/)).toBeTruthy();
   });
 
+  // [BUG-800] When submitSummary rejects, the alert must surface the server's
+  // typed reason (word-limit exceeded, too short, etc.) — not the generic
+  // "Please try again." which hides actionable info from the user.
+  it('[BREAK / BUG-800] alert uses formatApiError so typed server reason reaches user', async () => {
+    mockSubmitMutateAsync.mockRejectedValue(
+      new Error('Reflection too short — needs at least 30 characters')
+    );
+
+    render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+    fireEvent.changeText(
+      screen.getByTestId('summary-input'),
+      'I learned about photosynthesis and chlorophyll absorption'
+    );
+    fireEvent.press(screen.getByTestId('submit-summary-button'));
+
+    await waitFor(() => {
+      expect(platformAlert).toHaveBeenCalledWith(
+        'Could not save',
+        'Reflection too short — needs at least 30 characters'
+      );
+    });
+  });
+
+  it('[BUG-800] non-Error rejection does not crash the alert', async () => {
+    mockSubmitMutateAsync.mockRejectedValue({
+      code: 'WORD_LIMIT',
+      maxWords: 200,
+    });
+
+    render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+    fireEvent.changeText(
+      screen.getByTestId('summary-input'),
+      'I explored gravity and Newtons three laws of motion today'
+    );
+    fireEvent.press(screen.getByTestId('submit-summary-button'));
+
+    await waitFor(() => {
+      // Stub returns 'Unknown error' for non-Error inputs.
+      expect(platformAlert).toHaveBeenCalledWith(
+        'Could not save',
+        'Unknown error'
+      );
+    });
+  });
+
   // BUG-33 Phase 1: Structured sentence starter prompt chips
   describe('summary prompt chips (BUG-33 Phase 1)', () => {
     it('renders all five sentence starter chips', () => {
@@ -547,6 +670,59 @@ describe('SessionSummaryScreen', () => {
     expect(screen.getByTestId('fast-celebrations')).toBeTruthy();
     expect(screen.getByText('Quadratic Equations')).toBeTruthy();
     expect(screen.getByText(/15 minutes - great session!/)).toBeTruthy();
+  });
+
+  // [BREAK / BUG-825] Malformed milestones param (non-string array values) must
+  // be filtered out by the type-guard. Without it, milestoneLabels would render
+  // numbers/objects and the switch fallthrough would produce garbage.
+  it('[BREAK / BUG-825] filters out non-string milestone values', () => {
+    mockParams.wallClockSeconds = '900';
+    mockParams.milestones = encodeURIComponent(
+      JSON.stringify([1, 2, 'polar_star', null, { foo: 'bar' }, 'persistent'])
+    );
+
+    render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+    expect(screen.getByTestId('milestone-recap')).toBeTruthy();
+    expect(screen.getByText(/Polar Star/)).toBeTruthy();
+    expect(screen.getByText(/Persistent/)).toBeTruthy();
+    expect(screen.queryByText(/\[object Object\]/)).toBeNull();
+  });
+
+  describe('resume-this-session CTA', () => {
+    it('renders the Resume CTA for learners and navigates back into the session with the sessionId', () => {
+      mockParams.subjectId = 'subject-1';
+      mockParams.topicId = 'topic-1';
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      const cta = screen.getByTestId('resume-session-cta');
+      expect(cta).toBeTruthy();
+
+      fireEvent.press(cta);
+
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: '/(app)/session',
+        params: {
+          mode: 'learning',
+          sessionId: '660e8400-e29b-41d4-a716-446655440000',
+          subjectId: 'subject-1',
+          topicId: 'topic-1',
+        },
+      });
+    });
+
+    it('hides the Resume CTA in parent-proxy mode so parents cannot open the learner chat', () => {
+      mockUseParentProxy.mockReturnValue({
+        isParentProxy: true,
+        childProfile: { id: 'p-1', birthYear: 2012 } as never,
+        parentProfile: { id: 'parent-1', isOwner: true } as never,
+      });
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      expect(screen.queryByTestId('resume-session-cta')).toBeNull();
+    });
   });
 
   // BUG-449: revisiting a past session (Library → Shelf → Book → tap session)

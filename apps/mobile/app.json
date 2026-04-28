@@ -96,6 +96,7 @@
       ],
       "expo-updates",
       "./plugins/withForceDarkDisabled",
+      "./plugins/withRemoveActivityRecognition",
       [
         "expo-build-properties",
         {

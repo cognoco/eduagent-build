@@ -17,6 +17,7 @@ import {
   useTopicProgress,
   useActiveSessionForTopic,
   useResolveTopicSubject,
+  useLearningResumeTarget,
 } from '../../../hooks/use-progress';
 import {
   useTopicRetention,
@@ -25,7 +26,10 @@ import {
 import { useTopicParkingLot } from '../../../hooks/use-sessions';
 import { useGetTopicNote } from '../../../hooks/use-notes';
 import { useThemeColors } from '../../../lib/theme';
-import { goBackOrReplace } from '../../../lib/navigation';
+import {
+  goBackOrReplace,
+  pushLearningResumeTarget,
+} from '../../../lib/navigation';
 import { ErrorFallback } from '../../../components/common';
 
 function deriveRetentionStatus(
@@ -164,6 +168,10 @@ export default function TopicDetailScreen() {
     needsResolve ? topicId : undefined
   );
   const subjectId = paramSubjectId || resolved?.subjectId;
+  const { data: resumeTarget } = useLearningResumeTarget({
+    subjectId: subjectId ?? undefined,
+    topicId: topicId ?? undefined,
+  });
 
   const {
     data: topicProgress,
@@ -273,7 +281,11 @@ export default function TopicDetailScreen() {
     // different AI pedagogy for the same topic depending on entry point.
     return {
       label: 'Continue learning',
-      onPress: () =>
+      onPress: () => {
+        if (resumeTarget) {
+          pushLearningResumeTarget(router, resumeTarget);
+          return;
+        }
         router.push({
           pathname: '/(app)/session',
           params: {
@@ -285,12 +297,14 @@ export default function TopicDetailScreen() {
               sessionId: activeSession.sessionId,
             }),
           },
-        } as never),
+        } as never);
+      },
     };
   }, [
     activeSession?.sessionId,
     failureCount,
     retentionCard?.nextReviewAt,
+    resumeTarget,
     router,
     subjectId,
     topicId,

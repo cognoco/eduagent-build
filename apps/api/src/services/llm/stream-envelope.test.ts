@@ -200,4 +200,31 @@ describe('teeEnvelopeStream', () => {
       '{"reply":"order matters","signals":{}}'
     );
   });
+
+  it('[BUG-628] rawResponsePromise resolves with partial text when cleanReplyStream is abandoned early', async () => {
+    // Simulates a client disconnect / SSE write error where the caller stops
+    // consuming cleanReplyStream before the source is exhausted. The
+    // rawResponsePromise must still settle (with whatever was accumulated)
+    // rather than suspending forever and timing out the Cloudflare Worker.
+    const raw = '{"reply":"Hello world","signals":{}}';
+
+    const { cleanReplyStream, rawResponsePromise } = teeEnvelopeStream(
+      fromChunks([raw])
+    );
+
+    // Consume only the first chunk of cleanReplyStream, then abandon it.
+
+    for await (const _chunk of cleanReplyStream) {
+      break; // stop after first yield
+    }
+
+    // rawResponsePromise must settle even though cleanReplyStream was not
+    // fully drained. It resolves with whatever was accumulated up to the
+    // break point (at minimum, empty string — not a hanging promise).
+    const settled = await Promise.race([
+      rawResponsePromise.then(() => 'resolved'),
+      new Promise<string>((r) => setTimeout(() => r('timed_out'), 500)),
+    ]);
+    expect(settled).toBe('resolved');
+  });
 });

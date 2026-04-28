@@ -46,14 +46,15 @@ jest.mock('../services/coaching-cards', () => ({
 
 import { app } from '../index';
 import { getCoachingCardForProfile } from '../services/coaching-cards';
+import {
+  AUTH_HEADERS as BASE_AUTH_HEADERS,
+  BASE_AUTH_ENV,
+} from '../test-utils/test-env';
 
-const TEST_ENV = {
-  CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',
-};
+const TEST_ENV = { ...BASE_AUTH_ENV };
 
 const AUTH_HEADERS = {
-  Authorization: 'Bearer valid.jwt.token',
-  'Content-Type': 'application/json',
+  ...BASE_AUTH_HEADERS,
   'X-Profile-Id': 'test-profile-id',
 };
 

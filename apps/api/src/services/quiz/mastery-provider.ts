@@ -7,7 +7,7 @@ export interface MasteryRowData {
 }
 
 export interface MasterySm2Input {
-  easeFactor: string;
+  easeFactor: number;
   interval: number;
   repetitions: number;
   lastReviewedAt: Date;
@@ -15,7 +15,7 @@ export interface MasterySm2Input {
 }
 
 export interface MasterySm2Result {
-  easeFactor: string;
+  easeFactor: number;
   interval: number;
   repetitions: number;
   nextReviewAt: Date;
@@ -48,7 +48,7 @@ export function applyQuizSm2(
   const result = sm2({
     quality,
     card: {
-      easeFactor: Number(current.easeFactor),
+      easeFactor: current.easeFactor,
       interval: Math.max(1, current.interval),
       repetitions: current.repetitions,
       lastReviewedAt: current.lastReviewedAt.toISOString(),
@@ -57,7 +57,7 @@ export function applyQuizSm2(
   });
 
   return {
-    easeFactor: String(result.card.easeFactor),
+    easeFactor: result.card.easeFactor,
     interval: result.card.interval,
     repetitions: result.card.repetitions,
     nextReviewAt: new Date(result.card.nextReviewAt),

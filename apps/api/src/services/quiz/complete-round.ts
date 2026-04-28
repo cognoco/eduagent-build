@@ -361,7 +361,7 @@ export async function completeQuizRound(
         if (existing) {
           const sm2Result = applyQuizSm2(
             {
-              easeFactor: String(existing.easeFactor),
+              easeFactor: existing.easeFactor,
               interval: existing.interval,
               repetitions: existing.repetitions,
               lastReviewedAt: existing.updatedAt,
@@ -479,6 +479,9 @@ export async function completeQuizRound(
         // in analytics. Only set when true to keep JSONB lean.
         if (result.disputed) {
           entry.disputed = true;
+        }
+        if (result.cluesUsed != null) {
+          entry.cluesUsed = result.cluesUsed;
         }
         return entry;
       }

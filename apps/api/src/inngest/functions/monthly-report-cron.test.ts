@@ -134,21 +134,43 @@ import {
 // Fixtures
 // ---------------------------------------------------------------------------
 
+// Matches progressMetricsSchema exactly. [BUG-848]: the previous fixture was
+// missing required fields (totalExchanges, topicsInProgress, vocabulary
+// breakdowns, retention card buckets, currentStreak, plus the per-subject
+// uuid/pedagogyMode/sessionsCount/lastSessionAt). The schema is the source
+// of truth; the fixture must conform to it.
 const SAMPLE_METRICS = {
   totalSessions: 20,
   totalActiveMinutes: 300,
+  totalWallClockMinutes: 360,
+  totalExchanges: 80,
+  topicsAttempted: 8,
   topicsMastered: 5,
-  longestStreak: 7,
+  topicsInProgress: 3,
   vocabularyTotal: 40,
+  vocabularyMastered: 20,
+  vocabularyLearning: 15,
+  vocabularyNew: 5,
+  retentionCardsDue: 4,
+  retentionCardsStrong: 12,
+  retentionCardsFading: 3,
+  currentStreak: 4,
+  longestStreak: 7,
   subjects: [
     {
-      subjectId: 'sub-1',
+      subjectId: '11111111-1111-4111-8111-111111111111',
       subjectName: 'Maths',
-      topicsMastered: 3,
+      pedagogyMode: 'socratic' as const,
       topicsAttempted: 4,
+      topicsMastered: 3,
+      topicsTotal: 10,
       topicsExplored: 5,
       vocabularyTotal: 0,
+      vocabularyMastered: 0,
+      sessionsCount: 12,
       activeMinutes: 100,
+      wallClockMinutes: 120,
+      lastSessionAt: '2026-03-29T10:00:00.000Z',
     },
   ],
 };
@@ -400,7 +422,9 @@ describe('monthlyReportGenerate', () => {
 
       const { result } = await executeGenerateSteps(makeGenerateEvent());
 
-      expect(result).toEqual({ status: 'skipped', reason: 'child_missing' });
+      expect(result).toEqual(
+        expect.objectContaining({ status: 'skipped', reason: 'child_missing' })
+      );
     });
 
     it('does not call getSnapshotsInRange when child is missing', async () => {
@@ -436,7 +460,9 @@ describe('monthlyReportGenerate', () => {
 
       const { result } = await executeGenerateSteps(makeGenerateEvent());
 
-      expect(result).toEqual({ status: 'skipped', reason: 'no_snapshot' });
+      expect(result).toEqual(
+        expect.objectContaining({ status: 'skipped', reason: 'no_snapshot' })
+      );
     });
 
     it('does not generate a report when current snapshots are empty', async () => {
@@ -696,18 +722,19 @@ describe('monthlyReportGenerate', () => {
   });
 
   describe('error handling', () => {
-    it('returns failed status when an unexpected error occurs', async () => {
+    // [SWEEP-SILENT-RECOVERY / J-11] Production now re-throws after
+    // captureException so Inngest retries the step. Returning
+    // { status: 'failed' } resolved the step as success — invisible failure.
+    // Match daily-snapshot.ts:78-80 and the same assertion shape used in
+    // weekly-progress-push.test.ts.
+    it('[J-11] re-throws so Inngest retries when an unexpected error occurs', async () => {
       (
         mockMonthlyReportDb.query.profiles.findFirst as jest.Mock
       ).mockRejectedValueOnce(new Error('DB connection lost'));
 
-      const { result } = await executeGenerateSteps(makeGenerateEvent());
-
-      expect(result).toEqual({
-        status: 'failed',
-        parentId: 'parent-001',
-        childId: 'child-001',
-      });
+      await expect(executeGenerateSteps(makeGenerateEvent())).rejects.toThrow(
+        'DB connection lost'
+      );
     });
 
     it('calls captureException with parentId and childId context on error', async () => {
@@ -715,10 +742,14 @@ describe('monthlyReportGenerate', () => {
         mockMonthlyReportDb.query.profiles.findFirst as jest.Mock
       ).mockRejectedValueOnce(new Error('DB connection lost'));
 
-      await executeGenerateSteps(
-        makeGenerateEvent({ parentId: 'parent-999', childId: 'child-999' })
-      );
+      await expect(
+        executeGenerateSteps(
+          makeGenerateEvent({ parentId: 'parent-999', childId: 'child-999' })
+        )
+      ).rejects.toThrow('DB connection lost');
 
+      // captureException must fire BEFORE the re-throw so Sentry sees the
+      // failure even on the retry-exhaustion terminal path.
       expect(mockCaptureException).toHaveBeenCalledWith(
         expect.objectContaining({ message: 'DB connection lost' }),
         expect.objectContaining({
@@ -746,13 +777,10 @@ describe('monthlyReportGenerate', () => {
         new Error('LLM timeout')
       );
 
-      const { result } = await executeGenerateSteps(makeGenerateEvent());
+      await expect(executeGenerateSteps(makeGenerateEvent())).rejects.toThrow(
+        'LLM timeout'
+      );
 
-      expect(result).toEqual({
-        status: 'failed',
-        parentId: 'parent-001',
-        childId: 'child-001',
-      });
       expect(mockCaptureException).toHaveBeenCalledWith(
         expect.objectContaining({ message: 'LLM timeout' }),
         expect.objectContaining({
@@ -763,7 +791,11 @@ describe('monthlyReportGenerate', () => {
       );
     });
 
-    it('calls captureException when sendPushNotification throws', async () => {
+    // [J-6] Push notification runs in a SEPARATE step so Inngest retries only
+    // the push — not the expensive LLM generation + DB insert.
+    // When the push step throws, the exception propagates (Inngest marks the
+    // step as failed and schedules a retry for ONLY that step).
+    it('[J-6] push step propagates error so Inngest retries only the push (not LLM+insert)', async () => {
       (
         mockMonthlyReportDb.query.profiles.findFirst as jest.Mock
       ).mockResolvedValue({
@@ -778,14 +810,13 @@ describe('monthlyReportGenerate', () => {
         new Error('Push service unavailable')
       );
 
-      const { result } = await executeGenerateSteps(makeGenerateEvent());
+      // Error propagates — the step runner should throw (triggering Inngest retry)
+      await expect(executeGenerateSteps(makeGenerateEvent())).rejects.toThrow(
+        'Push service unavailable'
+      );
 
-      expect(result).toEqual({
-        status: 'failed',
-        parentId: 'parent-001',
-        childId: 'child-001',
-      });
-      expect(mockCaptureException).toHaveBeenCalled();
+      // Report generation step DID complete (insert was called)
+      expect(mockInsert).toHaveBeenCalled();
     });
   });
 

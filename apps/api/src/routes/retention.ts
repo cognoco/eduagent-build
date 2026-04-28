@@ -9,8 +9,10 @@ import {
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
+import { assertNotProxyMode } from '../middleware/proxy-guard';
 import {
   getSubjectRetention,
+  getAllSubjectsRetention,
   getTopicRetention,
   processRecallTest,
   startRelearn,
@@ -41,6 +43,17 @@ const topicParamSchema = z.object({
 });
 
 export const retentionRoutes = new Hono<RetentionRouteEnv>()
+  // [BUG-732 / PERF-2] Aggregate retention across all subjects in one round-trip
+  // (Library mount used to fan out N parallel /subjects/:id/retention calls).
+  // MUST be registered before /subjects/:subjectId/retention so Hono routes
+  // /library/retention to this handler, not the param-matching one.
+  .get('/library/retention', async (c) => {
+    const db = c.get('db');
+    const profileId = requireProfileId(c.get('profileId'));
+    const result = await getAllSubjectsRetention(db, profileId);
+    return c.json(result);
+  })
+
   // Get retention status for all topics in subject
   .get(
     '/subjects/:subjectId/retention',
@@ -74,6 +87,7 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
     '/retention/recall-test',
     zValidator('json', recallTestSubmitSchema),
     async (c) => {
+      assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const input = c.req.valid('json');
@@ -88,6 +102,7 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
     '/retention/relearn',
     zValidator('json', relearnTopicSchema),
     async (c) => {
+      assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const input = c.req.valid('json');
@@ -169,14 +184,21 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
   )
 
   // Get topic stability status (FR93)
-  .get('/retention/stability', async (c) => {
-    const db = c.get('db');
-    const profileId = requireProfileId(c.get('profileId'));
-    const subjectId = c.req.query('subjectId');
+  // [BUG-831] subjectId query param must be a UUID. Defense-in-depth: validate
+  // at the boundary before passing to service so a malformed value never
+  // reaches downstream queries.
+  .get(
+    '/retention/stability',
+    zValidator('query', z.object({ subjectId: z.string().uuid().optional() })),
+    async (c) => {
+      const db = c.get('db');
+      const profileId = requireProfileId(c.get('profileId'));
+      const { subjectId } = c.req.valid('query');
 
-    const topics = await getStableTopics(db, profileId, subjectId || undefined);
-    return c.json({ topics });
-  })
+      const topics = await getStableTopics(db, profileId, subjectId);
+      return c.json({ topics });
+    }
+  )
 
   // Check EVALUATE eligibility for a topic (FR128-129)
   .get(

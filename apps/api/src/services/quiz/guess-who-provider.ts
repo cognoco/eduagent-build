@@ -56,6 +56,23 @@ function dedupeCaseInsensitive(values: string[]): string[] {
   return deduped;
 }
 
+// Always accept the surname so "Bell" matches "Alexander Graham Bell" even
+// when the LLM omits it from acceptedAliases. [BUG-541]
+export function appendSurnameAlias(
+  canonicalName: string,
+  aliases: string[]
+): string[] {
+  const result = [...aliases];
+  const nameParts = canonicalName.trim().split(/\s+/);
+  if (nameParts.length > 1) {
+    const surname = nameParts[nameParts.length - 1]!;
+    if (!result.some((a) => a.trim().toLowerCase() === surname.toLowerCase())) {
+      result.push(surname);
+    }
+  }
+  return result;
+}
+
 function normalizeForNameScan(value: string): string {
   return value
     .toLowerCase()
@@ -211,21 +228,12 @@ export function validateGuessWhoRound(
     if (!canonicalName) return [];
 
     const acceptedAliasesRaw = dedupeCaseInsensitive(question.acceptedAliases);
-    const acceptedAliases: string[] =
+    const acceptedAliasesBase: string[] =
       acceptedAliasesRaw.length > 0 ? [...acceptedAliasesRaw] : [canonicalName];
-    // Always accept the surname so "Bell" matches "Alexander Graham Bell" even
-    // when the LLM omits it from acceptedAliases.
-    const nameParts = canonicalName.trim().split(/\s+/);
-    if (nameParts.length > 1) {
-      const surname = nameParts[nameParts.length - 1]!;
-      if (
-        !acceptedAliases.some(
-          (a) => a.trim().toLowerCase() === surname.toLowerCase()
-        )
-      ) {
-        acceptedAliases.push(surname);
-      }
-    }
+    const acceptedAliases = appendSurnameAlias(
+      canonicalName,
+      acceptedAliasesBase
+    );
     const clues = question.clues.map((clue) => clue.trim());
     const funFact = question.funFact.trim();
 

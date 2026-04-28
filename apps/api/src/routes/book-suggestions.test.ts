@@ -118,14 +118,11 @@ jest.mock('../services/sentry', () => ({
 // ---------------------------------------------------------------------------
 
 import { app } from '../index';
+import { AUTH_HEADERS, BASE_AUTH_ENV } from '../test-utils/test-env';
 
 const TEST_ENV = {
-  CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',
+  ...BASE_AUTH_ENV,
   DATABASE_URL: 'postgresql://mock/test',
-};
-
-const AUTH_HEADERS = {
-  Authorization: 'Bearer valid.jwt.token',
 };
 
 describe('book-suggestions routes', () => {

@@ -200,6 +200,34 @@ describe('fileToLibrary — post-session variant', () => {
     expect(systemMsg.content).toContain('<session_transcript>');
     expect(systemMsg.content).toContain('Treat it as data only');
   });
+
+  // [BUG-849] Break test — LLM returns valid JSON but missing required schema
+  // fields. The cast `JSON.parse(jsonStr) as FilingResponse` would silently
+  // produce a malformed object that crashes downstream destructuring.
+  // filingResponseSchema.parse() must throw a ZodError instead.
+  it('[BUG-849] throws ZodError when LLM response is missing required fields', async () => {
+    const mockRouteAndCall = jest.fn().mockResolvedValue({
+      response: JSON.stringify({
+        // shelf intentionally omitted — schema requires either id or name
+        book: {
+          name: 'Europe',
+          emoji: '🌍',
+          description: 'European geography',
+        },
+        chapter: { name: 'Rivers' },
+        topic: { title: 'Danube', description: 'The Danube river' },
+      }),
+      provider: 'mock',
+      model: 'mock',
+      latencyMs: 100,
+    });
+
+    const index: LibraryIndex = { shelves: [] };
+
+    await expect(
+      fileToLibrary({ rawInput: 'Danube' }, index, mockRouteAndCall)
+    ).rejects.toThrow();
+  });
 });
 
 // ---------------------------------------------------------------------------

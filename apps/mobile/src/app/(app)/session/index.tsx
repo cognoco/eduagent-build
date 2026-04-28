@@ -9,7 +9,8 @@ import {
 import type { ErrorInfo, ReactNode } from 'react';
 import { AppState, View, Text, Pressable, ScrollView } from 'react-native';
 import { platformAlert } from '../../../lib/platform-alert';
-import { goBackOrReplace } from '../../../lib/navigation';
+import { goBackOrReplace, homeHrefForReturnTo } from '../../../lib/navigation';
+import { firstParam } from '../../../lib/route-params';
 import {
   router,
   useRouter,
@@ -52,6 +53,7 @@ import { useStreaks } from '../../../hooks/use-streaks';
 import {
   useOverallProgress,
   useProgressInventory,
+  useActiveSessionForTopic,
 } from '../../../hooks/use-progress';
 import { useNetworkStatus } from '../../../hooks/use-network-status';
 import { useApiReachability } from '../../../hooks/use-api-reachability';
@@ -105,6 +107,7 @@ import {
   TopicSwitcherModal,
 } from '../../../components/session/SessionModals';
 import { SessionFooter } from '../../../components/session/SessionFooter';
+import { SessionTopicHeader } from '../../../components/session/SessionTopicHeader';
 import { getResumeBannerCopy } from '../../../components/session/resume-banner-copy';
 import { Sentry } from '../../../lib/sentry';
 
@@ -269,10 +272,27 @@ class SessionErrorBoundary extends Component<
 function MilestoneDots({ count }: { count: number }) {
   if (count <= 0) return null;
 
+  // [BUG-645 / ACC-1] Bare colored dots are invisible to screen readers.
+  // The aggregate View carries the label so VoiceOver/TalkBack reads
+  // "3 milestones reached" instead of skipping the indicator entirely.
+  const accessibilityLabel =
+    count === 1 ? '1 milestone reached' : `${count} milestones reached`;
+
   return (
-    <View className="ms-2 flex-row items-center gap-1" testID="milestone-dots">
+    <View
+      className="ms-2 flex-row items-center gap-1"
+      testID="milestone-dots"
+      accessible
+      accessibilityRole="text"
+      accessibilityLabel={accessibilityLabel}
+    >
       {Array.from({ length: Math.min(count, 6) }).map((_, index) => (
-        <View key={index} className="w-2 h-2 rounded-full bg-primary" />
+        <View
+          key={index}
+          className="w-2 h-2 rounded-full bg-primary"
+          importantForAccessibility="no"
+          accessibilityElementsHidden
+        />
       ))}
     </View>
   );
@@ -299,9 +319,11 @@ function SessionScreenInner() {
     ocrText,
     captureSource,
     rawInput,
+    resumeFromSessionId,
+    returnTo,
     verificationType: routeVerificationType,
-    imageUri,
-    imageMimeType,
+    imageUri: rawImageUri,
+    imageMimeType: rawImageMimeType,
   } = useLocalSearchParams<{
     mode?: string;
     subjectId?: string;
@@ -314,16 +336,35 @@ function SessionScreenInner() {
     ocrText?: string;
     captureSource?: HomeworkCaptureSource;
     rawInput?: string;
+    resumeFromSessionId?: string;
+    returnTo?: string;
     verificationType?: string;
     imageUri?: string;
     imageMimeType?: string;
   }>();
+  // [BUG-635] Coerce Expo Router's `string | string[]` to a single string.
+  const imageUri = firstParam(rawImageUri);
+  const imageMimeType = firstParam(rawImageMimeType);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { activeProfile } = useProfile();
   const colors = useThemeColors();
 
   const effectiveMode = mode ?? 'freeform';
+  const homeBackHref = homeHrefForReturnTo(returnTo);
+  const chatBackFallback = returnTo
+    ? (homeBackHref as string)
+    : subjectId
+    ? `/(app)/shelf/${subjectId}`
+    : undefined;
+  const handleHomeBack = useCallback(() => {
+    if (returnTo) {
+      router.replace(homeBackHref as never);
+      return;
+    }
+
+    goBackOrReplace(router, homeBackHref);
+  }, [homeBackHref, returnTo, router]);
   const normalizedOcrText = Array.isArray(ocrText) ? ocrText[0] : ocrText;
   const normalizedCaptureSource = Array.isArray(captureSource)
     ? captureSource[0]
@@ -359,6 +400,12 @@ function SessionScreenInner() {
     subjectName ?? undefined,
     rawInput ?? undefined
   );
+  // [M-7] Capture openingContent in a ref at render time so the transcript
+  // hydration effect can use a stable reference. Without this, streak data
+  // arriving asynchronously after the first render causes openingContent to
+  // change, which triggers the hydration effect to re-run mid-conversation
+  // and re-inject the opening greeting, wiping out any user messages.
+  const openingContentRef = useRef<string>(openingContent);
 
   const { isOffline } = useNetworkStatus();
   const { isApiReachable, isChecked: apiChecked } = useApiReachability();
@@ -477,6 +524,31 @@ function SessionScreenInner() {
   } | null>(null);
 
   const transcript = useSessionTranscript(routeSessionId ?? '');
+
+  // Auto-resume the latest active/paused session when the user re-enters a
+  // learning topic (e.g. tapping "Continue learning" on the topic screen,
+  // selecting a topic from the bookshelf, etc.) without an explicit sessionId.
+  // We look up the existing session for the topic and backfill `sessionId`
+  // into the route params via setParams — that triggers the existing transcript
+  // hydration path the same way the home-screen Continue card does, so chat
+  // history loads everywhere instead of dropping the learner into a blank chat.
+  // Scoped to learning mode only: review/practice/homework/freeform intentionally
+  // start fresh.
+  const shouldLookupActiveSession =
+    effectiveMode === 'learning' && !!topicId && !routeSessionId;
+  const activeSessionLookup = useActiveSessionForTopic(
+    shouldLookupActiveSession ? topicId : undefined
+  );
+  const hasResolvedActiveSessionRef = useRef(false);
+  useEffect(() => {
+    if (hasResolvedActiveSessionRef.current) return;
+    if (!shouldLookupActiveSession) return;
+    const resumedSessionId = activeSessionLookup.data?.sessionId;
+    if (!resumedSessionId) return;
+    hasResolvedActiveSessionRef.current = true;
+    router.setParams({ sessionId: resumedSessionId });
+  }, [activeSessionLookup.data?.sessionId, shouldLookupActiveSession, router]);
+
   const sessionBookmarksQuery = useSessionBookmarks(
     activeSessionId ?? routeSessionId ?? undefined
   );
@@ -514,12 +586,24 @@ function SessionScreenInner() {
   useFocusEffect(
     useCallback(() => {
       animationCleanupRef.current?.();
-      setMessages([
-        { id: 'opening', role: 'assistant', content: openingContent },
-      ]);
+      // When resuming a session (routeSessionId set), leave messages,
+      // exchangeCount, and escalationRung alone — the transcript hydration
+      // useEffect below owns them. Blanking here on every focus would race
+      // the cached-transcript path: React Query returns the same data ref,
+      // so the hydration effect's deps don't change and it never re-fires,
+      // leaving the user staring at just the opening greeting.
+      if (!routeSessionId) {
+        // [M-7] Refresh the ref for new sessions so the opening message is
+        // always current. Resuming sessions skip this because hydration owns
+        // the message list via transcript.data.
+        openingContentRef.current = openingContent;
+        setMessages([
+          { id: 'opening', role: 'assistant', content: openingContent },
+        ]);
+        setExchangeCount(0);
+        setEscalationRung(1);
+      }
       setIsStreaming(false);
-      setExchangeCount(0);
-      setEscalationRung(1);
       setIsClosing(false);
       setActiveSessionId(routeSessionId ?? null);
       setPendingClassification(false);
@@ -660,7 +744,16 @@ function SessionScreenInner() {
     setMessages(
       transcriptMessages.length > 0
         ? transcriptMessages
-        : [{ id: 'opening', role: 'assistant', content: openingContent }]
+        : // [M-7] Use the ref so late-arriving streak data (which changes
+          // openingContent reactively) doesn't re-trigger this effect and
+          // wipe out in-progress conversation messages.
+          [
+            {
+              id: 'opening',
+              role: 'assistant',
+              content: openingContentRef.current,
+            },
+          ]
     );
     setExchangeCount(transcript.data.session.exchangeCount);
     setEscalationRung(
@@ -671,7 +764,7 @@ function SessionScreenInner() {
     setInputMode(transcript.data.session.inputMode ?? 'text');
     setActiveSessionId(routeSessionId);
     setResumedBanner(true);
-  }, [openingContent, routeSessionId, transcript.data]);
+  }, [routeSessionId, transcript.data]);
 
   useEffect(() => {
     if (!sessionExpired) return;
@@ -818,6 +911,7 @@ function SessionScreenInner() {
     topicName: topicName ?? undefined,
     inputMode,
     rawInput: rawInput ?? undefined,
+    resumeFromSessionId: resumeFromSessionId ?? undefined,
     verificationType: routeVerificationType ?? undefined,
     normalizedOcrText,
     homeworkCaptureSource,
@@ -1078,11 +1172,7 @@ function SessionScreenInner() {
   // Before session exists → "Exit" navigates home. After → normal "I'm Done".
   const endSessionButton = (
     <Pressable
-      onPress={
-        activeSessionId
-          ? handleEndSession
-          : () => goBackOrReplace(router, '/(app)/home')
-      }
+      onPress={activeSessionId ? handleEndSession : handleHomeBack}
       disabled={isClosing || isStreaming}
       className="ms-2 px-3 py-2 rounded-button bg-surface-elevated min-h-[44px] items-center justify-center"
       testID="end-session-button"
@@ -1160,6 +1250,21 @@ function SessionScreenInner() {
     </View>
   ) : null;
 
+  const topicHeaderStrip = topicName ? (
+    <SessionTopicHeader
+      topicName={topicName}
+      onChangeTopic={() => setShowTopicSwitcher(true)}
+    />
+  ) : null;
+
+  const headerBelow =
+    topicHeaderStrip || classifyErrorChip ? (
+      <View className="gap-2">
+        {topicHeaderStrip}
+        {classifyErrorChip}
+      </View>
+    ) : null;
+
   const sessionToolAccessory = (
     <SessionToolAccessory
       isStreaming={isStreaming}
@@ -1203,7 +1308,7 @@ function SessionScreenInner() {
       return (
         <View className="flex-row gap-2 mt-2">
           <Pressable
-            onPress={() => goBackOrReplace(router, '/(app)/home')}
+            onPress={handleHomeBack}
             className="bg-primary rounded-button px-4 py-2.5 items-center justify-center min-h-[40px]"
             accessibilityRole="button"
             accessibilityLabel="Start new session"
@@ -1214,7 +1319,7 @@ function SessionScreenInner() {
             </Text>
           </Pressable>
           <Pressable
-            onPress={() => goBackOrReplace(router, '/(app)/home')}
+            onPress={handleHomeBack}
             className="bg-surface-elevated rounded-button px-4 py-2.5 items-center justify-center min-h-[40px]"
             accessibilityRole="button"
             accessibilityLabel="Go Home"
@@ -1290,9 +1395,10 @@ function SessionScreenInner() {
       <ChatShell
         title={modeConfig.title}
         subtitle={subtitle}
-        headerBelow={classifyErrorChip}
+        headerBelow={headerBelow}
         placeholder={modeConfig.placeholder}
-        backFallback={subjectId ? `/(app)/shelf/${subjectId}` : undefined}
+        backFallback={chatBackFallback}
+        backBehavior={chatBackFallback ? 'replace' : undefined}
         messages={messages}
         onSend={handleSend}
         isStreaming={isStreaming}

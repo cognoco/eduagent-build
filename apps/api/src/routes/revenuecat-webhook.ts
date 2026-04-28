@@ -511,7 +511,13 @@ async function handleNonRenewingPurchase(
   );
 
   if (!granted) {
-    return null; // duplicate transaction — already granted, silently skip
+    // [A-22] Distinguish intentional idempotency skip from silent failure.
+    // Log with eventId + transactionId so ops can query how often this fires.
+    logger.info(
+      '[revenuecat] NON_RENEWING_PURCHASE duplicate skipped — credits already granted',
+      { eventId: event.id, transactionId, accountId }
+    );
+    return null;
   }
 
   await refreshKvCache(kv, db, accountId);
@@ -547,6 +553,7 @@ export const revenuecatWebhookRoute = new Hono<{
   Bindings: {
     REVENUECAT_WEBHOOK_SECRET?: string;
     SUBSCRIPTION_KV?: KVNamespace;
+    ENVIRONMENT?: string;
   };
   Variables: {
     db: Database;
@@ -615,19 +622,20 @@ export const revenuecatWebhookRoute = new Hono<{
   // Resolve account — reject if the app_user_id cannot be mapped to an account
   const accountId = await resolveAccountId(db, event.app_user_id);
   if (!accountId) {
-    console.error(
-      `[revenuecat-webhook] Unresolvable app_user_id: ${event.app_user_id}, event: ${event.type}/${event.id}`
-    );
-    captureException(
-      new Error(`Unresolvable RevenueCat app_user_id: ${event.app_user_id}`),
-      {
-        extra: {
-          eventType: event.type,
-          eventId: event.id,
-          appUserId: event.app_user_id,
-        },
-      }
-    );
+    // [SEC-11] appUserId is a Clerk pseudonymous identifier — GDPR data minimisation
+    // requires it is NOT sent to Sentry (third-party processor). eventId + eventType
+    // are sufficient for triage without PII exposure.
+    logger.error('[revenuecat-webhook] Unresolvable app_user_id', {
+      eventType: event.type,
+      eventId: event.id,
+    });
+    captureException(new Error('Unresolvable RevenueCat app_user_id'), {
+      extra: {
+        eventType: event.type,
+        eventId: event.id,
+        // appUserId intentionally omitted — GDPR data minimisation [SEC-11]
+      },
+    });
     return c.json({ received: true, error: 'Unknown app_user_id' }, 200);
   }
 
@@ -645,9 +653,28 @@ export const revenuecatWebhookRoute = new Hono<{
   // Ensure free subscription exists for the account (auto-provisioning)
   await ensureFreeSubscription(db, accountId);
 
-  // Warn in non-production environments when RevenueCat sends sandbox events.
-  // Sandbox webhooks from test purchases should not mutate production data.
+  // [BUG-624 / A-8] In production, sandbox events MUST NOT mutate state.
+  // The previous implementation only warned and fell through, so a single
+  // RevenueCat sandbox INITIAL_PURCHASE could activate a paid subscription on
+  // a real production account. Reject sandbox events outright in production;
+  // accept them in non-prod environments so QA can drive flows from sandbox
+  // purchases against staging/dev data.
   if (event.environment === 'SANDBOX') {
+    if (c.env.ENVIRONMENT === 'production') {
+      logger.warn(
+        '[revenuecat] Rejected SANDBOX webhook event in production environment',
+        {
+          eventType: event.type,
+          eventId: event.id,
+          accountId,
+        }
+      );
+      return c.json({
+        received: true,
+        skipped: true,
+        reason: 'sandbox_in_production',
+      });
+    }
     logger.warn(
       '[revenuecat] Received SANDBOX webhook event — verify this is intentional',
       {

@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { NativeModules, Platform } from 'react-native';
 import { useAuth } from '@clerk/clerk-expo';
 import TextRecognition from '@react-native-ml-kit/text-recognition';
@@ -192,8 +192,21 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
   const [failCount, setFailCount] = useState(0);
   const currentUriRef = useRef<string | null>(null);
   const cancelRef = useRef<AbortController | null>(null);
+  // [I-16] Guard state setters so recognizeText completing after unmount
+  // (or after cancel()) doesn't call setState on an unmounted component.
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      cancelRef.current?.abort();
+      cancelRef.current = null;
+    };
+  }, []);
 
   const finishAsError = useCallback((message: string) => {
+    if (!mountedRef.current) return;
     setFailCount((prev) => prev + 1);
     setError(message);
     setStatus('error');
@@ -202,6 +215,7 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
   const cancel = useCallback(() => {
     cancelRef.current?.abort();
     cancelRef.current = null;
+    if (!mountedRef.current) return;
     setStatus('idle');
     setError(null);
   }, []);

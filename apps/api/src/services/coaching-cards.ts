@@ -225,7 +225,7 @@ export async function precomputeCoachingCard(
       createdAt,
       topicId: mostOverdue.topicId,
       dueAt: (mostOverdue.nextReviewAt ?? new Date()).toISOString(),
-      easeFactor: Number(mostOverdue.easeFactor),
+      easeFactor: mostOverdue.easeFactor,
     };
   }
 

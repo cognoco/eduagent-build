@@ -38,39 +38,35 @@ jest.mock('../lib/profile', () => ({
 // Fixtures
 // ---------------------------------------------------------------------------
 
-function makeSubjectsResponse(subjects: Array<{ id: string; name: string }>) {
+interface BookFixture {
+  id: string;
+  title: string;
+  topicsGenerated?: boolean;
+}
+
+interface SubjectFixture {
+  subjectId: string;
+  subjectName: string;
+  books: BookFixture[];
+}
+
+function makeLibraryBooksResponse(subjects: SubjectFixture[]) {
   return new Response(
     JSON.stringify({
       subjects: subjects.map((s) => ({
-        ...s,
-        status: 'active',
-        profileId: 'test-profile-id',
-      })),
-    }),
-    { status: 200 }
-  );
-}
-
-function makeBooksResponse(
-  books: Array<{
-    id: string;
-    title: string;
-    subjectId: string;
-    topicsGenerated?: boolean;
-  }>
-) {
-  return new Response(
-    JSON.stringify({
-      books: books.map((b) => ({
-        id: b.id,
-        subjectId: b.subjectId,
-        title: b.title,
-        description: null,
-        emoji: null,
-        sortOrder: 0,
-        topicsGenerated: b.topicsGenerated ?? false,
-        createdAt: '2026-01-01T00:00:00.000Z',
-        updatedAt: '2026-01-01T00:00:00.000Z',
+        subjectId: s.subjectId,
+        subjectName: s.subjectName,
+        books: s.books.map((b) => ({
+          id: b.id,
+          subjectId: s.subjectId,
+          title: b.title,
+          description: null,
+          emoji: null,
+          sortOrder: 0,
+          topicsGenerated: b.topicsGenerated ?? false,
+          createdAt: '2026-01-01T00:00:00.000Z',
+          updatedAt: '2026-01-01T00:00:00.000Z',
+        })),
       })),
     }),
     { status: 200 }
@@ -111,33 +107,20 @@ describe('useAllBooks', () => {
   });
 
   it('returns enriched books from multiple subjects', async () => {
-    // First call: subjects list
     mockFetch.mockResolvedValueOnce(
-      makeSubjectsResponse([
-        { id: 's1', name: 'Math' },
-        { id: 's2', name: 'Science' },
-      ])
-    );
-    // Second call: books for s1
-    mockFetch.mockResolvedValueOnce(
-      makeBooksResponse([
-        { id: 'b1', title: 'Algebra', subjectId: 's1', topicsGenerated: true },
+      makeLibraryBooksResponse([
         {
-          id: 'b2',
-          title: 'Geometry',
           subjectId: 's1',
-          topicsGenerated: false,
+          subjectName: 'Math',
+          books: [
+            { id: 'b1', title: 'Algebra', topicsGenerated: true },
+            { id: 'b2', title: 'Geometry', topicsGenerated: false },
+          ],
         },
-      ])
-    );
-    // Third call: books for s2
-    mockFetch.mockResolvedValueOnce(
-      makeBooksResponse([
         {
-          id: 'b3',
-          title: 'Physics',
           subjectId: 's2',
-          topicsGenerated: true,
+          subjectName: 'Science',
+          books: [{ id: 'b3', title: 'Physics', topicsGenerated: true }],
         },
       ])
     );
@@ -175,22 +158,15 @@ describe('useAllBooks', () => {
 
   it('excludes unbuilt books (topicsGenerated=false) from results', async () => {
     mockFetch.mockResolvedValueOnce(
-      makeSubjectsResponse([{ id: 's1', name: 'Math' }])
-    );
-    mockFetch.mockResolvedValueOnce(
-      makeBooksResponse([
-        { id: 'b1', title: 'Algebra', subjectId: 's1', topicsGenerated: true },
+      makeLibraryBooksResponse([
         {
-          id: 'b2',
-          title: 'Not Built Yet',
           subjectId: 's1',
-          topicsGenerated: false,
-        },
-        {
-          id: 'b3',
-          title: 'Also Not Built',
-          subjectId: 's1',
-          topicsGenerated: false,
+          subjectName: 'Math',
+          books: [
+            { id: 'b1', title: 'Algebra', topicsGenerated: true },
+            { id: 'b2', title: 'Not Built Yet', topicsGenerated: false },
+            { id: 'b3', title: 'Also Not Built', topicsGenerated: false },
+          ],
         },
       ])
     );
@@ -215,7 +191,7 @@ describe('useAllBooks', () => {
   });
 
   it('returns empty array when no subjects exist', async () => {
-    mockFetch.mockResolvedValueOnce(makeSubjectsResponse([]));
+    mockFetch.mockResolvedValueOnce(makeLibraryBooksResponse([]));
 
     const { result } = renderHook(() => useAllBooks(), {
       wrapper: createWrapper(),
@@ -231,9 +207,10 @@ describe('useAllBooks', () => {
 
   it('returns empty array when subjects have no books', async () => {
     mockFetch.mockResolvedValueOnce(
-      makeSubjectsResponse([{ id: 's1', name: 'Math' }])
+      makeLibraryBooksResponse([
+        { subjectId: 's1', subjectName: 'Math', books: [] },
+      ])
     );
-    mockFetch.mockResolvedValueOnce(makeBooksResponse([]));
 
     const { result } = renderHook(() => useAllBooks(), {
       wrapper: createWrapper(),
@@ -247,10 +224,7 @@ describe('useAllBooks', () => {
     expect(result.current.isError).toBe(false);
   });
 
-  it('sets isError when a books query fails', async () => {
-    mockFetch.mockResolvedValueOnce(
-      makeSubjectsResponse([{ id: 's1', name: 'Math' }])
-    );
+  it('sets isError when the library books query fails', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response('Server error', { status: 500 })
     );
@@ -266,11 +240,12 @@ describe('useAllBooks', () => {
 
   it('sets topicCount and completedCount to 0 (baseline)', async () => {
     mockFetch.mockResolvedValueOnce(
-      makeSubjectsResponse([{ id: 's1', name: 'Math' }])
-    );
-    mockFetch.mockResolvedValueOnce(
-      makeBooksResponse([
-        { id: 'b1', title: 'Algebra', subjectId: 's1', topicsGenerated: true },
+      makeLibraryBooksResponse([
+        {
+          subjectId: 's1',
+          subjectName: 'Math',
+          books: [{ id: 'b1', title: 'Algebra', topicsGenerated: true }],
+        },
       ])
     );
 
@@ -290,7 +265,7 @@ describe('useAllBooks', () => {
   });
 
   it('exposes a refetch function', async () => {
-    mockFetch.mockResolvedValueOnce(makeSubjectsResponse([]));
+    mockFetch.mockResolvedValueOnce(makeLibraryBooksResponse([]));
 
     const { result } = renderHook(() => useAllBooks(), {
       wrapper: createWrapper(),
@@ -303,13 +278,14 @@ describe('useAllBooks', () => {
     expect(typeof result.current.refetch).toBe('function');
   });
 
-  it('stores per-subject books in the shared books cache as an array', async () => {
+  it('caches the aggregate response under the library books query key', async () => {
     mockFetch.mockResolvedValueOnce(
-      makeSubjectsResponse([{ id: 's1', name: 'Math' }])
-    );
-    mockFetch.mockResolvedValueOnce(
-      makeBooksResponse([
-        { id: 'b1', title: 'Algebra', subjectId: 's1', topicsGenerated: true },
+      makeLibraryBooksResponse([
+        {
+          subjectId: 's1',
+          subjectName: 'Math',
+          books: [{ id: 'b1', title: 'Algebra', topicsGenerated: true }],
+        },
       ])
     );
 
@@ -318,15 +294,12 @@ describe('useAllBooks', () => {
     });
 
     await waitFor(() => {
-      expect(
-        queryClient.getQueryData(['books', 's1', 'test-profile-id'])
-      ).toEqual([
-        expect.objectContaining({
-          id: 'b1',
-          subjectId: 's1',
-          title: 'Algebra',
-        }),
-      ]);
+      const cached = queryClient.getQueryData([
+        'library',
+        'books',
+        'test-profile-id',
+      ]) as { subjects: Array<{ books: Array<{ id: string }> }> } | undefined;
+      expect(cached?.subjects[0]?.books[0]?.id).toBe('b1');
     });
   });
 });

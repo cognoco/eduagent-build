@@ -2,12 +2,14 @@ import { Hono } from 'hono';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
-import { OCR_CONSTRAINTS } from '@eduagent/schemas';
+import { assertNotProxyMode } from '../middleware/proxy-guard';
+import { OCR_CONSTRAINTS, ocrResultSchema } from '@eduagent/schemas';
 import { validationError } from '../errors';
 import { startSession, SubjectInactiveError } from '../services/session';
 import { getOcrProvider } from '../services/ocr';
 import { apiError } from '../errors';
 import { ERROR_CODES } from '@eduagent/schemas';
+import { captureException } from '../services/sentry';
 
 type HomeworkRouteEnv = {
   Bindings: {
@@ -25,6 +27,7 @@ type HomeworkRouteEnv = {
 export const homeworkRoutes = new Hono<HomeworkRouteEnv>()
   // Start a homework help session
   .post('/subjects/:subjectId/homework', async (c) => {
+    assertNotProxyMode(c);
     const db = c.get('db');
     const profileId = requireProfileId(c.get('profileId'));
     const subjectId = c.req.param('subjectId');
@@ -88,5 +91,25 @@ export const homeworkRoutes = new Hono<HomeworkRouteEnv>()
       );
     }
     const result = await provider.extractText(imageBuffer, file.type);
-    return c.json(result);
+
+    // [BUG-660 / A-19] Validate the provider's response before returning.
+    // The OcrProvider interface promises an OcrResult, but the underlying
+    // call (Gemini/Vision/etc.) is an LLM JSON parse — malformed JSON or a
+    // schema drift would propagate downstream and crash mobile parsing.
+    // Schema-validate at the trust boundary so the client never sees junk
+    // typed as `OcrResult`.
+    const parsed = ocrResultSchema.safeParse(result);
+    if (!parsed.success) {
+      captureException(parsed.error, {
+        requestPath: '/ocr',
+        extra: { issues: parsed.error.issues, mimeType: file.type },
+      });
+      return apiError(
+        c,
+        502,
+        ERROR_CODES.INTERNAL_ERROR,
+        'OCR provider returned a malformed result. Please try again.'
+      );
+    }
+    return c.json(parsed.data);
   });

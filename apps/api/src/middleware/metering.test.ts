@@ -36,15 +36,24 @@ jest.mock('../services/session', () => ({
   processMessage: jest
     .fn()
     .mockResolvedValue({ reply: 'test', exchangeCount: 1 }),
-  getSession: jest
-    .fn()
-    .mockResolvedValue({ id: 'session-1', status: 'active' }),
+  getSession: jest.fn().mockResolvedValue({
+    id: 'session-1',
+    status: 'active',
+    sessionType: 'homework',
+  }),
   streamMessage: jest.fn(),
   startSession: jest.fn(),
   closeSession: jest.fn(),
   flagContent: jest.fn(),
   getSessionSummary: jest.fn(),
   submitSummary: jest.fn(),
+}));
+
+// Mock recall bridge service so we can exercise the route without an LLM call.
+jest.mock('../services/recall-bridge', () => ({
+  generateRecallBridge: jest
+    .fn()
+    .mockResolvedValue({ questions: ['Q?'], generated: true }),
 }));
 
 // Mock profile service
@@ -137,19 +146,32 @@ jest.mock('../services/kv', () => ({
     mockWriteSubscriptionStatus(...args),
 }));
 
+// [T-11 / BUG-753] Spy on logger so we can assert KV-failure observability.
+// safeReadKV/safeWriteKV must emit structured warns when they swallow an
+// error — silent recovery is banned by project policy.
+const mockLoggerWarn = jest.fn();
+const mockLoggerInfo = jest.fn();
+const mockLoggerError = jest.fn();
+const mockLoggerDebug = jest.fn();
+
+jest.mock('../services/logger', () => ({
+  createLogger: () => ({
+    info: mockLoggerInfo,
+    warn: mockLoggerWarn,
+    error: mockLoggerError,
+    debug: mockLoggerDebug,
+  }),
+}));
+
 import { app } from '../index';
+import { AUTH_HEADERS, BASE_AUTH_ENV } from '../test-utils/test-env';
 
 const TEST_ENV = {
   DATABASE_URL: 'postgresql://test:test@localhost:5432/test',
-  CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',
+  ...BASE_AUTH_ENV,
 };
 
 const SUBJECT_ID = 'subject-1';
-
-const AUTH_HEADERS = {
-  Authorization: 'Bearer valid.jwt.token',
-  'Content-Type': 'application/json',
-};
 
 function mockSubscription(overrides?: Record<string, unknown>) {
   return {
@@ -288,6 +310,64 @@ describe('metering middleware', () => {
   // -----------------------------------------------------------------------
 
   describe('LLM routes with quota available', () => {
+    it('[BUG-623 / A-6] decrements quota for POST /sessions/:id/recall-bridge', async () => {
+      mockEnsureFreeSubscription.mockResolvedValue(mockSubscription());
+      mockGetQuotaPool.mockResolvedValue(mockQuota({ usedThisMonth: 100 }));
+      mockDecrementQuota.mockResolvedValue({
+        success: true,
+        source: 'monthly',
+        remainingMonthly: 399,
+        remainingTopUp: 0,
+        remainingDaily: null,
+      });
+
+      const res = await app.request(
+        '/v1/sessions/session-1/recall-bridge',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({}),
+        },
+        TEST_ENV
+      );
+
+      // Critical: regardless of route response code, the metering middleware
+      // must have run BEFORE the handler — proving recall-bridge is metered.
+      expect(mockDecrementQuota).toHaveBeenCalledWith(
+        expect.anything(),
+        'sub-1'
+      );
+      expect(res.status).toBe(200);
+    });
+
+    it('[BUG-623 / A-6] returns 402 when quota exhausted on POST /sessions/:id/recall-bridge', async () => {
+      mockEnsureFreeSubscription.mockResolvedValue(mockSubscription());
+      mockGetQuotaPool.mockResolvedValue(
+        mockQuota({ usedThisMonth: 500, monthlyLimit: 500 })
+      );
+      mockDecrementQuota.mockResolvedValue({
+        success: false,
+        reason: 'monthly_exhausted',
+        remainingMonthly: 0,
+        remainingTopUp: 0,
+        remainingDaily: null,
+      });
+
+      const res = await app.request(
+        '/v1/sessions/session-1/recall-bridge',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({}),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(402);
+      // The recall-bridge handler must NOT have been called — quota gate stopped it.
+      // (route-side handler is mocked; the 402 implies middleware short-circuited.)
+    });
+
     it('allows session messages when quota is under limit (DB path)', async () => {
       mockEnsureFreeSubscription.mockResolvedValue(mockSubscription());
       mockGetQuotaPool.mockResolvedValue(mockQuota({ usedThisMonth: 100 }));
@@ -671,7 +751,8 @@ describe('metering middleware', () => {
       );
     });
 
-    it('tolerates KV read failure (I4 fix)', async () => {
+    it('tolerates KV read failure (I4 fix) AND emits observability metric [BUG-753]', async () => {
+      mockLoggerWarn.mockClear();
       mockReadSubscriptionStatus.mockRejectedValue(new Error('KV unavailable'));
       mockEnsureFreeSubscription.mockResolvedValue(mockSubscription());
       mockGetQuotaPool.mockResolvedValue(mockQuota());
@@ -695,12 +776,26 @@ describe('metering middleware', () => {
 
       // Should fall through to DB, not crash
       expect(res.status).toBe(200);
+
+      // [BUG-753] The silent fallback MUST emit a structured warn — without
+      // this we can't measure KV outage rate from logs.
+      const kvReadWarns = mockLoggerWarn.mock.calls.filter(
+        (call) =>
+          (call[1] as { event?: string })?.event === 'metering.kv_read_failed'
+      );
+      expect(kvReadWarns).toHaveLength(1);
+      expect(kvReadWarns[0]?.[1]).toMatchObject({
+        event: 'metering.kv_read_failed',
+        accountId: 'test-account-id',
+        error: 'KV unavailable',
+      });
     });
 
-    it('tolerates KV write failure (I4 fix)', async () => {
+    it('tolerates KV write failure (I4 fix) AND emits observability metric [BUG-753]', async () => {
+      mockLoggerWarn.mockClear();
       mockReadSubscriptionStatus.mockResolvedValue(null);
       mockWriteSubscriptionStatus.mockRejectedValue(
-        new Error('KV unavailable')
+        new Error('KV write timeout')
       );
       mockEnsureFreeSubscription.mockResolvedValue(mockSubscription());
       mockGetQuotaPool.mockResolvedValue(mockQuota());
@@ -724,6 +819,20 @@ describe('metering middleware', () => {
 
       // Should still succeed — KV is best-effort
       expect(res.status).toBe(200);
+
+      // [BUG-753] Silent recovery + observability requirement: at least one
+      // kv_write_failed event must be emitted. (Two writes fire — backfill
+      // and post-decrement update — both should surface a metric.)
+      const kvWriteWarns = mockLoggerWarn.mock.calls.filter(
+        (call) =>
+          (call[1] as { event?: string })?.event === 'metering.kv_write_failed'
+      );
+      expect(kvWriteWarns.length).toBeGreaterThanOrEqual(1);
+      expect(kvWriteWarns[0]?.[1]).toMatchObject({
+        event: 'metering.kv_write_failed',
+        accountId: 'test-account-id',
+        error: 'KV write timeout',
+      });
     });
 
     it('falls back to DB path when KV backfill write fails [4C.7]', async () => {

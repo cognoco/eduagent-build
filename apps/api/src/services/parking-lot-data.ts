@@ -3,7 +3,7 @@
 // Separate from parking-lot.ts (pure LLM logic) to keep service boundaries clean.
 // ---------------------------------------------------------------------------
 
-import { eq, and } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import { parkingLotItems, type Database } from '@eduagent/database';
 import { MAX_PARKING_LOT_PER_TOPIC } from './parking-lot';
 
@@ -70,6 +70,17 @@ export async function addParkingLotItem(
   // D-04: wrap count check + insert in a transaction to prevent concurrent
   // POSTs from exceeding the per-topic limit (TOCTOU race).
   return db.transaction(async (tx) => {
+    // Advisory lock per (profileId, topicId-or-sessionId) — serializes all
+    // concurrent inserts for the same bucket without blocking unrelated ones.
+    // Lock is released automatically on commit/rollback. [BUG-860]
+    const lockKey =
+      topicId != null
+        ? `parking-lot:${topicId}`
+        : `parking-lot:session:${sessionId}`;
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`
+    );
+
     const existing = await tx.query.parkingLotItems.findMany({
       where:
         topicId != null

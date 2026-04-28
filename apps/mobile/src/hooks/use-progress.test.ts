@@ -5,6 +5,7 @@ import {
   useSubjectProgress,
   useOverallProgress,
   useContinueSuggestion,
+  useLearningResumeTarget,
   useReviewSummary,
   useTopicProgress,
 } from './use-progress';
@@ -206,6 +207,55 @@ describe('useContinueSuggestion', () => {
     });
 
     expect(result.current.data).toBeNull();
+  });
+});
+
+describe('useLearningResumeTarget', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    queryClient.clear();
+  });
+
+  it('fetches resume target with optional scope', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          target: {
+            subjectId: '550e8400-e29b-41d4-a716-446655440000',
+            subjectName: 'Biology',
+            topicId: '770e8400-e29b-41d4-a716-446655440000',
+            topicTitle: 'Photosynthesis',
+            sessionId: null,
+            resumeFromSessionId: '880e8400-e29b-41d4-a716-446655440000',
+            resumeKind: 'recent_topic',
+            lastActivityAt: '2026-02-15T09:00:00.000Z',
+            reason: 'Pick up Photosynthesis',
+          },
+        }),
+        { status: 200 }
+      )
+    );
+
+    const { result } = renderHook(
+      () =>
+        useLearningResumeTarget({
+          subjectId: '550e8400-e29b-41d4-a716-446655440000',
+        }),
+      { wrapper: createWrapper() }
+    );
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    const url = String(mockFetch.mock.calls[0]?.[0]);
+    expect(url).toContain('/progress/resume-target');
+    expect(url).toContain('subjectId=550e8400-e29b-41d4-a716-446655440000');
+    expect(result.current.data?.topicTitle).toBe('Photosynthesis');
   });
 });
 
