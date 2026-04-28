@@ -12,6 +12,9 @@ import { routeAndCall } from '../../services/llm';
 import { extractFirstJsonObject } from '../../services/llm/extract-json';
 import { sanitizeXmlValue } from '../../services/llm/sanitize';
 import { captureException } from '../../services/sentry';
+import { createLogger } from '../../services/logger';
+
+const logger = createLogger();
 
 const filingCompletedDataSchema = z.object({
   bookId: z.string(),
@@ -32,9 +35,42 @@ export const postSessionSuggestions = inngest.createFunction(
   },
   { event: 'app/filing.completed' },
   async ({ event, step }) => {
-    const { bookId, topicTitle, profileId } = filingCompletedDataSchema.parse(
-      event.data
-    );
+    // [SWEEP-J8] safeParse so a malformed event payload doesn't throw before
+    // the first step.run — bare .parse() would surface as a transient
+    // function failure and Inngest would retry on a permanently-bad payload.
+    // Same class as BUG-697/J-8 in ask-silent-classify.
+    const validated = filingCompletedDataSchema.safeParse(event.data);
+    if (!validated.success) {
+      const issues = validated.error.issues.map((issue) => ({
+        path: issue.path.join('.'),
+        message: issue.message,
+      }));
+      logger.warn(
+        '[post-session-suggestions] invalid payload — skipping retries',
+        {
+          issues,
+        }
+      );
+      // Structured escalation per global "no silent recovery" rule —
+      // captureException keeps the case in Sentry for queryable counts.
+      captureException(
+        new Error('post-session-suggestions: invalid event payload'),
+        {
+          extra: {
+            surface: 'post-session-suggestions',
+            reason: 'invalid_payload',
+            issues,
+          },
+        }
+      );
+      return {
+        status: 'skipped' as const,
+        reason: 'invalid_payload',
+        issues,
+        timestamp: new Date().toISOString(),
+      };
+    }
+    const { bookId, topicTitle, profileId } = validated.data;
 
     const result = await step.run('generate-suggestions', async () => {
       const db = getStepDatabase();

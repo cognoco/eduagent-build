@@ -29,7 +29,37 @@ export const feedbackDeliveryFailed = inngest.createFunction(
   },
   { event: 'app/feedback.delivery_failed' },
   async ({ event, step }) => {
-    const { profileId, category } = eventDataSchema.parse(event.data);
+    // [SWEEP-J8] safeParse so a malformed event payload doesn't throw before
+    // the first step.run — bare .parse() would surface as a transient
+    // function failure and Inngest would retry (configured retries: 2) on a
+    // permanently-bad payload. Same class as BUG-697/J-8.
+    const validated = eventDataSchema.safeParse(event.data);
+    if (!validated.success) {
+      const issues = validated.error.issues.map((issue) => ({
+        path: issue.path.join('.'),
+        message: issue.message,
+      }));
+      logger.warn(
+        '[feedback-delivery-failed] invalid payload — skipping retries',
+        {
+          issues,
+        }
+      );
+      // Structured escalation per global "no silent recovery" rule —
+      // captureException keeps the case in Sentry for queryable counts.
+      captureException(
+        new Error('feedback-delivery-failed: invalid event payload'),
+        {
+          extra: {
+            surface: 'feedback-delivery-failed',
+            reason: 'invalid_payload',
+            issues,
+          },
+        }
+      );
+      return { status: 'skipped' as const, reason: 'invalid_payload', issues };
+    }
+    const { profileId, category } = validated.data;
 
     const categoryLabel =
       category === 'bug'
