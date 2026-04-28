@@ -722,18 +722,19 @@ describe('monthlyReportGenerate', () => {
   });
 
   describe('error handling', () => {
-    it('returns failed status when an unexpected error occurs', async () => {
+    // [SWEEP-SILENT-RECOVERY / J-11] Production now re-throws after
+    // captureException so Inngest retries the step. Returning
+    // { status: 'failed' } resolved the step as success — invisible failure.
+    // Match daily-snapshot.ts:78-80 and the same assertion shape used in
+    // weekly-progress-push.test.ts.
+    it('[J-11] re-throws so Inngest retries when an unexpected error occurs', async () => {
       (
         mockMonthlyReportDb.query.profiles.findFirst as jest.Mock
       ).mockRejectedValueOnce(new Error('DB connection lost'));
 
-      const { result } = await executeGenerateSteps(makeGenerateEvent());
-
-      expect(result).toEqual({
-        status: 'failed',
-        parentId: 'parent-001',
-        childId: 'child-001',
-      });
+      await expect(executeGenerateSteps(makeGenerateEvent())).rejects.toThrow(
+        'DB connection lost'
+      );
     });
 
     it('calls captureException with parentId and childId context on error', async () => {
@@ -741,10 +742,14 @@ describe('monthlyReportGenerate', () => {
         mockMonthlyReportDb.query.profiles.findFirst as jest.Mock
       ).mockRejectedValueOnce(new Error('DB connection lost'));
 
-      await executeGenerateSteps(
-        makeGenerateEvent({ parentId: 'parent-999', childId: 'child-999' })
-      );
+      await expect(
+        executeGenerateSteps(
+          makeGenerateEvent({ parentId: 'parent-999', childId: 'child-999' })
+        )
+      ).rejects.toThrow('DB connection lost');
 
+      // captureException must fire BEFORE the re-throw so Sentry sees the
+      // failure even on the retry-exhaustion terminal path.
       expect(mockCaptureException).toHaveBeenCalledWith(
         expect.objectContaining({ message: 'DB connection lost' }),
         expect.objectContaining({
@@ -772,13 +777,10 @@ describe('monthlyReportGenerate', () => {
         new Error('LLM timeout')
       );
 
-      const { result } = await executeGenerateSteps(makeGenerateEvent());
+      await expect(executeGenerateSteps(makeGenerateEvent())).rejects.toThrow(
+        'LLM timeout'
+      );
 
-      expect(result).toEqual({
-        status: 'failed',
-        parentId: 'parent-001',
-        childId: 'child-001',
-      });
       expect(mockCaptureException).toHaveBeenCalledWith(
         expect.objectContaining({ message: 'LLM timeout' }),
         expect.objectContaining({

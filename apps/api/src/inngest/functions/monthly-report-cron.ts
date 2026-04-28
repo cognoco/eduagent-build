@@ -223,7 +223,13 @@ export const monthlyReportGenerate = inngest.createFunction(
         captureException(error, {
           extra: { parentId, childId, context: 'monthly-report-generate' },
         });
-        return { status: 'failed' as const, parentId, childId };
+        // [SWEEP-SILENT-RECOVERY / J-11] Returning { status: 'failed' } here
+        // resolves the step as a success — Inngest only retries on thrown
+        // errors. Without re-throw, transient LLM/DB errors are absorbed and
+        // a parent/child pair quietly never gets their monthly report while
+        // the dashboard counts the run as completed. Re-throw lets Inngest
+        // retry and surface a real failure. See daily-snapshot.ts:78-80.
+        throw error;
       }
     });
 

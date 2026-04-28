@@ -281,7 +281,13 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
         captureException(error, {
           extra: { parentId, context: 'weekly-progress-push-generate' },
         });
-        return { status: 'failed', parentId };
+        // [SWEEP-SILENT-RECOVERY / J-11] Returning { status: 'failed' } here
+        // resolves the step as a success — Inngest only retries on thrown
+        // errors. Without re-throw, transient DB/push errors are absorbed,
+        // the user never gets their weekly recap, and the dashboard counts
+        // it as completed. Re-throw lets Inngest retry and surface a real
+        // failure on terminal exhaustion. See daily-snapshot.ts:78-80.
+        throw error;
       }
     });
   }

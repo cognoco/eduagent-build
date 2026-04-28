@@ -271,6 +271,11 @@ async function executeSteps(
       steps[name] = fn;
       return fn();
     }),
+    // [SWEEP-SILENT-RECOVERY] Production now dispatches a queryable
+    // app/session.filing_timed_out event via step.sendEvent when the
+    // 60s wait-for-filing window expires. Stub here so the handler
+    // doesn't TypeError on `step.sendEvent is not a function`.
+    sendEvent: jest.fn().mockResolvedValue(undefined),
     sleep: jest.fn(),
     waitForEvent: jest.fn().mockResolvedValue(null),
   };
@@ -378,6 +383,20 @@ describe('sessionCompleted', () => {
     );
     expect(consoleWarnSpy).toHaveBeenCalledWith(
       expect.stringContaining('filing waitForEvent timed out')
+    );
+    // [SWEEP-SILENT-RECOVERY] Filing-timeout must also dispatch an Inngest
+    // event for non-Sentry observability (oncall pages on rate spikes).
+    expect(mockStep.sendEvent).toHaveBeenCalledWith(
+      'filing-timed-out',
+      expect.objectContaining({
+        name: 'app/session.filing_timed_out',
+        data: expect.objectContaining({
+          sessionId: 'session-001',
+          profileId: 'profile-001',
+          sessionType: 'homework',
+          timeoutMs: 60000,
+        }),
+      })
     );
 
     consoleWarnSpy.mockRestore();
