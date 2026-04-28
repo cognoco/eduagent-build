@@ -14,22 +14,29 @@ const REMINDER_MONTHS_BEFORE_EXPIRY = [6, 4, 2, 0] as const;
 /**
  * For each milestone, compute the date range for credits expiring
  * at that milestone month from now. We check a 1-day window.
+ *
+ * [BUG-838 / F-SVC-004] Returns null if `now` is an invalid Date so the
+ * milestone is skipped instead of throwing RangeError out of toISOString and
+ * aborting the entire reminder batch. The previous version trusted the caller
+ * — fine today (always `new Date()`) but would explode if a future caller
+ * passed `new Date(undefined)` or a parsed-from-bad-input Date.
  */
 function getExpiryWindowForMilestone(
   now: Date,
   monthsBeforeExpiry: number
-): { rangeStart: Date; rangeEnd: Date } {
+): { rangeStart: Date; rangeEnd: Date } | null {
+  if (!Number.isFinite(now.getTime())) return null;
+
   const target = new Date(now);
   target.setMonth(target.getMonth() + monthsBeforeExpiry);
 
-  const rangeStart = new Date(
-    target.toISOString().slice(0, 10) + 'T00:00:00.000Z'
-  );
-  const rangeEnd = new Date(
-    target.toISOString().slice(0, 10) + 'T23:59:59.999Z'
-  );
+  if (!Number.isFinite(target.getTime())) return null;
 
-  return { rangeStart, rangeEnd };
+  const dateStr = target.toISOString().slice(0, 10);
+  return {
+    rangeStart: new Date(dateStr + 'T00:00:00.000Z'),
+    rangeEnd: new Date(dateStr + 'T23:59:59.999Z'),
+  };
 }
 
 export const topupExpiryReminder = inngest.createFunction(
@@ -40,6 +47,13 @@ export const topupExpiryReminder = inngest.createFunction(
   { cron: '0 9 * * *' }, // Daily at 09:00 UTC
   async ({ step }) => {
     const now = new Date();
+    // [BUG-838 / F-SVC-004] If the system clock yields an invalid Date,
+    // fall back to epoch for the structured timestamp instead of throwing
+    // RangeError out to Inngest (which would trigger pointless retries
+    // against the same broken clock).
+    const nowIso = Number.isFinite(now.getTime())
+      ? now.toISOString()
+      : new Date(0).toISOString();
     let totalReminders = 0;
 
     for (const months of REMINDER_MONTHS_BEFORE_EXPIRY) {
@@ -48,11 +62,9 @@ export const topupExpiryReminder = inngest.createFunction(
 
       const credits = await step.run(`find-credits-${label}`, async () => {
         const db = getStepDatabase();
-        const { rangeStart, rangeEnd } = getExpiryWindowForMilestone(
-          now,
-          months
-        );
-        return findExpiringTopUpCredits(db, rangeStart, rangeEnd);
+        const window = getExpiryWindowForMilestone(now, months);
+        if (!window) return [];
+        return findExpiringTopUpCredits(db, window.rangeStart, window.rangeEnd);
       });
 
       if (credits.length > 0) {
@@ -75,7 +87,7 @@ export const topupExpiryReminder = inngest.createFunction(
               remaining: credit.remaining,
               expiresAt: credit.expiresAt,
               monthsUntilExpiry: months,
-              timestamp: now.toISOString(),
+              timestamp: nowIso,
             },
           }))
         );
@@ -87,7 +99,7 @@ export const topupExpiryReminder = inngest.createFunction(
     return {
       status: 'completed',
       totalReminders,
-      timestamp: now.toISOString(),
+      timestamp: nowIso,
     };
   }
 );
