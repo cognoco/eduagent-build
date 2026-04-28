@@ -88,19 +88,46 @@ export const monthlyReportCron = inngest.createFunction(
       return { status: 'completed', queuedPairs: 0 };
     }
 
+    // [BUG-850 / F-SVC-021] Per-batch try/catch + Sentry escalation. Without
+    // per-batch isolation, a single failing sendEvent would either propagate
+    // and skip the rest of the batches, or silently report `completed` while
+    // half the parent/child pairs missed their monthly report.
     const BATCH_SIZE = 200;
+    let queuedBatches = 0;
+    let failedBatches = 0;
+    let queuedPairs = 0;
     for (let i = 0; i < pairs.length; i += BATCH_SIZE) {
       const batch = pairs.slice(i, i + BATCH_SIZE);
-      await step.sendEvent(
-        `fan-out-monthly-reports-${i}`,
-        batch.map((pair) => ({
-          name: 'app/monthly-report.generate' as const,
-          data: pair,
-        }))
-      );
+      try {
+        await step.sendEvent(
+          `fan-out-monthly-reports-${i}`,
+          batch.map((pair) => ({
+            name: 'app/monthly-report.generate' as const,
+            data: pair,
+          }))
+        );
+        queuedBatches += 1;
+        queuedPairs += batch.length;
+      } catch (err) {
+        failedBatches += 1;
+        captureException(err, {
+          extra: {
+            context: 'monthly-report-cron-fan-out',
+            batchIndex: i,
+            batchSize: batch.length,
+            totalPairs: pairs.length,
+          },
+        });
+      }
     }
 
-    return { status: 'completed', queuedPairs: pairs.length };
+    return {
+      status: failedBatches === 0 ? 'completed' : 'partial',
+      queuedPairs,
+      totalPairs: pairs.length,
+      queuedBatches,
+      failedBatches,
+    };
   }
 );
 

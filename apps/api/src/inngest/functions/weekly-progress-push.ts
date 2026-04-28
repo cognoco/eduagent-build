@@ -116,19 +116,50 @@ export const weeklyProgressPushCron = inngest.createFunction(
       return { status: 'completed', queuedParents: 0 };
     }
 
+    // [BUG-850 / F-SVC-021] Per-batch try/catch + Sentry escalation. Without
+    // this, a single failing batch sendEvent (transient Inngest 5xx, network
+    // blip) would either propagate and abort all subsequent batches OR —
+    // worse — silently leave the parent function returning `completed` while
+    // half the parents never got their weekly recap event. Each batch is now
+    // independently survivable: failures are captured to Sentry with batch
+    // metadata and counted in the final return so on-call and dashboards can
+    // detect partial fan-out.
     const BATCH_SIZE = 200;
+    let queuedBatches = 0;
+    let failedBatches = 0;
+    let queuedParents = 0;
     for (let i = 0; i < parentIds.length; i += BATCH_SIZE) {
       const batch = parentIds.slice(i, i + BATCH_SIZE);
-      await step.sendEvent(
-        `fan-out-weekly-progress-${i}`,
-        batch.map((parentId) => ({
-          name: 'app/weekly-progress-push.generate' as const,
-          data: { parentId },
-        }))
-      );
+      try {
+        await step.sendEvent(
+          `fan-out-weekly-progress-${i}`,
+          batch.map((parentId) => ({
+            name: 'app/weekly-progress-push.generate' as const,
+            data: { parentId },
+          }))
+        );
+        queuedBatches += 1;
+        queuedParents += batch.length;
+      } catch (err) {
+        failedBatches += 1;
+        captureException(err, {
+          extra: {
+            context: 'weekly-progress-push-cron-fan-out',
+            batchIndex: i,
+            batchSize: batch.length,
+            totalParents: parentIds.length,
+          },
+        });
+      }
     }
 
-    return { status: 'completed', queuedParents: parentIds.length };
+    return {
+      status: failedBatches === 0 ? 'completed' : 'partial',
+      queuedParents,
+      totalParents: parentIds.length,
+      queuedBatches,
+      failedBatches,
+    };
   }
 );
 

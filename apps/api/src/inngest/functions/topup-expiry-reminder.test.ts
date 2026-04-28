@@ -188,26 +188,11 @@ describe('topupExpiryReminder', () => {
     expect(mockInngestSend).not.toHaveBeenCalled();
   });
 
-  it('checks all four reminder milestones', async () => {
-    mockFindExpiringTopUpCredits.mockResolvedValue([]);
-
-    const { mockStep } = await executeSteps();
-
-    // Should run find-credits step for each of the 4 milestones
-    const runCalls = mockStep.run.mock.calls.map((call: unknown[]) => call[0]);
-    expect(runCalls).toContain('find-credits-expiring-in-6-months');
-    expect(runCalls).toContain('find-credits-expiring-in-4-months');
-    expect(runCalls).toContain('find-credits-expiring-in-2-months');
-    expect(runCalls).toContain('find-credits-expiring-today');
-  });
-
   it('[BUG-838] does not throw when system clock returns an invalid date', async () => {
-    // Break test for BUG-838: previously getExpiryWindowForMilestone called
-    // target.toISOString() unconditionally and the cron's final
-    // `timestamp: now.toISOString()` did the same — an Invalid Date would
-    // throw RangeError and abort the entire reminder batch (and all retries
-    // would re-throw against the same broken clock). The guarded version
-    // skips broken-clock milestones and falls back to epoch for the timestamp.
+    // Break test: the previous getExpiryWindowForMilestone called
+    // target.toISOString() unconditionally; an Invalid Date would throw
+    // RangeError and abort the entire reminder batch. The guarded version
+    // returns null and skips the milestone instead.
     const originalDate = global.Date;
     class BrokenDate extends originalDate {
       constructor(...args: ConstructorParameters<typeof Date>) {
@@ -230,5 +215,18 @@ describe('topupExpiryReminder', () => {
     } finally {
       global.Date = originalDate;
     }
+  });
+
+  it('checks all four reminder milestones', async () => {
+    mockFindExpiringTopUpCredits.mockResolvedValue([]);
+
+    const { mockStep } = await executeSteps();
+
+    // Should run find-credits step for each of the 4 milestones
+    const runCalls = mockStep.run.mock.calls.map((call: unknown[]) => call[0]);
+    expect(runCalls).toContain('find-credits-expiring-in-6-months');
+    expect(runCalls).toContain('find-credits-expiring-in-4-months');
+    expect(runCalls).toContain('find-credits-expiring-in-2-months');
+    expect(runCalls).toContain('find-credits-expiring-today');
   });
 });

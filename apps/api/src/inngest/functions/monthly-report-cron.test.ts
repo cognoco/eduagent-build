@@ -313,7 +313,7 @@ describe('monthlyReportCron', () => {
 
       const { result } = await executeCronSteps();
 
-      expect(result).toEqual({ status: 'completed', queuedPairs: 1 });
+      expect(result).toMatchObject({ status: 'completed', queuedPairs: 1 });
     });
 
     it('fans out sendEvent for each pair found', async () => {
@@ -360,7 +360,7 @@ describe('monthlyReportCron', () => {
 
       const { result } = await executeCronSteps();
 
-      expect(result).toEqual({ status: 'completed', queuedPairs: 2 });
+      expect(result).toMatchObject({ status: 'completed', queuedPairs: 2 });
     });
 
     it('batches large sets into chunks of 200', async () => {
@@ -380,7 +380,7 @@ describe('monthlyReportCron', () => {
 
       const { mockStep, result } = await executeCronSteps();
 
-      expect(result).toEqual({ status: 'completed', queuedPairs: 201 });
+      expect(result).toMatchObject({ status: 'completed', queuedPairs: 201 });
       expect(mockStep.sendEvent).toHaveBeenCalledTimes(2);
       // First batch is 200, second batch is 1
       const firstCall = mockStep.sendEvent.mock.calls[0][1];
