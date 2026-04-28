@@ -222,6 +222,13 @@ export interface EmailPayload {
 export interface EmailOptions {
   resendApiKey?: string;
   emailFrom?: string;
+  /**
+   * [BUG-699] Optional idempotency key forwarded as the `Idempotency-Key`
+   * header to the Resend API. Used by Inngest-driven email steps so that
+   * transient failures + step retries do not result in the same email being
+   * delivered to the user multiple times. Resend dedupes within a 24h window.
+   */
+  idempotencyKey?: string;
 }
 
 export interface EmailResult {
@@ -251,12 +258,18 @@ export async function sendEmail(
   const from = options?.emailFrom ?? 'noreply@mentomate.com';
 
   try {
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    };
+    // [BUG-699] Forward idempotency key when provided. Inngest step retries
+    // can otherwise replay sendEmail calls and double-send to the user.
+    if (options?.idempotencyKey) {
+      headers['Idempotency-Key'] = options.idempotencyKey;
+    }
     const response = await fetch(RESEND_API_URL, {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify({
         from,
         to: [payload.to],

@@ -81,6 +81,7 @@ async function executeHandler(
   const handler = (consentReminder as any).fn;
   await handler({
     event: {
+      id: 'evt-test-1',
       name: 'app/consent.requested',
       data: {
         profileId: 'profile-1',
@@ -194,5 +195,43 @@ describe('consentReminder', () => {
     expect(mockSendEmail).not.toHaveBeenCalled();
     // Atomic delete still happens because consent status is PENDING
     expect(mockDeleteProfileIfNoConsent).toHaveBeenCalled();
+  });
+
+  // [BUG-699] Inngest step retries can replay sendEmail. Each reminder step
+  // must pass a deterministic Idempotency-Key bound to (profileId, eventId,
+  // stepId) so Resend dedupes duplicate calls across retries.
+  it('[BUG-699] forwards a unique idempotencyKey per reminder step', async () => {
+    await executeHandler(['PENDING', 'PENDING', 'PENDING', 'PENDING']);
+
+    expect(mockSendEmail).toHaveBeenCalledTimes(3);
+
+    const day7Opts = mockSendEmail.mock.calls[0][1] as {
+      idempotencyKey?: string;
+    };
+    const day14Opts = mockSendEmail.mock.calls[1][1] as {
+      idempotencyKey?: string;
+    };
+    const day25Opts = mockSendEmail.mock.calls[2][1] as {
+      idempotencyKey?: string;
+    };
+
+    expect(day7Opts.idempotencyKey).toBe(
+      'consent-reminder:profile-1:evt-test-1:day-7'
+    );
+    expect(day14Opts.idempotencyKey).toBe(
+      'consent-reminder:profile-1:evt-test-1:day-14'
+    );
+    expect(day25Opts.idempotencyKey).toBe(
+      'consent-reminder:profile-1:evt-test-1:day-25-final'
+    );
+
+    // The keys must be distinct per step — otherwise Resend would dedupe
+    // legitimate later reminders against an earlier one.
+    const keys = new Set([
+      day7Opts.idempotencyKey,
+      day14Opts.idempotencyKey,
+      day25Opts.idempotencyKey,
+    ]);
+    expect(keys.size).toBe(3);
   });
 });

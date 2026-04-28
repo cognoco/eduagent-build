@@ -282,6 +282,47 @@ describe('sendEmail', () => {
 
     expect(result).toEqual({ sent: false, reason: 'network_error' });
   });
+
+  // [BUG-699] Inngest step retries can replay sendEmail calls. Forwarding the
+  // optional idempotency key as `Idempotency-Key` lets Resend dedupe duplicate
+  // sends within their 24h window.
+  it('[BUG-699] forwards idempotencyKey as Idempotency-Key header when provided', async () => {
+    mockFetchFn.mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: 'msg-id' }),
+    });
+
+    await sendEmail(emailPayload, {
+      resendApiKey: 're_test_key',
+      idempotencyKey: 'consent-reminder:profile-1:evt-1:day-7',
+    });
+
+    expect(mockFetchFn).toHaveBeenCalledWith(
+      'https://api.resend.com/emails',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'Idempotency-Key': 'consent-reminder:profile-1:evt-1:day-7',
+        }),
+      })
+    );
+  });
+
+  it('[BUG-699] omits Idempotency-Key header when not provided', async () => {
+    mockFetchFn.mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: 'msg-id' }),
+    });
+
+    await sendEmail(emailPayload, {
+      resendApiKey: 're_test_key',
+    });
+
+    const headers = mockFetchFn.mock.calls[0][1].headers as Record<
+      string,
+      string
+    >;
+    expect(headers['Idempotency-Key']).toBeUndefined();
+  });
 });
 
 // ---------------------------------------------------------------------------

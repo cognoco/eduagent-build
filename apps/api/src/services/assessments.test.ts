@@ -294,9 +294,119 @@ describe('evaluateAssessmentAnswer', () => {
       'Some answer'
     );
 
-    expect(result.feedback).toContain('partial understanding');
+    // [BUG-670 / S-16] Break test — raw LLM string MUST NOT leak as feedback.
+    // This catches regressions of the `?? response` / `feedback: response`
+    // antipattern where rate-limit JSON or safety refusals would surface
+    // directly to the learner.
+    expect(result.feedback).not.toContain('partial understanding');
+    expect(result.feedback).toBe(
+      "We couldn't evaluate your answer right now — please try again."
+    );
     expect(result.passed).toBe(false);
     expect(result.masteryScore).toBe(0);
+  });
+
+  // [BUG-664 / S-4] Break tests for the brittle /\{[\s\S]*\}/ regex.
+  // The regex would match from the first `{` to the LAST `}`, so any prose
+  // containing braces around the JSON would cause JSON.parse to throw and
+  // silently grade correct learner answers as failed.
+
+  it('parses correctly when prose with braces FOLLOWS the JSON envelope', async () => {
+    // The original /\{[\s\S]*\}/ regex went from the first `{` to the LAST `}`
+    // in the response. Any trailing prose containing `{}` would be glommed
+    // onto the parsed object, breaking JSON.parse and silently grading the
+    // learner as failed. The brace-depth walker stops at the first balanced
+    // object, so trailing braces no longer break extraction.
+    const messyProvider: LLMProvider = {
+      id: 'gemini',
+      async chat(): Promise<string> {
+        return (
+          'Here is my evaluation:\n' +
+          JSON.stringify({
+            feedback: 'Solid recall of the key concepts.',
+            passed: true,
+            shouldEscalateDepth: false,
+            rawScore: 0.45,
+            qualityRating: 4,
+          }) +
+          '\n(See {appendix} for grading rubric — irrelevant to envelope.)'
+        );
+      },
+      async *chatStream(): AsyncIterable<string> {
+        yield 'unused';
+      },
+    };
+    registerProvider(messyProvider);
+
+    const result = await evaluateAssessmentAnswer(
+      { ...assessmentContext, currentDepth: 'recall' },
+      'Variables store data.'
+    );
+
+    expect(result.feedback).toBe('Solid recall of the key concepts.');
+    expect(result.passed).toBe(true);
+    expect(result.masteryScore).toBeGreaterThan(0);
+  });
+
+  it('parses correctly when JSON is wrapped in markdown fence', async () => {
+    const fencedProvider: LLMProvider = {
+      id: 'gemini',
+      async chat(): Promise<string> {
+        return (
+          '```json\n' +
+          JSON.stringify({
+            feedback: 'Excellent explanation.',
+            passed: true,
+            shouldEscalateDepth: false,
+            rawScore: 0.7,
+            qualityRating: 4,
+          }) +
+          '\n```'
+        );
+      },
+      async *chatStream(): AsyncIterable<string> {
+        yield 'unused';
+      },
+    };
+    registerProvider(fencedProvider);
+
+    const result = await evaluateAssessmentAnswer(
+      { ...assessmentContext, currentDepth: 'explain' },
+      'Some answer'
+    );
+
+    expect(result.feedback).toBe('Excellent explanation.');
+    expect(result.passed).toBe(true);
+  });
+
+  it('uses canned fallback when parsed JSON is missing feedback field', async () => {
+    const missingFeedbackProvider: LLMProvider = {
+      id: 'gemini',
+      async chat(): Promise<string> {
+        // Valid JSON, but no `feedback` field — caller used to default to
+        // raw response under the old `?? response` pattern.
+        return JSON.stringify({
+          passed: false,
+          shouldEscalateDepth: false,
+          rawScore: 0.2,
+          qualityRating: 1,
+        });
+      },
+      async *chatStream(): AsyncIterable<string> {
+        yield 'unused';
+      },
+    };
+    registerProvider(missingFeedbackProvider);
+
+    const result = await evaluateAssessmentAnswer(
+      assessmentContext,
+      'Some answer'
+    );
+
+    expect(result.feedback).toBe(
+      "We couldn't evaluate your answer right now — please try again."
+    );
+    expect(result.passed).toBe(false);
   });
 });
 

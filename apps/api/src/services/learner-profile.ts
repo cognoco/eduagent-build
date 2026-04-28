@@ -20,7 +20,11 @@ import {
   type StruggleEntry,
 } from '@eduagent/schemas';
 import { routeAndCall, type ChatMessage } from './llm';
-import { escapeXml, sanitizeXmlValue } from './llm/sanitize';
+import {
+  escapeXml,
+  renderPromptTemplate,
+  sanitizeXmlValue,
+} from './llm/sanitize';
 import { createLogger } from './logger';
 import { captureException } from './sentry';
 
@@ -1490,9 +1494,9 @@ export async function analyzeSessionTranscript(
   const transcriptBody = conversationEvents
     .map(
       (entry) =>
-        `${entry.eventType === 'user_message' ? 'Learner' : 'Mentor'}: ${escapeXml(
-          entry.content
-        )}`
+        `${
+          entry.eventType === 'user_message' ? 'Learner' : 'Mentor'
+        }: ${escapeXml(entry.content)}`
     )
     .join('\n\n');
   const transcriptText = `<transcript>\n${transcriptBody}\n</transcript>`;
@@ -1530,11 +1534,16 @@ export async function analyzeSessionTranscript(
   const safeTopic = sanitizeXmlValue(topicTitle ?? 'General', 200);
   const safeRawInput = rawInput ? escapeXml(rawInput) : '(none)';
 
-  const systemPrompt = SESSION_ANALYSIS_PROMPT.replace('{subject}', safeSubject)
-    .replace('{topic}', safeTopic)
-    .replace('{rawInput}', safeRawInput)
-    .replaceAll('{knownStruggles}', knownStrugglesLabel)
-    .replaceAll('{suppressedTopics}', suppressedLabel);
+  // [BUG-773 / S-17] Single-pass token substitution. Chained .replace was
+  // vulnerable to curly-brace injection: a value like `{topic}` smuggled in
+  // an earlier substitution would be re-substituted on the next chained call.
+  const systemPrompt = renderPromptTemplate(SESSION_ANALYSIS_PROMPT, {
+    subject: safeSubject,
+    topic: safeTopic,
+    rawInput: safeRawInput,
+    knownStruggles: knownStrugglesLabel,
+    suppressedTopics: suppressedLabel,
+  });
 
   const messages: ChatMessage[] = [
     { role: 'system', content: systemPrompt },

@@ -192,6 +192,102 @@ describe('verifyResendSignature', () => {
     expect(result).toBe(false);
   });
 
+  // [BUG-768 / A-25] BREAK TEST. The pre-fix code had:
+  //
+  //     if (a.length !== b.length) return false;
+  //
+  // …above the constant-time loop, which leaks the length of the expected
+  // signature via timing (early return for length-mismatch is faster than
+  // the byte-by-byte XOR walk). The fix folds length difference into `diff`
+  // and walks Math.max(len) on both sides — different-length inputs return
+  // false through the same code path as same-length-wrong inputs.
+  //
+  // We can't measure timing in a unit test, but we CAN assert the function
+  // does not throw / short-circuit on length mismatch, and that pathological
+  // wrong inputs of any length still resolve to false.
+  describe('[BUG-768 / A-25] timingSafeEqual length-leak guard', () => {
+    it('returns false for short attacker-supplied signatures (length-mismatch path)', async () => {
+      const body = JSON.stringify({ type: 'email.delivered', data: {} });
+      const id = 'msg_short_sig';
+      const ts = nowTimestamp();
+
+      // Real HMAC-SHA256 base64 = 44 chars. We supply 8.
+      const result = await verifyResendSignature(
+        body,
+        id,
+        ts,
+        'v1,abcdefgh',
+        TEST_SECRET
+      );
+      expect(result).toBe(false);
+    });
+
+    it('returns false for over-long attacker-supplied signatures (length-mismatch path)', async () => {
+      const body = JSON.stringify({ type: 'email.delivered', data: {} });
+      const id = 'msg_long_sig';
+      const ts = nowTimestamp();
+
+      const overLong = 'A'.repeat(200);
+      const result = await verifyResendSignature(
+        body,
+        id,
+        ts,
+        `v1,${overLong}`,
+        TEST_SECRET
+      );
+      expect(result).toBe(false);
+    });
+
+    it('returns false for empty signature payload', async () => {
+      const body = JSON.stringify({ type: 'email.delivered', data: {} });
+      const id = 'msg_empty';
+      const ts = nowTimestamp();
+
+      const result = await verifyResendSignature(
+        body,
+        id,
+        ts,
+        'v1,',
+        TEST_SECRET
+      );
+      expect(result).toBe(false);
+    });
+
+    it('returns false for invalid base64 signature without throwing', async () => {
+      // base64ToBytes catches atob's InvalidCharacterError and returns an
+      // empty Uint8Array. The length-fold then makes the comparison fail.
+      const body = JSON.stringify({ type: 'email.delivered', data: {} });
+      const id = 'msg_garbage';
+      const ts = nowTimestamp();
+
+      const result = await verifyResendSignature(
+        body,
+        id,
+        ts,
+        'v1,!!not~~base64!!',
+        TEST_SECRET
+      );
+      expect(result).toBe(false);
+    });
+
+    it('returns false for valid-shape but wrong same-length signature', async () => {
+      const body = JSON.stringify({ type: 'email.delivered', data: {} });
+      const id = 'msg_same_len';
+      const ts = nowTimestamp();
+
+      // 44-char base64 string of zeros — same length as a real HMAC, wrong bytes.
+      const sameLength = 'A'.repeat(43) + '=';
+      const result = await verifyResendSignature(
+        body,
+        id,
+        ts,
+        `v1,${sameLength}`,
+        TEST_SECRET
+      );
+      expect(result).toBe(false);
+    });
+  });
+
   it('accepts signature without whsec_ prefix', async () => {
     const body = JSON.stringify({
       type: 'email.delivered',

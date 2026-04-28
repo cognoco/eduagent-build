@@ -34,10 +34,12 @@ import {
   dailySnapshotCron,
   dailySnapshotRefresh,
 } from './functions/daily-snapshot';
-import {
-  progressBackfillTrigger,
-  progressBackfillProfile,
-} from './functions/progress-backfill';
+// [BUG-698] progress-backfill (one-shot orchestrator + per-profile worker)
+// removed 2026-04-28. Both functions were wired to Inngest events that no
+// production code path ever sends, creating false confidence that the
+// backfill was operational. If a future migration needs to backfill, re-add
+// the function alongside its trigger (admin endpoint, cron, or migration
+// script) in the same change.
 import {
   weeklyProgressPushCron,
   weeklyProgressPushGenerate,
@@ -73,8 +75,6 @@ export {
   postSessionSuggestions,
   dailySnapshotCron,
   dailySnapshotRefresh,
-  progressBackfillTrigger,
-  progressBackfillProfile,
   weeklyProgressPushCron,
   weeklyProgressPushGenerate,
   monthlyReportCron,
@@ -113,8 +113,6 @@ export const functions = [
   postSessionSuggestions,
   dailySnapshotCron,
   dailySnapshotRefresh,
-  progressBackfillTrigger,
-  progressBackfillProfile,
   // [EP15-I1 AR-9] Weekly push split into cron + per-parent handler.
   weeklyProgressPushCron,
   weeklyProgressPushGenerate,

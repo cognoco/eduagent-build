@@ -24,10 +24,18 @@ export const consentReminder = inngest.createFunction(
   async ({ event, step }) => {
     const { profileId } = event.data;
 
-    // Build email options from Inngest middleware-injected env vars
-    const emailOpts = (): EmailOptions => ({
+    // [BUG-699] Build email options. Each reminder step passes a deterministic
+    // idempotency key so Inngest step retries cannot deliver the same reminder
+    // twice — Resend dedupes calls with matching `Idempotency-Key` within 24h.
+    // The key is bound to the Inngest run id so a *new* consent.requested
+    // event (e.g. re-requesting consent for the same profile after the
+    // workflow concluded) will produce a fresh key and send a fresh email.
+    const emailOpts = (stepId: string): EmailOptions => ({
       resendApiKey: getStepResendApiKey(),
       emailFrom: getStepEmailFrom(),
+      idempotencyKey: `consent-reminder:${profileId}:${
+        event.id ?? 'no-event'
+      }:${stepId}`,
     });
 
     /** Look up parentEmail and consentToken from the DB (never from event payload — PII). */
@@ -73,7 +81,7 @@ export const consentReminder = inngest.createFunction(
           23,
           buildTokenUrl(consentToken)
         ),
-        emailOpts()
+        emailOpts('day-7')
       );
     });
 
@@ -92,7 +100,7 @@ export const consentReminder = inngest.createFunction(
           16,
           buildTokenUrl(consentToken)
         ),
-        emailOpts()
+        emailOpts('day-14')
       );
     });
 
@@ -112,7 +120,7 @@ export const consentReminder = inngest.createFunction(
           body: `Without your consent, your child's account and data will be automatically removed in 5 days.`,
           type: 'consent_warning',
         },
-        emailOpts()
+        emailOpts('day-25-final')
       );
     });
 

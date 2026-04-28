@@ -8,6 +8,11 @@ import type { SummaryStatus } from '@eduagent/schemas';
 import { routeAndCall } from './llm';
 import type { ChatMessage } from './llm';
 import { escapeXml, sanitizeXmlValue } from './llm/sanitize';
+import { extractFirstJsonObject } from './llm/extract-json';
+import { captureException } from './sentry';
+import { createLogger } from './logger';
+
+const summariesLogger = createLogger();
 
 // ---------------------------------------------------------------------------
 // Summary Production & Evaluation — Story 2.8
@@ -124,28 +129,68 @@ export async function evaluateSummary(
  * Parses the LLM response into a SummaryEvaluation.
  * Falls back to a graceful default if JSON parsing fails.
  */
+/** [BUG-670 / S-16] Safe canned fallback feedback — never surface raw LLM
+ *  output to the learner. */
+const SUMMARY_FALLBACK_FEEDBACK =
+  "Your summary was saved. We couldn't provide AI feedback right now — you can try submitting again.";
+
 function parseSummaryEvaluation(response: string): SummaryEvaluation {
-  try {
-    const jsonMatch = response.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
+  // [BUG-664 / S-4] Use extractFirstJsonObject (brace-depth walker) — see
+  // assessments.ts for rationale on why the bare /\{[\s\S]*\}/ regex was wrong.
+  const jsonStr = extractFirstJsonObject(response);
+  if (jsonStr) {
+    try {
+      const parsed = JSON.parse(jsonStr);
+      // [BUG-670 / S-16] Use safe canned fallback rather than `?? response`.
       return {
-        feedback: String(parsed.feedback ?? response),
+        feedback:
+          typeof parsed.feedback === 'string' && parsed.feedback.length > 0
+            ? parsed.feedback
+            : SUMMARY_FALLBACK_FEEDBACK,
         hasUnderstandingGaps: Boolean(parsed.hasUnderstandingGaps),
         gapAreas: Array.isArray(parsed.gapAreas) ? parsed.gapAreas : undefined,
         isAccepted: Boolean(parsed.isAccepted),
       };
+    } catch (err) {
+      // [BUG-665 / S-5] Surface degraded LLM via Sentry + structured logger so
+      // ops can observe how often the evaluation pipeline silently degrades.
+      // Without this signal, learners think their summary was evaluated when
+      // it was actually never parsed — invisible quality regression.
+      captureException(err, {
+        extra: {
+          surface: 'summary-evaluation',
+          reason: 'invalid_json',
+          jsonStrSample: jsonStr.slice(0, 200),
+        },
+      });
+      summariesLogger.warn(
+        '[parseSummaryEvaluation] invalid JSON — falling back to canned feedback',
+        { reason: 'invalid_json' }
+      );
     }
-  } catch {
-    // Fall through to default
+  } else {
+    // [BUG-665 / S-5] No JSON envelope at all — also degraded.
+    captureException(
+      new Error('parseSummaryEvaluation: no JSON object found'),
+      {
+        extra: {
+          surface: 'summary-evaluation',
+          reason: 'no_json_found',
+          rawResponseLength: response.length,
+        },
+      }
+    );
+    summariesLogger.warn(
+      '[parseSummaryEvaluation] no JSON object found — falling back to canned feedback',
+      { reason: 'no_json_found', rawResponseLength: response.length }
+    );
   }
 
   // Fallback — LLM response was unparseable. Do NOT accept — the summary was
   // not actually evaluated. isAccepted=false is consistent with the feedback:
-  // the submission was saved but evaluation is unavailable (no contradictory checkmark).
+  // the submission was saved but evaluation is unavailable.
   return {
-    feedback:
-      "Your summary was saved. We couldn't provide AI feedback right now — you can try submitting again.",
+    feedback: SUMMARY_FALLBACK_FEEDBACK,
     hasUnderstandingGaps: false,
     isAccepted: false,
   };

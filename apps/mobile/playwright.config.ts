@@ -69,7 +69,10 @@ export default defineConfig({
     },
     {
       name: 'smoke-auth',
-      testMatch: /flows[\\/]auth[\\/]auth-navigation\.spec\.ts/,
+      // [BUG-754] Sign-up form smoke joins the auth-navigation spec under the
+      // same anonymous (no setup dependency) project. Both target /sign-in or
+      // /sign-up and don't require a seeded session.
+      testMatch: /flows[\\/]auth[\\/](auth-navigation|sign-up-flow)\.spec\.ts/,
     },
     {
       name: 'smoke-learner',

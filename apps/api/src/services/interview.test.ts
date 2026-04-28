@@ -721,6 +721,61 @@ describe('extractSignals', () => {
     expect(result.interests).toEqual([]);
   });
 
+  // [BUG-663 / S-3] Break tests for the brittle /\{[\s\S]*\}/ regex. The
+  // greedy regex matched from the first `{` in any prose to the LAST `}` in
+  // the document, producing a JSON.parse-incompatible superset and silently
+  // dropping all extracted signals (curriculum proceeded without
+  // personalisation).
+  //
+  // The interview.ts code-side fix shipped earlier under
+  // [BUG-842 / F-SVC-009] (commit 2ea4e116) — that swapped the regex for
+  // extractFirstJsonObject (brace-depth walker). BUG-663 / S-3 is the
+  // separate audit finding that no break tests existed to prove the
+  // regression cannot return; the tests below close that gap.
+  it('[BUG-663] extracts signals even when prose with braces FOLLOWS the JSON envelope', async () => {
+    // The original /\{[\s\S]*\}/ regex went from the first `{` to the LAST `}`
+    // in the document, so any trailing braces extended the match into prose
+    // and broke JSON.parse. The brace-depth walker (extractFirstJsonObject)
+    // stops at the first balanced object, so trailing prose braces no longer
+    // crash the extractor.
+    (routeAndCall as jest.Mock).mockResolvedValueOnce({
+      response:
+        'Here is the extracted envelope:\n' +
+        JSON.stringify({
+          goals: ['learn JavaScript'],
+          experienceLevel: 'beginner',
+          currentKnowledge: '',
+          interests: ['music'],
+        }) +
+        '\n(See {appendix} for trace — irrelevant to envelope.)',
+    });
+
+    const result = await extractSignals([{ role: 'user', content: 'hi' }]);
+
+    expect(result.goals).toEqual(['learn JavaScript']);
+    expect(result.experienceLevel).toBe('beginner');
+    expect(result.interests).toEqual(['music']);
+  });
+
+  it('[BUG-663] extracts signals when JSON is wrapped in a markdown code fence', async () => {
+    (routeAndCall as jest.Mock).mockResolvedValueOnce({
+      response:
+        '```json\n' +
+        JSON.stringify({
+          goals: ['get better at chess'],
+          experienceLevel: 'intermediate',
+          currentKnowledge: 'I know openings',
+          interests: ['chess'],
+        }) +
+        '\n```',
+    });
+
+    const result = await extractSignals([{ role: 'user', content: 'hi' }]);
+
+    expect(result.goals).toEqual(['get better at chess']);
+    expect(result.experienceLevel).toBe('intermediate');
+  });
+
   it('[BKT-C.2] returns empty interests when JSON.parse throws on partial JSON', async () => {
     // The regex matches `{...}` but the content is not valid JSON —
     // exercises the catch block rather than the regex-miss path above.

@@ -68,3 +68,33 @@ export function escapeXml(text: string): string {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&apos;');
 }
+
+/**
+ * [BUG-773 / S-17] Single-pass `{token}` substitution against a fixed
+ * vocabulary of allowed keys. Eliminates the curly-brace injection that
+ * chained `.replace('{a}', valA).replace('{b}', valB)` is vulnerable to:
+ * if `valA` contains the literal string `{b}`, the second .replace would
+ * re-substitute it. Because `String.replace` does not recursively re-scan
+ * replacement output, a single regex pass with a closed-set lookup table
+ * is safe even when values contain other tokens.
+ *
+ * The replacer function only resolves keys present in `values`; an unknown
+ * `{xyz}` left in the template is preserved verbatim — never replaced
+ * with `undefined`. This makes accidental template typos visible to the
+ * model rather than silently blanking the field.
+ */
+export function renderPromptTemplate(
+  template: string,
+  values: Record<string, string>
+): string {
+  return template.replace(
+    /\{([a-zA-Z][a-zA-Z0-9_]*)\}/g,
+    (match, key: string) => {
+      // Narrow via local lookup — `Record<string, string>` indexer still
+      // returns `string | undefined` under noUncheckedIndexedAccess, and
+      // `hasOwnProperty` does not narrow the indexer type.
+      const value = values[key];
+      return typeof value === 'string' ? value : match;
+    }
+  );
+}

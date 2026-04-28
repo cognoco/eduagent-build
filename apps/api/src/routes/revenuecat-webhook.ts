@@ -421,8 +421,11 @@ async function handleSubscriberAlias(
   event: RevenueCatWebhookPayload['event']
 ): Promise<void> {
   // SUBSCRIBER_ALIAS: RevenueCat merged two subscriber records.
-  // Log for audit — no immediate action needed since we key by Clerk user ID.
-  console.info('[revenuecat] SUBSCRIBER_ALIAS event', {
+  // [BUG-728 / SEC-12] Routed through the structured logger so the Clerk
+  // user IDs land as JSON `context` fields the log pipeline can index and
+  // redact uniformly, rather than as raw console.info args that bypass the
+  // pipeline's PII handling.
+  logger.info('[revenuecat] SUBSCRIBER_ALIAS event', {
     appUserId: event.app_user_id,
     transferredFrom: event.transferred_from,
     transferredTo: event.transferred_to,

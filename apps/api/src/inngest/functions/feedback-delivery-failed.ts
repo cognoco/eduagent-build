@@ -16,9 +16,14 @@ const logger = createLogger();
 
 const DEFAULT_SUPPORT_EMAIL = 'support@mentomate.com';
 
+// [BUG-767 / A-24] Category enum must match the route's submission schema
+// (`feedbackCategorySchema` in `@eduagent/schemas`). The route persists
+// `body.category` directly into the event payload, so a mismatch here would
+// silently safeParse-fail every event the route fires — exactly the
+// "wired-but-untriggered" anti-pattern A-24 was filed to prevent.
 const eventDataSchema = z.object({
   profileId: z.string(),
-  category: z.enum(['bug', 'suggestion', 'general']),
+  category: z.enum(['bug', 'suggestion', 'other']),
 });
 
 export const feedbackDeliveryFailed = inngest.createFunction(

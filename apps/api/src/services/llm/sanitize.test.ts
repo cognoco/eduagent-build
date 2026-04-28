@@ -1,4 +1,4 @@
-import { sanitizeXmlValue, escapeXml } from './sanitize';
+import { renderPromptTemplate, sanitizeXmlValue, escapeXml } from './sanitize';
 
 // ---------------------------------------------------------------------------
 // sanitizeXmlValue — destructive strip + length cap
@@ -171,5 +171,83 @@ describe('escapeXml', () => {
       const injection = '" onclick="evil()';
       expect(escapeXml(injection)).toBe('&quot; onclick=&quot;evil()');
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// renderPromptTemplate — single-pass token substitution
+// [BUG-773 / S-17] Replaces chained .replace() calls in learner-profile and
+// guards against curly-brace re-substitution attacks.
+// ---------------------------------------------------------------------------
+
+describe('renderPromptTemplate', () => {
+  it('substitutes a single token', () => {
+    expect(renderPromptTemplate('hello {name}', { name: 'world' })).toBe(
+      'hello world'
+    );
+  });
+
+  it('substitutes multiple distinct tokens', () => {
+    expect(
+      renderPromptTemplate('subject={subject}, topic={topic}', {
+        subject: 'Math',
+        topic: 'Algebra',
+      })
+    ).toBe('subject=Math, topic=Algebra');
+  });
+
+  it('substitutes the same token multiple times (replaceAll behavior)', () => {
+    expect(renderPromptTemplate('{n} + {n} = double', { n: '5' })).toBe(
+      '5 + 5 = double'
+    );
+  });
+
+  it('preserves unknown tokens verbatim instead of substituting undefined', () => {
+    expect(
+      renderPromptTemplate('use {known} not {unknown}', { known: 'X' })
+    ).toBe('use X not {unknown}');
+  });
+
+  // [BUG-773 / S-17] BREAK TESTS — chained .replace() failure mode.
+  // If a substituted value contains another token, that token MUST NOT be
+  // re-substituted on a second pass. A regex with a single .replace() call
+  // does not recurse into replacement output, so this is naturally safe;
+  // these tests pin that contract.
+  it('does NOT recursively substitute tokens that appear inside a value', () => {
+    // If `subject` contains the literal string `{topic}`, the legacy code
+    // ran a second .replace('{topic}', safeTopic) which would smuggle the
+    // real topic into a subject-controlled position. Our single-pass
+    // implementation must leave the injected `{topic}` literal intact.
+    const result = renderPromptTemplate('S={subject} T={topic}', {
+      subject: 'pwned-{topic}',
+      topic: 'Algebra',
+    });
+    expect(result).toBe('S=pwned-{topic} T=Algebra');
+  });
+
+  it('does NOT recursively substitute even when the injected token comes later in the values map', () => {
+    const result = renderPromptTemplate('A={a} B={b}', {
+      // {b} appears in `a`'s value but must remain a literal in output
+      a: '{b}-from-a',
+      b: 'real-b',
+    });
+    expect(result).toBe('A={b}-from-a B=real-b');
+  });
+
+  it('matches only valid identifier-style tokens', () => {
+    // Tokens must start with a letter; `{1}`, `{ }`, `{}` are not tokens.
+    expect(
+      renderPromptTemplate('keep {1} {} { } untouched, replace {good}', {
+        good: 'OK',
+      })
+    ).toBe('keep {1} {} { } untouched, replace OK');
+  });
+
+  it('does not consult Object.prototype for inherited keys', () => {
+    // Guard against prototype pollution: even if the template uses
+    // {toString} or {hasOwnProperty}, those should be unknown tokens.
+    expect(renderPromptTemplate('x={toString} y={hasOwnProperty}', {})).toBe(
+      'x={toString} y={hasOwnProperty}'
+    );
   });
 });
