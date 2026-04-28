@@ -14,7 +14,12 @@ const mockUseLearningResumeTarget = jest.fn();
 const mockUseReviewSummary = jest.fn();
 const mockMarkQuizDiscoverySurfaced = jest.fn();
 
+// [CR-757] LearnerScreen uses the direct `router` singleton from expo-router
+// instead of useRouter(). Mock the singleton + the hook so any indirect
+// callers in the screen still get the same mockPush. (Hook is unused after
+// CR-757 but kept for backward compat with sibling components.)
 jest.mock('expo-router', () => ({
+  router: { push: mockPush, replace: jest.fn() },
   useRouter: () => ({ push: mockPush }),
 }));
 

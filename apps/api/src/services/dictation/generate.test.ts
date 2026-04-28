@@ -345,6 +345,72 @@ describe('generateDictation', () => {
     expect(systemContent).not.toContain('LIBRARY TOPICS');
   });
 
+  // [CR-770] Boundary tests proving the unified age cutpoint at 13/14.
+  // Age 13 is the last "child" age; age 14 is the first "person" (adult).
+  // All three age-bracketed prompt fragments (literary theme, sentence
+  // length, advanced punctuation) must agree on this boundary.
+  it('[CR-770] age 13 = full child register: kids lit + 5-10 word sentences + no advanced punctuation', async () => {
+    mockRouteAndCall.mockResolvedValueOnce({
+      response: JSON.stringify({
+        sentences: [
+          {
+            text: 'A small dog ran into the field.',
+            withPunctuation: 'A small dog ran into the field period',
+            wordCount: 7,
+          },
+        ],
+        title: 'The Dog',
+        topic: 'adventure',
+        language: 'en',
+      }),
+      provider: 'gemini',
+      model: 'gemini-2.5-flash',
+      latencyMs: 80,
+    });
+
+    await generateDictation({ nativeLanguage: 'en', ageYears: 13 });
+
+    const systemContent = mockRouteAndCall.mock.calls[0][0][0]
+      .content as string;
+    expect(systemContent).toContain('child');
+    expect(systemContent).not.toContain(' person\n');
+    expect(systemContent).toContain("children's novels and chapter books");
+    expect(systemContent).toContain('5-10 words');
+    expect(systemContent).not.toContain('7-14 words');
+    expect(systemContent).not.toContain('Colons and semicolons');
+  });
+
+  it('[CR-770] age 14 = full adult register: adult lit + 7-14 word sentences + advanced punctuation', async () => {
+    mockRouteAndCall.mockResolvedValueOnce({
+      response: JSON.stringify({
+        sentences: [
+          {
+            text: 'The fog crept through the empty avenues without a sound.',
+            withPunctuation:
+              'The fog crept through the empty avenues without a sound period',
+            wordCount: 11,
+          },
+        ],
+        title: 'Foggy Morning',
+        topic: 'literary fiction',
+        language: 'en',
+      }),
+      provider: 'gemini',
+      model: 'gemini-2.5-flash',
+      latencyMs: 80,
+    });
+
+    await generateDictation({ nativeLanguage: 'en', ageYears: 14 });
+
+    const systemContent = mockRouteAndCall.mock.calls[0][0][0]
+      .content as string;
+    expect(systemContent).toContain('person');
+    expect(systemContent).toContain('contemporary literature');
+    expect(systemContent).toContain('7-14 words');
+    expect(systemContent).not.toContain('5-10 words');
+    expect(systemContent).toContain('Colons and semicolons sparingly');
+  });
+
   it('removed dead <11 literary theme branches — ageYears=12 resolves to chapter-book theme', async () => {
     // Product ships to 11+ only. The old ≤7 (fairy tales) and ≤10 (Narnia)
     // branches were dead; confirm ageYears=12 now picks the chapter-book

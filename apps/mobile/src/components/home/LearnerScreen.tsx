@@ -1,7 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+// [CR-757] Use the module-scoped `router` singleton directly instead of
+// `useRouter()`. The hook returns the same singleton on every render, but
+// passing it through React's hook system makes eslint-react-hooks treat it
+// as a non-stable value that must be listed in every memo/callback dep
+// array — including `intentCards` below, which then re-runs on every
+// re-render despite the ref being stable. Skipping the hook removes the
+// false-positive dep without suppressing the lint rule.
+import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Profile } from '@eduagent/schemas';
 import { BookPageFlipAnimation, ProfileSwitcher } from '../common';
@@ -49,7 +56,8 @@ export function LearnerScreen({
   onBack,
   now,
 }: LearnerScreenProps): React.ReactElement {
-  const router = useRouter();
+  // [CR-757] `router` is imported directly above as a module singleton — no
+  // hook call needed.
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
   const { data: subjects, isLoading, isError, refetch } = useSubjects();
@@ -318,7 +326,6 @@ export function LearnerScreen({
     recoveryMarker,
     resumeTarget,
     reviewSummary,
-    router,
   ]);
 
   if (isLoading) {
