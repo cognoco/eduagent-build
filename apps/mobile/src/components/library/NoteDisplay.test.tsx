@@ -48,4 +48,51 @@ describe('NoteDisplay', () => {
     const { getByText } = render(<NoteDisplay content={content} readOnly />);
     expect(getByText('Apr 5')).toBeTruthy();
   });
+
+  // [a11y sweep] Break tests: edit/delete icon wrappers must be a11y-hidden
+  // so VoiceOver/TalkBack only announces the Pressable label, not the icon name.
+  it('marks the edit icon wrapper as accessibility-hidden [a11y sweep]', () => {
+    const { getByTestId } = render(
+      <NoteDisplay
+        content="Test note"
+        onEdit={jest.fn()}
+        onDelete={jest.fn()}
+      />
+    );
+    const iconWrapper = getByTestId('note-edit-icon', {
+      includeHiddenElements: true,
+    });
+    expect(iconWrapper.props.accessibilityElementsHidden).toBe(true);
+    expect(iconWrapper.props.importantForAccessibility).toBe(
+      'no-hide-descendants'
+    );
+  });
+
+  it('edit icon is excluded from default visible-only queries [a11y sweep]', () => {
+    const { queryByTestId } = render(
+      <NoteDisplay
+        content="Test note"
+        onEdit={jest.fn()}
+        onDelete={jest.fn()}
+      />
+    );
+    expect(queryByTestId('note-edit-icon')).toBeNull();
+  });
+
+  it('marks the delete icon wrapper as accessibility-hidden [a11y sweep]', () => {
+    const { getByTestId } = render(
+      <NoteDisplay
+        content="Test note"
+        onEdit={jest.fn()}
+        onDelete={jest.fn()}
+      />
+    );
+    const iconWrapper = getByTestId('note-delete-icon', {
+      includeHiddenElements: true,
+    });
+    expect(iconWrapper.props.accessibilityElementsHidden).toBe(true);
+    expect(iconWrapper.props.importantForAccessibility).toBe(
+      'no-hide-descendants'
+    );
+  });
 });

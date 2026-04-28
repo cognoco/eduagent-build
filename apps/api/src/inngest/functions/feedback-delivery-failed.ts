@@ -77,6 +77,15 @@ export const feedbackDeliveryFailed = inngest.createFunction(
       const resendApiKey = getStepResendApiKey();
       const emailFrom = getStepEmailFrom();
 
+      // [BUG-699-FOLLOWUP] Pass a deterministic idempotency key so Inngest
+      // step retries (retries: 2) cannot deliver the same support email twice.
+      // Resend dedupes calls with matching `Idempotency-Key` within 24h.
+      // The key is bound to (profileId, eventId) so a genuinely new delivery
+      // failure for the same profile in a new run produces a fresh key.
+      const idempotencyKey = `feedback-delivery-failed:${profileId}:${
+        event.id ?? 'no-event'
+      }:retry-delivery`;
+
       const result = await sendEmail(
         {
           to: process.env['SUPPORT_EMAIL'] ?? DEFAULT_SUPPORT_EMAIL,
@@ -87,7 +96,7 @@ export const feedbackDeliveryFailed = inngest.createFunction(
           body: `[Delayed delivery] Category: ${category}\nProfile: ${profileId}\nOriginal delivery failed — this is a retry from the Inngest queue.`,
           type: 'feedback',
         },
-        { resendApiKey, emailFrom }
+        { resendApiKey, emailFrom, idempotencyKey }
       );
 
       if (!result.sent) {

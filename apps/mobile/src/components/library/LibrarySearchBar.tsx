@@ -37,11 +37,18 @@ export function LibrarySearchBar({
           testID="library-search-clear"
           accessibilityLabel="Clear search"
         >
-          <Ionicons
-            name="close-circle"
-            size={18}
-            color={themeColors.textSecondary}
-          />
+          {/* [a11y sweep] decorative icon — Pressable parent carries the label */}
+          <View
+            testID="library-search-clear-icon"
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+          >
+            <Ionicons
+              name="close-circle"
+              size={18}
+              color={themeColors.textSecondary}
+            />
+          </View>
         </Pressable>
       )}
     </View>

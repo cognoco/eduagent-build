@@ -21,13 +21,17 @@ export default function TextPreviewScreen(): React.ReactElement {
   // B1.4: 20s timeout hint for the prepare mutation — mirrors dictation/index.tsx pattern
   const [prepareTimedOut, setPrepareTimedOut] = useState(false);
   const prepareTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // [BUG-692] Set when back arrow, Cancel button, or 20s timeout fires while
+  // the mutation is in flight. Prevents a late response from pushing to playback.
+  const prepareCancelledRef = useRef(false);
   useEffect(() => {
     if (prepareMutation.isPending) {
       setPrepareTimedOut(false);
-      prepareTimeoutRef.current = setTimeout(
-        () => setPrepareTimedOut(true),
-        20_000
-      );
+      prepareTimeoutRef.current = setTimeout(() => {
+        // [BUG-692] Timeout counts as cancellation.
+        prepareCancelledRef.current = true;
+        setPrepareTimedOut(true);
+      }, 20_000);
     } else {
       if (prepareTimeoutRef.current) clearTimeout(prepareTimeoutRef.current);
       setPrepareTimedOut(false);
@@ -43,8 +47,16 @@ export default function TextPreviewScreen(): React.ReactElement {
       return;
     }
 
+    // [BUG-692] Reset cancelled flag at the start of each new attempt.
+    prepareCancelledRef.current = false;
+
     try {
       const result = await prepareMutation.mutateAsync({ text: text.trim() });
+
+      // [BUG-692] If back arrow, Cancel button, or the 20s timeout fired
+      // while the mutation was in flight, skip navigation to playback.
+      if (prepareCancelledRef.current) return;
+
       setData({
         sentences: result.sentences,
         language: result.language,
@@ -54,6 +66,8 @@ export default function TextPreviewScreen(): React.ReactElement {
       // playback screen mounts (same race as dictation/index.tsx).
       setTimeout(() => router.push('/(app)/dictation/playback' as never), 0);
     } catch (err) {
+      // [BUG-692] Don't show an alert if the user already navigated away.
+      if (prepareCancelledRef.current) return;
       console.warn('[dictation] homework preparation failed:', err);
       platformAlert(
         'Something went wrong',
@@ -78,7 +92,10 @@ export default function TextPreviewScreen(): React.ReactElement {
     >
       <View className="flex-row items-center mb-6">
         <Pressable
-          onPress={() => goBackOrReplace(router, '/(app)/dictation')}
+          onPress={() => {
+            prepareCancelledRef.current = true; // [BUG-692]
+            goBackOrReplace(router, '/(app)/dictation');
+          }}
           className="mr-3 min-h-[44px] min-w-[44px] items-center justify-center"
           accessibilityRole="button"
           accessibilityLabel="Go back"
@@ -141,6 +158,7 @@ export default function TextPreviewScreen(): React.ReactElement {
           )}
           <Pressable
             onPress={() => {
+              prepareCancelledRef.current = true; // [BUG-692]
               prepareMutation.reset();
               goBackOrReplace(router, '/(app)/dictation');
             }}

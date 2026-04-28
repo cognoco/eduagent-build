@@ -280,14 +280,16 @@ export async function sendEmail(
 
     if (!response.ok) {
       // Log only status code — error body may contain PII (echoed email addresses)
-      console.error(`[email] Resend API error: status ${response.status}`);
+      // [logging sweep] structured logger so PII fields land as JSON context
+      logger.error('[email] Resend API error', { status: response.status });
       return { sent: false, reason: `resend_api_error_${response.status}` };
     }
 
     const result = (await response.json()) as { id?: string };
     return { sent: true, messageId: result.id };
   } catch {
-    console.error('[email] Network error sending email');
+    // [logging sweep] structured logger so PII fields land as JSON context
+    logger.error('[email] Network error sending email');
     return { sent: false, reason: 'network_error' };
   }
 }

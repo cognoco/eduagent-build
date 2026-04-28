@@ -60,7 +60,14 @@ export function NoteDisplay({
               accessibilityRole="button"
               accessibilityLabel="Edit note"
             >
-              <Ionicons name="pencil" size={18} color={themeColors.primary} />
+              {/* [a11y sweep] decorative icon — Pressable parent carries the label */}
+              <View
+                testID="note-edit-icon"
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants"
+              >
+                <Ionicons name="pencil" size={18} color={themeColors.primary} />
+              </View>
             </Pressable>
           )}
           {onDelete != null && (
@@ -71,11 +78,18 @@ export function NoteDisplay({
               accessibilityRole="button"
               accessibilityLabel="Delete note"
             >
-              <Ionicons
-                name="trash-outline"
-                size={18}
-                color={themeColors.danger}
-              />
+              {/* [a11y sweep] decorative icon — Pressable parent carries the label */}
+              <View
+                testID="note-delete-icon"
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants"
+              >
+                <Ionicons
+                  name="trash-outline"
+                  size={18}
+                  color={themeColors.danger}
+                />
+              </View>
             </Pressable>
           )}
         </View>

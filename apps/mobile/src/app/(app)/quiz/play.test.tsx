@@ -395,9 +395,10 @@ describe('QuizPlayScreen — error feedback [BUG-799 / BUG-806]', () => {
       expect(screen.getByTestId('quiz-play-screen')).toBeTruthy()
     );
     await new Promise((r) => setTimeout(r, 280));
-    // Tap the screen-wide Pressable that wires handleContinue. With a
-    // 1-question round, handleContinue calls submitRound → completeRound.
-    fireEvent.press(screen.getByTestId('quiz-play-screen'));
+    // [BUG-691] handleContinue is now scoped to the body Pressable so the
+    // Quit X in the header can never bubble to it. With a 1-question round,
+    // handleContinue calls submitRound → completeRound.
+    fireEvent.press(screen.getByTestId('quiz-play-body'));
   }
 
   it('[BREAK / BUG-806] completeRound onError uses formatApiError, not instanceof', async () => {
@@ -433,5 +434,30 @@ describe('QuizPlayScreen — error feedback [BUG-799 / BUG-806]', () => {
     expect(mockSentryCapture).toHaveBeenCalledWith(
       expect.objectContaining({ message: 'Round save failed: 500' })
     );
+  });
+
+  // [BUG-691] The root container is a plain View, not a Pressable. The
+  // Quit X button cannot bubble its press to the continue handler because
+  // the continue Pressable is scoped to the body, sibling of the header.
+  it('[BUG-691] root is not a Pressable — Quit cannot trigger handleContinue', async () => {
+    mockCheckAnswer.mockResolvedValueOnce({ correct: true });
+    render(<QuizPlayScreen />);
+
+    // Resolve the answer so continueActive is true
+    fireEvent.press(screen.getByTestId('quiz-option-0'));
+    await waitFor(() =>
+      expect(screen.getByTestId('quiz-play-screen')).toBeTruthy()
+    );
+    await new Promise((r) => setTimeout(r, 280));
+
+    // Press the Quit button. This must show a confirm alert and must NOT
+    // submit the round (which would mean handleContinue also fired).
+    fireEvent.press(screen.getByTestId('quiz-play-quit'));
+    expect(mockPlatformAlert).toHaveBeenCalledWith(
+      'Quit this round?',
+      expect.any(String),
+      expect.any(Array)
+    );
+    expect(mockCompleteRoundMutate).not.toHaveBeenCalled();
   });
 });

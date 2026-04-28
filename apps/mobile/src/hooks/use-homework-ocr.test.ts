@@ -304,4 +304,102 @@ describe('useHomeworkOcr', () => {
     expect(result.current.status).toBe('idle');
     expect(mockRecognize).not.toHaveBeenCalled();
   });
+
+  // [BUG-681 / I-16] Break tests: cancel() must cause an in-flight OCR to
+  // abandon its result so the hook never transitions to 'done' or 'error'
+  // after a deliberate cancel. Without these guards, a slow ML Kit call
+  // completing after the user dismissed the screen would re-render stale
+  // text and could re-open a modal the user explicitly closed.
+
+  it('cancel() during native recognizeText drops the late result and stays idle [BUG-681]', async () => {
+    // Build a deferred recognizeText so we can resolve it AFTER cancel.
+    let resolveRecognize: (value: { text: string }) => void = () => undefined;
+    const recognizePromise = new Promise<{ text: string }>((resolve) => {
+      resolveRecognize = resolve;
+    });
+    mockRecognize.mockReturnValue(recognizePromise);
+
+    const { result } = renderHook(() => useHomeworkOcr());
+
+    // Kick off the OCR run — do NOT await; it suspends inside recognizeText.
+    // Note: process() awaits copyToCache first, then calls runOcr. Drain
+    // microtasks until the hook is actually inside the recognizeText await.
+    let processPromise: Promise<void> = Promise.resolve();
+    await act(async () => {
+      processPromise = result.current.process('file:///tmp/photo.jpg');
+      // Flush copyToCache + runOcr setup so cancelRef points at the active controller.
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // Sanity: recognizeText is in flight, status is 'processing'.
+    expect(mockRecognize).toHaveBeenCalled();
+    expect(result.current.status).toBe('processing');
+
+    // Cancel before recognizeText resolves.
+    act(() => {
+      result.current.cancel();
+    });
+    expect(result.current.status).toBe('idle');
+
+    // Now resolve the slow native call with a "valid" result — must be ignored.
+    await act(async () => {
+      resolveRecognize({ text: 'Solve for x: 2x + 5 = 13' });
+      await processPromise;
+    });
+
+    // Late result is discarded — cancel's idle wins.
+    expect(result.current.status).toBe('idle');
+    expect(result.current.text).toBeNull();
+    // Gate analytics must NOT fire — late result was dropped before gating ran.
+    expect(mockTrackHomeworkOcrGateAccepted).not.toHaveBeenCalled();
+    expect(mockTrackHomeworkOcrGateRejected).not.toHaveBeenCalled();
+  });
+
+  it('cancel() forwards abort into the server OCR fetch [BUG-681]', async () => {
+    // Local OCR returns no text → triggers server fallback path.
+    mockRecognize.mockResolvedValue({ text: null });
+
+    let capturedSignal: AbortSignal | undefined;
+    let resolveFetch: (value: unknown) => void = () => undefined;
+    const fetchPromise = new Promise((resolve) => {
+      resolveFetch = resolve;
+    });
+    mockFetch.mockImplementation(
+      (_url: string, init: { signal?: AbortSignal }) => {
+        capturedSignal = init.signal;
+        return fetchPromise;
+      }
+    );
+
+    const { result } = renderHook(() => useHomeworkOcr());
+
+    let processPromise: Promise<void> = Promise.resolve();
+    await act(async () => {
+      processPromise = result.current.process('file:///tmp/photo.jpg');
+      // Drain microtasks until fetch is issued.
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+    });
+
+    expect(mockFetch).toHaveBeenCalled();
+    expect(capturedSignal).toBeDefined();
+    expect(capturedSignal!.aborted).toBe(false);
+
+    // Cancel — the signal we passed to fetch must transition to aborted.
+    act(() => {
+      result.current.cancel();
+    });
+    expect(capturedSignal!.aborted).toBe(true);
+
+    // Resolve the (in real life: aborted) fetch so the hook can finish.
+    await act(async () => {
+      resolveFetch({ ok: false, status: 0 });
+      await processPromise;
+    });
+
+    // No transition to 'done' or 'error' — cancel suppressed the result.
+    expect(result.current.status).toBe('idle');
+    expect(result.current.text).toBeNull();
+  });
 });

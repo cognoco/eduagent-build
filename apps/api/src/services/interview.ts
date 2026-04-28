@@ -212,7 +212,17 @@ export function buildDraftResumeSummary(
 // verbose LLM response can't overflow what the mobile picker can render.
 const MAX_EXTRACTED_INTERESTS = 8;
 
-export async function extractSignals(exchangeHistory: ChatExchange[]): Promise<{
+// [BUG-771] Defensive character budget on the transcript body. A 4-exchange
+// interview can exceed the Flash context window when learners paste long
+// messages. We truncate from the head (oldest turns) so the most recent
+// signal-bearing turns are preserved. Below the smallest provider's input
+// budget with margin for the system prompt + envelope wrapper.
+const MAX_TRANSCRIPT_CHARS = 12000;
+
+export async function extractSignals(
+  exchangeHistory: ChatExchange[],
+  options?: { llmTier?: import('./subscription').LLMTier }
+): Promise<{
   goals: string[];
   experienceLevel: string;
   currentKnowledge: string;
@@ -222,9 +232,15 @@ export async function extractSignals(exchangeHistory: ChatExchange[]): Promise<{
   // Entity-encode each turn so a crafted message cannot close the
   // <transcript> tag or inject directives, then wrap in a named tag and
   // remind the model in the user content that the tag body is data.
-  const conversationText = exchangeHistory
+  let conversationText = exchangeHistory
     .map((e) => `${e.role.toUpperCase()}: ${escapeXml(e.content)}`)
     .join('\n');
+
+  // [BUG-771] Trim from the head — older turns are usually setup chatter; the
+  // tail carries the bulk of the structured signals (goals, level, interests).
+  if (conversationText.length > MAX_TRANSCRIPT_CHARS) {
+    conversationText = conversationText.slice(-MAX_TRANSCRIPT_CHARS);
+  }
 
   const messages: ChatMessage[] = [
     { role: 'system', content: SIGNAL_EXTRACTION_PROMPT },
@@ -237,7 +253,12 @@ export async function extractSignals(exchangeHistory: ChatExchange[]): Promise<{
     },
   ];
 
-  const result = await routeAndCall(messages, 2);
+  // [BUG-771] Honor caller's tier so premium users get Sonnet (longer context,
+  // higher quality) rather than silently degrading to Flash for the
+  // signal-extraction step.
+  const result = await routeAndCall(messages, 2, {
+    llmTier: options?.llmTier,
+  });
 
   // [BUG-842 / F-SVC-009] Use extractFirstJsonObject (brace-depth walker) over
   // the greedy /\{[\s\S]*\}/ regex — the regex grabs everything between the
@@ -407,7 +428,15 @@ export async function processInterviewExchange(
   // (MAX_INTERVIEW_EXCHANGES) is the only fail-safe when the model never
   // emits readyToFinish. Making it optional previously meant a future caller
   // could silently default to 0 and let the interview loop indefinitely.
-  options: { exchangeCount: number; profileId?: string; learnerName?: string }
+  options: {
+    exchangeCount: number;
+    profileId?: string;
+    learnerName?: string;
+    // [BUG-771] Caller's subscription tier. Threaded into routeAndCall AND
+    // extractSignals so premium users stay on Sonnet for both steps instead
+    // of degrading to Flash for signal extraction.
+    llmTier?: import('./subscription').LLMTier;
+  }
 ): Promise<InterviewResult> {
   const safeSubjectName = sanitizeXmlValue(context.subjectName, 200);
   const focusLine = buildFocusLine(context.bookTitle);
@@ -434,7 +463,9 @@ export async function processInterviewExchange(
     { role: 'user' as const, content: userMessage },
   ];
 
-  const result = await routeAndCall(messages, 1);
+  const result = await routeAndCall(messages, 1, {
+    llmTier: options?.llmTier,
+  });
   const { cleanResponse, readyToFinish } = interpretInterviewResponse({
     rawResponse: result.response,
     profileId: options?.profileId,
@@ -450,11 +481,14 @@ export async function processInterviewExchange(
     readyToFinish || currentExchangeCount >= MAX_INTERVIEW_EXCHANGES;
 
   if (isComplete) {
-    const signals = await extractSignals([
-      ...context.exchangeHistory,
-      { role: 'user', content: userMessage },
-      { role: 'assistant', content: cleanResponse },
-    ]);
+    const signals = await extractSignals(
+      [
+        ...context.exchangeHistory,
+        { role: 'user', content: userMessage },
+        { role: 'assistant', content: cleanResponse },
+      ],
+      { llmTier: options?.llmTier }
+    );
     return { response: cleanResponse, isComplete, extractedSignals: signals };
   }
 
@@ -482,6 +516,9 @@ export async function streamInterviewExchange(
      * pre-[EMPTY-REPLY-GUARD-1].
      */
     emptyReplyGuardEnabled?: boolean;
+    // [BUG-771] Caller's subscription tier. Threaded through routeAndStream
+    // and extractSignals.
+    llmTier?: import('./subscription').LLMTier;
   }
 ): Promise<{
   stream: AsyncIterable<string>;
@@ -511,7 +548,9 @@ export async function streamInterviewExchange(
     { role: 'user' as const, content: userMessage },
   ];
 
-  const streamResult = await routeAndStream(messages, 1);
+  const streamResult = await routeAndStream(messages, 1, {
+    llmTier: options?.llmTier,
+  });
   const currentExchangeCount = options.exchangeCount;
 
   // Tee the provider stream: mobile sees only the envelope `reply` chars,
@@ -568,11 +607,14 @@ export async function streamInterviewExchange(
       readyToFinish || currentExchangeCount >= MAX_INTERVIEW_EXCHANGES;
 
     if (isComplete) {
-      const signals = await extractSignals([
-        ...context.exchangeHistory,
-        { role: 'user', content: userMessage },
-        { role: 'assistant', content: cleanResponse },
-      ]);
+      const signals = await extractSignals(
+        [
+          ...context.exchangeHistory,
+          { role: 'user', content: userMessage },
+          { role: 'assistant', content: cleanResponse },
+        ],
+        { llmTier: options?.llmTier }
+      );
       return { response: cleanResponse, isComplete, extractedSignals: signals };
     }
 

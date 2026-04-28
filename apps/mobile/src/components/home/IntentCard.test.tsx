@@ -58,7 +58,9 @@ describe('IntentCard', () => {
       />
     );
 
-    expect(screen.getByTestId('card-icon')).toBeTruthy();
+    expect(
+      screen.getByTestId('card-icon', { includeHiddenElements: true })
+    ).toBeTruthy();
   });
 
   it('does not render icon element when omitted', () => {
@@ -89,6 +91,54 @@ describe('IntentCard', () => {
     const card = screen.getByTestId('card');
     expect(card.props.accessibilityRole).toBe('button');
     expect(card.props.accessibilityLabel).toBe('Pick a subject');
+  });
+
+  it('leading icon wrapper has both a11y-hidden flags [BUG-716]', () => {
+    render(
+      <IntentCard
+        title="Learn"
+        onPress={jest.fn()}
+        icon="book-outline"
+        testID="card"
+      />
+    );
+    const iconWrapper = screen.getByTestId('card-icon', {
+      includeHiddenElements: true,
+    });
+    expect(iconWrapper.props.accessibilityElementsHidden).toBe(true);
+    expect(iconWrapper.props.importantForAccessibility).toBe(
+      'no-hide-descendants'
+    );
+  });
+
+  it('chevron wrapper has both a11y-hidden flags [BUG-716]', () => {
+    render(<IntentCard title="Learn" onPress={jest.fn()} testID="card" />);
+    const chevron = screen.getByTestId('card-chevron', {
+      includeHiddenElements: true,
+    });
+    expect(chevron.props.accessibilityElementsHidden).toBe(true);
+    expect(chevron.props.importantForAccessibility).toBe('no-hide-descendants');
+  });
+
+  it('chevron is still hidden when dismiss is also present [BUG-716]', () => {
+    render(
+      <IntentCard
+        title="Learn"
+        onPress={jest.fn()}
+        onDismiss={jest.fn()}
+        testID="card"
+      />
+    );
+    const chevron = screen.getByTestId('card-chevron', {
+      includeHiddenElements: true,
+    });
+    expect(chevron.props.accessibilityElementsHidden).toBe(true);
+    expect(chevron.props.importantForAccessibility).toBe('no-hide-descendants');
+  });
+
+  it('chevron is excluded from default visible-only queries [BUG-716]', () => {
+    render(<IntentCard title="Learn" onPress={jest.fn()} testID="card" />);
+    expect(screen.queryByTestId('card-chevron')).toBeNull();
   });
 
   it('renders a dismiss action when provided and does not trigger card press', () => {

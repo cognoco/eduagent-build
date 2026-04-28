@@ -413,3 +413,95 @@ describe('formatStruggleNotificationCopy', () => {
     expect(copy.body).toContain('Your child');
   });
 });
+
+// ---------------------------------------------------------------------------
+// [logging sweep] BREAK TEST: sendEmail errors must emit structured JSON via
+// the logger (not raw console.error).
+// ---------------------------------------------------------------------------
+
+describe('sendEmail structured logging', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  const emailPayload: EmailPayload = {
+    to: 'parent@example.com',
+    subject: 'Consent required',
+    body: 'Please approve.',
+    type: 'consent_request',
+  };
+
+  // [LOGGING-SWEEP-1] BREAK TEST: Resend API error must emit JSON via logger,
+  // NOT raw console.error. Asserts:
+  //   1. console.error is NOT called directly
+  //   2. console.error IS called by the logger (JSON-wrapped)
+  //   3. The JSON output is parseable and contains the status field
+  it('emits a structured JSON log on Resend API error — never raw console.error', async () => {
+    mockFetchFn.mockResolvedValue({
+      ok: false,
+      status: 503,
+      text: async () => 'Service unavailable',
+    });
+
+    const errorSpy = jest
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
+    try {
+      const result = await sendEmail(emailPayload, {
+        resendApiKey: 're_test_key',
+      });
+      expect(result.sent).toBe(false);
+      expect(result.reason).toBe('resend_api_error_503');
+
+      // Must have logged via structured logger (which delegates to console.error)
+      expect(errorSpy).toHaveBeenCalled();
+      const logArg = errorSpy.mock.calls
+        .map((call) => call[0])
+        .find(
+          (arg): arg is string =>
+            typeof arg === 'string' && arg.includes('Resend API error')
+        );
+      expect(logArg).toBeDefined();
+      const parsed = JSON.parse(logArg!) as {
+        level: string;
+        message: string;
+        context?: { status?: unknown };
+      };
+      expect(parsed.level).toBe('error');
+      expect(parsed.message).toContain('Resend API error');
+      expect(parsed.context?.status).toBe(503);
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  // [LOGGING-SWEEP-2] BREAK TEST: network error must emit JSON via logger.
+  it('emits a structured JSON log on network error — never raw console.error', async () => {
+    mockFetchFn.mockRejectedValue(new Error('network down'));
+
+    const errorSpy = jest
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
+    try {
+      const result = await sendEmail(emailPayload, {
+        resendApiKey: 're_test_key',
+      });
+      expect(result.sent).toBe(false);
+      expect(result.reason).toBe('network_error');
+
+      expect(errorSpy).toHaveBeenCalled();
+      const logArg = errorSpy.mock.calls
+        .map((call) => call[0])
+        .find(
+          (arg): arg is string =>
+            typeof arg === 'string' && arg.includes('Network error')
+        );
+      expect(logArg).toBeDefined();
+      const parsed = JSON.parse(logArg!) as { level: string; message: string };
+      expect(parsed.level).toBe('error');
+      expect(parsed.message).toContain('Network error');
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+});

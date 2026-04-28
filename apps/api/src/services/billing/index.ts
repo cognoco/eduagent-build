@@ -38,7 +38,7 @@ export {
 
 // Quota decrement / increment (hot path)
 export type { DecrementResult } from './metering';
-export { decrementQuota, incrementQuota } from './metering';
+export { decrementQuota, incrementQuota, safeRefundQuota } from './metering';
 
 // Top-up credit management
 export type { TopUpCreditRow } from './top-up';

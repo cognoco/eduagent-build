@@ -30,6 +30,7 @@ import {
   buildSystemPrompt as _buildSystemPrompt,
   resolveAgeBracket,
 } from './exchange-prompts';
+import { stripPhoneticHints } from './llm/sanitize';
 
 const logger = createLogger();
 
@@ -456,7 +457,8 @@ export function parseExchangeEnvelope(
       reason: parsed.reason,
     });
     return {
-      cleanResponse: response.trim(),
+      // [BUG-865] Strip TTS pronunciation hints from chat-visible text.
+      cleanResponse: stripPhoneticHints(response.trim()),
       understandingCheck: detectUnderstandingCheckFromProse(response),
       partialProgress: false,
       needsDeepening: false,
@@ -478,7 +480,11 @@ function envelopeToParsedExchange(
 ): ParsedExchangeEnvelope {
   const signals = envelope.signals ?? {};
   const uiHints = envelope.ui_hints ?? {};
-  const cleanReply = envelope.reply.trim();
+  // [BUG-865] Phonetic hints like "de-nom-i-nay-tor" coach the TTS path
+  // but render verbatim in chat bubbles. Sanitize here so every consumer
+  // of the parsed envelope (text + audio paths) sees the same clean reply
+  // and the audio path can re-add pronunciation through SSML when needed.
+  const cleanReply = stripPhoneticHints(envelope.reply.trim());
 
   const notePrompt = uiHints.note_prompt;
   const drill = uiHints.fluency_drill;

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -89,6 +89,22 @@ export default function CreateProfileScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // [BUG-UX-PROFILE-TIMEOUT] Hard 30s UI timeout: if the profile-creation POST
+  // hasn't resolved, surface an inline error and restore the form so the user
+  // can retry. Avoids an infinite spinner dead-end on slow/stuck networks.
+  useEffect(() => {
+    if (!loading) return undefined;
+    const PROFILE_CREATE_TIMEOUT_MS = 30_000;
+    const timer = setTimeout(() => {
+      setLoading(false);
+      setError(
+        'Creating your profile is taking too long. Check your connection and try again.'
+      );
+    }, PROFILE_CREATE_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [loading]);
+
   const { scrollRef, onFieldLayout, onFieldFocus } = useKeyboardScroll();
 
   const handleClose = useCallback(() => {

@@ -31,6 +31,7 @@ import {
   getOpeningMessage,
   SessionTimer,
   FluencyDrillStrip,
+  MilestoneDots,
   type ChatMessage,
 } from '../../../components/session';
 import type { FluencyDrillEvent } from '../../../lib/sse';
@@ -269,35 +270,6 @@ class SessionErrorBoundary extends Component<
   }
 }
 
-function MilestoneDots({ count }: { count: number }) {
-  if (count <= 0) return null;
-
-  // [BUG-645 / ACC-1] Bare colored dots are invisible to screen readers.
-  // The aggregate View carries the label so VoiceOver/TalkBack reads
-  // "3 milestones reached" instead of skipping the indicator entirely.
-  const accessibilityLabel =
-    count === 1 ? '1 milestone reached' : `${count} milestones reached`;
-
-  return (
-    <View
-      className="ms-2 flex-row items-center gap-1"
-      testID="milestone-dots"
-      accessible
-      accessibilityRole="text"
-      accessibilityLabel={accessibilityLabel}
-    >
-      {Array.from({ length: Math.min(count, 6) }).map((_, index) => (
-        <View
-          key={index}
-          className="w-2 h-2 rounded-full bg-primary"
-          importantForAccessibility="no"
-          accessibilityElementsHidden
-        />
-      ))}
-    </View>
-  );
-}
-
 export default function SessionScreen() {
   return (
     <SessionErrorBoundary>
@@ -357,6 +329,24 @@ function SessionScreenInner() {
     : subjectId
     ? `/(app)/shelf/${subjectId}`
     : undefined;
+  // [BUG-867] String-templated dynamic paths (`/(app)/shelf/${subjectId}`)
+  // don't always resolve on web — the chevron looked clickable but the URL
+  // never changed. Supplying an explicit handler that uses Expo Router's
+  // typed object form makes the navigation reliable across web + native.
+  const handleChatBackPress = useCallback(() => {
+    if (returnTo) {
+      router.replace(homeBackHref as never);
+      return;
+    }
+    if (subjectId) {
+      router.replace({
+        pathname: '/(app)/shelf/[subjectId]',
+        params: { subjectId },
+      } as never);
+      return;
+    }
+    router.replace('/(app)/home' as never);
+  }, [returnTo, subjectId, homeBackHref, router]);
   const handleHomeBack = useCallback(() => {
     if (returnTo) {
       router.replace(homeBackHref as never);
@@ -1399,6 +1389,7 @@ function SessionScreenInner() {
         placeholder={modeConfig.placeholder}
         backFallback={chatBackFallback}
         backBehavior={chatBackFallback ? 'replace' : undefined}
+        onBackPress={handleChatBackPress}
         messages={messages}
         onSend={handleSend}
         isStreaming={isStreaming}

@@ -151,6 +151,26 @@ describe('ChatShell', () => {
     expect(mockBack).not.toHaveBeenCalled();
   });
 
+  it('defers fully to onBackPress when supplied [BUG-867]', () => {
+    // Regression: the back chevron looked clickable but the URL never
+    // changed because the string-templated `/(app)/shelf/${subjectId}`
+    // path didn't resolve. Parents now own navigation through onBackPress
+    // and use the typed object form, so the chevron must call the
+    // handler and skip the default router calls entirely.
+    const onBackPress = jest.fn();
+    renderChatShell({
+      backFallback: '/(app)/library',
+      backBehavior: 'replace',
+      onBackPress,
+    });
+
+    fireEvent.press(screen.getByLabelText('Go back'));
+
+    expect(onBackPress).toHaveBeenCalledTimes(1);
+    expect(mockReplace).not.toHaveBeenCalled();
+    expect(mockBack).not.toHaveBeenCalled();
+  });
+
   it('renders title, subtitle, and messages', () => {
     renderChatShell({ title: 'Learning Session', subtitle: 'Math' });
 

@@ -202,4 +202,42 @@ describe('VoicePlaybackBar', () => {
   // BUG-348: screenReaderEnabled prop and banner removed — the entire
   // VoicePlaybackBar is hidden at the ChatShell level when a screen reader
   // is active, so the component never renders with screenReaderEnabled.
+
+  // [a11y sweep] Break tests: decorative playback icons must be hidden from
+  // screen readers — each Pressable parent already carries an accessibilityLabel.
+  it('marks the replay icon wrapper as accessibility-hidden [a11y sweep]', () => {
+    render(<VoicePlaybackBar {...defaultProps} />);
+    const iconWrapper = screen.getByTestId('voice-replay-icon', {
+      includeHiddenElements: true,
+    });
+    expect(iconWrapper.props.accessibilityElementsHidden).toBe(true);
+    expect(iconWrapper.props.importantForAccessibility).toBe(
+      'no-hide-descendants'
+    );
+  });
+
+  it('replay icon is excluded from default visible-only queries [a11y sweep]', () => {
+    render(<VoicePlaybackBar {...defaultProps} />);
+    expect(screen.queryByTestId('voice-replay-icon')).toBeNull();
+  });
+
+  it('marks the pause/resume icon wrapper as accessibility-hidden [a11y sweep]', () => {
+    render(
+      <VoicePlaybackBar {...defaultProps} isSpeaking={true} isPaused={false} />
+    );
+    const iconWrapper = screen.getByTestId('voice-pause-resume-icon', {
+      includeHiddenElements: true,
+    });
+    expect(iconWrapper.props.accessibilityElementsHidden).toBe(true);
+  });
+
+  it('marks the stop icon wrapper as accessibility-hidden [a11y sweep]', () => {
+    render(
+      <VoicePlaybackBar {...defaultProps} isSpeaking={true} isPaused={false} />
+    );
+    const iconWrapper = screen.getByTestId('voice-stop-icon', {
+      includeHiddenElements: true,
+    });
+    expect(iconWrapper.props.accessibilityElementsHidden).toBe(true);
+  });
 });

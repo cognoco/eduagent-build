@@ -21,6 +21,9 @@ import {
 import { resolveSubjectName } from '../services/subject-resolve';
 import { classifySubject } from '../services/subject-classify';
 import { notFound, apiError } from '../errors';
+import { createLogger } from '../services/logger';
+
+const logger = createLogger();
 
 type SubjectRouteEnv = {
   Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
@@ -74,7 +77,10 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
       const result = await createSubjectWithStructure(db, profileId, input);
       return c.json(result, 201);
     } catch (err) {
-      console.error('[POST /subjects] Unhandled error:', err);
+      // [logging sweep] structured logger so PII fields land as JSON context
+      logger.error('[POST /subjects] Unhandled error', {
+        error: err instanceof Error ? err.message : String(err),
+      });
       return apiError(
         c,
         500,

@@ -20,6 +20,7 @@ jest.mock('../../lib/theme', () => ({
     muted: '#888',
     primary: '#007AFF',
     textInverse: '#fff',
+    textSecondary: '#666',
   }),
 }));
 
@@ -53,7 +54,10 @@ describe('VoiceRecordButton', () => {
     );
 
     expect(screen.getByTestId('voice-record-button')).toBeTruthy();
-    expect(screen.getByText('mic')).toBeTruthy();
+    // Icon is a11y-hidden — must use includeHiddenElements to find it
+    expect(
+      screen.getByText('mic', { includeHiddenElements: true })
+    ).toBeTruthy();
   });
 
   it('renders with stop icon when listening', () => {
@@ -65,7 +69,10 @@ describe('VoiceRecordButton', () => {
       />
     );
 
-    expect(screen.getByText('stop')).toBeTruthy();
+    // Icon is a11y-hidden — must use includeHiddenElements to find it
+    expect(
+      screen.getByText('stop', { includeHiddenElements: true })
+    ).toBeTruthy();
   });
 
   // -----------------------------------------------------------------------
@@ -190,6 +197,37 @@ describe('VoiceRecordButton', () => {
     expect(toJSON()).toBeTruthy();
     expect(screen.getByTestId('voice-record-button')).toBeTruthy();
   });
+
+  // [a11y sweep] Break tests: decorative mic/stop icon must be hidden from
+  // screen readers — the Pressable's accessibilityLabel already conveys the action.
+  it('marks the mic/stop icon wrapper as accessibility-hidden [a11y sweep]', () => {
+    render(
+      <VoiceRecordButton
+        isListening={false}
+        onPress={jest.fn()}
+        disabled={false}
+      />
+    );
+    // includeHiddenElements required because the wrapper is itself a11y-hidden.
+    const iconWrapper = screen.getByTestId('voice-record-icon', {
+      includeHiddenElements: true,
+    });
+    expect(iconWrapper.props.accessibilityElementsHidden).toBe(true);
+    expect(iconWrapper.props.importantForAccessibility).toBe(
+      'no-hide-descendants'
+    );
+  });
+
+  it('mic/stop icon is excluded from default visible-only queries [a11y sweep]', () => {
+    render(
+      <VoiceRecordButton
+        isListening={false}
+        onPress={jest.fn()}
+        disabled={false}
+      />
+    );
+    expect(screen.queryByTestId('voice-record-icon')).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -274,5 +312,31 @@ describe('VoiceTranscriptPreview', () => {
     fireEvent.press(screen.getByTestId('voice-rerecord-button'));
 
     expect(onReRecord).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders Re-record and Discard as icon-only with screen-reader labels [BUG-715]', () => {
+    render(
+      <VoiceTranscriptPreview
+        transcript="Hello"
+        onSend={jest.fn()}
+        onDiscard={jest.fn()}
+        onReRecord={jest.fn()}
+      />
+    );
+    // No visible text label for the secondary actions
+    expect(screen.queryByText('Discard')).toBeNull();
+    expect(screen.queryByText('Re-record')).toBeNull();
+    // Icons rendered (the @expo/vector-icons mock prints icon name as Text)
+    expect(screen.getByText('refresh-outline')).toBeTruthy();
+    expect(screen.getByText('trash-outline')).toBeTruthy();
+    // Screen-reader labels and tap targets preserved
+    const reRecord = screen.getByTestId('voice-rerecord-button');
+    const discard = screen.getByTestId('voice-discard-button');
+    expect(reRecord.props.accessibilityLabel).toBe('Re-record');
+    expect(discard.props.accessibilityLabel).toBe('Discard recording');
+    expect(reRecord.props.className).toContain('min-w-[44px]');
+    expect(reRecord.props.className).toContain('min-h-[44px]');
+    expect(discard.props.className).toContain('min-w-[44px]');
+    expect(discard.props.className).toContain('min-h-[44px]');
   });
 });

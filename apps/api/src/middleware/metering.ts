@@ -67,6 +67,10 @@ const LLM_ROUTE_PATTERNS = [
   // loop and burn unlimited LLM capacity at zero cost. Meter it like any
   // other LLM-driven session endpoint.
   /\/sessions\/[^/]+\/recall-bridge\/?$/,
+  // [BUG-653 / A-5] evaluateSessionDepth runs an LLM call (depth gate +
+  // topic detection). Without metering, an authenticated client could
+  // spam this endpoint and burn unbounded LLM capacity at zero cost.
+  /\/sessions\/[^/]+\/evaluate-depth\/?$/,
   // Onboarding interview is intentionally unmetered.
   // It has its own server-side hard cap (4 user exchanges) and should not
   // burn the learner's tutoring quota before regular learning even starts.

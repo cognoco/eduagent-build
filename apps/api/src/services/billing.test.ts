@@ -19,6 +19,7 @@ import {
   resetMonthlyQuota,
   decrementQuota,
   incrementQuota,
+  safeRefundQuota,
   getSubscriptionForProfile,
   getProfileCountForSubscription,
   canAddProfile,
@@ -622,6 +623,58 @@ describe('incrementQuota', () => {
     // a no-op. The test verifies no exception is thrown.
     const db = createMockDb({ updateReturning: [] });
     await expect(incrementQuota(db, subscriptionId)).resolves.toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// safeRefundQuota
+// ---------------------------------------------------------------------------
+
+describe('safeRefundQuota [BUG-661]', () => {
+  it('returns refunded:true on success and does not escalate', async () => {
+    const db = createMockDb();
+    const result = await safeRefundQuota(db, subscriptionId, {
+      route: 'sessions.message',
+      profileId: 'p-1',
+    });
+    expect(result).toEqual({ refunded: true });
+    expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
+  // Break test: if the underlying UPDATE throws (DB transient, connection
+  // dropped, etc.), the wrapper must still resolve, return refunded:false,
+  // and escalate to Sentry. Without escalation, the user is silently charged
+  // for a failed exchange.
+  it('escalates and returns refunded:false when incrementQuota throws [BUG-661]', async () => {
+    // Build a db whose .update().set().where() rejects.
+    const dbErr = new Error('connection terminated');
+    const db = {
+      update: jest.fn().mockReturnValue({
+        set: jest.fn().mockReturnValue({
+          where: jest.fn().mockRejectedValue(dbErr),
+        }),
+      }),
+    } as unknown as Database;
+
+    const result = await safeRefundQuota(db, subscriptionId, {
+      route: 'sessions.stream',
+      profileId: 'p-1',
+      sessionId: 'sess-1',
+    });
+
+    expect(result).toEqual({ refunded: false });
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      dbErr,
+      expect.objectContaining({
+        profileId: 'p-1',
+        extra: expect.objectContaining({
+          context: 'metering.refund.failed',
+          route: 'sessions.stream',
+          subscriptionId,
+          sessionId: 'sess-1',
+        }),
+      })
+    );
   });
 });
 

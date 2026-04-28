@@ -136,6 +136,14 @@ export function validateSessionInsights(raw: string): SessionInsightsResult {
   };
 }
 
+/**
+ * Sentinel that callers pass for `topics` when the session was a freeform
+ * conversation with no specific topic record. Surfaces as a friendlier
+ * "had a learning session" phrase rather than the awkward
+ * "studied a freeform session". [BUG-878]
+ */
+export const FREEFORM_TOPIC_SENTINEL = 'a freeform session';
+
 export function buildBrowseHighlight(
   childDisplayName: string,
   topics: string[],
@@ -147,8 +155,6 @@ export function buildBrowseHighlight(
       .replace(/[^\p{L}\p{N} '-]/gu, '')
       .trim()
       .slice(0, 50) || 'Learner';
-  const topicList = topics.slice(0, 3).join(', ');
-  const suffix = topics.length > 3 ? ` and ${topics.length - 3} more` : '';
   const mins = Math.max(1, Math.round(durationSeconds / 60));
   // [BUG-526] Include subject name when available so parents see context.
   // [CRIT-2] subjectName is user-created free text — apply the same
@@ -166,7 +172,22 @@ export function buildBrowseHighlight(
         .slice(0, 50)
     : '';
   const subjectPrefix = safeSubject ? `${safeSubject}: ` : '';
-  return `${safeName} browsed ${subjectPrefix}${topicList}${suffix} — ${mins} min`;
+
+  // [BUG-878] Freeform sessions reach the fallback with a sentinel topic.
+  // Render them as "had a learning session" so parents see real engagement
+  // signal instead of the passive-sounding "studied a freeform session".
+  const isFreeform =
+    topics.length === 1 && topics[0] === FREEFORM_TOPIC_SENTINEL;
+  if (isFreeform) {
+    const subjectClause = safeSubject ? ` on ${safeSubject}` : '';
+    return `${safeName} had a learning session${subjectClause} — ${mins} min`;
+  }
+
+  const topicList = topics.slice(0, 3).join(', ');
+  const suffix = topics.length > 3 ? ` and ${topics.length - 3} more` : '';
+  // [BUG-878] "browsed" implied passive scrolling; "studied" matches the
+  // active learning session this entry is summarising.
+  return `${safeName} studied ${subjectPrefix}${topicList}${suffix} — ${mins} min`;
 }
 
 const SESSION_INSIGHTS_SYSTEM_PROMPT = `You write concise parent recaps of a child's learning session.

@@ -5,7 +5,7 @@ import {
   type DepthEvaluation,
   type SessionTranscript,
 } from '@eduagent/schemas';
-import { routeAndCall, type ChatMessage } from '../llm';
+import { routeAndCall, extractFirstJsonObject, type ChatMessage } from '../llm';
 import { escapeXml } from '../llm/sanitize';
 import { createLogger } from '../logger';
 import { captureException } from '../sentry';
@@ -53,13 +53,22 @@ function formatTranscriptForPrompt(transcript: SessionTranscript): string {
 function parseDepthResponse(
   raw: string
 ): Omit<DepthEvaluation, 'method'> | null {
+  // [BUG-772] Use the shared brace-walker so prose preambles, fenced markdown
+  // blocks, and trailing chatter all parse uniformly with every other LLM
+  // call site (sweep). The bespoke 3-regex strip only handled fenced blocks
+  // and silently failed on any preamble like "Here's the analysis: {...}".
+  const jsonStr = extractFirstJsonObject(raw);
+  if (!jsonStr) {
+    captureException(new Error('session-depth: no JSON object found'), {
+      extra: {
+        context: 'parseDepthResponse',
+        rawSlice: raw.slice(0, 500),
+      },
+    });
+    return null;
+  }
   try {
-    const cleaned = raw
-      .replace(/^```json\s*/i, '')
-      .replace(/^```\s*/i, '')
-      .replace(/\s*```$/i, '')
-      .trim();
-    const parsed = JSON.parse(cleaned);
+    const parsed = JSON.parse(jsonStr);
     const result = llmDepthResponseSchema.safeParse(parsed);
     if (!result.success) {
       captureException(new Error('session-depth: schema validation failed'), {

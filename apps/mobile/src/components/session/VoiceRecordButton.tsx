@@ -70,11 +70,18 @@ export function VoiceRecordButton({
         accessibilityState={{ disabled }}
         testID="voice-record-button"
       >
-        <Ionicons
-          name={isListening ? 'stop' : 'mic'}
-          size={22}
-          color={isListening ? colors.textInverse : colors.primary}
-        />
+        {/* [a11y sweep] decorative icon — Pressable parent carries the label */}
+        <View
+          testID="voice-record-icon"
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        >
+          <Ionicons
+            name={isListening ? 'stop' : 'mic'}
+            size={22}
+            color={isListening ? colors.textInverse : colors.primary}
+          />
+        </View>
       </Pressable>
     </Animated.View>
   );
@@ -97,6 +104,7 @@ export function VoiceTranscriptPreview({
   onDiscard,
   onReRecord,
 }: VoiceTranscriptPreviewProps) {
+  const colors = useThemeColors();
   if (!transcript) return null;
 
   const handleSend = () => {
@@ -112,6 +120,7 @@ export function VoiceTranscriptPreview({
   return (
     <View className="mx-4 mb-2 p-3 bg-surface-elevated rounded-xl">
       <Text className="text-body text-text-primary mb-2">{transcript}</Text>
+      {/* [BUG-715 / ACC-12] Secondary buttons collapse to icon-only on the 360pt-budget row. accessibilityLabel preserved for screen readers; Send keeps text + flex-1 prominence. */}
       <View className="flex-row gap-2">
         <Pressable
           onPress={handleSend}
@@ -124,21 +133,29 @@ export function VoiceTranscriptPreview({
         </Pressable>
         <Pressable
           onPress={onReRecord}
-          className="bg-surface rounded-button px-4 py-2 items-center min-h-[44px] justify-center"
+          className="bg-surface rounded-button items-center justify-center min-h-[44px] min-w-[44px]"
           accessibilityLabel="Re-record"
           accessibilityRole="button"
           testID="voice-rerecord-button"
         >
-          <Text className="text-text-secondary font-semibold">Re-record</Text>
+          <Ionicons
+            name="refresh-outline"
+            size={20}
+            color={colors.textSecondary}
+          />
         </Pressable>
         <Pressable
           onPress={handleDiscard}
-          className="bg-surface rounded-button px-4 py-2 items-center min-h-[44px] justify-center"
+          className="bg-surface rounded-button items-center justify-center min-h-[44px] min-w-[44px]"
           accessibilityLabel="Discard recording"
           accessibilityRole="button"
           testID="voice-discard-button"
         >
-          <Text className="text-text-secondary font-semibold">Discard</Text>
+          <Ionicons
+            name="trash-outline"
+            size={20}
+            color={colors.textSecondary}
+          />
         </Pressable>
       </View>
     </View>

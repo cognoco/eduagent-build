@@ -398,6 +398,41 @@ describe('ShelfScreen', () => {
     expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
   });
 
+  it('shows pick-a-suggestion prompt instead of "Check back soon" when suggestions exist [BUG-868]', () => {
+    // Regression: with zero books but visible "Study next" suggestion cards,
+    // the empty state used to say "Your curriculum is still being built.
+    // Check back soon." — contradicting the cards the user can already tap.
+    mockUseBooks.mockReturnValue({
+      data: [],
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: mockBooksRefetch,
+    });
+    mockUseBookSuggestions.mockReturnValue({
+      data: [
+        {
+          id: 'sugg-1',
+          title: 'Geometry Foundations',
+          emoji: '📐',
+          description: 'Triangles, lines, angles.',
+        },
+        {
+          id: 'sugg-2',
+          title: 'Calculus: The Basics',
+          emoji: '∫',
+          description: 'Limits and derivatives.',
+        },
+      ],
+    });
+
+    const { getByTestId, queryByTestId, getByText } = render(<ShelfScreen />);
+    expect(getByTestId('shelf-empty-pick-suggestion')).toBeTruthy();
+    expect(getByText('Pick a book to start')).toBeTruthy();
+    // The conflicting "Check back soon" copy must not render.
+    expect(queryByTestId('shelf-empty')).toBeNull();
+  });
+
   // -----------------------------------------------------------------------
   // Single-book auto-skip
   // -----------------------------------------------------------------------

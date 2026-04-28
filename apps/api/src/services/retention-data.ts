@@ -41,6 +41,9 @@ import { routeAndCall, type ChatMessage } from './llm';
 import { captureException } from './sentry';
 import { escapeXml, sanitizeXmlValue } from './llm/sanitize';
 import { NotFoundError } from '../errors';
+import { createLogger } from './logger';
+
+const logger = createLogger();
 
 // ---------------------------------------------------------------------------
 // Mappers
@@ -649,7 +652,12 @@ export async function processRecallTest(
       // [AUDIT-SILENT-FAIL] Non-fatal for the recall response, but must be
       // visible — XP ledger drift silently accumulates across sessions if we
       // only console.error. Escalate so the fallback is queryable in Sentry.
-      console.error('[processRecallTest] XP sync failed (non-fatal):', err);
+      // [logging sweep] structured logger so PII fields land as JSON context
+      logger.error('[processRecallTest] XP sync failed (non-fatal)', {
+        topicId: input.topicId,
+        xpChange: result.xpChange,
+        error: err instanceof Error ? err.message : String(err),
+      });
       captureException(err, {
         profileId,
         extra: {
@@ -1209,9 +1217,12 @@ export async function updateRetentionFromSession(
   if (updateResult.length === 0) {
     // Another session updated the card concurrently — our update was
     // based on stale data. Log and skip rather than silently overwriting.
-    console.warn(
-      `[retention] Optimistic lock conflict for card ${card.id} — ` +
-        `concurrent update detected, skipping`
+    // [logging sweep] structured logger so PII fields land as JSON context
+    logger.warn(
+      '[retention] Optimistic lock conflict — concurrent update detected, skipping',
+      {
+        cardId: card.id,
+      }
     );
   }
 }

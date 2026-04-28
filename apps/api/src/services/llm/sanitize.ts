@@ -70,6 +70,29 @@ export function escapeXml(text: string): string {
 }
 
 /**
+ * [BUG-865] Strip TTS pronunciation hints that occasionally leak from the
+ * LLM into chat-visible text. The model sometimes splits long terms into
+ * hyphenated syllables — "de-nom-i-nay-tor", "num-er-ay-tor", "Least Common
+ * De-nom-i-nay-tor" — to coach pronunciation for the audio path. In text
+ * mode these render verbatim and look unprofessional.
+ *
+ * Heuristic: a "phonetic" token has FOUR or more short (1-3 char) segments
+ * separated by hyphens, with all but the first segment lowercase. This
+ * matches phonetic spellings while leaving normal compound words alone:
+ *   - "de-nom-i-nay-tor" → "denominaytor" (5 segments × 1-3 chars) ✓
+ *   - "self-help-two-step" → unchanged (first segment is 4 chars) ✗
+ *   - "well-rounded-three-piece" → unchanged (segments too long) ✗
+ *
+ * The fix is in services/llm/sanitize so it can be reused anywhere LLM
+ * free text reaches the chat surface.
+ */
+export function stripPhoneticHints(text: string): string {
+  return text.replace(/\b[A-Za-z][a-z]{0,2}(?:-[a-z]{1,3}){3,}\b/g, (match) =>
+    match.replace(/-/g, '')
+  );
+}
+
+/**
  * [BUG-773 / S-17] Single-pass `{token}` substitution against a fixed
  * vocabulary of allowed keys. Eliminates the curly-brace injection that
  * chained `.replace('{a}', valA).replace('{b}', valB)` is vulnerable to:

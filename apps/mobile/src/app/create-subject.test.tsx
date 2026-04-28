@@ -30,12 +30,17 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
+let mockSubjectsIsError = false;
+const mockSubjectsRefetch = jest.fn();
+
 jest.mock('../hooks/use-subjects', () => ({
   useCreateSubject: () => ({
     mutateAsync: mockCreateSubjectMutateAsync,
   }),
   useSubjects: () => ({
     data: mockExistingSubjects,
+    isError: mockSubjectsIsError,
+    refetch: mockSubjectsRefetch,
   }),
   useUpdateSubject: () => ({
     mutateAsync: jest.fn().mockResolvedValue({ subject: {} }),
@@ -70,6 +75,7 @@ describe('CreateSubjectScreen', () => {
     jest.clearAllMocks();
     mockSearchParams = {};
     mockExistingSubjects = [];
+    mockSubjectsIsError = false;
     mockCanGoBackValue = true;
   });
 
@@ -725,6 +731,115 @@ describe('CreateSubjectScreen', () => {
     fireEvent.changeText(screen.getByTestId('create-subject-name'), 'Art');
 
     expect(screen.queryByTestId('not-sure-hint')).toBeNull();
+  });
+
+  // -----------------------------------------------------------------------
+  // BUG-692: Cancel mid-flight must not push after mutation resolves
+  // -----------------------------------------------------------------------
+
+  it('[BUG-692] does not navigate after Cancel pressed during createSubject mutation', async () => {
+    let resolveCreate!: (v: unknown) => void;
+    const pendingCreate = new Promise((r) => {
+      resolveCreate = r;
+    });
+
+    mockResolveSubjectMutateAsync.mockResolvedValueOnce({
+      status: 'direct_match',
+      resolvedName: 'Math',
+      suggestions: [],
+      displayMessage: 'Math it is.',
+    });
+    mockCreateSubjectMutateAsync.mockReturnValueOnce(pendingCreate);
+
+    render(<CreateSubjectScreen />);
+
+    fireEvent.changeText(screen.getByTestId('create-subject-name'), 'Math');
+    fireEvent.press(screen.getByTestId('create-subject-submit'));
+
+    // Wait for resolve to finish (before create fires)
+    await waitFor(() => {
+      expect(mockCreateSubjectMutateAsync).toHaveBeenCalled();
+    });
+
+    // Cancel while create is still pending
+    fireEvent.press(screen.getByTestId('create-subject-cancel'));
+
+    // Now let the create mutation resolve
+    resolveCreate({
+      subject: { id: 'subject-math', name: 'Math' },
+    });
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // Cancel already navigated; the mutation result must NOT add another push/replace
+    // Only the cancel-triggered replace should have been called once (not twice)
+    const replaceCalls = mockReplace.mock.calls;
+    // All replace calls should be from the cancel handler, not from the mutation result
+    // (The cancel replaces to home/library, not to onboarding/interview)
+    const hasOnboardingNav = replaceCalls.some(
+      (call) =>
+        typeof call[0] === 'object' &&
+        call[0]?.pathname === '/(app)/onboarding/interview'
+    );
+    expect(hasOnboardingNav).toBe(false);
+  });
+
+  it('[BUG-692] does not navigate after Cancel pressed during resolveSubject mutation', async () => {
+    let resolveResolve!: (v: unknown) => void;
+    const pendingResolve = new Promise((r) => {
+      resolveResolve = r;
+    });
+
+    mockResolveSubjectMutateAsync.mockReturnValueOnce(pendingResolve);
+
+    render(<CreateSubjectScreen />);
+
+    fireEvent.changeText(screen.getByTestId('create-subject-name'), 'Science');
+    fireEvent.press(screen.getByTestId('create-subject-submit'));
+
+    // Cancel while resolve is pending
+    fireEvent.press(screen.getByTestId('create-subject-cancel'));
+
+    // Now let the resolve mutation resolve with a direct match
+    resolveResolve({
+      status: 'direct_match',
+      resolvedName: 'Science',
+      suggestions: [],
+      displayMessage: 'Science it is.',
+    });
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // createSubject must NOT have been called — cancelled before it ran
+    expect(mockCreateSubjectMutateAsync).not.toHaveBeenCalled();
+    // No post-cancel navigation from the mutation result
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  // -----------------------------------------------------------------------
+  // existingSubjects error: inline retry message
+  // -----------------------------------------------------------------------
+
+  it('shows inline retry message when existingSubjects fails to load', () => {
+    mockSubjectsIsError = true;
+    mockExistingSubjects = [];
+
+    render(<CreateSubjectScreen />);
+
+    expect(screen.getByTestId('subjects-load-error-retry')).toBeTruthy();
+  });
+
+  it('tapping subjects-load-error-retry calls refetch', () => {
+    mockSubjectsIsError = true;
+    mockExistingSubjects = [];
+
+    render(<CreateSubjectScreen />);
+
+    fireEvent.press(screen.getByTestId('subjects-load-error-retry'));
+
+    expect(mockSubjectsRefetch).toHaveBeenCalledTimes(1);
   });
 });
 

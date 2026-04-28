@@ -409,7 +409,8 @@ describe('processInterviewExchange', () => {
           content: 'I have some experience with JavaScript.',
         }),
       ]),
-      1
+      1,
+      expect.any(Object)
     );
   });
 });
@@ -548,7 +549,8 @@ describe('streamInterviewExchange', () => {
         expect.objectContaining({ role: 'system' }),
         expect.objectContaining({ role: 'user', content: 'Hi' }),
       ]),
-      1
+      1,
+      expect.any(Object)
     );
   });
 });
@@ -640,8 +642,55 @@ describe('extractSignals', () => {
         expect.objectContaining({ role: 'system' }),
         expect.objectContaining({ role: 'user' }),
       ]),
-      2
+      2,
+      expect.any(Object)
     );
+  });
+
+  // -------------------------------------------------------------------------
+  // [BUG-771] Break tests — tier propagation + transcript budget
+  // -------------------------------------------------------------------------
+
+  it('[BUG-771] passes llmTier through to routeAndCall when supplied', async () => {
+    (routeAndCall as jest.Mock).mockResolvedValueOnce({
+      response:
+        '{"goals": [], "experienceLevel": "beginner", "currentKnowledge": ""}',
+    });
+
+    await extractSignals([{ role: 'user', content: 'hi' }], {
+      llmTier: 'premium',
+    });
+
+    expect(routeAndCall).toHaveBeenCalledWith(
+      expect.any(Array),
+      2,
+      expect.objectContaining({ llmTier: 'premium' })
+    );
+  });
+
+  it('[BUG-771] truncates transcript over budget so context window cannot silently overflow', async () => {
+    (routeAndCall as jest.Mock).mockResolvedValueOnce({
+      response:
+        '{"goals": [], "experienceLevel": "beginner", "currentKnowledge": ""}',
+    });
+
+    // Single message far over the 12000-char budget. The transcript wrapper
+    // is the only call-site for this content, so we can assert the user
+    // message length stays bounded regardless of input size.
+    const huge = 'A'.repeat(50000);
+    await extractSignals([{ role: 'user', content: huge }]);
+
+    const call = (routeAndCall as jest.Mock).mock.calls[0];
+    const userMsg = call[0].find(
+      (m: { role: string }) => m.role === 'user'
+    ) as { content: string };
+
+    // Bounded: budget (12000) + envelope text overhead (~200 chars). If the
+    // budget is removed entirely, the message would balloon to 50000+ chars
+    // and this assertion fails loudly.
+    expect(userMsg.content.length).toBeLessThan(13000);
+    // The recent end of the transcript must survive (we slice from the tail).
+    expect(userMsg.content).toContain('AAAA');
   });
 
   // -------------------------------------------------------------------------

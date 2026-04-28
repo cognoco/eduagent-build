@@ -14,7 +14,11 @@
  * - TypeError from native fetch for network failures
  * - Standard Error for other caught exceptions
  */
-import { UpstreamError } from './api-errors';
+import {
+  ForbiddenError,
+  QuotaExceededError,
+  UpstreamError,
+} from './api-errors';
 
 const NETWORK_MESSAGE =
   "Looks like you're offline or our servers can't be reached. Check your internet connection and try again.";
@@ -296,11 +300,12 @@ export function classifyApiError(error: unknown): FormattedApiError {
     const effectiveCode = apiErrorLike.apiCode ?? apiErrorLike.code;
 
     // 2. Named error types
-    if (error.name === 'QuotaExceededError') {
+    // [BUG-774 / I-11] instanceof so spoofed .name strings cannot trick the classifier; both classes share identity via @eduagent/schemas (BUG-644 / P-4).
+    if (error instanceof QuotaExceededError) {
       return { message: msg, category: 'quota', recovery: 'none' };
     }
 
-    if (error.name === 'ForbiddenError') {
+    if (error instanceof ForbiddenError) {
       // Sub-classify by apiCode: SUBJECT_INACTIVE is a content state, not auth
       if (
         effectiveCode === 'SUBJECT_INACTIVE' ||

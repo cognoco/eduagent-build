@@ -182,6 +182,49 @@ function canSwitchFromConsentGate(
 }
 
 /**
+ * [BUG-776 / M-14] Builds the confirmation prompt + handler for the consent
+ * gate "Switch profile" action. Previously the handler silently picked the
+ * first non-current profile — for a 2+ child family, the parent could land
+ * on a child they weren't expecting. The fix: always confirm the destination
+ * by name, and (when more than one alternative exists) list the others in
+ * the message so the parent can cancel and try a more deliberate path.
+ */
+export function buildSwitchProfileConfirmation(params: {
+  activeProfile: { id: string } | null;
+  profiles: ReadonlyArray<{ id: string; displayName: string }>;
+}): {
+  target: { id: string; displayName: string };
+  title: string;
+  message: string;
+} | null {
+  const { activeProfile, profiles } = params;
+  if (!activeProfile) return null;
+  const others = profiles.filter((p) => p.id !== activeProfile.id);
+  if (others.length === 0) return null;
+  const target = others[0];
+  if (!target) return null;
+  if (others.length === 1) {
+    return {
+      target,
+      title: `Switch to ${target.displayName}?`,
+      message: `You'll continue as ${target.displayName}.`,
+    };
+  }
+  const otherNames = others
+    .slice(1)
+    .map((p) => p.displayName)
+    .join(', ');
+  return {
+    target,
+    title: `Switch to ${target.displayName}?`,
+    message:
+      `You'll continue as ${target.displayName}.` +
+      `\n\nOther profiles on this account: ${otherNames}.` +
+      `\n\nTap Cancel and sign out if you want a different profile.`,
+  };
+}
+
+/**
  * Checks whether the post-approval landing screen should be shown.
  * Returns [shouldShow, dismiss] — call dismiss() when user taps "Let's Go".
  */
@@ -581,12 +624,26 @@ function ConsentWithdrawnGate(): React.ReactElement {
       {canSwitchFromConsentGate(activeProfile, profiles) && (
         <Pressable
           onPress={() => {
-            const other = profiles.find((p) => p.id !== activeProfile?.id);
-            if (other) {
-              void switchProfile(other.id).catch(() => {
-                platformAlert('Could not switch profile', 'Please try again.');
-              });
-            }
+            // [BUG-776] Confirm destination by name before switching.
+            const prompt = buildSwitchProfileConfirmation({
+              activeProfile,
+              profiles,
+            });
+            if (!prompt) return;
+            platformAlert(prompt.title, prompt.message, [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Switch',
+                onPress: () => {
+                  void switchProfile(prompt.target.id).catch(() => {
+                    platformAlert(
+                      'Could not switch profile',
+                      'Please try again.'
+                    );
+                  });
+                },
+              },
+            ]);
           }}
           className="bg-surface rounded-button py-3.5 px-8 items-center mb-3 w-full"
           testID="withdrawn-switch-profile"
@@ -799,15 +856,26 @@ function ConsentPendingGate(): React.ReactElement {
         {canSwitchFromConsentGate(activeProfile, profiles) && (
           <Pressable
             onPress={() => {
-              const other = profiles.find((p) => p.id !== activeProfile?.id);
-              if (other) {
-                void switchProfile(other.id).catch(() => {
-                  platformAlert(
-                    'Could not switch profile',
-                    'Please try again.'
-                  );
-                });
-              }
+              // [BUG-776] Confirm destination by name before switching.
+              const prompt = buildSwitchProfileConfirmation({
+                activeProfile,
+                profiles,
+              });
+              if (!prompt) return;
+              platformAlert(prompt.title, prompt.message, [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Switch',
+                  onPress: () => {
+                    void switchProfile(prompt.target.id).catch(() => {
+                      platformAlert(
+                        'Could not switch profile',
+                        'Please try again.'
+                      );
+                    });
+                  },
+                },
+              ]);
             }}
             className="py-3.5 px-8 items-center mb-3 w-full"
             testID="consent-switch-profile"
@@ -1065,12 +1133,26 @@ function ConsentPendingGate(): React.ReactElement {
       {canSwitchFromConsentGate(activeProfile, profiles) && (
         <Pressable
           onPress={() => {
-            const other = profiles.find((p) => p.id !== activeProfile?.id);
-            if (other) {
-              void switchProfile(other.id).catch(() => {
-                platformAlert('Could not switch profile', 'Please try again.');
-              });
-            }
+            // [BUG-776] Confirm destination by name before switching.
+            const prompt = buildSwitchProfileConfirmation({
+              activeProfile,
+              profiles,
+            });
+            if (!prompt) return;
+            platformAlert(prompt.title, prompt.message, [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Switch',
+                onPress: () => {
+                  void switchProfile(prompt.target.id).catch(() => {
+                    platformAlert(
+                      'Could not switch profile',
+                      'Please try again.'
+                    );
+                  });
+                },
+              },
+            ]);
           }}
           className="py-3.5 px-8 items-center mb-3 w-full"
           testID="consent-switch-profile"

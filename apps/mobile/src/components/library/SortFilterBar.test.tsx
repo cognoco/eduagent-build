@@ -126,4 +126,39 @@ describe('SortFilterBar', () => {
     expect(activeChip.props.accessibilityState).toEqual({ selected: true });
     expect(pausedChip.props.accessibilityState).toEqual({ selected: false });
   });
+
+  // [a11y sweep] Break tests: sort/filter icons must be a11y-hidden —
+  // the Pressable accessibilityLabel (e.g. "Sort by Name (A-Z)") already
+  // conveys the action; reading "swap vertical icon" is noise.
+  it('marks the sort icon wrapper as accessibility-hidden [a11y sweep]', () => {
+    render(<SortFilterBar {...defaultProps} />);
+    const iconWrapper = screen.getByTestId('library-sort-icon', {
+      includeHiddenElements: true,
+    });
+    expect(iconWrapper.props.accessibilityElementsHidden).toBe(true);
+    expect(iconWrapper.props.importantForAccessibility).toBe(
+      'no-hide-descendants'
+    );
+  });
+
+  it('sort icon is excluded from default visible-only queries [a11y sweep]', () => {
+    render(<SortFilterBar {...defaultProps} />);
+    expect(screen.queryByTestId('library-sort-icon')).toBeNull();
+  });
+
+  it('marks the filter icon wrapper as accessibility-hidden [a11y sweep]', () => {
+    render(<SortFilterBar {...defaultProps} />);
+    const iconWrapper = screen.getByTestId('library-filter-icon', {
+      includeHiddenElements: true,
+    });
+    expect(iconWrapper.props.accessibilityElementsHidden).toBe(true);
+    expect(iconWrapper.props.importantForAccessibility).toBe(
+      'no-hide-descendants'
+    );
+  });
+
+  it('filter icon is excluded from default visible-only queries [a11y sweep]', () => {
+    render(<SortFilterBar {...defaultProps} />);
+    expect(screen.queryByTestId('library-filter-icon')).toBeNull();
+  });
 });

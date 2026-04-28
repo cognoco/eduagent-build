@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -23,6 +23,19 @@ export default function QuizResultsScreen(): React.ReactElement {
     setRound,
     clear,
   } = useQuizFlow();
+  // [BUG-777 / M-15] Pin the FIRST non-null round we see so a "Play Again"
+  // press — which sets a NEW round into context BEFORE this screen unmounts
+  // — can't cause a render flash where questionPrompt's 'Question' fallback
+  // briefly shows for indexes that exist in the old questionResults but not
+  // in the new round. Using a ref (vs lazy useState) is deliberate: round
+  // can arrive on a render after the first one (parent state propagation),
+  // so the ref upgrades from null to the first real round and then stays
+  // locked for the lifetime of this screen.
+  const pinnedRoundRef = useRef<typeof round>(null);
+  if (round && !pinnedRoundRef.current) {
+    pinnedRoundRef.current = round;
+  }
+  const stableRound = pinnedRoundRef.current ?? round;
   // [Q-13] Eagerly hydrate the prefetched round into the query cache as soon
   // as the results screen mounts so "Play Again" is instantaneous. For users
   // who tap Done we pay one extra GET /quiz/rounds/:id, which is intentional:
@@ -71,7 +84,7 @@ export default function QuizResultsScreen(): React.ReactElement {
   const missed = questionResults.filter((qr) => !qr.correct);
 
   function questionPrompt(questionIndex: number): string {
-    const q = round?.questions[questionIndex];
+    const q = stableRound?.questions[questionIndex];
     if (!q) return 'Question';
     switch (q.type) {
       case 'capitals':
@@ -154,9 +167,9 @@ export default function QuizResultsScreen(): React.ReactElement {
         </Text>
       ) : null}
 
-      {round?.theme ? (
+      {stableRound?.theme ? (
         <Text className="mt-2 text-center text-body text-text-secondary">
-          {round.theme}
+          {stableRound.theme}
         </Text>
       ) : null}
 
@@ -183,7 +196,7 @@ export default function QuizResultsScreen(): React.ReactElement {
             // screen from rendering a meaningless blank row).
             if (!qr.correctAnswer) return null;
             const prompt = questionPrompt(qr.questionIndex);
-            const question = round?.questions[qr.questionIndex];
+            const question = stableRound?.questions[qr.questionIndex];
             return (
               <View
                 key={qr.questionIndex}

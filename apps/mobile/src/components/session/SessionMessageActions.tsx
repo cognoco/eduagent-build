@@ -1,6 +1,6 @@
 import { View, Text, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { hapticLight } from '../../lib/haptics';
 import type { ChatMessage } from '../session';
 import { QuotaExceededCard } from '../session';
 import type { QuotaExceededDetails } from '../../lib/api-client';
@@ -203,7 +203,7 @@ export function SessionMessageActions({
           {message.eventId && onToggleBookmark ? (
             <Pressable
               onPress={() => {
-                void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                hapticLight();
                 void onToggleBookmark(message);
               }}
               className="ms-auto p-2"

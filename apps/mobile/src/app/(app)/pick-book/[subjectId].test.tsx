@@ -67,10 +67,13 @@ jest.mock('../../../hooks/use-subjects', () => ({
   }),
 }));
 
+let mockFilingIsPending = false;
 jest.mock('../../../hooks/use-filing', () => ({
   useFiling: () => ({
     mutateAsync: mockMutateAsync,
-    isPending: false,
+    get isPending() {
+      return mockFilingIsPending;
+    },
   }),
 }));
 
@@ -78,6 +81,7 @@ describe('PickBookScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockCanGoBack.mockReturnValue(true);
+    mockFilingIsPending = false;
   });
 
   it('renders suggestion cards', () => {
@@ -133,6 +137,66 @@ describe('PickBookScreen', () => {
           params: { subjectId: 'shelf-1', bookId: 'book-1' },
         })
       );
+    });
+  });
+
+  // [BUG-693 / M-13] BREAK TEST. The success push must seed the destination
+  // shelf stack with the shelf-list ancestor BEFORE pushing the book leaf,
+  // so back from the book screen lands on shelf — not Tabs Home.
+  it('seeds the shelf ancestor before pushing the book leaf on suggestion success', async () => {
+    mockMutateAsync.mockResolvedValueOnce({
+      shelfId: 'shelf-1',
+      bookId: 'book-1',
+      shelfName: 'Geography',
+      bookName: 'Europe',
+      chapter: 'Western Europe',
+      topicId: 'topic-1',
+      topicTitle: 'France',
+      isNew: { shelf: false, book: true, chapter: true },
+    });
+    const { getByText } = render(<PickBookScreen />);
+    fireEvent.press(getByText('Europe'));
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledTimes(2);
+    });
+    expect(mockPush).toHaveBeenNthCalledWith(1, {
+      pathname: '/(app)/shelf/[subjectId]',
+      params: { subjectId: 'shelf-1' },
+    });
+    expect(mockPush).toHaveBeenNthCalledWith(2, {
+      pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
+      params: { subjectId: 'shelf-1', bookId: 'book-1' },
+    });
+  });
+
+  it('seeds the shelf ancestor before pushing the book leaf on custom-text success', async () => {
+    mockMutateAsync.mockResolvedValueOnce({
+      shelfId: 'shelf-9',
+      bookId: 'book-9',
+      shelfName: 'Geography',
+      bookName: 'My custom book',
+      chapter: 'C1',
+      topicId: 'topic-9',
+      topicTitle: 'T1',
+      isNew: { shelf: false, book: true, chapter: true },
+    });
+    const { getByText, getByTestId } = render(<PickBookScreen />);
+    fireEvent.press(getByText('Something else...'));
+    fireEvent.changeText(
+      getByTestId('pick-book-custom-input'),
+      'My custom book'
+    );
+    fireEvent.press(getByTestId('pick-book-custom-submit'));
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledTimes(2);
+    });
+    expect(mockPush).toHaveBeenNthCalledWith(1, {
+      pathname: '/(app)/shelf/[subjectId]',
+      params: { subjectId: 'shelf-9' },
+    });
+    expect(mockPush).toHaveBeenNthCalledWith(2, {
+      pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
+      params: { subjectId: 'shelf-9', bookId: 'book-9' },
     });
   });
 
@@ -256,6 +320,64 @@ describe('PickBookScreen', () => {
           })
         );
       });
+    });
+  });
+
+  // [BUG-692] Tapping Skip while filing is in flight must (1) navigate the
+  // user to the shelf via router.replace and (2) drop the post-await
+  // router.push that would otherwise land them on a book they did not pick.
+  describe('[BUG-692] filing skip cancels stale navigation', () => {
+    it('skip button drops the post-await router.push when mutation resolves later', async () => {
+      jest.useFakeTimers();
+      // Manual deferred — resolve after Skip is pressed.
+      let resolveFiling!: (v: unknown) => void;
+      const filingPromise = new Promise((resolve) => {
+        resolveFiling = resolve;
+      });
+      mockMutateAsync.mockImplementation(() => {
+        // Flip pending true synchronously so the next render shows overlay.
+        mockFilingIsPending = true;
+        return filingPromise;
+      });
+
+      const { getByText, getByTestId, rerender } = render(<PickBookScreen />);
+
+      // Trigger handlePickSuggestion — kicks off filing.mutateAsync
+      fireEvent.press(getByText('Europe'));
+      rerender(<PickBookScreen />);
+
+      // Force the showSkip timer to fire (8s) so the Skip button renders.
+      jest.advanceTimersByTime(8_000);
+      rerender(<PickBookScreen />);
+
+      const skipBtn = getByTestId('pick-book-filing-skip');
+      fireEvent.press(skipBtn);
+
+      // Skip routed user to the shelf.
+      expect(mockReplace).toHaveBeenCalledWith({
+        pathname: '/(app)/shelf/[subjectId]',
+        params: { subjectId: 'sub-1' },
+      });
+
+      // Now the slow filing call resolves AFTER the user already escaped.
+      resolveFiling({
+        shelfId: 'sub-1',
+        bookId: 'book-late',
+        shelfName: 'Geography',
+        bookName: 'Europe',
+        chapter: 'Western Europe',
+        topicId: 'topic-late',
+        topicTitle: 'France',
+        isNew: { shelf: false, book: true, chapter: true },
+      });
+
+      // Flush microtasks so the await continuation runs.
+      jest.useRealTimers();
+      await filingPromise;
+      await Promise.resolve();
+
+      // The stale navigation must NOT fire.
+      expect(mockPush).not.toHaveBeenCalled();
     });
   });
 });

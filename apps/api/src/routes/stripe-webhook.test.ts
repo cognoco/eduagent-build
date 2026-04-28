@@ -49,6 +49,10 @@ jest.mock('../inngest/client', () => ({
   },
 }));
 
+jest.mock('../services/sentry', () => ({
+  captureException: jest.fn(),
+}));
+
 import { Hono } from 'hono';
 import { stripeWebhookRoute } from './stripe-webhook';
 import { verifyWebhookSignature } from '../services/stripe';
@@ -61,6 +65,7 @@ import {
   updateQuotaPoolLimit,
 } from '../services/billing';
 import { inngest } from '../inngest/client';
+import { captureException } from '../services/sentry';
 
 // ---------------------------------------------------------------------------
 // Test app with mock db middleware
@@ -621,6 +626,44 @@ describe('invoice.payment_failed', () => {
 
     expect(inngest.send).not.toHaveBeenCalled();
   });
+
+  // [BUG-659 / A-18] If Stripe SDK v21 (or later) refactors the invoice
+  // payload again, extractSubscriptionIdFromInvoice() will return undefined
+  // and we will silently skip marking the subscription past_due — customers
+  // stay on a paid tier they can no longer pay for. The fix is to escalate
+  // the drop to Sentry so we detect the schema drift before users notice.
+  it('escalates missing subscription id to Sentry [BUG-659]', async () => {
+    // Simulate a Stripe payload shape that does NOT include the expected
+    // subscription pointer (e.g. one-off invoice or a future schema change).
+    const invoice = makeInvoice({ parent: undefined });
+    (verifyWebhookSignature as jest.Mock).mockResolvedValue(
+      makeStripeEvent('invoice.payment_failed', invoice)
+    );
+
+    const res = await app.request(
+      '/stripe/webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'valid_sig' },
+        body: '{}',
+      },
+      TEST_ENV
+    );
+
+    expect(res.status).toBe(200);
+    // Service must NOT be invoked, AND the drop must be escalated.
+    expect(updateSubscriptionFromWebhook).not.toHaveBeenCalled();
+    expect(inngest.send).not.toHaveBeenCalled();
+    expect(captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          context: 'stripe.webhook.payment_failed.missing_subscription_id',
+          invoiceId: 'in_123',
+        }),
+      })
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -725,7 +768,12 @@ describe('checkout.session.completed', () => {
     expect(writeSubscriptionStatus).toHaveBeenCalled();
   });
 
-  it('handles missing metadata gracefully (200, no crash)', async () => {
+  // [BUG-658 / A-17] Missing metadata must escalate to Sentry. The webhook
+  // still 200s (so Stripe stops retrying) but a paid checkout that we drop
+  // means a customer is charged and never activated — a silent revenue +
+  // support disaster if it regresses. captureException makes the drop
+  // queryable.
+  it('escalates missing metadata to Sentry [BUG-658]', async () => {
     const session = makeCheckoutSession({ metadata: {} });
     (verifyWebhookSignature as jest.Mock).mockResolvedValue(
       makeStripeEvent('checkout.session.completed', session)
@@ -743,9 +791,19 @@ describe('checkout.session.completed', () => {
 
     expect(res.status).toBe(200);
     expect(activateSubscriptionFromCheckout).not.toHaveBeenCalled();
+    expect(captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          context: 'stripe.webhook.checkout.completed.missing_metadata',
+          hasAccountId: false,
+          hasTier: false,
+        }),
+      })
+    );
   });
 
-  it('handles missing subscription ID gracefully', async () => {
+  it('escalates missing subscription id to Sentry [BUG-658]', async () => {
     const session = makeCheckoutSession({ subscription: null });
     (verifyWebhookSignature as jest.Mock).mockResolvedValue(
       makeStripeEvent('checkout.session.completed', session)
@@ -763,9 +821,18 @@ describe('checkout.session.completed', () => {
 
     expect(res.status).toBe(200);
     expect(activateSubscriptionFromCheckout).not.toHaveBeenCalled();
+    expect(captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          context: 'stripe.webhook.checkout.completed.missing_metadata',
+          hasSubscriptionId: false,
+        }),
+      })
+    );
   });
 
-  it('handles invalid tier gracefully', async () => {
+  it('escalates invalid tier to Sentry [BUG-658]', async () => {
     const session = makeCheckoutSession({
       metadata: { accountId: 'acc-1', tier: 'invalid' },
     });
@@ -785,6 +852,14 @@ describe('checkout.session.completed', () => {
 
     expect(res.status).toBe(200);
     expect(activateSubscriptionFromCheckout).not.toHaveBeenCalled();
+    expect(captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          hasTier: false,
+        }),
+      })
+    );
   });
 
   it('skips KV refresh when activation returns null', async () => {

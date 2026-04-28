@@ -44,7 +44,7 @@ jest.mock('../client', () => ({
 
 import { feedbackDeliveryFailed } from './feedback-delivery-failed';
 
-async function executeHandler(eventData: unknown) {
+async function executeHandler(eventData: unknown, eventId?: string) {
   const mockStep = {
     run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
     sendEvent: jest.fn().mockResolvedValue(undefined),
@@ -52,7 +52,10 @@ async function executeHandler(eventData: unknown) {
     waitForEvent: jest.fn().mockResolvedValue(null),
   };
   const handler = (feedbackDeliveryFailed as any).fn;
-  const result = await handler({ event: { data: eventData }, step: mockStep });
+  const result = await handler({
+    event: { id: eventId, data: eventData },
+    step: mockStep,
+  });
   return { result, mockStep };
 }
 
@@ -153,6 +156,33 @@ describe('feedback-delivery-failed Inngest function [BUG-767 / A-24]', () => {
         category: 'bug',
       });
       expect(result).toEqual({ ok: true, profileId: 'p-1' });
+    });
+
+    // [BUG-699-FOLLOWUP] Inngest step retries (retries: 2) can replay the
+    // sendEmail call. A deterministic idempotency key bound to
+    // (profileId, eventId) must be forwarded so Resend dedupes within 24h.
+    it('[BUG-699-FOLLOWUP] forwards idempotencyKey containing profileId and eventId to sendEmail', async () => {
+      mockSendEmail.mockResolvedValue({ sent: true });
+
+      await executeHandler(
+        { profileId: 'profile-xyz-99999999', category: 'bug' },
+        'evt-feedback-123'
+      );
+
+      expect(mockSendEmail).toHaveBeenCalledTimes(1);
+      const [, optsArg] = mockSendEmail.mock.calls[0] as [
+        unknown,
+        { idempotencyKey?: string }
+      ];
+      expect(optsArg.idempotencyKey).toEqual(
+        expect.stringContaining('profile-xyz-99999999')
+      );
+      expect(optsArg.idempotencyKey).toEqual(
+        expect.stringContaining('evt-feedback-123')
+      );
+      expect(optsArg.idempotencyKey).toEqual(
+        expect.stringContaining('retry-delivery')
+      );
     });
   });
 

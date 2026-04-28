@@ -34,11 +34,18 @@ export function SessionInputModeToggle({
         accessibilityState={{ selected: mode === 'text' }}
         testID="input-mode-text"
       >
-        <Ionicons
-          name="chatbubble-outline"
-          size={18}
-          color={mode === 'text' ? colors.textInverse : colors.textSecondary}
-        />
+        {/* [a11y sweep] decorative icon — Pressable parent carries the label */}
+        <View
+          testID="input-mode-text-icon"
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        >
+          <Ionicons
+            name="chatbubble-outline"
+            size={18}
+            color={mode === 'text' ? colors.textInverse : colors.textSecondary}
+          />
+        </View>
         <Text
           className={`font-semibold ${
             mode === 'text' ? 'text-text-inverse' : 'text-text-secondary'
@@ -58,11 +65,18 @@ export function SessionInputModeToggle({
         accessibilityState={{ selected: mode === 'voice' }}
         testID="input-mode-voice"
       >
-        <Ionicons
-          name="mic-outline"
-          size={18}
-          color={mode === 'voice' ? colors.textInverse : colors.textSecondary}
-        />
+        {/* [a11y sweep] decorative icon — Pressable parent carries the label */}
+        <View
+          testID="input-mode-voice-icon"
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        >
+          <Ionicons
+            name="mic-outline"
+            size={18}
+            color={mode === 'voice' ? colors.textInverse : colors.textSecondary}
+          />
+        </View>
         <Text
           className={`font-semibold ${
             mode === 'voice' ? 'text-text-inverse' : 'text-text-secondary'

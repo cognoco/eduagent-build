@@ -17,6 +17,8 @@ import {
   pronounsSchema,
   profileSchema,
   onboardingPronounsPatchSchema,
+  onboardingLanguagePatchSchema,
+  profileUpdateSchema,
 } from './profiles.js';
 import {
   interestsArraySchema,
@@ -179,5 +181,22 @@ describe('interestsArraySchema forward-compat', () => {
     expect(() =>
       interestEntrySchema.parse({ label: 'chess', context: 'mixed' })
     ).toThrow();
+  });
+});
+
+describe('[BUG-780] onboarding patch schemas mirror profileUpdateSchema', () => {
+  // Onboarding endpoints are single-field PATCH variants of the broader
+  // profile-update path. They MUST be subsets of profileUpdateSchema —
+  // otherwise an onboarding step could write a column that the regular
+  // profile-edit screen cannot also reach. This guards the cross-reference.
+  const updateKeys = new Set(Object.keys(profileUpdateSchema.shape));
+
+  it.each([
+    ['onboardingLanguagePatchSchema', onboardingLanguagePatchSchema],
+    ['onboardingPronounsPatchSchema', onboardingPronounsPatchSchema],
+  ])('every key in %s is also in profileUpdateSchema', (_name, schema) => {
+    for (const key of Object.keys(schema.shape)) {
+      expect(updateKeys.has(key)).toBe(true);
+    }
   });
 });

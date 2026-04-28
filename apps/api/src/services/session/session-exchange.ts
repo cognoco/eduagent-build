@@ -36,28 +36,20 @@ import {
   getRetentionAwareStartingRung,
 } from '../escalation';
 import {
-  fetchPriorTopics,
   buildPriorLearningContext,
-  fetchCrossSubjectHighlights,
   buildCrossSubjectContext,
 } from '../prior-learning';
-import {
-  buildMemoryBlock,
-  getLearningProfile,
-  buildAccommodationBlock,
-} from '../learner-profile';
+import { buildMemoryBlock, buildAccommodationBlock } from '../learner-profile';
 import { retrieveRelevantMemory } from '../memory';
 import { getTeachingPreference } from '../retention-data';
 import { shouldTriggerEvaluate } from '../evaluate';
 import { shouldTriggerTeachBack } from '../teach-back';
 import { getRetentionStatus, type RetentionState } from '../retention';
-import { getLearningMode } from '../settings';
 import type { EscalationRung } from '../llm';
 import { inngest } from '../../inngest/client';
 import {
   getSessionStaticContext,
-  getSessionStaticContextCacheKey,
-  touchSessionStaticContextCacheEntry,
+  getOrLoadSessionSupplementary,
   getCachedBookLearningHistoryContext,
   getCachedHomeworkLibraryContext,
 } from './session-cache';
@@ -247,10 +239,23 @@ export async function prepareExchangeContext(
   // by the learner's original intent so the very first exchange has rich context.
   const isFreeformWithRawInput = isFreeform && !!session.rawInput;
 
-  // BUG-70: Use cached supplementary data for lookups that are static within
-  // a session (priorTopics, teachingPref, learningMode, learningProfile,
-  // crossSubjectHighlights). Saves ~5 DB queries per exchange after the first.
-  const cachedSupp = staticContext.supplementary;
+  // BUG-70: Supplementary data is static within a session (priorTopics,
+  // teachingPref, learningMode, learningProfile, crossSubjectHighlights).
+  // Loaded once on first exchange, reused for the cache TTL.
+  // [BUG-667 / S-10] getOrLoadSessionSupplementary deduplicates concurrent
+  // first-exchange fetches via a per-session in-flight promise mutex —
+  // previously two concurrent first exchanges would both run the 5-query
+  // fan-out in parallel, doubling cold-path DB load. Now both await the same
+  // promise. This sits inside the outer Promise.all so it still runs in
+  // parallel with the per-exchange queries below.
+  const supplementaryPromise = getOrLoadSessionSupplementary(
+    db,
+    profileId,
+    sessionId,
+    session.subjectId,
+    isFreeform,
+    staticContext
+  );
 
   const [
     subject,
@@ -258,14 +263,10 @@ export async function prepareExchangeContext(
     profileRows,
     retentionRows,
     events,
-    priorTopics,
     memory,
-    teachingPref,
     metadataRows,
-    learningModeRecord,
-    crossSubjectHighlights,
     rawInputMemory,
-    learningProfile,
+    supp,
   ] = await Promise.all([
     Promise.resolve(staticContext.subject),
     session.topicId
@@ -295,18 +296,7 @@ export async function prepareExchangeContext(
       ),
       orderBy: asc(sessionEvents.createdAt),
     }),
-    cachedSupp
-      ? Promise.resolve(cachedSupp.priorTopics)
-      : isFreeform
-      ? Promise.resolve([])
-      : fetchPriorTopics(db, profileId, session.subjectId),
     retrieveRelevantMemory(db, profileId, userMessage, options?.voyageApiKey),
-    // FR58: Load teaching method preference for adaptive teaching
-    cachedSupp
-      ? Promise.resolve(cachedSupp.teachingPref)
-      : isFreeform
-      ? Promise.resolve(null)
-      : getTeachingPreference(db, profileId, session.subjectId),
     // FR92: Load session metadata for interleaved topic list
     isInterleaved
       ? db
@@ -320,16 +310,6 @@ export async function prepareExchangeContext(
           )
           .limit(1)
       : Promise.resolve([]),
-    // Learning mode: affects LLM tutoring style (casual vs serious)
-    cachedSupp
-      ? Promise.resolve(cachedSupp.learningMode)
-      : getLearningMode(db, profileId),
-    // Story 16.0: Cross-subject learning highlights for broader context
-    cachedSupp
-      ? Promise.resolve(cachedSupp.crossSubjectHighlights)
-      : isFreeform
-      ? Promise.resolve([])
-      : fetchCrossSubjectHighlights(db, profileId, session.subjectId),
     // CFLF-23: Pre-session similarity scan — uses rawInput for freeform sessions
     // Graceful degradation: if Voyage API is down, returns empty (never breaks session)
     isFreeformWithRawInput && session.rawInput
@@ -341,23 +321,15 @@ export async function prepareExchangeContext(
           5
         )
       : Promise.resolve({ context: '', topicIds: [] }),
-    cachedSupp
-      ? Promise.resolve(cachedSupp.learningProfile)
-      : getLearningProfile(db, profileId),
+    supplementaryPromise,
   ]);
 
-  // BUG-70: Populate supplementary cache on first exchange
-  if (!cachedSupp) {
-    const cacheKey = getSessionStaticContextCacheKey(profileId, sessionId);
-    staticContext.supplementary = {
-      priorTopics,
-      teachingPref,
-      learningMode: learningModeRecord,
-      learningProfile,
-      crossSubjectHighlights,
-    };
-    touchSessionStaticContextCacheEntry(cacheKey, staticContext);
-  }
+  // Unpack supplementary back into the names the rest of the function uses.
+  const priorTopics = supp.priorTopics;
+  const teachingPref = supp.teachingPref;
+  const learningModeRecord = supp.learningMode;
+  const crossSubjectHighlights = supp.crossSubjectHighlights;
+  const learningProfile = supp.learningProfile;
 
   const topic = topicRows[0];
   const [profile] = profileRows;

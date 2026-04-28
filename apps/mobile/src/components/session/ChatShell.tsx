@@ -79,6 +79,13 @@ interface ChatShellProps {
   backFallback?: string;
   /** Use the fallback route directly when the parent route is known. */
   backBehavior?: 'history' | 'replace';
+  /**
+   * [BUG-867] Optional handler that fully replaces the default back-button
+   * behavior. Use when the parent must navigate to a typed dynamic route
+   * (e.g. `/(app)/shelf/[subjectId]`) — string-templated paths don't always
+   * resolve cleanly on web, so the parent supplies the navigation.
+   */
+  onBackPress?: () => void;
 }
 
 /**
@@ -148,6 +155,7 @@ export function ChatShell({
   messagesTestID,
   backFallback,
   backBehavior = 'history',
+  onBackPress,
 }: ChatShellProps) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -486,6 +494,13 @@ export function ChatShell({
         <View className="flex-row items-center px-4 py-3">
           <Pressable
             onPress={() => {
+              // [BUG-867] If the parent supplied an explicit handler, defer
+              // entirely to it — the parent owns the destination (typed
+              // dynamic routes that string hrefs can miss on web).
+              if (onBackPress) {
+                onBackPress();
+                return;
+              }
               const fallback = (backFallback ?? '/(app)/home') as '/(app)/home';
               if (backBehavior === 'replace') {
                 router.replace(fallback as never);
@@ -497,6 +512,7 @@ export function ChatShell({
             className="me-3 p-2 min-h-[44px] min-w-[44px] items-center justify-center"
             accessibilityLabel="Go back"
             accessibilityRole="button"
+            testID="chat-shell-back"
           >
             <Ionicons name="chevron-back" size={24} color={colors.primary} />
           </Pressable>

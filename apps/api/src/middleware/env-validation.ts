@@ -12,6 +12,9 @@
 
 import { createMiddleware } from 'hono/factory';
 import { validateEnv } from '../config';
+import { createLogger } from '../services/logger';
+
+const logger = createLogger();
 
 type EnvValidationEnv = {
   Bindings: Record<string, string | undefined>;
@@ -36,7 +39,8 @@ export const envValidationMiddleware = createMiddleware<EnvValidationEnv>(
             err instanceof Error
               ? err.message
               : 'Environment validation failed';
-          console.error('[env-validation]', message);
+          // [logging sweep] structured logger so PII fields land as JSON context
+          logger.error('[env-validation]', { message });
           return c.json({ code: 'ENV_VALIDATION_ERROR', message }, 500);
         }
       }

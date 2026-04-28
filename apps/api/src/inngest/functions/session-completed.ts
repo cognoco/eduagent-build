@@ -30,9 +30,13 @@ import {
   processTeachBackCompletion,
 } from '../../services/verification-completion';
 import { captureException } from '../../services/sentry';
+import { createLogger } from '../../services/logger';
 import { queueCelebration } from '../../services/celebrations';
+
+const logger = createLogger();
 import {
   buildBrowseHighlight,
+  FREEFORM_TOPIC_SENTINEL,
   generateSessionInsights,
 } from '../../services/session-highlights';
 import { generateLearnerRecap } from '../../services/session-recap';
@@ -102,7 +106,12 @@ async function runIsolated(
     };
   } catch (err) {
     captureException(err, { profileId });
-    console.error(`[session-completed] step "${name}" failed:`, err);
+    // [logging sweep] structured logger so PII fields land as JSON context
+    logger.error('[session-completed] step failed', {
+      step: name,
+      profileId,
+      error: err instanceof Error ? err.message : String(err),
+    });
     return {
       step: name,
       status: 'failed',
@@ -154,10 +163,14 @@ export const sessionCompleted = inngest.createFunction(
           'session-completed: filing waitForEvent timed out after 60s'
         );
         captureException(timeoutErr, { profileId });
-        console.warn(
-          `[session-completed] filing waitForEvent timed out for session=${sessionId}, profileId=${profileId}, sessionType=${
-            sessionType ?? 'unknown'
-          } — proceeding with stale topic placement`
+        // [logging sweep] structured logger so PII fields land as JSON context
+        logger.warn(
+          '[session-completed] filing waitForEvent timed out — proceeding with stale topic placement',
+          {
+            sessionId,
+            profileId,
+            sessionType: sessionType ?? 'unknown',
+          }
         );
         await step.sendEvent('filing-timed-out', {
           name: 'app/session.filing_timed_out',
@@ -283,11 +296,11 @@ export const sessionCompleted = inngest.createFunction(
         const parsed = verificationTypeSchema.safeParse(verificationType);
         if (!parsed.success) {
           if (verificationType != null) {
-            console.warn(
-              `[session-completed] Unknown verificationType: ${String(
-                verificationType
-              )}`
-            );
+            // [logging sweep] structured logger so PII fields land as JSON context
+            logger.warn('[session-completed] Unknown verificationType', {
+              verificationType: String(verificationType),
+              profileId,
+            });
             // [SWEEP-SILENT-RECOVERY] Capture for queryable failure rate —
             // an unknown verificationType arriving here is a contract drift
             // signal (new type added without a handler). Without Sentry we
@@ -396,8 +409,13 @@ export const sessionCompleted = inngest.createFunction(
         if (retentionTopicIds.length === 0)
           return { step: 'update-retention', status: 'skipped' as const };
         if (effectiveQuality == null) {
-          console.warn(
-            `[session-completed] No qualityRating for session ${sessionId} — skipping retention update`
+          // [logging sweep] structured logger so PII fields land as JSON context
+          logger.warn(
+            '[session-completed] No qualityRating — skipping retention update',
+            {
+              sessionId,
+              profileId,
+            }
           );
           return { step: 'update-retention', status: 'skipped' as const };
         }
@@ -622,8 +640,13 @@ export const sessionCompleted = inngest.createFunction(
             .limit(1);
 
           if (!summaryRow) {
-            console.warn(
-              `[session-completed] generate-session-insights: no session_summaries row for session=${sessionId}, profile=${profileId} — recap skipped`
+            // [logging sweep] structured logger so PII fields land as JSON context
+            logger.warn(
+              '[session-completed] generate-session-insights: no session_summaries row — recap skipped',
+              {
+                sessionId,
+                profileId,
+              }
             );
             return;
           }
@@ -664,8 +687,14 @@ export const sessionCompleted = inngest.createFunction(
               conversationPrompt = result.insights.conversationPrompt;
               engagementSignal = result.insights.engagementSignal;
             } else {
-              console.warn(
-                `[session-completed] generate-session-insights: LLM validation failed (${result.reason}) for session=${sessionId}, falling back to template highlight`
+              // [logging sweep] structured logger so PII fields land as JSON context
+              logger.warn(
+                '[session-completed] generate-session-insights: LLM validation failed — falling back to template highlight',
+                {
+                  sessionId,
+                  profileId,
+                  reason: result.reason,
+                }
               );
               // [SWEEP-SILENT-RECOVERY] LLM drift signal — must be queryable.
               // Without Sentry we can't see how often the insights LLM is
@@ -696,8 +725,12 @@ export const sessionCompleted = inngest.createFunction(
             const topicTitle = topicId
               ? await loadTopicTitle(db, topicId)
               : null;
-            // [BUG-526] Use descriptive fallback instead of "a topic"
-            const topics = topicTitle ? [topicTitle] : ['a freeform session'];
+            // [BUG-526 / BUG-878] Pass the shared freeform sentinel so the
+            // highlight builder renders friendly "had a learning session"
+            // copy instead of the awkward "studied a freeform session".
+            const topics = topicTitle
+              ? [topicTitle]
+              : [FREEFORM_TOPIC_SENTINEL];
 
             // Resolve subject name for context in the highlight
             const [subjectRow] = subjectId

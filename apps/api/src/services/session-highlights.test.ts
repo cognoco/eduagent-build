@@ -146,7 +146,7 @@ describe('validateSessionInsights', () => {
 describe('buildBrowseHighlight', () => {
   it('builds single-topic highlight', () => {
     expect(buildBrowseHighlight('Emma', ['Photosynthesis'], 120)).toBe(
-      'Emma browsed Photosynthesis — 2 min'
+      'Emma studied Photosynthesis — 2 min'
     );
   });
 
@@ -157,41 +157,59 @@ describe('buildBrowseHighlight', () => {
         ['Fractions', 'Decimals', 'Percentages'],
         300
       )
-    ).toBe('Alex browsed Fractions, Decimals, Percentages — 5 min');
+    ).toBe('Alex studied Fractions, Decimals, Percentages — 5 min');
   });
 
   it('truncates at 3 topics with overflow count', () => {
     expect(buildBrowseHighlight('Sam', ['A', 'B', 'C', 'D', 'E'], 60)).toBe(
-      'Sam browsed A, B, C and 2 more — 1 min'
+      'Sam studied A, B, C and 2 more — 1 min'
     );
   });
 
   it('rounds up to minimum 1 minute', () => {
     expect(buildBrowseHighlight('Zoe', ['Gravity'], 15)).toBe(
-      'Zoe browsed Gravity — 1 min'
+      'Zoe studied Gravity — 1 min'
     );
   });
 
   it('includes subject name when provided [BUG-526]', () => {
     expect(
       buildBrowseHighlight('Emma', ['Photosynthesis'], 120, 'Biology')
-    ).toBe('Emma browsed Biology: Photosynthesis — 2 min');
+    ).toBe('Emma studied Biology: Photosynthesis — 2 min');
   });
 
-  it('uses freeform fallback instead of "a topic" [BUG-526]', () => {
+  it('uses friendly freeform copy instead of "studied a freeform session" [BUG-878]', () => {
+    // Regression: parents previously saw "Alex studied a freeform session"
+    // (or earlier "Alex browsed a topic"), which sounds passive and reads
+    // awkwardly. The freeform sentinel must produce active engagement copy.
     const result = buildBrowseHighlight(
       'Alex',
       ['a freeform session'],
       300,
       'Mathematics'
     );
-    expect(result).toBe('Alex browsed Mathematics: a freeform session — 5 min');
-    expect(result).not.toContain('a topic');
+    expect(result).toBe('Alex had a learning session on Mathematics — 5 min');
+    expect(result).not.toContain('browsed');
+    expect(result).not.toContain('a freeform session');
+  });
+
+  it('omits the subject clause for freeform sessions with no subject [BUG-878]', () => {
+    expect(buildBrowseHighlight('Alex', ['a freeform session'], 60, null)).toBe(
+      'Alex had a learning session — 1 min'
+    );
+  });
+
+  it('uses active "studied" verb instead of passive "browsed" [BUG-878]', () => {
+    // Regression: the old "browsed a topic" wording undersold what the
+    // child actually did during the session.
+    const result = buildBrowseHighlight('TestKid', ['Fractions'], 1800);
+    expect(result).toContain('studied');
+    expect(result).not.toContain('browsed');
   });
 
   it('omits subject prefix when subjectName is null', () => {
     expect(buildBrowseHighlight('Sam', ['Fractions'], 60, null)).toBe(
-      'Sam browsed Fractions — 1 min'
+      'Sam studied Fractions — 1 min'
     );
   });
 
@@ -211,7 +229,7 @@ describe('buildBrowseHighlight', () => {
     // directive. Surviving letters stay collapsed onto one line as inert
     // prose inside the highlight slot.
     expect(result).not.toContain('\n');
-    expect(result).toContain('Emma browsed Biology');
+    expect(result).toContain('Emma studied Biology');
   });
 
   it('[CRIT-2] strips quotes and prompt-injection punctuation from subjectName', () => {
@@ -233,17 +251,17 @@ describe('buildBrowseHighlight', () => {
   it('[CRIT-2] caps subjectName length at 50 characters', () => {
     const longSubject = 'A'.repeat(200);
     const result = buildBrowseHighlight('Sam', ['Topic'], 60, longSubject);
-    // Extract the subject portion between "browsed " and ": "
-    const match = result.match(/browsed (.+?): /);
+    // Extract the subject portion between "studied " and ": "
+    const match = result.match(/studied (.+?): /);
     expect(match).not.toBeNull();
     expect(match![1].length).toBeLessThanOrEqual(50);
   });
 
   it('[CRIT-2] omits subject prefix when sanitization yields empty string', () => {
     // Subject name made entirely of punctuation gets scrubbed to nothing —
-    // we must not emit "Sam browsed : Fractions" with a stray colon.
+    // we must not emit "Sam studied : Fractions" with a stray colon.
     expect(buildBrowseHighlight('Sam', ['Fractions'], 60, '{}<>\n\t"')).toBe(
-      'Sam browsed Fractions — 1 min'
+      'Sam studied Fractions — 1 min'
     );
   });
 });

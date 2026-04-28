@@ -68,6 +68,16 @@ const sessionStaticContextCache = new Map<
   SessionStaticContextCacheEntry
 >();
 
+// [BUG-667 / S-10] Per-session in-flight mutex for supplementary fetches.
+// Two concurrent first exchanges previously both saw `supplementary===undefined`
+// and both kicked off the same 5-query parallel fan-out, doubling cold-path
+// DB load. The mutex collapses the second caller onto the first caller's
+// already-running promise.
+const supplementaryInflight = new Map<
+  string,
+  Promise<SessionSupplementaryData>
+>();
+
 // ---------------------------------------------------------------------------
 // Cache helpers
 // ---------------------------------------------------------------------------
@@ -220,4 +230,90 @@ export function clearSessionStaticContext(
 
 export function resetSessionStaticContextCache(): void {
   sessionStaticContextCache.clear();
+  supplementaryInflight.clear();
+}
+
+// ---------------------------------------------------------------------------
+// [BUG-667 / S-10] Supplementary data loader + in-flight de-dup
+// ---------------------------------------------------------------------------
+
+async function loadSessionSupplementary(
+  db: Database,
+  profileId: string,
+  subjectId: string,
+  isFreeform: boolean
+): Promise<SessionSupplementaryData> {
+  const [
+    priorTopics,
+    teachingPref,
+    learningMode,
+    crossSubjectHighlights,
+    learningProfile,
+  ] = await Promise.all([
+    isFreeform
+      ? Promise.resolve([])
+      : fetchPriorTopics(db, profileId, subjectId),
+    isFreeform
+      ? Promise.resolve(null)
+      : getTeachingPreference(db, profileId, subjectId),
+    getLearningMode(db, profileId),
+    isFreeform
+      ? Promise.resolve([])
+      : fetchCrossSubjectHighlights(db, profileId, subjectId),
+    getLearningProfile(db, profileId),
+  ]);
+  return {
+    priorTopics,
+    teachingPref,
+    learningMode,
+    learningProfile,
+    crossSubjectHighlights,
+  };
+}
+
+/**
+ * Returns the supplementary data for a session, deduplicating concurrent
+ * cold-path fetches via a per-cache-key in-flight promise map.
+ *
+ * Contract:
+ * - First caller registers a Promise; subsequent callers await the same one.
+ * - On success, the cache entry is populated and the in-flight slot is freed.
+ * - On failure, the in-flight slot is freed so the next caller can retry
+ *   (we do NOT cache the rejection).
+ */
+export async function getOrLoadSessionSupplementary(
+  db: Database,
+  profileId: string,
+  sessionId: string,
+  subjectId: string,
+  isFreeform: boolean,
+  cacheEntry: SessionStaticContextCacheEntry
+): Promise<SessionSupplementaryData> {
+  if (cacheEntry.supplementary) return cacheEntry.supplementary;
+
+  const cacheKey = getSessionStaticContextCacheKey(profileId, sessionId);
+  const inflight = supplementaryInflight.get(cacheKey);
+  if (inflight) return inflight;
+
+  const promise = loadSessionSupplementary(db, profileId, subjectId, isFreeform)
+    .then((supp) => {
+      // Re-read the cache entry — TTL pruning could have evicted ours mid-fetch.
+      const live = sessionStaticContextCache.get(cacheKey) ?? cacheEntry;
+      live.supplementary = supp;
+      touchSessionStaticContextCacheEntry(cacheKey, live);
+      return supp;
+    })
+    .finally(() => {
+      // Always clear the in-flight slot — both on success (so a future TTL
+      // miss can retry) and on failure (so the rejection isn't cached).
+      supplementaryInflight.delete(cacheKey);
+    });
+
+  supplementaryInflight.set(cacheKey, promise);
+  return promise;
+}
+
+// Test-only: surface the size of the in-flight map for assertions.
+export function _supplementaryInflightSize(): number {
+  return supplementaryInflight.size;
 }

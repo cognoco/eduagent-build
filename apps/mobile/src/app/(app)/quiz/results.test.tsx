@@ -218,6 +218,95 @@ describe('QuizResultsScreen — [F-040] missed-question cards', () => {
     expect(screen.queryByText('What you missed')).toBeNull();
   });
 
+  // -------------------------------------------------------------------------
+  // [BUG-777 / M-15] Break test — Play Again must not flash 'Question' fallback
+  // -------------------------------------------------------------------------
+  it('[BUG-777] keeps the original round pinned when context.round changes mid-screen', () => {
+    // Reproduces the Play Again transition: while the results screen is still
+    // mounted, a new round is pushed into context. Pre-fix, questionPrompt
+    // would dereference the NEW round with OLD indexes, so a 4-question old
+    // round + 2-question new round would show 'Question' fallback for two
+    // missed cards. Post-fix, stableRound is pinned to the round in scope at
+    // mount, so the prompts still resolve.
+    const oldRound = buildCapitalsRound();
+    // A "next" round with fewer questions — simulates Play Again loading a
+    // shorter prefetched round before the screen unmounts.
+    const newRound: QuizRoundResponse = {
+      ...buildCapitalsRound(),
+      id: 'round-next',
+      total: 2,
+      questions: oldRound.questions.slice(0, 2),
+    };
+
+    function MountThenSwap(): null {
+      const { setRound, setActivityType, setCompletionResult } = useQuizFlow();
+      const phase = React.useRef(0);
+      // First render: seed the OLD round + completion result.
+      // Second render: swap to the NEW round (still mounted).
+      React.useEffect(() => {
+        if (phase.current === 0) {
+          phase.current = 1;
+          setActivityType(oldRound.activityType);
+          setRound(oldRound);
+          setCompletionResult({
+            score: 2,
+            total: 4,
+            xpEarned: 20,
+            celebrationTier: 'nice',
+            droppedResults: 0,
+            questionResults: [
+              {
+                questionIndex: 0,
+                correct: true,
+                correctAnswer: 'Vienna',
+                answerGiven: 'Vienna',
+              },
+              {
+                questionIndex: 1,
+                correct: false,
+                correctAnswer: 'Berlin',
+                answerGiven: 'Munich',
+              },
+              {
+                questionIndex: 2,
+                correct: true,
+                correctAnswer: 'Paris',
+                answerGiven: 'Paris',
+              },
+              {
+                questionIndex: 3,
+                correct: false,
+                correctAnswer: 'Madrid',
+                answerGiven: 'Barcelona',
+              },
+            ],
+          });
+        } else if (phase.current === 1) {
+          phase.current = 2;
+          // Swap the round but leave completionResult intact — the exact
+          // window the bug describes.
+          setRound(newRound);
+        }
+      });
+      return null;
+    }
+
+    render(
+      <QuizFlowProvider>
+        <MountThenSwap />
+        <QuizResultsScreen />
+      </QuizFlowProvider>
+    );
+
+    // Both missed-card prompts must still resolve — even though indexes 2
+    // and 3 are now out of range on the live `newRound` in context. This
+    // proves the screen reads from the pinned round, not the live one.
+    expect(screen.getByText('Capital of Germany')).toBeTruthy();
+    expect(screen.getByText('Capital of Spain')).toBeTruthy();
+    // And the 'Question' fallback string never leaked.
+    expect(screen.queryByText('Question')).toBeNull();
+  });
+
   it('skips cards with missing correctAnswer rather than crashing', () => {
     renderWithFlow({
       round: buildCapitalsRound(),

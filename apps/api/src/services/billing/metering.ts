@@ -10,6 +10,10 @@ import {
   type Database,
   findQuotaPool,
 } from '@eduagent/database';
+import { captureException } from '../sentry';
+import { createLogger } from '../logger';
+
+const logger = createLogger();
 
 // ---------------------------------------------------------------------------
 // Types
@@ -206,4 +210,51 @@ export async function incrementQuota(
       updatedAt: new Date(),
     })
     .where(eq(quotaPools.subscriptionId, subscriptionId));
+}
+
+// ---------------------------------------------------------------------------
+// safeRefundQuota
+// ---------------------------------------------------------------------------
+
+/**
+ * [BUG-661 / A-21] Best-effort wrapper around incrementQuota for the LLM
+ * failure-refund path. The route already decremented the quota before the LLM
+ * call; if the LLM throws and the refund itself also throws, the user is
+ * silently charged for a failed exchange.
+ *
+ * This wrapper:
+ *  - Never throws (the caller is already in an error path)
+ *  - Logs the failure with the originating context
+ *  - Escalates to Sentry so we can query how often refunds fail in prod
+ *
+ * The escalation is mandatory per CLAUDE.md "Silent Recovery Without
+ * Escalation is Banned" — bare console.warn would not let us measure how
+ * often customers are silently overcharged.
+ */
+export async function safeRefundQuota(
+  db: Database,
+  subscriptionId: string,
+  context: { route: string; profileId?: string; sessionId?: string }
+): Promise<{ refunded: boolean }> {
+  try {
+    await incrementQuota(db, subscriptionId);
+    return { refunded: true };
+  } catch (refundErr) {
+    logger.error('[metering] Quota refund failed — user may be overcharged', {
+      subscriptionId,
+      route: context.route,
+      sessionId: context.sessionId,
+      error: refundErr instanceof Error ? refundErr.message : String(refundErr),
+    });
+    captureException(refundErr, {
+      profileId: context.profileId,
+      extra: {
+        context: 'metering.refund.failed',
+        route: context.route,
+        subscriptionId,
+        sessionId: context.sessionId,
+      },
+    });
+    return { refunded: false };
+  }
 }

@@ -48,6 +48,12 @@ export default function PickBookScreen(): React.ReactElement {
   // so an alert "Try again" callback and a "Go" button tap in the same frame
   // can both pass the isPending guard. The ref is checked and set atomically.
   const filingInFlight = useRef(false);
+  // [BUG-692] When the user taps the Skip overlay button while filing is
+  // in flight, we navigate them to the shelf. The mutateAsync still resolves
+  // and the post-await router.push would otherwise land the user on a book
+  // they did not choose. This ref tells the awaiting handler to drop its
+  // navigation when the user has already escaped.
+  const filingSkipped = useRef(false);
 
   const handleBack = useCallback(() => {
     if (subjectId) {
@@ -115,6 +121,7 @@ export default function PickBookScreen(): React.ReactElement {
     // the next render where both Alert retry and the Go button can fire.
     if (filing.isPending || filingInFlight.current) return;
     filingInFlight.current = true;
+    filingSkipped.current = false;
     try {
       const result = await filing.mutateAsync({
         rawInput: suggestion.title,
@@ -123,6 +130,16 @@ export default function PickBookScreen(): React.ReactElement {
         subjectId,
       });
       filingInFlight.current = false;
+      // [BUG-692] If the user pressed Skip during the network round-trip,
+      // they have already navigated to the shelf — do not push them away.
+      if (filingSkipped.current) return;
+      // [BUG-693 / M-13] Push the shelf ancestor first so the destination
+      // stack synthesises 2-deep (shelf > book) — without this, back from
+      // the book leaf falls through to Tabs Home.
+      router.push({
+        pathname: '/(app)/shelf/[subjectId]',
+        params: { subjectId: result.shelfId },
+      } as never);
       router.push({
         pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
         params: {
@@ -159,6 +176,7 @@ export default function PickBookScreen(): React.ReactElement {
     )
       return;
     filingInFlight.current = true;
+    filingSkipped.current = false;
     try {
       // M-10: Include subject name as context so the filing LLM places
       // the custom topic within the correct shelf/subject.
@@ -168,6 +186,15 @@ export default function PickBookScreen(): React.ReactElement {
         subjectId,
       });
       filingInFlight.current = false;
+      // [BUG-692] Drop stale navigation when user already pressed Skip.
+      if (filingSkipped.current) return;
+      // [BUG-693 / M-13] Push the shelf ancestor first so the destination
+      // stack synthesises 2-deep (shelf > book) — without this, back from
+      // the book leaf falls through to Tabs Home.
+      router.push({
+        pathname: '/(app)/shelf/[subjectId]',
+        params: { subjectId: result.shelfId },
+      } as never);
       router.push({
         pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
         params: {
@@ -423,14 +450,19 @@ export default function PickBookScreen(): React.ReactElement {
           </Text>
           {showSkip && (
             <Pressable
-              onPress={() =>
+              onPress={() => {
+                // [BUG-692] Mark the in-flight filing as skipped so its
+                // post-await router.push is dropped. Without this, the slow
+                // mutation resolves a moment later and pushes the user onto
+                // a book they already chose to skip.
+                filingSkipped.current = true;
                 // BUG-319: Navigate to shelf instead of router.back() which
                 // would return to create-subject. The subject already exists.
                 router.replace({
                   pathname: '/(app)/shelf/[subjectId]',
                   params: { subjectId },
-                } as never)
-              }
+                } as never);
+              }}
               className="mt-6 bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
               testID="pick-book-filing-skip"
               accessibilityLabel="Skip and start learning anyway"

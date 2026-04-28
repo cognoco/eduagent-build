@@ -1157,7 +1157,8 @@ export async function applyAnalysis(
   subjectId?: string | null
 ): Promise<ApplyAnalysisResult> {
   if (analysis.confidence === 'low') {
-    console.info('[learner-profile] Low-confidence analysis skipped', {
+    // [logging sweep] structured logger so PII fields land as JSON context
+    logger.info('[learner-profile] Low-confidence analysis skipped', {
       event: 'learner_profile.analysis.low_confidence',
       profileId,
     });
@@ -1202,7 +1203,8 @@ export async function applyAnalysis(
   }
 
   if (finalNotifications.length > 0) {
-    console.info('[learner-profile] Struggle notifications emitted', {
+    // [logging sweep] structured logger so PII fields land as JSON context
+    logger.info('[learner-profile] Struggle notifications emitted', {
       event: 'learner_profile.struggle.notifications',
       profileId,
       notifications: finalNotifications.map((n) => ({
@@ -1242,7 +1244,8 @@ export async function applyAnalysis(
     }
   }
 
-  console.info('[learner-profile] Analysis applied', {
+  // [logging sweep] structured logger so PII fields land as JSON context
+  logger.info('[learner-profile] Analysis applied', {
     event: 'learner_profile.analysis.completed',
     profileId,
     fieldsUpdated: finalFieldsUpdated,

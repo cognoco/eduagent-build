@@ -289,9 +289,31 @@ export default function LibraryScreen() {
   const enrichedBooks = useMemo(() => {
     return allBooksQuery.books.map((b) => {
       const counts = topicCountsByBookId.get(b.book.id);
-      return counts
-        ? { ...b, topicCount: counts.total, completedCount: counts.completed }
-        : b;
+      if (!counts) return b;
+      // [BUG-870] The API marks a book IN_PROGRESS based on session existence,
+      // but the badge sits next to the client-derived "X/Y topics" string,
+      // which counts xpStatus==='verified' topics. When a child opens a
+      // session without verifying any topic, the API returns IN_PROGRESS
+      // while the client shows "0/10 topics" — confusing parents about
+      // actual progress. Reconcile both signals from the same definition:
+      // verified-topic count. The badge follows the visible progress text.
+      let status = b.status;
+      if (counts.total > 0) {
+        if (counts.completed === 0) status = 'NOT_STARTED';
+        else if (counts.completed >= counts.total) {
+          // Don't downgrade REVIEW_DUE → COMPLETED — the API knows when
+          // retention has slipped and the user owes a review.
+          if (status !== 'REVIEW_DUE') status = 'COMPLETED';
+        } else {
+          status = 'IN_PROGRESS';
+        }
+      }
+      return {
+        ...b,
+        topicCount: counts.total,
+        completedCount: counts.completed,
+        status,
+      };
     });
   }, [allBooksQuery.books, topicCountsByBookId]);
 

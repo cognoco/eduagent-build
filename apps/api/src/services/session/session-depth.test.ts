@@ -201,4 +201,46 @@ describe('evaluateSessionDepth', () => {
       topics: [],
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // [BUG-772] Break test — extractFirstJsonObject must succeed on prose
+  // preambles that the old 3-regex strip would have failed on.
+  // ---------------------------------------------------------------------------
+  it('[BUG-772] parses depth response when LLM emits a prose preamble before the JSON', async () => {
+    const proseWrappedJson =
+      "Here's the analysis you asked for:\n\n" +
+      '{"meaningful": true, "reason": "deep follow-ups about fractions", "topics": []}\n' +
+      'Hope that helps.';
+    const provider: LLMProvider = {
+      ...createMockProvider('gemini'),
+      chat: jest.fn().mockResolvedValue(proseWrappedJson),
+    };
+    _clearProviders();
+    registerProvider(provider);
+
+    const transcript = makeTranscript([
+      {
+        user: 'Help me understand fractions.',
+        assistant: 'A fraction shows part of a whole.',
+      },
+      {
+        user: 'Why is one half bigger than one third?',
+        assistant: 'Because the whole is split into fewer pieces.',
+      },
+      {
+        user: 'Can you show me with pizza slices?',
+        assistant: 'Sure, two larger slices versus three smaller ones.',
+      },
+    ]);
+
+    const result = await evaluateSessionDepth(transcript);
+
+    // Old behavior: cleaned still contained the prose preamble, JSON.parse
+    // would throw, parseDepthResponse returned null, and the gate failed open.
+    // New behavior: extractFirstJsonObject finds the JSON despite the prose,
+    // and the LLM's actual decision propagates.
+    expect(result.method).toBe('llm_gate');
+    expect(result.meaningful).toBe(true);
+    expect(result.reason).toBe('deep follow-ups about fractions');
+  });
 });

@@ -449,6 +449,65 @@ describe('consent routes', () => {
       expect(body.code).toBe('NOT_FOUND');
       expect(body.message).toBe('Invalid consent token');
     });
+
+    // [BUG-655 / A-11] Break test: an unauthenticated source IP must be
+    // rate-limited after exceeding the per-hour cap (30). Without the limit,
+    // an attacker can pummel the endpoint with token guesses or DoS the DB.
+    // The 31st request from the same IP must return 429 + Retry-After and
+    // must NOT call the underlying processConsentResponse service.
+    it('rate-limits per source IP after 30 attempts in an hour [BUG-655]', async () => {
+      const { __resetConsentRespondRateLimit } = jest.requireActual(
+        './consent'
+      ) as { __resetConsentRespondRateLimit: () => void };
+      __resetConsentRespondRateLimit();
+
+      const { processConsentResponse: mockProcess } = jest.requireMock(
+        '../services/consent'
+      ) as { processConsentResponse: jest.Mock };
+      mockProcess.mockResolvedValue(undefined);
+
+      const ip = '203.0.113.99';
+      const headers = { ...AUTH_HEADERS, 'cf-connecting-ip': ip };
+      const body = JSON.stringify({ token: 't', approved: true });
+
+      // 30 allowed
+      for (let i = 0; i < 30; i++) {
+        const ok = await app.request(
+          '/v1/consent/respond',
+          { method: 'POST', headers, body },
+          TEST_ENV
+        );
+        expect(ok.status).toBe(200);
+      }
+
+      const callsBefore = mockProcess.mock.calls.length;
+
+      // 31st blocked
+      const blocked = await app.request(
+        '/v1/consent/respond',
+        { method: 'POST', headers, body },
+        TEST_ENV
+      );
+      expect(blocked.status).toBe(429);
+      expect(blocked.headers.get('Retry-After')).toBe('3600');
+      const blockedBody = await blocked.json();
+      expect(blockedBody.code).toBe('RATE_LIMITED');
+
+      // Service must NOT be invoked when rate-limited.
+      expect(mockProcess.mock.calls.length).toBe(callsBefore);
+
+      // A different IP is independent — proves the bucket is per-IP.
+      const otherIp = await app.request(
+        '/v1/consent/respond',
+        {
+          method: 'POST',
+          headers: { ...AUTH_HEADERS, 'cf-connecting-ip': '198.51.100.1' },
+          body,
+        },
+        TEST_ENV
+      );
+      expect(otherIp.status).toBe(200);
+    });
   });
 
   // -------------------------------------------------------------------------

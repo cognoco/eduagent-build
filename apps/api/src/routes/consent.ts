@@ -30,6 +30,47 @@ import { notFound, forbidden, apiError } from '../errors';
 import { inngest } from '../inngest/client';
 import { captureException } from '../services/sentry';
 
+// [BUG-655 / A-11] /consent/respond is unauthenticated (a parent clicks an
+// emailed link, no session). The token is a 122-bit UUID so brute-force is
+// infeasible, but the endpoint still needs rate limiting to prevent DoS and
+// to slow any future weakening of the token format. Same in-memory
+// sliding-window pattern as feedback.ts; cap is per source IP.
+//
+// Worker isolates each maintain independent state — the effective ceiling is
+// CONSENT_RESPOND_RATE_LIMIT_MAX × N isolates. For a low-volume parent flow
+// this is sufficient; if traffic grows, swap for a KV-backed limiter.
+const CONSENT_RESPOND_RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+const CONSENT_RESPOND_RATE_LIMIT_MAX = 30;
+const CONSENT_RESPOND_MAP_MAX_ENTRIES = 10_000;
+const consentRespondTimestamps = new Map<string, number[]>();
+
+// Exported for tests only — reset Map state between cases.
+export function __resetConsentRespondRateLimit(): void {
+  consentRespondTimestamps.clear();
+}
+
+function isConsentRespondRateLimited(ipKey: string): boolean {
+  const now = Date.now();
+  const cutoff = now - CONSENT_RESPOND_RATE_LIMIT_WINDOW_MS;
+  const timestamps = (consentRespondTimestamps.get(ipKey) ?? []).filter(
+    (t) => t > cutoff
+  );
+  if (timestamps.length === 0 && consentRespondTimestamps.has(ipKey)) {
+    consentRespondTimestamps.delete(ipKey);
+  }
+  if (consentRespondTimestamps.size >= CONSENT_RESPOND_MAP_MAX_ENTRIES) {
+    const oldest = consentRespondTimestamps.keys().next().value;
+    if (oldest !== undefined) consentRespondTimestamps.delete(oldest);
+  }
+  if (timestamps.length >= CONSENT_RESPOND_RATE_LIMIT_MAX) {
+    consentRespondTimestamps.set(ipKey, timestamps);
+    return true;
+  }
+  timestamps.push(now);
+  consentRespondTimestamps.set(ipKey, timestamps);
+  return false;
+}
+
 // [BUG-625 / A-10] Mask third-party PII before returning to a profile that
 // may not own the address. Format: keep first character + last character of
 // the local part, replace middle with "***", keep domain. Empty/short locals
@@ -169,6 +210,29 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
     async (c) => {
       const db = c.get('db');
       const input = c.req.valid('json');
+
+      // [BUG-655 / A-11] Rate-limit by source IP — endpoint is intentionally
+      // unauthenticated so a parent can act from an email link without a
+      // session. CF-Connecting-IP is set by Cloudflare's edge from the real
+      // client; fall back to a single shared bucket only when absent
+      // (local/test). 30 attempts / IP / hour is generous for legit double-
+      // taps yet hostile to enumeration / spray.
+      const ipKey =
+        c.req.header('cf-connecting-ip') ??
+        c.req.header('x-forwarded-for') ??
+        'unknown';
+      if (isConsentRespondRateLimited(ipKey)) {
+        const retryAfterSecs = Math.ceil(
+          CONSENT_RESPOND_RATE_LIMIT_WINDOW_MS / 1000
+        );
+        c.header('Retry-After', String(retryAfterSecs));
+        return apiError(
+          c,
+          429,
+          ERROR_CODES.RATE_LIMITED,
+          'Too many consent attempts. Please try again later.'
+        );
+      }
 
       try {
         await processConsentResponse(db, input.token, input.approved);

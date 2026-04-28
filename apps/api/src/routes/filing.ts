@@ -22,6 +22,9 @@ import {
 import { routeAndCall } from '../services/llm';
 import { captureException } from '../services/sentry';
 import { inngest } from '../inngest/client';
+import { createLogger } from '../services/logger';
+
+const logger = createLogger();
 
 type FilingRouteEnv = {
   Bindings: { DATABASE_URL: string };
@@ -92,7 +95,11 @@ export const filingRoutes = new Hono<FilingRouteEnv>()
         routeAndCall
       );
     } catch (err) {
-      console.error('[filing] fileToLibrary failed:', err);
+      // [logging sweep] structured logger so PII fields land as JSON context
+      logger.error('[filing] fileToLibrary failed', {
+        sessionId: body.sessionId,
+        error: err instanceof Error ? err.message : String(err),
+      });
       // Fire async retry for freeform/homework sessions
       if (sessionTranscript && body.sessionId) {
         await inngest
@@ -151,7 +158,11 @@ export const filingRoutes = new Hono<FilingRouteEnv>()
         sessionId: body.sessionId,
       });
     } catch (err) {
-      console.error('[filing] resolveFilingResult failed:', err);
+      // [logging sweep] structured logger so PII fields land as JSON context
+      logger.error('[filing] resolveFilingResult failed', {
+        sessionId: body.sessionId,
+        error: err instanceof Error ? err.message : String(err),
+      });
       // Fire async retry for freeform/homework sessions — but only if
       // the first catch block didn't already enqueue a retry (usedFallback).
       // Without this guard, two app/filing.retry events fire for the same

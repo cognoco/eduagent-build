@@ -346,26 +346,45 @@ export default function ShelfScreen() {
           />
         )}
         ListEmptyComponent={
-          <View
-            className="bg-surface rounded-card px-4 py-8 items-center"
-            testID="shelf-empty"
-          >
-            <Text className="text-body font-semibold text-text-primary text-center mb-2">
-              No books on this shelf yet.
-            </Text>
-            <Text className="text-body-sm text-text-secondary text-center mb-5">
-              Your curriculum is still being built. Check back soon.
-            </Text>
-            <Pressable
-              onPress={handleBack}
-              className="bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
-              testID="shelf-empty-back"
+          // [BUG-868] When there are no books yet but suggestions render
+          // above, "Check back soon" wrongly told the user to wait passively
+          // — the curriculum is already there to pick from. Show a Pick-a-
+          // book prompt in that case; only show the "still being built"
+          // copy when there's truly nothing to act on.
+          bookSuggestions.length > 0 ? (
+            <View
+              className="bg-surface rounded-card px-4 py-6 items-center"
+              testID="shelf-empty-pick-suggestion"
             >
-              <Text className="text-text-primary text-body font-semibold">
-                Go back
+              <Text className="text-body font-semibold text-text-primary text-center mb-2">
+                Pick a book to start
               </Text>
-            </Pressable>
-          </View>
+              <Text className="text-body-sm text-text-secondary text-center">
+                Tap one of the &ldquo;Study next&rdquo; cards above to begin.
+              </Text>
+            </View>
+          ) : (
+            <View
+              className="bg-surface rounded-card px-4 py-8 items-center"
+              testID="shelf-empty"
+            >
+              <Text className="text-body font-semibold text-text-primary text-center mb-2">
+                No books on this shelf yet.
+              </Text>
+              <Text className="text-body-sm text-text-secondary text-center mb-5">
+                Your curriculum is still being built. Check back soon.
+              </Text>
+              <Pressable
+                onPress={handleBack}
+                className="bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
+                testID="shelf-empty-back"
+              >
+                <Text className="text-text-primary text-body font-semibold">
+                  Go back
+                </Text>
+              </Pressable>
+            </View>
+          )
         }
       />
 

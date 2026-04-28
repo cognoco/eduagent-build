@@ -78,6 +78,7 @@ import {
   TRIAL_EXTENDED_DAYS,
 } from '../../services/trial';
 import { sendPushNotification } from '../../services/notifications';
+import { getRecentNotificationCount } from '../../services/settings';
 import { findOwnerProfile } from '../../services/profile';
 
 async function sendTrialNotificationToAccountOwner(
@@ -92,6 +93,23 @@ async function sendTrialNotificationToAccountOwner(
   const ownerProfile = await findOwnerProfile(db, accountId);
   if (!ownerProfile) {
     return { sent: false, reason: 'no_owner_profile' };
+  }
+
+  // [BUG-699-FOLLOWUP] Dedup by notification log: if this owner profile
+  // already received a trial_expiry push today (e.g. a previous step.run
+  // invocation succeeded before an Inngest retry), skip the send rather
+  // than deliver a duplicate. sendPushNotification writes to notificationLog
+  // on success, so the second pass finds count > 0 and returns early.
+  // 24h window matches the daily cron cadence — one trial_expiry push per
+  // owner per day is the intended maximum.
+  const recentCount = await getRecentNotificationCount(
+    db,
+    ownerProfile.id,
+    'trial_expiry',
+    24
+  );
+  if (recentCount > 0) {
+    return { sent: false, reason: 'dedup_24h' };
   }
 
   return sendPushNotification(db, {

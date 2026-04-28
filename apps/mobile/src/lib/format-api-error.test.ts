@@ -4,6 +4,17 @@ import {
   recoveryActions,
   type FormattedApiError,
 } from './format-api-error';
+import { ForbiddenError, QuotaExceededError } from './api-errors';
+const QUOTA_DETAILS = {
+  tier: 'free' as const,
+  reason: 'monthly' as const,
+  monthlyLimit: 100,
+  usedThisMonth: 100,
+  dailyLimit: 10,
+  usedToday: 5,
+  topUpCreditsRemaining: 0,
+  upgradeOptions: [],
+};
 
 /*
  * Screens updated with formatApiError (Story 10.4):
@@ -98,8 +109,10 @@ describe('classifyApiError', () => {
   // --- Named error types ---
 
   it('classifies QuotaExceededError as quota / none', () => {
-    const err = new Error('You have exceeded your monthly question limit');
-    err.name = 'QuotaExceededError';
+    const err = new QuotaExceededError(
+      'You have exceeded your monthly question limit',
+      QUOTA_DETAILS
+    );
     const result = classifyApiError(err);
     expect(result.category).toBe('quota');
     expect(result.recovery).toBe('none');
@@ -107,9 +120,8 @@ describe('classifyApiError', () => {
   });
 
   it('classifies ForbiddenError as auth / sign-out', () => {
-    const err = Object.assign(
-      new Error('You do not have permission to access this resource'),
-      { name: 'ForbiddenError', code: 'FORBIDDEN', apiCode: undefined }
+    const err = new ForbiddenError(
+      'You do not have permission to access this resource'
     );
     const result = classifyApiError(err);
     expect(result.category).toBe('auth');
@@ -117,13 +129,29 @@ describe('classifyApiError', () => {
   });
 
   it('classifies ForbiddenError with SUBJECT_INACTIVE as not-found / go-back', () => {
-    const err = Object.assign(
-      new Error('Subject is paused — resume it before starting a session'),
-      { name: 'ForbiddenError', code: 'FORBIDDEN', apiCode: 'SUBJECT_INACTIVE' }
+    const err = new ForbiddenError(
+      'Subject is paused — resume it before starting a session',
+      'SUBJECT_INACTIVE'
     );
     const result = classifyApiError(err);
     expect(result.category).toBe('not-found');
     expect(result.recovery).toBe('go-back');
+  });
+
+  it('does NOT classify a spoofed error.name="QuotaExceededError" as quota', () => {
+    const err = new Error('attacker-supplied message');
+    err.name = 'QuotaExceededError';
+    const result = classifyApiError(err);
+    expect(result.category).not.toBe('quota');
+    expect(result.recovery).not.toBe('none');
+  });
+
+  it('does NOT classify a spoofed error.name="ForbiddenError" as auth', () => {
+    const err = new Error('attacker-supplied message');
+    err.name = 'ForbiddenError';
+    const result = classifyApiError(err);
+    expect(result.category).not.toBe('auth');
+    expect(result.recovery).not.toBe('sign-out');
   });
 
   // --- Error codes on the error object ---
@@ -287,12 +315,12 @@ describe('formatApiError', () => {
   // --- ForbiddenError with apiCode [BUG-100] ---
 
   it('returns friendly subject-inactive message when ForbiddenError carries SUBJECT_INACTIVE apiCode', () => {
-    const err = Object.assign(
-      new Error('Subject is paused — resume it before starting a session'),
-      { name: 'ForbiddenError', code: 'FORBIDDEN', apiCode: 'SUBJECT_INACTIVE' }
+    const err = new ForbiddenError(
+      'Subject is paused — resume it before starting a session',
+      'SUBJECT_INACTIVE'
     );
     // classifyApiError catches SUBJECT_INACTIVE as a code-level check
-    // (before ForbiddenError name check) and applies friendlyMessage()
+    // (before ForbiddenError instanceof check) and applies friendlyMessage()
     // which matches the subject.*(paused|archived) pattern.
     expect(formatApiError(err)).toBe(
       'This subject is on pause right now. You can resume it from your subjects list.'
@@ -300,9 +328,8 @@ describe('formatApiError', () => {
   });
 
   it('passes through ForbiddenError message when apiCode is not a special code', () => {
-    const err = Object.assign(
-      new Error('You do not have permission to access this resource'),
-      { name: 'ForbiddenError', code: 'FORBIDDEN', apiCode: undefined }
+    const err = new ForbiddenError(
+      'You do not have permission to access this resource'
     );
     expect(formatApiError(err)).toBe(
       'You do not have permission to access this resource'
@@ -312,8 +339,10 @@ describe('formatApiError', () => {
   // --- QuotaExceededError ---
 
   it('passes through QuotaExceededError message', () => {
-    const err = new Error('You have exceeded your monthly question limit');
-    err.name = 'QuotaExceededError';
+    const err = new QuotaExceededError(
+      'You have exceeded your monthly question limit',
+      QUOTA_DETAILS
+    );
     expect(formatApiError(err)).toBe(
       'You have exceeded your monthly question limit'
     );

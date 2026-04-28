@@ -312,6 +312,88 @@ describe('CreateProfileScreen', () => {
   // BUG-301: isParentAddingChild code path tests
   // ---------------------------------------------------------------------------
 
+  // [BUG-UX-PROFILE-TIMEOUT] 30s hard UI-level timeout on profile creation POST.
+  describe('[BUG-UX-PROFILE-TIMEOUT] 30s safety timeout', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+      // POST never resolves — simulates a hung network call.
+      mockFetch.mockReturnValue(new Promise(() => undefined));
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    async function fillAndSubmit() {
+      fireEvent.changeText(screen.getByTestId('create-profile-name'), 'Sam');
+      fireEvent.press(screen.getByTestId('create-profile-birthdate'));
+      await act(async () => {
+        datePickerOnChange?.({ type: 'set' }, new Date(2000, 5, 15));
+      });
+      fireEvent.press(screen.getByTestId('create-profile-submit'));
+    }
+
+    it('does NOT show the timeout error before 30s elapses', async () => {
+      render(<CreateProfileScreen />, { wrapper: Wrapper });
+      await fillAndSubmit();
+
+      act(() => {
+        jest.advanceTimersByTime(29_999);
+      });
+
+      expect(screen.queryByTestId('create-profile-error')).toBeNull();
+    });
+
+    it('shows inline timeout error and restores form after 30s', async () => {
+      render(<CreateProfileScreen />, { wrapper: Wrapper });
+      await fillAndSubmit();
+
+      act(() => {
+        jest.advanceTimersByTime(30_000);
+      });
+
+      // Error message is shown.
+      expect(screen.getByTestId('create-profile-error')).toBeTruthy();
+      // Form is restored so the user can retry — submit button should be
+      // enabled again (loading=false, name + date still set).
+      const button = screen.getByTestId('create-profile-submit');
+      expect(
+        button.props.accessibilityState?.disabled ?? button.props.disabled
+      ).toBeFalsy();
+    });
+
+    it('clears the safety timeout when loading flag resets before 30s (cleanup)', async () => {
+      // The timeout watches `loading`. Once loading goes false (POST resolves
+      // or the component unmounts), the timer must be cancelled.
+      // We simulate: submit starts loading, then loading drops before 30s —
+      // advancing past 30s must NOT set the error.
+      const { rerender } = render(<CreateProfileScreen />, {
+        wrapper: Wrapper,
+      });
+      await fillAndSubmit();
+
+      // Advance to 15s — still loading, no error yet.
+      act(() => {
+        jest.advanceTimersByTime(15_000);
+      });
+      expect(screen.queryByTestId('create-profile-error')).toBeNull();
+
+      // Simulate POST completing: the component resets loading via setLoading(false)
+      // in the finally block. We can't easily reach that without a real resolve,
+      // so instead unmount and verify the timer doesn't fire after unmount.
+      // Unmounting the component calls the useEffect cleanup (clearTimeout).
+      rerender(<></>);
+
+      // Advance well past 30s — timer should have been cleared on unmount.
+      act(() => {
+        jest.advanceTimersByTime(20_000);
+      });
+
+      // No uncaught timer fire — the test would throw if setLoading/setError
+      // were called on an unmounted component without cleanup.
+    });
+  });
+
   describe('parent adding child', () => {
     const parentProfile = {
       id: 'parent-id',

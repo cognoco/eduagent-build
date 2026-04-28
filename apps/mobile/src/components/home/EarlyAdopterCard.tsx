@@ -81,11 +81,18 @@ export function EarlyAdopterCard(): React.ReactElement | null {
             accessibilityLabel="Send feedback"
             testID="early-adopter-feedback-cta"
           >
-            <Ionicons
-              name="chatbubble-outline"
-              size={16}
-              color={colors.primary}
-            />
+            {/* [a11y sweep] decorative icon — Pressable parent carries the label */}
+            <View
+              testID="early-adopter-feedback-icon"
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+            >
+              <Ionicons
+                name="chatbubble-outline"
+                size={16}
+                color={colors.primary}
+              />
+            </View>
             <Text className="text-body-sm font-semibold text-primary ml-1.5">
               Send feedback
             </Text>
@@ -99,7 +106,14 @@ export function EarlyAdopterCard(): React.ReactElement | null {
           hitSlop={8}
           testID="early-adopter-dismiss"
         >
-          <Ionicons name="close" size={18} color={colors.textSecondary} />
+          {/* [a11y sweep] decorative icon — Pressable parent carries the label */}
+          <View
+            testID="early-adopter-dismiss-icon"
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+          >
+            <Ionicons name="close" size={18} color={colors.textSecondary} />
+          </View>
         </Pressable>
       </View>
       {Platform.OS !== 'web' && (

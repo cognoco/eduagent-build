@@ -77,6 +77,7 @@ jest.mock('../../../lib/theme', () => ({
 // Mock the OCR hook
 const mockProcess = jest.fn().mockResolvedValue(undefined);
 const mockRetry = jest.fn().mockResolvedValue(undefined);
+const mockCancel = jest.fn();
 jest.mock('../../../hooks/use-homework-ocr', () => ({
   useHomeworkOcr: jest.fn().mockReturnValue({
     text: null,
@@ -85,6 +86,7 @@ jest.mock('../../../hooks/use-homework-ocr', () => ({
     failCount: 0,
     process: mockProcess,
     retry: mockRetry,
+    cancel: mockCancel,
   }),
 }));
 
@@ -189,6 +191,7 @@ beforeEach(() => {
     failCount: 0,
     process: mockProcess,
     retry: mockRetry,
+    cancel: mockCancel,
   });
 });
 
@@ -581,6 +584,37 @@ describe('CameraScreen', () => {
     );
   });
 
+  // [BUG-690] When classification fails AND useSubjects() is still loading,
+  // the picker would have rendered no choice rows at all — only "Create New"
+  // and the manual-name input. Show a loading row so the user knows their
+  // existing subjects are about to appear.
+  it('[BUG-690] shows a loading state when subjects are still loading and no candidates yet', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(jest.fn());
+    (useLocalSearchParams as jest.Mock).mockReturnValue({});
+    (useSubjects as jest.Mock).mockReturnValue({
+      data: undefined,
+      isLoading: true,
+    });
+    mockMutateAsync.mockRejectedValueOnce(new Error('classification down'));
+    (useHomeworkOcr as jest.Mock).mockReturnValue({
+      text: 'Some homework problem',
+      status: 'done',
+      error: null,
+      failCount: 0,
+      process: mockProcess,
+      retry: mockRetry,
+    });
+
+    const { getByTestId } = render(<CameraScreen />);
+
+    await waitFor(() => {
+      expect(getByTestId('subject-picker')).toBeTruthy();
+    });
+    expect(getByTestId('subject-picker-loading')).toBeTruthy();
+
+    alertSpy.mockRestore();
+  });
+
   // [BUG-802] When auto-classification of the subject fails, the user must
   // see an alert explaining why the picker appeared, not be silently dropped
   // into the picker with no context.
@@ -765,5 +799,63 @@ describe('CameraScreen', () => {
     // ref preventing a fresh classify. Retake path is covered separately
     // by handleRetake's explicit reset.
     expect(mockMutateAsync).toHaveBeenCalled();
+  });
+
+  // [BUG-689 / M-9] BREAK TESTS — UI-level safety timeout for OCR processing.
+  describe('[BUG-689] OCR processing UI timeout', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    async function driveToProcessing() {
+      mockLaunchImageLibraryAsync.mockResolvedValueOnce({
+        canceled: false,
+        assets: [{ uri: 'file:///gallery/photo.jpg' }],
+      });
+      mockProcess.mockImplementationOnce(() => new Promise(() => undefined));
+      const utils = render(<CameraScreen />);
+      await act(async () => {
+        fireEvent.press(utils.getByTestId('gallery-button'));
+      });
+      await waitFor(() => {
+        expect(utils.getByTestId('photo-preview')).toBeTruthy();
+      });
+      await act(async () => {
+        fireEvent.press(utils.getByTestId('camera-use-this-button'));
+      });
+      await waitFor(() => {
+        expect(utils.getByTestId('camera-cancel-ocr')).toBeTruthy();
+      });
+      return utils;
+    }
+
+    it('cancels OCR and shows an actionable error after the 45s safety timeout', async () => {
+      const { getByText } = await driveToProcessing();
+      await act(async () => {
+        jest.advanceTimersByTime(44_999);
+      });
+      expect(mockCancel).not.toHaveBeenCalled();
+      await act(async () => {
+        jest.advanceTimersByTime(2);
+      });
+      expect(mockCancel).toHaveBeenCalledTimes(1);
+      await waitFor(() => {
+        expect(getByText(/taking too long/i)).toBeTruthy();
+      });
+    });
+
+    it('clears the safety timeout when the user manually cancels before it fires', async () => {
+      const { getByTestId } = await driveToProcessing();
+      await act(async () => {
+        fireEvent.press(getByTestId('camera-cancel-ocr'));
+      });
+      await act(async () => {
+        jest.advanceTimersByTime(60_000);
+      });
+      expect(mockCancel).toHaveBeenCalledTimes(1);
+    });
   });
 });

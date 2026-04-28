@@ -1,4 +1,5 @@
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -11,6 +12,7 @@ const mockStream = jest.fn();
 const mockAbort = jest.fn();
 const mockStartSessionMutateAsync = jest.fn();
 const mockStreamSessionMessage = jest.fn();
+const mockForceCompleteMutateAsync = jest.fn();
 let mockSearchParams: Record<string, string> = {
   subjectId: 'subject-1',
   subjectName: 'History',
@@ -18,11 +20,20 @@ let mockSearchParams: Record<string, string> = {
   totalSteps: '4',
 };
 
+// Capture the useFocusEffect cleanup so tests can simulate blur (navigation away).
+let capturedFocusCleanup: (() => void) | undefined;
+
 jest.mock('expo-router', () => ({
   useRouter: () => ({
     replace: mockReplace,
   }),
   useLocalSearchParams: () => mockSearchParams,
+  useFocusEffect: (cb: () => (() => void) | undefined) => {
+    const cleanup = cb();
+    if (cleanup) {
+      capturedFocusCleanup = cleanup;
+    }
+  },
 }));
 
 jest.mock('react-native-safe-area-context', () => ({
@@ -76,7 +87,7 @@ jest.mock('../../../hooks/use-interview', () => ({
     isStreaming: false,
   })),
   useForceCompleteInterview: jest.fn(() => ({
-    mutateAsync: jest.fn(),
+    mutateAsync: mockForceCompleteMutateAsync,
     isPending: false,
   })),
 }));
@@ -97,6 +108,7 @@ const InterviewScreen = require('./interview').default;
 describe('InterviewScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    capturedFocusCleanup = undefined;
     mockSearchParams = {
       subjectId: 'subject-1',
       subjectName: 'History',
@@ -107,6 +119,8 @@ describe('InterviewScreen', () => {
     mockStartSessionMutateAsync.mockResolvedValue({
       session: { id: 'session-123' },
     });
+    // Default: forceComplete succeeds with no extracted interests
+    mockForceCompleteMutateAsync.mockResolvedValue({ extractedSignals: null });
   });
 
   it('renders the onboarding step indicator', () => {
@@ -297,5 +311,170 @@ describe('InterviewScreen', () => {
     });
 
     expect(mockStream).toHaveBeenCalledTimes(2);
+  });
+
+  // [BUG-UX-INTERVIEW-SKIP-TIMEOUT] 30s hard timeout on forceComplete.
+  // When forceComplete.isPending is true and stays true for 30s, the skip
+  // button area must switch to an inline error + Go Back action.
+  describe('[BUG-UX-INTERVIEW-SKIP-TIMEOUT] 30s forceComplete safety timeout', () => {
+    const {
+      useForceCompleteInterview,
+    } = require('../../../hooks/use-interview');
+
+    // Mutable so we can control isPending across renders.
+    let mockForceCompletePending = false;
+
+    beforeEach(() => {
+      jest.useFakeTimers();
+      mockForceCompletePending = true;
+      // Stub forceComplete as indefinitely pending.
+      useForceCompleteInterview.mockReturnValue({
+        mutateAsync: mockForceCompleteMutateAsync,
+        isPending: mockForceCompletePending,
+      });
+
+      // Drive stream to give exchangeCount >= 2 so the footer appears.
+      mockStream.mockImplementation(
+        async (
+          _msg: string,
+          _onChunk: (s: string) => void,
+          onDone: (r: { isComplete: boolean; exchangeCount: number }) => void
+        ) => {
+          onDone({ isComplete: false, exchangeCount: 1 });
+        }
+      );
+
+      // forceComplete mutation stays pending forever (never resolves).
+      mockForceCompleteMutateAsync.mockReturnValue(
+        new Promise(() => undefined)
+      );
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+      // Restore mock to the default non-pending state.
+      useForceCompleteInterview.mockReturnValue({
+        mutateAsync: mockForceCompleteMutateAsync,
+        isPending: false,
+      });
+    });
+
+    it('does NOT show the timeout error before 30s elapses', async () => {
+      render(<InterviewScreen />);
+
+      // Send twice to reach exchangeCount >= 2 so the skip footer renders.
+      fireEvent.press(screen.getByTestId('chat-shell-send'));
+      await waitFor(() => expect(mockStream).toHaveBeenCalledTimes(1));
+      fireEvent.press(screen.getByTestId('chat-shell-send'));
+      await waitFor(() => expect(mockStream).toHaveBeenCalledTimes(2));
+
+      // Press skip — forceComplete goes pending and stays pending.
+      await waitFor(() => {
+        expect(screen.getByTestId('skip-interview-button')).toBeTruthy();
+      });
+      fireEvent.press(screen.getByTestId('skip-interview-button'));
+
+      act(() => {
+        jest.advanceTimersByTime(29_999);
+      });
+
+      expect(screen.queryByTestId('force-complete-timeout-error')).toBeNull();
+    });
+
+    it('shows timeout error with Go Back after 30s of forceComplete pending', async () => {
+      render(<InterviewScreen />);
+
+      fireEvent.press(screen.getByTestId('chat-shell-send'));
+      await waitFor(() => expect(mockStream).toHaveBeenCalledTimes(1));
+      fireEvent.press(screen.getByTestId('chat-shell-send'));
+      await waitFor(() => expect(mockStream).toHaveBeenCalledTimes(2));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('skip-interview-button')).toBeTruthy();
+      });
+      fireEvent.press(screen.getByTestId('skip-interview-button'));
+
+      act(() => {
+        jest.advanceTimersByTime(30_000);
+      });
+
+      expect(screen.getByTestId('force-complete-timeout-error')).toBeTruthy();
+      expect(screen.getByTestId('force-complete-timeout-go-back')).toBeTruthy();
+    });
+
+    it('clears the safety timeout when forceComplete resolves before 30s (cleanup)', async () => {
+      // Override mutation to resolve quickly.
+      mockForceCompleteMutateAsync.mockResolvedValueOnce({
+        extractedSignals: null,
+      });
+      // Reset isPending to false so the useEffect cleanup fires.
+      useForceCompleteInterview.mockReturnValue({
+        mutateAsync: mockForceCompleteMutateAsync,
+        isPending: false,
+      });
+
+      render(<InterviewScreen />);
+
+      fireEvent.press(screen.getByTestId('chat-shell-send'));
+      await waitFor(() => expect(mockStream).toHaveBeenCalledTimes(1));
+      fireEvent.press(screen.getByTestId('chat-shell-send'));
+      await waitFor(() => expect(mockStream).toHaveBeenCalledTimes(2));
+
+      // Advance well past 30s — timer must not fire because mutation resolved.
+      await act(async () => {
+        jest.advanceTimersByTime(60_000);
+      });
+
+      expect(screen.queryByTestId('force-complete-timeout-error')).toBeNull();
+    });
+  });
+
+  it('[BUG-692-FOLLOWUP] goToNextStep does not fire when user navigates away during forceComplete', async () => {
+    // Arrange: stream resolves without completing so exchangeCount can reach 2.
+    mockStream.mockImplementation(
+      async (
+        _msg: string,
+        _onChunk: (accumulated: string) => void,
+        onDone: (result: { isComplete: boolean; exchangeCount: number }) => void
+      ) => {
+        onDone({ isComplete: false, exchangeCount: 1 });
+      }
+    );
+
+    // Deferred forceComplete — stays pending until we resolve it.
+    let resolveForceComplete!: (value: { extractedSignals: null }) => void;
+    mockForceCompleteMutateAsync.mockReturnValue(
+      new Promise<{ extractedSignals: null }>((resolve) => {
+        resolveForceComplete = resolve;
+      })
+    );
+
+    render(<InterviewScreen />);
+
+    // Send twice to get exchangeCount >= 2, making the skip button appear.
+    fireEvent.press(screen.getByTestId('chat-shell-send'));
+    await waitFor(() => expect(mockStream).toHaveBeenCalledTimes(1));
+    fireEvent.press(screen.getByTestId('chat-shell-send'));
+    await waitFor(() => expect(mockStream).toHaveBeenCalledTimes(2));
+
+    // Skip button should now be visible.
+    await waitFor(() => {
+      expect(screen.getByTestId('skip-interview-button')).toBeTruthy();
+    });
+
+    // Press skip — starts the in-flight mutation.
+    fireEvent.press(screen.getByTestId('skip-interview-button'));
+
+    // Simulate user navigating away (hardware back triggers useFocusEffect cleanup).
+    expect(capturedFocusCleanup).toBeDefined();
+    capturedFocusCleanup!();
+
+    // Now resolve the mutation — goToNextStep (router.replace) must NOT fire.
+    resolveForceComplete({ extractedSignals: null });
+
+    // Allow any pending microtasks to drain.
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(mockReplace).not.toHaveBeenCalled();
   });
 });

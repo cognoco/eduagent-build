@@ -1,4 +1,9 @@
-import { renderPromptTemplate, sanitizeXmlValue, escapeXml } from './sanitize';
+import {
+  renderPromptTemplate,
+  sanitizeXmlValue,
+  escapeXml,
+  stripPhoneticHints,
+} from './sanitize';
 
 // ---------------------------------------------------------------------------
 // sanitizeXmlValue — destructive strip + length cap
@@ -248,6 +253,61 @@ describe('renderPromptTemplate', () => {
     // {toString} or {hasOwnProperty}, those should be unknown tokens.
     expect(renderPromptTemplate('x={toString} y={hasOwnProperty}', {})).toBe(
       'x={toString} y={hasOwnProperty}'
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// stripPhoneticHints — BUG-865 chat-text scrubber
+// ---------------------------------------------------------------------------
+
+describe('stripPhoneticHints [BUG-865]', () => {
+  it('joins TTS phonetic markup back into a normal word', () => {
+    expect(stripPhoneticHints('use the de-nom-i-nay-tor')).toBe(
+      'use the denominaytor'
+    );
+  });
+
+  it('handles multiple phonetic tokens in a single sentence', () => {
+    expect(
+      stripPhoneticHints(
+        'multiply the num-er-ay-tor and the de-nom-i-nay-tor together'
+      )
+    ).toBe('multiply the numeraytor and the denominaytor together');
+  });
+
+  it('handles capitalized first segment (TitleCase phonetics)', () => {
+    expect(
+      stripPhoneticHints('Find the Least Common De-nom-i-nay-tor first.')
+    ).toBe('Find the Least Common Denominaytor first.');
+  });
+
+  it('leaves normal compound words untouched', () => {
+    // First segment is too long (4+ chars), so the regex must not match.
+    expect(stripPhoneticHints('a self-help book')).toBe('a self-help book');
+    expect(stripPhoneticHints('two-thirds of a well-known story')).toBe(
+      'two-thirds of a well-known story'
+    );
+    expect(stripPhoneticHints('a state-of-the-art system')).toBe(
+      'a state-of-the-art system'
+    );
+  });
+
+  it('leaves a 3-segment hyphenation untouched (below threshold)', () => {
+    // Three-segment compounds like "ice-cream-cone" are real English; the
+    // sanitizer only fires on 4+ tiny segments to avoid false positives.
+    expect(stripPhoneticHints('an ice-cream-cone please')).toBe(
+      'an ice-cream-cone please'
+    );
+  });
+
+  it('returns empty string unchanged', () => {
+    expect(stripPhoneticHints('')).toBe('');
+  });
+
+  it('preserves surrounding punctuation', () => {
+    expect(stripPhoneticHints('"de-nom-i-nay-tor", got it?')).toBe(
+      '"denominaytor", got it?'
     );
   });
 });

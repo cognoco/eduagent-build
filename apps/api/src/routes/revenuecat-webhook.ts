@@ -480,7 +480,8 @@ async function handleNonRenewingPurchase(
   // Reject if no transaction ID — without it we cannot guarantee idempotency
   // and webhook retries would grant duplicate credits.
   if (!transactionId) {
-    console.error('[revenuecat] NON_RENEWING_PURCHASE missing transaction ID', {
+    // [logging sweep] structured logger so PII fields land as JSON context
+    logger.error('[revenuecat] NON_RENEWING_PURCHASE missing transaction ID', {
       eventId: event.id,
       productId: event.product_id,
     });

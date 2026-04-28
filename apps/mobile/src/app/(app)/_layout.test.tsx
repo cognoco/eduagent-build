@@ -594,3 +594,73 @@ describe('AppLayout', () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// [BUG-776 / M-14] buildSwitchProfileConfirmation
+// ---------------------------------------------------------------------------
+// Pre-fix the consent-gate "Switch profile" handler silently picked the
+// first non-current profile, so a 2+ child family could land on a child
+// the parent wasn't expecting. This helper builds the platformAlert prompt
+// used to confirm the destination by name; these tests pin its behavior
+// across all family-size shapes.
+const { buildSwitchProfileConfirmation } = require('./_layout');
+
+describe('[BUG-776] buildSwitchProfileConfirmation', () => {
+  it('returns null when activeProfile is missing', () => {
+    expect(
+      buildSwitchProfileConfirmation({
+        activeProfile: null,
+        profiles: [{ id: 'p1', displayName: 'Alex' }],
+      })
+    ).toBeNull();
+  });
+
+  it('returns null when there are no other profiles to switch to', () => {
+    expect(
+      buildSwitchProfileConfirmation({
+        activeProfile: { id: 'p1' },
+        profiles: [{ id: 'p1', displayName: 'Alex' }],
+      })
+    ).toBeNull();
+  });
+
+  it('names a single sibling clearly in title and message', () => {
+    const result = buildSwitchProfileConfirmation({
+      activeProfile: { id: 'parent' },
+      profiles: [
+        { id: 'parent', displayName: 'Mom' },
+        { id: 'kid1', displayName: 'Alex' },
+      ],
+    });
+    expect(result).not.toBeNull();
+    expect(result.target.id).toBe('kid1');
+    expect(result.title).toBe('Switch to Alex?');
+    expect(result.message).toContain("You'll continue as Alex.");
+    // Single-sibling case: NO "other profiles" hint — it would be confusing
+    // when there are no others.
+    expect(result.message).not.toContain('Other profiles');
+  });
+
+  it('lists the other siblings when more than one alternative exists', () => {
+    const result = buildSwitchProfileConfirmation({
+      activeProfile: { id: 'parent' },
+      profiles: [
+        { id: 'parent', displayName: 'Mom' },
+        { id: 'kid1', displayName: 'Alex' },
+        { id: 'kid2', displayName: 'Sam' },
+        { id: 'kid3', displayName: 'Jordan' },
+      ],
+    });
+    expect(result).not.toBeNull();
+    // Picks the first non-current (deterministic) but the user can now SEE
+    // who they're being switched to and cancel if it's wrong.
+    expect(result.target.id).toBe('kid1');
+    expect(result.title).toBe('Switch to Alex?');
+    // Message must enumerate the other siblings so a parent with 3 kids
+    // can tell whether they're about to land on the right one.
+    expect(result.message).toContain('Sam');
+    expect(result.message).toContain('Jordan');
+    // And give them an off-ramp.
+    expect(result.message.toLowerCase()).toContain('cancel');
+  });
+});

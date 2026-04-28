@@ -1,4 +1,5 @@
 import {
+  act,
   render,
   screen,
   fireEvent,
@@ -14,6 +15,10 @@ const mockSkipMutate = jest.fn();
 const mockUnskipMutate = jest.fn();
 const mockChallengeMutateAsync = jest.fn();
 const mockAddTopicMutateAsync = jest.fn();
+const mockExplainTopicMutateAsync = jest.fn();
+const mockCurriculumRefetch = jest.fn();
+// Mutable so timeout tests can flip isLoading to true.
+let mockCurriculumIsLoading = false;
 let mockCurriculumData = {
   id: 'curriculum-1',
   subjectId: 'subject-1',
@@ -95,8 +100,10 @@ jest.mock('../../../lib/platform-alert', () => ({
 
 jest.mock('../../../hooks/use-curriculum', () => ({
   useCurriculum: () => ({
-    data: mockCurriculumData,
-    isLoading: false,
+    data: mockCurriculumIsLoading ? undefined : mockCurriculumData,
+    isLoading: mockCurriculumIsLoading,
+    isError: false,
+    refetch: mockCurriculumRefetch,
   }),
   useSkipTopic: () => ({ mutate: mockSkipMutate, isPending: false }),
   useUnskipTopic: () => ({ mutate: mockUnskipMutate, isPending: false }),
@@ -109,9 +116,7 @@ jest.mock('../../../hooks/use-curriculum', () => ({
     isPending: false,
   }),
   useExplainTopic: () => ({
-    mutateAsync: jest
-      .fn()
-      .mockResolvedValue({ explanation: 'Test explanation' }),
+    mutateAsync: mockExplainTopicMutateAsync,
     isPending: false,
   }),
 }));
@@ -121,6 +126,7 @@ const CurriculumReviewScreen = require('./curriculum-review').default;
 describe('CurriculumReviewScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockCurriculumIsLoading = false;
     mockCurriculumData = {
       id: 'curriculum-1',
       subjectId: 'subject-1',
@@ -137,6 +143,10 @@ describe('CurriculumReviewScreen', () => {
         },
       ],
     };
+    // Default: explain resolves with a plain string (as returned by the service).
+    mockExplainTopicMutateAsync.mockResolvedValue(
+      'Algebra Basics is first because it builds the foundation.'
+    );
   });
 
   it('previews and confirms a user-added topic', async () => {
@@ -394,5 +404,80 @@ describe('CurriculumReviewScreen', () => {
     expect(screen.getByTestId('placement-check-button')).toBeTruthy();
     expect(screen.getByTestId('continue-advanced-button')).toBeTruthy();
     expect(screen.getByTestId('choose-different-subject-button')).toBeTruthy();
+  });
+
+  it('[BUG-692-FOLLOWUP] setShowWhyModal does not open when user navigates back during explainTopic', async () => {
+    let resolveExplain!: (value: string) => void;
+    mockExplainTopicMutateAsync.mockReturnValue(
+      new Promise<string>((resolve) => {
+        resolveExplain = resolve;
+      })
+    );
+
+    render(<CurriculumReviewScreen />);
+
+    fireEvent.press(screen.getByTestId('explain-topic-1'));
+    fireEvent.press(screen.getByTestId('curriculum-back'));
+
+    resolveExplain('Algebra is foundational for all other maths.');
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(screen.queryByText('Why this order?')).toBeNull();
+  });
+
+  // [BUG-UX-CURRICULUM-TIMEOUT] 30s hard UI-level timeout on curriculum load.
+  describe('[BUG-UX-CURRICULUM-TIMEOUT] 30s loading safety timeout', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+      // Drive screen into the loading spinner phase.
+      mockCurriculumIsLoading = true;
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('does NOT show the timeout panel before 30s elapses', () => {
+      render(<CurriculumReviewScreen />);
+
+      act(() => {
+        jest.advanceTimersByTime(29_999);
+      });
+
+      expect(screen.queryByTestId('curriculum-loading-timeout')).toBeNull();
+      // Normal loading spinner is still present.
+      expect(screen.getByTestId('curriculum-loading')).toBeTruthy();
+    });
+
+    it('shows timeout panel with Try again and Go home after 30s', () => {
+      render(<CurriculumReviewScreen />);
+
+      act(() => {
+        jest.advanceTimersByTime(30_000);
+      });
+
+      expect(screen.getByTestId('curriculum-loading-timeout')).toBeTruthy();
+      expect(screen.getByTestId('curriculum-timeout-retry')).toBeTruthy();
+      expect(screen.getByTestId('curriculum-timeout-home')).toBeTruthy();
+    });
+
+    it('clears the safety timeout when loading finishes before 30s (cleanup)', () => {
+      const { rerender } = render(<CurriculumReviewScreen />);
+
+      act(() => {
+        jest.advanceTimersByTime(15_000);
+      });
+
+      // Loading resolves — flip back to loaded state.
+      mockCurriculumIsLoading = false;
+      rerender(<CurriculumReviewScreen />);
+
+      // Advance past original 30s mark — timer must have been cleared.
+      act(() => {
+        jest.advanceTimersByTime(15_001);
+      });
+
+      expect(screen.queryByTestId('curriculum-loading-timeout')).toBeNull();
+    });
   });
 });

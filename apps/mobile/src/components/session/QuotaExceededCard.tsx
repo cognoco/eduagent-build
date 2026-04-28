@@ -71,7 +71,7 @@ export function QuotaExceededCard({
         <>
           <Text className="text-body-sm text-text-secondary mb-3">
             You've reached {limitLabel} for learning sessions. Ask your parent
-            to upgrade so you can keep going.
+            for more learning time so you can keep going.
           </Text>
 
           <View
@@ -79,7 +79,7 @@ export function QuotaExceededCard({
             testID="quota-ask-parent"
           >
             <Text className="text-body-sm text-text-secondary">
-              Let your parent know to upgrade your plan
+              Let your parent know you need more learning time
             </Text>
           </View>
 

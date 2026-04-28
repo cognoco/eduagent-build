@@ -69,7 +69,7 @@ export interface DashboardInput {
 /**
  * Generates a one-sentence summary for a child's progress.
  *
- * Example: "Alex: Math — 5 problems, 3 guided. Science fading. 4 sessions this week (up from 2 last week)."
+ * Example: "Alex: Mathematics — 5 problems, 3 guided. Science fading. 4 sessions this week (up from 2 last week)."
  */
 export function generateChildSummary(input: DashboardInput): string {
   const parts: string[] = [];

@@ -52,11 +52,18 @@ export function SortFilterBar({
         accessibilityLabel={`Sort by ${activeSort?.label ?? 'default'}`}
         accessibilityRole="button"
       >
-        <Ionicons
-          name="swap-vertical"
-          size={16}
-          color={themeColors.textSecondary}
-        />
+        {/* [a11y sweep] decorative icon — Pressable parent carries the label */}
+        <View
+          testID="library-sort-icon"
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        >
+          <Ionicons
+            name="swap-vertical"
+            size={16}
+            color={themeColors.textSecondary}
+          />
+        </View>
         <Text className="text-sm text-text-primary">
           {activeSort?.label ?? 'Sort'}
         </Text>
@@ -70,7 +77,14 @@ export function SortFilterBar({
         accessibilityLabel={filterLabel}
         accessibilityRole="button"
       >
-        <Ionicons name="filter" size={16} color={themeColors.textSecondary} />
+        {/* [a11y sweep] decorative icon — Pressable parent carries the label */}
+        <View
+          testID="library-filter-icon"
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        >
+          <Ionicons name="filter" size={16} color={themeColors.textSecondary} />
+        </View>
         <Text className="text-sm text-text-primary">{filterLabel}</Text>
       </Pressable>
 
