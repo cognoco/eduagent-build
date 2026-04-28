@@ -8,7 +8,9 @@ import {
   pgEnum,
   index,
   unique,
+  check,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 import { numericAsNumber } from './_numeric-as-number';
 import { profiles } from './profiles';
 import { subjects, curriculumTopics } from './subjects';
@@ -72,7 +74,7 @@ export const vocabularyRetentionCards = pgTable(
     easeFactor: numericAsNumber('ease_factor', { precision: 4, scale: 2 })
       .notNull()
       .default(2.5),
-    intervalDays: integer('interval_days').notNull().default(0),
+    intervalDays: integer('interval_days').notNull().default(1),
     repetitions: integer('repetitions').notNull().default(0),
     lastReviewedAt: timestamp('last_reviewed_at', { withTimezone: true }),
     nextReviewAt: timestamp('next_review_at', { withTimezone: true }),
@@ -90,6 +92,10 @@ export const vocabularyRetentionCards = pgTable(
     index('vocab_retention_cards_review_idx').on(
       table.profileId,
       table.nextReviewAt
+    ),
+    check(
+      'vocab_retention_cards_interval_days_positive',
+      sql`${table.intervalDays} >= 1`
     ),
   ]
 );

@@ -124,7 +124,14 @@ export const learningSessions = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (table) => [index('learning_sessions_profile_id_idx').on(table.profileId)]
+  (table) => [
+    index('learning_sessions_profile_id_idx').on(table.profileId),
+    index('learning_sessions_profile_subject_exchange_idx').on(
+      table.profileId,
+      table.subjectId,
+      table.exchangeCount
+    ),
+  ]
 );
 
 export const sessionEvents = pgTable(
@@ -153,7 +160,14 @@ export const sessionEvents = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (table) => [index('session_events_session_id_idx').on(table.sessionId)]
+  (table) => [
+    index('session_events_session_id_idx').on(table.sessionId),
+    index('session_events_profile_event_created_idx').on(
+      table.profileId,
+      table.eventType,
+      table.createdAt
+    ),
+  ]
 );
 
 export const sessionSummaries = pgTable('session_summaries', {
