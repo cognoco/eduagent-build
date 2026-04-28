@@ -32,22 +32,20 @@ type SubjectRouteEnv = {
 };
 
 export const subjectRoutes = new Hono<SubjectRouteEnv>()
+  // [CR-650 / CR-651] Local bare catch{} blocks were swallowing LLM and quota
+  // failures with no Sentry capture and no error-type classification. The
+  // global onError handler in index.ts already does both — it converts
+  // UpstreamLlmError into a 502 LLM_UNAVAILABLE response and captures every
+  // other thrown error to Sentry with userId/profileId/requestPath context.
+  // Letting errors propagate is the correct behavior; the prior swallowing
+  // hid real outages.
   .post(
     '/subjects/resolve',
     zValidator('json', subjectResolveInputSchema),
     async (c) => {
       const { rawInput } = c.req.valid('json');
-      try {
-        const result = await resolveSubjectName(rawInput);
-        return c.json(result);
-      } catch {
-        return apiError(
-          c,
-          500,
-          ERROR_CODES.INTERNAL_ERROR,
-          'Subject name resolution failed — please try again'
-        );
-      }
+      const result = await resolveSubjectName(rawInput);
+      return c.json(result);
     }
   )
   .post(
@@ -57,17 +55,8 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
       const { text } = c.req.valid('json');
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
-      try {
-        const result = await classifySubject(db, profileId, text);
-        return c.json(result);
-      } catch {
-        return apiError(
-          c,
-          500,
-          ERROR_CODES.INTERNAL_ERROR,
-          'Subject classification failed'
-        );
-      }
+      const result = await classifySubject(db, profileId, text);
+      return c.json(result);
     }
   )
   .get('/subjects', async (c) => {

@@ -345,5 +345,52 @@ describe('filing routes', () => {
       expect(body).toHaveProperty('topicId');
       expect(body).toHaveProperty('topicTitle');
     });
+
+    // [CR-652] Break tests guarding against re-inversion of the filedFrom label.
+    // sessionTranscript present => session_filing; absent => freeform_filing.
+    it('[CR-652] tags filedFrom=freeform_filing when called with rawInput only', async () => {
+      const { resolveFilingResult } = await import('../services/filing');
+      (resolveFilingResult as jest.Mock).mockClear();
+
+      const res = await app.request(
+        '/v1/filing',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ rawInput: 'photosynthesis' }),
+        },
+        TEST_ENV
+      );
+      expect(res.status).toBe(200);
+
+      expect(resolveFilingResult).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ filedFrom: 'freeform_filing' })
+      );
+    });
+
+    it('[CR-652] tags filedFrom=session_filing when called with sessionTranscript', async () => {
+      const { resolveFilingResult } = await import('../services/filing');
+      (resolveFilingResult as jest.Mock).mockClear();
+
+      const res = await app.request(
+        '/v1/filing',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            sessionTranscript: 'Learner: hi\nTutor: hello',
+            sessionMode: 'freeform',
+          }),
+        },
+        TEST_ENV
+      );
+      expect(res.status).toBe(200);
+
+      expect(resolveFilingResult).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ filedFrom: 'session_filing' })
+      );
+    });
   });
 });

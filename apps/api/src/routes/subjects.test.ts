@@ -56,6 +56,19 @@ jest.mock('../services/subject-resolve', () => ({
   }),
 }));
 
+jest.mock('../services/subject-classify', () => ({
+  classifySubject: jest.fn().mockResolvedValue({
+    candidates: [],
+    needsConfirmation: false,
+    suggestedSubjectName: 'Mathematics',
+  }),
+}));
+
+jest.mock('../services/sentry', () => ({
+  captureException: jest.fn(),
+  addBreadcrumb: jest.fn(),
+}));
+
 jest.mock('../services/subject', () => ({
   listSubjects: jest.fn().mockResolvedValue([]),
   createSubject: jest.fn().mockImplementation((_db, profileId, input) => ({
@@ -182,6 +195,128 @@ describe('subject routes', () => {
       );
 
       expect(res.status).toBe(401);
+    });
+
+    // [CR-650] When the underlying LLM service throws UpstreamLlmError, the
+    // global onError handler must classify it as 502 LLM_UNAVAILABLE and
+    // capture to Sentry. The previous bare catch{} swallowed the error
+    // silently with a generic 500.
+    it('[CR-650] classifies UpstreamLlmError as 502 LLM_UNAVAILABLE and captures Sentry', async () => {
+      const { resolveSubjectName } = await import(
+        '../services/subject-resolve'
+      );
+      const { captureException } = await import('../services/sentry');
+      const { UpstreamLlmError } = await import('@eduagent/schemas');
+      (resolveSubjectName as jest.Mock).mockRejectedValueOnce(
+        new UpstreamLlmError('LLM provider down')
+      );
+      (captureException as jest.Mock).mockClear();
+
+      const res = await app.request(
+        '/v1/subjects/resolve',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ rawInput: 'Physics' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(502);
+      expect(captureException).toHaveBeenCalledTimes(1);
+    });
+
+    it('[CR-650] captures generic errors to Sentry and returns 500 (no silent swallow)', async () => {
+      const { resolveSubjectName } = await import(
+        '../services/subject-resolve'
+      );
+      const { captureException } = await import('../services/sentry');
+      (resolveSubjectName as jest.Mock).mockRejectedValueOnce(
+        new Error('unexpected boom')
+      );
+      (captureException as jest.Mock).mockClear();
+
+      const res = await app.request(
+        '/v1/subjects/resolve',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ rawInput: 'Physics' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(500);
+      expect(captureException).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // POST /v1/subjects/classify
+  // -------------------------------------------------------------------------
+
+  describe('POST /v1/subjects/classify', () => {
+    it('returns 200 with classification result', async () => {
+      const res = await app.request(
+        '/v1/subjects/classify',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ text: 'Newton laws of motion' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body).toHaveProperty('candidates');
+      expect(body).toHaveProperty('needsConfirmation');
+    });
+
+    // [CR-651] Same fix as resolve — UpstreamLlmError must surface as 502 with Sentry capture.
+    it('[CR-651] classifies UpstreamLlmError as 502 and captures Sentry', async () => {
+      const { classifySubject } = await import('../services/subject-classify');
+      const { captureException } = await import('../services/sentry');
+      const { UpstreamLlmError } = await import('@eduagent/schemas');
+      (classifySubject as jest.Mock).mockRejectedValueOnce(
+        new UpstreamLlmError('LLM provider down')
+      );
+      (captureException as jest.Mock).mockClear();
+
+      const res = await app.request(
+        '/v1/subjects/classify',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ text: 'Photosynthesis lesson' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(502);
+      expect(captureException).toHaveBeenCalledTimes(1);
+    });
+
+    it('[CR-651] captures generic classify errors to Sentry and returns 500', async () => {
+      const { classifySubject } = await import('../services/subject-classify');
+      const { captureException } = await import('../services/sentry');
+      (classifySubject as jest.Mock).mockRejectedValueOnce(
+        new Error('unexpected boom')
+      );
+      (captureException as jest.Mock).mockClear();
+
+      const res = await app.request(
+        '/v1/subjects/classify',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ text: 'Photosynthesis lesson' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(500);
+      expect(captureException).toHaveBeenCalledTimes(1);
     });
   });
 

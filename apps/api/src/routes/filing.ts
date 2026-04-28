@@ -135,9 +135,12 @@ export const filingRoutes = new Hono<FilingRouteEnv>()
     // Resolve into actual DB records
     // Note: 'pre_generated' is only set via the migration default on existing rows.
     // The filing route always produces 'session_filing' or 'freeform_filing'.
+    // A sessionTranscript means the user just finished a chat session and is
+    // filing its outcome — that is `session_filing`. Pre-session/ad-hoc adds
+    // (no transcript, raw user input) are `freeform_filing`. [CR-652]
     const filedFrom = sessionTranscript
-      ? ('freeform_filing' as const)
-      : ('session_filing' as const);
+      ? ('session_filing' as const)
+      : ('freeform_filing' as const);
 
     let result;
     try {
