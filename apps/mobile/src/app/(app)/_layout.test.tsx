@@ -120,6 +120,10 @@ jest.mock('../../hooks/use-revenuecat', () => ({
 
 jest.mock('../../lib/sentry', () => ({
   evaluateSentryForProfile: jest.fn(),
+  // useParentProxy (rendered inside _layout) catches SecureStore failures
+  // with Sentry.captureException — provide a no-op so the hook doesn't crash
+  // during _layout rendering.
+  Sentry: { captureException: jest.fn() },
 }));
 
 jest.mock('expo-secure-store', () => ({

@@ -33,13 +33,19 @@ export type CreateDatabaseOptions = Record<string, never>;
 // Pool only speaks Neon's WebSocket protocol, so it errors with "Received
 // network error or non-101 status code" against vanilla Postgres.
 //
-// Pick the driver based on the URL: Neon's serverless Pool for *.neon.tech (or
-// any URL that has explicit `sslmode=require` flagging a managed Neon-style
-// endpoint), and node-postgres's plain TCP Pool for everything else. Both
+// Pick the driver based on the URL: Neon's serverless Pool for *.neon.tech
+// hostnames, and node-postgres's plain TCP Pool for everything else. Both
 // drizzle wrappers expose the same PgDatabase interface, so callers see
 // identical typings — only the runtime transport differs.
+//
+// The match is intentionally narrow. A broader `\bneon\b` alternative would
+// also match plain Postgres URLs that happen to contain "neon" as a standalone
+// token (database named `neon_dev`, username `neon-user`, internal hostnames
+// like `neon.internal`), which would route those connections through the
+// WebSocket-only driver and fail with "Received network error or non-101
+// status code" against vanilla Postgres.
 function looksLikeNeon(url: string): boolean {
-  return /\.neon\.tech\b/.test(url) || /\bneon(\.tech)?\b/.test(url);
+  return /\.neon\.tech\b/.test(url);
 }
 
 /**

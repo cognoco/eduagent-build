@@ -352,6 +352,7 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
     '/quiz/rounds/:id/check',
     zValidator('json', questionCheckInputSchema),
     async (c) => {
+      assertNotProxyMode(c);
       const profileId = requireProfileId(c.get('profileId'));
       const db = c.get('db');
       const roundId = c.req.param('id');
@@ -379,6 +380,7 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
     '/quiz/rounds/:id/complete',
     zValidator('json', completeRoundInputSchema),
     async (c) => {
+      assertNotProxyMode(c);
       const profileId = requireProfileId(c.get('profileId'));
       const db = c.get('db');
       const roundId = c.req.param('id');
@@ -417,6 +419,7 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
       );
     }),
     async (c) => {
+      assertNotProxyMode(c);
       const profileId = requireProfileId(c.get('profileId'));
       const db = c.get('db');
       const { activityType } = c.req.valid('json');

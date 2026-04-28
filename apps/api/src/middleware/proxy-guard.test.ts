@@ -4,6 +4,14 @@ import { bookmarkRoutes } from '../routes/bookmarks';
 
 function createApp(): InstanceType<typeof Hono> {
   const app = new Hono();
+  // [CR-PROXY-GUARD-FAIL-CLOSED] profileScopeMiddleware always sets
+  // profileMeta in production; mirror that here so the header-only path
+  // remains exercised. A separate suite below covers the fail-closed
+  // path when profileMeta is intentionally absent.
+  app.use('*', async (c, next) => {
+    c.set('profileMeta' as never, { isOwner: true });
+    await next();
+  });
   app.post('/test', (c) => {
     assertNotProxyMode(c);
     return c.json({ ok: true });
@@ -102,6 +110,7 @@ describe('assertNotProxyMode - real route integration', () => {
     app.use('*', async (c, next) => {
       c.set('db' as never, new Proxy({}, { get: () => dbCalled }));
       c.set('profileId' as never, 'profile-test');
+      c.set('profileMeta' as never, { isOwner: true });
       await next();
     });
     app.route('/', bookmarkRoutes);
@@ -111,6 +120,35 @@ describe('assertNotProxyMode - real route integration', () => {
       {
         method: 'DELETE',
         headers: { 'X-Proxy-Mode': 'true' },
+      }
+    );
+
+    expect(res.status).toBe(403);
+    expect(dbCalled).not.toHaveBeenCalled();
+  });
+
+  // [CR-PROXY-4 / BREAK] End-to-end coverage for the server-derived path:
+  // a non-owner profile injected via profileMeta (the real production code
+  // path — set by profileScopeMiddleware after verifying X-Profile-Id) must
+  // be blocked from mutating bookmarks even when the X-Proxy-Mode header is
+  // omitted. This locks in the SEC-2 fix end-to-end so that a client which
+  // simply drops the header cannot regain write access.
+  it('[BREAK] returns 403 from bookmarks DELETE when profileMeta.isOwner=false and header is absent', async () => {
+    const app = new Hono();
+    const dbCalled = jest.fn();
+
+    app.use('*', async (c, next) => {
+      c.set('db' as never, new Proxy({}, { get: () => dbCalled }));
+      c.set('profileId' as never, 'profile-test');
+      c.set('profileMeta' as never, { isOwner: false });
+      await next();
+    });
+    app.route('/', bookmarkRoutes);
+
+    const res = await app.request(
+      '/bookmarks/00000000-0000-4000-8000-000000000000',
+      {
+        method: 'DELETE',
       }
     );
 

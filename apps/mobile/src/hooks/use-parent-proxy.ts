@@ -3,6 +3,7 @@ import { useProfile, type Profile } from '../lib/profile';
 import { setProxyMode } from '../lib/api-client';
 import * as SecureStore from '../lib/secure-storage';
 import { sanitizeSecureStoreKey } from '../lib/secure-storage';
+import { Sentry } from '../lib/sentry';
 
 // [BUG-827 / F-CMP-003] Mirror the sanitized constant in profile.ts so reads
 // and writes share the same shape. The literal is currently identity-safe,
@@ -33,10 +34,21 @@ export function useParentProxy(): ParentProxyState {
     if (!activeProfile) return;
 
     setProxyMode(isParentProxy);
+    // [CR-PROXY-3] Keychain writes can fail (device locked, quota). Without a
+    // catch, the in-memory flag set by setProxyMode() and the persisted flag
+    // diverge: requests in flight send X-Proxy-Mode correctly, but on the
+    // next cold start the hook sees the wrong persisted value and a parent
+    // could silently regain write access on the child profile. Surfacing the
+    // error to Sentry gives us a queryable signal per the silent-recovery
+    // rule (console.warn alone is insufficient).
     if (isParentProxy) {
-      void SecureStore.setItemAsync(PARENT_PROXY_KEY, 'true');
+      SecureStore.setItemAsync(PARENT_PROXY_KEY, 'true').catch(
+        Sentry.captureException
+      );
     } else {
-      void SecureStore.deleteItemAsync(PARENT_PROXY_KEY);
+      SecureStore.deleteItemAsync(PARENT_PROXY_KEY).catch(
+        Sentry.captureException
+      );
     }
   }, [activeProfile, isParentProxy]);
 
