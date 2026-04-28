@@ -82,11 +82,15 @@ export function signTestJWT(claims?: TestJWTClaims): string {
     kid: TEST_KID,
   };
 
+  // [SEC-1 / BUG-717] verifyClerkJWT now hard-fails on undefined audience and
+  // the verifier checks the token's aud claim against CLERK_AUDIENCE. Default
+  // to the same value buildIntegrationEnv() sets so tokens validate end-to-end.
+  // Tests can still override aud via the claims arg to drive negative cases.
   const payload: Record<string, unknown> = {
     sub: 'user_test',
     email: 'test@test.com',
     iss: 'https://clerk.test',
-    aud: undefined,
+    aud: 'integration-test-audience',
     iat: now,
     exp: now + 3600, // 1 hour
     ...claims,

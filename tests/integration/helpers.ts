@@ -5,9 +5,12 @@ type IntegrationEnvOverrides = Partial<{
   ENVIRONMENT: string;
   DATABASE_URL: string;
   CLERK_JWKS_URL: string;
+  CLERK_AUDIENCE: string;
   APP_URL: string;
   API_ORIGIN: string;
 }>;
+
+export const INTEGRATION_TEST_AUDIENCE = 'integration-test-audience';
 
 export function requireDatabaseUrl(): string {
   const url = process.env.DATABASE_URL;
@@ -26,6 +29,9 @@ export function buildIntegrationEnv(
     ENVIRONMENT: 'test',
     DATABASE_URL: requireDatabaseUrl(),
     CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',
+    // [SEC-1 / BUG-717] verifyClerkJWT hard-fails on undefined audience.
+    // signTestJWT() defaults aud to this same value so tokens validate.
+    CLERK_AUDIENCE: INTEGRATION_TEST_AUDIENCE,
     APP_URL: 'https://app.mentomate.test',
     API_ORIGIN: 'https://api.integration.test',
     ...overrides,
