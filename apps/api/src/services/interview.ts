@@ -300,12 +300,27 @@ export async function extractSignals(exchangeHistory: ChatExchange[]): Promise<{
     interests.push(label);
     if (interests.length >= MAX_EXTRACTED_INTERESTS) break;
   }
+  // [CR-769] Goals must be strings; previously we used `.map(String)` which
+  // turned a non-string LLM emission (e.g. `{topic: "X"}`) into the literal
+  // text "[object Object]" and persisted it as a learner goal. Filter to
+  // strings before normalising so the persisted goals list never contains
+  // synthetic object-stringified rows.
+  const rawGoals = Array.isArray(parsed.goals)
+    ? (parsed.goals as unknown[])
+        .filter((g): g is string => typeof g === 'string')
+        .map((g) => g.trim())
+        .filter((g) => g.length > 0)
+    : [];
   return {
-    goals: Array.isArray(parsed.goals)
-      ? (parsed.goals as unknown[]).map(String)
-      : [],
-    experienceLevel: String(parsed.experienceLevel ?? 'beginner'),
-    currentKnowledge: String(parsed.currentKnowledge ?? ''),
+    goals: rawGoals,
+    experienceLevel:
+      typeof parsed.experienceLevel === 'string' && parsed.experienceLevel
+        ? parsed.experienceLevel
+        : 'beginner',
+    currentKnowledge:
+      typeof parsed.currentKnowledge === 'string'
+        ? parsed.currentKnowledge
+        : '',
     interests,
   };
 }

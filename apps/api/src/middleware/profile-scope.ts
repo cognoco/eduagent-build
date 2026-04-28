@@ -65,6 +65,27 @@ export function requireProfileId(profileId: string | undefined): string {
   return profileId;
 }
 
+/**
+ * [CR-657] Defensive unwrap for `c.get('account')` in route handlers. Mirrors
+ * `requireProfileId`. Although the Hono context types declare `account` as
+ * non-nullable, that guarantee depends on accountMiddleware running before the
+ * route — if middleware order changes or accountMiddleware silently skips
+ * (e.g. unauthenticated path that still mounts the route), `c.get('account')`
+ * is `undefined` at runtime and `c.get('account').id` throws TypeError. Use:
+ *   `const account = requireAccount(c.get('account'));`
+ */
+export function requireAccount<T extends { id: string }>(
+  account: T | undefined
+): T {
+  if (!account) {
+    throw new HTTPException(401, {
+      message:
+        'Account required — no authenticated account resolved for this request',
+    });
+  }
+  return account;
+}
+
 export const profileScopeMiddleware = createMiddleware<ProfileScopeEnv>(
   async (c, next) => {
     const profileIdHeader = c.req.header('X-Profile-Id');

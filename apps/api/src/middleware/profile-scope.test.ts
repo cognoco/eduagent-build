@@ -5,7 +5,12 @@ jest.mock('../services/sentry', () => ({
   addBreadcrumb: jest.fn(),
 }));
 
-import { profileScopeMiddleware } from './profile-scope';
+import {
+  profileScopeMiddleware,
+  requireProfileId,
+  requireAccount,
+} from './profile-scope';
+import { HTTPException } from 'hono/http-exception';
 import { captureException } from '../services/sentry';
 
 jest.mock('../services/profile', () => ({
@@ -167,5 +172,46 @@ describe('profileScopeMiddleware', () => {
     expect(res.status).toBe(200);
     expect(body.profileId).toBeNull();
     expect(body.profileMeta).toBeNull();
+  });
+});
+
+// [CR-657] Break tests for requireAccount + requireProfileId helpers.
+describe('requireProfileId', () => {
+  it('returns the profileId when present', () => {
+    expect(requireProfileId('p-1')).toBe('p-1');
+  });
+
+  it('throws HTTPException(400) when profileId is undefined', () => {
+    expect(() => requireProfileId(undefined)).toThrow(HTTPException);
+    try {
+      requireProfileId(undefined);
+    } catch (err) {
+      expect(err).toBeInstanceOf(HTTPException);
+      expect((err as HTTPException).status).toBe(400);
+    }
+  });
+});
+
+describe('requireAccount', () => {
+  it('returns the account when present', () => {
+    const account = {
+      id: 'a-1',
+      clerkUserId: 'u-1',
+      email: 'x@y.com',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    expect(requireAccount(account)).toBe(account);
+  });
+
+  it('[CR-657] throws HTTPException(401) when account is undefined', () => {
+    expect(() => requireAccount(undefined)).toThrow(HTTPException);
+    try {
+      requireAccount(undefined);
+    } catch (err) {
+      expect(err).toBeInstanceOf(HTTPException);
+      expect((err as HTTPException).status).toBe(401);
+      expect((err as HTTPException).message).toMatch(/account required/i);
+    }
   });
 });

@@ -10,7 +10,7 @@ import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import type { Account } from '../services/account';
 import type { ProfileMeta } from '../middleware/profile-scope';
-import { requireProfileId } from '../middleware/profile-scope';
+import { requireProfileId, requireAccount } from '../middleware/profile-scope';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
 import { apiError, validationError } from '../errors';
 import {
@@ -183,10 +183,13 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
       // Placed before the LLM call so the expensive operation is gated.
       // Atomic check-and-log avoids TOCTOU where two concurrent requests
       // both read count=9, both pass, and both fire the expensive LLM call.
+      // [CR-657] requireAccount() throws 401 if account is unset at runtime
+      // (TS declares it non-nullable but that depends on middleware ordering).
+      const account = requireAccount(c.get('account'));
       const rateLimited = await checkAndLogRateLimit(
         db,
         profileId,
-        c.get('account').id,
+        account.id,
         'dictation_review',
         { hours: 1 / 60, maxCount: 10 }
       );

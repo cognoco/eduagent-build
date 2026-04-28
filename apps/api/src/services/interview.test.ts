@@ -794,6 +794,48 @@ describe('extractSignals', () => {
 
     expect(result.interests).toEqual([]);
   });
+
+  // [CR-769] Goals were previously coerced via `.map(String)` which turned
+  // any non-string element (e.g. an object) into the literal text
+  // "[object Object]" and persisted it. The fix filters to typeof string
+  // before normalising.
+  it('[CR-769] drops non-string goal entries instead of stringifying them', async () => {
+    (routeAndCall as jest.Mock).mockResolvedValueOnce({
+      response: JSON.stringify({
+        goals: [
+          'Master fractions',
+          { topic: 'Algebra', level: 'intermediate' }, // object — must be dropped
+          42, // number — must be dropped
+          null, // null — must be dropped
+          '   trim me   ',
+          '',
+        ],
+        experienceLevel: 'beginner',
+        currentKnowledge: '',
+        interests: [],
+      }),
+    });
+
+    const result = await extractSignals([{ role: 'user', content: 'hi' }]);
+
+    expect(result.goals).toEqual(['Master fractions', 'trim me']);
+    // Sanity: no synthetic stringified value made it through.
+    expect(result.goals.some((g) => g.includes('[object Object]'))).toBe(false);
+  });
+
+  it('[CR-769] preserves valid goals when array is fully strings', async () => {
+    (routeAndCall as jest.Mock).mockResolvedValueOnce({
+      response: JSON.stringify({
+        goals: ['learn long division', 'master decimals'],
+        experienceLevel: 'beginner',
+        currentKnowledge: '',
+        interests: [],
+      }),
+    });
+
+    const result = await extractSignals([{ role: 'user', content: 'hi' }]);
+    expect(result.goals).toEqual(['learn long division', 'master decimals']);
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -132,6 +132,10 @@ jest.mock('../services/subject', () => ({
 }));
 
 import { app } from '../index';
+import { resolveSubjectName } from '../services/subject-resolve';
+import { classifySubject } from '../services/subject-classify';
+import { captureException } from '../services/sentry';
+import { UpstreamLlmError } from '@eduagent/schemas';
 import {
   AUTH_HEADERS as BASE_AUTH_HEADERS,
   BASE_AUTH_ENV,
@@ -202,11 +206,6 @@ describe('subject routes', () => {
     // capture to Sentry. The previous bare catch{} swallowed the error
     // silently with a generic 500.
     it('[CR-650] classifies UpstreamLlmError as 502 LLM_UNAVAILABLE and captures Sentry', async () => {
-      const { resolveSubjectName } = await import(
-        '../services/subject-resolve'
-      );
-      const { captureException } = await import('../services/sentry');
-      const { UpstreamLlmError } = await import('@eduagent/schemas');
       (resolveSubjectName as jest.Mock).mockRejectedValueOnce(
         new UpstreamLlmError('LLM provider down')
       );
@@ -227,10 +226,6 @@ describe('subject routes', () => {
     });
 
     it('[CR-650] captures generic errors to Sentry and returns 500 (no silent swallow)', async () => {
-      const { resolveSubjectName } = await import(
-        '../services/subject-resolve'
-      );
-      const { captureException } = await import('../services/sentry');
       (resolveSubjectName as jest.Mock).mockRejectedValueOnce(
         new Error('unexpected boom')
       );
@@ -275,9 +270,6 @@ describe('subject routes', () => {
 
     // [CR-651] Same fix as resolve — UpstreamLlmError must surface as 502 with Sentry capture.
     it('[CR-651] classifies UpstreamLlmError as 502 and captures Sentry', async () => {
-      const { classifySubject } = await import('../services/subject-classify');
-      const { captureException } = await import('../services/sentry');
-      const { UpstreamLlmError } = await import('@eduagent/schemas');
       (classifySubject as jest.Mock).mockRejectedValueOnce(
         new UpstreamLlmError('LLM provider down')
       );
@@ -298,8 +290,6 @@ describe('subject routes', () => {
     });
 
     it('[CR-651] captures generic classify errors to Sentry and returns 500', async () => {
-      const { classifySubject } = await import('../services/subject-classify');
-      const { captureException } = await import('../services/sentry');
       (classifySubject as jest.Mock).mockRejectedValueOnce(
         new Error('unexpected boom')
       );
