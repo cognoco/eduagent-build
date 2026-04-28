@@ -22,6 +22,8 @@ import { inngest } from '../inngest/client';
 import { captureException } from '../services/sentry';
 import { createLogger } from '../services/logger';
 import type { Database } from '@eduagent/database';
+
+const logger = createLogger();
 import type Stripe from 'stripe';
 import type { CachedSubscriptionStatus } from '../services/kv';
 import type { WebhookSubscriptionUpdate } from '../services/billing';
