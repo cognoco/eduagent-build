@@ -52,6 +52,12 @@ export default function QuizPlayScreen(): React.ReactElement {
   } = useQuizFlow();
   const completeRound = useCompleteRound();
   const prefetchRound = usePrefetchRound();
+  // [BUG-542] Extract .mutate so the useEffect dep array references a stable
+  // variable rather than a member-access expression. ESLint exhaustive-deps
+  // treats `prefetchRound.mutate` in a dep array as an undeclared dep on
+  // `prefetchRound` (the whole object), which is recreated each render. The
+  // extracted local is still the stable TanStack Query .mutate ref.
+  const prefetchRoundMutate = prefetchRound.mutate;
   const checkAnswer = useCheckAnswer();
   // [ASSUMP-F10] When completeRound fails we surface an inline retry UI
   // instead of silently fabricating a 0-XP "nice" result and navigating.
@@ -162,17 +168,18 @@ export default function QuizPlayScreen(): React.ReactElement {
     }
 
     prefetchTriggeredRef.current = true;
-    prefetchRound.mutate(
+    prefetchRoundMutate(
       { activityType, subjectId: subjectId ?? undefined },
       {
         onSuccess: (data) => setPrefetchedRoundId(data.id),
       }
     );
-    // [BUG-542] Use .mutate (stable ref) instead of whole mutation result
+    // [BUG-542] Use extracted .mutate local (stable ref) instead of whole
+    // mutation result or member-access expression in the dep array.
   }, [
     activityType,
     currentIndex,
-    prefetchRound.mutate,
+    prefetchRoundMutate,
     setPrefetchedRoundId,
     subjectId,
     totalQuestions,

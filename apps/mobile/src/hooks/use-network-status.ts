@@ -20,11 +20,16 @@ export function useNetworkStatus(): NetworkStatus {
   useEffect(() => {
     // Proactive initial check — show offline banner immediately if already offline
     // rather than waiting for the first connectivity-change event.
-    NetInfo.fetch().then((state: NetInfoState) => {
-      const offline = state.isInternetReachable === false;
-      setIsOffline(offline);
-      setIsReady(true);
-    });
+    // .catch ensures isReady is always set even if NetInfo.fetch() rejects.
+    NetInfo.fetch()
+      .then((state: NetInfoState) => {
+        const offline = state.isInternetReachable === false;
+        setIsOffline(offline);
+        setIsReady(true);
+      })
+      .catch(() => {
+        setIsReady(true);
+      });
 
     const unsubscribe = NetInfo.addEventListener((state: NetInfoState) => {
       // isInternetReachable can be null during initial check — treat null as online

@@ -444,13 +444,16 @@ export default function LibraryScreen() {
     }
 
     if (subjectsQuery.isError || progressQuery.isError) {
+      const libraryLoadError = subjectsQuery.error ?? progressQuery.error;
       return (
         <View
           className="flex-1 items-center justify-center px-5 py-12"
           testID="library-error"
         >
           <Text className="text-body text-text-secondary text-center mb-4">
-            Unable to load your library. Please try again.
+            {libraryLoadError
+              ? formatApiError(libraryLoadError)
+              : 'Unable to load your library. Please try again.'}
           </Text>
           <Pressable
             onPress={handleRetry}
@@ -571,6 +574,13 @@ export default function LibraryScreen() {
               state={booksTabState}
               onStateChange={setBooksTabState}
               onBookPress={(subjectId, bookId) => {
+                // [CLAUDE.md] Cross-tab deep push: shelf layout has no
+                // unstable_settings.initialRouteName, so we must push the
+                // parent route first to synthesise a proper back-stack.
+                router.push({
+                  pathname: '/(app)/shelf/[subjectId]',
+                  params: { subjectId },
+                } as never);
                 router.push({
                   pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
                   params: { subjectId, bookId },

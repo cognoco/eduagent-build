@@ -643,10 +643,14 @@ function SessionScreenInner() {
   );
 
   useEffect(() => {
+    // Capture ref objects (not .current) so the cleanup reads the latest
+    // value at unmount without triggering react-hooks/exhaustive-deps.
+    const animCleanupRef = animationCleanupRef;
+    const silenceRef = silenceTimerRef;
     return () => {
-      animationCleanupRef.current?.();
-      if (silenceTimerRef.current) {
-        clearTimeout(silenceTimerRef.current);
+      animCleanupRef.current?.();
+      if (silenceRef.current) {
+        clearTimeout(silenceRef.current);
       }
     };
   }, []);

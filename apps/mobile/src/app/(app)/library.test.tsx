@@ -589,7 +589,11 @@ describe('LibraryScreen', () => {
     expect(screen.getByText('0/10 topics')).toBeTruthy();
   });
 
-  it('navigates to book route when a book is pressed from books tab', () => {
+  // [CLAUDE.md cross-tab nav rule] Shelf layout has no
+  // unstable_settings.initialRouteName so the parent route must be pushed
+  // FIRST before the deep book path. Without the parent push, router.back()
+  // skips to the Tabs first-route (Home) instead of returning to the shelf.
+  it('pushes parent shelf route THEN book route when a book is pressed from books tab [cross-tab-nav]', () => {
     mockUseSubjects.mockReturnValue({
       data: [{ id: 'sub-1', name: 'Math', status: 'active' }],
       isLoading: false,
@@ -629,10 +633,17 @@ describe('LibraryScreen', () => {
     fireEvent.press(screen.getByTestId('library-tab-books'));
     fireEvent.press(screen.getByTestId('book-card-book-1'));
 
-    expect(mockPush).toHaveBeenCalledWith({
+    // First call: parent shelf route (builds back-stack)
+    expect(mockPush).toHaveBeenNthCalledWith(1, {
+      pathname: '/(app)/shelf/[subjectId]',
+      params: { subjectId: 'sub-1' },
+    });
+    // Second call: the deep book route
+    expect(mockPush).toHaveBeenNthCalledWith(2, {
       pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
       params: { subjectId: 'sub-1', bookId: 'book-1' },
     });
+    expect(mockPush).toHaveBeenCalledTimes(2);
   });
 
   // -----------------------------------------------------------------------

@@ -111,8 +111,6 @@ export default function CreateProfileScreen() {
     goBackOrReplace(router, '/(app)/home');
   }, [router]);
 
-  const birthYear = birthDate ? birthDate.getFullYear() : null;
-
   const onDateChange = useCallback(
     (_event: DateTimePickerEvent, selectedDate?: Date) => {
       if (Platform.OS === 'android') {

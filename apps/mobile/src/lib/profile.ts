@@ -19,6 +19,7 @@ import {
   setActiveProfileId as pushProfileIdToApiClient,
   setProxyMode,
 } from './api-client';
+import { formatApiError } from './format-api-error';
 
 export type { Profile };
 
@@ -202,10 +203,10 @@ export function ProfileProvider({
         if (!res.ok) {
           return { success: false, error: 'Failed to switch profile' };
         }
-      } catch {
+      } catch (err) {
         return {
           success: false,
-          error: 'Network error while switching profile',
+          error: formatApiError(err),
         };
       }
       let persistenceFailed = false;

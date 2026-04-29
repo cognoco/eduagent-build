@@ -50,6 +50,7 @@ export default function QuizLaunchScreen(): React.ReactElement {
   const colors = useThemeColors();
   const { activityType, subjectId, setRound } = useQuizFlow();
   const generateRound = useGenerateRound();
+  const generateRoundMutate = generateRound.mutate;
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
   const [challengeRound, setChallengeRound] =
     useState<QuizRoundResponse | null>(null);
@@ -79,7 +80,7 @@ export default function QuizLaunchScreen(): React.ReactElement {
   // was stuck on the loading spinner.
   const startRound = useCallback(() => {
     if (!activityType) return;
-    generateRound.mutate(
+    generateRoundMutate(
       { activityType, subjectId: subjectId ?? undefined },
       {
         onSuccess: (round) => {
@@ -92,7 +93,7 @@ export default function QuizLaunchScreen(): React.ReactElement {
       }
     );
     // [BUG-542] Use .mutate (stable ref) instead of whole mutation result
-  }, [activityType, enterPlay, generateRound.mutate, subjectId]);
+  }, [activityType, enterPlay, generateRoundMutate, subjectId]);
 
   useEffect(() => {
     if (!activityType) {

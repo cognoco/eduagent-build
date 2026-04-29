@@ -10,6 +10,12 @@ const mockDatabaseModule = createDatabaseModuleMock({
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
+// [BREAK] Sentry is a true external boundary — mock it to assert escalation.
+const mockCaptureException = jest.fn();
+jest.mock('./sentry', () => ({
+  captureException: (...args: unknown[]) => mockCaptureException(...args),
+}));
+
 import {
   createScopedRepository,
   applyStreakDecay,
@@ -479,6 +485,43 @@ describe('precomputeCoachingCard', () => {
     const expiresAt = new Date(card.expiresAt!);
     const expected = new Date(NOW.getTime() + 24 * 60 * 60 * 1000);
     expect(expiresAt.getTime()).toBe(expected.getTime());
+  });
+
+  it('[BREAK] review_due book-enrichment DB throw still returns review_due card AND calls captureException with surface=coaching-cards', async () => {
+    // Arrange: one overdue card so the review_due branch is entered
+    const overdueCard = mockRetentionCardRow({
+      topicId: 'topic-break',
+      nextReviewAt: new Date('2026-02-10T10:00:00.000Z'),
+    });
+    setupScopedRepo({ retentionCardsFindMany: [overdueCard] });
+    const db = createMockDb();
+
+    // Make the enrichment query (db.query.curriculumTopics.findFirst) throw
+    db.query = {
+      ...db.query,
+      curriculumTopics: {
+        findFirst: jest.fn().mockRejectedValue(new Error('DB connection lost')),
+      },
+    } as unknown as typeof db.query;
+
+    mockCaptureException.mockClear();
+
+    // Act
+    const card = await precomputeCoachingCard(db, profileId);
+
+    // Assert 1: fallthrough behaviour preserved — card is still returned
+    expect(card.type).toBe('review_due');
+
+    // Assert 2: escalation fired at least once, including the enrichment site,
+    // with the correct surface in extra (birthYear_lookup may also fire due to
+    // mock db not having db.query.profiles — both correctly include surface).
+    expect(mockCaptureException).toHaveBeenCalled();
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        extra: expect.objectContaining({ surface: 'coaching-cards' }),
+      })
+    );
   });
 });
 

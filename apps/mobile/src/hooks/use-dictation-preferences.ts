@@ -48,17 +48,25 @@ export function useDictationPreferences(
   useEffect(() => {
     if (!profileId) return;
 
-    void SecureStore.getItemAsync(getPaceKey(profileId)).then((stored) => {
-      if (stored === 'slow' || stored === 'normal' || stored === 'fast') {
-        setPaceState(stored);
-      }
-    });
+    void SecureStore.getItemAsync(getPaceKey(profileId))
+      .then((stored) => {
+        if (stored === 'slow' || stored === 'normal' || stored === 'fast') {
+          setPaceState(stored);
+        }
+      })
+      .catch((err) =>
+        Sentry.captureException(err, { tags: { feature: 'dictation_prefs' } })
+      );
 
-    void SecureStore.getItemAsync(getPunctKey(profileId)).then((stored) => {
-      if (stored === 'true' || stored === 'false') {
-        setPunctState(stored === 'true');
-      }
-    });
+    void SecureStore.getItemAsync(getPunctKey(profileId))
+      .then((stored) => {
+        if (stored === 'true' || stored === 'false') {
+          setPunctState(stored === 'true');
+        }
+      })
+      .catch((err) =>
+        Sentry.captureException(err, { tags: { feature: 'dictation_prefs' } })
+      );
   }, [profileId]);
 
   const setPace = useCallback(

@@ -23,6 +23,23 @@ import {
   mergeHomeSurfaceCacheData,
   readHomeSurfaceCacheData,
 } from './home-surface-cache';
+import { captureException } from './sentry';
+
+// ---------------------------------------------------------------------------
+// silentDegrade — structured escalation for optional priority branches
+// Every catch block that gracefully falls through to the next priority MUST
+// call this so failures are queryable (Sentry extras surface + priority).
+// ---------------------------------------------------------------------------
+
+function silentDegrade(
+  err: unknown,
+  surface: string,
+  extra?: Record<string, unknown>
+): void {
+  captureException(err, {
+    extra: { surface: 'coaching-cards', priority: surface, ...extra },
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -139,7 +156,8 @@ export async function precomputeCoachingCard(
       columns: { birthYear: true },
     });
     birthYear = profileRow?.birthYear ?? null;
-  } catch {
+  } catch (err) {
+    silentDegrade(err, 'birthYear_lookup', { profileId });
     // Age lookup is optional — use neutral tone as fallback
   }
   const learnerAge = getLearnerAge(birthYear);
@@ -168,7 +186,8 @@ export async function precomputeCoachingCard(
         )
       );
     boostedSubjectIds = new Set(boostedSubjects.map((s) => s.id));
-  } catch {
+  } catch (err) {
+    silentDegrade(err, 'urgency_boost_query', { profileId });
     // Urgency boost is optional — graceful degradation
   }
 
@@ -203,7 +222,11 @@ export async function precomputeCoachingCard(
         });
         bookTitle = book?.title ?? null;
       }
-    } catch {
+    } catch (err) {
+      silentDegrade(err, 'review_due_book_enrichment', {
+        profileId,
+        topicId: mostOverdue.topicId,
+      });
       // Book context enrichment is optional — use default body
     }
 
@@ -261,7 +284,8 @@ export async function precomputeCoachingCard(
       { id, expiresAt, createdAt, learnerAge }
     );
     if (hwConnectionCard) return hwConnectionCard;
-  } catch {
+  } catch (err) {
+    silentDegrade(err, 'homework_connection_query', { profileId });
     // Homework connection is optional — fall through to next priority
   }
 
@@ -274,7 +298,8 @@ export async function precomputeCoachingCard(
       learnerAge,
     });
     if (quizDiscoveryCard) return quizDiscoveryCard;
-  } catch {
+  } catch (err) {
+    silentDegrade(err, 'quiz_discovery_query', { profileId });
     // Quiz discovery is optional — fall through to next priority
   }
 
@@ -307,7 +332,8 @@ export async function precomputeCoachingCard(
       { id, expiresAt, createdAt, learnerAge }
     );
     if (continueBookCard) return continueBookCard;
-  } catch {
+  } catch (err) {
+    silentDegrade(err, 'continue_book_query', { profileId });
     // Book queries fail gracefully — fall through to next priority
   }
 
@@ -320,7 +346,8 @@ export async function precomputeCoachingCard(
       { id, expiresAt, createdAt, learnerAge }
     );
     if (bookSuggestionCard) return bookSuggestionCard;
-  } catch {
+  } catch (err) {
+    silentDegrade(err, 'book_suggestion_query', { profileId });
     // Book queries fail gracefully — fall through to next priority
   }
 
