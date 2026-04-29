@@ -1484,22 +1484,14 @@ describe('sessionCompleted', () => {
       consoleSpy.mockRestore();
     });
 
-    it('recovers on step retry after transient retention failure', async () => {
-      mockUpdateRetentionFromSession
-        .mockRejectedValueOnce(new Error('DB connection reset'))
-        .mockResolvedValueOnce(undefined);
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
-
-      // First invocation — retention step fails
-      const { result: result1 } = (await executeSteps(
-        createEventData({ qualityRating: 4 })
-      )) as any;
-      const retentionOutcome1 = result1.outcomes.find(
-        (o: any) => o.step === 'update-retention'
+    it('[FIX-INNGEST-1] update-retention is critical: first call throws so Inngest retries', async () => {
+      mockUpdateRetentionFromSession.mockRejectedValueOnce(
+        new Error('DB connection reset')
       );
-      expect(retentionOutcome1.status).toBe('failed');
-
-      // Second invocation (simulating retry) — succeeds
+      await expect(
+        executeSteps(createEventData({ qualityRating: 4 }))
+      ).rejects.toThrow('DB connection reset');
+      mockUpdateRetentionFromSession.mockResolvedValueOnce(undefined);
       const { result: result2 } = (await executeSteps(
         createEventData({ qualityRating: 4 })
       )) as any;
@@ -1507,11 +1499,9 @@ describe('sessionCompleted', () => {
         (o: any) => o.step === 'update-retention'
       );
       expect(retentionOutcome2.status).toBe('ok');
-
-      consoleSpy.mockRestore();
     });
 
-    it('captures all errors to sentry on each step failure', async () => {
+    it('[FIX-INNGEST-1] soft step failures include structured extra.step and extra.surface tags', async () => {
       mockPrecomputeCoachingCard.mockRejectedValueOnce(
         new Error('Redis timeout')
       );
@@ -1521,7 +1511,13 @@ describe('sessionCompleted', () => {
 
       expect(mockCaptureException).toHaveBeenCalledWith(
         expect.objectContaining({ message: 'Redis timeout' }),
-        expect.objectContaining({ profileId: 'profile-001' })
+        expect.objectContaining({
+          profileId: 'profile-001',
+          extra: expect.objectContaining({
+            step: 'write-coaching-card',
+            surface: 'session-completed',
+          }),
+        })
       );
 
       consoleSpy.mockRestore();
@@ -1589,31 +1585,23 @@ describe('sessionCompleted', () => {
       consoleSpy.mockRestore();
     });
 
-    it('continues chain when retention step fails', async () => {
+    it('[FIX-INNGEST-1] retention step failure throws — stops pipeline (critical step)', async () => {
       mockUpdateRetentionFromSession.mockRejectedValueOnce(
         new Error('SM-2 calculation error')
       );
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
 
-      const { result } = (await executeSteps(
-        createEventData({ qualityRating: 4 })
-      )) as any;
+      await expect(
+        executeSteps(createEventData({ qualityRating: 4 }))
+      ).rejects.toThrow('SM-2 calculation error');
 
-      // All subsequent steps still ran
-      expect(mockUpdateNeedsDeepeningProgress).toHaveBeenCalled();
-      expect(mockPrecomputeCoachingCard).toHaveBeenCalled();
-      expect(mockRecordSessionActivity).toHaveBeenCalled();
-      expect(mockStoreSessionEmbedding).toHaveBeenCalled();
-
-      expect(result.status).toBe('completed-with-errors');
-
-      consoleSpy.mockRestore();
+      // No downstream steps ran — DB error stopped the pipeline
+      expect(mockPrecomputeCoachingCard).not.toHaveBeenCalled();
+      expect(mockRecordSessionActivity).not.toHaveBeenCalled();
+      expect(mockStoreSessionEmbedding).not.toHaveBeenCalled();
     });
 
-    it('reports multiple failures independently', async () => {
-      mockUpdateRetentionFromSession.mockRejectedValueOnce(
-        new Error('SM-2 fail')
-      );
+    it('reports multiple soft-step failures independently', async () => {
+      mockPrecomputeCoachingCard.mockRejectedValueOnce(new Error('Card fail'));
       mockStoreSessionEmbedding.mockRejectedValueOnce(new Error('Voyage fail'));
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
 
@@ -1621,18 +1609,14 @@ describe('sessionCompleted', () => {
         createEventData({ qualityRating: 4 })
       )) as any;
 
-      // Two independent failures
       const failed = result.outcomes.filter((o: any) => o.status === 'failed');
       expect(failed).toHaveLength(2);
       expect(failed.map((f: any) => f.step)).toEqual(
-        expect.arrayContaining(['update-retention', 'generate-embeddings'])
+        expect.arrayContaining(['write-coaching-card', 'generate-embeddings'])
       );
 
-      // Sentry called for each failure
       expect(mockCaptureException).toHaveBeenCalledTimes(2);
-
-      // Non-failing steps still ran
-      expect(mockPrecomputeCoachingCard).toHaveBeenCalled();
+      expect(mockUpdateRetentionFromSession).toHaveBeenCalled();
       expect(mockRecordSessionActivity).toHaveBeenCalled();
 
       consoleSpy.mockRestore();
@@ -1844,6 +1828,105 @@ describe('sessionCompleted', () => {
         'inferred',
         'subject-001' // subjectId threaded from event data
       );
+    });
+  });
+  // ---------------------------------------------------------------------------
+  // [FIX-INNGEST-1] Critical vs soft step break tests
+  // Proves that runCritical steps throw (Inngest retries) while runIsolated
+  // steps absorb errors (pipeline continues). These tests are the "break tests"
+  // required by CLAUDE.md for every security/correctness fix.
+  // ---------------------------------------------------------------------------
+
+  describe('[FIX-INNGEST-1] critical step break tests', () => {
+    it('update-dashboard throws on recordSessionActivity failure (critical)', async () => {
+      // update-dashboard has no try/catch — DB errors must propagate to Inngest.
+      // Silently absorbing would mean XP or streak is permanently lost.
+      mockRecordSessionActivity.mockRejectedValueOnce(
+        new Error('Streak DB write failed')
+      );
+
+      await expect(
+        executeSteps(createEventData({ qualityRating: 4 }))
+      ).rejects.toThrow('Streak DB write failed');
+    });
+
+    it('update-dashboard throws on insertSessionXpEntry failure (critical)', async () => {
+      mockInsertSessionXpEntry.mockRejectedValueOnce(
+        new Error('XP insert constraint violation')
+      );
+
+      await expect(
+        executeSteps(createEventData({ qualityRating: 4 }))
+      ).rejects.toThrow('XP insert constraint violation');
+    });
+
+    it('soft steps (generate-embeddings, write-coaching-card) do NOT throw (runIsolated)', async () => {
+      // Verifies the two-tier isolation: soft steps return { status: 'failed' }
+      // instead of throwing, so the overall function still resolves.
+      mockStoreSessionEmbedding.mockRejectedValueOnce(
+        new Error('Voyage rate limit')
+      );
+      mockPrecomputeCoachingCard.mockRejectedValueOnce(
+        new Error('Card LLM error')
+      );
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+
+      // Must NOT throw
+      const { result } = (await executeSteps(
+        createEventData({ qualityRating: 4 })
+      )) as any;
+
+      expect(result.status).toBe('completed-with-errors');
+      const embeddingOutcome = result.outcomes.find(
+        (o: any) => o.step === 'generate-embeddings'
+      );
+      const cardOutcome = result.outcomes.find(
+        (o: any) => o.step === 'write-coaching-card'
+      );
+      expect(embeddingOutcome.status).toBe('failed');
+      expect(cardOutcome.status).toBe('failed');
+
+      consoleSpy.mockRestore();
+    });
+
+    it('dispatches app/session.completed_with_errors event when soft steps fail', async () => {
+      // [FIX-INNGEST-1] Soft-step failures must emit a queryable Inngest event
+      // so on-call can page on volume spikes without Sentry access.
+      mockStoreSessionEmbedding.mockRejectedValueOnce(
+        new Error('Voyage error')
+      );
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+      const mockStep = {
+        run: jest.fn(async (name: string, fn: () => Promise<unknown>) => fn()),
+        sendEvent: jest.fn().mockResolvedValue(undefined),
+        sleep: jest.fn(),
+        waitForEvent: jest.fn().mockResolvedValue(null),
+      };
+
+      const handler = (sessionCompleted as any).fn;
+      await handler({
+        event: {
+          data: createEventData({ qualityRating: 4 }),
+          name: 'app/session.completed',
+        },
+        step: mockStep,
+      });
+
+      expect(mockStep.sendEvent).toHaveBeenCalledWith(
+        'session-completed-with-errors',
+        expect.objectContaining({
+          name: 'app/session.completed_with_errors',
+          data: expect.objectContaining({
+            sessionId: 'session-001',
+            profileId: 'profile-001',
+            failedSteps: expect.arrayContaining([
+              expect.objectContaining({ step: 'generate-embeddings' }),
+            ]),
+          }),
+        })
+      );
+
+      consoleSpy.mockRestore();
     });
   });
 });

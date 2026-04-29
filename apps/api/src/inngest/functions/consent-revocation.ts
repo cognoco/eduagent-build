@@ -18,6 +18,12 @@ export const consentRevocation = inngest.createFunction(
   {
     id: 'consent-revocation',
     name: 'Process consent revocation with grace period',
+    retries: 5,
+    // [FIX-INNGEST-3] Operator re-fires or replay after a 7-day sleep jump must
+    // not trigger a second cascade delete. idempotency dedupes within 24h;
+    // concurrency(limit:1) serialises any concurrent runs for the same child.
+    idempotency: 'event.data.childProfileId',
+    concurrency: { key: 'event.data.childProfileId', limit: 1 },
   },
   { event: 'app/consent.revoked' },
   async ({ event, step }) => {

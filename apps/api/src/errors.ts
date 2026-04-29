@@ -16,11 +16,27 @@ export {
   ConflictError,
   UpstreamLlmError,
   VocabularyContextError,
+  SubjectNotFoundError,
+  VocabularyNotFoundError,
+  TopicNotSkippedError,
 } from '@eduagent/schemas';
 
 export function apiError(
   c: Context,
-  status: 400 | 401 | 403 | 404 | 409 | 410 | 422 | 429 | 500 | 501 | 502 | 503,
+  status:
+    | 400
+    | 401
+    | 402
+    | 403
+    | 404
+    | 409
+    | 410
+    | 422
+    | 429
+    | 500
+    | 501
+    | 502
+    | 503,
   code: ErrorCode,
   message: string,
   details?: unknown

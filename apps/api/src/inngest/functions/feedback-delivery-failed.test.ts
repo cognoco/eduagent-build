@@ -19,6 +19,7 @@ const mockSendEmail = jest.fn();
 const mockCaptureException = jest.fn();
 const mockGetResendApiKey = jest.fn();
 const mockGetEmailFrom = jest.fn();
+const mockGetStepSupportEmail = jest.fn();
 
 jest.mock('../../services/notifications', () => ({
   sendEmail: (...args: unknown[]) => mockSendEmail(...args),
@@ -31,6 +32,7 @@ jest.mock('../../services/sentry', () => ({
 jest.mock('../helpers', () => ({
   getStepResendApiKey: () => mockGetResendApiKey(),
   getStepEmailFrom: () => mockGetEmailFrom(),
+  getStepSupportEmail: () => mockGetStepSupportEmail(),
 }));
 
 jest.mock('../client', () => ({
@@ -64,6 +66,7 @@ describe('feedback-delivery-failed Inngest function [BUG-767 / A-24]', () => {
     jest.clearAllMocks();
     mockGetResendApiKey.mockReturnValue('test-resend-key');
     mockGetEmailFrom.mockReturnValue('noreply@test.com');
+    mockGetStepSupportEmail.mockReturnValue('support@test.com');
   });
 
   describe('configuration', () => {
@@ -211,6 +214,50 @@ describe('feedback-delivery-failed Inngest function [BUG-767 / A-24]', () => {
       expect(ctx.profileId).toBe('p-1');
       expect(ctx.extra.reason).toBe('network_error');
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [FIX-INNGEST-5] getStepSupportEmail break test
+// Previously used process.env['SUPPORT_EMAIL'] directly — CF Workers bindings
+// are not available via process.env inside Inngest step functions. The fix
+// uses getStepSupportEmail() which is populated by the CF env middleware.
+// ---------------------------------------------------------------------------
+
+describe('[FIX-INNGEST-5] uses getStepSupportEmail() not process.env', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockGetResendApiKey.mockReturnValue('test-resend-key');
+    mockGetEmailFrom.mockReturnValue('noreply@test.com');
+    mockGetStepSupportEmail.mockReturnValue('support@test.com');
+  });
+  it('routes the email to the address from getStepSupportEmail()', async () => {
+    mockSendEmail.mockResolvedValue({ sent: true });
+    mockGetStepSupportEmail.mockReturnValue('ops@company.com');
+
+    await executeHandler({ profileId: 'p-1', category: 'bug' });
+
+    expect(mockGetStepSupportEmail).toHaveBeenCalled();
+    const [emailArg] = mockSendEmail.mock.calls[0] as [{ to: string }];
+    expect(emailArg.to).toBe('ops@company.com');
+  });
+
+  it('does NOT read process.env["SUPPORT_EMAIL"] directly', async () => {
+    // Confirm the old pattern is gone — getStepSupportEmail is called,
+    // not process.env. This test pins the indirection so CF Workers get the
+    // binding-injected value, not the (absent) Node.js env var.
+    mockSendEmail.mockResolvedValue({ sent: true });
+    const originalEnv = process.env['SUPPORT_EMAIL'];
+    delete process.env['SUPPORT_EMAIL'];
+    mockGetStepSupportEmail.mockReturnValue('support@mentomate.com');
+
+    await executeHandler({ profileId: 'p-1', category: 'bug' });
+
+    // Even with no process.env value, email was sent to the injected address
+    const [emailArg] = mockSendEmail.mock.calls[0] as [{ to: string }];
+    expect(emailArg.to).toBe('support@mentomate.com');
+
+    if (originalEnv !== undefined) process.env['SUPPORT_EMAIL'] = originalEnv;
   });
 });
 

@@ -58,6 +58,27 @@ export class VocabularyContextError extends Error {
   }
 }
 
+export class SubjectNotFoundError extends Error {
+  constructor() {
+    super('Subject not found');
+    this.name = 'SubjectNotFoundError';
+  }
+}
+
+export class VocabularyNotFoundError extends Error {
+  constructor() {
+    super('Vocabulary item not found');
+    this.name = 'VocabularyNotFoundError';
+  }
+}
+
+export class TopicNotSkippedError extends Error {
+  constructor() {
+    super('Topic is not skipped');
+    this.name = 'TopicNotSkippedError';
+  }
+}
+
 // Common error codes — single source of truth
 export const ERROR_CODES = {
   VALIDATION_ERROR: 'VALIDATION_ERROR',
@@ -84,6 +105,7 @@ export const ERROR_CODES = {
   // generic upstream-failure messaging. [BUG-832 / F-API-03]
   LLM_UNAVAILABLE: 'LLM_UNAVAILABLE',
   RATE_LIMITED: 'RATE_LIMITED',
+  PROFILE_LIMIT_EXCEEDED: 'PROFILE_LIMIT_EXCEEDED',
 } as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];

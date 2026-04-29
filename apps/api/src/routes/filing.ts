@@ -95,6 +95,13 @@ export const filingRoutes = new Hono<FilingRouteEnv>()
         routeAndCall
       );
     } catch (err) {
+      // [FIX-API-2] Capture primary fileToLibrary failure to Sentry BEFORE
+      // dispatching the async retry — this makes LLM/quota errors visible in
+      // Sentry even when the retry path succeeds or the fallback is used.
+      captureException(err, {
+        profileId,
+        extra: { sessionId: body.sessionId, phase: 'fileToLibrary' },
+      });
       // [logging sweep] structured logger so PII fields land as JSON context
       logger.error('[filing] fileToLibrary failed', {
         sessionId: body.sessionId,

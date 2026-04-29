@@ -7,14 +7,16 @@
 
 import { z } from 'zod';
 import { inngest } from '../client';
-import { getStepResendApiKey, getStepEmailFrom } from '../helpers';
+import {
+  getStepResendApiKey,
+  getStepEmailFrom,
+  getStepSupportEmail,
+} from '../helpers';
 import { sendEmail } from '../../services/notifications';
 import { captureException } from '../../services/sentry';
 import { createLogger } from '../../services/logger';
 
 const logger = createLogger();
-
-const DEFAULT_SUPPORT_EMAIL = 'support@mentomate.com';
 
 // [BUG-767 / A-24] Category enum must match the route's submission schema
 // (`feedbackCategorySchema` in `@eduagent/schemas`). The route persists
@@ -88,7 +90,7 @@ export const feedbackDeliveryFailed = inngest.createFunction(
 
       const result = await sendEmail(
         {
-          to: process.env['SUPPORT_EMAIL'] ?? DEFAULT_SUPPORT_EMAIL,
+          to: getStepSupportEmail(),
           subject: `[MentoMate ${categoryLabel}] delivery-retry for ${profileId.slice(
             0,
             8

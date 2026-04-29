@@ -199,7 +199,16 @@ export function buildDraftResumeSummary(
     .slice(0, 2);
 
   if (learnerMessages.length > 0) {
-    return `We already talked about ${learnerMessages.join(' and ')}.`;
+    // BUG-883: User messages typically end with `.`/`!`/`?` already, and they
+    // can themselves contain `.`/` and ` (e.g. "I want to learn Spanish."
+    // "Just basics."). The previous join produced literal "msg1. and msg2.."
+    // — both an awkward conjunction and a double trailing period. Strip
+    // terminal punctuation, quote each message so the boundary is visible,
+    // and join with a clean comma.
+    const cleaned = learnerMessages.map((m) => m.replace(/[.!?]+\s*$/u, ''));
+    return cleaned.length === 1
+      ? `Where we left off: "${cleaned[0]}".`
+      : `Where we left off: "${cleaned.join('", "')}".`;
   }
 
   return 'We already started talking about your goals, background, and current level.';

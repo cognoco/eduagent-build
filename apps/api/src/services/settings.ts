@@ -552,7 +552,53 @@ export async function getRecentNotificationCount(
  *
  * Returns `true` if the caller is rate-limited (count >= maxCount),
  * `false` if the request was allowed and logged.
+ *
+ * Server-internal variant — no profile-ownership check. Use only from trusted
+ * server contexts (Inngest functions, internal notification pipelines).
+ * For user-driven flows use `checkAndLogRateLimit`.
  */
+export async function checkAndLogRateLimitInternal(
+  db: Database,
+  profileId: string,
+  type: NotificationPayload['type'],
+  opts: { hours: number; maxCount: number }
+): Promise<boolean> {
+  return db.transaction(async (tx) => {
+    // Advisory lock per (profileId, notificationKey) — serializes concurrent
+    // rate-limit checks for the same bucket without blocking unrelated ones.
+    // Lock is released automatically on commit/rollback. [BUG-856]
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtextextended(${
+        'rate-limit:' + profileId + ':' + type
+      }, 0))`
+    );
+
+    const since = new Date(Date.now() - opts.hours * 60 * 60 * 1000);
+    const rows = await tx
+      .select()
+      .from(notificationLog)
+      .where(
+        and(
+          eq(notificationLog.profileId, profileId),
+          eq(notificationLog.type, type),
+          gte(notificationLog.sentAt, since)
+        )
+      );
+
+    if (rows.length >= opts.maxCount) {
+      return true;
+    }
+
+    await tx.insert(notificationLog).values({
+      profileId,
+      type,
+      ticketId: null,
+    });
+
+    return false;
+  });
+}
+
 export async function checkAndLogRateLimit(
   db: Database,
   profileId: string,

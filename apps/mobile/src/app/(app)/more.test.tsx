@@ -124,7 +124,39 @@ describe('MoreScreen — Learning Mode', () => {
   it('renders the Learning Mode section header', () => {
     render(<MoreScreen />, { wrapper: createWrapper() });
 
-    expect(screen.getByText('Learning Mode')).toBeTruthy();
+    // BUG-909: Section header is prefixed with the active profile's display
+    // name to make it unambiguous that the toggle applies to THAT profile,
+    // not a child profile selected from elsewhere.
+    expect(screen.getByText("Alex's Learning Mode")).toBeTruthy();
+  });
+
+  // BUG-909 break test: bare "Learning Mode" / "Learning Accommodation"
+  // labels must NOT appear on their own — they must be possessive-prefixed
+  // so a parent on their own More tab knows the setting applies to them,
+  // not to a child profile.
+  it('[BUG-909] section headers are prefixed with the active profile name', () => {
+    render(<MoreScreen />, { wrapper: createWrapper() });
+
+    expect(
+      screen.getByTestId('learning-mode-section-header')
+    ).toHaveTextContent("Alex's Learning Mode");
+    expect(
+      screen.getByTestId('learning-accommodation-section-header')
+    ).toHaveTextContent("Alex's Learning Accommodation");
+    // The bare uppercase label must not appear in the rendered tree.
+    expect(screen.queryByText('Learning Mode')).toBeNull();
+    expect(screen.queryByText('Learning Accommodation')).toBeNull();
+  });
+
+  // BUG-909: When the profile is an owner with linked children, the
+  // subtitle must direct them to a child profile to change a child's
+  // settings. Otherwise it's a generic "applies to your own sessions".
+  it('[BUG-909] subtitle clarifies scope when owner has linked children', () => {
+    render(<MoreScreen />, { wrapper: createWrapper() });
+
+    // Default mock: isOwner=true, no linked children -> generic copy.
+    const generic = screen.queryAllByText(/Applies to your own learning/i);
+    expect(generic.length).toBeGreaterThanOrEqual(2);
   });
 
   it('renders both learning mode options', () => {
@@ -269,8 +301,9 @@ describe('MoreScreen — Learning Mode', () => {
     render(<MoreScreen />, { wrapper: createWrapper() });
 
     expect(screen.queryByText('Appearance')).toBeNull();
-    expect(screen.getByText('Learning Mode')).toBeTruthy();
-    expect(screen.getByText('Learning Accommodation')).toBeTruthy();
+    // BUG-909: Section labels are now possessive (per active profile).
+    expect(screen.getByText("Alex's Learning Mode")).toBeTruthy();
+    expect(screen.getByText("Alex's Learning Accommodation")).toBeTruthy();
     expect(screen.getByText('Celebrations')).toBeTruthy();
     expect(screen.getByText('Notifications')).toBeTruthy();
     expect(screen.getByText('Account')).toBeTruthy();

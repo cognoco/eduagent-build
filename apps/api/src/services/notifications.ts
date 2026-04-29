@@ -16,7 +16,7 @@ import {
   getPushToken,
   getDailyNotificationCount,
   logNotification,
-  getRecentNotificationCount,
+  checkAndLogRateLimitInternal,
 } from './settings';
 import { createLogger } from './logger';
 
@@ -354,14 +354,17 @@ export async function notifyParentToSubscribe(
   emailOptions?: EmailOptions,
   appUrl?: string
 ): Promise<ParentSubscribeResult> {
-  // 1. Check rate limit — look for recent subscribe_request notifications
-  const recentCount = await getRecentNotificationCount(
+  // 1. [BUG-856] Atomic rate-limit check — counts recent subscribe_request
+  // notifications and reserves the rate-limit slot in a single transaction
+  // so two concurrent calls cannot both pass the count check and proceed.
+  // The advisory lock + insert serializes for this (profile, type) bucket.
+  const rateLimited = await checkAndLogRateLimitInternal(
     db,
     childProfileId,
     'subscribe_request',
-    SUBSCRIBE_RATE_LIMIT_HOURS
+    { hours: SUBSCRIBE_RATE_LIMIT_HOURS, maxCount: 1 }
   );
-  if (recentCount > 0) {
+  if (rateLimited) {
     return { sent: false, rateLimited: true, reason: 'rate_limited' };
   }
 
@@ -411,8 +414,8 @@ export async function notifyParentToSubscribe(
     );
   }
 
-  // 6. Log notification for rate limiting
-  await logNotification(db, childProfileId, 'subscribe_request');
+  // [BUG-856] Rate-limit slot was already reserved atomically in step 1.
+  // No additional log needed here.
 
   return { sent: true, rateLimited: false };
 }
@@ -476,13 +479,17 @@ export async function sendStruggleNotification(
   // notification fatigue when a learner struggles across several topics in
   // quick succession. The daily global cap in sendPushNotification is an
   // additional layer; this check prevents same-type redundancy.
-  const recentCount = await getRecentNotificationCount(
+  //
+  // [BUG-856] Atomic check + log via advisory lock — without this, two
+  // concurrent strugle signals for the same type both observed count=0 and
+  // both pushed, defeating the 24h dedup invariant.
+  const rateLimited = await checkAndLogRateLimitInternal(
     db,
     link.parentProfileId,
     notification.type,
-    24
+    { hours: 24, maxCount: 1 }
   );
-  if (recentCount > 0) {
+  if (rateLimited) {
     logger.info('Struggle notification deduped', {
       event: 'notification.struggle.deduped',
       childProfileId,

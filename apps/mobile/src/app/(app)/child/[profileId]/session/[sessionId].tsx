@@ -137,8 +137,14 @@ export default function SessionDetailScreen() {
     );
   }
 
+  // BUG-902: Parent-facing duration must be ACTIVE time, not wall-clock.
+  // Wall-clock inflates engagement — a 39-minute "browsed a topic" entry
+  // suggests sustained focus when active time may have been a few minutes.
+  // Per project_session_lifecycle_decisions.md, active time is the correct
+  // parent-facing aggregate; wall-clock is a fallback for legacy rows that
+  // never recorded active seconds.
   const duration = formatDuration(
-    session.wallClockSeconds ?? session.durationSeconds
+    session.durationSeconds ?? session.wallClockSeconds
   );
   const hasRecap = Boolean(
     session.narrative ||
@@ -146,6 +152,14 @@ export default function SessionDetailScreen() {
       session.conversationPrompt ||
       session.engagementSignal
   );
+
+  // BUG-901: Build at least one always-visible CTA so the screen is never a
+  // dead-end when summary/transcript are missing. Prefer a topic deep link
+  // (re-engage with the same content), fall back to the child profile.
+  const continueTopicHref =
+    session.topicId && profileId
+      ? (`/(app)/child/${profileId}/topic/${session.topicId}` as const)
+      : null;
 
   return (
     <ScrollView
@@ -299,10 +313,17 @@ export default function SessionDetailScreen() {
             {session.displaySummary}
           </Text>
         ) : (
-          <Text className="text-text-tertiary text-base italic">
-            {/* [BUG-552] displaySummary is only set for homework sessions,
-                so this fires for every learning session — not just old ones. */}
-            No summary available for this session.
+          // BUG-901: Replace bare "No summary available" with friendlier
+          // microcopy that explains *why* (short / browsing / pre-recap).
+          // [BUG-552] displaySummary is only set for homework sessions,
+          // so this fires for every learning session — not just old ones.
+          <Text
+            className="text-text-secondary text-base leading-relaxed"
+            testID="session-summary-empty-note"
+          >
+            We don&apos;t have a written summary for this session — it may have
+            been a short browse or finished before the recap was generated. The
+            CTAs below let you re-open the topic or jump back to the profile.
           </Text>
         )}
       </View>
@@ -318,6 +339,42 @@ export default function SessionDetailScreen() {
           </Text>
         </View>
       )}
+
+      {/* BUG-901: Always-on CTAs — never let the parent hit a dead-end. */}
+      <View className="mx-4 mt-6" testID="session-detail-ctas">
+        {continueTopicHref ? (
+          <Pressable
+            onPress={() => router.push(continueTopicHref as never)}
+            className="rounded-lg bg-primary px-4 py-3 items-center min-h-[48px] justify-center mb-2"
+            accessibilityRole="button"
+            accessibilityLabel={
+              session.topicTitle
+                ? `Open topic ${session.topicTitle}`
+                : 'Open this topic'
+            }
+            testID="session-detail-continue-topic"
+          >
+            <Text className="text-text-inverse font-medium">
+              {session.topicTitle
+                ? `Open ${session.topicTitle}`
+                : 'Open this topic'}
+            </Text>
+          </Pressable>
+        ) : null}
+        <Pressable
+          onPress={() =>
+            goBackOrReplace(router, `/(app)/child/${profileId}` as const)
+          }
+          className="rounded-lg px-4 py-3 items-center min-h-[48px] justify-center"
+          accessibilityRole="button"
+          accessibilityLabel="Back to child profile"
+          testID="session-detail-back-to-child"
+        >
+          <Text className="text-primary font-medium">
+            Back to child profile
+          </Text>
+        </Pressable>
+      </View>
     </ScrollView>
   );
 }

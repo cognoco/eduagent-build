@@ -407,8 +407,20 @@ export default function MoreScreen() {
         keyboardShouldPersistTaps="handled"
       >
         {/* 1. Learning Mode */}
-        <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2 mt-4">
-          Learning Mode
+        {/* BUG-909: Prefix with the active profile's display name and add a */}
+        {/* clarifying subtitle so parents know these toggles apply to their */}
+        {/* OWN learning sessions, not their child's. The child's settings */}
+        {/* live on /child/[id] (per-profile surface). */}
+        <Text
+          className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-1 mt-4"
+          testID="learning-mode-section-header"
+        >
+          {`${displayName}'s Learning Mode`}
+        </Text>
+        <Text className="text-caption text-text-secondary mb-2">
+          {activeProfile?.isOwner && linkedChildren.length > 0
+            ? "Applies to your own sessions. To change a child's, open their profile from the dashboard."
+            : 'Applies to your own learning sessions.'}
         </Text>
         {LEARNING_MODE_OPTIONS.map((opt) => (
           <LearningModeOption
@@ -423,8 +435,16 @@ export default function MoreScreen() {
         ))}
 
         {/* 2. Learning Accommodation */}
-        <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2 mt-6">
-          Learning Accommodation
+        <Text
+          className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-1 mt-6"
+          testID="learning-accommodation-section-header"
+        >
+          {`${displayName}'s Learning Accommodation`}
+        </Text>
+        <Text className="text-caption text-text-secondary mb-2">
+          {activeProfile?.isOwner && linkedChildren.length > 0
+            ? "Applies to your own sessions. To change a child's, open their profile from the dashboard."
+            : 'Applies to your own learning sessions.'}
         </Text>
         {ACCOMMODATION_OPTIONS.map((opt) => (
           <LearningModeOption

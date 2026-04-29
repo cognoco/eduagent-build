@@ -62,11 +62,17 @@ export default function ShelfScreen() {
   // R-1: Ref-based lock — backported from pick-book BUG-361 fix.
   // isPending resets before Alert callbacks fire, allowing double-submission.
   const filingInFlight = useRef(false);
+  // [BUG-692] Tracks whether the user pressed Skip during a filing round-trip.
+  // TanStack Query does not abort in-flight mutations on navigation, so the
+  // resolved onSuccess push would otherwise yank the user back into the book
+  // they just skipped.
+  const filingSkipped = useRef(false);
 
   const handlePickBookSuggestion = async (suggestion: BookSuggestion) => {
     // BUG-323 + R-1: Double guard — isPending (React state) + ref lock
     if (filing.isPending || filingInFlight.current) return;
     filingInFlight.current = true;
+    filingSkipped.current = false;
     setFilingError(null);
     try {
       const result = await filing.mutateAsync({
@@ -78,6 +84,9 @@ export default function ShelfScreen() {
       // Reset the in-flight lock before navigating so a back-navigation
       // doesn't leave filingInFlight permanently true. [CR-fix-3]
       filingInFlight.current = false;
+      // [BUG-692] If the user pressed Skip during the network round-trip,
+      // they have already navigated away — do not push them into the book.
+      if (filingSkipped.current) return;
       // M-12: Pass autoStart so the book screen begins a session immediately
       router.push({
         pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
@@ -400,12 +409,16 @@ export default function ShelfScreen() {
           </Text>
           {showSkip && (
             <Pressable
-              onPress={() =>
+              onPress={() => {
+                // [BUG-692] Mark the in-flight filing as skipped so the
+                // resolved onSuccess push won't navigate the user away from
+                // the shelf they just chose to stay on.
+                filingSkipped.current = true;
                 router.replace({
                   pathname: '/(app)/shelf/[subjectId]',
                   params: { subjectId },
-                } as never)
-              }
+                } as never);
+              }}
               className="mt-6 bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
               testID="shelf-filing-skip"
               accessibilityLabel="Skip and start learning anyway"

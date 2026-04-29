@@ -148,3 +148,29 @@ describe('scheduledDeletion', () => {
     expect(sleepOrder).toBeLessThan(firstRunOrder);
   });
 });
+
+// ---------------------------------------------------------------------------
+// [FIX-INNGEST-2] Idempotency and concurrency config break tests
+// ---------------------------------------------------------------------------
+
+describe('[FIX-INNGEST-2] idempotency and concurrency config', () => {
+  it('declares idempotency keyed on event.data.accountId', () => {
+    const opts = (scheduledDeletion as any).opts;
+    // Inngest reads idempotency from opts at runtime — the expression string
+    // is the source of truth; the actual dedup is Inngest-server-side.
+    expect(opts.idempotency).toBe('event.data.accountId');
+  });
+
+  it('declares concurrency limit of 1 keyed on event.data.accountId', () => {
+    const opts = (scheduledDeletion as any).opts;
+    expect(opts.concurrency).toMatchObject({
+      key: 'event.data.accountId',
+      limit: 1,
+    });
+  });
+
+  it('declares retries: 5 for transient DB failures during deletion', () => {
+    const opts = (scheduledDeletion as any).opts;
+    expect(opts.retries).toBe(5);
+  });
+});

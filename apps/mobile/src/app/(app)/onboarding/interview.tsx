@@ -790,17 +790,35 @@ export default function InterviewScreen() {
                 </Pressable>
               </View>
             ) : (
+              // BUG-883: After 3+ exchanges the LLM has typically emitted a
+              // wrap-up turn ("we can definitely build a curriculum…"). If
+              // the close envelope was dropped or never sent, the user was
+              // stuck on a subtle text link they often missed. Promote the
+              // skip CTA to a primary-button style at that point so it
+              // reads as an obvious "Continue" affordance.
               <Pressable
                 onPress={() => void handleSkipInterview()}
                 disabled={isStreaming || forceComplete.isPending}
-                className="py-2.5 items-center rounded-button"
+                className={
+                  exchangeCount >= 3
+                    ? 'bg-primary rounded-button py-3 items-center justify-center min-h-[48px]'
+                    : 'py-2.5 items-center rounded-button'
+                }
                 testID="skip-interview-button"
                 accessibilityLabel="Ready to start learning"
                 accessibilityRole="button"
               >
-                <Text className="text-body-sm text-primary font-medium">
+                <Text
+                  className={
+                    exchangeCount >= 3
+                      ? 'text-body font-semibold text-text-inverse'
+                      : 'text-body-sm text-primary font-medium'
+                  }
+                >
                   {forceComplete.isPending
                     ? 'Setting up your curriculum...'
+                    : exchangeCount >= 3
+                    ? "Continue — I'm ready to start learning"
                     : "I'm ready to start learning"}
                 </Text>
               </Pressable>

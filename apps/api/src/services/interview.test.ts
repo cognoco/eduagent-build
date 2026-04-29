@@ -1134,6 +1134,37 @@ describe('buildDraftResumeSummary', () => {
 
     expect(summary).toContain('essays');
   });
+
+  // BUG-883 break test: prior implementation produced
+  // "We already talked about I want to learn Spanish. and Just basics.."
+  // (literal "and" + double trailing period) when learner messages already
+  // ended with punctuation. The new format strips terminal punctuation and
+  // quotes each fragment so the boundary is unambiguous.
+  it('[BUG-883] joins multi-message fallback without literal " and " or doubled punctuation', () => {
+    const summary = buildDraftResumeSummary({
+      exchangeHistory: [
+        { role: 'user', content: 'I want to learn Spanish.' },
+        { role: 'user', content: 'Just basics.' },
+      ],
+      extractedSignals: {},
+    });
+
+    expect(summary).not.toMatch(/\.\.+/); // no doubled periods
+    expect(summary).not.toMatch(/Spanish\. and /); // no awkward ". and "
+    expect(summary).toContain('Spanish');
+    expect(summary).toContain('Just basics');
+  });
+
+  it('[BUG-883] handles a single learner message without dangling joiner', () => {
+    const summary = buildDraftResumeSummary({
+      exchangeHistory: [{ role: 'user', content: 'I want to learn calculus.' }],
+      extractedSignals: {},
+    });
+
+    expect(summary).not.toContain(' and ');
+    expect(summary).not.toMatch(/\.\.+/);
+    expect(summary).toContain('calculus');
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -232,7 +232,18 @@ async function handleInitialPurchase(
   if (!accountId) return;
 
   const tier = extractTierFromProductId(event.product_id);
-  if (!tier) return;
+  if (!tier) {
+    // [FIX-API-REVENUECAT] Unknown product_id — capture to Sentry so new
+    // products added to RevenueCat but not to PRODUCT_TIER_MAP are surfaced
+    // immediately rather than silently dropping the purchase event.
+    captureException(
+      new Error('Unknown RevenueCat product_id in INITIAL_PURCHASE'),
+      {
+        extra: { productId: event.product_id, eventId: event.id },
+      }
+    );
+    return;
+  }
 
   // RevenueCat sets period_type to "TRIAL" for introductory offer / free trial
   const isTrial = event.period_type === 'TRIAL';
@@ -441,7 +452,17 @@ async function handleProductChange(
   if (!accountId) return;
 
   const newTier = extractTierFromProductId(event.new_product_id);
-  if (!newTier) return;
+  if (!newTier) {
+    // [FIX-API-REVENUECAT] Unknown new_product_id — capture to Sentry so product
+    // map mismatches surface before they cause silent subscription-change drops.
+    captureException(
+      new Error('Unknown RevenueCat new_product_id in PRODUCT_CHANGE'),
+      {
+        extra: { newProductId: event.new_product_id, eventId: event.id },
+      }
+    );
+    return;
+  }
 
   const updated = await updateSubscriptionFromRevenuecatWebhook(db, accountId, {
     eventId: event.id,

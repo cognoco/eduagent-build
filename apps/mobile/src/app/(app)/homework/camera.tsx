@@ -1342,20 +1342,55 @@ export default function CameraScreen(): React.ReactNode {
                     <Text className="text-body font-semibold text-text-primary mt-2 mb-1">
                       Which subject is this for?
                     </Text>
-                    {subjects?.map((s) => (
-                      <Pressable
-                        key={s.id}
-                        onPress={() => handleManualPickSubject(s.id, s.name)}
-                        className="bg-surface-elevated rounded-button py-3 px-4 min-h-[48px] justify-center"
-                        accessibilityLabel={`Select ${s.name}`}
-                        accessibilityRole="button"
-                        testID={`manual-subject-pick-${s.id}`}
+                    {subjectsLoading ? (
+                      <View
+                        className="flex-row items-center gap-2 py-3"
+                        testID="manual-subject-picker-loading"
                       >
-                        <Text className="text-body text-text-primary">
-                          {s.name}
+                        <ActivityIndicator
+                          size="small"
+                          color={colors.primary}
+                        />
+                        <Text className="text-body-sm text-text-secondary">
+                          Loading your subjects...
                         </Text>
-                      </Pressable>
-                    ))}
+                      </View>
+                    ) : !subjects || subjects.length === 0 ? (
+                      <View
+                        className="py-3"
+                        testID="manual-subject-picker-empty"
+                      >
+                        <Text className="text-body-sm text-text-secondary mb-3">
+                          You don&apos;t have any subjects yet.
+                        </Text>
+                        <Pressable
+                          testID="manual-subject-picker-create"
+                          onPress={() => router.push('/create-subject')}
+                          className="bg-primary rounded-button py-3 px-4 min-h-[48px] items-center justify-center"
+                          accessibilityLabel="Create a new subject"
+                          accessibilityRole="button"
+                        >
+                          <Text className="text-body font-semibold text-text-inverse">
+                            Create a subject
+                          </Text>
+                        </Pressable>
+                      </View>
+                    ) : (
+                      subjects.map((s) => (
+                        <Pressable
+                          key={s.id}
+                          onPress={() => handleManualPickSubject(s.id, s.name)}
+                          className="bg-surface-elevated rounded-button py-3 px-4 min-h-[48px] justify-center"
+                          accessibilityLabel={`Select ${s.name}`}
+                          accessibilityRole="button"
+                          testID={`manual-subject-pick-${s.id}`}
+                        >
+                          <Text className="text-body text-text-primary">
+                            {s.name}
+                          </Text>
+                        </Pressable>
+                      ))
+                    )}
                   </>
                 ) : (
                   <Pressable

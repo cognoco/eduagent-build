@@ -260,3 +260,27 @@ describe('consentRevocation', () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// [FIX-INNGEST-3] Idempotency and concurrency config break tests
+// ---------------------------------------------------------------------------
+
+describe('[FIX-INNGEST-3] idempotency and concurrency config', () => {
+  it('declares idempotency keyed on event.data.childProfileId', () => {
+    const opts = (consentRevocation as any).opts;
+    expect(opts.idempotency).toBe('event.data.childProfileId');
+  });
+
+  it('declares concurrency limit of 1 keyed on event.data.childProfileId', () => {
+    const opts = (consentRevocation as any).opts;
+    expect(opts.concurrency).toMatchObject({
+      key: 'event.data.childProfileId',
+      limit: 1,
+    });
+  });
+
+  it('declares retries: 5 for transient DB failures during consent revocation', () => {
+    const opts = (consentRevocation as any).opts;
+    expect(opts.retries).toBe(5);
+  });
+});

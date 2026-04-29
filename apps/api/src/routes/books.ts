@@ -2,10 +2,10 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
 import type { Database } from '@eduagent/database';
-import { bookTopicGenerateInputSchema } from '@eduagent/schemas';
+import { bookTopicGenerateInputSchema, ERROR_CODES } from '@eduagent/schemas';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
-import { notFound, NotFoundError } from '../errors';
+import { notFound, NotFoundError, apiError } from '../errors';
 import {
   getBooks,
   getAllProfileBooks,
@@ -202,7 +202,14 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
       const { targetBookId } = c.req.valid('json');
 
       if (bookId === targetBookId) {
-        return c.json({ message: 'Topic is already in this book.' }, 400);
+        // [FIX-API-8] Use standard apiError envelope so mobile error classifier
+        // can distinguish this from a network error (which also has no 'code' field).
+        return apiError(
+          c,
+          400,
+          ERROR_CODES.VALIDATION_ERROR,
+          'Topic is already in this book.'
+        );
       }
 
       try {

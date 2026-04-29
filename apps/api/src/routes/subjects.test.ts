@@ -135,7 +135,7 @@ import { app } from '../index';
 import { resolveSubjectName } from '../services/subject-resolve';
 import { classifySubject } from '../services/subject-classify';
 import { captureException } from '../services/sentry';
-import { UpstreamLlmError } from '@eduagent/schemas';
+import { UpstreamLlmError, SubjectNotFoundError } from '@eduagent/schemas';
 import {
   AUTH_HEADERS as BASE_AUTH_HEADERS,
   BASE_AUTH_ENV,
@@ -479,12 +479,12 @@ describe('subject routes', () => {
       expect(body.subject.languageCode).toBe('es');
     });
 
-    it('returns 404 when subject is missing', async () => {
+    it('[FIX-API-6] returns 404 when SubjectNotFoundError is thrown (typed instanceof)', async () => {
       const { configureLanguageSubject } = jest.requireMock(
         '../services/subject'
       );
       configureLanguageSubject.mockRejectedValueOnce(
-        new Error('Subject not found')
+        new SubjectNotFoundError()
       );
 
       const res = await app.request(
@@ -501,6 +501,8 @@ describe('subject routes', () => {
       );
 
       expect(res.status).toBe(404);
+      const body = await res.json();
+      expect(body.code).toBe('NOT_FOUND');
     });
 
     it('returns 422 when subject is not a language subject', async () => {

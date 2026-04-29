@@ -11,7 +11,13 @@ import {
 } from '../../services/notifications';
 
 export const dailyReminderSend = inngest.createFunction(
-  { id: 'daily-reminder-send', name: 'Daily Reminder Send' },
+  {
+    id: 'daily-reminder-send',
+    name: 'Daily Reminder Send',
+    // [FIX-INNGEST-4] Inngest replay / operator re-fire must not push twice.
+    // event.id is unique per sendEvent call; dedupes within 24h.
+    idempotency: 'event.id',
+  },
   { event: 'app/daily-reminder.send' },
   async ({ event, step }) => {
     const { profileId, streakDays } = event.data;

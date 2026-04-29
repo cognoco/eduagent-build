@@ -13,6 +13,10 @@ import type {
   VocabularyReviewInput,
   VocabularyUpdateInput,
 } from '@eduagent/schemas';
+import {
+  SubjectNotFoundError,
+  VocabularyNotFoundError,
+} from '@eduagent/schemas';
 
 function mapVocabularyRow(row: typeof vocabulary.$inferSelect): Vocabulary {
   return {
@@ -64,7 +68,7 @@ async function ensureLanguageSubject(
   });
 
   if (!subject) {
-    throw new Error('Subject not found');
+    throw new SubjectNotFoundError();
   }
 }
 
@@ -200,13 +204,19 @@ export async function ensureVocabularyRetentionCard(
   profileId: string,
   vocabularyId: string
 ): Promise<typeof vocabularyRetentionCards.$inferSelect> {
+  // [VOCAB-RETENTION-INSERT] intervalDays must be >= 1 to satisfy the
+  // vocab_retention_cards_interval_days_positive CHECK constraint. Use 1
+  // (sm2's "first review" default per packages/retention/src/sm2.ts:54,58)
+  // rather than 0, so a never-reviewed card looks identical to a freshly-seen
+  // one — both have a 1-day interval until the first real review overwrites
+  // the row with the SM-2 calculated value.
   await db
     .insert(vocabularyRetentionCards)
     .values({
       profileId,
       vocabularyId,
       easeFactor: 2.5,
-      intervalDays: 0,
+      intervalDays: 1,
       repetitions: 0,
       failureCount: 0,
       consecutiveSuccesses: 0,
@@ -252,7 +262,7 @@ export async function reviewVocabulary(
     where: and(...conditions),
   });
   if (!vocabRow) {
-    throw new Error('Vocabulary item not found');
+    throw new VocabularyNotFoundError();
   }
 
   // Wrap read-compute-write in a transaction to prevent SM-2 race conditions:

@@ -122,6 +122,7 @@ const {
 
 const mockRouter = {
   replace: jest.fn(),
+  push: jest.fn(),
   back: jest.fn(),
   canGoBack: jest.fn(() => true),
 };
@@ -611,6 +612,95 @@ describe('CameraScreen', () => {
       expect(getByTestId('subject-picker')).toBeTruthy();
     });
     expect(getByTestId('subject-picker-loading')).toBeTruthy();
+
+    alertSpy.mockRestore();
+  });
+
+  // [BUG-690] Error-phase picker (after OCR fail → user types text → classify
+  // fails or returns multiple candidates) used to call `subjects?.map()` with
+  // no loading or empty branches. When useSubjects() was still loading the
+  // user saw only the "Which subject is this for?" header above zero rows —
+  // a true dead end. Verify both states render an actionable UI.
+  it('[BUG-690] error-phase manual picker shows loading state when subjects still loading', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(jest.fn());
+    (useLocalSearchParams as jest.Mock).mockReturnValue({});
+    (useSubjects as jest.Mock).mockReturnValue({
+      data: undefined,
+      isLoading: true,
+    });
+    (useHomeworkOcr as jest.Mock).mockReturnValue({
+      text: null,
+      status: 'error',
+      error: "We couldn't read that.",
+      failCount: 1,
+      process: mockProcess,
+      retry: mockRetry,
+    });
+    // Classify returns multiple candidates → picker opens
+    mockMutateAsync.mockResolvedValue({
+      needsConfirmation: true,
+      candidates: [
+        { subjectId: 'a', subjectName: 'A', confidence: 0.5 },
+        { subjectId: 'b', subjectName: 'B', confidence: 0.4 },
+      ],
+    });
+
+    const { getByTestId } = render(<CameraScreen />);
+
+    await waitFor(() => {
+      expect(getByTestId('manual-input')).toBeTruthy();
+    });
+
+    fireEvent.changeText(getByTestId('manual-input'), 'some homework text');
+    fireEvent.press(getByTestId('manual-continue-button'));
+
+    await waitFor(() => {
+      expect(getByTestId('manual-subject-picker-loading')).toBeTruthy();
+    });
+
+    alertSpy.mockRestore();
+  });
+
+  it('[BUG-690] error-phase manual picker shows empty state with Create action when no subjects', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(jest.fn());
+    (useLocalSearchParams as jest.Mock).mockReturnValue({});
+    (useSubjects as jest.Mock).mockReturnValue({
+      data: [],
+      isLoading: false,
+    });
+    (useHomeworkOcr as jest.Mock).mockReturnValue({
+      text: null,
+      status: 'error',
+      error: "We couldn't read that.",
+      failCount: 1,
+      process: mockProcess,
+      retry: mockRetry,
+    });
+    mockMutateAsync.mockResolvedValue({
+      needsConfirmation: true,
+      candidates: [
+        { subjectId: 'a', subjectName: 'A', confidence: 0.5 },
+        { subjectId: 'b', subjectName: 'B', confidence: 0.4 },
+      ],
+    });
+
+    const { getByTestId } = render(<CameraScreen />);
+
+    await waitFor(() => {
+      expect(getByTestId('manual-input')).toBeTruthy();
+    });
+
+    fireEvent.changeText(getByTestId('manual-input'), 'some homework text');
+    fireEvent.press(getByTestId('manual-continue-button'));
+
+    await waitFor(() => {
+      expect(getByTestId('manual-subject-picker-empty')).toBeTruthy();
+    });
+    // Empty state must include an actionable Create button (not a dead end).
+    expect(getByTestId('manual-subject-picker-create')).toBeTruthy();
+
+    fireEvent.press(getByTestId('manual-subject-picker-create'));
+    expect(mockRouter.push).toHaveBeenCalledWith('/create-subject');
 
     alertSpy.mockRestore();
   });

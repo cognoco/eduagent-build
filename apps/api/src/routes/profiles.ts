@@ -4,11 +4,12 @@ import {
   profileCreateSchema,
   profileUpdateSchema,
   profileSwitchSchema,
+  ERROR_CODES,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import type { Account } from '../services/account';
-import { notFound, forbidden, validationError } from '../errors';
+import { notFound, forbidden, validationError, apiError } from '../errors';
 import {
   listProfiles,
   createProfileWithLimitCheck,
@@ -47,8 +48,13 @@ export const profileRoutes = new Hono<ProfileEnv>()
       return c.json({ profile }, 201);
     } catch (err) {
       if (err instanceof ProfileLimitError) {
-        return forbidden(
+        // [FIX-API-7] 402 Payment Required is the correct status for a quota gate
+        // that requires a subscription upgrade. 403 Forbidden implies a permissions
+        // issue the user can't resolve; 402 routes the mobile upgrade modal correctly.
+        return apiError(
           c,
+          402,
+          ERROR_CODES.PROFILE_LIMIT_EXCEEDED,
           'Your subscription does not support additional profiles. Please upgrade to Family or Pro.'
         );
       }

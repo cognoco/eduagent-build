@@ -8,6 +8,7 @@ import {
 import {
   generateCurriculum,
   getCurriculum,
+  getBooks,
   skipTopic,
   unskipTopic,
   challengeCurriculum,
@@ -1266,5 +1267,132 @@ describe('persistBookTopics', () => {
         persistBookTopics(db, PROFILE_ID, SUBJECT_ID, BOOK_ID, sampleTopics, [])
       ).rejects.toThrow('Book not found');
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// BUG-884: getBooks must scope topic counters to the LATEST curriculum
+// ---------------------------------------------------------------------------
+
+describe('getBooks (BUG-884)', () => {
+  // Build a mock DB whose `select(...).from(...).where(...)` chain captures
+  // the where-clause args so we can assert the new curriculumId filter is
+  // present. Drizzle's `eq(table.col, value)` returns an opaque builder
+  // object, but `db.select(...).from(curriculumTopics).where(arg)` lets us
+  // capture `arg` directly and inspect it for the curriculumId filter.
+  function mockDbForGetBooks(opts: {
+    subject: ReturnType<typeof mockSubjectRow> | undefined;
+    bookRows: Array<{ id: string; subjectId: string; sortOrder: number }>;
+    curriculumFindFirst: ReturnType<typeof mockCurriculumRow> | undefined;
+    topicRowsForLatestCurriculum: Array<{ id: string; bookId: string }>;
+  }): { db: Database; capturedWhereCalls: unknown[] } {
+    const capturedWhereCalls: unknown[] = [];
+    const db = {
+      query: {
+        subjects: {
+          findFirst: jest.fn().mockResolvedValue(opts.subject),
+        },
+        curricula: {
+          findFirst: jest.fn().mockResolvedValue(opts.curriculumFindFirst),
+        },
+        curriculumBooks: {
+          findMany: jest.fn().mockResolvedValue(opts.bookRows),
+        },
+      },
+      select: jest.fn().mockReturnValue({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockImplementation((arg: unknown) => {
+            capturedWhereCalls.push(arg);
+            return Promise.resolve(opts.topicRowsForLatestCurriculum);
+          }),
+          // computeBookStatusesBatch also issues db.select chains. Stub a
+          // generic resolution so the call doesn't throw.
+          leftJoin: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue([]),
+          }),
+        }),
+      }),
+    } as unknown as Database;
+    return { db, capturedWhereCalls };
+  }
+
+  it('returns topicCount=0 when no curriculum row exists for the subject', async () => {
+    const { db } = mockDbForGetBooks({
+      subject: mockSubjectRow(),
+      bookRows: [
+        {
+          id: BOOK_ID,
+          subjectId: SUBJECT_ID,
+          sortOrder: 0,
+          title: 'Test Book',
+          description: '',
+          topicsGenerated: false,
+          createdAt: NOW,
+          updatedAt: NOW,
+        } as unknown as { id: string; subjectId: string; sortOrder: number },
+      ],
+      curriculumFindFirst: undefined, // no curriculum
+      topicRowsForLatestCurriculum: [],
+    });
+
+    const result = await getBooks(db, PROFILE_ID, SUBJECT_ID);
+    expect(result).toHaveLength(1);
+    expect(result[0].topicCount).toBe(0);
+    expect(result[0].status).toBe('NOT_STARTED');
+  });
+
+  // BUG-884 break test: orphan curriculum_topics rows from prior curriculum
+  // versions inflated topicCount because the WHERE clause matched on bookId
+  // alone. After the fix the query is constrained to the latest curriculum,
+  // so orphan rows must not slip through.
+  it('[BUG-884] reflects only topics belonging to the latest curriculum', async () => {
+    const latestCurriculum = mockCurriculumRow({
+      id: 'curriculum-latest',
+      version: 2,
+    });
+    const { db, capturedWhereCalls } = mockDbForGetBooks({
+      subject: mockSubjectRow(),
+      bookRows: [
+        {
+          id: BOOK_ID,
+          subjectId: SUBJECT_ID,
+          sortOrder: 0,
+          title: 'Test Book',
+          description: '',
+          topicsGenerated: false,
+          createdAt: NOW,
+          updatedAt: NOW,
+        } as unknown as { id: string; subjectId: string; sortOrder: number },
+      ],
+      curriculumFindFirst: latestCurriculum,
+      // The DB stub returns whatever rows the mock decides — the production
+      // query is what we assert on. Returning [] simulates "no topics in
+      // the latest curriculum"; orphans tied to older curriculum_ids would
+      // not match because the new SQL filters on curriculumId.
+      topicRowsForLatestCurriculum: [],
+    });
+
+    const result = await getBooks(db, PROFILE_ID, SUBJECT_ID);
+    expect(result[0].topicCount).toBe(0);
+
+    // Inspect the captured WHERE arg — it must reference the latest
+    // curriculumId. Drizzle's expression objects have circular refs, so we
+    // walk the tree looking for the literal curriculum-id string.
+    function deepContains(
+      value: unknown,
+      needle: string,
+      seen = new Set<unknown>()
+    ): boolean {
+      if (value == null) return false;
+      if (typeof value === 'string') return value.includes(needle);
+      if (typeof value !== 'object') return false;
+      if (seen.has(value)) return false;
+      seen.add(value);
+      for (const v of Object.values(value as Record<string, unknown>)) {
+        if (deepContains(v, needle, seen)) return true;
+      }
+      return false;
+    }
+    expect(deepContains(capturedWhereCalls, 'curriculum-latest')).toBe(true);
   });
 });

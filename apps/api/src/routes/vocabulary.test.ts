@@ -107,6 +107,10 @@ import {
   AUTH_HEADERS as BASE_AUTH_HEADERS,
   BASE_AUTH_ENV,
 } from '../test-utils/test-env';
+import {
+  SubjectNotFoundError,
+  VocabularyNotFoundError,
+} from '@eduagent/schemas';
 
 const TEST_ENV = { ...BASE_AUTH_ENV };
 
@@ -139,9 +143,9 @@ describe('vocabulary routes', () => {
       expect(listVocabulary).toHaveBeenCalled();
     });
 
-    it('returns 404 when subject is missing', async () => {
+    it('[FIX-API-6] returns 404 when SubjectNotFoundError is thrown (typed instanceof)', async () => {
       (listVocabulary as jest.Mock).mockRejectedValueOnce(
-        new Error('Subject not found')
+        new SubjectNotFoundError()
       );
 
       const res = await app.request(
@@ -151,6 +155,8 @@ describe('vocabulary routes', () => {
       );
 
       expect(res.status).toBe(404);
+      const body = await res.json();
+      expect(body.code).toBe('NOT_FOUND');
     });
 
     it('returns 401 without auth header', async () => {
@@ -205,9 +211,9 @@ describe('vocabulary routes', () => {
       expect(res.status).toBe(400);
     });
 
-    it('returns 404 when subject is missing', async () => {
+    it('[FIX-API-6] returns 404 when SubjectNotFoundError is thrown on create (typed instanceof)', async () => {
       (createVocabulary as jest.Mock).mockRejectedValueOnce(
-        new Error('Subject not found')
+        new SubjectNotFoundError()
       );
 
       const res = await app.request(
@@ -224,6 +230,8 @@ describe('vocabulary routes', () => {
       );
 
       expect(res.status).toBe(404);
+      const body = await res.json();
+      expect(body.code).toBe('NOT_FOUND');
     });
   });
 
@@ -247,9 +255,9 @@ describe('vocabulary routes', () => {
       expect(reviewVocabulary).toHaveBeenCalled();
     });
 
-    it('returns 404 when vocabulary item is missing', async () => {
+    it('[FIX-API-6] returns 404 when VocabularyNotFoundError is thrown on review (typed instanceof)', async () => {
       (reviewVocabulary as jest.Mock).mockRejectedValueOnce(
-        new Error('Vocabulary item not found')
+        new VocabularyNotFoundError()
       );
 
       const res = await app.request(
@@ -263,6 +271,8 @@ describe('vocabulary routes', () => {
       );
 
       expect(res.status).toBe(404);
+      const body = await res.json();
+      expect(body.code).toBe('NOT_FOUND');
     });
 
     it('returns 422 when review input is semantically invalid', async () => {

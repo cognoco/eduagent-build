@@ -20,10 +20,7 @@ import {
 } from '../services/subject';
 import { resolveSubjectName } from '../services/subject-resolve';
 import { classifySubject } from '../services/subject-classify';
-import { notFound, apiError } from '../errors';
-import { createLogger } from '../services/logger';
-
-const logger = createLogger();
+import { notFound, apiError, SubjectNotFoundError } from '../errors';
 
 type SubjectRouteEnv = {
   Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
@@ -73,21 +70,12 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
     const db = c.get('db');
     const input = c.req.valid('json');
     const profileId = requireProfileId(c.get('profileId'));
-    try {
-      const result = await createSubjectWithStructure(db, profileId, input);
-      return c.json(result, 201);
-    } catch (err) {
-      // [logging sweep] structured logger so PII fields land as JSON context
-      logger.error('[POST /subjects] Unhandled error', {
-        error: err instanceof Error ? err.message : String(err),
-      });
-      return apiError(
-        c,
-        500,
-        ERROR_CODES.INTERNAL_ERROR,
-        'Subject creation failed — please try again'
-      );
-    }
+    // [FIX-API-1] Let errors propagate to the global onError handler in index.ts
+    // which converts UpstreamLlmError → 502 LLM_UNAVAILABLE and captures all
+    // others to Sentry. The old try/catch was masking quota and LLM errors
+    // as generic 500s, making them invisible in Sentry.
+    const result = await createSubjectWithStructure(db, profileId, input);
+    return c.json(result, 201);
   })
   .put(
     '/subjects/:id/language-setup',
@@ -104,8 +92,9 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
         );
         return c.json({ subject });
       } catch (err) {
-        if (err instanceof Error && err.message === 'Subject not found') {
-          return notFound(c, 'Subject not found');
+        // [FIX-API-6] Use typed instanceof check instead of string-matching message
+        if (err instanceof SubjectNotFoundError) {
+          return notFound(c, err.message);
         }
         if (
           err instanceof Error &&

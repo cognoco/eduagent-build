@@ -9,7 +9,13 @@ import {
 } from '../../services/notifications';
 
 export const recallNudgeSend = inngest.createFunction(
-  { id: 'recall-nudge-send', name: 'Recall Nudge Send' },
+  {
+    id: 'recall-nudge-send',
+    name: 'Recall Nudge Send',
+    // [FIX-INNGEST-4] Inngest replay / operator re-fire must not push twice.
+    // event.id is unique per sendEvent call; dedupes within 24h.
+    idempotency: 'event.id',
+  },
   { event: 'app/recall-nudge.send' },
   async ({ event, step }) => {
     const { profileId, fadingCount, topTopicIds } = event.data;

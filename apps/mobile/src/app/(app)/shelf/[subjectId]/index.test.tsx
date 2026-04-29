@@ -1,4 +1,4 @@
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
 import ShelfScreen from './index';
 
 // ---------------------------------------------------------------------------
@@ -501,6 +501,85 @@ describe('ShelfScreen', () => {
   });
 
   // Auto-skip was removed — single-book shelves render normally now.
+
+  // [BUG-692] When the user taps Skip while filing.mutateAsync is in flight,
+  // the resolved onSuccess push must NOT navigate them to the book — they
+  // already replaced the route to stay on the shelf. Without the
+  // filingSkipped guard, the late onSuccess would yank them back into the
+  // book they just chose to skip. Test mirrors the existing pick-book guard.
+  it('[BUG-692] Skip during filing prevents stale onSuccess navigation', async () => {
+    jest.useFakeTimers();
+    try {
+      mockUseBookSuggestions.mockReturnValue({
+        data: [{ id: 'sug-1', title: 'Number Theory', emoji: '🔢' }],
+      });
+
+      // Start with filing not pending so suggestion card renders.
+      let resolveFiling: (value: {
+        shelfId: string;
+        bookId: string;
+      }) => void = () => undefined;
+      const filingPromise = new Promise<{ shelfId: string; bookId: string }>(
+        (resolve) => {
+          resolveFiling = resolve;
+        }
+      );
+      mockFilingMutateAsync.mockReturnValueOnce(filingPromise);
+
+      // After tap, the consumer flips isPending=true. We toggle the mock so
+      // subsequent renders see isPending=true → overlay + Skip button.
+      let pending = false;
+      mockUseFiling.mockImplementation(() => ({
+        mutateAsync: mockFilingMutateAsync,
+        isPending: pending,
+      }));
+
+      const { getByTestId, queryByTestId, rerender } = render(<ShelfScreen />);
+      fireEvent.press(getByTestId('shelf-suggestion-sug-1'));
+
+      // Flip pending=true and re-render so the overlay + skip-after-15s timer
+      // mount.
+      pending = true;
+      rerender(<ShelfScreen />);
+      expect(getByTestId('shelf-filing-overlay')).toBeTruthy();
+
+      // Advance past the 15s skip-button delay (act so React flushes state).
+      await act(async () => {
+        jest.advanceTimersByTime(15_500);
+      });
+      expect(getByTestId('shelf-filing-skip')).toBeTruthy();
+
+      // User taps Skip — must replace route AND mark filing as skipped.
+      fireEvent.press(getByTestId('shelf-filing-skip'));
+      expect(mockReplace).toHaveBeenCalledWith(
+        expect.objectContaining({
+          pathname: '/(app)/shelf/[subjectId]',
+          params: { subjectId: 'sub-1' },
+        })
+      );
+
+      // Now resolve the pending filing — this is the core of the bug.
+      resolveFiling({ shelfId: 'sub-1', bookId: 'book-new' });
+      await waitFor(() => {
+        expect(mockFilingMutateAsync).toHaveBeenCalled();
+      });
+      // Flush microtasks so the awaited mutateAsync resumes.
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // The break: push to the book route must NOT have fired even though
+      // the mutation succeeded — filingSkipped.current was true.
+      const bookPushed = mockPush.mock.calls.some((call) => {
+        const arg = call[0] as { pathname?: string } | undefined;
+        return arg?.pathname === '/(app)/shelf/[subjectId]/book/[bookId]';
+      });
+      expect(bookPushed).toBe(false);
+      // Sanity: error overlay also did not appear.
+      expect(queryByTestId('shelf-filing-error-overlay')).toBeNull();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
 
   it('shows ErrorFallback overlay when picking a book suggestion fails', async () => {
     mockUseBookSuggestions.mockReturnValue({
