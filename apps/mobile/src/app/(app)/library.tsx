@@ -141,7 +141,11 @@ export default function LibraryScreen() {
   const subjectsQuery = useSubjects({ includeInactive: true });
   // S-5: Centralized Array.isArray guard — same class as BUG-418.
   // TanStack Query's select can be bypassed when enabled=false.
-  const subjects = Array.isArray(subjectsQuery.data) ? subjectsQuery.data : [];
+  // Memoised so downstream useMemo deps don't see a fresh `[]` each render.
+  const subjects = useMemo(
+    () => (Array.isArray(subjectsQuery.data) ? subjectsQuery.data : []),
+    [subjectsQuery.data]
+  );
   const progressQuery = useOverallProgress();
 
   // [M19] Timeout escape for subjects/progress loading spinner
@@ -340,7 +344,7 @@ export default function LibraryScreen() {
       reviewDueCount:
         retentionBySubjectId.get(subject.id)?.reviewDueCount ?? undefined,
     }));
-  }, [progressBySubjectId, retentionQueries, subjectsQuery.data]);
+  }, [progressBySubjectId, retentionQueries, subjects]);
 
   const totalOverdue = useMemo(
     () =>

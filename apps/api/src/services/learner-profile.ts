@@ -25,6 +25,7 @@ import {
   renderPromptTemplate,
   sanitizeXmlValue,
 } from './llm/sanitize';
+import { projectAiResponseContent } from './llm/project-response';
 import { createLogger } from './logger';
 import { captureException } from './sentry';
 
@@ -1217,14 +1218,16 @@ export async function applyAnalysis(
   // Epic 7 FR165.3: Write urgency boost when test/deadline detected
   // [CR-119.3]: Prefer subjectId for exact match — fall back to name only
   // when the caller doesn't have an ID (e.g. manual analysis calls).
-  if (analysis.urgencyDeadline && (subjectId || subjectName)) {
+  const subjectFilter = subjectId
+    ? eq(subjects.id, subjectId)
+    : subjectName
+    ? eq(subjects.name, subjectName)
+    : null;
+  if (analysis.urgencyDeadline && subjectFilter) {
     try {
       const boostUntil = new Date(
         Date.now() + analysis.urgencyDeadline.daysFromNow * 24 * 60 * 60 * 1000
       );
-      const subjectFilter = subjectId
-        ? eq(subjects.id, subjectId)
-        : eq(subjects.name, subjectName!);
       await db
         .update(subjects)
         .set({
@@ -1494,13 +1497,18 @@ export async function analyzeSessionTranscript(
   // cannot close the wrapping <transcript> tag. Wrap the joined transcript
   // so the model can distinguish data from directives (the system prompt
   // notice above references this tag).
+  // [BUG-934] Legacy ai_response rows may store raw envelope JSON. Project
+  // to plain reply text before building the XML so the LLM sees clean prose.
   const transcriptBody = conversationEvents
-    .map(
-      (entry) =>
-        `${
-          entry.eventType === 'user_message' ? 'Learner' : 'Mentor'
-        }: ${escapeXml(entry.content)}`
-    )
+    .map((entry) => {
+      const text =
+        entry.eventType === 'ai_response'
+          ? projectAiResponseContent(entry.content, { silent: true })
+          : entry.content;
+      return `${
+        entry.eventType === 'user_message' ? 'Learner' : 'Mentor'
+      }: ${escapeXml(text)}`;
+    })
     .join('\n\n');
   const transcriptText = `<transcript>\n${transcriptBody}\n</transcript>`;
 

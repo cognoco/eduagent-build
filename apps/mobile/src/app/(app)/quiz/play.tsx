@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -72,10 +78,13 @@ export default function QuizPlayScreen(): React.ReactElement {
   // client can highlight the right option and show the person's name.
   const [correctAnswer, setCorrectAnswer] = useState<string | null>(null);
   const [showContinueHint, setShowContinueHint] = useState(false);
-  const [shuffledOptions, setShuffledOptions] = useState<string[]>([]);
-  // [F-Q-13] elapsedMs is computed for analytics (timeMs in QuestionResult)
-  // but no longer displayed. Prefixed with _ to satisfy no-unused-vars.
-  const [_elapsedMs, setElapsedMs] = useState(0);
+  // [BUG-928] elapsedMs is shown in the question header and also used for
+  // analytics (timeMs in QuestionResult). Spec — docs/flows/learning-path-flows.md
+  // Path 7: "Question header: '1 of 7' + dot indicators + elapsed seconds".
+  // The previous F-Q-13 carve-out hid this for "countdown anxiety", but it's
+  // a count-UP timer, not a deadline — and the spec was updated to require
+  // it for motivational feedback ("how fast am I going?").
+  const [elapsedMs, setElapsedMs] = useState(0);
   const [guessWhoCluesUsed, setGuessWhoCluesUsed] = useState(1);
   const [freeTextAnswer, setFreeTextAnswer] = useState('');
 
@@ -93,6 +102,20 @@ export default function QuizPlayScreen(): React.ReactElement {
 
   const currentQuestion = questions[currentIndex];
 
+  // [BUG-STALE-OPTIONS] Derived synchronously from currentQuestion so the
+  // same render that shows the prompt already has the correct options. A
+  // useEffect would run AFTER the commit, leaving a one-frame window where
+  // shuffledOptions still held the previous question's options — a tap in
+  // that window would record a stale answerGiven against the new question.
+  // Must be defined AFTER currentQuestion (same render pass, deps evaluated
+  // at this point in the execution).
+  const shuffledOptions = useMemo<string[]>(() => {
+    if (!currentQuestion || currentQuestion.type === 'guess_who') {
+      return [];
+    }
+    return Array.from(new Set(currentQuestion.options));
+  }, [currentQuestion]);
+
   useEffect(() => {
     if (!round || !currentQuestion) {
       router.replace('/(app)/quiz' as never);
@@ -102,12 +125,11 @@ export default function QuizPlayScreen(): React.ReactElement {
   useEffect(() => {
     if (!currentQuestion) return;
 
-    if (currentQuestion.type !== 'guess_who') {
-      // [CR-1] Options arrive pre-shuffled from the server with answer fields
-      // stripped. Dedup in case the LLM produced a duplicate distractor.
-      setShuffledOptions(Array.from(new Set(currentQuestion.options)));
-    } else {
-      setShuffledOptions([]);
+    // [BUG-STALE-OPTIONS] shuffledOptions is now derived via useMemo (above)
+    // so it updates synchronously with currentQuestion in the same render.
+    // Only side-effecty resets that must run after the new question commits
+    // are kept here.
+    if (currentQuestion.type === 'guess_who') {
       setGuessWhoCluesUsed(1);
     }
 
@@ -196,6 +218,8 @@ export default function QuizPlayScreen(): React.ReactElement {
           roundId,
           questionIndex: currentIndex,
           answerGiven,
+          // guess_who is always free-text input
+          answerMode: 'free_text',
         });
         if (!result.correct && result.correctAnswer) {
           correctAnswerCapturedRef.current = true;
@@ -257,6 +281,8 @@ export default function QuizPlayScreen(): React.ReactElement {
           roundId,
           questionIndex: currentIndex,
           answerGiven: result.answerGiven,
+          // guess_who background correctAnswer fetch is always free_text
+          answerMode: 'free_text',
         })
           .then((checkResult) => {
             if (checkResult.correctAnswer) {
@@ -449,6 +475,9 @@ export default function QuizPlayScreen(): React.ReactElement {
         roundId: activeRound.id,
         questionIndex,
         answerGiven: answer,
+        // [BUG-STALE-OPTIONS] Forward answerMode so the API can verify MC
+        // answers are in question.options — defense-in-depth guard.
+        answerMode,
       });
       correct = result.correct;
       // [F-Q-02] Server reveals correctAnswer on wrong submissions so the
@@ -595,10 +624,20 @@ export default function QuizPlayScreen(): React.ReactElement {
           </View>
         </View>
 
-        {/* [F-Q-13] Timer hidden — elapsed time is tracked for analytics
-            (feeds timeMs into QuestionResult) but not shown to avoid
-            countdown anxiety. */}
-        <View className="w-[32px]" />
+        {/* [BUG-928] Elapsed seconds — count UP timer (not countdown), shown
+            for motivational feedback per Path 7 spec. The same value drives
+            the timeMs analytics field at answer time. Min-width keeps the
+            header from reflowing as digits grow. */}
+        <Text
+          className="text-body-sm font-semibold text-text-secondary text-right"
+          style={{ minWidth: 36 }}
+          accessibilityLabel={`Elapsed time: ${Math.floor(
+            elapsedMs / 1000
+          )} seconds`}
+          testID="quiz-play-elapsed"
+        >
+          {Math.floor(elapsedMs / 1000)}s
+        </Text>
       </View>
 
       <Pressable
@@ -774,7 +813,10 @@ export default function QuizPlayScreen(): React.ReactElement {
                 : 'Not quite'}
             </Text>
             {/* [BUG-469] Dispute button — lets user flag LLM's judgment as wrong */}
-            {!disputedIndices.has(currentIndex) ? (
+            {/* [BUG-927] Only surface dispute UI on incorrect answers. There's
+                nothing to dispute on a correct response, and showing the link
+                pollutes triage with noise on clearly-correct answers. */}
+            {answerState === 'wrong' && !disputedIndices.has(currentIndex) ? (
               <Pressable
                 onPress={handleDispute}
                 className="mt-2 items-center py-1"
@@ -786,14 +828,14 @@ export default function QuizPlayScreen(): React.ReactElement {
                   Not quite right?
                 </Text>
               </Pressable>
-            ) : (
+            ) : answerState === 'wrong' && disputedIndices.has(currentIndex) ? (
               <Text
                 className="mt-2 text-center text-caption text-text-secondary"
                 testID="quiz-dispute-noted"
               >
                 Noted — we'll review this
               </Text>
-            )}
+            ) : null}
           </View>
         ) : null}
 

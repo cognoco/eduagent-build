@@ -98,6 +98,36 @@ describe('buildExchangeHistory', () => {
   it('produces empty history when no events', () => {
     expect(buildExchangeHistory([])).toEqual([]);
   });
+
+  it('[BUG-934] projects legacy raw-envelope ai_response content to plain reply before re-wrapping', () => {
+    // Repro: a legacy DB row where content is raw envelope JSON (not cleaned
+    // prose). buildExchangeHistory must extract reply from the raw envelope so
+    // the LLM receives plain text in the reply field — NOT a nested JSON string.
+    const rawEnvelope = JSON.stringify({
+      reply: 'hi',
+      signals: {
+        partial_progress: false,
+        needs_deepening: false,
+        understanding_check: false,
+      },
+      ui_hints: { note_prompt: { show: false, post_session: false } },
+    });
+
+    const events: ExchangeHistoryEvent[] = [
+      { eventType: 'user_message', content: 'hello' },
+      { eventType: 'ai_response', content: rawEnvelope },
+    ];
+
+    const history = buildExchangeHistory(events);
+    const assistantTurn = history.find((h) => h.role === 'assistant');
+    expect(assistantTurn).toBeDefined();
+
+    const rewrapped = JSON.parse(assistantTurn!.content) as { reply: string };
+    // The reply field must be plain text ("hi"), not the raw envelope JSON string.
+    expect(rewrapped.reply).toBe('hi');
+    expect(rewrapped.reply).not.toContain('"signals"');
+    expect(rewrapped.reply).not.toContain('"ui_hints"');
+  });
 });
 
 describe('mergeMemoryContexts', () => {

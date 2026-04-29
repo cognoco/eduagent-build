@@ -155,7 +155,10 @@ export default function CreateProfileScreen() {
     try {
       const body = {
         displayName: trimmedName,
-        birthYear: birthYear!,
+        // birthDate is non-null here (guarded above) — read birthYear from
+        // the narrowed value rather than the outer `birthYear` derivation,
+        // which TS sees as `number | null`.
+        birthYear: birthDate.getFullYear(),
       };
 
       const res = await client.profiles.$post({ json: body });
@@ -220,7 +223,6 @@ export default function CreateProfileScreen() {
     canSubmit,
     displayName,
     birthDate,
-    birthYear,
     isParentAddingChild,
     client,
     queryClient,

@@ -992,7 +992,6 @@ export default function SubscriptionScreen() {
     usage,
     queryClient,
     activeProfile?.id,
-    refetchUsage,
   ]);
 
   const handleContactSupport = useCallback(async () => {
@@ -1542,22 +1541,40 @@ export default function SubscriptionScreen() {
               <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2">
                 Manage
               </Text>
-              <Pressable
-                onPress={handleManageBilling}
-                className="bg-surface rounded-card px-4 py-3.5 mb-2"
-                accessibilityLabel="Manage billing"
-                accessibilityRole="button"
-                testID="manage-billing-button"
-              >
-                <Text className="text-body text-text-primary">
-                  Manage billing
-                </Text>
-                <Text className="text-caption text-text-secondary mt-0.5">
-                  {Platform.OS === 'ios'
-                    ? 'Opens App Store subscriptions'
-                    : 'Opens Google Play subscriptions'}
-                </Text>
-              </Pressable>
+              {/* [BUG-916] Web has no native store deep link — RevenueCat IAP
+                  runs on iOS/Android only, Stripe is dormant for web. Render a
+                  static info row pointing the user to their mobile device
+                  instead of the Google Play link, which is misleading. */}
+              {Platform.OS === 'web' ? (
+                <View
+                  className="bg-surface rounded-card px-4 py-3.5 mb-2"
+                  testID="manage-billing-web-info"
+                >
+                  <Text className="text-body text-text-primary">
+                    Manage billing
+                  </Text>
+                  <Text className="text-caption text-text-secondary mt-0.5">
+                    Subscription is managed on your mobile device
+                  </Text>
+                </View>
+              ) : (
+                <Pressable
+                  onPress={handleManageBilling}
+                  className="bg-surface rounded-card px-4 py-3.5 mb-2"
+                  accessibilityLabel="Manage billing"
+                  accessibilityRole="button"
+                  testID="manage-billing-button"
+                >
+                  <Text className="text-body text-text-primary">
+                    Manage billing
+                  </Text>
+                  <Text className="text-caption text-text-secondary mt-0.5">
+                    {Platform.OS === 'ios'
+                      ? 'Opens App Store subscriptions'
+                      : 'Opens Google Play subscriptions'}
+                  </Text>
+                </Pressable>
+              )}
             </View>
           )}
 

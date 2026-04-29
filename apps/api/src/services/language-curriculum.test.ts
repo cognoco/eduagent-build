@@ -185,6 +185,30 @@ describe('generateLanguageCurriculum', () => {
       ).toBeGreaterThanOrEqual(a1Topics[0].targetWordCount!);
     }
   });
+
+  // [BUG-940] Topic descriptions used to interpolate the lowercase canonical
+  // language name verbatim ("Focused italian practice for A1."), which reads
+  // as a copy bug. Fixed by title-casing at the boundary.
+  it('[BUG-940] capitalizes the language name in topic descriptions', () => {
+    const cases: Array<[string, string]> = [
+      ['it', 'Italian'],
+      ['es', 'Spanish'],
+      ['fr', 'French'],
+      ['de', 'German'],
+      ['pt', 'Portuguese'],
+    ];
+    for (const [code, expectedDisplay] of cases) {
+      const topics = generateLanguageCurriculum(code, 'A1');
+      expect(topics.length).toBeGreaterThan(0);
+      for (const topic of topics) {
+        expect(topic.description).toContain(`Focused ${expectedDisplay}`);
+        // No lowercase form should leak through.
+        expect(topic.description).not.toContain(
+          `Focused ${expectedDisplay.toLowerCase()} `
+        );
+      }
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------

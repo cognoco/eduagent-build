@@ -171,21 +171,23 @@ export default function QuizIndexScreen(): React.ReactElement {
               getLanguageDisplayName(subject.languageCode) ??
               subject.name ??
               'Language';
-            const vocabStats = stats?.find(
-              (stat) => stat.activityType === 'vocabulary'
+            // [BUG-926] Per-language stats: look up the stat row keyed on
+            // (activityType: 'vocabulary', languageCode: subject.languageCode).
+            // The backend now groups by (activityType, languageCode) so each
+            // language card only shows stats for rounds played in that language.
+            const langStat = stats?.find(
+              (s) =>
+                s.activityType === 'vocabulary' &&
+                s.languageCode === subject.languageCode
             );
-            const statsSubtitle =
-              vocabStats &&
-              vocabStats.bestScore != null &&
-              vocabStats.bestTotal != null
-                ? `Best: ${vocabStats.bestScore}/${vocabStats.bestTotal} · Played: ${vocabStats.roundsPlayed}`
-                : vocabStats
-                ? `Played: ${vocabStats.roundsPlayed}`
-                : 'New!';
             const subtitle =
-              subject.name && subject.name !== displayLanguage
-                ? `${subject.name} · ${statsSubtitle}`
-                : statsSubtitle;
+              langStat &&
+              langStat.bestScore != null &&
+              langStat.bestTotal != null
+                ? `Best: ${langStat.bestScore}/${langStat.bestTotal} · Played: ${langStat.roundsPlayed}`
+                : langStat
+                ? `Played: ${langStat.roundsPlayed}`
+                : 'Practice new words and phrases';
 
             return (
               <IntentCard

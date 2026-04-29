@@ -43,7 +43,8 @@ export interface NotificationPayload {
     | 'struggle_noticed'
     | 'struggle_flagged'
     | 'struggle_resolved'
-    | 'dictation_review';
+    | 'dictation_review'
+    | 'session_filing_failed';
 }
 
 export interface NotificationResult {
@@ -90,7 +91,11 @@ export function isExpoPushToken(token: string): boolean {
  */
 export async function sendPushNotification(
   db: Database,
-  payload: NotificationPayload
+  payload: NotificationPayload,
+  // [BUG-856] When the caller already reserved the rate-limit slot via
+  // checkAndLogRateLimitInternal, set skipRateLimitLog to true so we do not
+  // double-count this push toward the daily cap or per-type rate limit.
+  options?: { skipRateLimitLog?: boolean }
 ): Promise<NotificationResult> {
   // 1. Get push token
   const token = await getPushToken(db, payload.profileId);
@@ -135,8 +140,12 @@ export async function sendPushNotification(
     };
     const ticketId = result.data?.id;
 
-    // 5. Log the notification
-    await logNotification(db, payload.profileId, payload.type, ticketId);
+    // 5. Log the notification (skipped when caller already reserved the slot
+    // via checkAndLogRateLimitInternal — avoids double-counting toward the
+    // daily cap on per-type rate-limited paths).
+    if (!options?.skipRateLimitLog) {
+      await logNotification(db, payload.profileId, payload.type, ticketId);
+    }
 
     return { sent: true, ticketId };
   } catch {
@@ -199,6 +208,13 @@ export function formatRecallNudge(
   return {
     title: `${fadingCount} topics need a refresh`,
     body: `Starting with ${topTopicTitle}. About ${fadingCount * 2} minutes.`,
+  };
+}
+
+export function formatFilingFailedPush(): { title: string; body: string } {
+  return {
+    title: 'Topic placement needs attention',
+    body: "We couldn't sort your last session into a topic. Tap to try again.",
   };
 }
 
@@ -511,10 +527,17 @@ export async function sendStruggleNotification(
     childName
   );
 
-  return sendPushNotification(db, {
-    profileId: link.parentProfileId,
-    title: copy.title,
-    body: copy.body,
-    type: notification.type,
-  });
+  return sendPushNotification(
+    db,
+    {
+      profileId: link.parentProfileId,
+      title: copy.title,
+      body: copy.body,
+      type: notification.type,
+    },
+    // [BUG-856] Slot already reserved by checkAndLogRateLimitInternal above
+    // for the same (parentProfileId, type) bucket — skip the push log so we
+    // do not record two rows for the same notification.
+    { skipRateLimitLog: true }
+  );
 }

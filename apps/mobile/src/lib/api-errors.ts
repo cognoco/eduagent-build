@@ -12,7 +12,11 @@
  */
 
 import type { QuotaExceeded } from '@eduagent/schemas';
-import { ForbiddenError } from '@eduagent/schemas';
+import {
+  ConflictError,
+  ForbiddenError,
+  RateLimitedError,
+} from '@eduagent/schemas';
 
 export type QuotaExceededDetails = QuotaExceeded['details'];
 export type UpgradeOption = QuotaExceededDetails['upgradeOptions'][number];
@@ -28,7 +32,7 @@ export class QuotaExceededError extends Error {
   }
 }
 
-export { ForbiddenError };
+export { ConflictError, ForbiddenError, RateLimitedError };
 
 /**
  * [F-Q-01] Typed error for 5xx upstream responses.
@@ -44,5 +48,6 @@ export class UpstreamError extends Error {
     this.name = 'UpstreamError';
     this.code = code;
     this.status = status;
+    Object.setPrototypeOf(this, UpstreamError.prototype);
   }
 }

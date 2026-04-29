@@ -314,10 +314,21 @@ export function generateLanguageCurriculum(
     throw new Error(`Unsupported language code: ${languageCode}`);
   }
 
+  // [BUG-940] Topic descriptions interpolate the language name directly into
+  // sentence-case prose ("Focused italian practice for A1."). The canonical
+  // names live lowercase in language.names — title-case at the boundary so
+  // the rendered description reads naturally without leaking the source-data
+  // casing convention. Mirrors the book-label normalization at the bottom of
+  // regenerateLanguageCurriculum (BUG-611).
+  const languageDisplayName = (language.names[0] ?? languageCode).replace(
+    /^./,
+    (c) => c.toUpperCase()
+  );
+
   const currentLevelMilestones = buildMilestonesForLevel(
     startingLevel,
     language.cefrMilestones[startingLevel],
-    language.names[0] ?? languageCode
+    languageDisplayName
   );
 
   const upcomingLevel = nextLevel(startingLevel);
@@ -328,7 +339,7 @@ export function generateLanguageCurriculum(
   const nextLevelMilestones = buildMilestonesForLevel(
     upcomingLevel,
     Math.max(2, Math.min(4, language.cefrMilestones[upcomingLevel])),
-    language.names[0] ?? languageCode
+    languageDisplayName
   );
 
   return [...currentLevelMilestones, ...nextLevelMilestones];

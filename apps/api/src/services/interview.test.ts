@@ -21,6 +21,10 @@ jest.mock('./llm', () => {
     // Real brace-depth walker — the service uses this to extract JSON from
     // signal-extraction responses [BUG-842 / F-SVC-009].
     extractFirstJsonObject: actual.extractFirstJsonObject,
+    // Real reply-candidate extractor — the schema-failure fallback path uses
+    // it to surface the inner reply text instead of raw envelope JSON
+    // [BUG-934][BUG-935].
+    extractReplyCandidate: actual.extractReplyCandidate,
     registerProvider: jest.fn((p: { name: string }) =>
       providers.set(p.name, p)
     ),
@@ -1296,5 +1300,110 @@ describe('persistCurriculum', () => {
     // Verify no curriculum was inserted
     expect(db.insert).not.toHaveBeenCalled();
     expect(generateCurriculum).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// interpretInterviewResponse schema-failure fallback [BUG-934][BUG-935]
+//
+// These tests exercise the fallback inside interpretInterviewResponse via the
+// public processInterviewExchange surface (the helper is not exported).
+// They guard against the regression where a Zod-invalid envelope caused the
+// raw JSON to be persisted as ai_response.content, leaking into resumed-session
+// chat bubbles, parent dashboards, and the next turn's LLM history.
+// ---------------------------------------------------------------------------
+
+describe('interpretInterviewResponse schema-failure fallback [BUG-934][BUG-935]', () => {
+  const schemaFailContext: InterviewContext = {
+    subjectName: 'Mathematics',
+    exchangeHistory: [],
+  };
+
+  it('extracts .reply when envelope is JSON with valid reply but Zod-invalid signals [BUG-934]', async () => {
+    // ready_to_finish is expected to be a boolean — passing a string causes
+    // Zod to reject the envelope, which historically dumped the full envelope
+    // JSON into response (and therefore ai_response.content).
+    (routeAndCall as jest.Mock).mockResolvedValueOnce({
+      response: JSON.stringify({
+        reply: 'Good effort! Keep going.',
+        signals: { ready_to_finish: 'not-a-boolean' },
+      }),
+      provider: 'gemini',
+      model: 'gemini-2.5-flash',
+      latencyMs: 50,
+    });
+
+    const result = await processInterviewExchange(schemaFailContext, 'Hi', {
+      exchangeCount: 1,
+    });
+
+    expect(result.response).toBe('Good effort! Keep going.');
+    expect(result.response).not.toContain('"reply"');
+    expect(result.response).not.toContain('signals');
+  });
+
+  it('extracts .reply when envelope signals field has wrong type [BUG-934]', async () => {
+    // Passing signals as a plain string (not an object) fails the Zod schema
+    // — the fix must still recover the prose reply rather than leaking JSON.
+    (routeAndCall as jest.Mock).mockResolvedValueOnce({
+      response: JSON.stringify({
+        reply: "That's correct — well done!",
+        signals: 'ready_to_finish',
+      }),
+      provider: 'gemini',
+      model: 'gemini-2.5-flash',
+      latencyMs: 50,
+    });
+
+    const result = await processInterviewExchange(schemaFailContext, 'Hi', {
+      exchangeCount: 1,
+    });
+
+    expect(result.response).toBe("That's correct — well done!");
+    expect(result.response).not.toMatch(/^\{/);
+  });
+
+  it("normalizes literal '\\n' inside an extracted reply on Zod failure [BUG-935]", async () => {
+    // The reply contains the double-escape pattern (backslash + n, two chars)
+    // AND the envelope is Zod-invalid so the fallback path runs. Persisted
+    // content must already have real newlines so resumed sessions render
+    // correctly in chat bubbles.
+    (routeAndCall as jest.Mock).mockResolvedValueOnce({
+      response: JSON.stringify({
+        reply: "Great start!\\n\\nNow let's try a harder one.",
+        signals: { ready_to_finish: 'wrong-type' },
+      }),
+      provider: 'gemini',
+      model: 'gemini-2.5-flash',
+      latencyMs: 50,
+    });
+
+    const result = await processInterviewExchange(schemaFailContext, 'Hi', {
+      exchangeCount: 1,
+    });
+
+    // JSON.stringify above produces wire bytes the LLM would emit. After
+    // JSON.parse the reply becomes "Great start!\\n\\nNow let's..." (literal
+    // backslash-n pairs). normalizeReplyText must turn each \\n into \n.
+    expect(result.response).toContain('\n\n');
+    expect(result.response).not.toContain('\\n');
+  });
+
+  it('falls back to raw text when envelope has no reply field at all [BUG-934]', async () => {
+    // Defensive — non-JSON prose should still surface SOMETHING rather than
+    // silently dropping the LLM output. We accept the trimmed raw string as
+    // a worst-case fallback, same as before BUG-934.
+    (routeAndCall as jest.Mock).mockResolvedValueOnce({
+      response: 'plain text, no json at all',
+      provider: 'gemini',
+      model: 'gemini-2.5-flash',
+      latencyMs: 50,
+    });
+
+    const result = await processInterviewExchange(schemaFailContext, 'Hi', {
+      exchangeCount: 1,
+    });
+
+    expect(result.response).toBe('plain text, no json at all');
   });
 });

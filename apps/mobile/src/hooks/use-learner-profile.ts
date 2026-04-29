@@ -86,10 +86,11 @@ export function useChildLearnerProfile(
   return useQuery({
     queryKey: learnerProfileKey(childProfileId),
     queryFn: async ({ signal: querySignal }) => {
+      if (!childProfileId) throw new Error('childProfileId is required');
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
         const res = await client['learner-profile'][':profileId'].$get(
-          { param: { profileId: childProfileId! } },
+          { param: { profileId: childProfileId } },
           { init: { signal } }
         );
         await assertOk(res);

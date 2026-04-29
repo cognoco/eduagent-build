@@ -48,6 +48,9 @@ export const quizRounds = pgTable(
       .notNull()
       .defaultNow(),
     completedAt: timestamp('completed_at', { withTimezone: true }),
+    // [BUG-926] Per-language stats: language being practised for vocabulary
+    // rounds. NULL for capitals and guess_who (not language-specific).
+    languageCode: text('language_code'),
   },
   (table) => [
     index('idx_quiz_rounds_profile_activity').on(

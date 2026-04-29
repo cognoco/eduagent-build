@@ -13,9 +13,11 @@ import {
   parseEnvelope,
   teeEnvelopeStream,
   extractFirstJsonObject,
+  extractReplyCandidate,
   type ChatMessage,
 } from './llm';
 import { classifyExchangeOutcome, type ExchangeFallback } from './exchanges';
+import { normalizeReplyText } from './llm/envelope';
 import { sanitizeXmlValue, escapeXml } from './llm/sanitize';
 import { createLogger } from './logger';
 import { captureException } from './sentry';
@@ -404,10 +406,24 @@ function interpretInterviewResponse(params: {
     profile_id: profileId ?? 'unknown',
     reason: parse.reason,
   });
-  // Best-effort surface of the raw text so the learner isn't stuck — the
+  // [BUG-934] When the envelope is structurally JSON with a `reply` field
+  // but fails Zod (e.g. ready_to_finish has the wrong type, or an unknown
+  // field violates strictness), extract the reply directly instead of
+  // persisting the raw envelope JSON. Raw JSON ends up in ai_response.content
+  // and leaks into resumed-session chat bubbles, parent dashboards, and the
+  // next turn's LLM history.
+  // [BUG-935] Apply normalizeReplyText so any literal `\n` from a
+  // double-escaping LLM becomes a real newline before persistence —
+  // matches the streaming path's createLiteralEscapeNormalizer behavior.
+  const replyCandidate = extractReplyCandidate(rawResponse);
+  const fallbackText =
+    replyCandidate && replyCandidate.length > 0
+      ? normalizeReplyText(replyCandidate)
+      : rawResponse.trim();
+  // Best-effort surface of the reply so the learner isn't stuck — the
   // MAX_INTERVIEW_EXCHANGES cap still forces eventual completion.
   return {
-    cleanResponse: rawResponse.trim(),
+    cleanResponse: fallbackText,
     readyToFinish: false,
   };
 }

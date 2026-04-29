@@ -409,7 +409,7 @@ describe('CreateProfileScreen', () => {
       // or the component unmounts), the timer must be cancelled.
       // We simulate: submit starts loading, then loading drops before 30s —
       // advancing past 30s must NOT set the error.
-      const { rerender } = render(<CreateProfileScreen />, {
+      const { unmount } = render(<CreateProfileScreen />, {
         wrapper: Wrapper,
       });
       await fillAndSubmit();
@@ -424,7 +424,7 @@ describe('CreateProfileScreen', () => {
       // in the finally block. We can't easily reach that without a real resolve,
       // so instead unmount and verify the timer doesn't fire after unmount.
       // Unmounting the component calls the useEffect cleanup (clearTimeout).
-      rerender(<></>);
+      unmount();
 
       // Advance well past 30s — timer should have been cleared on unmount.
       act(() => {

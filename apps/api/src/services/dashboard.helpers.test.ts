@@ -4,6 +4,7 @@ import {
   calculateRetentionTrend,
   calculateTrend,
   generateChildSummary,
+  sortSubjectsByActivityPriority,
   type DashboardInput,
 } from './dashboard';
 
@@ -129,5 +130,72 @@ describe('buildProgressGuidance', () => {
   it('returns null when sessions are steady, increasing, or there is no subject', () => {
     expect(buildProgressGuidance('Alex', ['Math'], 4, 3)).toBeNull();
     expect(buildProgressGuidance('Alex', [], 0, 3, 0)).toBeNull();
+  });
+});
+
+// [BUG-913] Coaching nudge previously recommended whichever subject came
+// first in the linked-subjects array (often alphabetical), even when that
+// subject had zero sessions. Sorting by activity priority guarantees we
+// recommend a subject the child has actually engaged with.
+describe('sortSubjectsByActivityPriority (BUG-913)', () => {
+  it('puts subjects with a recent lastSessionAt before never-touched subjects', () => {
+    const subjects = [
+      {
+        name: 'Biology',
+        lastSessionAt: null,
+        topicsCompleted: 0,
+      },
+      {
+        name: 'Mathematics',
+        lastSessionAt: '2026-04-19T10:00:00.000Z',
+        topicsCompleted: 0,
+      },
+      {
+        name: 'Programming',
+        lastSessionAt: null,
+        topicsCompleted: 0,
+      },
+    ];
+    const ordered = sortSubjectsByActivityPriority(subjects);
+    expect(ordered.map((s: { name: string }) => s.name)).toEqual([
+      'Mathematics',
+      'Biology',
+      'Programming',
+    ]);
+  });
+
+  it('breaks ties between never-touched subjects with topicsCompleted, then name', () => {
+    const subjects = [
+      { name: 'Zoology', lastSessionAt: null, topicsCompleted: 2 },
+      { name: 'Biology', lastSessionAt: null, topicsCompleted: 0 },
+      { name: 'Astronomy', lastSessionAt: null, topicsCompleted: 0 },
+    ];
+    const ordered = sortSubjectsByActivityPriority(subjects);
+    expect(ordered.map((s: { name: string }) => s.name)).toEqual([
+      'Zoology',
+      'Astronomy',
+      'Biology',
+    ]);
+  });
+
+  it('after sorting, buildProgressGuidance recommends the active subject (BUG-913 break test)', () => {
+    const testKidSubjects = [
+      // Alphabetical input — Biology first, but never used.
+      { name: 'Biology', lastSessionAt: null, topicsCompleted: 0 },
+      {
+        name: 'Mathematics',
+        lastSessionAt: '2026-04-19T10:00:00.000Z',
+        topicsCompleted: 1,
+      },
+      { name: 'Programming', lastSessionAt: null, topicsCompleted: 0 },
+    ];
+    const subjectNames = sortSubjectsByActivityPriority(testKidSubjects).map(
+      (s: { name: string }) => s.name
+    );
+    const guidance = buildProgressGuidance('TestKid', subjectNames, 0, 4, 2);
+    // Pre-fix this would say "...keep it going with Biology!". Post-fix:
+    // Mathematics (the only subject with sessions) is the recommendation.
+    expect(guidance).toMatch(/Mathematics/);
+    expect(guidance).not.toMatch(/Biology/);
   });
 });

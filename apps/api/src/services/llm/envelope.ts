@@ -54,7 +54,43 @@ export type EnvelopeSurface =
   | 'exchange.session'
   | 'exchange.silent_classify'
   | 'filing'
+  | 'transcript.hydration'
   | 'unknown';
+
+// ---------------------------------------------------------------------------
+// Reply text normalization — defensive guard against double-escape leak.
+//
+// Some LLMs (especially smaller models or fallback tiers) emit `\\n` inside the
+// envelope's JSON `reply` string when they meant a real newline. Once
+// JSON.parse runs, that becomes literal backslash + `n` characters, which the
+// markdown renderer prints verbatim ("That's it!\n\nNow…"). The prompt has
+// been tightened to ask for real line breaks, but the LLM still slips ~1% of
+// the time, so we sanitize on the way out.
+//
+// Scope: ONLY four common whitespace-escape sequences. We intentionally do NOT
+// touch `\u`, `\\`, `\"`, `\/`, or unknown `\X` sequences — those are either
+// legitimate text (a backslash teaching code) or already-decoded JSON.
+// ---------------------------------------------------------------------------
+
+/** True when `text` contains the bug pattern (literal `\n`, `\r`, or `\t`). */
+export function replyHasLiteralEscape(text: string): boolean {
+  return /\\[nrt]/.test(text);
+}
+
+/**
+ * Replace literal `\n`, `\r\n`, `\r`, `\t` sequences (backslash + letter, two
+ * characters in the JS string) with the corresponding real whitespace.
+ *
+ * Order matters: `\r\n` is matched before `\n` and `\r` so a CRLF pair becomes
+ * a single newline, not two.
+ */
+export function normalizeReplyText(text: string): string {
+  return text
+    .replace(/\\r\\n/g, '\n')
+    .replace(/\\n/g, '\n')
+    .replace(/\\r/g, '\n')
+    .replace(/\\t/g, '\t');
+}
 
 function parseEnvelopeRaw(response: string): ParseEnvelopeResult {
   const jsonStr = extractFirstJsonObject(response);
@@ -79,15 +115,33 @@ function parseEnvelopeRaw(response: string): ParseEnvelopeResult {
     };
   }
 
-  return { ok: true, envelope: result.data };
+  // Sanitize literal-escape leaks (`\\n` etc.) before any caller renders or
+  // persists the reply. Idempotent for well-behaved LLM output.
+  const envelope: LlmResponseEnvelope = {
+    ...result.data,
+    reply: normalizeReplyText(result.data.reply),
+  };
+
+  return { ok: true, envelope };
+}
+
+export interface ParseEnvelopeOptions {
+  /**
+   * When `true`, suppresses the per-call `llm.envelope.parse_failed` warn.
+   * Use this on batch/loop call sites (e.g. transcript hydration) where
+   * the caller aggregates failures itself and emits a single summary log.
+   * Other callers must NOT set this — per-call logging is required by [BUG-847].
+   */
+  silent?: boolean;
 }
 
 export function parseEnvelope(
   response: string,
-  surface: EnvelopeSurface = 'unknown'
+  surface: EnvelopeSurface = 'unknown',
+  options: ParseEnvelopeOptions = {}
 ): ParseEnvelopeResult {
   const result = parseEnvelopeRaw(response);
-  if (!result.ok) {
+  if (!result.ok && !options.silent) {
     logger.warn('llm.envelope.parse_failed', {
       surface,
       reason: result.reason,
@@ -120,6 +174,38 @@ export const KNOWN_MARKER_KEYS: ReadonlySet<string> = new Set([
   'fluencyDrill',
   'escalationHold',
 ]);
+
+// ---------------------------------------------------------------------------
+// extractReplyCandidate — best-effort raw `reply` reader for fallback paths.
+//
+// When `parseEnvelope` fails (schema violation, missing field), callers still
+// need to surface *something* to the learner instead of raw envelope JSON
+// (see [BUG-934]). This pulls the `reply` string directly out of the first
+// JSON object without going through Zod, so flow-specific fallbacks can
+// distinguish "schema violation due to empty reply" from "schema violation
+// due to missing reply field" without each flow re-implementing the
+// extraction. Returns undefined when no `reply` key is present or the JSON
+// can't be extracted — callers should fall back to `rawResponse.trim()`.
+// ---------------------------------------------------------------------------
+
+export function extractReplyCandidate(response: string): string | undefined {
+  const jsonStr = extractFirstJsonObject(response);
+  if (!jsonStr) return undefined;
+  try {
+    const parsed = JSON.parse(jsonStr);
+    if (
+      typeof parsed === 'object' &&
+      parsed !== null &&
+      !Array.isArray(parsed) &&
+      typeof (parsed as { reply?: unknown }).reply === 'string'
+    ) {
+      return (parsed as { reply: string }).reply;
+    }
+  } catch {
+    return undefined;
+  }
+  return undefined;
+}
 
 export function isRecognizedMarker(response: string): boolean {
   const jsonStr = extractFirstJsonObject(response);

@@ -95,6 +95,9 @@ const LLM_ROUTE_PATTERNS_POST_ONLY = [
   /\/dictation\/generate\/?$/,
   /\/dictation\/prepare-homework\/?$/,
   /\/dictation\/review\/?$/,
+  // Retry filing re-runs the LLM-backed filing flow. Match only UUIDs so a
+  // malformed path falls through to the route validator without burning quota.
+  /\/sessions\/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\/retry-filing\/?$/,
 ];
 
 function isLlmRoute(path: string, method: string): boolean {

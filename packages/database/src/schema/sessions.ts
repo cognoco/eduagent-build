@@ -9,6 +9,7 @@ import {
   pgEnum,
   index,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 import { profiles } from './profiles';
 import { subjects, curriculumTopics } from './subjects';
 import { generateUUIDv7 } from '../utils/uuid';
@@ -60,6 +61,12 @@ export const summaryStatusEnum = pgEnum('summary_status', [
   'accepted',
   'skipped',
   'auto_closed',
+]);
+
+export const filingStatusEnum = pgEnum('filing_status', [
+  'filing_pending',
+  'filing_failed',
+  'filing_recovered',
 ]);
 
 export const onboardingDrafts = pgTable('onboarding_drafts', {
@@ -117,6 +124,9 @@ export const learningSessions = pgTable(
     wallClockSeconds: integer('wall_clock_seconds'),
     metadata: jsonb('metadata').default({}),
     rawInput: text('raw_input'),
+    filedAt: timestamp('filed_at', { withTimezone: true }),
+    filingStatus: filingStatusEnum('filing_status'),
+    filingRetryCount: integer('filing_retry_count').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -131,6 +141,9 @@ export const learningSessions = pgTable(
       table.subjectId,
       table.exchangeCount
     ),
+    index('learning_sessions_filing_status_idx')
+      .on(table.filingStatus)
+      .where(sql`${table.filingStatus} IS NOT NULL`),
   ]
 );
 

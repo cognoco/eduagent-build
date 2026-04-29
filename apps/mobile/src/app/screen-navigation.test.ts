@@ -56,6 +56,9 @@ function getAllScreenFiles(dir: string): string[] {
         entry.name.endsWith('.tsx') &&
         !entry.name.endsWith('.test.tsx') &&
         !entry.name.startsWith('_layout') &&
+        // Expo Router meta-files (+html.tsx, +not-found.tsx, +native-intent.tsx)
+        // are document/infra files, not user-navigable screens.
+        !entry.name.startsWith('+') &&
         // PascalCase .tsx files are co-located components, not route pages
         !/^[A-Z]/.test(entry.name)
       ) {

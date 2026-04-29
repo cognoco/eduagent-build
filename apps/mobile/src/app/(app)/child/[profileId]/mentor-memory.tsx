@@ -472,11 +472,11 @@ export default function ChildMentorMemoryScreen() {
                 onPress={() =>
                   void (async () => {
                     const text = correctionText.trim();
-                    if (!text) return;
+                    if (!text || !childProfileId) return;
                     try {
                       // [BUG-533] Consume result and show confirmation.
                       const result = await tellMentor.mutateAsync({
-                        childProfileId: childProfileId!,
+                        childProfileId,
                         text: `[parent_correction] ${text}`,
                       });
                       setCorrectionOpen(false);

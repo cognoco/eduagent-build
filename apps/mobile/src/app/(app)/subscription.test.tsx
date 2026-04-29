@@ -850,6 +850,32 @@ describe('SubscriptionScreen', () => {
     Object.defineProperty(Platform, 'OS', { get: () => originalPlatform });
   });
 
+  // [BUG-916] On web there is no native store deep link — IAP runs on
+  // iOS/Android only and Stripe is dormant for web. The Manage row must show
+  // a static "managed on your mobile device" info instead of the misleading
+  // "Opens Google Play subscriptions" copy.
+  it('shows static "managed on your mobile device" info on web (BUG-916)', () => {
+    const originalPlatform = Platform.OS;
+    Object.defineProperty(Platform, 'OS', { get: () => 'web' });
+
+    mockOfferings = makeMockOfferings([makeMockPackage()]);
+    mockCustomerInfo = makeMockCustomerInfo({
+      activeEntitlements: { pro: { isActive: true, identifier: 'pro' } },
+    });
+
+    render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+    expect(screen.getByTestId('manage-billing-web-info')).toBeTruthy();
+    expect(
+      screen.getByText('Subscription is managed on your mobile device')
+    ).toBeTruthy();
+    // No interactive Pressable on web — no misleading Google Play copy.
+    expect(screen.queryByTestId('manage-billing-button')).toBeNull();
+    expect(screen.queryByText('Opens Google Play subscriptions')).toBeNull();
+
+    Object.defineProperty(Platform, 'OS', { get: () => originalPlatform });
+  });
+
   // -------------------------------------------------------------------------
   // Navigation
   // -------------------------------------------------------------------------

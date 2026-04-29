@@ -165,7 +165,27 @@ export function BrandCelebration({
         if (finished) runOnJS(done)();
       })
     );
-  }, [done, reduceMotion]);
+    // Reanimated SharedValues have stable identity across renders, so listing
+    // them satisfies the linter without changing when this effect actually
+    // re-runs (still only on `done` / `reduceMotion` changes).
+  }, [
+    done,
+    reduceMotion,
+    containerOp,
+    dot1R,
+    dot2R,
+    dot3R,
+    happyBounce,
+    mentorInR,
+    mentorR,
+    pathDraw,
+    ringOp,
+    spark1,
+    spark2,
+    spark3,
+    studentInR,
+    studentR,
+  ]);
 
   // Fabric safety net: if AnimatedCircle prop updates didn't fire after 500ms
   // (cold start, JS thread busy, Fabric native module init delay), jump to

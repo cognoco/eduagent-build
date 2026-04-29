@@ -16,6 +16,92 @@
 
 const REPLY_KEY_RE = /"reply"\s*:/;
 
+// ---------------------------------------------------------------------------
+// Literal-escape normalizer — defensive guard for the streaming path.
+//
+// Some LLMs emit `\\n` inside the JSON `reply` string when they meant a real
+// newline. After our JSON-spec-correct decode (`tryDecodeEscape`), `\\n`
+// becomes literal backslash + `n` in the yielded chunk, which then leaks to
+// the rendered chat bubble as visible "\n". This normalizer mirrors the
+// non-streaming `normalizeReplyText` in envelope.ts but operates on streaming
+// chunks: a trailing `\` from chunk N must be deferred so it can be paired
+// with the leading char of chunk N+1.
+//
+// Sequences handled (post-JSON-decode): `\n`, `\r\n`, `\r`, `\t`. Every other
+// `\X` is left alone — those are legitimate text (backslashes in code, etc).
+// ---------------------------------------------------------------------------
+
+interface LiteralEscapeNormalizer {
+  /** Feed a decoded chunk; returns the chunk with literal escapes resolved. */
+  push(input: string): string;
+  /** Flush any deferred trailing `\` once the source has drained. */
+  flush(): string;
+}
+
+function createLiteralEscapeNormalizer(): LiteralEscapeNormalizer {
+  // True when the previous push ended on a lone `\` whose pair (n/r/t) may
+  // still arrive in the next chunk. Deferring it preserves real-text
+  // backslashes when the partner is a different char.
+  let pendingBackslash = false;
+
+  return {
+    push(input: string): string {
+      let out = '';
+      let i = 0;
+
+      if (pendingBackslash && input.length > 0) {
+        const c = input[0];
+        if (c === 'n' || c === 'r') {
+          out += '\n';
+          i = 1;
+        } else if (c === 't') {
+          out += '\t';
+          i = 1;
+        } else {
+          // Lone backslash — emit it and let the main loop handle the next
+          // char (which may itself start a new escape).
+          out += '\\';
+        }
+        pendingBackslash = false;
+      }
+
+      while (i < input.length) {
+        const ch = input[i];
+        if (ch === '\\') {
+          if (i === input.length - 1) {
+            pendingBackslash = true;
+            i++;
+            break;
+          }
+          const next = input[i + 1];
+          if (next === 'n' || next === 'r') {
+            out += '\n';
+            i += 2;
+          } else if (next === 't') {
+            out += '\t';
+            i += 2;
+          } else {
+            out += '\\';
+            i++;
+          }
+        } else {
+          out += ch;
+          i++;
+        }
+      }
+
+      return out;
+    },
+    flush(): string {
+      if (pendingBackslash) {
+        pendingBackslash = false;
+        return '\\';
+      }
+      return '';
+    },
+  };
+}
+
 type StreamState =
   | 'find_reply_key'
   | 'find_reply_value_start'
@@ -123,6 +209,13 @@ export async function* streamEnvelopeReply(
   let buffer = '';
   let state: StreamState = 'find_reply_key';
   let pendingEscape = '';
+  // Defensive normalizer — removes literal `\n`/`\r`/`\t` leaks from
+  // double-escaping LLMs before the chunk reaches the SSE consumer.
+  const normalizer = createLiteralEscapeNormalizer();
+
+  function emit(text: string): string {
+    return normalizer.push(text);
+  }
 
   for await (const chunk of source) {
     buffer += chunk;
@@ -179,7 +272,10 @@ export async function* streamEnvelopeReply(
         }
         if (pendingEscape.length > 0) {
           buffer = '';
-          if (out) yield out;
+          if (out) {
+            const normalized = emit(out);
+            if (normalized) yield normalized;
+          }
           break;
         }
 
@@ -210,7 +306,10 @@ export async function* streamEnvelopeReply(
         }
 
         buffer = buffer.slice(i);
-        if (out) yield out;
+        if (out) {
+          const normalized = emit(out);
+          if (normalized) yield normalized;
+        }
         if (state === 'after_reply') break;
         // Otherwise need more chunks.
         break;
@@ -224,6 +323,9 @@ export async function* streamEnvelopeReply(
   }
 
   if (pendingEscape.length > 0) {
-    yield pendingEscape;
+    const normalized = emit(pendingEscape);
+    if (normalized) yield normalized;
   }
+  const flushed = normalizer.flush();
+  if (flushed) yield flushed;
 }

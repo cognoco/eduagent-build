@@ -8,9 +8,11 @@ import {
 } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
 import { AppState, View, Text, Pressable, ScrollView } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { platformAlert } from '../../../lib/platform-alert';
 import { goBackOrReplace, homeHrefForReturnTo } from '../../../lib/navigation';
 import { firstParam } from '../../../lib/route-params';
+import { shouldShowBookLink } from '../../../lib/show-book-link';
 import {
   router,
   useRouter,
@@ -378,9 +380,6 @@ function SessionScreenInner() {
   const { data: overallProgress } = useOverallProgress();
   const progressInventory = useProgressInventory();
   const { data: celebrationLevel = 'all' } = useCelebrationLevel();
-  const showBookLink =
-    effectiveMode !== 'homework' &&
-    (overallProgress?.totalTopicsCompleted ?? 0) > 0;
   const sessionExperience = streak?.longestStreak ?? 0;
   const openingContent = getOpeningMessage(
     effectiveMode,
@@ -403,6 +402,13 @@ function SessionScreenInner() {
   const [messages, setMessages] = useState<ChatMessage[]>([
     { id: 'opening', role: 'assistant', content: openingContent },
   ]);
+  // [BUG-919] Hide the "Go to the Library" hint once the conversation
+  // starts. See shouldShowBookLink for the full rationale.
+  const showBookLink = shouldShowBookLink({
+    effectiveMode,
+    totalTopicsCompleted: overallProgress?.totalTopicsCompleted ?? 0,
+    messagesLength: messages.length,
+  });
   const [isStreaming, setIsStreaming] = useState(false);
   const [exchangeCount, setExchangeCount] = useState(0);
   const [escalationRung, setEscalationRung] = useState(1);
@@ -681,10 +687,9 @@ function SessionScreenInner() {
       setTopicSwitcherSubjectId((current) => current ?? effectiveSubjectId);
       return;
     }
-    if (availableSubjects.length > 0) {
-      setTopicSwitcherSubjectId(
-        (current) => current ?? availableSubjects[0]!.id
-      );
+    const [firstSubject] = availableSubjects;
+    if (firstSubject) {
+      setTopicSwitcherSubjectId((current) => current ?? firstSubject.id);
     }
   }, [availableSubjects, effectiveSubjectId]);
 
@@ -842,15 +847,19 @@ function SessionScreenInner() {
     effectiveSubjectName,
     trackerState,
     topicId,
+    topicName,
   ]);
 
   useEffect(() => {
     if (!imageUri) return;
+    // Capture as a narrowed const so the inner async closure sees a defined
+    // string without re-asserting non-null at every reference.
+    const uri = imageUri;
     let cancelled = false;
 
     async function convertImage() {
       try {
-        const base64 = await FileSystem.readAsStringAsync(imageUri!, {
+        const base64 = await FileSystem.readAsStringAsync(uri, {
           encoding: 'base64',
         });
         if (!cancelled) {
@@ -859,7 +868,7 @@ function SessionScreenInner() {
           // extension sniffing. Camera captures are always JPEG; gallery
           // picks provide OS-level mimeType. Falls back to extension
           // sniffing for backward compat with deep links or missing values.
-          const ext = imageUri!.split('.').pop()?.toLowerCase();
+          const ext = uri.split('.').pop()?.toLowerCase();
           const mimeType: 'image/jpeg' | 'image/png' | 'image/webp' =
             imageMimeType === 'image/png'
               ? 'image/png'
@@ -884,7 +893,7 @@ function SessionScreenInner() {
     return () => {
       cancelled = true;
     };
-  }, [imageUri]);
+  }, [imageUri, imageMimeType]);
 
   const {
     syncHomeworkMetadata,
@@ -1176,6 +1185,17 @@ function SessionScreenInner() {
   );
 
   const agencyLabel = escalationRung >= 3 ? 'Guided' : 'Independent';
+  // [BUG-936] On narrow widths (375px) the header was fighting for room
+  // between a back arrow, a "Learning Session" title, a textual agency
+  // pill ("Independent" / "Guided"), milestone dots, and a textual "I'm
+  // Done" pill — title and subtitle truncated to ~7 chars. The agency
+  // pill is a passive state indicator (not a primary action) so we
+  // collapse it to an icon-only Pressable. The full label is preserved
+  // in accessibilityLabel and the tap-for-info modal so SR users and
+  // curious learners still see the textual mode name. Saves ~60-80px
+  // for the title column without removing functionality.
+  const agencyIconName: keyof typeof Ionicons.glyphMap =
+    agencyLabel === 'Guided' ? 'school-outline' : 'compass-outline';
   const agencyBadge = (
     <Pressable
       onPress={() =>
@@ -1186,14 +1206,12 @@ function SessionScreenInner() {
             : "I'm mostly letting you drive and checking in with lighter guidance."
         )
       }
-      className="ms-2 px-3 py-2 rounded-button bg-surface-elevated min-h-[44px] items-center justify-center"
+      className="ms-1 px-2 py-2 rounded-button bg-surface-elevated min-h-[44px] min-w-[44px] items-center justify-center"
       accessibilityRole="button"
       accessibilityLabel={`Session mode: ${agencyLabel}`}
       testID="agency-badge"
     >
-      <Text className="text-body-sm font-semibold text-text-secondary">
-        {agencyLabel}
-      </Text>
+      <Ionicons name={agencyIconName} size={20} color={colors.textSecondary} />
     </Pressable>
   );
 

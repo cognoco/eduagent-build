@@ -29,6 +29,7 @@ export default function MilestonesListScreen(): React.ReactElement {
   } = useProgressMilestones(50);
 
   const isEmpty = !isLoading && !isError && (milestones?.length ?? 0) === 0;
+  const milestoneCount = milestones?.length ?? 0;
 
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
@@ -48,10 +49,10 @@ export default function MilestonesListScreen(): React.ReactElement {
           <Text className="text-h2 font-bold text-text-primary">
             Your Milestones
           </Text>
-          {!isLoading && !isError && (milestones?.length ?? 0) > 0 ? (
+          {!isLoading && !isError && milestoneCount > 0 ? (
             <Text className="text-body-sm text-text-secondary mt-0.5">
-              {milestones!.length} milestone
-              {milestones!.length !== 1 ? 's' : ''} earned
+              {milestoneCount} milestone
+              {milestoneCount !== 1 ? 's' : ''} earned
             </Text>
           ) : null}
         </View>
@@ -113,7 +114,7 @@ export default function MilestonesListScreen(): React.ReactElement {
             </Pressable>
           </View>
         ) : (
-          milestones!.map((milestone) => (
+          milestones?.map((milestone) => (
             <View key={milestone.id} className="mt-3">
               <MilestoneCard milestone={milestone} />
             </View>

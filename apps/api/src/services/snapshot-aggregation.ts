@@ -257,6 +257,10 @@ async function loadProgressState(
     db.query.retentionCards.findMany({
       where: eq(retentionCards.profileId, profileId),
     }),
+    // [BUG-912] Intentionally reads the RAW streak row (not findCurrentForToday)
+    // — snapshots represent point-in-time state for the snapshotDate, so
+    // applying today's decay rule would falsify what the user actually had on
+    // that historical date. Display paths must use repo.streaks.findCurrentForToday().
     db.query.streaks.findFirst({
       where: eq(streaks.profileId, profileId),
     }),

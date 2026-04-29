@@ -96,10 +96,11 @@ export function useChildDetail(
   return useQuery({
     queryKey: ['dashboard', 'child', childProfileId],
     queryFn: async ({ signal: querySignal }) => {
+      if (!childProfileId) throw new Error('childProfileId is required');
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
         const res = await client.dashboard.children[':profileId'].$get(
-          { param: { profileId: childProfileId! } },
+          { param: { profileId: childProfileId } },
           { init: { signal } }
         );
         await assertOk(res);
@@ -124,12 +125,14 @@ export function useChildSubjectTopics(
   return useQuery({
     queryKey: ['dashboard', 'child', childProfileId, 'subject', subjectId],
     queryFn: async ({ signal: querySignal }) => {
+      if (!childProfileId) throw new Error('childProfileId is required');
+      if (!subjectId) throw new Error('subjectId is required');
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
         const res = await client.dashboard.children[':profileId'].subjects[
           ':subjectId'
         ].$get(
-          { param: { profileId: childProfileId!, subjectId: subjectId! } },
+          { param: { profileId: childProfileId, subjectId: subjectId } },
           { init: { signal } }
         );
         await assertOk(res);
@@ -154,10 +157,11 @@ export function useChildSessions(childProfileId: string | undefined) {
   return useQuery({
     queryKey: ['dashboard', 'children', childProfileId, 'sessions'],
     queryFn: async ({ signal: querySignal }) => {
+      if (!childProfileId) throw new Error('childProfileId is required');
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
         const res = await client.dashboard.children[':profileId'].sessions.$get(
-          { param: { profileId: childProfileId! } },
+          { param: { profileId: childProfileId } },
           { init: { signal } }
         );
         await assertOk(res);
@@ -182,6 +186,8 @@ export function useChildSessionDetail(
   return useQuery({
     queryKey: ['dashboard', 'children', childProfileId, 'session', sessionId],
     queryFn: async ({ signal: querySignal }) => {
+      if (!childProfileId) throw new Error('childProfileId is required');
+      if (!sessionId) throw new Error('sessionId is required');
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
         const res = await client.dashboard.children[':profileId'].sessions[
@@ -189,8 +195,8 @@ export function useChildSessionDetail(
         ].$get(
           {
             param: {
-              profileId: childProfileId!,
-              sessionId: sessionId!,
+              profileId: childProfileId,
+              sessionId,
             },
           },
           { init: { signal } }
@@ -218,10 +224,11 @@ export function useChildMemory(childProfileId: string | undefined) {
   return useQuery({
     queryKey: ['dashboard', 'children', childProfileId, 'memory'],
     queryFn: async ({ signal: querySignal }) => {
+      if (!childProfileId) throw new Error('childProfileId is required');
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
         const res = await client.dashboard.children[':profileId'].memory.$get(
-          { param: { profileId: childProfileId! } },
+          { param: { profileId: childProfileId } },
           { init: { signal } }
         );
         await assertOk(res);

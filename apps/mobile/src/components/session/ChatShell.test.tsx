@@ -756,6 +756,47 @@ describe('ChatShell', () => {
       expect(mockRemove).toHaveBeenCalledTimes(1);
     });
 
+    it('[BUG-928] does NOT subscribe to AccessibilityInfo on web (Chromium AXMode false-positives)', async () => {
+      // Chromium-based browsers report isScreenReaderEnabled() === true when
+      // the accessibility tree is generated for any reason, even without
+      // assistive tech. Auto-suppressing TTS based on that signal silently
+      // disables voice for ordinary Chrome users. The fix: skip the entire
+      // listener wiring on web. Native (iOS/Android) is unaffected.
+      const RN = require('react-native');
+      const originalPlatform = RN.Platform.OS;
+      Object.defineProperty(RN.Platform, 'OS', { get: () => 'web' });
+
+      try {
+        // Even if AccessibilityInfo.isScreenReaderEnabled would resolve true,
+        // the component must not consult it on web.
+        jest
+          .spyOn(AccessibilityInfo, 'isScreenReaderEnabled')
+          .mockResolvedValue(true);
+
+        renderChatShell({
+          verificationType: 'teach_back',
+          messages: [
+            { id: 'ai-1', role: 'assistant', content: 'Hello learner!' },
+          ],
+        });
+
+        await act(async () => {
+          await Promise.resolve();
+        });
+
+        // The component should not have subscribed at all on web.
+        expect(AccessibilityInfo.addEventListener).not.toHaveBeenCalled();
+        expect(AccessibilityInfo.isScreenReaderEnabled).not.toHaveBeenCalled();
+
+        // And TTS still fires for the AI message — not suppressed.
+        expect(mockSpeak).toHaveBeenCalledWith('Hello learner!');
+      } finally {
+        Object.defineProperty(RN.Platform, 'OS', {
+          get: () => originalPlatform,
+        });
+      }
+    });
+
     it('transitions from auto to manual TTS when screen reader detected', async () => {
       renderChatShell({
         verificationType: 'teach_back',

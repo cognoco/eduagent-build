@@ -171,7 +171,7 @@ function base64ToBytes(b64: string): Uint8Array {
 function maskEmail(email: string | undefined): string {
   if (!email || !email.includes('@')) return '***';
   const [local, domain] = email.split('@');
-  return `${local![0]}***@${domain}`;
+  return `${(local ?? '').charAt(0)}***@${domain}`;
 }
 
 // ---------------------------------------------------------------------------

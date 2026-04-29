@@ -3,8 +3,11 @@ import type {
   GuessWhoQuestion,
   QuestionResult,
   QuizQuestion,
+  VocabularyQuestion,
 } from '@eduagent/schemas';
+import { BadRequestError } from '@eduagent/schemas';
 import {
+  assertAnswerInOptions,
   buildMissedItemText,
   calculateScore,
   calculateXp,
@@ -183,6 +186,78 @@ describe('isAnswerCorrect (server-side truth)', () => {
   });
 });
 
+// [BUG-STALE-OPTIONS] Defense-in-depth: assertAnswerInOptions rejects MC
+// answers that are not in the server-known option set (distractors + correct).
+describe('assertAnswerInOptions [BUG-STALE-OPTIONS]', () => {
+  const vocabQuestion: VocabularyQuestion = {
+    type: 'vocabulary',
+    term: 'die Katze',
+    correctAnswer: 'cat',
+    acceptedAnswers: ['cat', 'the cat'],
+    distractors: ['dog', 'fish', 'bird'],
+    funFact: '',
+    cefrLevel: 'A1',
+    isLibraryItem: false,
+  };
+
+  const capitalsQuestion: CapitalsQuestion = {
+    type: 'capitals',
+    country: 'France',
+    correctAnswer: 'Paris',
+    acceptedAliases: ['Paris'],
+    distractors: ['Lyon', 'Madrid', 'Rome'],
+    funFact: '',
+    isLibraryItem: false,
+  };
+
+  it('[BREAK] throws BadRequestError when MC vocabulary answer is not in options', () => {
+    // Simulates stale-options race: 'dog' is from a different question
+    expect(() =>
+      assertAnswerInOptions(
+        vocabQuestion,
+        'dog_from_old_question',
+        'multiple_choice'
+      )
+    ).toThrow(BadRequestError);
+  });
+
+  it('[BREAK] throws BadRequestError when MC capitals answer is not in options', () => {
+    expect(() =>
+      assertAnswerInOptions(capitalsQuestion, 'Berlin', 'multiple_choice')
+    ).toThrow(BadRequestError);
+  });
+
+  it('accepts a valid MC answer that is in distractors', () => {
+    expect(() =>
+      assertAnswerInOptions(vocabQuestion, 'dog', 'multiple_choice')
+    ).not.toThrow();
+  });
+
+  it('accepts a valid MC answer that is the correctAnswer', () => {
+    expect(() =>
+      assertAnswerInOptions(vocabQuestion, 'cat', 'multiple_choice')
+    ).not.toThrow();
+  });
+
+  it('is a no-op for free_text mode (accepts any answer)', () => {
+    expect(() =>
+      assertAnswerInOptions(vocabQuestion, 'completely_stale', 'free_text')
+    ).not.toThrow();
+  });
+
+  it('is a no-op when answerMode is undefined (backward compat)', () => {
+    expect(() =>
+      assertAnswerInOptions(vocabQuestion, 'completely_stale', undefined)
+    ).not.toThrow();
+  });
+
+  it('is case-insensitive for MC matching', () => {
+    expect(() =>
+      assertAnswerInOptions(vocabQuestion, 'CAT', 'multiple_choice')
+    ).not.toThrow();
+  });
+});
+
 describe('validateResults (anti-tampering)', () => {
   const questions: QuizQuestion[] = [
     {
@@ -239,6 +314,96 @@ describe('validateResults (anti-tampering)', () => {
     const validated = validateResults(questions, malicious);
     expect(validated).toHaveLength(1);
     expect(validated[0]?.questionIndex).toBe(0);
+  });
+
+  // [BUG-STALE-OPTIONS] validateResults must drop MC results where
+  // answerGiven is not in the server-known options — this is the final
+  // defense layer against stale-options race results reaching the score.
+  it('[BREAK/BUG-STALE-OPTIONS] drops MC vocabulary result where answerGiven is not in options', () => {
+    const vocabQuestions: QuizQuestion[] = [
+      {
+        type: 'vocabulary',
+        term: 'die Katze',
+        correctAnswer: 'cat',
+        acceptedAnswers: ['cat'],
+        distractors: ['dog', 'fish', 'bird'],
+        funFact: '',
+        cefrLevel: 'A1',
+        isLibraryItem: false,
+      },
+    ];
+    // Simulates a stale-options answer: 'Bratislava' was from the previous
+    // question (capitals) and got submitted against this vocabulary question.
+    const staleResult: QuestionResult[] = [
+      {
+        questionIndex: 0,
+        correct: false,
+        answerGiven: 'Bratislava',
+        timeMs: 500,
+        answerMode: 'multiple_choice',
+      },
+    ];
+
+    const validated = validateResults(vocabQuestions, staleResult);
+    // The stale result must be dropped, not scored (even as wrong)
+    expect(validated).toHaveLength(0);
+  });
+
+  it('[BUG-STALE-OPTIONS] does NOT drop MC result when answerGiven is a valid option', () => {
+    const vocabQuestions: QuizQuestion[] = [
+      {
+        type: 'vocabulary',
+        term: 'die Katze',
+        correctAnswer: 'cat',
+        acceptedAnswers: ['cat'],
+        distractors: ['dog', 'fish', 'bird'],
+        funFact: '',
+        cefrLevel: 'A1',
+        isLibraryItem: false,
+      },
+    ];
+    const validResult: QuestionResult[] = [
+      {
+        questionIndex: 0,
+        correct: false,
+        answerGiven: 'dog',
+        timeMs: 500,
+        answerMode: 'multiple_choice',
+      },
+    ];
+
+    const validated = validateResults(vocabQuestions, validResult);
+    expect(validated).toHaveLength(1);
+    expect(validated[0]?.answerGiven).toBe('dog');
+    expect(validated[0]?.correct).toBe(false);
+  });
+
+  it('[BUG-STALE-OPTIONS] does NOT drop free_text result regardless of options', () => {
+    const vocabQuestions: QuizQuestion[] = [
+      {
+        type: 'vocabulary',
+        term: 'die Katze',
+        correctAnswer: 'cat',
+        acceptedAnswers: ['cat'],
+        distractors: ['dog', 'fish', 'bird'],
+        funFact: '',
+        cefrLevel: 'A1',
+        isLibraryItem: false,
+      },
+    ];
+    // Free text can be any string — should never be dropped for not being in options
+    const freeTextResult: QuestionResult[] = [
+      {
+        questionIndex: 0,
+        correct: false,
+        answerGiven: 'le chat',
+        timeMs: 500,
+        answerMode: 'free_text',
+      },
+    ];
+
+    const validated = validateResults(vocabQuestions, freeTextResult);
+    expect(validated).toHaveLength(1);
   });
 });
 

@@ -61,6 +61,7 @@ import {
 import { createLogger } from '../logger';
 import { captureException } from '../sentry';
 import { buildResumeContext } from './session-context-builders';
+import { projectAiResponseContent } from '../llm/project-response';
 /**
  * English-language intent pre-classifier used to fast-path four-strands
  * pedagogy for obvious translation / "how do you say" asks.
@@ -189,15 +190,25 @@ export function buildExchangeHistory(
           : ('assistant' as const),
       content:
         e.eventType === 'ai_response'
-          ? JSON.stringify({
-              reply: e.content,
-              signals: {
-                partial_progress: false,
-                needs_deepening: false,
-                understanding_check: false,
-              },
-              ui_hints: { note_prompt: { show: false, post_session: false } },
-            })
+          ? (() => {
+              // [BUG-934] Legacy rows may have raw envelope JSON as content.
+              // Project to plain reply text before re-wrapping in the envelope
+              // so the LLM sees consistent, non-nested history.
+              const replyText = projectAiResponseContent(e.content, {
+                silent: true,
+              });
+              return JSON.stringify({
+                reply: replyText,
+                signals: {
+                  partial_progress: false,
+                  needs_deepening: false,
+                  understanding_check: false,
+                },
+                ui_hints: {
+                  note_prompt: { show: false, post_session: false },
+                },
+              });
+            })()
           : e.content,
     }));
 }

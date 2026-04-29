@@ -59,7 +59,8 @@ export async function getDictationStreak(
   ];
 
   const today = getServerDate();
-  const mostRecentDate = uniqueDates[0]!;
+  const mostRecentDate = uniqueDates[0];
+  if (mostRecentDate == null) return { streak: 0, lastDate: null };
   const daysSinceMostRecent =
     (new Date(today).getTime() - new Date(mostRecentDate).getTime()) /
     (24 * 60 * 60 * 1000);

@@ -40,6 +40,10 @@ import { useSubjects } from '../../hooks/use-subjects';
 import { usePermissionSetup } from '../../hooks/use-permission-setup';
 import { PermissionSetupGate } from '../../components/PermissionSetupGate';
 import { useParentProxy } from '../../hooks/use-parent-proxy';
+import {
+  useActiveProfileRole,
+  type ActiveProfileRole,
+} from '../../hooks/use-active-profile-role';
 
 // ─── Tab visibility whitelist ────────────────────────────────────────
 // Only these routes render a visible tab button. Every other route in
@@ -230,9 +234,16 @@ export function buildSwitchProfileConfirmation(params: {
  */
 function usePostApprovalLanding(
   profileId: string | undefined,
-  consentStatus: string | null | undefined
+  consentStatus: string | null | undefined,
+  // [BUG-914] Only child profiles ever see the post-approval celebration —
+  // parents (owners) approve consent FOR a child, never receive it, and
+  // an impersonating parent isn't the audience for "Your parent said yes"
+  // either. Gating on the discriminated role lets all role-aware copy
+  // sites (more.tsx, mentor-memory.tsx, this hook) speak one vocabulary.
+  role: ActiveProfileRole | null
 ): [boolean, () => void] {
   const isConsented = !!profileId && consentStatus === 'CONSENTED';
+  const isChildProfile = role === 'child';
   const [shouldShow, setShouldShow] = React.useState(false);
   const [checked, setChecked] = React.useState(false);
   // [IMP-2] Only query subjects once we know the screen should show — avoids
@@ -240,12 +251,13 @@ function usePostApprovalLanding(
   // key is already set to 'true'. For new users, the query fires after the
   // SecureStore async read completes.
   const subjects = useSubjects({
-    enabled: isConsented && checked && shouldShow,
+    enabled: isConsented && isChildProfile && checked && shouldShow,
   });
 
   React.useEffect(() => {
-    if (!profileId || consentStatus !== 'CONSENTED') {
+    if (!profileId || consentStatus !== 'CONSENTED' || !isChildProfile) {
       setChecked(true);
+      setShouldShow(false);
       return;
     }
 
@@ -259,7 +271,7 @@ function usePostApprovalLanding(
         setChecked(true);
       }
     })();
-  }, [profileId, consentStatus]);
+  }, [profileId, consentStatus, isChildProfile]);
 
   const dismiss = React.useCallback(() => {
     if (!profileId) return;
@@ -273,7 +285,10 @@ function usePostApprovalLanding(
   // Don't show if subjects are still loading or if user already has subjects
   const subjectsReady = !subjects.isLoading;
   const hasSubjects = (subjects.data?.length ?? 0) > 0;
-  return [checked && subjectsReady && shouldShow && !hasSubjects, dismiss];
+  return [
+    isChildProfile && checked && subjectsReady && shouldShow && !hasSubjects,
+    dismiss,
+  ];
 }
 
 function PostApprovalLanding({
@@ -775,12 +790,14 @@ function ConsentPendingGate(): React.ReactElement {
 
   const onSubmitNewEmail = () => {
     if (!activeProfile || !canSubmitNewEmail) return;
+    const consentType = consentData?.consentType;
+    if (!consentType) return;
     setChangeEmailError('');
     resendMutation.mutate(
       {
         childProfileId: activeProfile.id,
         parentEmail: newParentEmail.trim(),
-        consentType: consentData!.consentType!,
+        consentType,
       },
       {
         onSuccess: () => {
@@ -837,12 +854,13 @@ function ConsentPendingGate(): React.ReactElement {
         </Text>
 
         <Pressable
-          onPress={() =>
+          onPress={() => {
+            if (!activeProfile) return;
             router.push({
               pathname: '/consent',
-              params: { profileId: activeProfile!.id },
-            })
-          }
+              params: { profileId: activeProfile.id },
+            });
+          }}
           className="bg-primary rounded-button py-3.5 px-8 items-center mb-3 w-full"
           testID="consent-send-to-parent"
           accessibilityRole="button"
@@ -1279,19 +1297,33 @@ export default function AppLayout() {
     return () => clearTimeout(timer);
   }, [profileWasRemoved, acknowledgeProfileRemoval]);
 
-  // Post-approval landing: show once after parent approves GDPR/COPPA consent
+  // Post-approval landing: show once after parent approves GDPR/COPPA consent.
+  // [BUG-914] Gate on role === 'child' so the celebration is suppressed for
+  // parent profiles (relevant when a parent switches back from impersonating
+  // a child and lands here) AND for impersonated-child sessions (where the
+  // user is actually the parent and would see "Your parent said yes" while
+  // operating their own account).
+  const role = useActiveProfileRole();
   const [showPostApproval, dismissPostApproval] = usePostApprovalLanding(
     activeProfile?.id,
-    activeProfile?.consentStatus
+    activeProfile?.consentStatus,
+    role
   );
   const [showPermSetup, dismissPermSetup, permState, requestMic, requestNotif] =
     usePermissionSetup(activeProfile?.id);
   usePushTokenRegistration(permState.notif === 'granted');
 
-  if (__DEV__)
-    console.log(
-      `[AUTH-DEBUG] (app) layout | isLoaded=${isLoaded} | isSignedIn=${isSignedIn}`
-    );
+  // [BUG-923] Previously fired on every render of the (app) layout, drowning
+  // signal in noise during debugging sessions. Log only when isLoaded or
+  // isSignedIn actually transition.
+  React.useEffect(() => {
+    if (__DEV__) {
+      console.log(
+        `[AUTH-DEBUG] (app) layout | isLoaded=${isLoaded} | isSignedIn=${isSignedIn}`
+      );
+    }
+  }, [isLoaded, isSignedIn]);
+
   if (!isLoaded)
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>

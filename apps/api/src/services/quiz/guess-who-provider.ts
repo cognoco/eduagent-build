@@ -65,7 +65,7 @@ export function appendSurnameAlias(
   const result = [...aliases];
   const nameParts = canonicalName.trim().split(/\s+/);
   if (nameParts.length > 1) {
-    const surname = nameParts[nameParts.length - 1]!;
+    const surname = nameParts[nameParts.length - 1] ?? '';
     if (!result.some((a) => a.trim().toLowerCase() === surname.toLowerCase())) {
       result.push(surname);
     }

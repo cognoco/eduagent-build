@@ -14,6 +14,7 @@ import type {
 import { routeAndCall } from './llm';
 import type { ChatMessage } from './llm';
 import { escapeXml, sanitizeXmlValue } from './llm/sanitize';
+import { projectAiResponseContent } from './llm/project-response';
 
 const HOMEWORK_SUMMARY_SYSTEM_PROMPT = `You are creating a short parent-facing summary of a student's homework session.
 
@@ -177,7 +178,11 @@ export async function extractHomeworkSummary(
     )
     .map((event) => {
       const role = event.eventType === 'user_message' ? 'Student' : 'Tutor';
-      return `${role}: ${event.content}`;
+      const content =
+        event.eventType === 'ai_response'
+          ? projectAiResponseContent(event.content, { silent: true })
+          : event.content;
+      return `${role}: ${content}`;
     })
     .join('\n');
 
@@ -185,7 +190,9 @@ export async function extractHomeworkSummary(
   // string of raw learner+assistant turns. Sanitize subject + entity-encode
   // the transcript so crafted values inside cannot escape the wrapping tags.
   const safeSubjectName = sanitizeXmlValue(subjectName, 200);
-  const safeTranscript = transcript ? escapeXml(transcript) : 'No transcript available.';
+  const safeTranscript = transcript
+    ? escapeXml(transcript)
+    : 'No transcript available.';
   const messages: ChatMessage[] = [
     { role: 'system', content: HOMEWORK_SUMMARY_SYSTEM_PROMPT },
     {

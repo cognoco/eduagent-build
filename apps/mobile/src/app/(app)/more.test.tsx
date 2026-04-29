@@ -34,6 +34,15 @@ jest.mock('../../lib/profile', () => ({
   }),
 }));
 
+let mockIsParentProxy = false;
+jest.mock('../../hooks/use-parent-proxy', () => ({
+  useParentProxy: () => ({
+    isParentProxy: mockIsParentProxy,
+    childProfile: null,
+    parentProfile: null,
+  }),
+}));
+
 jest.mock('../../hooks/use-account', () => ({
   useExportData: () => ({ mutateAsync: mockExportMutateAsync }),
 }));
@@ -333,6 +342,7 @@ describe('MoreScreen — Learning Mode', () => {
 describe('MoreScreen — Account Actions', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockIsParentProxy = false;
     mockExportMutateAsync.mockResolvedValue({
       account: {
         email: 'alex@example.com',
@@ -412,5 +422,39 @@ describe('MoreScreen — Account Actions', () => {
         undefined
       );
     });
+  });
+});
+
+// [BUG-915] When the parent is impersonating a child profile, the More tab
+// must hide account-level destructive rows. The ProxyBanner at the top of the
+// (app) layout already provides the Switch-back escape, so the user is never
+// stranded — they can return to their parent account at any time.
+describe('MoreScreen — impersonation hides destructive actions (BUG-915)', () => {
+  afterEach(() => {
+    mockIsParentProxy = false;
+  });
+
+  it('hides Sign out, Delete account, Export my data, and Subscription when impersonating', () => {
+    mockIsParentProxy = true;
+    render(<MoreScreen />, { wrapper: createWrapper() });
+
+    expect(screen.queryByTestId('sign-out-button')).toBeNull();
+    expect(screen.queryByTestId('more-row-delete-account')).toBeNull();
+    expect(screen.queryByTestId('more-row-export')).toBeNull();
+    expect(screen.queryByTestId('more-row-subscription')).toBeNull();
+    // Sanity: text-level checks make the assertion visible without testIDs.
+    expect(screen.queryByText('Sign out')).toBeNull();
+    expect(screen.queryByText('Delete account')).toBeNull();
+    expect(screen.queryByText('Export my data')).toBeNull();
+  });
+
+  it('shows Sign out, Delete account, Export my data, and Subscription on the parent account', () => {
+    mockIsParentProxy = false;
+    render(<MoreScreen />, { wrapper: createWrapper() });
+
+    expect(screen.getByTestId('sign-out-button')).toBeTruthy();
+    expect(screen.getByTestId('more-row-delete-account')).toBeTruthy();
+    expect(screen.getByTestId('more-row-export')).toBeTruthy();
+    expect(screen.getByTestId('more-row-subscription')).toBeTruthy();
   });
 });

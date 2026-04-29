@@ -111,7 +111,7 @@ describe('[BUG-850 / F-SVC-021] weekly-progress-push fan-out error escalation', 
     const parentIds = Array.from({ length: 401 }, (_, i) => `parent-${i}`);
     let sendEventCalls = 0;
     const mockStep = {
-      run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => {
+      run: jest.fn(async (_name: string, _fn: () => Promise<unknown>) => {
         // The handler's first step.run resolves the parent list; later steps
         // are only used inside the per-event handler (not under test here).
         return parentIds;

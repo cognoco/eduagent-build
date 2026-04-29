@@ -14,11 +14,13 @@ export {
   NotFoundError,
   ForbiddenError,
   ConflictError,
+  RateLimitedError,
   UpstreamLlmError,
   VocabularyContextError,
   SubjectNotFoundError,
   VocabularyNotFoundError,
   TopicNotSkippedError,
+  BadRequestError,
 } from '@eduagent/schemas';
 
 export function apiError(

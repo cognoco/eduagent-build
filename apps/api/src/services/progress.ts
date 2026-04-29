@@ -698,7 +698,9 @@ export async function getActiveSessionForTopic(
   const sorted = [...sessions].sort(
     (a, b) => b.lastActivityAt.getTime() - a.lastActivityAt.getTime()
   );
-  return { sessionId: sorted[0]!.id };
+  const newest = sorted[0];
+  if (newest == null) return null;
+  return { sessionId: newest.id };
 }
 
 // [F-009] Resolve the subject that owns a given topic — used for deep-link

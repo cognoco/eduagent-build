@@ -28,7 +28,16 @@ export interface DictationPreferences {
   cyclePace: () => void;
 }
 
-const PACE_CYCLE: DictationPace[] = ['slow', 'normal', 'fast'];
+function nextPace(prev: DictationPace): DictationPace {
+  switch (prev) {
+    case 'slow':
+      return 'normal';
+    case 'normal':
+      return 'fast';
+    case 'fast':
+      return 'slow';
+  }
+}
 
 export function useDictationPreferences(
   profileId: string | undefined
@@ -79,8 +88,7 @@ export function useDictationPreferences(
 
   const cyclePace = useCallback(() => {
     setPaceState((prev) => {
-      const idx = PACE_CYCLE.indexOf(prev);
-      const next = PACE_CYCLE[(idx + 1) % PACE_CYCLE.length]!;
+      const next = nextPace(prev);
       if (profileId) {
         void SecureStore.setItemAsync(getPaceKey(profileId), next).catch(
           (err) => reportSecureStoreFailure('pace', err)

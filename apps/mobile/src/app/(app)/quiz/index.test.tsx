@@ -143,6 +143,97 @@ describe('QuizIndexScreen', () => {
       expect(screen.getByTestId('quiz-vocab-locked')).toBeTruthy();
     });
 
+    // [BUG-926] Per-language stats: stat rows now include languageCode so each
+    // vocabulary card only shows stats for rounds played in that language.
+    it('shows per-language stats on the matching card only (BUG-926 fix)', () => {
+      mockStatsState = {
+        data: [
+          // Italian stat row — only the Italian card should show this.
+          {
+            activityType: 'vocabulary',
+            languageCode: 'it',
+            bestScore: 2,
+            bestTotal: 6,
+            roundsPlayed: 1,
+          },
+        ],
+        isError: false,
+      };
+      mockSubjectsState = {
+        data: [
+          {
+            id: 'sub-it',
+            name: 'Italian',
+            pedagogyMode: 'four_strands',
+            languageCode: 'it',
+            status: 'active',
+          },
+          {
+            id: 'sub-es',
+            name: 'Spanish',
+            pedagogyMode: 'four_strands',
+            languageCode: 'es',
+            status: 'active',
+          },
+        ],
+        isError: false,
+      };
+      render(<QuizIndexScreen />);
+
+      expect(screen.getByTestId('quiz-vocabulary-sub-it')).toBeTruthy();
+      expect(screen.getByTestId('quiz-vocabulary-sub-es')).toBeTruthy();
+      // Italian card shows its specific stats.
+      expect(screen.getByText(/Best: 2\/6 · Played: 1/)).toBeTruthy();
+      // Spanish card has no stat row — must show neutral fallback, not the Italian stats.
+      expect(
+        screen.getAllByText(/Practice new words and phrases/).length
+      ).toBeGreaterThanOrEqual(1);
+    });
+
+    it('shows neutral fallback on a language card with no matching stat row (BUG-926 fix)', () => {
+      mockStatsState = {
+        // Only Spanish stats present.
+        data: [
+          {
+            activityType: 'vocabulary',
+            languageCode: 'es',
+            bestScore: 5,
+            bestTotal: 6,
+            roundsPlayed: 3,
+          },
+        ],
+        isError: false,
+      };
+      mockSubjectsState = {
+        data: [
+          {
+            id: 'sub-it',
+            name: 'Italian',
+            pedagogyMode: 'four_strands',
+            languageCode: 'it',
+            status: 'active',
+          },
+          {
+            id: 'sub-es',
+            name: 'Spanish',
+            pedagogyMode: 'four_strands',
+            languageCode: 'es',
+            status: 'active',
+          },
+        ],
+        isError: false,
+      };
+      render(<QuizIndexScreen />);
+
+      // Spanish card shows its stats.
+      expect(screen.getByText(/Best: 5\/6 · Played: 3/)).toBeTruthy();
+      // Italian card has no stat row — neutral fallback must appear.
+      expect(screen.getByText(/Practice new words and phrases/)).toBeTruthy();
+      // Spanish stats must NOT bleed onto Italian card — there should be
+      // exactly one "Best: 5/6" text node (on the Spanish card only).
+      expect(screen.getAllByText(/Best: 5\/6 · Played: 3/).length).toBe(1);
+    });
+
     it('renders a Vocabulary card per active four_strands language subject', () => {
       mockSubjectsState = {
         data: [

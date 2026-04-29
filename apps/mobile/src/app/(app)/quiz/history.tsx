@@ -1,11 +1,12 @@
 import { View, Text, Pressable, FlatList } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRecentRounds } from '../../../hooks/use-quiz';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { useThemeColors } from '../../../lib/theme';
 import { ErrorFallback } from '../../../components/common/ErrorFallback';
+import { extractLanguageFromTheme } from '../../../lib/extract-vocabulary-language';
+import { useScreenTopInset } from '../../../lib/use-screen-top-inset';
 
 // [F-037] Friendly date label — "Today" / "Yesterday" / locale long date.
 function formatDateHeader(isoDate: string): string {
@@ -36,7 +37,10 @@ const ACTIVITY_LABELS: Record<string, string> = {
 export default function QuizHistoryScreen() {
   const router = useRouter();
   const colors = useThemeColors();
-  const insets = useSafeAreaInsets();
+  // [BUG-933] On web, useSafeAreaInsets returns top:0 — useScreenTopInset
+  // applies a 24px minimum so the header doesn't sit flush against the
+  // browser URL bar. Native devices pass through unchanged.
+  const insets = useScreenTopInset();
   const { data: rounds, isLoading, isError, refetch } = useRecentRounds();
 
   if (isLoading) {
@@ -136,9 +140,22 @@ export default function QuizHistoryScreen() {
               {formatDateHeader(section.date)}
             </Text>
             {section.items.map((round) => {
-              const label =
+              const baseLabel =
                 ACTIVITY_LABELS[round.activityType] ??
                 round.activityType.replace(/_/g, ' ');
+              // [BUG-930] Vocabulary rounds are otherwise indistinguishable
+              // by language at a glance — quiz_rounds has no languageCode
+              // column yet, so we extract the language word from the theme
+              // when one is detectable. Falls back to plain "Vocabulary"
+              // when no known language prefix is found, so we never invent
+              // a language attribution for non-language quizzes.
+              const detectedLanguage =
+                round.activityType === 'vocabulary'
+                  ? extractLanguageFromTheme(round.theme)
+                  : null;
+              const label = detectedLanguage
+                ? `${baseLabel}: ${detectedLanguage}`
+                : baseLabel;
               return (
                 <Pressable
                   key={round.id}

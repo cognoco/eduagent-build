@@ -1,4 +1,9 @@
-import { isRecognizedMarker, parseEnvelope } from './envelope';
+import {
+  isRecognizedMarker,
+  normalizeReplyText,
+  parseEnvelope,
+  replyHasLiteralEscape,
+} from './envelope';
 
 // [BUG-847] Telemetry helper — the structured logger writes JSON entries to
 // `console.warn`, so we spy on that and parse the captured JSON to assert
@@ -101,6 +106,87 @@ describe('parseEnvelope', () => {
     if (!result.ok) {
       expect(result.reason).toBe('schema_violation');
     }
+  });
+
+  // ---- [LITERAL-ESCAPE] Defensive normalization -------------------------
+
+  it('[LITERAL-ESCAPE] converts literal `\\n` in reply to a real newline', () => {
+    // Raw JSON `\\n` decodes to literal backslash + n. Without normalization
+    // the renderer prints "Hello\nWorld"; the user expects a paragraph break.
+    const result = parseEnvelope('{"reply": "Hello\\\\nWorld"}');
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.envelope.reply).toBe('Hello\nWorld');
+      expect(result.envelope.reply).not.toContain('\\n');
+    }
+  });
+
+  it('[LITERAL-ESCAPE] converts literal `\\r\\n` to a single newline', () => {
+    const result = parseEnvelope('{"reply": "Line1\\\\r\\\\nLine2"}');
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.envelope.reply).toBe('Line1\nLine2');
+    }
+  });
+
+  it('[LITERAL-ESCAPE] converts literal `\\t` to a real tab', () => {
+    const result = parseEnvelope('{"reply": "col1\\\\tcol2"}');
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.envelope.reply).toBe('col1\tcol2');
+    }
+  });
+
+  it('[LITERAL-ESCAPE] leaves a real newline (correct JSON `\\n`) untouched', () => {
+    // `\\n` in source → `\n` in JSON string → real newline after parse.
+    const result = parseEnvelope('{"reply": "Hello\\nWorld"}');
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.envelope.reply).toBe('Hello\nWorld');
+    }
+  });
+
+  it('[LITERAL-ESCAPE] leaves backslashes preceding non-escape chars alone', () => {
+    // `\\d` is not one of n/r/t — must survive as a literal backslash.
+    const result = parseEnvelope('{"reply": "regex \\\\d+"}');
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.envelope.reply).toBe('regex \\d+');
+    }
+  });
+
+  describe('replyHasLiteralEscape', () => {
+    it('detects a literal `\\n`', () => {
+      expect(replyHasLiteralEscape('Hello\\nWorld')).toBe(true);
+    });
+
+    it('detects a literal `\\t`', () => {
+      expect(replyHasLiteralEscape('a\\tb')).toBe(true);
+    });
+
+    it('returns false for a real newline', () => {
+      expect(replyHasLiteralEscape('Hello\nWorld')).toBe(false);
+    });
+
+    it('returns false for clean prose', () => {
+      expect(replyHasLiteralEscape('Just regular text.')).toBe(false);
+    });
+
+    it('returns false for an unrelated `\\X` sequence', () => {
+      expect(replyHasLiteralEscape('regex \\d+')).toBe(false);
+    });
+  });
+
+  describe('normalizeReplyText', () => {
+    it('is idempotent for already-normalized text', () => {
+      const clean = 'Hello\nWorld\twith\ttabs';
+      expect(normalizeReplyText(clean)).toBe(clean);
+    });
+
+    it('returns a string identical to its input when no leak is present', () => {
+      const input = 'No backslash sequences here.';
+      expect(normalizeReplyText(input)).toBe(input);
+    });
   });
 
   it('accepts ui_hints for upcoming F2.1 / F2.2 migrations', () => {

@@ -618,7 +618,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Subscription confirmed — MentoMate</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -672,7 +672,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Checkout cancelled — MentoMate</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }

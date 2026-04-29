@@ -16,6 +16,7 @@ import {
   curricula,
   curriculumBooks,
   curriculumTopics,
+  learningSessions,
   generateUUIDv7,
   createScopedRepository,
 } from '@eduagent/database';
@@ -621,6 +622,22 @@ export async function resolveFilingResult(
         filedFrom,
         sessionId: sessionId ?? null,
       });
+    }
+
+    if (sessionId) {
+      await txDb
+        .update(learningSessions)
+        .set({
+          topicId,
+          filedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(learningSessions.id, sessionId),
+            eq(learningSessions.profileId, profileId)
+          )
+        );
     }
 
     return {

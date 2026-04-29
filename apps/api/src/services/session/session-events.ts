@@ -52,6 +52,9 @@ export function mapSessionRow(
     durationSeconds: row.durationSeconds ?? null,
     wallClockSeconds: row.wallClockSeconds ?? null,
     rawInput: row.rawInput ?? null,
+    filedAt: row.filedAt?.toISOString() ?? null,
+    filingStatus: row.filingStatus ?? null,
+    filingRetryCount: row.filingRetryCount,
     ...(metadata ? { metadata } : {}),
   };
 }

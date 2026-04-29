@@ -435,6 +435,13 @@ export function streamSSEViaXHR(
   // DB writes) after LLM streaming finishes.
   xhr.send(options.body ?? null);
 
+  // Hoisted executor so the closure isn't re-declared per loop iteration.
+  // The XHR callbacks read `resolve` to wake the generator; the executor only
+  // needs to install the latest resolver before each await.
+  const installResolver = (r: () => void) => {
+    resolve = r;
+  };
+
   async function* generateEvents(): AsyncGenerator<StreamEvent> {
     while (true) {
       // [BUG-632 / I-21] Check streamError BEFORE draining the queue. If a
@@ -458,9 +465,7 @@ export function streamSSEViaXHR(
         }
         return;
       }
-      await new Promise<void>((r) => {
-        resolve = r;
-      });
+      await new Promise<void>(installResolver);
     }
   }
 

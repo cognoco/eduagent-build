@@ -21,14 +21,18 @@ import { getApiUrl } from './api';
 
 import {
   QuotaExceededError,
+  ConflictError,
   ForbiddenError,
+  RateLimitedError,
   UpstreamError,
 } from './api-errors';
 import type { QuotaExceededDetails } from './api-errors';
 
 export {
   QuotaExceededError,
+  ConflictError,
   ForbiddenError,
+  RateLimitedError,
   UpstreamError,
 } from './api-errors';
 export type { QuotaExceededDetails, UpgradeOption } from './api-errors';
@@ -192,6 +196,30 @@ export function useApiClient(): ApiClient {
           throw new ForbiddenError(
             (body?.message as string) ?? undefined,
             (body?.code as string) ?? undefined
+          );
+        }
+
+        if (res.status === 409) {
+          const body = await res
+            .json()
+            .catch(() => null as Record<string, unknown> | null);
+          throw new ConflictError(
+            (body?.message as string) ?? 'Request conflicts with current state'
+          );
+        }
+
+        if (res.status === 429) {
+          const body = await res
+            .json()
+            .catch(() => null as Record<string, unknown> | null);
+          const retryAfterHeader = res.headers.get('Retry-After');
+          const retryAfter =
+            retryAfterHeader != null ? Number(retryAfterHeader) : undefined;
+          throw new RateLimitedError(
+            (body?.message as string) ?? undefined,
+            (body?.code as string) ?? undefined,
+            undefined,
+            Number.isFinite(retryAfter) ? retryAfter : undefined
           );
         }
 

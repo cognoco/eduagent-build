@@ -250,7 +250,28 @@ export function AnimatedSplash({ onComplete }: AnimatedSplashProps) {
         if (finished) runOnJS(done)();
       })
     );
-  }, [done, reduceMotion]);
+    // The reanimated SharedValues below are listed for the linter; their
+    // identity is stable across renders (useSharedValue), so including them
+    // does not change the effect's run cadence — it still fires only when
+    // `done` or `reduceMotion` flip.
+  }, [
+    done,
+    reduceMotion,
+    dot1R,
+    dot2R,
+    dot3R,
+    fade,
+    mentorInR,
+    mentorR,
+    pathDraw,
+    ringOp,
+    spark1,
+    spark2,
+    spark3,
+    studentInR,
+    studentR,
+    wordOp,
+  ]);
 
   // --- Animated props for SVG elements ---
   // Android SVG fix (attempt 4): Android's native SVG renderer discards circles

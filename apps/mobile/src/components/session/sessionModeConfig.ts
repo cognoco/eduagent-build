@@ -7,7 +7,9 @@ export interface SessionModeConfig {
   showQuestionCount: boolean;
 }
 
-export const SESSION_MODE_CONFIGS: Record<string, SessionModeConfig> = {
+export const SESSION_MODE_CONFIGS: Record<string, SessionModeConfig> & {
+  freeform: SessionModeConfig;
+} = {
   homework: {
     title: 'Homework Help',
     subtitle: "Let's work through this together",
@@ -72,7 +74,7 @@ export const SESSION_MODE_CONFIGS: Record<string, SessionModeConfig> = {
   },
 };
 
-const DEFAULT_CONFIG = SESSION_MODE_CONFIGS.freeform!;
+const DEFAULT_CONFIG = SESSION_MODE_CONFIGS.freeform;
 
 export function getModeConfig(mode: string): SessionModeConfig {
   return SESSION_MODE_CONFIGS[mode] ?? DEFAULT_CONFIG;
@@ -82,7 +84,7 @@ export function getModeConfig(mode: string): SessionModeConfig {
 // Cold-start coaching voice (sessions 1-5)
 // ---------------------------------------------------------------------------
 
-const FIRST_SESSION: Record<string, string> = {
+const FIRST_SESSION: Record<string, string> & { freeform: string } = {
   homework:
     "Welcome! I'm your learning mate. Let's tackle this homework together. What are you working on?",
   learning:
@@ -95,7 +97,7 @@ const FIRST_SESSION: Record<string, string> = {
     "Hi! I'm your learning mate. Feel free to ask me anything — I'm here to help.",
 };
 
-export const EARLY_SESSIONS: Record<string, string> = {
+export const EARLY_SESSIONS: Record<string, string> & { freeform: string } = {
   homework: 'Good to see you again! What homework are we tackling today?',
   learning: 'Back for more learning — awesome! What shall we dive into?',
   practice: "Ready for another round? Let's test your knowledge.",
@@ -104,13 +106,14 @@ export const EARLY_SESSIONS: Record<string, string> = {
   freeform: 'Hey again — what are you curious about?',
 };
 
-export const FAMILIAR_SESSIONS: Record<string, string> = {
-  homework: "Let's get this homework done. What do you need help with?",
-  learning: 'What do you remember from our last session?',
-  practice: "Quick: what's the key concept we covered?",
-  recitation: 'What are we reciting today?',
-  freeform: 'Hey again — what are you curious about?',
-};
+export const FAMILIAR_SESSIONS: Record<string, string> & { freeform: string } =
+  {
+    homework: "Let's get this homework done. What do you need help with?",
+    learning: 'What do you remember from our last session?',
+    practice: "Quick: what's the key concept we covered?",
+    recitation: 'What are we reciting today?',
+    freeform: 'Hey again — what are you curious about?',
+  };
 
 /**
  * Returns a session-count-aware opening message.
@@ -172,15 +175,15 @@ export function getOpeningMessage(
   }
 
   if (sessionExperience <= 0) {
-    return FIRST_SESSION[mode] ?? FIRST_SESSION.freeform!;
+    return FIRST_SESSION[mode] ?? FIRST_SESSION.freeform;
   }
 
   if (sessionExperience <= 2) {
-    return EARLY_SESSIONS[mode] ?? EARLY_SESSIONS.freeform!;
+    return EARLY_SESSIONS[mode] ?? EARLY_SESSIONS.freeform;
   }
 
   if (sessionExperience <= 4) {
-    return FAMILIAR_SESSIONS[mode] ?? FAMILIAR_SESSIONS.freeform!;
+    return FAMILIAR_SESSIONS[mode] ?? FAMILIAR_SESSIONS.freeform;
   }
 
   // Session 6+ — standard brief messages

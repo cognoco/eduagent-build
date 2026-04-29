@@ -21,7 +21,7 @@ import {
   xpLedger,
 } from '@eduagent/database';
 import type { ProgressMetrics } from '@eduagent/schemas';
-import { eq, like } from 'drizzle-orm';
+import { like } from 'drizzle-orm';
 import { ForbiddenError } from '../errors';
 import {
   countGuidedMetrics,

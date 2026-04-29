@@ -1489,4 +1489,43 @@ describe('analyzeSessionTranscript', () => {
     expect(systemPrompt).not.toContain(malicious);
     expect(systemPrompt).toContain('&lt;/learner_raw_input&gt;');
   });
+
+  it('[BUG-934] projects legacy raw-envelope ai_response content to plain reply in transcript XML', async () => {
+    mockRouteAndCall.mockResolvedValue({ response: null });
+
+    const rawEnvelope = JSON.stringify({
+      reply: 'The mitochondria is the powerhouse of the cell.',
+      signals: {
+        partial_progress: false,
+        needs_deepening: false,
+        understanding_check: false,
+      },
+      ui_hints: { note_prompt: { show: false, post_session: false } },
+    });
+
+    // Need at least 3 conversation events to pass the minEvents guard.
+    const events = [
+      { eventType: 'user_message', content: 'What is mitochondria?' },
+      { eventType: 'ai_response', content: rawEnvelope },
+      { eventType: 'user_message', content: 'Tell me more.' },
+      { eventType: 'ai_response', content: 'It produces ATP via respiration.' },
+    ];
+
+    await analyzeSessionTranscript(events, 'Biology', 'Cells', null);
+
+    const [messages] = mockRouteAndCall.mock.calls[0] as [
+      { role: string; content: string }[]
+    ];
+    // The transcript body is sent as the user message (messages[1]), not
+    // the system prompt (messages[0]).
+    const userMessage = messages[1].content;
+
+    // The plain reply text must appear in the transcript block.
+    expect(userMessage).toContain(
+      'The mitochondria is the powerhouse of the cell.'
+    );
+    // Raw JSON structure must NOT appear — that would leak to the LLM.
+    expect(userMessage).not.toContain('"signals"');
+    expect(userMessage).not.toContain('"ui_hints"');
+  });
 });

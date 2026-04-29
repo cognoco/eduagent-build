@@ -5,3 +5,4 @@ export * from './account-repository';
 export * from './rls';
 export * from './utils/uuid';
 export * from './queries/embeddings';
+export * from './streaks-rules';

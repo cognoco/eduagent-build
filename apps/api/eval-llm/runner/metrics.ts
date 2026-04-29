@@ -33,6 +33,15 @@ export interface SampleMetrics {
   envelopeOk: boolean;
   /** Reply field present and non-empty. */
   hasReply: boolean;
+  /**
+   * Reply contains a literal `\n`, `\r`, or `\t` escape sequence (backslash +
+   * letter, two visible characters) — the bug pattern produced by LLMs that
+   * double-escape JSON. Measured on the RAW envelope reply, before any runtime
+   * normalization, so a regression of the prompt instruction is visible here
+   * even though end users never see the literal escape thanks to
+   * `normalizeReplyText`. False when envelope parse failed.
+   */
+  replyHasLiteralEscape: boolean;
   /** Signals observed in the envelope (all false when envelope parse failed). */
   signals: {
     partialProgress: boolean;
@@ -56,6 +65,8 @@ export interface FlowAggregate {
   rates: {
     envelopeOk: number;
     hasReply: number;
+    /** Share of samples whose raw reply contained a literal escape leak. */
+    replyHasLiteralEscape: number;
     partialProgress: number;
     needsDeepening: number;
     understandingCheck: number;
@@ -100,6 +111,7 @@ export function extractSampleMetrics(rawResponse: string): SampleMetrics {
   const empty: SampleMetrics = {
     envelopeOk: false,
     hasReply: false,
+    replyHasLiteralEscape: false,
     signals: {
       partialProgress: false,
       needsDeepening: false,
@@ -132,6 +144,9 @@ export function extractSampleMetrics(rawResponse: string): SampleMetrics {
   return {
     envelopeOk: true,
     hasReply: env.reply.trim().length > 0,
+    // Read the RAW reply (before runtime normalization) so prompt regressions
+    // are caught even though end users see clean text.
+    replyHasLiteralEscape: /\\[nrt]/.test(env.reply),
     signals: {
       partialProgress: signals.partial_progress === true,
       needsDeepening: signals.needs_deepening === true,
@@ -155,6 +170,7 @@ export function aggregateFlowSamples(samples: SampleMetrics[]): FlowAggregate {
       rates: {
         envelopeOk: 0,
         hasReply: 0,
+        replyHasLiteralEscape: 0,
         partialProgress: 0,
         needsDeepening: 0,
         understandingCheck: 0,
@@ -168,6 +184,7 @@ export function aggregateFlowSamples(samples: SampleMetrics[]): FlowAggregate {
 
   let envelopeOk = 0;
   let hasReply = 0;
+  let replyHasLiteralEscape = 0;
   let partialProgress = 0;
   let needsDeepening = 0;
   let understandingCheck = 0;
@@ -179,6 +196,7 @@ export function aggregateFlowSamples(samples: SampleMetrics[]): FlowAggregate {
   for (const s of samples) {
     if (s.envelopeOk) envelopeOk++;
     if (s.hasReply) hasReply++;
+    if (s.replyHasLiteralEscape) replyHasLiteralEscape++;
     if (s.signals.partialProgress) partialProgress++;
     if (s.signals.needsDeepening) needsDeepening++;
     if (s.signals.understandingCheck) understandingCheck++;
@@ -193,6 +211,7 @@ export function aggregateFlowSamples(samples: SampleMetrics[]): FlowAggregate {
     rates: {
       envelopeOk: envelopeOk / n,
       hasReply: hasReply / n,
+      replyHasLiteralEscape: replyHasLiteralEscape / n,
       partialProgress: partialProgress / n,
       needsDeepening: needsDeepening / n,
       understandingCheck: understandingCheck / n,

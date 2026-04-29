@@ -16,6 +16,7 @@ import {
   type Database,
 } from '@eduagent/database';
 import { escapeXml, sanitizeXmlValue } from '../llm/sanitize';
+import { projectAiResponseContent } from '../llm/project-response';
 
 // ---------------------------------------------------------------------------
 // FR210: Active time computation (internal analytics)
@@ -326,7 +327,14 @@ export async function buildResumeContext(
 
   const transcriptLines = [...events].reverse().map((event) => {
     const role = event.eventType === 'user_message' ? 'Learner' : 'Mentor';
-    return `${role}: ${escapeXml(event.content.slice(0, 500))}`;
+    // [BUG-934] Legacy ai_response rows may store raw envelope JSON.
+    // Project to plain reply text before slicing so the resume context
+    // block never leaks raw JSON into the system prompt.
+    const projected =
+      event.eventType === 'ai_response'
+        ? projectAiResponseContent(event.content, { silent: true })
+        : event.content;
+    return `${role}: ${escapeXml(projected.slice(0, 500))}`;
   });
   if (transcriptLines.length > 0) {
     sections.push(`Recent exchange:\n${transcriptLines.join('\n')}`);

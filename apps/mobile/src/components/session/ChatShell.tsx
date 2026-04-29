@@ -272,6 +272,16 @@ export function ChatShell({
   }, [messages]);
 
   useEffect(() => {
+    // [BUG-928] On web, AccessibilityInfo.isScreenReaderEnabled() returns
+    // true on Chromium-based browsers whenever the accessibility tree is
+    // generated for performance reasons (Chromium's AXMode), even with no
+    // assistive tech actually running. Auto-suppressing TTS based on that
+    // signal silently disables voice output for ordinary Chrome users.
+    // Native (iOS/Android) reports accurately, so we keep the listener
+    // there. Web users who actually use AT can disable voice manually via
+    // the VoiceToggle.
+    if (Platform.OS === 'web') return;
+
     let mounted = true;
 
     void AccessibilityInfo.isScreenReaderEnabled().then((enabled) => {

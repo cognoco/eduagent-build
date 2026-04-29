@@ -178,6 +178,7 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
       activeProfileId,
       activeSessionId,
       inputMode,
+      setInputMode,
       setSessionInputMode,
       showConfirmation,
     ]
@@ -405,6 +406,7 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
     exchangeCount,
     topicId,
     navigateToSummary,
+    router,
     setIsClosing,
     setShowFilingPrompt,
     closedSessionRef,

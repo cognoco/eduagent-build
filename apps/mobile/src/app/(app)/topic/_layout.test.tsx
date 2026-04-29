@@ -14,9 +14,7 @@ interface ScreenProps {
 const capturedScreens: ScreenProps[] = [];
 
 jest.mock('expo-router', () => {
-  function MockStack({ children }: { children?: React.ReactNode }) {
-    return <>{children}</>;
-  }
+  const MockStack = ({ children }: { children?: React.ReactNode }) => children;
   MockStack.Screen = (props: ScreenProps) => {
     capturedScreens.push(props);
     return null;

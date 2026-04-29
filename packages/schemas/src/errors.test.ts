@@ -14,6 +14,7 @@ import {
   ConflictError,
   ForbiddenError,
   NotFoundError,
+  RateLimitedError,
   UpstreamLlmError,
   VocabularyContextError,
 } from './errors.js';
@@ -44,6 +45,16 @@ describe('typed error classes [BUG-644]', () => {
     expect(err).toBeInstanceOf(ConflictError);
     expect(err.name).toBe('ConflictError');
     expect(err.message).toBe('round already completed');
+  });
+
+  it('RateLimitedError exposes code, retryAfter, and preserves instanceof', () => {
+    const err = new RateLimitedError('too fast', 'RATE_LIMITED', undefined, 30);
+    expect(err).toBeInstanceOf(Error);
+    expect(err).toBeInstanceOf(RateLimitedError);
+    expect(err.name).toBe('RateLimitedError');
+    expect(err.message).toBe('too fast');
+    expect(err.code).toBe('RATE_LIMITED');
+    expect(err.retryAfter).toBe(30);
   });
 
   it('UpstreamLlmError preserves caller-supplied message', () => {

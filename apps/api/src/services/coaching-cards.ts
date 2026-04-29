@@ -8,7 +8,6 @@
 import { eq, and, gt, gte, asc, desc, sql, inArray } from 'drizzle-orm';
 import {
   learningSessions,
-  streaks,
   subjects,
   curriculumBooks,
   curriculumTopics,
@@ -24,7 +23,6 @@ import {
   mergeHomeSurfaceCacheData,
   readHomeSurfaceCacheData,
 } from './home-surface-cache';
-import { getStreakDisplayInfo, type StreakState } from './streaks';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -150,10 +148,12 @@ export async function precomputeCoachingCard(
   const repo = createScopedRepository(db, profileId);
   const allCards = await repo.retentionCards.findMany();
 
-  // Fetch streak state (streaks has unique profileId constraint)
-  const streakRow = await db.query.streaks.findFirst({
-    where: eq(streaks.profileId, profileId),
-  });
+  // [BUG-912] Fetch streak through findCurrentForToday so the row is already
+  // decayed-for-today before it reaches a display path. The returned object
+  // exposes isOnGracePeriod + graceDaysRemaining directly.
+  const streakRow = await repo.streaks.findCurrentForToday(
+    now.toISOString().slice(0, 10)
+  );
 
   // --- Check urgency boost before priority cascade ---
   let boostedSubjectIds = new Set<string>();
@@ -230,38 +230,26 @@ export async function precomputeCoachingCard(
   }
 
   // --- Priority 2: streak (grace period) ---
-  if (streakRow) {
-    const streakState: StreakState = {
+  if (streakRow && streakRow.isOnGracePeriod) {
+    const young = learnerAge !== null && learnerAge < 13;
+    return {
+      id,
+      profileId,
+      type: 'streak',
+      title: young ? "Don't lose your streak!" : 'Keep your streak alive!',
+      body: young
+        ? `You've been learning for ${streakRow.currentStreak} days in a row! Come back today to keep it going!`
+        : `Your ${streakRow.currentStreak}-day streak is at risk. ${
+            streakRow.graceDaysRemaining
+          } grace day${
+            streakRow.graceDaysRemaining === 1 ? '' : 's'
+          } remaining.`,
+      priority: 6,
+      expiresAt,
+      createdAt,
       currentStreak: streakRow.currentStreak,
-      longestStreak: streakRow.longestStreak,
-      lastActivityDate: streakRow.lastActivityDate,
-      gracePeriodStartDate: streakRow.gracePeriodStartDate,
+      graceRemaining: streakRow.graceDaysRemaining,
     };
-
-    const today = now.toISOString().slice(0, 10);
-    const display = getStreakDisplayInfo(streakState, today);
-
-    if (display.isOnGracePeriod) {
-      const young = learnerAge !== null && learnerAge < 13;
-      return {
-        id,
-        profileId,
-        type: 'streak',
-        title: young ? "Don't lose your streak!" : 'Keep your streak alive!',
-        body: young
-          ? `You've been learning for ${streakState.currentStreak} days in a row! Come back today to keep it going!`
-          : `Your ${streakState.currentStreak}-day streak is at risk. ${
-              display.graceDaysRemaining
-            } grace day${
-              display.graceDaysRemaining === 1 ? '' : 's'
-            } remaining.`,
-        priority: 6,
-        expiresAt,
-        createdAt,
-        currentStreak: streakState.currentStreak,
-        graceRemaining: display.graceDaysRemaining,
-      };
-    }
   }
 
   // --- Priority 2.5: homework_connection (homework matches curriculum) ---
@@ -452,7 +440,8 @@ async function findQuizDiscoveryCard(
 
   if (qualifying.length === 0) return null;
 
-  const top = qualifying[0]!;
+  const top = qualifying[0];
+  if (top == null) return null;
   const copy = quizDiscoveryCopy(top.activityType, top.count, meta.learnerAge);
 
   return {

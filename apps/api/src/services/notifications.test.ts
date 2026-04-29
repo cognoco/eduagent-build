@@ -1,10 +1,12 @@
 import {
   sendPushNotification,
   sendEmail,
+  sendStruggleNotification,
   isExpoPushToken,
   formatReviewReminderBody,
   formatDailyReminderBody,
   formatRecallNudge,
+  formatFilingFailedPush,
   formatStruggleNotificationCopy,
   MAX_DAILY_PUSH,
   type NotificationPayload,
@@ -19,12 +21,15 @@ import type { Database } from '@eduagent/database';
 const mockGetPushToken = jest.fn();
 const mockGetDailyNotificationCount = jest.fn();
 const mockLogNotification = jest.fn();
+const mockCheckAndLogRateLimitInternal = jest.fn();
 
 jest.mock('./settings', () => ({
   getPushToken: (...args: unknown[]) => mockGetPushToken(...args),
   getDailyNotificationCount: (...args: unknown[]) =>
     mockGetDailyNotificationCount(...args),
   logNotification: (...args: unknown[]) => mockLogNotification(...args),
+  checkAndLogRateLimitInternal: (...args: unknown[]) =>
+    mockCheckAndLogRateLimitInternal(...args),
 }));
 
 // ---------------------------------------------------------------------------
@@ -147,6 +152,14 @@ describe('sendPushNotification', () => {
     const result = await sendPushNotification(mockDb, payload);
 
     expect(result).toEqual({ sent: false, reason: 'network_error' });
+  });
+});
+
+describe('formatFilingFailedPush', () => {
+  it('returns title and body referencing topic placement', () => {
+    const { title, body } = formatFilingFailedPush();
+    expect(title).toMatch(/topic placement/i);
+    expect(body.length).toBeGreaterThan(0);
   });
 });
 
@@ -322,6 +335,95 @@ describe('sendEmail', () => {
       string
     >;
     expect(headers['Idempotency-Key']).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [BUG-856] sendStruggleNotification — atomic rate-limit migration
+// ---------------------------------------------------------------------------
+//
+// The non-atomic getRecentNotificationCount + later log pattern allowed two
+// concurrent strugle notifications for the same (parentProfileId, type) to
+// both observe count=0 and both push, defeating the 24h dedup invariant.
+// The migration uses checkAndLogRateLimitInternal which serializes via a
+// pg_advisory_xact_lock so only the first concurrent caller proceeds.
+
+describe('[BUG-856] sendStruggleNotification rate-limit atomicity', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  function dbWithFamilyLink(parentProfileId: string | null) {
+    const familyLinkRow = parentProfileId
+      ? { parentProfileId, childProfileId: 'child-1' }
+      : null;
+    const childProfileRow = { displayName: 'Emma' };
+    return {
+      query: {
+        familyLinks: { findFirst: jest.fn().mockResolvedValue(familyLinkRow) },
+        profiles: { findFirst: jest.fn().mockResolvedValue(childProfileRow) },
+      },
+    } as unknown as Database;
+  }
+
+  it('[BUG-856] returns dedup_24h and skips push when checkAndLogRateLimitInternal returns true', async () => {
+    mockCheckAndLogRateLimitInternal.mockResolvedValue(true);
+    mockGetPushToken.mockResolvedValue('ExponentPushToken[abc]');
+
+    const result = await sendStruggleNotification(
+      dbWithFamilyLink('parent-1'),
+      'child-1',
+      { type: 'struggle_noticed', topic: 'Algebra', confidence: 0.7 }
+    );
+
+    expect(result).toEqual({ sent: false, reason: 'dedup_24h' });
+    expect(mockCheckAndLogRateLimitInternal).toHaveBeenCalledWith(
+      expect.anything(),
+      'parent-1',
+      'struggle_noticed',
+      { hours: 24, maxCount: 1 }
+    );
+    // Never reaches push send when rate-limited.
+    expect(mockFetchFn).not.toHaveBeenCalled();
+  });
+
+  it('[BUG-856] proceeds with push and DOES NOT double-log when rate-limit slot is reserved', async () => {
+    mockCheckAndLogRateLimitInternal.mockResolvedValue(false);
+    mockGetPushToken.mockResolvedValue('ExponentPushToken[abc]');
+    mockGetDailyNotificationCount.mockResolvedValue(0);
+    mockFetchFn.mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: { id: 'ticket-1' } }),
+    });
+
+    const result = await sendStruggleNotification(
+      dbWithFamilyLink('parent-1'),
+      'child-1',
+      { type: 'struggle_flagged', topic: 'Geometry', confidence: 0.95 }
+    );
+
+    expect(result).toEqual({ sent: true, ticketId: 'ticket-1' });
+    expect(mockCheckAndLogRateLimitInternal).toHaveBeenCalledTimes(1);
+    // Critical: sendPushNotification must skip its own log because the slot
+    // was already reserved atomically — otherwise we'd double-count toward
+    // the daily cap and create a phantom dedup row.
+    expect(mockLogNotification).not.toHaveBeenCalled();
+    expect(mockFetchFn).toHaveBeenCalledTimes(1);
+  });
+
+  it('[BUG-856] returns no_parent_link without consulting rate-limit when no familyLink', async () => {
+    const result = await sendStruggleNotification(
+      dbWithFamilyLink(null),
+      'child-1',
+      {
+        type: 'struggle_noticed',
+        topic: 'X',
+        confidence: 0.7,
+      }
+    );
+
+    expect(result).toEqual({ sent: false, reason: 'no_parent_link' });
+    expect(mockCheckAndLogRateLimitInternal).not.toHaveBeenCalled();
   });
 });
 

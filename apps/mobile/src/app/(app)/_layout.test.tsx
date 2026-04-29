@@ -206,6 +206,33 @@ describe('AppLayout', () => {
     expect(screen.queryByTestId('redirect')).toBeNull();
   });
 
+  // [BUG-923] AUTH-DEBUG must log only on auth state transitions, not on
+  // every render of the (app) layout. Pre-fix the log fired on every render,
+  // drowning real signal in noise during debugging sessions.
+  it('logs AUTH-DEBUG only once per mount when auth state is stable (BUG-923)', () => {
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(jest.fn());
+    try {
+      const { rerender } = render(<AppLayout />);
+      const initialAuthLogs = logSpy.mock.calls.filter(
+        (args) =>
+          typeof args[0] === 'string' &&
+          args[0].includes('[AUTH-DEBUG] (app) layout')
+      ).length;
+      // Re-render with the same auth state — the debug log must not fire again.
+      rerender(<AppLayout />);
+      rerender(<AppLayout />);
+      const afterRerendersAuthLogs = logSpy.mock.calls.filter(
+        (args) =>
+          typeof args[0] === 'string' &&
+          args[0].includes('[AUTH-DEBUG] (app) layout')
+      ).length;
+      expect(initialAuthLogs).toBe(1);
+      expect(afterRerendersAuthLogs).toBe(initialAuthLogs);
+    } finally {
+      logSpy.mockRestore();
+    }
+  });
+
   // ---------------------------------------------------------------------------
   // Auth guard — redirects unauthenticated users to sign-in.
   //
@@ -330,6 +357,54 @@ describe('AppLayout', () => {
     expect(screen.getByTestId('profile-loading')).toBeTruthy();
     expect(screen.queryByTestId('tabs')).toBeNull();
     expect(screen.queryByTestId('redirect')).toBeNull();
+  });
+
+  // [BUG-914] When a parent (isOwner=true) is the active profile — typically
+  // because they just tapped "Switch back" while impersonating a child — the
+  // post-approval celebration must NOT render. The celebration addresses the
+  // child in the second person ("Your parent said yes"), so showing it to the
+  // parent is wrong copy and indicates a misclassified state. Pre-fix, the
+  // landing showed for any CONSENTED profile with no subjects, including
+  // parents.
+  it('does not show post-approval landing for parent (owner) profiles (BUG-914)', () => {
+    mockUseProfile.mockReturnValue({
+      profiles: [
+        {
+          id: 'p1',
+          isOwner: true,
+          consentStatus: 'CONSENTED',
+          birthYear: 1990,
+        },
+      ],
+      activeProfile: {
+        id: 'p1',
+        isOwner: true, // <-- parent
+        consentStatus: 'CONSENTED',
+        birthYear: 1990,
+      },
+      isLoading: false,
+      profileWasRemoved: false,
+      acknowledgeProfileRemoval: jest.fn(),
+      switchProfile: jest.fn(),
+    });
+    mockUseConsentStatus.mockReturnValue({
+      data: {
+        consentStatus: 'CONSENTED',
+        parentEmail: null,
+        consentType: null,
+      },
+    });
+    // No subjects yet — pre-fix this triggered the celebration.
+    mockUseSubjects.mockReturnValue({
+      data: [],
+      isLoading: false,
+    });
+
+    render(<AppLayout />);
+
+    expect(screen.queryByTestId('post-approval-landing')).toBeNull();
+    expect(screen.queryByText("You're approved!")).toBeNull();
+    expect(screen.getByTestId('tabs')).toBeTruthy();
   });
 
   it('does not show post-approval landing when user already has subjects (BUG-544)', () => {

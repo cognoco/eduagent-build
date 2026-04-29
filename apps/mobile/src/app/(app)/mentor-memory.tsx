@@ -33,6 +33,7 @@ import {
 } from '../../hooks/use-learner-profile';
 import { MemoryConsentPrompt } from '../../components/memory-consent-prompt';
 import { useParentProxy } from '../../hooks/use-parent-proxy';
+import { useActiveProfileRole } from '../../hooks/use-active-profile-role';
 
 export default function MentorMemoryScreen() {
   const insets = useSafeAreaInsets();
@@ -46,6 +47,7 @@ export default function MentorMemoryScreen() {
   const unsuppress = useUnsuppressInference();
   const grantConsent = useGrantMemoryConsent();
   const { isParentProxy } = useParentProxy();
+  const role = useActiveProfileRole();
   const [draft, setDraft] = useState('');
 
   // [H12] Timeout escape for loading spinner
@@ -333,9 +335,15 @@ export default function MentorMemoryScreen() {
             <Text className="text-body-sm font-medium text-primary">
               {accommodationBadgeText}
             </Text>
-            <Text className="text-caption text-text-secondary mt-1">
-              Set by your parent in their settings.
-            </Text>
+            {/* Role-aware attribution: owner profiles set their own
+                accommodation in /more, so they have no "parent" to
+                attribute it to. The phrase only fits non-owner profiles
+                (child user, or parent in proxy mode). */}
+            {role !== 'owner' ? (
+              <Text className="text-caption text-text-secondary mt-1">
+                Set by your parent in their settings.
+              </Text>
+            ) : null}
           </View>
         ) : null}
 

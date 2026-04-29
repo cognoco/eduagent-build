@@ -18,10 +18,8 @@ export default function QuizResultsScreen(): React.ReactElement {
     completionResult,
     prefetchedRoundId,
     round,
-    setCompletionResult,
     setPrefetchedRoundId,
     setRound,
-    clear,
   } = useQuizFlow();
   // [BUG-777 / M-15] Pin the FIRST non-null round we see so a "Play Again"
   // press — which sets a NEW round into context BEFORE this screen unmounts
@@ -46,7 +44,10 @@ export default function QuizResultsScreen(): React.ReactElement {
   const prefetchedRound = useFetchRound(prefetchedRoundId);
 
   // [MIN-6] Guard against direct navigation with cleared context — redirect
-  // to practice rather than rendering a meaningless "0/0" screen.
+  // to practice rather than rendering a meaningless "0/0" screen. Only fires
+  // on a cold mount with empty state (deep-link / refreshed tab on web); the
+  // Play Again / Done handlers below never null completionResult themselves,
+  // so this guard cannot race with intentional navigation.
   useEffect(() => {
     if (!completionResult) {
       goBackOrReplace(router, '/(app)/practice');
@@ -100,16 +101,19 @@ export default function QuizResultsScreen(): React.ReactElement {
   }
 
   function handlePlayAgain() {
-    // [F-Q-09] Navigate FIRST, then clear completionResult. Clearing first
-    // triggers the useEffect guard at the top of this screen (which fires when
-    // completionResult becomes null) and causes an unintended redirect to
-    // /practice before our explicit replace() runs. By navigating first we
-    // leave the results screen before the null-check effect can react.
+    // [BUG-925 fix] Do NOT mutate completionResult here. On web, setting it
+    // null inside the handler causes the QuizFlowProvider re-render to
+    // interleave with router.replace's internal state update, and the
+    // navigation gets dropped while the screen blanks out.
+    //
+    // We don't need to clear it: navigating to /quiz/play stays inside the
+    // quiz stack and the next round's completion will overwrite this value
+    // before the user sees /quiz/results again. Navigating to /quiz/launch
+    // does the same.
     if (prefetchedRound.data) {
       setRound(prefetchedRound.data);
       setPrefetchedRoundId(null);
       router.replace('/(app)/quiz/play' as never);
-      setCompletionResult(null);
       return;
     }
 
@@ -122,17 +126,25 @@ export default function QuizResultsScreen(): React.ReactElement {
     }
 
     if (!activityType) {
-      goBackOrReplace(router, '/(app)/practice');
+      router.replace('/(app)/practice' as never);
       return;
     }
 
     router.replace('/(app)/quiz/launch' as never);
-    setCompletionResult(null);
   }
 
   function handleDone() {
-    clear();
-    goBackOrReplace(router, '/(app)/practice');
+    // [BUG-925 fix] Always replace to /practice, never router.back(). When
+    // canGoBack() is true (the common case after a normal quiz flow),
+    // router.back() lands on /quiz/play with stale/null round state, where
+    // /quiz/play's own guard re-redirects — the user perceives "Done did
+    // nothing". router.replace targets /practice deterministically.
+    //
+    // Do NOT call clear() here. Navigating out of the quiz stack unmounts
+    // QuizFlowProvider, which resets state naturally; calling clear() inside
+    // the handler causes the same QuizFlowProvider/router-update interleave
+    // that broke Play Again on web.
+    router.replace('/(app)/practice' as never);
   }
 
   return (

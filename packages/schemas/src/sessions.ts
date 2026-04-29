@@ -192,6 +192,13 @@ export const sessionStatusSchema = z.enum([
 ]);
 export type SessionStatus = z.infer<typeof sessionStatusSchema>;
 
+export const filingStatusSchema = z.enum([
+  'filing_pending',
+  'filing_failed',
+  'filing_recovered',
+]);
+export type FilingStatus = z.infer<typeof filingStatusSchema>;
+
 export const summaryStatusSchema = z.enum([
   'pending',
   'submitted',
@@ -242,6 +249,9 @@ export const learningSessionSchema = z.object({
   wallClockSeconds: z.number().int().nullable(),
   metadata: sessionMetadataSchema.optional(),
   rawInput: z.string().nullable().optional(),
+  filedAt: z.string().datetime().nullable(),
+  filingStatus: filingStatusSchema.nullable(),
+  filingRetryCount: z.number().int().nonnegative(),
 });
 export type LearningSession = z.infer<typeof learningSessionSchema>;
 

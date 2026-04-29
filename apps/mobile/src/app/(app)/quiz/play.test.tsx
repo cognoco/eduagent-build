@@ -150,8 +150,25 @@ describe('QuizPlayScreen', () => {
         roundId: 'round-1',
         questionIndex: 0,
         answerGiven: 'Bratislava',
+        answerMode: 'free_text',
       });
     });
+  });
+
+  // [BUG-928] Path 7 spec: "Question header: '1 of 7' + dot indicators +
+  // elapsed seconds". The previous F-Q-13 implementation hid the timer for
+  // anxiety, but this is a count-UP timer so motivation > anxiety.
+  it('[BUG-928] renders the elapsed-seconds counter in the header', () => {
+    render(<QuizPlayScreen />);
+
+    const elapsed = screen.getByTestId('quiz-play-elapsed');
+    expect(elapsed).toBeTruthy();
+    // Initial render: timer started from Date.now() in this same tick, so
+    // the floored seconds value is 0.
+    expect(elapsed.props.children).toEqual([0, 's']);
+    // Aria-label includes a unit so screen-reader users hear "Elapsed time:
+    // 0 seconds" instead of just "0s".
+    expect(elapsed.props.accessibilityLabel).toBe('Elapsed time: 0 seconds');
   });
 });
 
@@ -228,6 +245,121 @@ describe('QuizPlayScreen — malformed MC dedup', () => {
   });
 });
 
+// [BUG-924] REGRESSION PIN — not a fix confirmation.
+//
+// User report: "tapped The bird (idx 0), recorded The worm (idx 1)" on
+// Expo web preview (Vocabulary: Italian round, parent account on
+// /quiz/play). The original index-mismatch hypothesis (shuffled-vs-
+// canonical index) does not fit because the client sends answerGiven as
+// a string, not an index, and the server stores it verbatim — any
+// divergence must come from JSX-layer closure binding or web-specific
+// event routing, neither of which Jest/RNTL exercises.
+//
+// What this test does: it locks the expected contract — each option's
+// onPress must record EXACTLY the option string rendered at that index,
+// for every index in the round. If the native path ever regresses
+// (wrong string captured), this test will catch it.
+//
+// What this test does NOT do: reproduce the original user-reported bug.
+// The actual failure mode is web-only. No reliable Playwright repro has
+// been pinned down yet; a durable web-layer regression test remains an
+// open follow-up on BUG-924.
+describe('QuizPlayScreen — answerGiven matches rendered option text (BUG-924)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCheckAnswer.mockResolvedValue({ correct: true });
+  });
+
+  it.each([
+    [0, 'The bird'],
+    [1, 'The worm'],
+    [2, 'The feather'],
+    [3, 'The animal'],
+  ])(
+    'tap on quiz-option-%i records answerGiven=%j',
+    async (index: number, expected: string) => {
+      mockRound = {
+        id: 'round-924',
+        activityType: 'vocabulary' as const,
+        theme: 'Italian — animals',
+        total: 1,
+        questions: [
+          {
+            type: 'vocabulary' as const,
+            term: "L'uccello",
+            options: ['The bird', 'The worm', 'The feather', 'The animal'],
+            cefrLevel: 'A2',
+            isLibraryItem: false,
+            freeTextEligible: false,
+          },
+        ],
+      };
+      render(<QuizPlayScreen />);
+      fireEvent.press(screen.getByTestId(`quiz-option-${index}`));
+      await waitFor(() => {
+        expect(mockCheckAnswer).toHaveBeenCalledWith({
+          roundId: 'round-924',
+          questionIndex: 0,
+          answerGiven: expected,
+          answerMode: 'multiple_choice',
+        });
+      });
+    }
+  );
+});
+
+// [BUG-927] Dispute UI ("Not quite right?") must not appear after a CORRECT
+// answer — there is nothing to dispute. Surfacing the link there is confusing
+// UX and creates noisy challenge reports for clearly correct answers.
+describe('QuizPlayScreen — dispute button visibility (BUG-927)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockRound = {
+      id: 'round-dispute',
+      activityType: 'capitals' as const,
+      theme: 'Europe',
+      total: 1,
+      questions: [
+        {
+          type: 'capitals' as const,
+          country: 'Slovakia',
+          options: ['Bratislava', 'Prague', 'Warsaw', 'Budapest'],
+          isLibraryItem: true,
+          freeTextEligible: false,
+        },
+      ],
+    };
+  });
+
+  it('hides dispute button after a correct answer', async () => {
+    mockCheckAnswer.mockResolvedValueOnce({ correct: true });
+    render(<QuizPlayScreen />);
+
+    fireEvent.press(screen.getByTestId('quiz-option-0'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Correct')).toBeTruthy();
+    });
+    expect(screen.queryByTestId('quiz-dispute-button')).toBeNull();
+    expect(screen.queryByText('Not quite right?')).toBeNull();
+  });
+
+  it('shows dispute button after a wrong answer', async () => {
+    mockCheckAnswer.mockResolvedValueOnce({
+      correct: false,
+      correctAnswer: 'Bratislava',
+    });
+    render(<QuizPlayScreen />);
+
+    fireEvent.press(screen.getByTestId('quiz-option-1'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Not quite')).toBeTruthy();
+    });
+    expect(screen.getByTestId('quiz-dispute-button')).toBeTruthy();
+  });
+});
+
 // [BUG-819] handleAnswer must record the result against the question that
 // was visible when the user tapped, not against whatever currentIndex
 // happens to be after the network round-trip.
@@ -277,12 +409,86 @@ describe('QuizPlayScreen — handleAnswer questionIndex stability', () => {
       roundId: 'round-stable',
       questionIndex: 0,
       answerGiven: 'Bratislava',
+      answerMode: 'multiple_choice',
     });
 
     resolveCheck?.({ correct: true });
 
     await waitFor(() => {
       expect(screen.queryByText('Correct')).toBeTruthy();
+    });
+  });
+});
+
+// [BUG-STALE-OPTIONS] The one-frame window between currentQuestion updating
+// and shuffledOptions updating (via useEffect) allowed a tap to pass a stale
+// option string to handleAnswer. Fix: shuffledOptions is now a useMemo
+// derived from currentQuestion — the new options are available in the same
+// render that shows the new prompt. This test simulates advancing to question
+// 2 and immediately tapping; it asserts the recorded answerGiven is one of
+// the NEW question's options, not the previous question's options.
+describe('QuizPlayScreen — shuffledOptions derived synchronously (BUG-STALE-OPTIONS)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCheckAnswer.mockResolvedValue({ correct: false, correctAnswer: 'Cat' });
+  });
+
+  it('after question advance, tapping option-0 records an option from the NEW question', async () => {
+    const q1Options = ['Dog', 'Fish', 'Horse', 'Rabbit'];
+    const q2Options = ['Cat', 'Parrot', 'Hamster', 'Turtle'];
+    mockRound = {
+      id: 'round-stale',
+      activityType: 'vocabulary' as const,
+      theme: 'Animals',
+      total: 2,
+      questions: [
+        {
+          type: 'vocabulary' as const,
+          term: 'der Hund',
+          options: q1Options,
+          cefrLevel: 'A1',
+          isLibraryItem: false,
+          freeTextEligible: false,
+        },
+        {
+          type: 'vocabulary' as const,
+          term: 'die Katze',
+          options: q2Options,
+          cefrLevel: 'A1',
+          isLibraryItem: false,
+          freeTextEligible: false,
+        },
+      ],
+    };
+
+    // First answer on Q1 so the "continue" gate opens
+    mockCheckAnswer.mockResolvedValueOnce({ correct: true });
+    render(<QuizPlayScreen />);
+
+    // Tap option-0 on Q1 and wait for the result to commit
+    fireEvent.press(screen.getByTestId('quiz-option-0'));
+    await waitFor(() => expect(screen.getByText('Correct')).toBeTruthy());
+
+    // Advance to Q2 via the body continue Pressable (after 250ms guard)
+    await new Promise((r) => setTimeout(r, 280));
+    fireEvent.press(screen.getByTestId('quiz-play-body'));
+
+    // Now immediately tap option-0; with useMemo, shuffledOptions is already
+    // bound to Q2's options in the same render that shows Q2.
+    mockCheckAnswer.mockResolvedValueOnce({
+      correct: false,
+      correctAnswer: 'Cat',
+    });
+    fireEvent.press(screen.getByTestId('quiz-option-0'));
+
+    await waitFor(() => {
+      // The second call to checkAnswer must use an option from Q2, not Q1.
+      const calls = mockCheckAnswer.mock.calls;
+      const secondCall = calls[1];
+      expect(secondCall).toBeDefined();
+      const answerGiven = secondCall[0].answerGiven;
+      expect(q2Options).toContain(answerGiven);
+      expect(q1Options).not.toContain(answerGiven);
     });
   });
 });

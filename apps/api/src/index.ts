@@ -11,7 +11,9 @@ import {
   ForbiddenError,
   NotFoundError,
   ConflictError,
+  RateLimitedError,
   UpstreamLlmError,
+  BadRequestError,
 } from './errors';
 
 import { envValidationMiddleware } from './middleware/env-validation';
@@ -260,6 +262,23 @@ app.onError((err, c) => {
   }
   if (err instanceof ConflictError) {
     return c.json({ code: ERROR_CODES.CONFLICT, message: err.message }, 409);
+  }
+  if (err instanceof RateLimitedError) {
+    if (err.retryAfter != null) {
+      c.header('Retry-After', String(err.retryAfter));
+    }
+    return c.json(
+      { code: ERROR_CODES.RATE_LIMITED, message: err.message },
+      429
+    );
+  }
+  // [BUG-STALE-OPTIONS] 400 for domain-level bad-request conditions (e.g.
+  // MC answer not in question.options). Not a server fault — no Sentry.
+  if (err instanceof BadRequestError) {
+    return c.json(
+      { code: ERROR_CODES.VALIDATION_ERROR, message: err.message },
+      400
+    );
   }
   if (err instanceof UpstreamLlmError) {
     // Track LLM-provider drift in Sentry; surface 502 so clients can retry.

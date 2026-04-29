@@ -11,6 +11,7 @@ import { classifyApiError } from '../../../lib/format-api-error';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { platformAlert } from '../../../lib/platform-alert';
 import { useThemeColors } from '../../../lib/theme';
+import { ErrorFallback } from '../../../components/common/ErrorFallback';
 
 export default function AccommodationsScreen(): React.ReactElement {
   const router = useRouter();
@@ -96,19 +97,33 @@ export default function AccommodationsScreen(): React.ReactElement {
   }, [navigateToCurriculum, selectedMode, updateAccommodation]);
 
   if (!subjectId) {
+    // [BUG-921] This screen is normally entered from a subject's onboarding
+    // flow. Direct-URL or stale-deep-link arrivals land here with no
+    // subjectId param and previously hit a terse "No subject selected" +
+    // "Go back" dead-end. Per UX Resilience Rules every state needs both
+    // an explanation and a forward path — we offer the Library (which is
+    // the legitimate way to start a subject's onboarding) plus Go back.
     return (
       <View
-        className="flex-1 items-center justify-center bg-background px-5"
+        className="flex-1 bg-background"
         style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
       >
-        <Text className="text-text-primary text-body font-semibold mb-4">
-          No subject selected
-        </Text>
-        <Pressable
-          onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
-        >
-          <Text className="text-primary text-body font-semibold">Go back</Text>
-        </Pressable>
+        <ErrorFallback
+          variant="centered"
+          title="No subject selected"
+          message="Open this screen from a subject's detail page. Browse your Library to pick a subject and continue setup from there."
+          primaryAction={{
+            label: 'Open Library',
+            onPress: () => router.replace('/(app)/library' as const),
+            testID: 'accommodation-empty-library',
+          }}
+          secondaryAction={{
+            label: 'Go back',
+            onPress: () => goBackOrReplace(router, '/(app)/home' as const),
+            testID: 'accommodation-empty-back',
+          }}
+          testID="accommodation-no-subject"
+        />
       </View>
     );
   }

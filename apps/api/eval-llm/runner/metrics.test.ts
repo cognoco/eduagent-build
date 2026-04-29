@@ -71,6 +71,43 @@ describe('extractSampleMetrics', () => {
     );
     expect(s.uiHints.fluencyDrillActive).toBe(true);
   });
+
+  // ---- [LITERAL-ESCAPE] Regression guard for double-escape leak ---------
+
+  it('[LITERAL-ESCAPE] flags a reply containing literal `\\n`', () => {
+    // The exact bug pattern from the bubble screenshot: LLM emits `\\\\n` in
+    // raw JSON, parses to a literal backslash + n in the reply. Even though
+    // the runtime normalizer cleans this for the user, the metric should
+    // still report it so prompt regressions are visible.
+    const s = extractSampleMetrics(
+      '{"reply": "That\'s it!\\\\nNow we move on."}'
+    );
+    expect(s.envelopeOk).toBe(true);
+    expect(s.replyHasLiteralEscape).toBe(true);
+  });
+
+  it('[LITERAL-ESCAPE] does NOT flag a reply with proper JSON-escaped newline', () => {
+    // Correct emission: raw JSON `\\n` → real newline after parse → no leak.
+    const s = extractSampleMetrics('{"reply": "Line1\\nLine2"}');
+    expect(s.envelopeOk).toBe(true);
+    expect(s.replyHasLiteralEscape).toBe(false);
+  });
+
+  it('[LITERAL-ESCAPE] flags literal `\\t` and `\\r` too', () => {
+    expect(
+      extractSampleMetrics('{"reply": "a\\\\tb"}').replyHasLiteralEscape
+    ).toBe(true);
+    expect(
+      extractSampleMetrics('{"reply": "a\\\\rb"}').replyHasLiteralEscape
+    ).toBe(true);
+  });
+
+  it('[LITERAL-ESCAPE] returns false when envelope parse fails', () => {
+    // Defensive: malformed JSON yields the empty-sample default, not true.
+    const s = extractSampleMetrics('not JSON at all');
+    expect(s.envelopeOk).toBe(false);
+    expect(s.replyHasLiteralEscape).toBe(false);
+  });
 });
 
 describe('aggregateFlowSamples', () => {
@@ -119,6 +156,7 @@ describe('compareAgainstBaseline', () => {
       rates: {
         envelopeOk: 1,
         hasReply: 1,
+        replyHasLiteralEscape: 0,
         partialProgress: 0.2,
         needsDeepening: 0.05,
         understandingCheck: 0.3,
@@ -233,6 +271,7 @@ describe('buildBaseline + parseBaseline', () => {
         rates: {
           envelopeOk: 1,
           hasReply: 1,
+          replyHasLiteralEscape: 0,
           partialProgress: 0.25,
           needsDeepening: 0.05,
           understandingCheck: 0.3,

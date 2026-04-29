@@ -118,4 +118,21 @@ describe('buildRecapTranscriptText', () => {
     expect(text).toContain('&apos;');
     expect(text).not.toContain(' & ');
   });
+
+  // Break test [BUG-934] — legacy ai_response rows may contain raw envelope
+  // JSON. The transcript must expose prose to the recap LLM, not signals JSON.
+  it('[BUG-934] projects raw envelope JSON in ai_response content to prose', () => {
+    const rawEnvelope = JSON.stringify({
+      reply: 'hi',
+      signals: { close: false },
+      ui_hints: {},
+    });
+    const text = buildRecapTranscriptText([
+      { eventType: 'user_message', content: 'hello' },
+      { eventType: 'ai_response', content: rawEnvelope },
+    ]);
+    expect(text).toContain('Mentor: hi');
+    expect(text).not.toContain('"signals"');
+    expect(text).not.toContain('"ui_hints"');
+  });
 });

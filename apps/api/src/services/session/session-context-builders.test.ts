@@ -89,6 +89,37 @@ describe('buildResumeContext', () => {
     const result = await buildResumeContext(db, 'profile-1', 'missing');
     expect(result).toBeUndefined();
   });
+
+  it('[BUG-934] projects legacy raw-envelope ai_response content to plain reply in Recent exchange block', async () => {
+    mockSubjectFixture = { name: 'History' };
+    // Simulate a legacy ai_response row whose content is raw envelope JSON.
+    const rawEnvelope = JSON.stringify({
+      reply: 'The French Revolution began in 1789.',
+      signals: {
+        partial_progress: false,
+        needs_deepening: false,
+        understanding_check: false,
+      },
+      ui_hints: { note_prompt: { show: false, post_session: false } },
+    });
+
+    const db = makeDbStub({
+      session: { id: 's1', subjectId: 'sub1', topicId: null },
+      events: [
+        { eventType: 'user_message', content: 'When did it start?' },
+        { eventType: 'ai_response', content: rawEnvelope },
+      ],
+    });
+
+    const result = await buildResumeContext(db, 'profile-1', 'session-legacy');
+
+    expect(result).toBeTruthy();
+    // The plain reply text must appear in the resume context block.
+    expect(result).toContain('The French Revolution began in 1789.');
+    // The raw JSON structure must NOT appear — that would leak to the LLM.
+    expect(result).not.toContain('"signals"');
+    expect(result).not.toContain('"ui_hints"');
+  });
 });
 
 describe('computeActiveSeconds', () => {
