@@ -458,12 +458,22 @@ export async function getSessionTranscript(
   const session = await getSession(db, profileId, sessionId);
   if (!session) return null;
 
+  // [BUG-913] Tie-break by id when created_at collides. Batch inserts share
+  // a single Postgres NOW() snapshot, so multiple events created in the same
+  // statement get identical timestamps and ORDER BY created_at returns heap
+  // order — nondeterministic across re-runs. sessionEvents.id is a UUID v7
+  // generated in JS in monotonic insertion order, so asc(id) is the natural
+  // tie-break. The same pattern exists in 13 other reads of sessionEvents
+  // across this codebase (homework-summary, session-completed, session-recap,
+  // verification-completion, session-context-builders, session-exchange,
+  // evaluate-data, plus three more in this file) — sweep follow-up tracked
+  // separately to keep this fix's blast radius contained.
   const events = await db.query.sessionEvents.findMany({
     where: and(
       eq(sessionEvents.sessionId, sessionId),
       eq(sessionEvents.profileId, profileId)
     ),
-    orderBy: asc(sessionEvents.createdAt),
+    orderBy: [asc(sessionEvents.createdAt), asc(sessionEvents.id)],
   });
 
   const exchanges = events
