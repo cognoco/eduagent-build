@@ -196,18 +196,38 @@ export const filingTimedOutObserve = inngest.createFunction(
       return { resolution: 'retry_succeeded' as const, snapshot };
     }
 
-    await step.run('mark-failed', async () => {
+    // [CR-FIL-RACE-01] CAS guard: only flip to filing_failed when the status is
+    // still filing_pending. If filing-completed-observe already set the status
+    // to filing_recovered (race: retry succeeded AFTER the waitForEvent window
+    // closed), the UPDATE will match 0 rows and we return early to avoid
+    // permanently corrupting the recovered state.
+    const markFailedResult = await step.run('mark-failed', async () => {
       const db = getStepDatabase();
-      await db
+      const result = await db
         .update(learningSessions)
         .set({ filingStatus: 'filing_failed', updatedAt: new Date() })
         .where(
           and(
             eq(learningSessions.id, sessionId),
-            eq(learningSessions.profileId, profileId)
+            eq(learningSessions.profileId, profileId),
+            eq(learningSessions.filingStatus, 'filing_pending')
           )
-        );
+        )
+        .returning({ id: learningSessions.id });
+      return result.length > 0;
     });
+
+    if (!markFailedResult) {
+      // The status was already advanced (e.g. to filing_recovered) by a
+      // concurrent filing-completed-observe run — the retry succeeded but
+      // app/filing.retry_completed arrived after the 60 s waitForEvent window.
+      // Do NOT overwrite the recovered state; emit nothing and exit cleanly.
+      logger.info(
+        '[filing-timed-out-observe] mark-failed no-op: status already advanced, treating as recovered_after_window',
+        { sessionId, profileId }
+      );
+      return { resolution: 'recovered_after_window' as const, snapshot };
+    }
 
     await step.sendEvent('emit-resolved', {
       name: 'app/session.filing_resolved',
