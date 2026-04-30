@@ -27,9 +27,9 @@
 8. *** IN PROGRESS *** Cascading guidance files from Claude.md downwards (seesion: dupes)
     - Attempting to sort rules into agent behavioral, product requirements, lessons learned/troubelshooting info, general feedback etc.
     - Establishing cross-consistency and determining obsolesence
-9. *** IN PROGRESS ***  General sweep - obsolete & stale (session: Stale Docs)
+9. General sweep - obsolete & stale (session: Stale Docs)
     - Processed all non-code/config files in the entire repo to identify obsolete documentation and leftover files, temporary stubs, etc. 
-    *** TODO *** Review and decide: `docs\cleanup-triage-2026-04-30.md`
+    Reviewed and decide: `docs\cleanup-triage-2026-04-30.md`
     - 
 10. Executed `/context-audit` - Pass 1 (session:context-audit)
     Added:
@@ -37,9 +37,19 @@
     - `autocompact: true` and `maxBashOutputLines` to global settings
     - `.claudeignore` with sane defaults for this Expo/NX monorepo
     Installed typescript-language-server (LSP) and installed related plugin.
+11. Executed `/context-audit` - Pass 2
+     - Stripped stale Bash(mv ...) permissions from settings.local.json                                       
+    - Removed duplicate typescript-lsp from project settings (kept in global)                               
+    - Set subagentStatusLine to surface the model each subagent is using                                     
+    - Moved the lint-staged note from CLAUDE.md:58 to a code comment.
+12. Commit command
+    - Moved from global to `.claude/commands/my`
+    - Refactored for quality and performance
+13. Skill cleanup
+    - Sorted personal skills in under `.claude/commands/my` (and also moved BMAD to subfolder)
+    - Removed 3 duplicate skills between `commands/` and `commands/my`
+
 ### Backlog
-00. Execute `/context-audit` - Pass 2
-00. Commit command
 
 Quote: The systematic-debugging skill warns against "each fix reveals a new symptom in a different place." That's exactly the pattern this codebase  has lived through: the 2026-04-22 post-mortem documents a 3-hour debugging spiral where each issue masked the next. That's a strong signal the architecture of the guidance/tooling itself is wrong, not just any individual fix
     
