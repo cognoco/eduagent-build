@@ -123,7 +123,7 @@ jest.mock('../../lib/sentry', () => ({
   // useParentProxy (rendered inside _layout) catches SecureStore failures
   // with Sentry.captureException — provide a no-op so the hook doesn't crash
   // during _layout rendering.
-  Sentry: { captureException: jest.fn() },
+  Sentry: { captureException: jest.fn(), addBreadcrumb: jest.fn() },
 }));
 
 jest.mock('expo-secure-store', () => ({

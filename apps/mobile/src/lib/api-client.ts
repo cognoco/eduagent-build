@@ -20,19 +20,27 @@ import { getApiUrl } from './api';
 // ---------------------------------------------------------------------------
 
 import {
-  QuotaExceededError,
+  BadRequestError,
   ConflictError,
   ForbiddenError,
+  NetworkError,
+  NotFoundError,
+  QuotaExceededError,
   RateLimitedError,
+  ResourceGoneError,
   UpstreamError,
 } from './api-errors';
 import type { QuotaExceededDetails } from './api-errors';
 
 export {
-  QuotaExceededError,
+  BadRequestError,
   ConflictError,
   ForbiddenError,
+  NetworkError,
+  NotFoundError,
+  QuotaExceededError,
   RateLimitedError,
+  ResourceGoneError,
   UpstreamError,
 } from './api-errors';
 export type { QuotaExceededDetails, UpgradeOption } from './api-errors';
@@ -140,9 +148,35 @@ export function useApiClient(): ApiClient {
         headers.set('X-Profile-Id', snapshotProfileId);
       if (snapshotProxyMode) headers.set('X-Proxy-Mode', 'true');
 
-      const res = await globalThis.fetch(input, { ...init, headers });
+      // Wrap the underlying fetch in try/catch so network-layer rejections
+      // (no response received) become typed NetworkError instead of raw TypeError.
+      let res: Response;
+      try {
+        res = await globalThis.fetch(input, { ...init, headers });
+      } catch (fetchErr) {
+        throw new NetworkError(undefined, fetchErr);
+      }
 
       if (!res.ok) {
+        // Read the body ONCE as text, then parse JSON manually to avoid the
+        // "body double-read" footgun (calling both .json() and .text() on the
+        // same Response consumes the stream on first read).
+        const errBody = await res.text().catch(() => '');
+        type ParsedErrBody = {
+          code?: string;
+          message?: string;
+          details?: unknown;
+          error?: { code?: string; message?: string };
+        };
+        let parsed: ParsedErrBody | null = null;
+        try {
+          parsed = JSON.parse(errBody) as ParsedErrBody;
+        } catch {
+          // Not JSON — fall through; errBody used as plain text
+        }
+        const code = parsed?.error?.code ?? parsed?.code;
+        const apiMessage = parsed?.error?.message ?? parsed?.message;
+
         // 401 handling — differentiate "expired token" from "no token yet".
         // After setActive() Clerk may not have minted the JWT by the time
         // the first API call fires (ProfileProvider query).  If no token
@@ -172,70 +206,66 @@ export function useApiClient(): ApiClient {
           );
         }
 
+        if (res.status === 400) {
+          throw new BadRequestError(apiMessage ?? (errBody || 'Bad request'));
+        }
+
         if (res.status === 402) {
-          const body = await res
-            .json()
-            .catch(() => null as Record<string, unknown> | null);
-          if (body && body.code === 'QUOTA_EXCEEDED' && body.details) {
+          if (code === 'QUOTA_EXCEEDED' && parsed?.details) {
             throw new QuotaExceededError(
-              (body.message as string) ?? 'Quota exceeded',
-              body.details as QuotaExceededDetails
+              apiMessage ?? 'Quota exceeded',
+              parsed.details as QuotaExceededDetails
             );
           }
+          // Fall through to generic handling for non-quota 402s
         }
 
         // [EP15-I5] Classify 403 into typed ForbiddenError so screens can
-        // distinguish "access denied" from generic API errors.  Always throw
-        // here to avoid double-consuming the response body with text() below.
+        // distinguish "access denied" from generic API errors.
         // [BUG-100] Also preserve the server's error code (e.g. SUBJECT_INACTIVE)
         // so errorHasCode() and formatApiError() can classify the specific reason.
         if (res.status === 403) {
-          const body = await res
-            .json()
-            .catch(() => null as Record<string, unknown> | null);
-          throw new ForbiddenError(
-            (body?.message as string) ?? undefined,
-            (body?.code as string) ?? undefined
+          throw new ForbiddenError(apiMessage ?? undefined, code ?? undefined);
+        }
+
+        if (res.status === 404) {
+          throw new NotFoundError(
+            apiMessage ?? (errBody || 'Resource not found')
           );
         }
 
         if (res.status === 409) {
-          const body = await res
-            .json()
-            .catch(() => null as Record<string, unknown> | null);
           throw new ConflictError(
-            (body?.message as string) ?? 'Request conflicts with current state'
+            apiMessage ?? 'Request conflicts with current state'
+          );
+        }
+
+        if (res.status === 410) {
+          throw new ResourceGoneError(
+            apiMessage ?? undefined,
+            code ?? undefined,
+            parsed?.details
           );
         }
 
         if (res.status === 429) {
-          const body = await res
-            .json()
-            .catch(() => null as Record<string, unknown> | null);
           const retryAfterHeader = res.headers.get('Retry-After');
           const retryAfter =
             retryAfterHeader != null ? Number(retryAfterHeader) : undefined;
           throw new RateLimitedError(
-            (body?.message as string) ?? undefined,
-            (body?.code as string) ?? undefined,
+            apiMessage ?? undefined,
+            code ?? undefined,
             undefined,
             Number.isFinite(retryAfter) ? retryAfter : undefined
           );
         }
 
-        // [F-Q-01] Parse JSON body for non-ok responses so typed errors
-        // carry a .code property that screens can classify.
-        const errBody = await res.text().catch(() => '');
-        let parsed: { code?: string; message?: string } | null = null;
-        try {
-          parsed = JSON.parse(errBody) as { code?: string; message?: string };
-        } catch {
-          // Not JSON — fall through to generic error
-        }
-        if (parsed?.code) {
+        // [F-Q-01] For 5xx (and any unhandled 4xx), use UpstreamError when a
+        // structured code is present, otherwise fall back to a plain Error.
+        if (code) {
           throw new UpstreamError(
-            parsed.message ?? (errBody || res.statusText),
-            parsed.code,
+            apiMessage ?? (errBody || res.statusText),
+            code,
             res.status
           );
         }

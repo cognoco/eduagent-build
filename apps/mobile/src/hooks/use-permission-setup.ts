@@ -3,6 +3,7 @@ import { AppState, Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import * as SecureStore from '../lib/secure-storage';
 import { sanitizeSecureStoreKey } from '../lib/secure-storage';
+import { Sentry } from '../lib/sentry';
 
 export type PermState = {
   mic: 'unknown' | 'granted' | 'denied';
@@ -45,8 +46,13 @@ export function usePermissionSetup(
       const result = await Notifications.getPermissionsAsync();
       notifStatus = result.status === 'granted' ? 'granted' : 'denied';
       notifCanAskAgain = result.canAskAgain ?? true;
-    } catch {
-      /* non-fatal */
+    } catch (err) {
+      Sentry.addBreadcrumb({
+        category: 'permissions',
+        message: 'permission check failed',
+        level: 'warning',
+        data: { type: 'notifications', error: String(err) },
+      });
     }
 
     let micStatus: 'granted' | 'denied' = 'denied';
@@ -63,7 +69,13 @@ export function usePermissionSetup(
       } else {
         micAvailable = false;
       }
-    } catch {
+    } catch (err) {
+      Sentry.addBreadcrumb({
+        category: 'permissions',
+        message: 'permission check failed',
+        level: 'warning',
+        data: { type: 'microphone', error: String(err) },
+      });
       micAvailable = false;
     }
 
@@ -159,8 +171,13 @@ export function usePermissionSetup(
         mic: granted ? 'granted' : 'denied',
         micCanAskAgain: canAskAgain,
       }));
-    } catch {
-      /* non-fatal */
+    } catch (err) {
+      Sentry.addBreadcrumb({
+        category: 'permissions',
+        message: 'permission check failed',
+        level: 'warning',
+        data: { type: 'microphone_request', error: String(err) },
+      });
     }
   }, []);
 
@@ -173,8 +190,13 @@ export function usePermissionSetup(
         notif: status === 'granted' ? 'granted' : 'denied',
         notifCanAskAgain: canAskAgain ?? false,
       }));
-    } catch {
-      /* non-fatal */
+    } catch (err) {
+      Sentry.addBreadcrumb({
+        category: 'permissions',
+        message: 'permission check failed',
+        level: 'warning',
+        data: { type: 'notifications_request', error: String(err) },
+      });
     }
   }, []);
 

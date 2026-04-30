@@ -4,7 +4,16 @@ import {
   recoveryActions,
   type FormattedApiError,
 } from './format-api-error';
-import { ForbiddenError, QuotaExceededError } from './api-errors';
+import {
+  BadRequestError,
+  ForbiddenError,
+  NetworkError,
+  NotFoundError,
+  QuotaExceededError,
+  RateLimitedError,
+  ResourceGoneError,
+  UpstreamError,
+} from './api-errors';
 const QUOTA_DETAILS = {
   tier: 'free' as const,
   reason: 'monthly' as const,
@@ -58,6 +67,64 @@ describe('classifyApiError', () => {
     const result = classifyApiError(err);
     expect(result.category).toBe('network');
     expect(result.recovery).toBe('retry');
+  });
+
+  // --- Typed error classes from api-client.ts boundary ---
+
+  it('classifies NetworkError as network / retry', () => {
+    const err = new NetworkError();
+    const result = classifyApiError(err);
+    expect(result.category).toBe('network');
+    expect(result.recovery).toBe('retry');
+    expect(result.message).toContain('offline');
+  });
+
+  it('classifies NotFoundError as not-found / go-back', () => {
+    const err = new NotFoundError('Session');
+    const result = classifyApiError(err);
+    expect(result.category).toBe('not-found');
+    expect(result.recovery).toBe('go-back');
+  });
+
+  it('classifies ResourceGoneError as not-found / go-back', () => {
+    const err = new ResourceGoneError('This resource is no longer available.');
+    const result = classifyApiError(err);
+    expect(result.category).toBe('not-found');
+    expect(result.recovery).toBe('go-back');
+  });
+
+  it('classifies RateLimitedError as quota / retry', () => {
+    const err = new RateLimitedError(
+      "You've hit the limit.",
+      'RATE_LIMITED',
+      undefined,
+      30
+    );
+    const result = classifyApiError(err);
+    expect(result.category).toBe('quota');
+    expect(result.recovery).toBe('retry');
+  });
+
+  it('classifies BadRequestError as unknown / retry', () => {
+    const err = new BadRequestError('Email already exists');
+    const result = classifyApiError(err);
+    expect(result.category).toBe('unknown');
+    expect(result.recovery).toBe('retry');
+    expect(result.message).toBe('Email already exists');
+  });
+
+  it('classifies UpstreamError as server / retry', () => {
+    const err = new UpstreamError('Server exploded', 'INTERNAL_ERROR', 503);
+    const result = classifyApiError(err);
+    expect(result.category).toBe('server');
+    expect(result.recovery).toBe('retry');
+  });
+
+  it('NotFoundError with friendly-message pattern applies translation', () => {
+    const err = new NotFoundError('Session');
+    const result = classifyApiError(err);
+    // "Session not found" matches /session.*not.*found/i
+    expect(result.message).toContain("That session isn't available anymore");
   });
 
   // --- HTTP status codes ---

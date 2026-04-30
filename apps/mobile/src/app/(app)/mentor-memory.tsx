@@ -11,6 +11,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Redirect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { personaFromBirthYear, useProfile } from '../../lib/profile';
+import { formatApiError } from '../../lib/format-api-error';
+import { Sentry } from '../../lib/sentry';
 import {
   CollapsibleMemorySection,
   MemoryRow,
@@ -126,8 +128,11 @@ export default function MentorMemoryScreen() {
           onPress: async () => {
             try {
               await deleteAll.mutateAsync({});
-            } catch {
-              platformAlert('Could not clear memory', 'Please try again.');
+            } catch (err) {
+              platformAlert('Could not clear memory', formatApiError(err));
+              Sentry.captureException(err, {
+                tags: { surface: 'mentor-memory', action: 'delete_all' },
+              });
             }
           },
         },
@@ -141,8 +146,11 @@ export default function MentorMemoryScreen() {
     try {
       await tellMentor.mutateAsync({ text });
       setDraft('');
-    } catch {
-      platformAlert('Could not save that', 'Please try again.');
+    } catch (err) {
+      platformAlert('Could not save that', formatApiError(err));
+      Sentry.captureException(err, {
+        tags: { surface: 'mentor-memory', action: 'tell_mentor' },
+      });
     }
   }, [draft, tellMentor]);
 
@@ -153,8 +161,11 @@ export default function MentorMemoryScreen() {
           await toggleInjection.mutateAsync({
             memoryInjectionEnabled: value,
           });
-        } catch {
-          platformAlert('Could not update memory', 'Please try again.');
+        } catch (err) {
+          platformAlert('Could not update memory', formatApiError(err));
+          Sentry.captureException(err, {
+            tags: { surface: 'mentor-memory', action: 'toggle_injection' },
+          });
         }
       })();
     },
@@ -302,11 +313,17 @@ export default function MentorMemoryScreen() {
                 void (async () => {
                   try {
                     await grantConsent.mutateAsync({ consent: 'granted' });
-                  } catch {
+                  } catch (err) {
                     platformAlert(
                       'Could not enable memory',
-                      'Please try again.'
+                      formatApiError(err)
                     );
+                    Sentry.captureException(err, {
+                      tags: {
+                        surface: 'mentor-memory',
+                        action: 'grant_consent',
+                      },
+                    });
                   }
                 })()
               }
@@ -314,11 +331,17 @@ export default function MentorMemoryScreen() {
                 void (async () => {
                   try {
                     await grantConsent.mutateAsync({ consent: 'declined' });
-                  } catch {
+                  } catch (err) {
                     platformAlert(
                       'Could not update memory',
-                      'Please try again.'
+                      formatApiError(err)
                     );
+                    Sentry.captureException(err, {
+                      tags: {
+                        surface: 'mentor-memory',
+                        action: 'decline_consent',
+                      },
+                    });
                   }
                 })()
               }
@@ -387,8 +410,14 @@ export default function MentorMemoryScreen() {
                       value: row.key,
                       suppress: true,
                     });
-                  } catch {
-                    platformAlert('Could not delete item', 'Please try again.');
+                  } catch (err) {
+                    platformAlert('Could not delete item', formatApiError(err));
+                    Sentry.captureException(err, {
+                      tags: {
+                        surface: 'mentor-memory',
+                        action: 'delete_learning_style',
+                      },
+                    });
                   }
                 }}
               />
@@ -427,11 +456,17 @@ export default function MentorMemoryScreen() {
                         value: label,
                         suppress: true,
                       });
-                    } catch {
+                    } catch (err) {
                       platformAlert(
                         'Could not delete item',
-                        'Please try again.'
+                        formatApiError(err)
                       );
+                      Sentry.captureException(err, {
+                        tags: {
+                          surface: 'mentor-memory',
+                          action: 'delete_interest',
+                        },
+                      });
                     }
                   }}
                 />
@@ -456,8 +491,14 @@ export default function MentorMemoryScreen() {
                       value: entry.subject,
                       suppress: true,
                     });
-                  } catch {
-                    platformAlert('Could not delete item', 'Please try again.');
+                  } catch (err) {
+                    platformAlert('Could not delete item', formatApiError(err));
+                    Sentry.captureException(err, {
+                      tags: {
+                        surface: 'mentor-memory',
+                        action: 'delete_strength',
+                      },
+                    });
                   }
                 }}
               />
@@ -496,11 +537,17 @@ export default function MentorMemoryScreen() {
                         subject: entry.subject ?? undefined,
                         suppress: true,
                       });
-                    } catch {
+                    } catch (err) {
                       platformAlert(
                         'Could not delete item',
-                        'Please try again.'
+                        formatApiError(err)
                       );
+                      Sentry.captureException(err, {
+                        tags: {
+                          surface: 'mentor-memory',
+                          action: 'delete_struggle',
+                        },
+                      });
                     }
                   }}
                 />
@@ -524,8 +571,14 @@ export default function MentorMemoryScreen() {
                       value: note,
                       suppress: true,
                     });
-                  } catch {
-                    platformAlert('Could not delete item', 'Please try again.');
+                  } catch (err) {
+                    platformAlert('Could not delete item', formatApiError(err));
+                    Sentry.captureException(err, {
+                      tags: {
+                        surface: 'mentor-memory',
+                        action: 'delete_communication_note',
+                      },
+                    });
                   }
                 }}
               />
@@ -548,11 +601,17 @@ export default function MentorMemoryScreen() {
                 onRemove={async () => {
                   try {
                     await unsuppress.mutateAsync({ value });
-                  } catch {
+                  } catch (err) {
                     platformAlert(
                       'Could not restore item',
-                      'Please try again.'
+                      formatApiError(err)
                     );
+                    Sentry.captureException(err, {
+                      tags: {
+                        surface: 'mentor-memory',
+                        action: 'unsuppress_inference',
+                      },
+                    });
                   }
                 }}
               />

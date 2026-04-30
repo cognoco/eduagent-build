@@ -13,8 +13,10 @@
 
 import type { QuotaExceeded } from '@eduagent/schemas';
 import {
+  BadRequestError,
   ConflictError,
   ForbiddenError,
+  NotFoundError,
   RateLimitedError,
 } from '@eduagent/schemas';
 
@@ -32,7 +34,52 @@ export class QuotaExceededError extends Error {
   }
 }
 
-export { ConflictError, ForbiddenError, RateLimitedError };
+export {
+  BadRequestError,
+  ConflictError,
+  ForbiddenError,
+  NotFoundError,
+  RateLimitedError,
+};
+
+/**
+ * Thrown when a 410 Gone response is received — the resource existed but has
+ * been permanently removed. Callers should navigate away rather than retry.
+ */
+export class ResourceGoneError extends Error {
+  readonly code: string | undefined;
+  readonly details: unknown;
+
+  constructor(
+    message = 'This resource is no longer available.',
+    code?: string,
+    details?: unknown
+  ) {
+    super(message);
+    this.name = 'ResourceGoneError';
+    this.code = code;
+    this.details = details;
+    Object.setPrototypeOf(this, ResourceGoneError.prototype);
+  }
+}
+
+/**
+ * Thrown when `fetch` itself rejects (no HTTP response received).
+ * Distinguishes network-layer failures from API-layer errors.
+ */
+export class NetworkError extends Error {
+  override readonly cause: unknown;
+
+  constructor(
+    message = "Looks like you're offline or our servers can't be reached. Check your internet connection and try again.",
+    cause?: unknown
+  ) {
+    super(message);
+    this.name = 'NetworkError';
+    this.cause = cause;
+    Object.setPrototypeOf(this, NetworkError.prototype);
+  }
+}
 
 /**
  * [F-Q-01] Typed error for 5xx upstream responses.
