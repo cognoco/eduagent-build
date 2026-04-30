@@ -96,6 +96,32 @@ const TIER_FEATURES: Array<{
   },
 ];
 
+/**
+ * [BUG-917] When the user is already on the Family tier, append a Family
+ * card to the comparison so they can see their entitlements next to lower
+ * tiers. The card is read-only (no purchase action) since Family is sold
+ * through a separate channel — this preserves BUG-899 (no upsell to public
+ * users) while fixing the visibility gap for Family customers.
+ */
+const FAMILY_TIER_ENTRY: { tier: SubscriptionTier; features: string[] } = {
+  tier: 'family',
+  features: [
+    '1,500 questions per month (shared across pool)',
+    'Up to 6 child profiles',
+    'All Plus features',
+    'Managed by parent account',
+  ],
+};
+
+function getTiersToCompare(
+  currentTier: SubscriptionTier
+): Array<{ tier: SubscriptionTier; features: string[] }> {
+  if (currentTier === 'family') {
+    return [...TIER_FEATURES, FAMILY_TIER_ENTRY];
+  }
+  return TIER_FEATURES;
+}
+
 /** Map RevenueCat PACKAGE_TYPE to human-readable period labels. */
 const PACKAGE_PERIOD_LABEL: Partial<Record<PACKAGE_TYPE, string>> = {
   [PACKAGE_TYPE.MONTHLY]: 'Monthly',
@@ -1361,7 +1387,7 @@ export default function SubscriptionScreen() {
                     : `You're on the ${TIER_LABELS[tier]} plan with ${TIER_LIMITS[tier]}. Here's what each plan includes — store purchasing isn't available on this device yet.`}
                 </Text>
               </View>
-              {TIER_FEATURES.map((entry) => (
+              {getTiersToCompare(tier).map((entry) => (
                 <View
                   key={entry.tier}
                   className={`bg-surface rounded-card px-4 py-3.5 mb-2 ${
