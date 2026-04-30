@@ -37,7 +37,7 @@ apps/api     →  @eduagent/schemas, @eduagent/database, @eduagent/retention
 | API | Hono 4.11 on Cloudflare Workers |
 | Database | Neon (PostgreSQL) + pgvector, Drizzle ORM |
 | Auth | Clerk |
-| Payments | Stripe |
+| Payments | RevenueCat (mobile IAP) |
 | AI/LLM | Multi-provider (Claude, GPT-4, Gemini Flash) via AI SDK |
 | Background Jobs | Inngest |
 | Real-time | SSE streaming |
@@ -95,21 +95,14 @@ Required: `DATABASE_URL` (Neon connection string). See `.env.example` for all va
 
 ## Project Status
 
-**Epics 0-5 complete** (API layer with 521 unit tests):
-- Epic 0: User management, profiles, consent (Clerk + GDPR)
-- Epic 1: Onboarding, curriculum generation
-- Epic 2: Learning experience, homework help, session infrastructure
-- Epic 3: Assessment, retention, adaptive teaching (SM-2)
-- Epic 4: Progress tracking, motivation, dashboard
-- Epic 5: Subscription, billing (Stripe)
+**Epics 0-16 complete.** Pre-launch — store publishing blocked (Apple enrollment pending, Google Play appeal in progress).
 
-**Phase 1 mobile screens** (NativeWind + Expo Router):
-- Three-persona theming (teen dark / learner calm / parent light)
-- Tab navigation (Home, Library, More)
-- Coaching card, chat, parent dashboard screens
-- Currently using mock data — not yet wired to API
-
-**Not yet implemented:** Auth (Clerk), real API integration, SSE streaming, database connection, E2E tests.
+- 38+ mobile screens, 1,228 mobile tests (117 suites)
+- 33 API route groups, 2,136 API tests, 19 integration suites
+- 16 Inngest background functions
+- Auth (Clerk), SSE streaming, Neon DB, E2E tests (Playwright + Maestro) — all shipped
+- LLM structured response envelope migrated across all 9 prompt surfaces
+- OTA updates operational via EAS Update
 
 ## Documentation
 

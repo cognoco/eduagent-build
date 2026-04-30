@@ -23,14 +23,19 @@
       "PowerShell(Get-NetTCPConnection -State Listen | Where-Object {$_.LocalPort -in @\\(8081,8082,8083\\)} | Select-Object LocalPort,OwningProcess)",
       "mcp__plugin_playwright_playwright__browser_navigate",
       "mcp__Claude_in_Chrome__tabs_context_mcp",
-      "mcp__Claude_in_Chrome__navigate"
+      "mcp__Claude_in_Chrome__navigate",
+      "Bash(mv .claude/memory/project_cr_124_scope.md .claude/memory/_archive/)",
+      "Bash(mv .claude/memory/project_epic15_code_review.md .claude/memory/_archive/)",
+      "Bash(mv .claude/memory/project_expo_router_pollution.md .claude/memory/_archive/)",
+      "Bash(mv .claude/memory/project_implementation_phase.md .claude/memory/_archive/)",
+      "Bash(mv .claude/memory/project_web_flow_bugs.md .claude/memory/_archive/)"
     ],
     "deny": [],
     "ask": []
   },
-  "outputStyle": "Explanatory",
-  "autoMemoryDirectory": "C:/Dev/Projects/Products/Apps/eduagent-build/.claude/memory",
   "enabledPlugins": {
     "typescript-lsp@claude-plugins-official": true
-  }
+  },
+  "outputStyle": "Explanatory",
+  "autoMemoryDirectory": "C:/Dev/Projects/Products/Apps/eduagent-build/.claude/memory"
 }
