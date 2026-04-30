@@ -551,6 +551,24 @@ export default function QuizPlayScreen(): React.ReactElement {
       return;
     }
 
+    // [BUG-929] Reset answer state in the SAME React batch as setCurrentIndex.
+    // Without this, the first commit of Q+1 still carries answerState='correct'
+    // (or 'wrong') from Q+0, which means every option Pressable renders with
+    // `disabled={answerState !== 'unanswered'}` === true. The reset effect at
+    // [currentIndex, currentQuestion] only runs after that commit, leaving a
+    // window between paint and the next render in which a user tap lands on
+    // disabled Pressables and is silently dropped — exactly the symptom
+    // reported (no red/green animation, no /quiz/rounds/:id/check). Doing the
+    // reset here closes that window: the first render of Q+1 already shows
+    // enabled options. The downstream useEffect's setAnswerState('unanswered')
+    // then becomes a no-op (same-value bail-out) instead of a render trigger.
+    answerSubmittedRef.current = false;
+    correctAnswerCapturedRef.current = false;
+    setAnswerState('unanswered');
+    setSelectedAnswer(null);
+    setCorrectAnswer(null);
+    setShowContinueHint(false);
+    setAnswerCheckFailed(false);
     setCurrentIndex((current) => current + 1);
   }
 
