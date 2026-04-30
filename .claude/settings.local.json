@@ -28,5 +28,6 @@
     "deny": [],
     "ask": []
   },
+  "autoMemoryDirectory": "C:/Dev/Projects/Products/Apps/eduagent-build/.claude/memory",
   "outputStyle": "Explanatory"
 }
