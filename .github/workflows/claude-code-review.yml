@@ -10,6 +10,13 @@ on:
       - '.idea/**'
       - '.claude/**'
 
+# [CR-794] Workflow-level least-privilege default. Without this, GitHub falls
+# back to the repo default token permissions (often `write-all`) for any job
+# that doesn't declare its own `permissions:` block. Each job below must
+# still declare what it actually needs — the workflow-level setting just
+# makes "forgot to declare" fail closed.
+permissions: {}
+
 jobs:
   claude-review:
     runs-on: ubuntu-latest
