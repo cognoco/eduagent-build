@@ -17,6 +17,6 @@ type: project
 - BUG-431 (P3): Route test rebalancing — 105 route tests properly balanced, 0 deletions needed.
 
 **Prior stabilization fixes still in place:**
-- BUG-359/397/311/237 fixed. EP15-C2 zero tests still open.
+- BUG-359/397/311/237 fixed. EP15-C2/C3 CLOSED 2026-04-19 (b16d0616, 0170f81f).
 
-**How to apply:** No P0/P1 to worry about. Remaining EP15-C2/C3/C4 are code review findings, not runtime bugs.
+**How to apply:** No P0/P1 to worry about. EP15-C2/C3 closed. EP15-C4 is a minor code review finding, not a runtime bug.

@@ -2060,7 +2060,7 @@ The consent request route (`POST /v1/consent/request`) crashed when Inngest dev 
 
 ### Pre-session State
 
-Branch `e2e/session-23-visual-review` has 12 bug fixes applied (FIX-01 through FIX-12 from `e2e-bug-fix-plan.md`). All fixes verified in source code by code review. Unit tests all pass:
+Branch `e2e/session-23-visual-review` has 12 bug fixes applied (FIX-01 through FIX-12; see commit 6e096385 for the original e2e-bug-fix-plan). All fixes verified in source code by code review. Unit tests all pass:
 - **API:** 95 suites, 1,622 tests PASS
 - **Mobile:** 67 suites, 623 tests PASS
 - **DB schema:** In sync (`pnpm run db:push:dev` → "No changes detected")

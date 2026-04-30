@@ -13,7 +13,7 @@ Self-improvement Layer 1 for the eval harness. Catches envelope-signal distribut
 - `FlowDefinition.emitsEnvelope?: boolean` in `runner/types.ts` — opt-in per flow
 - `RunSummary.envelopeMetrics` accumulated in `runHarness`
 - CLI flags `--check-baseline`, `--update-baseline`, `--baseline-tolerance <fraction>` in `parseCliArgs`
-- Baseline stored at `apps/api/eval-llm/baseline.json` (not yet created — seed with first `--update-baseline` run)
+- Baseline stored at `apps/api/eval-llm/baseline.json` (seed with `--update-baseline` on first Tier 2 run)
 
 Flows opted in so far:
 - `exchangesFlow` (`emitsEnvelope: true` + `expectedResponseSchema: llmResponseEnvelopeSchema`)

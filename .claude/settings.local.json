@@ -28,7 +28,10 @@
       "Bash(mv .claude/memory/project_epic15_code_review.md .claude/memory/_archive/)",
       "Bash(mv .claude/memory/project_expo_router_pollution.md .claude/memory/_archive/)",
       "Bash(mv .claude/memory/project_implementation_phase.md .claude/memory/_archive/)",
-      "Bash(mv .claude/memory/project_web_flow_bugs.md .claude/memory/_archive/)"
+      "Bash(mv .claude/memory/project_web_flow_bugs.md .claude/memory/_archive/)",
+      "Bash(mkdir -p \"C:/Users/ZuzanaKopečná/.claude/commands/my\")",
+      "Bash(mv \"C:/Users/ZuzanaKopečná/.claude/commands/commit.md\" \"C:/Users/ZuzanaKopečná/.claude/commands/my/commit.md\")",
+      "Read(//c/Users/ZuzanaKopečná/.claude/commands/**)"
     ],
     "deny": [],
     "ask": []

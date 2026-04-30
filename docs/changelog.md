@@ -31,7 +31,7 @@
     - Processed all non-code/config files in the entire repo to identify obsolete documentation and leftover files, temporary stubs, etc. 
     *** TODO *** Review and decide: `docs\cleanup-triage-2026-04-30.md`
     - 
-10. Executed `/context-audit` - Pass 1 (session:context-audit)
+10. *** INPROGRESS *** Executed `/context-audit` - Pass 1 (session:context-audit)
     Added:
     - compaction instructions to project `CLAUDE.md`              
     - `autocompact: true` and `maxBashOutputLines` to global settings
@@ -39,7 +39,7 @@
     Installed typescript-language-server (LSP) and installed related plugin.
 ### Backlog
 00. Execute `/context-audit` - Pass 2
-00. 
+00. Commit command
 
 Quote: The systematic-debugging skill warns against "each fix reveals a new symptom in a different place." That's exactly the pattern this codebase  has lived through: the 2026-04-22 post-mortem documents a 3-hour debugging spiral where each issue masked the next. That's a strong signal the architecture of the guidance/tooling itself is wrong, not just any individual fix
     

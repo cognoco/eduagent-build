@@ -1,12 +1,12 @@
 ---
 name: New onboarding dimensions committed 2026-04-18
-description: Three personalization dimensions decided but not yet DB-migrated: conversationLanguage (mandatory), interestContext (extends interests), pronouns (optional for older learners).
+description: Three personalization dimensions shipped: conversationLanguage (mandatory), interestContext (extends interests), pronouns (optional for older learners). Schema migrated in 99d234fc.
 type: project
 ---
 
 ## Decision date
 
-2026-04-18 — committed during the LLM personalization audit session. Not yet in schema or onboarding UI.
+2026-04-18 — committed during the LLM personalization audit session. Schema migrated in 99d234fc (conversation_language + pronouns columns + InterestEntry shape).
 
 ## Formal spec
 

@@ -12,11 +12,11 @@ A prompt asks the LLM to include a `[MARKER]` token (or JSON blob) inside its fr
 
 | # | Marker | File:line | Risk | Status |
 |---|---|---|---|---|
-| F1.1 | `[INTERVIEW_COMPLETE]` | `interview.ts:234, :280` — `response.includes()` | **CRITICAL** — user trapped if not emitted; only 7-day TTL recovery | **NOT MIGRATED** |
-| F1.2 | `[PARTIAL_PROGRESS]` | `escalation.ts:108` + `exchanges.ts:948` | HIGH — freeze escalation counter | **Divergent matchers fixed 2026-04-19** in `3b32b0a1`; full migration pending |
-| F1.3 | `[NEEDS_DEEPENING]` | `exchanges.ts:943` | MEDIUM — queue topic for remediation | NOT MIGRATED |
-| F2.1 | `{"notePrompt":true}` JSON-in-text | `exchanges.ts:861` | MEDIUM — UI hint, safe fallback | NOT MIGRATED |
-| F2.2 | `{"fluencyDrill":{...}}` JSON-in-text | `language-prompts.ts:59` + `exchanges.ts:890` | MEDIUM — UI hint, safe fallback | NOT MIGRATED |
+| F1.1 | `[INTERVIEW_COMPLETE]` | `interview.ts:234, :280` — `response.includes()` | **CRITICAL** — user trapped if not emitted; only 7-day TTL recovery | **MIGRATED** (3ce28b45) |
+| F1.2 | `[PARTIAL_PROGRESS]` | `escalation.ts:108` + `exchanges.ts:948` | HIGH — freeze escalation counter | **MIGRATED** (3ce28b45). Divergent matchers fixed earlier in 3b32b0a1. |
+| F1.3 | `[NEEDS_DEEPENING]` | `exchanges.ts:943` | MEDIUM — queue topic for remediation | **MIGRATED** (3ce28b45) |
+| F2.1 | `{"notePrompt":true}` JSON-in-text | `exchanges.ts:861` | MEDIUM — UI hint, safe fallback | **MIGRATED** (3ce28b45) |
+| F2.2 | `{"fluencyDrill":{...}}` JSON-in-text | `language-prompts.ts:59` + `exchanges.ts:890` | MEDIUM — UI hint, safe fallback | **MIGRATED** (3ce28b45) |
 
 ## Near-miss worth watching
 
@@ -53,11 +53,11 @@ Full envelope shape in `docs/specs/2026-04-18-llm-response-envelope.md`:
 }
 ```
 
-## Migration order (from reliability audit P0→P3)
+## Migration order (COMPLETE — 3ce28b45)
 
-1. **F1.1 INTERVIEW_COMPLETE** (P0, next) — reference implementation. Smallest scope, highest user risk (F-042).
-2. **F1.2 + F1.3** (P1) — main exchange loop. Same system prompt, migrate together.
-3. **F2.1 + F2.2** (P2) — UI hints in same envelope.
+1. **F1.1 INTERVIEW_COMPLETE** (P0) — reference implementation. Done.
+2. **F1.2 + F1.3** (P1) — main exchange loop. Done.
+3. **F2.1 + F2.2** (P2) — UI hints in same envelope. Done.
 
 ## Formal implementation plan
 

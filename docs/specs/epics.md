@@ -458,8 +458,8 @@ Completed specs are in `docs/specs/Done/`. Active/in-progress specs are in `docs
 | — | Proactivity & copy sweep | `specs/Done/2026-04-19-proactivity-copy-sweep-design.md` | DONE |
 | — | Stabilization sprint | `specs/Done/2026-04-14-stabilization-sprint.md` | DONE |
 | — | Code review fixes plan | `specs/Done/plan-code-review-fixes.md` | DONE |
-| — | Animation improvements | `specs/2026-04-16-animation-improvements-design.md` | IN PROGRESS |
-| — | Quiz UI redesign fixes | `specs/2026-04-18-quiz-ui-redesign-finding-fixes.md` | IN PROGRESS |
+| — | Animation improvements | `specs/Done/2026-04-16-animation-improvements-design.md` | DONE |
+| — | Quiz UI redesign fixes | `specs/Done/2026-04-18-quiz-ui-redesign-finding-fixes.md` | DONE |
 | — | Prompt tuning design | `specs/2026-04-19-prompt-tuning-design.md` | IN PROGRESS |
 | WEB-A | Parent control center (web) — candidate | Stories in this file | NOT STARTED |
 | WEB-B | Text-mode learning flow (web) — candidate | Stories in this file | NOT STARTED |

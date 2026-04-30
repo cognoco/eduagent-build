@@ -1,6 +1,6 @@
 # S-06 RLS — Phase 0 + Phase 1: Preparatory (Post-Launch Sprint 1)
 
-> **Parent finding:** `bug-fix-plan HR.md` → S-06
+> **Parent finding:** `docs/_archive/plans/bug-fix-plan HR.md` → S-06
 > **Created:** 2026-04-15
 > **Last updated:** 2026-04-27 — re-verification + 14-site audit; risk reassessed High; recommendation revised from Option C to Option B.
 > **Risk:** ~~Low~~ **High** — RLS scaffolding shipped without Phase 0 prerequisites. Multiple live production races currently hidden by the silent fallback (see Audit Results below). Switching the connection role to `app_user` will silently return zero rows for every scoped query until Phase 0.0 + 0.1 + 0.3 ship.

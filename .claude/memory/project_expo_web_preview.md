@@ -41,4 +41,4 @@ preview_start name="mobile"
 - Anything past sign-in without user intervention.
 - Audio, camera, push, IAP, SecureStore-dependent behavior.
 
-**Known findings from first web-preview pass (2026-04-17):** see `project_expo_router_pollution.md`.
+**Known findings from first web-preview pass (2026-04-17):** see `_archive/project_expo_router_pollution.md`.

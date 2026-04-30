@@ -1,6 +1,6 @@
 ---
 name: Eval-LLM harness — apps/api/eval-llm
-description: Fixture-driven snapshot harness for every LLM prompt builder. `pnpm eval:llm`. Tier 1 free, Tier 2 --live burns credits. 8 of 9 flows wired; exchanges remaining.
+description: All 9 flows wired. Fixture-driven snapshot harness for every LLM prompt builder.
 type: project
 ---
 
@@ -64,9 +64,9 @@ apps/api/eval-llm/
 
 ## What's wired (2026-04-19)
 
-**8 of 9 LLM flows:** quiz-capitals, quiz-vocabulary, quiz-guess-who, dictation-generate, dictation-review, dictation-prepare-homework, session-analysis, filing-pre-session.
+**All 9 LLM flows wired:** quiz-capitals, quiz-vocabulary, quiz-guess-who, dictation-generate, dictation-review, dictation-prepare-homework, session-analysis, filing-pre-session, exchanges (added 002f5bad).
 
-**Not yet wired:** `exchanges.ts:buildSystemPrompt` (the main tutoring loop). It's 700+ lines with 13+ context inputs (priorLearning text blocks, crossSubject text, embedding memory context, accommodation block, retention state, etc). Needs its own session. `filing-post-session` also a trivial copy of filing-pre-session.
+**Also available:** `filing-post-session` (trivial copy of filing-pre-session, wired as needed).
 
 ## Response-shape validation (added in commit 3b32b0a1)
 

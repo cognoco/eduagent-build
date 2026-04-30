@@ -2,24 +2,21 @@
 
 ## Implementation Status
 
-- [project_implementation_phase.md](project_implementation_phase.md) — Epics 0-16 COMPLETE. **`improvements` branch active (2026-04-19)** with LLM tuning phase in progress.
+- [project_implementation_phase.md](_archive/project_implementation_phase.md) — Epics 0-16 COMPLETE. LLM tuning phase COMPLETE (all 4 agents merged).
 - [project_session_lifecycle_decisions.md](project_session_lifecycle_decisions.md) — Wall-clock for users, active time internal. Adaptive silence. Hard caps removed.
 
-## Active Work (2026-04-19)
+## Active Work (2026-04-30)
 
-- Active branch: **`improvements`**. Four parallel agents dispatched for Phase 3 LLM tuning; 3 merged, Agent 1 (quiz personalization) pending.
+- Active branch: **`proc-optimization`**. Phase 3 LLM tuning COMPLETE (all 4 agents merged).
 - [project_llm_audit_2026_04_18.md](project_llm_audit_2026_04_18.md) — Three audit specs in docs/specs/: personalization, reliability/UX, response envelope. 9 prompt surfaces mapped.
 - [project_llm_marker_antipattern.md](project_llm_marker_antipattern.md) — 5 marker/JSON-in-text patterns. F1.2 hotfix shipped. Plan `docs/plans/2026-04-19-bucket-a-envelope-migration.md` (Bucket A).
-- [project_eval_llm_harness.md](project_eval_llm_harness.md) — `apps/api/eval-llm/` + `pnpm eval:llm`. 8 of 9 flows wired. Exchanges loop wiring plan at `docs/plans/2026-04-19-exchanges-harness-wiring.md` (40-snapshot scenario matrix).
+- [project_eval_llm_harness.md](project_eval_llm_harness.md) — `apps/api/eval-llm/` + `pnpm eval:llm`. All 9 flows wired (exchanges added in 002f5bad).
 - [project_eval_llm_signal_metrics.md](project_eval_llm_signal_metrics.md) — Layer 1 signal-distribution regression guard. `emitsEnvelope` flag + `--check-baseline`/`--update-baseline`. Restored 2026-04-21 after concurrent-edit loss.
 - [project_onboarding_new_dimensions.md](project_onboarding_new_dimensions.md) — conversationLanguage (mandatory), interestContext, pronouns. Spec `docs/specs/2026-04-19-onboarding-new-dimensions.md` (Bucket C).
 - [project_f8_memory_source_refs.md](project_f8_memory_source_refs.md) — Struggle/StrengthEntry provenance back-links. Spec `docs/specs/2026-04-19-memory-sources-f8.md` (Bucket C).
 - [project_parent_visibility_spec.md](project_parent_visibility_spec.md) — Two specs 2026-04-18: parent privacy/RLS + progress highlights. Pending implementation.
-- [project_ux_review_pass.md](project_ux_review_pass.md) — Home timeout nav, topic features, consent offline DONE. Progressive disclosure + hierarchy flattening remaining.
+- [project_ux_review_pass.md](project_ux_review_pass.md) — Home timeout nav, topic features, consent offline, progressive disclosure DONE. Hierarchy flattening under evaluation.
 - [project_summary_draft_backup_deferred.md](project_summary_draft_backup_deferred.md) — Local draft autosave shipped `DRAFT-BULLETPROOF-01` (2026-04-23). Server-side mirror deferred 2026-04-24 over volume concerns; design options already mapped.
-- [project_cr_124_scope.md](project_cr_124_scope.md) — CR-124-SCOPE session-recap IDOR closed via scoped repo + break tests (3 commits on proxy-parent-fix).
-- [project_epic15_code_review.md](project_epic15_code_review.md) — ALL Criticals+Importants CLOSED 2026-04-19. C2 test coverage filled (220 tests).
-- [project_web_flow_bugs.md](project_web_flow_bugs.md) — All code-level web bugs FIXED. WEB-02 swept (33 screens). goBackOrReplace mandatory.
 - [project_language_pedagogy.md](project_language_pedagogy.md) — four_strands pedagogy, vocabulary CRUD, CEFR levels.
 - [project_deploy_safety.md](project_deploy_safety.md) — deploy.yml uses drizzle-kit migrate (not push --force) for prod.
 - [project_eas_update_ota.md](project_eas_update_ota.md) — OTA IMPLEMENTED. JS-only changes deploy in ~5 min.
@@ -31,12 +28,11 @@ Two production dead-code branches removed 2026-04-19 in commit `970a82a5`: `AgeB
 ## Known Issues
 
 - [project_nx_expo_plugin_bug.md](project_nx_expo_plugin_bug.md) — @nx/expo/plugin stack overflow on Windows. Run Jest/eslint directly.
-- [project_open_bugs.md](project_open_bugs.md) — No P0/P1. BUG-359/397/311/237 fixed 2026-04-15. EP15-C2 CLOSED 2026-04-19.
+- [project_open_bugs.md](project_open_bugs.md) — No P0/P1. BUG-359/397/311/237 fixed 2026-04-15. EP15-C2/C3 CLOSED 2026-04-19.
 - [project_known_bug_patterns.md](project_known_bug_patterns.md) — Systemic patterns: silent fallbacks + React state timing gaps.
 - [project_schema_drift_pattern.md](project_schema_drift_pattern.md) — push→migrate transition silently skips columns. Fix dev: `db:push:dev`.
-- [project_schema_drift_staging_fix.md](project_schema_drift_staging_fix.md) — Staging 500s from missing column. Manual ALTER fix 2026-04-15.
 - [project_dev_schema_drift_trap.md](project_dev_schema_drift_trap.md) — `mentomate-api-dev` "column does not exist" → `db:push:dev` + `db:generate`. Neon "staging" ≠ dev Worker's DB.
-- [project_expo_router_pollution.md](project_expo_router_pollution.md) — Helpers under `app/(app)/` treated as routes. Fix: `_components/`, `_hooks/` dirs.
+- [project_expo_router_pollution.md](_archive/project_expo_router_pollution.md) — Helpers under `app/(app)/` treated as routes. Fix: `_components/`, `_hooks/` dirs.
 
 ## Auth
 
@@ -54,7 +50,6 @@ Two production dead-code branches removed 2026-04-19 in commit `970a82a5`: `AgeB
 - [market_language_pivot.md](market_language_pivot.md) — English UI only. Language TEACHING active (four_strands). GDPR-everywhere.
 - [project_themekey_removed.md](project_themekey_removed.md) — NEVER use key={themeKey} OR Animated.View opacity on root layout.
 - [feedback_drizzle_transaction_cast.md](feedback_drizzle_transaction_cast.md) — PgTransaction → Database cast pattern for transactions.
-- [project_neon_transaction_facts.md](project_neon_transaction_facts.md) — neon-http never supports interactive tx (incl. 1.0 beta). `db.batch()` IS ACID. RLS scaffolding currently silent no-op. See updated S-06 RLS plan.
 
 ## Workflow Preferences
 
@@ -172,3 +167,6 @@ Two production dead-code branches removed 2026-04-19 in commit `970a82a5`: `AgeB
 ## Archived
 
 Resolved/historical memories in `_archive/`. Use `git log --grep` for context on past issues.
+- [project_cr_124_scope.md](_archive/project_cr_124_scope.md) — CR-124-SCOPE session-recap IDOR closed via scoped repo + break tests (3 commits on proxy-parent-fix).
+- [project_epic15_code_review.md](_archive/project_epic15_code_review.md) — ALL Criticals+Importants CLOSED 2026-04-19. C2 test coverage filled (220 tests).
+- [project_web_flow_bugs.md](_archive/project_web_flow_bugs.md) — All code-level web bugs FIXED. WEB-02 swept (33 screens). goBackOrReplace mandatory.

@@ -8,7 +8,7 @@ type: project
 
 The user reviewed the product with external LLM feedback and made UX improvements:
 
-1. **Progressive disclosure of progress features** — Spec done. Hide retention signals, CEFR labels, growth charts from new users. Surface after ~3-5 sessions. Gate on `totalSessions`.
+1. **Progressive disclosure of progress features** — DONE (89898d2b). Hide retention signals, CEFR labels, growth charts from new users. Surface after ~3-5 sessions. Gated on `totalSessions`.
 
 2. **Platform-specific auth buttons** — DONE. Hide Google sign-in on iOS, hide Google SSO on Android.
 
@@ -28,4 +28,4 @@ The user reviewed the product with external LLM feedback and made UX improvement
 
 **Why:** Pre-launch product polish. Progressive disclosure philosophy — deep features exist but new users see a simplified surface.
 
-**How to apply:** Most items now implemented. Check code for remaining items (#1 progressive disclosure gating, #4 hierarchy flattening).
+**How to apply:** All items implemented except #4 hierarchy flattening (under evaluation). Progressive disclosure shipped in 89898d2b.

@@ -1,6 +1,6 @@
 ---
 name: LLM personalization + reliability audit (2026-04-18)
-description: Three specs in docs/specs/ map every LLM prompt surface, catalog marker anti-patterns, and define the response envelope migration. Phase 3 tuning in progress on branch `improvements`.
+description: Three specs in docs/specs/ map every LLM prompt surface, catalog marker anti-patterns, and define the response envelope migration. Phase 3 tuning COMPLETE. All 4 agents merged. Envelope migration complete (3ce28b45).
 type: project
 ---
 
@@ -26,7 +26,7 @@ All under `docs/specs/`, dated 2026-04-18:
 | 8 | Dictation review (multimodal) | `dictation/review.ts:buildReviewSystemPrompt` (refactored from const — Agent 2) |
 | 9 | Dictation prepare-homework | `dictation/prepare-homework.ts:SYSTEM_PROMPT` (now exported) |
 
-## Phase 3 (tuning) status on `improvements` branch
+## Phase 3 (tuning) — COMPLETE
 
 Four parallel agents dispatched 2026-04-19:
 
@@ -36,14 +36,14 @@ Four parallel agents dispatched 2026-04-19:
 | 4 — tone + F7 | `349ecad8` | Remove "learning mate" / "dive in" / "enthusiastic" across exchanges + interview. Interview 3-5 → 2-3 exchanges. Lower analysis threshold for interview context. |
 | 2 — dictation + dead-code | `970a82a5` | interests/libraryTopics → dictation generate. Dictation review refactored to `buildReviewSystemPrompt(ageYears?, preferredExplanations?)`. **Removed `AgeBracket.child`** and dictation ≤7/≤10 branches (unreachable in 11+ product). |
 | 3 — memory enrichment | `413ece4f` | `buildMemoryBlock` now returns `{text, entries[]}` with kind/sourceSessionId/sourceEventId metadata (F8 prep). Surfaces strengths (top 3) + urgency_boost_reason. 8 new tests. |
-| 1 — quiz personalization | Pending | Still running as of 2026-04-19. Quiz capitals/vocab/guess-who: accept optional interests + libraryTopics + ageYears + L1-aware distractors. |
+| 1 — quiz personalization | `1f513d1c` | Quiz capitals/vocab/guess-who: accept optional interests + libraryTopics + ageYears + L1-aware distractors. |
 
-Still not migrated: F1.1 INTERVIEW_COMPLETE (structured-output migration) — biggest-leverage next step.
+Envelope migration COMPLETE (3ce28b45): all markers (F1.1–F2.2) migrated to structured response envelope.
 
 ## Key product constraints surfaced by the audit
 
 - **Product is strictly 11+.** This invalidated two dead-code branches (see `project_llm_marker_antipattern.md` companion + Agent 2's cleanup).
-- **Three new onboarding dimensions committed** (schema not yet migrated): see `project_onboarding_new_dimensions.md`.
+- **Three new onboarding dimensions shipped** (schema migrated in 99d234fc): see `project_onboarding_new_dimensions.md`.
 
 ## How to apply
 
