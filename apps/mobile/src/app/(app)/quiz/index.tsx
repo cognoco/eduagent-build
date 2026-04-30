@@ -6,9 +6,65 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IntentCard } from '../../../components/home/IntentCard';
 import { useQuizStats } from '../../../hooks/use-quiz';
 import { useSubjects } from '../../../hooks/use-subjects';
+import { useVocabulary } from '../../../hooks/use-vocabulary';
 import { goBackOrReplace, homeHrefForReturnTo } from '../../../lib/navigation';
 import { useThemeColors } from '../../../lib/theme';
 import { useQuizFlow } from './_layout';
+
+// [BUG-891] Below this threshold the quiz draws from a generic seed list,
+// not the learner's own recorded words. Surface that honestly via title +
+// subtitle rather than mislabel a stock round as personalised practice.
+// SYNC: keep the threshold consistent with the four_strands prompt's
+// "known vocabulary" treatment in apps/api/src/services/language-prompts.ts.
+const PERSONAL_VOCAB_QUIZ_THRESHOLD = 5;
+
+// [BUG-891] One IntentCard per language subject, with vocab-aware copy.
+// Extracted so each card can call useVocabulary(subjectId) without forcing
+// the parent screen to fan out N parallel queries that always run.
+interface LanguageVocabCardProps {
+  subjectId: string;
+  displayLanguage: string;
+  /** Stats summary line when the round has been played before. */
+  playedSubtitle: string | null;
+  onSelect: () => void;
+}
+
+function LanguageVocabCard({
+  subjectId,
+  displayLanguage,
+  playedSubtitle,
+  onSelect,
+}: LanguageVocabCardProps): React.ReactElement {
+  const vocabulary = useVocabulary(subjectId);
+  const vocabCount = vocabulary.data?.length ?? 0;
+  // While the count is loading, default to "starter" labelling — the
+  // alternative (claiming personalisation we cannot prove yet) would lie
+  // to brand-new language subjects until the round actually opens.
+  const isLoadingVocab = vocabulary.isLoading && vocabulary.data === undefined;
+  const usingStarterWords =
+    isLoadingVocab || vocabCount < PERSONAL_VOCAB_QUIZ_THRESHOLD;
+
+  const title = usingStarterWords
+    ? `${displayLanguage} basics`
+    : `Vocabulary: ${displayLanguage}`;
+
+  // [BUG-891] When the learner has < threshold recorded words the round
+  // pulls from a stock seed list, not their own vocabulary. Say so — the
+  // previous "Practice new words and phrases" subtitle implied
+  // personalisation that wasn't happening for fresh language subjects.
+  const subtitle = usingStarterWords
+    ? `Stock starter words — record ${PERSONAL_VOCAB_QUIZ_THRESHOLD} of your own to unlock personalised rounds`
+    : playedSubtitle ?? 'Practice new words and phrases';
+
+  return (
+    <IntentCard
+      title={title}
+      subtitle={subtitle}
+      onPress={onSelect}
+      testID={`quiz-vocabulary-${subjectId}`}
+    />
+  );
+}
 
 function getLanguageDisplayName(
   code: string | null | undefined
@@ -171,33 +227,28 @@ export default function QuizIndexScreen(): React.ReactElement {
               getLanguageDisplayName(subject.languageCode) ??
               subject.name ??
               'Language';
-            // [BUG-926] Per-language stats: look up the stat row keyed on
-            // (activityType: 'vocabulary', languageCode: subject.languageCode).
-            // The backend now groups by (activityType, languageCode) so each
-            // language card only shows stats for rounds played in that language.
             const langStat = stats?.find(
               (s) =>
                 s.activityType === 'vocabulary' &&
                 s.languageCode === subject.languageCode
             );
-            const subtitle =
-              langStat &&
-              langStat.bestScore != null &&
-              langStat.bestTotal != null
-                ? `Best: ${langStat.bestScore}/${langStat.bestTotal} · Played: ${langStat.roundsPlayed}`
-                : langStat
-                ? `Played: ${langStat.roundsPlayed}`
-                : 'Practice new words and phrases';
-
             return (
-              <IntentCard
+              <LanguageVocabCard
                 key={subject.id}
-                title={`Vocabulary: ${displayLanguage}`}
-                subtitle={subtitle}
-                onPress={() =>
+                subjectId={subject.id}
+                displayLanguage={displayLanguage}
+                playedSubtitle={
+                  langStat &&
+                  langStat.bestScore != null &&
+                  langStat.bestTotal != null
+                    ? `Best: ${langStat.bestScore}/${langStat.bestTotal} · Played: ${langStat.roundsPlayed}`
+                    : langStat
+                    ? `Played: ${langStat.roundsPlayed}`
+                    : null
+                }
+                onSelect={() =>
                   handleSelectVocabulary(subject.id, displayLanguage)
                 }
-                testID={`quiz-vocabulary-${subject.id}`}
               />
             );
           })}
