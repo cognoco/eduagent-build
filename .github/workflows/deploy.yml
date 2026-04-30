@@ -151,21 +151,28 @@ jobs:
       - name: Build API
         run: pnpm exec nx run api:build
 
+      # CFG-2 / BUG-782: DATABASE_URL is selected by deploy environment via separately
+      # named secrets (DATABASE_URL_STAGING / DATABASE_URL_PRODUCTION) rather than a flat
+      # `secrets.DATABASE_URL`. The flat name silently shared one URL across staging and
+      # production deploys, allowing a staging deploy to run migrations on prod (and vice
+      # versa). Selecting by event/input makes the target unambiguous in the YAML itself
+      # and removes the dependency on whoever last set the repo-level fallback secret.
+      - name: Verify deploy target before migrations
+        env:
+          DEPLOY_ENV: ${{ github.event_name == 'push' && 'staging' || inputs.api_environment }}
+          DATABASE_URL: ${{ (github.event_name == 'push' || inputs.api_environment == 'staging') && secrets.DATABASE_URL_STAGING || secrets.DATABASE_URL_PRODUCTION }}
+        run: node packages/database/scripts/verify-db-target.mjs
+
       - name: Baseline migration journal (push→migrate transition)
         working-directory: packages/database
         env:
-          # CFG-2: DATABASE_URL must be a GitHub Environment-scoped secret, NOT a flat repo secret.
-          # Go to Settings → Environments → staging (and production) → Add secret: DATABASE_URL
-          # pointing to the respective Neon connection string. This prevents staging migrations
-          # from running against the production DB and vice versa.
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_URL: ${{ (github.event_name == 'push' || inputs.api_environment == 'staging') && secrets.DATABASE_URL_STAGING || secrets.DATABASE_URL_PRODUCTION }}
         run: node scripts/baseline-migrations.mjs
 
       - name: Run database migrations
         working-directory: packages/database
         env:
-          # CFG-2: same as above — must be environment-scoped.
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_URL: ${{ (github.event_name == 'push' || inputs.api_environment == 'staging') && secrets.DATABASE_URL_STAGING || secrets.DATABASE_URL_PRODUCTION }}
         run: |
           DEPLOY_ENV="${{ github.event_name == 'push' && 'staging' || inputs.api_environment }}"
           echo "Running migrations on ${DEPLOY_ENV} database..."
