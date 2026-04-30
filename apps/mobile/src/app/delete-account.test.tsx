@@ -3,9 +3,9 @@ import {
   screen,
   fireEvent,
   waitFor,
+  act,
 } from '@testing-library/react-native';
 import React from 'react';
-import { Alert } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const mockBack = jest.fn();
@@ -26,11 +26,12 @@ jest.mock('react-native-safe-area-context', () => ({
 
 const mockDeleteMutateAsync = jest.fn();
 const mockCancelMutateAsync = jest.fn();
+let mockDeleteIsPending = false;
 
 jest.mock('../hooks/use-account', () => ({
   useDeleteAccount: () => ({
     mutateAsync: mockDeleteMutateAsync,
-    isPending: false,
+    isPending: mockDeleteIsPending,
   }),
   useCancelDeletion: () => ({
     mutateAsync: mockCancelMutateAsync,
@@ -50,18 +51,24 @@ function Wrapper({ children }: { children: React.ReactNode }) {
 
 const DeleteAccountScreen = require('./delete-account').default;
 
-// Mock Alert.alert to auto-press the destructive "Delete" button
-const alertSpy = jest.spyOn(Alert, 'alert');
+/**
+ * Helper: drive the screen from the initial warning into the typed-
+ * confirmation stage and type the exact phrase. Used by tests that
+ * exercise the post-confirm path (mutation fires, error shown, etc.).
+ */
+function advanceToConfirmedState(phrase = 'DELETE') {
+  fireEvent.press(screen.getByTestId('delete-account-confirm'));
+  fireEvent.changeText(
+    screen.getByTestId('delete-account-confirm-input'),
+    phrase
+  );
+}
 
 describe('DeleteAccountScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockCanGoBack.mockReturnValue(true);
-    // By default, auto-press the destructive button in the confirmation alert
-    alertSpy.mockImplementation((_title, _message, buttons) => {
-      const deleteBtn = buttons?.find((b) => b.style === 'destructive');
-      deleteBtn?.onPress?.();
-    });
+    mockDeleteIsPending = false;
   });
 
   afterEach(() => {
@@ -77,7 +84,7 @@ describe('DeleteAccountScreen', () => {
     expect(screen.getByText(/7-day grace period/)).toBeTruthy();
   });
 
-  it('schedules deletion and shows grace period', async () => {
+  it('schedules deletion and shows grace period after typed confirmation', async () => {
     mockDeleteMutateAsync.mockResolvedValue({
       message: 'Deletion scheduled',
       gracePeriodEnds: '2026-02-24T00:00:00.000Z',
@@ -85,7 +92,8 @@ describe('DeleteAccountScreen', () => {
 
     render(<DeleteAccountScreen />, { wrapper: Wrapper });
 
-    fireEvent.press(screen.getByTestId('delete-account-confirm'));
+    advanceToConfirmedState();
+    fireEvent.press(screen.getByTestId('delete-account-confirm-final'));
 
     await waitFor(() => {
       expect(mockDeleteMutateAsync).toHaveBeenCalled();
@@ -107,14 +115,13 @@ describe('DeleteAccountScreen', () => {
 
     render(<DeleteAccountScreen />, { wrapper: Wrapper });
 
-    // First, schedule deletion
-    fireEvent.press(screen.getByTestId('delete-account-confirm'));
+    advanceToConfirmedState();
+    fireEvent.press(screen.getByTestId('delete-account-confirm-final'));
 
     await waitFor(() => {
       expect(screen.getByTestId('delete-account-scheduled')).toBeTruthy();
     });
 
-    // Then cancel
     fireEvent.press(screen.getByTestId('delete-account-keep'));
 
     await waitFor(() => {
@@ -131,7 +138,8 @@ describe('DeleteAccountScreen', () => {
 
     render(<DeleteAccountScreen />, { wrapper: Wrapper });
 
-    fireEvent.press(screen.getByTestId('delete-account-confirm'));
+    advanceToConfirmedState();
+    fireEvent.press(screen.getByTestId('delete-account-confirm-final'));
 
     await waitFor(() => {
       expect(screen.getByTestId('delete-account-error')).toBeTruthy();
@@ -162,10 +170,11 @@ describe('DeleteAccountScreen', () => {
     expect(mockReplace).toHaveBeenCalledWith('/(app)/more');
   });
 
-  // [BUG-820] Double-tap of the alert's destructive button must result in
-  // exactly ONE deleteAccount mutation. Prior to the ref-based guard, a fast
-  // re-press could fire the mutation twice and create a server-side race.
-  it('fires exactly one mutation when alert destructive button is double-pressed', async () => {
+  // [BUG-820] Double-tap of the destructive button must result in exactly
+  // ONE deleteAccount mutation. After [BUG-910] the destructive button moved
+  // from the native alert to an in-screen "Permanently delete" button — the
+  // ref-based race guard still applies.
+  it('fires exactly one mutation when the final delete button is double-pressed', async () => {
     let resolveMutation: ((v: unknown) => void) | undefined;
     mockDeleteMutateAsync.mockImplementation(
       () =>
@@ -174,23 +183,15 @@ describe('DeleteAccountScreen', () => {
         })
     );
 
-    // Override the alert mock for this test only — fire the destructive
-    // onPress twice in rapid succession before the mutation resolves.
-    alertSpy.mockImplementation((_title, _message, buttons) => {
-      const deleteBtn = buttons?.find((b) => b.style === 'destructive');
-      // Simulate a double-tap on the alert's Delete button.
-      void deleteBtn?.onPress?.();
-      void deleteBtn?.onPress?.();
-    });
-
     render(<DeleteAccountScreen />, { wrapper: Wrapper });
 
-    fireEvent.press(screen.getByTestId('delete-account-confirm'));
+    advanceToConfirmedState();
+    const finalBtn = screen.getByTestId('delete-account-confirm-final');
+    fireEvent.press(finalBtn);
+    fireEvent.press(finalBtn);
 
-    // Both alert taps fire synchronously; the second must short-circuit.
     expect(mockDeleteMutateAsync).toHaveBeenCalledTimes(1);
 
-    // Resolve so the test cleans up cleanly.
     resolveMutation?.({
       message: 'Deletion scheduled',
       gracePeriodEnds: '2026-02-24T00:00:00.000Z',
@@ -198,6 +199,130 @@ describe('DeleteAccountScreen', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('delete-account-scheduled')).toBeTruthy();
+    });
+  });
+
+  // ---------------------------------------------------------------------
+  // [BUG-910] Second-stage typed confirmation, family-pool warning, and
+  // active-subscription advisory.
+  // ---------------------------------------------------------------------
+
+  describe('typed confirmation stage [BUG-910]', () => {
+    it('does NOT fire the mutation when the initial "I understand" button is pressed', () => {
+      render(<DeleteAccountScreen />, { wrapper: Wrapper });
+
+      fireEvent.press(screen.getByTestId('delete-account-confirm'));
+
+      expect(mockDeleteMutateAsync).not.toHaveBeenCalled();
+      expect(screen.getByTestId('delete-account-confirming')).toBeTruthy();
+    });
+
+    it('shows the family-pool warning in the confirming stage', () => {
+      render(<DeleteAccountScreen />, { wrapper: Wrapper });
+      fireEvent.press(screen.getByTestId('delete-account-confirm'));
+
+      expect(
+        screen.getByTestId('delete-account-family-warning')
+      ).toBeTruthy();
+      expect(screen.getByText(/linked child profiles/i)).toBeTruthy();
+      expect(
+        screen.getByText(/permanently deleted along with your account/i)
+      ).toBeTruthy();
+    });
+
+    it('shows the App Store / Play Store subscription advisory', () => {
+      render(<DeleteAccountScreen />, { wrapper: Wrapper });
+      fireEvent.press(screen.getByTestId('delete-account-confirm'));
+
+      expect(
+        screen.getByTestId('delete-account-subscription-warning')
+      ).toBeTruthy();
+      expect(screen.getByText(/App Store or Play Store/i)).toBeTruthy();
+      expect(screen.getByText(/not.*automatically cancelled/i)).toBeTruthy();
+    });
+
+    it('disables the final delete button until "DELETE" is typed exactly', () => {
+      render(<DeleteAccountScreen />, { wrapper: Wrapper });
+      fireEvent.press(screen.getByTestId('delete-account-confirm'));
+
+      const finalBtn = screen.getByTestId('delete-account-confirm-final');
+      // Initial: empty input → disabled.
+      expect(finalBtn.props.accessibilityState.disabled).toBe(true);
+
+      // Wrong text → still disabled.
+      fireEvent.changeText(
+        screen.getByTestId('delete-account-confirm-input'),
+        'delete'
+      );
+      expect(finalBtn.props.accessibilityState.disabled).toBe(true);
+
+      // Wrong text (typo) → still disabled.
+      fireEvent.changeText(
+        screen.getByTestId('delete-account-confirm-input'),
+        'DELET'
+      );
+      expect(finalBtn.props.accessibilityState.disabled).toBe(true);
+
+      // Exact match → enabled.
+      fireEvent.changeText(
+        screen.getByTestId('delete-account-confirm-input'),
+        'DELETE'
+      );
+      expect(finalBtn.props.accessibilityState.disabled).toBe(false);
+    });
+
+    it('does not fire the mutation when the final button is pressed without exact phrase', async () => {
+      render(<DeleteAccountScreen />, { wrapper: Wrapper });
+      fireEvent.press(screen.getByTestId('delete-account-confirm'));
+
+      // Type a near-miss.
+      fireEvent.changeText(
+        screen.getByTestId('delete-account-confirm-input'),
+        'delete'
+      );
+
+      // Pressing a disabled Pressable in RN test renderer still fires
+      // onPress; the screen-side guard inside onConfirmDelete must short-
+      // circuit. This is the regression test for the guard.
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('delete-account-confirm-final'));
+      });
+
+      expect(mockDeleteMutateAsync).not.toHaveBeenCalled();
+    });
+
+    it('returns to the initial warning when "Go back" is pressed', () => {
+      render(<DeleteAccountScreen />, { wrapper: Wrapper });
+      fireEvent.press(screen.getByTestId('delete-account-confirm'));
+
+      expect(screen.getByTestId('delete-account-confirming')).toBeTruthy();
+
+      fireEvent.press(screen.getByTestId('delete-account-back-to-warning'));
+
+      expect(screen.queryByTestId('delete-account-confirming')).toBeNull();
+      expect(screen.getByTestId('delete-account-confirm')).toBeTruthy();
+    });
+
+    it('clears the typed phrase when the user goes back to the warning', () => {
+      render(<DeleteAccountScreen />, { wrapper: Wrapper });
+      fireEvent.press(screen.getByTestId('delete-account-confirm'));
+
+      fireEvent.changeText(
+        screen.getByTestId('delete-account-confirm-input'),
+        'DELETE'
+      );
+      fireEvent.press(screen.getByTestId('delete-account-back-to-warning'));
+      fireEvent.press(screen.getByTestId('delete-account-confirm'));
+
+      // Re-entering the confirming stage starts fresh — input is empty,
+      // final button disabled.
+      expect(
+        screen.getByTestId('delete-account-confirm-input').props.value
+      ).toBe('');
+      expect(
+        screen.getByTestId('delete-account-confirm-final').props
+          .accessibilityState.disabled
+      ).toBe(true);
     });
   });
 });
