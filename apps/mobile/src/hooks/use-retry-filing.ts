@@ -13,16 +13,7 @@ export function useRetryFiling() {
     }: {
       sessionId: string;
     }): Promise<{ session: LearningSession }> => {
-      const retryFilingClient = (
-        client.sessions[':sessionId'] as unknown as {
-          'retry-filing': {
-            $post: (args: {
-              param: { sessionId: string };
-            }) => Promise<Response>;
-          };
-        }
-      )['retry-filing'];
-      const res = await retryFilingClient.$post({
+      const res = await client.sessions[':sessionId']['retry-filing'].$post({
         param: { sessionId },
       });
       await assertOk(res);
