@@ -66,7 +66,7 @@ Two production dead-code branches removed 2026-04-19 in commit `970a82a5`: `AgeB
 - [feedback_sweep_for_same_bug.md](feedback_sweep_for_same_bug.md) — After fixing a bug, sweep codebase for same pattern.
 - [feedback_just_do_it.md](feedback_just_do_it.md) — Clear action commands = execute immediately, don't gate on confirmations.
 - [feedback_autonomous_speccing.md](feedback_autonomous_speccing.md) — Decide small stuff yourself, only ask on genuinely big trade-offs.
-- [feedback_agents_commit_push.md](feedback_agents_commit_push.md) — Subagents NEVER commit. Only coordinator commits via `/commit`.
+- [feedback_agents_commit_push.md](feedback_agents_commit_push.md) — Subagents never commit by default; coordinator commits via `/commit`. Exception: user-instructed one-off subagent commits are OK.
 - [feedback_no_pr_unless_asked.md](feedback_no_pr_unless_asked.md) — NEVER create a PR unless explicitly asked.
 - [feedback_no_ota_unless_asked.md](feedback_no_ota_unless_asked.md) — NEVER run eas update (OTA) unless user asks.
 - [feedback_use_sonnet_agents.md](feedback_use_sonnet_agents.md) — Use Sonnet for subagents where possible; reserve Opus for deep reasoning.

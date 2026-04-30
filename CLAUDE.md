@@ -34,6 +34,7 @@
 - Never run `drizzle-kit push` against staging or production.
 - A worker deploy does not migrate Neon. Apply the target migration before shipping code that reads new columns.
 - Keep staging and production database credentials separate in CI. Never let staging deploys point at production data.
+- Any migration that drops columns, tables, or types must include a `## Rollback` section in the plan specifying: (a) whether rollback is possible, (b) what data is lost, (c) what the recovery procedure is. If rollback is impossible, say so explicitly — "rollback is not possible, data is permanently destroyed."
 
 ## Required Validation
 
@@ -58,134 +59,75 @@ Do not call work complete if related tests, lint, typecheck, or required migrati
 - Cross-tab / cross-stack `router.push` calls must push the full ancestor chain, not just the leaf. A direct push to `shelf/[subjectId]/book/[bookId]` from another tab synthesizes a 1-deep stack containing only the leaf, so `router.back()` falls through to the Tabs first-route (Home). Either push the parent first then the child, or rely on `unstable_settings.initialRouteName` in the nested layout — but the rule of thumb is to push the chain. `unstable_settings` only seeds one level, so it does not protect future deeper paths (e.g. `shelf/[subjectId]/book/[bookId]/chapter/[chapterId]`).
 - Any new nested Expo Router layout that contains both an `index` screen and a deeper dynamic child must export `unstable_settings = { initialRouteName: 'index' }` as a safety net for cross-stack deep pushes.
 
-## Inherited Rules (To Be Reorganized in Step 2)
+## UX Resilience Rules
 
-Content moved here from `~/.claude/CLAUDE.md` during the Step 1 cleanup of the global file (2026-04-30). These rules will be sorted into project-specific blocks, stack-specific skills/playbooks, or kept here permanently during the Step 2 audit. Treat as authoritative for now.
+These rules prevent dead-end states where users get stuck with no actionable escape. Learned from a full-app UX audit (2026-04-05) that found 44 dead-end issues across all flows. Screen-state checklist (mutateAsync catch feedback, guarded navigation, etc.) lives in the `ux-dead-end-audit` skill.
 
-### UX Resilience Rules
+- **Classify errors at the API client boundary, not per-screen.** Distinguish quota exhausted, forbidden, gone, network error, etc. in middleware. Screens must never parse HTTP status codes.
+- **Typed error hierarchy.** Define a shared error class hierarchy in the schema package (e.g., `QuotaExhaustedError`, `ResourceGoneError`, `ForbiddenError`). The API client middleware classifies HTTP responses into typed errors ONCE. Screens switch on error type.
+- **Standard error fallback pattern.** Primary action retries / fixes the specific problem; secondary action goes back / home / signs out. Build reusable `ErrorFallback` and `TimeoutLoader` components rather than ad-hoc per-screen handling.
+- **Spec failure modes before coding.** Every feature spec / story must include a Failure Modes table with columns: State, Trigger, User sees, Recovery. If the Recovery column can't be filled, the design isn't complete.
+- **End-to-end feature tracing.** For every event handler, cron function, or background job, verify something actually dispatches the event or schedules the cron in production code. Wired-but-untriggered code is worse than dead code — it creates false confidence.
 
-These rules prevent dead-end states where users get stuck with no actionable escape. Learned from a full-app UX audit (2026-04-05) that found 44 dead-end issues across all flows.
-
-#### Error Handling Rules
-
-> Most rules in this category are covered by the `ux-dead-end-audit` skill (mutateAsync catch feedback, specific server errors, guarded navigation, screen-state checklist). The remaining project rule below is architectural rather than screen-state, so stays here.
-
-- **Classify errors at the API client boundary, not per-screen** — distinguish quota exhausted, forbidden, gone, network error, etc. in middleware. Screens should never parse HTTP status codes.
-
-#### Spec Failure Modes Before Coding
-
-Every feature spec / story must include a Failure Modes table:
-
-```markdown
-| State | Trigger | User sees | Recovery |
-|-------|---------|-----------|----------|
-| Stream drops | Network loss | "Connection lost" | Tap to retry, Go Home |
-| Session expired | 30min+ idle | "Session ended" | Start new session |
-```
-
-If you can't fill in the "Recovery" column, the design isn't complete.
-
-#### Typed Error Hierarchy
-
-Define a shared error class hierarchy in the schema package (e.g., `QuotaExhaustedError`, `ResourceGoneError`, `ForbiddenError`). The API client middleware should classify HTTP responses into typed errors ONCE. Screens switch on error type — they never parse HTTP status codes directly.
-
-#### End-to-End Feature Tracing
-
-For every event handler, cron function, or background job — verify that something actually dispatches the event or schedules the cron in production code. Wired-but-untriggered code is worse than dead code because it creates false confidence.
-
-#### No Internal Mocks in Integration Tests
-
-Never `jest.mock` your own database, services, or middleware in integration tests. Mock only true external boundaries (Stripe, Clerk JWKS, email providers, push notification services). Internal mocks in integration tests hide real bugs.
-
-#### Standard Error Fallback Pattern
-
-All error states should follow this pattern:
-- **Primary action:** Retry / Fix the specific problem
-- **Secondary action:** Go back / Go home / Sign out
-
-Build reusable `ErrorFallback` and `TimeoutLoader` components rather than ad-hoc error handling per screen.
-
-### Fix Verification Rules
+## Fix Verification Rules
 
 Changed code is not fixed code. Every fix must be verified, not just applied. These rules apply to all bug fixes, security patches, and review-finding resolutions.
 
-#### Security Fixes Require a "Break Test"
+- **Security fixes require a "break test."** Every fix tagged CRITICAL or HIGH in a security or data-integrity context must include at least one negative-path test that attempts the exact attack being prevented (unauthorized access, missing auth, invalid input). Use the red-green regression pattern (see `superpowers:verification-before-completion` → "Regression tests"): write the test, watch it pass, revert the fix, watch it fail, restore.
+- **Silent recovery without escalation is banned.** Any `catch` block or fallback path in billing, auth, or webhook code that silently recovers must also emit a structured metric or Inngest event. `console.warn` alone is never sufficient — if you can't query how many times the fallback fired in the last 24 hours, the "recovery" is invisible.
+- **Fix tables must include a "Verified By" column** with one of: `test: file.test.ts:"test name"`, `manual: description`, or `N/A: reason`. An empty cell means the fix is PARTIAL, not DONE.
+- **Fix commits must reference the finding ID** — e.g. `fix(api): atomic quota decrement [CR-1C.1]`. This makes `git log --grep="CR-1C"` useful and links code changes to the discovery that motivated them.
 
-Every fix tagged CRITICAL or HIGH in a security or data-integrity context must include at least one negative-path test that attempts the exact attack being prevented — unauthorized access, missing auth, invalid input. The test proves the guard works, not just that the code compiles.
-
-#### Silent Recovery Without Escalation is Banned
-
-Any `catch` block or fallback path in billing, auth, or webhook code that silently recovers must also emit a structured metric or Inngest event. `console.warn` alone is never sufficient — if you can't query how many times the fallback fired in the last 24 hours, the "recovery" is invisible.
-
-#### Destructive Migrations Need a Rollback Section
-
-Any migration that drops columns, tables, or types must include a `## Rollback` section in the plan specifying: (a) whether rollback is possible, (b) what data is lost, (c) what the recovery procedure is. If rollback is impossible, say so explicitly — "rollback is not possible, data is permanently destroyed."
-
-#### Fix Tables Must Include a "Verified By" Column
-
-Every fix row in a plan must have a verification column with one of:
-- `test: file.test.ts:"test name"` — automated test proves the fix
-- `manual: description` — what was manually checked
-- `N/A: reason` — verification not applicable, with justification
-
-An empty Verified By cell means the fix is PARTIAL, not DONE.
-
-#### Fix Commits Must Reference the Finding ID
-
-Commit messages for fixes must include the finding ID tag, e.g. `fix(api): atomic quota decrement [CR-1C.1]`. This makes `git log --grep="CR-1C"` instantly useful and links code changes to the discovery that motivated them.
-
-### Code Quality Guards
+## Code Quality Guards
 
 These rules catch bugs that survive type-checking and only surface at runtime. Learned from adversarial review (2026-04-05).
 
-#### Response Bodies Are Single-Use
+- **No internal mocks in integration tests.** Never `jest.mock` your own database, services, or middleware in integration tests. Mock only true external boundaries (Stripe, Clerk JWKS, email providers, push notification services). Internal mocks hide real bugs.
+- **Response bodies are single-use.** Never call both `.json()` and `.text()` on the same `fetch` Response — the body stream is consumed on first read. If you need both JSON parsing with a text fallback, read `.text()` once and `JSON.parse` it manually. Applies to `assertOk`-style helpers, error-extraction middleware, and SSE error handlers.
+- **Classify errors before formatting.** When code branches on error *type* (reconnectable vs. fatal, quota vs. network) and also formats errors for display, classify the **raw** error object first, then format for the user. Never string-match on the output of `formatApiError` — the formatter strips status codes, error codes, and keywords classifiers depend on.
+- **Clean up all artifacts when removing a feature.** Grep the entire project for all references: types, imports, constants, SecureStore keys, commented-out JSX, fallback branches. Orphaned types create false confidence, unreachable fallback branches inflate coverage, leaked storage keys waste device storage forever.
+- **Verify JSX handler references exist.** Every `onPress`, `onSubmit`, or event handler referenced in JSX must be defined or imported in the component scope. A missing handler is a **runtime crash** (`ReferenceError`), not a lint warning. After adding any `Pressable`/`Button`, search the file for the handler name before committing.
 
-Never call both `.json()` and `.text()` on the same `fetch` Response — the body stream is consumed on first read. If you need both JSON parsing with a text fallback, read `.text()` once and `JSON.parse` it manually. This applies to `assertOk`-style helpers, error-extraction middleware, and SSE error handlers.
-
-#### Classify Errors Before Formatting
-
-When code branches on error *type* (reconnectable vs. fatal, quota vs. network) and also formats errors for display, always classify the **raw** error object first, then format for the user. Never string-match on the output of `formatApiError` — the formatter strips status codes, error codes, and keywords that classifiers depend on.
-
-#### Clean Up All Artifacts When Removing a Feature
-
-After removing a feature or code path, grep the entire project for all references: types, imports, constants, SecureStore keys, commented-out JSX, and fallback branches. Orphaned types create false confidence, unreachable fallback branches inflate coverage, and leaked storage keys waste device storage forever.
-
-#### Verify JSX Handler References Exist
-
-Every `onPress`, `onSubmit`, or event handler referenced in JSX must be defined or imported in the component scope. A missing handler is a **runtime crash** (`ReferenceError`), not a lint warning. After adding any `Pressable`/`Button`, search the file for the handler name before committing.
-
-### Secrets Management
+## Secrets Management
 
 All secrets are managed through **Doppler**. Never suggest `wrangler secret put`, direct Cloudflare dashboard entry, AWS console, or any other platform-specific secret management. When secrets need to be set, say "add to Doppler."
 
-### PR Review & CI Protocol
+## PR Review & CI Protocol
 
 **ALL agents MUST follow this protocol when working with PRs. This is non-negotiable.**
 
-#### Before Declaring a PR "Ready to Merge"
+### Before Declaring a PR "Ready to Merge"
 
 1. **Read the actual PR diff** — run `gh pr diff <number>` to see what files are actually changed relative to the base branch. Do NOT assume from commit messages alone.
-
 2. **Check all CI checks** — run `gh pr checks <number>`. ALL checks must pass, including automated code reviews (Claude Code Review, etc.).
-
-3. **Read automated code review findings** — If a code review check exists (e.g., Claude Code Review), read all findings:
+3. **Read automated code review findings** — if a code review check exists, fetch and triage findings:
    ```bash
    gh pr checks <number>
    gh api repos/{owner}/{repo}/pulls/<number>/reviews
    gh api repos/{owner}/{repo}/pulls/<number>/comments
    ```
-   Then fix ALL findings by priority:
    - **High (Must fix):** Security issues, data loss risks, correctness bugs — MUST be fixed before merge
    - **Medium:** Best practice violations, missing validation, config issues — SHOULD be fixed before merge
    - **Low:** Style, docs, minor improvements — can be deferred but note them
+4. **NEVER dismiss review failures as "OK to merge."** Automated code review catches real bugs, security issues, and architectural violations. Treat findings with the same weight as a senior engineer's review.
 
-4. **NEVER dismiss review failures as "OK to merge."** Automated code review catches real bugs, security issues, and architectural violations. Treat its findings with the same weight as a senior engineer's review. Always read the report and fix the issues.
+### When Rebasing PRs
 
-#### When Rebasing PRs
+- After rebase, always verify the PR diff (`gh pr diff`) — merge strategies like `-X theirs` can silently drop code.
+- Check for duplicate functions/tests, missing imports, and schema export gaps.
+- Run type checking (`tsc --noEmit`) to catch errors before pushing.
 
-- After rebase, always verify the PR diff (`gh pr diff`) — merge strategies like `-X theirs` can silently drop code
-- Check for duplicate functions/tests, missing imports, and schema export gaps
-- Run type checking (`tsc --noEmit`) to catch errors before pushing
+## On Compaction
+
+When the conversation is compacted, preserve at minimum:
+
+- The full list of files modified in this session (paths only, no diffs).
+- Names and reproductions of any failing tests, lint errors, or typecheck errors not yet resolved.
+- The active plan or task list — current step, next step, and anything blocked.
+- The current branch name and which base branch it tracks.
+- Any decisions made in conversation that aren't reflected in the diff yet (e.g., "we agreed to defer X").
+
+It is fine to discard: tool-call output bodies, exploratory file reads that didn't change anything, and resolved error messages.
 
 ## Handy Commands
 

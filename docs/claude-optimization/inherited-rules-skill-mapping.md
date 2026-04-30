@@ -6,6 +6,27 @@
 
 **Created:** 2026-04-30, during Step 1 cleanup of global CLAUDE.md.
 
+**Phase A executed (2026-04-30):** 3 HIGH-confidence items deleted (commit `3c56b0d8`). See `CLAUDE.md` history for the diff.
+
+**Phase B executed (2026-04-30):** 4 paraphrase memories reduced to context-only pointers (commit `f40f41e9`).
+
+**Phase C executed (2026-04-30):** All 8 MEDIUM and 8 NONE items KEPT after skill-body verification. Holding section "Inherited Rules (To Be Reorganized in Step 2)" dissolved — subsections promoted to top-level project sections. Destructive Migrations rule moved into Schema And Deploy Safety. Break Test rule now points at `verification-before-completion` skill's red-green regression pattern (the only real linkage that survived body reading). See "Phase C findings" below.
+
+---
+
+## Phase C findings — methodology lesson
+
+**Description-based mapping over-reports overlap.** Of the 8 MEDIUM items flagged as "skill could absorb with extension," body verification showed:
+
+- `superpowers:writing-plans` body has zero failure-modes coverage — it's purely TDD task decomposition. Spec Failure Modes stays project-specific.
+- `superpowers:test-driven-development` says "real code, no mocks unless unavoidable" generically, but doesn't distinguish integration-vs-unit or internal-vs-external mocks. No Internal Mocks rule stays project-specific.
+- `superpowers:verification-before-completion` actually does encode the red-green break-test pattern — this is the only real overlap that survived body reading. Captured by adding a skill pointer to the Break Test rule rather than deleting it.
+- `simplify` skill does not exist on this filesystem (the description was guessed during initial mapping). Clean Up All Artifacts stays project-specific.
+- `gstack/ship` and `gstack/review` bodies delegate to `C:/.tools/.gstack/...` which isn't installed here, so coverage couldn't be verified. The PR-Ready protocol's `gh pr diff` / `gh pr checks` workflow is project-specific anyway.
+- `superpowers:requesting-code-review` dispatches a `superpowers:code-reviewer` subagent on a SHA range — different mechanism from "PR already pushed, read CI output." Adjacent, not overlapping.
+
+**Rule of thumb for future audits:** read the skill body before deciding overlap. Description-based mapping is a triage tool, not a verdict.
+
 ---
 
 ## Confidence legend
