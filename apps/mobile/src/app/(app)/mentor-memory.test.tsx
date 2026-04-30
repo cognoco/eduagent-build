@@ -68,8 +68,9 @@ jest.mock('../../hooks/use-parent-proxy', () => ({
   useParentProxy: () => ({ isParentProxy: false }),
 }));
 
+let mockActiveRole: 'owner' | 'child' | 'impersonated-child' | null = 'owner';
 jest.mock('../../hooks/use-active-profile-role', () => ({
-  useActiveProfileRole: () => 'owner',
+  useActiveProfileRole: () => mockActiveRole,
 }));
 
 jest.mock('../../lib/platform-alert', () => ({
@@ -137,6 +138,57 @@ jest.mock('../../components/tell-mentor-input', () => ({
     );
   },
 }));
+
+// [BUG-918] Regression test: the "Set by your parent in their settings."
+// helper text below the accommodation badge must be hidden for owner profiles
+// (parents on their own account have no parent to attribute the setting to)
+// and shown for child profiles. Driven by `useActiveProfileRole() !== 'owner'`.
+describe('MentorMemoryScreen — accommodation helper copy is role-gated [BUG-918]', () => {
+  const SET_BY_PARENT = /Set by your parent in their settings\./;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockActiveRole = 'owner';
+    mockProfileData = {
+      ...mockProfileBase,
+      interests: [],
+      accommodationMode: 'audio-first',
+    };
+  });
+
+  afterEach(() => {
+    mockActiveRole = 'owner';
+  });
+
+  it('hides "Set by your parent" for owner profiles even with accommodation badge visible', () => {
+    mockActiveRole = 'owner';
+    render(<MentorMemoryScreen />);
+
+    expect(screen.getByTestId('accommodation-badge')).toBeTruthy();
+    expect(screen.queryByText(SET_BY_PARENT)).toBeNull();
+  });
+
+  it('shows "Set by your parent" for child profiles with accommodation badge visible', () => {
+    mockActiveRole = 'child';
+    render(<MentorMemoryScreen />);
+
+    expect(screen.getByTestId('accommodation-badge')).toBeTruthy();
+    expect(screen.getByText(SET_BY_PARENT)).toBeTruthy();
+  });
+
+  it('hides "Set by your parent" when accommodation badge is not shown', () => {
+    mockProfileData = {
+      ...mockProfileBase,
+      interests: [],
+      accommodationMode: 'none',
+    };
+    mockActiveRole = 'child';
+    render(<MentorMemoryScreen />);
+
+    expect(screen.queryByTestId('accommodation-badge')).toBeNull();
+    expect(screen.queryByText(SET_BY_PARENT)).toBeNull();
+  });
+});
 
 describe('MentorMemoryScreen — catch blocks use formatApiError not generic copy', () => {
   beforeEach(() => {
