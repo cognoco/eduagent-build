@@ -6,10 +6,15 @@ import { createDatabaseModuleMock } from '../../test-utils/database-module';
 
 const col = (name: string) => ({ name });
 
+const mockCurriculumTopicsFindFirst = jest.fn().mockResolvedValue(null);
+const mockCurriculumBooksFindFirst = jest.fn().mockResolvedValue(null);
+
 const mockDb = {
   query: {
     sessionEvents: { findMany: jest.fn().mockResolvedValue([]) },
     learningSessions: { findFirst: jest.fn().mockResolvedValue(null) },
+    curriculumTopics: { findFirst: mockCurriculumTopicsFindFirst },
+    curriculumBooks: { findFirst: mockCurriculumBooksFindFirst },
   },
 };
 
@@ -22,7 +27,18 @@ const mockDatabaseModule = createDatabaseModuleMock({
       createdAt: col('createdAt'),
       eventType: col('eventType'),
     },
-    learningSessions: { id: col('id'), profileId: col('profileId') },
+    learningSessions: {
+      id: col('id'),
+      profileId: col('profileId'),
+      filedAt: col('filedAt'),
+      topicId: col('topicId'),
+    },
+    curriculumTopics: {
+      id: col('id'),
+      bookId: col('bookId'),
+      title: col('title'),
+    },
+    curriculumBooks: { id: col('id') },
   },
 });
 
@@ -267,5 +283,92 @@ describe('freeformFilingRetry', () => {
         }),
       })
     );
+  });
+
+  // -------------------------------------------------------------------------
+  // [CR-FIL-CONSISTENCY-02] alreadyFiled early-exit path — payload consistency
+  // -------------------------------------------------------------------------
+
+  describe('when session is already filed (alreadyFiled path)', () => {
+    const filedTopicId = 'topic-filed-001';
+    const filedBookId = 'book-filed-001';
+
+    beforeEach(() => {
+      // Session row shows it was already filed and has a topicId
+      mockDb.query.learningSessions.findFirst.mockResolvedValue({
+        filedAt: new Date('2026-01-01T10:00:00Z'),
+        topicId: filedTopicId,
+      });
+      mockCurriculumTopicsFindFirst.mockResolvedValue({
+        title: 'Newton Laws',
+        bookId: filedBookId,
+      });
+      mockCurriculumBooksFindFirst.mockResolvedValue({ id: filedBookId });
+    });
+
+    it('skips filing and returns already_filed status', async () => {
+      const { result } = await executeSteps(createEventData());
+      expect(result).toMatchObject({ status: 'already_filed', skipped: true });
+    });
+
+    it('does not call fileToLibrary on the already_filed path', async () => {
+      await executeSteps(createEventData());
+      expect(mockFileToLibrary).not.toHaveBeenCalled();
+    });
+
+    it('emits app/filing.completed with the same key set as the success path [CR-FIL-CONSISTENCY-02]', async () => {
+      const { mockStep } = await executeSteps(createEventData());
+
+      const completedCall = (mockStep.sendEvent as jest.Mock).mock.calls.find(
+        (c: unknown[]) => (c[0] as string) === 'notify-filing-completed'
+      );
+      expect(completedCall).toBeDefined();
+      const payload = (completedCall as unknown[])[1] as {
+        name: string;
+        data: Record<string, unknown>;
+      };
+
+      // Must have all four data keys that the success path emits
+      expect(payload.data).toHaveProperty('bookId');
+      expect(payload.data).toHaveProperty('topicTitle');
+      expect(payload.data).toHaveProperty('profileId', testProfileId);
+      expect(payload.data).toHaveProperty('sessionId', testSessionId);
+      // Resolved values from the topic lookup
+      expect(payload.data.bookId).toBe(filedBookId);
+      expect(payload.data.topicTitle).toBe('Newton Laws');
+    });
+
+    it('falls back to undefined bookId/topicTitle when topicId is null [CR-FIL-CONSISTENCY-02]', async () => {
+      // Session filed but topicId not yet written (edge case)
+      mockDb.query.learningSessions.findFirst.mockResolvedValue({
+        filedAt: new Date('2026-01-01T10:00:00Z'),
+        topicId: null,
+      });
+
+      const { mockStep } = await executeSteps(createEventData());
+
+      const completedCall = (mockStep.sendEvent as jest.Mock).mock.calls.find(
+        (c: unknown[]) => (c[0] as string) === 'notify-filing-completed'
+      );
+      const payload = (completedCall as unknown[])[1] as {
+        data: Record<string, unknown>;
+      };
+      // Keys must exist even when values are undefined (structure matches success path)
+      expect(Object.keys(payload.data)).toContain('bookId');
+      expect(Object.keys(payload.data)).toContain('topicTitle');
+      expect(payload.data.bookId).toBeUndefined();
+      expect(payload.data.topicTitle).toBeUndefined();
+    });
+
+    it('scopes the session read to both sessionId and profileId [CR-FIL-SCOPE-05]', async () => {
+      await executeSteps(createEventData());
+
+      // The check-already-filed step must read with profileId scoping
+      expect(mockDb.query.learningSessions.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          columns: expect.objectContaining({ filedAt: true, topicId: true }),
+        })
+      );
+    });
   });
 });

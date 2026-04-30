@@ -1,7 +1,11 @@
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
-import { eq } from 'drizzle-orm';
-import { learningSessions } from '@eduagent/database';
+import { and, eq } from 'drizzle-orm';
+import {
+  curriculumBooks,
+  curriculumTopics,
+  learningSessions,
+} from '@eduagent/database';
 import { filingRetryCompletedEventSchema } from '@eduagent/schemas';
 import {
   buildLibraryIndex,
@@ -26,20 +30,67 @@ export const freeformFilingRetry = inngest.createFunction(
       sessionMode: 'freeform' | 'homework';
     };
 
-    const alreadyFiled = await step.run('check-already-filed', async () => {
+    const sessionSnapshot = await step.run('check-already-filed', async () => {
       const db = getStepDatabase();
+      // [CR-FIL-SCOPE-05] Scope the read to both id AND profileId to satisfy the
+      // auditable-scoping requirement (CLAUDE.md: "Reads must use profileId scope").
       const row = await db.query.learningSessions.findFirst({
-        where: eq(learningSessions.id, sessionId),
-        columns: { filedAt: true },
+        where: and(
+          eq(learningSessions.id, sessionId),
+          eq(learningSessions.profileId, profileId)
+        ),
+        columns: { filedAt: true, topicId: true },
       });
-      return row?.filedAt != null;
+      return {
+        alreadyFiled: row?.filedAt != null,
+        topicId: row?.topicId ?? null,
+      };
     });
 
+    const alreadyFiled = sessionSnapshot.alreadyFiled;
+
     if (alreadyFiled) {
+      // [CR-FIL-CONSISTENCY-02] Look up topicTitle and bookId from the existing
+      // topic row so the early-exit payload matches the success-path payload shape.
+      // The session row already carries topicId when filedAt is set.
+      // Step result is JSON-serialized by Inngest so undefined fields become
+      // optional in the inferred type. We assert FilingInfo to restore the
+      // explicit structure — both bookId and topicTitle are always present as
+      // keys (possibly undefined in value) on every code path.
+      type FilingInfo = {
+        topicTitle: string | undefined;
+        bookId: string | undefined;
+      };
+      const noFilingInfo: FilingInfo = {
+        topicTitle: undefined,
+        bookId: undefined,
+      };
+      const filedTopicId = sessionSnapshot.topicId;
+      const existingFilingInfo: FilingInfo = filedTopicId
+        ? ((await step.run('lookup-filed-topic', async () => {
+            const db = getStepDatabase();
+            const topic = await db.query.curriculumTopics.findFirst({
+              where: eq(curriculumTopics.id, filedTopicId),
+              columns: { title: true, bookId: true },
+            });
+            if (!topic) return noFilingInfo;
+            const book = await db.query.curriculumBooks.findFirst({
+              where: eq(curriculumBooks.id, topic.bookId),
+              columns: { id: true },
+            });
+            return {
+              topicTitle: topic.title,
+              bookId: book?.id ?? undefined,
+            };
+          })) as FilingInfo)
+        : noFilingInfo;
+
       const timestamp = new Date().toISOString();
       await step.sendEvent('notify-filing-completed', {
         name: 'app/filing.completed',
         data: {
+          bookId: existingFilingInfo.bookId,
+          topicTitle: existingFilingInfo.topicTitle,
           profileId,
           sessionId,
           timestamp,
