@@ -13,7 +13,7 @@ Scope was derived from these commits on `improvements` and the related spec:
 | `1316619e fix(mobile): web stack stacking + quiz/parent improvements [F-003,F-006,F-016,F-017,F-055]` | Mobile polish under quiz umbrella |
 | `970a82a5 feat(api): dictation personalization + dead-code cleanup [P0.1, P0.2]` | Removed `AgeBracket.child` and ≤7/≤10 branches from the quiz themer — product is 11+ |
 
-Corresponding spec: [`docs/specs/2026-04-18-quiz-ui-redesign-finding-fixes.md`](../specs/2026-04-18-quiz-ui-redesign-finding-fixes.md) (F-032 … F-041). The parent-side spec `docs/specs/Done/2026-04-18-quiz-activities-design.md` documents the upstream activity design.
+Corresponding spec: [`docs/_archive/specs/2026-04-18-quiz-ui-redesign-finding-fixes.md`](../specs/2026-04-18-quiz-ui-redesign-finding-fixes.md) (F-032 … F-041). The parent-side spec `docs/_archive/specs/Done/2026-04-18-quiz-activities-design.md` documents the upstream activity design.
 
 ## Test environment
 

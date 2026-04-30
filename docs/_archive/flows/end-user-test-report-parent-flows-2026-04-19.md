@@ -21,9 +21,9 @@ Scope was derived from these commits on `improvements` and related specs:
 | `68a2288c feat: code review fixes + parent narrative phase 1` | Parent narrative: narrative / highlight / conversationPrompt / engagementSignal + DB migration 0034 |
 
 Corresponding specs:
-- `docs/specs/Done/2026-04-18-parent-visibility-privacy-design.md`
-- `docs/specs/Done/2026-04-18-progress-empty-states-highlights-design.md`
-- `docs/specs/Done/2026-04-10-parent-report-empty-state-design.md`
+- `docs/_archive/specs/Done/2026-04-18-parent-visibility-privacy-design.md`
+- `docs/_archive/specs/Done/2026-04-18-progress-empty-states-highlights-design.md`
+- `docs/_archive/specs/Done/2026-04-10-parent-report-empty-state-design.md`
 
 ## Test environment
 
