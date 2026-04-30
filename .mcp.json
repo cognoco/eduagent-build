@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "maestro": {
+      "command": "C:\\tools\\maestro\\bin\\maestro.bat",
+      "args": ["mcp"],
+      "env": {
+        "TEMP": "C:\\tools\\maestro\\tmp",
+        "TMP": "C:\\tools\\maestro\\tmp"
+      }
+    }
+  }
+}
