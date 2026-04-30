@@ -26,8 +26,9 @@ import {
   processExchange,
   streamExchange,
   estimateExpectedResponseMinutes,
-  parseExchangeEnvelope,
+  classifyExchangeOutcome,
   type ExchangeContext,
+  type ExchangeFallback,
   type FluencyDrillAnnotation,
   type ImageData,
 } from '../exchanges';
@@ -1059,6 +1060,10 @@ export async function streamMessage(
     notePromptPostSession?: boolean;
     fluencyDrill?: FluencyDrillAnnotation;
     confidence?: 'low' | 'medium' | 'high';
+    /** [BUG-941] Set when the LLM response was empty or unparseable — caller
+     *  MUST emit a `fallback` SSE frame and skip persisting the exchange so
+     *  the raw envelope never reaches ai_response.content. */
+    fallback?: ExchangeFallback;
   }>;
 }> {
   // Early exchange limit check — runs before expensive prepareExchangeContext
@@ -1088,14 +1093,34 @@ export async function streamMessage(
       // The client-facing `stream` yields only decoded `reply` text via
       // teeEnvelopeStream. The full raw envelope (with signals + ui_hints)
       // is available through `rawResponsePromise` once the caller finishes
-      // draining the stream — that's the one parseExchangeEnvelope wants.
+      // draining the stream — that's the one classifyExchangeOutcome wants.
       const rawResponse = await result.rawResponsePromise;
-      const parsed = parseExchangeEnvelope(rawResponse, {
+
+      // [BUG-941] Use classifyExchangeOutcome (same as interview path) so that
+      // empty / unparseable / orphan-marker responses return a typed fallback
+      // instead of falling back to `response.trim()` — the raw envelope JSON —
+      // which would be written verbatim to ai_response.content and re-rendered
+      // by the client as a raw JSON blob.
+      const outcome = classifyExchangeOutcome(rawResponse, {
         sessionId,
         profileId,
         flow: 'streamMessage',
       });
 
+      // [BUG-941] When the LLM emitted an unparseable / empty response, return
+      // the fallback descriptor without persisting. The caller (sessions route)
+      // MUST emit a `fallback` SSE frame and refund the quota increment so the
+      // exchange is not counted. Raw envelope NEVER touches ai_response.content.
+      if (outcome.fallback) {
+        return {
+          exchangeCount: 0,
+          escalationRung: effectiveRung,
+          expectedResponseMinutes: 0,
+          fallback: outcome.fallback,
+        };
+      }
+
+      const parsed = outcome.parsed;
       const expectedResponseMinutes = estimateExpectedResponseMinutes(
         parsed.cleanResponse,
         context

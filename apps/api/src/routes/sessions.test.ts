@@ -1206,6 +1206,87 @@ describe('session routes', () => {
 
       expect(res.status).toBe(401);
     });
+
+    // [BUG-941] When onComplete returns a fallback (LLM response was empty or
+    // unparseable), the route must emit a `fallback` SSE frame — NOT a `done`
+    // frame — so the mobile client shows the recovery prompt rather than
+    // rendering raw envelope JSON in the chat bubble. Quota must also be
+    // refunded because the exchange was never persisted.
+    it('[BUG-941] emits fallback SSE frame and refunds quota when onComplete returns fallback', async () => {
+      mockIncrementQuota.mockClear();
+
+      (streamMessage as jest.Mock).mockResolvedValueOnce({
+        stream: (async function* () {
+          // Zero non-whitespace chunks — LLM produced nothing renderable.
+        })(),
+        onComplete: jest.fn().mockResolvedValue({
+          exchangeCount: 0,
+          escalationRung: 1,
+          expectedResponseMinutes: 0,
+          fallback: {
+            reason: 'malformed_envelope',
+            fallbackText: "I didn't have a reply — tap to try again.",
+          },
+        }),
+      });
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/stream`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'Spiega passo per passo' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.text();
+
+      // Route MUST emit a typed `fallback` frame (not `done` with raw JSON).
+      expect(body).toContain('"type":"fallback"');
+      expect(body).toContain('"reason":"malformed_envelope"');
+      expect(body).toContain("tap to try again");
+
+      // Route MUST refund quota since the exchange was not persisted.
+      expect(mockIncrementQuota).toHaveBeenCalledWith(
+        expect.anything(),
+        'sub-1'
+      );
+    });
+
+    // [BUG-941] Variant: empty_reply reason from a valid but empty-reply envelope.
+    it('[BUG-941] emits empty_reply fallback frame when onComplete reports empty_reply', async () => {
+      (streamMessage as jest.Mock).mockResolvedValueOnce({
+        stream: (async function* () {})(),
+        onComplete: jest.fn().mockResolvedValue({
+          exchangeCount: 0,
+          escalationRung: 1,
+          expectedResponseMinutes: 0,
+          fallback: {
+            reason: 'empty_reply',
+            fallbackText: "I didn't have a reply — tap to try again.",
+          },
+        }),
+      });
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/stream`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'Hello' }),
+        },
+        TEST_ENV
+      );
+
+      const body = await res.text();
+      expect(body).toContain('"type":"fallback"');
+      expect(body).toContain('"reason":"empty_reply"');
+      // Must NOT contain a regular `done` frame — client must not count this
+      // as a successful exchange.
+      expect(body).not.toContain('"exchangeCount":1');
+    });
   });
 
   // -------------------------------------------------------------------------

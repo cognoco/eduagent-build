@@ -836,6 +836,40 @@ describe('classifyExchangeOutcome', () => {
     const result = classifyExchangeOutcome('{"escalationHold":true}', ctx);
     expect(result.fallback?.reason).toBe('orphan_marker');
   });
+
+  // [BUG-941] Regression: Italian session with partial_progress=true envelope.
+  // Before the fix, streamMessage.onComplete called parseExchangeEnvelope
+  // which, on any schema failure, fell back to `response.trim()` — the full
+  // raw envelope JSON — and wrote it to ai_response.content. The mobile client
+  // then rendered the entire JSON blob in the chat bubble.
+  // classifyExchangeOutcome (this path) must ALWAYS resolve cleanResponse to
+  // the reply text, never to the raw envelope, for any well-formed envelope.
+  it('[BUG-941] extracts reply text from Italian session partial_progress envelope', () => {
+    const raw = JSON.stringify({
+      reply:
+        "Very close! The letters 'gi' together make a 'j' sound in Italian, like in 'giorno' (day). So 'gi' is pronounced like the English 'j'. Does that help clarify things?",
+      signals: {
+        partial_progress: true,
+        needs_deepening: false,
+        understanding_check: false,
+      },
+      ui_hints: { note_prompt: { show: false, post_session: false } },
+    });
+
+    const result = classifyExchangeOutcome(raw, ctx);
+
+    // No fallback — this is a valid, non-empty envelope.
+    expect(result.fallback).toBeUndefined();
+    // cleanResponse must be the reply text, never the raw JSON blob.
+    expect(result.parsed.cleanResponse).toContain(
+      "Very close! The letters 'gi' together make a 'j' sound"
+    );
+    expect(result.parsed.cleanResponse).not.toContain('"reply"');
+    expect(result.parsed.cleanResponse).not.toContain('"signals"');
+    expect(result.parsed.cleanResponse).not.toContain('"ui_hints"');
+    // Signal is correctly extracted.
+    expect(result.parsed.partialProgress).toBe(true);
+  });
 });
 
 // [BUG-934][BUG-935] Break tests for the schema-failure persistence fallback.

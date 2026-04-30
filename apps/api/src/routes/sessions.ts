@@ -15,6 +15,7 @@ import {
   ERROR_CODES,
   filingRetryEventSchema,
   RateLimitedError,
+  streamFallbackFrameSchema,
 } from '@eduagent/schemas';
 import { learningSessions, type Database } from '@eduagent/database';
 import { and, eq, lt, sql } from 'drizzle-orm';
@@ -314,9 +315,25 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         );
 
         return streamSSEUtf8(c, async (sseStream) => {
+          // [BUG-866] Track chunk count so we can detect zero-token streams.
+          let chunkCount = 0;
           for await (const chunk of stream) {
+            if (chunk.trim().length > 0) chunkCount++;
             await sseStream.writeSSE({
               data: JSON.stringify({ type: 'chunk', content: chunk }),
+            });
+          }
+
+          // [BUG-866] Structured metric on zero-token stream — "silent recovery
+          // without escalation is banned" (CLAUDE.md). This fires even when
+          // onComplete succeeds, so the fallback reason can be correlated with
+          // it in observability tooling.
+          if (chunkCount === 0) {
+            logger.warn('[sessions/stream] Zero-token stream completed', {
+              surface: 'sessions.stream',
+              sessionId,
+              profileId,
+              tokensReceived: 0,
             });
           }
 
@@ -324,6 +341,38 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             // onComplete reads the raw envelope via rawResponsePromise internally —
             // the clean reply text from the stream is not needed.
             const result = await onComplete();
+
+            // [BUG-941] If the LLM response was empty or unparseable, emit a
+            // typed `fallback` SSE frame so the client shows a meaningful
+            // recovery prompt instead of raw envelope JSON. Refund quota because
+            // the exchange was not persisted.
+            if (result.fallback) {
+              const frame = streamFallbackFrameSchema.parse({
+                type: 'fallback',
+                reason: result.fallback.reason,
+                fallbackText: result.fallback.fallbackText,
+              });
+              // Refund quota before emitting frames — safe to call even if the
+              // refund itself fails (safeRefundQuota escalates internally).
+              if (subscriptionId) {
+                await safeRefundQuota(db, subscriptionId, {
+                  route: 'sessions.stream.fallback',
+                  profileId,
+                  sessionId,
+                });
+              }
+              await sseStream.writeSSE({ data: JSON.stringify(frame) });
+              await sseStream.writeSSE({
+                data: JSON.stringify({
+                  type: 'done',
+                  exchangeCount: 0,
+                  escalationRung: result.escalationRung,
+                  expectedResponseMinutes: 0,
+                }),
+              });
+              return;
+            }
+
             await sseStream.writeSSE({
               data: JSON.stringify({
                 type: 'done',
