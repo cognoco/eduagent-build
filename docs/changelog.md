@@ -31,7 +31,7 @@
     - Processed all non-code/config files in the entire repo to identify obsolete documentation and leftover files, temporary stubs, etc. 
     *** TODO *** Review and decide: `docs\cleanup-triage-2026-04-30.md`
     - 
-10. *** INPROGRESS *** Executed `/context-audit` - Pass 1 (session:context-audit)
+10. Executed `/context-audit` - Pass 1 (session:context-audit)
     Added:
     - compaction instructions to project `CLAUDE.md`              
     - `autocompact: true` and `maxBashOutputLines` to global settings
