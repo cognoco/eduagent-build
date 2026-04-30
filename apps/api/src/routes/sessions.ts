@@ -22,7 +22,7 @@ import { z } from 'zod';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
-import { streamSSE } from 'hono/streaming';
+import { streamSSEUtf8 } from '../services/llm/sse-utf8';
 import { captureException } from '../services/sentry';
 import { createLogger } from '../services/logger';
 import {
@@ -313,7 +313,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
           { llmTier, voyageApiKey: c.env.VOYAGE_API_KEY }
         );
 
-        return streamSSE(c, async (sseStream) => {
+        return streamSSEUtf8(c, async (sseStream) => {
           for await (const chunk of stream) {
             await sseStream.writeSSE({
               data: JSON.stringify({ type: 'chunk', content: chunk }),

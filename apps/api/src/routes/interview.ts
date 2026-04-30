@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { streamSSE } from 'hono/streaming';
+import { streamSSEUtf8 } from '../services/llm/sse-utf8';
 import { zValidator } from '@hono/zod-validator';
 import {
   ERROR_CODES,
@@ -199,7 +199,7 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
         );
       }
 
-      return streamSSE(c, async (sseStream) => {
+      return streamSSEUtf8(c, async (sseStream) => {
         let fullResponse = '';
 
         for await (const chunk of stream) {
