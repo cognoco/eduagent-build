@@ -14,6 +14,13 @@ jest.mock('../middleware/jwt', () => ({
   }),
 }));
 
+// [BUG-666] capture mock used by the SSE-onComplete-failure break test
+const mockCaptureException = jest.fn();
+
+jest.mock('../services/sentry', () => ({
+  captureException: (...args: unknown[]) => mockCaptureException(...args),
+}));
+
 // ---------------------------------------------------------------------------
 // Mock database module — middleware creates a stub db per request
 // ---------------------------------------------------------------------------
@@ -78,6 +85,15 @@ const mockSubscription = {
 };
 
 const mockIncrementQuota = jest.fn().mockResolvedValue(undefined);
+// [BUG-661] safeRefundQuota replaces direct incrementQuota in routes; the
+// mock proxies through mockIncrementQuota so existing assertions about
+// "refund happened with subscriptionId" still apply.
+const mockSafeRefundQuota = jest.fn(
+  async (db: unknown, subscriptionId: string) => {
+    await mockIncrementQuota(db, subscriptionId);
+    return { refunded: true };
+  }
+);
 
 jest.mock('../services/billing', () => ({
   getSubscriptionByAccountId: jest.fn().mockResolvedValue(mockSubscription),
@@ -102,6 +118,8 @@ jest.mock('../services/billing', () => ({
   }),
   getTopUpCreditsRemaining: jest.fn().mockResolvedValue(0),
   incrementQuota: (...args: unknown[]) => mockIncrementQuota(...args),
+  safeRefundQuota: (...args: unknown[]) =>
+    mockSafeRefundQuota(args[0], args[1] as string, args[2]),
   createSubscription: jest.fn(),
 }));
 
@@ -311,10 +329,18 @@ const mockStartInterleavedSession = jest.fn().mockResolvedValue({
   ],
 });
 
-jest.mock('../services/interleaved', () => ({
-  startInterleavedSession: (...args: unknown[]) =>
-    mockStartInterleavedSession(...args),
-}));
+jest.mock('../services/interleaved', () => {
+  const actual = jest.requireActual('../services/interleaved') as Record<
+    string,
+    unknown
+  >;
+  return {
+    // Preserve the real error class so route-layer instanceof checks work.
+    NoInterleavedTopicsError: actual.NoInterleavedTopicsError,
+    startInterleavedSession: (...args: unknown[]) =>
+      mockStartInterleavedSession(...args),
+  };
+});
 
 jest.mock('../services/recall-bridge', () => ({
   generateRecallBridge: jest.fn().mockResolvedValue({
@@ -1253,6 +1279,62 @@ describe('session routes', () => {
       );
     });
 
+    // [BUG-666 / S-7] When the SSE stream is abandoned mid-flight — i.e.
+    // streamMessage returned but onComplete (which drains rawResponsePromise,
+    // parses the envelope, and persists the user_message + ai_response in a
+    // single atomic insert) throws — the server must:
+    //   1. Refund the quota that the metering middleware already decremented
+    //   2. Escalate to Sentry so we can detect persistent onComplete failures
+    //   3. Send the SSE 'error' frame so the client can surface a retry
+    // The original audit worried about a "ghost turn" — a half-persisted
+    // exchange. persistExchangeResult writes both rows in a single batch
+    // (apps/api/src/services/session/session-exchange.ts:916-934), so an
+    // onComplete failure either persists nothing or both. The remaining risk
+    // is the silent over-charge, addressed by safeRefundQuota + capture.
+    it('refunds quota AND captures exception when onComplete throws inside SSE [BUG-666]', async () => {
+      mockCaptureException.mockClear();
+      mockIncrementQuota.mockClear();
+
+      const onCompleteErr = new Error('envelope parse failed');
+      (streamMessage as jest.Mock).mockResolvedValueOnce({
+        stream: (async function* () {
+          yield 'partial ';
+        })(),
+        onComplete: jest.fn().mockRejectedValue(onCompleteErr),
+      });
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/stream`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'Tell me about photosynthesis' }),
+        },
+        TEST_ENV
+      );
+
+      // SSE response itself opens with 200; the failure surfaces via the
+      // 'error' SSE frame. Read the body to make sure the callback ran.
+      expect(res.status).toBe(200);
+      const body = await res.text();
+      expect(body).toContain('"type":"error"');
+
+      // Quota refund must fire — without this, the user is silently charged
+      // for an exchange that was never persisted.
+      expect(mockIncrementQuota).toHaveBeenCalledWith(
+        expect.anything(),
+        'sub-1'
+      );
+      // Escalation must fire — without this, persistent onComplete drift
+      // (e.g. envelope schema rot) is invisible in production.
+      expect(mockCaptureException).toHaveBeenCalledWith(
+        onCompleteErr,
+        expect.objectContaining({
+          extra: expect.objectContaining({ sessionId: SESSION_ID }),
+        })
+      );
+    });
+
     it('does not refund quota when processMessage succeeds', async () => {
       const res = await app.request(
         `/v1/sessions/${SESSION_ID}/messages`,
@@ -1323,9 +1405,13 @@ describe('session routes', () => {
       );
     });
 
-    it('returns 400 when no topics are available', async () => {
+    // [BUG-764] Route classifies by typed error, not by err.message string.
+    it('returns 400 when service throws NoInterleavedTopicsError', async () => {
+      const interleavedMock = jest.requireMock('../services/interleaved') as {
+        NoInterleavedTopicsError: new () => Error;
+      };
       mockStartInterleavedSession.mockRejectedValueOnce(
-        new Error('No topics available for interleaved retrieval')
+        new interleavedMock.NoInterleavedTopicsError()
       );
 
       const res = await app.request(
@@ -1344,6 +1430,31 @@ describe('session routes', () => {
       expect(body.message).toBe(
         'No topics available for interleaved retrieval'
       );
+    });
+
+    // [BUG-764] Negative path: a generic Error with the same message must NOT
+    // be silently classified as a 400. This is what prevents the regression
+    // where any random error containing the right phrase was silently
+    // remapped to a 400 — typed instanceof breaks that string-coupling.
+    it('[BUG-764] does NOT classify a generic Error as 400 even when its message matches', async () => {
+      mockStartInterleavedSession.mockRejectedValueOnce(
+        new Error('No topics available for interleaved retrieval')
+      );
+
+      const res = await app.request(
+        '/v1/sessions/interleaved',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({}),
+        },
+        TEST_ENV
+      );
+
+      // Must NOT be 400 — only NoInterleavedTopicsError should map to 400.
+      // Generic errors fall through to 500 via the global handler.
+      expect(res.status).not.toBe(400);
+      expect(res.status).toBe(500);
     });
 
     it('returns 400 with invalid subjectId', async () => {

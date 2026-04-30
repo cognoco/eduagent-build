@@ -9,6 +9,7 @@ import {
 import {
   buildSystemPrompt,
   classifyExchangeOutcome,
+  parseExchangeEnvelope,
   processExchange,
   streamExchange,
 } from './exchanges';
@@ -834,6 +835,80 @@ describe('classifyExchangeOutcome', () => {
     // the turn.
     const result = classifyExchangeOutcome('{"escalationHold":true}', ctx);
     expect(result.fallback?.reason).toBe('orphan_marker');
+  });
+});
+
+// [BUG-934][BUG-935] Break tests for the schema-failure persistence fallback.
+// The write-path (parseExchangeEnvelope → cleanResponse → ai_response.content)
+// is the canonical place to strip envelope JSON; the transcript projection
+// helper is defense-in-depth for legacy rows. If these tests start failing,
+// raw envelope JSON is leaking back into resumed-session chat bubbles and
+// parent dashboards.
+describe('parseExchangeEnvelope schema-failure fallback [BUG-934][BUG-935]', () => {
+  const ctx = { sessionId: 's1', profileId: 'p1', flow: 'streamMessage' };
+
+  it('extracts .reply when envelope is JSON with valid reply but Zod-invalid signals', () => {
+    // signals.partial_progress must be a boolean — passing a string violates
+    // the schema, which historically dumped the full envelope JSON into
+    // cleanResponse.
+    const raw = JSON.stringify({
+      reply: 'Ciao! Italian is wonderful.',
+      signals: { partial_progress: 'not-a-boolean' },
+    });
+
+    const result = parseExchangeEnvelope(raw, ctx);
+
+    expect(result.cleanResponse).toBe('Ciao! Italian is wonderful.');
+    expect(result.cleanResponse).not.toContain('"reply"');
+    expect(result.cleanResponse).not.toContain('signals');
+  });
+
+  it('extracts .reply when ui_hints fluency_drill duration violates min(15)', () => {
+    // Real-world failure mode noted in projectAiResponseContent's comment:
+    // duration_s: 0 fails the min(15) clamp.
+    const raw = JSON.stringify({
+      reply: "That's it! Now try the next one.",
+      signals: {
+        partial_progress: false,
+        needs_deepening: false,
+        understanding_check: false,
+      },
+      ui_hints: { fluency_drill: { duration_s: 0, score: null } },
+    });
+
+    const result = parseExchangeEnvelope(raw, ctx);
+
+    expect(result.cleanResponse).toBe("That's it! Now try the next one.");
+    expect(result.cleanResponse).not.toMatch(/^\{/);
+  });
+
+  it("normalizes literal '\\n' inside an extracted reply on Zod failure", () => {
+    // The reply contains the bug pattern (backslash + n, two chars) AND the
+    // envelope is Zod-invalid so the fallback path runs. Persisted content
+    // must already have real newlines so resumed sessions render correctly.
+    const raw = JSON.stringify({
+      reply: "That's it! Easy, right? \\n\\nNow, while 'Ciao'...",
+      signals: { partial_progress: 'wrong-type' },
+    });
+
+    const result = parseExchangeEnvelope(raw, ctx);
+
+    // JSON.stringify above produced the wire bytes the LLM would emit. After
+    // JSON.parse the `reply` becomes "That's it! Easy, right? \\n\\nNow…"
+    // (literal backslash-n pairs). Normalizer should turn each \\n into \n.
+    expect(result.cleanResponse).toContain('\n\n');
+    expect(result.cleanResponse).not.toContain('\\n');
+  });
+
+  it('falls back to raw text when envelope has no reply field at all', () => {
+    // Defensive — non-JSON garbage should still surface SOMETHING rather
+    // than silently dropping the LLM output. We accept the trimmed raw
+    // string as a worst-case fallback, same as before BUG-934.
+    const raw = 'plain text, no json at all';
+
+    const result = parseExchangeEnvelope(raw, ctx);
+
+    expect(result.cleanResponse).toBe('plain text, no json at all');
   });
 });
 

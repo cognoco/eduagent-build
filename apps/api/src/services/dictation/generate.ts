@@ -35,8 +35,19 @@ export interface GenerateContext {
   libraryTopics?: string[];
 }
 
+// [CR-770] Single source of truth for the child-vs-teen pedagogical boundary
+// across this module. Previously the literary theme switched at 13/14, the
+// sentence-length cutpoint switched at 12/13, and the advanced-punctuation
+// cutpoint switched at 11/12 — meaning a 13-year-old got children's literary
+// theme but adult-length sentences and advanced punctuation. The "person" vs
+// "child" prompt descriptor (`>= 14` = "person") is the strongest signal in
+// the prompt, so the unified boundary aligns everything to age 14: under 14
+// is the child register, 14+ is the adult register.
+const CHILD_AGE_CEILING = 13;
+const SHORT_PHRASE_CEILING = 8; // ages 8 and under get 4-7 word phrases (defensive — strictly 11+ product gate makes this branch unreachable today)
+
 function getLiteraryTheme(ageYears: number): string {
-  if (ageYears <= 13) {
+  if (ageYears <= CHILD_AGE_CEILING) {
     return `Draw from children's novels and chapter books — school adventures, fantasy quests, historical stories, nature and discovery. Think Harry Potter, Percy Jackson, or Jules Verne.`;
   }
   return `Draw from classic and contemporary literature — novels, short stories, literary fiction. Think Hemingway, Kafka, Čapek, or contemporary bestsellers. Use adult-level vocabulary and sentence structure.`;
@@ -81,8 +92,14 @@ export function buildGeneratePrompt(ctx: GenerateContext): string {
   const literaryTheme = getLiteraryTheme(ctx.ageYears);
   const interestThemeBlock = buildInterestThemeBlock(ctx);
 
+  // [CR-770] All age cutpoints below align to CHILD_AGE_CEILING (13). Under
+  // or at the ceiling = child register (children's lit + shorter sentences +
+  // basic punctuation). Above the ceiling = adult register (adult lit +
+  // longer sentences + advanced punctuation). The "person" vs "child"
+  // descriptor uses the same boundary.
+  const isAdultRegister = ctx.ageYears > CHILD_AGE_CEILING;
   return `You are a dictation content generator for a ${ctx.ageYears}-year-old${
-    ctx.ageYears >= 14 ? ' person' : ' child'
+    isAdultRegister ? ' person' : ' child'
   }.
 
 LANGUAGE: Write the dictation in ${ctx.nativeLanguage} (ISO 639-1 code).
@@ -95,15 +112,15 @@ Do NOT use geographical, scientific, or encyclopaedia-style factual content.${in
 CONSTRAINTS:
 - 6-10 sentences total
 - Sentence length: ${
-    ctx.ageYears <= 8
+    ctx.ageYears <= SHORT_PHRASE_CEILING
       ? '4-7 words (short phrases a child can hold in memory)'
-      : ctx.ageYears <= 12
+      : !isAdultRegister
       ? '5-10 words'
       : '7-14 words'
   }
 - Target age-appropriate spelling patterns and vocabulary
 - Punctuation: commas and periods always. Question marks occasionally.${
-    ctx.ageYears >= 12 ? ' Colons and semicolons sparingly.' : ''
+    isAdultRegister ? ' Colons and semicolons sparingly.' : ''
   }
 - Sentences must sound natural when read aloud — good rhythm, no awkward constructions
 - Include 1-2 sentences that are slightly challenging (unusual spelling, tricky grammar)

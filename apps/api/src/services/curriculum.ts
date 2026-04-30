@@ -33,6 +33,7 @@ import type {
   GeneratedBookTopic,
   GeneratedConnection,
 } from '@eduagent/schemas';
+import { TopicNotSkippedError } from '@eduagent/schemas';
 import { regenerateLanguageCurriculum } from './language-curriculum';
 
 // ---------------------------------------------------------------------------
@@ -615,12 +616,32 @@ export async function getBooks(
 
   if (rows.length === 0) return [];
 
+  // BUG-884: Topic counters were stale because this query matched on bookId
+  // alone. Curriculum versioning leaves orphan curriculum_topics rows with
+  // older curriculum_ids when a subject re-generates its curriculum, so
+  // counting by bookId only inflated `topicCount` (book card said "10
+  // topics" while the detail screen — which scopes to the latest curriculum
+  // — found zero). Constrain to the latest curriculum so all three sources
+  // (library aggregator, /subjects/:id/books/:id, /subjects/:id/curriculum)
+  // agree.
+  const latestCurriculum = await getLatestCurriculumRow(db, subjectId);
+  if (!latestCurriculum) {
+    // No curriculum row yet — every book legitimately has zero topics.
+    return rows.map((book) => ({
+      ...mapBookRow(book),
+      status: 'NOT_STARTED' as const,
+      topicCount: 0,
+      completedTopicCount: 0,
+    }));
+  }
+
   // Batch: fetch all non-skipped topic IDs for all books in one query
   const allTopicRows = await db
     .select({ id: curriculumTopics.id, bookId: curriculumTopics.bookId })
     .from(curriculumTopics)
     .where(
       and(
+        eq(curriculumTopics.curriculumId, latestCurriculum.id),
         inArray(
           curriculumTopics.bookId,
           rows.map((b) => b.id)
@@ -695,19 +716,54 @@ export async function getAllProfileBooks(
     };
   }
 
+  // BUG-884: Constrain to the LATEST curriculum per subject. See note in
+  // getBooks() above — counting curriculum_topics by bookId alone counts
+  // orphan rows from prior curriculum versions and disagrees with the
+  // per-book detail endpoint. We take MAX(version) per subject_id and only
+  // count topics whose curriculum_id is in that set.
+  const latestCurriculaRows = await db
+    .select({
+      id: curricula.id,
+      subjectId: curricula.subjectId,
+      version: curricula.version,
+    })
+    .from(curricula)
+    .where(inArray(curricula.subjectId, subjectIds));
+  // Pick max-version row per subject in JS — Drizzle's window-function
+  // surface varies by driver and the row count is bounded by `subjectIds`.
+  const latestCurriculumIdBySubject = new Map<string, string>();
+  const latestVersionBySubject = new Map<string, number>();
+  for (const row of latestCurriculaRows) {
+    const prev = latestVersionBySubject.get(row.subjectId);
+    if (prev === undefined || row.version > prev) {
+      latestVersionBySubject.set(row.subjectId, row.version);
+      latestCurriculumIdBySubject.set(row.subjectId, row.id);
+    }
+  }
+  const latestCurriculumIds = Array.from(latestCurriculumIdBySubject.values());
+
   // 2. All non-skipped topic IDs for those books in a single query.
-  const allTopicRows = await db
-    .select({ id: curriculumTopics.id, bookId: curriculumTopics.bookId })
-    .from(curriculumTopics)
-    .where(
-      and(
-        inArray(
-          curriculumTopics.bookId,
-          bookRows.map((b) => b.id)
-        ),
-        eq(curriculumTopics.skipped, false)
-      )
-    );
+  // If no curriculum exists yet for any subject, skip the query entirely —
+  // every book legitimately has zero topics.
+  const allTopicRows =
+    latestCurriculumIds.length === 0
+      ? []
+      : await db
+          .select({
+            id: curriculumTopics.id,
+            bookId: curriculumTopics.bookId,
+          })
+          .from(curriculumTopics)
+          .where(
+            and(
+              inArray(curriculumTopics.curriculumId, latestCurriculumIds),
+              inArray(
+                curriculumTopics.bookId,
+                bookRows.map((b) => b.id)
+              ),
+              eq(curriculumTopics.skipped, false)
+            )
+          );
 
   const topicsByBook = new Map<string, string[]>();
   for (const t of allTopicRows) {
@@ -1096,7 +1152,7 @@ export async function unskipTopic(
   });
   if (!topic) throw new NotFoundError('Topic');
 
-  if (!topic.skipped) throw new Error('Topic is not skipped');
+  if (!topic.skipped) throw new TopicNotSkippedError();
 
   await db
     .update(curriculumTopics)

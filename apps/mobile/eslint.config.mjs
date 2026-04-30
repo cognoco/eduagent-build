@@ -44,9 +44,15 @@ export default [
       'src/lib/design-tokens.ts',
       'src/**/*.test.ts',
       'src/**/*.test.tsx',
+      // Brand graphics — hex IS the brand asset (precedent set by AnimatedSplash).
       'src/components/AnimatedSplash.tsx',
       'src/components/common/BrandCelebration.tsx',
+      'src/components/common/MagicPenAnimation.tsx',
       'src/components/MentomateLogo.tsx',
+      // Error-boundary fallbacks — render before ThemeProvider is mounted,
+      // so they cannot use the React-Context-driven theme tokens.
+      'src/app/_layout.tsx',
+      'src/app/(app)/session/index.tsx',
     ],
     rules: {
       'no-restricted-syntax': [

@@ -24,17 +24,30 @@ export const bookPreGeneration = inngest.createFunction(
       profileId: string;
     };
 
-    const result = await step.run('pre-generate-next-books', async () => {
+    // [BUG-779 / J-12] Split into per-book step.run blocks. Inngest caches
+    // each step's result by step id, so on retry the books that already
+    // succeeded (and the prep step) are not re-executed — only the failed
+    // step re-runs. Previously the entire 1-2-book loop sat inside a single
+    // step.run, so a failure on book 2 forced book 1's LLM call to repeat
+    // on retry, wasting tokens and risking duplicate topic inserts before
+    // persistBookTopics's idempotency guard kicked in.
+    const prep = await step.run('load-pre-generation-context', async () => {
       const db = getStepDatabase();
 
       const currentBook = await db.query.curriculumBooks.findFirst({
         where: eq(curriculumBooks.id, bookId),
       });
-      if (!currentBook) return { status: 'skipped', reason: 'book not found' };
+      if (!currentBook) {
+        return {
+          status: 'skipped' as const,
+          reason: 'book not found',
+          nextBookIds: [] as string[],
+          learnerAge: 12,
+        };
+      }
 
-      // Find next 1-2 books that haven't had topics generated
       const nextBooks = await db
-        .select()
+        .select({ id: curriculumBooks.id })
         .from(curriculumBooks)
         .where(
           and(
@@ -47,10 +60,14 @@ export const bookPreGeneration = inngest.createFunction(
         .limit(2);
 
       if (nextBooks.length === 0) {
-        return { status: 'skipped', reason: 'no unbuilt books remaining' };
+        return {
+          status: 'skipped' as const,
+          reason: 'no unbuilt books remaining',
+          nextBookIds: [] as string[],
+          learnerAge: 12,
+        };
       }
 
-      // Get learner age
       const profile = await db.query.profiles.findFirst({
         where: eq(profiles.id, profileId),
       });
@@ -59,30 +76,62 @@ export const bookPreGeneration = inngest.createFunction(
         ? currentYear - profile.birthYear
         : 12;
 
-      const generated: string[] = [];
-
-      for (const book of nextBooks) {
-        const topics = await generateBookTopics(
-          book.title,
-          book.description ?? '',
-          learnerAge
-        );
-        await persistBookTopics(
-          db,
-          profileId,
-          subjectId,
-          book.id,
-          topics.topics,
-          topics.connections
-        );
-        generated.push(book.title);
-      }
-
-      return { status: 'completed', generated };
+      return {
+        status: 'pending' as const,
+        nextBookIds: nextBooks.map((b) => b.id),
+        learnerAge,
+      };
     });
 
+    if (prep.status === 'skipped') {
+      return {
+        status: 'skipped',
+        reason: prep.reason,
+        timestamp: new Date().toISOString(),
+      };
+    }
+
+    const generated: string[] = [];
+    for (const nextBookId of prep.nextBookIds) {
+      // Each book is its own step. The step id includes the bookId so the
+      // cache key is per-book — Inngest will not replay a successful
+      // generation on retry of a sibling failure.
+      const title = await step.run(
+        `generate-book-${nextBookId}`,
+        async (): Promise<string | null> => {
+          const db = getStepDatabase();
+
+          // Re-check topicsGenerated inside the step so a parallel pre-gen
+          // (or a manual fill from another flow) cannot trigger a wasted
+          // LLM call here. Belt + suspenders to persistBookTopics's own
+          // idempotency.
+          const book = await db.query.curriculumBooks.findFirst({
+            where: eq(curriculumBooks.id, nextBookId),
+          });
+          if (!book || book.topicsGenerated) return null;
+
+          const topics = await generateBookTopics(
+            book.title,
+            book.description ?? '',
+            prep.learnerAge
+          );
+          await persistBookTopics(
+            db,
+            profileId,
+            subjectId,
+            book.id,
+            topics.topics,
+            topics.connections
+          );
+          return book.title;
+        }
+      );
+      if (title) generated.push(title);
+    }
+
     return {
-      ...result,
+      status: 'completed',
+      generated,
       timestamp: new Date().toISOString(),
     };
   }

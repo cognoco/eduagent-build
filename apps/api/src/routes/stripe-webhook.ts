@@ -19,10 +19,14 @@ import {
 import { getTierConfig } from '../services/subscription';
 
 import { inngest } from '../inngest/client';
+import { captureException } from '../services/sentry';
+import { createLogger } from '../services/logger';
 import type { Database } from '@eduagent/database';
 import type Stripe from 'stripe';
 import type { CachedSubscriptionStatus } from '../services/kv';
 import type { WebhookSubscriptionUpdate } from '../services/billing';
+
+const logger = createLogger();
 
 // ---------------------------------------------------------------------------
 // Stripe SDK v20 type helpers
@@ -240,8 +244,35 @@ async function handleCheckoutCompleted(
       ? session.subscription
       : session.subscription?.id;
 
-  // Graceful exit: missing critical data — log-worthy but not crash-worthy
-  if (!accountId || !tier || !stripeSubscriptionId) return;
+  // [BUG-658 / A-17] Missing critical metadata is graceful at the route level
+  // (we still 200 to Stripe so it does not retry indefinitely), but it must
+  // be observable. Without escalation a regression in checkout-session
+  // metadata wiring silently drops paid users on the floor — they are charged
+  // but never activated. Fields below help triage which one is missing.
+  if (!accountId || !tier || !stripeSubscriptionId) {
+    logger.warn(
+      `[stripe-webhook] checkout.completed dropped — missing metadata (accountId=${!!accountId}, tier=${!!tier}, subscriptionId=${!!stripeSubscriptionId}, sessionId=${
+        session.id
+      })`
+    );
+    captureException(
+      new Error('Stripe checkout.session.completed missing required metadata'),
+      {
+        extra: {
+          context: 'stripe.webhook.checkout.completed.missing_metadata',
+          stripeSessionId: session.id,
+          hasAccountId: !!accountId,
+          hasTier: !!tier,
+          hasSubscriptionId: !!stripeSubscriptionId,
+          customerId:
+            typeof session.customer === 'string'
+              ? session.customer
+              : session.customer?.id,
+        },
+      }
+    );
+    return;
+  }
 
   const activated = await activateSubscriptionFromCheckout(
     db,
@@ -264,7 +295,34 @@ async function handlePaymentFailed(
 ): Promise<void> {
   const stripeSubscriptionId = extractSubscriptionIdFromInvoice(invoice);
 
-  if (!stripeSubscriptionId) return;
+  // [BUG-659 / A-18] Schema-evolution risk: Stripe SDK v20 moved
+  // invoice.subscription → invoice.parent.subscription_details.subscription.
+  // If Stripe further refactors the invoice payload, our extractor returns
+  // undefined and we drop a payment-failed event silently — the customer's
+  // subscription is never marked past_due. Escalate so we can detect the
+  // schema drift before users are silently kept on a tier they can't pay for.
+  if (!stripeSubscriptionId) {
+    logger.warn(
+      `[stripe-webhook] invoice.payment_failed dropped — could not extract subscription id (invoiceId=${invoice.id})`
+    );
+    captureException(
+      new Error(
+        'Stripe invoice.payment_failed missing subscription id (possible Stripe schema change)'
+      ),
+      {
+        extra: {
+          context: 'stripe.webhook.payment_failed.missing_subscription_id',
+          invoiceId: invoice.id,
+          customerId:
+            typeof invoice.customer === 'string'
+              ? invoice.customer
+              : invoice.customer?.id,
+          billingReason: invoice.billing_reason,
+        },
+      }
+    );
+    return;
+  }
 
   // Update subscription to past_due
   const updated = await updateSubscriptionFromWebhook(

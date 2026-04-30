@@ -152,3 +152,33 @@ export function getStepResendApiKey(): string | undefined {
 export function getStepEmailFrom(): string {
   return _emailFrom ?? process.env['EMAIL_FROM'] ?? 'noreply@mentomate.com';
 }
+
+// ---------------------------------------------------------------------------
+// Module-level SUPPORT_EMAIL — set by Inngest middleware on CF Workers,
+// falls back to process.env for Node.js test environments.
+// ---------------------------------------------------------------------------
+
+let _supportEmail: string | undefined;
+
+/** Called by Inngest middleware to inject the SUPPORT_EMAIL binding. */
+export function setSupportEmail(email: string): void {
+  _supportEmail = email;
+}
+
+/** Reset the injected email — for test cleanup only. */
+export function resetSupportEmail(): void {
+  _supportEmail = undefined;
+}
+
+/**
+ * Returns the support email address for use within Inngest step functions.
+ *
+ * Prefers the value injected via {@link setSupportEmail} (set by middleware on
+ * CF Workers). Falls back to process.env['SUPPORT_EMAIL'] then the canonical
+ * default.
+ */
+export function getStepSupportEmail(): string {
+  return (
+    _supportEmail ?? process.env['SUPPORT_EMAIL'] ?? 'support@mentomate.com'
+  );
+}

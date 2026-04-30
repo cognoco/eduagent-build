@@ -58,7 +58,12 @@ function shuffle<T>(arr: T[]): T[] {
   const result = [...arr];
   for (let i = result.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [result[i], result[j]] = [result[j]!, result[i]!];
+    const tmp = result[i];
+    const swapVal = result[j];
+    if (tmp !== undefined && swapVal !== undefined) {
+      result[i] = swapVal;
+      result[j] = tmp;
+    }
   }
   return result;
 }
@@ -318,7 +323,11 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
           celebrationTier: getCelebrationTier(round.score ?? 0, round.total),
           completedAt: round.completedAt?.toISOString(),
           questions: questions.map((q) => {
-            const base = toClientSafeQuestions([q])[0]!;
+            const base = toClientSafeQuestions([q])[0];
+            if (base == null)
+              throw new Error(
+                'toClientSafeQuestions returned empty array for a single question'
+              );
             return {
               ...base,
               correctAnswer: q.correctAnswer,
@@ -356,14 +365,15 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
       const profileId = requireProfileId(c.get('profileId'));
       const db = c.get('db');
       const roundId = c.req.param('id');
-      const { questionIndex, answerGiven } = c.req.valid('json');
+      const { questionIndex, answerGiven, answerMode } = c.req.valid('json');
 
       const result = await checkQuizAnswerWithCorrect(
         db,
         profileId,
         roundId,
         questionIndex,
-        answerGiven
+        answerGiven,
+        answerMode
       );
       // [F-Q-02/F-Q-07] Reveal correctAnswer only on wrong submissions so the
       // client can highlight the right option and show the person's name.

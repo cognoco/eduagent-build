@@ -11,6 +11,10 @@ on:
   pull_request_review:
     types: [submitted]
 
+# [CR-794 sweep] Workflow-level least-privilege default — see claude-code-review.yml.
+# Each job below must still declare its own permissions block for what it needs.
+permissions: {}
+
 jobs:
   claude:
     if: |

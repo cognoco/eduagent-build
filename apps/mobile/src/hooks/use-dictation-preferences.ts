@@ -28,7 +28,16 @@ export interface DictationPreferences {
   cyclePace: () => void;
 }
 
-const PACE_CYCLE: DictationPace[] = ['slow', 'normal', 'fast'];
+function nextPace(prev: DictationPace): DictationPace {
+  switch (prev) {
+    case 'slow':
+      return 'normal';
+    case 'normal':
+      return 'fast';
+    case 'fast':
+      return 'slow';
+  }
+}
 
 export function useDictationPreferences(
   profileId: string | undefined
@@ -39,17 +48,25 @@ export function useDictationPreferences(
   useEffect(() => {
     if (!profileId) return;
 
-    void SecureStore.getItemAsync(getPaceKey(profileId)).then((stored) => {
-      if (stored === 'slow' || stored === 'normal' || stored === 'fast') {
-        setPaceState(stored);
-      }
-    });
+    void SecureStore.getItemAsync(getPaceKey(profileId))
+      .then((stored) => {
+        if (stored === 'slow' || stored === 'normal' || stored === 'fast') {
+          setPaceState(stored);
+        }
+      })
+      .catch((err) =>
+        Sentry.captureException(err, { tags: { feature: 'dictation_prefs' } })
+      );
 
-    void SecureStore.getItemAsync(getPunctKey(profileId)).then((stored) => {
-      if (stored === 'true' || stored === 'false') {
-        setPunctState(stored === 'true');
-      }
-    });
+    void SecureStore.getItemAsync(getPunctKey(profileId))
+      .then((stored) => {
+        if (stored === 'true' || stored === 'false') {
+          setPunctState(stored === 'true');
+        }
+      })
+      .catch((err) =>
+        Sentry.captureException(err, { tags: { feature: 'dictation_prefs' } })
+      );
   }, [profileId]);
 
   const setPace = useCallback(
@@ -79,8 +96,7 @@ export function useDictationPreferences(
 
   const cyclePace = useCallback(() => {
     setPaceState((prev) => {
-      const idx = PACE_CYCLE.indexOf(prev);
-      const next = PACE_CYCLE[(idx + 1) % PACE_CYCLE.length]!;
+      const next = nextPace(prev);
       if (profileId) {
         void SecureStore.setItemAsync(getPaceKey(profileId), next).catch(
           (err) => reportSecureStoreFailure('pace', err)

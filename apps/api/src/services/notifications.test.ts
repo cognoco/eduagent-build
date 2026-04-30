@@ -1,10 +1,12 @@
 import {
   sendPushNotification,
   sendEmail,
+  sendStruggleNotification,
   isExpoPushToken,
   formatReviewReminderBody,
   formatDailyReminderBody,
   formatRecallNudge,
+  formatFilingFailedPush,
   formatStruggleNotificationCopy,
   MAX_DAILY_PUSH,
   type NotificationPayload,
@@ -19,12 +21,15 @@ import type { Database } from '@eduagent/database';
 const mockGetPushToken = jest.fn();
 const mockGetDailyNotificationCount = jest.fn();
 const mockLogNotification = jest.fn();
+const mockCheckAndLogRateLimitInternal = jest.fn();
 
 jest.mock('./settings', () => ({
   getPushToken: (...args: unknown[]) => mockGetPushToken(...args),
   getDailyNotificationCount: (...args: unknown[]) =>
     mockGetDailyNotificationCount(...args),
   logNotification: (...args: unknown[]) => mockLogNotification(...args),
+  checkAndLogRateLimitInternal: (...args: unknown[]) =>
+    mockCheckAndLogRateLimitInternal(...args),
 }));
 
 // ---------------------------------------------------------------------------
@@ -147,6 +152,14 @@ describe('sendPushNotification', () => {
     const result = await sendPushNotification(mockDb, payload);
 
     expect(result).toEqual({ sent: false, reason: 'network_error' });
+  });
+});
+
+describe('formatFilingFailedPush', () => {
+  it('returns title and body referencing topic placement', () => {
+    const { title, body } = formatFilingFailedPush();
+    expect(title).toMatch(/topic placement/i);
+    expect(body.length).toBeGreaterThan(0);
   });
 });
 
@@ -282,6 +295,136 @@ describe('sendEmail', () => {
 
     expect(result).toEqual({ sent: false, reason: 'network_error' });
   });
+
+  // [BUG-699] Inngest step retries can replay sendEmail calls. Forwarding the
+  // optional idempotency key as `Idempotency-Key` lets Resend dedupe duplicate
+  // sends within their 24h window.
+  it('[BUG-699] forwards idempotencyKey as Idempotency-Key header when provided', async () => {
+    mockFetchFn.mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: 'msg-id' }),
+    });
+
+    await sendEmail(emailPayload, {
+      resendApiKey: 're_test_key',
+      idempotencyKey: 'consent-reminder:profile-1:evt-1:day-7',
+    });
+
+    expect(mockFetchFn).toHaveBeenCalledWith(
+      'https://api.resend.com/emails',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'Idempotency-Key': 'consent-reminder:profile-1:evt-1:day-7',
+        }),
+      })
+    );
+  });
+
+  it('[BUG-699] omits Idempotency-Key header when not provided', async () => {
+    mockFetchFn.mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: 'msg-id' }),
+    });
+
+    await sendEmail(emailPayload, {
+      resendApiKey: 're_test_key',
+    });
+
+    const headers = mockFetchFn.mock.calls[0][1].headers as Record<
+      string,
+      string
+    >;
+    expect(headers['Idempotency-Key']).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [BUG-856] sendStruggleNotification — atomic rate-limit migration
+// ---------------------------------------------------------------------------
+//
+// The non-atomic getRecentNotificationCount + later log pattern allowed two
+// concurrent strugle notifications for the same (parentProfileId, type) to
+// both observe count=0 and both push, defeating the 24h dedup invariant.
+// The migration uses checkAndLogRateLimitInternal which serializes via a
+// pg_advisory_xact_lock so only the first concurrent caller proceeds.
+
+describe('[BUG-856] sendStruggleNotification rate-limit atomicity', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  function dbWithFamilyLink(parentProfileId: string | null) {
+    const familyLinkRow = parentProfileId
+      ? { parentProfileId, childProfileId: 'child-1' }
+      : null;
+    const childProfileRow = { displayName: 'Emma' };
+    return {
+      query: {
+        familyLinks: { findFirst: jest.fn().mockResolvedValue(familyLinkRow) },
+        profiles: { findFirst: jest.fn().mockResolvedValue(childProfileRow) },
+      },
+    } as unknown as Database;
+  }
+
+  it('[BUG-856] returns dedup_24h and skips push when checkAndLogRateLimitInternal returns true', async () => {
+    mockCheckAndLogRateLimitInternal.mockResolvedValue(true);
+    mockGetPushToken.mockResolvedValue('ExponentPushToken[abc]');
+
+    const result = await sendStruggleNotification(
+      dbWithFamilyLink('parent-1'),
+      'child-1',
+      { type: 'struggle_noticed', topic: 'Algebra', confidence: 0.7 }
+    );
+
+    expect(result).toEqual({ sent: false, reason: 'dedup_24h' });
+    expect(mockCheckAndLogRateLimitInternal).toHaveBeenCalledWith(
+      expect.anything(),
+      'parent-1',
+      'struggle_noticed',
+      { hours: 24, maxCount: 1 }
+    );
+    // Never reaches push send when rate-limited.
+    expect(mockFetchFn).not.toHaveBeenCalled();
+  });
+
+  it('[BUG-856] proceeds with push and DOES NOT double-log when rate-limit slot is reserved', async () => {
+    mockCheckAndLogRateLimitInternal.mockResolvedValue(false);
+    mockGetPushToken.mockResolvedValue('ExponentPushToken[abc]');
+    mockGetDailyNotificationCount.mockResolvedValue(0);
+    mockFetchFn.mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: { id: 'ticket-1' } }),
+    });
+
+    const result = await sendStruggleNotification(
+      dbWithFamilyLink('parent-1'),
+      'child-1',
+      { type: 'struggle_flagged', topic: 'Geometry', confidence: 0.95 }
+    );
+
+    expect(result).toEqual({ sent: true, ticketId: 'ticket-1' });
+    expect(mockCheckAndLogRateLimitInternal).toHaveBeenCalledTimes(1);
+    // Critical: sendPushNotification must skip its own log because the slot
+    // was already reserved atomically — otherwise we'd double-count toward
+    // the daily cap and create a phantom dedup row.
+    expect(mockLogNotification).not.toHaveBeenCalled();
+    expect(mockFetchFn).toHaveBeenCalledTimes(1);
+  });
+
+  it('[BUG-856] returns no_parent_link without consulting rate-limit when no familyLink', async () => {
+    const result = await sendStruggleNotification(
+      dbWithFamilyLink(null),
+      'child-1',
+      {
+        type: 'struggle_noticed',
+        topic: 'X',
+        confidence: 0.7,
+      }
+    );
+
+    expect(result).toEqual({ sent: false, reason: 'no_parent_link' });
+    expect(mockCheckAndLogRateLimitInternal).not.toHaveBeenCalled();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -370,5 +513,97 @@ describe('formatStruggleNotificationCopy', () => {
       null
     );
     expect(copy.body).toContain('Your child');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [logging sweep] BREAK TEST: sendEmail errors must emit structured JSON via
+// the logger (not raw console.error).
+// ---------------------------------------------------------------------------
+
+describe('sendEmail structured logging', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  const emailPayload: EmailPayload = {
+    to: 'parent@example.com',
+    subject: 'Consent required',
+    body: 'Please approve.',
+    type: 'consent_request',
+  };
+
+  // [LOGGING-SWEEP-1] BREAK TEST: Resend API error must emit JSON via logger,
+  // NOT raw console.error. Asserts:
+  //   1. console.error is NOT called directly
+  //   2. console.error IS called by the logger (JSON-wrapped)
+  //   3. The JSON output is parseable and contains the status field
+  it('emits a structured JSON log on Resend API error — never raw console.error', async () => {
+    mockFetchFn.mockResolvedValue({
+      ok: false,
+      status: 503,
+      text: async () => 'Service unavailable',
+    });
+
+    const errorSpy = jest
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
+    try {
+      const result = await sendEmail(emailPayload, {
+        resendApiKey: 're_test_key',
+      });
+      expect(result.sent).toBe(false);
+      expect(result.reason).toBe('resend_api_error_503');
+
+      // Must have logged via structured logger (which delegates to console.error)
+      expect(errorSpy).toHaveBeenCalled();
+      const logArg = errorSpy.mock.calls
+        .map((call) => call[0])
+        .find(
+          (arg): arg is string =>
+            typeof arg === 'string' && arg.includes('Resend API error')
+        );
+      expect(logArg).toBeDefined();
+      const parsed = JSON.parse(logArg!) as {
+        level: string;
+        message: string;
+        context?: { status?: unknown };
+      };
+      expect(parsed.level).toBe('error');
+      expect(parsed.message).toContain('Resend API error');
+      expect(parsed.context?.status).toBe(503);
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  // [LOGGING-SWEEP-2] BREAK TEST: network error must emit JSON via logger.
+  it('emits a structured JSON log on network error — never raw console.error', async () => {
+    mockFetchFn.mockRejectedValue(new Error('network down'));
+
+    const errorSpy = jest
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
+    try {
+      const result = await sendEmail(emailPayload, {
+        resendApiKey: 're_test_key',
+      });
+      expect(result.sent).toBe(false);
+      expect(result.reason).toBe('network_error');
+
+      expect(errorSpy).toHaveBeenCalled();
+      const logArg = errorSpy.mock.calls
+        .map((call) => call[0])
+        .find(
+          (arg): arg is string =>
+            typeof arg === 'string' && arg.includes('Network error')
+        );
+      expect(logArg).toBeDefined();
+      const parsed = JSON.parse(logArg!) as { level: string; message: string };
+      expect(parsed.level).toBe('error');
+      expect(parsed.message).toContain('Network error');
+    } finally {
+      errorSpy.mockRestore();
+    }
   });
 });

@@ -141,7 +141,8 @@ export function CelebrationAnimation({
         {PARTICLES.map((p, i) => {
           const endX = half + Math.cos(toRad(p.angle)) * maxRadius * p.dist;
           const endY = half + Math.sin(toRad(p.angle)) * maxRadius * p.dist;
-          const useAccent = i % 3 === 0 && accentColor;
+          const particleColor =
+            i % 3 === 0 && accentColor ? accentColor : color;
           return (
             <AnimatedParticle
               key={i}
@@ -150,7 +151,7 @@ export function CelebrationAnimation({
               endX={endX}
               endY={endY}
               r={i % 2 === 0 ? particleR : innerR}
-              color={useAccent ? accentColor! : color}
+              color={particleColor}
               progress={progress}
             />
           );

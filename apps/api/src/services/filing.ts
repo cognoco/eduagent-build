@@ -16,6 +16,7 @@ import {
   curricula,
   curriculumBooks,
   curriculumTopics,
+  learningSessions,
   generateUUIDv7,
   createScopedRepository,
 } from '@eduagent/database';
@@ -370,18 +371,52 @@ export async function fileToLibrary(
 // Fallback — used when the LLM filing call fails but subjectId is known
 // ---------------------------------------------------------------------------
 
+// [BUG-871] When the LLM filing call fails, we used to lose the only signal
+// of user intent we had — the title of the topic / suggestion they just
+// picked — by always falling back to a generic "Uncategorized" book. If the
+// caller passes the suggestion or raw input as `selectedSuggestion` (or it
+// is at least 3 chars long, matching the bookRefSchema floor), use that as
+// the book name so the Library reflects the user's choice rather than
+// looking auto-generated.
+const MIN_BOOK_NAME_LENGTH = 3;
+const MAX_BOOK_NAME_LENGTH = 200;
+
+function pickFallbackBookName(
+  selectedSuggestion: string | null | undefined,
+  rawInput: string
+): { name: string; isSpecific: boolean } {
+  const candidates = [selectedSuggestion, rawInput];
+  for (const candidate of candidates) {
+    const trimmed = candidate?.trim() ?? '';
+    if (
+      trimmed.length >= MIN_BOOK_NAME_LENGTH &&
+      trimmed.length <= MAX_BOOK_NAME_LENGTH
+    ) {
+      return { name: trimmed, isSpecific: true };
+    }
+  }
+  return { name: 'Uncategorized', isSpecific: false };
+}
+
 export function buildFallbackFilingResponse(
   subjectId: string,
-  rawInput: string
+  rawInput: string,
+  selectedSuggestion?: string | null
 ): FilingResponse {
+  const { name: bookName, isSpecific } = pickFallbackBookName(
+    selectedSuggestion,
+    rawInput
+  );
   return {
     shelf: { id: subjectId },
     book: {
-      name: 'Uncategorized',
-      emoji: '📂',
-      description: 'Topics to be organized',
+      name: bookName,
+      emoji: isSpecific ? '📚' : '📂',
+      description: isSpecific
+        ? `Learn about ${bookName}`
+        : 'Topics to be organized',
     },
-    chapter: { name: 'General' },
+    chapter: { name: isSpecific ? bookName : 'General' },
     topic: {
       title: rawInput,
       description: `Topic about ${rawInput}`,
@@ -549,29 +584,61 @@ export async function resolveFilingResult(
       isNewChapter = !existingTopic;
     }
 
-    // --- 5. Create topic ---
-    const topicId = generateUUIDv7();
+    // --- 5. Resolve or create topic ---
+    // [BUG-841 / F-SVC-008] Dedup on (bookId, lower(title)) so that a retry
+    // from session-completed (or any caller that re-fires the filing event)
+    // returns the existing topic instead of inserting a duplicate. Without
+    // this, every retry produced a new topic row with a fresh UUID — same
+    // title, same book, different id — and the user saw "Photosynthesis"
+    // twice in the same chapter. SELECT FOR UPDATE keeps the dedup atomic
+    // alongside the surrounding shelf/book serialization (transaction
+    // semantics depend on the WS driver swap; until then the dedup at least
+    // collapses sequential retries within the same connection).
     const existingTopics = await txDb.query.curriculumTopics.findMany({
       where: eq(curriculumTopics.bookId, bookId),
     });
-    const maxTopicOrder = existingTopics.reduce(
-      (max, t) => Math.max(max, t.sortOrder),
-      -1
+    const existingDuplicate = existingTopics.find(
+      (t) => t.title.toLowerCase() === filingResponse.topic.title.toLowerCase()
     );
+    let topicId: string;
+    if (existingDuplicate) {
+      topicId = existingDuplicate.id;
+    } else {
+      topicId = generateUUIDv7();
+      const maxTopicOrder = existingTopics.reduce(
+        (max, t) => Math.max(max, t.sortOrder),
+        -1
+      );
+      await txDb.insert(curriculumTopics).values({
+        id: topicId,
+        curriculumId,
+        bookId,
+        title: filingResponse.topic.title,
+        description: filingResponse.topic.description,
+        chapter: chapterName,
+        sortOrder: maxTopicOrder + 1,
+        relevance: 'core',
+        estimatedMinutes: 15,
+        filedFrom,
+        sessionId: sessionId ?? null,
+      });
+    }
 
-    await txDb.insert(curriculumTopics).values({
-      id: topicId,
-      curriculumId,
-      bookId,
-      title: filingResponse.topic.title,
-      description: filingResponse.topic.description,
-      chapter: chapterName,
-      sortOrder: maxTopicOrder + 1,
-      relevance: 'core',
-      estimatedMinutes: 15,
-      filedFrom,
-      sessionId: sessionId ?? null,
-    });
+    if (sessionId) {
+      await txDb
+        .update(learningSessions)
+        .set({
+          topicId,
+          filedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(learningSessions.id, sessionId),
+            eq(learningSessions.profileId, profileId)
+          )
+        );
+    }
 
     return {
       shelfId,

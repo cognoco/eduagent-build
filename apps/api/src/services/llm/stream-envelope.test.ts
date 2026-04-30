@@ -90,6 +90,47 @@ describe('streamEnvelopeReply', () => {
     const stream = streamEnvelopeReply(fromChunks(['{"reply": 42}']));
     expect(await collect(stream)).toBe('');
   });
+
+  // ---- [LITERAL-ESCAPE] Defensive normalizer for double-escaping LLMs ----
+
+  it('[LITERAL-ESCAPE] converts literal `\\n` (raw `\\\\n`) to a real newline mid-stream', async () => {
+    // Raw JSON contains `\\\\n` (4 chars). JSON-decode → literal `\n` (2 chars).
+    // The normalizer collapses that to a real newline before yielding.
+    const stream = streamEnvelopeReply(
+      fromChunks(['{"reply":"Hello\\\\nWorld"}'])
+    );
+    const out = await collect(stream);
+    expect(out).toBe('Hello\nWorld');
+    expect(out).not.toContain('\\n');
+  });
+
+  it('[LITERAL-ESCAPE] handles a literal escape split across chunk boundary', async () => {
+    // `\` arrives in chunk N and `n` arrives in chunk N+1. The normalizer
+    // must defer the trailing backslash and pair it with the next chunk.
+    const stream = streamEnvelopeReply(fromChunks(['{"reply":"a\\\\', 'nb"}']));
+    expect(await collect(stream)).toBe('a\nb');
+  });
+
+  it('[LITERAL-ESCAPE] preserves a backslash whose paired char is not n/r/t', async () => {
+    // `\\d` in raw → literal `\d` after JSON decode → must survive untouched
+    // (regexes and code samples teach learners with backslashes).
+    const stream = streamEnvelopeReply(
+      fromChunks(['{"reply":"regex \\\\d+ matches"}'])
+    );
+    expect(await collect(stream)).toBe('regex \\d+ matches');
+  });
+
+  it('[LITERAL-ESCAPE] flushes a trailing lone backslash at end of reply', async () => {
+    // A `\` right before the closing quote with no partner: must end up in
+    // the output, not get silently dropped.
+    const stream = streamEnvelopeReply(fromChunks(['{"reply":"trail\\\\"}']));
+    expect(await collect(stream)).toBe('trail\\');
+  });
+
+  it('[LITERAL-ESCAPE] does not touch real newlines (correct JSON `\\n`)', async () => {
+    const stream = streamEnvelopeReply(fromChunks(['{"reply":"a\\nb"}']));
+    expect(await collect(stream)).toBe('a\nb');
+  });
 });
 
 describe('teeEnvelopeStream', () => {

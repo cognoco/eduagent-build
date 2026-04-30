@@ -25,6 +25,11 @@ jest.mock('../inngest/client', () => ({
   },
 }));
 
+jest.mock('../services/sentry', () => ({
+  captureException: jest.fn(),
+  addBreadcrumb: jest.fn(),
+}));
+
 import { createDatabaseModuleMock } from '../test-utils/database-module';
 
 const mockDatabaseModule = createDatabaseModuleMock();
@@ -93,6 +98,7 @@ import {
   AUTH_HEADERS as BASE_AUTH_HEADERS,
   BASE_AUTH_ENV,
 } from '../test-utils/test-env';
+import { captureException } from '../services/sentry';
 
 const TEST_ENV = { ...BASE_AUTH_ENV };
 
@@ -455,13 +461,14 @@ describe('homework routes', () => {
       expect(res.status).toBe(200);
     });
 
-    it('returns 503 when OCR provider is not configured', async () => {
+    it('[FIX-API-5] returns 500 (not 503) when OCR provider is not configured and captures Sentry', async () => {
       const { getOcrProvider } = require('../services/ocr') as {
         getOcrProvider: jest.Mock;
       };
       getOcrProvider.mockImplementationOnce(() => {
         throw new Error('OCR provider not configured');
       });
+      (captureException as jest.Mock).mockClear();
 
       const formData = new FormData();
       formData.append(
@@ -482,13 +489,16 @@ describe('homework routes', () => {
         TEST_ENV
       );
 
-      expect(res.status).toBe(503);
+      // [FIX-API-5] Config error is a permanent server misconfiguration, not transient — 500 not 503
+      expect(res.status).toBe(500);
 
       const body = await res.json();
       expect(body.code).toBe('INTERNAL_ERROR');
       expect(body.message).toBe(
         'OCR service is not configured. Please contact support.'
       );
+      // [FIX-API-5] captureException must be called so ops can detect unconfigured OCR
+      expect(captureException).toHaveBeenCalledTimes(1);
     });
 
     it('returns 401 without auth header', async () => {

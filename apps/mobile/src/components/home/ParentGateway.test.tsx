@@ -116,11 +116,13 @@ describe('ParentGateway', () => {
     expect(screen.getByText('Tomas practiced 900 min this week')).toBeTruthy();
   });
 
-  it('navigates to parent dashboard on "Check child\'s progress"', () => {
+  it('navigates to parent dashboard on "Check child\'s progress" with returnTo=home [BUG-905]', () => {
     render(<ParentGateway {...defaultProps} />);
 
     fireEvent.press(screen.getByTestId('gateway-check-progress'));
-    expect(mockPush).toHaveBeenCalledWith('/(app)/dashboard');
+    // [BUG-905] Pass returnTo=home so the dashboard back button lands the
+    // parent on Home, not on the More tab.
+    expect(mockPush).toHaveBeenCalledWith('/(app)/dashboard?returnTo=home');
   });
 
   it('calls onLearn when "Learn something" is pressed', () => {

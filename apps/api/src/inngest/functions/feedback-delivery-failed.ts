@@ -7,18 +7,25 @@
 
 import { z } from 'zod';
 import { inngest } from '../client';
-import { getStepResendApiKey, getStepEmailFrom } from '../helpers';
+import {
+  getStepResendApiKey,
+  getStepEmailFrom,
+  getStepSupportEmail,
+} from '../helpers';
 import { sendEmail } from '../../services/notifications';
 import { captureException } from '../../services/sentry';
 import { createLogger } from '../../services/logger';
 
 const logger = createLogger();
 
-const DEFAULT_SUPPORT_EMAIL = 'support@mentomate.com';
-
+// [BUG-767 / A-24] Category enum must match the route's submission schema
+// (`feedbackCategorySchema` in `@eduagent/schemas`). The route persists
+// `body.category` directly into the event payload, so a mismatch here would
+// silently safeParse-fail every event the route fires — exactly the
+// "wired-but-untriggered" anti-pattern A-24 was filed to prevent.
 const eventDataSchema = z.object({
   profileId: z.string(),
-  category: z.enum(['bug', 'suggestion', 'general']),
+  category: z.enum(['bug', 'suggestion', 'other']),
 });
 
 export const feedbackDeliveryFailed = inngest.createFunction(
@@ -72,9 +79,18 @@ export const feedbackDeliveryFailed = inngest.createFunction(
       const resendApiKey = getStepResendApiKey();
       const emailFrom = getStepEmailFrom();
 
+      // [BUG-699-FOLLOWUP] Pass a deterministic idempotency key so Inngest
+      // step retries (retries: 2) cannot deliver the same support email twice.
+      // Resend dedupes calls with matching `Idempotency-Key` within 24h.
+      // The key is bound to (profileId, eventId) so a genuinely new delivery
+      // failure for the same profile in a new run produces a fresh key.
+      const idempotencyKey = `feedback-delivery-failed:${profileId}:${
+        event.id ?? 'no-event'
+      }:retry-delivery`;
+
       const result = await sendEmail(
         {
-          to: process.env['SUPPORT_EMAIL'] ?? DEFAULT_SUPPORT_EMAIL,
+          to: getStepSupportEmail(),
           subject: `[MentoMate ${categoryLabel}] delivery-retry for ${profileId.slice(
             0,
             8
@@ -82,7 +98,7 @@ export const feedbackDeliveryFailed = inngest.createFunction(
           body: `[Delayed delivery] Category: ${category}\nProfile: ${profileId}\nOriginal delivery failed — this is a retry from the Inngest queue.`,
           type: 'feedback',
         },
-        { resendApiKey, emailFrom }
+        { resendApiKey, emailFrom, idempotencyKey }
       );
 
       if (!result.sent) {

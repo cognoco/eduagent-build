@@ -12,7 +12,17 @@
  *
  * Used by `useStreamMessage` to pipe real-time LLM tokens into the chat UI.
  */
-import { QuotaExceededError, type QuotaExceededDetails } from './api-client';
+import {
+  BadRequestError,
+  ForbiddenError,
+  NetworkError,
+  NotFoundError,
+  QuotaExceededError,
+  RateLimitedError,
+  ResourceGoneError,
+  UpstreamError,
+  type QuotaExceededDetails,
+} from './api-client';
 
 export interface StreamChunkEvent {
   type: 'chunk';
@@ -294,8 +304,8 @@ export function streamSSEViaXHR(
 
   xhr.onerror = () => {
     if (idleTimer) clearTimeout(idleTimer);
-    streamError = new Error(
-      `SSE connection failed: ${xhr.statusText || 'network error'}`
+    streamError = new NetworkError(
+      "Looks like you're offline or our servers can't be reached. Check your internet connection and try again."
     );
     done = true;
     const r = resolve;
@@ -303,55 +313,80 @@ export function streamSSEViaXHR(
     r?.();
   };
 
+  /** Classify a non-ok XHR response into a typed error using the same
+   * hierarchy as customFetch in api-client.ts. Reads body from xhr.responseText
+   * (already fully received at this point). */
+  function classifyXhrError(status: number, responseText: string): Error {
+    type ParsedErrBody = {
+      code?: string;
+      message?: string;
+      details?: QuotaExceededDetails;
+      error?: { code?: string; message?: string };
+    };
+    let parsed: ParsedErrBody | null = null;
+    try {
+      parsed = JSON.parse(responseText || '{}') as ParsedErrBody;
+    } catch {
+      // Not JSON
+    }
+    const code = parsed?.error?.code ?? parsed?.code;
+    const apiMessage = parsed?.error?.message ?? parsed?.message;
+
+    if (status === 400) {
+      return new BadRequestError(apiMessage ?? (responseText || 'Bad request'));
+    }
+    if (status === 402) {
+      if (code === 'QUOTA_EXCEEDED' && parsed?.details) {
+        return new QuotaExceededError(
+          apiMessage ?? 'Quota exceeded',
+          parsed.details
+        );
+      }
+    }
+    if (status === 403) {
+      return new ForbiddenError(apiMessage ?? undefined, code ?? undefined);
+    }
+    if (status === 404) {
+      return new NotFoundError(
+        apiMessage ?? (responseText || 'Resource not found')
+      );
+    }
+    if (status === 409) {
+      return new Error(apiMessage ?? 'Request conflicts with current state');
+    }
+    if (status === 410) {
+      return new ResourceGoneError(
+        apiMessage ?? undefined,
+        code ?? undefined,
+        parsed?.details
+      );
+    }
+    if (status === 429) {
+      return new RateLimitedError(
+        apiMessage ?? undefined,
+        code ?? undefined,
+        undefined,
+        undefined
+      );
+    }
+    if (code) {
+      return new UpstreamError(
+        apiMessage ?? (responseText || 'Server error'),
+        code,
+        status
+      );
+    }
+    return new Error(
+      `API error ${status}: ${responseText || 'request failed'}`
+    );
+  }
+
   xhr.onloadend = () => {
     if (idleTimer) clearTimeout(idleTimer);
     // If headers-received handler already flagged an error, enrich it with the
-    // full response body (now available) and extract any structured error code.
+    // full response body (now available) by replacing with a fully typed error.
     if (streamError && xhr.status >= 400) {
-      // Promote 402 to QuotaExceededError so downstream code gets quota details
-      // and can show the upgrade CTA — a plain Error silently drops them.
-      if (xhr.status === 402) {
-        try {
-          const parsed = JSON.parse(xhr.responseText || '{}') as {
-            code?: string;
-            message?: string;
-            details?: QuotaExceededDetails;
-          };
-          if (parsed.code === 'QUOTA_EXCEEDED' && parsed.details) {
-            streamError = new QuotaExceededError(
-              parsed.message ?? 'Quota exceeded',
-              parsed.details
-            );
-            done = true;
-            const r = resolve;
-            resolve = null;
-            r?.();
-            return;
-          }
-        } catch {
-          // Fall through to generic error enrichment below.
-        }
-      }
-      const apiError = streamError as Error & {
-        status?: number;
-        code?: string;
-      };
-      // Overwrite with full body now that it's available
-      apiError.message = `API error ${xhr.status}: ${
-        xhr.responseText || xhr.statusText
-      }`;
-      try {
-        const parsed = JSON.parse(xhr.responseText || '{}') as {
-          code?: string;
-          error?: { code?: string };
-        };
-        const errorCode = parsed.code ?? parsed.error?.code;
-        if (typeof errorCode === 'string') {
-          apiError.code = errorCode;
-        }
-      } catch {
-        // Ignore malformed error bodies — formatApiError handles plain text.
-      }
+      streamError = classifyXhrError(xhr.status, xhr.responseText);
       done = true;
       const r = resolve;
       resolve = null;
@@ -367,47 +402,7 @@ export function streamSSEViaXHR(
       return;
     }
     if (xhr.status >= 400) {
-      // Promote 402 to QuotaExceededError so downstream code gets quota details
-      // and can show the upgrade CTA — a plain Error silently drops them.
-      if (xhr.status === 402) {
-        try {
-          const parsed = JSON.parse(xhr.responseText || '{}') as {
-            code?: string;
-            message?: string;
-            details?: QuotaExceededDetails;
-          };
-          if (parsed.code === 'QUOTA_EXCEEDED' && parsed.details) {
-            streamError = new QuotaExceededError(
-              parsed.message ?? 'Quota exceeded',
-              parsed.details
-            );
-            done = true;
-            const r = resolve;
-            resolve = null;
-            r?.();
-            return;
-          }
-        } catch {
-          // Fall through to generic error path below.
-        }
-      }
-      const apiError = new Error(
-        `API error ${xhr.status}: ${xhr.responseText || xhr.statusText}`
-      ) as Error & { status?: number; code?: string };
-      apiError.status = xhr.status;
-      try {
-        const parsed = JSON.parse(xhr.responseText || '{}') as {
-          code?: string;
-          error?: { code?: string };
-        };
-        const errorCode = parsed.code ?? parsed.error?.code;
-        if (typeof errorCode === 'string') {
-          apiError.code = errorCode;
-        }
-      } catch {
-        // Ignore malformed error bodies here — formatApiError handles plain text.
-      }
-      streamError = apiError;
+      streamError = classifyXhrError(xhr.status, xhr.responseText);
       done = true;
       const r = resolve;
       resolve = null;
@@ -435,6 +430,13 @@ export function streamSSEViaXHR(
   // DB writes) after LLM streaming finishes.
   xhr.send(options.body ?? null);
 
+  // Hoisted executor so the closure isn't re-declared per loop iteration.
+  // The XHR callbacks read `resolve` to wake the generator; the executor only
+  // needs to install the latest resolver before each await.
+  const installResolver = (r: () => void) => {
+    resolve = r;
+  };
+
   async function* generateEvents(): AsyncGenerator<StreamEvent> {
     while (true) {
       // [BUG-632 / I-21] Check streamError BEFORE draining the queue. If a
@@ -458,9 +460,7 @@ export function streamSSEViaXHR(
         }
         return;
       }
-      await new Promise<void>((r) => {
-        resolve = r;
-      });
+      await new Promise<void>(installResolver);
     }
   }
 

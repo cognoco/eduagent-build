@@ -10,6 +10,14 @@ export const scheduledDeletion = inngest.createFunction(
   {
     id: 'scheduled-account-deletion',
     name: 'Process scheduled account deletion',
+    retries: 5,
+    // [FIX-INNGEST-2] Idempotency: identical accountId events dedup within 24h
+    // so an operator re-fire or network retry cannot start a second 7-day timer
+    // and later run executeDeletion twice. concurrency(limit:1) serialises any
+    // concurrent executions for the same account that arrive before Inngest
+    // can deduplicate them.
+    idempotency: 'event.data.accountId',
+    concurrency: { key: 'event.data.accountId', limit: 1 },
   },
   { event: 'app/account.deletion-scheduled' },
   async ({ event, step }) => {

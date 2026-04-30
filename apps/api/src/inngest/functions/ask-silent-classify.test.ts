@@ -126,6 +126,28 @@ describe('ask-silent-classify Inngest function', () => {
     });
   });
 
+  describe('[BUG-845 / F-SVC-014] idempotency dedup', () => {
+    // Concurrency=1 serializes execution but does NOT prevent two events from
+    // both passing the `check-existing` step before either writes. The
+    // idempotency key (24h dedup window) short-circuits the second event at
+    // the Inngest queue level — guaranteed at-most-once semantics for racing
+    // duplicate classify events for the same session.
+    it('declares idempotency key on event.data.sessionId', () => {
+      const cfg = (askSilentClassify as any)._config as {
+        idempotency?: string;
+      };
+      expect(cfg.idempotency).toBe('event.data.sessionId');
+    });
+
+    it('keeps concurrency=1 as defence-in-depth alongside idempotency', () => {
+      const cfg = (askSilentClassify as any)._config as {
+        concurrency?: { key?: string; limit?: number };
+      };
+      expect(cfg.concurrency?.key).toBe('event.data.sessionId');
+      expect(cfg.concurrency?.limit).toBe(1);
+    });
+  });
+
   describe('valid payload — happy path proxies', () => {
     // Smoke checks that the safeParse fix did not regress the happy path —
     // a fully-valid payload must still pass through to classifySubject.

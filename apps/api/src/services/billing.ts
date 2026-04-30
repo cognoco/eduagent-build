@@ -53,7 +53,11 @@ export {
 // ---------------------------------------------------------------------------
 
 export type { DecrementResult } from './billing/metering';
-export { decrementQuota, incrementQuota } from './billing/metering';
+export {
+  decrementQuota,
+  incrementQuota,
+  safeRefundQuota,
+} from './billing/metering';
 
 // ---------------------------------------------------------------------------
 // Top-up credit management

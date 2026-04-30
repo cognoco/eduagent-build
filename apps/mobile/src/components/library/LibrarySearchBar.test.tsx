@@ -58,4 +58,34 @@ describe('LibrarySearchBar', () => {
     );
     expect(screen.queryByTestId('library-search-clear')).toBeNull();
   });
+
+  // [a11y sweep] Break tests: the clear-search icon must be a11y-hidden —
+  // the Pressable accessibilityLabel "Clear search" already conveys the action.
+  it('marks the clear icon wrapper as accessibility-hidden [a11y sweep]', () => {
+    const { getByTestId } = render(
+      <LibrarySearchBar
+        value="math"
+        onChangeText={jest.fn()}
+        placeholder="Search..."
+      />
+    );
+    const iconWrapper = getByTestId('library-search-clear-icon', {
+      includeHiddenElements: true,
+    });
+    expect(iconWrapper.props.accessibilityElementsHidden).toBe(true);
+    expect(iconWrapper.props.importantForAccessibility).toBe(
+      'no-hide-descendants'
+    );
+  });
+
+  it('clear icon is excluded from default visible-only queries [a11y sweep]', () => {
+    const { queryByTestId } = render(
+      <LibrarySearchBar
+        value="math"
+        onChangeText={jest.fn()}
+        placeholder="Search..."
+      />
+    );
+    expect(queryByTestId('library-search-clear-icon')).toBeNull();
+  });
 });

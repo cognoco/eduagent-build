@@ -397,6 +397,51 @@ describe('resolveFilingResult (integration)', () => {
     expect(topic!.sessionId).toBe(session!.id);
   });
 
+  it('[BUG-841 / F-SVC-008] retry with same topic title is idempotent — no duplicate row', async () => {
+    // Pre-fix: each retry produced a fresh UUID for the same (book, title)
+    // pair. The user saw "Photosynthesis" listed twice in the same chapter
+    // every time session-completed re-fired the filing event.
+    // Post-fix: dedup on (bookId, lower(title)) returns the existing topicId.
+    const { profile } = await seedAccountAndProfile();
+    const db = createIntegrationDb();
+
+    const filingPayload = {
+      profileId: profile.id,
+      filingResponse: {
+        shelf: { name: 'Biology' },
+        book: {
+          name: 'Plants',
+          emoji: '🌱',
+          description: 'Plant biology',
+        },
+        chapter: { name: 'Photosynthesis' },
+        topic: {
+          title: 'Light reactions',
+          description: 'How chlorophyll captures light',
+        },
+      },
+      filedFrom: 'session_filing' as const,
+    };
+
+    const first = await resolveFilingResult(db, filingPayload);
+    const second = await resolveFilingResult(db, filingPayload);
+    const third = await resolveFilingResult(db, filingPayload);
+
+    // Same topicId returned every time → no duplicate inserts.
+    expect(second.topicId).toBe(first.topicId);
+    expect(third.topicId).toBe(first.topicId);
+
+    // Confirmed at the row level: only one curriculum_topics row exists for
+    // this (bookId, title) pair, regardless of retry count.
+    const allTopics = await db.query.curriculumTopics.findMany({
+      where: eq(curriculumTopics.bookId, first.bookId),
+    });
+    const matchingTopics = allTopics.filter(
+      (t) => t.title.toLowerCase() === 'light reactions'
+    );
+    expect(matchingTopics).toHaveLength(1);
+  });
+
   it('assigns correct sortOrder to second topic in same book', async () => {
     const { profile } = await seedAccountAndProfile();
     const db = createIntegrationDb();

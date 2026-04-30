@@ -115,8 +115,11 @@ function renderChatShell(
 // Tests
 // ---------------------------------------------------------------------------
 
+// [BUG-759] No test in this file calls jest.advanceTimersByTime / runAllTimers
+// / etc., so the previous global jest.useFakeTimers() / useRealTimers() pair
+// was dead scaffolding that risked deadlocking RN async work (state updates,
+// microtasks) under fake-time. Removed.
 beforeEach(() => {
-  jest.useFakeTimers();
   jest.clearAllMocks();
   mockGetMicrophonePermissionStatus.mockResolvedValue({
     granted: true,
@@ -130,14 +133,26 @@ beforeEach(() => {
   };
 });
 
-afterEach(() => {
-  jest.useRealTimers();
-});
-
 describe('ChatShell', () => {
   // -----------------------------------------------------------------------
   // Basic rendering (regression — existing behaviour)
   // -----------------------------------------------------------------------
+
+  // [BUG-887] On small phones (Galaxy S10e ~5.8") the Text/Voice mode
+  // toggle eats vertical space the composer needs when the soft keyboard
+  // opens. Onboarding interview opts in to hide the toggle.
+  it('renders the input mode toggle by default [BUG-887]', () => {
+    renderChatShell();
+    expect(screen.getByTestId('input-mode-toggle')).toBeTruthy();
+  });
+
+  it('hides the input mode toggle when hideInputModeToggle is true [BUG-887]', () => {
+    renderChatShell({ hideInputModeToggle: true });
+    expect(screen.queryByTestId('input-mode-toggle')).toBeNull();
+    // Composer itself is still rendered.
+    expect(screen.getByTestId('chat-input')).toBeTruthy();
+    expect(screen.getByTestId('send-button')).toBeTruthy();
+  });
 
   it('uses the explicit fallback route when backBehavior is replace', () => {
     renderChatShell({
@@ -148,6 +163,26 @@ describe('ChatShell', () => {
     fireEvent.press(screen.getByLabelText('Go back'));
 
     expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
+    expect(mockBack).not.toHaveBeenCalled();
+  });
+
+  it('defers fully to onBackPress when supplied [BUG-867]', () => {
+    // Regression: the back chevron looked clickable but the URL never
+    // changed because the string-templated `/(app)/shelf/${subjectId}`
+    // path didn't resolve. Parents now own navigation through onBackPress
+    // and use the typed object form, so the chevron must call the
+    // handler and skip the default router calls entirely.
+    const onBackPress = jest.fn();
+    renderChatShell({
+      backFallback: '/(app)/library',
+      backBehavior: 'replace',
+      onBackPress,
+    });
+
+    fireEvent.press(screen.getByLabelText('Go back'));
+
+    expect(onBackPress).toHaveBeenCalledTimes(1);
+    expect(mockReplace).not.toHaveBeenCalled();
     expect(mockBack).not.toHaveBeenCalled();
   });
 
@@ -719,6 +754,47 @@ describe('ChatShell', () => {
       unmount();
 
       expect(mockRemove).toHaveBeenCalledTimes(1);
+    });
+
+    it('[BUG-928] does NOT subscribe to AccessibilityInfo on web (Chromium AXMode false-positives)', async () => {
+      // Chromium-based browsers report isScreenReaderEnabled() === true when
+      // the accessibility tree is generated for any reason, even without
+      // assistive tech. Auto-suppressing TTS based on that signal silently
+      // disables voice for ordinary Chrome users. The fix: skip the entire
+      // listener wiring on web. Native (iOS/Android) is unaffected.
+      const RN = require('react-native');
+      const originalPlatform = RN.Platform.OS;
+      Object.defineProperty(RN.Platform, 'OS', { get: () => 'web' });
+
+      try {
+        // Even if AccessibilityInfo.isScreenReaderEnabled would resolve true,
+        // the component must not consult it on web.
+        jest
+          .spyOn(AccessibilityInfo, 'isScreenReaderEnabled')
+          .mockResolvedValue(true);
+
+        renderChatShell({
+          verificationType: 'teach_back',
+          messages: [
+            { id: 'ai-1', role: 'assistant', content: 'Hello learner!' },
+          ],
+        });
+
+        await act(async () => {
+          await Promise.resolve();
+        });
+
+        // The component should not have subscribed at all on web.
+        expect(AccessibilityInfo.addEventListener).not.toHaveBeenCalled();
+        expect(AccessibilityInfo.isScreenReaderEnabled).not.toHaveBeenCalled();
+
+        // And TTS still fires for the AI message — not suppressed.
+        expect(mockSpeak).toHaveBeenCalledWith('Hello learner!');
+      } finally {
+        Object.defineProperty(RN.Platform, 'OS', {
+          get: () => originalPlatform,
+        });
+      }
     });
 
     it('transitions from auto to manual TTS when screen reader detected', async () => {

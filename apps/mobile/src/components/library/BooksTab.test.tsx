@@ -302,6 +302,19 @@ describe('BooksTab', () => {
       );
     });
 
+    it('uses singular "topic" when shelf has exactly one topic [BUG-885]', () => {
+      const oneTopicBook: EnrichedBook = {
+        ...algebraBook,
+        topicCount: 1,
+        completedCount: 0,
+      };
+      render(<BooksTab {...defaultProps} books={[oneTopicBook]} />);
+
+      expect(screen.getByTestId('books-shelf-count-sub-1').props.children).toBe(
+        '1 book · 1 topic'
+      );
+    });
+
     it('falls back to book-only count when per-book topic counts are missing', () => {
       const unbuiltBook: EnrichedBook = {
         ...algebraBook,

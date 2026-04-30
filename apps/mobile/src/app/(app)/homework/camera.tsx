@@ -8,6 +8,7 @@ import {
   Linking,
   ScrollView,
   AppState,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
@@ -51,7 +52,7 @@ export default function CameraScreen(): React.ReactNode {
   const [state, dispatch] = useReducer(cameraReducer, initialCameraState);
   const ocr = useHomeworkOcr();
   const cameraRef = useRef<CameraView>(null);
-  const { data: subjects } = useSubjects();
+  const { data: subjects, isLoading: subjectsLoading } = useSubjects();
   const createSubject = useCreateSubject();
 
   const [ocrText, setOcrText] = useState('');
@@ -141,6 +142,26 @@ export default function CameraScreen(): React.ReactNode {
       setDroppedProblems([]);
     }
   }, [ocr.status, ocr.text, ocr.error]);
+
+  // [BUG-689 / M-9] UI-level safety timeout. The hook itself caps the
+  // on-device pass at 20s and the server fallback at 15s, but a hung
+  // promise (e.g. native module wedged, fetch never resolving) can leave
+  // the screen stuck on the "Reading your homework..." spinner. After
+  // 45s in the processing phase we cancel the OCR and surface an
+  // actionable error so the user is never trapped.
+  useEffect(() => {
+    if (state.phase !== 'processing') return undefined;
+    const OCR_UI_TIMEOUT_MS = 45_000;
+    const timeoutId = setTimeout(() => {
+      ocr.cancel();
+      dispatch({
+        type: 'OCR_ERROR',
+        message:
+          'Reading the photo is taking too long. Check your connection and try again, or type the problem in.',
+      });
+    }, OCR_UI_TIMEOUT_MS);
+    return () => clearTimeout(timeoutId);
+  }, [state.phase, ocr]);
 
   const combinedProblemText = getHomeworkProblemText(draftProblems);
   const homeworkCaptureSource = state.imageUri ? state.source : undefined;
@@ -1086,6 +1107,20 @@ export default function CameraScreen(): React.ReactNode {
             <Text className="text-body font-semibold text-text-primary mb-3">
               Which subject is this for?
             </Text>
+            {/* [BUG-690] In the error/no-candidate phase the picker can render
+                empty rows of subjects while useSubjects() is still loading.
+                Show an explicit loading state so the picker is never blank. */}
+            {subjectsLoading && !classifyMutation.data?.candidates?.length ? (
+              <View
+                className="flex-row items-center gap-2 py-3"
+                testID="subject-picker-loading"
+              >
+                <ActivityIndicator size="small" color={colors.primary} />
+                <Text className="text-body-sm text-text-secondary">
+                  Loading your subjects...
+                </Text>
+              </View>
+            ) : null}
             {/* Show classification candidates first (sorted by confidence) */}
             {classifyMutation.data?.candidates
               ?.slice()
@@ -1307,20 +1342,55 @@ export default function CameraScreen(): React.ReactNode {
                     <Text className="text-body font-semibold text-text-primary mt-2 mb-1">
                       Which subject is this for?
                     </Text>
-                    {subjects?.map((s) => (
-                      <Pressable
-                        key={s.id}
-                        onPress={() => handleManualPickSubject(s.id, s.name)}
-                        className="bg-surface-elevated rounded-button py-3 px-4 min-h-[48px] justify-center"
-                        accessibilityLabel={`Select ${s.name}`}
-                        accessibilityRole="button"
-                        testID={`manual-subject-pick-${s.id}`}
+                    {subjectsLoading ? (
+                      <View
+                        className="flex-row items-center gap-2 py-3"
+                        testID="manual-subject-picker-loading"
                       >
-                        <Text className="text-body text-text-primary">
-                          {s.name}
+                        <ActivityIndicator
+                          size="small"
+                          color={colors.primary}
+                        />
+                        <Text className="text-body-sm text-text-secondary">
+                          Loading your subjects...
                         </Text>
-                      </Pressable>
-                    ))}
+                      </View>
+                    ) : !subjects || subjects.length === 0 ? (
+                      <View
+                        className="py-3"
+                        testID="manual-subject-picker-empty"
+                      >
+                        <Text className="text-body-sm text-text-secondary mb-3">
+                          You don&apos;t have any subjects yet.
+                        </Text>
+                        <Pressable
+                          testID="manual-subject-picker-create"
+                          onPress={() => router.push('/create-subject')}
+                          className="bg-primary rounded-button py-3 px-4 min-h-[48px] items-center justify-center"
+                          accessibilityLabel="Create a new subject"
+                          accessibilityRole="button"
+                        >
+                          <Text className="text-body font-semibold text-text-inverse">
+                            Create a subject
+                          </Text>
+                        </Pressable>
+                      </View>
+                    ) : (
+                      subjects.map((s) => (
+                        <Pressable
+                          key={s.id}
+                          onPress={() => handleManualPickSubject(s.id, s.name)}
+                          className="bg-surface-elevated rounded-button py-3 px-4 min-h-[48px] justify-center"
+                          accessibilityLabel={`Select ${s.name}`}
+                          accessibilityRole="button"
+                          testID={`manual-subject-pick-${s.id}`}
+                        >
+                          <Text className="text-body text-text-primary">
+                            {s.name}
+                          </Text>
+                        </Pressable>
+                      ))
+                    )}
                   </>
                 ) : (
                   <Pressable

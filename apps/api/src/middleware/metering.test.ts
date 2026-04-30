@@ -47,6 +47,40 @@ jest.mock('../services/session', () => ({
   flagContent: jest.fn(),
   getSessionSummary: jest.fn(),
   submitSummary: jest.fn(),
+  // [BUG-653] evaluateSessionDepth + getSessionTranscript needed for the
+  // metering coverage on POST /sessions/:id/evaluate-depth.
+  getSessionTranscript: jest.fn().mockResolvedValue({
+    session: {
+      sessionId: 'session-1',
+      subjectId: 'subject-1',
+      topicId: null,
+      sessionType: 'learning',
+      inputMode: 'text',
+      verificationType: null,
+      startedAt: new Date().toISOString(),
+      exchangeCount: 0,
+      milestonesReached: [],
+      wallClockSeconds: null,
+    },
+    exchanges: [],
+  }),
+  evaluateSessionDepth: jest.fn().mockResolvedValue({
+    meaningful: false,
+    reason: 'mock',
+    method: 'heuristic_shallow',
+    topics: [],
+  }),
+  // Other session service exports referenced by the route module — return
+  // permissive defaults so the route module loads without TypeError.
+  getSessionCompletionContext: jest.fn(),
+  recordSystemPrompt: jest.fn(),
+  recordSessionEvent: jest.fn(),
+  skipSummary: jest.fn(),
+  syncHomeworkState: jest.fn(),
+  setSessionInputMode: jest.fn(),
+  getResumeNudgeCandidate: jest.fn(),
+  SubjectInactiveError: class extends Error {},
+  SessionExchangeLimitError: class extends Error {},
 }));
 
 // Mock recall bridge service so we can exercise the route without an LLM call.
@@ -66,6 +100,8 @@ jest.mock('../services/profile', () => ({
   }),
   getProfile: jest.fn().mockResolvedValue(null),
   getProfileDisplayName: jest.fn().mockResolvedValue('Test User'),
+  // [BUG-653] Used by the evaluate-depth route to age-tag the LLM call.
+  getProfileAgeBracket: jest.fn().mockResolvedValue('teen'),
 }));
 
 // Mock subject service for interview route coverage
@@ -303,6 +339,49 @@ describe('metering middleware', () => {
       expect(mockEnsureFreeSubscription).not.toHaveBeenCalled();
       expect(mockDecrementQuota).not.toHaveBeenCalled();
     });
+
+    // [BUG-763] GET /v1/quiz/* is DB-only and must not decrement quota.
+    // Before fix: classifier did `LLM_ROUTE_PATTERNS.filter(p => !p.source.includes('quiz'))`
+    // — fragile; renaming any quiz route would silently flip the filter. The
+    // typed grouping splits LLM_ROUTE_PATTERNS_ANY_METHOD vs _POST_ONLY so
+    // the dispatcher never inspects regex.source.
+    it('[BUG-763] does NOT meter GET /v1/quiz/rounds (DB-only listing)', async () => {
+      const res = await app.request(
+        '/v1/quiz/rounds',
+        { method: 'GET', headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(mockDecrementQuota).not.toHaveBeenCalled();
+      expect(mockEnsureFreeSubscription).not.toHaveBeenCalled();
+      // Status may be 404/501 depending on route registration; what matters
+      // is that the metering middleware is bypassed.
+      expect([200, 400, 401, 404, 405, 500].includes(res.status)).toBe(true);
+    });
+
+    it('[BUG-763] does NOT meter GET /v1/quiz/rounds/prefetch', async () => {
+      const res = await app.request(
+        '/v1/quiz/rounds/prefetch',
+        { method: 'GET', headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(mockDecrementQuota).not.toHaveBeenCalled();
+      expect(mockEnsureFreeSubscription).not.toHaveBeenCalled();
+      expect([200, 400, 401, 404, 405, 500].includes(res.status)).toBe(true);
+    });
+
+    it('[BUG-763] does NOT meter GET /v1/dictation/generate', async () => {
+      const res = await app.request(
+        '/v1/dictation/generate',
+        { method: 'GET', headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(mockDecrementQuota).not.toHaveBeenCalled();
+      expect(mockEnsureFreeSubscription).not.toHaveBeenCalled();
+      expect([200, 400, 401, 404, 405, 500].includes(res.status)).toBe(true);
+    });
   });
 
   // -----------------------------------------------------------------------
@@ -338,6 +417,66 @@ describe('metering middleware', () => {
         'sub-1'
       );
       expect(res.status).toBe(200);
+    });
+
+    it('[BUG-653 / A-5] decrements quota for POST /sessions/:id/evaluate-depth', async () => {
+      // Break test: BEFORE the fix, evaluate-depth was missing from
+      // LLM_ROUTE_PATTERNS so decrementQuota was NEVER called for this
+      // endpoint. An attacker could spam the route in a tight loop and
+      // burn unlimited LLM capacity at zero cost. This test fails if the
+      // pattern is removed from the metered list.
+      mockEnsureFreeSubscription.mockResolvedValue(mockSubscription());
+      mockGetQuotaPool.mockResolvedValue(mockQuota({ usedThisMonth: 100 }));
+      mockDecrementQuota.mockResolvedValue({
+        success: true,
+        source: 'monthly',
+        remainingMonthly: 399,
+        remainingTopUp: 0,
+        remainingDaily: null,
+      });
+
+      const res = await app.request(
+        '/v1/sessions/session-1/evaluate-depth',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+        },
+        TEST_ENV
+      );
+
+      expect(mockDecrementQuota).toHaveBeenCalledWith(
+        expect.anything(),
+        'sub-1'
+      );
+      expect(res.status).toBe(200);
+    });
+
+    it('[BUG-653 / A-5] returns 402 when quota exhausted on POST /sessions/:id/evaluate-depth', async () => {
+      // Companion break test: when quota is exhausted, the metering
+      // middleware MUST short-circuit BEFORE evaluateSessionDepth fires
+      // its LLM call. Otherwise the quota is meaningless on this route.
+      mockEnsureFreeSubscription.mockResolvedValue(mockSubscription());
+      mockGetQuotaPool.mockResolvedValue(
+        mockQuota({ usedThisMonth: 500, monthlyLimit: 500 })
+      );
+      mockDecrementQuota.mockResolvedValue({
+        success: false,
+        reason: 'monthly_exhausted',
+        remainingMonthly: 0,
+        remainingTopUp: 0,
+        remainingDaily: null,
+      });
+
+      const res = await app.request(
+        '/v1/sessions/session-1/evaluate-depth',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(402);
     });
 
     it('[BUG-623 / A-6] returns 402 when quota exhausted on POST /sessions/:id/recall-bridge', async () => {

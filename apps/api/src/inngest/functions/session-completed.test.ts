@@ -80,6 +80,19 @@ const mockDatabaseModule = createDatabaseModuleMock({
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
+// Default fixture UUIDs used across all tests via createEventData().
+// Must satisfy z.string().uuid() — the filing-timed-out event schema
+// (and other event schemas) tightened to UUID-only after FILING-TIMEOUT-OBS.
+const PROFILE_ID = '00000000-0000-4000-8000-000000000001';
+const SESSION_ID = '00000000-0000-4000-8000-000000000002';
+const TOPIC_ID = '00000000-0000-4000-8000-000000000003';
+const SUBJECT_ID = '00000000-0000-4000-8000-000000000004';
+
+// Separate UUIDs used in the BUG-852 wait-for-filing timeout tests so
+// assertions on those specific values remain distinct from the defaults above.
+const validProfileId = '00000000-0000-4000-8000-000000000011';
+const validSessionId = '00000000-0000-4000-8000-000000000012';
+
 const mockStoreSessionEmbedding = jest.fn().mockResolvedValue(undefined);
 const mockExtractSessionContent = jest
   .fn()
@@ -132,14 +145,14 @@ jest.mock('../../services/summaries', () => ({
 
 const mockPrecomputeCoachingCard = jest.fn().mockResolvedValue({
   id: 'card-1',
-  profileId: 'profile-001',
+  profileId: PROFILE_ID,
   type: 'challenge',
   title: 'Ready?',
   body: 'Continue.',
   priority: 3,
   expiresAt: '2026-02-18T10:00:00.000Z',
   createdAt: '2026-02-17T10:00:00.000Z',
-  topicId: 'topic-001',
+  topicId: TOPIC_ID,
   difficulty: 'medium',
   xpReward: 50,
 });
@@ -293,10 +306,10 @@ function createEventData(
   overrides: Record<string, unknown> = {}
 ): Record<string, unknown> {
   return {
-    profileId: 'profile-001',
-    sessionId: 'session-001',
-    topicId: 'topic-001',
-    subjectId: 'subject-001',
+    profileId: PROFILE_ID,
+    sessionId: SESSION_ID,
+    topicId: TOPIC_ID,
+    subjectId: SUBJECT_ID,
     summaryStatus: 'pending',
     sessionType: 'learning',
     escalationRungs: [1, 2],
@@ -368,7 +381,12 @@ describe('sessionCompleted', () => {
       .mockImplementation(() => undefined);
 
     const { mockStep } = (await executeSteps(
-      createEventData({ topicId: null, sessionType: 'homework' })
+      createEventData({
+        profileId: validProfileId,
+        sessionId: validSessionId,
+        topicId: null,
+        sessionType: 'homework',
+      })
     )) as any;
 
     expect(mockStep.waitForEvent).toHaveBeenCalledWith(
@@ -379,7 +397,7 @@ describe('sessionCompleted', () => {
       expect.objectContaining({
         message: expect.stringContaining('waitForEvent timed out'),
       }),
-      expect.objectContaining({ profileId: 'profile-001' })
+      expect.objectContaining({ profileId: validProfileId })
     );
     expect(consoleWarnSpy).toHaveBeenCalledWith(
       expect.stringContaining('filing waitForEvent timed out')
@@ -391,8 +409,8 @@ describe('sessionCompleted', () => {
       expect.objectContaining({
         name: 'app/session.filing_timed_out',
         data: expect.objectContaining({
-          sessionId: 'session-001',
-          profileId: 'profile-001',
+          sessionId: validSessionId,
+          profileId: validProfileId,
           sessionType: 'homework',
           timeoutMs: 60000,
         }),
@@ -412,7 +430,7 @@ describe('sessionCompleted', () => {
       sleep: jest.fn(),
       waitForEvent: jest
         .fn()
-        .mockResolvedValue({ data: { sessionId: 'session-001' } }),
+        .mockResolvedValue({ data: { sessionId: SESSION_ID } }),
     };
     const handler = (sessionCompleted as unknown as { fn: any }).fn;
     await handler({
@@ -437,7 +455,7 @@ describe('sessionCompleted', () => {
     expect(result).toEqual(
       expect.objectContaining({
         status: 'completed',
-        sessionId: 'session-001',
+        sessionId: SESSION_ID,
         outcomes: expect.any(Array),
       })
     );
@@ -500,8 +518,8 @@ describe('sessionCompleted', () => {
 
       expect(mockUpdateRetentionFromSession).toHaveBeenCalledWith(
         expect.anything(), // db
-        'profile-001',
-        'topic-001',
+        PROFILE_ID,
+        TOPIC_ID,
         4,
         '2026-02-17T10:00:00.000Z' // timestamp from event data
       );
@@ -536,8 +554,8 @@ describe('sessionCompleted', () => {
 
       expect(mockUpdateRetentionFromSession).toHaveBeenCalledWith(
         expect.anything(),
-        'profile-001',
-        'topic-001',
+        PROFILE_ID,
+        TOPIC_ID,
         3,
         '2026-02-17T10:00:00.000Z'
       );
@@ -548,8 +566,8 @@ describe('sessionCompleted', () => {
 
       expect(mockUpdateRetentionFromSession).toHaveBeenCalledWith(
         expect.anything(),
-        'profile-001',
-        'topic-001',
+        PROFILE_ID,
+        TOPIC_ID,
         3,
         '2026-02-17T10:00:00.000Z'
       );
@@ -578,21 +596,21 @@ describe('sessionCompleted', () => {
       expect(mockUpdateRetentionFromSession).toHaveBeenCalledTimes(3);
       expect(mockUpdateRetentionFromSession).toHaveBeenCalledWith(
         expect.anything(),
-        'profile-001',
+        PROFILE_ID,
         'topic-a',
         4,
         '2026-02-17T10:00:00.000Z'
       );
       expect(mockUpdateRetentionFromSession).toHaveBeenCalledWith(
         expect.anything(),
-        'profile-001',
+        PROFILE_ID,
         'topic-b',
         4,
         '2026-02-17T10:00:00.000Z'
       );
       expect(mockUpdateRetentionFromSession).toHaveBeenCalledWith(
         expect.anything(),
-        'profile-001',
+        PROFILE_ID,
         'topic-c',
         4,
         '2026-02-17T10:00:00.000Z'
@@ -602,7 +620,7 @@ describe('sessionCompleted', () => {
     it('prefers interleavedTopicIds over single topicId (FR92)', async () => {
       await executeSteps(
         createEventData({
-          topicId: 'topic-001',
+          topicId: TOPIC_ID,
           interleavedTopicIds: ['topic-a', 'topic-b'],
           qualityRating: 4,
         })
@@ -612,8 +630,8 @@ describe('sessionCompleted', () => {
       expect(mockUpdateRetentionFromSession).toHaveBeenCalledTimes(2);
       expect(mockUpdateRetentionFromSession).not.toHaveBeenCalledWith(
         expect.anything(),
-        'profile-001',
-        'topic-001',
+        PROFILE_ID,
+        TOPIC_ID,
         expect.anything(),
         expect.anything()
       );
@@ -626,8 +644,8 @@ describe('sessionCompleted', () => {
 
       expect(mockUpdateNeedsDeepeningProgress).toHaveBeenCalledWith(
         expect.anything(), // db
-        'profile-001',
-        'topic-001',
+        PROFILE_ID,
+        TOPIC_ID,
         4
       );
     });
@@ -665,19 +683,19 @@ describe('sessionCompleted', () => {
       expect(mockUpdateNeedsDeepeningProgress).toHaveBeenCalledTimes(3);
       expect(mockUpdateNeedsDeepeningProgress).toHaveBeenCalledWith(
         expect.anything(),
-        'profile-001',
+        PROFILE_ID,
         'topic-a',
         5
       );
       expect(mockUpdateNeedsDeepeningProgress).toHaveBeenCalledWith(
         expect.anything(),
-        'profile-001',
+        PROFILE_ID,
         'topic-b',
         5
       );
       expect(mockUpdateNeedsDeepeningProgress).toHaveBeenCalledWith(
         expect.anything(),
-        'profile-001',
+        PROFILE_ID,
         'topic-c',
         5
       );
@@ -724,8 +742,8 @@ describe('sessionCompleted', () => {
     }
 
     const fourStrandsSubject = {
-      id: 'subject-001',
-      profileId: 'profile-001',
+      id: SUBJECT_ID,
+      profileId: PROFILE_ID,
       pedagogyMode: 'four_strands',
       languageCode: 'es',
     };
@@ -773,8 +791,8 @@ describe('sessionCompleted', () => {
 
     it('skips when subject pedagogyMode is not four_strands', async () => {
       setupSubjectMock({
-        id: 'subject-001',
-        profileId: 'profile-001',
+        id: SUBJECT_ID,
+        profileId: PROFILE_ID,
         pedagogyMode: 'socratic',
         languageCode: null,
       });
@@ -790,8 +808,8 @@ describe('sessionCompleted', () => {
 
     it('skips when subject has no languageCode', async () => {
       setupSubjectMock({
-        id: 'subject-001',
-        profileId: 'profile-001',
+        id: SUBJECT_ID,
+        profileId: PROFILE_ID,
         pedagogyMode: 'four_strands',
         languageCode: null,
       });
@@ -843,8 +861,8 @@ describe('sessionCompleted', () => {
 
       expect(mockUpsertExtractedVocabulary).toHaveBeenCalledWith(
         expect.anything(), // db
-        'profile-001',
-        'subject-001',
+        PROFILE_ID,
+        SUBJECT_ID,
         expect.arrayContaining([
           expect.objectContaining({
             term: 'hola',
@@ -875,8 +893,8 @@ describe('sessionCompleted', () => {
 
       expect(mockUpsertExtractedVocabulary).toHaveBeenCalledWith(
         expect.anything(),
-        'profile-001',
-        'subject-001',
+        PROFILE_ID,
+        SUBJECT_ID,
         expect.arrayContaining([expect.objectContaining({ quality: 5 })])
       );
     });
@@ -892,8 +910,8 @@ describe('sessionCompleted', () => {
 
       expect(mockUpsertExtractedVocabulary).toHaveBeenCalledWith(
         expect.anything(),
-        'profile-001',
-        'subject-001',
+        PROFILE_ID,
+        SUBJECT_ID,
         expect.arrayContaining([expect.objectContaining({ quality: 3 })])
       );
     });
@@ -909,8 +927,8 @@ describe('sessionCompleted', () => {
 
       expect(mockUpsertExtractedVocabulary).toHaveBeenCalledWith(
         expect.anything(),
-        'profile-001',
-        'subject-001',
+        PROFILE_ID,
+        SUBJECT_ID,
         expect.arrayContaining([
           expect.objectContaining({ milestoneId: undefined }),
         ])
@@ -932,8 +950,8 @@ describe('sessionCompleted', () => {
 
       expect(mockUpsertExtractedVocabulary).toHaveBeenCalledWith(
         expect.anything(),
-        'profile-001',
-        'subject-001',
+        PROFILE_ID,
+        SUBJECT_ID,
         expect.arrayContaining([
           expect.objectContaining({ term: 'hola', cefrLevel: 'A2' }),
         ])
@@ -955,8 +973,8 @@ describe('sessionCompleted', () => {
 
       expect(mockUpsertExtractedVocabulary).toHaveBeenCalledWith(
         expect.anything(),
-        'profile-001',
-        'subject-001',
+        PROFILE_ID,
+        SUBJECT_ID,
         expect.arrayContaining([
           expect.objectContaining({ term: 'hola', cefrLevel: 'B1' }),
         ])
@@ -978,14 +996,13 @@ describe('sessionCompleted', () => {
       // getCurrentLanguageProgress is called at least twice (before and after upsert)
       expect(mockGetCurrentLanguageProgress).toHaveBeenCalledWith(
         expect.anything(), // db
-        'profile-001',
-        'subject-001'
+        PROFILE_ID,
+        SUBJECT_ID
       );
       // Called at least twice: once for previousLanguageProgress, once for nextLanguageProgress
       const vocabRetentionCalls =
         mockGetCurrentLanguageProgress.mock.calls.filter(
-          (call: unknown[]) =>
-            call[1] === 'profile-001' && call[2] === 'subject-001'
+          (call: unknown[]) => call[1] === PROFILE_ID && call[2] === SUBJECT_ID
         );
       expect(vocabRetentionCalls.length).toBeGreaterThanOrEqual(2);
     });
@@ -1038,9 +1055,9 @@ describe('sessionCompleted', () => {
 
       expect(mockCreatePendingSessionSummary).toHaveBeenCalledWith(
         expect.anything(), // db
-        'session-001',
-        'profile-001',
-        'topic-001',
+        SESSION_ID,
+        PROFILE_ID,
+        TOPIC_ID,
         'pending'
       );
     });
@@ -1050,11 +1067,11 @@ describe('sessionCompleted', () => {
 
       expect(mockPrecomputeCoachingCard).toHaveBeenCalledWith(
         expect.anything(),
-        'profile-001'
+        PROFILE_ID
       );
       expect(mockWriteCoachingCardCache).toHaveBeenCalledWith(
         expect.anything(),
-        'profile-001',
+        PROFILE_ID,
         expect.objectContaining({ type: expect.any(String) })
       );
     });
@@ -1066,7 +1083,7 @@ describe('sessionCompleted', () => {
 
       expect(mockRecordSessionActivity).toHaveBeenCalledWith(
         expect.anything(), // db
-        'profile-001',
+        PROFILE_ID,
         '2026-02-17'
       );
     });
@@ -1079,7 +1096,7 @@ describe('sessionCompleted', () => {
 
       expect(mockRecordSessionActivity).toHaveBeenCalledWith(
         expect.anything(),
-        'profile-001',
+        PROFILE_ID,
         '2026-02-17'
       );
     });
@@ -1089,7 +1106,7 @@ describe('sessionCompleted', () => {
 
       expect(mockRecordSessionActivity).toHaveBeenCalledWith(
         expect.anything(),
-        'profile-001',
+        PROFILE_ID,
         '2026-02-17'
       );
     });
@@ -1102,7 +1119,7 @@ describe('sessionCompleted', () => {
 
       expect(mockRecordSessionActivity).toHaveBeenCalledWith(
         expect.anything(),
-        'profile-001',
+        PROFILE_ID,
         today
       );
     });
@@ -1112,9 +1129,9 @@ describe('sessionCompleted', () => {
 
       expect(mockInsertSessionXpEntry).toHaveBeenCalledWith(
         expect.anything(), // db
-        'profile-001',
-        'topic-001',
-        'subject-001'
+        PROFILE_ID,
+        TOPIC_ID,
+        SUBJECT_ID
       );
     });
 
@@ -1123,9 +1140,9 @@ describe('sessionCompleted', () => {
 
       expect(mockInsertSessionXpEntry).toHaveBeenCalledWith(
         expect.anything(),
-        'profile-001',
+        PROFILE_ID,
         null,
-        'subject-001'
+        SUBJECT_ID
       );
     });
   });
@@ -1136,8 +1153,8 @@ describe('sessionCompleted', () => {
 
       expect(mockExtractSessionContent).toHaveBeenCalledWith(
         expect.anything(),
-        'session-001',
-        'profile-001'
+        SESSION_ID,
+        PROFILE_ID
       );
     });
 
@@ -1146,9 +1163,9 @@ describe('sessionCompleted', () => {
 
       expect(mockStoreSessionEmbedding).toHaveBeenCalledWith(
         expect.anything(),
-        'session-001',
-        'profile-001',
-        'topic-001',
+        SESSION_ID,
+        PROFILE_ID,
+        TOPIC_ID,
         'User: What is algebra?\n\nAI: Algebra is...',
         'pa-test-key-123'
       );
@@ -1173,8 +1190,8 @@ describe('sessionCompleted', () => {
 
       expect(mockExtractAndStoreHomeworkSummary).toHaveBeenCalledWith(
         expect.anything(),
-        'profile-001',
-        'session-001'
+        PROFILE_ID,
+        SESSION_ID
       );
       const outcome = result.outcomes.find(
         (o: any) => o.step === 'extract-homework-summary'
@@ -1207,9 +1224,9 @@ describe('sessionCompleted', () => {
 
       expect(mockProcessEvaluateCompletion).toHaveBeenCalledWith(
         expect.anything(), // db
-        'profile-001',
-        'session-001',
-        'topic-001'
+        PROFILE_ID,
+        SESSION_ID,
+        TOPIC_ID
       );
       expect(mockProcessTeachBackCompletion).not.toHaveBeenCalled();
       const outcome = result.outcomes.find(
@@ -1225,9 +1242,9 @@ describe('sessionCompleted', () => {
 
       expect(mockProcessTeachBackCompletion).toHaveBeenCalledWith(
         expect.anything(), // db
-        'profile-001',
-        'session-001',
-        'topic-001'
+        PROFILE_ID,
+        SESSION_ID,
+        TOPIC_ID
       );
       expect(mockProcessEvaluateCompletion).not.toHaveBeenCalled();
       const outcome = result.outcomes.find(
@@ -1380,11 +1397,11 @@ describe('sessionCompleted', () => {
       // analysis, subject name, source, and subjectId [CR-119.3].
       expect(mockApplyAnalysis).toHaveBeenCalledWith(
         expect.anything(),
-        'profile-001',
+        PROFILE_ID,
         expect.objectContaining({ interests: ['space'] }),
         null,
         'inferred',
-        'subject-001'
+        SUBJECT_ID
       );
     });
 
@@ -1409,7 +1426,7 @@ describe('sessionCompleted', () => {
 
       expect(mockIncrementSummarySkips).toHaveBeenCalledWith(
         expect.anything(),
-        'profile-001'
+        PROFILE_ID
       );
       expect(mockResetSummarySkips).not.toHaveBeenCalled();
     });
@@ -1419,7 +1436,7 @@ describe('sessionCompleted', () => {
 
       expect(mockResetSummarySkips).toHaveBeenCalledWith(
         expect.anything(),
-        'profile-001'
+        PROFILE_ID
       );
       expect(mockIncrementSummarySkips).not.toHaveBeenCalled();
     });
@@ -1429,7 +1446,7 @@ describe('sessionCompleted', () => {
 
       expect(mockResetSummarySkips).toHaveBeenCalledWith(
         expect.anything(),
-        'profile-001'
+        PROFILE_ID
       );
       expect(mockIncrementSummarySkips).not.toHaveBeenCalled();
     });
@@ -1484,22 +1501,14 @@ describe('sessionCompleted', () => {
       consoleSpy.mockRestore();
     });
 
-    it('recovers on step retry after transient retention failure', async () => {
-      mockUpdateRetentionFromSession
-        .mockRejectedValueOnce(new Error('DB connection reset'))
-        .mockResolvedValueOnce(undefined);
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
-
-      // First invocation — retention step fails
-      const { result: result1 } = (await executeSteps(
-        createEventData({ qualityRating: 4 })
-      )) as any;
-      const retentionOutcome1 = result1.outcomes.find(
-        (o: any) => o.step === 'update-retention'
+    it('[FIX-INNGEST-1] update-retention is critical: first call throws so Inngest retries', async () => {
+      mockUpdateRetentionFromSession.mockRejectedValueOnce(
+        new Error('DB connection reset')
       );
-      expect(retentionOutcome1.status).toBe('failed');
-
-      // Second invocation (simulating retry) — succeeds
+      await expect(
+        executeSteps(createEventData({ qualityRating: 4 }))
+      ).rejects.toThrow('DB connection reset');
+      mockUpdateRetentionFromSession.mockResolvedValueOnce(undefined);
       const { result: result2 } = (await executeSteps(
         createEventData({ qualityRating: 4 })
       )) as any;
@@ -1507,11 +1516,9 @@ describe('sessionCompleted', () => {
         (o: any) => o.step === 'update-retention'
       );
       expect(retentionOutcome2.status).toBe('ok');
-
-      consoleSpy.mockRestore();
     });
 
-    it('captures all errors to sentry on each step failure', async () => {
+    it('[FIX-INNGEST-1] soft step failures include structured extra.step and extra.surface tags', async () => {
       mockPrecomputeCoachingCard.mockRejectedValueOnce(
         new Error('Redis timeout')
       );
@@ -1521,7 +1528,13 @@ describe('sessionCompleted', () => {
 
       expect(mockCaptureException).toHaveBeenCalledWith(
         expect.objectContaining({ message: 'Redis timeout' }),
-        expect.objectContaining({ profileId: 'profile-001' })
+        expect.objectContaining({
+          profileId: PROFILE_ID,
+          extra: expect.objectContaining({
+            step: 'write-coaching-card',
+            surface: 'session-completed',
+          }),
+        })
       );
 
       consoleSpy.mockRestore();
@@ -1552,7 +1565,7 @@ describe('sessionCompleted', () => {
       // Sentry captured the error
       expect(mockCaptureException).toHaveBeenCalledWith(
         expect.any(Error),
-        expect.objectContaining({ profileId: 'profile-001' })
+        expect.objectContaining({ profileId: PROFILE_ID })
       );
 
       // Status reflects partial failure
@@ -1589,31 +1602,23 @@ describe('sessionCompleted', () => {
       consoleSpy.mockRestore();
     });
 
-    it('continues chain when retention step fails', async () => {
+    it('[FIX-INNGEST-1] retention step failure throws — stops pipeline (critical step)', async () => {
       mockUpdateRetentionFromSession.mockRejectedValueOnce(
         new Error('SM-2 calculation error')
       );
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
 
-      const { result } = (await executeSteps(
-        createEventData({ qualityRating: 4 })
-      )) as any;
+      await expect(
+        executeSteps(createEventData({ qualityRating: 4 }))
+      ).rejects.toThrow('SM-2 calculation error');
 
-      // All subsequent steps still ran
-      expect(mockUpdateNeedsDeepeningProgress).toHaveBeenCalled();
-      expect(mockPrecomputeCoachingCard).toHaveBeenCalled();
-      expect(mockRecordSessionActivity).toHaveBeenCalled();
-      expect(mockStoreSessionEmbedding).toHaveBeenCalled();
-
-      expect(result.status).toBe('completed-with-errors');
-
-      consoleSpy.mockRestore();
+      // No downstream steps ran — DB error stopped the pipeline
+      expect(mockPrecomputeCoachingCard).not.toHaveBeenCalled();
+      expect(mockRecordSessionActivity).not.toHaveBeenCalled();
+      expect(mockStoreSessionEmbedding).not.toHaveBeenCalled();
     });
 
-    it('reports multiple failures independently', async () => {
-      mockUpdateRetentionFromSession.mockRejectedValueOnce(
-        new Error('SM-2 fail')
-      );
+    it('reports multiple soft-step failures independently', async () => {
+      mockPrecomputeCoachingCard.mockRejectedValueOnce(new Error('Card fail'));
       mockStoreSessionEmbedding.mockRejectedValueOnce(new Error('Voyage fail'));
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
 
@@ -1621,18 +1626,14 @@ describe('sessionCompleted', () => {
         createEventData({ qualityRating: 4 })
       )) as any;
 
-      // Two independent failures
       const failed = result.outcomes.filter((o: any) => o.status === 'failed');
       expect(failed).toHaveLength(2);
       expect(failed.map((f: any) => f.step)).toEqual(
-        expect.arrayContaining(['update-retention', 'generate-embeddings'])
+        expect.arrayContaining(['write-coaching-card', 'generate-embeddings'])
       );
 
-      // Sentry called for each failure
       expect(mockCaptureException).toHaveBeenCalledTimes(2);
-
-      // Non-failing steps still ran
-      expect(mockPrecomputeCoachingCard).toHaveBeenCalled();
+      expect(mockUpdateRetentionFromSession).toHaveBeenCalled();
       expect(mockRecordSessionActivity).toHaveBeenCalled();
 
       consoleSpy.mockRestore();
@@ -1653,7 +1654,7 @@ describe('sessionCompleted', () => {
 
       expect(mockQueueCelebration).toHaveBeenCalledWith(
         expect.anything(),
-        'profile-001',
+        PROFILE_ID,
         'comet',
         'streak_7'
       );
@@ -1669,7 +1670,7 @@ describe('sessionCompleted', () => {
 
       expect(mockQueueCelebration).toHaveBeenCalledWith(
         expect.anything(),
-        'profile-001',
+        PROFILE_ID,
         'orions_belt',
         'streak_30'
       );
@@ -1759,8 +1760,8 @@ describe('sessionCompleted', () => {
       // receives topicId. It must now get the backfilled value, not null.
       expect(mockCreatePendingSessionSummary).toHaveBeenCalledWith(
         expect.anything(),
-        'session-001',
-        'profile-001',
+        SESSION_ID,
+        PROFILE_ID,
         'topic-from-db',
         'pending'
       );
@@ -1777,8 +1778,8 @@ describe('sessionCompleted', () => {
       // topicId stays null — summary must receive null
       expect(mockCreatePendingSessionSummary).toHaveBeenCalledWith(
         expect.anything(),
-        'session-001',
-        'profile-001',
+        SESSION_ID,
+        PROFILE_ID,
         null,
         'pending'
       );
@@ -1793,8 +1794,8 @@ describe('sessionCompleted', () => {
 
       expect(mockCreatePendingSessionSummary).toHaveBeenCalledWith(
         expect.anything(),
-        'session-001',
-        'profile-001',
+        SESSION_ID,
+        PROFILE_ID,
         null,
         'pending'
       );
@@ -1802,7 +1803,7 @@ describe('sessionCompleted', () => {
 
     it('skips re-read-session step when topicId is already set', async () => {
       const { mockStep } = (await executeSteps(
-        createEventData({ topicId: 'topic-001' })
+        createEventData({ topicId: TOPIC_ID })
       )) as any;
 
       // re-read-session must NOT be called when topicId is already known
@@ -1838,12 +1839,111 @@ describe('sessionCompleted', () => {
       // applyAnalysis args: (db, profileId, analysis, subjectName, source, subjectId)
       expect(mockApplyAnalysis).toHaveBeenCalledWith(
         expect.anything(),
-        'profile-001',
+        PROFILE_ID,
         expect.any(Object),
         null, // subjectName (null when DB lookup returns no name)
         'inferred',
-        'subject-001' // subjectId threaded from event data
+        SUBJECT_ID // subjectId threaded from event data
       );
+    });
+  });
+  // ---------------------------------------------------------------------------
+  // [FIX-INNGEST-1] Critical vs soft step break tests
+  // Proves that runCritical steps throw (Inngest retries) while runIsolated
+  // steps absorb errors (pipeline continues). These tests are the "break tests"
+  // required by CLAUDE.md for every security/correctness fix.
+  // ---------------------------------------------------------------------------
+
+  describe('[FIX-INNGEST-1] critical step break tests', () => {
+    it('update-dashboard throws on recordSessionActivity failure (critical)', async () => {
+      // update-dashboard has no try/catch — DB errors must propagate to Inngest.
+      // Silently absorbing would mean XP or streak is permanently lost.
+      mockRecordSessionActivity.mockRejectedValueOnce(
+        new Error('Streak DB write failed')
+      );
+
+      await expect(
+        executeSteps(createEventData({ qualityRating: 4 }))
+      ).rejects.toThrow('Streak DB write failed');
+    });
+
+    it('update-dashboard throws on insertSessionXpEntry failure (critical)', async () => {
+      mockInsertSessionXpEntry.mockRejectedValueOnce(
+        new Error('XP insert constraint violation')
+      );
+
+      await expect(
+        executeSteps(createEventData({ qualityRating: 4 }))
+      ).rejects.toThrow('XP insert constraint violation');
+    });
+
+    it('soft steps (generate-embeddings, write-coaching-card) do NOT throw (runIsolated)', async () => {
+      // Verifies the two-tier isolation: soft steps return { status: 'failed' }
+      // instead of throwing, so the overall function still resolves.
+      mockStoreSessionEmbedding.mockRejectedValueOnce(
+        new Error('Voyage rate limit')
+      );
+      mockPrecomputeCoachingCard.mockRejectedValueOnce(
+        new Error('Card LLM error')
+      );
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+
+      // Must NOT throw
+      const { result } = (await executeSteps(
+        createEventData({ qualityRating: 4 })
+      )) as any;
+
+      expect(result.status).toBe('completed-with-errors');
+      const embeddingOutcome = result.outcomes.find(
+        (o: any) => o.step === 'generate-embeddings'
+      );
+      const cardOutcome = result.outcomes.find(
+        (o: any) => o.step === 'write-coaching-card'
+      );
+      expect(embeddingOutcome.status).toBe('failed');
+      expect(cardOutcome.status).toBe('failed');
+
+      consoleSpy.mockRestore();
+    });
+
+    it('dispatches app/session.completed_with_errors event when soft steps fail', async () => {
+      // [FIX-INNGEST-1] Soft-step failures must emit a queryable Inngest event
+      // so on-call can page on volume spikes without Sentry access.
+      mockStoreSessionEmbedding.mockRejectedValueOnce(
+        new Error('Voyage error')
+      );
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+      const mockStep = {
+        run: jest.fn(async (name: string, fn: () => Promise<unknown>) => fn()),
+        sendEvent: jest.fn().mockResolvedValue(undefined),
+        sleep: jest.fn(),
+        waitForEvent: jest.fn().mockResolvedValue(null),
+      };
+
+      const handler = (sessionCompleted as any).fn;
+      await handler({
+        event: {
+          data: createEventData({ qualityRating: 4 }),
+          name: 'app/session.completed',
+        },
+        step: mockStep,
+      });
+
+      expect(mockStep.sendEvent).toHaveBeenCalledWith(
+        'session-completed-with-errors',
+        expect.objectContaining({
+          name: 'app/session.completed_with_errors',
+          data: expect.objectContaining({
+            sessionId: SESSION_ID,
+            profileId: PROFILE_ID,
+            failedSteps: expect.arrayContaining([
+              expect.objectContaining({ step: 'generate-embeddings' }),
+            ]),
+          }),
+        })
+      );
+
+      consoleSpy.mockRestore();
     });
   });
 });

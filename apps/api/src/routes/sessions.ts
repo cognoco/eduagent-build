@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import {
+  ConflictError,
   sessionStartSchema,
   sessionMessageSchema,
   sessionCloseSchema,
@@ -12,8 +13,12 @@ import {
   homeworkStateSyncSchema,
   systemPromptBodySchema,
   ERROR_CODES,
+  filingRetryEventSchema,
+  RateLimitedError,
 } from '@eduagent/schemas';
-import type { Database } from '@eduagent/database';
+import { learningSessions, type Database } from '@eduagent/database';
+import { and, eq, lt, sql } from 'drizzle-orm';
+import { z } from 'zod';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
@@ -44,16 +49,22 @@ import {
 import type { LLMTier } from '../services/subscription';
 import { notFound, apiError } from '../errors';
 import { inngest } from '../inngest/client';
-import { incrementQuota } from '../services/billing';
+import { safeRefundQuota } from '../services/billing';
 import {
   shouldPromptCasualSwitch,
   getSkipWarningFlags,
 } from '../services/settings';
-import { startInterleavedSession } from '../services/interleaved';
+import {
+  startInterleavedSession,
+  NoInterleavedTopicsError,
+} from '../services/interleaved';
 import { generateRecallBridge } from '../services/recall-bridge';
 import { getProfileAgeBracket } from '../services/profile';
 
 const logger = createLogger();
+const retryFilingParamsSchema = z.object({
+  sessionId: z.string().uuid(),
+});
 
 type SessionRouteEnv = {
   Bindings: {
@@ -108,6 +119,64 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     return c.json({ session });
   })
 
+  .post(
+    '/sessions/:sessionId/retry-filing',
+    zValidator('param', retryFilingParamsSchema),
+    async (c) => {
+      const db = c.get('db');
+      const profileId = requireProfileId(c.get('profileId'));
+      const { sessionId } = c.req.valid('param');
+
+      const session = await getSession(db, profileId, sessionId);
+      if (!session) return notFound(c, 'Session not found');
+
+      const [updated] = await db
+        .update(learningSessions)
+        .set({
+          filingStatus: 'filing_pending',
+          filingRetryCount: sql`${learningSessions.filingRetryCount} + 1`,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(learningSessions.id, sessionId),
+            eq(learningSessions.profileId, profileId),
+            eq(learningSessions.filingStatus, 'filing_failed'),
+            lt(learningSessions.filingRetryCount, 3)
+          )
+        )
+        .returning();
+
+      if (!updated) {
+        const fresh = await getSession(db, profileId, sessionId);
+        if (!fresh) return notFound(c, 'Session not found');
+        if (fresh.filingRetryCount >= 3) {
+          throw new RateLimitedError(
+            'Retry limit reached for this session.',
+            ERROR_CODES.RATE_LIMITED
+          );
+        }
+        throw new ConflictError(
+          `Session is not in a retriable state (status: ${
+            fresh.filingStatus ?? 'null'
+          })`
+        );
+      }
+
+      const retryPayload = filingRetryEventSchema.parse({
+        profileId,
+        sessionId,
+        sessionMode:
+          session.sessionType === 'homework' ? 'homework' : 'freeform',
+      });
+      await inngest.send({ name: 'app/filing.retry', data: retryPayload });
+
+      const updatedSession = await getSession(db, profileId, sessionId);
+      if (!updatedSession) return notFound(c, 'Session not found');
+      return c.json({ session: updatedSession });
+    }
+  )
+
   // Send a message (the core learning exchange)
   .post(
     '/sessions/:sessionId/messages',
@@ -138,8 +207,12 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
           );
         }
         // Refund quota on LLM failure — user should not be charged for a failed exchange
+        // [BUG-661 / A-21] safeRefundQuota escalates if the refund itself fails.
         if (subscriptionId) {
-          await incrementQuota(db, subscriptionId);
+          await safeRefundQuota(db, subscriptionId, {
+            route: 'sessions.message',
+            profileId,
+          });
         }
         throw err;
       }
@@ -173,25 +246,41 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     }, 0);
 
     // [A-1] Observability events — no Inngest handler; awaited per CLAUDE.md rule.
-    await inngest.send({
-      name: 'app/ask.gate_decision',
-      data: {
-        sessionId,
-        meaningful: result.meaningful,
-        reason: result.reason,
-        method: result.method,
-        exchangeCount: transcript.session.exchangeCount,
-        learnerWordCount,
-        topicCount: result.topics.length,
-      },
-    });
-
-    if (result.method === 'fail_open') {
+    // [BUG-653] Inngest events are observability-only — never fail the request
+    // when their delivery hiccups (network blip, rate-limit, partial outage).
+    // The depth result is already in hand and is what the client asked for.
+    try {
       await inngest.send({
-        name: 'app/ask.gate_timeout',
+        name: 'app/ask.gate_decision',
         data: {
           sessionId,
+          meaningful: result.meaningful,
+          reason: result.reason,
+          method: result.method,
           exchangeCount: transcript.session.exchangeCount,
+          learnerWordCount,
+          topicCount: result.topics.length,
+        },
+      });
+
+      if (result.method === 'fail_open') {
+        await inngest.send({
+          name: 'app/ask.gate_timeout',
+          data: {
+            sessionId,
+            exchangeCount: transcript.session.exchangeCount,
+          },
+        });
+      }
+    } catch (err) {
+      // Capture so the silent-recovery rule (CLAUDE.md → "Silent Recovery
+      // Without Escalation is Banned") is satisfied — failures here surface
+      // in Sentry rather than disappearing into stdout.
+      captureException(err, {
+        extra: {
+          context: 'sessions.evaluate-depth.inngest_send',
+          sessionId,
+          method: result.method,
         },
       });
     }
@@ -250,14 +339,20 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
               }),
             });
           } catch (err) {
-            console.error(
-              '[sessions/stream] Post-stream processing failed:',
-              err
-            );
+            // [logging sweep] structured logger so PII fields land as JSON context
+            logger.error('[sessions/stream] Post-stream processing failed', {
+              sessionId,
+              error: err instanceof Error ? err.message : String(err),
+            });
             captureException(err, { profileId, extra: { sessionId } });
             // Refund quota — user should not be charged for a failed exchange
+            // [BUG-661 / A-21] safeRefundQuota escalates if the refund itself fails.
             if (subscriptionId) {
-              await incrementQuota(db, subscriptionId);
+              await safeRefundQuota(db, subscriptionId, {
+                route: 'sessions.stream.onComplete',
+                profileId,
+                sessionId,
+              });
             }
             await sseStream.writeSSE({
               data: JSON.stringify({
@@ -277,8 +372,13 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
           );
         }
         // Refund quota on LLM failure — user should not be charged for a failed exchange
+        // [BUG-661 / A-21] safeRefundQuota escalates if the refund itself fails.
         if (subscriptionId) {
-          await incrementQuota(db, subscriptionId);
+          await safeRefundQuota(db, subscriptionId, {
+            route: 'sessions.stream',
+            profileId,
+            sessionId,
+          });
         }
         throw err;
       }
@@ -541,10 +641,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         const result = await startInterleavedSession(db, profileId, input);
         return c.json(result, 201);
       } catch (err) {
-        if (
-          err instanceof Error &&
-          err.message === 'No topics available for interleaved retrieval'
-        ) {
+        if (err instanceof NoInterleavedTopicsError) {
           return apiError(c, 400, ERROR_CODES.VALIDATION_ERROR, err.message);
         }
         throw err;

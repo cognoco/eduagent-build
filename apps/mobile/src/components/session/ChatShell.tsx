@@ -8,10 +8,12 @@ import {
   View,
   Text,
   Pressable,
-  ScrollView,
+  FlatList,
+  type ListRenderItemInfo,
   TextInput,
   KeyboardAvoidingView,
   Vibration,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -78,6 +80,20 @@ interface ChatShellProps {
   backFallback?: string;
   /** Use the fallback route directly when the parent route is known. */
   backBehavior?: 'history' | 'replace';
+  /**
+   * [BUG-867] Optional handler that fully replaces the default back-button
+   * behavior. Use when the parent must navigate to a typed dynamic route
+   * (e.g. `/(app)/shelf/[subjectId]`) — string-templated paths don't always
+   * resolve cleanly on web, so the parent supplies the navigation.
+   */
+  onBackPress?: () => void;
+  /**
+   * [BUG-887] Hide the Text/Voice mode toggle above the composer. Useful for
+   * onboarding-style screens where voice is not offered yet — saves ~50px of
+   * vertical space so the composer stays comfortably visible on small phones
+   * (Galaxy S10e ~5.8" with the soft keyboard open).
+   */
+  hideInputModeToggle?: boolean;
 }
 
 /**
@@ -147,11 +163,16 @@ export function ChatShell({
   messagesTestID,
   backFallback,
   backBehavior = 'history',
+  onBackPress,
+  hideInputModeToggle = false,
 }: ChatShellProps) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
-  const scrollRef = useRef<ScrollView>(null);
+  // [BUG-740 / PERF-10] FlatList ref so virtualization kicks in for long
+  // sessions. ScrollView previously rendered every message bubble in the
+  // tree, growing unbounded — students hit OOM after a few hundred turns.
+  const scrollRef = useRef<FlatList<ChatMessage>>(null);
   const [input, setInput] = useState('');
   const [screenReaderEnabled, setScreenReaderEnabled] = useState(false);
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
@@ -251,6 +272,16 @@ export function ChatShell({
   }, [messages]);
 
   useEffect(() => {
+    // [BUG-928] On web, AccessibilityInfo.isScreenReaderEnabled() returns
+    // true on Chromium-based browsers whenever the accessibility tree is
+    // generated for performance reasons (Chromium's AXMode), even with no
+    // assistive tech actually running. Auto-suppressing TTS based on that
+    // signal silently disables voice output for ordinary Chrome users.
+    // Native (iOS/Android) reports accurately, so we keep the listener
+    // there. Web users who actually use AT can disable voice manually via
+    // the VoiceToggle.
+    if (Platform.OS === 'web') return;
+
     let mounted = true;
 
     void AccessibilityInfo.isScreenReaderEnabled().then((enabled) => {
@@ -471,7 +502,10 @@ export function ChatShell({
   return (
     <KeyboardAvoidingView
       className="flex-1 bg-background"
-      behavior="padding"
+      // [BUG-887] iOS responds best to "padding"; Android relies on the OS-level
+      // adjustResize behaviour (the default in app.json), so passing a behaviour
+      // there can fight the resize and leave the composer offscreen.
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={0}
     >
       {/* Header */}
@@ -482,6 +516,13 @@ export function ChatShell({
         <View className="flex-row items-center px-4 py-3">
           <Pressable
             onPress={() => {
+              // [BUG-867] If the parent supplied an explicit handler, defer
+              // entirely to it — the parent owns the destination (typed
+              // dynamic routes that string hrefs can miss on web).
+              if (onBackPress) {
+                onBackPress();
+                return;
+              }
               const fallback = (backFallback ?? '/(app)/home') as '/(app)/home';
               if (backBehavior === 'replace') {
                 router.replace(fallback as never);
@@ -493,6 +534,7 @@ export function ChatShell({
             className="me-3 p-2 min-h-[44px] min-w-[44px] items-center justify-center"
             accessibilityLabel="Go back"
             accessibilityRole="button"
+            testID="chat-shell-back"
           >
             <Ionicons name="chevron-back" size={24} color={colors.primary} />
           </Pressable>
@@ -515,17 +557,75 @@ export function ChatShell({
         {headerBelow ? <View className="px-4 pb-3">{headerBelow}</View> : null}
       </View>
 
-      {/* Messages */}
-      <ScrollView
+      {/* Messages — [BUG-740 / PERF-10] FlatList virtualises the message list
+          so the bubble tree stays bounded on long sessions. The ScrollView
+          version rendered every message in memory, OOM-ing students after a
+          few hundred turns. ListFooterComponent carries the streaming
+          spinner, idle pen animation, and any caller-provided footer so
+          they remain pinned below the messages. */}
+      <FlatList
         ref={scrollRef}
         className="flex-1 px-4 pt-4"
         testID={messagesTestID ?? 'chat-messages'}
         contentContainerStyle={{ paddingBottom: 16 }}
+        data={messages.filter((msg) => !(msg.isSystemPrompt && !msg.kind))}
+        keyExtractor={(item) => item.id}
+        // Virtualization knobs tuned for chat: keep recent context warm for
+        // jump-to-bottom snappiness, drop offscreen older bubbles to bound
+        // memory. removeClippedSubviews is intentionally true on Android
+        // even though it can be flaky with absolute-positioned children —
+        // MessageBubble does not use absolute positioning, so it is safe.
+        initialNumToRender={20}
+        maxToRenderPerBatch={10}
+        windowSize={5}
+        removeClippedSubviews
         onContentSizeChange={() =>
           scrollRef.current?.scrollToEnd({ animated: false })
         }
-      >
-        {messages.length === 0 ? (
+        renderItem={({ item: msg }: ListRenderItemInfo<ChatMessage>) => (
+          <View>
+            {msg.imageUri && !failedImages.has(msg.id) && (
+              <View className="self-end max-w-[85%] mb-1">
+                <Image
+                  testID={`message-image-${msg.id}`}
+                  source={{ uri: msg.imageUri }}
+                  className="w-full aspect-[4/3] rounded-lg"
+                  resizeMode="contain"
+                  accessibilityLabel="Homework image"
+                  onError={() => {
+                    setFailedImages((prev) => new Set(prev).add(msg.id));
+                  }}
+                />
+              </View>
+            )}
+            {msg.imageUri && failedImages.has(msg.id) && (
+              <View className="self-end max-w-[85%] mb-1">
+                <View
+                  testID={`message-image-fallback-${msg.id}`}
+                  className="w-full aspect-[4/3] rounded-lg bg-surface items-center justify-center"
+                >
+                  <Ionicons
+                    name="camera-outline"
+                    size={32}
+                    color={colors.muted}
+                  />
+                  <Text className="text-body-sm text-text-secondary mt-1">
+                    Image no longer available
+                  </Text>
+                </View>
+              </View>
+            )}
+            <MessageBubble
+              role={msg.role}
+              content={msg.content}
+              streaming={msg.streaming}
+              escalationRung={msg.escalationRung}
+              verificationBadge={msg.verificationBadge}
+              actions={renderMessageActions?.(msg)}
+            />
+          </View>
+        )}
+        ListEmptyComponent={
           <View
             className="flex-1 items-center justify-center py-16"
             testID="chat-empty-state"
@@ -534,69 +634,30 @@ export function ChatShell({
               Your conversation will appear here.
             </Text>
           </View>
-        ) : (
-          messages
-            .filter((msg) => !(msg.isSystemPrompt && !msg.kind))
-            .map((msg) => (
-              <View key={msg.id}>
-                {msg.imageUri && !failedImages.has(msg.id) && (
-                  <View className="self-end max-w-[85%] mb-1">
-                    <Image
-                      testID={`message-image-${msg.id}`}
-                      source={{ uri: msg.imageUri }}
-                      className="w-full aspect-[4/3] rounded-lg"
-                      resizeMode="contain"
-                      accessibilityLabel="Homework image"
-                      onError={() => {
-                        setFailedImages((prev) => new Set(prev).add(msg.id));
-                      }}
-                    />
-                  </View>
-                )}
-                {msg.imageUri && failedImages.has(msg.id) && (
-                  <View className="self-end max-w-[85%] mb-1">
-                    <View
-                      testID={`message-image-fallback-${msg.id}`}
-                      className="w-full aspect-[4/3] rounded-lg bg-surface items-center justify-center"
-                    >
-                      <Ionicons
-                        name="camera-outline"
-                        size={32}
-                        color={colors.muted}
-                      />
-                      <Text className="text-body-sm text-text-secondary mt-1">
-                        Image no longer available
-                      </Text>
-                    </View>
-                  </View>
-                )}
-                <MessageBubble
-                  role={msg.role}
-                  content={msg.content}
-                  streaming={msg.streaming}
-                  escalationRung={msg.escalationRung}
-                  verificationBadge={msg.verificationBadge}
-                  actions={renderMessageActions?.(msg)}
-                />
+        }
+        ListFooterComponent={
+          <>
+            {isStreaming && (
+              <View
+                className="items-center py-4"
+                testID="thinking-bulb-animation"
+              >
+                <DeskLampAnimation size={48} color={colors.muted} />
               </View>
-            ))
-        )}
-        {isStreaming && (
-          <View className="items-center py-4" testID="thinking-bulb-animation">
-            <DeskLampAnimation size={48} color={colors.muted} />
-          </View>
-        )}
-        {showIdleAnim && (
-          <Animated.View
-            className="items-center py-4"
-            testID="idle-pen-animation"
-            exiting={FadeOut.duration(200)}
-          >
-            <MagicPenAnimation size={48} color={colors.primary} />
-          </Animated.View>
-        )}
-        {footer}
-      </ScrollView>
+            )}
+            {showIdleAnim && (
+              <Animated.View
+                className="items-center py-4"
+                testID="idle-pen-animation"
+                exiting={FadeOut.duration(200)}
+              >
+                <MagicPenAnimation size={48} color={colors.primary} />
+              </Animated.View>
+            )}
+            {footer}
+          </>
+        }
+      />
 
       {/* BUG-348: Hide VoicePlaybackBar entirely when screen reader is active.
           TTS controls compete with VoiceOver/TalkBack for the audio channel,
@@ -689,62 +750,64 @@ export function ChatShell({
         </View>
       ) : (
         <View>
-          <View className="px-4 py-2 bg-surface border-t border-surface-elevated">
-            <View
-              className="flex-row rounded-full bg-surface-elevated p-1"
-              testID="input-mode-toggle"
-            >
-              <Pressable
-                onPress={() => void handleSelectInputMode('text')}
-                className={
-                  !isVoiceEnabled
-                    ? 'flex-1 rounded-full bg-background px-4 py-2 items-center'
-                    : 'flex-1 rounded-full px-4 py-2 items-center'
-                }
-                accessibilityRole="button"
-                accessibilityState={{ selected: !isVoiceEnabled }}
-                accessibilityLabel="Switch to text mode"
-                testID="input-mode-text"
+          {!hideInputModeToggle && (
+            <View className="px-4 py-2 bg-surface border-t border-surface-elevated">
+              <View
+                className="flex-row rounded-full bg-surface-elevated p-1"
+                testID="input-mode-toggle"
               >
-                <Text
+                <Pressable
+                  onPress={() => void handleSelectInputMode('text')}
                   className={
                     !isVoiceEnabled
-                      ? 'text-body-sm font-semibold text-text-primary'
-                      : 'text-body-sm font-semibold text-text-secondary'
+                      ? 'flex-1 rounded-full bg-background px-4 py-2 items-center'
+                      : 'flex-1 rounded-full px-4 py-2 items-center'
                   }
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: !isVoiceEnabled }}
+                  accessibilityLabel="Switch to text mode"
+                  testID="input-mode-text"
                 >
-                  Text mode
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={() => void handleSelectInputMode('voice')}
-                className={
-                  isVoiceEnabled
-                    ? 'flex-1 rounded-full bg-background px-4 py-2 items-center'
-                    : 'flex-1 rounded-full px-4 py-2 items-center'
-                }
-                accessibilityRole="button"
-                accessibilityState={{ selected: isVoiceEnabled }}
-                accessibilityLabel="Switch to voice mode"
-                testID="input-mode-voice"
-              >
-                <Text
+                  <Text
+                    className={
+                      !isVoiceEnabled
+                        ? 'text-body-sm font-semibold text-text-primary'
+                        : 'text-body-sm font-semibold text-text-secondary'
+                    }
+                  >
+                    Text mode
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => void handleSelectInputMode('voice')}
                   className={
                     isVoiceEnabled
-                      ? 'text-body-sm font-semibold text-text-primary'
-                      : 'text-body-sm font-semibold text-text-secondary'
+                      ? 'flex-1 rounded-full bg-background px-4 py-2 items-center'
+                      : 'flex-1 rounded-full px-4 py-2 items-center'
                   }
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: isVoiceEnabled }}
+                  accessibilityLabel="Switch to voice mode"
+                  testID="input-mode-voice"
                 >
-                  Voice mode
+                  <Text
+                    className={
+                      isVoiceEnabled
+                        ? 'text-body-sm font-semibold text-text-primary'
+                        : 'text-body-sm font-semibold text-text-secondary'
+                    }
+                  >
+                    Voice mode
+                  </Text>
+                </Pressable>
+              </View>
+              {screenReaderEnabled && isVoiceEnabled ? (
+                <Text className="text-caption text-text-secondary mt-2">
+                  Screen reader is on, so voice mode keeps manual playback only.
                 </Text>
-              </Pressable>
+              ) : null}
             </View>
-            {screenReaderEnabled && isVoiceEnabled ? (
-              <Text className="text-caption text-text-secondary mt-2">
-                Screen reader is on, so voice mode keeps manual playback only.
-              </Text>
-            ) : null}
-          </View>
+          )}
           <View
             className="flex-row items-end px-4 py-3 bg-surface border-t border-surface-elevated"
             style={{ paddingBottom: Math.max(insets.bottom, 8) }}

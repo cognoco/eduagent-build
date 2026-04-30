@@ -21,6 +21,16 @@ export const askSilentClassify = inngest.createFunction(
     id: 'ask-silent-classify',
     name: 'Silently classify freeform ask sessions',
     retries: 2,
+    // [BUG-845 / F-SVC-014] Idempotency key (24h window) ensures two events
+    // for the same session are deduped at the Inngest queue level instead of
+    // racing through the concurrency=1 lane. Concurrency limits serialize
+    // execution but do NOT prevent two events from both passing the
+    // `check-existing` step before either writes — the second classification
+    // call burns an LLM tokens budget for nothing and last-write-wins on the
+    // metadata. The idempotency key short-circuits the second event entirely.
+    // Concurrency=1 is kept as defence-in-depth in case the dedup window
+    // misses (e.g., 24h+1s late retry).
+    idempotency: 'event.data.sessionId',
     concurrency: { key: 'event.data.sessionId', limit: 1 },
   },
   { event: 'app/ask.classify_silently' },

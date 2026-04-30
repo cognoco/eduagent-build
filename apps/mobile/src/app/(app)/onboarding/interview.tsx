@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { View, Text, Pressable, ActivityIndicator } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import {
   ChatShell,
   LivingBook,
@@ -174,6 +174,38 @@ export default function InterviewScreen() {
   const seededDraftRef = useRef(false);
   // BUG-317: Store last sent text so Try Again can resend the orphaned message
   const lastSentTextRef = useRef<string | null>(null);
+  // BUG-692-FOLLOWUP: Guard post-await navigation in handleSkipInterview against
+  // the user having navigated away (hardware back) while the mutation was in
+  // flight. Set to true when the screen loses focus, reset before each attempt.
+  const skipCancelledRef = useRef(false);
+
+  // [BUG-UX-INTERVIEW-SKIP-TIMEOUT] Hard 30s timeout on the "I'm ready to
+  // start learning" skip action. forceComplete.mutateAsync calls the LLM to
+  // close the interview — if it hangs the button label freezes on
+  // "Setting up your curriculum…" with no escape. On timeout we show an inline
+  // error with a Go Back action so the user is never silently stuck.
+  const [forceCompleteTimedOut, setForceCompleteTimedOut] = useState(false);
+  useEffect(() => {
+    if (!forceComplete.isPending) {
+      setForceCompleteTimedOut(false);
+      return undefined;
+    }
+    const FORCE_COMPLETE_TIMEOUT_MS = 30_000;
+    const timer = setTimeout(
+      () => setForceCompleteTimedOut(true),
+      FORCE_COMPLETE_TIMEOUT_MS
+    );
+    return () => clearTimeout(timer);
+  }, [forceComplete.isPending]);
+
+  useFocusEffect(
+    useCallback(() => {
+      skipCancelledRef.current = false;
+      return () => {
+        skipCancelledRef.current = true;
+      };
+    }, [])
+  );
 
   // R-4: Exclude isAutoSent messages — consistent with session screen (BUG-373).
   // Currently no auto-sends in interview, but this prevents latent bugs.
@@ -362,9 +394,15 @@ export default function InterviewScreen() {
   // [BUG-464] Client escape: let user skip ahead after 2+ exchanges
   const handleSkipInterview = useCallback(async () => {
     if (interviewComplete || sessionPhase || forceComplete.isPending) return;
+    // BUG-692-FOLLOWUP: Reset the cancellation flag at the start of each attempt
+    // so a prior back-navigation doesn't permanently suppress the next attempt.
+    skipCancelledRef.current = false;
     try {
       abortStream();
       const result = await forceComplete.mutateAsync();
+      // BUG-692-FOLLOWUP: User navigated away while the mutation was in flight —
+      // don't advance the wizard from a screen the user has already left.
+      if (skipCancelledRef.current) return;
       // BKT-C.2: Capture freshly-extracted interests from the mutation
       // response so goToNextStep can route into the interests-context picker
       // without waiting for the invalidated state query to refetch.
@@ -380,6 +418,8 @@ export default function InterviewScreen() {
       // they had to find a small "Done" button in the header.
       goToNextStep();
     } catch (err: unknown) {
+      // BUG-692-FOLLOWUP: Don't surface error alert if user already navigated away.
+      if (skipCancelledRef.current) return;
       platformAlert('Could not skip ahead', formatApiError(err));
     }
   }, [
@@ -572,6 +612,10 @@ export default function InterviewScreen() {
       messages={messages}
       onSend={handleSend}
       isStreaming={isStreaming}
+      // [BUG-887] Voice is not wired in onboarding interview yet, and the
+      // mode toggle eats vertical space that pushes the composer offscreen
+      // on small phones (Galaxy S10e ~5.8" with the soft keyboard open).
+      hideInputModeToggle={!sessionPhase}
       inputDisabled={
         // Interview phase: disable when complete (fallback), expired, or errored
         // Session phase: briefly disable while session is being created
@@ -723,20 +767,62 @@ export default function InterviewScreen() {
           !restartRequired &&
           exchangeCount >= 2 ? (
           <View className="px-2 mt-1 mb-2">
-            <Pressable
-              onPress={() => void handleSkipInterview()}
-              disabled={isStreaming || forceComplete.isPending}
-              className="py-2.5 items-center rounded-button"
-              testID="skip-interview-button"
-              accessibilityLabel="Ready to start learning"
-              accessibilityRole="button"
-            >
-              <Text className="text-body-sm text-primary font-medium">
-                {forceComplete.isPending
-                  ? 'Setting up your curriculum...'
-                  : "I'm ready to start learning"}
-              </Text>
-            </Pressable>
+            {forceCompleteTimedOut ? (
+              // [BUG-UX-INTERVIEW-SKIP-TIMEOUT] Hard timeout: mutation has been
+              // pending > 30s — show an inline error with a Go Back escape.
+              <View testID="force-complete-timeout-error">
+                <Text className="text-body-sm text-danger text-center mb-2">
+                  Setting up your curriculum is taking too long. Check your
+                  connection and try again.
+                </Text>
+                <Pressable
+                  onPress={() =>
+                    goBackOrReplace(router, '/(app)/home' as const)
+                  }
+                  className="py-2.5 items-center rounded-button bg-surface-elevated"
+                  testID="force-complete-timeout-go-back"
+                  accessibilityRole="button"
+                  accessibilityLabel="Go back to home"
+                >
+                  <Text className="text-body-sm text-primary font-medium">
+                    Go Back
+                  </Text>
+                </Pressable>
+              </View>
+            ) : (
+              // BUG-883: After 3+ exchanges the LLM has typically emitted a
+              // wrap-up turn ("we can definitely build a curriculum…"). If
+              // the close envelope was dropped or never sent, the user was
+              // stuck on a subtle text link they often missed. Promote the
+              // skip CTA to a primary-button style at that point so it
+              // reads as an obvious "Continue" affordance.
+              <Pressable
+                onPress={() => void handleSkipInterview()}
+                disabled={isStreaming || forceComplete.isPending}
+                className={
+                  exchangeCount >= 3
+                    ? 'bg-primary rounded-button py-3 items-center justify-center min-h-[48px]'
+                    : 'py-2.5 items-center rounded-button'
+                }
+                testID="skip-interview-button"
+                accessibilityLabel="Ready to start learning"
+                accessibilityRole="button"
+              >
+                <Text
+                  className={
+                    exchangeCount >= 3
+                      ? 'text-body font-semibold text-text-inverse'
+                      : 'text-body-sm text-primary font-medium'
+                  }
+                >
+                  {forceComplete.isPending
+                    ? 'Setting up your curriculum...'
+                    : exchangeCount >= 3
+                    ? "Continue — I'm ready to start learning"
+                    : "I'm ready to start learning"}
+                </Text>
+              </Pressable>
+            )}
           </View>
         ) : restartRequired ? (
           <View className="bg-coaching-card rounded-card p-4 mt-2 mb-4">

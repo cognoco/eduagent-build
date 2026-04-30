@@ -10,7 +10,17 @@ const mockDatabaseModule = createDatabaseModuleMock({
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
-import { createScopedRepository, type Database } from '@eduagent/database';
+// [BREAK] Sentry is a true external boundary — mock it to assert escalation.
+const mockCaptureException = jest.fn();
+jest.mock('./sentry', () => ({
+  captureException: (...args: unknown[]) => mockCaptureException(...args),
+}));
+
+import {
+  createScopedRepository,
+  applyStreakDecay,
+  type Database,
+} from '@eduagent/database';
 import {
   precomputeCoachingCard,
   writeCoachingCardCache,
@@ -100,12 +110,31 @@ function createMockDb(): Database {
   return db as unknown as Database;
 }
 
+interface StreakRowInput {
+  currentStreak: number;
+  longestStreak: number;
+  lastActivityDate: string | null;
+  gracePeriodStartDate: string | null;
+}
+
 function setupScopedRepo({
   retentionCardsFindMany = [] as ReturnType<typeof mockRetentionCardRow>[],
+  streakRow = null as StreakRowInput | null,
+}: {
+  retentionCardsFindMany?: ReturnType<typeof mockRetentionCardRow>[];
+  streakRow?: StreakRowInput | null;
 } = {}) {
+  const today = NOW.toISOString().slice(0, 10);
   (createScopedRepository as jest.Mock).mockReturnValue({
     retentionCards: {
       findMany: jest.fn().mockResolvedValue(retentionCardsFindMany),
+    },
+    streaks: {
+      findCurrentForToday: jest
+        .fn()
+        .mockResolvedValue(
+          streakRow ? applyStreakDecay(streakRow, today) : null
+        ),
     },
   });
 }
@@ -167,18 +196,17 @@ describe('precomputeCoachingCard', () => {
     const futureCard = mockRetentionCardRow({
       nextReviewAt: new Date('2026-02-25T10:00:00.000Z'),
     });
-    setupScopedRepo({ retentionCardsFindMany: [futureCard] });
-    const db = createMockDb();
-
     // Streak on grace period: last activity 2 days ago (gap=2, grace remaining)
-    (db.query.streaks.findFirst as jest.Mock).mockResolvedValue({
-      id: 'streak-1',
-      profileId,
-      currentStreak: 5,
-      longestStreak: 5,
-      lastActivityDate: '2026-02-13', // 2 days before NOW (Feb 15)
-      gracePeriodStartDate: null,
+    setupScopedRepo({
+      retentionCardsFindMany: [futureCard],
+      streakRow: {
+        currentStreak: 5,
+        longestStreak: 5,
+        lastActivityDate: '2026-02-13', // 2 days before NOW (Feb 15)
+        gracePeriodStartDate: null,
+      },
     });
+    const db = createMockDb();
 
     const card = await precomputeCoachingCard(db, profileId);
 
@@ -195,18 +223,17 @@ describe('precomputeCoachingCard', () => {
       xpStatus: 'verified',
       nextReviewAt: new Date('2026-02-25T10:00:00.000Z'), // not overdue
     });
-    setupScopedRepo({ retentionCardsFindMany: [verifiedCard] });
-    const db = createMockDb();
-
     // Streak is active (consecutive day), no grace period
-    (db.query.streaks.findFirst as jest.Mock).mockResolvedValue({
-      id: 'streak-1',
-      profileId,
-      currentStreak: 3,
-      longestStreak: 3,
-      lastActivityDate: '2026-02-15', // today, no grace
-      gracePeriodStartDate: null,
+    setupScopedRepo({
+      retentionCardsFindMany: [verifiedCard],
+      streakRow: {
+        currentStreak: 3,
+        longestStreak: 3,
+        lastActivityDate: '2026-02-15', // today, no grace
+        gracePeriodStartDate: null,
+      },
     });
+    const db = createMockDb();
 
     const card = await precomputeCoachingCard(db, profileId);
 
@@ -222,11 +249,9 @@ describe('precomputeCoachingCard', () => {
 
   it('returns curriculum_complete when no retention cards exist', async () => {
     // [BUG-55] No retention cards = no valid topicId, returns curriculum_complete
+    // No streak data (streakRow defaults to null in setupScopedRepo)
     setupScopedRepo({ retentionCardsFindMany: [] });
     const db = createMockDb();
-
-    // No streak data
-    (db.query.streaks.findFirst as jest.Mock).mockResolvedValue(null);
 
     const card = await precomputeCoachingCard(db, profileId);
 
@@ -252,18 +277,17 @@ describe('precomputeCoachingCard', () => {
         nextReviewAt: new Date('2026-02-25T10:00:00.000Z'),
       }),
     ];
-    setupScopedRepo({ retentionCardsFindMany: verifiedCards });
-    const db = createMockDb();
-
     // No streak on grace period
-    (db.query.streaks.findFirst as jest.Mock).mockResolvedValue({
-      id: 'streak-1',
-      profileId,
-      currentStreak: 10,
-      longestStreak: 10,
-      lastActivityDate: '2026-02-15', // today
-      gracePeriodStartDate: null,
+    setupScopedRepo({
+      retentionCardsFindMany: verifiedCards,
+      streakRow: {
+        currentStreak: 10,
+        longestStreak: 10,
+        lastActivityDate: '2026-02-15', // today
+        gracePeriodStartDate: null,
+      },
     });
+    const db = createMockDb();
 
     const card = await precomputeCoachingCard(db, profileId);
 
@@ -285,18 +309,17 @@ describe('precomputeCoachingCard', () => {
         nextReviewAt: new Date('2026-02-25T10:00:00.000Z'),
       }),
     ];
-    setupScopedRepo({ retentionCardsFindMany: verifiedCards });
-    const db = createMockDb();
-
     // No streak on grace
-    (db.query.streaks.findFirst as jest.Mock).mockResolvedValue({
-      id: 'streak-1',
-      profileId,
-      currentStreak: 5,
-      longestStreak: 5,
-      lastActivityDate: '2026-02-15',
-      gracePeriodStartDate: null,
+    setupScopedRepo({
+      retentionCardsFindMany: verifiedCards,
+      streakRow: {
+        currentStreak: 5,
+        longestStreak: 5,
+        lastActivityDate: '2026-02-15',
+        gracePeriodStartDate: null,
+      },
     });
+    const db = createMockDb();
 
     const card = await precomputeCoachingCard(db, profileId);
 
@@ -323,17 +346,16 @@ describe('precomputeCoachingCard', () => {
         nextReviewAt: new Date('2026-02-25T10:00:00.000Z'),
       }),
     ];
-    setupScopedRepo({ retentionCardsFindMany: mixedCards });
-    const db = createMockDb();
-
-    (db.query.streaks.findFirst as jest.Mock).mockResolvedValue({
-      id: 'streak-1',
-      profileId,
-      currentStreak: 5,
-      longestStreak: 5,
-      lastActivityDate: '2026-02-15',
-      gracePeriodStartDate: null,
+    setupScopedRepo({
+      retentionCardsFindMany: mixedCards,
+      streakRow: {
+        currentStreak: 5,
+        longestStreak: 5,
+        lastActivityDate: '2026-02-15',
+        gracePeriodStartDate: null,
+      },
     });
+    const db = createMockDb();
 
     const card = await precomputeCoachingCard(db, profileId);
 
@@ -400,18 +422,17 @@ describe('precomputeCoachingCard', () => {
     const overdueCard = mockRetentionCardRow({
       nextReviewAt: new Date('2026-02-10T10:00:00.000Z'),
     });
-    setupScopedRepo({ retentionCardsFindMany: [overdueCard] });
-    const db = createMockDb();
-
     // Streak on grace period
-    (db.query.streaks.findFirst as jest.Mock).mockResolvedValue({
-      id: 'streak-1',
-      profileId,
-      currentStreak: 5,
-      longestStreak: 5,
-      lastActivityDate: '2026-02-13',
-      gracePeriodStartDate: null,
+    setupScopedRepo({
+      retentionCardsFindMany: [overdueCard],
+      streakRow: {
+        currentStreak: 5,
+        longestStreak: 5,
+        lastActivityDate: '2026-02-13',
+        gracePeriodStartDate: null,
+      },
     });
+    const db = createMockDb();
 
     const card = await precomputeCoachingCard(db, profileId);
 
@@ -424,18 +445,17 @@ describe('precomputeCoachingCard', () => {
       xpStatus: 'verified',
       nextReviewAt: new Date('2026-02-25T10:00:00.000Z'),
     });
-    setupScopedRepo({ retentionCardsFindMany: [verifiedCard] });
-    const db = createMockDb();
-
     // Streak on grace period
-    (db.query.streaks.findFirst as jest.Mock).mockResolvedValue({
-      id: 'streak-1',
-      profileId,
-      currentStreak: 7,
-      longestStreak: 7,
-      lastActivityDate: '2026-02-13', // 2 days gap = grace
-      gracePeriodStartDate: null,
+    setupScopedRepo({
+      retentionCardsFindMany: [verifiedCard],
+      streakRow: {
+        currentStreak: 7,
+        longestStreak: 7,
+        lastActivityDate: '2026-02-13', // 2 days gap = grace
+        gracePeriodStartDate: null,
+      },
     });
+    const db = createMockDb();
 
     const card = await precomputeCoachingCard(db, profileId);
 
@@ -465,6 +485,43 @@ describe('precomputeCoachingCard', () => {
     const expiresAt = new Date(card.expiresAt!);
     const expected = new Date(NOW.getTime() + 24 * 60 * 60 * 1000);
     expect(expiresAt.getTime()).toBe(expected.getTime());
+  });
+
+  it('[BREAK] review_due book-enrichment DB throw still returns review_due card AND calls captureException with surface=coaching-cards', async () => {
+    // Arrange: one overdue card so the review_due branch is entered
+    const overdueCard = mockRetentionCardRow({
+      topicId: 'topic-break',
+      nextReviewAt: new Date('2026-02-10T10:00:00.000Z'),
+    });
+    setupScopedRepo({ retentionCardsFindMany: [overdueCard] });
+    const db = createMockDb();
+
+    // Make the enrichment query (db.query.curriculumTopics.findFirst) throw
+    db.query = {
+      ...db.query,
+      curriculumTopics: {
+        findFirst: jest.fn().mockRejectedValue(new Error('DB connection lost')),
+      },
+    } as unknown as typeof db.query;
+
+    mockCaptureException.mockClear();
+
+    // Act
+    const card = await precomputeCoachingCard(db, profileId);
+
+    // Assert 1: fallthrough behaviour preserved — card is still returned
+    expect(card.type).toBe('review_due');
+
+    // Assert 2: escalation fired at least once, including the enrichment site,
+    // with the correct surface in extra (birthYear_lookup may also fire due to
+    // mock db not having db.query.profiles — both correctly include surface).
+    expect(mockCaptureException).toHaveBeenCalled();
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        extra: expect.objectContaining({ surface: 'coaching-cards' }),
+      })
+    );
   });
 });
 

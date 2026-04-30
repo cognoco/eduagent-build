@@ -7,14 +7,27 @@
  * - RevenueCat purchase errors (have their own discriminator in subscription.tsx)
  *
  * Error shapes in this codebase:
- * - Hono RPC client throws Error('API error {status}: {body}') for non-ok responses
- *   (see api-client.ts customFetch)
+ * - NetworkError for fetch-layer rejections (see api-client.ts customFetch)
+ * - BadRequestError for 400 responses (see api-client.ts)
  * - QuotaExceededError for 402 responses (see api-client.ts)
+ * - ForbiddenError for 403 responses (see api-client.ts)
+ * - NotFoundError for 404 responses (see api-client.ts)
+ * - ResourceGoneError for 410 responses (see api-client.ts)
+ * - RateLimitedError for 429 responses (see api-client.ts)
  * - UpstreamError for 5xx responses with a parsed JSON code (see api-client.ts)
- * - TypeError from native fetch for network failures
+ * - TypeError from native fetch for network failures (legacy path)
  * - Standard Error for other caught exceptions
  */
-import { UpstreamError } from './api-errors';
+import {
+  BadRequestError,
+  ForbiddenError,
+  NetworkError,
+  NotFoundError,
+  QuotaExceededError,
+  RateLimitedError,
+  ResourceGoneError,
+  UpstreamError,
+} from './api-errors';
 
 const NETWORK_MESSAGE =
   "Looks like you're offline or our servers can't be reached. Check your internet connection and try again.";
@@ -247,10 +260,10 @@ export function recoveryActions(
  *
  * Classification order (each step narrows the raw error, NOT the formatted
  * message — per the "Classify Before Format" rule):
- *  1. Network / connectivity failures → network / retry
- *  2. Named error types (QuotaExceededError, ForbiddenError) → quota or auth
+ *  1. Typed NetworkError / TypeError network failures → network / retry
+ *  2. Typed error classes from api-client.ts boundary (instanceof checks)
  *  3. Error codes on the error object (apiCode, code)
- *  4. HTTP status from the "API error {status}: …" shape
+ *  4. HTTP status from the "API error {status}: …" shape (plain Error fallback)
  *  5. Message pattern heuristics (network keywords)
  *  6. Anything else → unknown / retry
  *
@@ -258,7 +271,12 @@ export function recoveryActions(
  * string-matches on formatted output.
  */
 export function classifyApiError(error: unknown): FormattedApiError {
-  // 1. Network errors (TypeError from native fetch)
+  // 1. Typed NetworkError — thrown by customFetch on fetch rejection
+  if (error instanceof NetworkError) {
+    return { message: NETWORK_MESSAGE, category: 'network', recovery: 'retry' };
+  }
+
+  // 1b. Legacy TypeError from native fetch (raw fetch calls outside customFetch)
   if (error instanceof TypeError) {
     const msg = error.message.toLowerCase();
     if (msg.includes('fetch') || msg.includes('network')) {
@@ -284,6 +302,59 @@ export function classifyApiError(error: unknown): FormattedApiError {
     };
   }
 
+  // Typed 404 — NotFoundError from api-client.ts
+  if (error instanceof NotFoundError) {
+    return {
+      message:
+        friendlyMessage(error.message) ?? 'That page or item no longer exists.',
+      category: 'not-found',
+      recovery: 'go-back',
+    };
+  }
+
+  // Typed 410 — ResourceGoneError from api-client.ts
+  if (error instanceof ResourceGoneError) {
+    return {
+      message:
+        friendlyMessage(error.message) ??
+        'This resource is no longer available.',
+      category: 'not-found',
+      recovery: 'go-back',
+    };
+  }
+
+  // Typed 429 — RateLimitedError from api-client.ts
+  if (error instanceof RateLimitedError) {
+    return {
+      message:
+        friendlyMessage(error.message) ??
+        "You've hit the limit. Wait a moment and try again.",
+      category: 'quota',
+      recovery: 'retry',
+    };
+  }
+
+  // Typed 400 — BadRequestError from api-client.ts. Pass through the server
+  // message when it's short and non-technical (same logic as the short
+  // user-facing message passthrough below), with a friendly override if matched.
+  if (error instanceof BadRequestError) {
+    const msg = error.message;
+    const looksLikeStack =
+      /\n\s+at /.test(msg) || /at [A-Z]\w*\./.test(msg) || /^at \S/.test(msg);
+    const passThrough =
+      msg.length > 0 &&
+      msg.length < 200 &&
+      !looksLikeStack &&
+      !msg.toLowerCase().includes('undefined');
+    return {
+      message: passThrough
+        ? friendlyMessage(msg) ?? msg
+        : "That didn't work. Please check your input and try again.",
+      category: 'unknown',
+      recovery: 'retry',
+    };
+  }
+
   if (error instanceof Error) {
     const msg = error.message;
     const msgLower = msg.toLowerCase();
@@ -296,11 +367,12 @@ export function classifyApiError(error: unknown): FormattedApiError {
     const effectiveCode = apiErrorLike.apiCode ?? apiErrorLike.code;
 
     // 2. Named error types
-    if (error.name === 'QuotaExceededError') {
+    // [BUG-774 / I-11] instanceof so spoofed .name strings cannot trick the classifier; both classes share identity via @eduagent/schemas (BUG-644 / P-4).
+    if (error instanceof QuotaExceededError) {
       return { message: msg, category: 'quota', recovery: 'none' };
     }
 
-    if (error.name === 'ForbiddenError') {
+    if (error instanceof ForbiddenError) {
       // Sub-classify by apiCode: SUBJECT_INACTIVE is a content state, not auth
       if (
         effectiveCode === 'SUBJECT_INACTIVE' ||
@@ -352,7 +424,9 @@ export function classifyApiError(error: unknown): FormattedApiError {
       };
     }
 
-    // 4. HTTP status from "API error {status}: …"
+    // 4. HTTP status from "API error {status}: …" (plain Error fallback shape —
+    // emitted for 402 without QUOTA_EXCEEDED code, and any other unclassified
+    // statuses that fall through customFetch).
     const parsedApiBody = parseApiBody(msg);
     if (parsedApiBody) {
       const { status, code, apiMessage } = parsedApiBody;

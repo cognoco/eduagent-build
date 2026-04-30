@@ -13,9 +13,11 @@ import {
   parseEnvelope,
   teeEnvelopeStream,
   extractFirstJsonObject,
+  extractReplyCandidate,
   type ChatMessage,
 } from './llm';
 import { classifyExchangeOutcome, type ExchangeFallback } from './exchanges';
+import { normalizeReplyText } from './llm/envelope';
 import { sanitizeXmlValue, escapeXml } from './llm/sanitize';
 import { createLogger } from './logger';
 import { captureException } from './sentry';
@@ -25,6 +27,7 @@ import {
   ensureDefaultBook,
 } from './curriculum';
 import { getProfileAge } from './profile';
+import type { LLMTier } from './subscription';
 import type {
   InterviewContext,
   InterviewResult,
@@ -198,7 +201,16 @@ export function buildDraftResumeSummary(
     .slice(0, 2);
 
   if (learnerMessages.length > 0) {
-    return `We already talked about ${learnerMessages.join(' and ')}.`;
+    // BUG-883: User messages typically end with `.`/`!`/`?` already, and they
+    // can themselves contain `.`/` and ` (e.g. "I want to learn Spanish."
+    // "Just basics."). The previous join produced literal "msg1. and msg2.."
+    // — both an awkward conjunction and a double trailing period. Strip
+    // terminal punctuation, quote each message so the boundary is visible,
+    // and join with a clean comma.
+    const cleaned = learnerMessages.map((m) => m.replace(/[.!?]+\s*$/u, ''));
+    return cleaned.length === 1
+      ? `Where we left off: "${cleaned[0]}".`
+      : `Where we left off: "${cleaned.join('", "')}".`;
   }
 
   return 'We already started talking about your goals, background, and current level.';
@@ -212,7 +224,17 @@ export function buildDraftResumeSummary(
 // verbose LLM response can't overflow what the mobile picker can render.
 const MAX_EXTRACTED_INTERESTS = 8;
 
-export async function extractSignals(exchangeHistory: ChatExchange[]): Promise<{
+// [BUG-771] Defensive character budget on the transcript body. A 4-exchange
+// interview can exceed the Flash context window when learners paste long
+// messages. We truncate from the head (oldest turns) so the most recent
+// signal-bearing turns are preserved. Below the smallest provider's input
+// budget with margin for the system prompt + envelope wrapper.
+const MAX_TRANSCRIPT_CHARS = 12000;
+
+export async function extractSignals(
+  exchangeHistory: ChatExchange[],
+  options?: { llmTier?: LLMTier }
+): Promise<{
   goals: string[];
   experienceLevel: string;
   currentKnowledge: string;
@@ -222,9 +244,15 @@ export async function extractSignals(exchangeHistory: ChatExchange[]): Promise<{
   // Entity-encode each turn so a crafted message cannot close the
   // <transcript> tag or inject directives, then wrap in a named tag and
   // remind the model in the user content that the tag body is data.
-  const conversationText = exchangeHistory
+  let conversationText = exchangeHistory
     .map((e) => `${e.role.toUpperCase()}: ${escapeXml(e.content)}`)
     .join('\n');
+
+  // [BUG-771] Trim from the head — older turns are usually setup chatter; the
+  // tail carries the bulk of the structured signals (goals, level, interests).
+  if (conversationText.length > MAX_TRANSCRIPT_CHARS) {
+    conversationText = conversationText.slice(-MAX_TRANSCRIPT_CHARS);
+  }
 
   const messages: ChatMessage[] = [
     { role: 'system', content: SIGNAL_EXTRACTION_PROMPT },
@@ -237,7 +265,12 @@ export async function extractSignals(exchangeHistory: ChatExchange[]): Promise<{
     },
   ];
 
-  const result = await routeAndCall(messages, 2);
+  // [BUG-771] Honor caller's tier so premium users get Sonnet (longer context,
+  // higher quality) rather than silently degrading to Flash for the
+  // signal-extraction step.
+  const result = await routeAndCall(messages, 2, {
+    llmTier: options?.llmTier,
+  });
 
   // [BUG-842 / F-SVC-009] Use extractFirstJsonObject (brace-depth walker) over
   // the greedy /\{[\s\S]*\}/ regex — the regex grabs everything between the
@@ -300,12 +333,27 @@ export async function extractSignals(exchangeHistory: ChatExchange[]): Promise<{
     interests.push(label);
     if (interests.length >= MAX_EXTRACTED_INTERESTS) break;
   }
+  // [CR-769] Goals must be strings; previously we used `.map(String)` which
+  // turned a non-string LLM emission (e.g. `{topic: "X"}`) into the literal
+  // text "[object Object]" and persisted it as a learner goal. Filter to
+  // strings before normalising so the persisted goals list never contains
+  // synthetic object-stringified rows.
+  const rawGoals = Array.isArray(parsed.goals)
+    ? (parsed.goals as unknown[])
+        .filter((g): g is string => typeof g === 'string')
+        .map((g) => g.trim())
+        .filter((g) => g.length > 0)
+    : [];
   return {
-    goals: Array.isArray(parsed.goals)
-      ? (parsed.goals as unknown[]).map(String)
-      : [],
-    experienceLevel: String(parsed.experienceLevel ?? 'beginner'),
-    currentKnowledge: String(parsed.currentKnowledge ?? ''),
+    goals: rawGoals,
+    experienceLevel:
+      typeof parsed.experienceLevel === 'string' && parsed.experienceLevel
+        ? parsed.experienceLevel
+        : 'beginner',
+    currentKnowledge:
+      typeof parsed.currentKnowledge === 'string'
+        ? parsed.currentKnowledge
+        : '',
     interests,
   };
 }
@@ -358,10 +406,24 @@ function interpretInterviewResponse(params: {
     profile_id: profileId ?? 'unknown',
     reason: parse.reason,
   });
-  // Best-effort surface of the raw text so the learner isn't stuck — the
+  // [BUG-934] When the envelope is structurally JSON with a `reply` field
+  // but fails Zod (e.g. ready_to_finish has the wrong type, or an unknown
+  // field violates strictness), extract the reply directly instead of
+  // persisting the raw envelope JSON. Raw JSON ends up in ai_response.content
+  // and leaks into resumed-session chat bubbles, parent dashboards, and the
+  // next turn's LLM history.
+  // [BUG-935] Apply normalizeReplyText so any literal `\n` from a
+  // double-escaping LLM becomes a real newline before persistence —
+  // matches the streaming path's createLiteralEscapeNormalizer behavior.
+  const replyCandidate = extractReplyCandidate(rawResponse);
+  const fallbackText =
+    replyCandidate && replyCandidate.length > 0
+      ? normalizeReplyText(replyCandidate)
+      : rawResponse.trim();
+  // Best-effort surface of the reply so the learner isn't stuck — the
   // MAX_INTERVIEW_EXCHANGES cap still forces eventual completion.
   return {
-    cleanResponse: rawResponse.trim(),
+    cleanResponse: fallbackText,
     readyToFinish: false,
   };
 }
@@ -392,7 +454,15 @@ export async function processInterviewExchange(
   // (MAX_INTERVIEW_EXCHANGES) is the only fail-safe when the model never
   // emits readyToFinish. Making it optional previously meant a future caller
   // could silently default to 0 and let the interview loop indefinitely.
-  options: { exchangeCount: number; profileId?: string; learnerName?: string }
+  options: {
+    exchangeCount: number;
+    profileId?: string;
+    learnerName?: string;
+    // [BUG-771] Caller's subscription tier. Threaded into routeAndCall AND
+    // extractSignals so premium users stay on Sonnet for both steps instead
+    // of degrading to Flash for signal extraction.
+    llmTier?: LLMTier;
+  }
 ): Promise<InterviewResult> {
   const safeSubjectName = sanitizeXmlValue(context.subjectName, 200);
   const focusLine = buildFocusLine(context.bookTitle);
@@ -419,7 +489,9 @@ export async function processInterviewExchange(
     { role: 'user' as const, content: userMessage },
   ];
 
-  const result = await routeAndCall(messages, 1);
+  const result = await routeAndCall(messages, 1, {
+    llmTier: options?.llmTier,
+  });
   const { cleanResponse, readyToFinish } = interpretInterviewResponse({
     rawResponse: result.response,
     profileId: options?.profileId,
@@ -435,11 +507,14 @@ export async function processInterviewExchange(
     readyToFinish || currentExchangeCount >= MAX_INTERVIEW_EXCHANGES;
 
   if (isComplete) {
-    const signals = await extractSignals([
-      ...context.exchangeHistory,
-      { role: 'user', content: userMessage },
-      { role: 'assistant', content: cleanResponse },
-    ]);
+    const signals = await extractSignals(
+      [
+        ...context.exchangeHistory,
+        { role: 'user', content: userMessage },
+        { role: 'assistant', content: cleanResponse },
+      ],
+      { llmTier: options?.llmTier }
+    );
     return { response: cleanResponse, isComplete, extractedSignals: signals };
   }
 
@@ -467,6 +542,9 @@ export async function streamInterviewExchange(
      * pre-[EMPTY-REPLY-GUARD-1].
      */
     emptyReplyGuardEnabled?: boolean;
+    // [BUG-771] Caller's subscription tier. Threaded through routeAndStream
+    // and extractSignals.
+    llmTier?: LLMTier;
   }
 ): Promise<{
   stream: AsyncIterable<string>;
@@ -496,7 +574,9 @@ export async function streamInterviewExchange(
     { role: 'user' as const, content: userMessage },
   ];
 
-  const streamResult = await routeAndStream(messages, 1);
+  const streamResult = await routeAndStream(messages, 1, {
+    llmTier: options?.llmTier,
+  });
   const currentExchangeCount = options.exchangeCount;
 
   // Tee the provider stream: mobile sees only the envelope `reply` chars,
@@ -553,11 +633,14 @@ export async function streamInterviewExchange(
       readyToFinish || currentExchangeCount >= MAX_INTERVIEW_EXCHANGES;
 
     if (isComplete) {
-      const signals = await extractSignals([
-        ...context.exchangeHistory,
-        { role: 'user', content: userMessage },
-        { role: 'assistant', content: cleanResponse },
-      ]);
+      const signals = await extractSignals(
+        [
+          ...context.exchangeHistory,
+          { role: 'user', content: userMessage },
+          { role: 'assistant', content: cleanResponse },
+        ],
+        { llmTier: options?.llmTier }
+      );
       return { response: cleanResponse, isComplete, extractedSignals: signals };
     }
 

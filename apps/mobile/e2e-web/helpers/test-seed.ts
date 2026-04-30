@@ -35,7 +35,9 @@ async function fetchWithRetry(
   init: RequestInit | undefined,
   action: string
 ): Promise<Response> {
-  let lastError: Error | undefined;
+  // Initialised to a generic Error so the post-loop throw is always typed —
+  // overwritten on every retryable failure with the actual status + body.
+  let lastError = new Error(`${action} failed: no attempts made`);
   for (let attempt = 0; attempt < RETRY_MAX_ATTEMPTS; attempt++) {
     const response = await fetch(input, init);
     if (response.ok || !RETRYABLE_STATUSES.has(response.status)) {
@@ -51,7 +53,7 @@ async function fetchWithRetry(
       await sleep(jitter);
     }
   }
-  throw lastError!;
+  throw lastError;
 }
 
 async function readJsonOrThrow<T>(

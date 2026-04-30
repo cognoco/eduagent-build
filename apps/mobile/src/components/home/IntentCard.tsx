@@ -63,6 +63,8 @@ export function IntentCard({
           <View
             testID={`${testID ?? 'intent-card'}-icon`}
             style={{ marginRight: 14 }}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
           >
             <Ionicons name={icon} size={28} color={colors.primary} />
           </View>
@@ -100,14 +102,35 @@ export function IntentCard({
             testID={testID ? `${testID}-dismiss` : undefined}
             hitSlop={8}
           >
-            <Ionicons name="close" size={18} color={colors.textPrimary} />
+            <View
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+            >
+              <Ionicons name="close" size={18} color={colors.textPrimary} />
+            </View>
           </Pressable>
           {onPress ? (
-            <Ionicons name="chevron-forward" size={22} color={colors.primary} />
+            <View
+              testID={testID ? `${testID}-chevron` : 'intent-card-chevron'}
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+            >
+              <Ionicons
+                name="chevron-forward"
+                size={22}
+                color={colors.primary}
+              />
+            </View>
           ) : null}
         </View>
       ) : onPress ? (
-        <Ionicons name="chevron-forward" size={22} color={colors.primary} />
+        <View
+          testID={testID ? `${testID}-chevron` : 'intent-card-chevron'}
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        >
+          <Ionicons name="chevron-forward" size={22} color={colors.primary} />
+        </View>
       ) : null}
     </Wrapper>
   );

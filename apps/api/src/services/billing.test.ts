@@ -19,6 +19,7 @@ import {
   resetMonthlyQuota,
   decrementQuota,
   incrementQuota,
+  safeRefundQuota,
   getSubscriptionForProfile,
   getProfileCountForSubscription,
   canAddProfile,
@@ -173,9 +174,23 @@ function createMockDb({
   selectResult = [] as unknown[],
   insertReturning = [] as unknown[],
   updateReturning = [] as unknown[],
+  // [BUG-751] Sequence of return values for consecutive UPDATE...RETURNING
+  // calls. When provided, each call to .returning() consumes the next entry.
+  // After the sequence is exhausted, falls back to `updateReturning`.
+  updateReturningSequence = undefined as undefined | unknown[][],
 } = {}): Database {
+  const returningFn = updateReturningSequence
+    ? (() => {
+        const fn = jest.fn();
+        for (const value of updateReturningSequence) {
+          fn.mockResolvedValueOnce(value);
+        }
+        fn.mockResolvedValue(updateReturning);
+        return fn;
+      })()
+    : jest.fn().mockResolvedValue(updateReturning);
   const updateWhere = jest.fn().mockReturnValue({
-    returning: jest.fn().mockResolvedValue(updateReturning),
+    returning: returningFn,
   });
   const updateSet = jest.fn().mockReturnValue({ where: updateWhere });
 
@@ -529,48 +544,26 @@ describe('decrementQuota', () => {
     const topUp = mockTopUpRow({ remaining: 100 });
     const updatedTopUp = mockTopUpRow({ remaining: 99 });
 
-    // [S-2/BUG-627] mock chain in order: (1) monthly atomic UPDATE returns
-    // empty → fall through to top-up, (2) top-up credit decrement succeeds,
-    // (3) daily-counter UPDATE returns the updated pool. The third UPDATE
-    // is guarded by `usedToday < dailyLimit OR dailyLimit IS NULL`; when the
-    // guard fails the call site rolls the top-up credit back. dailyLimit
-    // is null in this fixture so the guard always passes.
-    const updateReturningFn = jest
-      .fn()
-      .mockResolvedValueOnce([]) // monthly: WHERE used < limit fails
-      .mockResolvedValueOnce([updatedTopUp]) // top-up: succeeds
-      .mockResolvedValueOnce([{ dailyLimit: null, usedToday: 1 }]); // daily counter increment
-    const updateWhere = jest
-      .fn()
-      .mockReturnValue({ returning: updateReturningFn });
-    const updateSet = jest.fn().mockReturnValue({ where: updateWhere });
-
-    const db = {
-      query: {
-        subscriptions: { findFirst: jest.fn().mockResolvedValue(undefined) },
-        quotaPools: {
-          findFirst: jest.fn().mockResolvedValue({
-            monthlyLimit: 100,
-            usedThisMonth: 100,
-            dailyLimit: null,
-            usedToday: 0,
-          }),
-        },
-        topUpCredits: { findFirst: jest.fn().mockResolvedValue(topUp) },
-        profiles: { findFirst: jest.fn().mockResolvedValue(undefined) },
-      },
-      insert: jest.fn().mockReturnValue({
-        values: jest.fn().mockReturnValue({
-          returning: jest.fn().mockResolvedValue([]),
-        }),
+    // [S-2/BUG-627 — refactored for BUG-751] Use createMockDb with the
+    // updateReturningSequence helper instead of a hand-rolled mock chain
+    // tracking the same ORM call shape three times. This removes the drift
+    // risk: any change to createMockDb propagates to every test, and the
+    // sequence here only captures what is unique to this scenario — the
+    // three sequential UPDATE results.
+    const db = createMockDb({
+      quotaPoolFindFirst: mockQuotaPoolRow({
+        monthlyLimit: 100,
+        usedThisMonth: 100,
+        dailyLimit: null,
+        usedToday: 0,
       }),
-      update: jest.fn().mockReturnValue({ set: updateSet }),
-      select: jest.fn().mockReturnValue({
-        from: jest.fn().mockReturnValue({
-          where: jest.fn().mockResolvedValue([]),
-        }),
-      }),
-    } as unknown as Database;
+      topUpFindFirst: topUp,
+      updateReturningSequence: [
+        [], // monthly atomic UPDATE: WHERE used < limit fails
+        [updatedTopUp], // top-up credit decrement succeeds
+        [{ dailyLimit: null, usedToday: 1 }], // daily counter increment
+      ],
+    });
 
     const result = await decrementQuota(db, subscriptionId);
 
@@ -630,6 +623,58 @@ describe('incrementQuota', () => {
     // a no-op. The test verifies no exception is thrown.
     const db = createMockDb({ updateReturning: [] });
     await expect(incrementQuota(db, subscriptionId)).resolves.toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// safeRefundQuota
+// ---------------------------------------------------------------------------
+
+describe('safeRefundQuota [BUG-661]', () => {
+  it('returns refunded:true on success and does not escalate', async () => {
+    const db = createMockDb();
+    const result = await safeRefundQuota(db, subscriptionId, {
+      route: 'sessions.message',
+      profileId: 'p-1',
+    });
+    expect(result).toEqual({ refunded: true });
+    expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
+  // Break test: if the underlying UPDATE throws (DB transient, connection
+  // dropped, etc.), the wrapper must still resolve, return refunded:false,
+  // and escalate to Sentry. Without escalation, the user is silently charged
+  // for a failed exchange.
+  it('escalates and returns refunded:false when incrementQuota throws [BUG-661]', async () => {
+    // Build a db whose .update().set().where() rejects.
+    const dbErr = new Error('connection terminated');
+    const db = {
+      update: jest.fn().mockReturnValue({
+        set: jest.fn().mockReturnValue({
+          where: jest.fn().mockRejectedValue(dbErr),
+        }),
+      }),
+    } as unknown as Database;
+
+    const result = await safeRefundQuota(db, subscriptionId, {
+      route: 'sessions.stream',
+      profileId: 'p-1',
+      sessionId: 'sess-1',
+    });
+
+    expect(result).toEqual({ refunded: false });
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      dbErr,
+      expect.objectContaining({
+        profileId: 'p-1',
+        extra: expect.objectContaining({
+          context: 'metering.refund.failed',
+          route: 'sessions.stream',
+          subscriptionId,
+          sessionId: 'sess-1',
+        }),
+      })
+    );
   });
 });
 

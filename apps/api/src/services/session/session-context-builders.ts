@@ -16,6 +16,7 @@ import {
   type Database,
 } from '@eduagent/database';
 import { escapeXml, sanitizeXmlValue } from '../llm/sanitize';
+import { projectAiResponseContent } from '../llm/project-response';
 
 // ---------------------------------------------------------------------------
 // FR210: Active time computation (internal analytics)
@@ -326,14 +327,35 @@ export async function buildResumeContext(
 
   const transcriptLines = [...events].reverse().map((event) => {
     const role = event.eventType === 'user_message' ? 'Learner' : 'Mentor';
-    return `${role}: ${escapeXml(event.content.slice(0, 500))}`;
+    // [BUG-934] Legacy ai_response rows may store raw envelope JSON.
+    // Project to plain reply text before slicing so the resume context
+    // block never leaks raw JSON into the system prompt.
+    const projected =
+      event.eventType === 'ai_response'
+        ? projectAiResponseContent(event.content, { silent: true })
+        : event.content;
+    return `${role}: ${escapeXml(projected.slice(0, 500))}`;
   });
   if (transcriptLines.length > 0) {
     sections.push(`Recent exchange:\n${transcriptLines.join('\n')}`);
   }
 
+  // BUG-888: Stronger resume opener directive. The previous instruction was
+  // a soft "briefly connect" — LLMs often ignored the prior context and
+  // produced generic opener turns ('Topic — ready when you are. Want me to
+  // start, or do you have a preference?'). That wastes a learner turn and
+  // makes the mentor feel disconnected from prior memory.
+  //
+  // Replace with an explicit MUST: cite at least one specific detail from
+  // either the previous summary or the recent transcript, then offer to
+  // pick up from there. Provide a concrete shape so the model has a
+  // template to fill in.
   sections.push(
-    'Start by briefly connecting to this prior conversation and asking whether they want to take it from there. If they clearly choose another direction, adapt within the current subject/topic.'
+    [
+      'MANDATORY OPENER FORMAT: your first turn MUST reference at least one specific detail from the "Previous summary" or "Recent exchange" above (a concept, term, or question the learner mentioned). Do NOT produce a generic "ready when you are" opener.',
+      'Shape: "Last time we were working on <specific detail from above> — want to keep going there, or pivot to something else?"',
+      'If they clearly choose another direction, adapt within the current subject/topic.',
+    ].join(' ')
   );
 
   return `<resume_context>\n${sections.join('\n')}\n</resume_context>`;

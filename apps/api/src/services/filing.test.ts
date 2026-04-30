@@ -3,6 +3,7 @@ import {
   formatLibraryIndexForPrompt,
   fileToLibrary,
   resolveFilingResult,
+  buildFallbackFilingResponse,
 } from './filing';
 import type { LibraryIndex } from '@eduagent/schemas';
 
@@ -272,4 +273,78 @@ describe('resolveFilingResult', () => {
   // - Reusing existing shelf/book by case-insensitive name match
   // - Concurrent creation race (FOR UPDATE locking)
   // - Invalid shelf/book ID from LLM (error path)
+});
+
+// ---------------------------------------------------------------------------
+// [BUG-871] buildFallbackFilingResponse — preserve user intent on LLM failure
+// ---------------------------------------------------------------------------
+
+describe('buildFallbackFilingResponse [BUG-871]', () => {
+  const SUBJECT_ID = '11111111-1111-1111-1111-111111111111';
+
+  it('falls back to "Uncategorized" when no suggestion is supplied', () => {
+    const result = buildFallbackFilingResponse(SUBJECT_ID, 'Random raw input');
+    if ('id' in result.book) {
+      throw new Error('expected book to be a name-form ref');
+    }
+    expect(result.book.name).toBe('Random raw input');
+    // raw input is long enough to be a book name on its own
+  });
+
+  it('uses the picked suggestion title as the book name when provided', () => {
+    const result = buildFallbackFilingResponse(
+      SUBJECT_ID,
+      'Geometry Foundations',
+      'Geometry Foundations'
+    );
+    if ('id' in result.book) {
+      throw new Error('expected book to be a name-form ref');
+    }
+    expect(result.book.name).toBe('Geometry Foundations');
+    // Specific book gets a non-default emoji + meaningful description
+    expect(result.book.emoji).not.toBe('📂');
+    expect(result.book.description).toContain('Geometry Foundations');
+    if ('id' in result.chapter) {
+      throw new Error('expected chapter to be a name-form ref');
+    }
+    if ('existing' in result.chapter) {
+      throw new Error('expected chapter to be a name-form ref');
+    }
+    expect(result.chapter.name).toBe('Geometry Foundations');
+    // Topic title still preserved
+    expect(result.topic.title).toBe('Geometry Foundations');
+  });
+
+  it('falls back to "Uncategorized" when both inputs are too short for the schema floor', () => {
+    const result = buildFallbackFilingResponse(SUBJECT_ID, 'a', '');
+    if ('id' in result.book) {
+      throw new Error('expected book to be a name-form ref');
+    }
+    expect(result.book.name).toBe('Uncategorized');
+    expect(result.book.emoji).toBe('📂');
+  });
+
+  it('prefers selectedSuggestion over rawInput when both are valid', () => {
+    const result = buildFallbackFilingResponse(
+      SUBJECT_ID,
+      'raw fallback name',
+      'Picked Suggestion'
+    );
+    if ('id' in result.book) {
+      throw new Error('expected book to be a name-form ref');
+    }
+    expect(result.book.name).toBe('Picked Suggestion');
+  });
+
+  it('trims whitespace before measuring schema floor', () => {
+    const result = buildFallbackFilingResponse(
+      SUBJECT_ID,
+      'rawInput',
+      '   Geometry   '
+    );
+    if ('id' in result.book) {
+      throw new Error('expected book to be a name-form ref');
+    }
+    expect(result.book.name).toBe('Geometry');
+  });
 });

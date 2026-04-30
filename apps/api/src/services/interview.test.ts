@@ -21,6 +21,10 @@ jest.mock('./llm', () => {
     // Real brace-depth walker — the service uses this to extract JSON from
     // signal-extraction responses [BUG-842 / F-SVC-009].
     extractFirstJsonObject: actual.extractFirstJsonObject,
+    // Real reply-candidate extractor — the schema-failure fallback path uses
+    // it to surface the inner reply text instead of raw envelope JSON
+    // [BUG-934][BUG-935].
+    extractReplyCandidate: actual.extractReplyCandidate,
     registerProvider: jest.fn((p: { name: string }) =>
       providers.set(p.name, p)
     ),
@@ -409,7 +413,8 @@ describe('processInterviewExchange', () => {
           content: 'I have some experience with JavaScript.',
         }),
       ]),
-      1
+      1,
+      expect.any(Object)
     );
   });
 });
@@ -548,7 +553,8 @@ describe('streamInterviewExchange', () => {
         expect.objectContaining({ role: 'system' }),
         expect.objectContaining({ role: 'user', content: 'Hi' }),
       ]),
-      1
+      1,
+      expect.any(Object)
     );
   });
 });
@@ -640,8 +646,55 @@ describe('extractSignals', () => {
         expect.objectContaining({ role: 'system' }),
         expect.objectContaining({ role: 'user' }),
       ]),
-      2
+      2,
+      expect.any(Object)
     );
+  });
+
+  // -------------------------------------------------------------------------
+  // [BUG-771] Break tests — tier propagation + transcript budget
+  // -------------------------------------------------------------------------
+
+  it('[BUG-771] passes llmTier through to routeAndCall when supplied', async () => {
+    (routeAndCall as jest.Mock).mockResolvedValueOnce({
+      response:
+        '{"goals": [], "experienceLevel": "beginner", "currentKnowledge": ""}',
+    });
+
+    await extractSignals([{ role: 'user', content: 'hi' }], {
+      llmTier: 'premium',
+    });
+
+    expect(routeAndCall).toHaveBeenCalledWith(
+      expect.any(Array),
+      2,
+      expect.objectContaining({ llmTier: 'premium' })
+    );
+  });
+
+  it('[BUG-771] truncates transcript over budget so context window cannot silently overflow', async () => {
+    (routeAndCall as jest.Mock).mockResolvedValueOnce({
+      response:
+        '{"goals": [], "experienceLevel": "beginner", "currentKnowledge": ""}',
+    });
+
+    // Single message far over the 12000-char budget. The transcript wrapper
+    // is the only call-site for this content, so we can assert the user
+    // message length stays bounded regardless of input size.
+    const huge = 'A'.repeat(50000);
+    await extractSignals([{ role: 'user', content: huge }]);
+
+    const call = (routeAndCall as jest.Mock).mock.calls[0];
+    const userMsg = call[0].find(
+      (m: { role: string }) => m.role === 'user'
+    ) as { content: string };
+
+    // Bounded: budget (12000) + envelope text overhead (~200 chars). If the
+    // budget is removed entirely, the message would balloon to 50000+ chars
+    // and this assertion fails loudly.
+    expect(userMsg.content.length).toBeLessThan(13000);
+    // The recent end of the transcript must survive (we slice from the tail).
+    expect(userMsg.content).toContain('AAAA');
   });
 
   // -------------------------------------------------------------------------
@@ -721,6 +774,61 @@ describe('extractSignals', () => {
     expect(result.interests).toEqual([]);
   });
 
+  // [BUG-663 / S-3] Break tests for the brittle /\{[\s\S]*\}/ regex. The
+  // greedy regex matched from the first `{` in any prose to the LAST `}` in
+  // the document, producing a JSON.parse-incompatible superset and silently
+  // dropping all extracted signals (curriculum proceeded without
+  // personalisation).
+  //
+  // The interview.ts code-side fix shipped earlier under
+  // [BUG-842 / F-SVC-009] (commit 2ea4e116) — that swapped the regex for
+  // extractFirstJsonObject (brace-depth walker). BUG-663 / S-3 is the
+  // separate audit finding that no break tests existed to prove the
+  // regression cannot return; the tests below close that gap.
+  it('[BUG-663] extracts signals even when prose with braces FOLLOWS the JSON envelope', async () => {
+    // The original /\{[\s\S]*\}/ regex went from the first `{` to the LAST `}`
+    // in the document, so any trailing braces extended the match into prose
+    // and broke JSON.parse. The brace-depth walker (extractFirstJsonObject)
+    // stops at the first balanced object, so trailing prose braces no longer
+    // crash the extractor.
+    (routeAndCall as jest.Mock).mockResolvedValueOnce({
+      response:
+        'Here is the extracted envelope:\n' +
+        JSON.stringify({
+          goals: ['learn JavaScript'],
+          experienceLevel: 'beginner',
+          currentKnowledge: '',
+          interests: ['music'],
+        }) +
+        '\n(See {appendix} for trace — irrelevant to envelope.)',
+    });
+
+    const result = await extractSignals([{ role: 'user', content: 'hi' }]);
+
+    expect(result.goals).toEqual(['learn JavaScript']);
+    expect(result.experienceLevel).toBe('beginner');
+    expect(result.interests).toEqual(['music']);
+  });
+
+  it('[BUG-663] extracts signals when JSON is wrapped in a markdown code fence', async () => {
+    (routeAndCall as jest.Mock).mockResolvedValueOnce({
+      response:
+        '```json\n' +
+        JSON.stringify({
+          goals: ['get better at chess'],
+          experienceLevel: 'intermediate',
+          currentKnowledge: 'I know openings',
+          interests: ['chess'],
+        }) +
+        '\n```',
+    });
+
+    const result = await extractSignals([{ role: 'user', content: 'hi' }]);
+
+    expect(result.goals).toEqual(['get better at chess']);
+    expect(result.experienceLevel).toBe('intermediate');
+  });
+
   it('[BKT-C.2] returns empty interests when JSON.parse throws on partial JSON', async () => {
     // The regex matches `{...}` but the content is not valid JSON —
     // exercises the catch block rather than the regex-miss path above.
@@ -793,6 +901,48 @@ describe('extractSignals', () => {
     const result = await extractSignals([{ role: 'user', content: 'hi' }]);
 
     expect(result.interests).toEqual([]);
+  });
+
+  // [CR-769] Goals were previously coerced via `.map(String)` which turned
+  // any non-string element (e.g. an object) into the literal text
+  // "[object Object]" and persisted it. The fix filters to typeof string
+  // before normalising.
+  it('[CR-769] drops non-string goal entries instead of stringifying them', async () => {
+    (routeAndCall as jest.Mock).mockResolvedValueOnce({
+      response: JSON.stringify({
+        goals: [
+          'Master fractions',
+          { topic: 'Algebra', level: 'intermediate' }, // object — must be dropped
+          42, // number — must be dropped
+          null, // null — must be dropped
+          '   trim me   ',
+          '',
+        ],
+        experienceLevel: 'beginner',
+        currentKnowledge: '',
+        interests: [],
+      }),
+    });
+
+    const result = await extractSignals([{ role: 'user', content: 'hi' }]);
+
+    expect(result.goals).toEqual(['Master fractions', 'trim me']);
+    // Sanity: no synthetic stringified value made it through.
+    expect(result.goals.some((g) => g.includes('[object Object]'))).toBe(false);
+  });
+
+  it('[CR-769] preserves valid goals when array is fully strings', async () => {
+    (routeAndCall as jest.Mock).mockResolvedValueOnce({
+      response: JSON.stringify({
+        goals: ['learn long division', 'master decimals'],
+        experienceLevel: 'beginner',
+        currentKnowledge: '',
+        interests: [],
+      }),
+    });
+
+    const result = await extractSignals([{ role: 'user', content: 'hi' }]);
+    expect(result.goals).toEqual(['learn long division', 'master decimals']);
   });
 });
 
@@ -988,6 +1138,37 @@ describe('buildDraftResumeSummary', () => {
 
     expect(summary).toContain('essays');
   });
+
+  // BUG-883 break test: prior implementation produced
+  // "We already talked about I want to learn Spanish. and Just basics.."
+  // (literal "and" + double trailing period) when learner messages already
+  // ended with punctuation. The new format strips terminal punctuation and
+  // quotes each fragment so the boundary is unambiguous.
+  it('[BUG-883] joins multi-message fallback without literal " and " or doubled punctuation', () => {
+    const summary = buildDraftResumeSummary({
+      exchangeHistory: [
+        { role: 'user', content: 'I want to learn Spanish.' },
+        { role: 'user', content: 'Just basics.' },
+      ],
+      extractedSignals: {},
+    });
+
+    expect(summary).not.toMatch(/\.\.+/); // no doubled periods
+    expect(summary).not.toMatch(/Spanish\. and /); // no awkward ". and "
+    expect(summary).toContain('Spanish');
+    expect(summary).toContain('Just basics');
+  });
+
+  it('[BUG-883] handles a single learner message without dangling joiner', () => {
+    const summary = buildDraftResumeSummary({
+      exchangeHistory: [{ role: 'user', content: 'I want to learn calculus.' }],
+      extractedSignals: {},
+    });
+
+    expect(summary).not.toContain(' and ');
+    expect(summary).not.toMatch(/\.\.+/);
+    expect(summary).toContain('calculus');
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1119,5 +1300,110 @@ describe('persistCurriculum', () => {
     // Verify no curriculum was inserted
     expect(db.insert).not.toHaveBeenCalled();
     expect(generateCurriculum).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// interpretInterviewResponse schema-failure fallback [BUG-934][BUG-935]
+//
+// These tests exercise the fallback inside interpretInterviewResponse via the
+// public processInterviewExchange surface (the helper is not exported).
+// They guard against the regression where a Zod-invalid envelope caused the
+// raw JSON to be persisted as ai_response.content, leaking into resumed-session
+// chat bubbles, parent dashboards, and the next turn's LLM history.
+// ---------------------------------------------------------------------------
+
+describe('interpretInterviewResponse schema-failure fallback [BUG-934][BUG-935]', () => {
+  const schemaFailContext: InterviewContext = {
+    subjectName: 'Mathematics',
+    exchangeHistory: [],
+  };
+
+  it('extracts .reply when envelope is JSON with valid reply but Zod-invalid signals [BUG-934]', async () => {
+    // ready_to_finish is expected to be a boolean — passing a string causes
+    // Zod to reject the envelope, which historically dumped the full envelope
+    // JSON into response (and therefore ai_response.content).
+    (routeAndCall as jest.Mock).mockResolvedValueOnce({
+      response: JSON.stringify({
+        reply: 'Good effort! Keep going.',
+        signals: { ready_to_finish: 'not-a-boolean' },
+      }),
+      provider: 'gemini',
+      model: 'gemini-2.5-flash',
+      latencyMs: 50,
+    });
+
+    const result = await processInterviewExchange(schemaFailContext, 'Hi', {
+      exchangeCount: 1,
+    });
+
+    expect(result.response).toBe('Good effort! Keep going.');
+    expect(result.response).not.toContain('"reply"');
+    expect(result.response).not.toContain('signals');
+  });
+
+  it('extracts .reply when envelope signals field has wrong type [BUG-934]', async () => {
+    // Passing signals as a plain string (not an object) fails the Zod schema
+    // — the fix must still recover the prose reply rather than leaking JSON.
+    (routeAndCall as jest.Mock).mockResolvedValueOnce({
+      response: JSON.stringify({
+        reply: "That's correct — well done!",
+        signals: 'ready_to_finish',
+      }),
+      provider: 'gemini',
+      model: 'gemini-2.5-flash',
+      latencyMs: 50,
+    });
+
+    const result = await processInterviewExchange(schemaFailContext, 'Hi', {
+      exchangeCount: 1,
+    });
+
+    expect(result.response).toBe("That's correct — well done!");
+    expect(result.response).not.toMatch(/^\{/);
+  });
+
+  it("normalizes literal '\\n' inside an extracted reply on Zod failure [BUG-935]", async () => {
+    // The reply contains the double-escape pattern (backslash + n, two chars)
+    // AND the envelope is Zod-invalid so the fallback path runs. Persisted
+    // content must already have real newlines so resumed sessions render
+    // correctly in chat bubbles.
+    (routeAndCall as jest.Mock).mockResolvedValueOnce({
+      response: JSON.stringify({
+        reply: "Great start!\\n\\nNow let's try a harder one.",
+        signals: { ready_to_finish: 'wrong-type' },
+      }),
+      provider: 'gemini',
+      model: 'gemini-2.5-flash',
+      latencyMs: 50,
+    });
+
+    const result = await processInterviewExchange(schemaFailContext, 'Hi', {
+      exchangeCount: 1,
+    });
+
+    // JSON.stringify above produces wire bytes the LLM would emit. After
+    // JSON.parse the reply becomes "Great start!\\n\\nNow let's..." (literal
+    // backslash-n pairs). normalizeReplyText must turn each \\n into \n.
+    expect(result.response).toContain('\n\n');
+    expect(result.response).not.toContain('\\n');
+  });
+
+  it('falls back to raw text when envelope has no reply field at all [BUG-934]', async () => {
+    // Defensive — non-JSON prose should still surface SOMETHING rather than
+    // silently dropping the LLM output. We accept the trimmed raw string as
+    // a worst-case fallback, same as before BUG-934.
+    (routeAndCall as jest.Mock).mockResolvedValueOnce({
+      response: 'plain text, no json at all',
+      provider: 'gemini',
+      model: 'gemini-2.5-flash',
+      latencyMs: 50,
+    });
+
+    const result = await processInterviewExchange(schemaFailContext, 'Hi', {
+      exchangeCount: 1,
+    });
+
+    expect(result.response).toBe('plain text, no json at all');
   });
 });

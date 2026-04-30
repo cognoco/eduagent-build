@@ -3,6 +3,7 @@ import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import { useRegisterPushToken } from './use-settings';
+import { Sentry } from '../lib/sentry';
 
 /**
  * Registers the Expo push token with the API when notification permission
@@ -46,8 +47,10 @@ export function usePushTokenRegistration(notificationGranted = false): void {
         await registerPushToken.mutateAsync(tokenData.data);
         hasRegistered.current = true;
       } catch (err) {
-        // Push registration is non-critical, but log for prod observability [SC-3]
-        console.error('[Push Token] Registration failed:', err);
+        // Push registration is non-critical, but capture for prod observability [SC-3]
+        Sentry.captureException(err, {
+          tags: { feature: 'push_registration' },
+        });
       }
     }
 

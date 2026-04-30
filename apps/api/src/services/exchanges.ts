@@ -3,9 +3,11 @@ import {
   routeAndStream,
   parseEnvelope,
   extractFirstJsonObject,
+  extractReplyCandidate,
   KNOWN_MARKER_KEYS,
   teeEnvelopeStream,
 } from './llm';
+import { normalizeReplyText } from './llm/envelope';
 import type {
   ChatMessage,
   EscalationRung,
@@ -30,6 +32,7 @@ import {
   buildSystemPrompt as _buildSystemPrompt,
   resolveAgeBracket,
 } from './exchange-prompts';
+import { stripPhoneticHints } from './llm/sanitize';
 
 const logger = createLogger();
 
@@ -455,9 +458,25 @@ export function parseExchangeEnvelope(
       profile_id: context?.profileId,
       reason: parsed.reason,
     });
+    // [BUG-934] When the envelope is structurally JSON with a `reply` field
+    // but fails Zod (e.g. fluency_drill duration_s violates min(15)), extract
+    // the reply directly instead of persisting the raw envelope JSON. Raw
+    // JSON ends up in ai_response.content and leaks into resumed-session
+    // transcripts, parent dashboards, embeddings, and the next turn's LLM
+    // exchangeHistory. The transcript projection helper is defense-in-depth
+    // for legacy rows; this is the canonical fix at the persistence boundary.
+    // [BUG-935] Apply normalizeReplyText so any literal `\n` from a
+    // double-escaping LLM becomes a real newline before persistence —
+    // matches the streaming path's createLiteralEscapeNormalizer behavior.
+    const replyCandidate = extractReplyCandidate(response);
+    const fallbackText =
+      replyCandidate && replyCandidate.length > 0
+        ? normalizeReplyText(replyCandidate)
+        : response.trim();
     return {
-      cleanResponse: response.trim(),
-      understandingCheck: detectUnderstandingCheckFromProse(response),
+      // [BUG-865] Strip TTS pronunciation hints from chat-visible text.
+      cleanResponse: stripPhoneticHints(fallbackText),
+      understandingCheck: detectUnderstandingCheckFromProse(fallbackText),
       partialProgress: false,
       needsDeepening: false,
       notePrompt: false,
@@ -478,7 +497,13 @@ function envelopeToParsedExchange(
 ): ParsedExchangeEnvelope {
   const signals = envelope.signals ?? {};
   const uiHints = envelope.ui_hints ?? {};
-  const cleanReply = envelope.reply.trim();
+  // [BUG-865] Phonetic hints like "de-nom-i-nay-tor" coach the TTS path
+  // but render verbatim in chat bubbles. Strip them here so every consumer
+  // (text + audio) sees the same clean reply. There is no SSML re-emission
+  // pipeline today — the LLM hint is dropped on the floor for TTS too. If
+  // pronunciation regresses on long words, restore via SSML at the audio
+  // boundary, not by passing the dashed form through.
+  const cleanReply = stripPhoneticHints(envelope.reply.trim());
 
   const notePrompt = uiHints.note_prompt;
   const drill = uiHints.fluency_drill;
@@ -514,30 +539,6 @@ function envelopeToParsedExchange(
     confidence: envelope.confidence,
     readyToFinish: signals.ready_to_finish === true,
   };
-}
-
-// Reads the raw `reply` string out of the first JSON object without going
-// through Zod, so we can distinguish "schema violation due to empty reply"
-// (→ empty_reply) from "schema violation due to missing reply field"
-// (→ marker or malformed). Returns undefined when no `reply` key is
-// present or the JSON can't be extracted.
-function extractReplyCandidate(response: string): string | undefined {
-  const jsonStr = extractFirstJsonObject(response);
-  if (!jsonStr) return undefined;
-  try {
-    const parsed = JSON.parse(jsonStr);
-    if (
-      typeof parsed === 'object' &&
-      parsed !== null &&
-      !Array.isArray(parsed) &&
-      typeof (parsed as { reply?: unknown }).reply === 'string'
-    ) {
-      return (parsed as { reply: string }).reply;
-    }
-  } catch {
-    return undefined;
-  }
-  return undefined;
 }
 
 // Pulls handled-marker values out of a bare-marker payload (no `reply`).
@@ -639,7 +640,7 @@ function extractKnownMarkerKey(response: string): string | null {
 // ---------------------------------------------------------------------------
 export function classifyExchangeOutcome(
   rawResponse: string,
-  context?: { sessionId?: string; profileId?: string; flow?: string }
+  _context?: { sessionId?: string; profileId?: string; flow?: string }
 ): ClassifiedExchangeOutcome {
   // [BUG-847] Distinct surface tag — silent_classify is the marker-only
   // fallback path, expected to fail full envelope validation more often.

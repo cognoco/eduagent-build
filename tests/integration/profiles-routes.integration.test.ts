@@ -137,7 +137,7 @@ describe('Integration: POST /v1/profiles', () => {
     expect(res.status).toBe(400);
   });
 
-  it('returns 403 when profile limit is exceeded', async () => {
+  it('returns 402 when profile limit is exceeded', async () => {
     await createProfileViaRoute({
       app,
       env: TEST_ENV,
@@ -162,8 +162,9 @@ describe('Integration: POST /v1/profiles', () => {
       TEST_ENV
     );
 
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(402);
     const body = await res.json();
+    expect(body.code).toBe('PROFILE_LIMIT_EXCEEDED');
     expect(body.message).toMatch(/upgrade/i);
   });
 

@@ -280,4 +280,69 @@ describe('retrieveRelevantMemory', () => {
     expect(result.context).toContain('...');
     expect(result.context).not.toContain(longContent);
   });
+
+  // [CR-668] Previous formatMemoryContext threw on any undefined/empty entry
+  // in the contents array. The outer try/catch in retrieveRelevantMemory then
+  // swallowed the throw and returned EMPTY_RESULT — meaning ONE bad row
+  // silently disabled memory injection for the entire session even when
+  // other rows were valid. The fix is to skip empty/null rows individually.
+  it('[CR-668] keeps valid memory rows when one row has null content', async () => {
+    mockGenerateEmbedding.mockResolvedValue({
+      vector: [0.1],
+      dimensions: 1,
+      model: 'voyage-3.5',
+      provider: 'voyage',
+    });
+    mockFindSimilarTopics.mockResolvedValue([
+      {
+        id: 'emb-1',
+        topicId: 'topic-1',
+        content: 'Quadratic equations involve x squared',
+        distance: 0.1,
+      },
+      { id: 'emb-2', topicId: 'topic-2', content: null, distance: 0.2 },
+      {
+        id: 'emb-3',
+        topicId: 'topic-3',
+        content: 'Linear equations have a single x term',
+        distance: 0.3,
+      },
+    ]);
+
+    const result = await retrieveRelevantMemory(
+      mockDb,
+      'profile-1',
+      'How do I solve equations?',
+      'pa-test-key'
+    );
+
+    expect(result.context).toContain('Quadratic equations');
+    expect(result.context).toContain('Linear equations');
+    expect(result.context).toContain('Relevant prior learning');
+    expect(result.topicIds).toEqual(['topic-1', 'topic-2', 'topic-3']);
+  });
+
+  it('[CR-668] returns empty context when every row is null/empty (no throw)', async () => {
+    mockGenerateEmbedding.mockResolvedValue({
+      vector: [0.1],
+      dimensions: 1,
+      model: 'voyage-3.5',
+      provider: 'voyage',
+    });
+    mockFindSimilarTopics.mockResolvedValue([
+      { id: 'emb-1', topicId: 'topic-1', content: null, distance: 0.1 },
+      { id: 'emb-2', topicId: 'topic-2', content: '', distance: 0.2 },
+    ]);
+
+    const result = await retrieveRelevantMemory(
+      mockDb,
+      'profile-1',
+      'Hello',
+      'pa-test-key'
+    );
+
+    expect(result.context).toBe('');
+    // Topic IDs are still returned so callers can track which topics matched.
+    expect(result.topicIds).toEqual(['topic-1', 'topic-2']);
+  });
 });

@@ -287,6 +287,54 @@ describe('generateExport', () => {
     expect(result.parkingLotItems).toHaveLength(1);
   });
 
+  // Break test [BUG-934] — GDPR export is user-visible. ai_response rows
+  // that contain raw envelope JSON must be projected to prose before export.
+  it('[BUG-934] projects raw envelope JSON in ai_response sessionEvent rows to prose', async () => {
+    const profileRow = mockProfileRow('p1', 'Alice');
+    const rawEnvelope = JSON.stringify({
+      reply: 'Great job today!',
+      signals: { close: true },
+      ui_hints: {},
+    });
+    const eventRows = [
+      {
+        id: 'evt-user',
+        profileId: 'p1',
+        sessionId: 'ses-1',
+        eventType: 'user_message',
+        content: 'What is gravity?',
+      },
+      {
+        id: 'evt-ai',
+        profileId: 'p1',
+        sessionId: 'ses-1',
+        eventType: 'ai_response',
+        content: rawEnvelope,
+      },
+    ];
+
+    const db = createMockDb({
+      profiles: [profileRow],
+      sessionEvents: eventRows,
+    });
+
+    const result = await generateExport(db, 'account-1');
+
+    const aiRow = result.sessionEvents.find(
+      (e) => (e as Record<string, unknown>)['eventType'] === 'ai_response'
+    ) as Record<string, unknown> | undefined;
+    expect(aiRow).toBeDefined();
+    expect(aiRow!['content']).toBe('Great job today!');
+    expect(aiRow!['content']).not.toContain('"signals"');
+    expect(aiRow!['content']).not.toContain('"ui_hints"');
+
+    // user_message rows must be left untouched
+    const userRow = result.sessionEvents.find(
+      (e) => (e as Record<string, unknown>)['eventType'] === 'user_message'
+    ) as Record<string, unknown> | undefined;
+    expect(userRow!['content']).toBe('What is gravity?');
+  });
+
   it('returns empty arrays for GDPR tables when no profiles exist', async () => {
     const db = createMockDb({ profiles: [], consents: [] });
     const result = await generateExport(db, 'account-1');

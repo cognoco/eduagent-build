@@ -12,6 +12,7 @@ import {
   createScopedRepository,
   type Database,
 } from '@eduagent/database';
+import { SubjectNotFoundError } from '@eduagent/schemas';
 import { getProfileAge } from './profile';
 import { createLogger } from './logger';
 
@@ -294,7 +295,7 @@ export async function configureLanguageSubject(
 ): Promise<Subject> {
   const subject = await getSubject(db, profileId, subjectId);
   if (!subject) {
-    throw new Error('Subject not found');
+    throw new SubjectNotFoundError();
   }
   if (subject.pedagogyMode !== 'four_strands' || !subject.languageCode) {
     throw new Error('Subject is not configured for language learning');

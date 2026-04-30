@@ -7,6 +7,9 @@ import { registerProvider } from '../services/llm';
 import { createGeminiProvider } from '../services/llm/providers/gemini';
 import { createOpenAIProvider } from '../services/llm/providers/openai';
 import { createAnthropicProvider } from '../services/llm/providers/anthropic';
+import { createLogger } from '../services/logger';
+
+const logger = createLogger();
 
 type LLMEnv = {
   Bindings: {
@@ -47,7 +50,8 @@ export const llmMiddleware = createMiddleware<LLMEnv>(async (c, next) => {
         // (CF Workers never reach this path without API keys).
         process.env['NODE_ENV'] === 'test'
       ) {
-        console.warn(
+        // [logging sweep] structured logger so PII fields land as JSON context
+        logger.warn(
           '[llm] No LLM API keys set — skipping provider registration (test environment)'
         );
       } else {

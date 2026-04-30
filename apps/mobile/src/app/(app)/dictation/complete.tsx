@@ -1,7 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -53,6 +53,22 @@ export default function DictationCompleteScreen(): React.ReactElement {
   // same tick, closing the gap.
   const doneInFlightRef = React.useRef(false);
 
+  // [BUG-692] Set when the user navigates away (hardware back, Skip alert
+  // button, or screen blur) while reviewMutation is still in flight. Checked
+  // post-await before pushing to /dictation/review and inside the catch block
+  // before showing the retry alert.
+  const reviewCancelledRef = useRef(false);
+
+  // [BUG-692] Mark cancelled on screen blur (hardware back gesture) so a
+  // late-arriving review response does not push to the review screen.
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        reviewCancelledRef.current = true;
+      };
+    }, [])
+  );
+
   // [F-020] If a user lands on /dictation/complete via a deep link, back
   // gesture, or browser refresh, `data` is null (context is stack-lifecycle
   // scoped). Tapping "I'm done" in that case would POST /dictation/results
@@ -94,6 +110,9 @@ export default function DictationCompleteScreen(): React.ReactElement {
   }
 
   const handleCheckWriting = async () => {
+    // [BUG-692] Reset the cancelled flag at the start of each new attempt.
+    reviewCancelledRef.current = false;
+
     // 1. Launch camera
     let uri: string | undefined;
     let assetMimeType: string | undefined;
@@ -163,12 +182,18 @@ export default function DictationCompleteScreen(): React.ReactElement {
         language,
       });
 
+      // [BUG-692] If the user navigated away (hardware back, Cancel button,
+      // or screen blur) while the review was in flight, skip navigation.
+      if (reviewCancelledRef.current) return;
+
       // 4. Store review result in context then navigate
       if (data) {
         setData({ ...data, reviewResult });
       }
       router.push('/(app)/dictation/review' as never);
     } catch (err) {
+      // [BUG-692] Don't pop an alert if the user already navigated away.
+      if (reviewCancelledRef.current) return;
       const message =
         err instanceof Error ? err.message : 'Something went wrong.';
       platformAlert('Review failed', message, [
@@ -176,7 +201,13 @@ export default function DictationCompleteScreen(): React.ReactElement {
           text: 'Try again',
           onPress: () => void handleCheckWriting(),
         },
-        { text: 'Skip', style: 'cancel' },
+        {
+          text: 'Skip',
+          style: 'cancel',
+          onPress: () => {
+            reviewCancelledRef.current = true;
+          },
+        },
       ]);
     }
   };
@@ -267,6 +298,7 @@ export default function DictationCompleteScreen(): React.ReactElement {
           )}
           <Pressable
             onPress={() => {
+              reviewCancelledRef.current = true; // [BUG-692]
               reviewMutation.reset();
               setReviewTimedOut(false);
               goBackOrReplace(router, '/(app)/practice');

@@ -122,7 +122,12 @@ export function ParkingLotModal({
             )}
           </ScrollView>
 
-          <Pressable onPress={onClose} className="items-center py-3 mt-3">
+          <Pressable
+            onPress={onClose}
+            accessibilityRole="button"
+            accessibilityLabel="Close"
+            className="items-center justify-center min-h-[44px] py-3 mt-3"
+          >
             <Text className="text-body font-semibold text-text-secondary">
               Close
             </Text>
@@ -263,7 +268,12 @@ export function TopicSwitcherModal({
             )}
           </ScrollView>
 
-          <Pressable onPress={onClose} className="items-center py-3 mt-3">
+          <Pressable
+            onPress={onClose}
+            accessibilityRole="button"
+            accessibilityLabel="Close"
+            className="items-center justify-center min-h-[44px] py-3 mt-3"
+          >
             <Text className="text-body font-semibold text-text-secondary">
               Close
             </Text>

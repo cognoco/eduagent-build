@@ -974,6 +974,7 @@ describe('Quiz routes', () => {
       const statsRows = [
         {
           activityType: 'capitals',
+          languageCode: null,
           roundsPlayed: 2,
           totalXp: 140,
           bestScore: 8,
@@ -1002,11 +1003,63 @@ describe('Quiz routes', () => {
       const body = await res.json();
       expect(body[0]).toMatchObject({
         activityType: 'capitals',
+        languageCode: null,
         roundsPlayed: 2,
         bestScore: 8,
         bestTotal: 8,
         totalXp: 140,
       });
+    });
+
+    // [BUG-926] Per-language stats: vocabulary rounds for different languages
+    // now produce separate stat rows keyed on (activityType, languageCode).
+    it('returns separate stat rows for vocabulary rounds in different languages (BUG-926)', async () => {
+      const statsRows = [
+        {
+          activityType: 'vocabulary',
+          languageCode: 'it',
+          roundsPlayed: 3,
+          totalXp: 90,
+          bestScore: 5,
+          bestTotal: 6,
+        },
+        {
+          activityType: 'vocabulary',
+          languageCode: 'es',
+          roundsPlayed: 1,
+          totalXp: 20,
+          bestScore: 4,
+          bestTotal: 6,
+        },
+      ];
+
+      const groupByReturn = Promise.resolve(statsRows);
+      const whereReturn = Object.assign(Promise.resolve(statsRows), {
+        groupBy: jest.fn().mockReturnValue(groupByReturn),
+      });
+      const fromReturn = {
+        where: jest.fn().mockReturnValue(whereReturn),
+      };
+      (mockDb as any).select = jest
+        .fn()
+        .mockReturnValue({ from: jest.fn().mockReturnValue(fromReturn) });
+
+      const res = await app.request(
+        '/v1/quiz/stats',
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as Array<Record<string, unknown>>;
+      const itRow = body.find(
+        (r) => r.activityType === 'vocabulary' && r.languageCode === 'it'
+      );
+      const esRow = body.find(
+        (r) => r.activityType === 'vocabulary' && r.languageCode === 'es'
+      );
+      expect(itRow).toMatchObject({ roundsPlayed: 3, bestScore: 5 });
+      expect(esRow).toMatchObject({ roundsPlayed: 1, bestScore: 4 });
     });
 
     it('returns an empty array when the profile has no completed rounds', async () => {

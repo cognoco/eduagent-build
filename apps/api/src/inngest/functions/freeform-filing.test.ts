@@ -77,6 +77,9 @@ import { freeformFilingRetry } from './freeform-filing';
 // Helpers
 // ---------------------------------------------------------------------------
 
+const testProfileId = '00000000-0000-4000-8000-000000000001';
+const testSessionId = '00000000-0000-4000-8000-000000000002';
+
 async function executeSteps(
   eventData: Record<string, unknown>
 ): Promise<{ result: unknown; mockStep: Record<string, unknown> }> {
@@ -98,8 +101,8 @@ function createEventData(
   overrides: Record<string, unknown> = {}
 ): Record<string, unknown> {
   return {
-    profileId: 'profile-001',
-    sessionId: 'session-001',
+    profileId: testProfileId,
+    sessionId: testSessionId,
     sessionMode: 'freeform',
     ...overrides,
   };
@@ -195,8 +198,8 @@ describe('freeformFilingRetry', () => {
 
       expect(mockGetSessionTranscript).toHaveBeenCalledWith(
         expect.anything(),
-        'profile-001',
-        'session-001'
+        testProfileId,
+        testSessionId
       );
       expect(mockFileToLibrary).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -244,8 +247,23 @@ describe('freeformFilingRetry', () => {
         name: 'app/filing.completed',
         data: expect.objectContaining({
           bookId: 'book-001',
-          sessionId: 'session-001',
-          profileId: 'profile-001',
+          sessionId: testSessionId,
+          profileId: testProfileId,
+        }),
+      })
+    );
+  });
+
+  it('fires app/filing.retry_completed event after successful retry filing', async () => {
+    const { mockStep } = await executeSteps(createEventData());
+
+    expect(mockStep.sendEvent).toHaveBeenCalledWith(
+      'notify-filing-retry-completed',
+      expect.objectContaining({
+        name: 'app/filing.retry_completed',
+        data: expect.objectContaining({
+          sessionId: testSessionId,
+          profileId: testProfileId,
         }),
       })
     );

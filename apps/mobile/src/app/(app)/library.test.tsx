@@ -518,7 +518,82 @@ describe('LibraryScreen', () => {
     expect(screen.getByText('Math')).toBeTruthy();
   });
 
-  it('navigates to book route when a book is pressed from books tab', () => {
+  it('downgrades book status to NOT_STARTED when 0 topics are verified [BUG-870]', () => {
+    // Regression: API returned book.status='IN_PROGRESS' (because at least
+    // one session row exists) but the shelf-side retention payload showed
+    // zero verified topics. The visible "0/10 topics" string conflicted
+    // with the "In progress" badge. Reconcile: the badge follows the
+    // client-derived completed/total count.
+    mockUseSubjects.mockReturnValue({
+      data: [{ id: 'sub-1', name: 'Biology', status: 'active' }],
+      isLoading: false,
+    });
+    mockUseOverallProgress.mockReturnValue({
+      data: { subjects: [] },
+      isLoading: false,
+    });
+    setLibraryRetention({
+      subjects: [
+        {
+          subjectId: 'sub-1',
+          topics: Array.from({ length: 10 }, (_, i) => ({
+            topicId: `t${i}`,
+            topicTitle: `Topic ${i}`,
+            bookId: 'book-1',
+            easeFactor: 2.5,
+            repetitions: 0,
+            lastReviewedAt: null,
+            // Zero verified topics — the badge MUST follow this signal.
+            xpStatus: 'pending',
+            failureCount: 0,
+          })),
+          reviewDueCount: 0,
+        },
+      ],
+    });
+    mockUseAllBooks.mockReturnValue({
+      books: [
+        {
+          book: {
+            id: 'book-1',
+            subjectId: 'sub-1',
+            title: 'Photosynthesis',
+            description: null,
+            emoji: null,
+            sortOrder: 1,
+            topicsGenerated: true,
+            createdAt: '2026-01-01T00:00:00Z',
+            updatedAt: '2026-01-01T00:00:00Z',
+          },
+          subjectId: 'sub-1',
+          subjectName: 'Biology',
+          topicCount: 0,
+          completedCount: 0,
+          // API marked it IN_PROGRESS based on session existence.
+          status: 'IN_PROGRESS',
+        },
+      ],
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+
+    render(<LibraryScreen />, { wrapper: createWrapper() });
+
+    fireEvent.press(screen.getByTestId('library-tab-books'));
+
+    // Status label rendered next to the book card must say "Not started"
+    // (matching the 0/10 topics text), not "In progress".
+    expect(screen.getByText('Not started')).toBeTruthy();
+    expect(screen.queryByText('In progress')).toBeNull();
+    expect(screen.getByText('0/10 topics')).toBeTruthy();
+  });
+
+  // [CLAUDE.md cross-tab nav rule] Shelf layout has no
+  // unstable_settings.initialRouteName so the parent route must be pushed
+  // FIRST before the deep book path. Without the parent push, router.back()
+  // skips to the Tabs first-route (Home) instead of returning to the shelf.
+  it('pushes parent shelf route THEN book route when a book is pressed from books tab [cross-tab-nav]', () => {
     mockUseSubjects.mockReturnValue({
       data: [{ id: 'sub-1', name: 'Math', status: 'active' }],
       isLoading: false,
@@ -558,10 +633,17 @@ describe('LibraryScreen', () => {
     fireEvent.press(screen.getByTestId('library-tab-books'));
     fireEvent.press(screen.getByTestId('book-card-book-1'));
 
-    expect(mockPush).toHaveBeenCalledWith({
+    // First call: parent shelf route (builds back-stack)
+    expect(mockPush).toHaveBeenNthCalledWith(1, {
+      pathname: '/(app)/shelf/[subjectId]',
+      params: { subjectId: 'sub-1' },
+    });
+    // Second call: the deep book route
+    expect(mockPush).toHaveBeenNthCalledWith(2, {
       pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
       params: { subjectId: 'sub-1', bookId: 'book-1' },
     });
+    expect(mockPush).toHaveBeenCalledTimes(2);
   });
 
   // -----------------------------------------------------------------------

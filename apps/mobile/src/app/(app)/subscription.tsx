@@ -64,7 +64,14 @@ const TIER_LIMITS: Record<SubscriptionTier, string> = {
   pro: '3,000 questions/month',
 };
 
-/** Static tier features for display when RevenueCat offerings are unavailable. */
+/**
+ * Static tier features for display when RevenueCat offerings are unavailable.
+ *
+ * BUG-899: Only Free and Plus are surfaced to end-users. Family/Pro tiers
+ * exist server-side but their store SKUs are not approved for public listing
+ * (see `pricing_dual_cap.md`). Showing them as upgrade options creates
+ * marketing/legal exposure and contradicts approved pricing.
+ */
 const TIER_FEATURES: Array<{
   tier: SubscriptionTier;
   features: string[];
@@ -85,24 +92,6 @@ const TIER_FEATURES: Array<{
       'All Free features',
       'Premium AI mentor',
       'Detailed progress analytics',
-    ],
-  },
-  {
-    tier: 'family',
-    features: [
-      '1,500 questions per month (shared)',
-      'All Free features',
-      'Up to 4 child profiles',
-      'Parent dashboard',
-    ],
-  },
-  {
-    tier: 'pro',
-    features: [
-      '3,000 questions per month',
-      'Up to 6 profiles',
-      'Premium AI mentor for 2 profiles',
-      'Priority support',
     ],
   },
 ];
@@ -630,11 +619,8 @@ export default function SubscriptionScreen() {
     isError: offeringsError,
     refetch: refetchOfferings,
   } = useOfferings();
-  const {
-    data: customerInfo,
-    isLoading: customerInfoLoading,
-    isError: customerInfoError,
-  } = useCustomerInfo();
+  const { data: customerInfo, isLoading: customerInfoLoading } =
+    useCustomerInfo();
   const purchase = usePurchase();
   const restore = useRestorePurchases();
 
@@ -1006,7 +992,6 @@ export default function SubscriptionScreen() {
     usage,
     queryClient,
     activeProfile?.id,
-    refetchUsage,
   ]);
 
   const handleContactSupport = useCallback(async () => {
@@ -1372,9 +1357,8 @@ export default function SubscriptionScreen() {
               <View className="bg-surface rounded-card px-4 py-3.5 mb-3">
                 <Text className="text-body-sm text-text-secondary">
                   {offeringsError
-                    ? 'We could not load purchase options right now. '
-                    : 'Subscription plans will be available soon. '}
-                  {`You're on the ${TIER_LABELS[tier]} plan with ${TIER_LIMITS[tier]}.`}
+                    ? `We could not load purchase options right now. You're on the ${TIER_LABELS[tier]} plan with ${TIER_LIMITS[tier]}.`
+                    : `You're on the ${TIER_LABELS[tier]} plan with ${TIER_LIMITS[tier]}. Here's what each plan includes — store purchasing isn't available on this device yet.`}
                 </Text>
               </View>
               {TIER_FEATURES.map((entry) => (
@@ -1546,56 +1530,51 @@ export default function SubscriptionScreen() {
             </View>
           )}
 
-          {/* AI Upgrade — premium model for individual profiles */}
-          {isPaidTier && (
-            <View className="mt-6" testID="ai-upgrade-section">
-              <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2">
-                Premium Mentor
-              </Text>
-              <View className="bg-surface rounded-card px-4 py-3.5">
-                <Text className="text-body font-semibold text-text-primary mb-1">
-                  Upgrade your AI mentor
-                </Text>
-                <Text className="text-body-sm text-text-secondary mb-3">
-                  Get a more advanced AI that explains things more clearly,
-                  catches misunderstandings faster, and adapts better to how you
-                  learn. Available as an add-on for individual profiles.
-                </Text>
-                <View className="bg-primary-soft rounded-card px-3 py-2">
-                  <Text className="text-body-sm font-semibold text-primary">
-                    +$15/month per profile
-                  </Text>
-                  <Text className="text-caption text-text-secondary mt-0.5">
-                    Coming soon — we'll notify you when available.
-                  </Text>
-                </View>
-              </View>
-            </View>
-          )}
-
           {/* Manage billing — deep links to platform subscription management */}
           {/* BUG-394: Fall back to API-side tier when RevenueCat fails */}
-          {(hasActiveSubscription || (customerInfoError && isPaidTier)) && (
+          {/* BUG-896: Show whenever user is on a paid tier per API, not only when */}
+          {/* RevenueCat reports an active entitlement. The store deep-link works */}
+          {/* regardless of RC sync state, and a paid user must always have a way */}
+          {/* to cancel/manage in-app. */}
+          {(isPaidTier || hasActiveSubscription) && (
             <View className="mt-6" testID="manage-section">
               <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2">
                 Manage
               </Text>
-              <Pressable
-                onPress={handleManageBilling}
-                className="bg-surface rounded-card px-4 py-3.5 mb-2"
-                accessibilityLabel="Manage billing"
-                accessibilityRole="button"
-                testID="manage-billing-button"
-              >
-                <Text className="text-body text-text-primary">
-                  Manage billing
-                </Text>
-                <Text className="text-caption text-text-secondary mt-0.5">
-                  {Platform.OS === 'ios'
-                    ? 'Opens App Store subscriptions'
-                    : 'Opens Google Play subscriptions'}
-                </Text>
-              </Pressable>
+              {/* [BUG-916] Web has no native store deep link — RevenueCat IAP
+                  runs on iOS/Android only, Stripe is dormant for web. Render a
+                  static info row pointing the user to their mobile device
+                  instead of the Google Play link, which is misleading. */}
+              {Platform.OS === 'web' ? (
+                <View
+                  className="bg-surface rounded-card px-4 py-3.5 mb-2"
+                  testID="manage-billing-web-info"
+                >
+                  <Text className="text-body text-text-primary">
+                    Manage billing
+                  </Text>
+                  <Text className="text-caption text-text-secondary mt-0.5">
+                    Subscription is managed on your mobile device
+                  </Text>
+                </View>
+              ) : (
+                <Pressable
+                  onPress={handleManageBilling}
+                  className="bg-surface rounded-card px-4 py-3.5 mb-2"
+                  accessibilityLabel="Manage billing"
+                  accessibilityRole="button"
+                  testID="manage-billing-button"
+                >
+                  <Text className="text-body text-text-primary">
+                    Manage billing
+                  </Text>
+                  <Text className="text-caption text-text-secondary mt-0.5">
+                    {Platform.OS === 'ios'
+                      ? 'Opens App Store subscriptions'
+                      : 'Opens Google Play subscriptions'}
+                  </Text>
+                </Pressable>
+              )}
             </View>
           )}
 

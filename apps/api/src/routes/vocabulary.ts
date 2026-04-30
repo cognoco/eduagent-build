@@ -3,6 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import {
   vocabularyCreateSchema,
   vocabularyReviewSchema,
+  ERROR_CODES,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
@@ -13,8 +14,12 @@ import {
   listVocabulary,
   reviewVocabulary,
 } from '../services/vocabulary';
-import { apiError, notFound } from '../errors';
-import { ERROR_CODES } from '@eduagent/schemas';
+import {
+  apiError,
+  notFound,
+  SubjectNotFoundError,
+  VocabularyNotFoundError,
+} from '../errors';
 
 type VocabularyRouteEnv = {
   Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
@@ -37,8 +42,9 @@ export const vocabularyRoutes = new Hono<VocabularyRouteEnv>()
       );
       return c.json({ vocabulary });
     } catch (err) {
-      if (err instanceof Error && err.message === 'Subject not found') {
-        return notFound(c, 'Subject not found');
+      // [FIX-API-6] Use typed instanceof check instead of string-matching message
+      if (err instanceof SubjectNotFoundError) {
+        return notFound(c, err.message);
       }
       throw err;
     }
@@ -58,8 +64,9 @@ export const vocabularyRoutes = new Hono<VocabularyRouteEnv>()
         );
         return c.json({ vocabulary }, 201);
       } catch (err) {
-        if (err instanceof Error && err.message === 'Subject not found') {
-          return notFound(c, 'Subject not found');
+        // [FIX-API-6] Use typed instanceof check instead of string-matching message
+        if (err instanceof SubjectNotFoundError) {
+          return notFound(c, err.message);
         }
         throw err;
       }
@@ -81,11 +88,9 @@ export const vocabularyRoutes = new Hono<VocabularyRouteEnv>()
         );
         return c.json(result);
       } catch (err) {
-        if (
-          err instanceof Error &&
-          err.message === 'Vocabulary item not found'
-        ) {
-          return notFound(c, 'Vocabulary item not found');
+        // [FIX-API-6] Use typed instanceof check instead of string-matching message
+        if (err instanceof VocabularyNotFoundError) {
+          return notFound(c, err.message);
         }
         return apiError(
           c,

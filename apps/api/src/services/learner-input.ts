@@ -6,6 +6,9 @@ import type { Database } from '@eduagent/database';
 import { routeAndCall, type ChatMessage } from './llm';
 import { escapeXml } from './llm/sanitize';
 import { applyAnalysis } from './learner-profile';
+import { createLogger } from './logger';
+
+const logger = createLogger();
 
 const TELL_MENTOR_PROMPT = `You are turning a direct learner or parent note into learner-memory signals.
 
@@ -140,7 +143,8 @@ async function parseLearnerInputToAnalysis(
     // SC-7: Log at error level for prod observability. The outer parseLearnerInput
     // does not see this path because the fallback resolves successfully — without
     // logging here, LLM/network failures are invisible in production.
-    console.error('[learner-input] LLM parse failed, using fallback', {
+    // [logging sweep] structured logger so PII fields land as JSON context
+    logger.error('[learner-input] LLM parse failed, using fallback', {
       event: 'learner_input.llm.failed',
       source,
       error: err instanceof Error ? err.message : String(err),
@@ -164,7 +168,8 @@ export async function parseLearnerInput(
       fieldsUpdated: result.fieldsUpdated,
     };
   } catch (err) {
-    console.error('[learner-input] parseLearnerInput failed', {
+    // [logging sweep] structured logger so PII fields land as JSON context
+    logger.error('[learner-input] parseLearnerInput failed', {
       event: 'learner_input.parse.failed',
       profileId,
       source,

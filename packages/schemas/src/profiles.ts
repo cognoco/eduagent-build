@@ -48,6 +48,11 @@ export const profileCreateSchema = z.object({
 
 export type ProfileCreateInput = z.infer<typeof profileCreateSchema>;
 
+// Mirrors profileCreateSchema minus birthYear/location. When you add a new
+// field to profileCreateSchema that should be user-editable post-onboarding,
+// it auto-flows through .partial() — but if it should also be patchable via
+// the dedicated single-field onboarding endpoints below, add a parallel
+// onboarding*PatchSchema. Keep these in sync.
 export const profileUpdateSchema = profileCreateSchema
   .partial()
   .omit({ birthYear: true, location: true })
@@ -56,7 +61,9 @@ export type ProfileUpdateInput = z.infer<typeof profileUpdateSchema>;
 
 // BKT-C.1 — onboarding endpoint bodies. Each is a single-field PATCH so the
 // wire contract is clear and each step can be retried independently without
-// risking a merged write.
+// risking a merged write. NOTE: every field here MUST also be present in
+// profileUpdateSchema (and therefore profileCreateSchema) — these are parallel
+// paths into the same DB columns.
 export const onboardingLanguagePatchSchema = z.object({
   conversationLanguage: conversationLanguageSchema,
 });

@@ -141,7 +141,11 @@ export default function LibraryScreen() {
   const subjectsQuery = useSubjects({ includeInactive: true });
   // S-5: Centralized Array.isArray guard — same class as BUG-418.
   // TanStack Query's select can be bypassed when enabled=false.
-  const subjects = Array.isArray(subjectsQuery.data) ? subjectsQuery.data : [];
+  // Memoised so downstream useMemo deps don't see a fresh `[]` each render.
+  const subjects = useMemo(
+    () => (Array.isArray(subjectsQuery.data) ? subjectsQuery.data : []),
+    [subjectsQuery.data]
+  );
   const progressQuery = useOverallProgress();
 
   // [M19] Timeout escape for subjects/progress loading spinner
@@ -289,9 +293,31 @@ export default function LibraryScreen() {
   const enrichedBooks = useMemo(() => {
     return allBooksQuery.books.map((b) => {
       const counts = topicCountsByBookId.get(b.book.id);
-      return counts
-        ? { ...b, topicCount: counts.total, completedCount: counts.completed }
-        : b;
+      if (!counts) return b;
+      // [BUG-870] The API marks a book IN_PROGRESS based on session existence,
+      // but the badge sits next to the client-derived "X/Y topics" string,
+      // which counts xpStatus==='verified' topics. When a child opens a
+      // session without verifying any topic, the API returns IN_PROGRESS
+      // while the client shows "0/10 topics" — confusing parents about
+      // actual progress. Reconcile both signals from the same definition:
+      // verified-topic count. The badge follows the visible progress text.
+      let status = b.status;
+      if (counts.total > 0) {
+        if (counts.completed === 0) status = 'NOT_STARTED';
+        else if (counts.completed >= counts.total) {
+          // Don't downgrade REVIEW_DUE → COMPLETED — the API knows when
+          // retention has slipped and the user owes a review.
+          if (status !== 'REVIEW_DUE') status = 'COMPLETED';
+        } else {
+          status = 'IN_PROGRESS';
+        }
+      }
+      return {
+        ...b,
+        topicCount: counts.total,
+        completedCount: counts.completed,
+        status,
+      };
     });
   }, [allBooksQuery.books, topicCountsByBookId]);
 
@@ -318,7 +344,7 @@ export default function LibraryScreen() {
       reviewDueCount:
         retentionBySubjectId.get(subject.id)?.reviewDueCount ?? undefined,
     }));
-  }, [progressBySubjectId, retentionQueries, subjectsQuery.data]);
+  }, [progressBySubjectId, retentionQueries, subjects]);
 
   const totalOverdue = useMemo(
     () =>
@@ -418,13 +444,16 @@ export default function LibraryScreen() {
     }
 
     if (subjectsQuery.isError || progressQuery.isError) {
+      const libraryLoadError = subjectsQuery.error ?? progressQuery.error;
       return (
         <View
           className="flex-1 items-center justify-center px-5 py-12"
           testID="library-error"
         >
           <Text className="text-body text-text-secondary text-center mb-4">
-            Unable to load your library. Please try again.
+            {libraryLoadError
+              ? formatApiError(libraryLoadError)
+              : 'Unable to load your library. Please try again.'}
           </Text>
           <Pressable
             onPress={handleRetry}
@@ -545,6 +574,13 @@ export default function LibraryScreen() {
               state={booksTabState}
               onStateChange={setBooksTabState}
               onBookPress={(subjectId, bookId) => {
+                // [CLAUDE.md] Cross-tab deep push: shelf layout has no
+                // unstable_settings.initialRouteName, so we must push the
+                // parent route first to synthesise a proper back-stack.
+                router.push({
+                  pathname: '/(app)/shelf/[subjectId]',
+                  params: { subjectId },
+                } as never);
                 router.push({
                   pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
                   params: { subjectId, bookId },

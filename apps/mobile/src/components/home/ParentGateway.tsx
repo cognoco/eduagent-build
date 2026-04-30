@@ -108,7 +108,9 @@ export function ParentGateway({
           <IntentCard
             title="Check child's progress"
             subtitle={getChildHighlight(dashboard)}
-            onPress={() => router.push('/(app)/dashboard' as never)}
+            onPress={() =>
+              router.push('/(app)/dashboard?returnTo=home' as never)
+            }
             testID="gateway-check-progress"
           />
           <IntentCard

@@ -3,6 +3,9 @@ import { getLanguageByCode } from '../data/languages';
 import { routeAndCall, type ChatMessage } from './llm';
 import { escapeXml } from './llm/sanitize';
 import { captureException } from './sentry';
+import { createLogger } from './logger';
+
+const logger = createLogger();
 
 export interface ExtractedVocabularyItem {
   term: string;
@@ -107,7 +110,11 @@ export async function extractVocabularyFromTranscript(
     // and skips the vocabulary update — without captureException we can't
     // distinguish "no new vocab in session" from "LLM outage suppressed all
     // learning extraction." Escalate so the degraded path is queryable.
-    console.error('[extractVocabularyFromTranscript] extraction failed:', err);
+    // [logging sweep] structured logger so PII fields land as JSON context
+    logger.error('[extractVocabularyFromTranscript] extraction failed', {
+      languageCode,
+      error: err instanceof Error ? err.message : String(err),
+    });
     captureException(err, {
       extra: {
         site: 'extractVocabularyFromTranscript',

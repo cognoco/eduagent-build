@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -92,6 +92,9 @@ export default function LanguageSetup() {
   const [customLanguage, setCustomLanguage] = useState('');
   const [startingLevel, setStartingLevel] = useState<CefrLevel>('A1');
   const [error, setError] = useState('');
+  // BUG-692-FOLLOWUP: Guard post-await router.replace against the user having
+  // pressed Back while configureLanguageSubject.mutateAsync was in flight.
+  const cancelledRef = useRef(false);
 
   const safeLanguageName = useMemo(
     () => languageName?.trim() || 'this language',
@@ -102,6 +105,9 @@ export default function LanguageSetup() {
     nativeLanguage === 'other' ? customLanguage.trim() : nativeLanguage;
 
   const handleBack = useCallback(() => {
+    // BUG-692-FOLLOWUP: Mark the mutation as cancelled so the post-await
+    // router.replace in handleContinue does not fire after back-navigation.
+    cancelledRef.current = true;
     goBackOrReplace(router, {
       pathname: '/(app)/onboarding/interview',
       params: {
@@ -122,12 +128,18 @@ export default function LanguageSetup() {
       return;
     }
     setError('');
+    // BUG-692-FOLLOWUP: Reset the cancellation flag at the start of each attempt
+    // so a prior back-navigation doesn't permanently suppress the next attempt.
+    cancelledRef.current = false;
     try {
       await configureLanguageSubject.mutateAsync({
         subjectId,
         nativeLanguage: effectiveNativeLanguage,
         startingLevel,
       });
+      // BUG-692-FOLLOWUP: User pressed Back while the mutation was in flight —
+      // don't navigate to accommodations from a screen the user has already left.
+      if (cancelledRef.current) return;
       router.replace({
         pathname: '/(app)/onboarding/accommodations',
         params: {
@@ -140,6 +152,8 @@ export default function LanguageSetup() {
         },
       } as never);
     } catch (err: unknown) {
+      // BUG-692-FOLLOWUP: Don't surface error if user already navigated away.
+      if (cancelledRef.current) return;
       setError(formatApiError(err));
     }
   };

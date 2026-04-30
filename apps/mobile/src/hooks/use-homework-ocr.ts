@@ -133,10 +133,15 @@ async function recognizeText(imageUri: string): Promise<RecognizedTextResult> {
   };
 }
 
+// [BUG-681 / I-16] Accept an optional external AbortSignal so a user-initiated
+// cancel() actually aborts the server OCR fetch (previously only the internal
+// timeout could abort). Both signals are wired into a single controller; the
+// fetch aborts on whichever fires first.
 async function recognizeTextServerSide(
   imageUri: string,
   token: string | null,
-  profileId?: string
+  profileId?: string,
+  externalSignal?: AbortSignal
 ): Promise<RecognizedTextResult> {
   const uploadUri = await resizeImage(imageUri);
   const formData = new FormData();
@@ -156,6 +161,18 @@ async function recognizeTextServerSide(
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), OCR_SERVER_TIMEOUT_MS);
+  // Forward an already-aborted external signal immediately, and listen for
+  // future aborts. We do not remove the listener on completion — the
+  // controller is short-lived (one fetch); the closure GCs with it.
+  if (externalSignal) {
+    if (externalSignal.aborted) {
+      controller.abort();
+    } else {
+      externalSignal.addEventListener('abort', () => controller.abort(), {
+        once: true,
+      });
+    }
+  }
   let response: Response;
   try {
     response = await fetch(`${getApiUrl()}/v1/ocr`, {
@@ -253,15 +270,24 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
   );
 
   const tryServerFallback = useCallback(
-    async (uri: string): Promise<RecognizedTextResult | null> => {
+    async (
+      uri: string,
+      signal?: AbortSignal
+    ): Promise<RecognizedTextResult | null> => {
       try {
         const token = await getToken();
         return await recognizeTextServerSide(
           uri,
           token ?? null,
-          activeProfile?.id
+          activeProfile?.id,
+          signal
         );
       } catch (err) {
+        // [BUG-681] Distinguish user-initiated cancel from a real failure so
+        // we do not surface a "server failed" error after a deliberate cancel.
+        if ((err as { name?: string } | null)?.name === 'AbortError') {
+          return null;
+        }
         console.error('[OCR] Server fallback failed:', err);
         return null;
       }
@@ -291,7 +317,11 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
           '[OCR] ML Kit TextRecognition native module is not linked. ' +
             'Rebuild the app with EAS to include @react-native-ml-kit/text-recognition.'
         );
-        const serverResult = await tryServerFallback(uri);
+        const serverResult = await tryServerFallback(uri, controller.signal);
+        // [BUG-681] After every await, drop the result if cancel() fired
+        // mid-flight. Without this, server OCR completing after cancel would
+        // setState 'done', re-opening a screen the user already dismissed.
+        if (controller.signal.aborted) return;
         if (serverResult && resolveSuccess(serverResult, 'server')) {
           return;
         }
@@ -309,6 +339,9 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
 
       try {
         const recognized = await recognizeText(uri);
+        // [BUG-681] The native ML Kit call cannot be aborted, so the only
+        // defense is to drop its result if the user cancelled while it ran.
+        if (controller.signal.aborted) return;
         if (recognized.text) {
           if (resolveSuccess(recognized, 'local')) {
             return;
@@ -322,7 +355,8 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
           return;
         }
 
-        const serverResult = await tryServerFallback(uri);
+        const serverResult = await tryServerFallback(uri, controller.signal);
+        if (controller.signal.aborted) return;
         if (serverResult && resolveSuccess(serverResult, 'server')) {
           return;
         }
@@ -332,8 +366,13 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
         }
         finishAsError("Couldn't read any text from the image");
       } catch (err) {
+        // [BUG-681] If recognizeText threw because we aborted (rare — the
+        // native module typically does not honor signals), treat as a cancel
+        // and exit without a user-visible error.
+        if (controller.signal.aborted) return;
         console.error('[OCR] Text recognition failed:', err);
-        const serverResult = await tryServerFallback(uri);
+        const serverResult = await tryServerFallback(uri, controller.signal);
+        if (controller.signal.aborted) return;
         if (serverResult && resolveSuccess(serverResult, 'server')) {
           return;
         }

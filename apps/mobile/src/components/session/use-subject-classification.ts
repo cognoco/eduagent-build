@@ -347,8 +347,13 @@ export function useSubjectClassification(
         setClassifyError(null);
         try {
           const result = await classifySubject.mutateAsync({ text });
-          if (!result.needsConfirmation && result.candidates.length === 1) {
-            const candidate = result.candidates[0]!;
+          const [firstCandidate] = result.candidates;
+          if (
+            !result.needsConfirmation &&
+            result.candidates.length === 1 &&
+            firstCandidate
+          ) {
+            const candidate = firstCandidate;
             setClassifiedSubject({
               subjectId: candidate.subjectId,
               subjectName: candidate.subjectName,

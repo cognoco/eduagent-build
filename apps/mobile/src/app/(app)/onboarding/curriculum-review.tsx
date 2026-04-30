@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -78,6 +78,23 @@ export default function CurriculumScreen() {
   const challengeCurriculum = useChallengeCurriculum(subjectId ?? '');
   const addCurriculumTopic = useAddCurriculumTopic(subjectId ?? '');
   const explainTopic = useExplainTopic(subjectId ?? '');
+  // [BUG-UX-CURRICULUM-TIMEOUT] Hard 30s UI timeout: if the curriculum query is
+  // still loading after 30s the user gets an explicit error panel instead of a
+  // silent infinite spinner.
+  const [loadingTimedOut, setLoadingTimedOut] = useState(false);
+  useEffect(() => {
+    if (!isLoading) {
+      setLoadingTimedOut(false);
+      return undefined;
+    }
+    const CURRICULUM_UI_TIMEOUT_MS = 30_000;
+    const timer = setTimeout(
+      () => setLoadingTimedOut(true),
+      CURRICULUM_UI_TIMEOUT_MS
+    );
+    return () => clearTimeout(timer);
+  }, [isLoading]);
+
   const [showChallengeModal, setShowChallengeModal] = useState(false);
   const [challengeFeedback, setChallengeFeedback] = useState('');
   const [showAddTopicModal, setShowAddTopicModal] = useState(false);
@@ -92,8 +109,16 @@ export default function CurriculumScreen() {
   const [explainingTopicId, setExplainingTopicId] = useState<string | null>(
     null
   );
+  // BUG-692-FOLLOWUP: Guard post-await setShowWhyModal(true) against the user
+  // having dismissed the pending "Why?" request via Android back while the LLM
+  // call was in flight. Set to true when the user dismisses a pending explain
+  // request; reset at the start of each attempt.
+  const explainCancelledRef = useRef(false);
 
   const handleBack = useCallback(() => {
+    // BUG-692-FOLLOWUP: Mark any in-flight explain request as cancelled so the
+    // post-await setShowWhyModal(true) does not fire after navigation away.
+    explainCancelledRef.current = true;
     goBackOrReplace(router, {
       pathname: '/(app)/onboarding/accommodations',
       params: {
@@ -207,13 +232,21 @@ export default function CurriculumScreen() {
     topicId: string,
     topicTitle: string
   ): Promise<void> => {
+    // BUG-692-FOLLOWUP: Reset cancellation flag at the start of each attempt so
+    // a prior dismiss doesn't permanently suppress future explain requests.
+    explainCancelledRef.current = false;
     try {
       setExplainingTopicId(topicId);
       const explanation = await explainTopic.mutateAsync(topicId);
+      // BUG-692-FOLLOWUP: User dismissed the pending explain request (Android
+      // back while the LLM call was running) — don't open the modal.
+      if (explainCancelledRef.current) return;
       setWhyTopicTitle(topicTitle);
       setWhyExplanation(explanation);
       setShowWhyModal(true);
     } catch (err: unknown) {
+      // BUG-692-FOLLOWUP: Don't surface error if user already dismissed.
+      if (explainCancelledRef.current) return;
       platformAlert('Could not explain the order', formatApiError(err));
     } finally {
       setExplainingTopicId(null);
@@ -255,7 +288,47 @@ export default function CurriculumScreen() {
         <OnboardingStepIndicator step={step} totalSteps={totalSteps} />
       </View>
 
-      {isLoading ? (
+      {isLoading && loadingTimedOut ? (
+        // [BUG-UX-CURRICULUM-TIMEOUT] Hard timeout — give the user an escape
+        // instead of an infinite spinner.
+        <View
+          className="flex-1 items-center justify-center px-8"
+          testID="curriculum-loading-timeout"
+        >
+          <Text className="text-h3 font-semibold text-text-primary text-center mb-2">
+            Still loading…
+          </Text>
+          <Text className="text-body text-text-secondary text-center mb-6">
+            Loading your curriculum is taking longer than expected. Check your
+            connection and try again.
+          </Text>
+          <Pressable
+            onPress={() => {
+              setLoadingTimedOut(false);
+              void refetch();
+            }}
+            className="bg-primary rounded-button px-6 py-3 items-center min-h-[48px] justify-center mb-3 w-full"
+            testID="curriculum-timeout-retry"
+            accessibilityRole="button"
+            accessibilityLabel="Try again"
+          >
+            <Text className="text-text-inverse text-body font-semibold">
+              Try again
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
+            className="bg-surface rounded-button px-6 py-3 items-center min-h-[48px] justify-center w-full"
+            testID="curriculum-timeout-home"
+            accessibilityRole="button"
+            accessibilityLabel="Go home"
+          >
+            <Text className="text-text-primary text-body font-semibold">
+              Go home
+            </Text>
+          </Pressable>
+        </View>
+      ) : isLoading ? (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" testID="curriculum-loading" />
           <Text className="text-text-secondary mt-2">

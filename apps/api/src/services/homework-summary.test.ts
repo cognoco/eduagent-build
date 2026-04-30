@@ -246,6 +246,77 @@ describe('extractHomeworkSummary', () => {
   });
 });
 
+describe('extractHomeworkSummary — [BUG-934] envelope projection', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('[BUG-934] projects raw envelope JSON in ai_response rows before sending to LLM', async () => {
+    (routeAndCall as jest.Mock).mockResolvedValue({
+      response:
+        '{"problemCount":1,"practicedSkills":["fractions"],"independentProblemCount":1,"guidedProblemCount":0,"summary":"1 problem.","displayTitle":"Math Homework"}',
+    });
+
+    const rawEnvelopeContent = JSON.stringify({
+      reply: 'Nice work on fractions!',
+      signals: { close: false },
+      ui_hints: {},
+    });
+
+    const selectMock = jest
+      .fn()
+      .mockReturnValueOnce(
+        createSelectChain([
+          {
+            subjectId: 'subject-1',
+            metadata: {
+              homework: { problemCount: 1, problems: [] },
+            },
+          },
+        ])
+      )
+      .mockReturnValueOnce(createSelectChain([{ name: 'Math' }]))
+      .mockReturnValueOnce(createSelectChain([{ metadata: {} }]));
+
+    const db = {
+      select: selectMock,
+      update: jest.fn().mockReturnValue({
+        set: jest.fn().mockReturnValue({
+          where: jest.fn().mockResolvedValue(undefined),
+        }),
+      }),
+      query: {
+        sessionEvents: {
+          findMany: jest.fn().mockResolvedValue([
+            {
+              eventType: 'user_message',
+              content: 'What is 1/2 + 1/4?',
+              createdAt: new Date('2026-03-01T10:00:00Z'),
+            },
+            {
+              eventType: 'ai_response',
+              content: rawEnvelopeContent,
+              createdAt: new Date('2026-03-01T10:00:05Z'),
+            },
+          ]),
+        },
+      },
+    } as unknown as Database;
+
+    await extractHomeworkSummary(db, 'profile-1', 'session-1');
+
+    // The LLM transcript passed via routeAndCall must contain the projected
+    // prose reply, NOT the raw envelope JSON.
+    const call = (routeAndCall as jest.Mock).mock.calls[0];
+    const userMessage = call[0].find(
+      (m: { role: string }) => m.role === 'user'
+    );
+    expect(userMessage.content).toContain('Nice work on fractions!');
+    expect(userMessage.content).not.toContain('"signals"');
+    expect(userMessage.content).not.toContain('"ui_hints"');
+  });
+});
+
 describe('extractAndStoreHomeworkSummary', () => {
   beforeEach(() => {
     jest.clearAllMocks();

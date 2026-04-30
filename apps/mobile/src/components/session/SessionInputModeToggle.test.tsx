@@ -69,4 +69,33 @@ describe('SessionInputModeToggle', () => {
     expect(screen.getByLabelText('Text mode')).toBeTruthy();
     expect(screen.getByLabelText('Voice mode')).toBeTruthy();
   });
+
+  // [a11y sweep] Break tests: decorative mode icons must be hidden so screen
+  // readers only announce the Pressable label, not the icon name.
+  it('marks the text-mode icon wrapper as accessibility-hidden [a11y sweep]', () => {
+    render(<SessionInputModeToggle mode="text" onModeChange={jest.fn()} />);
+    const iconWrapper = screen.getByTestId('input-mode-text-icon', {
+      includeHiddenElements: true,
+    });
+    expect(iconWrapper.props.accessibilityElementsHidden).toBe(true);
+    expect(iconWrapper.props.importantForAccessibility).toBe(
+      'no-hide-descendants'
+    );
+  });
+
+  it('text-mode icon is excluded from default visible-only queries [a11y sweep]', () => {
+    render(<SessionInputModeToggle mode="text" onModeChange={jest.fn()} />);
+    expect(screen.queryByTestId('input-mode-text-icon')).toBeNull();
+  });
+
+  it('marks the voice-mode icon wrapper as accessibility-hidden [a11y sweep]', () => {
+    render(<SessionInputModeToggle mode="voice" onModeChange={jest.fn()} />);
+    const iconWrapper = screen.getByTestId('input-mode-voice-icon', {
+      includeHiddenElements: true,
+    });
+    expect(iconWrapper.props.accessibilityElementsHidden).toBe(true);
+    expect(iconWrapper.props.importantForAccessibility).toBe(
+      'no-hide-descendants'
+    );
+  });
 });

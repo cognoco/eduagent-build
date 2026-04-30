@@ -20,12 +20,19 @@ export default function DictationChoiceScreen(): React.ReactElement {
   const [lastError, setLastError] = useState<string | null>(null);
   const [generateTimedOut, setGenerateTimedOut] = useState(false);
   const generateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // [BUG-692] Set when back arrow, Cancel button, or 20s timeout fires while
+  // the mutation is in flight. Prevents late-arriving response from pushing to
+  // the playback screen after the user has already navigated away.
+  const generateCancelledRef = useRef(false);
 
   // Start/clear 20s timeout whenever the pending state changes
   useEffect(() => {
     if (generateMutation.isPending) {
       setGenerateTimedOut(false);
       generateTimeoutRef.current = setTimeout(() => {
+        // [BUG-692] Timeout counts as cancellation — block any late response
+        // from navigating to playback.
+        generateCancelledRef.current = true;
         setGenerateTimedOut(true);
       }, 20_000);
     } else {
@@ -38,10 +45,17 @@ export default function DictationChoiceScreen(): React.ReactElement {
   }, [generateMutation.isPending]);
 
   const handleSurpriseMe = async () => {
+    // [BUG-692] Reset the cancelled flag at the start of each new attempt.
+    generateCancelledRef.current = false;
     setLastError(null);
     setGenerateTimedOut(false);
     try {
       const result = await generateMutation.mutateAsync();
+
+      // [BUG-692] If back arrow, Cancel button, or the 20s timeout fired
+      // while the mutation was in flight, skip navigation to playback.
+      if (generateCancelledRef.current) return;
+
       setData({
         sentences: result.sentences,
         language: result.language,
@@ -54,6 +68,8 @@ export default function DictationChoiceScreen(): React.ReactElement {
       // and playback sees data=null on first attempt.
       setTimeout(() => router.push('/(app)/dictation/playback' as never), 0);
     } catch (err: unknown) {
+      // [BUG-692] Don't show an alert if the user already navigated away.
+      if (generateCancelledRef.current) return;
       const message = formatApiError(err);
       setLastError(message);
       platformAlert("Couldn't create a dictation right now", message, [
@@ -75,7 +91,10 @@ export default function DictationChoiceScreen(): React.ReactElement {
     >
       <View className="flex-row items-center mb-6">
         <Pressable
-          onPress={() => goBackOrReplace(router, '/(app)/practice')}
+          onPress={() => {
+            generateCancelledRef.current = true; // [BUG-692]
+            goBackOrReplace(router, '/(app)/practice');
+          }}
           className="mr-3 min-h-[44px] min-w-[44px] items-center justify-center"
           accessibilityRole="button"
           accessibilityLabel="Go back"
@@ -148,7 +167,10 @@ export default function DictationChoiceScreen(): React.ReactElement {
             </>
           )}
           <Pressable
-            onPress={() => generateMutation.reset()}
+            onPress={() => {
+              generateCancelledRef.current = true; // [BUG-692]
+              generateMutation.reset();
+            }}
             className="mt-4 py-2 px-4 min-h-[44px] items-center justify-center"
             accessibilityRole="button"
             accessibilityLabel="Cancel generating a dictation"

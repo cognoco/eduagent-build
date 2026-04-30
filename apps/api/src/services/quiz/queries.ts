@@ -129,12 +129,15 @@ export async function computeRoundStats(db: Database, profileId: string) {
   const repo = createScopedRepository(db, profileId);
   const baseStats = await repo.quizRounds.aggregateCompletedStats();
 
-  // Compute bestConsecutive per activity by scanning results arrays
+  // Compute bestConsecutive per (activityType, languageCode) by scanning
+  // results arrays. [BUG-926] Key on the composite to keep per-language
+  // vocabulary streaks separate from each other.
   const allCompleted = await repo.quizRounds.findMany(
     eq(quizRounds.status, 'completed')
   );
 
-  const consecutiveByActivity = new Map<string, number>();
+  // Composite key: "activityType|languageCode" (languageCode may be null).
+  const consecutiveByKey = new Map<string, number>();
   for (const round of allCompleted) {
     const results = (round.results ?? []) as Array<{ correct: boolean }>;
     let maxStreak = 0;
@@ -143,14 +146,16 @@ export async function computeRoundStats(db: Database, profileId: string) {
       current = r.correct ? current + 1 : 0;
       if (current > maxStreak) maxStreak = current;
     }
-    const prev = consecutiveByActivity.get(round.activityType) ?? 0;
-    if (maxStreak > prev)
-      consecutiveByActivity.set(round.activityType, maxStreak);
+    const key = `${round.activityType}|${round.languageCode ?? ''}`;
+    const prev = consecutiveByKey.get(key) ?? 0;
+    if (maxStreak > prev) consecutiveByKey.set(key, maxStreak);
   }
 
   return baseStats.map((stat) => ({
     ...stat,
-    bestConsecutive: consecutiveByActivity.get(stat.activityType) ?? null,
+    bestConsecutive:
+      consecutiveByKey.get(`${stat.activityType}|${stat.languageCode ?? ''}`) ??
+      null,
   }));
 }
 

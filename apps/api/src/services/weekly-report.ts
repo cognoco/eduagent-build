@@ -42,30 +42,54 @@ export function generateWeeklyReportData(
     lastWeek?.vocabularyTotal
   );
 
-  const headlineMode =
-    vocabularyDelta > topicsMasteredDelta
-      ? {
-          label: 'Words learned',
-          value: vocabularyDelta,
-          comparison: lastWeek
-            ? `up from ${lastWeek.vocabularyTotal} last week`
-            : 'in a first week',
-        }
-      : topicsExploredDelta > topicsMasteredDelta
-      ? {
-          label: 'Topics explored',
-          value: topicsExploredDelta,
-          comparison: lastWeek
-            ? `${topicsExploredDelta} new this week`
-            : 'in a first week',
-        }
-      : {
-          label: 'Topics mastered',
-          value: topicsMasteredDelta,
-          comparison: lastWeek
-            ? `up from ${lastWeek.topicsMastered} last week`
-            : 'in a first week',
-        };
+  // BUG-903: When the headline metric is zero AND last week's value is also
+  // zero, "up from 0 last week" is meaningless and reads like a dead-end.
+  // Replace the comparison with a friendly empty-state line so parents see
+  // an honest "no activity yet" framing instead of a contradictory zero diff.
+  const isQuietWeek =
+    topicsMasteredDelta === 0 &&
+    topicsExploredDelta === 0 &&
+    vocabularyDelta === 0 &&
+    (!lastWeek ||
+      (lastWeek.vocabularyTotal === 0 && lastWeek.topicsMastered === 0));
+
+  const headlineMode = isQuietWeek
+    ? {
+        label: 'Topics mastered',
+        value: 0,
+        comparison: lastWeek
+          ? "No activity this week — that's OK. A nudge can help."
+          : 'A first week is for warming up.',
+      }
+    : vocabularyDelta > topicsMasteredDelta
+    ? {
+        label: 'Words learned',
+        value: vocabularyDelta,
+        comparison: lastWeek
+          ? vocabularyDelta === 0 && lastWeek.vocabularyTotal === 0
+            ? "No new words this week — that's OK."
+            : `up from ${lastWeek.vocabularyTotal} last week`
+          : 'in a first week',
+      }
+    : topicsExploredDelta > topicsMasteredDelta
+    ? {
+        label: 'Topics explored',
+        value: topicsExploredDelta,
+        comparison: lastWeek
+          ? topicsExploredDelta === 0
+            ? "No new topics this week — that's OK."
+            : `${topicsExploredDelta} new this week`
+          : 'in a first week',
+      }
+    : {
+        label: 'Topics mastered',
+        value: topicsMasteredDelta,
+        comparison: lastWeek
+          ? topicsMasteredDelta === 0 && lastWeek.topicsMastered === 0
+            ? "No new topics mastered — that's OK."
+            : `up from ${lastWeek.topicsMastered} last week`
+          : 'in a first week',
+      };
 
   // thisWeek stores incremental deltas (not absolute values) except for
   // vocabularyTotal (cumulative) and streakBest (absolute). Callers reading

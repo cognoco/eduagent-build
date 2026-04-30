@@ -1,13 +1,20 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   ActivityIndicator,
+  Modal,
   Pressable,
   Text,
   TextInput,
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { hapticError, hapticLight, hapticSuccess } from '../../../lib/haptics';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { ClientQuizQuestion, QuestionResult } from '@eduagent/schemas';
@@ -18,6 +25,9 @@ import {
 } from '../../../hooks/use-quiz';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { platformAlert } from '../../../lib/platform-alert';
+// platformAlert maps to window.confirm on web for 2-button prompts, which
+// blocks the renderer (BUG-892). For the quit-quiz confirmation we use a
+// styled in-app Modal — same pattern as parent withdraw-consent (BUG-553).
 import { formatApiError } from '../../../lib/format-api-error';
 import { useThemeColors } from '../../../lib/theme';
 import { Sentry } from '../../../lib/sentry';
@@ -42,6 +52,12 @@ export default function QuizPlayScreen(): React.ReactElement {
   } = useQuizFlow();
   const completeRound = useCompleteRound();
   const prefetchRound = usePrefetchRound();
+  // [BUG-542] Extract .mutate so the useEffect dep array references a stable
+  // variable rather than a member-access expression. ESLint exhaustive-deps
+  // treats `prefetchRound.mutate` in a dep array as an undeclared dep on
+  // `prefetchRound` (the whole object), which is recreated each render. The
+  // extracted local is still the stable TanStack Query .mutate ref.
+  const prefetchRoundMutate = prefetchRound.mutate;
   const checkAnswer = useCheckAnswer();
   // [ASSUMP-F10] When completeRound fails we surface an inline retry UI
   // instead of silently fabricating a 0-XP "nice" result and navigating.
@@ -54,6 +70,9 @@ export default function QuizPlayScreen(): React.ReactElement {
   const [disputedIndices, setDisputedIndices] = useState<Set<number>>(
     new Set()
   );
+  // [BUG-892] Quit confirmation rendered as an in-app Modal so web doesn't
+  // hit window.confirm via Alert.alert mapping (which blocks the renderer).
+  const [quitConfirmVisible, setQuitConfirmVisible] = useState(false);
 
   const questions = (round?.questions ?? []) as ClientQuizQuestion[];
   const totalQuestions = round?.total ?? 0;
@@ -65,10 +84,13 @@ export default function QuizPlayScreen(): React.ReactElement {
   // client can highlight the right option and show the person's name.
   const [correctAnswer, setCorrectAnswer] = useState<string | null>(null);
   const [showContinueHint, setShowContinueHint] = useState(false);
-  const [shuffledOptions, setShuffledOptions] = useState<string[]>([]);
-  // [F-Q-13] elapsedMs is computed for analytics (timeMs in QuestionResult)
-  // but no longer displayed. Prefixed with _ to satisfy no-unused-vars.
-  const [_elapsedMs, setElapsedMs] = useState(0);
+  // [BUG-928] elapsedMs is shown in the question header and also used for
+  // analytics (timeMs in QuestionResult). Spec — docs/flows/learning-path-flows.md
+  // Path 7: "Question header: '1 of 7' + dot indicators + elapsed seconds".
+  // The previous F-Q-13 carve-out hid this for "countdown anxiety", but it's
+  // a count-UP timer, not a deadline — and the spec was updated to require
+  // it for motivational feedback ("how fast am I going?").
+  const [elapsedMs, setElapsedMs] = useState(0);
   const [guessWhoCluesUsed, setGuessWhoCluesUsed] = useState(1);
   const [freeTextAnswer, setFreeTextAnswer] = useState('');
 
@@ -86,6 +108,20 @@ export default function QuizPlayScreen(): React.ReactElement {
 
   const currentQuestion = questions[currentIndex];
 
+  // [BUG-STALE-OPTIONS] Derived synchronously from currentQuestion so the
+  // same render that shows the prompt already has the correct options. A
+  // useEffect would run AFTER the commit, leaving a one-frame window where
+  // shuffledOptions still held the previous question's options — a tap in
+  // that window would record a stale answerGiven against the new question.
+  // Must be defined AFTER currentQuestion (same render pass, deps evaluated
+  // at this point in the execution).
+  const shuffledOptions = useMemo<string[]>(() => {
+    if (!currentQuestion || currentQuestion.type === 'guess_who') {
+      return [];
+    }
+    return Array.from(new Set(currentQuestion.options));
+  }, [currentQuestion]);
+
   useEffect(() => {
     if (!round || !currentQuestion) {
       router.replace('/(app)/quiz' as never);
@@ -95,12 +131,11 @@ export default function QuizPlayScreen(): React.ReactElement {
   useEffect(() => {
     if (!currentQuestion) return;
 
-    if (currentQuestion.type !== 'guess_who') {
-      // [CR-1] Options arrive pre-shuffled from the server with answer fields
-      // stripped. Dedup in case the LLM produced a duplicate distractor.
-      setShuffledOptions(Array.from(new Set(currentQuestion.options)));
-    } else {
-      setShuffledOptions([]);
+    // [BUG-STALE-OPTIONS] shuffledOptions is now derived via useMemo (above)
+    // so it updates synchronously with currentQuestion in the same render.
+    // Only side-effecty resets that must run after the new question commits
+    // are kept here.
+    if (currentQuestion.type === 'guess_who') {
       setGuessWhoCluesUsed(1);
     }
 
@@ -133,17 +168,18 @@ export default function QuizPlayScreen(): React.ReactElement {
     }
 
     prefetchTriggeredRef.current = true;
-    prefetchRound.mutate(
+    prefetchRoundMutate(
       { activityType, subjectId: subjectId ?? undefined },
       {
         onSuccess: (data) => setPrefetchedRoundId(data.id),
       }
     );
-    // [BUG-542] Use .mutate (stable ref) instead of whole mutation result
+    // [BUG-542] Use extracted .mutate local (stable ref) instead of whole
+    // mutation result or member-access expression in the dep array.
   }, [
     activityType,
     currentIndex,
-    prefetchRound.mutate,
+    prefetchRoundMutate,
     setPrefetchedRoundId,
     subjectId,
     totalQuestions,
@@ -163,15 +199,14 @@ export default function QuizPlayScreen(): React.ReactElement {
   // rules-of-hooks invariant (no conditional hooks) is respected even though
   // this particular handler is a plain function.
   // [F-Q-08] Show a confirmation dialog before discarding in-progress answers.
+  // [BUG-892] On web, platformAlert with 2 buttons falls back to window.confirm
+  // which blocks the renderer. Render a styled in-app Modal instead.
   const handleQuit = () => {
-    platformAlert('Quit this round?', 'Your progress will not be saved.', [
-      { text: 'Keep playing', style: 'cancel' },
-      {
-        text: 'Quit',
-        style: 'destructive',
-        onPress: () => goBackOrReplace(router, '/(app)/quiz'),
-      },
-    ]);
+    setQuitConfirmVisible(true);
+  };
+  const handleConfirmQuit = () => {
+    setQuitConfirmVisible(false);
+    goBackOrReplace(router, '/(app)/quiz');
   };
 
   // [CR-1] Callback for server-side answer checking, declared before the
@@ -190,6 +225,8 @@ export default function QuizPlayScreen(): React.ReactElement {
           roundId,
           questionIndex: currentIndex,
           answerGiven,
+          // guess_who is always free-text input
+          answerMode: 'free_text',
         });
         if (!result.correct && result.correctAnswer) {
           correctAnswerCapturedRef.current = true;
@@ -238,11 +275,11 @@ export default function QuizPlayScreen(): React.ReactElement {
       continueHintTimerRef.current = setTimeout(() => {
         setShowContinueHint(true);
       }, 4000);
-      void Haptics.notificationAsync(
-        result.correct
-          ? Haptics.NotificationFeedbackType.Success
-          : Haptics.NotificationFeedbackType.Error
-      );
+      if (result.correct) {
+        hapticSuccess();
+      } else {
+        hapticError();
+      }
       // [F-Q-07] If the answer was wrong and we don't already have the
       // correct answer (e.g. skip path bypasses onCheckAnswer), fire a
       // background check to get it for the feedback panel.
@@ -251,6 +288,8 @@ export default function QuizPlayScreen(): React.ReactElement {
           roundId,
           questionIndex: currentIndex,
           answerGiven: result.answerGiven,
+          // guess_who background correctAnswer fetch is always free_text
+          answerMode: 'free_text',
         })
           .then((checkResult) => {
             if (checkResult.correctAnswer) {
@@ -388,7 +427,7 @@ export default function QuizPlayScreen(): React.ReactElement {
     resultsRef.current = resultsRef.current.map((r) =>
       r.questionIndex === currentIndex ? { ...r, disputed: true } : r
     );
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    hapticLight();
   }
 
   // [ASSUMP-F10] Shared submit path so Retry re-uses the same success/error
@@ -443,6 +482,9 @@ export default function QuizPlayScreen(): React.ReactElement {
         roundId: activeRound.id,
         questionIndex,
         answerGiven: answer,
+        // [BUG-STALE-OPTIONS] Forward answerMode so the API can verify MC
+        // answers are in question.options — defense-in-depth guard.
+        answerMode,
       });
       correct = result.correct;
       // [F-Q-02] Server reveals correctAnswer on wrong submissions so the
@@ -480,11 +522,11 @@ export default function QuizPlayScreen(): React.ReactElement {
       setShowContinueHint(true);
     }, 4000);
 
-    void Haptics.notificationAsync(
-      correct
-        ? Haptics.NotificationFeedbackType.Success
-        : Haptics.NotificationFeedbackType.Error
-    );
+    if (correct) {
+      hapticSuccess();
+    } else {
+      hapticError();
+    }
   }
 
   function handleFreeTextSubmit() {
@@ -538,17 +580,19 @@ export default function QuizPlayScreen(): React.ReactElement {
     return 'text-text-secondary';
   }
 
+  // [BUG-691] The "tap anywhere to continue" affordance must NOT overlap the
+  // Quit X button. Previously the entire screen was a Pressable wrapping the
+  // header, so on Android a single tap on Quit could bubble to the parent and
+  // advance the question while the confirmation dialog opened. Splitting the
+  // root into a View + a body-only continue-Pressable removes the overlap.
+  const continueActive =
+    answerState !== 'unanswered' &&
+    answerState !== 'checking' &&
+    !completeError;
   return (
-    <Pressable
+    <View
       className="flex-1 bg-background"
       style={{ paddingTop: insets.top + 12, paddingBottom: insets.bottom + 20 }}
-      onPress={
-        answerState !== 'unanswered' &&
-        answerState !== 'checking' &&
-        !completeError
-          ? handleContinue
-          : undefined
-      }
       testID="quiz-play-screen"
     >
       <View className="mb-6 flex-row items-center justify-between px-5">
@@ -587,248 +631,321 @@ export default function QuizPlayScreen(): React.ReactElement {
           </View>
         </View>
 
-        {/* [F-Q-13] Timer hidden — elapsed time is tracked for analytics
-            (feeds timeMs into QuestionResult) but not shown to avoid
-            countdown anxiety. */}
-        <View className="w-[32px]" />
+        {/* [BUG-928] Elapsed seconds — count UP timer (not countdown), shown
+            for motivational feedback per Path 7 spec. The same value drives
+            the timeMs analytics field at answer time. Min-width keeps the
+            header from reflowing as digits grow. */}
+        <Text
+          className="text-body-sm font-semibold text-text-secondary text-right"
+          style={{ minWidth: 36 }}
+          accessibilityLabel={`Elapsed time: ${Math.floor(
+            elapsedMs / 1000
+          )} seconds`}
+          testID="quiz-play-elapsed"
+        >
+          {Math.floor(elapsedMs / 1000)}s
+        </Text>
       </View>
 
-      {/* [IMP-7] Non-blocking warning when answer-check API fails. The quiz
+      <Pressable
+        className="flex-1"
+        onPress={continueActive ? handleContinue : undefined}
+        testID="quiz-play-body"
+      >
+        {/* [IMP-7] Non-blocking warning when answer-check API fails. The quiz
           continues with the result assumed wrong; this banner lets the user
           know so they don't think their connection is fine. */}
-      {answerCheckFailed ? (
-        <Text className="text-caption text-warning text-center mb-2 px-5">
-          Answer check failed — result may be inaccurate
-        </Text>
-      ) : null}
-
-      <View className="mb-8 px-5">
-        {currentQuestion.type === 'capitals' ? (
-          <>
-            <Text className="mb-2 text-body text-text-secondary">
-              What is the capital of...
-            </Text>
-            <Text className="text-display font-bold text-text-primary">
-              {currentQuestion.country}?
-            </Text>
-          </>
-        ) : currentQuestion.type === 'vocabulary' ? (
-          <>
-            <Text className="mb-2 text-body text-text-secondary">
-              Translate:
-            </Text>
-            <Text className="text-display font-bold text-text-primary">
-              {currentQuestion.term}
-            </Text>
-          </>
-        ) : answerState === 'unanswered' ? (
-          <Text className="text-center text-h3 font-semibold text-text-primary">
-            Who is this person?
+        {answerCheckFailed ? (
+          <Text className="text-caption text-warning text-center mb-2 px-5">
+            Answer check failed — result may be inaccurate
           </Text>
         ) : null}
-      </View>
 
-      {answerState === 'checking' ? (
-        <View className="mt-6 items-center gap-2 px-5">
-          <ActivityIndicator size="small" color={colors.primary} />
-          <Text className="text-center text-body-sm text-text-secondary">
-            Checking...
-          </Text>
-        </View>
-      ) : null}
-
-      {question.type !== 'guess_who' ? (
-        <View className="gap-3 px-5">
-          {question.freeTextEligible ? (
-            <View testID="quiz-free-text-input">
-              <Text className="mb-2 text-body-sm text-text-secondary">
-                Type your answer
+        <View className="mb-8 px-5">
+          {currentQuestion.type === 'capitals' ? (
+            <>
+              <Text className="mb-2 text-body text-text-secondary">
+                What is the capital of...
               </Text>
-              <TextInput
-                testID="quiz-free-text-field"
-                className="rounded-card bg-surface-elevated px-4 py-4 text-body text-text-primary"
-                placeholder="Type your answer..."
-                placeholderTextColor={colors.textSecondary}
-                value={freeTextAnswer}
-                onChangeText={setFreeTextAnswer}
-                editable={answerState === 'unanswered'}
-                autoCorrect={false}
-                autoCapitalize="words"
-                autoFocus
-                returnKeyType="done"
-                onSubmitEditing={handleFreeTextSubmit}
-              />
-              <Pressable
-                testID="quiz-free-text-submit"
-                className={`mt-3 min-h-[48px] items-center justify-center rounded-button px-6 py-3 ${
-                  freeTextAnswer.trim() && answerState === 'unanswered'
-                    ? 'bg-primary'
-                    : 'bg-surface-elevated opacity-60'
-                }`}
-                onPress={handleFreeTextSubmit}
-                disabled={
-                  !freeTextAnswer.trim() || answerState !== 'unanswered'
-                }
-              >
-                <Text
-                  className={`text-body font-semibold ${
-                    freeTextAnswer.trim() && answerState === 'unanswered'
-                      ? 'text-text-inverse'
-                      : 'text-text-secondary'
-                  }`}
-                >
-                  Submit
+              <Text className="text-display font-bold text-text-primary">
+                {currentQuestion.country}?
+              </Text>
+            </>
+          ) : currentQuestion.type === 'vocabulary' ? (
+            <>
+              <Text className="mb-2 text-body text-text-secondary">
+                Translate:
+              </Text>
+              <Text className="text-display font-bold text-text-primary">
+                {currentQuestion.term}
+              </Text>
+            </>
+          ) : answerState === 'unanswered' ? (
+            <Text className="text-center text-h3 font-semibold text-text-primary">
+              Who is this person?
+            </Text>
+          ) : null}
+        </View>
+
+        {answerState === 'checking' ? (
+          <View className="mt-6 items-center gap-2 px-5">
+            <ActivityIndicator size="small" color={colors.primary} />
+            <Text className="text-center text-body-sm text-text-secondary">
+              Checking...
+            </Text>
+          </View>
+        ) : null}
+
+        {question.type !== 'guess_who' ? (
+          <View className="gap-3 px-5">
+            {question.freeTextEligible ? (
+              <View testID="quiz-free-text-input">
+                <Text className="mb-2 text-body-sm text-text-secondary">
+                  Type your answer
                 </Text>
-              </Pressable>
-            </View>
-          ) : (
-            shuffledOptions.map((option, index) => (
-              <Pressable
-                key={`${index}-${option}`}
-                onPress={() => handleAnswer(option, 'multiple_choice')}
-                disabled={answerState !== 'unanswered'}
-                className={`min-h-[64px] items-center justify-center rounded-card px-5 py-4 ${getOptionContainerClass(
-                  option
-                )}`}
-                accessibilityRole="button"
-                accessibilityLabel={option}
-                accessibilityState={{
-                  selected: option === selectedAnswer,
-                  disabled: answerState !== 'unanswered',
-                }}
-                testID={`quiz-option-${index}`}
-              >
-                <Text
-                  className={`text-body font-semibold ${getOptionTextClass(
+                <TextInput
+                  testID="quiz-free-text-field"
+                  className="rounded-card bg-surface-elevated px-4 py-4 text-body text-text-primary"
+                  placeholder="Type your answer..."
+                  placeholderTextColor={colors.textSecondary}
+                  value={freeTextAnswer}
+                  onChangeText={setFreeTextAnswer}
+                  editable={answerState === 'unanswered'}
+                  autoCorrect={false}
+                  autoCapitalize="words"
+                  autoFocus
+                  returnKeyType="done"
+                  onSubmitEditing={handleFreeTextSubmit}
+                />
+                <Pressable
+                  testID="quiz-free-text-submit"
+                  className={`mt-3 min-h-[48px] items-center justify-center rounded-button px-6 py-3 ${
+                    freeTextAnswer.trim() && answerState === 'unanswered'
+                      ? 'bg-primary'
+                      : 'bg-surface-elevated opacity-60'
+                  }`}
+                  onPress={handleFreeTextSubmit}
+                  disabled={
+                    !freeTextAnswer.trim() || answerState !== 'unanswered'
+                  }
+                >
+                  <Text
+                    className={`text-body font-semibold ${
+                      freeTextAnswer.trim() && answerState === 'unanswered'
+                        ? 'text-text-inverse'
+                        : 'text-text-secondary'
+                    }`}
+                  >
+                    Submit
+                  </Text>
+                </Pressable>
+              </View>
+            ) : (
+              shuffledOptions.map((option, index) => (
+                <Pressable
+                  key={`${index}-${option}`}
+                  onPress={() => handleAnswer(option, 'multiple_choice')}
+                  disabled={answerState !== 'unanswered'}
+                  className={`min-h-[64px] items-center justify-center rounded-card px-5 py-4 ${getOptionContainerClass(
                     option
                   )}`}
+                  accessibilityRole="button"
+                  accessibilityLabel={option}
+                  accessibilityState={{
+                    selected: option === selectedAnswer,
+                    disabled: answerState !== 'unanswered',
+                  }}
+                  testID={`quiz-option-${index}`}
                 >
-                  {option}
-                </Text>
-              </Pressable>
-            ))
-          )}
-        </View>
-      ) : answerState === 'unanswered' ? (
-        <View className="px-5">
-          <GuessWhoQuestion
-            question={question}
-            onCheckAnswer={handleCheckGuessWhoAnswer}
-            onResolved={handleGuessWhoResolved}
-          />
-        </View>
-      ) : null}
-
-      {answerState !== 'unanswered' && answerState !== 'checking' ? (
-        <View className="mt-6 px-5">
-          {question.type === 'guess_who' ? (
-            <View className="mb-3">
-              {answerState === 'correct' ? (
-                <Text className="text-center text-body-lg font-semibold text-success">
-                  You got it in {guessWhoCluesUsed} clue
-                  {guessWhoCluesUsed !== 1 ? 's' : ''}!
-                </Text>
-              ) : (
-                <>
-                  <Text className="text-center text-body-lg text-text-primary">
-                    Better luck next time!
+                  <Text
+                    className={`text-body font-semibold ${getOptionTextClass(
+                      option
+                    )}`}
+                  >
+                    {option}
                   </Text>
-                  {/* [F-Q-07] Reveal the person's name after wrong/skip */}
-                  {correctAnswer ? (
-                    <Text className="mt-1 text-center text-body-sm text-text-secondary">
-                      The answer was{' '}
-                      <Text className="font-bold text-success">
-                        {correctAnswer}
-                      </Text>
+                </Pressable>
+              ))
+            )}
+          </View>
+        ) : answerState === 'unanswered' ? (
+          <View className="px-5">
+            <GuessWhoQuestion
+              question={question}
+              onCheckAnswer={handleCheckGuessWhoAnswer}
+              onResolved={handleGuessWhoResolved}
+            />
+          </View>
+        ) : null}
+
+        {answerState !== 'unanswered' && answerState !== 'checking' ? (
+          <View className="mt-6 px-5">
+            {question.type === 'guess_who' ? (
+              <View className="mb-3">
+                {answerState === 'correct' ? (
+                  <Text className="text-center text-body-lg font-semibold text-success">
+                    You got it in {guessWhoCluesUsed} clue
+                    {guessWhoCluesUsed !== 1 ? 's' : ''}!
+                  </Text>
+                ) : (
+                  <>
+                    <Text className="text-center text-body-lg text-text-primary">
+                      Better luck next time!
                     </Text>
-                  ) : null}
-                </>
-              )}
-            </View>
-          ) : null}
-          {currentQuestion.funFact ? (
+                    {/* [F-Q-07] Reveal the person's name after wrong/skip */}
+                    {correctAnswer ? (
+                      <Text className="mt-1 text-center text-body-sm text-text-secondary">
+                        The answer was{' '}
+                        <Text className="font-bold text-success">
+                          {correctAnswer}
+                        </Text>
+                      </Text>
+                    ) : null}
+                  </>
+                )}
+              </View>
+            ) : null}
+            {currentQuestion.funFact ? (
+              <View className="rounded-card bg-surface p-4">
+                <Text className="text-body-sm text-text-secondary">
+                  {currentQuestion.funFact}
+                </Text>
+              </View>
+            ) : null}
+            <Text className="mt-3 text-center text-caption text-text-secondary">
+              {showContinueHint
+                ? 'Tap anywhere to continue'
+                : answerState === 'correct'
+                ? 'Correct'
+                : 'Not quite'}
+            </Text>
+            {/* [BUG-469] Dispute button — lets user flag LLM's judgment as wrong */}
+            {/* [BUG-927] Only surface dispute UI on incorrect answers. There's
+                nothing to dispute on a correct response, and showing the link
+                pollutes triage with noise on clearly-correct answers. */}
+            {answerState === 'wrong' && !disputedIndices.has(currentIndex) ? (
+              <Pressable
+                onPress={handleDispute}
+                className="mt-2 items-center py-1"
+                testID="quiz-dispute-button"
+                accessibilityRole="button"
+                accessibilityLabel="Dispute this answer"
+              >
+                <Text className="text-caption text-text-secondary underline">
+                  Not quite right?
+                </Text>
+              </Pressable>
+            ) : answerState === 'wrong' && disputedIndices.has(currentIndex) ? (
+              <Text
+                className="mt-2 text-center text-caption text-text-secondary"
+                testID="quiz-dispute-noted"
+              >
+                Noted — we'll review this
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
+
+        {completeRound.isPending ? (
+          <View className="mt-6 items-center gap-2 px-5">
+            <ActivityIndicator size="small" color={colors.primary} />
+            <Text className="text-center text-body-sm text-text-secondary">
+              Scoring your round...
+            </Text>
+          </View>
+        ) : null}
+
+        {completeError ? (
+          <View className="mt-6 px-5" testID="quiz-play-error">
             <View className="rounded-card bg-surface p-4">
-              <Text className="text-body-sm text-text-secondary">
-                {currentQuestion.funFact}
+              <Text className="text-body-sm font-semibold text-text-primary">
+                Couldn&apos;t save your round
               </Text>
-            </View>
-          ) : null}
-          <Text className="mt-3 text-center text-caption text-text-secondary">
-            {showContinueHint
-              ? 'Tap anywhere to continue'
-              : answerState === 'correct'
-              ? 'Correct'
-              : 'Not quite'}
-          </Text>
-          {/* [BUG-469] Dispute button — lets user flag LLM's judgment as wrong */}
-          {!disputedIndices.has(currentIndex) ? (
-            <Pressable
-              onPress={handleDispute}
-              className="mt-2 items-center py-1"
-              testID="quiz-dispute-button"
-              accessibilityRole="button"
-              accessibilityLabel="Dispute this answer"
-            >
-              <Text className="text-caption text-text-secondary underline">
-                Not quite right?
+              <Text className="mt-1 text-body-sm text-text-secondary">
+                {completeError}
               </Text>
-            </Pressable>
-          ) : (
-            <Text
-              className="mt-2 text-center text-caption text-text-secondary"
-              testID="quiz-dispute-noted"
-            >
-              Noted — we'll review this
-            </Text>
-          )}
-        </View>
-      ) : null}
-
-      {completeRound.isPending ? (
-        <View className="mt-6 items-center gap-2 px-5">
-          <ActivityIndicator size="small" color={colors.primary} />
-          <Text className="text-center text-body-sm text-text-secondary">
-            Scoring your round...
-          </Text>
-        </View>
-      ) : null}
-
-      {completeError ? (
-        <View className="mt-6 px-5" testID="quiz-play-error">
-          <View className="rounded-card bg-surface p-4">
-            <Text className="text-body-sm font-semibold text-text-primary">
-              Couldn&apos;t save your round
-            </Text>
-            <Text className="mt-1 text-body-sm text-text-secondary">
-              {completeError}
-            </Text>
-            <View className="mt-3 flex-row gap-3">
-              <Pressable
-                onPress={submitRound}
-                className="flex-1 min-h-[44px] items-center justify-center rounded-button bg-primary px-4 py-2"
-                accessibilityRole="button"
-                accessibilityLabel="Retry"
-                testID="quiz-play-retry"
-              >
-                <Text className="text-body-sm font-semibold text-text-inverse">
-                  Retry
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={handleQuit}
-                className="flex-1 min-h-[44px] items-center justify-center rounded-button bg-surface-elevated px-4 py-2"
-                accessibilityRole="button"
-                accessibilityLabel="Exit without saving"
-                testID="quiz-play-exit"
-              >
-                <Text className="text-body-sm font-semibold text-text-primary">
-                  Exit
-                </Text>
-              </Pressable>
+              <View className="mt-3 flex-row gap-3">
+                <Pressable
+                  onPress={submitRound}
+                  className="flex-1 min-h-[44px] items-center justify-center rounded-button bg-primary px-4 py-2"
+                  accessibilityRole="button"
+                  accessibilityLabel="Retry"
+                  testID="quiz-play-retry"
+                >
+                  <Text className="text-body-sm font-semibold text-text-inverse">
+                    Retry
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={handleQuit}
+                  className="flex-1 min-h-[44px] items-center justify-center rounded-button bg-surface-elevated px-4 py-2"
+                  accessibilityRole="button"
+                  accessibilityLabel="Exit without saving"
+                  testID="quiz-play-exit"
+                >
+                  <Text className="text-body-sm font-semibold text-text-primary">
+                    Exit
+                  </Text>
+                </Pressable>
+              </View>
             </View>
           </View>
-        </View>
-      ) : null}
-    </Pressable>
+        ) : null}
+      </Pressable>
+
+      {/* [BUG-892] Quit confirmation rendered as an in-app Modal so web does
+          not hit window.confirm via Alert.alert mapping (which freezes the
+          renderer). Mirrors the BUG-553 withdraw-consent pattern. */}
+      <Modal
+        visible={quitConfirmVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setQuitConfirmVisible(false)}
+      >
+        <Pressable
+          className="flex-1 bg-black/40 justify-center items-center px-6"
+          onPress={() => setQuitConfirmVisible(false)}
+          accessibilityRole="button"
+          accessibilityLabel="Dismiss"
+          testID="quiz-quit-modal-backdrop"
+        >
+          <Pressable
+            className="bg-background rounded-2xl w-full max-w-sm p-6"
+            onPress={(e) => e.stopPropagation()}
+          >
+            <Text className="text-h3 font-bold text-text-primary text-center">
+              Quit this round?
+            </Text>
+            <Text className="text-body-sm text-text-secondary text-center mt-3 leading-relaxed">
+              Your progress will not be saved.
+            </Text>
+            <View className="mt-5 gap-3">
+              <Pressable
+                onPress={handleConfirmQuit}
+                className="bg-danger rounded-button py-3 items-center min-h-[48px] justify-center"
+                accessibilityRole="button"
+                accessibilityLabel="Confirm quit round"
+                testID="quiz-quit-confirm"
+              >
+                <Text className="text-body font-semibold text-text-inverse">
+                  Quit
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setQuitConfirmVisible(false)}
+                className="bg-surface rounded-button py-3 items-center min-h-[48px] justify-center"
+                accessibilityRole="button"
+                accessibilityLabel="Keep playing"
+                testID="quiz-quit-cancel"
+              >
+                <Text className="text-body font-semibold text-text-primary">
+                  Keep playing
+                </Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </View>
   );
 }

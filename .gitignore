@@ -197,6 +197,9 @@ apps/mobile/e2e/scripts/regression-batch*.txt
 # entries here have historically held a Notion API key — keep gitignored.
 .tmp/
 .tmp_notion/
+# Notion REST query / debug scratch files at repo root (e.g. .tmp-bug-934.json,
+# .tmp-notion-envelope.json). The .tmp/ entry above only matches the directory.
+.tmp-*
 /results.json
 /.bug-bodies/
 /.bug-pages.txt
@@ -211,4 +214,6 @@ apps/mobile/e2e/scripts/regression-batch*.txt
 /.notion-status-update.json
 apps/api/.notion-*.json
 .claude/notion_bugs.json
+/notion_bugs_tmp.json
+/bug_ids.json
 .scratch/

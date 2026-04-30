@@ -146,4 +146,37 @@ describe('LanguageSetup', () => {
     expect(continueButton.props.accessibilityState?.disabled).toBe(true);
     expect(screen.queryByText(/^Continue$/i)).toBeNull();
   });
+
+  it('[BUG-692-FOLLOWUP] router.replace does not fire when user presses Back during configureLanguageSubject', async () => {
+    // Arrange: deferred mutation — stays pending until we resolve it.
+    let resolveMutation!: (value: { subject: { id: string } }) => void;
+    mockMutateAsync.mockReturnValue(
+      new Promise<{ subject: { id: string } }>((resolve) => {
+        resolveMutation = resolve;
+      })
+    );
+
+    render(<LanguageSetup />);
+
+    // Fire the mutation.
+    fireEvent.press(screen.getByTestId('language-setup-continue'));
+
+    // While mutation is in-flight, press Back (the bail-out).
+    fireEvent.press(screen.getByTestId('language-setup-back'));
+
+    // Resolve the mutation after back-navigation.
+    resolveMutation({ subject: { id: 'test-id' } });
+
+    // Allow microtasks to drain.
+    await new Promise((r) => setTimeout(r, 0));
+
+    // router.replace (navigation to accommodations) must NOT have been called —
+    // only the goBackOrReplace from Back should have fired.
+    expect(mockReplace).not.toHaveBeenCalled();
+    expect(mockGoBackOrReplace).toHaveBeenCalledTimes(1);
+    expect(mockGoBackOrReplace).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ pathname: '/(app)/onboarding/interview' })
+    );
+  });
 });

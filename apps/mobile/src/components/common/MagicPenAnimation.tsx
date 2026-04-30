@@ -74,8 +74,7 @@ const PATH_LENGTH = 160; // overestimate is safe
 //   y=50..52  chrome grip ring
 //   y=52..56  section cone (taper)
 //   y=56..60  metallic nib tip
-const PEN_CAP =
-  'M16 4 Q20 1 24 4 L26 22 L14 22 Z';
+const PEN_CAP = 'M16 4 Q20 1 24 4 L26 22 L14 22 Z';
 const PEN_BARREL = 'M14 24 L26 24 L26 40 L14 40 Z';
 const PEN_SECTION = 'M14 52 L26 52 L22 56 L18 56 Z';
 const PEN_NIB = 'M18 56 L22 56 L20 60 Z';
@@ -495,7 +494,12 @@ export function MagicPenAnimation({
             {/* Section cone tapering to nib */}
             <Path d={PEN_SECTION} fill={color} opacity={0.85} />
             {/* Metallic nib tip */}
-            <Path d={PEN_NIB} fill={CHROME_FILL} stroke={CHROME_STROKE} strokeWidth={0.3} />
+            <Path
+              d={PEN_NIB}
+              fill={CHROME_FILL}
+              stroke={CHROME_STROKE}
+              strokeWidth={0.3}
+            />
           </Svg>
 
           {/* Ink level fill overlay — animated height. Always rendered (the
@@ -516,8 +520,9 @@ export function MagicPenAnimation({
             ]}
           />
           {/* Subtle highlight on the ink fill (mimics liquid meniscus) */}
+          {/* [BUG-922] Move pointerEvents into style — props.pointerEvents is
+              deprecated on React Native Web. */}
           <View
-            pointerEvents="none"
             style={{
               position: 'absolute',
               left: (INK_WIN_X + 0.5) * penScaleFactor,
@@ -527,6 +532,7 @@ export function MagicPenAnimation({
               backgroundColor: '#ffffff',
               opacity: 0.25,
               borderRadius: 1,
+              pointerEvents: 'none',
             }}
           />
         </Animated.View>

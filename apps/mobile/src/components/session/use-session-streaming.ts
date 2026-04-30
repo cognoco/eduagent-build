@@ -272,33 +272,44 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
         const data = (await res.json()) as { session: { id: string } };
         newId = data.session.id;
       } else {
-        const result = await startSession.mutateAsync({
-          subjectId: sid,
-          topicId: topicId ?? undefined,
-          sessionType,
-          inputMode,
-          ...(verificationType
-            ? {
-                verificationType: verificationType as 'evaluate' | 'teach_back',
-              }
-            : {}),
-          ...(rawInput ? { rawInput } : {}),
-          metadata: {
+        // [IMP-3] Errors propagate to sendMessage's catch block, which
+        // classifies quota / reconnect / fatal failures and surfaces
+        // user-visible feedback. The explicit .catch + rethrow is how this
+        // intent is declared to the local/require-mutate-error-handling rule.
+        const result = await startSession
+          .mutateAsync({
+            subjectId: sid,
+            topicId: topicId ?? undefined,
+            sessionType,
             inputMode,
-            effectiveMode,
-            ...(resumeFromSessionId ? { resumeFromSessionId } : {}),
-            ...(effectiveMode === 'homework' && homeworkProblemsState.length > 0
+            ...(verificationType
               ? {
-                  homework: buildHomeworkSessionMetadata(
-                    homeworkProblemsState,
-                    currentProblemIndex,
-                    normalizedOcrText,
-                    homeworkCaptureSource
-                  ),
+                  verificationType: verificationType as
+                    | 'evaluate'
+                    | 'teach_back',
                 }
               : {}),
-          },
-        });
+            ...(rawInput ? { rawInput } : {}),
+            metadata: {
+              inputMode,
+              effectiveMode,
+              ...(resumeFromSessionId ? { resumeFromSessionId } : {}),
+              ...(effectiveMode === 'homework' &&
+              homeworkProblemsState.length > 0
+                ? {
+                    homework: buildHomeworkSessionMetadata(
+                      homeworkProblemsState,
+                      currentProblemIndex,
+                      normalizedOcrText,
+                      homeworkCaptureSource
+                    ),
+                  }
+                : {}),
+            },
+          })
+          .catch((err) => {
+            throw err;
+          });
         newId = result.session.id;
       }
       setActiveSessionId(newId);
@@ -329,8 +340,11 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
       topicId,
       effectiveMode,
       inputMode,
+      verificationType,
+      rawInput,
       apiClient,
       startSession,
+      setActiveSessionId,
       resumeFromSessionId,
       homeworkProblemsState,
       currentProblemIndex,
@@ -409,6 +423,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
       setMessages,
       silenceTimerRef,
       topicId,
+      topicName,
       trackerStateRef,
     ]
   );
@@ -498,11 +513,14 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
           }
         }
 
-        streamId = createLocalMessageId('ai');
+        // Capture into a local const so the closure below sees a definitely
+        // non-undefined id without a non-null assertion.
+        const newStreamId = createLocalMessageId('ai');
+        streamId = newStreamId;
         const previousAiAt = lastAiAtRef.current;
         setMessages((prev) => [
           ...prev,
-          { id: streamId!, role: 'assistant', content: '', streaming: true },
+          { id: newStreamId, role: 'assistant', content: '', streaming: true },
         ]);
         setIsStreaming(true);
         let chunkCount = 0;
@@ -805,6 +823,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
       subjectId,
       syncHomeworkMetadata,
       topicId,
+      topicName,
       trackerStateRef,
       trackExchange,
       // CR-2: trackerState removed — reads trackerStateRef.current inside body.

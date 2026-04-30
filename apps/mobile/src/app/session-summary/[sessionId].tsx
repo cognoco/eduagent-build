@@ -17,6 +17,7 @@ import { useParentProxy } from '../../hooks/use-parent-proxy';
 import { useUpdateLearningMode } from '../../hooks/use-settings';
 import { useRatingPrompt } from '../../hooks/use-rating-prompt';
 import {
+  useSession,
   useSessionTranscript,
   useSessionSummary,
   useSkipSummary,
@@ -41,6 +42,7 @@ import {
   ShimmerSkeleton,
   ErrorFallback,
 } from '../../components/common';
+import { FilingFailedBanner } from '../../components/session/FilingFailedBanner';
 
 // BUG-33 Phase 1: Structured sentence starters shown as suggestion chips
 // above the text input to reduce skip rate. Kid-friendly, plain language.
@@ -102,6 +104,7 @@ export default function SessionSummaryScreen() {
   const submitSummary = useSubmitSummary(sessionId ?? '');
   const skipSummary = useSkipSummary(sessionId ?? '');
   const updateLearningMode = useUpdateLearningMode();
+  const session = useSession(sessionId ?? '');
   const transcript = useSessionTranscript(sessionId ?? '');
   const { onSuccessfulRecall } = useRatingPrompt();
   const { activeProfile } = useProfile();
@@ -825,6 +828,8 @@ export default function SessionSummaryScreen() {
         className="flex-1 px-4 pt-4"
         contentContainerStyle={{ paddingBottom: 24 }}
       >
+        {session.data ? <FilingFailedBanner session={session.data} /> : null}
+
         {persisted?.closingLine ? (
           <Text
             className="text-body text-text-primary italic px-1 mb-3"

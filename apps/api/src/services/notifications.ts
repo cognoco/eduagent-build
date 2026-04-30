@@ -16,7 +16,7 @@ import {
   getPushToken,
   getDailyNotificationCount,
   logNotification,
-  getRecentNotificationCount,
+  checkAndLogRateLimitInternal,
 } from './settings';
 import { createLogger } from './logger';
 
@@ -43,7 +43,8 @@ export interface NotificationPayload {
     | 'struggle_noticed'
     | 'struggle_flagged'
     | 'struggle_resolved'
-    | 'dictation_review';
+    | 'dictation_review'
+    | 'session_filing_failed';
 }
 
 export interface NotificationResult {
@@ -90,7 +91,11 @@ export function isExpoPushToken(token: string): boolean {
  */
 export async function sendPushNotification(
   db: Database,
-  payload: NotificationPayload
+  payload: NotificationPayload,
+  // [BUG-856] When the caller already reserved the rate-limit slot via
+  // checkAndLogRateLimitInternal, set skipRateLimitLog to true so we do not
+  // double-count this push toward the daily cap or per-type rate limit.
+  options?: { skipRateLimitLog?: boolean }
 ): Promise<NotificationResult> {
   // 1. Get push token
   const token = await getPushToken(db, payload.profileId);
@@ -135,8 +140,12 @@ export async function sendPushNotification(
     };
     const ticketId = result.data?.id;
 
-    // 5. Log the notification
-    await logNotification(db, payload.profileId, payload.type, ticketId);
+    // 5. Log the notification (skipped when caller already reserved the slot
+    // via checkAndLogRateLimitInternal — avoids double-counting toward the
+    // daily cap on per-type rate-limited paths).
+    if (!options?.skipRateLimitLog) {
+      await logNotification(db, payload.profileId, payload.type, ticketId);
+    }
 
     return { sent: true, ticketId };
   } catch {
@@ -202,6 +211,13 @@ export function formatRecallNudge(
   };
 }
 
+export function formatFilingFailedPush(): { title: string; body: string } {
+  return {
+    title: 'Topic placement needs attention',
+    body: "We couldn't sort your last session into a topic. Tap to try again.",
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Email Notification Types — Story 0.5 (Parental Consent)
 // ---------------------------------------------------------------------------
@@ -222,6 +238,13 @@ export interface EmailPayload {
 export interface EmailOptions {
   resendApiKey?: string;
   emailFrom?: string;
+  /**
+   * [BUG-699] Optional idempotency key forwarded as the `Idempotency-Key`
+   * header to the Resend API. Used by Inngest-driven email steps so that
+   * transient failures + step retries do not result in the same email being
+   * delivered to the user multiple times. Resend dedupes within a 24h window.
+   */
+  idempotencyKey?: string;
 }
 
 export interface EmailResult {
@@ -251,12 +274,18 @@ export async function sendEmail(
   const from = options?.emailFrom ?? 'noreply@mentomate.com';
 
   try {
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    };
+    // [BUG-699] Forward idempotency key when provided. Inngest step retries
+    // can otherwise replay sendEmail calls and double-send to the user.
+    if (options?.idempotencyKey) {
+      headers['Idempotency-Key'] = options.idempotencyKey;
+    }
     const response = await fetch(RESEND_API_URL, {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify({
         from,
         to: [payload.to],
@@ -267,14 +296,16 @@ export async function sendEmail(
 
     if (!response.ok) {
       // Log only status code — error body may contain PII (echoed email addresses)
-      console.error(`[email] Resend API error: status ${response.status}`);
+      // [logging sweep] structured logger so PII fields land as JSON context
+      logger.error('[email] Resend API error', { status: response.status });
       return { sent: false, reason: `resend_api_error_${response.status}` };
     }
 
     const result = (await response.json()) as { id?: string };
     return { sent: true, messageId: result.id };
   } catch {
-    console.error('[email] Network error sending email');
+    // [logging sweep] structured logger so PII fields land as JSON context
+    logger.error('[email] Network error sending email');
     return { sent: false, reason: 'network_error' };
   }
 }
@@ -339,14 +370,17 @@ export async function notifyParentToSubscribe(
   emailOptions?: EmailOptions,
   appUrl?: string
 ): Promise<ParentSubscribeResult> {
-  // 1. Check rate limit — look for recent subscribe_request notifications
-  const recentCount = await getRecentNotificationCount(
+  // 1. [BUG-856] Atomic rate-limit check — counts recent subscribe_request
+  // notifications and reserves the rate-limit slot in a single transaction
+  // so two concurrent calls cannot both pass the count check and proceed.
+  // The advisory lock + insert serializes for this (profile, type) bucket.
+  const rateLimited = await checkAndLogRateLimitInternal(
     db,
     childProfileId,
     'subscribe_request',
-    SUBSCRIBE_RATE_LIMIT_HOURS
+    { hours: SUBSCRIBE_RATE_LIMIT_HOURS, maxCount: 1 }
   );
-  if (recentCount > 0) {
+  if (rateLimited) {
     return { sent: false, rateLimited: true, reason: 'rate_limited' };
   }
 
@@ -396,8 +430,8 @@ export async function notifyParentToSubscribe(
     );
   }
 
-  // 6. Log notification for rate limiting
-  await logNotification(db, childProfileId, 'subscribe_request');
+  // [BUG-856] Rate-limit slot was already reserved atomically in step 1.
+  // No additional log needed here.
 
   return { sent: true, rateLimited: false };
 }
@@ -461,13 +495,17 @@ export async function sendStruggleNotification(
   // notification fatigue when a learner struggles across several topics in
   // quick succession. The daily global cap in sendPushNotification is an
   // additional layer; this check prevents same-type redundancy.
-  const recentCount = await getRecentNotificationCount(
+  //
+  // [BUG-856] Atomic check + log via advisory lock — without this, two
+  // concurrent strugle signals for the same type both observed count=0 and
+  // both pushed, defeating the 24h dedup invariant.
+  const rateLimited = await checkAndLogRateLimitInternal(
     db,
     link.parentProfileId,
     notification.type,
-    24
+    { hours: 24, maxCount: 1 }
   );
-  if (recentCount > 0) {
+  if (rateLimited) {
     logger.info('Struggle notification deduped', {
       event: 'notification.struggle.deduped',
       childProfileId,
@@ -489,10 +527,17 @@ export async function sendStruggleNotification(
     childName
   );
 
-  return sendPushNotification(db, {
-    profileId: link.parentProfileId,
-    title: copy.title,
-    body: copy.body,
-    type: notification.type,
-  });
+  return sendPushNotification(
+    db,
+    {
+      profileId: link.parentProfileId,
+      title: copy.title,
+      body: copy.body,
+      type: notification.type,
+    },
+    // [BUG-856] Slot already reserved by checkAndLogRateLimitInternal above
+    // for the same (parentProfileId, type) bucket — skip the push log so we
+    // do not record two rows for the same notification.
+    { skipRateLimitLog: true }
+  );
 }

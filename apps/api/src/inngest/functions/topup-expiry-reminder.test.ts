@@ -188,6 +188,35 @@ describe('topupExpiryReminder', () => {
     expect(mockInngestSend).not.toHaveBeenCalled();
   });
 
+  it('[BUG-838] does not throw when system clock returns an invalid date', async () => {
+    // Break test: the previous getExpiryWindowForMilestone called
+    // target.toISOString() unconditionally; an Invalid Date would throw
+    // RangeError and abort the entire reminder batch. The guarded version
+    // returns null and skips the milestone instead.
+    const originalDate = global.Date;
+    class BrokenDate extends originalDate {
+      constructor(...args: ConstructorParameters<typeof Date>) {
+        if (args.length === 0) {
+          super(NaN);
+          return;
+        }
+        super(...args);
+      }
+    }
+    // @ts-expect-error — temporarily override Date for the in-handler `new Date()`
+    global.Date = BrokenDate;
+
+    try {
+      mockFindExpiringTopUpCredits.mockResolvedValue([]);
+      const { result } = await executeSteps();
+      // Cron must still resolve cleanly even though the clock is invalid —
+      // not throw a RangeError up to Inngest.
+      expect((result as { status: string }).status).toBe('completed');
+    } finally {
+      global.Date = originalDate;
+    }
+  });
+
   it('checks all four reminder milestones', async () => {
     mockFindExpiringTopUpCredits.mockResolvedValue([]);
 

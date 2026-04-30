@@ -235,6 +235,31 @@ describe('dashboard routes', () => {
 
       expect(res.status).toBe(401);
     });
+
+    it('demo summary mentions every subject by its canonical name [BUG-876]', async () => {
+      // Regression: dashboard summary copy used "Math" while the subjects
+      // array used "Mathematics", confusing users about which subject was
+      // referenced. Each child's summary string must match the names in
+      // their subjects[] list verbatim, so library/progress/shelf/dashboard
+      // all read the same word for the same subject.
+      const res = await app.request(
+        '/v1/dashboard/demo',
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+      const body = await res.json();
+
+      for (const child of body.children) {
+        for (const subject of child.subjects) {
+          expect(child.summary).toContain(subject.name);
+        }
+        // Specifically: Alex should reference "Mathematics", not "Math".
+        if (child.profileId === 'demo-child-1') {
+          expect(child.summary).toContain('Mathematics');
+          expect(child.summary).not.toMatch(/\bMath\b(?!ematics)/);
+        }
+      }
+    });
   });
 
   // -------------------------------------------------------------------------

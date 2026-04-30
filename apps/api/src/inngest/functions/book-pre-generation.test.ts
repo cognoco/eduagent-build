@@ -187,24 +187,23 @@ describe('bookPreGeneration', () => {
 
   describe('pre-generation for next books', () => {
     it('generates topics for the next books and persists them', async () => {
-      // Current book found
-      mockDb.query.curriculumBooks.findFirst.mockResolvedValueOnce({
-        id: 'book-001',
-        sortOrder: 1,
-        subjectId: 'subject-001',
-      });
-
-      // Next books found
-      const nextBooks = [
-        {
+      // [BUG-779] findFirst is now called twice: once for current book in
+      // prep step, once per next book in the per-book step (topicsGenerated
+      // re-check). Provide both responses in order.
+      mockDb.query.curriculumBooks.findFirst
+        .mockResolvedValueOnce({
+          id: 'book-001',
+          sortOrder: 1,
+          subjectId: 'subject-001',
+        })
+        .mockResolvedValueOnce({
           id: 'book-002',
           title: 'Ancient Greece',
           description: 'Gods and heroes',
-          sortOrder: 2,
-          subjectId: 'subject-001',
           topicsGenerated: false,
-        },
-      ];
+        });
+
+      const nextBooks = [{ id: 'book-002' }];
       mockSelectChain.limit.mockResolvedValueOnce(nextBooks);
 
       // Profile found with birthYear
@@ -239,25 +238,22 @@ describe('bookPreGeneration', () => {
     });
 
     it('generates topics for up to 2 next books', async () => {
-      mockDb.query.curriculumBooks.findFirst.mockResolvedValueOnce({
-        id: 'book-001',
-        sortOrder: 1,
-      });
-
-      const nextBooks = [
-        {
+      mockDb.query.curriculumBooks.findFirst
+        .mockResolvedValueOnce({ id: 'book-001', sortOrder: 1 })
+        .mockResolvedValueOnce({
           id: 'book-002',
           title: 'Ancient Greece',
           description: 'Gods and heroes',
-          sortOrder: 2,
-        },
-        {
+          topicsGenerated: false,
+        })
+        .mockResolvedValueOnce({
           id: 'book-003',
           title: 'Roman Empire',
           description: 'Legions and roads',
-          sortOrder: 3,
-        },
-      ];
+          topicsGenerated: false,
+        });
+
+      const nextBooks = [{ id: 'book-002' }, { id: 'book-003' }];
       mockSelectChain.limit.mockResolvedValueOnce(nextBooks);
 
       mockDb.query.profiles.findFirst.mockResolvedValueOnce({
@@ -280,19 +276,16 @@ describe('bookPreGeneration', () => {
 
   describe('missing profile fallback', () => {
     it('defaults to age 12 when profile is not found', async () => {
-      mockDb.query.curriculumBooks.findFirst.mockResolvedValueOnce({
-        id: 'book-001',
-        sortOrder: 1,
-      });
-
-      const nextBooks = [
-        {
+      mockDb.query.curriculumBooks.findFirst
+        .mockResolvedValueOnce({ id: 'book-001', sortOrder: 1 })
+        .mockResolvedValueOnce({
           id: 'book-002',
           title: 'Ancient Greece',
           description: '',
-          sortOrder: 2,
-        },
-      ];
+          topicsGenerated: false,
+        });
+
+      const nextBooks = [{ id: 'book-002' }];
       mockSelectChain.limit.mockResolvedValueOnce(nextBooks);
 
       // Profile not found — null is the default
@@ -310,19 +303,16 @@ describe('bookPreGeneration', () => {
 
   describe('error handling', () => {
     it('propagates errors from generateBookTopics', async () => {
-      mockDb.query.curriculumBooks.findFirst.mockResolvedValueOnce({
-        id: 'book-001',
-        sortOrder: 1,
-      });
-
-      const nextBooks = [
-        {
+      mockDb.query.curriculumBooks.findFirst
+        .mockResolvedValueOnce({ id: 'book-001', sortOrder: 1 })
+        .mockResolvedValueOnce({
           id: 'book-002',
           title: 'Ancient Greece',
           description: 'Gods and heroes',
-          sortOrder: 2,
-        },
-      ];
+          topicsGenerated: false,
+        });
+
+      const nextBooks = [{ id: 'book-002' }];
       mockSelectChain.limit.mockResolvedValueOnce(nextBooks);
 
       mockDb.query.profiles.findFirst.mockResolvedValueOnce({
@@ -340,19 +330,16 @@ describe('bookPreGeneration', () => {
     });
 
     it('propagates errors from persistBookTopics', async () => {
-      mockDb.query.curriculumBooks.findFirst.mockResolvedValueOnce({
-        id: 'book-001',
-        sortOrder: 1,
-      });
-
-      const nextBooks = [
-        {
+      mockDb.query.curriculumBooks.findFirst
+        .mockResolvedValueOnce({ id: 'book-001', sortOrder: 1 })
+        .mockResolvedValueOnce({
           id: 'book-002',
           title: 'Ancient Greece',
           description: 'Gods',
-          sortOrder: 2,
-        },
-      ];
+          topicsGenerated: false,
+        });
+
+      const nextBooks = [{ id: 'book-002' }];
       mockSelectChain.limit.mockResolvedValueOnce(nextBooks);
 
       mockDb.query.profiles.findFirst.mockResolvedValueOnce({
@@ -370,19 +357,16 @@ describe('bookPreGeneration', () => {
     });
 
     it('uses empty string for null book description', async () => {
-      mockDb.query.curriculumBooks.findFirst.mockResolvedValueOnce({
-        id: 'book-001',
-        sortOrder: 1,
-      });
-
-      const nextBooks = [
-        {
+      mockDb.query.curriculumBooks.findFirst
+        .mockResolvedValueOnce({ id: 'book-001', sortOrder: 1 })
+        .mockResolvedValueOnce({
           id: 'book-002',
           title: 'Ancient Greece',
-          description: null, // null description
-          sortOrder: 2,
-        },
-      ];
+          description: null,
+          topicsGenerated: false,
+        });
+
+      const nextBooks = [{ id: 'book-002' }];
       mockSelectChain.limit.mockResolvedValueOnce(nextBooks);
 
       mockDb.query.profiles.findFirst.mockResolvedValueOnce({
@@ -397,6 +381,83 @@ describe('bookPreGeneration', () => {
         '', // description ?? '' fallback
         expect.any(Number)
       );
+    });
+  });
+
+  describe('[BUG-779] per-book idempotency', () => {
+    it('skips LLM call for a next book whose topicsGenerated is already true', async () => {
+      // Belt + suspenders for the per-book step.run cache: even if Inngest
+      // chose to re-run a successful step (e.g. step id changes between
+      // deploys, or a parallel pre-gen flow already filled this book),
+      // the in-step re-check prevents a wasted LLM call.
+      mockDb.query.curriculumBooks.findFirst
+        .mockResolvedValueOnce({ id: 'book-001', sortOrder: 1 })
+        // Per-book re-check returns topicsGenerated=true — must short-circuit.
+        .mockResolvedValueOnce({
+          id: 'book-002',
+          title: 'Ancient Greece',
+          description: 'Gods and heroes',
+          topicsGenerated: true,
+        });
+
+      const nextBooks = [{ id: 'book-002' }];
+      mockSelectChain.limit.mockResolvedValueOnce(nextBooks);
+
+      mockDb.query.profiles.findFirst.mockResolvedValueOnce({
+        id: 'profile-001',
+        birthYear: 2014,
+      });
+
+      const { result } = await executeSteps(createEventData());
+
+      expect(mockGenerateBookTopics).not.toHaveBeenCalled();
+      expect(mockPersistBookTopics).not.toHaveBeenCalled();
+      expect(result).toEqual(
+        expect.objectContaining({
+          status: 'completed',
+          generated: [], // book-002 was already generated, nothing new
+        })
+      );
+    });
+
+    it('uses a unique step id per book so successful steps cache across retries', async () => {
+      // The per-book step ids must be deterministic AND unique. If the loop
+      // ever regressed to a single shared step.run id, Inngest's step cache
+      // would conflate book-002 and book-003, replaying the wrong work on
+      // retry. Asserting the literal step ids guards that contract.
+      mockDb.query.curriculumBooks.findFirst
+        .mockResolvedValueOnce({ id: 'book-001', sortOrder: 1 })
+        .mockResolvedValueOnce({
+          id: 'book-002',
+          title: 'Ancient Greece',
+          description: '',
+          topicsGenerated: false,
+        })
+        .mockResolvedValueOnce({
+          id: 'book-003',
+          title: 'Roman Empire',
+          description: '',
+          topicsGenerated: false,
+        });
+
+      const nextBooks = [{ id: 'book-002' }, { id: 'book-003' }];
+      mockSelectChain.limit.mockResolvedValueOnce(nextBooks);
+
+      mockDb.query.profiles.findFirst.mockResolvedValueOnce({
+        id: 'profile-001',
+        birthYear: 2014,
+      });
+
+      const { mockStep } = (await executeSteps(createEventData())) as any;
+
+      const stepIds = (mockStep.run.mock.calls as Array<[string, unknown]>).map(
+        (call) => call[0]
+      );
+      expect(stepIds).toEqual([
+        'load-pre-generation-context',
+        'generate-book-book-002',
+        'generate-book-book-003',
+      ]);
     });
   });
 });

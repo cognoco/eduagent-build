@@ -3,12 +3,14 @@ import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
-import { OCR_CONSTRAINTS, ocrResultSchema } from '@eduagent/schemas';
-import { validationError } from '../errors';
+import {
+  OCR_CONSTRAINTS,
+  ocrResultSchema,
+  ERROR_CODES,
+} from '@eduagent/schemas';
+import { validationError, apiError } from '../errors';
 import { startSession, SubjectInactiveError } from '../services/session';
 import { getOcrProvider } from '../services/ocr';
-import { apiError } from '../errors';
-import { ERROR_CODES } from '@eduagent/schemas';
 import { captureException } from '../services/sentry';
 
 type HomeworkRouteEnv = {
@@ -82,10 +84,17 @@ export const homeworkRoutes = new Hono<HomeworkRouteEnv>()
     let provider;
     try {
       provider = getOcrProvider(c.env.GEMINI_API_KEY);
-    } catch {
+    } catch (err) {
+      // [FIX-API-5] 500 (not 503): missing config is a permanent server error,
+      // not a transient service unavailability. Capture to Sentry so ops can see
+      // how many requests hit an unconfigured OCR provider.
+      captureException(err, {
+        requestPath: '/ocr',
+        extra: { context: 'ocr.provider_config' },
+      });
       return apiError(
         c,
-        503,
+        500,
         ERROR_CODES.INTERNAL_ERROR,
         'OCR service is not configured. Please contact support.'
       );

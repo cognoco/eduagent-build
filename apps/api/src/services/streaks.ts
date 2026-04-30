@@ -7,6 +7,8 @@ import { eq, and } from 'drizzle-orm';
 import {
   createScopedRepository,
   streaks,
+  daysBetween,
+  MAX_GRACE_DAYS,
   type Database,
 } from '@eduagent/database';
 import type { Streak, XpSummary } from '@eduagent/schemas';
@@ -24,36 +26,8 @@ export interface StreakUpdate {
   message?: string;
 }
 
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
-/** Maximum number of grace period days before streak resets */
-const MAX_GRACE_DAYS = 3;
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/** Parse ISO date string (YYYY-MM-DD) to Date object at midnight UTC */
-function parseDate(dateStr: string): Date {
-  const parts = dateStr.split('-').map(Number);
-  const year = parts[0];
-  const month = parts[1];
-  const day = parts[2];
-  if (year == null || month == null || day == null) {
-    throw new Error(`Invalid date string: ${dateStr}`);
-  }
-  return new Date(Date.UTC(year, month - 1, day));
-}
-
-/** Calculate the number of days between two ISO date strings */
-function daysBetween(dateA: string, dateB: string): number {
-  const a = parseDate(dateA);
-  const b = parseDate(dateB);
-  const diffMs = Math.abs(b.getTime() - a.getTime());
-  return Math.round(diffMs / (24 * 60 * 60 * 1000));
-}
+// MAX_GRACE_DAYS and daysBetween are re-exported from @eduagent/database/streaks-rules
+// so they are available to any caller that previously imported them from here.
 
 // ---------------------------------------------------------------------------
 // Factory
@@ -201,15 +175,20 @@ export function getStreakDisplayInfo(
 // DB-aware query functions (Sprint 8 Phase 1 — route wiring)
 // ---------------------------------------------------------------------------
 
-/** Get streak state from DB for a profile, with display info */
+/**
+ * Get streak state from DB for a profile, with display info.
+ * Delegates to `repo.streaks.findCurrentForToday()` so decay-on-read is
+ * applied at the repository layer.
+ */
 export async function getStreakData(
   db: Database,
   profileId: string
 ): Promise<Streak> {
   const repo = createScopedRepository(db, profileId);
-  const row = await repo.streaks.findFirst();
+  const today = new Date().toISOString().slice(0, 10);
+  const result = await repo.streaks.findCurrentForToday(today);
 
-  if (!row) {
+  if (!result) {
     return {
       currentStreak: 0,
       longestStreak: 0,
@@ -220,23 +199,13 @@ export async function getStreakData(
     };
   }
 
-  const state: StreakState = {
-    currentStreak: row.currentStreak,
-    longestStreak: row.longestStreak,
-    lastActivityDate: row.lastActivityDate,
-    gracePeriodStartDate: row.gracePeriodStartDate,
-  };
-
-  const today = new Date().toISOString().slice(0, 10);
-  const display = getStreakDisplayInfo(state, today);
-
   return {
-    currentStreak: state.currentStreak,
-    longestStreak: state.longestStreak,
-    lastActivityDate: state.lastActivityDate,
-    gracePeriodStartDate: state.gracePeriodStartDate,
-    isOnGracePeriod: display.isOnGracePeriod,
-    graceDaysRemaining: display.graceDaysRemaining,
+    currentStreak: result.currentStreak,
+    longestStreak: result.longestStreak,
+    lastActivityDate: result.lastActivityDate,
+    gracePeriodStartDate: result.gracePeriodStartDate,
+    isOnGracePeriod: result.isOnGracePeriod,
+    graceDaysRemaining: result.graceDaysRemaining,
   };
 }
 

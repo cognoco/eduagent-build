@@ -78,6 +78,15 @@ jest.mock('../../services/notifications', () => ({
     mockSendPushNotification(...args),
 }));
 
+// [BUG-699-FOLLOWUP] getRecentNotificationCount gates dedup: default 0 so
+// existing tests continue to send. Individual tests override to simulate a
+// prior successful send (retry path).
+const mockGetRecentNotificationCount = jest.fn().mockResolvedValue(0);
+jest.mock('../../services/settings', () => ({
+  getRecentNotificationCount: (...args: unknown[]) =>
+    mockGetRecentNotificationCount(...args),
+}));
+
 const mockFindOwnerProfile = jest.fn();
 jest.mock('../../services/profile', () => ({
   findOwnerProfile: (...args: unknown[]) => mockFindOwnerProfile(...args),
@@ -582,6 +591,40 @@ describe('trialExpiry', () => {
       );
 
       expect(result.warningsSent).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // [BUG-699-FOLLOWUP] Retry dedup via notificationLog
+  // The send-trial-warnings and send-soft-landing-messages steps both loop
+  // over trials and call sendPushNotification per trial. If Inngest retries
+  // the step, it replays every per-trial send. The fix: check
+  // getRecentNotificationCount for trial_expiry within 24h before sending;
+  // if count > 0 the notification was already delivered on a previous attempt.
+  // -------------------------------------------------------------------------
+  describe('[BUG-699-FOLLOWUP] retry dedup — skips send when notificationLog already has trial_expiry entry', () => {
+    it('does NOT call sendPushNotification on retry when prior attempt already logged a trial_expiry', async () => {
+      const trialEndingSoon = {
+        id: 'sub-dedup',
+        accountId: 'acc-dedup',
+        status: 'trial',
+        trialEndsAt: '2025-01-18T12:00:00.000Z',
+      };
+
+      mockFindExpiredTrials.mockResolvedValueOnce([]);
+      mockFindSubscriptionsByTrialDateRange
+        .mockResolvedValueOnce([trialEndingSoon]) // 3-day warning
+        .mockResolvedValue([]);
+
+      // Simulate: prior run already wrote a trial_expiry log entry for this
+      // owner profile. getRecentNotificationCount returns 1 → dedup fires.
+      mockGetRecentNotificationCount.mockResolvedValue(1);
+
+      const { result } = await executeSteps();
+
+      // No push sent — dedup guard blocked it.
+      expect(mockSendPushNotification).not.toHaveBeenCalled();
+      expect(result.warningsSent).toBe(0);
     });
   });
 });

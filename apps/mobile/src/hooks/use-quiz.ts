@@ -106,15 +106,22 @@ export function useFetchRound(
 export function useCheckAnswer(): UseMutationResult<
   QuestionCheckResponse,
   Error,
-  { roundId: string; questionIndex: number; answerGiven: string }
+  {
+    roundId: string;
+    questionIndex: number;
+    answerGiven: string;
+    answerMode?: 'free_text' | 'multiple_choice';
+  }
 > {
   const client = useApiClient();
 
   return useMutation({
-    mutationFn: async ({ roundId, questionIndex, answerGiven }) => {
+    mutationFn: async ({ roundId, questionIndex, answerGiven, answerMode }) => {
       const res = await client.quiz.rounds[':id'].check.$post({
         param: { id: roundId },
-        json: { questionIndex, answerGiven },
+        // [BUG-STALE-OPTIONS] Pass answerMode so the API can verify MC answers
+        // are in question.options — defense-in-depth against stale-options race.
+        json: { questionIndex, answerGiven, answerMode },
       });
       await assertOk(res);
       return (await res.json()) as QuestionCheckResponse;

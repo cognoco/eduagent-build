@@ -3,6 +3,36 @@
 @tailwind utilities;
 
 /*
+ * Web-only viewport height anchor.
+ *
+ * React Native Web mounts the app tree as a child of #root with
+ * `flex: 1 1 0%`. Two things are required for that flex-grow to actually
+ * expand to viewport height:
+ *   1. html/body/#root must have a defined height (otherwise there's no
+ *      anchor for `height: 100%` to resolve against).
+ *   2. #root must be `display: flex` — `flex-grow` is meaningless inside
+ *      a `display: block` parent, so the child collapses to content height.
+ * Without (2) the cream background View stretches a bit but the inner
+ * tree still shrinks, leaving the tab bar floating in the middle of the
+ * page. These selectors don't match anything on native (NativeWind only
+ * consumes CSS variables there), so this is web-only by construction.
+ */
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+}
+
+/*
  * Fallback values for Tailwind build-time processing.
  * Runtime values are injected from design-tokens.ts via NativeWind vars().
  * The :root block mirrors the teen dark theme (default for unauthenticated screens).

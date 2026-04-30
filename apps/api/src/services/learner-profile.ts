@@ -20,7 +20,12 @@ import {
   type StruggleEntry,
 } from '@eduagent/schemas';
 import { routeAndCall, type ChatMessage } from './llm';
-import { escapeXml, sanitizeXmlValue } from './llm/sanitize';
+import {
+  escapeXml,
+  renderPromptTemplate,
+  sanitizeXmlValue,
+} from './llm/sanitize';
+import { projectAiResponseContent } from './llm/project-response';
 import { createLogger } from './logger';
 import { captureException } from './sentry';
 
@@ -1153,7 +1158,8 @@ export async function applyAnalysis(
   subjectId?: string | null
 ): Promise<ApplyAnalysisResult> {
   if (analysis.confidence === 'low') {
-    console.info('[learner-profile] Low-confidence analysis skipped', {
+    // [logging sweep] structured logger so PII fields land as JSON context
+    logger.info('[learner-profile] Low-confidence analysis skipped', {
       event: 'learner_profile.analysis.low_confidence',
       profileId,
     });
@@ -1198,7 +1204,8 @@ export async function applyAnalysis(
   }
 
   if (finalNotifications.length > 0) {
-    console.info('[learner-profile] Struggle notifications emitted', {
+    // [logging sweep] structured logger so PII fields land as JSON context
+    logger.info('[learner-profile] Struggle notifications emitted', {
       event: 'learner_profile.struggle.notifications',
       profileId,
       notifications: finalNotifications.map((n) => ({
@@ -1211,14 +1218,16 @@ export async function applyAnalysis(
   // Epic 7 FR165.3: Write urgency boost when test/deadline detected
   // [CR-119.3]: Prefer subjectId for exact match — fall back to name only
   // when the caller doesn't have an ID (e.g. manual analysis calls).
-  if (analysis.urgencyDeadline && (subjectId || subjectName)) {
+  const subjectFilter = subjectId
+    ? eq(subjects.id, subjectId)
+    : subjectName
+    ? eq(subjects.name, subjectName)
+    : null;
+  if (analysis.urgencyDeadline && subjectFilter) {
     try {
       const boostUntil = new Date(
         Date.now() + analysis.urgencyDeadline.daysFromNow * 24 * 60 * 60 * 1000
       );
-      const subjectFilter = subjectId
-        ? eq(subjects.id, subjectId)
-        : eq(subjects.name, subjectName!);
       await db
         .update(subjects)
         .set({
@@ -1238,7 +1247,8 @@ export async function applyAnalysis(
     }
   }
 
-  console.info('[learner-profile] Analysis applied', {
+  // [logging sweep] structured logger so PII fields land as JSON context
+  logger.info('[learner-profile] Analysis applied', {
     event: 'learner_profile.analysis.completed',
     profileId,
     fieldsUpdated: finalFieldsUpdated,
@@ -1487,13 +1497,18 @@ export async function analyzeSessionTranscript(
   // cannot close the wrapping <transcript> tag. Wrap the joined transcript
   // so the model can distinguish data from directives (the system prompt
   // notice above references this tag).
+  // [BUG-934] Legacy ai_response rows may store raw envelope JSON. Project
+  // to plain reply text before building the XML so the LLM sees clean prose.
   const transcriptBody = conversationEvents
-    .map(
-      (entry) =>
-        `${entry.eventType === 'user_message' ? 'Learner' : 'Mentor'}: ${escapeXml(
-          entry.content
-        )}`
-    )
+    .map((entry) => {
+      const text =
+        entry.eventType === 'ai_response'
+          ? projectAiResponseContent(entry.content, { silent: true })
+          : entry.content;
+      return `${
+        entry.eventType === 'user_message' ? 'Learner' : 'Mentor'
+      }: ${escapeXml(text)}`;
+    })
     .join('\n\n');
   const transcriptText = `<transcript>\n${transcriptBody}\n</transcript>`;
 
@@ -1530,11 +1545,16 @@ export async function analyzeSessionTranscript(
   const safeTopic = sanitizeXmlValue(topicTitle ?? 'General', 200);
   const safeRawInput = rawInput ? escapeXml(rawInput) : '(none)';
 
-  const systemPrompt = SESSION_ANALYSIS_PROMPT.replace('{subject}', safeSubject)
-    .replace('{topic}', safeTopic)
-    .replace('{rawInput}', safeRawInput)
-    .replaceAll('{knownStruggles}', knownStrugglesLabel)
-    .replaceAll('{suppressedTopics}', suppressedLabel);
+  // [BUG-773 / S-17] Single-pass token substitution. Chained .replace was
+  // vulnerable to curly-brace injection: a value like `{topic}` smuggled in
+  // an earlier substitution would be re-substituted on the next chained call.
+  const systemPrompt = renderPromptTemplate(SESSION_ANALYSIS_PROMPT, {
+    subject: safeSubject,
+    topic: safeTopic,
+    rawInput: safeRawInput,
+    knownStruggles: knownStrugglesLabel,
+    suppressedTopics: suppressedLabel,
+  });
 
   const messages: ChatMessage[] = [
     { role: 'system', content: systemPrompt },

@@ -17,6 +17,7 @@ const BAR_COLORS: Record<WarningLevel, string> = {
 export function UsageMeter({ used, limit, warningLevel }: UsageMeterProps) {
   const percentage = limit > 0 ? Math.min((used / limit) * 100, 100) : 0;
   const barColor = BAR_COLORS[warningLevel];
+  const clampedUsed = Math.min(used, limit);
 
   return (
     <View>
@@ -28,7 +29,13 @@ export function UsageMeter({ used, limit, warningLevel }: UsageMeterProps) {
           {Math.round(percentage)}%
         </Text>
       </View>
-      <View className="h-2.5 bg-border rounded-full overflow-hidden">
+      <View
+        accessible
+        accessibilityRole="progressbar"
+        accessibilityLabel={`Usage: ${used} of ${limit} questions used`}
+        accessibilityValue={{ min: 0, max: limit, now: clampedUsed }}
+        className="h-2.5 bg-border rounded-full overflow-hidden"
+      >
         <View
           className={`h-full rounded-full ${barColor}`}
           style={{ width: `${percentage}%` }}

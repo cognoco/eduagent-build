@@ -18,6 +18,7 @@ export type { StopReason, StopReasonProvider } from './stop-reason';
 export {
   parseEnvelope,
   isRecognizedMarker,
+  extractReplyCandidate,
   KNOWN_MARKER_KEYS,
 } from './envelope';
 export { streamEnvelopeReply, teeEnvelopeStream } from './stream-envelope';

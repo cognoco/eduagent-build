@@ -189,9 +189,10 @@ function formatUnsupportedVerificationMessage(strategies: string[]): string {
     return 'This account needs an additional verification method that is not available on mobile yet.';
   }
 
-  if (strategies.length === 1) {
+  const [first] = strategies;
+  if (strategies.length === 1 && first) {
     return `This account requires ${describeVerificationStrategy(
-      strategies[0]!
+      first
     )} which isn't available on mobile yet.`;
   }
 
@@ -689,7 +690,6 @@ export default function SignInScreen() {
       clearVerificationFlow,
       handleIncompleteSignIn,
       isLoaded,
-      setActive,
       startSSOFlow,
     ]
   );

@@ -47,36 +47,47 @@ export const needsDeepeningStatusEnum = pgEnum('needs_deepening_status', [
   'resolved',
 ]);
 
-export const assessments = pgTable('assessments', {
-  id: uuid('id')
-    .primaryKey()
-    .$defaultFn(() => generateUUIDv7()),
-  profileId: uuid('profile_id')
-    .notNull()
-    .references(() => profiles.id, { onDelete: 'cascade' }),
-  subjectId: uuid('subject_id')
-    .notNull()
-    .references(() => subjects.id, { onDelete: 'cascade' }),
-  topicId: uuid('topic_id')
-    .notNull()
-    .references(() => curriculumTopics.id, { onDelete: 'cascade' }),
-  sessionId: uuid('session_id').references(() => learningSessions.id, {
-    onDelete: 'cascade',
-  }),
-  verificationDepth: verificationDepthEnum('verification_depth')
-    .notNull()
-    .default('recall'),
-  status: assessmentStatusEnum('status').notNull().default('in_progress'),
-  masteryScore: numericAsNumber('mastery_score', { precision: 3, scale: 2 }),
-  qualityRating: integer('quality_rating'),
-  exchangeHistory: jsonb('exchange_history').notNull().default([]),
-  createdAt: timestamp('created_at', { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+export const assessments = pgTable(
+  'assessments',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .$defaultFn(() => generateUUIDv7()),
+    profileId: uuid('profile_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    subjectId: uuid('subject_id')
+      .notNull()
+      .references(() => subjects.id, { onDelete: 'cascade' }),
+    topicId: uuid('topic_id')
+      .notNull()
+      .references(() => curriculumTopics.id, { onDelete: 'cascade' }),
+    sessionId: uuid('session_id').references(() => learningSessions.id, {
+      onDelete: 'cascade',
+    }),
+    verificationDepth: verificationDepthEnum('verification_depth')
+      .notNull()
+      .default('recall'),
+    status: assessmentStatusEnum('status').notNull().default('in_progress'),
+    masteryScore: numericAsNumber('mastery_score', { precision: 3, scale: 2 }),
+    qualityRating: integer('quality_rating'),
+    exchangeHistory: jsonb('exchange_history').notNull().default([]),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index('assessments_profile_topic_idx').on(table.profileId, table.topicId),
+    index('assessments_topic_id_idx').on(table.topicId),
+    check(
+      'assessments_mastery_score_range',
+      sql`${table.masteryScore} IS NULL OR (${table.masteryScore} >= 0 AND ${table.masteryScore} <= 1)`
+    ),
+  ]
+);
 
 export const retentionCards = pgTable(
   'retention_cards',
@@ -121,30 +132,40 @@ export const retentionCards = pgTable(
   ]
 );
 
-export const needsDeepeningTopics = pgTable('needs_deepening_topics', {
-  id: uuid('id')
-    .primaryKey()
-    .$defaultFn(() => generateUUIDv7()),
-  profileId: uuid('profile_id')
-    .notNull()
-    .references(() => profiles.id, { onDelete: 'cascade' }),
-  subjectId: uuid('subject_id')
-    .notNull()
-    .references(() => subjects.id, { onDelete: 'cascade' }),
-  topicId: uuid('topic_id')
-    .notNull()
-    .references(() => curriculumTopics.id, { onDelete: 'cascade' }),
-  status: needsDeepeningStatusEnum('status').notNull().default('active'),
-  consecutiveSuccessCount: integer('consecutive_success_count')
-    .notNull()
-    .default(0),
-  createdAt: timestamp('created_at', { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+export const needsDeepeningTopics = pgTable(
+  'needs_deepening_topics',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .$defaultFn(() => generateUUIDv7()),
+    profileId: uuid('profile_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    subjectId: uuid('subject_id')
+      .notNull()
+      .references(() => subjects.id, { onDelete: 'cascade' }),
+    topicId: uuid('topic_id')
+      .notNull()
+      .references(() => curriculumTopics.id, { onDelete: 'cascade' }),
+    status: needsDeepeningStatusEnum('status').notNull().default('active'),
+    consecutiveSuccessCount: integer('consecutive_success_count')
+      .notNull()
+      .default(0),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index('needs_deepening_profile_topic_idx').on(
+      table.profileId,
+      table.topicId
+    ),
+    index('needs_deepening_topic_id_idx').on(table.topicId),
+  ]
+);
 
 export const analogyDomainEnum = pgEnum('analogy_domain', [
   'cooking',

@@ -21,6 +21,15 @@ import { routeAndCall } from '../llm';
 import { completeQuizRound } from './complete-round';
 import { generateQuizRound } from './generate-round';
 import { getVocabularyRoundContext } from './queries';
+import { QUIZ_CONFIG } from './config';
+
+// [CR-758] Single source of truth for the expected vocabulary round size.
+// Previously the test asserted `toHaveLength(6)` and `total).toBe(6)` with
+// no derivation — if QUIZ_CONFIG.perActivity.vocabulary.roundSize ever
+// changed, the test would silently fail with a misleading "expected 6"
+// message. Reading from the config makes the test self-documenting AND
+// ensures it tracks the production-shipped value.
+const VOCAB_ROUND_SIZE = QUIZ_CONFIG.perActivity.vocabulary.roundSize;
 
 loadDatabaseEnv(resolve(__dirname, '../../../../..'));
 
@@ -239,7 +248,7 @@ describe('vocabulary quiz round lifecycle (integration)', () => {
       allVocabulary: context.allVocabulary,
     });
 
-    expect(round.questions).toHaveLength(6);
+    expect(round.questions).toHaveLength(VOCAB_ROUND_SIZE);
     const masteryQuestions = round.questions.filter(
       (question): question is Extract<QuizQuestion, { type: 'vocabulary' }> =>
         question.type === 'vocabulary' && question.isLibraryItem
@@ -293,7 +302,7 @@ describe('vocabulary quiz round lifecycle (integration)', () => {
       round.id,
       results
     );
-    expect(completion.total).toBe(6);
+    expect(completion.total).toBe(VOCAB_ROUND_SIZE);
 
     const afterCards = await db.query.vocabularyRetentionCards.findMany({
       where: inArray(vocabularyRetentionCards.vocabularyId, masteryIds),

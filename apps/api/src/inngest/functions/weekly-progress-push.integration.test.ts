@@ -6,6 +6,7 @@ import {
   createDatabase,
   familyLinks,
   generateUUIDv7,
+  notificationLog,
   notificationPreferences,
   progressSnapshots,
   profiles,
@@ -502,6 +503,75 @@ describe('weekly progress push integration', () => {
       parentId: parentProfileId,
     });
     expect(pushApiCalls).toHaveLength(0);
+  });
+
+  // [BUG-699-FOLLOWUP] 24h notification-log dedup. The weeklyReports row
+  // write is idempotent via onConflictDoNothing, but a duplicate
+  // `app/weekly-progress-push.generate` event would otherwise push the same
+  // parent twice. Priming notificationLog with a recent `weekly_progress`
+  // entry must cause the generate handler to skip the push while leaving the
+  // report row intact.
+  it('[BUG-699-FOLLOWUP] does not re-push when a weekly_progress notification was logged in the last 24h', async () => {
+    const { profileId: parentProfileId } = await seedProfile({
+      displayName: 'Parent',
+      timezone: 'UTC',
+    });
+    const { profileId: childProfileId } = await seedProfile({
+      displayName: 'Emma',
+      timezone: 'UTC',
+    });
+    await seedFamilyLink(parentProfileId, childProfileId);
+    await seedWeeklyPushPrefs(parentProfileId);
+
+    const today = new Date();
+    const latestSnapshotDate = isoDate(today);
+    const previousSnapshotDate = isoDate(
+      subtractDays(new Date(`${latestSnapshotDate}T00:00:00.000Z`), 7)
+    );
+
+    await seedSnapshot({
+      profileId: childProfileId,
+      snapshotDate: previousSnapshotDate,
+      metrics: buildProgressMetrics({
+        totalSessions: 1,
+        topicsMastered: 1,
+        vocabularyTotal: 5,
+      }),
+    });
+    await seedSnapshot({
+      profileId: childProfileId,
+      snapshotDate: latestSnapshotDate,
+      metrics: buildProgressMetrics({
+        totalSessions: 4,
+        topicsMastered: 6,
+        vocabularyTotal: 12,
+      }),
+    });
+
+    // Prime notificationLog with a fresh weekly_progress entry for the parent.
+    await db.insert(notificationLog).values({
+      profileId: parentProfileId,
+      type: 'weekly_progress',
+      ticketId: null,
+    });
+
+    const result = await executeGenerateHandler(parentProfileId);
+
+    expect(result).toEqual({
+      status: 'throttled',
+      reason: 'dedup_24h',
+      parentId: parentProfileId,
+    });
+    // No push API call should have fired.
+    expect(pushApiCalls).toHaveLength(0);
+    // Report row IS still persisted — dedup gates the push only.
+    const storedReports = await db.query.weeklyReports.findMany({
+      where: and(
+        eq(weeklyReports.profileId, parentProfileId),
+        eq(weeklyReports.childProfileId, childProfileId)
+      ),
+    });
+    expect(storedReports).toHaveLength(1);
   });
 
   it('skips children with no snapshots but still pushes for children that have activity', async () => {

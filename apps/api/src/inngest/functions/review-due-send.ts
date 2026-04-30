@@ -13,7 +13,13 @@ import {
 } from '../../services/notifications';
 
 export const reviewDueSend = inngest.createFunction(
-  { id: 'review-due-send', name: 'Review Due Send' },
+  {
+    id: 'review-due-send',
+    name: 'Review Due Send',
+    // [FIX-INNGEST-4] Inngest replay / operator re-fire must not push twice.
+    // event.id is unique per sendEvent call; dedupes within 24h.
+    idempotency: 'event.id',
+  },
   { event: 'app/retention.review-due' },
   async ({ event, step }) => {
     const { profileId, overdueCount, topTopicIds } = event.data;

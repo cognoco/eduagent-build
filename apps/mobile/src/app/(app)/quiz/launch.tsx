@@ -9,6 +9,12 @@ import { goBackOrReplace } from '../../../lib/navigation';
 import { useThemeColors } from '../../../lib/theme';
 import { useQuizFlow } from './_layout';
 
+// [BUG-UX-QUIZ-TIMEOUT] Hard UI-level timeout: if the mutation is still pending
+// after 30s the user sees a full error panel instead of an infinite spinner.
+// This complements the 20s soft nudge (timedOut) which only shows a text hint
+// and relies on the user finding the Cancel button.
+const ROUND_GENERATION_TIMEOUT_MS = 30_000;
+
 // [F-Q-01] Map error codes to kid-friendly copy so the error panel
 // never leaks raw JSON envelopes or HTTP status codes. The fallback trims any
 // message over 60 chars — those are almost always raw API payloads.
@@ -44,6 +50,7 @@ export default function QuizLaunchScreen(): React.ReactElement {
   const colors = useThemeColors();
   const { activityType, subjectId, setRound } = useQuizFlow();
   const generateRound = useGenerateRound();
+  const generateRoundMutate = generateRound.mutate;
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
   const [challengeRound, setChallengeRound] =
     useState<QuizRoundResponse | null>(null);
@@ -52,6 +59,10 @@ export default function QuizLaunchScreen(): React.ReactElement {
   // Cancel button. Prevents the "infinite spinner" dead-end that the UX
   // audit flagged as the #1 source of kid abandonment.
   const [timedOut, setTimedOut] = useState(false);
+  // [BUG-UX-QUIZ-TIMEOUT] Separate hard-timeout state that flips to an error
+  // panel. Kept distinct from timedOut (soft hint) so the two behaviours are
+  // independently testable and can be tuned separately.
+  const [hardTimedOut, setHardTimedOut] = useState(false);
   const startedRef = useRef(false);
 
   const enterPlay = useCallback(
@@ -69,7 +80,7 @@ export default function QuizLaunchScreen(): React.ReactElement {
   // was stuck on the loading spinner.
   const startRound = useCallback(() => {
     if (!activityType) return;
-    generateRound.mutate(
+    generateRoundMutate(
       { activityType, subjectId: subjectId ?? undefined },
       {
         onSuccess: (round) => {
@@ -82,7 +93,7 @@ export default function QuizLaunchScreen(): React.ReactElement {
       }
     );
     // [BUG-542] Use .mutate (stable ref) instead of whole mutation result
-  }, [activityType, enterPlay, generateRound.mutate, subjectId]);
+  }, [activityType, enterPlay, generateRoundMutate, subjectId]);
 
   useEffect(() => {
     if (!activityType) {
@@ -112,6 +123,21 @@ export default function QuizLaunchScreen(): React.ReactElement {
       return;
     }
     const timer = setTimeout(() => setTimedOut(true), 20000);
+    return () => clearTimeout(timer);
+  }, [generateRound.isPending]);
+
+  // [BUG-UX-QUIZ-TIMEOUT] Hard 30s timeout: transition to an explicit error
+  // panel if the mutation has not resolved. The soft nudge (timedOut) only
+  // appends a text hint — this gives a full Retry / Go Back escape hatch.
+  useEffect(() => {
+    if (!generateRound.isPending) {
+      setHardTimedOut(false);
+      return undefined;
+    }
+    const timer = setTimeout(
+      () => setHardTimedOut(true),
+      ROUND_GENERATION_TIMEOUT_MS
+    );
     return () => clearTimeout(timer);
   }, [generateRound.isPending]);
 
@@ -155,6 +181,39 @@ export default function QuizLaunchScreen(): React.ReactElement {
             </Text>
           </Pressable>
         </View>
+      </View>
+    );
+  }
+
+  // [BUG-UX-QUIZ-TIMEOUT] Hard timeout: mutation is stuck — show a full error
+  // panel. Retry resets the flag and fires startRound() so the user gets a
+  // fresh attempt without navigating away.
+  if (hardTimedOut) {
+    return (
+      <View
+        className="flex-1 bg-background"
+        style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
+        testID="quiz-launch-error"
+      >
+        <ErrorFallback
+          variant="centered"
+          title="Quiz is taking too long"
+          message="Generating the round took longer than expected. Check your connection and try again."
+          primaryAction={{
+            label: 'Retry',
+            onPress: () => {
+              setHardTimedOut(false);
+              startRound();
+            },
+            testID: 'quiz-launch-retry',
+          }}
+          secondaryAction={{
+            label: 'Go Back',
+            onPress: () => goBackOrReplace(router, '/(app)/quiz'),
+            testID: 'quiz-launch-back',
+          }}
+          testID="quiz-launch-error-fallback"
+        />
       </View>
     );
   }

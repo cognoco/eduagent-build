@@ -267,3 +267,75 @@ describe('parseLearnerInput — error path', () => {
     expect(result.fieldsUpdated).toHaveLength(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// [logging sweep] BREAK TEST: learner-input errors must emit structured JSON
+// via logger (not raw console.error). profileId must be in JSON context, not
+// as a loose string argument.
+// ---------------------------------------------------------------------------
+
+describe('parseLearnerInput structured logging', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockApplyAnalysis.mockResolvedValue({
+      fieldsUpdated: [],
+      notifications: [],
+    });
+  });
+
+  // [LOGGING-SWEEP-3] BREAK TEST: on DB write failure, parseLearnerInput must
+  // emit structured JSON via the logger. profileId must land in context, not
+  // as a loose console.error argument. Asserts:
+  //   1. console.error is called by the logger (JSON wrapper present)
+  //   2. Output is parseable JSON with level + context.profileId
+  //   3. Raw console.error with loose args is NOT produced (the logger wraps)
+  it('emits structured JSON log on applyAnalysis failure — profileId in context', async () => {
+    mockRouteAndCall.mockResolvedValueOnce({
+      response: JSON.stringify({
+        explanationEffectiveness: null,
+        interests: null,
+        strengths: null,
+        struggles: null,
+        resolvedTopics: null,
+        communicationNotes: null,
+        engagementLevel: null,
+        confidence: 'high',
+        urgencyDeadline: null,
+      }),
+    } as any);
+    mockApplyAnalysis.mockRejectedValueOnce(new Error('DB write failed'));
+
+    const errorSpy = jest
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
+    try {
+      const result = await parseLearnerInput(
+        db,
+        profileId,
+        'I love robots',
+        'learner'
+      );
+      expect(result.success).toBe(false);
+
+      // Must have logged via structured logger
+      expect(errorSpy).toHaveBeenCalled();
+      const logArg = errorSpy.mock.calls
+        .map((call) => call[0])
+        .find(
+          (arg): arg is string =>
+            typeof arg === 'string' && arg.includes('parseLearnerInput failed')
+        );
+      expect(logArg).toBeDefined();
+      const parsed = JSON.parse(logArg!) as {
+        level: string;
+        message: string;
+        context?: { profileId?: unknown };
+      };
+      expect(parsed.level).toBe('error');
+      // profileId must be in JSON context, not a loose extra arg
+      expect(parsed.context?.profileId).toBe(profileId);
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+});

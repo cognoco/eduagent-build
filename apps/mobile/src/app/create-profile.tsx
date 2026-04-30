@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -89,13 +89,27 @@ export default function CreateProfileScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // [BUG-UX-PROFILE-TIMEOUT] Hard 30s UI timeout: if the profile-creation POST
+  // hasn't resolved, surface an inline error and restore the form so the user
+  // can retry. Avoids an infinite spinner dead-end on slow/stuck networks.
+  useEffect(() => {
+    if (!loading) return undefined;
+    const PROFILE_CREATE_TIMEOUT_MS = 30_000;
+    const timer = setTimeout(() => {
+      setLoading(false);
+      setError(
+        'Creating your profile is taking too long. Check your connection and try again.'
+      );
+    }, PROFILE_CREATE_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [loading]);
+
   const { scrollRef, onFieldLayout, onFieldFocus } = useKeyboardScroll();
 
   const handleClose = useCallback(() => {
     goBackOrReplace(router, '/(app)/home');
   }, [router]);
-
-  const birthYear = birthDate ? birthDate.getFullYear() : null;
 
   const onDateChange = useCallback(
     (_event: DateTimePickerEvent, selectedDate?: Date) => {
@@ -139,7 +153,10 @@ export default function CreateProfileScreen() {
     try {
       const body = {
         displayName: trimmedName,
-        birthYear: birthYear!,
+        // birthDate is non-null here (guarded above) — read birthYear from
+        // the narrowed value rather than the outer `birthYear` derivation,
+        // which TS sees as `number | null`.
+        birthYear: birthDate.getFullYear(),
       };
 
       const res = await client.profiles.$post({ json: body });
@@ -204,7 +221,6 @@ export default function CreateProfileScreen() {
     canSubmit,
     displayName,
     birthDate,
-    birthYear,
     isParentAddingChild,
     client,
     queryClient,
@@ -234,7 +250,7 @@ export default function CreateProfileScreen() {
       >
         <View className="flex-row items-center justify-between mb-8">
           <Text className="text-h1 font-bold text-text-primary">
-            New profile
+            {isParentAddingChild ? 'Add a child' : 'New profile'}
           </Text>
           <Button
             variant="tertiary"
@@ -261,11 +277,13 @@ export default function CreateProfileScreen() {
 
         <View onLayout={onFieldLayout('name')}>
           <Text className="text-body-sm font-semibold text-text-secondary mb-1">
-            Display name
+            {isParentAddingChild ? "Child's display name" : 'Display name'}
           </Text>
           <TextInput
             className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-4"
-            placeholder="Enter name"
+            placeholder={
+              isParentAddingChild ? "Enter your child's name" : 'Enter name'
+            }
             placeholderTextColor={colors.muted}
             value={displayName}
             onChangeText={(value: string) => {
@@ -280,11 +298,12 @@ export default function CreateProfileScreen() {
         </View>
 
         <Text className="text-body-sm font-semibold text-text-secondary mb-1">
-          Birth date
+          {isParentAddingChild ? "Child's birth date" : 'Birth date'}
         </Text>
         <Text className="text-body-sm text-text-secondary mb-2">
-          We use your age to personalise how your mentor talks to you and to
-          comply with privacy laws.
+          {isParentAddingChild
+            ? "We use your child's age to personalise how their mentor talks to them and to comply with privacy laws. Minimum age is 11."
+            : 'We use your age to personalise how your mentor talks to you and to comply with privacy laws. Minimum age is 11.'}
         </Text>
         {Platform.OS === 'web' ? (
           <View className="mb-2" onLayout={onFieldLayout('birthdate')}>
@@ -297,11 +316,15 @@ export default function CreateProfileScreen() {
               editable={!loading}
               autoComplete="birthdate-full"
               testID="create-profile-birthdate-input"
-              accessibilityLabel="Birth date"
+              accessibilityLabel={
+                isParentAddingChild ? "Child's birth date" : 'Birth date'
+              }
               onFocus={onFieldFocus('birthdate')}
             />
             <Text className="text-caption text-text-secondary mt-2">
-              Enter your birth date as YYYY-MM-DD.
+              {isParentAddingChild
+                ? "Enter your child's birth date as YYYY-MM-DD."
+                : 'Enter your birth date as YYYY-MM-DD.'}
             </Text>
           </View>
         ) : (
@@ -309,7 +332,11 @@ export default function CreateProfileScreen() {
             onPress={() => setShowDatePicker(true)}
             className="bg-surface rounded-input px-4 py-3 mb-2"
             disabled={loading}
-            accessibilityLabel="Select birth date"
+            accessibilityLabel={
+              isParentAddingChild
+                ? "Select child's birth date"
+                : 'Select birth date'
+            }
             testID="create-profile-birthdate"
           >
             <Text
@@ -320,6 +347,8 @@ export default function CreateProfileScreen() {
             >
               {birthDate
                 ? formatDateForDisplay(birthDate)
+                : isParentAddingChild
+                ? "Select your child's date of birth"
                 : 'Select date of birth'}
             </Text>
           </Pressable>

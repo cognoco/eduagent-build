@@ -151,6 +151,10 @@ export type CompleteRoundInput = z.infer<typeof completeRoundInputSchema>;
 export const questionCheckInputSchema = z.object({
   questionIndex: z.number().int().min(0),
   answerGiven: z.string().min(1),
+  // [BUG-STALE-OPTIONS] Defense-in-depth: API uses answerMode to verify MC
+  // answers are actually in question.options, catching stale-options race
+  // conditions on the client before they corrupt the score.
+  answerMode: z.enum(['free_text', 'multiple_choice']).optional(),
 });
 export type QuestionCheckInput = z.infer<typeof questionCheckInputSchema>;
 
@@ -230,6 +234,10 @@ export type RecentRound = z.infer<typeof recentRoundSchema>;
 
 export const quizStatsSchema = z.object({
   activityType: quizActivityTypeSchema,
+  // [BUG-926] languageCode is populated for vocabulary rows (the language being
+  // practised), and null for capitals / guess_who rows. The client uses this to
+  // match a stat row to the specific language subject card.
+  languageCode: z.string().nullable(),
   roundsPlayed: z.number().int().nonnegative(),
   bestScore: z.number().int().nonnegative().nullable(),
   bestTotal: z.number().int().positive().nullable(),

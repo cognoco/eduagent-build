@@ -28,6 +28,7 @@ export * from './billing.ts';
 
 // Filing (Conversation-First Flow)
 export * from './filing.ts';
+export * from './inngest-events.ts';
 export * from './depth-evaluation.ts';
 
 // Topic Notes

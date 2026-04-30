@@ -34,6 +34,19 @@ import {
   type StreamFallbackReason,
 } from '../lib/sse';
 
+type FilingStatus =
+  | 'filing_pending'
+  | 'filing_failed'
+  | 'filing_recovered'
+  | null
+  | undefined;
+
+export function computeFilingRefetchInterval(
+  filingStatus: FilingStatus
+): number | false {
+  return filingStatus === 'filing_pending' ? 15_000 : false;
+}
+
 // API-route-specific response wrappers (not in schemas)
 interface SessionStartResult {
   session: LearningSession;
@@ -417,6 +430,39 @@ export function useSessionTranscript(
     enabled: !!activeProfile && !!sessionId,
     // Don't retry client errors (404/403) — the session is gone, retrying
     // just delays the expired-session UI by several seconds.
+    retry: (failureCount, error) => {
+      const status = (error as { status?: number }).status;
+      if (status && status >= 400 && status < 500) return false;
+      return failureCount < 2;
+    },
+  });
+}
+
+export function useSession(
+  sessionId: string
+): UseQueryResult<LearningSession | null> {
+  const client = useApiClient();
+  const { activeProfile } = useProfile();
+
+  return useQuery({
+    queryKey: ['session', sessionId, activeProfile?.id],
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const res = await client.sessions[':sessionId'].$get(
+          { param: { sessionId } },
+          { init: { signal } }
+        );
+        await assertOk(res);
+        const data = (await res.json()) as { session: LearningSession };
+        return data.session;
+      } finally {
+        cleanup();
+      }
+    },
+    enabled: !!activeProfile && !!sessionId,
+    refetchInterval: (query) =>
+      computeFilingRefetchInterval(query.state.data?.filingStatus),
     retry: (failureCount, error) => {
       const status = (error as { status?: number }).status;
       if (status && status >= 400 && status < 500) return false;

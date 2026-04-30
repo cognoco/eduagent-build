@@ -551,6 +551,9 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
     total: round.total,
     libraryQuestionIndices: round.libraryQuestionIndices,
     status: 'active',
+    // [BUG-926] Persist the language being practised so aggregateCompletedStats
+    // can group by (activityType, languageCode). NULL for non-vocabulary rounds.
+    languageCode: activityType === 'vocabulary' ? languageCode ?? null : null,
   });
 
   if (!inserted) {

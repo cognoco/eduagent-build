@@ -22,6 +22,9 @@ import {
 import { routeAndCall } from '../services/llm';
 import { captureException } from '../services/sentry';
 import { inngest } from '../inngest/client';
+import { createLogger } from '../services/logger';
+
+const logger = createLogger();
 
 type FilingRouteEnv = {
   Bindings: { DATABASE_URL: string };
@@ -92,7 +95,18 @@ export const filingRoutes = new Hono<FilingRouteEnv>()
         routeAndCall
       );
     } catch (err) {
-      console.error('[filing] fileToLibrary failed:', err);
+      // [FIX-API-2] Capture primary fileToLibrary failure to Sentry BEFORE
+      // dispatching the async retry — this makes LLM/quota errors visible in
+      // Sentry even when the retry path succeeds or the fallback is used.
+      captureException(err, {
+        profileId,
+        extra: { sessionId: body.sessionId, phase: 'fileToLibrary' },
+      });
+      // [logging sweep] structured logger so PII fields land as JSON context
+      logger.error('[filing] fileToLibrary failed', {
+        sessionId: body.sessionId,
+        error: err instanceof Error ? err.message : String(err),
+      });
       // Fire async retry for freeform/homework sessions
       if (sessionTranscript && body.sessionId) {
         await inngest
@@ -116,12 +130,16 @@ export const filingRoutes = new Hono<FilingRouteEnv>()
             });
           });
       }
-      // Pre-session fallback: file under "Uncategorized" book so the session
-      // can start immediately. The user can move the topic later via long-press.
+      // [BUG-871] Pre-session fallback: when the LLM filing call fails we
+      // forward the user's `selectedSuggestion` so the fallback book is
+      // named after the topic the user actually picked (e.g. "Geometry
+      // Foundations") rather than always landing under "Uncategorized".
+      // The user can still move/rename the topic later via long-press.
       if (body.subjectId && body.rawInput) {
         filingResponse = buildFallbackFilingResponse(
           body.subjectId,
-          body.rawInput
+          body.rawInput,
+          body.selectedSuggestion
         );
         usedFallback = true;
       } else {
@@ -135,9 +153,12 @@ export const filingRoutes = new Hono<FilingRouteEnv>()
     // Resolve into actual DB records
     // Note: 'pre_generated' is only set via the migration default on existing rows.
     // The filing route always produces 'session_filing' or 'freeform_filing'.
+    // A sessionTranscript means the user just finished a chat session and is
+    // filing its outcome — that is `session_filing`. Pre-session/ad-hoc adds
+    // (no transcript, raw user input) are `freeform_filing`. [CR-652]
     const filedFrom = sessionTranscript
-      ? ('freeform_filing' as const)
-      : ('session_filing' as const);
+      ? ('session_filing' as const)
+      : ('freeform_filing' as const);
 
     let result;
     try {
@@ -148,7 +169,11 @@ export const filingRoutes = new Hono<FilingRouteEnv>()
         sessionId: body.sessionId,
       });
     } catch (err) {
-      console.error('[filing] resolveFilingResult failed:', err);
+      // [logging sweep] structured logger so PII fields land as JSON context
+      logger.error('[filing] resolveFilingResult failed', {
+        sessionId: body.sessionId,
+        error: err instanceof Error ? err.message : String(err),
+      });
       // Fire async retry for freeform/homework sessions — but only if
       // the first catch block didn't already enqueue a retry (usedFallback).
       // Without this guard, two app/filing.retry events fire for the same

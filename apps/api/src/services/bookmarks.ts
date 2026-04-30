@@ -8,6 +8,7 @@ import {
 } from '@eduagent/database';
 import type { Bookmark, SessionBookmark } from '@eduagent/schemas';
 import { ConflictError, NotFoundError } from '../errors';
+import { projectAiResponseContent } from './llm/project-response';
 
 function isUniqueViolation(error: unknown): boolean {
   return (
@@ -73,6 +74,13 @@ export async function createBookmark(
     throw new NotFoundError('Session event');
   }
 
+  // [BUG-934] Legacy ai_response rows may store raw envelope JSON.
+  // Project to plain reply text before persisting so users never see
+  // raw JSON in their Saved Items.
+  const bookmarkContent = projectAiResponseContent(event.content, {
+    silent: true,
+  });
+
   try {
     const [row] = await db
       .insert(bookmarks)
@@ -82,7 +90,7 @@ export async function createBookmark(
         eventId: event.id,
         subjectId: event.subjectId,
         topicId: event.topicId ?? null,
-        content: event.content,
+        content: bookmarkContent,
       })
       .returning({
         id: bookmarks.id,

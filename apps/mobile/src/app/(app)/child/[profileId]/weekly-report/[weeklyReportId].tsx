@@ -30,6 +30,52 @@ function MetricCard({
   );
 }
 
+/**
+ * BUG-903 (c): Render a "Apr 27 – May 3, 2026" date range so the parent sees
+ * the full week rather than just the week-start date.
+ *
+ * weekStart is an ISO date string (YYYY-MM-DD) representing the first day of
+ * the report week. The end day is +6 days (inclusive 7-day window).
+ */
+function formatWeeklyReportRange(weekStart: string): string {
+  const start = new Date(`${weekStart}T00:00:00Z`);
+  if (Number.isNaN(start.getTime())) return 'Weekly report';
+  const end = new Date(start.getTime());
+  end.setUTCDate(end.getUTCDate() + 6);
+  const startLabel = start.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  });
+  const endLabel = end.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+  return `${startLabel} – ${endLabel}`;
+}
+
+/**
+ * BUG-903 (d): Detect a fully-empty report so the screen can show friendly
+ * empty-state copy and skip meaningless metric cards / "up from 0" lines.
+ */
+function isEmptyWeeklyReport(reportData: {
+  thisWeek: {
+    totalSessions: number;
+    totalActiveMinutes: number;
+    topicsMastered: number;
+    vocabularyTotal: number;
+  };
+}): boolean {
+  return (
+    reportData.thisWeek.totalSessions === 0 &&
+    reportData.thisWeek.totalActiveMinutes === 0 &&
+    reportData.thisWeek.topicsMastered === 0 &&
+    reportData.thisWeek.vocabularyTotal === 0
+  );
+}
+
 export default function ChildWeeklyReportDetailScreen(): React.ReactElement {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -102,13 +148,7 @@ export default function ChildWeeklyReportDetailScreen(): React.ReactElement {
           <View className="flex-1">
             <Text className="text-h2 font-bold text-text-primary">
               {report
-                ? `Week of ${new Date(
-                    `${report.reportData.weekStart}T00:00:00Z`
-                  ).toLocaleDateString(undefined, {
-                    month: 'long',
-                    day: 'numeric',
-                    year: 'numeric',
-                  })}`
+                ? formatWeeklyReportRange(report.reportData.weekStart)
                 : 'Weekly report'}
             </Text>
             <Text className="text-body-sm text-text-secondary mt-0.5">
@@ -184,6 +224,53 @@ export default function ChildWeeklyReportDetailScreen(): React.ReactElement {
                 value={String(report.reportData.thisWeek.vocabularyTotal)}
                 testID="child-weekly-report-metric-vocabulary"
               />
+            </View>
+
+            {/* BUG-903 (d): Empty-state guidance when nothing happened this */}
+            {/* week. Without this, parents see four zero cards and stop. */}
+            {isEmptyWeeklyReport(report.reportData) && (
+              <View
+                className="bg-surface rounded-card p-4 mt-4"
+                testID="child-weekly-report-empty-note"
+              >
+                <Text className="text-body-sm text-text-secondary">
+                  No activity this week — quiet weeks happen. A short nudge
+                  often helps {report.reportData.childName} get going again.
+                </Text>
+              </View>
+            )}
+
+            {/* BUG-903 (b): Always provide at least one CTA so the report */}
+            {/* is never a true dead-end. Parent can jump back to the child */}
+            {/* dashboard to suggest a topic or send a nudge. */}
+            <View className="mt-5" testID="child-weekly-report-ctas">
+              <Pressable
+                onPress={() => {
+                  if (!profileId) return;
+                  router.push(`/(app)/child/${profileId}` as never);
+                }}
+                className="bg-primary rounded-button px-4 py-3 items-center min-h-[48px] justify-center"
+                accessibilityRole="button"
+                accessibilityLabel={`Open ${report.reportData.childName}'s profile`}
+                testID="child-weekly-report-open-child"
+              >
+                <Text className="text-body font-semibold text-text-inverse">
+                  {isEmptyWeeklyReport(report.reportData)
+                    ? `Send ${report.reportData.childName} a nudge`
+                    : `Open ${report.reportData.childName}'s profile`}
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => goBackOrReplace(router, reportsHref)}
+                className="rounded-button px-4 py-3 items-center min-h-[48px] justify-center mt-2"
+                accessibilityRole="button"
+                accessibilityLabel="Back to all reports"
+                testID="child-weekly-report-back-to-reports"
+              >
+                <Text className="text-body font-semibold text-primary">
+                  Back to all reports
+                </Text>
+              </Pressable>
             </View>
           </>
         ) : (

@@ -8,6 +8,7 @@ import {
 import { learnerRecapResponseSchema } from '@eduagent/schemas';
 import { extractFirstJsonObject, routeAndCall } from './llm';
 import { escapeXml, sanitizeXmlValue } from './llm/sanitize';
+import { projectAiResponseContent } from './llm/project-response';
 import { createLogger } from './logger';
 
 const logger = createLogger();
@@ -61,12 +62,15 @@ export function buildRecapTranscriptText(
   events: ReadonlyArray<{ eventType: string; content: string }>
 ): string {
   return events
-    .map(
-      (event) =>
-        `${
-          event.eventType === 'user_message' ? 'Student' : 'Mentor'
-        }: ${escapeXml(event.content)}`
-    )
+    .map((event) => {
+      const content =
+        event.eventType === 'ai_response'
+          ? projectAiResponseContent(event.content, { silent: true })
+          : event.content;
+      return `${
+        event.eventType === 'user_message' ? 'Student' : 'Mentor'
+      }: ${escapeXml(content)}`;
+    })
     .join('\n\n');
 }
 

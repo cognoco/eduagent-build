@@ -21,6 +21,7 @@ export class NotFoundError extends Error {
   constructor(resource: string) {
     super(`${resource} not found`);
     this.name = 'NotFoundError';
+    Object.setPrototypeOf(this, NotFoundError.prototype);
   }
 }
 
@@ -34,6 +35,7 @@ export class ForbiddenError extends Error {
     super(message);
     this.name = 'ForbiddenError';
     this.apiCode = apiCode;
+    Object.setPrototypeOf(this, ForbiddenError.prototype);
   }
 }
 
@@ -41,6 +43,26 @@ export class ConflictError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'ConflictError';
+    Object.setPrototypeOf(this, ConflictError.prototype);
+  }
+}
+
+export class RateLimitedError extends Error {
+  readonly code: string | undefined;
+  /** Seconds until the client may retry, usually from a Retry-After header. */
+  readonly retryAfter: number | undefined;
+
+  constructor(
+    message = "You've hit the limit. Wait a moment and try again.",
+    code?: string,
+    _details?: unknown,
+    retryAfter?: number
+  ) {
+    super(message);
+    this.name = 'RateLimitedError';
+    this.code = code;
+    this.retryAfter = retryAfter;
+    Object.setPrototypeOf(this, RateLimitedError.prototype);
   }
 }
 
@@ -48,6 +70,7 @@ export class UpstreamLlmError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'UpstreamLlmError';
+    Object.setPrototypeOf(this, UpstreamLlmError.prototype);
   }
 }
 
@@ -55,6 +78,39 @@ export class VocabularyContextError extends Error {
   constructor(message: string, options?: ErrorOptions) {
     super(message, options);
     this.name = 'VocabularyContextError';
+    Object.setPrototypeOf(this, VocabularyContextError.prototype);
+  }
+}
+
+export class SubjectNotFoundError extends Error {
+  constructor() {
+    super('Subject not found');
+    this.name = 'SubjectNotFoundError';
+    Object.setPrototypeOf(this, SubjectNotFoundError.prototype);
+  }
+}
+
+export class VocabularyNotFoundError extends Error {
+  constructor() {
+    super('Vocabulary item not found');
+    this.name = 'VocabularyNotFoundError';
+    Object.setPrototypeOf(this, VocabularyNotFoundError.prototype);
+  }
+}
+
+export class TopicNotSkippedError extends Error {
+  constructor() {
+    super('Topic is not skipped');
+    this.name = 'TopicNotSkippedError';
+    Object.setPrototypeOf(this, TopicNotSkippedError.prototype);
+  }
+}
+
+export class BadRequestError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'BadRequestError';
+    Object.setPrototypeOf(this, BadRequestError.prototype);
   }
 }
 
@@ -84,6 +140,7 @@ export const ERROR_CODES = {
   // generic upstream-failure messaging. [BUG-832 / F-API-03]
   LLM_UNAVAILABLE: 'LLM_UNAVAILABLE',
   RATE_LIMITED: 'RATE_LIMITED',
+  PROFILE_LIMIT_EXCEEDED: 'PROFILE_LIMIT_EXCEEDED',
 } as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];

@@ -348,18 +348,25 @@ describe('recordSessionActivity', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// getStreakData — now delegates to repo.streaks.findCurrentForToday
+// [BUG-912] Decay-on-read is applied at the repo layer; getStreakData just
+// maps the result. Mocks return the already-decayed repo output to verify
+// that getStreakData correctly surfaces the repo values unchanged.
+// ---------------------------------------------------------------------------
+
 describe('getStreakData', () => {
   it('returns streak state with display info for profile', async () => {
     const today = new Date().toISOString().slice(0, 10);
     (createScopedRepository as jest.Mock).mockReturnValue({
       streaks: {
-        findFirst: jest.fn().mockResolvedValue({
-          id: 'streak-1',
-          profileId: 'profile-1',
+        findCurrentForToday: jest.fn().mockResolvedValue({
           currentStreak: 7,
           longestStreak: 12,
           lastActivityDate: today,
           gracePeriodStartDate: null,
+          isOnGracePeriod: false,
+          graceDaysRemaining: 0,
         }),
       },
     });
@@ -378,7 +385,7 @@ describe('getStreakData', () => {
   it('returns initial state when no streak record exists', async () => {
     (createScopedRepository as jest.Mock).mockReturnValue({
       streaks: {
-        findFirst: jest.fn().mockResolvedValue(null),
+        findCurrentForToday: jest.fn().mockResolvedValue(null),
       },
     });
     const { db } = createMockStreakDb();
@@ -399,13 +406,15 @@ describe('getStreakData', () => {
       .slice(0, 10);
     (createScopedRepository as jest.Mock).mockReturnValue({
       streaks: {
-        findFirst: jest.fn().mockResolvedValue({
-          id: 'streak-1',
-          profileId: 'profile-1',
+        // repo.streaks.findCurrentForToday already applies decay and returns
+        // the grace-period fields; this mock simulates a 2-day-stale row.
+        findCurrentForToday: jest.fn().mockResolvedValue({
           currentStreak: 5,
           longestStreak: 5,
           lastActivityDate: twoDaysAgo,
           gracePeriodStartDate: null,
+          isOnGracePeriod: true,
+          graceDaysRemaining: 2,
         }),
       },
     });
@@ -415,6 +424,39 @@ describe('getStreakData', () => {
 
     expect(result.isOnGracePeriod).toBe(true);
     expect(result.graceDaysRemaining).toBeGreaterThan(0);
+  });
+
+  // [BUG-912] When the gap since lastActivityDate exceeds the grace window
+  // (>4 days), the persisted currentStreak is stale. The repo layer applies
+  // decay-on-read, so findCurrentForToday already returns currentStreak=0.
+  // getStreakData must surface this without re-decaying.
+  it('decays currentStreak to 0 when gap exceeds grace window (BUG-912)', async () => {
+    const tenDaysAgo = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10);
+    (createScopedRepository as jest.Mock).mockReturnValue({
+      streaks: {
+        // Repo already applies decay — returns currentStreak: 0
+        findCurrentForToday: jest.fn().mockResolvedValue({
+          currentStreak: 0, // decayed by repo layer
+          longestStreak: 7,
+          lastActivityDate: tenDaysAgo,
+          gracePeriodStartDate: null,
+          isOnGracePeriod: false,
+          graceDaysRemaining: 0,
+        }),
+      },
+    });
+    const { db } = createMockStreakDb();
+
+    const result = await getStreakData(db, 'profile-1');
+
+    // currentStreak surfaces as 0 (already decayed by the repo layer).
+    expect(result.currentStreak).toBe(0);
+    // longestStreak (historical record) is preserved.
+    expect(result.longestStreak).toBe(7);
+    // Past the grace window, isOnGracePeriod is false.
+    expect(result.isOnGracePeriod).toBe(false);
   });
 });
 

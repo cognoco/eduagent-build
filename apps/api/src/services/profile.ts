@@ -354,6 +354,24 @@ export async function getProfileAge(
 }
 
 /**
+ * Loads the raw profile row by ID. Self-keyed lookup — caller is asking for the
+ * exact row that defines the scope, not a child resource, so no parent-chain
+ * check is needed. Centralised here so `db.select().from(profiles)` and
+ * `db.query.profiles.findFirst({ where: eq(profiles.id, ...) })` aren't sprinkled
+ * across services. If scoping ever needs to tighten, this is the single migration
+ * point.
+ */
+export async function loadProfileRowById(
+  db: Database,
+  profileId: string
+): Promise<typeof profiles.$inferSelect | null> {
+  const row = await db.query.profiles.findFirst({
+    where: eq(profiles.id, profileId),
+  });
+  return row ?? null;
+}
+
+/**
  * Returns the learner's display name. Used to personalise LLM prompts.
  * Returns undefined if the profile doesn't exist.
  */

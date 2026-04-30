@@ -30,9 +30,11 @@ import {
   processTeachBackCompletion,
 } from '../../services/verification-completion';
 import { captureException } from '../../services/sentry';
+import { createLogger } from '../../services/logger';
 import { queueCelebration } from '../../services/celebrations';
 import {
   buildBrowseHighlight,
+  FREEFORM_TOPIC_SENTINEL,
   generateSessionInsights,
 } from '../../services/session-highlights';
 import { generateLearnerRecap } from '../../services/session-recap';
@@ -55,10 +57,22 @@ import {
 } from '../../services/learner-profile';
 import { sendStruggleNotification } from '../../services/notifications';
 
+const logger = createLogger();
+
 // ---------------------------------------------------------------------------
-// Step error isolation — each step catches its own errors so that a failure
-// in one step (e.g. Voyage AI down) never blocks the remaining steps.
-// Errors are logged to Sentry and the step returns a degraded result.
+// Step error isolation — two tiers:
+//
+//   CRITICAL steps (must-retry): re-throw from within step.run so Inngest's
+//     own retry machinery fires. These write durable user-facing state (SM-2
+//     retention cards, XP/streak) whose loss would be observable to the user.
+//
+//   SOFT steps (best-effort enrichment): use runIsolated — errors are
+//     captured to Sentry with a structured tag and the function continues.
+//     A missing coaching card or embedding is annoying but not data-loss.
+//
+// [FIX-INNGEST-1] Prior to this fix every step used runIsolated, so Inngest
+// always saw success and never retried. Critical writes could silently fail
+// on transient DB hiccups with no recovery path.
 // ---------------------------------------------------------------------------
 
 interface StepOutcome {
@@ -101,14 +115,35 @@ async function runIsolated(
       ...(typeof result === 'number' ? { qualityRating: result } : {}),
     };
   } catch (err) {
-    captureException(err, { profileId });
-    console.error(`[session-completed] step "${name}" failed:`, err);
+    // [FIX-INNGEST-1] Structured tag so we can query soft-step failure rate
+    // per step name. Required by "Silent Recovery Without Escalation is Banned".
+    captureException(err, {
+      profileId,
+      extra: { step: name, surface: 'session-completed' },
+    });
+    // [logging sweep] structured logger so PII fields land as JSON context
+    logger.error('[session-completed] soft step failed', {
+      step: name,
+      profileId,
+      error: err instanceof Error ? err.message : String(err),
+    });
     return {
       step: name,
       status: 'failed',
       error: err instanceof Error ? err.message : String(err),
     };
   }
+}
+
+// CRITICAL step: re-throws so Inngest's retry machinery fires. Use for writes
+// that are durable user-facing state (SM-2 retention cards, XP/streak).
+// The caller must wrap this inside step.run — do NOT add a catch around it.
+async function runCritical(
+  name: string,
+  fn: () => Promise<void>
+): Promise<StepOutcome> {
+  await fn(); // throws on error — Inngest retries the whole step.run
+  return { step: name, status: 'ok' };
 }
 
 export const sessionCompleted = inngest.createFunction(
@@ -154,10 +189,14 @@ export const sessionCompleted = inngest.createFunction(
           'session-completed: filing waitForEvent timed out after 60s'
         );
         captureException(timeoutErr, { profileId });
-        console.warn(
-          `[session-completed] filing waitForEvent timed out for session=${sessionId}, profileId=${profileId}, sessionType=${
-            sessionType ?? 'unknown'
-          } — proceeding with stale topic placement`
+        // [logging sweep] structured logger so PII fields land as JSON context
+        logger.warn(
+          '[session-completed] filing waitForEvent timed out — proceeding with stale topic placement',
+          {
+            sessionId,
+            profileId,
+            sessionType: sessionType ?? 'unknown',
+          }
         );
         await step.sendEvent('filing-timed-out', {
           name: 'app/session.filing_timed_out',
@@ -283,11 +322,11 @@ export const sessionCompleted = inngest.createFunction(
         const parsed = verificationTypeSchema.safeParse(verificationType);
         if (!parsed.success) {
           if (verificationType != null) {
-            console.warn(
-              `[session-completed] Unknown verificationType: ${String(
-                verificationType
-              )}`
-            );
+            // [logging sweep] structured logger so PII fields land as JSON context
+            logger.warn('[session-completed] Unknown verificationType', {
+              verificationType: String(verificationType),
+              profileId,
+            });
             // [SWEEP-SILENT-RECOVERY] Capture for queryable failure rate —
             // an unknown verificationType arriving here is a contract drift
             // signal (new type added without a handler). Without Sentry we
@@ -396,12 +435,17 @@ export const sessionCompleted = inngest.createFunction(
         if (retentionTopicIds.length === 0)
           return { step: 'update-retention', status: 'skipped' as const };
         if (effectiveQuality == null) {
-          console.warn(
-            `[session-completed] No qualityRating for session ${sessionId} — skipping retention update`
+          // [logging sweep] structured logger so PII fields land as JSON context
+          logger.warn(
+            '[session-completed] No qualityRating — skipping retention update',
+            {
+              sessionId,
+              profileId,
+            }
           );
           return { step: 'update-retention', status: 'skipped' as const };
         }
-        return runIsolated('update-retention', profileId, async () => {
+        return runCritical('update-retention', async () => {
           const db = getStepDatabase();
           for (const tid of retentionTopicIds) {
             await updateRetentionFromSession(
@@ -622,8 +666,13 @@ export const sessionCompleted = inngest.createFunction(
             .limit(1);
 
           if (!summaryRow) {
-            console.warn(
-              `[session-completed] generate-session-insights: no session_summaries row for session=${sessionId}, profile=${profileId} — recap skipped`
+            // [logging sweep] structured logger so PII fields land as JSON context
+            logger.warn(
+              '[session-completed] generate-session-insights: no session_summaries row — recap skipped',
+              {
+                sessionId,
+                profileId,
+              }
             );
             return;
           }
@@ -664,8 +713,14 @@ export const sessionCompleted = inngest.createFunction(
               conversationPrompt = result.insights.conversationPrompt;
               engagementSignal = result.insights.engagementSignal;
             } else {
-              console.warn(
-                `[session-completed] generate-session-insights: LLM validation failed (${result.reason}) for session=${sessionId}, falling back to template highlight`
+              // [logging sweep] structured logger so PII fields land as JSON context
+              logger.warn(
+                '[session-completed] generate-session-insights: LLM validation failed — falling back to template highlight',
+                {
+                  sessionId,
+                  profileId,
+                  reason: result.reason,
+                }
               );
               // [SWEEP-SILENT-RECOVERY] LLM drift signal — must be queryable.
               // Without Sentry we can't see how often the insights LLM is
@@ -696,8 +751,12 @@ export const sessionCompleted = inngest.createFunction(
             const topicTitle = topicId
               ? await loadTopicTitle(db, topicId)
               : null;
-            // [BUG-526] Use descriptive fallback instead of "a topic"
-            const topics = topicTitle ? [topicTitle] : ['a freeform session'];
+            // [BUG-526 / BUG-878] Pass the shared freeform sentinel so the
+            // highlight builder renders friendly "had a learning session"
+            // copy instead of the awkward "studied a freeform session".
+            const topics = topicTitle
+              ? [topicTitle]
+              : [FREEFORM_TOPIC_SENTINEL];
 
             // Resolve subject name for context in the highlight
             const [subjectRow] = subjectId
@@ -936,41 +995,43 @@ export const sessionCompleted = inngest.createFunction(
     // [CR-119.1]: Return streak as part of the step result so it survives
     // Inngest replay — same memoization pattern as stepNotifications above.
     const dashboardOutcome = (await step.run('update-dashboard', async () => {
+      // [FIX-INNGEST-1] CRITICAL step — no try/catch, errors propagate to Inngest
+      // for retry. Streak and XP are user-facing data; silent loss breaks
+      // gamification and erodes user trust.
       let stepStreak: {
         currentStreak: number;
         longestStreak: number;
       } | null = null;
-      const result = await runIsolated(
-        'update-dashboard',
-        profileId,
-        async () => {
-          const db = getStepDatabase();
-          const today = timestamp
-            ? new Date(timestamp).toISOString().slice(0, 10)
-            : new Date().toISOString().slice(0, 10);
+      const db = getStepDatabase();
+      const today = timestamp
+        ? new Date(timestamp).toISOString().slice(0, 10)
+        : new Date().toISOString().slice(0, 10);
 
-          // Streak and XP are independent writes — no transaction needed.
-          // The neon-http driver does not support multi-statement transactions;
-          // wrapping these in db.transaction() would either fail outright or
-          // fall back to non-atomic execution via the client.ts shim.
-          //
-          // Streak recording is decoupled from effectiveQuality (which gates
-          // SM-2 retention updates).  Any session with user engagement
-          // (exchangeCount > 0) should count toward the streak, UNLESS it
-          // was an unattended close (e.g. silence_timeout from the stale-
-          // cleanup cron where no learning occurred).
-          const reason = event.data.reason as string | undefined;
-          const isUnattended =
-            reason != null &&
-            (UNATTENDED_REASONS as readonly string[]).includes(reason);
-          if (!isUnattended && (exchangeCount ?? 0) > 0) {
-            stepStreak = await recordSessionActivity(db, profileId, today);
-          }
+      // Streak and XP are independent writes — no transaction needed.
+      // The neon-http driver does not support multi-statement transactions;
+      // wrapping these in db.transaction() would either fail outright or
+      // fall back to non-atomic execution via the client.ts shim.
+      //
+      // Streak recording is decoupled from effectiveQuality (which gates
+      // SM-2 retention updates).  Any session with user engagement
+      // (exchangeCount > 0) should count toward the streak, UNLESS it
+      // was an unattended close (e.g. silence_timeout from the stale-
+      // cleanup cron where no learning occurred).
+      const reason = event.data.reason as string | undefined;
+      const isUnattended =
+        reason != null &&
+        (UNATTENDED_REASONS as readonly string[]).includes(reason);
+      if (!isUnattended && (exchangeCount ?? 0) > 0) {
+        stepStreak = await recordSessionActivity(db, profileId, today);
+      }
 
-          await insertSessionXpEntry(db, profileId, topicId ?? null, subjectId);
-        }
-      );
-      return { ...result, streak: stepStreak } as DashboardStepResult;
+      await insertSessionXpEntry(db, profileId, topicId ?? null, subjectId);
+      // Note: no try/catch — errors propagate to Inngest for retry.
+      return {
+        step: 'update-dashboard',
+        status: 'ok' as const,
+        streak: stepStreak,
+      } as DashboardStepResult;
     })) as unknown as DashboardStepResult;
     outcomes.push(dashboardOutcome);
 
@@ -1115,6 +1176,26 @@ export const sessionCompleted = inngest.createFunction(
     );
 
     const failed = outcomes.filter((o) => o.status === 'failed');
+
+    // [FIX-INNGEST-1] Emit a queryable observability event when any soft step
+    // failed so dashboards / alerts can detect systematic enrichment degradation
+    // without polling Sentry. A spike in this event rate signals upstream issues
+    // (Voyage AI down, LLM service errors, DB overload) before user complaints.
+    if (failed.length > 0) {
+      await step.sendEvent('session-completed-with-errors', {
+        name: 'app/session.completed_with_errors',
+        data: {
+          sessionId,
+          profileId,
+          failedSteps: failed.map((o) => ({
+            step: o.step,
+            error: o.error ?? null,
+          })),
+          timestamp: new Date().toISOString(),
+        },
+      });
+    }
+
     return {
       status: failed.length > 0 ? 'completed-with-errors' : 'completed',
       sessionId,

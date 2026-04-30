@@ -26,6 +26,20 @@ export interface InterleavedTopic {
   consecutiveSuccesses: number;
 }
 
+/**
+ * [BUG-764] Thrown when an interleaved session is requested but the profile
+ * has no eligible topics (no retention cards, no fallbacks). The route layer
+ * maps this to 400 VALIDATION_ERROR via `instanceof` — replacing the previous
+ * `err.message === '...'` string comparison, which silently broke any time
+ * the message text was edited or wrapped by an upstream layer.
+ */
+export class NoInterleavedTopicsError extends Error {
+  constructor() {
+    super('No topics available for interleaved retrieval');
+    this.name = 'NoInterleavedTopicsError';
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Topic selection
 // ---------------------------------------------------------------------------
@@ -152,7 +166,7 @@ export async function startInterleavedSession(
   const topics = await selectInterleavedTopics(db, profileId, opts);
 
   if (topics.length === 0) {
-    throw new Error('No topics available for interleaved retrieval');
+    throw new NoInterleavedTopicsError();
   }
 
   const firstTopic = topics[0];

@@ -78,6 +78,7 @@ import {
   TRIAL_EXTENDED_DAYS,
 } from '../../services/trial';
 import { sendPushNotification } from '../../services/notifications';
+import { getRecentNotificationCount } from '../../services/settings';
 import { findOwnerProfile } from '../../services/profile';
 
 async function sendTrialNotificationToAccountOwner(
@@ -92,6 +93,22 @@ async function sendTrialNotificationToAccountOwner(
   const ownerProfile = await findOwnerProfile(db, accountId);
   if (!ownerProfile) {
     return { sent: false, reason: 'no_owner_profile' };
+  }
+
+  // [BUG-699-FOLLOWUP] Best-effort dedup by notification log. Read-then-write
+  // is NOT atomic: two concurrent step.run invocations (Inngest retry racing
+  // a fresh daily cron run) could both see count===0 and both send. The daily
+  // cron cadence + retries=2 keeps the race window narrow in practice; if
+  // duplicate sends are ever observed, promote to a (profile_id, type, day)
+  // unique constraint on notificationLog so the DB rejects the race loser.
+  const recentCount = await getRecentNotificationCount(
+    db,
+    ownerProfile.id,
+    'trial_expiry',
+    24
+  );
+  if (recentCount > 0) {
+    return { sent: false, reason: 'dedup_24h' };
   }
 
   return sendPushNotification(db, {
@@ -216,7 +233,19 @@ export const trialExpiry = inngest.createFunction(
     }
     const extendedExpiredCount = extendedResult.count;
 
-    // Step 3: Send warning notifications for trials ending in 3 days, 1 day, last day
+    // Step 3: Send warning notifications for trials ending in 3 days, 1 day, last day.
+    //
+    // [BUG-699-FOLLOWUP] Both `send-trial-warnings` (Step 3) and
+    // `send-soft-landing-messages` (Step 4) write to the SAME notificationLog
+    // bucket — `type: 'trial_expiry'` — and rely on the shared 24h dedup in
+    // `sendTrialNotificationToAccountOwner`. This is intentional, not a copy-
+    // paste oversight: a single subscription is `status: 'trial'` XOR
+    // `status: 'expired'` at any moment, so a given account can never qualify
+    // for both warnings AND soft-landing within the same 24h window. Splitting
+    // into two notificationType enum values would force a Drizzle migration
+    // for a race that cannot occur in production. If this premise ever
+    // changes (e.g. trial pause/unpause flows, retroactive status edits),
+    // promote to distinct enum values rather than broaden the dedup window.
     const warningsSent = await step.run('send-trial-warnings', async () => {
       const db = getStepDatabase();
       let sent = 0;

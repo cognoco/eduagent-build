@@ -100,19 +100,34 @@ export async function retrieveRelevantMemory(
  * Formats retrieved memory content into a structured text block
  * for system prompt injection.
  */
-function formatMemoryContext(contents: string[]): string {
+function formatMemoryContext(contents: (string | undefined | null)[]): string {
   const lines = [
     'Relevant prior learning (retrieved from past sessions via semantic similarity):',
     '',
   ];
 
+  // [CR-668] Skip undefined/empty entries instead of throwing. The previous
+  // throw-on-undefined disabled memory injection for the entire session
+  // whenever a single retrieved row had a null/empty `content` column —
+  // which can legitimately happen for legacy rows or when a topic record
+  // exists but its embedded summary is missing. The outer try/catch in
+  // loadMemoryContext would swallow the error to EMPTY_RESULT, silently
+  // dropping ALL of the other valid memory entries that were retrieved.
+  let displayedIndex = 0;
   for (let i = 0; i < contents.length; i++) {
-    // Truncate each content block to avoid overwhelming the prompt
     const content = contents[i];
-    if (!content) throw new Error(`contents[${i}] is unexpectedly undefined`);
+    if (!content) continue;
+    displayedIndex += 1;
+    // Truncate each content block to avoid overwhelming the prompt
     const truncated =
       content.length > 500 ? content.slice(0, 500) + '...' : content;
-    lines.push(`[${i + 1}] ${truncated}`);
+    lines.push(`[${displayedIndex}] ${truncated}`);
+  }
+
+  // If every element was empty, fall back to the no-memory header rather
+  // than emitting a meaningless "use this context" footer.
+  if (displayedIndex === 0) {
+    return '';
   }
 
   lines.push(

@@ -10,6 +10,9 @@ import {
 import { routeAndCall } from './llm';
 import type { ChatMessage } from './llm';
 import { escapeXml, sanitizeXmlValue } from './llm/sanitize';
+import { extractFirstJsonObject } from './llm/extract-json';
+import { captureException } from './sentry';
+import { createLogger } from './logger';
 import type {
   VerificationDepth,
   QuickCheckContext,
@@ -20,6 +23,12 @@ import type {
   AssessmentStatus,
   ChatExchange,
 } from '@eduagent/schemas';
+
+// [BUG-665 / S-5] Structured logger for parse-fallback observability. Sentry
+// covers production aggregation, but the structured logger surfaces the same
+// degradations in Cloudflare Worker tail logs (dev/staging) where Sentry may
+// not be wired. Mirrors the pattern in services/summaries.ts.
+const assessmentsLogger = createLogger();
 
 // ---------------------------------------------------------------------------
 // Assessment Engine — Stories 3.1, 3.2
@@ -201,24 +210,67 @@ export function calculateMasteryScore(
 // ---------------------------------------------------------------------------
 
 function parseQuickCheckResult(response: string): QuickCheckResult {
-  try {
-    const jsonMatch = response.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
+  // [BUG-664 / S-4] Use extractFirstJsonObject (brace-depth walker) instead of
+  // the greedy /\{[\s\S]*\}/ regex — the regex grabs everything between the
+  // first `{` and the LAST `}`, which fails when the LLM emits prose containing
+  // braces around the real envelope or wraps the JSON in markdown fences.
+  const jsonStr = extractFirstJsonObject(response);
+  if (jsonStr) {
+    try {
+      const parsed = JSON.parse(jsonStr);
       if (Array.isArray(parsed.questions) && parsed.questions.length >= 2) {
         return {
           questions: parsed.questions.slice(0, 3).map(String),
           checkType: 'concept_boundary',
         };
       }
+      // Parsed but missing required fields — log so silent quality regressions
+      // surface in telemetry instead of silently degrading verification.
+      captureException(
+        new Error('parseQuickCheckResult: missing questions array'),
+        {
+          extra: {
+            surface: 'assessments-quick-check',
+            reason: 'missing_questions',
+            rawResponseLength: response.length,
+          },
+        }
+      );
+      assessmentsLogger.warn(
+        '[parseQuickCheckResult] missing questions array — falling back to generic prompts',
+        { reason: 'missing_questions', rawResponseLength: response.length }
+      );
+    } catch (err) {
+      captureException(err, {
+        extra: {
+          surface: 'assessments-quick-check',
+          reason: 'invalid_json',
+          jsonStrSample: jsonStr.slice(0, 200),
+        },
+      });
+      assessmentsLogger.warn(
+        '[parseQuickCheckResult] invalid JSON — falling back to generic prompts',
+        { reason: 'invalid_json' }
+      );
     }
-  } catch {
-    // Fall through to default
+  } else {
+    captureException(new Error('parseQuickCheckResult: no JSON object found'), {
+      extra: {
+        surface: 'assessments-quick-check',
+        reason: 'no_json_found',
+        rawResponseLength: response.length,
+      },
+    });
+    assessmentsLogger.warn(
+      '[parseQuickCheckResult] no JSON object found — falling back to generic prompts',
+      { reason: 'no_json_found', rawResponseLength: response.length }
+    );
   }
 
   // Graceful fallback — return generic topic-agnostic questions.
-  // S-4: Do NOT embed response.slice() — the raw LLM output could be an error
-  // message, safety refusal, or rate-limit JSON that would leak into the UI.
+  // [BUG-670 / S-16] Do NOT embed response.slice() — the raw LLM output could
+  // be an error message, safety refusal, or rate-limit JSON that would leak
+  // into the UI as feedback to the learner.
   return {
     questions: [
       'Can you explain this concept in your own words?',
@@ -228,14 +280,24 @@ function parseQuickCheckResult(response: string): QuickCheckResult {
   };
 }
 
+/** [BUG-670 / S-16] Safe canned feedback shown to the learner whenever the LLM
+ *  evaluation cannot be parsed. The raw LLM string MUST NOT be surfaced — it
+ *  could be an error envelope, a safety refusal, or rate-limit JSON. */
+const ASSESSMENT_FALLBACK_FEEDBACK =
+  "We couldn't evaluate your answer right now — please try again.";
+
 function parseAssessmentEvaluation(
   response: string,
   depth: VerificationDepth
 ): AssessmentEvaluation {
-  try {
-    const jsonMatch = response.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
+  // [BUG-664 / S-4] Use extractFirstJsonObject — see parseQuickCheckResult for
+  // the rationale. Falling back to the brittle /\{[\s\S]*\}/ regex caused
+  // correct learner answers to be silently graded as failed when the LLM
+  // emitted prose containing braces or markdown fences.
+  const jsonStr = extractFirstJsonObject(response);
+  if (jsonStr) {
+    try {
+      const parsed = JSON.parse(jsonStr);
       const rawScore = Number(parsed.rawScore ?? 0);
       const masteryScore = calculateMasteryScore(depth, rawScore);
       const qualityRating = Math.max(
@@ -248,22 +310,53 @@ function parseAssessmentEvaluation(
         ? getNextVerificationDepth(depth)
         : undefined;
 
+      // [BUG-670 / S-16] Use safe canned fallback when parsed.feedback is
+      // missing rather than `?? response` — see ASSESSMENT_FALLBACK_FEEDBACK.
       return {
-        feedback: String(parsed.feedback ?? response),
+        feedback:
+          typeof parsed.feedback === 'string' && parsed.feedback.length > 0
+            ? parsed.feedback
+            : ASSESSMENT_FALLBACK_FEEDBACK,
         passed,
         shouldEscalateDepth,
         nextDepth: nextDepth ?? undefined,
         masteryScore,
         qualityRating,
       };
+    } catch (err) {
+      captureException(err, {
+        extra: {
+          surface: 'assessments-evaluation',
+          reason: 'invalid_json',
+          jsonStrSample: jsonStr.slice(0, 200),
+        },
+      });
+      assessmentsLogger.warn(
+        '[parseAssessmentEvaluation] invalid JSON — falling back to canned feedback',
+        { reason: 'invalid_json' }
+      );
     }
-  } catch {
-    // Fall through to default
+  } else {
+    captureException(
+      new Error('parseAssessmentEvaluation: no JSON object found'),
+      {
+        extra: {
+          surface: 'assessments-evaluation',
+          reason: 'no_json_found',
+          rawResponseLength: response.length,
+        },
+      }
+    );
+    assessmentsLogger.warn(
+      '[parseAssessmentEvaluation] no JSON object found — falling back to canned feedback',
+      { reason: 'no_json_found', rawResponseLength: response.length }
+    );
   }
 
-  // Graceful fallback
+  // [BUG-670 / S-16] Graceful fallback — never expose raw LLM string as
+  // feedback. `passed:false` is the conservative default; the learner can retry.
   return {
-    feedback: response,
+    feedback: ASSESSMENT_FALLBACK_FEEDBACK,
     passed: false,
     shouldEscalateDepth: false,
     masteryScore: 0,

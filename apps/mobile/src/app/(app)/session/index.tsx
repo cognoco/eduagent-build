@@ -8,9 +8,11 @@ import {
 } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
 import { AppState, View, Text, Pressable, ScrollView } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { platformAlert } from '../../../lib/platform-alert';
 import { goBackOrReplace, homeHrefForReturnTo } from '../../../lib/navigation';
 import { firstParam } from '../../../lib/route-params';
+import { shouldShowBookLink } from '../../../lib/show-book-link';
 import {
   router,
   useRouter,
@@ -31,6 +33,7 @@ import {
   getOpeningMessage,
   SessionTimer,
   FluencyDrillStrip,
+  MilestoneDots,
   type ChatMessage,
 } from '../../../components/session';
 import type { FluencyDrillEvent } from '../../../lib/sse';
@@ -269,35 +272,6 @@ class SessionErrorBoundary extends Component<
   }
 }
 
-function MilestoneDots({ count }: { count: number }) {
-  if (count <= 0) return null;
-
-  // [BUG-645 / ACC-1] Bare colored dots are invisible to screen readers.
-  // The aggregate View carries the label so VoiceOver/TalkBack reads
-  // "3 milestones reached" instead of skipping the indicator entirely.
-  const accessibilityLabel =
-    count === 1 ? '1 milestone reached' : `${count} milestones reached`;
-
-  return (
-    <View
-      className="ms-2 flex-row items-center gap-1"
-      testID="milestone-dots"
-      accessible
-      accessibilityRole="text"
-      accessibilityLabel={accessibilityLabel}
-    >
-      {Array.from({ length: Math.min(count, 6) }).map((_, index) => (
-        <View
-          key={index}
-          className="w-2 h-2 rounded-full bg-primary"
-          importantForAccessibility="no"
-          accessibilityElementsHidden
-        />
-      ))}
-    </View>
-  );
-}
-
 export default function SessionScreen() {
   return (
     <SessionErrorBoundary>
@@ -357,6 +331,24 @@ function SessionScreenInner() {
     : subjectId
     ? `/(app)/shelf/${subjectId}`
     : undefined;
+  // [BUG-867] String-templated dynamic paths (`/(app)/shelf/${subjectId}`)
+  // don't always resolve on web — the chevron looked clickable but the URL
+  // never changed. Supplying an explicit handler that uses Expo Router's
+  // typed object form makes the navigation reliable across web + native.
+  const handleChatBackPress = useCallback(() => {
+    if (returnTo) {
+      router.replace(homeBackHref as never);
+      return;
+    }
+    if (subjectId) {
+      router.replace({
+        pathname: '/(app)/shelf/[subjectId]',
+        params: { subjectId },
+      } as never);
+      return;
+    }
+    router.replace('/(app)/home' as never);
+  }, [returnTo, subjectId, homeBackHref, router]);
   const handleHomeBack = useCallback(() => {
     if (returnTo) {
       router.replace(homeBackHref as never);
@@ -388,9 +380,6 @@ function SessionScreenInner() {
   const { data: overallProgress } = useOverallProgress();
   const progressInventory = useProgressInventory();
   const { data: celebrationLevel = 'all' } = useCelebrationLevel();
-  const showBookLink =
-    effectiveMode !== 'homework' &&
-    (overallProgress?.totalTopicsCompleted ?? 0) > 0;
   const sessionExperience = streak?.longestStreak ?? 0;
   const openingContent = getOpeningMessage(
     effectiveMode,
@@ -413,6 +402,13 @@ function SessionScreenInner() {
   const [messages, setMessages] = useState<ChatMessage[]>([
     { id: 'opening', role: 'assistant', content: openingContent },
   ]);
+  // [BUG-919] Hide the "Go to the Library" hint once the conversation
+  // starts. See shouldShowBookLink for the full rationale.
+  const showBookLink = shouldShowBookLink({
+    effectiveMode,
+    totalTopicsCompleted: overallProgress?.totalTopicsCompleted ?? 0,
+    messagesLength: messages.length,
+  });
   const [isStreaming, setIsStreaming] = useState(false);
   const [exchangeCount, setExchangeCount] = useState(0);
   const [escalationRung, setEscalationRung] = useState(1);
@@ -647,10 +643,14 @@ function SessionScreenInner() {
   );
 
   useEffect(() => {
+    // Capture ref objects (not .current) so the cleanup reads the latest
+    // value at unmount without triggering react-hooks/exhaustive-deps.
+    const animCleanupRef = animationCleanupRef;
+    const silenceRef = silenceTimerRef;
     return () => {
-      animationCleanupRef.current?.();
-      if (silenceTimerRef.current) {
-        clearTimeout(silenceTimerRef.current);
+      animCleanupRef.current?.();
+      if (silenceRef.current) {
+        clearTimeout(silenceRef.current);
       }
     };
   }, []);
@@ -691,10 +691,9 @@ function SessionScreenInner() {
       setTopicSwitcherSubjectId((current) => current ?? effectiveSubjectId);
       return;
     }
-    if (availableSubjects.length > 0) {
-      setTopicSwitcherSubjectId(
-        (current) => current ?? availableSubjects[0]!.id
-      );
+    const [firstSubject] = availableSubjects;
+    if (firstSubject) {
+      setTopicSwitcherSubjectId((current) => current ?? firstSubject.id);
     }
   }, [availableSubjects, effectiveSubjectId]);
 
@@ -852,15 +851,19 @@ function SessionScreenInner() {
     effectiveSubjectName,
     trackerState,
     topicId,
+    topicName,
   ]);
 
   useEffect(() => {
     if (!imageUri) return;
+    // Capture as a narrowed const so the inner async closure sees a defined
+    // string without re-asserting non-null at every reference.
+    const uri = imageUri;
     let cancelled = false;
 
     async function convertImage() {
       try {
-        const base64 = await FileSystem.readAsStringAsync(imageUri!, {
+        const base64 = await FileSystem.readAsStringAsync(uri, {
           encoding: 'base64',
         });
         if (!cancelled) {
@@ -869,7 +872,7 @@ function SessionScreenInner() {
           // extension sniffing. Camera captures are always JPEG; gallery
           // picks provide OS-level mimeType. Falls back to extension
           // sniffing for backward compat with deep links or missing values.
-          const ext = imageUri!.split('.').pop()?.toLowerCase();
+          const ext = uri.split('.').pop()?.toLowerCase();
           const mimeType: 'image/jpeg' | 'image/png' | 'image/webp' =
             imageMimeType === 'image/png'
               ? 'image/png'
@@ -894,7 +897,7 @@ function SessionScreenInner() {
     return () => {
       cancelled = true;
     };
-  }, [imageUri]);
+  }, [imageUri, imageMimeType]);
 
   const {
     syncHomeworkMetadata,
@@ -1186,6 +1189,17 @@ function SessionScreenInner() {
   );
 
   const agencyLabel = escalationRung >= 3 ? 'Guided' : 'Independent';
+  // [BUG-936] On narrow widths (375px) the header was fighting for room
+  // between a back arrow, a "Learning Session" title, a textual agency
+  // pill ("Independent" / "Guided"), milestone dots, and a textual "I'm
+  // Done" pill — title and subtitle truncated to ~7 chars. The agency
+  // pill is a passive state indicator (not a primary action) so we
+  // collapse it to an icon-only Pressable. The full label is preserved
+  // in accessibilityLabel and the tap-for-info modal so SR users and
+  // curious learners still see the textual mode name. Saves ~60-80px
+  // for the title column without removing functionality.
+  const agencyIconName: keyof typeof Ionicons.glyphMap =
+    agencyLabel === 'Guided' ? 'school-outline' : 'compass-outline';
   const agencyBadge = (
     <Pressable
       onPress={() =>
@@ -1196,14 +1210,12 @@ function SessionScreenInner() {
             : "I'm mostly letting you drive and checking in with lighter guidance."
         )
       }
-      className="ms-2 px-3 py-2 rounded-button bg-surface-elevated min-h-[44px] items-center justify-center"
+      className="ms-1 px-2 py-2 rounded-button bg-surface-elevated min-h-[44px] min-w-[44px] items-center justify-center"
       accessibilityRole="button"
       accessibilityLabel={`Session mode: ${agencyLabel}`}
       testID="agency-badge"
     >
-      <Text className="text-body-sm font-semibold text-text-secondary">
-        {agencyLabel}
-      </Text>
+      <Ionicons name={agencyIconName} size={20} color={colors.textSecondary} />
     </Pressable>
   );
 
@@ -1399,6 +1411,7 @@ function SessionScreenInner() {
         placeholder={modeConfig.placeholder}
         backFallback={chatBackFallback}
         backBehavior={chatBackFallback ? 'replace' : undefined}
+        onBackPress={handleChatBackPress}
         messages={messages}
         onSend={handleSend}
         isStreaming={isStreaming}

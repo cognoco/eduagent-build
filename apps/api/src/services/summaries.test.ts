@@ -162,4 +162,98 @@ describe('evaluateSummary', () => {
     expect(result.feedback).toBe('Well done!');
     expect(result.isAccepted).toBe(true);
   });
+
+  // [BUG-664 / S-4] Break tests for the brittle /\{[\s\S]*\}/ regex.
+  it('parses correctly when prose with braces FOLLOWS the JSON envelope', async () => {
+    // The original regex matched first `{` to LAST `}`, so trailing prose
+    // braces would corrupt the substring fed to JSON.parse. The brace-depth
+    // walker stops at the first balanced object, recovering correctly here.
+    const messyProvider: LLMProvider = {
+      id: 'gemini',
+      async chat(): Promise<string> {
+        return (
+          'Here is the evaluation:\n' +
+          JSON.stringify({
+            feedback: 'Captured the main idea.',
+            hasUnderstandingGaps: false,
+            gapAreas: [],
+            isAccepted: true,
+          }) +
+          '\n(rubric reference: see {section-3})'
+        );
+      },
+      async *chatStream(): AsyncIterable<string> {
+        yield 'unused';
+      },
+    };
+    registerProvider(messyProvider);
+
+    const result = await evaluateSummary(
+      'Functions',
+      'Function declarations',
+      'Functions are reusable blocks of code.'
+    );
+
+    // Without the brace-walker fix, this would fall back to the canned message.
+    expect(result.feedback).toBe('Captured the main idea.');
+    expect(result.isAccepted).toBe(true);
+  });
+
+  it('parses correctly when JSON is wrapped in a markdown code fence', async () => {
+    const fencedProvider: LLMProvider = {
+      id: 'gemini',
+      async chat(): Promise<string> {
+        return (
+          '```json\n' +
+          JSON.stringify({
+            feedback: 'Solid.',
+            hasUnderstandingGaps: false,
+            gapAreas: [],
+            isAccepted: true,
+          }) +
+          '\n```'
+        );
+      },
+      async *chatStream(): AsyncIterable<string> {
+        yield 'unused';
+      },
+    };
+    registerProvider(fencedProvider);
+
+    const result = await evaluateSummary(
+      'Loops',
+      'For and while loops',
+      'For loops repeat n times.'
+    );
+
+    expect(result.feedback).toBe('Solid.');
+    expect(result.isAccepted).toBe(true);
+  });
+
+  // [BUG-670 / S-16] Break test — never leak raw LLM string as feedback.
+  it('uses canned fallback when parsed JSON is missing the feedback field', async () => {
+    const missingFeedbackProvider: LLMProvider = {
+      id: 'gemini',
+      async chat(): Promise<string> {
+        return JSON.stringify({
+          hasUnderstandingGaps: true,
+          gapAreas: ['x'],
+          isAccepted: false,
+        });
+      },
+      async *chatStream(): AsyncIterable<string> {
+        yield 'unused';
+      },
+    };
+    registerProvider(missingFeedbackProvider);
+
+    const result = await evaluateSummary(
+      'Arrays',
+      'Arrays',
+      'Some summary text.'
+    );
+
+    expect(result.feedback).toContain("couldn't provide AI feedback");
+    expect(result.isAccepted).toBe(false);
+  });
 });

@@ -33,6 +33,7 @@ import {
   type Database,
 } from '@eduagent/database';
 import type { DataExport, ConsentStatus, Profile } from '@eduagent/schemas';
+import { projectAiResponseContent } from './llm/project-response';
 
 export async function generateExport(
   db: Database,
@@ -148,6 +149,9 @@ export async function generateExport(
         })
       : [];
 
+  // [BUG-912] Intentionally reads RAW streak rows (not findCurrentForToday) —
+  // user-data export must reflect the actual stored truth, not a derived
+  // display value. Display paths must use repo.streaks.findCurrentForToday().
   const streakRows =
     profileIds.length > 0
       ? await db.query.streaks.findMany({
@@ -279,7 +283,23 @@ export async function generateExport(
     curricula: curriculaRows as Record<string, unknown>[],
     curriculumTopics: curriculumTopicRows as Record<string, unknown>[],
     learningSessions: learningSessionRows as Record<string, unknown>[],
-    sessionEvents: sessionEventRows as Record<string, unknown>[],
+    sessionEvents: sessionEventRows.map((row) => {
+      if (
+        typeof row === 'object' &&
+        row !== null &&
+        (row as Record<string, unknown>)['eventType'] === 'ai_response' &&
+        typeof (row as Record<string, unknown>)['content'] === 'string'
+      ) {
+        return {
+          ...(row as Record<string, unknown>),
+          content: projectAiResponseContent(
+            (row as Record<string, unknown>)['content'] as string,
+            { silent: true }
+          ),
+        };
+      }
+      return row as Record<string, unknown>;
+    }),
     sessionSummaries: sessionSummaryRows as Record<string, unknown>[],
     retentionCards: retentionCardRows as Record<string, unknown>[],
     assessments: assessmentRows as Record<string, unknown>[],

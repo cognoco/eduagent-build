@@ -16,6 +16,7 @@ import { useSubjects } from '../../../hooks/use-subjects';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { platformAlert } from '../../../lib/platform-alert';
 import { useThemeColors } from '../../../lib/theme';
+import { ErrorFallback } from '../../../components/common/ErrorFallback';
 import type { Vocabulary } from '@eduagent/schemas';
 
 function TypeBadge({ type }: { type: 'word' | 'chunk' }) {
@@ -140,24 +141,33 @@ export default function VocabularyListScreen() {
     goBackOrReplace(router, '/(app)/progress/vocabulary' as const);
 
   if (!subjectId) {
+    // [BUG-921] Vocabulary is normally entered from a subject's progress
+    // page (`/progress/[subjectId]`). Direct-URL or stale-deep-link arrivals
+    // land here with no subjectId param and previously hit a terse "No
+    // subject selected." dead-end. Per UX Resilience Rules, give an
+    // explanation plus a forward path — Library to pick a subject — in
+    // addition to the existing "Back to progress" return path.
     return (
       <View
-        className="flex-1 bg-background items-center justify-center px-6"
+        className="flex-1 bg-background"
         style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
       >
-        <Text className="text-body text-text-secondary text-center mb-4">
-          No subject selected.
-        </Text>
-        <Pressable
-          onPress={() => router.replace('/(app)/progress' as never)}
-          className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center"
-          accessibilityRole="button"
-          accessibilityLabel="Back to progress"
-        >
-          <Text className="text-body font-semibold text-text-inverse">
-            Back to progress
-          </Text>
-        </Pressable>
+        <ErrorFallback
+          variant="centered"
+          title="No subject selected"
+          message="Open this screen from a subject's detail page. Browse your Library to pick a subject and view its vocabulary."
+          primaryAction={{
+            label: 'Open Library',
+            onPress: () => router.replace('/(app)/library' as const),
+            testID: 'vocabulary-empty-library',
+          }}
+          secondaryAction={{
+            label: 'Back to progress',
+            onPress: () => router.replace('/(app)/progress' as never),
+            testID: 'vocabulary-empty-back',
+          }}
+          testID="vocabulary-no-subject"
+        />
       </View>
     );
   }

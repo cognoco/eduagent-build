@@ -16,10 +16,10 @@ let capturedStackProps: StackProps | null = null;
 const capturedScreens: ScreenProps[] = [];
 
 jest.mock('expo-router', () => {
-  function MockStack(props: StackProps) {
+  const MockStack = (props: StackProps) => {
     capturedStackProps = props;
-    return <>{props.children}</>;
-  }
+    return props.children;
+  };
   MockStack.Screen = (props: ScreenProps) => {
     capturedScreens.push(props);
     return null;

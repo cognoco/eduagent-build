@@ -436,15 +436,55 @@ describe('SubscriptionScreen', () => {
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
     expect(screen.getByTestId('no-offerings')).toBeTruthy();
-    // Shows helpful availability message instead of "not available on this device"
+    // BUG-897: message must NOT say "plans available soon" while listing
+    // plan cards — pick one direction. We keep the cards as informational
+    // tier comparison and rephrase the disclaimer to not contradict.
     expect(
-      screen.getByText(/Subscription plans will be available soon/)
+      screen.queryByText(/Subscription plans will be available soon/)
+    ).toBeNull();
+    expect(
+      screen.getByText(/store purchasing isn't available on this device yet/i)
     ).toBeTruthy();
-    // Shows static tier cards
+    // BUG-899: only Free and Plus are approved per pricing_dual_cap.md.
+    // Family and Pro static cards must not be shown — their store SKUs
+    // are not approved for public listing.
     expect(screen.getByTestId('static-tier-free')).toBeTruthy();
     expect(screen.getByTestId('static-tier-plus')).toBeTruthy();
-    expect(screen.getByTestId('static-tier-family')).toBeTruthy();
-    expect(screen.getByTestId('static-tier-pro')).toBeTruthy();
+    expect(screen.queryByTestId('static-tier-family')).toBeNull();
+    expect(screen.queryByTestId('static-tier-pro')).toBeNull();
+  });
+
+  // BUG-899 break test: Premium Mentor add-on advertises an unapproved
+  // +$15/month price. It must not render even on a paid tier until pricing
+  // is approved.
+  it('does not show the Premium Mentor +$15/month add-on on paid tiers', () => {
+    mockSubscription = { tier: 'plus', status: 'active' };
+    mockOfferings = makeMockOfferings([makeMockPackage()]);
+    mockCustomerInfo = makeMockCustomerInfo({
+      activeEntitlements: { plus: { isActive: true, identifier: 'plus' } },
+    });
+
+    render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+    expect(screen.queryByTestId('ai-upgrade-section')).toBeNull();
+    expect(screen.queryByText(/\+\$15\/month per profile/)).toBeNull();
+  });
+
+  // BUG-896 break test: Manage billing must appear whenever the API tier is
+  // paid, even if RevenueCat hasn't synced an active entitlement. Otherwise
+  // a paid parent has no in-app way to cancel.
+  it('renders manage billing when API tier is paid even if RevenueCat shows no active entitlement', () => {
+    mockSubscription = {
+      tier: 'family',
+      status: 'active',
+      currentPeriodEnd: '2026-05-18T00:00:00Z',
+    };
+    mockOfferings = null;
+    mockCustomerInfo = makeMockCustomerInfo(); // no active entitlements
+
+    render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+    expect(screen.getByTestId('manage-billing-button')).toBeTruthy();
   });
 
   it('shows current plan info from subscription data', () => {
@@ -806,6 +846,32 @@ describe('SubscriptionScreen', () => {
         'https://play.google.com/store/account/subscriptions'
       );
     });
+
+    Object.defineProperty(Platform, 'OS', { get: () => originalPlatform });
+  });
+
+  // [BUG-916] On web there is no native store deep link — IAP runs on
+  // iOS/Android only and Stripe is dormant for web. The Manage row must show
+  // a static "managed on your mobile device" info instead of the misleading
+  // "Opens Google Play subscriptions" copy.
+  it('shows static "managed on your mobile device" info on web (BUG-916)', () => {
+    const originalPlatform = Platform.OS;
+    Object.defineProperty(Platform, 'OS', { get: () => 'web' });
+
+    mockOfferings = makeMockOfferings([makeMockPackage()]);
+    mockCustomerInfo = makeMockCustomerInfo({
+      activeEntitlements: { pro: { isActive: true, identifier: 'pro' } },
+    });
+
+    render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+    expect(screen.getByTestId('manage-billing-web-info')).toBeTruthy();
+    expect(
+      screen.getByText('Subscription is managed on your mobile device')
+    ).toBeTruthy();
+    // No interactive Pressable on web — no misleading Google Play copy.
+    expect(screen.queryByTestId('manage-billing-button')).toBeNull();
+    expect(screen.queryByText('Opens Google Play subscriptions')).toBeNull();
 
     Object.defineProperty(Platform, 'OS', { get: () => originalPlatform });
   });

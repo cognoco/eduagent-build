@@ -67,6 +67,31 @@ export class ConsentTokenExpiredError extends Error {
   }
 }
 
+/**
+ * [BUG-765] Thrown when a parent attempts to view/revoke/restore consent for a
+ * profile that is not linked to them via family_links. The route layer maps
+ * this to a 403 Forbidden via `instanceof` — the previous classification used
+ * `error.message.includes('Not authorized')`, which silently broke any time
+ * the message text was edited or wrapped by an upstream library.
+ */
+export class ConsentNotAuthorizedError extends Error {
+  constructor(action: 'view' | 'revoke' | 'restore') {
+    super(`Not authorized to ${action} consent for this profile`);
+    this.name = 'ConsentNotAuthorizedError';
+  }
+}
+
+/**
+ * [BUG-765] Thrown when a consent state row is missing for the given profile —
+ * route layer maps to 404 Not Found.
+ */
+export class ConsentRecordNotFoundError extends Error {
+  constructor() {
+    super('No consent record found for this profile');
+    this.name = 'ConsentRecordNotFoundError';
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -531,7 +556,7 @@ export async function getChildConsentForParent(
     ),
   });
   if (!link) {
-    throw new Error('Not authorized to view consent for this profile');
+    throw new ConsentNotAuthorizedError('view');
   }
 
   const row = await db.query.consentStates.findFirst({
@@ -566,7 +591,7 @@ export async function revokeConsent(
     ),
   });
   if (!link) {
-    throw new Error('Not authorized to revoke consent for this profile');
+    throw new ConsentNotAuthorizedError('revoke');
   }
 
   // Find the consent state
@@ -575,7 +600,7 @@ export async function revokeConsent(
     orderBy: desc(consentStates.requestedAt),
   });
   if (!existing) {
-    throw new Error('No consent record found for this profile');
+    throw new ConsentRecordNotFoundError();
   }
   if (existing.status === 'WITHDRAWN') {
     return mapConsentRow(existing);
@@ -618,7 +643,7 @@ export async function restoreConsent(
     ),
   });
   if (!link) {
-    throw new Error('Not authorized to restore consent for this profile');
+    throw new ConsentNotAuthorizedError('restore');
   }
 
   // Find the consent state
@@ -627,7 +652,7 @@ export async function restoreConsent(
     orderBy: desc(consentStates.requestedAt),
   });
   if (!existing) {
-    throw new Error('No consent record found for this profile');
+    throw new ConsentRecordNotFoundError();
   }
   if (existing.status !== 'WITHDRAWN') {
     return mapConsentRow(existing);

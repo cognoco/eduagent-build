@@ -9,9 +9,9 @@ import {
   Share,
 } from 'react-native';
 import { useState, useCallback } from 'react';
-import * as SecureStore from '../../lib/secure-storage';
 import { platformAlert } from '../../lib/platform-alert';
 import { clearTransitionState } from '../../lib/auth-transition';
+import { clearProfileSecureStorageOnSignOut } from '../../lib/sign-out-cleanup';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth, useUser } from '@clerk/clerk-expo';
@@ -22,6 +22,7 @@ import type {
   LearningMode,
 } from '@eduagent/schemas';
 import { useProfile } from '../../lib/profile';
+import { useActiveProfileRole } from '../../hooks/use-active-profile-role';
 import { useQueryClient } from '@tanstack/react-query';
 import { isNewLearner } from '../../lib/progressive-disclosure';
 import { useExportData } from '../../hooks/use-account';
@@ -48,10 +49,12 @@ function SettingsRow({
   label,
   value,
   onPress,
+  testID,
 }: {
   label: string;
   value?: string;
   onPress?: () => void;
+  testID?: string;
 }) {
   return (
     <Pressable
@@ -64,6 +67,7 @@ function SettingsRow({
       })}
       accessibilityLabel={label}
       accessibilityRole="button"
+      testID={testID}
     >
       <Text className="text-body text-text-primary">{label}</Text>
       {value && (
@@ -179,6 +183,16 @@ export default function MoreScreen() {
   const { signOut } = useAuth();
   const { user } = useUser();
   const { activeProfile, profiles } = useProfile();
+  // [BUG-915] When the parent is impersonating a child profile, the More tab
+  // must hide account-level destructive actions (Sign out, Delete account,
+  // Export my data, Subscription). Those operate on the parent's underlying
+  // account and are unsafe to expose while "Viewing TestKid's account" — the
+  // ProxyBanner at the top of (app)/_layout already provides the Switch-back
+  // pointer, so no additional escape affordance is needed in this screen.
+  // Uses the discriminated useActiveProfileRole() so the same role guard
+  // shape applies in mentor-memory and the post-approval landing.
+  const role = useActiveProfileRole();
+  const isImpersonating = role === 'impersonated-child';
   const queryClient = useQueryClient();
   const cachedInventory = queryClient.getQueryData<KnowledgeInventory>([
     'progress',
@@ -407,8 +421,20 @@ export default function MoreScreen() {
         keyboardShouldPersistTaps="handled"
       >
         {/* 1. Learning Mode */}
-        <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2 mt-4">
-          Learning Mode
+        {/* BUG-909: Prefix with the active profile's display name and add a */}
+        {/* clarifying subtitle so parents know these toggles apply to their */}
+        {/* OWN learning sessions, not their child's. The child's settings */}
+        {/* live on /child/[id] (per-profile surface). */}
+        <Text
+          className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-1 mt-4"
+          testID="learning-mode-section-header"
+        >
+          {`${displayName}'s Learning Mode`}
+        </Text>
+        <Text className="text-caption text-text-secondary mb-2">
+          {activeProfile?.isOwner && linkedChildren.length > 0
+            ? "Applies to your own sessions. To change a child's, open their profile from the dashboard."
+            : 'Applies to your own learning sessions.'}
         </Text>
         {LEARNING_MODE_OPTIONS.map((opt) => (
           <LearningModeOption
@@ -423,8 +449,16 @@ export default function MoreScreen() {
         ))}
 
         {/* 2. Learning Accommodation */}
-        <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2 mt-6">
-          Learning Accommodation
+        <Text
+          className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-1 mt-6"
+          testID="learning-accommodation-section-header"
+        >
+          {`${displayName}'s Learning Accommodation`}
+        </Text>
+        <Text className="text-caption text-text-secondary mb-2">
+          {activeProfile?.isOwner && linkedChildren.length > 0
+            ? "Applies to your own sessions. To change a child's, open their profile from the dashboard."
+            : 'Applies to your own learning sessions.'}
         </Text>
         {ACCOMMODATION_OPTIONS.map((opt) => (
           <LearningModeOption
@@ -465,7 +499,9 @@ export default function MoreScreen() {
                 value={`${linkedChildren.length} ${
                   linkedChildren.length === 1 ? 'child' : 'children'
                 }`}
-                onPress={() => router.push('/(app)/dashboard')}
+                onPress={() =>
+                  router.push('/(app)/dashboard?returnTo=more' as never)
+                }
               />
             )}
             <Pressable
@@ -582,17 +618,22 @@ export default function MoreScreen() {
             })
           }
         />
-        <SettingsRow
-          label="Subscription"
-          value={
-            subscription
-              ? `${subscription.tier
-                  .charAt(0)
-                  .toUpperCase()}${subscription.tier.slice(1)}`
-              : undefined
-          }
-          onPress={() => router.push('/(app)/subscription')}
-        />
+        {/* [BUG-915] Hide Subscription in impersonation — billing is the
+            parent account's, not the child profile's. */}
+        {!isImpersonating && (
+          <SettingsRow
+            label="Subscription"
+            value={
+              subscription
+                ? `${subscription.tier
+                    .charAt(0)
+                    .toUpperCase()}${subscription.tier.slice(1)}`
+                : undefined
+            }
+            onPress={() => router.push('/(app)/subscription')}
+            testID="more-row-subscription"
+          />
+        )}
 
         {/* 8. Other — support, legal, data management */}
         <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2 mt-6">
@@ -608,15 +649,23 @@ export default function MoreScreen() {
           label="Terms of Service"
           onPress={() => router.push('/terms')}
         />
-        <SettingsRow
-          label="Export my data"
-          onPress={exportData.isPending ? undefined : handleExport}
-          value={exportData.isPending ? 'Preparing export...' : undefined}
-        />
-        <SettingsRow
-          label="Delete account"
-          onPress={() => router.push('/delete-account')}
-        />
+        {/* [BUG-915] Hide Export my data and Delete account in impersonation —
+            both operate on the parent's underlying account. */}
+        {!isImpersonating && (
+          <SettingsRow
+            label="Export my data"
+            onPress={exportData.isPending ? undefined : handleExport}
+            value={exportData.isPending ? 'Preparing export...' : undefined}
+            testID="more-row-export"
+          />
+        )}
+        {!isImpersonating && (
+          <SettingsRow
+            label="Delete account"
+            onPress={() => router.push('/delete-account')}
+            testID="more-row-delete-account"
+          />
+        )}
 
         {/* Homework Help — hidden until parent-controlled toggle is implemented
         <Pressable
@@ -635,38 +684,51 @@ export default function MoreScreen() {
         </Pressable>
         */}
 
-        <Pressable
-          onPress={async () => {
-            if (isSigningOut) return;
-            setIsSigningOut(true);
-            try {
-              clearTransitionState();
-              void SecureStore.deleteItemAsync('hasSignedInBefore').catch(
-                () => {
-                  /* non-fatal */
-                }
-              );
-              await signOut();
-            } catch {
-              platformAlert(
-                'Could not sign out',
-                'Please try again in a moment.'
-              );
-              setIsSigningOut(false);
+        {/* [BUG-915] Hide the Sign out button in impersonation — it would sign
+            out the parent's whole account session, which the user (operating
+            "as the child") almost certainly does not intend. The ProxyBanner
+            at the top already provides the safe Switch-back path. */}
+        {!isImpersonating && (
+          <Pressable
+            onPress={async () => {
+              if (isSigningOut) return;
+              setIsSigningOut(true);
+              try {
+                clearTransitionState();
+                // [BUG-723 / SEC-7] Wipe per-profile + global SecureStore keys
+                // before signing out so the next signed-in user on a shared
+                // device does not inherit bookmark prompts, dictation prefs,
+                // rating-prompt counters, etc. Includes all known profileIds
+                // (owner + linked children) so child-profile keys are cleared
+                // too. Best-effort: per-key failure is swallowed inside the
+                // helper so cleanup never blocks sign-out.
+                await clearProfileSecureStorageOnSignOut(
+                  profiles.map((p) => p.id)
+                );
+                await signOut();
+              } catch {
+                platformAlert(
+                  'Could not sign out',
+                  'Please try again in a moment.'
+                );
+                setIsSigningOut(false);
+              }
+            }}
+            disabled={isSigningOut}
+            className={
+              'bg-surface rounded-card px-4 py-3.5 mt-6 items-center' +
+              (isSigningOut ? ' opacity-50' : '')
             }
-          }}
-          disabled={isSigningOut}
-          className={
-            'bg-surface rounded-card px-4 py-3.5 mt-6 items-center' +
-            (isSigningOut ? ' opacity-50' : '')
-          }
-          style={Platform.OS === 'web' ? { cursor: 'pointer' } : undefined}
-          testID="sign-out-button"
-          accessibilityLabel="Sign out"
-          accessibilityRole="button"
-        >
-          <Text className="text-body font-semibold text-danger">Sign out</Text>
-        </Pressable>
+            style={Platform.OS === 'web' ? { cursor: 'pointer' } : undefined}
+            testID="sign-out-button"
+            accessibilityLabel="Sign out"
+            accessibilityRole="button"
+          >
+            <Text className="text-body font-semibold text-danger">
+              Sign out
+            </Text>
+          </Pressable>
+        )}
 
         <View className="mt-8 items-center">
           <Text className="text-caption text-text-secondary">

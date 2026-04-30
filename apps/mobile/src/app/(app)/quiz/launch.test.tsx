@@ -1,4 +1,5 @@
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -8,6 +9,15 @@ import {
 const mockReplace = jest.fn();
 const mockSetRound = jest.fn();
 const mockMutate = jest.fn();
+const mockGoBackOrReplace = jest.fn();
+
+// Mutable so timeout tests can flip isPending to true without rerendering.
+let mockGenerateRound = {
+  mutate: mockMutate,
+  isPending: false,
+  isError: false,
+  error: null as Error | null,
+};
 
 const challengeRound = {
   id: 'round-1',
@@ -45,15 +55,11 @@ jest.mock('../../../lib/theme', () => ({
 }));
 
 jest.mock('../../../lib/navigation', () => ({
-  goBackOrReplace: jest.fn(),
+  goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
 }));
 
 jest.mock('../../../hooks/use-quiz', () => ({
-  useGenerateRound: () => ({
-    mutate: mockMutate,
-    isPending: false,
-    isError: false,
-  }),
+  useGenerateRound: () => mockGenerateRound,
 }));
 
 jest.mock('./_layout', () => ({
@@ -88,6 +94,12 @@ describe('friendlyErrorMessage', () => {
 describe('QuizLaunchScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockGenerateRound = {
+      mutate: mockMutate,
+      isPending: false,
+      isError: false,
+      error: null,
+    };
     mockMutate.mockImplementation(
       (
         _input: unknown,
@@ -111,5 +123,72 @@ describe('QuizLaunchScreen', () => {
 
     expect(mockSetRound).toHaveBeenCalledWith(challengeRound);
     expect(mockReplace).toHaveBeenCalledWith('/(app)/quiz/play');
+  });
+
+  // [BUG-UX-QUIZ-TIMEOUT] 30s hard UI-level timeout on round generation.
+  describe('[BUG-UX-QUIZ-TIMEOUT] 30s safety timeout', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+      // Mutation is stuck in pending — never resolves.
+      mockGenerateRound = {
+        mutate: mockMutate,
+        isPending: true,
+        isError: false,
+        error: null,
+      };
+      mockMutate.mockImplementation(() => {
+        // Intentionally never calls onSuccess/onError — simulates a hung network.
+      });
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('does NOT show the error panel before 30s elapses', () => {
+      render(<QuizLaunchScreen />);
+
+      act(() => {
+        jest.advanceTimersByTime(29_999);
+      });
+
+      expect(screen.queryByTestId('quiz-launch-error-fallback')).toBeNull();
+    });
+
+    it('shows error panel with Retry and Go Back after 30s', () => {
+      render(<QuizLaunchScreen />);
+
+      act(() => {
+        jest.advanceTimersByTime(30_000);
+      });
+
+      expect(screen.getByTestId('quiz-launch-error-fallback')).toBeTruthy();
+      expect(screen.getByTestId('quiz-launch-retry')).toBeTruthy();
+      expect(screen.getByTestId('quiz-launch-back')).toBeTruthy();
+    });
+
+    it('clears the safety timeout when mutation leaves pending before 30s (cleanup)', () => {
+      const { rerender } = render(<QuizLaunchScreen />);
+
+      act(() => {
+        jest.advanceTimersByTime(15_000);
+      });
+
+      // Mutation resolves before 30s — reset isPending.
+      mockGenerateRound = {
+        mutate: mockMutate,
+        isPending: false,
+        isError: false,
+        error: null,
+      };
+      rerender(<QuizLaunchScreen />);
+
+      // Advance past original 30s mark — timer should have been cleared.
+      act(() => {
+        jest.advanceTimersByTime(15_001);
+      });
+
+      expect(screen.queryByTestId('quiz-launch-error-fallback')).toBeNull();
+    });
   });
 });

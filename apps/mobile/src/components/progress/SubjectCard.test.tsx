@@ -83,7 +83,13 @@ describe('SubjectCard headline', () => {
     expect(screen.getByText('2 topics started · 0 mastered')).toBeTruthy();
   });
 
-  it('shows a session-based headline when sessions exist but topics are still zero', () => {
+  // [BUG-880] Subjects with sessions but zero started topics previously
+  // showed "X sessions completed" as the headline while peers showed
+  // "X topics started · Y mastered" — making it look as if some subjects
+  // had richer tracking when they were just at a different stage. Use the
+  // unified topic-based schema everywhere; sessions still surface in the
+  // subline.
+  it('uses the unified topic headline even when sessions exist but topics are still zero [BUG-880]', () => {
     render(
       <SubjectCard
         subject={makeSubject({
@@ -94,8 +100,12 @@ describe('SubjectCard headline', () => {
       />
     );
 
-    expect(screen.getByText('2 sessions completed')).toBeTruthy();
-    expect(screen.queryByTestId('card-bar')).toBeNull();
+    expect(screen.getByText('0 topics started · 0 mastered')).toBeTruthy();
+    expect(screen.queryByText('2 sessions completed')).toBeNull();
+    // Sessions still visible in the subline.
+    expect(screen.getByText(/2 sessions/)).toBeTruthy();
+    // Bar is rendered (topics.total is not null in the default fixture).
+    expect(screen.getByTestId('card-bar')).toBeTruthy();
   });
 
   it('hides the progress bar for open-ended subjects', () => {

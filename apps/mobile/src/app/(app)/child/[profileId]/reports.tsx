@@ -314,24 +314,22 @@ export default function ChildReportsScreen(): React.ReactElement {
             <Text className="text-h3 font-semibold text-text-primary text-center">
               Your first report is on its way
             </Text>
+            {/* [BUG-904] Empty state previously stacked four near-duplicate
+                copies of the same fact ("first report coming soon"). Collapse
+                to a single information line + the time context, keep the one
+                CTA. The push-notification claim was removed because it isn't
+                accurate when the parent has Push Notifications switched off. */}
             {(() => {
               const { date, timeContext } = getNextReportInfo();
               return (
-                <>
-                  <Text className="text-body-sm text-text-secondary text-center mt-2">
-                    Reports are generated on the 1st of each month, summarizing
-                    your child's learning from the previous month.{' '}
-                    {date
-                      ? `${childName}'s first report will arrive on ${date}.`
-                      : `${childName}'s first report ${timeContext}.`}
-                  </Text>
-                  <Text
-                    className="text-body-sm font-semibold text-primary text-center mt-2"
-                    testID="child-reports-empty-time-context"
-                  >
-                    Your first report {timeContext}
-                  </Text>
-                </>
+                <Text
+                  className="text-body-sm text-text-secondary text-center mt-2"
+                  testID="child-reports-empty-time-context"
+                >
+                  {date
+                    ? `${childName}'s first report will arrive on ${date}.`
+                    : `${childName}'s first report ${timeContext}.`}
+                </Text>
               );
             })()}
             <Pressable
@@ -352,9 +350,6 @@ export default function ChildReportsScreen(): React.ReactElement {
                 See {childName}'s progress now
               </Text>
             </Pressable>
-            <Text className="text-caption text-text-secondary text-center mt-3">
-              You'll get a push notification when the report is ready.
-            </Text>
           </View>
         )}
       </ScrollView>

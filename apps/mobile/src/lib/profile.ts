@@ -19,6 +19,7 @@ import {
   setActiveProfileId as pushProfileIdToApiClient,
   setProxyMode,
 } from './api-client';
+import { formatApiError } from './format-api-error';
 
 export type { Profile };
 
@@ -161,7 +162,12 @@ export function ProfileProvider({
       if (activeProfileId) {
         setProfileWasRemoved(true);
       }
-      const owner = profiles.find((p) => p.isOwner) ?? profiles[0]!;
+      // profiles.length > 0 is guarded above, so the fallback is always
+      // defined; the `as` cast just communicates that to TS under
+      // noUncheckedIndexedAccess without a runtime non-null assertion.
+      const owner =
+        profiles.find((p) => p.isOwner) ??
+        (profiles[0] as (typeof profiles)[number]);
       setActiveProfileId(owner.id);
       void SecureStore.setItemAsync(ACTIVE_PROFILE_KEY, owner.id).catch(() => {
         /* non-fatal — in-memory activeProfileId is already set above */
@@ -197,10 +203,10 @@ export function ProfileProvider({
         if (!res.ok) {
           return { success: false, error: 'Failed to switch profile' };
         }
-      } catch {
+      } catch (err) {
         return {
           success: false,
-          error: 'Network error while switching profile',
+          error: formatApiError(err),
         };
       }
       let persistenceFailed = false;

@@ -11,6 +11,9 @@ import type { ChatMessage } from './llm';
 import { escapeXml, sanitizeXmlValue } from './llm/sanitize';
 import { listSubjects } from './subject';
 import { captureException } from './sentry';
+import { createLogger } from './logger';
+
+const logger = createLogger();
 
 const CLASSIFY_SYSTEM_PROMPT = `You are a subject classifier for a tutoring platform.
 
@@ -107,7 +110,10 @@ export async function classifySubject(
       // S-6 / [AUDIT-SILENT-FAIL]: Log AND escalate. Returning a null
       // suggestion silently masks LLM outages — captureException makes the
       // degraded experience queryable.
-      console.error('[classify] LLM failed for zero-subject path:', err);
+      // [logging sweep] structured logger so PII fields land as JSON context
+      logger.error('[classify] LLM failed for zero-subject path', {
+        error: err instanceof Error ? err.message : String(err),
+      });
       captureException(err, {
         profileId,
         extra: { site: 'classifySubject.zeroSubjectPath' },
@@ -211,7 +217,11 @@ export async function classifySubject(
     // S-6 / [AUDIT-SILENT-FAIL]: Log AND escalate. An empty-candidates
     // response looks identical to a genuine no-match, so we need Sentry to
     // distinguish degraded-LLM from no-match in production.
-    console.error('[classify] LLM failed for multi-subject path:', err);
+    // [logging sweep] structured logger so PII fields land as JSON context
+    logger.error('[classify] LLM failed for multi-subject path', {
+      subjectCount: subjects.length,
+      error: err instanceof Error ? err.message : String(err),
+    });
     captureException(err, {
       profileId,
       extra: {

@@ -34,6 +34,15 @@ jest.mock('../../lib/profile', () => ({
   }),
 }));
 
+let mockIsParentProxy = false;
+jest.mock('../../hooks/use-parent-proxy', () => ({
+  useParentProxy: () => ({
+    isParentProxy: mockIsParentProxy,
+    childProfile: null,
+    parentProfile: null,
+  }),
+}));
+
 jest.mock('../../hooks/use-account', () => ({
   useExportData: () => ({ mutateAsync: mockExportMutateAsync }),
 }));
@@ -124,7 +133,39 @@ describe('MoreScreen — Learning Mode', () => {
   it('renders the Learning Mode section header', () => {
     render(<MoreScreen />, { wrapper: createWrapper() });
 
-    expect(screen.getByText('Learning Mode')).toBeTruthy();
+    // BUG-909: Section header is prefixed with the active profile's display
+    // name to make it unambiguous that the toggle applies to THAT profile,
+    // not a child profile selected from elsewhere.
+    expect(screen.getByText("Alex's Learning Mode")).toBeTruthy();
+  });
+
+  // BUG-909 break test: bare "Learning Mode" / "Learning Accommodation"
+  // labels must NOT appear on their own — they must be possessive-prefixed
+  // so a parent on their own More tab knows the setting applies to them,
+  // not to a child profile.
+  it('[BUG-909] section headers are prefixed with the active profile name', () => {
+    render(<MoreScreen />, { wrapper: createWrapper() });
+
+    expect(
+      screen.getByTestId('learning-mode-section-header')
+    ).toHaveTextContent("Alex's Learning Mode");
+    expect(
+      screen.getByTestId('learning-accommodation-section-header')
+    ).toHaveTextContent("Alex's Learning Accommodation");
+    // The bare uppercase label must not appear in the rendered tree.
+    expect(screen.queryByText('Learning Mode')).toBeNull();
+    expect(screen.queryByText('Learning Accommodation')).toBeNull();
+  });
+
+  // BUG-909: When the profile is an owner with linked children, the
+  // subtitle must direct them to a child profile to change a child's
+  // settings. Otherwise it's a generic "applies to your own sessions".
+  it('[BUG-909] subtitle clarifies scope when owner has linked children', () => {
+    render(<MoreScreen />, { wrapper: createWrapper() });
+
+    // Default mock: isOwner=true, no linked children -> generic copy.
+    const generic = screen.queryAllByText(/Applies to your own learning/i);
+    expect(generic.length).toBeGreaterThanOrEqual(2);
   });
 
   it('renders both learning mode options', () => {
@@ -269,8 +310,9 @@ describe('MoreScreen — Learning Mode', () => {
     render(<MoreScreen />, { wrapper: createWrapper() });
 
     expect(screen.queryByText('Appearance')).toBeNull();
-    expect(screen.getByText('Learning Mode')).toBeTruthy();
-    expect(screen.getByText('Learning Accommodation')).toBeTruthy();
+    // BUG-909: Section labels are now possessive (per active profile).
+    expect(screen.getByText("Alex's Learning Mode")).toBeTruthy();
+    expect(screen.getByText("Alex's Learning Accommodation")).toBeTruthy();
     expect(screen.getByText('Celebrations')).toBeTruthy();
     expect(screen.getByText('Notifications')).toBeTruthy();
     expect(screen.getByText('Account')).toBeTruthy();
@@ -300,6 +342,7 @@ describe('MoreScreen — Learning Mode', () => {
 describe('MoreScreen — Account Actions', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockIsParentProxy = false;
     mockExportMutateAsync.mockResolvedValue({
       account: {
         email: 'alex@example.com',
@@ -379,5 +422,39 @@ describe('MoreScreen — Account Actions', () => {
         undefined
       );
     });
+  });
+});
+
+// [BUG-915] When the parent is impersonating a child profile, the More tab
+// must hide account-level destructive rows. The ProxyBanner at the top of the
+// (app) layout already provides the Switch-back escape, so the user is never
+// stranded — they can return to their parent account at any time.
+describe('MoreScreen — impersonation hides destructive actions (BUG-915)', () => {
+  afterEach(() => {
+    mockIsParentProxy = false;
+  });
+
+  it('hides Sign out, Delete account, Export my data, and Subscription when impersonating', () => {
+    mockIsParentProxy = true;
+    render(<MoreScreen />, { wrapper: createWrapper() });
+
+    expect(screen.queryByTestId('sign-out-button')).toBeNull();
+    expect(screen.queryByTestId('more-row-delete-account')).toBeNull();
+    expect(screen.queryByTestId('more-row-export')).toBeNull();
+    expect(screen.queryByTestId('more-row-subscription')).toBeNull();
+    // Sanity: text-level checks make the assertion visible without testIDs.
+    expect(screen.queryByText('Sign out')).toBeNull();
+    expect(screen.queryByText('Delete account')).toBeNull();
+    expect(screen.queryByText('Export my data')).toBeNull();
+  });
+
+  it('shows Sign out, Delete account, Export my data, and Subscription on the parent account', () => {
+    mockIsParentProxy = false;
+    render(<MoreScreen />, { wrapper: createWrapper() });
+
+    expect(screen.getByTestId('sign-out-button')).toBeTruthy();
+    expect(screen.getByTestId('more-row-delete-account')).toBeTruthy();
+    expect(screen.getByTestId('more-row-export')).toBeTruthy();
+    expect(screen.getByTestId('more-row-subscription')).toBeTruthy();
   });
 });

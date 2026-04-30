@@ -15,6 +15,8 @@ import {
   sessionSummaries,
   streaks,
   xpLedger,
+  createScopedRepository,
+  applyStreakDecay,
   type Database,
 } from '@eduagent/database';
 import type {
@@ -43,7 +45,17 @@ import {
   markMonthlyReportViewed,
 } from './monthly-report';
 import { assertParentAccess } from './family-access';
-import { isoDate, subtractDays, sumTopicsExplored } from './progress-helpers';
+import {
+  isoDate,
+  subtractDays,
+  sumTopicsExplored,
+  getActiveSubjectsByRecency,
+} from './progress-helpers';
+
+/** Returns today's date as an ISO-8601 date string (YYYY-MM-DD, UTC). */
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10);
+}
 
 export interface DashboardInput {
   childProfileId: string;
@@ -69,7 +81,7 @@ export interface DashboardInput {
 /**
  * Generates a one-sentence summary for a child's progress.
  *
- * Example: "Alex: Math — 5 problems, 3 guided. Science fading. 4 sessions this week (up from 2 last week)."
+ * Example: "Alex: Mathematics — 5 problems, 3 guided. Science fading. 4 sessions this week (up from 2 last week)."
  */
 export function generateChildSummary(input: DashboardInput): string {
   const parts: string[] = [];
@@ -305,6 +317,46 @@ function formatSessionDisplayTitle(
   }
 }
 
+/**
+ * @deprecated For new code, use `getActiveSubjectsByRecency` from
+ * `./progress-helpers` instead. That function lives at the service layer and
+ * applies the same sort order while fetching fresh session data from the DB.
+ * `sortSubjectsByActivityPriority` remains here for the batch path in
+ * `getChildrenForParent` where subject progress is already in memory.
+ *
+ * [BUG-913] Order subjects so the most recently active ones come first.
+ * The coaching nudge in `buildProgressGuidance` picks `subjectNames[0]`, so
+ * recommending "Biology" when a child only ever practised "Mathematics"
+ * looks broken — even though Biology is technically a linked subject. Pass
+ * the result of this helper as `subjectNames` to the guidance builder so
+ * empty / never-touched subjects fall to the back.
+ */
+export function sortSubjectsByActivityPriority<
+  T extends {
+    name: string;
+    lastSessionAt?: string | null;
+    topicsCompleted?: number;
+  }
+>(subjects: T[]): T[] {
+  // Sort tiebreaks are deterministic because Array.prototype.sort is stable
+  // (ES2019+). The comparator below intentionally returns 0 for unrelated
+  // subjects so original order is preserved — DO NOT add `id` as a final
+  // tiebreak unless the comparator becomes total.
+  // [BUG-913]
+  //  1. lastSessionAt non-null (most recent first)
+  //  2. topicsCompleted > 0 (any progress at all)
+  //  3. name (alphabetical) — deterministic tiebreaker within each tier
+  return [...subjects].sort((a, b) => {
+    const aActive = a.lastSessionAt ? Date.parse(a.lastSessionAt) : 0;
+    const bActive = b.lastSessionAt ? Date.parse(b.lastSessionAt) : 0;
+    if (aActive !== bActive) return bActive - aActive;
+    const aCompleted = a.topicsCompleted ?? 0;
+    const bCompleted = b.topicsCompleted ?? 0;
+    if (aCompleted !== bCompleted) return bCompleted - aCompleted;
+    return a.name.localeCompare(b.name);
+  });
+}
+
 export function buildProgressGuidance(
   childName: string,
   subjectNames: string[],
@@ -532,7 +584,25 @@ export async function getChildrenForParent(
       .groupBy(xpLedger.profileId),
   ]);
 
-  const streaksByProfile = new Map(streakResults.map((s) => [s.profileId, s]));
+  // [BUG-912] Streaks decay lazily — they only update when the next session
+  // is recorded. For dashboard reads we apply decay-on-read so the parent
+  // never sees "2-day streak" when the child has been inactive past the
+  // grace window. Compute today once so all children share the same boundary.
+  // applyStreakDecay (from @eduagent/database) is the shared source of truth.
+  const today = todayIso();
+  const streaksByProfile = new Map(
+    streakResults.map((s) => {
+      const decayed = applyStreakDecay(s, today);
+      return [
+        s.profileId,
+        {
+          profileId: s.profileId,
+          currentStreak: decayed.currentStreak,
+          longestStreak: decayed.longestStreak,
+        },
+      ];
+    })
+  );
   const xpByProfile = new Map(
     xpResults.map((x) => [x.profileId, x.totalXp ?? 0])
   );
@@ -635,7 +705,11 @@ export async function getChildrenForParent(
       sessionsThisWeek,
       sessionsLastWeek,
       totalTimeThisWeekMinutes: dashboardInput.totalTimeThisWeekMinutes,
-      subjectNames: progress.subjects.map((subject) => subject.name),
+      // [BUG-913] Sort by activity so coaching nudges reference subjects
+      // the child has actually practised. See sortSubjectsByActivityPriority.
+      subjectNames: sortSubjectsByActivityPriority(progress.subjects).map(
+        (subject) => subject.name
+      ),
       dashboardInput,
       progress,
       guidedMetrics,
@@ -791,13 +865,15 @@ export async function getChildDetail(
     .reduce((acc, s) => acc + s.exchangeCount, 0);
 
   // Step 5: Parallel fan-out — getOverallProgress (~6 queries), countGuidedMetrics
-  // (1 query), streaks + XP (2 queries) — all concurrent
-  const [progress, guidedMetrics, streakRow, xpResult] = await Promise.all([
+  // (1 query), streaks + XP (2 queries) — all concurrent.
+  // [BUG-912] Use repo.streaks.findCurrentForToday() so decay-on-read is
+  // guaranteed at the repository layer; callers no longer need to apply
+  // decay manually before exposing streak counts.
+  const childRepo = createScopedRepository(db, childProfileId);
+  const [progress, guidedMetrics, streakData, xpResult] = await Promise.all([
     getOverallProgress(db, childProfileId),
     countGuidedMetrics(db, childProfileId, startOfLastWeek),
-    db.query.streaks.findFirst({
-      where: eq(streaks.profileId, childProfileId),
-    }),
+    childRepo.streaks.findCurrentForToday(todayIso()),
     db
       .select({
         profileId: xpLedger.profileId,
@@ -810,7 +886,17 @@ export async function getChildDetail(
 
   const totalTimeThisWeekMinutes = Math.round(totalTimeThisWeek / 60);
   const totalTimeLastWeekMinutes = Math.round(totalTimeLastWeek / 60);
-  const subjectNames = progress.subjects.map((s) => s.name);
+  // [BUG-913] Sort by activity so coaching nudges reference subjects the
+  // child has actually practised. getActiveSubjectsByRecency returns subjects
+  // ordered by lastSessionAt DESC so the most-recently-used subject is first.
+  const activeSubjectsByRecency = await getActiveSubjectsByRecency(
+    db,
+    childProfileId
+  );
+  const subjectNames =
+    activeSubjectsByRecency.length > 0
+      ? activeSubjectsByRecency.map((s) => s.name)
+      : sortSubjectsByActivityPriority(progress.subjects).map((s) => s.name);
 
   // Step 6: buildChildProgressSummary — 2 queries (snapshot reads)
   const { progress: progressSummary, totalSessions } =
@@ -822,7 +908,8 @@ export async function getChildDetail(
       sessionsLastWeek,
       totalTimeThisWeekMinutes,
       subjectNames,
-      streakRow?.currentStreak ?? 0
+      // streakData.currentStreak is already decay-adjusted by the repo layer.
+      streakData?.currentStreak ?? 0
     );
 
   // Step 7: Compute all derived fields using the same helpers as getChildrenForParent
@@ -876,8 +963,9 @@ export async function getChildDetail(
     retentionTrend,
     totalSessions,
     progress: progressSummary,
-    currentStreak: streakRow?.currentStreak ?? 0,
-    longestStreak: streakRow?.longestStreak ?? 0,
+    // streakData is already decay-adjusted (repo.streaks.findCurrentForToday).
+    currentStreak: streakData?.currentStreak ?? 0,
+    longestStreak: streakData?.longestStreak ?? 0,
     totalXp: xpResult[0]?.totalXp ?? 0,
   };
 }

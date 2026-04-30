@@ -5,6 +5,7 @@ import {
   setResendApiKey,
   setEmailFrom,
   setAppUrl,
+  setSupportEmail,
 } from './helpers';
 
 /**
@@ -37,6 +38,9 @@ const envBindingMiddleware = new InngestMiddleware({
         }
         if (env && typeof env['APP_URL'] === 'string') {
           setAppUrl(env['APP_URL']);
+        }
+        if (env && typeof env['SUPPORT_EMAIL'] === 'string') {
+          setSupportEmail(env['SUPPORT_EMAIL']);
         }
         return {};
       },

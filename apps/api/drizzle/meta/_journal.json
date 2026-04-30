@@ -274,6 +274,34 @@
       "when": 1776877543157,
       "tag": "0038_outgoing_bulldozer",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1777375452316,
+      "tag": "0039_curved_red_ghost",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1777484126843,
+      "tag": "0040_unique_scorpion",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1777485718146,
+      "tag": "0041_filing_state_tracking",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1777485844178,
+      "tag": "0042_session_filing_failed_notification_type",
+      "breakpoints": true
     }
   ]
 }

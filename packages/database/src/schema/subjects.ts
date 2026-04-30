@@ -171,6 +171,7 @@ export const curriculumTopics = pgTable(
       table.bookId,
       table.sortOrder
     ),
+    index('curriculum_topics_book_id_idx').on(table.bookId),
   ]
 );
 

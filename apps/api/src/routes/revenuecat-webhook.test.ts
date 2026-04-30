@@ -852,6 +852,52 @@ describe('SUBSCRIBER_ALIAS', () => {
     );
     expect(res.status).toBe(200);
   });
+
+  // [BUG-728 / SEC-12] BREAK TEST: the SUBSCRIBER_ALIAS handler must emit
+  // structured JSON via the logger (not raw console.info args). Asserts:
+  //   1. console.log receives a single JSON-parseable string (logger output)
+  //   2. Clerk user IDs land in the `context` block — not loose extra args
+  //   3. `console.info` is NOT called directly (the legacy behavior)
+  it('emits a structured JSON log entry — never raw console.info', async () => {
+    const logSpy = jest
+      .spyOn(console, 'log')
+      .mockImplementation(() => undefined);
+    const infoSpy = jest
+      .spyOn(console, 'info')
+      .mockImplementation(() => undefined);
+    try {
+      const res = await makeRequest(
+        makeWebhookPayload('SUBSCRIBER_ALIAS', {
+          app_user_id: 'user_clerk_abc',
+          transferred_from: ['user_clerk_old'],
+          transferred_to: ['user_clerk_abc'],
+        })
+      );
+      expect(res.status).toBe(200);
+      expect(infoSpy).not.toHaveBeenCalled();
+
+      const aliasLog = logSpy.mock.calls
+        .map((call) => call[0])
+        .filter(
+          (arg): arg is string =>
+            typeof arg === 'string' && arg.includes('SUBSCRIBER_ALIAS')
+        );
+      expect(aliasLog.length).toBeGreaterThan(0);
+
+      const parsed = JSON.parse(aliasLog[0]) as {
+        level: string;
+        message: string;
+        context?: { appUserId?: unknown; transferredFrom?: unknown };
+      };
+      expect(parsed.level).toBe('info');
+      expect(parsed.message).toContain('SUBSCRIBER_ALIAS');
+      expect(parsed.context?.appUserId).toBe('user_clerk_abc');
+      expect(parsed.context?.transferredFrom).toEqual(['user_clerk_old']);
+    } finally {
+      logSpy.mockRestore();
+      infoSpy.mockRestore();
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -6,7 +6,8 @@ import {
   RefreshControl,
   ActivityIndicator,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import type { Href } from 'expo-router';
 import { goBackOrReplace } from '../../lib/navigation';
 import { platformAlert } from '../../lib/platform-alert';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -102,6 +103,15 @@ function renderChildCards(
 export default function DashboardScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { returnTo: rawReturnTo } = useLocalSearchParams<{
+    returnTo?: string;
+  }>();
+  // [BUG-905] Honor returnTo so the back button lands the parent on the screen
+  // they came from. Defaults to /home — most parent dashboard entries originate
+  // there via the "Check child's progress" intent card.
+  const returnTo = Array.isArray(rawReturnTo) ? rawReturnTo[0] : rawReturnTo;
+  const backFallback: Href =
+    returnTo === 'more' ? '/(app)/more' : '/(app)/home';
   const {
     data: dashboard,
     isLoading: dashboardLoading,
@@ -131,11 +141,11 @@ export default function DashboardScreen() {
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
       <View className="px-5 pt-4 pb-2">
         <Pressable
-          onPress={() => goBackOrReplace(router, '/(app)/more' as const)}
+          onPress={() => goBackOrReplace(router, backFallback)}
           className="mb-2 self-start"
           hitSlop={12}
           testID="dashboard-back"
-          accessibilityLabel="Back to more"
+          accessibilityLabel="Back"
           accessibilityRole="button"
         >
           <Text className="text-body text-accent">← Back</Text>

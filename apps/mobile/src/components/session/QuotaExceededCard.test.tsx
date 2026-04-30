@@ -68,4 +68,11 @@ describe('QuotaExceededCard', () => {
     fireEvent.press(screen.getByTestId('quota-go-home-btn'));
     expect(mockPush).toHaveBeenCalledWith('/(app)/home');
   });
+
+  // BUG-713: child view must not surface adult/jargon copy ("upgrade", "plan")
+  it('child view: never shows upgrade/plan jargon [BUG-713]', () => {
+    render(<QuotaExceededCard details={ownerDetails} isOwner={false} />);
+    expect(screen.queryByText(/upgrade/i)).toBeNull();
+    expect(screen.queryByText(/plan/i)).toBeNull();
+  });
 });

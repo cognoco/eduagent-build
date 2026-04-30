@@ -68,6 +68,10 @@ jest.mock('../../hooks/use-sessions', () => ({
     isError: false,
     error: null,
   }),
+  useSession: () => ({
+    data: undefined,
+    isLoading: false,
+  }),
   useSessionTranscript: () => ({
     data: mockTranscriptData,
     isLoading: false,

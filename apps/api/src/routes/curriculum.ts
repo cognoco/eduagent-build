@@ -20,7 +20,12 @@ import {
   addCurriculumTopic,
   adaptCurriculumFromPerformance,
 } from '../services/curriculum';
-import { notFound, apiError, NotFoundError } from '../errors';
+import {
+  notFound,
+  apiError,
+  NotFoundError,
+  TopicNotSkippedError,
+} from '../errors';
 
 type CurriculumRouteEnv = {
   Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
@@ -76,16 +81,9 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
         if (error instanceof NotFoundError) {
           return notFound(c, error.message);
         }
-        if (
-          error instanceof Error &&
-          error.message === 'Topic is not skipped'
-        ) {
-          return apiError(
-            c,
-            422,
-            ERROR_CODES.VALIDATION_ERROR,
-            'Topic is not skipped'
-          );
+        // [FIX-API-6] Use typed instanceof check instead of string-matching message
+        if (error instanceof TopicNotSkippedError) {
+          return apiError(c, 422, ERROR_CODES.VALIDATION_ERROR, error.message);
         }
         throw error;
       }

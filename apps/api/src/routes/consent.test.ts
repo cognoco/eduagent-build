@@ -109,6 +109,8 @@ jest.mock('../services/consent', () => {
     ConsentTokenNotFoundError: actual.ConsentTokenNotFoundError,
     ConsentAlreadyProcessedError: actual.ConsentAlreadyProcessedError,
     ConsentTokenExpiredError: actual.ConsentTokenExpiredError,
+    ConsentNotAuthorizedError: actual.ConsentNotAuthorizedError,
+    ConsentRecordNotFoundError: actual.ConsentRecordNotFoundError,
     checkConsentRequired: jest.fn().mockReturnValue({
       required: true,
       consentType: 'GDPR',
@@ -147,6 +149,16 @@ jest.mock('../services/consent', () => {
       requestedAt: new Date().toISOString(),
       respondedAt: new Date().toISOString(),
     }),
+    restoreConsent: jest.fn().mockResolvedValue({
+      id: 'consent-1',
+      profileId: '550e8400-e29b-41d4-a716-446655440000',
+      consentType: 'GDPR',
+      status: 'CONSENTED',
+      parentEmail: 'parent@example.com',
+      requestedAt: new Date().toISOString(),
+      respondedAt: new Date().toISOString(),
+    }),
+    getChildConsentForParent: jest.fn().mockResolvedValue(null),
     getConsentStatus: jest.fn().mockResolvedValue(null),
     getProfileConsentState: jest.fn().mockResolvedValue(null),
   };
@@ -154,6 +166,7 @@ jest.mock('../services/consent', () => {
 
 import { app } from '../index';
 import { AUTH_HEADERS, BASE_AUTH_ENV } from '../test-utils/test-env';
+import { ERROR_CODES } from '@eduagent/schemas';
 
 const TEST_ENV = {
   ...BASE_AUTH_ENV,
@@ -449,6 +462,65 @@ describe('consent routes', () => {
       expect(body.code).toBe('NOT_FOUND');
       expect(body.message).toBe('Invalid consent token');
     });
+
+    // [BUG-655 / A-11] Break test: an unauthenticated source IP must be
+    // rate-limited after exceeding the per-hour cap (30). Without the limit,
+    // an attacker can pummel the endpoint with token guesses or DoS the DB.
+    // The 31st request from the same IP must return 429 + Retry-After and
+    // must NOT call the underlying processConsentResponse service.
+    it('rate-limits per source IP after 30 attempts in an hour [BUG-655]', async () => {
+      const { __resetConsentRespondRateLimit } = jest.requireActual(
+        './consent'
+      ) as { __resetConsentRespondRateLimit: () => void };
+      __resetConsentRespondRateLimit();
+
+      const { processConsentResponse: mockProcess } = jest.requireMock(
+        '../services/consent'
+      ) as { processConsentResponse: jest.Mock };
+      mockProcess.mockResolvedValue(undefined);
+
+      const ip = '203.0.113.99';
+      const headers = { ...AUTH_HEADERS, 'cf-connecting-ip': ip };
+      const body = JSON.stringify({ token: 't', approved: true });
+
+      // 30 allowed
+      for (let i = 0; i < 30; i++) {
+        const ok = await app.request(
+          '/v1/consent/respond',
+          { method: 'POST', headers, body },
+          TEST_ENV
+        );
+        expect(ok.status).toBe(200);
+      }
+
+      const callsBefore = mockProcess.mock.calls.length;
+
+      // 31st blocked
+      const blocked = await app.request(
+        '/v1/consent/respond',
+        { method: 'POST', headers, body },
+        TEST_ENV
+      );
+      expect(blocked.status).toBe(429);
+      expect(blocked.headers.get('Retry-After')).toBe('3600');
+      const blockedBody = await blocked.json();
+      expect(blockedBody.code).toBe('RATE_LIMITED');
+
+      // Service must NOT be invoked when rate-limited.
+      expect(mockProcess.mock.calls.length).toBe(callsBefore);
+
+      // A different IP is independent — proves the bucket is per-IP.
+      const otherIp = await app.request(
+        '/v1/consent/respond',
+        {
+          method: 'POST',
+          headers: { ...AUTH_HEADERS, 'cf-connecting-ip': '198.51.100.1' },
+          body,
+        },
+        TEST_ENV
+      );
+      expect(otherIp.status).toBe(200);
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -644,5 +716,143 @@ describe('consent Inngest dispatch observability [A-23]', () => {
         }),
       })
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [BUG-765] Break tests — typed-error classification
+//
+// Before fix: route handlers classified service errors via
+// `error.message.includes('Not authorized')`. If the service was refactored
+// to use a typed error (or any upstream library wrapped the message), the
+// 403 path silently fell through to a 500. These tests force a typed
+// `ConsentNotAuthorizedError` / `ConsentRecordNotFoundError` from the service
+// and assert the route maps them to the right HTTP status — independent of
+// the error message text.
+// ---------------------------------------------------------------------------
+
+describe('[BUG-765] consent route classification by typed error (not by err.message string)', () => {
+  it('GET /v1/consent/:id/status returns 403 when service throws ConsentNotAuthorizedError', async () => {
+    const consentMock = jest.requireMock('../services/consent') as {
+      getChildConsentForParent: jest.Mock;
+      ConsentNotAuthorizedError: new (
+        action: 'view' | 'revoke' | 'restore'
+      ) => Error;
+    };
+    consentMock.getChildConsentForParent.mockRejectedValueOnce(
+      new consentMock.ConsentNotAuthorizedError('view')
+    );
+
+    const res = await app.request(
+      '/v1/consent/550e8400-e29b-41d4-a716-446655440000/status',
+      {
+        method: 'GET',
+        headers: { ...AUTH_HEADERS, 'X-Profile-Id': 'test-profile-id' },
+      },
+      TEST_ENV
+    );
+
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe(ERROR_CODES.FORBIDDEN);
+  });
+
+  it('PUT /v1/consent/:id/revoke returns 403 when service throws ConsentNotAuthorizedError', async () => {
+    const consentMock = jest.requireMock('../services/consent') as {
+      revokeConsent: jest.Mock;
+      ConsentNotAuthorizedError: new (
+        action: 'view' | 'revoke' | 'restore'
+      ) => Error;
+    };
+    consentMock.revokeConsent.mockRejectedValueOnce(
+      new consentMock.ConsentNotAuthorizedError('revoke')
+    );
+
+    const res = await app.request(
+      '/v1/consent/550e8400-e29b-41d4-a716-446655440000/revoke',
+      {
+        method: 'PUT',
+        headers: { ...AUTH_HEADERS, 'X-Profile-Id': 'test-profile-id' },
+      },
+      TEST_ENV
+    );
+
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe(ERROR_CODES.FORBIDDEN);
+  });
+
+  it('PUT /v1/consent/:id/revoke returns 404 when service throws ConsentRecordNotFoundError', async () => {
+    const consentMock = jest.requireMock('../services/consent') as {
+      revokeConsent: jest.Mock;
+      ConsentRecordNotFoundError: new () => Error;
+    };
+    consentMock.revokeConsent.mockRejectedValueOnce(
+      new consentMock.ConsentRecordNotFoundError()
+    );
+
+    const res = await app.request(
+      '/v1/consent/550e8400-e29b-41d4-a716-446655440000/revoke',
+      {
+        method: 'PUT',
+        headers: { ...AUTH_HEADERS, 'X-Profile-Id': 'test-profile-id' },
+      },
+      TEST_ENV
+    );
+
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe(ERROR_CODES.NOT_FOUND);
+  });
+
+  it('PUT /v1/consent/:id/restore returns 403 when service throws ConsentNotAuthorizedError', async () => {
+    const consentMock = jest.requireMock('../services/consent') as {
+      restoreConsent: jest.Mock;
+      ConsentNotAuthorizedError: new (
+        action: 'view' | 'revoke' | 'restore'
+      ) => Error;
+    };
+    consentMock.restoreConsent.mockRejectedValueOnce(
+      new consentMock.ConsentNotAuthorizedError('restore')
+    );
+
+    const res = await app.request(
+      '/v1/consent/550e8400-e29b-41d4-a716-446655440000/restore',
+      {
+        method: 'PUT',
+        headers: { ...AUTH_HEADERS, 'X-Profile-Id': 'test-profile-id' },
+      },
+      TEST_ENV
+    );
+
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe(ERROR_CODES.FORBIDDEN);
+  });
+
+  // Negative path: a generic Error must NOT be classified as 403/404.
+  // This is what prevents the regression where any random
+  // "Not authorized to do something else" Error.message would silently
+  // become a 403 — forcing instanceof breaks that string-coupling.
+  it('PUT /v1/consent/:id/revoke does NOT swallow a generic Error as 403/404', async () => {
+    const consentMock = jest.requireMock('../services/consent') as {
+      revokeConsent: jest.Mock;
+    };
+    consentMock.revokeConsent.mockRejectedValueOnce(
+      new Error('Not authorized to do something else entirely')
+    );
+
+    const res = await app.request(
+      '/v1/consent/550e8400-e29b-41d4-a716-446655440000/revoke',
+      {
+        method: 'PUT',
+        headers: { ...AUTH_HEADERS, 'X-Profile-Id': 'test-profile-id' },
+      },
+      TEST_ENV
+    );
+
+    // Must NOT classify by string match — generic errors fall through to 500.
+    expect(res.status).not.toBe(403);
+    expect(res.status).toBe(500);
   });
 });

@@ -30,7 +30,11 @@ import { incrementSummarySkips } from '../settings';
 import { computeActiveSeconds } from './session-context-builders';
 import { mapSessionRow } from './session-events';
 import { clearSessionStaticContext } from './session-cache';
+import { projectAiResponseContent } from '../llm/project-response';
+import { createLogger } from '../logger';
 import type { TimedEvent } from './session-context-builders';
+
+const logger = createLogger();
 
 // ---------------------------------------------------------------------------
 // Error classes
@@ -61,6 +65,18 @@ export class SessionExchangeLimitError extends Error {
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
+
+// [BUG-934 follow-up] projectAiResponseContent and stripMarkdownFence used to
+// live here. They were extracted to services/llm/project-response.ts so 8+
+// other read paths (bookmarks, GDPR export, learner-profile, homework-summary,
+// recap, vocab extraction, session-insights, buildExchangeHistory,
+// buildContinueSessionContext) can use the same projection without coupling
+// to session CRUD. Re-exported below to keep existing test entry points
+// (session-crud.test.ts) and any external imports working.
+export {
+  projectAiResponseContent,
+  stripMarkdownFence,
+} from '../llm/project-response';
 
 function collectEscalationRungs(
   events: Array<TimedEvent>
@@ -458,13 +474,29 @@ export async function getSessionTranscript(
   const session = await getSession(db, profileId, sessionId);
   if (!session) return null;
 
+  // [BUG-913] Tie-break by id when created_at collides. Batch inserts share
+  // a single Postgres NOW() snapshot, so multiple events created in the same
+  // statement get identical timestamps and ORDER BY created_at returns heap
+  // order — nondeterministic across re-runs. sessionEvents.id is a UUID v7
+  // generated in JS in monotonic insertion order, so asc(id) is the natural
+  // tie-break. The same pattern exists in 13 other reads of sessionEvents
+  // across this codebase (homework-summary, session-completed, session-recap,
+  // verification-completion, session-context-builders, session-exchange,
+  // evaluate-data, plus three more in this file) — sweep follow-up tracked
+  // separately to keep this fix's blast radius contained.
   const events = await db.query.sessionEvents.findMany({
     where: and(
       eq(sessionEvents.sessionId, sessionId),
       eq(sessionEvents.profileId, profileId)
     ),
-    orderBy: asc(sessionEvents.createdAt),
+    orderBy: [asc(sessionEvents.createdAt), asc(sessionEvents.id)],
   });
+
+  // [I-1] Count leaked ai_response rows so we can emit ONE aggregate log
+  // entry instead of one warn per row. projectAiResponseContent is called
+  // with silent:true to suppress per-row parseEnvelope noise; we track
+  // whether each row was repaired (content changed) to count leaks.
+  let leakedEnvelopeCount = 0;
 
   const exchanges = events
     .filter(
@@ -476,10 +508,23 @@ export async function getSessionTranscript(
     .map((event) => {
       const meta = event.metadata as Record<string, unknown> | null;
       const isSystemPrompt = event.eventType === 'system_prompt';
+      // [BUG-934] Strip leaked envelope JSON from ai_response content before
+      // it reaches the rendered chat bubble. Use silent:true to suppress
+      // per-row warn — aggregate is emitted below after mapping.
+      let content = event.content;
+      if (event.eventType === 'ai_response') {
+        const projected = projectAiResponseContent(event.content, {
+          silent: true,
+        });
+        if (projected !== event.content) {
+          leakedEnvelopeCount++;
+        }
+        content = projected;
+      }
       return {
         eventId: event.id,
         role: event.eventType === 'user_message' ? 'user' : 'assistant',
-        content: event.content,
+        content,
         timestamp: event.createdAt.toISOString(),
         isSystemPrompt,
         escalationRung:
@@ -488,6 +533,16 @@ export async function getSessionTranscript(
             : undefined,
       } as const;
     });
+
+  // Emit ONE aggregate log entry when any rows were repaired. This avoids
+  // N warn lines per transcript and keeps the signal queryable.
+  if (leakedEnvelopeCount > 0) {
+    logger.warn('transcript.hydration.envelope_leak_repaired', {
+      surface: 'transcript.hydration',
+      leakedEventCount: leakedEnvelopeCount,
+      sessionId,
+    });
+  }
 
   const rawSession = await db.query.learningSessions.findFirst({
     where: and(

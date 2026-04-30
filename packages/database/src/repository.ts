@@ -12,6 +12,7 @@ import {
   type Column,
 } from 'drizzle-orm';
 import type { Database } from './client';
+import { applyStreakDecay } from './streaks-rules';
 import {
   profiles,
   consentStates,
@@ -181,6 +182,29 @@ export function createScopedRepository(db: Database, profileId: string) {
         return db.query.streaks.findFirst({
           where: eq(streaks.profileId, profileId),
         });
+      },
+      /**
+       * Read the streak row for today and apply lazy decay so callers never
+       * receive a stale "N-day streak" when the profile has been inactive past
+       * the grace window. Pass `todayIso` in tests to control the clock;
+       * production callers can omit it to default to the real date.
+       *
+       * Returns null only when the profile has never had a streak row at all.
+       */
+      async findCurrentForToday(todayIso?: string): Promise<{
+        currentStreak: number;
+        longestStreak: number;
+        lastActivityDate: string | null;
+        gracePeriodStartDate: string | null;
+        isOnGracePeriod: boolean;
+        graceDaysRemaining: number;
+      } | null> {
+        const row = await db.query.streaks.findFirst({
+          where: eq(streaks.profileId, profileId),
+        });
+        if (!row) return null;
+        const today = todayIso ?? new Date().toISOString().slice(0, 10);
+        return applyStreakDecay(row, today);
       },
     },
 
@@ -578,11 +602,16 @@ export function createScopedRepository(db: Database, profileId: string) {
        * query. Uses `array_agg(... ORDER BY ratio DESC)[1]` to resolve the
        * best-round score/total in the same GROUP BY scan — no correlated
        * subqueries, single table pass regardless of activity type count.
+       *
+       * [BUG-926] Groups by (activityType, languageCode) so vocabulary rounds
+       * for different languages produce separate stat rows. languageCode is
+       * NULL for capitals and guess_who rounds.
        */
       async aggregateCompletedStats() {
         const rows = await db
           .select({
             activityType: quizRounds.activityType,
+            languageCode: quizRounds.languageCode,
             roundsPlayed: sql<number>`count(*)::int`,
             totalXp: sql<number>`coalesce(sum(${quizRounds.xpEarned}), 0)::int`,
             bestScore: sql<number | null>`(array_agg(
@@ -603,10 +632,11 @@ export function createScopedRepository(db: Database, profileId: string) {
               eq(quizRounds.status, 'completed')
             )
           )
-          .groupBy(quizRounds.activityType);
+          .groupBy(quizRounds.activityType, quizRounds.languageCode);
 
         return rows.map((row) => ({
           activityType: row.activityType,
+          languageCode: row.languageCode ?? null,
           roundsPlayed: row.roundsPlayed,
           totalXp: row.totalXp,
           bestScore: row.bestScore ?? null,

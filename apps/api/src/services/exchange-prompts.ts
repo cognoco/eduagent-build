@@ -243,6 +243,7 @@ function getExchangeEnvelopeInstruction(context: {
     `${uiHints}\n` +
     '}\n' +
     'The `reply` field is the ONLY thing the learner sees. Do not mention JSON, signals, or ui_hints in the reply text. Do not include markers like [PARTIAL_PROGRESS] or [NEEDS_DEEPENING] — use the `signals` object instead.\n' +
+    'For line breaks inside the `reply` string, write the JSON escape `\\n` (backslash + n). NEVER write the literal two characters `\\\\n` (an escaped backslash followed by n) — that renders to the learner as visible "\\n" text instead of a real line break.\n' +
     '\n' +
     'Signal guidance:\n' +
     signalGuidance.map((line) => `- ${line}`).join('\n') +

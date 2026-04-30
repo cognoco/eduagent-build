@@ -232,6 +232,121 @@ describe('createScopedRepository', () => {
   });
 
   // ---------------------------------------------------------------------------
+  // streaks.findCurrentForToday — decay-on-read [BUG-912]
+  // ---------------------------------------------------------------------------
+
+  describe('streaks.findCurrentForToday', () => {
+    it('returns null when no streak row exists', async () => {
+      const { db } = createMockDb();
+      // findFirst already mocked to return null by default
+      const repo = createScopedRepository(db, TEST_PROFILE_ID);
+
+      const result = await repo.streaks.findCurrentForToday('2026-04-29');
+
+      expect(result).toBeNull();
+    });
+
+    it('returns currentStreak:0 for a row 10 days stale with currentStreak:2 saved', async () => {
+      const staleRow = {
+        id: 'streak-1',
+        profileId: TEST_PROFILE_ID,
+        currentStreak: 2,
+        longestStreak: 7,
+        lastActivityDate: '2026-04-19', // 10 days before today
+        gracePeriodStartDate: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      const findFirst = jest.fn().mockResolvedValue(staleRow);
+      const db = {
+        query: new Proxy(
+          {},
+          {
+            get: () => ({
+              findFirst,
+              findMany: jest.fn().mockResolvedValue([]),
+            }),
+          }
+        ),
+      } as unknown as Database;
+
+      const repo = createScopedRepository(db, TEST_PROFILE_ID);
+      const result = await repo.streaks.findCurrentForToday('2026-04-29');
+
+      expect(result).not.toBeNull();
+      // streak decayed to 0 — 10-day gap exceeds MAX_GRACE_DAYS (3)
+      expect(result!.currentStreak).toBe(0);
+      // longestStreak is historical record — preserved
+      expect(result!.longestStreak).toBe(7);
+      expect(result!.isOnGracePeriod).toBe(false);
+    });
+
+    it('preserves currentStreak for a row active today', async () => {
+      const freshRow = {
+        id: 'streak-2',
+        profileId: TEST_PROFILE_ID,
+        currentStreak: 3,
+        longestStreak: 5,
+        lastActivityDate: '2026-04-29', // same day as today
+        gracePeriodStartDate: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      const findFirst = jest.fn().mockResolvedValue(freshRow);
+      const db = {
+        query: new Proxy(
+          {},
+          {
+            get: () => ({
+              findFirst,
+              findMany: jest.fn().mockResolvedValue([]),
+            }),
+          }
+        ),
+      } as unknown as Database;
+
+      const repo = createScopedRepository(db, TEST_PROFILE_ID);
+      const result = await repo.streaks.findCurrentForToday('2026-04-29');
+
+      expect(result!.currentStreak).toBe(3);
+      expect(result!.isOnGracePeriod).toBe(false);
+    });
+
+    it('reports grace period for a row 2 days stale', async () => {
+      const graceRow = {
+        id: 'streak-3',
+        profileId: TEST_PROFILE_ID,
+        currentStreak: 5,
+        longestStreak: 5,
+        lastActivityDate: '2026-04-27', // 2 days before today
+        gracePeriodStartDate: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      const findFirst = jest.fn().mockResolvedValue(graceRow);
+      const db = {
+        query: new Proxy(
+          {},
+          {
+            get: () => ({
+              findFirst,
+              findMany: jest.fn().mockResolvedValue([]),
+            }),
+          }
+        ),
+      } as unknown as Database;
+
+      const repo = createScopedRepository(db, TEST_PROFILE_ID);
+      const result = await repo.streaks.findCurrentForToday('2026-04-29');
+
+      // Still within grace window — streak is still 5
+      expect(result!.currentStreak).toBe(5);
+      expect(result!.isOnGracePeriod).toBe(true);
+      expect(result!.graceDaysRemaining).toBeGreaterThan(0);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
   // sessionEvents — findMany only
   // ---------------------------------------------------------------------------
 

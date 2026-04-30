@@ -62,7 +62,11 @@ export default function CreateSubjectScreen() {
   const colors = useThemeColors();
   const createSubject = useCreateSubject();
   const resolveSubject = useResolveSubject();
-  const { data: existingSubjects } = useSubjects();
+  const {
+    data: existingSubjects,
+    isError: existingSubjectsError,
+    refetch: refetchSubjects,
+  } = useSubjects();
   const [name, setName] = useState('');
   const [originalInput, setOriginalInput] = useState('');
   const [error, setError] = useState('');
@@ -77,6 +81,9 @@ export default function CreateSubjectScreen() {
   const [clarificationInput, setClarificationInput] = useState('');
   const [resolveTimedOut, setResolveTimedOut] = useState(false);
   const resolveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // [BUG-692] Ref set when Cancel is pressed mid-flight; checked post-await
+  // before any router navigation and inside catch before showing alerts.
+  const cancelledRef = useRef(false);
   const { scrollRef, onFieldLayout, onFieldFocus } = useKeyboardScroll();
 
   // [M4] 30s timeout on resolve phase — show error + retry
@@ -113,6 +120,7 @@ export default function CreateSubjectScreen() {
     ) => {
       setResolveState({ phase: 'creating' });
       setError('');
+      cancelledRef.current = false; // [BUG-692] reset on each new attempt
       try {
         const rawInput =
           rawInputOverride ??
@@ -124,6 +132,10 @@ export default function CreateSubjectScreen() {
           ...(rawInput ? { rawInput } : {}),
           ...(focus ? { focus, focusDescription } : {}),
         });
+
+        // [BUG-692] If the user pressed Cancel while the mutation was in
+        // flight, abort navigation — the router already moved elsewhere.
+        if (cancelledRef.current) return;
 
         // BUG-236: When invoked from chat, return to the session with the new
         // subject so the user can continue learning the topic they asked about.
@@ -195,6 +207,8 @@ export default function CreateSubjectScreen() {
           },
         } as never);
       } catch (err: unknown) {
+        // [BUG-692] Don't show error alert if user already navigated away.
+        if (cancelledRef.current) return;
         const rawMsg = err instanceof Error ? err.message : '';
         setIsSubjectLimitError(
           /subject limit|max subjects|too many subjects/i.test(rawMsg)
@@ -215,11 +229,15 @@ export default function CreateSubjectScreen() {
       setOriginalInput((prev) => prev || trimmedInput);
       setResolveState({ phase: 'resolving' });
       setError('');
+      cancelledRef.current = false; // [BUG-692] reset on each new attempt
 
       try {
         const result = await resolveSubject.mutateAsync({
           rawInput: trimmedInput,
         });
+
+        // [BUG-692] Abort if the user cancelled while resolve was in flight.
+        if (cancelledRef.current) return;
 
         if (result.status === 'direct_match') {
           await doCreate(
@@ -234,6 +252,8 @@ export default function CreateSubjectScreen() {
         setShowClarifyInput(false);
         setResolveState({ phase: 'suggestion', result });
       } catch {
+        // [BUG-692] Don't show error if user already navigated away.
+        if (cancelledRef.current) return;
         // Don't fall through to create on network error
         setError(
           'Could not check if this subject exists. Please check your connection and try again.'
@@ -345,6 +365,9 @@ export default function CreateSubjectScreen() {
   );
 
   const handleCancel = useCallback(() => {
+    // [BUG-692] Signal any in-flight mutation to skip post-await navigation.
+    cancelledRef.current = true;
+
     if (returnTo === 'chat') {
       // [BUG-633 / M-1] Bare router.back() silently no-ops when the modal was
       // opened via deep link / push notification — no prior stack entry to go
@@ -506,6 +529,25 @@ export default function CreateSubjectScreen() {
             onFocus={onFieldFocus('name')}
           />
         </View>
+
+        {/* Inline error when existing subjects failed to load [UX-DE] */}
+        {resolveState.phase === 'idle' &&
+          !isBusy &&
+          name.trim() === '' &&
+          existingSubjectsError && (
+            <Pressable
+              onPress={() => void refetchSubjects()}
+              className="mb-3 self-start"
+              accessibilityRole="button"
+              accessibilityLabel="Retry loading your subjects"
+              testID="subjects-load-error-retry"
+            >
+              <Text className="text-body-sm text-danger">
+                Couldn&apos;t load your subjects.{' '}
+                <Text className="font-semibold text-primary">Tap to retry</Text>
+              </Text>
+            </Pressable>
+          )}
 
         {resolveState.phase === 'idle' &&
           !isBusy &&

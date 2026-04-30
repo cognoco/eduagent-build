@@ -32,11 +32,17 @@ type FeedbackEnv = {
   };
 };
 
-function createTestApp(bindings?: Partial<FeedbackEnv['Bindings']>) {
+function createTestApp(
+  bindings?: Partial<FeedbackEnv['Bindings']>,
+  userOverride?: { userId: string; profileId?: string }
+) {
   const app = new Hono<FeedbackEnv>();
   app.use('*', async (c, next) => {
-    c.set('user', { userId: 'user-1', email: 'test@example.com' });
-    c.set('profileId', 'profile-1');
+    c.set('user', {
+      userId: userOverride?.userId ?? 'user-1',
+      email: 'test@example.com',
+    });
+    c.set('profileId', userOverride?.profileId ?? 'profile-1');
     // Inject bindings so sendEmail actually attempts the Resend fetch
     c.env = {
       RESEND_API_KEY: TEST_API_KEY,
@@ -162,6 +168,62 @@ describe('POST /feedback', () => {
     });
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ success: true, queued: true });
+  });
+
+  // [BUG-767 / A-24] BREAK TESTS. The route MUST dispatch the
+  // app/feedback.delivery_failed event whenever the synchronous send fails,
+  // and the consumer (feedback-delivery-failed Inngest function) is what
+  // turns that event into a retry. Pre-fix audit found the event was wired
+  // here but had no consumer — every queued retry was a black hole.
+  //
+  // Use unique userIds to avoid colliding with the in-memory feedback rate
+  // limit (5/hour/userId) accumulated by earlier tests in this suite.
+  it('[BUG-767 / A-24] dispatches app/feedback.delivery_failed when sendEmail fails', async () => {
+    const { inngest } = require('../inngest/client');
+    (inngest.send as jest.Mock).mockClear();
+
+    fetchSpy.mockImplementationOnce(async () => {
+      return new Response(JSON.stringify({ error: 'rate_limited' }), {
+        status: 429,
+      });
+    });
+
+    const app = createTestApp(undefined, {
+      userId: 'user-bug767-fail',
+      profileId: 'profile-bug767-fail',
+    });
+    await app.request('/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        category: 'bug',
+        message: 'Crash on launch',
+      }),
+    });
+
+    expect(inngest.send).toHaveBeenCalledTimes(1);
+    expect(inngest.send).toHaveBeenCalledWith({
+      name: 'app/feedback.delivery_failed',
+      data: { profileId: 'profile-bug767-fail', category: 'bug' },
+    });
+  });
+
+  it('[BUG-767 / A-24] does NOT dispatch retry event when sendEmail succeeds', async () => {
+    const { inngest } = require('../inngest/client');
+    (inngest.send as jest.Mock).mockClear();
+
+    const app = createTestApp(undefined, {
+      userId: 'user-bug767-ok',
+      profileId: 'profile-bug767-ok',
+    });
+    const res = await app.request('/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ category: 'other', message: 'Looks great' }),
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ success: true, queued: false });
+    expect(inngest.send).not.toHaveBeenCalled();
   });
 
   it('returns success even if Resend fetch throws (network failure)', async () => {

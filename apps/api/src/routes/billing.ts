@@ -35,6 +35,9 @@ import { createStripeClient } from '../services/stripe';
 import { readSubscriptionStatus } from '../services/kv';
 import { apiError, notFound } from '../errors';
 import { BRAND_COLOR_PRIMARY } from '../services/brand';
+import { createLogger } from '../services/logger';
+
+const logger = createLogger();
 
 type BillingRouteEnv = {
   Bindings: {
@@ -239,8 +242,12 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     const itemLevelEnd = updated.items.data[0]?.current_period_end;
     const periodEndTs = subscriptionLevelEnd ?? itemLevelEnd;
     if (!periodEndTs) {
-      console.error(
-        `[billing] Subscription ${subscription.stripeSubscriptionId} returned no current_period_end at subscription or item level. Falling back to current timestamp.`
+      // [logging sweep] structured logger so PII fields land as JSON context
+      logger.error(
+        '[billing] Subscription returned no current_period_end — falling back to current timestamp',
+        {
+          stripeSubscriptionId: subscription.stripeSubscriptionId,
+        }
       );
     }
     const currentPeriodEnd = periodEndTs
@@ -611,7 +618,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Subscription confirmed — MentoMate</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -665,7 +672,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Checkout cancelled — MentoMate</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }

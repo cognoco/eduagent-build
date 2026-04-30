@@ -6,8 +6,13 @@ import {
 } from '@testing-library/react-native';
 import * as Clipboard from 'expo-clipboard';
 
+const mockPush = jest.fn();
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ back: jest.fn(), canGoBack: jest.fn(() => true) }),
+  useRouter: () => ({
+    back: jest.fn(),
+    canGoBack: jest.fn(() => true),
+    push: mockPush,
+  }),
   useLocalSearchParams: () => ({
     profileId: 'child-profile-001',
     sessionId: 'session-001',
@@ -116,9 +121,88 @@ describe('SessionDetailScreen (summary-only)', () => {
     render(<SessionDetailScreen />);
 
     expect(screen.getByTestId('narrative-unavailable')).toBeTruthy();
+    // BUG-901: friendlier "missing summary" microcopy + the empty-state
+    // testID stays stable so other surfaces can detect the case.
+    expect(screen.getByTestId('session-summary-empty-note')).toBeTruthy();
+    // The bare "No summary available for this session." string is replaced
+    // by an explanation + pointer to the always-on CTAs at the bottom.
     expect(
-      screen.getByText('No summary available for this session.')
-    ).toBeTruthy();
+      screen.queryByText('No summary available for this session.')
+    ).toBeNull();
+  });
+
+  // BUG-901 break test: every session detail must render at least one CTA.
+  it('[BUG-901] always renders at least one CTA at the bottom', () => {
+    mockUseChildSessionDetail.mockReturnValue({
+      data: makeSession({ displaySummary: null }),
+      isLoading: false,
+    });
+
+    render(<SessionDetailScreen />);
+
+    expect(screen.getByTestId('session-detail-ctas')).toBeTruthy();
+    expect(screen.getByTestId('session-detail-back-to-child')).toBeTruthy();
+  });
+
+  // BUG-901 break test: when topic context is available, "Open this topic"
+  // must be wired up so a parent can re-engage the same content.
+  it('[BUG-901] renders an Open Topic CTA that deep-links to the topic', () => {
+    mockUseChildSessionDetail.mockReturnValue({
+      data: makeSession({
+        topicId: 'topic-1',
+        topicTitle: 'Light reactions',
+        displaySummary: null,
+      }),
+      isLoading: false,
+    });
+
+    render(<SessionDetailScreen />);
+
+    const cta = screen.getByTestId('session-detail-continue-topic');
+    expect(cta).toBeTruthy();
+
+    fireEvent.press(cta);
+    expect(mockPush).toHaveBeenCalledWith(
+      '/(app)/child/child-profile-001/topic/topic-1'
+    );
+  });
+
+  // BUG-902 break test: parent-facing duration must be active time, not
+  // wall-clock. Otherwise a 39-min "browsed a topic" entry inflates
+  // engagement.
+  it('[BUG-902] renders ACTIVE-time duration in preference to wall-clock', () => {
+    mockUseChildSessionDetail.mockReturnValue({
+      // 5-min active session that the user "left open" for 30 minutes
+      data: makeSession({
+        durationSeconds: 5 * 60,
+        wallClockSeconds: 30 * 60,
+        displaySummary: null,
+      }),
+      isLoading: false,
+    });
+
+    render(<SessionDetailScreen />);
+
+    // 5 min — not 30 min — must be shown.
+    expect(screen.getByText('5 min')).toBeTruthy();
+    expect(screen.queryByText('30 min')).toBeNull();
+  });
+
+  // BUG-902 break test: when active time is missing, fall back to wall-clock
+  // so legacy rows still render a duration instead of "—".
+  it('[BUG-902] falls back to wall-clock duration when active time is null', () => {
+    mockUseChildSessionDetail.mockReturnValue({
+      data: makeSession({
+        durationSeconds: null,
+        wallClockSeconds: 12 * 60,
+        displaySummary: null,
+      }),
+      isLoading: false,
+    });
+
+    render(<SessionDetailScreen />);
+
+    expect(screen.getByText('12 min')).toBeTruthy();
   });
 
   it('shows homework summary when present', () => {

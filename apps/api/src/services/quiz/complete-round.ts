@@ -6,7 +6,7 @@ import type {
   ValidatedQuestionResult,
 } from '@eduagent/schemas';
 import { isGuessWhoFuzzyMatch } from '@eduagent/schemas';
-import { ConflictError, NotFoundError } from '../../errors';
+import { BadRequestError, ConflictError, NotFoundError } from '../../errors';
 import { createLogger } from '../logger';
 import { reviewVocabulary } from '../vocabulary';
 import { QUIZ_CONFIG } from './config';
@@ -50,6 +50,43 @@ export function isAnswerCorrect(
 }
 
 /**
+ * [BUG-STALE-OPTIONS] Defense-in-depth: when answerMode is 'multiple_choice'
+ * and the question type uses a fixed options list (capitals, vocabulary),
+ * verify the submitted answer is actually one of the options. This catches
+ * the one-frame race condition where the client held stale shuffledOptions
+ * and submitted an answer from the previous question.
+ *
+ * guard is exported for direct unit testing.
+ */
+export function assertAnswerInOptions(
+  question: QuizQuestion,
+  answerGiven: string,
+  answerMode: 'free_text' | 'multiple_choice' | undefined
+): void {
+  if (
+    answerMode !== 'multiple_choice' ||
+    (question.type !== 'capitals' && question.type !== 'vocabulary')
+  ) {
+    return;
+  }
+  const options: string[] =
+    question.type === 'capitals'
+      ? question.distractors.concat(question.correctAnswer)
+      : question.type === 'vocabulary'
+      ? question.distractors.concat(question.correctAnswer)
+      : [];
+  const normalizedGiven = answerGiven.trim().toLowerCase();
+  const inOptions = options.some(
+    (o) => o.trim().toLowerCase() === normalizedGiven
+  );
+  if (!inOptions) {
+    throw new BadRequestError(
+      'Answer is not one of the available options for this question'
+    );
+  }
+}
+
+/**
  * Lightweight answer check for a single question within an active round.
  * Used by POST /quiz/rounds/:id/check to provide per-question feedback
  * without exposing the correct answer to the client.
@@ -59,7 +96,8 @@ export async function checkQuizAnswer(
   profileId: string,
   roundId: string,
   questionIndex: number,
-  answerGiven: string
+  answerGiven: string,
+  answerMode?: 'free_text' | 'multiple_choice'
 ): Promise<boolean> {
   const repo = createScopedRepository(db, profileId);
   const round = await repo.quizRounds.findById(roundId);
@@ -69,6 +107,7 @@ export async function checkQuizAnswer(
   const questions = round.questions as QuizQuestion[];
   const question = questions[questionIndex];
   if (!question) throw new NotFoundError('Question');
+  assertAnswerInOptions(question, answerGiven, answerMode);
   return isAnswerCorrect(question, answerGiven);
 }
 
@@ -82,7 +121,8 @@ export async function checkQuizAnswerWithCorrect(
   profileId: string,
   roundId: string,
   questionIndex: number,
-  answerGiven: string
+  answerGiven: string,
+  answerMode?: 'free_text' | 'multiple_choice'
 ): Promise<{ correct: boolean; correctAnswer: string }> {
   const repo = createScopedRepository(db, profileId);
   const round = await repo.quizRounds.findById(roundId);
@@ -92,6 +132,7 @@ export async function checkQuizAnswerWithCorrect(
   const questions = round.questions as QuizQuestion[];
   const question = questions[questionIndex];
   if (!question) throw new NotFoundError('Question');
+  assertAnswerInOptions(question, answerGiven, answerMode);
   const correct = isAnswerCorrect(question, answerGiven);
   return { correct, correctAnswer: question.correctAnswer };
 }
@@ -100,6 +141,12 @@ export async function checkQuizAnswerWithCorrect(
  * [ASSUMP-F5] Re-derive correctness for every client-reported result.
  * If the client references a `questionIndex` out of bounds, that entry is
  * dropped (rather than trusted) — it can't match any real question.
+ *
+ * [BUG-STALE-OPTIONS] Defense-in-depth: if the client reports answerMode
+ * 'multiple_choice' for a capitals/vocabulary question and answerGiven is
+ * not in question.options (server-held distractors + correct), the result
+ * is dropped — it arose from the stale-options race and would corrupt the
+ * score. The dropped count is reflected in `droppedResults` in the response.
  */
 export function validateResults(
   questions: QuizQuestion[],
@@ -109,6 +156,22 @@ export function validateResults(
   for (const result of clientResults) {
     const question = questions[result.questionIndex];
     if (!question) continue;
+    // Drop MC answers for fixed-option question types when the submitted
+    // value is not one of the server-known options.
+    if (
+      result.answerMode === 'multiple_choice' &&
+      (question.type === 'capitals' || question.type === 'vocabulary')
+    ) {
+      const options: string[] =
+        question.type === 'capitals'
+          ? question.distractors.concat(question.correctAnswer)
+          : question.distractors.concat(question.correctAnswer);
+      const normalizedGiven = result.answerGiven.trim().toLowerCase();
+      const inOptions = options.some(
+        (o) => o.trim().toLowerCase() === normalizedGiven
+      );
+      if (!inOptions) continue;
+    }
     validated.push({
       ...result,
       correct: isAnswerCorrect(question, result.answerGiven),
@@ -164,7 +227,7 @@ export function calculateXp(
       .reduce((sum, r) => {
         // Defense-in-depth: clamp to [0,5] so bonus is always non-negative
         // even if the schema validation is loosened in the future.
-        const clamped = Math.max(0, Math.min(5, r.cluesUsed!));
+        const clamped = Math.max(0, Math.min(5, r.cluesUsed ?? 0));
         return sum + (5 - clamped) * QUIZ_CONFIG.xp.guessWhoClueBonus;
       }, 0);
   }
