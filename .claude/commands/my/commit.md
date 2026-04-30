@@ -18,33 +18,39 @@ Follow these steps in order. Do NOT skip or reorder them.
 Run `git status` (never use `-uall`) and `git diff --stat` to see all changes.
 Also run `git log --oneline -5` for commit message style reference.
 
+If there are no changes (no modified, deleted, or untracked files), report "Nothing to commit" and stop.
+
 ### 2. Safety check
 
 Identify any files that should NOT be committed:
-- `.env`, `credentials.json`, secrets, tokens — WARN the user and exclude
+- `.env`, `.dev.vars`, `credentials.json`, `*.pem`, `*.key`, secrets, tokens — WARN the user and exclude
 - Binary / large files that look unintentional — ask first
 
 ### 3. Stage everything
 
 Stage ALL remaining changes — modified, deleted, AND untracked files.
-Use explicit file paths with `git add`, not `git add -A` (to respect the exclusions from step 2).
+
+- **If step 2 found no exclusions** (the common case): use `git add -A` — one command, instant.
+- **If step 2 found exclusions**: use `git add -A` then `git reset HEAD -- <excluded-files>`.
+
+**Expo Router bracket files**: Any file with `[` or `]` in the name (e.g., `[sessionId].tsx`) requires the `:(literal)` pathspec prefix when used in `git reset`, `git stash push`, or individual `git add` — otherwise git treats brackets as glob character classes and may target wrong files. Example: `git reset HEAD -- ':(literal)apps/mobile/src/app/session/[sessionId].tsx'`
 
 This is the critical step: with nothing left unstaged, lint-staged cannot stash or revert anything.
 
 ### 4. Draft commit message
 
-Analyze the staged diff and write a commit message:
+Run `git diff --cached --stat` to see the staged summary. Use the stat output (file names + change counts) to draft the message — do not read the full line-by-line diff unless the stat is ambiguous.
+
 - First line: `<type>(<scope>): <summary>` (max 72 chars)
 - Types: feat, fix, chore, docs, refactor, test, style, perf, ci
 - Body: 2-4 bullet points summarizing the changes
-- Footer: `Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>`
+- Footer: `Co-Authored-By: Claude <noreply@anthropic.com>`
 - Use a HEREDOC to pass the message (preserves formatting)
 
 ### 5. Commit (let hooks run naturally)
 
 Run `git commit` with the message. Do NOT use `--no-verify`.
-The pre-commit hook will run lint-staged, tsc, and tests — but since everything
-is staged, lint-staged's stash is a no-op.
+The pre-commit hook runs three phases in order: (1) lint-staged (eslint --fix + prettier), (2) `tsc --build` (incremental, only if .ts/.tsx staged), (3) surgical jest tests via `scripts/pre-commit-tests.sh`. Since everything is staged, lint-staged's stash is a no-op.
 
 ### 6. If the commit fails
 
@@ -55,7 +61,8 @@ a) **Read the error output carefully.** Classify the failure:
    - **Lint/format errors**: lint-staged may have auto-fixed these. Re-stage the fixed files (`git add` the modified files) and retry the commit.
    - **Type errors (tsc)**: Parse file paths from the tsc output. Unstage ONLY those files with `git reset HEAD -- <file>`. Retry the commit immediately.
    - **Test failures (jest)**: Parse the failing test file paths. Find their source files (strip `.test.ts` / `.test.tsx`). Unstage both the source and test files. Retry the commit immediately.
-   - **Type errors in UNSTAGED files**: tsc checks the whole working tree, not just staged files. If the failing file is NOT staged, stash all unstaged + untracked changes before retrying: `git stash push --keep-index -u -m "temp: unstaged WIP during commit"`. Pop the stash after the commit succeeds.
+   - **Type errors in UNSTAGED files**: tsc checks the whole working tree, not just staged files. If the failing file is NOT staged, stash all unstaged + untracked changes before retrying: `git stash push --keep-index -u -m "temp: unstaged WIP during commit"`. After the commit succeeds, run `git stash pop`. If the output says "stash entry is kept," the apply was **incomplete** — do NOT drop the stash. Verify with `git stash show --stat 'stash@{0}'` and compare file count against `git status --short` before proceeding.
+   - **NX boundary errors** (e.g., "Static imports of lazy-loaded libraries are forbidden"): Likely stale NX project graph cache. Run `pnpm exec nx reset`, re-stage, and retry.
 
 b) **Retry the commit** with the reduced staged set. Do NOT attempt to fix the code — just commit what passes.
 
@@ -64,7 +71,7 @@ c) **If it still fails**, report to the user:
    - What errors remain
    - Do NOT keep retrying in a loop — two attempts max
 
-d) **Excluded files remain as unstaged local changes** — they are NOT lost, just not in this commit. Do NOT try to fix them before pushing. Push what was committed, then address failures separately if asked.
+d) **Excluded files remain as unstaged local changes** — they are NOT lost, just not in this commit. Do NOT try to fix them before pushing.
 
 **IMPORTANT — Stash safety for untracked files**: Always use `--keep-index -u` (not just `--keep-index`) when manually stashing during a partial commit. Without `-u`, untracked files stay in the working tree and lint-staged's own stash/pop cycle can destroy them. The `-u` flag stashes untracked files too, protecting them from being lost. Always commit untracked files in the same batch as their dependencies (e.g., commit `feedback.ts` together with the schema re-export it imports from).
 
