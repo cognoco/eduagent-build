@@ -895,6 +895,29 @@ export default function SessionSummaryScreen() {
           </Pressable>
         ) : null}
 
+        {/* [BUG-889] Returning learners had no path to the actual chat history.
+            The transcript exists server-side and powers session resume; this
+            link surfaces it in a read-only screen so the learner can scroll
+            back through what was discussed. */}
+        {sessionId ? (
+          <Pressable
+            onPress={() => {
+              router.push({
+                pathname: '/session-transcript/[sessionId]',
+                params: { sessionId },
+              } as never);
+            }}
+            className="bg-surface rounded-button py-3 items-center mb-4"
+            accessibilityRole="button"
+            accessibilityLabel="View full transcript"
+            testID="view-transcript-cta"
+          >
+            <Text className="text-text-primary text-body font-semibold">
+              View full transcript
+            </Text>
+          </Pressable>
+        ) : null}
+
         {persisted?.learnerRecap ? (
           <View
             className="bg-surface rounded-card p-4 mb-4"
