@@ -96,7 +96,10 @@ describe('QuizRoundDetailScreen — hint reveal', () => {
     fireEvent.press(screen.getByTestId('round-detail-question-0'));
 
     expect(screen.getByTestId('round-detail-question-0-hints')).toBeTruthy();
-    expect(screen.getByText('Born in Croatia in 1856.')).toBeTruthy();
+    // After [BUG-932] fix the first clue also appears as the collapsed-row
+    // prompt, so the same text now exists twice (once in the row prompt,
+    // once in the expanded clues list). Both occurrences are intentional.
+    expect(screen.getAllByText('Born in Croatia in 1856.').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('He could speak eight languages.')).toBeTruthy();
   });
 
@@ -131,5 +134,74 @@ describe('QuizRoundDetailScreen — hint reveal', () => {
     expect(screen.getByTestId('round-detail-question-0-hints')).toBeTruthy();
     fireEvent.press(card);
     expect(screen.queryByTestId('round-detail-question-0-hints')).toBeNull();
+  });
+
+  // [BUG-932] The collapsed Guess Who row used to show the literal string
+  // "Guess Who" — the activity name repeated for every question, with no
+  // way to tell rows apart without expanding each one. The fix renders the
+  // first clue (truncated) so each row carries a unique prompt.
+  describe('collapsed Guess Who row prompt [BUG-932]', () => {
+    it('shows the first clue as the row prompt instead of the literal "Guess Who"', () => {
+      mockUseRoundDetail.mockReturnValue({
+        data: buildGuessWhoRound(),
+        isLoading: false,
+        isError: false,
+        refetch: jest.fn(),
+      });
+
+      render(<QuizRoundDetailScreen />);
+
+      // Collapsed state: Q0 row shows first clue. The expanded clue list
+      // is gated on tap, so before any press the clue appears exactly once
+      // (in the row prompt) — no duplication possible.
+      expect(screen.getByText('Born in Croatia in 1856.')).toBeTruthy();
+      // The hints panel is NOT rendered in collapsed state — proves the
+      // clue we're seeing is the row prompt, not the expanded list.
+      expect(screen.queryByTestId('round-detail-question-0-hints')).toBeNull();
+    });
+
+    it('truncates clues longer than 60 characters with an ellipsis', () => {
+      const longClue =
+        'This is a very long first clue that definitely exceeds sixty characters in total length.';
+      const data = buildGuessWhoRound();
+      const q0 = data.questions[0];
+      if (!q0) throw new Error('fixture invariant: questions[0] exists');
+      q0.clues = [longClue, 'short2'];
+      mockUseRoundDetail.mockReturnValue({
+        data,
+        isLoading: false,
+        isError: false,
+        refetch: jest.fn(),
+      });
+
+      render(<QuizRoundDetailScreen />);
+
+      // Truncated form (60 chars + ellipsis) IS in the row prompt.
+      expect(screen.getByText(`${longClue.slice(0, 60)}…`)).toBeTruthy();
+      // Full untruncated form is NOT visible in the collapsed view.
+      expect(screen.queryByText(longClue)).toBeNull();
+    });
+
+    it('falls back to "Guess Who" when clues array is empty', () => {
+      const data = buildGuessWhoRound();
+      const q0 = data.questions[0];
+      if (!q0) throw new Error('fixture invariant: questions[0] exists');
+      q0.clues = [];
+      mockUseRoundDetail.mockReturnValue({
+        data,
+        isLoading: false,
+        isError: false,
+        refetch: jest.fn(),
+      });
+
+      render(<QuizRoundDetailScreen />);
+
+      // The row prompt falls back to the activity name when no clues exist.
+      // The header renders the activity label combined with score
+      // ("Guess Who · 1/2"), so its text node won't match the exact string;
+      // the only standalone "Guess Who" Text in the tree is the Q0 row
+      // prompt fallback.
+      expect(screen.getByText('Guess Who')).toBeTruthy();
+    });
   });
 });
