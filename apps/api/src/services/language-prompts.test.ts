@@ -86,23 +86,41 @@ describe('buildFourStrandsPrompt', () => {
     expect(joined).toContain('gracias');
   });
 
-  it('handles empty known vocabulary gracefully', () => {
+  it('handles empty known vocabulary as a hard zero-knowledge signal [BUG-937]', () => {
     const result = buildFourStrandsPrompt(
       makeContext({ languageCode: 'es', knownVocabulary: [] })
     );
     const joined = result.join('\n');
 
-    // Should mention vocabulary is not available
-    expect(joined).toContain('not available');
+    // BUG-937: empty vocab must read as "treat as complete beginner" so the
+    // model cannot assume the learner already knows greetings.
+    expect(joined).toContain('NONE');
+    expect(joined).toContain('complete beginner');
+    expect(joined).toMatch(/Do NOT assume they already know/i);
   });
 
-  it('handles undefined known vocabulary', () => {
+  it('handles undefined known vocabulary as a hard zero-knowledge signal [BUG-937]', () => {
     const result = buildFourStrandsPrompt(
       makeContext({ languageCode: 'es', knownVocabulary: undefined })
     );
     const joined = result.join('\n');
 
-    expect(joined).toContain('not available');
+    expect(joined).toContain('NONE');
+    expect(joined).toContain('complete beginner');
+  });
+
+  it('does not soften "NONE" for non-empty vocabulary [BUG-937]', () => {
+    // Break test: with vocabulary present, the zero-knowledge wording must NOT
+    // appear — otherwise the model gets a contradictory signal.
+    const result = buildFourStrandsPrompt(
+      makeContext({ languageCode: 'es', knownVocabulary: ['hola', 'gracias'] })
+    );
+    const joined = result.join('\n');
+
+    expect(joined).not.toContain('NONE');
+    expect(joined).not.toContain('complete beginner');
+    expect(joined).toContain('hola');
+    expect(joined).toContain('gracias');
   });
 
   it('includes STT/TTS locale info for supported languages', () => {

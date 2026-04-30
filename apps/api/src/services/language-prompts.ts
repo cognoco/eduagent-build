@@ -4,7 +4,16 @@ import type { ExchangeContext } from './exchanges';
 
 function formatKnownVocabulary(knownVocabulary: string[] | undefined): string {
   if (!knownVocabulary || knownVocabulary.length === 0) {
-    return 'Known vocabulary list is not available yet. Start slightly easier and introduce new language gently.';
+    // BUG-937: previous wording ("not available yet … introduce gently") let the
+    // model assume the learner already knew universal greetings like "ciao" /
+    // "grazie". Empty vocabulary now reads as a hard zero-knowledge signal so
+    // the opening exchange teaches every word from scratch.
+    return (
+      'Known vocabulary: NONE — treat the learner as a complete beginner with ' +
+      'zero target-language vocabulary. Do NOT assume they already know any ' +
+      'words, including greetings ("hello", "thank you"), numbers, or other ' +
+      'basics. Introduce and translate each new word the first time you use it.'
+    );
   }
 
   // [PROMPT-INJECT-6] Vocabulary entries are stored LLM output. Sanitize each
