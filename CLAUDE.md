@@ -66,25 +66,11 @@ Content moved here from `~/.claude/CLAUDE.md` during the Step 1 cleanup of the g
 
 These rules prevent dead-end states where users get stuck with no actionable escape. Learned from a full-app UX audit (2026-04-05) that found 44 dead-end issues across all flows.
 
-#### Every Screen State Must Have an Action
-
-Before implementing any screen, enumerate ALL possible states — not just the happy path. Every state MUST have at least one interactive element the user can tap.
-
-Required states to consider for every screen:
-- **Loading** — show spinner + cancel/timeout after 15-30s
-- **Error** — show specific error + retry + "Go Back" or "Go Home"
-- **Empty** — show guidance (not just "Nothing here")
-- **Offline** — show proactive warning before user tries an action
-- **Expired/Gone** — show explanation + recovery path
-
-If any state has zero user actions — that's a design bug, not a code bug.
-
 #### Error Handling Rules
 
-1. **Every `mutateAsync` catch block must show user-visible feedback** — toast, alert, or inline error. Bare `catch {}` is forbidden.
-2. **Classify errors at the API client boundary, not per-screen** — distinguish quota exhausted, forbidden, gone, network error, etc. in middleware. Screens should never parse HTTP status codes.
-3. **Never replace specific server errors with generic "check your connection"** — if the server says "subject is paused", show that, not "connection error".
-4. **Navigation after mutations must be guarded** — `router.back()` only after the API call succeeds, not in a finally block.
+> Most rules in this category are covered by the `ux-dead-end-audit` skill (mutateAsync catch feedback, specific server errors, guarded navigation, screen-state checklist). The remaining project rule below is architectural rather than screen-state, so stays here.
+
+- **Classify errors at the API client boundary, not per-screen** — distinguish quota exhausted, forbidden, gone, network error, etc. in middleware. Screens should never parse HTTP status codes.
 
 #### Spec Failure Modes Before Coding
 
@@ -134,10 +120,6 @@ Any `catch` block or fallback path in billing, auth, or webhook code that silent
 #### Destructive Migrations Need a Rollback Section
 
 Any migration that drops columns, tables, or types must include a `## Rollback` section in the plan specifying: (a) whether rollback is possible, (b) what data is lost, (c) what the recovery procedure is. If rollback is impossible, say so explicitly — "rollback is not possible, data is permanently destroyed."
-
-#### NO-OP Dismissals Need Line References
-
-When a discovery or review finding is dismissed as NO-OP or "already handled," cite the specific file and line number that proves the fix already exists. Without a line reference, it's an assertion, not evidence.
 
 #### Fix Tables Must Include a "Verified By" Column
 
@@ -204,14 +186,6 @@ All secrets are managed through **Doppler**. Never suggest `wrangler secret put`
 - After rebase, always verify the PR diff (`gh pr diff`) — merge strategies like `-X theirs` can silently drop code
 - Check for duplicate functions/tests, missing imports, and schema export gaps
 - Run type checking (`tsc --noEmit`) to catch errors before pushing
-
-#### When Asked to "Fix CI" on a PR
-
-1. First read `gh pr checks <number>` to identify ALL failing checks
-2. For each failing check, investigate the actual failure (not just the check name)
-3. Fix the root cause — don't skip or suppress checks
-4. Re-run tests locally before pushing
-5. After pushing, monitor CI until it passes or identify the next failure
 
 ## Handy Commands
 
