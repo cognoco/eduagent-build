@@ -1,3 +1,0 @@
-Create a detailed plan to execute {$ARGUMENTS}. Make sure to leverage your available MCP servers (specifically Sequential Thinking, Exa,and Context7) for analysis (if required) and planning. Ultrathink.
-
-Consider deploying specialized sub-agents for plan phase analysis and for execution. Ensure you include the use of MCP servers also during the execution phase (specifically consider Sequential Thinking, Context7, NX and Vibe-Check), and instruct sub-agents accordingly.
