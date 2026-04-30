@@ -153,10 +153,11 @@ Two production dead-code branches removed 2026-04-19 in commit `970a82a5`: `AgeB
 - [project_template_repo.md](project_template_repo.md) — Reusable SaaS mobile template extraction plan.
 - [feedback_notion_rest_for_queries.md](feedback_notion_rest_for_queries.md) — Always REST API for exhaustive Notion queries.
 - [feedback_notion_resolution_recording.md](feedback_notion_resolution_recording.md) — Record resolution on Done items. Never reopen.
+- [feedback_e2e_runbook.md](feedback_e2e_runbook.md) — Read `docs/E2Edocs/e2e-runbook.md` BEFORE any E2E/emulator/Maestro debugging. 2,358 lines of vault docs replaced with verified short runbook on 2026-04-30.
 
 ## Custom Skills
 
-- `/e2e`, `/ship`, `/fix-ci`, `/dispatch`, `/notion`, `/build`, `/commit` — all operational
+- `/e2e`, `/ship`, `/fix-ci`, `/dispatch`, `/notion`, `/build`, `/commit` — all operational. **`/e2e` rewritten 2026-04-30** with empirical verification — see `feedback_e2e_runbook.md`.
 - Husky pre-commit: `tsc --build` (incremental) + lint-staged + surgical tests
 
 ## Cross-Project Assets
