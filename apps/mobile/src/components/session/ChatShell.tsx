@@ -16,6 +16,7 @@ import {
   Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useIsFocused } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MessageBubble, type VerificationBadge } from './MessageBubble';
@@ -169,6 +170,14 @@ export function ChatShell({
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
+  // [BUG-886] On RN Web the Stack mounts every screen simultaneously, so a
+  // prior session's ChatShell stays in the DOM with a clickable Send button.
+  // Tap-target geometry can route a click on the visually active screen to
+  // the offscreen instance and fire its `onSend` (still bound to the prior
+  // session's POST URL). useIsFocused returns false on the inactive instance
+  // — we use it both to short-circuit handleSend and to remove the dormant
+  // input + buttons from the accessibility tree on web.
+  const isFocused = useIsFocused();
   // [BUG-740 / PERF-10] FlatList ref so virtualization kicks in for long
   // sessions. ScrollView previously rendered every message bubble in the
   // tree, growing unbounded — students hit OOM after a few hundred turns.
@@ -394,6 +403,12 @@ export function ChatShell({
   );
 
   const handleSend = useCallback(() => {
+    // [BUG-886] Hard guard against stale-instance taps on RN Web. Without
+    // this, a prior screen's ChatShell still in the DOM can fire onSend
+    // bound to the prior session's POST URL when the user taps the visually
+    // active Send button. The accessibility-tree changes below are the
+    // primary defense; this is the belt-and-braces backstop.
+    if (!isFocused) return;
     if (!input.trim() || isStreaming) return;
     const text = input.trim();
     setInput('');
@@ -402,7 +417,7 @@ export function ChatShell({
     // if user switched to text mode while TTS was still playing (BUG-344)
     stopSpeaking();
     onSend(text);
-  }, [input, isStreaming, onDraftChange, onSend, stopSpeaking]);
+  }, [input, isFocused, isStreaming, onDraftChange, onSend, stopSpeaking]);
 
   // Voice record button toggle
   const handleVoicePress = useCallback(async () => {
@@ -825,6 +840,16 @@ export function ChatShell({
           <View
             className="flex-row items-end px-4 py-3 bg-surface border-t border-surface-elevated"
             style={{ paddingBottom: Math.max(insets.bottom, 8) }}
+            testID="chat-input-row"
+            // [BUG-886] On RN Web, mounted-but-unfocused screens stay in the
+            // DOM. Remove the input row from the AT tree, swallow pointer
+            // events, and skip tab order so a click on the visible screen
+            // cannot land on this dormant ChatShell's Send.
+            pointerEvents={
+              !isFocused && Platform.OS === 'web' ? 'none' : 'auto'
+            }
+            aria-hidden={!isFocused && Platform.OS === 'web' ? true : undefined}
+            tabIndex={!isFocused && Platform.OS === 'web' ? -1 : undefined}
           >
             <TextInput
               className="flex-1 bg-background rounded-input px-4 py-3 text-body text-text-primary me-2"
@@ -840,7 +865,11 @@ export function ChatShell({
               returnKeyType="send"
               autoCapitalize="sentences"
               blurOnSubmit={false}
-              editable={!isStreaming}
+              // [BUG-886] Disabling here is the second-line guard; the View
+              // wrapper above already removes the input from the AT tree on
+              // web. Native (iOS/Android) only renders the focused screen so
+              // !isFocused effectively never fires there.
+              editable={!isStreaming && isFocused}
               testID="chat-input"
               accessibilityLabel="Message input"
             />
@@ -857,7 +886,10 @@ export function ChatShell({
             )}
             <Pressable
               onPress={handleSend}
-              disabled={!input.trim() || isStreaming}
+              // [BUG-886] Pressable disabled state mirrors handleSend's
+              // guard — belt-and-braces against any path that bypasses the
+              // wrapping View's pointerEvents/aria-hidden treatment.
+              disabled={!input.trim() || isStreaming || !isFocused}
               className={`rounded-button px-5 py-3 min-h-[44px] min-w-[44px] items-center justify-center ${
                 input.trim() && !isStreaming
                   ? 'bg-primary'
