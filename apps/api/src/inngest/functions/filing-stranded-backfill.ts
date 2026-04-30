@@ -1,4 +1,4 @@
-import { and, gte, inArray, isNull } from 'drizzle-orm';
+import { and, asc, gte, inArray, isNull } from 'drizzle-orm';
 import { learningSessions } from '@eduagent/database';
 import { filingTimedOutEventSchema } from '@eduagent/schemas';
 import { inngest } from '../client';
@@ -29,6 +29,8 @@ export const filingStrandedBackfill = inngest.createFunction(
           sessionType: true,
           createdAt: true,
         },
+        orderBy: asc(learningSessions.createdAt),
+        limit: 500,
       });
     });
 
@@ -46,6 +48,6 @@ export const filingStrandedBackfill = inngest.createFunction(
       });
     }
 
-    return { dispatched: stranded.length };
+    return { dispatched: stranded.length, capped: stranded.length === 500 };
   }
 );
