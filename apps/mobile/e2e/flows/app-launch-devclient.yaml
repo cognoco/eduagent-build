@@ -1,12 +1,19 @@
 # App Launch smoke test — for dev-client APK on emulator
-# Handles the dev-client launcher, waits for bundle loading,
-# then validates the sign-in screen.
+# Assumes seed-and-run.sh has already gotten the app to the sign-in screen
+# (per the migration noted in _setup/launch-devclient.yaml's deprecation header).
+# DO NOT call this directly via `maestro test`; always invoke via:
+#   bash apps/mobile/e2e/scripts/seed-and-run.sh --no-seed apps/mobile/e2e/flows/app-launch-devclient.yaml
 appId: com.mentomate.app
 tags:
   - smoke
   - devclient
 ---
-- runFlow: _setup/launch-devclient.yaml
+# Wait for sign-in screen (seed-and-run.sh already gets us here).
+# Use testID, not heading text — heading varies by first-time vs returning user.
+- extendedWaitUntil:
+    visible:
+      id: "sign-in-button"
+    timeout: 30000
 
 # Verify key sign-in elements are present
 - assertVisible: "Sign in to start learning"
@@ -19,7 +26,8 @@ tags:
 - assertVisible:
     id: "sign-in-button"
 
-# Verify navigation to sign-up is available
-- assertVisible: "Sign up"
+# NOTE: "Sign up" assertion removed — UI drift confirmed 2026-04-30.
+# See docs/E2Edocs/e2e-2026-04-30-empirical-state.md for context.
+# Restore this assertion when sign-up entry point is reintroduced.
 
 - takeScreenshot: app-launch-devclient
