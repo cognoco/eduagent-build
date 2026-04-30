@@ -19,6 +19,7 @@ import {
   setProxyMode,
   useApiClient,
 } from './api-client';
+import { UpstreamError, QuotaExceededError } from './api-errors';
 
 const mockGetToken = jest.fn();
 jest.mock('@clerk/clerk-expo', () => ({
@@ -147,5 +148,106 @@ describe('useApiClient header snapshot [BUG-631 / I-3]', () => {
 
     expect(capturedHeaders).not.toBeNull();
     expect(capturedHeaders!.has('X-Proxy-Mode')).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [CR-API-402-04] Non-quota 402 must throw UpstreamError with status 402.
+//
+// Before the fix, a 402 response without a structured `code` field fell
+// through to the generic `throw new Error(...)` path, permanently losing the
+// status code.  Callers that branch on payment-required (e.g., to show an
+// upgrade prompt vs. a generic error) could not distinguish 402 from 5xx.
+// ---------------------------------------------------------------------------
+
+describe('useApiClient 402 error classification [CR-API-402-04]', () => {
+  let originalFetch: typeof globalThis.fetch;
+
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+    mockGetToken.mockResolvedValue('test-token');
+    setActiveProfileId('profile-A');
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    setActiveProfileId(undefined);
+    mockGetToken.mockReset();
+  });
+
+  function makeClient() {
+    const { result } = renderHook(() => useApiClient());
+    return result.current as unknown as {
+      v1: { health: { $get: () => Promise<Response> } };
+    };
+  }
+
+  it('[BREAK] non-quota 402 with no code throws UpstreamError with status 402', async () => {
+    globalThis.fetch = jest.fn(
+      async () =>
+        new Response('Payment required', {
+          status: 402,
+          statusText: 'Payment Required',
+        })
+    ) as unknown as typeof globalThis.fetch;
+
+    const client = makeClient();
+    const err = await client.v1.health.$get().catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(UpstreamError);
+    const upstream = err as UpstreamError;
+    expect(upstream.status).toBe(402);
+    expect(upstream.code).toBe('PAYMENT_REQUIRED');
+  });
+
+  it('[BREAK] non-quota 402 with a structured code preserves that code', async () => {
+    globalThis.fetch = jest.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            code: 'SUBSCRIPTION_EXPIRED',
+            message: 'Subscribe to continue',
+          }),
+          { status: 402, headers: { 'Content-Type': 'application/json' } }
+        )
+    ) as unknown as typeof globalThis.fetch;
+
+    const client = makeClient();
+    const err = await client.v1.health.$get().catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(UpstreamError);
+    const upstream = err as UpstreamError;
+    expect(upstream.status).toBe(402);
+    expect(upstream.code).toBe('SUBSCRIPTION_EXPIRED');
+  });
+
+  it('[BREAK] quota 402 still throws QuotaExceededError (regression guard)', async () => {
+    const quotaBody = {
+      code: 'QUOTA_EXCEEDED',
+      message: 'Quota exceeded',
+      details: {
+        tier: 'free',
+        reason: 'monthly',
+        monthlyLimit: 100,
+        usedThisMonth: 100,
+        dailyLimit: 10,
+        usedToday: 5,
+        topUpCreditsRemaining: 0,
+        upgradeOptions: [],
+      },
+    };
+    globalThis.fetch = jest.fn(
+      async () =>
+        new Response(JSON.stringify(quotaBody), {
+          status: 402,
+          headers: { 'Content-Type': 'application/json' },
+        })
+    ) as unknown as typeof globalThis.fetch;
+
+    const client = makeClient();
+    const err = await client.v1.health.$get().catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(QuotaExceededError);
+    expect(err).not.toBeInstanceOf(UpstreamError);
   });
 });
