@@ -28,6 +28,9 @@
     "deny": [],
     "ask": []
   },
+  "outputStyle": "Explanatory",
   "autoMemoryDirectory": "C:/Dev/Projects/Products/Apps/eduagent-build/.claude/memory",
-  "outputStyle": "Explanatory"
+  "enabledPlugins": {
+    "typescript-lsp@claude-plugins-official": true
+  }
 }

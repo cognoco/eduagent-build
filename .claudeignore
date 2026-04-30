@@ -1,0 +1,69 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build artifacts
+dist/
+build/
+out/
+web-build/
+.next/
+.expo/
+.expo-shared/
+*.tsbuildinfo
+
+# Native build directories (Expo prebuild output)
+android/
+ios/
+
+# Caches
+.nx/
+.turbo/
+.cache/
+.parcel-cache/
+.wrangler/
+.eslintcache
+.jest-cache/
+coverage/
+
+# Test/lint artifacts
+playwright-report/
+test-results/
+.lighthouseci/
+
+# Bundle outputs
+*.apk
+*.aab
+*.ipa
+*.app
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Env files (never read these directly — use Doppler)
+.env
+.env.local
+.env.*.local
+.dev.vars
+.dev.vars.local
+
+# Lock files (large, low signal — read package.json instead)
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
+# Generated schemas / migrations output
+apps/api/drizzle/meta/
+
+# Snapshots / fixtures (large, opt-in via explicit Read)
+**/__snapshots__/
