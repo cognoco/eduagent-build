@@ -49,6 +49,18 @@ jest.mock('../../../hooks/use-settings', () => ({
   }),
 }));
 
+let mockSubjects: Array<Record<string, unknown>> | undefined = [
+  { id: 'subject-1', name: 'Mathematics', pedagogyMode: 'standard' },
+];
+let mockSubjectsLoading = false;
+
+jest.mock('../../../hooks/use-subjects', () => ({
+  useSubjects: () => ({
+    data: mockSubjects,
+    isLoading: mockSubjectsLoading,
+  }),
+}));
+
 function createWrapper() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
@@ -70,6 +82,10 @@ describe('SubjectSettingsScreen', () => {
     mockAnalogyDomain = null;
     mockIsLoading = false;
     mockIsPending = false;
+    mockSubjects = [
+      { id: 'subject-1', name: 'Mathematics', pedagogyMode: 'standard' },
+    ];
+    mockSubjectsLoading = false;
   });
 
   it('renders the subject name in the header', () => {
@@ -173,6 +189,45 @@ describe('SubjectSettingsScreen', () => {
     expect(mockReplace).toHaveBeenCalledWith({
       pathname: '/(app)/shelf/[subjectId]',
       params: { subjectId: 'subject-1' },
+    });
+  });
+
+  // [BUG-939] Analogy Preference is meaningless for language subjects
+  // (pedagogyMode 'four_strands') because the four-strands pedagogy teaches
+  // vocabulary directly without analogy framing.
+  describe('language subject handling [BUG-939]', () => {
+    it('hides Analogy Preference for four_strands subjects', () => {
+      mockSubjects = [
+        { id: 'subject-1', name: 'Italian', pedagogyMode: 'four_strands' },
+      ];
+
+      render(<SubjectSettingsScreen />, { wrapper: createWrapper() });
+
+      expect(screen.queryByText('Analogy Preference')).toBeNull();
+      expect(screen.queryByTestId('analogy-domain-picker')).toBeNull();
+      expect(screen.getByTestId('subject-settings-language-empty')).toBeTruthy();
+    });
+
+    it('shows Analogy Preference for non-language subjects', () => {
+      mockSubjects = [
+        { id: 'subject-1', name: 'Mathematics', pedagogyMode: 'standard' },
+      ];
+
+      render(<SubjectSettingsScreen />, { wrapper: createWrapper() });
+
+      expect(screen.getByText('Analogy Preference')).toBeTruthy();
+      expect(screen.queryByTestId('subject-settings-language-empty')).toBeNull();
+    });
+
+    it('still shows the back button on the language-subject empty state', () => {
+      mockSubjects = [
+        { id: 'subject-1', name: 'Italian', pedagogyMode: 'four_strands' },
+      ];
+
+      render(<SubjectSettingsScreen />, { wrapper: createWrapper() });
+
+      // Empty state must not be a dead-end — back button is reachable.
+      expect(screen.getByTestId('subject-settings-back')).toBeTruthy();
     });
   });
 });
