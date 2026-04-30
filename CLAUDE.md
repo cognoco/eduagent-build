@@ -55,7 +55,6 @@ Do not call work complete if related tests, lint, typecheck, or required migrati
 - Package imports go through the package barrel (`@eduagent/schemas`, `@eduagent/database`, etc.).
 - SecureStore keys must use Expo-safe characters only: letters, numbers, `.`, `-`, `_`.
 - In API code, use the typed config object instead of raw `process.env` reads.
-- lint-staged uses `node --stack-size=65536` to work around Windows stack overflow in eslint AST traversal (see `project_nx_expo_plugin_bug.md`).
 - Cross-tab / cross-stack `router.push` calls must push the full ancestor chain, not just the leaf. A direct push to `shelf/[subjectId]/book/[bookId]` from another tab synthesizes a 1-deep stack containing only the leaf, so `router.back()` falls through to the Tabs first-route (Home). Either push the parent first then the child, or rely on `unstable_settings.initialRouteName` in the nested layout — but the rule of thumb is to push the chain. `unstable_settings` only seeds one level, so it does not protect future deeper paths (e.g. `shelf/[subjectId]/book/[bookId]/chapter/[chapterId]`).
 - Any new nested Expo Router layout that contains both an `index` screen and a deeper dynamic child must export `unstable_settings = { initialRouteName: 'index' }` as a safety net for cross-stack deep pushes.
 
