@@ -210,10 +210,17 @@ export function ShelvesTab({
     // F-010 / BUG-[NOTION-3468bce9]: "completed" was confused with Progress's
     // "mastered". topicsCompleted tracks content-coverage (started), not
     // retention-verified mastery. Label now says "started" to avoid confusion.
-    const progressLabel =
-      progress && progress.topicsTotal > 0
-        ? `${progress.topicsCompleted}/${progress.topicsTotal} topics started`
-        : 'Shelf ready to explore';
+    //
+    // [BUG-920] Two empty states must be visually distinguishable:
+    //   1. No books on the shelf yet (topicsTotal === 0) → "No books yet"
+    //   2. Books on the shelf but nothing started (topicsTotal > 0,
+    //      topicsCompleted === 0) → "0/N topics started"
+    // The previous code collapsed both into "Shelf ready to explore", which
+    // hid case (2) — users with 10 unstarted topics couldn't tell them apart
+    // from a truly empty shelf.
+    const progressLabel = !progress || progress.topicsTotal === 0
+      ? 'No books yet'
+      : `${progress.topicsCompleted}/${progress.topicsTotal} topics started`;
     const reviewLabel =
       item.reviewDueCount && item.reviewDueCount > 0
         ? `${item.reviewDueCount} to review`

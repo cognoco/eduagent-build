@@ -273,4 +273,118 @@ describe('ShelvesTab', () => {
       filters: { status: [], retention: [] },
     });
   });
+
+  // [BUG-920] Shelves with no books (topicsTotal === 0) used to share the
+  // copy "Shelf ready to explore" with shelves that *had* books but no
+  // started topics, leaving users unable to tell them apart. The fix
+  // distinguishes the two states explicitly.
+  describe('progress label distinguishes empty shelf vs unstarted topics [BUG-920]', () => {
+    const emptyShelf: ShelfItem = {
+      subject: {
+        id: 'sub-empty',
+        name: 'General Studies',
+        status: 'active',
+        profileId: 'p1',
+        pedagogyMode: 'four_strands',
+        rawInput: null,
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+      },
+      progress: {
+        subjectId: 'sub-empty',
+        name: 'General Studies',
+        topicsTotal: 0,
+        topicsCompleted: 0,
+        topicsVerified: 0,
+        urgencyScore: 0,
+        retentionStatus: 'strong',
+        lastSessionAt: null,
+      },
+    };
+
+    const unstartedShelf: ShelfItem = {
+      subject: {
+        id: 'sub-italian',
+        name: 'Italian',
+        status: 'active',
+        profileId: 'p1',
+        pedagogyMode: 'four_strands',
+        rawInput: null,
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+      },
+      progress: {
+        subjectId: 'sub-italian',
+        name: 'Italian',
+        topicsTotal: 10,
+        topicsCompleted: 0,
+        topicsVerified: 0,
+        urgencyScore: 0,
+        retentionStatus: 'strong',
+        lastSessionAt: null,
+      },
+    };
+
+    const noProgressShelf: ShelfItem = {
+      subject: {
+        id: 'sub-noprog',
+        name: 'Spanish',
+        status: 'active',
+        profileId: 'p1',
+        pedagogyMode: 'four_strands',
+        rawInput: null,
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+      },
+      progress: undefined,
+    };
+
+    it('shows "No books yet" when the shelf has zero topics total', () => {
+      render(
+        <ShelvesTab
+          {...defaultProps}
+          shelves={[emptyShelf]}
+        />
+      );
+
+      expect(screen.getByText('No books yet')).toBeTruthy();
+      expect(screen.queryByText(/Shelf ready to explore/)).toBeNull();
+    });
+
+    it('shows "0/N topics started" when the shelf has books but none started', () => {
+      render(
+        <ShelvesTab
+          {...defaultProps}
+          shelves={[unstartedShelf]}
+        />
+      );
+
+      expect(screen.getByText('0/10 topics started')).toBeTruthy();
+      expect(screen.queryByText('No books yet')).toBeNull();
+    });
+
+    it('shows "No books yet" when no progress data is available at all', () => {
+      render(
+        <ShelvesTab
+          {...defaultProps}
+          shelves={[noProgressShelf]}
+        />
+      );
+
+      expect(screen.getByText('No books yet')).toBeTruthy();
+    });
+
+    it('does not collapse the empty-shelf state into the unstarted-topics state', () => {
+      render(
+        <ShelvesTab
+          {...defaultProps}
+          shelves={[emptyShelf, unstartedShelf]}
+        />
+      );
+
+      // Both labels are visible — they are NOT the same string.
+      expect(screen.getByText('No books yet')).toBeTruthy();
+      expect(screen.getByText('0/10 topics started')).toBeTruthy();
+    });
+  });
 });
