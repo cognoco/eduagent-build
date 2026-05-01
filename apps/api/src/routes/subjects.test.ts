@@ -70,6 +70,12 @@ jest.mock('../services/sentry', () => ({
 }));
 
 jest.mock('../services/subject', () => ({
+  SubjectNotLanguageLearningError: class SubjectNotLanguageLearningError extends Error {
+    constructor() {
+      super('Subject is not configured for language learning');
+      this.name = 'SubjectNotLanguageLearningError';
+    }
+  },
   listSubjects: jest.fn().mockResolvedValue([]),
   createSubject: jest.fn().mockImplementation((_db, profileId, input) => ({
     id: 'test-subject-id',
@@ -136,6 +142,7 @@ import { resolveSubjectName } from '../services/subject-resolve';
 import { classifySubject } from '../services/subject-classify';
 import { captureException } from '../services/sentry';
 import { UpstreamLlmError, SubjectNotFoundError } from '@eduagent/schemas';
+import { SubjectNotLanguageLearningError } from '../services/subject';
 import {
   AUTH_HEADERS as BASE_AUTH_HEADERS,
   BASE_AUTH_ENV,
@@ -505,7 +512,36 @@ describe('subject routes', () => {
       expect(body.code).toBe('NOT_FOUND');
     });
 
-    it('returns 422 when subject is not a language subject', async () => {
+    it('returns 422 when subject is not a language subject (typed SubjectNotLanguageLearningError)', async () => {
+      const { configureLanguageSubject } = jest.requireMock(
+        '../services/subject'
+      );
+      configureLanguageSubject.mockRejectedValueOnce(
+        new SubjectNotLanguageLearningError()
+      );
+
+      const res = await app.request(
+        '/v1/subjects/test-subject-id/language-setup',
+        {
+          method: 'PUT',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            nativeLanguage: 'en',
+            startingLevel: 'A1',
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(422);
+      const body = await res.json();
+      expect(body.code).toBe('VALIDATION_ERROR');
+    });
+
+    // [BUG-SUBJ-LANG] Break test: a generic Error with the same message text
+    // must NOT map to 422 — it should propagate as a 500. This proves the
+    // route uses instanceof and not string-matching.
+    it('[BUG-SUBJ-LANG] generic Error with matching message text does NOT map to 422 (falls through to 500)', async () => {
       const { configureLanguageSubject } = jest.requireMock(
         '../services/subject'
       );
@@ -526,7 +562,7 @@ describe('subject routes', () => {
         TEST_ENV
       );
 
-      expect(res.status).toBe(422);
+      expect(res.status).toBe(500);
     });
 
     it('returns 400 with invalid body', async () => {
