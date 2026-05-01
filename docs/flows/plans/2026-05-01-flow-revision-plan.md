@@ -1,0 +1,573 @@
+# Mobile App Flow Revision Plan — 2026-05-01
+
+Source inventory: [`mobile-app-flow-inventory.md`](../mobile-app-flow-inventory.md) (snapshot 2026-04-19, doc updated 2026-04-30).
+
+## Purpose
+
+Walk every flow in the inventory, log defects in the Notion Bug Tracker, and update the inventory document where descriptions have drifted. **Total scope: 154 numbered items across 13 sections + an open-ended discovery register for flows missing from the inventory.**
+
+## Operating Instructions (read before starting any batch)
+
+This plan is meant to be executable by either the human owner or an agent running unattended. Follow these instructions verbatim; they're the difference between a plan and a checklist.
+
+### 0. Pre-flight (once, before Batch 1)
+
+1. **Branch & build:** test on the latest `staging` build or whatever branch is explicitly named when the batch is started. Do NOT switch branches mid-batch.
+2. **Environment:** mobile dev client points at staging API; web preview via `pnpm exec nx serve mobile` (auth-walled past sign-in). Note the build SHA in the **Notes** column of the first row tested.
+3. **Doppler scope:** all secret reads use `"C:\Tools\doppler\doppler.exe" -- ...` with project=mentomate (auto-resolved from repo `.doppler.yaml`).
+4. **Test devices:** primary = Galaxy S10e emulator (5.8" — small-screen sweep is part of every batch). Secondary = web preview for CC-09 verification.
+5. **Account slots:** create the persona slots from the *Test Account / Environment Inventory* table below before the batches that need them. Do NOT improvise accounts mid-batch — the slot table is the contract.
+
+### 1. Per-flow procedure (repeat for each row)
+
+For every row in a batch, do this loop. It takes 2–10 minutes per flow.
+
+1. **Read** the inventory row for that ID in [`mobile-app-flow-inventory.md`](../mobile-app-flow-inventory.md). The "Primary routes / entry points" column is your spec.
+2. **Set status to 🔄** in the plan's batch table (mark the row in progress).
+3. **Walk** the flow end-to-end in the app. Touch every documented entry point and every documented branch. Take a screenshot of any unexpected state.
+4. **Compare** observed behaviour against the inventory description. Three things to watch for:
+   - **Defect** → flow doesn't behave as described, or behaves but is broken/confusing/dead-ends.
+   - **Drift** → flow works, but the inventory description is now wrong (route changed, testID renamed, branch removed, new branch added).
+   - **Discovery** → adjacent flow you encountered that is not in the inventory at all.
+5. **Classify the result** using the Result Column Convention below.
+6. **Record** results in three places (in this order):
+   1. **File bugs in Notion** for every defect (see Section 2).
+   2. **Edit the inventory** for every drift/discovery (see Section 3).
+   3. **Update this plan's row** with the final status, result, bug URLs, and a one-line note.
+7. **Move on.** Don't try to fix anything during testing — you are a tester in this exercise, not a developer. Defects belong in Notion, not in code edits.
+
+### 2. Filing bugs in Notion
+
+**Where:** MentoMate Bug Tracker, database ID `b8ce802f-1126-4a2f-a123-be5f888cbb23`.
+
+**How:** prefer the `/notion` skill if available. Otherwise hit the REST API:
+
+```bash
+NOTION_API_KEY="$('C:/Tools/doppler/doppler.exe' secrets get NOTION_API_KEY --plain)"
+curl -X POST https://api.notion.com/v1/pages \
+  -H "Authorization: Bearer $NOTION_API_KEY" \
+  -H "Notion-Version: 2022-06-28" \
+  -H "Content-Type: application/json" \
+  -d '{ "parent": {"database_id": "b8ce802f-1126-4a2f-a123-be5f888cbb23"}, "properties": {...} }'
+```
+
+**Required fields per bug:**
+
+| Field | Value | Notes |
+| --- | --- | --- |
+| Bug (title) | `[FLOW-ID] short imperative summary` | e.g. `[QUIZ-05] Mid-round quit confirm dialog dismisses on outside tap` |
+| Status | `Not started` | Property type is `status` not `select` — payload must be `{"status": {"name": "Not started"}}` |
+| Priority | `P0`/`P1`/`P2`/`P3` | See severity guide below |
+| Platform | one or more of `API` / `Mobile-iOS` / `Mobile-Android` / `Packages` / `CI` | Multi-select |
+| Found In | `flow-revision-2026-05-01 / Batch N / FLOW-ID` | Free text — makes `git log --grep` and Notion search useful |
+| Reported | today's date | |
+
+**Body content (one bug = one Notion page body):**
+
+- **Repro steps** — numbered list, observable preconditions first.
+- **Expected** — what the inventory or product spec says should happen.
+- **Actual** — what you observed.
+- **Screenshot/recording** — attach via Screenshots property (REST file upload) or paste URL if hosted.
+- **Build/SHA + device** — copy from your pre-flight notes.
+
+**Severity guide (Priority field):**
+
+| Priority | Use when |
+| --- | --- |
+| P0 | Crash, data loss, security/privacy leak, billing wrong, consent gate bypassed |
+| P1 | Flow blocked or unusable for a primary persona; back button dead-ends; key feature broken |
+| P2 | Flow works but UX is degraded; copy wrong; layout broken on small screen |
+| P3 | Cosmetic, polish, nice-to-have |
+
+**Multiple bugs per flow:** file separately. One bug = one fix in code. Do NOT bundle two unrelated defects into a single Notion page. Paste all bug URLs into the row's **Bugs** column, comma-separated.
+
+**Existing bugs:** before filing, search Notion (REST `databases/{id}/query` with a title or Found-In filter) to avoid duplicates. If the bug already exists and matches, link to it instead of filing a new one. See `feedback_notion_resolution_recording.md` — never reopen a Done bug; file a new one and link.
+
+### 3. Updating the inventory
+
+The inventory document is a deliverable of this exercise. Edit it inline whenever testing reveals drift.
+
+**When to edit `mobile-app-flow-inventory.md`:**
+
+- Route in "Primary routes / entry points" no longer matches the file tree → update the path.
+- TestID in description was renamed → update or remove.
+- A documented branch (e.g. "Surprise me path") no longer exists → mark it Removed in the row and note the date.
+- A new branch was added that the description doesn't cover → expand the description.
+- A whole row's Coverage status changed (a Maestro flow was added/removed) → update the Coverage column.
+- Section heading bullets ("What changed since…") need a new entry covering this revision sweep — add one at the top once Batch 18 is complete.
+
+**Edit discipline:**
+
+- Keep the table structure intact. Don't reorder rows mid-revision.
+- Preserve existing IDs. If a flow is dead, mark it `(removed 2026-05-NN)` rather than deleting the row.
+- After editing, tick the **Doc Updated** column in this plan with the date (e.g. `✅ 05-03`).
+
+**Discovered flows:**
+
+If you find a flow not in the inventory, do BOTH:
+
+1. Add a row in the **Discovered Flows** register at the bottom of this plan with a temporary `DISC-NN` ID.
+2. Open `mobile-app-flow-inventory.md` and append a row to the most appropriate section table with a real ID (next free in that section's number range). Cross-reference the temp ID in the Discovered table once assigned.
+
+### 4. Edge cases and how to record them
+
+| Situation | Status | Result | Action |
+| --- | --- | --- | --- |
+| Need an account/state I don't have, can't create from current persona | 🚫 | `Blocked` | Note what's missing in the row; flag in batch summary; do not skip — return after setup |
+| Flow exists but Apple/Google store gating prevents purchase test | 🚫 | `Blocked` | Document partial coverage in Notes; mark Blocked; revisit after store enrolment |
+| Flow described in inventory has been removed from the app | ➖ | `Removed` | Edit inventory to mark removed; tick Doc Updated; no bug needed |
+| Flow works but inventory description is wrong | ✅ or ⚠️ | `Pass` | Edit inventory; tick Doc Updated; no bug needed (drift, not defect) |
+| Flow partly works, one branch broken | ⚠️ | `Pass w/ issues` | File bug for the broken branch; mark plan row ⚠️ |
+| Critical defect blocks rest of batch | ❌ | `Fail` | File P0/P1 bug; stop batch; record block in batch summary; resume after fix or move to next independent batch |
+
+### 5. Commit & push cadence
+
+- Commit after each batch is fully tested. Message: `chore(flows): batch N revision results [flow-revision-2026-05-01]`.
+- The plan file and the inventory file should be committed together — never one without the other.
+- Push immediately so progress is visible to the user. (Per `feedback_*` workflow rules: commit early, push after every commit.)
+- Do NOT open a PR for these doc edits unless explicitly asked — direct commits to the working branch.
+
+### 6. Status Legend
+
+| Symbol | Meaning |
+| --- | --- |
+| ⬜ | Not yet tested |
+| 🔄 | Testing in progress |
+| ✅ | Pass — flow works as described |
+| ⚠️ | Pass with minor issues — bugs filed, no blocker |
+| ❌ | Fail — flow broken or significantly off-spec |
+| 🚫 | Blocked — cannot test (account, env, store gating, etc.) |
+| ➖ | N/A — flow no longer exists or is intentionally deferred |
+
+### 7. Result Column Convention
+
+`Result` is `—` until tested, then one of: `Pass`, `Pass w/ issues`, `Fail`, `Blocked`, `Removed`.
+
+## Test Account / Environment Inventory
+
+These are the personas this plan needs. Set up before Batch 1 to avoid mid-flight account creation.
+
+| Slot | Persona | Notes |
+| --- | --- | --- |
+| A | Fresh email, never signed in | Used and burned in Batch 1 (signup) |
+| B | Adult learner (18+), Free plan, no subjects yet | Created in Batch 2 |
+| C | Adult learner with 2+ subjects, mixed retention state | Promoted from B after Batch 3 |
+| D | Underage learner profile (11–13) needing parent consent | Batch 2 / consent variants |
+| E | Underage learner (14–15, GDPR variant) | Batch 2 |
+| F | Parent owner, Family plan, 0 children | Batch 14 (HOME-07) |
+| G | Parent owner, Family plan, 1 child | Batch 14 → 15 |
+| H | Parent owner, Family plan, 2+ children | Batch 15 (multi-child) |
+| I | Account on Plus/Pro plan with active trial | Batch 16 |
+| J | Account hitting free daily-quota cap | Batch 16 |
+| K | Account scheduled for deletion (7-day grace) | Batch 13 |
+
+## Cross-Cutting Observation Rules
+
+Watch for these in **every** batch and file bugs as encountered. They do not need their own session.
+
+- **CC-04** `goBackOrReplace`: every back button must navigate somewhere sensible (no dead-ends, no fall-through to Home from a deep link).
+- **CC-09** Opaque web backgrounds: on web preview, no screen bleed-through between stacked navigators.
+- **CC-03** Animation polish: icon transitions, intent card press, celebrations should feel responsive — not janky or missing.
+
+A final pass to confirm coverage of these is captured in **Batch 17**.
+
+---
+
+## Batch 1 — Pre-Auth & Auth Entry
+
+**State required:** No active session. Slot A (fresh email) ready. Run on a clean dev client.
+**Estimated time:** 45–60 min.
+
+| ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| HOME-04 | Animated splash and initial shell | ✅ | Pass | | | Web preview: splash renders, auth gate loads sign-in screen |
+| AUTH-01 | App launch and auth gate | ✅ | Pass | | | Unauthenticated → sign-in screen; no bleed-through |
+| AUTH-12 | First-time vs returning sign-in copy | ⚠️ | Pass w/ issues | [AUTH-12 P2](https://app.notion.com/p/AUTH-12-hasSignedInBefore-not-persisted-on-web-for-sign-up-cookie-restore-paths-3538bce91f7c81cba5f4c81fc09ca3ec) | | `hasSignedInBefore` not written on sign-up or cookie-restore — always shows first-time copy on web |
+| AUTH-07 | Auth screen navigation (sign-in ↔ sign-up ↔ forgot) | ✅ | Pass | | | All three screens navigate correctly; back buttons work |
+| AUTH-02 | Sign up with email and password | ✅ | Pass | | | Slot A `slot_a+clerk_test@example.com` created successfully |
+| AUTH-03 | Sign-up email verification code | ✅ | Pass | | | Clerk test code 424242 accepted; profile creation screen reached |
+| AUTH-04 | Sign in with email and password | ✅ | Pass | | | Signed in with Slot A; landed on "Welcome! / Let's set up your profile" |
+| AUTH-05 | Additional sign-in verification (email/phone/TOTP) | 🚫 | Blocked | | | TOTP/phone not configured on Slot A; requires MFA-enabled account |
+| AUTH-06 | Forgot password and reset password | ✅ | Pass | | | Reset code 424242 accepted; new password set; auto-signed-in to profile setup |
+| AUTH-08 | OAuth sign in / sign up (Google, Apple, OpenAI) | 🚫 | Blocked | | ✅ 05-01 | Platform-conditional by design: Google=Android/web, Apple=iOS only. Inventory updated for drift. Cannot test OAuth in web preview. |
+| AUTH-09 | SSO callback completion + fallback | 🚫 | Blocked | | | Depends on OAuth sign-in (AUTH-08); cannot reach callback without OAuth flow |
+| HOME-05 | Empty first-user state | ✅ | Pass | | | Tested after ACCOUNT-01: learner home shows intent cards (Learn/Ask/Practice/Homework) with 0 subjects. No redirect to create-subject (Maestro flow outdated). |
+
+---
+
+## Batch 2 — First Profile + Consent Variants
+
+**State required:** Slot A signed in but no profile yet. Will exercise consent age branches; needs to register profiles with different birth years (Slots D, E).
+**Estimated time:** 60–90 min.
+
+| ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| ACCOUNT-01 | Create first profile | ✅ | Pass | | | Adult profile (age 20) created; landed on learner home with intent cards |
+| SUBJECT-08 | Language learning setup | 🚫 | Blocked | | | Interview fails before reaching language-setup screen (see SUBJECT-09 P1) |
+| ACCOUNT-19 | Consent request during underage profile creation | ⬜ | — | | | |
+| ACCOUNT-20 | Child handoff to parent consent request | ⬜ | — | | | |
+| ACCOUNT-21 | Parent email entry, send / resend / change email | ⬜ | — | | | |
+| ACCOUNT-22 | Consent pending gate | ⬜ | — | | | |
+| ACCOUNT-23 | Consent withdrawn gate | ⬜ | — | | | |
+| ACCOUNT-24 | Post-approval landing | ⬜ | — | | | |
+| ACCOUNT-26 | Regional consent variants (COPPA / GDPR / above threshold) | ⬜ | — | | | |
+
+---
+
+## Batch 3 — Subject Onboarding (Adult Learner)
+
+**State required:** Slot B (adult learner, no subjects).
+**Estimated time:** 60–90 min.
+
+| ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| SUBJECT-01 | Create subject from learner home | ⬜ | — | | | |
+| SUBJECT-05 | Subject resolution + clarification suggestions | ⬜ | — | | | |
+| SUBJECT-06 | Broad subject → pick a book | ⬜ | — | | | |
+| SUBJECT-07 | Focused subject / focused-book flow | ⬜ | — | | | |
+| SUBJECT-09 | Interview onboarding | ⬜ | — | | | |
+| SUBJECT-10 | Analogy-preference onboarding | ⬜ | — | | | |
+| SUBJECT-11 | Curriculum review | ⬜ | — | | | |
+| SUBJECT-12 | View curriculum without committing | ⬜ | — | | | |
+| SUBJECT-13 | Challenge curriculum (skip / add / explain ordering) | ⬜ | — | | | |
+| SUBJECT-14 | Placement / knowledge assessment | ⬜ | — | | | |
+| SUBJECT-15 | Accommodation-mode onboarding (FR255) | ⬜ | — | | | |
+
+---
+
+## Batch 4 — Learner Home, Intent Cards, Resume
+
+**State required:** Slot C (adult learner with subjects, partially-completed session).
+**Estimated time:** 30–45 min.
+
+| ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| HOME-01 | Learner home with intent cards | ⬜ | — | | | |
+| HOME-06 | Resume interrupted session (Continue card) | ⬜ | — | | | |
+| HOME-08 | Home loading-timeout fallback (10s) | ⬜ | — | | | |
+| ACCOUNT-04 | Profile switching | ⬜ | — | | | |
+| ACCOUNT-06 | More tab navigation | ⬜ | — | | | |
+| CC-05 | Continue-where-you-left-off (recovery marker vs API) | ⬜ | — | | | |
+
+---
+
+## Batch 5 — Core Learning Sessions (Tutoring + Chat)
+
+**State required:** Slot C with at least one subject + voice/mic permissions granted. Plan ~2 full live sessions in different modes.
+**Estimated time:** 90 min.
+
+| ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| LEARN-01 | Freeform chat (Ask intent card) | ⬜ | — | | | |
+| LEARN-02 | Guided learning session from subject/topic | ⬜ | — | | | |
+| LEARN-03 | First session experience | ⬜ | — | | | |
+| LEARN-04 | Core learning loop | ⬜ | — | | | |
+| LEARN-05 | Coach bubble visual variants (light/dark) | ⬜ | — | | | |
+| LEARN-06 | Voice input + voice-speed controls | ⬜ | — | | | |
+| LEARN-07 | Session summary (submit / skip) | ⬜ | — | | | |
+| SUBJECT-02 | Create subject from library empty state | ⬜ | — | | | |
+| SUBJECT-03 | Create subject from chat (classifier miss) | ⬜ | — | | | |
+| CC-01 | Conversation-stage chips + feedback gating | ⬜ | — | | | |
+| CC-02 | Greeting-aware subject classification | ⬜ | — | | | |
+
+---
+
+## Batch 6 — Library, Books, Topics
+
+**State required:** Slot C with several subjects (broad + focused) and at least one book.
+**Estimated time:** 30–45 min.
+
+| ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| LEARN-08 | Library root (shelves / books / topics tabs) | ⬜ | — | | | |
+| LEARN-09 | Subject shelf → book selection | ⬜ | — | | | |
+| LEARN-10 | Book detail + start learning from book | ⬜ | — | | | |
+| LEARN-11 | Manage subject status (active / paused / archived) | ⬜ | — | | | |
+| LEARN-12 | Topic detail | ⬜ | — | | | |
+| ACCOUNT-18 | Subject analogy preference after setup | ⬜ | — | | | |
+
+---
+
+## Batch 7 — Retention & Recall
+
+**State required:** Slot C with overdue topics (force-age data via dev tools or wait).
+**Estimated time:** 45 min.
+
+| ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| LEARN-13 | Recall check | ⬜ | — | | | |
+| LEARN-14 | Failed recall remediation | ⬜ | — | | | |
+| LEARN-15 | Relearn flow (same / different method) | ⬜ | — | | | |
+| LEARN-16 | Retention review (library + retention surfaces) | ⬜ | — | | | |
+
+---
+
+## Batch 8 — Progress, Milestones, Vocabulary
+
+**State required:** Slot C with multi-day learning history (streak ≥ 2, ≥ 1 milestone unlocked, ≥ 1 language subject for vocab).
+**Estimated time:** 30 min.
+
+| ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| LEARN-17 | Progress overview tab | ⬜ | — | | | |
+| LEARN-18 | Subject progress detail | ⬜ | — | | | |
+| LEARN-19 | Streak display | ⬜ | — | | | |
+| LEARN-20 | Milestones list | ⬜ | — | | | |
+| LEARN-21 | Cross-subject vocabulary browser | ⬜ | — | | | |
+| LEARN-22 | Per-subject vocabulary list (delete + CEFR/word badges) | ⬜ | — | | | |
+
+---
+
+## Batch 9 — Practice Hub & Quiz
+
+**State required:** Slot C. For PRACTICE-04, needs a profile with no overdue topics. For QUIZ-08, needs Slot J (quota-capped) at end of batch.
+**Estimated time:** 90 min.
+
+| ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| PRACTICE-01 | Practice hub menu | ⬜ | — | | | |
+| PRACTICE-02 | Review topics shortcut | ⬜ | — | | | |
+| PRACTICE-03 | Recitation session | ⬜ | — | | | |
+| PRACTICE-04 | "All caught up" empty state with countdown | ⬜ | — | | | |
+| QUIZ-01 | Quiz activity picker (Capitals / Vocab / Guess Who) | ⬜ | — | | | |
+| QUIZ-02 | Round generation loading + 20s "still trying" hint | ⬜ | — | | | |
+| QUIZ-03 | Round play — multiple choice | ⬜ | — | | | |
+| QUIZ-04 | Round play — Guess Who clue reveal | ⬜ | — | | | |
+| QUIZ-05 | Mid-round quit with confirm | ⬜ | — | | | |
+| QUIZ-06 | Round complete error retry | ⬜ | — | | | |
+| QUIZ-07 | Results screen (celebration tier + soft-fail streak) | ⬜ | — | | | |
+| QUIZ-08 | Quota / consent / forbidden typed errors | ⬜ | — | | | |
+| QUIZ-09 | Quiz history (grouping + empty state) | ⬜ | — | | | |
+| QUIZ-10 | Quiz round detail (per-question review) | ⬜ | — | | | |
+| CC-10 | Soft-fail side effects on completion | ⬜ | — | | | |
+
+---
+
+## Batch 10 — Dictation
+
+**State required:** Slot C with an active language subject (target language sentences). Camera permission for DICT-07.
+**Estimated time:** 60 min.
+
+| ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| DICT-01 | Choice screen (text vs surprise) | ⬜ | — | | | |
+| DICT-02 | OCR text preview + edit (homework path) | ⬜ | — | | | |
+| DICT-03 | "Surprise me" LLM-generated dictation | ⬜ | — | | | |
+| DICT-04 | Playback (TTS, pace, punctuation, repeat, tap-pause) | ⬜ | — | | | |
+| DICT-05 | Mid-dictation exit confirm dialog | ⬜ | — | | | |
+| DICT-06 | Completion screen | ⬜ | — | | | |
+| DICT-07 | Photo review of handwritten dictation (vision LLM) | ⬜ | — | | | |
+| DICT-08 | Sentence-level remediation | ⬜ | — | | | |
+| DICT-09 | Perfect-score celebration | ⬜ | — | | | |
+| DICT-10 | Recording dictation result + retry | ⬜ | — | | | |
+
+---
+
+## Batch 11 — Homework
+
+**State required:** Slot C, camera + gallery permissions. Have a printed/written page handy.
+**Estimated time:** 45 min.
+
+| ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| HOMEWORK-01 | Start homework from home / More | ⬜ | — | | | |
+| HOMEWORK-02 | Camera permission, capture, preview, OCR | ⬜ | — | | | |
+| HOMEWORK-03 | Manual fallback when OCR is weak | ⬜ | — | | | |
+| HOMEWORK-04 | Homework session multi-problem nav | ⬜ | — | | | |
+| HOMEWORK-05 | Gallery import | ⬜ | — | | | |
+| HOMEWORK-06 | Image pass-through to multimodal LLM | ⬜ | — | | | |
+| SUBJECT-04 | Create subject from homework branch | ⬜ | — | | | |
+
+---
+
+## Batch 12 — Account, Settings, Mentor Memory, Sign-out
+
+**State required:** Slot C signed in.
+**Estimated time:** 45 min.
+
+| ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| ACCOUNT-07 | Push notifications + weekly digest toggles | ⬜ | — | | | |
+| ACCOUNT-08 | Learning mode + celebration preferences | ⬜ | — | | | |
+| ACCOUNT-09 | Change password | ⬜ | — | | | |
+| ACCOUNT-10 | Export my data | ⬜ | — | | | |
+| ACCOUNT-13 | Privacy policy | ⬜ | — | | | |
+| ACCOUNT-14 | Terms of service | ⬜ | — | | | |
+| ACCOUNT-15 | Self mentor memory | ⬜ | — | | | |
+| AUTH-10 | Sign out | ⬜ | — | | | |
+| AUTH-11 | Session-expired forced sign-out | ⬜ | — | | | |
+
+---
+
+## Batch 13 — Account Deletion Lifecycle
+
+**State required:** Slot K (account that can be safely deleted). Run last among the learner batches because it terminates the session.
+**Estimated time:** 20 min.
+
+| ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| ACCOUNT-11 | Delete account with 7-day grace | ⬜ | — | | | |
+| ACCOUNT-12 | Cancel scheduled deletion | ⬜ | — | | | |
+
+---
+
+## Batch 14 — Parent Setup, Adding Children, Family Gating
+
+**State required:** Slot F (parent owner, Family plan, 0 children). End-state: Slot G with 1 child added.
+**Estimated time:** 45 min.
+
+| ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| HOME-07 | Add-first-child gate | ⬜ | — | | | |
+| ACCOUNT-02 | Create additional profile (generic) | ⬜ | — | | | |
+| ACCOUNT-03 | Add child profile from More / Profiles | ⬜ | — | | | |
+| ACCOUNT-05 | Family-plan + max-profile gating | ⬜ | — | | | |
+| ACCOUNT-25 | Parent consent management for a child | ⬜ | — | | | |
+| ACCOUNT-16 | Child mentor memory | ⬜ | — | | | |
+| ACCOUNT-17 | Child memory consent prompt | ⬜ | — | | | |
+
+---
+
+## Batch 15 — Parent Dashboard & Drill-Downs
+
+**State required:** Slot H (parent, ≥ 2 children with active learning history). Demo dashboard tested in same batch.
+**Estimated time:** 75 min.
+
+| ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| HOME-02 | Parent gateway home | ⬜ | — | | | |
+| HOME-03 | Parent tabs and parent-mode navigation | ⬜ | — | | | |
+| PARENT-01 | Parent dashboard (live + demo) | ⬜ | — | | | |
+| PARENT-02 | Multi-child dashboard | ⬜ | — | | | |
+| PARENT-03 | Child detail drill-down | ⬜ | — | | | |
+| PARENT-04 | Child subject → topic drill-down | ⬜ | — | | | |
+| PARENT-05 | Child session / transcript drill-down | ⬜ | — | | | |
+| PARENT-06 | Child monthly reports list + report detail | ⬜ | — | | | |
+| PARENT-07 | Parent library view | ⬜ | — | | | |
+| PARENT-08 | Subject raw-input audit | ⬜ | — | | | |
+| PARENT-09 | Guided label tooltip | ⬜ | — | | | |
+| PARENT-10 | Child-topic "Understanding" card + gated retention | ⬜ | — | | | |
+| PARENT-11 | Child-session recap (narrative + clipboard + chip) | ⬜ | — | | | |
+| PARENT-12 | Child-subject detail retention badges (data-gated) | ⬜ | — | | | |
+| CC-07 | Accommodation badge surfaces | ⬜ | — | | | |
+| CC-08 | Parent-facing metric vocabulary canon | ⬜ | — | | | |
+
+---
+
+## Batch 16 — Billing & Monetization
+
+**State required:** Slot I (trialing) for upgrade flows; Slot J (quota-capped) for paywall; Slot G child profile for child paywall. RevenueCat sandbox account on device.
+**Estimated time:** 60 min. **Risk:** Apple/Google store gating — some flows may be 🚫 Blocked.
+
+| ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| BILLING-01 | Subscription screen + current-plan details | ⬜ | — | | | |
+| BILLING-02 | Upgrade plan purchase flow | ⬜ | — | | | |
+| BILLING-03 | Trial / plan usage / family-pool detail | ⬜ | — | | | |
+| BILLING-04 | Restore purchases | ⬜ | — | | | |
+| BILLING-05 | Manage billing deep link | ⬜ | — | | | |
+| BILLING-06 | Child paywall + notify-parent | ⬜ | — | | | |
+| BILLING-07 | Daily quota exceeded paywall | ⬜ | — | | | |
+| BILLING-08 | Family pool visibility | ⬜ | — | | | |
+| BILLING-09 | Top-up question credits | ⬜ | — | | | |
+| BILLING-10 | BYOK waitlist | ⬜ | — | | | |
+| CC-06 | Top-up purchase confidence (two-stage polling) | ⬜ | — | | | |
+
+---
+
+## Batch 17 — Cross-Cutting Final Pass
+
+**State required:** Web preview + native (Galaxy S10e). This is a *visual / behavioural* sweep across screens already tested in earlier batches; only file new bugs if not already caught.
+**Estimated time:** 30 min.
+
+| ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| CC-03 | Animation polish (icon, intent cards, celebrations) | ⬜ | — | | | |
+| CC-04 | `goBackOrReplace` on every back button | ⬜ | — | | | |
+| CC-09 | Opaque web layout backgrounds | ⬜ | — | | | |
+
+---
+
+## Batch 18 — Regression Smoke Set
+
+**State required:** Slot C; some flows have specific reproduction states embedded in the YAML.
+**Estimated time:** 45 min.
+
+| ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| QA-01 | Quick smoke check | ⬜ | — | | | |
+| QA-02 | Post-auth comprehensive smoke | ⬜ | — | | | |
+| QA-03 | Chat classifier regression (easter / suggestion) | ⬜ | — | | | |
+| QA-04 | Chat subject picker regression | ⬜ | — | | | |
+| QA-05 | Return to chat after creating a subject | ⬜ | — | | | |
+| QA-06 | Focused-book generation regression | ⬜ | — | | | |
+| QA-07 | Tab-bar leak regression | ⬜ | — | | | |
+| QA-08 | Parent add-child regression | ⬜ | — | | | |
+| QA-09 | Consent email URL regression | ⬜ | — | | | |
+
+---
+
+## Discovered Flows (Not in Inventory)
+
+If a flow is found in the app but is missing from `mobile-app-flow-inventory.md`, add it here AND in the inventory in the same edit. Use a temporary ID `DISC-NN` until the inventory assigns a real ID.
+
+| Temp ID | Flow | Found in batch | Routes / entry points | Inventory updated | Notes |
+| --- | --- | --- | --- | --- | --- |
+| _none yet_ | | | | | |
+
+### Likely candidates to look for during testing
+
+The 2026-04-19 inventory snapshot pre-dates several branches. Be alert for:
+
+- Notion bug-fix branch work on `notion-bugfix-2026-04-30` — recent Found-In tags may point at flows that were not catalogued.
+- New screens under `apps/mobile/src/app/(app)` that are not referenced anywhere in the inventory tables.
+- New `_components/` or `_hooks/` siblings that signal new feature surfaces.
+- Any screen with testIDs not mentioned in the inventory.
+
+Quick sanity check before each batch: `git log --since="2026-04-19" --name-only --pretty=format: -- apps/mobile/src/app/ | sort -u` to spot files added since the snapshot.
+
+---
+
+## Master Roll-Up
+
+Update this once a batch is complete to track overall progress.
+
+| Batch | Section | Items | Status | Notes |
+| --- | --- | --- | --- | --- |
+| 1  | Pre-auth & Auth          | 12 | ⬜ |  |
+| 2  | First Profile + Consent  |  9 | ⬜ |  |
+| 3  | Subject Onboarding       | 11 | ⬜ |  |
+| 4  | Learner Home + Resume    |  6 | ⬜ |  |
+| 5  | Core Learning Sessions   | 11 | ⬜ |  |
+| 6  | Library, Books, Topics   |  6 | ⬜ |  |
+| 7  | Retention & Recall       |  4 | ⬜ |  |
+| 8  | Progress / Vocab         |  6 | ⬜ |  |
+| 9  | Practice Hub + Quiz      | 15 | ⬜ |  |
+| 10 | Dictation                | 10 | ⬜ |  |
+| 11 | Homework                 |  7 | ⬜ |  |
+| 12 | Account / Settings       |  9 | ⬜ |  |
+| 13 | Account Deletion         |  2 | ⬜ |  |
+| 14 | Parent Setup + Children  |  7 | ⬜ |  |
+| 15 | Parent Dashboard         | 16 | ⬜ |  |
+| 16 | Billing                  | 11 | ⬜ |  |
+| 17 | Cross-Cutting Final Pass |  3 | ⬜ |  |
+| 18 | Regression Smoke         |  9 | ⬜ |  |
+| **Total** | | **154** | | Discovered flows tracked separately |
+
+### Coverage Audit
+
+Cross-check after Batch 18: every inventory ID must appear in exactly one batch table or in Discovered Flows.
+
+- AUTH-01..12 → Batches 1, 12 (sign out, expired)
+- ACCOUNT-01..26 → Batches 2, 4, 12, 13, 14
+- HOME-01..08 → Batches 1, 4, 14, 15
+- SUBJECT-01..15 → Batches 3, 5, 11
+- LEARN-01..22 → Batches 5, 6, 7, 8
+- PRACTICE-01..04 → Batch 9
+- QUIZ-01..10 → Batch 9
+- DICT-01..10 → Batch 10
+- HOMEWORK-01..06 → Batch 11
+- PARENT-01..12 → Batch 15
+- BILLING-01..10 → Batch 16
+- QA-01..09 → Batch 18
+- CC-01..10 → Batches 4 (CC-05), 5 (CC-01, CC-02), 9 (CC-10), 15 (CC-07, CC-08), 16 (CC-06), 17 (CC-03, CC-04, CC-09)
