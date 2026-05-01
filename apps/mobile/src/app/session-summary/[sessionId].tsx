@@ -898,8 +898,10 @@ export default function SessionSummaryScreen() {
         {/* [BUG-889] Returning learners had no path to the actual chat history.
             The transcript exists server-side and powers session resume; this
             link surfaces it in a read-only screen so the learner can scroll
-            back through what was discussed. */}
-        {sessionId ? (
+            back through what was discussed.
+            [CR-PR129-M5] Hide transcript in parent-proxy mode: parents have
+            read-only summary access only and must not see the full chat log. */}
+        {!isParentProxy && sessionId ? (
           <Pressable
             onPress={() => {
               router.push({

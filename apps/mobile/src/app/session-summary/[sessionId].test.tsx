@@ -729,6 +729,29 @@ describe('SessionSummaryScreen', () => {
     });
   });
 
+  // [CR-PR129-M5] Transcript privacy boundary: parents viewing a child's
+  // session in proxy mode must not see the full chat transcript.
+  describe('transcript link visibility [CR-PR129-M5]', () => {
+    it('shows the transcript link when the viewer is the session owner (proxy OFF)', () => {
+      // Default mockUseParentProxy returns isParentProxy: false (set in beforeEach).
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      expect(screen.getByTestId('view-transcript-cta')).toBeTruthy();
+    });
+
+    it('hides the transcript link in parent-proxy mode so parents cannot read the full chat', () => {
+      mockUseParentProxy.mockReturnValue({
+        isParentProxy: true,
+        childProfile: { id: 'p-1', birthYear: 2012 } as never,
+        parentProfile: { id: 'parent-1', isOwner: true } as never,
+      });
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      expect(screen.queryByTestId('view-transcript-cta')).toBeNull();
+    });
+  });
+
   // BUG-449: revisiting a past session (Library → Shelf → Book → tap session)
   // must render the already-saved summary, not the empty "Your Words" prompt.
   describe('revisiting a session with an already-persisted summary [BUG-449]', () => {
