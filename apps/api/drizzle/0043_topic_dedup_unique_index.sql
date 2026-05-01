@@ -21,3 +21,16 @@
 
 CREATE UNIQUE INDEX IF NOT EXISTS "curriculum_topics_book_title_lower_uq"
   ON "curriculum_topics" ("book_id", lower("title"));
+
+-- ## Rollback
+-- Non-destructive: DROP INDEX does not delete any rows.
+-- Data-safe: YES — no data is lost by removing the index.
+--
+-- To reverse this migration:
+--   DROP INDEX IF EXISTS "curriculum_topics_book_title_lower_uq";
+--
+-- Caveat: if the constraint has already rejected duplicate INSERTs between
+-- deploy and rollback, those rejected rows were never written. Rolling back
+-- the index does NOT restore them — callers that received a conflict error
+-- must retry their inserts after the rollback. This is inherent to any
+-- uniqueness constraint and is not recoverable from the DB side.
