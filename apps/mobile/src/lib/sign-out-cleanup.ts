@@ -19,13 +19,19 @@ import { sanitizeSecureStoreKey } from './secure-storage';
 // Per-profile key constructors. Each takes a profileId and returns the exact
 // SecureStore key. Keep these in sync with the writers — if a writer changes
 // its key shape, this list must too. Cross-references included so future
-// readers can verify against the writer.
-const PER_PROFILE_KEYS: ReadonlyArray<(profileId: string) => string> = [
-  // EarlyAdopterCard.tsx — `earlyAdopterDismissed_${profileId}`
+// readers can verify against the writer. The companion meta-test
+// (sign-out-cleanup-registry.test.ts) scans the codebase for
+// SecureStore.setItemAsync callsites and fails if any key shape isn't
+// covered here, in GLOBAL_KEYS, or in the documented exceptions list.
+//
+// IMPORTANT: when exporting this array, keep it as `export` so tests can
+// introspect; the export is purely for test enforcement.
+export const PER_PROFILE_KEYS: ReadonlyArray<(profileId: string) => string> = [
+  // EarlyAdopterCard.tsx — DISMISSED_KEY: `earlyAdopterDismissed_${profileId}`
   (id) => `earlyAdopterDismissed_${id}`,
-  // BookmarkNudgeTooltip.tsx — `bookmark-nudge-shown:${profileId}`
+  // BookmarkNudgeTooltip.tsx — getBookmarkNudgeKey: `bookmark-nudge-shown:${profileId}`
   (id) => `bookmark-nudge-shown:${id}`,
-  // use-dictation-preferences.ts — pace + punctuation
+  // use-dictation-preferences.ts — getPaceKey + getPunctKey
   (id) => `dictation-pace-${id}`,
   (id) => `dictation-punctuation-${id}`,
   // use-rating-prompt.ts — current + legacy (different separator)
@@ -33,19 +39,61 @@ const PER_PROFILE_KEYS: ReadonlyArray<(profileId: string) => string> = [
   (id) => `rating-last-prompt-${id}`,
   (id) => `rating-recall-success-count:${id}`,
   (id) => `rating-last-prompt:${id}`,
-  // session-recovery.ts — sanitized `session-recovery-marker-${profileId}`
+  // session-recovery.ts — getRecoveryKey, sanitized
   (id) => sanitizeSecureStoreKey(`session-recovery-marker-${id}`),
+  // [CR-SECURESTORE-REGISTRY-11] Previously-unregistered keys (BUG-723 leak).
+  // (app)/_layout.tsx — postApprovalSeen flag per profile
+  (id) => `postApprovalSeen_${id}`,
+  // (app)/subscription.tsx — getNotifyStorageKey: child-paywall notify timestamp
+  (id) => `child-paywall-notified-at-${id}`,
+  // use-permission-setup.ts — permissionSetupSeen flag, sanitized
+  (id) => sanitizeSecureStoreKey(`permissionSetupSeen_${id}`),
+  // session-types.ts — getInputModeKey, sanitized
+  (id) => sanitizeSecureStoreKey(`voice-input-mode-${id}`),
 ];
 
 // Global keys that should reset when no one is signed in. Excludes onboarding
 // flags that legitimately survive sign-out cycles (e.g., a user who signs out
 // to switch accounts on the same device should not be prompted to re-onboard).
-const GLOBAL_KEYS: ReadonlyArray<string> = [
-  'hasSignedInBefore', // sign-in.tsx — guards "Welcome back" copy
+export const GLOBAL_KEYS: ReadonlyArray<string> = [
+  'hasSignedInBefore', // sign-in.tsx HAS_SIGNED_IN_KEY — "Welcome back" gate
   'mentomate_pending_auth_redirect', // pending-auth-redirect.ts
   sanitizeSecureStoreKey('parent-proxy-active'), // use-parent-proxy.ts / profile.ts
   'session-recovery-marker', // session-recovery.ts (un-keyed legacy form)
   sanitizeSecureStoreKey('mentomate_active_profile_id'), // profile.ts ACTIVE_PROFILE_KEY
+  // [CR-SECURESTORE-REGISTRY-11] Previously-unregistered. BYOK waitlist is
+  // account-scoped (see BUG-399 comment in subscription.tsx) — clears on sign-out.
+  'byok-waitlist-joined',
+];
+
+// [CR-SECURESTORE-REGISTRY-11] Documented exceptions — callsites that the
+// meta-test should ignore. Each entry must justify why the key is NOT in
+// the registry. If a future writer is added that doesn't fit one of these
+// categories, register its key shape above instead of expanding this list.
+export const REGISTRY_EXCEPTIONS: ReadonlyArray<{
+  file: string;
+  reason: string;
+}> = [
+  {
+    file: 'apps/mobile/src/lib/secure-storage.ts',
+    reason:
+      'Wrapper module — calls ExpoSecureStore.setItemAsync directly. Not a callsite that writes app data.',
+  },
+  {
+    file: 'apps/mobile/src/lib/migrate-secure-store-key.ts',
+    reason:
+      'One-shot migration helper that copies arbitrary oldKey→newKey. Both keys are caller-supplied — registration belongs at the call site of the migration, not here.',
+  },
+  {
+    file: 'apps/mobile/src/app/_layout.tsx',
+    reason:
+      'Clerk tokenCache adapter — keys are Clerk-internal session/JWT tokens, not app data. Clerk manages their lifecycle; signOut() drops them via the SDK.',
+  },
+  {
+    file: 'apps/mobile/src/lib/summary-draft.ts',
+    reason:
+      'Drafts use getDraftKey(profileId, sessionId) — multi-key shape with sessionId we cannot enumerate at sign-out. Drafts self-expire via DRAFT_TTL_MS (7d) on next read, so leakage is bounded; document and accept rather than register a prefix-wipe (expo-secure-store has no listKeys API).',
+  },
 ];
 
 /**
