@@ -8,13 +8,14 @@
 #
 # testIDs verified against:
 #   - apps/mobile/src/app/(app)/_layout.tsx (tab-progress)
-#   - apps/mobile/src/app/(app)/progress/index.tsx (progress-keep-learning)
+#   - apps/mobile/src/app/(app)/progress/index.tsx (progress-keep-learning,
+#     progress-streak-count)
 #
 # NOTE: streak-badge was removed from the home screen header. The streak count
-# is now rendered as plain text "{n}-day streak" inside a View on the Progress
-# tab — it has no testID, so we assert by text match. The text is only rendered
-# in the full progress view (not the new-learner teaser), which requires enough
-# sessions to exit the new-learner gate. The learning-active seed provides this.
+# is now rendered as "{n}-day streak" inside the progress-streak-count pill.
+# The pill is only rendered in the full progress view (not the new-learner
+# teaser), which requires enough sessions to exit the new-learner gate.
+# The learning-active seed provides this.
 appId: com.mentomate.app
 tags:
   - nightly
@@ -47,12 +48,9 @@ tags:
 # 5. Screenshot: Progress tab
 - takeScreenshot: streak-display-01-progress-tab
 
-# 6. Verify streak count text is visible.
-#    Rendered as "{n}-day streak" plain text in the stats pills section.
-#    Uses "day streak" partial match — Maestro can find substrings in Text nodes.
+# 6. Verify streak count pill is visible (mandatory — feature under test).
 - assertVisible:
-    text: "day streak"
-    optional: true
+    id: "progress-streak-count"
 
 - takeScreenshot: streak-display-02-streak-visible
 
