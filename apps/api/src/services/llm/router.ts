@@ -204,7 +204,7 @@ function withSafetyPreamble(
 export const MIN_REPLY_MAX_TOKENS = 8192;
 
 function getModelConfig(
-  _rung: EscalationRung,
+  rung: EscalationRung,
   llmTier: LLMTier = 'standard'
 ): ModelConfig {
   // Premium tier: route to Anthropic Sonnet when the provider is registered.
@@ -222,7 +222,7 @@ function getModelConfig(
   // ceiling is the same in both; rung now only governs MODEL choice, not
   // token budget. [BUG-875]
   const useGemini = providers.has('gemini');
-  const isLight = llmTier === 'flash' || _rung <= 2;
+  const isLight = llmTier === 'flash' || rung <= 2;
 
   if (isLight) {
     if (useGemini) {

@@ -1246,7 +1246,7 @@ describe('session routes', () => {
       // Route MUST emit a typed `fallback` frame (not `done` with raw JSON).
       expect(body).toContain('"type":"fallback"');
       expect(body).toContain('"reason":"malformed_envelope"');
-      expect(body).toContain("tap to try again");
+      expect(body).toContain('tap to try again');
 
       // Route MUST refund quota since the exchange was not persisted.
       expect(mockIncrementQuota).toHaveBeenCalledWith(
@@ -1258,7 +1258,9 @@ describe('session routes', () => {
     // [BUG-941] Variant: empty_reply reason from a valid but empty-reply envelope.
     it('[BUG-941] emits empty_reply fallback frame when onComplete reports empty_reply', async () => {
       (streamMessage as jest.Mock).mockResolvedValueOnce({
-        stream: (async function* () {})(),
+        stream: (async function* () {
+          yield* [];
+        })(),
         onComplete: jest.fn().mockResolvedValue({
           exchangeCount: 0,
           escalationRung: 1,
