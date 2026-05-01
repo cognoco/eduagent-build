@@ -1,7 +1,7 @@
 # Flow: Empty First User — Brand-new user with 0 subjects
-# Validates: user with completed onboarding but no subjects is redirected to
-# the create-subject screen, can enter a subject name, and is navigated to the
-# onboarding interview where the AI greeting appears.
+# Validates: user with completed onboarding but no subjects can tap the
+# intent-learn card on home, reach the create-subject screen, enter a
+# subject name, and arrive at the onboarding interview with chat-input.
 # Tags: nightly, edge, onboarding
 #
 # Journey: UX Journey 1 (First-time User Onboarding)
@@ -11,16 +11,17 @@
 #                consent granted, but 0 subjects)
 #
 # testIDs verified against:
-#   - apps/mobile/src/app/(learner)/home.tsx (redirects to /create-subject when 0 subjects)
-#   - apps/mobile/src/app/create-subject.tsx (create-subject-name, create-subject-submit,
-#     create-subject-cancel)
-#   - apps/mobile/src/app/(learner)/onboarding/interview.tsx (chat-input, ChatShell)
+#   - apps/mobile/src/components/home/LearnerScreen.tsx (intent-learn card,
+#     pushes to /create-subject)
+#   - apps/mobile/src/app/(app)/_layout.tsx (PostApprovalLanding, shown only
+#     when subjects empty AND SecureStore postApprovalSeen flag missing)
+#   - apps/mobile/src/app/create-subject.tsx (create-subject-name,
+#     create-subject-submit, create-subject-cancel)
+#   - apps/mobile/src/components/session/ChatShell.tsx (chat-input)
 #
-# NOTE: The seed-and-sign-in setup flow waits for id: "learner-screen" as its
-# final step. With 0 subjects, the home screen immediately redirects to
-# /create-subject. The setup flow's last wait may timeout — that's expected.
-# Auth is still completed by that point. We add our own extended wait for
-# the create-subject screen.
+# NOTE: There is NO auto-redirect from home → create-subject when subjects=0.
+# The home screen renders LearnerScreen with intent-learn (the "Learn" card),
+# which pushes to /create-subject when tapped. This flow taps that card.
 #
 # BUG-34: onboarding-complete now includes a subject (to keep learner-screen
 # visible for other flows). Use onboarding-no-subject for the empty-state test.
@@ -56,14 +57,22 @@ tags:
     # Only present if PostApprovalLanding appeared (see step above)
     optional: true
 
-# 2. Wait for create-subject screen — home.tsx redirects here when subjects=0.
-#    After sign-in → PostApproval → home → redirect to create-subject.
-#    Increased from 20s to 30s: auth + PostApproval dismiss + home redirect
-#    chain takes ~15-20s on WHPX emulator.
+# 2. Wait for the LearnerScreen to render after PostApproval dismiss.
+- extendedWaitUntil:
+    visible:
+      id: "learner-screen"
+    timeout: 30000
+
+# 2b. Tap the Learn intent card to navigate to /create-subject.
+#     LearnerScreen.tsx pushes to /create-subject on intent-learn press.
+- tapOn:
+    id: "intent-learn"
+
+# 2c. Wait for create-subject screen.
 - extendedWaitUntil:
     visible:
       id: "create-subject-name"
-    timeout: 30000
+    timeout: 15000
 
 # 3. Verify "New subject" heading is visible
 # Keyboard autoFocus may push heading above fold on small screens (BUG-60)
