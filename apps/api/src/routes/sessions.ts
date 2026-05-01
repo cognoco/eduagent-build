@@ -21,6 +21,7 @@ import { learningSessions, type Database } from '@eduagent/database';
 import { and, eq, lt, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { AuthUser } from '../middleware/auth';
+import { idempotencyPreflight } from '../middleware/idempotency';
 import { requireProfileId } from '../middleware/profile-scope';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
 import { streamSSEUtf8 } from '../services/streaming/sse-utf8';
@@ -61,6 +62,7 @@ import {
 } from '../services/interleaved';
 import { generateRecallBridge } from '../services/recall-bridge';
 import { getProfileAgeBracket } from '../services/profile';
+import { markPersisted } from '../services/idempotency-marker';
 
 const logger = createLogger();
 const retryFilingParamsSchema = z.object({
@@ -72,6 +74,7 @@ type SessionRouteEnv = {
     DATABASE_URL: string;
     CLERK_JWKS_URL?: string;
     VOYAGE_API_KEY?: string;
+    IDEMPOTENCY_KV?: KVNamespace;
   };
   Variables: {
     user: AuthUser;
@@ -83,6 +86,11 @@ type SessionRouteEnv = {
 };
 
 export const sessionRoutes = new Hono<SessionRouteEnv>()
+  .use('/sessions/:sessionId/stream', idempotencyPreflight({ flow: 'session' }))
+  .use(
+    '/sessions/:sessionId/messages',
+    idempotencyPreflight({ flow: 'session' })
+  )
   .get('/sessions/resume-nudge', async (c) => {
     const db = c.get('db');
     const profileId = requireProfileId(c.get('profileId'));
@@ -186,6 +194,8 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const subscriptionId = c.get('subscriptionId');
+      const sessionId = c.req.param('sessionId');
+      const clientId = c.req.header('Idempotency-Key')?.trim() || undefined;
 
       const llmTier = c.get('llmTier');
 
@@ -193,10 +203,16 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         const result = await processMessage(
           db,
           profileId,
-          c.req.param('sessionId'),
+          sessionId,
           c.req.valid('json'),
-          { llmTier, voyageApiKey: c.env.VOYAGE_API_KEY }
+          { llmTier, voyageApiKey: c.env.VOYAGE_API_KEY, clientId }
         );
+        await markPersisted({
+          kv: c.env.IDEMPOTENCY_KV,
+          profileId,
+          flow: 'session',
+          key: clientId,
+        });
         return c.json(result);
       } catch (err) {
         if (err instanceof SessionExchangeLimitError) {
@@ -299,6 +315,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       const subscriptionId = c.get('subscriptionId');
       const sessionId = c.req.param('sessionId');
       const input = c.req.valid('json');
+      const clientId = c.req.header('Idempotency-Key')?.trim() || undefined;
 
       const session = await getSession(db, profileId, sessionId);
       if (!session) return notFound(c, 'Session not found');
@@ -311,7 +328,11 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
           profileId,
           sessionId,
           input,
-          { llmTier, voyageApiKey: c.env.VOYAGE_API_KEY }
+          {
+            llmTier,
+            voyageApiKey: c.env.VOYAGE_API_KEY,
+            clientId,
+          }
         );
 
         return streamSSEUtf8(c, async (sseStream) => {
@@ -414,6 +435,12 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                 fluencyDrill: result.fluencyDrill || undefined,
                 confidence: result.confidence || undefined,
               }),
+            });
+            await markPersisted({
+              kv: c.env.IDEMPOTENCY_KV,
+              profileId,
+              flow: 'session',
+              key: clientId,
             });
           } catch (err) {
             // [logging sweep] structured logger so PII fields land as JSON context

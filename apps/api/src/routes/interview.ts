@@ -26,6 +26,12 @@ import {
   persistCurriculum,
   buildDraftResumeSummary,
 } from '../services/interview';
+import {
+  appendInterviewAssistantExchange,
+  appendInterviewUserExchange,
+} from '../services/onboarding/exchange-history-writer';
+import { idempotencyPreflight } from '../middleware/idempotency';
+import { markPersisted } from '../services/idempotency-marker';
 import { notFound } from '../errors';
 import { captureException } from '../services/sentry';
 
@@ -38,6 +44,7 @@ type InterviewRouteEnv = {
     // the binding as a raw string, but env-validation middleware guarantees
     // it's one of these two values at runtime.
     EMPTY_REPLY_GUARD_ENABLED?: 'true' | 'false';
+    IDEMPOTENCY_KV?: KVNamespace;
   };
   Variables: {
     user: AuthUser;
@@ -51,6 +58,14 @@ type InterviewStreamRouteResult = InterviewResult & {
 };
 
 export const interviewRoutes = new Hono<InterviewRouteEnv>()
+  .use(
+    '/subjects/:subjectId/interview/stream',
+    idempotencyPreflight({ flow: 'interview' })
+  )
+  .use(
+    '/subjects/:subjectId/interview/complete',
+    idempotencyPreflight({ flow: 'interview' })
+  )
   // Start or continue an interview for a subject
   .post(
     '/subjects/:subjectId/interview',
@@ -62,6 +77,7 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
       const subjectId = c.req.param('subjectId');
       const { message } = c.req.valid('json');
       const bookId = c.req.query('bookId');
+      const clientId = c.req.header('Idempotency-Key')?.trim() || undefined;
 
       const subject = await getSubject(db, profileId, subjectId);
       if (!subject) return notFound(c, 'Subject not found');
@@ -90,11 +106,11 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
         learnerName,
       });
 
-      const updatedHistory = [
-        ...draft.exchangeHistory,
-        { role: 'user' as const, content: message },
-        { role: 'assistant' as const, content: result.response },
-      ];
+      const updatedHistory = appendInterviewAssistantExchange(
+        appendInterviewUserExchange(draft.exchangeHistory, message, clientId),
+        result.response,
+        clientId
+      );
 
       if (result.isComplete) {
         // Save history first without marking complete — if persistCurriculum
@@ -126,6 +142,13 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
         });
       }
 
+      await markPersisted({
+        kv: c.env.IDEMPOTENCY_KV,
+        profileId,
+        flow: 'interview',
+        key: clientId,
+      });
+
       return c.json({
         response: result.response,
         isComplete: result.isComplete,
@@ -144,6 +167,7 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
       const subjectId = c.req.param('subjectId');
       const { message } = c.req.valid('json');
       const bookId = c.req.query('bookId');
+      const clientId = c.req.header('Idempotency-Key')?.trim() || undefined;
 
       const subject = await getSubject(db, profileId, subjectId);
       if (!subject) return notFound(c, 'Subject not found');
@@ -239,11 +263,15 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
             // a metered flow; mirror the quotaRefunded guard in sessions.ts.
           }
 
-          const updatedHistory = [
-            ...draft.exchangeHistory,
-            { role: 'user' as const, content: message },
-            { role: 'assistant' as const, content: result.response },
-          ];
+          const updatedHistory = appendInterviewAssistantExchange(
+            appendInterviewUserExchange(
+              draft.exchangeHistory,
+              message,
+              clientId
+            ),
+            result.response,
+            clientId
+          );
 
           if (result.isComplete) {
             // Save history first without marking complete — if persistCurriculum
@@ -276,6 +304,13 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
               exchangeHistory: updatedHistory,
             });
           }
+
+          await markPersisted({
+            kv: c.env.IDEMPOTENCY_KV,
+            profileId,
+            flow: 'interview',
+            key: clientId,
+          });
 
           await sseStream.writeSSE({
             data: JSON.stringify({

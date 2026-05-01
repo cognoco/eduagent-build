@@ -24,14 +24,8 @@ export default [
   ...reactConfig,
   {
     files: ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx'],
-    rules: {
-      // jsx-a11y/aria-role inherits from nx flat/react and treats every
-      // `role="..."` JSX prop as an ARIA attribute, which is wrong for
-      // custom components that happen to expose a `role` prop (e.g.
-      // `<MessageBubble role="assistant" />`). ignoreNonDOM scopes the
-      // check to lowercase intrinsic elements where ARIA actually applies.
-      'jsx-a11y/aria-role': ['warn', { ignoreNonDOM: true }],
-    },
+    // Override or add rules here
+    rules: {},
   },
   // Require visible error handling on every mutateAsync() call.
   {
@@ -50,15 +44,9 @@ export default [
       'src/lib/design-tokens.ts',
       'src/**/*.test.ts',
       'src/**/*.test.tsx',
-      // Brand graphics — hex IS the brand asset (precedent set by AnimatedSplash).
       'src/components/AnimatedSplash.tsx',
       'src/components/common/BrandCelebration.tsx',
-      'src/components/common/MagicPenAnimation.tsx',
       'src/components/MentomateLogo.tsx',
-      // Error-boundary fallbacks — render before ThemeProvider is mounted,
-      // so they cannot use the React-Context-driven theme tokens.
-      'src/app/_layout.tsx',
-      'src/app/(app)/session/index.tsx',
     ],
     rules: {
       'no-restricted-syntax': [

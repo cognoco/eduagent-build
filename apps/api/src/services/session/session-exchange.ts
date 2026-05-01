@@ -853,8 +853,13 @@ export async function persistExchangeResult(
   userMessage: string,
   aiResponse: string,
   effectiveRung: EscalationRung,
-  behavioral?: Partial<ExchangeBehavioralMetrics>
-): Promise<{ exchangeCount: number; aiEventId?: string }> {
+  behavioral?: Partial<ExchangeBehavioralMetrics>,
+  clientId?: string
+): Promise<{
+  exchangeCount: number;
+  aiEventId?: string;
+  persistedUserMessage: boolean;
+}> {
   const previousRung = session.escalationRung;
 
   // Build ai_response metadata — always includes escalationRung,
@@ -882,6 +887,33 @@ export async function persistExchangeResult(
       }),
     }),
   };
+
+  let insertedUserEventId: string | undefined;
+  if (clientId) {
+    const insertedUserRows = await db
+      .insert(sessionEvents)
+      .values({
+        sessionId,
+        profileId,
+        subjectId: session.subjectId,
+        eventType: 'user_message' as const,
+        content: userMessage,
+        clientId,
+      })
+      .onConflictDoNothing({
+        target: [sessionEvents.sessionId, sessionEvents.clientId],
+      })
+      .returning({ id: sessionEvents.id });
+
+    insertedUserEventId = insertedUserRows[0]?.id;
+    if (!insertedUserEventId) {
+      const freshSession = await getSession(db, profileId, sessionId);
+      return {
+        exchangeCount: freshSession?.exchangeCount ?? session.exchangeCount,
+        persistedUserMessage: false,
+      };
+    }
+  }
 
   // [S-1 / BUG-626] Run the atomic exchange-count UPDATE FIRST and only
   // insert events if it succeeded. Pre-fix: events were inserted BEFORE the
@@ -920,33 +952,70 @@ export async function persistExchangeResult(
     .returning({ exchangeCount: learningSessions.exchangeCount });
 
   if (!updated) {
+    if (insertedUserEventId) {
+      try {
+        await db
+          .delete(sessionEvents)
+          .where(
+            and(
+              eq(sessionEvents.id, insertedUserEventId),
+              eq(sessionEvents.profileId, profileId)
+            )
+          );
+      } catch (rollbackErr) {
+        captureException(rollbackErr, {
+          profileId,
+          extra: {
+            context: 'session.exchange.user_insert_rollback_failed',
+            sessionId,
+            clientId,
+            userEventId: insertedUserEventId,
+          },
+        });
+      }
+    }
     throw new SessionExchangeLimitError(session.exchangeCount);
   }
 
   // Atomic guard passed — now persist the events.
-  const insertedEvents = await db
-    .insert(sessionEvents)
-    .values([
-      {
-        sessionId,
-        profileId,
-        subjectId: session.subjectId,
-        eventType: 'user_message' as const,
-        content: userMessage,
-      },
-      {
-        sessionId,
-        profileId,
-        subjectId: session.subjectId,
-        eventType: 'ai_response' as const,
-        content: aiResponse,
-        metadata: aiMetadata,
-      },
-    ])
-    .returning({
-      id: sessionEvents.id,
-      eventType: sessionEvents.eventType,
-    });
+  const insertedEvents = clientId
+    ? await db
+        .insert(sessionEvents)
+        .values({
+          sessionId,
+          profileId,
+          subjectId: session.subjectId,
+          eventType: 'ai_response' as const,
+          content: aiResponse,
+          metadata: aiMetadata,
+        })
+        .returning({
+          id: sessionEvents.id,
+          eventType: sessionEvents.eventType,
+        })
+    : await db
+        .insert(sessionEvents)
+        .values([
+          {
+            sessionId,
+            profileId,
+            subjectId: session.subjectId,
+            eventType: 'user_message' as const,
+            content: userMessage,
+          },
+          {
+            sessionId,
+            profileId,
+            subjectId: session.subjectId,
+            eventType: 'ai_response' as const,
+            content: aiResponse,
+            metadata: aiMetadata,
+          },
+        ])
+        .returning({
+          id: sessionEvents.id,
+          eventType: sessionEvents.eventType,
+        });
 
   if (previousRung !== effectiveRung) {
     await db.insert(sessionEvents).values({
@@ -963,6 +1032,7 @@ export async function persistExchangeResult(
     exchangeCount: updated.exchangeCount,
     aiEventId: insertedEvents.find((event) => event.eventType === 'ai_response')
       ?.id,
+    persistedUserMessage: true,
   };
 }
 
@@ -978,6 +1048,7 @@ export async function processMessage(
   options?: {
     voyageApiKey?: string;
     llmTier?: import('../subscription').LLMTier;
+    clientId?: string;
   }
 ): Promise<{
   response: string;
@@ -1025,7 +1096,8 @@ export async function processMessage(
       partialProgress: result.partialProgress,
       needsDeepening: result.needsDeepening,
       confidence: result.confidence,
-    }
+    },
+    options?.clientId
   );
 
   return {
@@ -1050,6 +1122,7 @@ export async function streamMessage(
   options?: {
     voyageApiKey?: string;
     llmTier?: import('../subscription').LLMTier;
+    clientId?: string;
   }
 ): Promise<{
   stream: AsyncIterable<string>;
@@ -1144,7 +1217,8 @@ export async function streamMessage(
           partialProgress: parsed.partialProgress,
           needsDeepening: parsed.needsDeepening,
           confidence: parsed.confidence,
-        }
+        },
+        options?.clientId
       );
       return {
         exchangeCount: persisted.exchangeCount,

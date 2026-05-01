@@ -12,11 +12,16 @@ import type {
   InterviewState,
 } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
+import {
+  withIdempotencyKey,
+  type IdempotencyReplayBody,
+} from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
 import { getApiUrl } from '../lib/api';
 import { streamSSEViaXHR } from '../lib/sse';
+import type { StreamFallbackReason } from '../lib/sse';
 
 // InterviewResponse is API-route-specific (includes exchangeCount, not extractedSignals)
 interface InterviewResponse {
@@ -126,6 +131,10 @@ export function useForceCompleteInterview(
 interface InterviewStreamDoneResult {
   isComplete: boolean;
   exchangeCount: number;
+  fallback?: {
+    reason: StreamFallbackReason;
+    fallbackText: string;
+  };
 }
 
 export function useStreamInterviewMessage(
@@ -135,7 +144,11 @@ export function useStreamInterviewMessage(
   stream: (
     message: string,
     onChunk: (accumulated: string) => void,
-    onDone: (result: InterviewStreamDoneResult) => void
+    onDone: (result: InterviewStreamDoneResult) => void,
+    options?: {
+      idempotencyKey?: string;
+      onReplay?: (result: IdempotencyReplayBody) => void;
+    }
   ) => Promise<void>;
   abort: () => void;
   isStreaming: boolean;
@@ -161,7 +174,11 @@ export function useStreamInterviewMessage(
     async (
       message: string,
       onChunk: (accumulated: string) => void,
-      onDone: (result: InterviewStreamDoneResult) => void
+      onDone: (result: InterviewStreamDoneResult) => void,
+      options?: {
+        idempotencyKey?: string;
+        onReplay?: (result: IdempotencyReplayBody) => void;
+      }
     ): Promise<void> => {
       const effectiveSubjectId = subjectIdRef.current;
       if (isStreamingRef.current || !effectiveSubjectId) return;
@@ -177,26 +194,42 @@ export function useStreamInterviewMessage(
         if (token) headers['Authorization'] = `Bearer ${token}`;
         if (profileIdRef.current)
           headers['X-Profile-Id'] = profileIdRef.current;
+        const finalHeaders = withIdempotencyKey(
+          headers,
+          options?.idempotencyKey
+        );
 
         const url = `${getApiUrl()}/v1/subjects/${effectiveSubjectId}/interview/stream${
           bookIdRef.current ? `?bookId=${bookIdRef.current}` : ''
         }`;
         const { events, abort } = streamSSEViaXHR(url, {
           method: 'POST',
-          headers,
+          headers: finalHeaders,
           body: JSON.stringify({ message }),
         });
         abortRef.current = abort;
 
         let accumulated = '';
+        let fallback:
+          | { reason: StreamFallbackReason; fallbackText: string }
+          | undefined;
         for await (const event of events) {
           if (event.type === 'chunk') {
             accumulated += event.content;
             onChunk(accumulated);
+          } else if (event.type === 'fallback') {
+            fallback = {
+              reason: event.reason,
+              fallbackText: event.fallbackText,
+            };
+          } else if (event.type === 'replay') {
+            options?.onReplay?.(event);
+            return;
           } else if (event.type === 'done') {
             onDone({
               isComplete: event.isComplete ?? false,
               exchangeCount: event.exchangeCount,
+              fallback,
             });
           } else if (event.type === 'error') {
             throw new Error(event.message);

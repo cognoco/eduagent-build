@@ -10,6 +10,7 @@ export { ErrorFallback } from './ErrorFallback';
 export { OfflineBanner } from './OfflineBanner';
 export { PasswordInput } from './PasswordInput';
 export { DeskLampAnimation } from './DeskLampAnimation';
+export { LightBulbAnimation } from './LightBulbAnimation';
 export { MagicPenAnimation } from './MagicPenAnimation';
 export { ProfileSwitcher } from './ProfileSwitcher';
 export { ShimmerSkeleton } from './ShimmerSkeleton';

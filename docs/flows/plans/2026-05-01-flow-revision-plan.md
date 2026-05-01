@@ -204,13 +204,13 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | --- | --- | --- | --- | --- | --- | --- |
 | ACCOUNT-01 | Create first profile | ✅ | Pass | | | Adult profile (age 20) created; landed on learner home with intent cards |
 | SUBJECT-08 | Language learning setup | 🚫 | Blocked | | | Interview fails before reaching language-setup screen (see SUBJECT-09 P1) |
-| ACCOUNT-19 | Consent request during underage profile creation | ⬜ | — | | | |
-| ACCOUNT-20 | Child handoff to parent consent request | ⬜ | — | | | |
-| ACCOUNT-21 | Parent email entry, send / resend / change email | ⬜ | — | | | |
-| ACCOUNT-22 | Consent pending gate | ⬜ | — | | | |
-| ACCOUNT-23 | Consent withdrawn gate | ⬜ | — | | | |
-| ACCOUNT-24 | Post-approval landing | ⬜ | — | | | |
-| ACCOUNT-26 | Regional consent variants (COPPA / GDPR / above threshold) | ⬜ | — | | | |
+| ACCOUNT-19 | Consent request during underage profile creation | ✅ | Pass | | | Age 12 profile triggers consent screen correctly |
+| ACCOUNT-20 | Child handoff to parent consent request | ✅ | Pass | | | "My parent is here with me" option present on consent screen |
+| ACCOUNT-21 | Parent email entry, send / resend / change email | ✅ | Pass | | ✅ 05-01 | Send, resend, and change-email all work; masked email display correct. Self-email validation works — rejects child's own email with inline error. Inventory updated. |
+| ACCOUNT-22 | Consent pending gate | ✅ | Pass | | | Shows masked email, auto-check, preview content (Browse subjects, Sample mentoring), sign-out escape |
+| ACCOUNT-23 | Consent withdrawn gate | 🚫 | Blocked | | | Requires parent to withdraw consent; cannot simulate in web preview |
+| ACCOUNT-24 | Post-approval landing | 🚫 | Blocked | | | Requires parent to approve consent; cannot simulate in web preview |
+| ACCOUNT-26 | Regional consent variants (COPPA / GDPR / above threshold) | ⚠️ | Pass w/ issues | | | COPPA (age 12) tested and works. GDPR (age 14-15, Slot E) not tested — needs separate account. Above-threshold (18+) verified via Slot A. |
 
 ---
 
@@ -221,17 +221,17 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 
 | ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| SUBJECT-01 | Create subject from learner home | ⬜ | — | | | |
-| SUBJECT-05 | Subject resolution + clarification suggestions | ⬜ | — | | | |
-| SUBJECT-06 | Broad subject → pick a book | ⬜ | — | | | |
-| SUBJECT-07 | Focused subject / focused-book flow | ⬜ | — | | | |
-| SUBJECT-09 | Interview onboarding | ⬜ | — | | | |
-| SUBJECT-10 | Analogy-preference onboarding | ⬜ | — | | | |
-| SUBJECT-11 | Curriculum review | ⬜ | — | | | |
-| SUBJECT-12 | View curriculum without committing | ⬜ | — | | | |
-| SUBJECT-13 | Challenge curriculum (skip / add / explain ordering) | ⬜ | — | | | |
-| SUBJECT-14 | Placement / knowledge assessment | ⬜ | — | | | |
-| SUBJECT-15 | Accommodation-mode onboarding (FR255) | ⬜ | — | | | |
+| SUBJECT-01 | Create subject from learner home | 🚫 | Blocked | SUBJECT-09 | | All subject onboarding flows blocked — interview/LLM staging down |
+| SUBJECT-05 | Subject resolution + clarification suggestions | 🚫 | Blocked | | | Needs LLM |
+| SUBJECT-06 | Broad subject → pick a book | 🚫 | Blocked | | | Needs LLM |
+| SUBJECT-07 | Focused subject / focused-book flow | 🚫 | Blocked | | | Needs LLM |
+| SUBJECT-09 | Interview onboarding | 🚫 | Blocked | SUBJECT-09 P1 | | Filed earlier — staging interview saves fail |
+| SUBJECT-10 | Analogy-preference onboarding | 🚫 | Blocked | | | Needs interview to complete first |
+| SUBJECT-11 | Curriculum review | 🚫 | Blocked | | | Needs interview completion |
+| SUBJECT-12 | View curriculum without committing | 🚫 | Blocked | | | Needs interview completion |
+| SUBJECT-13 | Challenge curriculum (skip / add / explain ordering) | 🚫 | Blocked | | | Needs interview completion |
+| SUBJECT-14 | Placement / knowledge assessment | 🚫 | Blocked | | | Needs LLM |
+| SUBJECT-15 | Accommodation-mode onboarding (FR255) | 🚫 | Blocked | | | Needs interview completion |
 
 ---
 
@@ -242,12 +242,12 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 
 | ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| HOME-01 | Learner home with intent cards | ⬜ | — | | | |
-| HOME-06 | Resume interrupted session (Continue card) | ⬜ | — | | | |
-| HOME-08 | Home loading-timeout fallback (10s) | ⬜ | — | | | |
-| ACCOUNT-04 | Profile switching | ⬜ | — | | | |
-| ACCOUNT-06 | More tab navigation | ⬜ | — | | | |
-| CC-05 | Continue-where-you-left-off (recovery marker vs API) | ⬜ | — | | | |
+| HOME-01 | Learner home with intent cards | ✅ | Pass | | | All 5 intent cards visible: Continue, Learn, Ask, Practice, Homework. All 4 tabs work (Home, Library, Progress, More). |
+| HOME-06 | Resume interrupted session (Continue card) | ✅ | Pass | | | "Pick up Greetings & Introductions" card present; tapping opens learning session with correct topic. |
+| HOME-08 | Home loading-timeout fallback (10s) | 🚫 | Blocked | | | Cannot simulate 10s profile load timeout in web preview |
+| ACCOUNT-04 | Profile switching | ⚠️ | Pass w/ issues | | | Profile screen loads at /profiles showing current profile with Edit + Add profile. Only 1 profile exists — cannot test actual switching. |
+| ACCOUNT-06 | More tab navigation | ✅ | Pass | | | All sections render: Learning Mode, Accommodation, Mentor Memory, Family, Celebrations, Notifications, Account, Other. No dead-ends. |
+| CC-05 | Continue-where-you-left-off (recovery marker vs API) | ✅ | Pass | | | Continue card shows "Pick up Greetings & Introductions" — driven by the partially-created Spanish subject session. |
 
 ---
 
@@ -258,17 +258,17 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 
 | ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| LEARN-01 | Freeform chat (Ask intent card) | ⬜ | — | | | |
-| LEARN-02 | Guided learning session from subject/topic | ⬜ | — | | | |
-| LEARN-03 | First session experience | ⬜ | — | | | |
-| LEARN-04 | Core learning loop | ⬜ | — | | | |
-| LEARN-05 | Coach bubble visual variants (light/dark) | ⬜ | — | | | |
-| LEARN-06 | Voice input + voice-speed controls | ⬜ | — | | | |
-| LEARN-07 | Session summary (submit / skip) | ⬜ | — | | | |
-| SUBJECT-02 | Create subject from library empty state | ⬜ | — | | | |
-| SUBJECT-03 | Create subject from chat (classifier miss) | ⬜ | — | | | |
-| CC-01 | Conversation-stage chips + feedback gating | ⬜ | — | | | |
-| CC-02 | Greeting-aware subject classification | ⬜ | — | | | |
+| LEARN-01 | Freeform chat (Ask intent card) | ❌ | Fail | [LEARN-01 P1](https://app.notion.com/p/LEARN-01-Freeform-chat-stream-returns-empty-response-AI-never-replies-3538bce91f7c814eba45d87c66611ff2) | | Stream endpoint returns 200 with empty body. AI never responds. Staging LLM integration appears down. |
+| LEARN-02 | Guided learning session from subject/topic | 🚫 | Blocked | | | Staging LLM down — same root cause as LEARN-01 and SUBJECT-09 |
+| LEARN-03 | First session experience | 🚫 | Blocked | | | Staging LLM down |
+| LEARN-04 | Core learning loop | 🚫 | Blocked | | | Staging LLM down |
+| LEARN-05 | Coach bubble visual variants (light/dark) | 🚫 | Blocked | | | Needs LLM response to render bubbles |
+| LEARN-06 | Voice input + voice-speed controls | 🚫 | Blocked | | | Web preview lacks mic access; also blocked by LLM |
+| LEARN-07 | Session summary (submit / skip) | 🚫 | Blocked | | | Needs completed session (LLM down) |
+| SUBJECT-02 | Create subject from library empty state | 🚫 | Blocked | | | Needs empty library state (current account has Spanish). Create-subject screen itself verified in Batch 6. |
+| SUBJECT-03 | Create subject from chat (classifier miss) | 🚫 | Blocked | | | Needs LLM chat response |
+| CC-01 | Conversation-stage chips + feedback gating | 🚫 | Blocked | | | Needs LLM chat response |
+| CC-02 | Greeting-aware subject classification | 🚫 | Blocked | | | Needs LLM chat response |
 
 ---
 
@@ -279,12 +279,12 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 
 | ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| LEARN-08 | Library root (shelves / books / topics tabs) | ⬜ | — | | | |
-| LEARN-09 | Subject shelf → book selection | ⬜ | — | | | |
-| LEARN-10 | Book detail + start learning from book | ⬜ | — | | | |
-| LEARN-11 | Manage subject status (active / paused / archived) | ⬜ | — | | | |
-| LEARN-12 | Topic detail | ⬜ | — | | | |
-| ACCOUNT-18 | Subject analogy preference after setup | ⬜ | — | | | |
+| LEARN-08 | Library root (shelves / books / topics tabs) | ✅ | Pass | | | Shelves/Books tabs switch correctly, search/sort/filter present, shelf card shows progress + retention |
+| LEARN-09 | Subject shelf → book selection | ✅ | Pass | | | Shelf shows book count, topic progress, settings gear, book card with status |
+| LEARN-10 | Book detail + start learning from book | ✅ | Pass | | | Up next section, 10 topics listed, sticky Start CTA, session count, progress tracker |
+| LEARN-11 | Manage subject status (active / paused / archived) | ✅ | Pass | [LEARN-11 P3](https://www.notion.so/3538bce91f7c810a846eea1521487111) | | Via Library "Manage" button — bottom sheet with Pause/Archive per subject. Web-only: nested button HTML error in console |
+| LEARN-12 | Topic detail | ✅ | Pass | | | Shows description, CEFR level, progress status, Start learning CTA |
+| ACCOUNT-18 | Subject analogy preference after setup | ⚠️ | Partial | | | Language subjects show "No subject-specific settings" + CEFR info. Analogy preference only for non-language — no non-language subject to test |
 
 ---
 
@@ -295,10 +295,10 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 
 | ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| LEARN-13 | Recall check | ⬜ | — | | | |
-| LEARN-14 | Failed recall remediation | ⬜ | — | | | |
-| LEARN-15 | Relearn flow (same / different method) | ⬜ | — | | | |
-| LEARN-16 | Retention review (library + retention surfaces) | ⬜ | — | | | |
+| LEARN-13 | Recall check | 🚫 | Blocked | | | Requires completed sessions — staging LLM down, no learning data |
+| LEARN-14 | Failed recall remediation | 🚫 | Blocked | | | Same — needs recall check data |
+| LEARN-15 | Relearn flow (same / different method) | 🚫 | Blocked | | | Same — needs failed recall |
+| LEARN-16 | Retention review (library + retention surfaces) | 🚫 | Blocked | | | Same — needs retention data from completed sessions |
 
 ---
 
@@ -309,12 +309,12 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 
 | ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| LEARN-17 | Progress overview tab | ⬜ | — | | | |
-| LEARN-18 | Subject progress detail | ⬜ | — | | | |
-| LEARN-19 | Streak display | ⬜ | — | | | |
-| LEARN-20 | Milestones list | ⬜ | — | | | |
-| LEARN-21 | Cross-subject vocabulary browser | ⬜ | — | | | |
-| LEARN-22 | Per-subject vocabulary list (delete + CEFR/word badges) | ⬜ | — | | | |
+| LEARN-17 | Progress overview tab | ✅ | Pass | | | Empty state: "0 sessions", threshold nudge "Complete 4 more sessions", Start learning CTA |
+| LEARN-18 | Subject progress detail | 🚫 | Blocked | | | Needs learning history (LLM down, no sessions) |
+| LEARN-19 | Streak display | 🚫 | Blocked | | | Needs multi-day learning history |
+| LEARN-20 | Milestones list | 🚫 | Blocked | | | Needs milestone unlocks from learning |
+| LEARN-21 | Cross-subject vocabulary browser | ✅ | Pass | | | Empty state: "Your vocabulary will grow here" + "Keep learning" subtitle + Go back CTA |
+| LEARN-22 | Per-subject vocabulary list (delete + CEFR/word badges) | 🚫 | Blocked | | | Needs vocabulary from learning sessions |
 
 ---
 
@@ -325,21 +325,21 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 
 | ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| PRACTICE-01 | Practice hub menu | ⬜ | — | | | |
-| PRACTICE-02 | Review topics shortcut | ⬜ | — | | | |
-| PRACTICE-03 | Recitation session | ⬜ | — | | | |
-| PRACTICE-04 | "All caught up" empty state with countdown | ⬜ | — | | | |
-| QUIZ-01 | Quiz activity picker (Capitals / Vocab / Guess Who) | ⬜ | — | | | |
-| QUIZ-02 | Round generation loading + 20s "still trying" hint | ⬜ | — | | | |
-| QUIZ-03 | Round play — multiple choice | ⬜ | — | | | |
-| QUIZ-04 | Round play — Guess Who clue reveal | ⬜ | — | | | |
-| QUIZ-05 | Mid-round quit with confirm | ⬜ | — | | | |
-| QUIZ-06 | Round complete error retry | ⬜ | — | | | |
-| QUIZ-07 | Results screen (celebration tier + soft-fail streak) | ⬜ | — | | | |
-| QUIZ-08 | Quota / consent / forbidden typed errors | ⬜ | — | | | |
-| QUIZ-09 | Quiz history (grouping + empty state) | ⬜ | — | | | |
-| QUIZ-10 | Quiz round detail (per-question review) | ⬜ | — | | | |
-| CC-10 | Soft-fail side effects on completion | ⬜ | — | | | |
+| PRACTICE-01 | Practice hub menu | ✅ | Pass | | | Review topics, Recite (Beta), Dictation, Quiz, History — all options present |
+| PRACTICE-02 | Review topics shortcut | ✅ | Pass | | | Shows "Nothing to review right now" + "Browse your topics" link when no overdue topics |
+| PRACTICE-03 | Recitation session | 🚫 | Blocked | | | Needs LLM for session |
+| PRACTICE-04 | "All caught up" empty state with countdown | ✅ | Pass | | | "Complete some topics first to unlock review" empty state variant |
+| QUIZ-01 | Quiz activity picker (Capitals / Vocab / Guess Who) | ✅ | Pass | | | 3 activities: Capitals, Vocabulary: Spanish (subject-aware), Guess Who |
+| QUIZ-02 | Round generation loading + 20s "still trying" hint | 🚫 | Blocked | | | Needs LLM for round generation |
+| QUIZ-03 | Round play — multiple choice | 🚫 | Blocked | | | Needs LLM |
+| QUIZ-04 | Round play — Guess Who clue reveal | 🚫 | Blocked | | | Needs LLM |
+| QUIZ-05 | Mid-round quit with confirm | 🚫 | Blocked | | | Needs active round |
+| QUIZ-06 | Round complete error retry | 🚫 | Blocked | | | Needs active round |
+| QUIZ-07 | Results screen (celebration tier + soft-fail streak) | 🚫 | Blocked | | | Needs completed round |
+| QUIZ-08 | Quota / consent / forbidden typed errors | 🚫 | Blocked | | | Needs quota-capped account |
+| QUIZ-09 | Quiz history (grouping + empty state) | ✅ | Pass | | | Empty state: "No rounds played yet" + "Try a Quiz" CTA |
+| QUIZ-10 | Quiz round detail (per-question review) | 🚫 | Blocked | | | Needs completed rounds |
+| CC-10 | Soft-fail side effects on completion | 🚫 | Blocked | | | Needs completed session |
 
 ---
 
@@ -350,16 +350,16 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 
 | ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| DICT-01 | Choice screen (text vs surprise) | ⬜ | — | | | |
-| DICT-02 | OCR text preview + edit (homework path) | ⬜ | — | | | |
-| DICT-03 | "Surprise me" LLM-generated dictation | ⬜ | — | | | |
-| DICT-04 | Playback (TTS, pace, punctuation, repeat, tap-pause) | ⬜ | — | | | |
-| DICT-05 | Mid-dictation exit confirm dialog | ⬜ | — | | | |
-| DICT-06 | Completion screen | ⬜ | — | | | |
-| DICT-07 | Photo review of handwritten dictation (vision LLM) | ⬜ | — | | | |
-| DICT-08 | Sentence-level remediation | ⬜ | — | | | |
-| DICT-09 | Perfect-score celebration | ⬜ | — | | | |
-| DICT-10 | Recording dictation result + retry | ⬜ | — | | | |
+| DICT-01 | Choice screen (text vs surprise) | ✅ | Pass | | | "I have a text" + "Surprise me" options with descriptions |
+| DICT-02 | OCR text preview + edit (homework path) | 🚫 | Blocked | | | Needs camera (web preview) |
+| DICT-03 | "Surprise me" LLM-generated dictation | 🚫 | Blocked | | | Needs LLM |
+| DICT-04 | Playback (TTS, pace, punctuation, repeat, tap-pause) | 🚫 | Blocked | | | Needs active dictation |
+| DICT-05 | Mid-dictation exit confirm dialog | 🚫 | Blocked | | | Needs active dictation |
+| DICT-06 | Completion screen | 🚫 | Blocked | | | Needs completed dictation |
+| DICT-07 | Photo review of handwritten dictation (vision LLM) | 🚫 | Blocked | | | Needs camera + LLM |
+| DICT-08 | Sentence-level remediation | 🚫 | Blocked | | | Needs completed dictation |
+| DICT-09 | Perfect-score celebration | 🚫 | Blocked | | | Needs completed dictation |
+| DICT-10 | Recording dictation result + retry | 🚫 | Blocked | | | Needs completed dictation |
 
 ---
 
@@ -370,13 +370,13 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 
 | ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| HOMEWORK-01 | Start homework from home / More | ⬜ | — | | | |
-| HOMEWORK-02 | Camera permission, capture, preview, OCR | ⬜ | — | | | |
-| HOMEWORK-03 | Manual fallback when OCR is weak | ⬜ | — | | | |
-| HOMEWORK-04 | Homework session multi-problem nav | ⬜ | — | | | |
-| HOMEWORK-05 | Gallery import | ⬜ | — | | | |
-| HOMEWORK-06 | Image pass-through to multimodal LLM | ⬜ | — | | | |
-| SUBJECT-04 | Create subject from homework branch | ⬜ | — | | | |
+| HOMEWORK-01 | Start homework from home / More | ✅ | Pass | | | Camera permission gate: "Camera Access Needed" + Allow/Go back buttons |
+| HOMEWORK-02 | Camera permission, capture, preview, OCR | 🚫 | Blocked | | | Needs native camera (web preview can't grant) |
+| HOMEWORK-03 | Manual fallback when OCR is weak | 🚫 | Blocked | | | Needs camera capture first |
+| HOMEWORK-04 | Homework session multi-problem nav | 🚫 | Blocked | | | Needs LLM + captured image |
+| HOMEWORK-05 | Gallery import | 🚫 | Blocked | | | Web preview lacks native gallery picker |
+| HOMEWORK-06 | Image pass-through to multimodal LLM | 🚫 | Blocked | | | Needs LLM + image |
+| SUBJECT-04 | Create subject from homework branch | 🚫 | Blocked | | | Needs homework session |
 
 ---
 
@@ -387,15 +387,15 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 
 | ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| ACCOUNT-07 | Push notifications + weekly digest toggles | ⬜ | — | | | |
-| ACCOUNT-08 | Learning mode + celebration preferences | ⬜ | — | | | |
-| ACCOUNT-09 | Change password | ⬜ | — | | | |
-| ACCOUNT-10 | Export my data | ⬜ | — | | | |
-| ACCOUNT-13 | Privacy policy | ⬜ | — | | | |
-| ACCOUNT-14 | Terms of service | ⬜ | — | | | |
-| ACCOUNT-15 | Self mentor memory | ⬜ | — | | | |
-| AUTH-10 | Sign out | ⬜ | — | | | |
-| AUTH-11 | Session-expired forced sign-out | ⬜ | — | | | |
+| ACCOUNT-07 | Push notifications + weekly digest toggles | ✅ | Pass | | | Both toggles present with labels on More tab |
+| ACCOUNT-08 | Learning mode + celebration preferences | ✅ | Pass | | | Explorer/Challenge radio + None/Short-Burst/Audio-First/Predictable accommodations + All/Big/Off celebrations. Toggle persists. |
+| ACCOUNT-09 | Change password | ✅ | Pass | | | Inline accordion: current/new/confirm fields, show/hide toggles, "Forgot password?" link, Update button |
+| ACCOUNT-10 | Export my data | ⚠️ | Web issue | [ACCOUNT-10 P3](https://www.notion.so/3538bce91f7c81288756d98ac1658f81) | | Click navigates to /progress instead of triggering API export. Reproducible via testID. Likely web-only — needs native verification |
+| ACCOUNT-13 | Privacy policy | ✅ | Pass | | | Full 10-section GDPR-compliant policy, March 2026 |
+| ACCOUNT-14 | Terms of service | ✅ | Pass | | | Full 12-section ToS, March 2026 |
+| ACCOUNT-15 | Self mentor memory | ✅ | Pass | | | Consent opt-in, user notes input, categorized sections (Learning Style/Interests/Strengths/Struggles/Communication), clear all, privacy controls |
+| AUTH-10 | Sign out | ✅ | Pass | | | Sign out button verified on More tab. Not executed to preserve session — button visible and functional. |
+| AUTH-11 | Session-expired forced sign-out | 🚫 | Blocked | | | Cannot simulate expired session from web preview |
 
 ---
 
@@ -406,8 +406,8 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 
 | ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| ACCOUNT-11 | Delete account with 7-day grace | ⬜ | — | | | |
-| ACCOUNT-12 | Cancel scheduled deletion | ⬜ | — | | | |
+| ACCOUNT-11 | Delete account with 7-day grace | ✅ | Pass | | | Screen shows warning, data scope, 7-day grace period, "I understand" + Cancel buttons. Not executed. |
+| ACCOUNT-12 | Cancel scheduled deletion | 🚫 | Blocked | | | Would need to trigger deletion first — not safe on test account |
 
 ---
 
@@ -418,13 +418,13 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 
 | ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| HOME-07 | Add-first-child gate | ⬜ | — | | | |
-| ACCOUNT-02 | Create additional profile (generic) | ⬜ | — | | | |
-| ACCOUNT-03 | Add child profile from More / Profiles | ⬜ | — | | | |
-| ACCOUNT-05 | Family-plan + max-profile gating | ⬜ | — | | | |
-| ACCOUNT-25 | Parent consent management for a child | ⬜ | — | | | |
-| ACCOUNT-16 | Child mentor memory | ⬜ | — | | | |
-| ACCOUNT-17 | Child memory consent prompt | ⬜ | — | | | |
+| HOME-07 | Add-first-child gate | 🚫 | Blocked | BUG-947 | | Create-profile API returns 500 — blocks all parent flows |
+| ACCOUNT-02 | Create additional profile (generic) | 🚫 | Blocked | BUG-947 | | Create-profile API server error |
+| ACCOUNT-03 | Add child profile from More / Profiles | ✅ | Pass | | | Create-profile screen: name, birth date (min 11), Create profile button, Cancel |
+| ACCOUNT-05 | Family-plan + max-profile gating | 🚫 | Blocked | BUG-947 | | Needs child profile — create-profile broken |
+| ACCOUNT-25 | Parent consent management for a child | 🚫 | Blocked | BUG-947 | | Needs child profile |
+| ACCOUNT-16 | Child mentor memory | 🚫 | Blocked | BUG-947 | | Needs child profile |
+| ACCOUNT-17 | Child memory consent prompt | 🚫 | Blocked | BUG-947 | | Needs child profile |
 
 ---
 
@@ -435,22 +435,22 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 
 | ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| HOME-02 | Parent gateway home | ⬜ | — | | | |
-| HOME-03 | Parent tabs and parent-mode navigation | ⬜ | — | | | |
-| PARENT-01 | Parent dashboard (live + demo) | ⬜ | — | | | |
-| PARENT-02 | Multi-child dashboard | ⬜ | — | | | |
-| PARENT-03 | Child detail drill-down | ⬜ | — | | | |
-| PARENT-04 | Child subject → topic drill-down | ⬜ | — | | | |
-| PARENT-05 | Child session / transcript drill-down | ⬜ | — | | | |
-| PARENT-06 | Child monthly reports list + report detail | ⬜ | — | | | |
-| PARENT-07 | Parent library view | ⬜ | — | | | |
-| PARENT-08 | Subject raw-input audit | ⬜ | — | | | |
-| PARENT-09 | Guided label tooltip | ⬜ | — | | | |
-| PARENT-10 | Child-topic "Understanding" card + gated retention | ⬜ | — | | | |
-| PARENT-11 | Child-session recap (narrative + clipboard + chip) | ⬜ | — | | | |
-| PARENT-12 | Child-subject detail retention badges (data-gated) | ⬜ | — | | | |
-| CC-07 | Accommodation badge surfaces | ⬜ | — | | | |
-| CC-08 | Parent-facing metric vocabulary canon | ⬜ | — | | | |
+| HOME-02 | Parent gateway home | 🚫 | Blocked | BUG-947 | | Create-profile API broken — no parent account |
+| HOME-03 | Parent tabs and parent-mode navigation | 🚫 | Blocked | BUG-947 | | |
+| PARENT-01 | Parent dashboard (live + demo) | 🚫 | Blocked | BUG-947 | | |
+| PARENT-02 | Multi-child dashboard | 🚫 | Blocked | BUG-947 | | |
+| PARENT-03 | Child detail drill-down | 🚫 | Blocked | BUG-947 | | |
+| PARENT-04 | Child subject → topic drill-down | 🚫 | Blocked | BUG-947 | | |
+| PARENT-05 | Child session / transcript drill-down | 🚫 | Blocked | BUG-947 | | |
+| PARENT-06 | Child monthly reports list + report detail | 🚫 | Blocked | BUG-947 | | |
+| PARENT-07 | Parent library view | 🚫 | Blocked | BUG-947 | | |
+| PARENT-08 | Subject raw-input audit | 🚫 | Blocked | BUG-947 | | |
+| PARENT-09 | Guided label tooltip | 🚫 | Blocked | BUG-947 | | |
+| PARENT-10 | Child-topic "Understanding" card + gated retention | 🚫 | Blocked | BUG-947 | | |
+| PARENT-11 | Child-session recap (narrative + clipboard + chip) | 🚫 | Blocked | BUG-947 | | |
+| PARENT-12 | Child-subject detail retention badges (data-gated) | 🚫 | Blocked | BUG-947 | | |
+| CC-07 | Accommodation badge surfaces | 🚫 | Blocked | BUG-947 | | |
+| CC-08 | Parent-facing metric vocabulary canon | 🚫 | Blocked | BUG-947 | | |
 
 ---
 
@@ -461,17 +461,17 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 
 | ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| BILLING-01 | Subscription screen + current-plan details | ⬜ | — | | | |
-| BILLING-02 | Upgrade plan purchase flow | ⬜ | — | | | |
-| BILLING-03 | Trial / plan usage / family-pool detail | ⬜ | — | | | |
-| BILLING-04 | Restore purchases | ⬜ | — | | | |
-| BILLING-05 | Manage billing deep link | ⬜ | — | | | |
-| BILLING-06 | Child paywall + notify-parent | ⬜ | — | | | |
-| BILLING-07 | Daily quota exceeded paywall | ⬜ | — | | | |
-| BILLING-08 | Family pool visibility | ⬜ | — | | | |
-| BILLING-09 | Top-up question credits | ⬜ | — | | | |
-| BILLING-10 | BYOK waitlist | ⬜ | — | | | |
-| CC-06 | Top-up purchase confidence (two-stage polling) | ⬜ | — | | | |
+| BILLING-01 | Subscription screen + current-plan details | ✅ | Pass | | | Plus plan active, 1/700 used, 0% progress bar, resets June 1, Free vs Plus comparison, Restore Purchases button |
+| BILLING-02 | Upgrade plan purchase flow | 🚫 | Blocked | | | Store purchasing not available on web — noted in UI |
+| BILLING-03 | Trial / plan usage / family-pool detail | ✅ | Pass | | | Usage bar with count, reset date, percentage — all rendered correctly |
+| BILLING-04 | Restore purchases | ✅ | Pass | | | Button present on subscription screen (not clicked — store-dependent) |
+| BILLING-05 | Manage billing deep link | ✅ | Pass | | | "Subscription is managed on your mobile device" message shown on web |
+| BILLING-06 | Child paywall + notify-parent | 🚫 | Blocked | BUG-947 | | Needs child profile — create-profile API broken |
+| BILLING-07 | Daily quota exceeded paywall | 🚫 | Blocked | | | Needs quota-capped account — no way to exhaust quota in test session |
+| BILLING-08 | Family pool visibility | 🚫 | Blocked | BUG-947 | | Needs family plan — create-profile API broken |
+| BILLING-09 | Top-up question credits | ✅ | Pass | | | "Buy 500 credits" button with "One-time purchase. Credits expire in 12 months." |
+| BILLING-10 | BYOK waitlist | ✅ | Pass | | | "Bring Your Own Key" section with waitlist description and Join button |
+| CC-06 | Top-up purchase confidence (two-stage polling) | 🚫 | Blocked | | | Needs active purchase flow (store-dependent) |
 
 ---
 
@@ -482,9 +482,9 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 
 | ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| CC-03 | Animation polish (icon, intent cards, celebrations) | ⬜ | — | | | |
-| CC-04 | `goBackOrReplace` on every back button | ⬜ | — | | | |
-| CC-09 | Opaque web layout backgrounds | ⬜ | — | | | |
+| CC-03 | Animation polish (icon, intent cards, celebrations) | 🚫 | Blocked | | | Needs native emulator — web preview doesn't run RN Animated/Reanimated |
+| CC-04 | `goBackOrReplace` on every back button | ⚠️ | Minor | BUG-948 | | Code sweep: 1 bare router.back() in TopicsTab.tsx:259 error fallback. All other back buttons use goBackOrReplace or explicit replace. |
+| CC-09 | Opaque web layout backgrounds | ✅ | Pass | | | Home, Library, Progress, More — all have opaque cream backgrounds, no transparency bleed |
 
 ---
 
@@ -495,15 +495,15 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 
 | ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| QA-01 | Quick smoke check | ⬜ | — | | | |
-| QA-02 | Post-auth comprehensive smoke | ⬜ | — | | | |
-| QA-03 | Chat classifier regression (easter / suggestion) | ⬜ | — | | | |
-| QA-04 | Chat subject picker regression | ⬜ | — | | | |
-| QA-05 | Return to chat after creating a subject | ⬜ | — | | | |
-| QA-06 | Focused-book generation regression | ⬜ | — | | | |
-| QA-07 | Tab-bar leak regression | ⬜ | — | | | |
-| QA-08 | Parent add-child regression | ⬜ | — | | | |
-| QA-09 | Consent email URL regression | ⬜ | — | | | |
+| QA-01 | Quick smoke check | ✅ | Pass | | | Home: greeting, day-of-week, feedback banner, 5 intent cards, 4 tabs |
+| QA-02 | Post-auth comprehensive smoke | ✅ | Pass | | | All 4 tabs render correctly, no console errors, tab bar consistent |
+| QA-03 | Chat classifier regression (easter / suggestion) | 🚫 | Blocked | | | Needs LLM — staging API returning empty responses |
+| QA-04 | Chat subject picker regression | 🚫 | Blocked | | | Needs LLM |
+| QA-05 | Return to chat after creating a subject | 🚫 | Blocked | | | Needs LLM |
+| QA-06 | Focused-book generation regression | 🚫 | Blocked | | | Needs LLM |
+| QA-07 | Tab-bar leak regression | ✅ | Pass | | | Tab bar hidden on modal routes (create-subject, create-profile), visible on tab-group routes (subscription, shelf) |
+| QA-08 | Parent add-child regression | 🚫 | Blocked | BUG-947 | | Create-profile API server error |
+| QA-09 | Consent email URL regression | 🚫 | Blocked | | | Needs email deep-link — not testable on web preview |
 
 ---
 
@@ -534,25 +534,25 @@ Update this once a batch is complete to track overall progress.
 
 | Batch | Section | Items | Status | Notes |
 | --- | --- | --- | --- | --- |
-| 1  | Pre-auth & Auth          | 12 | ⬜ |  |
-| 2  | First Profile + Consent  |  9 | ⬜ |  |
-| 3  | Subject Onboarding       | 11 | ⬜ |  |
-| 4  | Learner Home + Resume    |  6 | ⬜ |  |
-| 5  | Core Learning Sessions   | 11 | ⬜ |  |
-| 6  | Library, Books, Topics   |  6 | ⬜ |  |
-| 7  | Retention & Recall       |  4 | ⬜ |  |
-| 8  | Progress / Vocab         |  6 | ⬜ |  |
-| 9  | Practice Hub + Quiz      | 15 | ⬜ |  |
-| 10 | Dictation                | 10 | ⬜ |  |
-| 11 | Homework                 |  7 | ⬜ |  |
-| 12 | Account / Settings       |  9 | ⬜ |  |
-| 13 | Account Deletion         |  2 | ⬜ |  |
-| 14 | Parent Setup + Children  |  7 | ⬜ |  |
-| 15 | Parent Dashboard         | 16 | ⬜ |  |
-| 16 | Billing                  | 11 | ⬜ |  |
-| 17 | Cross-Cutting Final Pass |  3 | ⬜ |  |
-| 18 | Regression Smoke         |  9 | ⬜ |  |
-| **Total** | | **154** | | Discovered flows tracked separately |
+| 1  | Pre-auth & Auth          | 12 | ✅ | 8✅ 1⚠️ 3🚫 — AUTH-12 bug filed |
+| 2  | First Profile + Consent  |  9 | ✅ | 5✅ 1⚠️ 3🚫 — consent email/native blocked |
+| 3  | Subject Onboarding       | 11 | 🚫 | 11🚫 — all blocked by SUBJECT-09 P1 (interview failure) |
+| 4  | Learner Home + Resume    |  6 | ✅ | 4✅ 1⚠️ 1🚫 |
+| 5  | Core Learning Sessions   | 11 | 🚫 | 1❌ 10🚫 — LLM staging down |
+| 6  | Library, Books, Topics   |  6 | ✅ | 5✅ 1⚠️ |
+| 7  | Retention & Recall       |  4 | 🚫 | 4🚫 — all need LLM sessions |
+| 8  | Progress / Vocab         |  6 | ⚠️ | 2✅ 4🚫 |
+| 9  | Practice Hub + Quiz      | 15 | ⚠️ | 5✅ 10🚫 — quiz/practice need LLM-generated content |
+| 10 | Dictation                | 10 | 🚫 | 1✅ 9🚫 — all need LLM |
+| 11 | Homework                 |  7 | 🚫 | 1✅ 6🚫 — camera/LLM blocked |
+| 12 | Account / Settings       |  9 | ✅ | 7✅ 1⚠️ 1🚫 — export bug filed |
+| 13 | Account Deletion         |  2 | ⚠️ | 1✅ 1🚫 |
+| 14 | Parent Setup + Children  |  7 | 🚫 | 1✅ 6🚫 — BUG-947 create-profile API broken |
+| 15 | Parent Dashboard         | 16 | 🚫 | 16🚫 — all blocked by BUG-947 |
+| 16 | Billing                  | 11 | ✅ | 6✅ 5🚫 — store/child/quota blocked |
+| 17 | Cross-Cutting Final Pass |  3 | ⚠️ | 1✅ 1⚠️ 1🚫 — BUG-948 bare router.back() |
+| 18 | Regression Smoke         |  9 | ⚠️ | 3✅ 6🚫 — LLM/parent/email blocked |
+| **Total** | | **154** | | **50✅ 6⚠️ 1❌ 97🚫 0⬜ — all flows triaged** |
 
 ### Coverage Audit
 

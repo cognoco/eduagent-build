@@ -245,7 +245,9 @@ describe('[CR-SECURESTORE-REGISTRY-11] sign-out cleanup registry enforcement', (
     // file-scoped, so a registered key in an exception-listed file is still
     // checked against the registry.
     const exceptionCallsites = new Set(
-      REGISTRY_EXCEPTIONS.map((e) => `${e.file}:${e.line}`)
+      REGISTRY_EXCEPTIONS.map(
+        (e: { file: string; line: number }) => `${e.file}:${e.line}`
+      )
     );
 
     const unregistered: Callsite[] = [];
@@ -288,7 +290,8 @@ describe('[CR-SECURESTORE-REGISTRY-11] sign-out cleanup registry enforcement', (
     // fast-path in isCoveredByPerProfileShape regardless. The important thing is
     // that the callsite is present in REGISTRY_EXCEPTIONS and its file exists.
     const clerkException = REGISTRY_EXCEPTIONS.find(
-      (e) => e.file === 'apps/mobile/src/app/_layout.tsx' && e.line === 55
+      (e: { file: string; line: number }) =>
+        e.file === 'apps/mobile/src/app/_layout.tsx' && e.line === 55
     );
     expect(clerkException).toBeDefined();
     const abs = path.resolve(
@@ -308,7 +311,9 @@ describe('[CR-SECURESTORE-REGISTRY-11] sign-out cleanup registry enforcement', (
     // `totally-unregistered-key`. With file-scoped exceptions this would be
     // silently ignored; with callsite-scoped exceptions it must be flagged.
     const exceptionCallsites = new Set(
-      REGISTRY_EXCEPTIONS.map((e) => `${e.file}:${e.line}`)
+      REGISTRY_EXCEPTIONS.map(
+        (e: { file: string; line: number }) => `${e.file}:${e.line}`
+      )
     );
 
     // Pick any file that has at least one exception entry.

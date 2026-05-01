@@ -28,6 +28,7 @@ interface MessageBubbleProps {
   role: 'assistant' | 'user';
   content: string;
   streaming?: boolean;
+  outboxStatus?: 'pending' | 'permanently-failed';
   escalationRung?: number;
   verificationBadge?: VerificationBadge;
   actions?: React.ReactNode;
@@ -279,6 +280,7 @@ export function MessageBubble({
   role,
   content,
   streaming,
+  outboxStatus,
   escalationRung,
   verificationBadge,
   actions,
@@ -439,6 +441,15 @@ export function MessageBubble({
         )}
         {actions ? <View className="mt-3">{actions}</View> : null}
       </View>
+      {!isAI && outboxStatus === 'pending' ? (
+        <View
+          className="self-end mt-1"
+          testID="outbox-pending-indicator"
+          accessibilityLabel="Message pending sync"
+        >
+          <Text className="text-caption text-text-secondary">Sending…</Text>
+        </View>
+      ) : null}
     </Animated.View>
   );
 }

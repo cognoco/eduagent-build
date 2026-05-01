@@ -113,6 +113,7 @@ import { SessionFooter } from '../../../components/session/SessionFooter';
 import { SessionTopicHeader } from '../../../components/session/SessionTopicHeader';
 import { getResumeBannerCopy } from '../../../components/session/resume-banner-copy';
 import { Sentry } from '../../../lib/sentry';
+import { OutboxFailedBanner } from '../../../components/durability/OutboxFailedBanner';
 
 /**
  * Session-specific error boundary with visible diagnostics.
@@ -1495,6 +1496,9 @@ function SessionScreenInner() {
           </>
         }
       />
+      {activeProfile?.id ? (
+        <OutboxFailedBanner profileId={activeProfile.id} flow="session" />
+      ) : null}
       <ParkingLotModal
         visible={showParkingLot}
         onClose={() => setShowParkingLot(false)}

@@ -95,7 +95,7 @@ jest.mock('../../hooks/use-text-to-speech', () => ({
 
 // Stub animated SVG components to avoid reanimated timer leaks in tests
 jest.mock('../common', () => ({
-  DeskLampAnimation: () => null,
+  LightBulbAnimation: () => null,
   MagicPenAnimation: () => null,
 }));
 
@@ -1044,7 +1044,7 @@ describe('ChatShell', () => {
   });
 
   describe('animation wiring (ANIM-IMPROVE)', () => {
-    it('shows DeskLampAnimation when streaming', () => {
+    it('shows LightBulbAnimation (thinking-bulb-animation) when streaming', () => {
       renderChatShell({ isStreaming: true });
       expect(screen.getByTestId('thinking-bulb-animation')).toBeTruthy();
       expect(screen.queryByTestId('idle-pen-animation')).toBeNull();

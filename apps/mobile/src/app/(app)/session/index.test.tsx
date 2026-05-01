@@ -362,6 +362,12 @@ jest.mock('../../../lib/api-client', () => {
   return {
     QuotaExceededError,
     ForbiddenError,
+    withIdempotencyKey: (
+      headers: Record<string, string>,
+      key: string | undefined
+    ) => (key ? { ...headers, 'Idempotency-Key': key } : headers),
+    isIdempotencyReplay: (response: Response) =>
+      response.headers.get('Idempotency-Replay') === 'true',
     useApiClient: () => ({
       sessions: {
         ':sessionId': {
@@ -515,7 +521,7 @@ describe('SessionScreen homework flow', () => {
         expect.any(Function),
         expect.any(Function),
         'session-1',
-        undefined
+        expect.objectContaining({ idempotencyKey: expect.any(String) })
       );
     });
     expect(mockStartSession).toHaveBeenCalledTimes(1);
@@ -538,7 +544,7 @@ describe('SessionScreen homework flow', () => {
         expect.any(Function),
         expect.any(Function),
         'session-1',
-        undefined
+        expect.objectContaining({ idempotencyKey: expect.any(String) })
       );
     });
     expect(mockStartSession).toHaveBeenCalledTimes(1);
@@ -619,7 +625,7 @@ describe('SessionScreen homework flow', () => {
         expect.any(Function),
         expect.any(Function),
         'session-1',
-        undefined
+        expect.objectContaining({ idempotencyKey: expect.any(String) })
       );
     });
 
@@ -646,7 +652,7 @@ describe('SessionScreen homework flow', () => {
         expect.any(Function),
         expect.any(Function),
         'session-1',
-        undefined
+        expect.objectContaining({ idempotencyKey: expect.any(String) })
       );
     });
     expect(screen.getByTestId('session-confirmation-toast')).toBeTruthy();
@@ -679,7 +685,7 @@ describe('SessionScreen homework flow', () => {
         expect.any(Function),
         expect.any(Function),
         'session-1',
-        undefined
+        expect.objectContaining({ idempotencyKey: expect.any(String) })
       );
     });
 
@@ -715,7 +721,7 @@ describe('SessionScreen homework flow', () => {
         expect.any(Function),
         expect.any(Function),
         'session-1',
-        undefined
+        expect.objectContaining({ idempotencyKey: expect.any(String) })
       );
     });
   });
@@ -954,7 +960,7 @@ describe('SessionScreen homework flow', () => {
         expect.any(Function),
         expect.any(Function),
         'session-1',
-        undefined
+        expect.objectContaining({ idempotencyKey: expect.any(String) })
       );
     });
   });

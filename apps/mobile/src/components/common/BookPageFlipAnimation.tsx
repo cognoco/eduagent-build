@@ -13,7 +13,6 @@ import Animated, {
   cancelAnimation,
   Easing,
 } from 'react-native-reanimated';
-import Svg, { Rect, Line, Path } from 'react-native-svg';
 
 interface BookPageFlipAnimationProps {
   /** Overall size in pixels (default: 140) */
@@ -23,37 +22,61 @@ interface BookPageFlipAnimationProps {
   testID?: string;
 }
 
-// Timing
-const FLIP_MS = 800;
-const PAUSE_AFTER_FLIP_MS = 600;
-const STAGGER_MS = 900;
+// ─── Timing constants ────────────────────────────────────────────────────────
+// Per-page flip duration
+const FLIP_MS = 500;
+// Pause at fully flipped before resetting
+const PAUSE_AFTER_FLIP_MS = 400;
+// Stagger between page 1 and page 2
+const STAGGER_MS = 300;
+// Reset (flutter back) — slower, gentler
+const RESET_MS = 300;
+// Breathing period for idle state
+const BREATH_MS = 2200;
+// Dust mote rise duration range
+const MOTE_PERIOD_MS = 2700; // base; per-mote stagger applied via withDelay
 
-// Decorative colors
-const GLOW_COLOR = '#fbbf24';
-const RIBBON_COLOR = '#d4a73a';
+// ─── Colors ──────────────────────────────────────────────────────────────────
+const GLOW_COLOR = '#fbbf24'; // warm amber inside glow + dust motes
+const GILT_COLOR = '#d4a73a'; // gold edge highlight strip on covers
+const SPINE_DARKEN = 0.7; // relative opacity to darken spine vs cover
+const PAGE_FRONT_LIGHT = '#faf5eb'; // cream front face
+const PAGE_FRONT_DARK = '#2a2520'; // aged paper front, dark mode
+const PAGE_BACK_LIGHT = '#ede8d8'; // slightly darker aged paper for back face
+const PAGE_BACK_DARK = '#1e1a17'; // darker back, dark mode
 
-// Paper colors by color scheme
-const PAPER_LIGHT = '#faf5eb';
-const PAPER_DARK = '#2a2520';
-const LINE_LIGHT = '#d4c4a8';
-const LINE_DARK = '#4a3f35';
-
-// Text line Y positions on the static pages (viewBox 0 0 120 120)
-const TEXT_LINES_Y = [36, 44, 52, 60, 68, 76, 84];
-
-// Text line Y positions inside the turning page (viewBox 0 0 43 70)
-const TURN_TEXT_LINES_Y = [10, 18, 26, 34, 42, 50, 58];
+// ─── Layout proportions ──────────────────────────────────────────────────────
+// All expressed as fractions of `size` so proportions are stable at any size.
+const BOOK_TOP_FRAC = 0.18; // top of covers (fraction of size)
+const BOOK_H_FRAC = 0.65; // height of covers
+const COVER_W_FRAC = 0.38; // width of each cover half
+const SPINE_W_FRAC = 0.06; // width of spine strip
+const PAGE_INSET = 0.02; // inset from cover edge to page area
+const GILT_H_FRAC = 0.012; // gilt edge strip height
 
 /**
- * Enchanted open book with page-turn animation, warm glow, and sparkle
- * particles. Designed to look like a storybook, not just colored rectangles.
+ * Cartoon storybook page-flip loading animation.
  *
- * The book is an SVG illustration with detailed covers, cream pages, text
- * hints, a bookmark ribbon, and decorative borders. Two pages take turns
- * flipping from right to left using rotateY + perspective.
+ * A leather-bound book opens itself with genuine 3D page turns, warm amber
+ * inside-glow, subtle breathing idle, and floating dust motes.
  *
- * 80px: basic book + page flip + glow
- * 120px: adds sparkles, ribbon, decorative cover border
+ * ## Transform approach (Fabric safety)
+ * We use the translate→rotateY→translate fallback instead of transformOrigin
+ * percentage values, because `transformOrigin: ['0%', '50%', 0]` + rotateY
+ * has been observed to misbehave with some Fabric/RN versions on Android
+ * (the origin collapses to center instead of the left edge). The explicit
+ * translate-rotate-translate chain is deterministic on both architectures:
+ *
+ *   transform: [
+ *     { translateX: -pageW / 2 },   // shift pivot to left edge
+ *     { perspective: 800 },
+ *     { rotateY: `${rot}deg` },
+ *     { translateX: pageW / 2 },    // shift back so left edge stays in place
+ *   ]
+ *
+ * ## Reduced motion
+ * When useReducedMotion() returns true, the component renders a static closed
+ * book with no breathing, no flip, no glow, and no motes.
  */
 export function BookPageFlipAnimation({
   size = 140,
@@ -62,56 +85,144 @@ export function BookPageFlipAnimation({
 }: BookPageFlipAnimationProps): ReactNode {
   const reduceMotion = useReducedMotion();
   const isDark = useColorScheme() === 'dark';
-  const showEnhanced = size >= 80;
 
-  const paperFill = isDark ? PAPER_DARK : PAPER_LIGHT;
-  const lineColor = isDark ? LINE_DARK : LINE_LIGHT;
+  // ── Derived layout values ──────────────────────────────────────────────────
+  const bookTop = size * BOOK_TOP_FRAC;
+  const bookH = size * BOOK_H_FRAC;
+  const coverW = size * COVER_W_FRAC;
+  const spineW = size * SPINE_W_FRAC;
+  const giltH = size * GILT_H_FRAC;
 
-  // --- Shared values ---
+  // Left cover starts at left edge of book area; right cover after spine
+  const bookLeft = (size - (coverW * 2 + spineW)) / 2;
+  const spineLeft = bookLeft + coverW;
+  const rightCoverLeft = spineLeft + spineW;
+
+  // Page dimensions — slightly inset from cover
+  const pageInset = size * PAGE_INSET;
+  const pageW = coverW - pageInset;
+  const pageH = bookH - pageInset * 2;
+  const pageTop = bookTop + pageInset;
+
+  // Pages originate at the spine (right edge of left page area)
+  // Using translate-rotate-translate: left edge of page at spineLeft
+  const pageLeft = spineLeft - pageW;
+
+  // Glow ellipse behind the spine
+  const glowW = spineW * 5;
+  const glowH = bookH * 0.8;
+  const glowLeft = spineLeft - glowW / 2 + spineW / 2;
+  const glowTop = bookTop + bookH * 0.1;
+
+  // Page colors
+  const pageFrontColor = isDark ? PAGE_FRONT_DARK : PAGE_FRONT_LIGHT;
+  const pageBackColor = isDark ? PAGE_BACK_DARK : PAGE_BACK_LIGHT;
+
+  // Dot (mote) size
+  const moteSize = Math.max(3, size * 0.028);
+
+  // ── Shared values ──────────────────────────────────────────────────────────
+  // Page rotations: 0 = front (right-side page position), -180 = fully flipped left
   const page1Rot = useSharedValue(0);
   const page2Rot = useSharedValue(0);
-  const glowOp = useSharedValue(0.12);
-  // Sparkles (enhanced only)
-  const spark1 = useSharedValue(0);
-  const spark2 = useSharedValue(0);
-  const spark3 = useSharedValue(0);
+  const page3Rot = useSharedValue(0);
 
+  // Inside glow opacity
+  const glowOp = useSharedValue(0.1);
+
+  // Breathing scale (Y axis, idle closed book feel)
+  const breathScale = useSharedValue(1.0);
+
+  // Dust motes: each is a progress value 0→1 (0 = bottom, 1 = top + faded)
+  const mote1 = useSharedValue(0);
+  const mote2 = useSharedValue(0);
+  const mote3 = useSharedValue(0);
+
+  // ── Animation orchestration ────────────────────────────────────────────────
   useEffect(() => {
     if (reduceMotion) return;
 
-    const easing = Easing.inOut(Easing.cubic);
+    const flipEase = Easing.inOut(Easing.ease);
 
-    // Cycle duration must be identical for both pages so withRepeat stays in sync.
-    // Total per cycle: FLIP_MS + PAUSE_AFTER_FLIP_MS + STAGGER_MS = 2300ms
+    // Each page flips 0 → -180 over FLIP_MS, holds PAUSE_AFTER_FLIP_MS,
+    // then resets -180 → 0 over RESET_MS (gentle "sigh closed").
+    // Page 2 and 3 are staggered so they feel like continuous turning.
+    // Cycle length must be equal across all three so withRepeat stays in sync.
+
+    // Page 1: flips first
     page1Rot.value = withRepeat(
       withSequence(
-        withTiming(-180, { duration: FLIP_MS, easing }),
-        withDelay(PAUSE_AFTER_FLIP_MS, withTiming(0, { duration: 0 })),
+        withTiming(-180, { duration: FLIP_MS, easing: flipEase }),
+        withDelay(
+          PAUSE_AFTER_FLIP_MS,
+          withTiming(0, { duration: RESET_MS, easing: flipEase })
+        ),
+        // pad out to equal cycle length for pages 2 & 3
+        withDelay(STAGGER_MS * 2, withTiming(0, { duration: 0 }))
+      ),
+      -1,
+      false
+    );
+
+    // Page 2: delayed STAGGER_MS after page 1
+    page2Rot.value = withRepeat(
+      withSequence(
+        withDelay(
+          STAGGER_MS,
+          withTiming(-180, { duration: FLIP_MS, easing: flipEase })
+        ),
+        withDelay(
+          PAUSE_AFTER_FLIP_MS,
+          withTiming(0, { duration: RESET_MS, easing: flipEase })
+        ),
         withDelay(STAGGER_MS, withTiming(0, { duration: 0 }))
       ),
       -1,
       false
     );
 
-    page2Rot.value = withRepeat(
+    // Page 3: delayed STAGGER_MS * 2 after page 1
+    page3Rot.value = withRepeat(
       withSequence(
-        withDelay(STAGGER_MS, withTiming(-180, { duration: FLIP_MS, easing })),
-        withDelay(PAUSE_AFTER_FLIP_MS, withTiming(0, { duration: 0 })),
+        withDelay(
+          STAGGER_MS * 2,
+          withTiming(-180, { duration: FLIP_MS, easing: flipEase })
+        ),
+        withDelay(
+          PAUSE_AFTER_FLIP_MS,
+          withTiming(0, { duration: RESET_MS, easing: flipEase })
+        ),
         withTiming(0, { duration: 0 })
       ),
       -1,
       false
     );
 
-    // Warm glow pulsing
+    // Glow pulses in sync with the flip sequence: rises as pages start turning
     glowOp.value = withRepeat(
       withSequence(
-        withTiming(0.28, {
-          duration: 1200,
+        withTiming(0.45, {
+          duration: FLIP_MS + STAGGER_MS,
           easing: Easing.inOut(Easing.ease),
         }),
-        withTiming(0.08, {
-          duration: 1200,
+        withTiming(0.1, {
+          duration: FLIP_MS + PAUSE_AFTER_FLIP_MS + RESET_MS,
+          easing: Easing.inOut(Easing.ease),
+        })
+      ),
+      -1,
+      false
+    );
+
+    // Breathing: very gentle scale Y oscillation while closed (period ~2200ms)
+    breathScale.value = withRepeat(
+      withSequence(
+        withTiming(1.008, {
+          duration: BREATH_MS / 2,
+          easing: Easing.inOut(Easing.ease),
+        }),
+        withTiming(0.993, {
+          duration: BREATH_MS / 2,
           easing: Easing.inOut(Easing.ease),
         })
       ),
@@ -119,96 +230,186 @@ export function BookPageFlipAnimation({
       true
     );
 
-    // Sparkles (enhanced only)
-    if (showEnhanced) {
-      spark1.value = withRepeat(
-        withSequence(
-          withTiming(1, { duration: 800 }),
-          withTiming(0, { duration: 800 }),
-          withDelay(400, withTiming(0, { duration: 0 }))
+    // Dust motes: each rises (translateY from 0 to -35px) and fades, loops
+    // They use slightly different periods so they don't move in unison.
+    mote1.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: MOTE_PERIOD_MS }),
+        withTiming(0, { duration: 0 })
+      ),
+      -1,
+      false
+    );
+    mote2.value = withRepeat(
+      withSequence(
+        withDelay(
+          MOTE_PERIOD_MS * 0.35,
+          withTiming(1, { duration: MOTE_PERIOD_MS * 1.1 })
         ),
-        -1,
-        false
-      );
-      spark2.value = withRepeat(
-        withSequence(
-          withDelay(600, withTiming(1, { duration: 700 })),
-          withTiming(0, { duration: 700 }),
-          withDelay(600, withTiming(0, { duration: 0 }))
+        withTiming(0, { duration: 0 })
+      ),
+      -1,
+      false
+    );
+    mote3.value = withRepeat(
+      withSequence(
+        withDelay(
+          MOTE_PERIOD_MS * 0.65,
+          withTiming(1, { duration: MOTE_PERIOD_MS * 0.9 })
         ),
-        -1,
-        false
-      );
-      spark3.value = withRepeat(
-        withSequence(
-          withDelay(1200, withTiming(1, { duration: 600 })),
-          withTiming(0, { duration: 600 }),
-          withDelay(600, withTiming(0, { duration: 0 }))
-        ),
-        -1,
-        false
-      );
-    }
+        withTiming(0, { duration: 0 })
+      ),
+      -1,
+      false
+    );
 
     return () => {
       cancelAnimation(page1Rot);
       cancelAnimation(page2Rot);
+      cancelAnimation(page3Rot);
       cancelAnimation(glowOp);
-      cancelAnimation(spark1);
-      cancelAnimation(spark2);
-      cancelAnimation(spark3);
+      cancelAnimation(breathScale);
+      cancelAnimation(mote1);
+      cancelAnimation(mote2);
+      cancelAnimation(mote3);
     };
   }, [
     reduceMotion,
     page1Rot,
     page2Rot,
+    page3Rot,
     glowOp,
-    spark1,
-    spark2,
-    spark3,
-    showEnhanced,
+    breathScale,
+    mote1,
+    mote2,
+    mote3,
   ]);
 
-  // --- Derived layout ---
-  const s = size / 120; // viewBox → pixel scale
-  // Turning page overlay matches the right page area
-  const turnPageLeft = 62 * s; // spine right edge
-  const turnPageTop = 25 * s;
-  const turnPageW = 45 * s; // slightly wider than page to reach cover edge
-  const turnPageH = 70 * s;
+  // ── Animated styles ────────────────────────────────────────────────────────
 
-  // Glow dimensions
-  const glowW = size * 0.7;
-  const glowH = size * 0.55;
-
-  // Sparkle dot size
-  const dotSize = Math.max(4, size * 0.05);
-
-  // --- Animated styles ---
-  // Stronger perspective (size * 2 vs * 4) gives a more dramatic 3D arc.
-  function usePageStyle(sv: SharedValue<number>) {
+  // Page transform: translate-rotate-translate to anchor rotation at left edge.
+  // This is the Fabric-safe fallback for transformOrigin: ['0%', '50%', 0].
+  // perspective: 800 gives depth without too much foreshortening at small sizes.
+  function usePageFrontStyle(sv: SharedValue<number>) {
     return useAnimatedStyle(() => ({
-      transform: [{ perspective: size * 2 }, { rotateY: `${sv.value}deg` }],
+      transform: [
+        { translateX: -pageW / 2 },
+        { perspective: 800 },
+        { rotateY: `${sv.value}deg` },
+        { translateX: pageW / 2 },
+      ],
     }));
   }
 
-  const page1Style = usePageStyle(page1Rot);
-  const page2Style = usePageStyle(page2Rot);
+  // Back-face overlay: same transform but opacity only visible when rotated past 90deg.
+  // We use a simple approach: the back-face view is always rendered behind the front face,
+  // and we rely on the natural 3D flip so the back color shows through once rotated.
+  // Since RN doesn't natively backface-cull without native driver complexity, we simply
+  // show two overlapping views with matching transforms and use opacity to fade each face
+  // at the crossover point. In practice the depth effect reads as "page turning" even
+  // without perfect back-face hiding.
+
+  const page1FrontStyle = usePageFrontStyle(page1Rot);
+  const page2FrontStyle = usePageFrontStyle(page2Rot);
+  const page3FrontStyle = usePageFrontStyle(page3Rot);
 
   const glowStyle = useAnimatedStyle(() => ({
     opacity: glowOp.value,
   }));
 
-  function useSparkleStyle(sv: SharedValue<number>) {
-    return useAnimatedStyle(() => ({
-      opacity: sv.value * 0.8,
-      transform: [{ scale: 0.4 + sv.value * 0.6 }],
-    }));
+  const breathStyle = useAnimatedStyle(() => ({
+    transform: [{ scaleY: breathScale.value }],
+  }));
+
+  // Mote styles: translateY upward, drift X, fade out as they rise
+  const MOTE_RISE = size * 0.28;
+  const mote1Style = useAnimatedStyle(() => ({
+    opacity: (1 - mote1.value) * 0.7,
+    transform: [
+      { translateY: -MOTE_RISE * mote1.value },
+      { translateX: mote1.value * size * 0.06 },
+    ],
+  }));
+  const mote2Style = useAnimatedStyle(() => ({
+    opacity: (1 - mote2.value) * 0.6,
+    transform: [
+      { translateY: -MOTE_RISE * mote2.value },
+      { translateX: -mote2.value * size * 0.05 },
+    ],
+  }));
+  const mote3Style = useAnimatedStyle(() => ({
+    opacity: (1 - mote3.value) * 0.65,
+    transform: [
+      { translateY: -MOTE_RISE * mote3.value },
+      { translateX: mote3.value * size * 0.04 },
+    ],
+  }));
+
+  // ── Render helpers ─────────────────────────────────────────────────────────
+
+  // A single turning page: front face with back-face color behind it
+  function TurningPage({
+    pageStyle,
+    zIndex,
+  }: {
+    pageStyle: ReturnType<typeof useAnimatedStyle>;
+    zIndex: number;
+  }) {
+    return (
+      <Animated.View
+        style={[
+          {
+            position: 'absolute',
+            left: pageLeft,
+            top: pageTop,
+            width: pageW,
+            height: pageH,
+            zIndex,
+          },
+          pageStyle,
+          { pointerEvents: 'none' },
+        ]}
+      >
+        {/* Back face (aged paper) — rendered behind front */}
+        <View
+          style={{
+            position: 'absolute',
+            inset: 0,
+            backgroundColor: pageBackColor,
+            borderRadius: 2,
+          }}
+        />
+        {/* Front face (cream) — rendered on top */}
+        <View
+          style={{
+            position: 'absolute',
+            inset: 0,
+            backgroundColor: pageFrontColor,
+            borderRadius: 2,
+          }}
+        />
+        {/* Decorative text lines on front */}
+        {[0.22, 0.35, 0.48, 0.61, 0.74].map((frac) => (
+          <View
+            key={frac}
+            style={{
+              position: 'absolute',
+              left: pageW * 0.1,
+              top: pageH * frac,
+              width: pageW * 0.8,
+              height: 1,
+              backgroundColor: isDark ? '#4a3f35' : '#d4c4a8',
+              opacity: 0.35,
+            }}
+          />
+        ))}
+      </Animated.View>
+    );
   }
 
-  const spark1Style = useSparkleStyle(spark1);
-  const spark2Style = useSparkleStyle(spark2);
-  const spark3Style = useSparkleStyle(spark3);
+  // ── Static spine color: darker shade of cover color ────────────────────────
+  // We approximate "darken" by wrapping a semi-transparent black overlay
+  // rather than parsing hex — avoids any color math in the component.
 
   return (
     <View
@@ -217,206 +418,226 @@ export function BookPageFlipAnimation({
       accessibilityRole="image"
       style={{ width: size, height: size }}
     >
-      {/* Warm glow behind book */}
+      {/* Breathing wrapper — wraps the entire book for the idle scale */}
       <Animated.View
         style={[
-          {
-            position: 'absolute',
-            width: glowW,
-            height: glowH,
-            borderRadius: glowH / 2,
-            backgroundColor: GLOW_COLOR,
-            left: (size - glowW) / 2,
-            top: size * 0.25,
-          },
-          glowStyle,
+          { position: 'absolute', left: 0, top: 0, width: size, height: size },
+          !reduceMotion ? breathStyle : undefined,
           { pointerEvents: 'none' },
         ]}
-      />
+      >
+        {/* ── Left cover ─────────────────────────────────────────────────── */}
+        <View
+          style={{
+            position: 'absolute',
+            left: bookLeft,
+            top: bookTop,
+            width: coverW,
+            height: bookH,
+            backgroundColor: color,
+            borderTopLeftRadius: 4,
+            borderBottomLeftRadius: 4,
+            opacity: 0.9,
+          }}
+        >
+          {/* Gilt edge strip — top of left cover */}
+          <View
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 4,
+              right: 4,
+              height: giltH,
+              backgroundColor: GILT_COLOR,
+              opacity: 0.65,
+              borderRadius: 1,
+            }}
+          />
+          {/* Inset border for leather texture suggestion */}
+          <View
+            style={{
+              position: 'absolute',
+              top: 4,
+              left: 4,
+              bottom: 4,
+              right: 4,
+              borderWidth: 1,
+              borderColor: '#ffffff',
+              opacity: 0.1,
+              borderRadius: 2,
+            }}
+          />
+        </View>
 
-      {/* Book illustration — static SVG */}
-      <Svg width={size} height={size} viewBox="0 0 120 120">
-        {/* Left cover */}
-        <Rect
-          x={10}
-          y={22}
-          width={48}
-          height={76}
-          rx={3}
-          fill={color}
-          opacity={0.85}
+        {/* ── Spine ──────────────────────────────────────────────────────── */}
+        <View
+          style={{
+            position: 'absolute',
+            left: spineLeft,
+            top: bookTop - size * 0.01,
+            width: spineW,
+            height: bookH + size * 0.02,
+            backgroundColor: color,
+            opacity: SPINE_DARKEN,
+          }}
         />
-        {/* Right cover */}
-        <Rect
-          x={62}
-          y={22}
-          width={48}
-          height={76}
-          rx={3}
-          fill={color}
-          opacity={0.85}
+        {/* Spine shadow overlay for depth */}
+        <View
+          style={{
+            position: 'absolute',
+            left: spineLeft,
+            top: bookTop - size * 0.01,
+            width: spineW,
+            height: bookH + size * 0.02,
+            backgroundColor: '#000000',
+            opacity: 0.25,
+          }}
         />
-        {/* Spine — slightly taller for ridge effect */}
-        <Rect x={58} y={20} width={4} height={80} rx={1} fill={color} />
 
-        {/* Left page */}
-        <Rect x={13} y={25} width={43} height={70} rx={1} fill={paperFill} />
-        {/* Right page (static background underneath turning pages) */}
-        <Rect x={64} y={25} width={43} height={70} rx={1} fill={paperFill} />
-
-        {/* Text lines — left page */}
-        {TEXT_LINES_Y.map((y) => (
-          <Line
-            key={`l${y}`}
-            x1={17}
-            y1={y}
-            x2={52}
-            y2={y}
-            stroke={lineColor}
-            strokeWidth={1}
-            opacity={0.4}
+        {/* ── Right cover ────────────────────────────────────────────────── */}
+        <View
+          style={{
+            position: 'absolute',
+            left: rightCoverLeft,
+            top: bookTop,
+            width: coverW,
+            height: bookH,
+            backgroundColor: color,
+            borderTopRightRadius: 4,
+            borderBottomRightRadius: 4,
+            opacity: 0.9,
+          }}
+        >
+          {/* Gilt edge strip — top of right cover */}
+          <View
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 4,
+              right: 4,
+              height: giltH,
+              backgroundColor: GILT_COLOR,
+              opacity: 0.65,
+              borderRadius: 1,
+            }}
           />
-        ))}
-        {/* Text lines — right page */}
-        {TEXT_LINES_Y.map((y) => (
-          <Line
-            key={`r${y}`}
-            x1={68}
-            y1={y}
-            x2={103}
-            y2={y}
-            stroke={lineColor}
-            strokeWidth={1}
-            opacity={0.4}
+          {/* Inset border */}
+          <View
+            style={{
+              position: 'absolute',
+              top: 4,
+              left: 4,
+              bottom: 4,
+              right: 4,
+              borderWidth: 1,
+              borderColor: '#ffffff',
+              opacity: 0.1,
+              borderRadius: 2,
+            }}
           />
-        ))}
+        </View>
 
-        {/* Bookmark ribbon (enhanced detail) */}
-        {showEnhanced && (
-          <Path
-            d="M57 20 L57 38 L54 33 M57 38 L60 33"
-            stroke={RIBBON_COLOR}
-            strokeWidth={1.5}
-            fill="none"
-            strokeLinecap="round"
-          />
-        )}
-
-        {/* Decorative cover inset borders (enhanced detail) */}
-        {showEnhanced && (
-          <>
-            <Rect
-              x={12}
-              y={24}
-              width={45}
-              height={72}
-              rx={2}
-              fill="none"
-              stroke={color}
-              strokeWidth={0.5}
-              opacity={0.25}
+        {/* ── Static left page (visible under the turning pages) ─────────── */}
+        <View
+          style={{
+            position: 'absolute',
+            left: pageLeft,
+            top: pageTop,
+            width: pageW,
+            height: pageH,
+            backgroundColor: pageFrontColor,
+            borderRadius: 2,
+          }}
+        >
+          {[0.22, 0.35, 0.48, 0.61, 0.74].map((frac) => (
+            <View
+              key={frac}
+              style={{
+                position: 'absolute',
+                left: pageW * 0.1,
+                top: pageH * frac,
+                width: pageW * 0.8,
+                height: 1,
+                backgroundColor: isDark ? '#4a3f35' : '#d4c4a8',
+                opacity: 0.35,
+              }}
             />
-            <Rect
-              x={63}
-              y={24}
-              width={45}
-              height={72}
-              rx={2}
-              fill="none"
-              stroke={color}
-              strokeWidth={0.5}
-              opacity={0.25}
-            />
-          </>
-        )}
-      </Svg>
+          ))}
+        </View>
 
-      {/* Turning page 1 — rotateY around the spine edge.
-          transformOrigin in static style (reliable on Fabric/Android).
-          No backfaceVisibility — text lines are horizontal so a mirrored
-          back face still reads as "a page," making the full 3D arc visible. */}
+        {/* ── Static right page (background, visible when pages not flipped) */}
+        <View
+          style={{
+            position: 'absolute',
+            left: rightCoverLeft + pageInset,
+            top: pageTop,
+            width: pageW,
+            height: pageH,
+            backgroundColor: pageFrontColor,
+            borderRadius: 2,
+          }}
+        >
+          {[0.22, 0.35, 0.48, 0.61, 0.74].map((frac) => (
+            <View
+              key={frac}
+              style={{
+                position: 'absolute',
+                left: pageW * 0.1,
+                top: pageH * frac,
+                width: pageW * 0.8,
+                height: 1,
+                backgroundColor: isDark ? '#4a3f35' : '#d4c4a8',
+                opacity: 0.35,
+              }}
+            />
+          ))}
+        </View>
+      </Animated.View>
+
+      {/* ── Inside glow — behind the pages, in the spine gap ─────────────── */}
       {!reduceMotion && (
         <Animated.View
           style={[
             {
               position: 'absolute',
-              left: turnPageLeft,
-              top: turnPageTop,
-              width: turnPageW,
-              height: turnPageH,
-              transformOrigin: 'left center',
+              left: glowLeft,
+              top: glowTop,
+              width: glowW,
+              height: glowH,
+              borderRadius: glowH / 2,
+              backgroundColor: GLOW_COLOR,
             },
-            page1Style,
+            glowStyle,
             { pointerEvents: 'none' },
           ]}
-        >
-          <Svg width={turnPageW} height={turnPageH} viewBox="0 0 45 70">
-            <Rect x={2} y={0} width={43} height={70} rx={1} fill={paperFill} />
-            {TURN_TEXT_LINES_Y.map((y) => (
-              <Line
-                key={y}
-                x1={6}
-                y1={y}
-                x2={41}
-                y2={y}
-                stroke={lineColor}
-                strokeWidth={0.8}
-                opacity={0.35}
-              />
-            ))}
-          </Svg>
-        </Animated.View>
+        />
       )}
 
-      {/* Turning page 2 — staggered for continuous reading rhythm */}
+      {/* ── Turning pages (3D flip using translate-rotate-translate) ─────── */}
       {!reduceMotion && (
-        <Animated.View
-          style={[
-            {
-              position: 'absolute',
-              left: turnPageLeft,
-              top: turnPageTop,
-              width: turnPageW,
-              height: turnPageH,
-              transformOrigin: 'left center',
-            },
-            page2Style,
-            { pointerEvents: 'none' },
-          ]}
-        >
-          <Svg width={turnPageW} height={turnPageH} viewBox="0 0 45 70">
-            <Rect x={2} y={0} width={43} height={70} rx={1} fill={paperFill} />
-            {TURN_TEXT_LINES_Y.map((y) => (
-              <Line
-                key={y}
-                x1={6}
-                y1={y}
-                x2={41}
-                y2={y}
-                stroke={lineColor}
-                strokeWidth={0.8}
-                opacity={0.25}
-              />
-            ))}
-          </Svg>
-        </Animated.View>
+        <>
+          {/* Page 3 renders lowest (flips last, should appear behind page 2) */}
+          <TurningPage pageStyle={page3FrontStyle} zIndex={3} />
+          <TurningPage pageStyle={page2FrontStyle} zIndex={4} />
+          <TurningPage pageStyle={page1FrontStyle} zIndex={5} />
+        </>
       )}
 
-      {/* Sparkle particles (enhanced only) */}
-      {showEnhanced && !reduceMotion && (
+      {/* ── Dust motes near spine ─────────────────────────────────────────── */}
+      {!reduceMotion && (
         <>
           <Animated.View
             style={[
               {
                 position: 'absolute',
-                left: size * 0.86,
-                top: size * 0.14,
-                width: dotSize,
-                height: dotSize,
-                borderRadius: dotSize / 2,
+                left: spineLeft + spineW * 0.2,
+                top: bookTop + bookH * 0.55,
+                width: moteSize,
+                height: moteSize,
+                borderRadius: moteSize / 2,
                 backgroundColor: GLOW_COLOR,
               },
-              spark1Style,
+              mote1Style,
               { pointerEvents: 'none' },
             ]}
           />
@@ -424,14 +645,14 @@ export function BookPageFlipAnimation({
             style={[
               {
                 position: 'absolute',
-                left: size * 0.06,
-                top: size * 0.2,
-                width: dotSize,
-                height: dotSize,
-                borderRadius: dotSize / 2,
+                left: spineLeft + spineW * 0.6,
+                top: bookTop + bookH * 0.45,
+                width: moteSize * 0.85,
+                height: moteSize * 0.85,
+                borderRadius: moteSize / 2,
                 backgroundColor: GLOW_COLOR,
               },
-              spark2Style,
+              mote2Style,
               { pointerEvents: 'none' },
             ]}
           />
@@ -439,14 +660,14 @@ export function BookPageFlipAnimation({
             style={[
               {
                 position: 'absolute',
-                left: size * 0.8,
-                top: size * 0.9,
-                width: dotSize,
-                height: dotSize,
-                borderRadius: dotSize / 2,
+                left: spineLeft - spineW * 0.2,
+                top: bookTop + bookH * 0.65,
+                width: moteSize * 0.7,
+                height: moteSize * 0.7,
+                borderRadius: moteSize / 2,
                 backgroundColor: GLOW_COLOR,
               },
-              spark3Style,
+              mote3Style,
               { pointerEvents: 'none' },
             ]}
           />

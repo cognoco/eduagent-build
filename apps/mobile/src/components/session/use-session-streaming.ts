@@ -36,6 +36,14 @@ import {
   RECONNECT_PROMPT,
   TIMEOUT_PROMPT,
 } from './session-types';
+import {
+  beginAttempt,
+  enqueue,
+  getOutboxEntry,
+  markConfirmed,
+  recordFailure,
+  type OutboxEntry,
+} from '../../lib/message-outbox';
 
 export interface UseSessionStreamingOptions {
   // Route / derived params
@@ -105,6 +113,7 @@ export interface UseSessionStreamingOptions {
   lastRetryPayloadRef: React.MutableRefObject<{
     text: string;
     options?: { sessionSubjectId?: string; sessionSubjectName?: string };
+    outboxEntryId?: string;
   } | null>;
   trackerStateRef: React.MutableRefObject<
     ReturnType<typeof useMilestoneTracker>['trackerState']
@@ -434,6 +443,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
       options?: {
         sessionSubjectId?: string;
         sessionSubjectName?: string;
+        existingEntry?: OutboxEntry;
       }
     ) => {
       let streamId: string | null = null;
@@ -462,7 +472,12 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
         // (current) message — not the payload from the previous send.
         lastRetryPayloadRef.current = {
           text,
-          options,
+          options: options
+            ? {
+                sessionSubjectId: options.sessionSubjectId,
+                sessionSubjectName: options.sessionSubjectName,
+              }
+            : undefined,
         };
 
         const sid = await ensureSession(sessionSubjectId);
@@ -556,10 +571,49 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
           }
         }, 5_000);
 
+        const outboxEntry =
+          activeProfileId && sid
+            ? options?.existingEntry ??
+              (await enqueue({
+                profileId: activeProfileId,
+                flow: 'session',
+                surfaceKey: sid,
+                content: text,
+                metadata: {
+                  sessionId: sid,
+                  ...(effectiveMode === 'homework' && homeworkMode
+                    ? { homeworkMode }
+                    : {}),
+                },
+              }))
+            : null;
+
+        if (outboxEntry && activeProfileId) {
+          await beginAttempt(activeProfileId, 'session', outboxEntry.id);
+          lastRetryPayloadRef.current = {
+            text,
+            options: options
+              ? {
+                  sessionSubjectId: options.sessionSubjectId,
+                  sessionSubjectName: options.sessionSubjectName,
+                }
+              : undefined,
+            outboxEntryId: outboxEntry.id,
+          };
+        }
+
         const streamOptions: {
           homeworkMode?: 'help_me' | 'check_answer';
           imageBase64?: string;
           imageMimeType?: 'image/jpeg' | 'image/png' | 'image/webp';
+          idempotencyKey?: string;
+          onReplay?: (result: {
+            replayed: true;
+            clientId: string;
+            status: 'persisted';
+            assistantTurnReady: boolean;
+            latestExchangeId: string | null;
+          }) => void;
         } = {};
         if (effectiveMode === 'homework' && homeworkMode) {
           streamOptions.homeworkMode = homeworkMode;
@@ -570,6 +624,31 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
           // Clear after first send — subsequent messages are text-only
           imageBase64Ref.current = null;
           imageMimeTypeRef.current = null;
+        }
+        if (outboxEntry) {
+          streamOptions.idempotencyKey = outboxEntry.id;
+          streamOptions.onReplay = (replay) => {
+            void (async () => {
+              if (activeProfileId) {
+                await markConfirmed(activeProfileId, 'session', outboxEntry.id);
+              }
+            })();
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === streamId
+                  ? {
+                      ...m,
+                      content: replay.assistantTurnReady
+                        ? 'Previous send restored.'
+                        : 'Previous send restored. Waiting for the reply…',
+                      streaming: false,
+                      isSystemPrompt: true,
+                    }
+                  : m
+              )
+            );
+            setIsStreaming(false);
+          };
         }
 
         await streamMessage(
@@ -634,8 +713,20 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
             setEscalationRung(result.escalationRung);
 
             if (shouldConvertToReconnect) {
+              if (activeProfileId && outboxEntry) {
+                await recordFailure(
+                  activeProfileId,
+                  'session',
+                  outboxEntry.id,
+                  result.fallback?.reason ?? 'missing_reply'
+                );
+              }
               setLowConfidenceMessageId(null);
               return;
+            }
+
+            if (activeProfileId && outboxEntry) {
+              await markConfirmed(activeProfileId, 'session', outboxEntry.id);
             }
 
             // Handle note prompt triggers
@@ -694,6 +785,14 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
           Object.keys(streamOptions).length > 0 ? streamOptions : undefined
         );
       } catch (err: unknown) {
+        if (activeProfileId && lastRetryPayloadRef.current?.outboxEntryId) {
+          await recordFailure(
+            activeProfileId,
+            'session',
+            lastRetryPayloadRef.current.outboxEntryId,
+            err instanceof Error ? err.message : 'stream_failed'
+          );
+        }
         // Detect quota before reconnect classification — QuotaExceededError is
         // never reconnectable and needs a structured card, not a text bubble.
         if (err instanceof QuotaExceededError) {
@@ -846,6 +945,14 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
       }
 
       const retryPayload = lastRetryPayloadRef.current;
+      const existingEntry =
+        retryPayload.outboxEntryId && activeProfileId
+          ? await getOutboxEntry(
+              activeProfileId,
+              'session',
+              retryPayload.outboxEntryId
+            )
+          : null;
       // Remove both the error message AND the user's preceding message to
       // prevent the AI from seeing a duplicate exchange (the replay via
       // continueWithMessage re-adds the user message to the transcript).
@@ -860,9 +967,13 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
             : -1;
         return prev.filter((_, i) => i !== errorIndex && i !== userIndex);
       });
-      await continueWithMessage(retryPayload.text, retryPayload.options);
+      await continueWithMessage(retryPayload.text, {
+        ...retryPayload.options,
+        ...(existingEntry ? { existingEntry } : {}),
+      });
     },
     [
+      activeProfileId,
       continueWithMessage,
       isStreaming,
       lastRetryPayloadRef,

@@ -12,6 +12,7 @@ import {
   useSkipSummary,
   useSubmitSummary,
   useTopicParkingLot,
+  computeFilingRefetchInterval,
 } from './use-sessions';
 
 const mockFetch = jest.fn();
@@ -39,6 +40,10 @@ jest.mock('../lib/api-client', () => ({
   },
   // [I-1] getProxyMode is called by useStreamMessage to inject X-Proxy-Mode.
   getProxyMode: jest.fn().mockReturnValue(false),
+  withIdempotencyKey: (
+    headers: Record<string, string>,
+    key: string | undefined
+  ) => (key ? { ...headers, 'X-Idempotency-Key': key } : headers),
 }));
 
 jest.mock('../lib/api', () => ({
@@ -817,5 +822,27 @@ describe('useTopicParkingLot', () => {
     expect(result.current.data?.[0]?.question).toBe(
       'Why does factoring help here?'
     );
+  });
+});
+
+describe('computeFilingRefetchInterval', () => {
+  it('returns 15000 for filing_pending so useSession polls while retry is in flight', () => {
+    expect(computeFilingRefetchInterval('filing_pending')).toBe(15_000);
+  });
+
+  it('returns false for filing_failed (terminal — no polling needed)', () => {
+    expect(computeFilingRefetchInterval('filing_failed')).toBe(false);
+  });
+
+  it('returns false for filing_recovered (terminal — banner auto-dismisses)', () => {
+    expect(computeFilingRefetchInterval('filing_recovered')).toBe(false);
+  });
+
+  it('returns false for null (healthy session)', () => {
+    expect(computeFilingRefetchInterval(null)).toBe(false);
+  });
+
+  it('returns false for undefined (data not yet loaded)', () => {
+    expect(computeFilingRefetchInterval(undefined)).toBe(false);
   });
 });

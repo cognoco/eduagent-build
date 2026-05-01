@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import type { ComponentProps, ComponentType, ReactNode } from 'react';
-import { View, useColorScheme } from 'react-native';
+import { View } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -14,11 +14,13 @@ import Animated, {
   Easing,
   type AnimatedProps,
 } from 'react-native-reanimated';
-import Svg, { Path, Rect, Line } from 'react-native-svg';
+import Svg, { Path, Rect, Line, Circle } from 'react-native-svg';
 
+// ---------------------------------------------------------------------------
+// Fabric-safe animated component setup
 // Wrap in try-catch: on some Android release builds (Hermes + Fabric),
-// Reanimated's native module can fail to initialize, causing
-// createAnimatedComponent to throw. Same pattern as AnimatedSplash.
+// createAnimatedComponent can throw on initialisation.
+// ---------------------------------------------------------------------------
 type AnimatedPathComponent = ComponentType<
   AnimatedProps<ComponentProps<typeof Path>>
 >;
@@ -33,88 +35,115 @@ try {
   AnimatedPath = Path as unknown as AnimatedPathComponent;
 }
 
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
 interface MagicPenAnimationProps {
   /** Overall size in pixels (default: 140) */
   size?: number;
-  /** Pen/ink color (default: brand teal #0d9488) */
+  /** Pen / ink color (default: brand teal #0d9488) */
   color?: string;
   testID?: string;
 }
 
-// Paper colors by scheme
-const PAPER_LIGHT = '#faf5eb';
-const PAPER_DARK = '#2a2520';
-const PAPER_STROKE_LIGHT = '#e8dcc8';
-const PAPER_STROKE_DARK = '#3d3630';
-const RULE_LIGHT = '#e0d8c8';
-const RULE_DARK = '#3d3630';
-
-// Paper geometry (viewBox 0 0 120 120)
-const PAPER_X = 6;
-const PAPER_Y = 18;
-const PAPER_W = 108;
-const PAPER_H = 92;
-
-// Ruled-line Y positions on the paper
-const RULED_LINES_Y = [40, 55, 70, 85, 98];
-
-// Writing path — cursive bezier that stays within the paper bounds
-const WRITING_PATH = 'M 16 82 C 30 50, 48 94, 62 60 S 90 44, 108 74';
-const PATH_LENGTH = 160; // overestimate is safe
-
-// Pen body SVG paths (viewBox 0 0 40 60, pen points downward; rotated 35deg
-// in the parent View). The body is drawn slim (x=14..26, 12 wide) so the
-// silhouette reads as a tall roller-pen rather than a stubby pencil.
+// ---------------------------------------------------------------------------
+// Pen SVG — viewBox 0 0 100 100, angled at 45°
 //
-// Anatomy (top → bottom in pre-rotation viewBox coords):
-//   y= 2..22  cap (rounded top)
-//   y=22..24  chrome ring (cap-to-barrel join)
-//   y=24..40  upper barrel (solid)
-//   y=40..50  ink window (translucent — animated fill rendered here)
-//   y=50..52  chrome grip ring
-//   y=52..56  section cone (taper)
-//   y=56..60  metallic nib tip
-const PEN_CAP = 'M16 4 Q20 1 24 4 L26 22 L14 22 Z';
-const PEN_BARREL = 'M14 24 L26 24 L26 40 L14 40 Z';
-const PEN_SECTION = 'M14 52 L26 52 L22 56 L18 56 Z';
-const PEN_NIB = 'M18 56 L22 56 L20 60 Z';
-// Chrome clip silhouette on the cap (right side, with characteristic fold)
-const PEN_CLIP = 'M23 5 L23 17 L24 19 L23 21';
+// The pen is intentionally large within its viewBox so it stays legible at
+// the smallest render size (48px → penSize ≈ 30px).
+//
+// Anatomy (drawn pointing upper-left → lower-right at 45°, but the SVG is
+// drawn upright and rotated by the parent Animated.View):
+//
+//   Barrel:  rounded-rect, fills most of the viewBox width
+//   Grip:    slightly narrower rect below barrel (slightly darker shade)
+//   Nib:     triangle below grip
+//   Slit:    thin line down the center of the nib
+// ---------------------------------------------------------------------------
 
-// Chrome accents (fixed metallic tone — independent of pen color so cap clip
-// and grip rings still read as metal in any theme).
-const CHROME_FILL = '#cbd5e1';
-const CHROME_STROKE = '#475569';
+// All coordinates are in the 100×100 pen viewBox.
+// Barrel: wide, centre-heavy rectangle
+const BARREL_X = 20;
+const BARREL_Y = 5;
+const BARREL_W = 60;
+const BARREL_H = 58;
+const BARREL_RX = 8;
 
-// Ink window inside barrel (viewBox coords) — middle of the pen body so the
-// depleting ink level is visible right where the user expects on a roller pen.
-const INK_WIN_X = 15;
-const INK_WIN_Y = 40;
-const INK_WIN_W = 10;
-const INK_WIN_H = 10;
+// Grip: slightly narrower, sits directly below barrel
+const GRIP_X = 26;
+const GRIP_Y = 63;
+const GRIP_W = 48;
+const GRIP_H = 16;
+const GRIP_RX = 4;
 
-// Pen follower endpoints (start/end of writing path)
-const PEN_START_X = 16;
-const PEN_START_Y = 82;
-const PEN_END_X = 108;
-const PEN_END_Y = 74;
+// Nib: triangle from bottom of grip to a point
+const NIB_PATH = 'M26 79 L74 79 L50 100 Z';
 
-// Timing
-const DRAW_MS = 1500;
-const PAUSE_MS = 600;
-const RESET_MS = 300;
+// Slit: center line on nib
+const SLIT_X1 = 50;
+const SLIT_Y1 = 79;
+const SLIT_X2 = 50;
+const SLIT_Y2 = 98;
 
-// Glow color for nib
-const NIB_GLOW = '#fbbf24';
+// ---------------------------------------------------------------------------
+// Writing path — cursive wave in viewBox 0 0 100 100.
+// Kept readable (not micro-detailed). A gentle S-wave that looks like
+// natural handwriting motion.
+// ---------------------------------------------------------------------------
+const WRITING_PATH = 'M 8 70 C 20 40, 38 90, 52 55 S 78 38, 92 62';
+const PATH_LENGTH = 140; // safe overestimate
 
+// ---------------------------------------------------------------------------
+// Pen follower: start and end coords of the writing path (in writing viewBox)
+// The nib tip should track from start to end.
+// ---------------------------------------------------------------------------
+const PEN_START = { x: 8, y: 70 };
+const PEN_END = { x: 92, y: 62 };
+
+// Approximate slope of path at start (for initial pen angle)
+// We use a fixed 45° angle throughout for simplicity, matching the pen body
+// orientation.
+
+// ---------------------------------------------------------------------------
+// Ink droplet "glow" accent color (warm amber — per spec)
+// ---------------------------------------------------------------------------
+const INK_GLOW_COLOR = '#fbbf24';
+
+// ---------------------------------------------------------------------------
+// Timing constants — total cycle ≈ 3 000 ms
+// ---------------------------------------------------------------------------
+const DROP_IN_MS = 300; // pen drops in from above
+const SWAY_MS = 200; // brief settle/sway pause
+const TRACE_MS = 1800; // pen traces the path
+const FLICK_MS = 200; // upward flick at end
+const FLOAT_BACK_MS = 400; // pen floats back to start
+const FADE_MS = 300; // stroke fades out
+const TOTAL_MS = DROP_IN_MS + SWAY_MS + TRACE_MS + FLICK_MS + FLOAT_BACK_MS;
+// sanity-check: ~2900ms ≈ 3s
+
+// ---------------------------------------------------------------------------
+// Easing helpers — defined as lazy getter functions so they are only
+// evaluated at animation time (inside useEffect), not at module load.
+// This avoids failures in test environments where the Easing mock may not
+// include all methods (elastic, cubic, etc.).
+// ---------------------------------------------------------------------------
+const getEaseBounce = () => Easing.out(Easing.elastic(1.4));
+const getEaseTrace = () => Easing.inOut(Easing.cubic);
+const getEaseOut = () => Easing.out(Easing.cubic);
+const getEaseIn = () => Easing.in(Easing.quad);
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
 /**
- * Magic pen animation: a slim roller-pen writes on a sheet of paper.
- * The ink stroke appears on the paper as the pen moves, and the ink level
- * inside the pen barrel visibly depletes from ~95% → ~25%.
+ * MagicPenAnimation — a charming cartoon fountain pen that writes a cursive
+ * loop, with visible ink emerging from the nib and an ink droplet effect.
  *
- * <48px: paper + minimal pen body (no enhanced details).
- * 48px+: full effect — chrome cap clip, ink window with depleting level,
- *        chrome grip ring, metallic nib, droplets, nib glow, paper fold.
+ * Fabric-safe: all animation is via Animated.View + useAnimatedStyle or
+ * AnimatedPath + useAnimatedProps (strokeDashoffset). No SVG-native animated
+ * x/y props, no AnimatedCircle with r starting at 0.
+ *
+ * Renders clearly at 48px (idle state) and 100px+ (topic loading).
  */
 export function MagicPenAnimation({
   size = 140,
@@ -123,159 +152,425 @@ export function MagicPenAnimation({
 }: MagicPenAnimationProps): ReactNode {
   const reduceMotion = useReducedMotion();
   const animationDisabled = reduceMotion || !_penAnimationAvailable;
-  const isDark = useColorScheme() === 'dark';
-  const showEnhanced = size >= 48;
 
-  const paperFill = isDark ? PAPER_DARK : PAPER_LIGHT;
-  const paperStroke = isDark ? PAPER_STROKE_DARK : PAPER_STROKE_LIGHT;
-  const ruleColor = isDark ? RULE_DARK : RULE_LIGHT;
+  // -------------------------------------------------------------------------
+  // Pen sizing
+  // The pen occupies 60% of the canvas along its major axis. Since the pen
+  // SVG viewBox is 100×100 and the pen is drawn upright (then rotated 45°),
+  // we make the pen container 60% of size. The barrel itself fills ~60% of
+  // the viewBox width, so it's clearly visible even at 48px (penContainerSize
+  // ≈ 29px → barrel ≈ 17px wide × 35px tall before rotation).
+  // -------------------------------------------------------------------------
+  const penContainerSize = size * 0.6;
+  // scale factor: penViewBox (100) → pixel size
+  const penScale = penContainerSize / 100;
 
+  // -------------------------------------------------------------------------
+  // Writing viewBox scale — maps writing path coords to pixel canvas coords
+  // -------------------------------------------------------------------------
+  const drawingScale = size / 100;
+
+  // -------------------------------------------------------------------------
+  // Shared values
+  // -------------------------------------------------------------------------
+  // progress: 0 = start of trace, 1 = end of trace
   const progress = useSharedValue(animationDisabled ? 1 : 0);
-  // Ink droplet shared values (only animated at >= 80px)
-  const drop1Y = useSharedValue(0);
-  const drop1Op = useSharedValue(0);
-  const drop2Y = useSharedValue(0);
-  const drop2Op = useSharedValue(0);
+  // dropIn: 0 = above canvas, 1 = settled at writing position
+  const dropIn = useSharedValue(animationDisabled ? 1 : 0);
+  // flick: 0 = normal, 1 = flicked up, 0 = back
+  const flick = useSharedValue(0);
+  // strokeFade: 1 = visible, 0 = faded out
+  const strokeFade = useSharedValue(animationDisabled ? 1 : 0);
+  // droplet: 0→1 swells, then fades
+  const dropletScale = useSharedValue(0);
+  const dropletOpacity = useSharedValue(0);
+  // sparkle: 0→1
+  const sparkle = useSharedValue(0);
 
+  // -------------------------------------------------------------------------
+  // Animation loop
+  // -------------------------------------------------------------------------
   useEffect(() => {
     if (animationDisabled) {
       progress.value = 1;
+      dropIn.value = 1;
+      strokeFade.value = 1;
       return;
     }
 
+    // Reset all to start
     progress.value = 0;
-    progress.value = withRepeat(
+    dropIn.value = 0;
+    flick.value = 0;
+    strokeFade.value = 0;
+    dropletScale.value = 0;
+    dropletOpacity.value = 0;
+    sparkle.value = 0;
+
+    // Resolve easing functions here (inside useEffect) so they are only
+    // evaluated at animation time, not at module load. This prevents failures
+    // in test environments where the Easing mock is minimal.
+    const easeBounce = getEaseBounce();
+    const easeTrace = getEaseTrace();
+    const easeOut = getEaseOut();
+    const easeIn = getEaseIn();
+
+    // --- Pen drop-in (bouncy settle) ---
+    dropIn.value = withRepeat(
       withSequence(
-        withTiming(1, {
-          duration: DRAW_MS,
-          easing: Easing.inOut(Easing.ease),
-        }),
-        withDelay(PAUSE_MS, withTiming(1, { duration: 0 })),
-        withTiming(0, { duration: RESET_MS })
+        withTiming(1, { duration: DROP_IN_MS, easing: easeBounce }),
+        // hold through trace + flick
+        withDelay(
+          SWAY_MS + TRACE_MS + FLICK_MS,
+          withTiming(1, { duration: 0 })
+        ),
+        // float back
+        withTiming(0, { duration: FLOAT_BACK_MS, easing: easeOut }),
+        // brief gap before next cycle
+        withTiming(0, { duration: 100 })
       ),
       -1,
       false
     );
 
-    // Ink droplets (>= 80px only)
-    if (showEnhanced) {
-      drop1Y.value = withRepeat(
-        withSequence(
-          withDelay(400, withTiming(10, { duration: 600 })),
-          withTiming(0, { duration: 0 })
+    // --- Stroke progress (drives both AnimatedPath and pen X/Y) ---
+    progress.value = withRepeat(
+      withSequence(
+        // wait for drop-in + sway
+        withDelay(
+          DROP_IN_MS + SWAY_MS,
+          withTiming(1, { duration: TRACE_MS, easing: easeTrace })
         ),
-        -1,
-        false
-      );
-      drop1Op.value = withRepeat(
-        withSequence(
-          withDelay(400, withTiming(0.6, { duration: 100 })),
-          withTiming(0, { duration: 500 }),
-          withTiming(0, { duration: 0 })
+        // hold through flick
+        withTiming(1, { duration: FLICK_MS }),
+        // reset for next cycle
+        withTiming(0, { duration: FLOAT_BACK_MS + 100 })
+      ),
+      -1,
+      false
+    );
+
+    // --- Stroke visibility (fade out at end of cycle) ---
+    strokeFade.value = withRepeat(
+      withSequence(
+        // appears as trace begins
+        withDelay(DROP_IN_MS + SWAY_MS, withTiming(1, { duration: 200 })),
+        // stay visible through trace + flick
+        withDelay(
+          TRACE_MS - 200 + FLICK_MS,
+          // fade out during float-back
+          withTiming(0, { duration: FADE_MS, easing: easeOut })
         ),
-        -1,
-        false
-      );
-      drop2Y.value = withRepeat(
-        withSequence(
-          withDelay(900, withTiming(12, { duration: 500 })),
-          withTiming(0, { duration: 0 })
+        // gap
+        withTiming(0, { duration: 100 })
+      ),
+      -1,
+      false
+    );
+
+    // --- Pen flick at end ---
+    flick.value = withRepeat(
+      withSequence(
+        // wait for drop-in + sway + trace
+        withDelay(
+          DROP_IN_MS + SWAY_MS + TRACE_MS,
+          withTiming(1, { duration: FLICK_MS / 2, easing: easeOut })
         ),
-        -1,
-        false
-      );
-      drop2Op.value = withRepeat(
-        withSequence(
-          withDelay(900, withTiming(0.5, { duration: 100 })),
-          withTiming(0, { duration: 400 }),
-          withTiming(0, { duration: 0 })
+        withTiming(0, { duration: FLICK_MS / 2, easing: easeOut }),
+        // hold through float-back + gap
+        withTiming(0, { duration: FLOAT_BACK_MS + 100 })
+      ),
+      -1,
+      false
+    );
+
+    // --- Ink droplet at nib (swells then dissolves, once per cycle at ~60% trace) ---
+    // Uses Animated.View scale (Fabric-safe — NOT AnimatedCircle with r=0)
+    const dropletDelay = DROP_IN_MS + SWAY_MS + Math.round(TRACE_MS * 0.6);
+    dropletScale.value = withRepeat(
+      withSequence(
+        withDelay(
+          dropletDelay,
+          withTiming(1, { duration: 120, easing: easeOut })
         ),
-        -1,
-        false
-      );
-    }
+        withTiming(1.4, { duration: 80 }),
+        withTiming(0, { duration: 200, easing: easeIn }),
+        withTiming(0, { duration: TOTAL_MS - dropletDelay - 400 })
+      ),
+      -1,
+      false
+    );
+    dropletOpacity.value = withRepeat(
+      withSequence(
+        withDelay(dropletDelay, withTiming(0.9, { duration: 120 })),
+        withTiming(0, { duration: 280 }),
+        withTiming(0, { duration: TOTAL_MS - dropletDelay - 400 })
+      ),
+      -1,
+      false
+    );
+
+    // --- Sparkle (one cross puff at ~80% trace) ---
+    const sparkleDelay = DROP_IN_MS + SWAY_MS + Math.round(TRACE_MS * 0.8);
+    sparkle.value = withRepeat(
+      withSequence(
+        withDelay(
+          sparkleDelay,
+          withTiming(1, { duration: 150, easing: easeOut })
+        ),
+        withTiming(0, { duration: 200, easing: easeIn }),
+        withTiming(0, { duration: TOTAL_MS - sparkleDelay - 350 })
+      ),
+      -1,
+      false
+    );
 
     return () => {
       cancelAnimation(progress);
-      cancelAnimation(drop1Y);
-      cancelAnimation(drop1Op);
-      cancelAnimation(drop2Y);
-      cancelAnimation(drop2Op);
+      cancelAnimation(dropIn);
+      cancelAnimation(flick);
+      cancelAnimation(strokeFade);
+      cancelAnimation(dropletScale);
+      cancelAnimation(dropletOpacity);
+      cancelAnimation(sparkle);
     };
   }, [
     animationDisabled,
     progress,
-    showEnhanced,
-    drop1Y,
-    drop1Op,
-    drop2Y,
-    drop2Op,
+    dropIn,
+    flick,
+    strokeFade,
+    dropletScale,
+    dropletOpacity,
+    sparkle,
   ]);
 
-  // Ink stroke — strokeDashoffset trick (proven Fabric-safe)
+  // -------------------------------------------------------------------------
+  // Animated props — ink stroke (strokeDashoffset, Fabric-safe)
+  // -------------------------------------------------------------------------
   const pathAnimatedProps = useAnimatedProps(() => ({
     strokeDashoffset: PATH_LENGTH * (1 - progress.value),
   }));
 
-  // Pen position — Animated.View overlay (proven Fabric-safe)
-  const scale = size / 120;
-  // Pen takes ~38% of canvas width so the barrel, grip, nib, AND ink window
-  // are all legible. At 25% the pen rendered as a 4px-wide barrel — the
-  // user only saw the nib tip.
-  const penSize = size * 0.38;
-  const penScaleFactor = penSize / 40; // viewBox 0 0 40 60 → pixel
+  // -------------------------------------------------------------------------
+  // Animated styles
+  // -------------------------------------------------------------------------
 
-  const penStyle = useAnimatedStyle(() => {
-    const x = PEN_START_X + (PEN_END_X - PEN_START_X) * progress.value;
-    const y = PEN_START_Y + (PEN_END_Y - PEN_START_Y) * progress.value;
+  // Ink stroke opacity
+  const strokeStyle = useAnimatedStyle(() => ({
+    opacity: strokeFade.value,
+  }));
+
+  // Pen body: drops in from above, tracks writing progress, flicks at end
+  const penBodyStyle = useAnimatedStyle(() => {
+    // Current nib position in drawing coords (0–100)
+    const drawX = PEN_START.x + (PEN_END.x - PEN_START.x) * progress.value;
+    const drawY = PEN_START.y + (PEN_END.y - PEN_START.y) * progress.value;
+
+    // Pixel position of nib tip in canvas space
+    const nibPixelX = drawX * drawingScale;
+    const nibPixelY = drawY * drawingScale;
+
+    // The pen container is rotated 45°. The nib tip is at the bottom of the
+    // pen SVG viewBox (y=100 in pen coords), so after rotation the nib tip
+    // is at the container's lower-right corner. We offset the container so
+    // the nib tip lands at the nib pixel position.
+    //
+    // For a 45° rotated square container of side L:
+    //   After rotation, top-left corner shifts by (-L/2, -L/2) from centre.
+    //   Nib is at bottom-centre of SVG = (L/2, L) in unrotated coords.
+    //   After 45° rotation, nib tip relative to centre ≈ (L/√2 * sin45, L/√2 * cos0)
+    //   ≈ (0, L * 0.7)  — approximately.
+    // We use a simpler empirical offset: nib tip ≈ 0.35 * container from left,
+    // 0.85 * container from top (tweaked for the pen shape).
+    const nibOffsetX = penContainerSize * 0.35;
+    const nibOffsetY = penContainerSize * 0.85;
+
+    // Drop-in: pen arrives from above (starts -size/2 above canvas)
+    const dropOffset = (1 - dropIn.value) * -(size * 0.5);
+
+    // Flick: slight upward rotate + translateY
+    const flickAngle = flick.value * -10; // degrees
+    const flickY = flick.value * -6; // pixels
+
     return {
       transform: [
-        { translateX: x * scale - penSize * 0.5 },
-        { translateY: y * scale - penSize * 0.85 },
-        { rotate: '35deg' },
+        { translateX: nibPixelX - nibOffsetX },
+        { translateY: nibPixelY - nibOffsetY + dropOffset + flickY },
+        { rotate: `${45 + flickAngle}deg` },
       ],
     };
   });
 
-  // Ink level inside barrel — depletes as pen writes. Drains from 95% → 25%
-  // so the falling ink line is clearly visible even at the small (48px) idle
-  // size where the window is only ~4px tall on screen.
-  const inkLevelStyle = useAnimatedStyle(() => {
-    const inkPercent = 0.95 - progress.value * 0.7;
+  // Droplet at nib tip (Animated.View scale — Fabric-safe, no AnimatedCircle r=0)
+  const dropletStyle = useAnimatedStyle(() => {
+    // Position droplet at the current nib position
+    const drawX = PEN_START.x + (PEN_END.x - PEN_START.x) * progress.value;
+    const drawY = PEN_START.y + (PEN_END.y - PEN_START.y) * progress.value;
+    const nibPixelX = drawX * drawingScale;
+    const nibPixelY = drawY * drawingScale;
+
     return {
-      height: INK_WIN_H * penScaleFactor * inkPercent,
-      top: (INK_WIN_Y + INK_WIN_H * (1 - inkPercent)) * penScaleFactor,
+      opacity: dropletOpacity.value,
+      transform: [
+        { translateX: nibPixelX - 4 },
+        { translateY: nibPixelY - 2 },
+        { scale: dropletScale.value },
+      ],
     };
   });
 
-  // Ink droplet styles (Animated.View — Fabric-safe)
-  const drop1Style = useAnimatedStyle(() => ({
-    opacity: drop1Op.value,
-    transform: [{ translateY: drop1Y.value }],
-  }));
-  const drop2Style = useAnimatedStyle(() => ({
-    opacity: drop2Op.value,
-    transform: [{ translateY: drop2Y.value }],
+  // Sparkle at a fixed crossing point (~mid-path)
+  const sparkleStyle = useAnimatedStyle(() => ({
+    opacity: sparkle.value,
+    transform: [{ scale: 0.4 + sparkle.value * 0.6 }],
   }));
 
-  // Nib glow — only at size >= 80px
-  const glowStyle = useAnimatedStyle(() => ({
-    opacity: animationDisabled ? 0 : 0.4 * progress.value,
-    transform: [
-      {
-        translateX:
-          (PEN_START_X + (PEN_END_X - PEN_START_X) * progress.value) * scale -
-          6,
-      },
-      {
-        translateY:
-          (PEN_START_Y + (PEN_END_Y - PEN_START_Y) * progress.value) * scale -
-          4,
-      },
-      { scale: 0.8 + 0.4 * progress.value },
-    ],
-  }));
+  // Leading edge dot (ink emerging from nib — small bright dot at nib position)
+  const nibDotStyle = useAnimatedStyle(() => {
+    const drawX = PEN_START.x + (PEN_END.x - PEN_START.x) * progress.value;
+    const drawY = PEN_START.y + (PEN_END.y - PEN_START.y) * progress.value;
+    const nibPixelX = drawX * drawingScale;
+    const nibPixelY = drawY * drawingScale;
 
+    return {
+      opacity: strokeFade.value * 0.85,
+      transform: [{ translateX: nibPixelX - 3 }, { translateY: nibPixelY - 3 }],
+    };
+  });
+
+  // -------------------------------------------------------------------------
+  // Derived colors
+  // -------------------------------------------------------------------------
+  // Grip is slightly darker (use opacity trick — dark overlay)
+  // Sparkle position (fixed crossing point on the writing path, approx 50% t)
+  const sparkleX =
+    (PEN_START.x + (PEN_END.x - PEN_START.x) * 0.5) * drawingScale;
+  const sparkleY =
+    (PEN_START.y + (PEN_END.y - PEN_START.y) * 0.5) * drawingScale;
+  const sparkleSize = Math.max(6, size * 0.08);
+
+  // Droplet base size
+  const dropletRadius = Math.max(3, size * 0.055);
+
+  // -------------------------------------------------------------------------
+  // Reduced motion: static render (pen mid-stroke, full line visible)
+  // -------------------------------------------------------------------------
+  if (animationDisabled) {
+    // Static mid-stroke position
+    const staticProgress = 0.55;
+    const staticDrawX =
+      PEN_START.x + (PEN_END.x - PEN_START.x) * staticProgress;
+    const staticDrawY =
+      PEN_START.y + (PEN_END.y - PEN_START.y) * staticProgress;
+    const staticNibX = staticDrawX * drawingScale;
+    const staticNibY = staticDrawY * drawingScale;
+    const nibOffsetX = penContainerSize * 0.35;
+    const nibOffsetY = penContainerSize * 0.85;
+
+    return (
+      <View
+        testID={testID}
+        accessibilityLabel="Writing animation"
+        accessibilityRole="image"
+        style={{ width: size, height: size, position: 'relative' }}
+      >
+        {/* Static ink stroke — full path visible */}
+        <Svg width={size} height={size} viewBox="0 0 100 100">
+          <Path
+            d={WRITING_PATH}
+            fill="none"
+            stroke={color}
+            strokeWidth={3}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </Svg>
+
+        {/* Static pen body */}
+        <View
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: penContainerSize,
+            height: penContainerSize,
+            transform: [
+              { translateX: staticNibX - nibOffsetX },
+              { translateY: staticNibY - nibOffsetY },
+              { rotate: '45deg' },
+            ],
+            pointerEvents: 'none',
+          }}
+        >
+          <Svg
+            width={penContainerSize}
+            height={penContainerSize}
+            viewBox="0 0 100 100"
+          >
+            {/* Barrel */}
+            <Rect
+              x={BARREL_X}
+              y={BARREL_Y}
+              width={BARREL_W}
+              height={BARREL_H}
+              rx={BARREL_RX}
+              fill={color}
+              stroke="#000000"
+              strokeWidth={1.5 / penScale}
+              strokeOpacity={0.2}
+            />
+            {/* Grip (slightly darker via opacity overlay) */}
+            <Rect
+              x={GRIP_X}
+              y={GRIP_Y}
+              width={GRIP_W}
+              height={GRIP_H}
+              rx={GRIP_RX}
+              fill={color}
+              stroke="#000000"
+              strokeWidth={1.5 / penScale}
+              strokeOpacity={0.2}
+            />
+            {/* Dark tint on grip for depth */}
+            <Rect
+              x={GRIP_X}
+              y={GRIP_Y}
+              width={GRIP_W}
+              height={GRIP_H}
+              rx={GRIP_RX}
+              fill="#000000"
+              opacity={0.18}
+            />
+            {/* Nib triangle */}
+            <Path
+              d={NIB_PATH}
+              fill={color}
+              stroke="#000000"
+              strokeWidth={1 / penScale}
+              strokeOpacity={0.25}
+              strokeLinejoin="round"
+            />
+            {/* Nib center slit */}
+            <Line
+              x1={SLIT_X1}
+              y1={SLIT_Y1}
+              x2={SLIT_X2}
+              y2={SLIT_Y2}
+              stroke="#000000"
+              strokeOpacity={0.3}
+              strokeWidth={1 / penScale}
+              strokeLinecap="round"
+            />
+          </Svg>
+        </View>
+      </View>
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // Animated render
+  // -------------------------------------------------------------------------
   return (
     <View
       testID={testID}
@@ -283,260 +578,238 @@ export function MagicPenAnimation({
       accessibilityRole="image"
       style={{ width: size, height: size, position: 'relative' }}
     >
-      <Svg width={size} height={size} viewBox="0 0 120 120">
-        {/* Paper background */}
-        <Rect
-          x={PAPER_X}
-          y={PAPER_Y}
-          width={PAPER_W}
-          height={PAPER_H}
-          rx={4}
-          fill={paperFill}
-          stroke={paperStroke}
-          strokeWidth={0.8}
-        />
-
-        {/* Ruled lines */}
-        {RULED_LINES_Y.map((y) => (
-          <Line
-            key={y}
-            x1={PAPER_X + 8}
-            y1={y}
-            x2={PAPER_X + PAPER_W - 8}
-            y2={y}
-            stroke={ruleColor}
-            strokeWidth={0.5}
-            opacity={0.6}
-          />
-        ))}
-
-        {/* Page fold corner (80px+ detail) */}
-        {showEnhanced && (
-          <Path
-            d={`M${PAPER_X + PAPER_W - 12} ${PAPER_Y} L${PAPER_X + PAPER_W} ${
-              PAPER_Y + 12
-            } L${PAPER_X + PAPER_W} ${PAPER_Y}`}
-            fill={paperStroke}
-            opacity={0.3}
-          />
-        )}
-
-        {/* Writing guide line (very faint) */}
-        <Path
-          d={WRITING_PATH}
-          fill="none"
-          stroke={color}
-          strokeWidth={2.5 * 0.3}
-          strokeLinecap="round"
-          opacity={0.1}
-        />
-
-        {/* Ink trail — wider, faded duplicate behind main stroke (>= 80px) */}
-        {showEnhanced && (
+      {/* ------------------------------------------------------------------ */}
+      {/* Ink stroke (AnimatedPath + strokeDashoffset — Fabric-safe)          */}
+      {/* Wrapped in Animated.View for opacity (strokeFade)                   */}
+      {/* ------------------------------------------------------------------ */}
+      <Animated.View
+        style={[
+          { position: 'absolute', top: 0, left: 0, width: size, height: size },
+          strokeStyle,
+          { pointerEvents: 'none' },
+        ]}
+      >
+        <Svg width={size} height={size} viewBox="0 0 100 100">
+          {/* Thicker ghost stroke for ink "body" behind leading edge */}
           <AnimatedPath
             d={WRITING_PATH}
             fill="none"
             stroke={color}
             strokeWidth={4}
             strokeLinecap="round"
+            strokeLinejoin="round"
             strokeDasharray={PATH_LENGTH}
             animatedProps={pathAnimatedProps}
-            opacity={0.15}
+            opacity={0.25}
           />
-        )}
-
-        {/* Animated ink stroke on paper */}
-        <AnimatedPath
-          d={WRITING_PATH}
-          fill="none"
-          stroke={color}
-          strokeWidth={2.5}
-          strokeLinecap="round"
-          strokeDasharray={PATH_LENGTH}
-          animatedProps={pathAnimatedProps}
-        />
-      </Svg>
-
-      {/* Ink droplets — Animated.View dots (>= 80px only) */}
-      {showEnhanced && !animationDisabled && (
-        <>
-          <Animated.View
-            style={[
-              {
-                position: 'absolute',
-                left: size * 0.45,
-                top: size * 0.6,
-                width: 4,
-                height: 4,
-                borderRadius: 2,
-                backgroundColor: color,
-              },
-              drop1Style,
-              { pointerEvents: 'none' },
-            ]}
+          {/* Main crisp stroke */}
+          <AnimatedPath
+            d={WRITING_PATH}
+            fill="none"
+            stroke={color}
+            strokeWidth={2.5}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeDasharray={PATH_LENGTH}
+            animatedProps={pathAnimatedProps}
           />
-          <Animated.View
-            style={[
-              {
-                position: 'absolute',
-                left: size * 0.55,
-                top: size * 0.5,
-                width: 3,
-                height: 3,
-                borderRadius: 1.5,
-                backgroundColor: color,
-              },
-              drop2Style,
-              { pointerEvents: 'none' },
-            ]}
+        </Svg>
+      </Animated.View>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* Leading-edge nib dot — small bright dot at ink tip (Animated.View) */}
+      {/* Makes ink look like it's emerging from the pen, not appearing        */}
+      {/* magically. Fabric-safe (View scale, not SVG r).                     */}
+      {/* ------------------------------------------------------------------ */}
+      <Animated.View
+        style={[
+          {
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: 6,
+            height: 6,
+            borderRadius: 3,
+            backgroundColor: color,
+          },
+          nibDotStyle,
+          { pointerEvents: 'none' },
+        ]}
+      />
+
+      {/* ------------------------------------------------------------------ */}
+      {/* Ink droplet: swells at nib then dissolves (Animated.View scale)     */}
+      {/* Fabric-safe: scale animated, NOT AnimatedCircle r starting at 0     */}
+      {/* ------------------------------------------------------------------ */}
+      <Animated.View
+        style={[
+          {
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: dropletRadius * 2,
+            height: dropletRadius * 2,
+            borderRadius: dropletRadius,
+            backgroundColor: INK_GLOW_COLOR,
+          },
+          dropletStyle,
+          { pointerEvents: 'none' },
+        ]}
+      />
+
+      {/* ------------------------------------------------------------------ */}
+      {/* Sparkle — 4-point cross puff at one path crossing point (once/cycle) */}
+      {/* ------------------------------------------------------------------ */}
+      <Animated.View
+        style={[
+          {
+            position: 'absolute',
+            left: sparkleX - sparkleSize / 2,
+            top: sparkleY - sparkleSize / 2,
+            width: sparkleSize,
+            height: sparkleSize,
+          },
+          sparkleStyle,
+          { pointerEvents: 'none' },
+        ]}
+      >
+        <Svg width={sparkleSize} height={sparkleSize} viewBox="0 0 10 10">
+          {/* Horizontal arm */}
+          <Line
+            x1={0}
+            y1={5}
+            x2={10}
+            y2={5}
+            stroke={INK_GLOW_COLOR}
+            strokeWidth={1.5}
+            strokeLinecap="round"
           />
-        </>
-      )}
+          {/* Vertical arm */}
+          <Line
+            x1={5}
+            y1={0}
+            x2={5}
+            y2={10}
+            stroke={INK_GLOW_COLOR}
+            strokeWidth={1.5}
+            strokeLinecap="round"
+          />
+          {/* Diagonal arms (smaller) */}
+          <Line
+            x1={1.5}
+            y1={1.5}
+            x2={8.5}
+            y2={8.5}
+            stroke={INK_GLOW_COLOR}
+            strokeWidth={0.8}
+            strokeLinecap="round"
+          />
+          <Line
+            x1={8.5}
+            y1={1.5}
+            x2={1.5}
+            y2={8.5}
+            stroke={INK_GLOW_COLOR}
+            strokeWidth={0.8}
+            strokeLinecap="round"
+          />
+        </Svg>
+      </Animated.View>
 
-      {/* Nib glow — Animated.View, only at >= 80px */}
-      {showEnhanced && !animationDisabled && (
-        <Animated.View
-          style={[
-            {
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: 12,
-              height: 12,
-              borderRadius: 6,
-              backgroundColor: NIB_GLOW,
-            },
-            glowStyle,
-            { pointerEvents: 'none' },
-          ]}
-        />
-      )}
-
-      {/* Pen body — Animated.View overlay with static SVG inside */}
-      {!animationDisabled && (
-        <Animated.View
-          style={[
-            {
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: penSize,
-              height: penSize * 1.5,
-            },
-            penStyle,
-            { pointerEvents: 'none' },
-          ]}
+      {/* ------------------------------------------------------------------ */}
+      {/* Pen body — Animated.View with static SVG inside (Fabric-safe)       */}
+      {/* The SVG uses a 100×100 viewBox with a large, clearly readable pen.  */}
+      {/* Rotated 45° so it points upper-left to lower-right.                 */}
+      {/* ------------------------------------------------------------------ */}
+      <Animated.View
+        style={[
+          {
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: penContainerSize,
+            height: penContainerSize,
+          },
+          penBodyStyle,
+          { pointerEvents: 'none' },
+        ]}
+      >
+        <Svg
+          width={penContainerSize}
+          height={penContainerSize}
+          viewBox="0 0 100 100"
         >
-          <Svg width={penSize} height={penSize * 1.5} viewBox="0 0 40 60">
-            {/* Cap — darker shade of pen color (top of pen, before chrome ring) */}
-            <Path d={PEN_CAP} fill={color} opacity={0.95} />
-            {/* Chrome clip on cap (right side) */}
-            <Path
-              d={PEN_CLIP}
-              fill="none"
-              stroke={CHROME_FILL}
-              strokeWidth={1.5}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-            {/* Chrome ring at cap-barrel join */}
-            <Rect
-              x={14}
-              y={22}
-              width={12}
-              height={2}
-              fill={CHROME_FILL}
-              stroke={CHROME_STROKE}
-              strokeWidth={0.3}
-            />
-            {/* Upper barrel — main pen body color */}
-            <Path d={PEN_BARREL} fill={color} opacity={0.9} />
-            {/* Ink window background — translucent so ink fill below shows. */}
-            <Rect
-              x={INK_WIN_X}
-              y={INK_WIN_Y}
-              width={INK_WIN_W}
-              height={INK_WIN_H}
-              rx={1}
-              fill={color}
-              opacity={0.18}
-            />
-            {/* Window outline ridges — top + bottom thin rings give the
-                window a "tube" feel and frame the ink level. */}
-            <Line
-              x1={14}
-              y1={40}
-              x2={26}
-              y2={40}
-              stroke={color}
-              strokeWidth={0.6}
-              opacity={0.6}
-            />
-            <Line
-              x1={14}
-              y1={50}
-              x2={26}
-              y2={50}
-              stroke={color}
-              strokeWidth={0.6}
-              opacity={0.6}
-            />
-            {/* Chrome grip ring below the ink window */}
-            <Rect
-              x={14}
-              y={50}
-              width={12}
-              height={2}
-              fill={CHROME_FILL}
-              stroke={CHROME_STROKE}
-              strokeWidth={0.3}
-            />
-            {/* Section cone tapering to nib */}
-            <Path d={PEN_SECTION} fill={color} opacity={0.85} />
-            {/* Metallic nib tip */}
-            <Path
-              d={PEN_NIB}
-              fill={CHROME_FILL}
-              stroke={CHROME_STROKE}
-              strokeWidth={0.3}
-            />
-          </Svg>
+          {/* ----- Barrel ----- */}
+          <Rect
+            x={BARREL_X}
+            y={BARREL_Y}
+            width={BARREL_W}
+            height={BARREL_H}
+            rx={BARREL_RX}
+            fill={color}
+            stroke="#000000"
+            strokeWidth={1.5 / penScale}
+            strokeOpacity={0.2}
+          />
+          {/* Barrel highlight stripe (white shimmer) */}
+          <Rect
+            x={BARREL_X + 8}
+            y={BARREL_Y + 4}
+            width={8}
+            height={BARREL_H - 8}
+            rx={3}
+            fill="#ffffff"
+            opacity={0.18}
+          />
 
-          {/* Ink level fill overlay — animated height. Always rendered (the
-              depleting level is the signature behavior of the pen). Higher
-              opacity than before so the falling level reads at 48px. */}
-          <Animated.View
-            style={[
-              {
-                position: 'absolute',
-                left: INK_WIN_X * penScaleFactor,
-                width: INK_WIN_W * penScaleFactor,
-                borderRadius: 1,
-                backgroundColor: color,
-                opacity: 0.85,
-              },
-              inkLevelStyle,
-              { pointerEvents: 'none' },
-            ]}
+          {/* ----- Grip ----- */}
+          <Rect
+            x={GRIP_X}
+            y={GRIP_Y}
+            width={GRIP_W}
+            height={GRIP_H}
+            rx={GRIP_RX}
+            fill={color}
+            stroke="#000000"
+            strokeWidth={1.5 / penScale}
+            strokeOpacity={0.2}
           />
-          {/* Subtle highlight on the ink fill (mimics liquid meniscus) */}
-          {/* [BUG-922] Move pointerEvents into style — props.pointerEvents is
-              deprecated on React Native Web. */}
-          <View
-            style={{
-              position: 'absolute',
-              left: (INK_WIN_X + 0.5) * penScaleFactor,
-              width: (INK_WIN_W - 1) * penScaleFactor,
-              top: (INK_WIN_Y + 0.5) * penScaleFactor,
-              height: 0.6 * penScaleFactor,
-              backgroundColor: '#ffffff',
-              opacity: 0.25,
-              borderRadius: 1,
-              pointerEvents: 'none',
-            }}
+          {/* Dark tint on grip so it reads as slightly darker */}
+          <Rect
+            x={GRIP_X}
+            y={GRIP_Y}
+            width={GRIP_W}
+            height={GRIP_H}
+            rx={GRIP_RX}
+            fill="#000000"
+            opacity={0.18}
           />
-        </Animated.View>
-      )}
+
+          {/* ----- Nib (triangle) ----- */}
+          <Path
+            d={NIB_PATH}
+            fill={color}
+            stroke="#000000"
+            strokeWidth={1 / penScale}
+            strokeOpacity={0.25}
+            strokeLinejoin="round"
+          />
+          {/* Nib center slit */}
+          <Line
+            x1={SLIT_X1}
+            y1={SLIT_Y1}
+            x2={SLIT_X2}
+            y2={SLIT_Y2}
+            stroke="#000000"
+            strokeOpacity={0.3}
+            strokeWidth={1.2 / penScale}
+            strokeLinecap="round"
+          />
+
+          {/* Nib tip gleam — small white dot (static, no AnimatedCircle) */}
+          <Circle cx={50} cy={97} r={1.5} fill="#ffffff" opacity={0.55} />
+        </Svg>
+      </Animated.View>
     </View>
   );
 }

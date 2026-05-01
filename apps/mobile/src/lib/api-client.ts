@@ -121,6 +121,32 @@ export function getProxyMode(): boolean {
 
 export type ApiClient = ReturnType<typeof hc<AppType>>;
 
+export interface IdempotencyReplayBody {
+  replayed: true;
+  clientId: string;
+  status: 'persisted';
+  assistantTurnReady: boolean;
+  latestExchangeId: string | null;
+}
+
+export function withIdempotencyKey(
+  headers: Record<string, string>,
+  key?: string
+): Record<string, string> {
+  if (!key) {
+    return headers;
+  }
+
+  return {
+    ...headers,
+    'Idempotency-Key': key,
+  };
+}
+
+export function isIdempotencyReplay(response: Response): boolean {
+  return response.headers.get('Idempotency-Replay') === 'true';
+}
+
 export function useApiClient(): ApiClient {
   const { getToken } = useAuth();
 

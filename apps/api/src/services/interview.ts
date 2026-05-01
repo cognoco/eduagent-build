@@ -32,7 +32,7 @@ import type {
   InterviewContext,
   InterviewResult,
   OnboardingDraft,
-  ChatExchange,
+  ExchangeEntry,
   DraftStatus,
 } from '@eduagent/schemas';
 import {
@@ -232,7 +232,7 @@ const MAX_EXTRACTED_INTERESTS = 8;
 const MAX_TRANSCRIPT_CHARS = 12000;
 
 export async function extractSignals(
-  exchangeHistory: ChatExchange[],
+  exchangeHistory: ExchangeEntry[],
   options?: { llmTier?: LLMTier }
 ): Promise<{
   goals: string[];
@@ -738,7 +738,7 @@ export async function updateDraft(
   profileId: string,
   draftId: string,
   updates: {
-    exchangeHistory?: ChatExchange[];
+    exchangeHistory?: ExchangeEntry[];
     extractedSignals?: Record<string, unknown>;
     status?: DraftStatus;
   }

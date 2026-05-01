@@ -15,6 +15,7 @@
 import {
   BadRequestError,
   ForbiddenError,
+  type IdempotencyReplayBody,
   NetworkError,
   NotFoundError,
   QuotaExceededError,
@@ -38,6 +39,10 @@ export interface StreamFallbackEvent {
   type: 'fallback';
   reason: StreamFallbackReason;
   fallbackText: string;
+}
+
+export interface StreamReplayEvent extends IdempotencyReplayBody {
+  type: 'replay';
 }
 
 /** Fluency drill annotation surfaced via SSE done event */
@@ -74,6 +79,7 @@ export interface StreamErrorEvent {
 export type StreamEvent =
   | StreamChunkEvent
   | StreamFallbackEvent
+  | StreamReplayEvent
   | StreamDoneEvent
   | StreamErrorEvent;
 
@@ -383,6 +389,34 @@ export function streamSSEViaXHR(
 
   xhr.onloadend = () => {
     if (idleTimer) clearTimeout(idleTimer);
+    if (
+      !streamError &&
+      xhr.status >= 200 &&
+      xhr.status < 300 &&
+      xhr.getResponseHeader('Idempotency-Replay') === 'true'
+    ) {
+      try {
+        const parsed = JSON.parse(xhr.responseText || '{}') as Omit<
+          StreamReplayEvent,
+          'type'
+        >;
+        eventQueue.push({
+          type: 'replay',
+          replayed: true,
+          clientId: parsed.clientId,
+          status: 'persisted',
+          assistantTurnReady: parsed.assistantTurnReady,
+          latestExchangeId: parsed.latestExchangeId ?? null,
+        });
+      } catch {
+        streamError = new Error('Malformed idempotency replay response');
+      }
+      done = true;
+      const r = resolve;
+      resolve = null;
+      r?.();
+      return;
+    }
     // If headers-received handler already flagged an error, enrich it with the
     // full response body (now available) by replacing with a fully typed error.
     if (streamError && xhr.status >= 400) {

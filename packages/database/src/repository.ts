@@ -209,9 +209,16 @@ export function createScopedRepository(db: Database, profileId: string) {
     },
 
     sessionEvents: {
-      async findMany(extraWhere?: SQL) {
+      async findMany(extraWhere?: SQL, orderBy?: SQL | SQL[]) {
         return db.query.sessionEvents.findMany({
           where: scopedWhere(sessionEvents, extraWhere),
+          ...(orderBy ? { orderBy } : {}),
+        });
+      },
+      async findFirst(extraWhere?: SQL, orderBy?: SQL | SQL[]) {
+        return db.query.sessionEvents.findFirst({
+          where: scopedWhere(sessionEvents, extraWhere),
+          ...(orderBy ? { orderBy } : {}),
         });
       },
     },
@@ -251,13 +258,14 @@ export function createScopedRepository(db: Database, profileId: string) {
     },
 
     onboardingDrafts: {
-      async findMany(extraWhere?: SQL, orderBy?: SQL) {
+      async findMany(extraWhere?: SQL, orderBy?: SQL | SQL[], limit?: number) {
         return db.query.onboardingDrafts.findMany({
           where: scopedWhere(onboardingDrafts, extraWhere),
           ...(orderBy ? { orderBy } : {}),
+          ...(limit !== undefined ? { limit } : {}),
         });
       },
-      async findFirst(extraWhere?: SQL, orderBy?: SQL) {
+      async findFirst(extraWhere?: SQL, orderBy?: SQL | SQL[]) {
         return db.query.onboardingDrafts.findFirst({
           where: scopedWhere(onboardingDrafts, extraWhere),
           ...(orderBy ? { orderBy } : {}),

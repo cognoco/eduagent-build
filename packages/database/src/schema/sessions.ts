@@ -8,6 +8,7 @@ import {
   jsonb,
   pgEnum,
   index,
+  uniqueIndex,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { profiles } from './profiles';
@@ -169,6 +170,7 @@ export const sessionEvents = pgTable(
     content: text('content').notNull(),
     metadata: jsonb('metadata').default({}),
     structuredAssessment: jsonb('structured_assessment'),
+    clientId: text('client_id'),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -180,6 +182,9 @@ export const sessionEvents = pgTable(
       table.eventType,
       table.createdAt
     ),
+    uniqueIndex('session_events_session_client_id_uniq')
+      .on(table.sessionId, table.clientId)
+      .where(sql`${table.clientId} IS NOT NULL`),
   ]
 );
 
