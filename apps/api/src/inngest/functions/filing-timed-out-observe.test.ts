@@ -36,12 +36,10 @@ jest.mock('../../services/sentry', () => ({
   captureException: (...args: unknown[]) => mockCaptureException(...args),
 }));
 
-const mockFormatFilingFailedPush = jest
-  .fn()
-  .mockReturnValue({
-    title: 'Filing failed',
-    body: 'We could not save your session.',
-  });
+const mockFormatFilingFailedPush = jest.fn().mockReturnValue({
+  title: 'Filing failed',
+  body: 'We could not save your session.',
+});
 const mockSendPushNotification = jest.fn().mockResolvedValue({ sent: true });
 jest.mock('../../services/notifications', () => ({
   formatFilingFailedPush: () => mockFormatFilingFailedPush(),
@@ -171,6 +169,9 @@ describe('filing-timed-out-observe [CR-FIL-RACE-01]', () => {
   //      0 rows because status is now filing_recovered.
   //   6. Function MUST return resolved_after_window — NOT unrecoverable.
   //   7. The subsequent push notification + captureException MUST NOT fire.
+  //   8. A structured app/session.filing_resolved event with
+  //      resolution: 'recovered_after_window' MUST be emitted so ops can
+  //      query this path in Inngest run history. [CR-FIL-SILENT-01]
   //
   // Red→green verification (reasoned):
   //   Without the CAS guard the WHERE clause had no status predicate, so
@@ -178,6 +179,7 @@ describe('filing-timed-out-observe [CR-FIL-RACE-01]', () => {
   //   branch regardless of the current status. The test asserts:
   //     - resolution === 'recovered_after_window'   (would be 'unrecoverable' without guard)
   //     - sendEvent (emit-resolved unrecoverable) NOT called
+  //     - sendEvent (emit-resolved-recovered-after-window) IS called with correct data
   //     - send-failure-push step NOT called
   //     - captureException NOT called
   //   Each of these fails on the old code and passes on the fixed code.
@@ -214,6 +216,21 @@ describe('filing-timed-out-observe [CR-FIL-RACE-01]', () => {
         payload?.data?.resolution === 'unrecoverable'
     );
     expect(unrecoverableEmit).toBeUndefined();
+
+    // [CR-FIL-SILENT-01] emit-resolved-recovered-after-window MUST be called
+    // with name 'app/session.filing_resolved' and resolution 'recovered_after_window'.
+    const recoveredAfterWindowEmit = mockStep.sendEvent.mock.calls.find(
+      ([name]: [string]) => name === 'emit-resolved-recovered-after-window'
+    );
+    expect(recoveredAfterWindowEmit).toBeDefined();
+    expect(recoveredAfterWindowEmit[1]).toMatchObject({
+      name: 'app/session.filing_resolved',
+      data: expect.objectContaining({
+        resolution: 'recovered_after_window',
+        sessionId: SESSION_ID,
+        profileId: PROFILE_ID,
+      }),
+    });
 
     // send-failure-push step must NOT be invoked.
     const sendFailurePushCalls = mockStep.run.mock.calls.filter(
@@ -265,6 +282,7 @@ describe('filing-timed-out-observe [CR-FIL-RACE-01]', () => {
   // -------------------------------------------------------------------------
   // No retry slot: attemptNumber is null (retry count exhausted).
   // mark-failed should also be guarded — CAS no-op path.
+  // [CR-FIL-SILENT-01] The recovered_after_window event MUST still be emitted.
   // -------------------------------------------------------------------------
   it('[CR-FIL-RACE-01] CAS guard works even without a retry attempt (retry slot exhausted)', async () => {
     // No retry slot — attemptNumber is null.
@@ -287,6 +305,21 @@ describe('filing-timed-out-observe [CR-FIL-RACE-01]', () => {
       ([name]: [string]) => name === 'send-failure-push'
     );
     expect(sendFailurePushCalls).toHaveLength(0);
+
+    // [CR-FIL-SILENT-01] structured event must be emitted even when no retry
+    // slot was claimed — ops must be able to query this path.
+    const recoveredAfterWindowEmit = mockStep.sendEvent.mock.calls.find(
+      ([name]: [string]) => name === 'emit-resolved-recovered-after-window'
+    );
+    expect(recoveredAfterWindowEmit).toBeDefined();
+    expect(recoveredAfterWindowEmit[1]).toMatchObject({
+      name: 'app/session.filing_resolved',
+      data: expect.objectContaining({
+        resolution: 'recovered_after_window',
+        sessionId: SESSION_ID,
+        profileId: PROFILE_ID,
+      }),
+    });
   });
 
   // -------------------------------------------------------------------------

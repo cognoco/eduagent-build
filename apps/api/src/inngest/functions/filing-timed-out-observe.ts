@@ -223,11 +223,22 @@ export const filingTimedOutObserve = inngest.createFunction(
       // The status was already advanced (e.g. to filing_recovered) by a
       // concurrent filing-completed-observe run — the retry succeeded but
       // app/filing.retry_completed arrived after the 60 s waitForEvent window.
-      // Do NOT overwrite the recovered state; emit nothing and exit cleanly.
+      // Do NOT overwrite the recovered state. Emit a structured event so ops
+      // can query "how many sessions recovered after the wait window closed?"
+      // against Inngest run history. [CR-FIL-SILENT-01]
       logger.info(
         '[filing-timed-out-observe] mark-failed no-op: status already advanced, treating as recovered_after_window',
         { sessionId, profileId }
       );
+      await step.sendEvent('emit-resolved-recovered-after-window', {
+        name: 'app/session.filing_resolved',
+        data: filingResolvedEventSchema.parse({
+          sessionId,
+          profileId,
+          resolution: 'recovered_after_window',
+          timestamp: new Date().toISOString(),
+        }),
+      });
       return { resolution: 'recovered_after_window' as const, snapshot };
     }
 
