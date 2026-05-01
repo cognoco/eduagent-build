@@ -755,21 +755,25 @@ export const interviewPersistCurriculum = inngest.createFunction(
   async ({ event, step }) => {
     const { draftId, profileId, subjectId, subjectName, bookId } = event.data;
 
+    // → R3: extractSignals returns { goals: string[], experienceLevel: string,
+    //   currentKnowledge: string, interests: string[] } — NOT { topics }.
+    //   Topic generation happens later inside persistCurriculum via generateCurriculum().
     const signals = await step.run('extract-signals', async () => {
       const db = getStepDatabase();
       const draft = await loadDraft(db, profileId, draftId);
       if (!draft) throw new NonRetriableError('draft-disappeared');
 
-      // Structural cache check: keys count is not enough — { topics: [] }
-      // would falsely pass. Verify topics exist and have content.
-      const cached = draft.extractedSignals as { topics?: { name: string }[] } | null;
-      if (cached?.topics && cached.topics.length > 0) {
+      // → R3: Structural cache check on actual return shape of extractSignals.
+      // The signals are meaningful if they have goals OR interests.
+      type ExtractedSignals = { goals: string[]; experienceLevel: string; currentKnowledge: string; interests: string[] };
+      const cached = draft.extractedSignals as ExtractedSignals | null;
+      if (cached && (cached.goals?.length > 0 || cached.interests?.length > 0)) {
         return cached;
       }
 
       try {
         const fresh = await extractSignals(draft.exchangeHistory);
-        if (!fresh?.topics || fresh.topics.length === 0) {
+        if (!fresh || (fresh.goals.length === 0 && fresh.interests.length === 0)) {
           throw new PersistCurriculumError('empty_signals');
         }
         return fresh;
