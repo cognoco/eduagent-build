@@ -24,6 +24,7 @@ import { Button } from '../components/common/Button';
 import { useKeyboardScroll } from '../hooks/use-keyboard-scroll';
 import { formatApiError } from '../lib/format-api-error';
 import { platformAlert } from '../lib/platform-alert';
+import { errorHasCode } from '../components/session/session-types';
 
 // Captured at module load — safe because these screens are portrait-locked.
 // On web, cap at a mobile-like height to avoid massive whitespace.
@@ -213,7 +214,29 @@ export default function CreateProfileScreen() {
         handleClose();
       }
     } catch (err: unknown) {
-      setError(formatApiError(err));
+      // [BUG-947] PROFILE_LIMIT_EXCEEDED is an upgrade gate, not a server fault.
+      // The route returns 402 with an actionable "upgrade to Family or Pro"
+      // message; without this branch the generic UpstreamError path renders it
+      // as "Something went wrong on our end" — exactly what QA reported as a
+      // fake 500. Surface the upgrade CTA inline so the user can act.
+      if (errorHasCode(err, 'PROFILE_LIMIT_EXCEEDED')) {
+        platformAlert(
+          'Upgrade required',
+          err instanceof Error && err.message
+            ? err.message
+            : 'Your subscription does not support additional profiles. Please upgrade to Family or Pro.',
+          [
+            { text: 'Not now', style: 'cancel' },
+            {
+              text: 'See plans',
+              onPress: () => router.push('/(app)/subscription'),
+            },
+          ]
+        );
+        setError('');
+      } else {
+        setError(formatApiError(err));
+      }
     } finally {
       setLoading(false);
     }

@@ -52,6 +52,7 @@ import {
   monthlyReportGenerate,
 } from './functions/monthly-report-cron';
 import { feedbackDeliveryFailed } from './functions/feedback-delivery-failed';
+import { orphanPersistFailed } from './functions/orphan-persist-failed';
 
 export {
   inngest,
@@ -92,6 +93,7 @@ export {
   dailyReminderSend,
   askSilentClassify,
   askSilentClassifyOnFailure,
+  orphanPersistFailed,
 };
 
 // All Inngest functions to register with the serve handler
@@ -134,4 +136,5 @@ export const functions = [
   dailyReminderSend,
   askSilentClassify,
   askSilentClassifyOnFailure,
+  orphanPersistFailed,
 ];

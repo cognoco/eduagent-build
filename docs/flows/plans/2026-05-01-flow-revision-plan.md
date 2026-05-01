@@ -418,13 +418,13 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 
 | ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| HOME-07 | Add-first-child gate | 🚫 | Blocked | BUG-947 | | Create-profile API returns 500 — blocks all parent flows |
-| ACCOUNT-02 | Create additional profile (generic) | 🚫 | Blocked | BUG-947 | | Create-profile API server error |
-| ACCOUNT-03 | Add child profile from More / Profiles | ✅ | Pass | | | Create-profile screen: name, birth date (min 11), Create profile button, Cancel |
-| ACCOUNT-05 | Family-plan + max-profile gating | 🚫 | Blocked | BUG-947 | | Needs child profile — create-profile broken |
-| ACCOUNT-25 | Parent consent management for a child | 🚫 | Blocked | BUG-947 | | Needs child profile |
-| ACCOUNT-16 | Child mentor memory | 🚫 | Blocked | BUG-947 | | Needs child profile |
-| ACCOUNT-17 | Child memory consent prompt | 🚫 | Blocked | BUG-947 | | Needs child profile |
+| HOME-07 | Add-first-child gate | 🚫 | Blocked | | | Plus plan doesn't support child profiles — needs Family plan account |
+| ACCOUNT-02 | Create additional profile (generic) | 🚫 | Blocked | | | Plus plan → 402 PROFILE_LIMIT_EXCEEDED (correctly shows upgrade CTA) |
+| ACCOUNT-03 | Add child profile from More / Profiles | ✅ | Pass | | | Create-profile screen: name, birth date (min 11), Create profile button, Cancel. 402 upgrade gate works correctly. |
+| ACCOUNT-05 | Family-plan + max-profile gating | ✅ | Pass | | | Verified: Plus plan correctly blocks child creation with "Upgrade required" alert + "See plans" CTA |
+| ACCOUNT-25 | Parent consent management for a child | 🚫 | Blocked | | | Needs Family plan account with child profile |
+| ACCOUNT-16 | Child mentor memory | 🚫 | Blocked | | | Needs child profile (requires Family plan) |
+| ACCOUNT-17 | Child memory consent prompt | 🚫 | Blocked | | | Needs child profile (requires Family plan) |
 
 ---
 
@@ -435,22 +435,22 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 
 | ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| HOME-02 | Parent gateway home | 🚫 | Blocked | BUG-947 | | Create-profile API broken — no parent account |
-| HOME-03 | Parent tabs and parent-mode navigation | 🚫 | Blocked | BUG-947 | | |
-| PARENT-01 | Parent dashboard (live + demo) | 🚫 | Blocked | BUG-947 | | |
-| PARENT-02 | Multi-child dashboard | 🚫 | Blocked | BUG-947 | | |
-| PARENT-03 | Child detail drill-down | 🚫 | Blocked | BUG-947 | | |
-| PARENT-04 | Child subject → topic drill-down | 🚫 | Blocked | BUG-947 | | |
-| PARENT-05 | Child session / transcript drill-down | 🚫 | Blocked | BUG-947 | | |
-| PARENT-06 | Child monthly reports list + report detail | 🚫 | Blocked | BUG-947 | | |
-| PARENT-07 | Parent library view | 🚫 | Blocked | BUG-947 | | |
-| PARENT-08 | Subject raw-input audit | 🚫 | Blocked | BUG-947 | | |
-| PARENT-09 | Guided label tooltip | 🚫 | Blocked | BUG-947 | | |
-| PARENT-10 | Child-topic "Understanding" card + gated retention | 🚫 | Blocked | BUG-947 | | |
-| PARENT-11 | Child-session recap (narrative + clipboard + chip) | 🚫 | Blocked | BUG-947 | | |
-| PARENT-12 | Child-subject detail retention badges (data-gated) | 🚫 | Blocked | BUG-947 | | |
-| CC-07 | Accommodation badge surfaces | 🚫 | Blocked | BUG-947 | | |
-| CC-08 | Parent-facing metric vocabulary canon | 🚫 | Blocked | BUG-947 | | |
+| HOME-02 | Parent gateway home | 🚫 | Blocked | | | Needs Family plan account with children |
+| HOME-03 | Parent tabs and parent-mode navigation | 🚫 | Blocked | | | Needs Family plan account |
+| PARENT-01 | Parent dashboard (live + demo) | 🚫 | Blocked | | | Needs Family plan + children |
+| PARENT-02 | Multi-child dashboard | 🚫 | Blocked | | | Needs Family plan + 2+ children |
+| PARENT-03 | Child detail drill-down | 🚫 | Blocked | | | Needs Family plan + child |
+| PARENT-04 | Child subject → topic drill-down | 🚫 | Blocked | | | Needs Family plan + child |
+| PARENT-05 | Child session / transcript drill-down | 🚫 | Blocked | | | Needs Family plan + child |
+| PARENT-06 | Child monthly reports list + report detail | 🚫 | Blocked | | | Needs Family plan + child |
+| PARENT-07 | Parent library view | 🚫 | Blocked | | | Needs Family plan + child |
+| PARENT-08 | Subject raw-input audit | 🚫 | Blocked | | | Needs Family plan + child |
+| PARENT-09 | Guided label tooltip | 🚫 | Blocked | | | Needs Family plan + child |
+| PARENT-10 | Child-topic "Understanding" card + gated retention | 🚫 | Blocked | | | Needs Family plan + child |
+| PARENT-11 | Child-session recap (narrative + clipboard + chip) | 🚫 | Blocked | | | Needs Family plan + child |
+| PARENT-12 | Child-subject detail retention badges (data-gated) | 🚫 | Blocked | | | Needs Family plan + child |
+| CC-07 | Accommodation badge surfaces | 🚫 | Blocked | | | Needs Family plan + child |
+| CC-08 | Parent-facing metric vocabulary canon | 🚫 | Blocked | | | Needs Family plan + child |
 
 ---
 
@@ -466,9 +466,9 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | BILLING-03 | Trial / plan usage / family-pool detail | ✅ | Pass | | | Usage bar with count, reset date, percentage — all rendered correctly |
 | BILLING-04 | Restore purchases | ✅ | Pass | | | Button present on subscription screen (not clicked — store-dependent) |
 | BILLING-05 | Manage billing deep link | ✅ | Pass | | | "Subscription is managed on your mobile device" message shown on web |
-| BILLING-06 | Child paywall + notify-parent | 🚫 | Blocked | BUG-947 | | Needs child profile — create-profile API broken |
+| BILLING-06 | Child paywall + notify-parent | 🚫 | Blocked | | | Needs Family plan account with child at quota limit |
 | BILLING-07 | Daily quota exceeded paywall | 🚫 | Blocked | | | Needs quota-capped account — no way to exhaust quota in test session |
-| BILLING-08 | Family pool visibility | 🚫 | Blocked | BUG-947 | | Needs family plan — create-profile API broken |
+| BILLING-08 | Family pool visibility | 🚫 | Blocked | | | Needs Family plan account |
 | BILLING-09 | Top-up question credits | ✅ | Pass | | | "Buy 500 credits" button with "One-time purchase. Credits expire in 12 months." |
 | BILLING-10 | BYOK waitlist | ✅ | Pass | | | "Bring Your Own Key" section with waitlist description and Join button |
 | CC-06 | Top-up purchase confidence (two-stage polling) | 🚫 | Blocked | | | Needs active purchase flow (store-dependent) |
@@ -547,12 +547,12 @@ Update this once a batch is complete to track overall progress.
 | 11 | Homework                 |  7 | 🚫 | 1✅ 6🚫 — camera/LLM blocked |
 | 12 | Account / Settings       |  9 | ✅ | 7✅ 1⚠️ 1🚫 — export bug filed |
 | 13 | Account Deletion         |  2 | ⚠️ | 1✅ 1🚫 |
-| 14 | Parent Setup + Children  |  7 | 🚫 | 1✅ 6🚫 — BUG-947 create-profile API broken |
-| 15 | Parent Dashboard         | 16 | 🚫 | 16🚫 — all blocked by BUG-947 |
+| 14 | Parent Setup + Children  |  7 | ⚠️ | 2✅ 5🚫 — Plus plan blocks child creation (not a bug). Needs Family plan account. |
+| 15 | Parent Dashboard         | 16 | 🚫 | 16🚫 — needs Family plan account with children |
 | 16 | Billing                  | 11 | ✅ | 6✅ 5🚫 — store/child/quota blocked |
 | 17 | Cross-Cutting Final Pass |  3 | ⚠️ | 1✅ 1⚠️ 1🚫 — BUG-948 bare router.back() |
 | 18 | Regression Smoke         |  9 | ⚠️ | 3✅ 6🚫 — LLM/parent/email blocked |
-| **Total** | | **154** | | **50✅ 6⚠️ 1❌ 97🚫 0⬜ — all flows triaged** |
+| **Total** | | **154** | | **51✅ 6⚠️ 1❌ 96🚫 0⬜ — all flows triaged** |
 
 ### Coverage Audit
 

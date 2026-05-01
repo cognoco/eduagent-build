@@ -94,6 +94,7 @@ function isValidStreamEvent(obj: Record<string, unknown>): boolean {
       typeof obj.reason === 'string' && typeof obj.fallbackText === 'string'
     );
   }
+  if (obj.type === 'replay') return obj.replayed === true;
   if (obj.type === 'done') return typeof obj.exchangeCount === 'number';
   if (obj.type === 'error') return typeof obj.message === 'string';
   return false;

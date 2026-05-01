@@ -8,6 +8,8 @@ import {
   extractedInterviewSignalsSchema,
   streamFallbackFrameSchema,
   type ExchangeFallback,
+  PersistCurriculumError,
+  classifyOrphanError,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
@@ -34,6 +36,8 @@ import { idempotencyPreflight } from '../middleware/idempotency';
 import { markPersisted } from '../services/idempotency-marker';
 import { notFound } from '../errors';
 import { captureException } from '../services/sentry';
+import { appendOrphanInterviewTurn } from '../services/interview/append-orphan-interview-turn';
+import { inngest } from '../inngest/client';
 
 type InterviewRouteEnv = {
   Bindings: {
@@ -274,31 +278,35 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
           );
 
           if (result.isComplete) {
-            // Save history first without marking complete — if persistCurriculum
-            // fails, the draft stays in-progress and the user can retry.
-            await updateDraft(db, profileId, draft.id, {
-              exchangeHistory: updatedHistory,
-              extractedSignals:
-                result.extractedSignals ?? draft.extractedSignals,
-            });
-            await persistCurriculum(
-              db,
-              profileId,
-              subjectId,
-              subject.name,
-              {
-                ...draft,
+            try {
+              await updateDraft(db, profileId, draft.id, {
                 exchangeHistory: updatedHistory,
                 extractedSignals:
                   result.extractedSignals ?? draft.extractedSignals,
-              },
-              bookId,
-              bookTitle
-            );
-            // Only mark complete after curriculum is persisted
-            await updateDraft(db, profileId, draft.id, {
-              status: 'completed',
-            });
+              });
+              await persistCurriculum(
+                db,
+                profileId,
+                subjectId,
+                subject.name,
+                {
+                  ...draft,
+                  exchangeHistory: updatedHistory,
+                  extractedSignals:
+                    result.extractedSignals ?? draft.extractedSignals,
+                },
+                bookId,
+                bookTitle
+              );
+              await updateDraft(db, profileId, draft.id, {
+                status: 'completed',
+              });
+            } catch (cause) {
+              throw new PersistCurriculumError(
+                'interview/stream: persist curriculum failed',
+                cause
+              );
+            }
           } else {
             await updateDraft(db, profileId, draft.id, {
               exchangeHistory: updatedHistory,
@@ -321,6 +329,46 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
             }),
           });
         } catch (err) {
+          const orphanReason = classifyOrphanError(err);
+
+          if (clientId) {
+            try {
+              await appendOrphanInterviewTurn(
+                db,
+                profileId,
+                draft.id,
+                message,
+                {
+                  clientId,
+                  orphanReason,
+                }
+              );
+            } catch (persistErr) {
+              await inngest.send({
+                name: 'app/orphan.persist.failed',
+                data: {
+                  profileId,
+                  draftId: draft.id,
+                  route: 'interview/stream',
+                  reason: orphanReason,
+                  error: String(persistErr),
+                },
+              });
+              captureException(persistErr, {
+                profileId,
+                extra: { phase: 'orphan_persist_failed' },
+              });
+            }
+          } else {
+            captureException(
+              new Error('interview/stream: clientId missing on orphan path'),
+              {
+                profileId,
+                extra: { draftId: draft.id, phase: 'orphan_clientid_missing' },
+              }
+            );
+          }
+
           captureException(err, {
             profileId,
             extra: {
@@ -371,26 +419,32 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
       ? await getBookTitle(db, profileId, bookId, subjectId)
       : undefined;
 
-    // Extract whatever signals we have from the conversation so far
     const signals = await extractSignals(draft.exchangeHistory);
 
-    await updateDraft(db, profileId, draft.id, {
-      extractedSignals: signals,
-    });
+    try {
+      await updateDraft(db, profileId, draft.id, {
+        extractedSignals: signals,
+      });
 
-    await persistCurriculum(
-      db,
-      profileId,
-      subjectId,
-      subject.name,
-      { ...draft, extractedSignals: signals },
-      bookId,
-      bookTitle
-    );
+      await persistCurriculum(
+        db,
+        profileId,
+        subjectId,
+        subject.name,
+        { ...draft, extractedSignals: signals },
+        bookId,
+        bookTitle
+      );
 
-    await updateDraft(db, profileId, draft.id, {
-      status: 'completed',
-    });
+      await updateDraft(db, profileId, draft.id, {
+        status: 'completed',
+      });
+    } catch (cause) {
+      throw new PersistCurriculumError(
+        'interview/complete: persist curriculum failed',
+        cause
+      );
+    }
 
     // Return extracted signals alongside completion so the mobile force-complete
     // mutation can route into interests-context without waiting for a state

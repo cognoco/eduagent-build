@@ -13,6 +13,8 @@
 // sign-out time is fragile.
 // ---------------------------------------------------------------------------
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import * as SecureStore from './secure-storage';
 import { sanitizeSecureStoreKey } from './secure-storage';
 
@@ -145,6 +147,8 @@ export const REGISTRY_EXCEPTIONS: ReadonlyArray<{
  */
 export const SIGNOUT_CLEANUP_TIMEOUT_MS = 3_000;
 
+const OUTBOX_FLOWS = ['session', 'interview'] as const;
+
 export async function clearProfileSecureStorageOnSignOut(
   profileIds: ReadonlyArray<string>
 ): Promise<void> {
@@ -160,16 +164,31 @@ export async function clearProfileSecureStorageOnSignOut(
     keys.add(k);
   }
 
+  // Outbox entries live in AsyncStorage, not SecureStore. Build the key list
+  // so they are wiped alongside SecureStore keys below.
+  const outboxKeys: string[] = [];
+  for (const profileId of profileIds) {
+    if (!profileId) continue;
+    for (const flow of OUTBOX_FLOWS) {
+      outboxKeys.push(`outbox-${profileId}-${flow}`);
+    }
+  }
+
   // Run in parallel with per-key error isolation. SecureStore.deleteItemAsync
   // is a no-op on missing keys, so we never need to check existence first.
-  const cleanup = Promise.all(
-    Array.from(keys).map((key) =>
+  const cleanup = Promise.all([
+    ...Array.from(keys).map((key) =>
       SecureStore.deleteItemAsync(key).catch(() => {
         // Per-key failure is non-fatal — better to clear what we can than
         // to abort cleanup over one stuck key.
       })
-    )
-  );
+    ),
+    outboxKeys.length > 0
+      ? AsyncStorage.multiRemove(outboxKeys).catch(() => {
+          // Per-key failure is non-fatal — same policy as SecureStore deletes above.
+        })
+      : Promise.resolve(),
+  ]);
 
   // [CR-SIGNOUT-TIMEOUT-10] Hard cap so a stuck Keychain/Keystore can't
   // trap the user. Whichever finishes first wins; remaining deletes

@@ -18,7 +18,7 @@ export async function recordOutboxSpillover(
   // Write: explicit profileId on every row + uniqueness on (profileId, clientId)
   // means re-spills from the same device are idempotent and can never insert
   // under another profile's scope.
-  await db
+  const inserted = await db
     .insert(supportMessages)
     .values(
       entries.map((entry) => ({
@@ -34,7 +34,8 @@ export async function recordOutboxSpillover(
     )
     .onConflictDoNothing({
       target: [supportMessages.profileId, supportMessages.clientId],
-    });
+    })
+    .returning({ id: supportMessages.id });
 
-  return { written: entries.length };
+  return { written: inserted.length };
 }

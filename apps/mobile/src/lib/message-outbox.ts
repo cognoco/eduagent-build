@@ -3,6 +3,8 @@ import { withLock } from './async-mutex';
 
 export type OutboxFlow = 'session' | 'interview';
 
+export const MAX_OUTBOX_ATTEMPTS = 3;
+
 export interface OutboxEntry {
   id: string;
   flow: OutboxFlow;
@@ -173,7 +175,7 @@ export async function recordFailure(
             ...entry,
             failureReason: reason,
             status:
-              entry.attempts >= 3
+              entry.attempts >= MAX_OUTBOX_ATTEMPTS
                 ? ('permanently-failed' as const)
                 : entry.status,
           }
@@ -206,7 +208,14 @@ export async function drain(
 ): Promise<number> {
   const entries = await listPending(profileId, flow);
   for (const entry of entries) {
-    await handler(entry);
+    try {
+      await handler(entry);
+    } catch {
+      // Handler errors are non-fatal — continue draining remaining entries.
+      // Callers that need per-entry error handling (e.g. recordFailure + Sentry)
+      // should catch inside their handler; this catch prevents a single throw
+      // from aborting the entire drain loop.
+    }
   }
   return entries.length;
 }

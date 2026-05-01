@@ -293,6 +293,21 @@ export function classifyApiError(error: unknown): FormattedApiError {
   // UPSTREAM_ERROR/INTERNAL_ERROR) is caught here rather than falling through
   // to parseApiBody heuristics. Uses instanceof for type safety + .status/.code access.
   if (error instanceof UpstreamError) {
+    // [BUG-947] 402 PROFILE_LIMIT_EXCEEDED is a subscription-tier upgrade gate,
+    // not a server fault. The route layer returns 402 with a clear actionable
+    // message ("Please upgrade to Family or Pro"), but the generic UpstreamError
+    // path below would replace it with "Something went wrong on our end" — the
+    // exact symptom QA reported as a fake 500. Route it through the quota
+    // category and surface the server's message verbatim so the user knows the
+    // real reason and the create-profile screen can detect the code and route
+    // to the upgrade flow.
+    if (error.status === 402 && error.code === 'PROFILE_LIMIT_EXCEEDED') {
+      return {
+        category: 'quota' as const,
+        message: friendlyMessage(error.message) ?? error.message,
+        recovery: 'go-back' as const,
+      };
+    }
     return {
       category: 'server' as const,
       message:

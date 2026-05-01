@@ -45,6 +45,33 @@ import { inngest } from '../inngest/client';
 // Interview service — pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
+const SERVER_NOTE_RE = /<\/?server_note[^>]*>/gi;
+
+function sanitizeUserContent(content: string): string {
+  return content.replace(SERVER_NOTE_RE, '');
+}
+
+function buildOrphanSystemAddendum(history: ExchangeEntry[]): string {
+  const recentOrphans: ExchangeEntry[] = [];
+  for (let i = history.length - 1; i >= 0; i--) {
+    const turn = history[i]!;
+    if (turn.role === 'assistant') break;
+    if (turn.role === 'user' && turn.orphan_reason) {
+      recentOrphans.unshift(turn);
+    }
+  }
+  if (recentOrphans.length === 0) return '';
+  return (
+    '\n\n' +
+    recentOrphans
+      .map(
+        (t) =>
+          `<server_note kind="orphan_user_turn" reason="${t.orphan_reason}"/>`
+      )
+      .join('\n')
+  );
+}
+
 /** Look up a curriculum book's title, verifying ownership through the subject→profile chain. */
 export async function getBookTitle(
   db: Database,
@@ -467,15 +494,12 @@ export async function processInterviewExchange(
   const safeSubjectName = sanitizeXmlValue(context.subjectName, 200);
   const focusLine = buildFocusLine(context.bookTitle);
   const nameLine = buildInterviewNameLine(options?.learnerName);
+  const orphanAddendum = buildOrphanSystemAddendum(context.exchangeHistory);
   const messages: ChatMessage[] = [
     {
       role: 'system',
-      content: `${INTERVIEW_SYSTEM_PROMPT}\n\nSubject: <subject_name>${safeSubjectName}</subject_name>${focusLine}${nameLine}`,
+      content: `${INTERVIEW_SYSTEM_PROMPT}\n\nSubject: <subject_name>${safeSubjectName}</subject_name>${focusLine}${nameLine}${orphanAddendum}`,
     },
-    // Re-wrap assistant turns in the interview envelope so history is
-    // consistent with the JSON format the system prompt demands. DB stores
-    // cleanResponse (prose only); without re-wrapping, the LLM sees
-    // contradictory history and may produce malformed output.
     ...context.exchangeHistory.map((e) => ({
       role: e.role as 'user' | 'assistant',
       content:
@@ -484,9 +508,9 @@ export async function processInterviewExchange(
               reply: e.content,
               signals: { ready_to_finish: false },
             })
-          : e.content,
+          : sanitizeUserContent(e.content),
     })),
-    { role: 'user' as const, content: userMessage },
+    { role: 'user' as const, content: sanitizeUserContent(userMessage) },
   ];
 
   const result = await routeAndCall(messages, 1, {
@@ -555,12 +579,12 @@ export async function streamInterviewExchange(
   const safeSubjectName = sanitizeXmlValue(context.subjectName, 200);
   const focusLine = buildFocusLine(context.bookTitle);
   const nameLine = buildInterviewNameLine(options?.learnerName);
+  const orphanAddendum = buildOrphanSystemAddendum(context.exchangeHistory);
   const messages: ChatMessage[] = [
     {
       role: 'system',
-      content: `${INTERVIEW_SYSTEM_PROMPT}\n\nSubject: <subject_name>${safeSubjectName}</subject_name>${focusLine}${nameLine}`,
+      content: `${INTERVIEW_SYSTEM_PROMPT}\n\nSubject: <subject_name>${safeSubjectName}</subject_name>${focusLine}${nameLine}${orphanAddendum}`,
     },
-    // Re-wrap assistant turns — same rationale as processInterviewExchange.
     ...context.exchangeHistory.map((e) => ({
       role: e.role as 'user' | 'assistant',
       content:
@@ -569,9 +593,9 @@ export async function streamInterviewExchange(
               reply: e.content,
               signals: { ready_to_finish: false },
             })
-          : e.content,
+          : sanitizeUserContent(e.content),
     })),
-    { role: 'user' as const, content: userMessage },
+    { role: 'user' as const, content: sanitizeUserContent(userMessage) },
   ];
 
   const streamResult = await routeAndStream(messages, 1, {

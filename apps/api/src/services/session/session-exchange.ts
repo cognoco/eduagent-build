@@ -22,6 +22,8 @@ import type {
   StruggleEntry,
   VerificationType,
 } from '@eduagent/schemas';
+import { LlmStreamError, classifyOrphanError } from '@eduagent/schemas';
+import { persistUserMessageOnly } from './persist-user-message-only';
 import {
   processExchange,
   streamExchange,
@@ -170,11 +172,14 @@ export function mergeMemoryContexts(
 export interface ExchangeHistoryEvent {
   eventType: string | null;
   content: string;
+  orphanReason?: string | null;
 }
 
-export function buildExchangeHistory(
-  events: ExchangeHistoryEvent[]
-): Array<{ role: 'user' | 'system' | 'assistant'; content: string }> {
+export function buildExchangeHistory(events: ExchangeHistoryEvent[]): Array<{
+  role: 'user' | 'system' | 'assistant';
+  content: string;
+  orphan_reason?: string;
+}> {
   return events
     .filter(
       (e) =>
@@ -189,6 +194,7 @@ export function buildExchangeHistory(
           : e.eventType === 'system_prompt'
           ? ('system' as const)
           : ('assistant' as const),
+      ...(e.orphanReason ? { orphan_reason: e.orphanReason } : {}),
       content:
         e.eventType === 'ai_response'
           ? (() => {
@@ -1072,7 +1078,36 @@ export async function processMessage(
     input.imageBase64 && input.imageMimeType
       ? { base64: input.imageBase64, mimeType: input.imageMimeType }
       : undefined;
-  const result = await processExchange(context, input.message, imageData);
+  let result: Awaited<ReturnType<typeof processExchange>>;
+  try {
+    result = await processExchange(context, input.message, imageData);
+  } catch (cause) {
+    const err = new LlmStreamError('processExchange threw', cause);
+    if (options?.clientId) {
+      try {
+        await persistUserMessageOnly(db, profileId, sessionId, input.message, {
+          clientId: options.clientId,
+          orphanReason: classifyOrphanError(err),
+        });
+      } catch (persistErr) {
+        await inngest.send({
+          name: 'app/orphan.persist.failed',
+          data: {
+            profileId,
+            sessionId,
+            route: 'session-exchange/process',
+            reason: classifyOrphanError(err),
+            error: String(persistErr),
+          },
+        });
+        captureException(persistErr, {
+          profileId,
+          extra: { phase: 'orphan_persist_failed' },
+        });
+      }
+    }
+    throw err;
+  }
 
   // Compute time-to-answer: ms between last AI response and now
   const timeToAnswerMs = lastAiResponseAt
@@ -1160,7 +1195,12 @@ export async function streamMessage(
     input.imageBase64 && input.imageMimeType
       ? { base64: input.imageBase64, mimeType: input.imageMimeType }
       : undefined;
-  const result = await streamExchange(context, input.message, imageData);
+  let result: Awaited<ReturnType<typeof streamExchange>>;
+  try {
+    result = await streamExchange(context, input.message, imageData);
+  } catch (cause) {
+    throw new LlmStreamError('streamExchange threw', cause);
+  }
 
   return {
     stream: result.stream,
@@ -1169,7 +1209,42 @@ export async function streamMessage(
       // teeEnvelopeStream. The full raw envelope (with signals + ui_hints)
       // is available through `rawResponsePromise` once the caller finishes
       // draining the stream — that's the one classifyExchangeOutcome wants.
-      const rawResponse = await result.rawResponsePromise;
+      let rawResponse: string;
+      try {
+        rawResponse = await result.rawResponsePromise;
+      } catch (cause) {
+        const err = new LlmStreamError('rawResponsePromise rejected', cause);
+        if (options?.clientId) {
+          try {
+            await persistUserMessageOnly(
+              db,
+              profileId,
+              sessionId,
+              input.message,
+              {
+                clientId: options.clientId,
+                orphanReason: classifyOrphanError(err),
+              }
+            );
+          } catch (persistErr) {
+            await inngest.send({
+              name: 'app/orphan.persist.failed',
+              data: {
+                profileId,
+                sessionId,
+                route: 'session-exchange/stream',
+                reason: classifyOrphanError(err),
+                error: String(persistErr),
+              },
+            });
+            captureException(persistErr, {
+              profileId,
+              extra: { phase: 'orphan_persist_failed' },
+            });
+          }
+        }
+        throw err;
+      }
 
       // [BUG-941] Use classifyExchangeOutcome (same as interview path) so that
       // empty / unparseable / orphan-marker responses return a typed fallback
@@ -1187,6 +1262,35 @@ export async function streamMessage(
       // MUST emit a `fallback` SSE frame and refund the quota increment so the
       // exchange is not counted. Raw envelope NEVER touches ai_response.content.
       if (outcome.fallback) {
+        if (options?.clientId) {
+          try {
+            await persistUserMessageOnly(
+              db,
+              profileId,
+              sessionId,
+              input.message,
+              {
+                clientId: options.clientId,
+                orphanReason: 'llm_empty_or_unparseable',
+              }
+            );
+          } catch (persistErr) {
+            await inngest.send({
+              name: 'app/orphan.persist.failed',
+              data: {
+                profileId,
+                sessionId,
+                route: 'session-exchange/fallback',
+                reason: 'llm_empty_or_unparseable',
+                error: String(persistErr),
+              },
+            });
+            captureException(persistErr, {
+              profileId,
+              extra: { phase: 'orphan_persist_failed' },
+            });
+          }
+        }
         return {
           exchangeCount: 0,
           escalationRung: effectiveRung,

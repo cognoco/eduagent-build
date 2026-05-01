@@ -12,12 +12,14 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 const mockBack = jest.fn();
 const mockReplace = jest.fn();
 const mockCanGoBack = jest.fn();
+const mockPush = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({
     back: mockBack,
     replace: mockReplace,
     canGoBack: mockCanGoBack,
+    push: mockPush,
   }),
 }));
 
@@ -330,6 +332,62 @@ describe('CreateProfileScreen', () => {
     await waitFor(() => {
       expect(screen.getByTestId('create-profile-error')).toBeTruthy();
     });
+  });
+
+  // [BUG-947] 402 PROFILE_LIMIT_EXCEEDED is an upgrade gate, not a server fault.
+  // Without the special-case, the catch block rendered the generic
+  // "Something went wrong on our end" inline error — the symptom QA reported as
+  // a fake 500. The screen must instead surface an upgrade alert that routes to
+  // the subscription screen on confirm.
+  it('[BUG-947] surfaces upgrade alert and routes to subscription on PROFILE_LIMIT_EXCEEDED', async () => {
+    const upgradeMessage =
+      'Your subscription does not support additional profiles. Please upgrade to Family or Pro.';
+    // Throw the typed error directly from the mocked fetch — this is what the
+    // real `customFetch` in api-client.ts converts a 402+code response into.
+    // The test's `useApiClient` mock uses raw `hc(...)` and does not reproduce
+    // the customFetch error-classification layer, so we simulate its output
+    // here. See api-client.ts:248 for the production conversion.
+    const { UpstreamError } = require('../lib/api-errors');
+    mockFetch.mockImplementationOnce(() => {
+      throw new UpstreamError(upgradeMessage, 'PROFILE_LIMIT_EXCEEDED', 402);
+    });
+
+    render(<CreateProfileScreen />, { wrapper: Wrapper });
+
+    fireEvent.changeText(
+      screen.getByTestId('create-profile-name'),
+      'Test Child'
+    );
+    fireEvent.press(screen.getByTestId('create-profile-birthdate'));
+    await act(() => {
+      datePickerOnChange?.({ type: 'set' }, new Date(2013, 4, 1));
+    });
+    fireEvent.press(screen.getByTestId('create-profile-submit'));
+
+    await waitFor(() => {
+      expect(Alert.alert).toHaveBeenCalledTimes(1);
+    });
+
+    const alertCall = (Alert.alert as jest.Mock).mock.calls[0];
+    expect(alertCall[0]).toBe('Upgrade required');
+    expect(alertCall[1]).toBe(upgradeMessage);
+    // Two buttons: "Not now" (cancel) + "See plans" (action)
+    const buttons = alertCall[2] as Array<{
+      text?: string;
+      style?: string;
+      onPress?: () => void;
+    }>;
+    expect(buttons).toHaveLength(2);
+    expect(buttons[0]?.text).toBe('Not now');
+    expect(buttons[0]?.style).toBe('cancel');
+    expect(buttons[1]?.text).toBe('See plans');
+
+    // Pressing "See plans" routes to the subscription screen
+    buttons[1]?.onPress?.();
+    expect(mockPush).toHaveBeenCalledWith('/(app)/subscription');
+
+    // The inline error banner must NOT be shown — the alert is the surface.
+    expect(screen.queryByTestId('create-profile-error')).toBeNull();
   });
 
   it('navigates back on cancel', () => {

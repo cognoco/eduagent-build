@@ -171,6 +171,7 @@ export const sessionEvents = pgTable(
     metadata: jsonb('metadata').default({}),
     structuredAssessment: jsonb('structured_assessment'),
     clientId: text('client_id'),
+    orphanReason: text('orphan_reason'),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
+import { zValidator } from '@hono/zod-validator';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
@@ -31,27 +32,13 @@ type SupportRouteEnv = {
 
 export const supportRoutes = new Hono<SupportRouteEnv>().post(
   '/outbox-spillover',
+  zValidator('json', outboxSpilloverSchema),
   async (c) => {
     const profileId = requireProfileId(c.get('profileId'));
     const db = c.get('db');
+    const { entries } = c.req.valid('json');
 
-    const json = await c.req.json().catch(() => null);
-    const parsed = outboxSpilloverSchema.safeParse(json);
-    if (!parsed.success) {
-      return c.json(
-        {
-          error: 'invalid-body',
-          details: parsed.error.flatten(),
-        },
-        400
-      );
-    }
-
-    const result = await recordOutboxSpillover(
-      db,
-      profileId,
-      parsed.data.entries
-    );
+    const result = await recordOutboxSpillover(db, profileId, entries);
     return c.json(result);
   }
 );

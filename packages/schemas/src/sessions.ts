@@ -19,10 +19,19 @@ export const draftStatusSchema = z.enum([
 ]);
 export type DraftStatus = z.infer<typeof draftStatusSchema>;
 
+export const orphanReasonSchema = z.enum([
+  'llm_stream_error',
+  'llm_empty_or_unparseable',
+  'persist_curriculum_failed',
+  'unknown_post_stream',
+]);
+export type OrphanReason = z.infer<typeof orphanReasonSchema>;
+
 export const exchangeEntrySchema = z.object({
   role: z.enum(['user', 'assistant']),
   content: z.string(),
   client_id: z.string().min(1).max(128).optional(),
+  orphan_reason: orphanReasonSchema.optional(),
 });
 export type ExchangeEntry = z.infer<typeof exchangeEntrySchema>;
 
