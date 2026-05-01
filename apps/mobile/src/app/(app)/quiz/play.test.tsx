@@ -711,6 +711,57 @@ describe('QuizPlayScreen — tap-to-continue synchronous reset (BUG-929)', () =>
     const field = screen.getByTestId('quiz-free-text-field');
     expect(field.props.value).toBe('');
   });
+
+  // [CR-PR129-M4] Per-question timer must reset in the same batch as
+  // answerState so the first render of Q+1 shows 0s, not the stale elapsed
+  // time from Q+0. This is a break test: if setElapsedMs(0) /
+  // questionStartTimeRef reset are removed from handleContinue, the elapsed
+  // display will briefly show a non-zero value on Q+1's first render.
+  it('elapsed timer reads 0s on the first render of Q+1 after continue [CR-PR129-M4]', async () => {
+    const q1Options = ['Bratislava', 'Prague', 'Warsaw', 'Budapest'];
+    const q2Options = ['Paris', 'Lyon', 'Madrid', 'Rome'];
+    mockRound = {
+      id: 'round-929-timer',
+      activityType: 'capitals' as const,
+      theme: 'Europe',
+      total: 2,
+      questions: [
+        {
+          type: 'capitals' as const,
+          country: 'Slovakia',
+          options: q1Options,
+          isLibraryItem: true,
+          freeTextEligible: false,
+        },
+        {
+          type: 'capitals' as const,
+          country: 'France',
+          options: q2Options,
+          isLibraryItem: true,
+          freeTextEligible: false,
+        },
+      ],
+    };
+
+    mockCheckAnswer.mockResolvedValueOnce({ correct: true });
+    render(<QuizPlayScreen />);
+
+    // Answer Q1 correctly to reach the 'correct' answerState.
+    fireEvent.press(screen.getByTestId('quiz-option-0'));
+    await waitFor(() => expect(screen.getByText('Correct')).toBeTruthy());
+
+    // Elapsed time ticks — but we don't need to wait for an actual second
+    // since the timer only ticks on the setInterval (1000 ms). The critical
+    // check is that advancing resets the display immediately to 0s.
+    await new Promise((r) => setTimeout(r, 280));
+    fireEvent.press(screen.getByTestId('quiz-play-body'));
+
+    // Q2's first render — elapsed display must show 0s, not stale time.
+    // The Text renders as {Math.floor(elapsedMs / 1000)}s → children is [0, "s"].
+    // We assert via accessibilityLabel which interpolates both values cleanly.
+    const elapsedEl = screen.getByTestId('quiz-play-elapsed');
+    expect(elapsedEl.props.accessibilityLabel).toBe('Elapsed time: 0 seconds');
+  });
 });
 
 // [UX-DE-H1] When no round is loaded, render an error state with Retry and

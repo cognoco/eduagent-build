@@ -575,6 +575,13 @@ export default function QuizPlayScreen(): React.ReactElement {
     // too, but only runs AFTER the commit — this closes the one-frame window.
     setFreeTextAnswer('');
     setGuessWhoCluesUsed(1);
+    // [CR-PR129-M4] Reset the per-question timer in the same batch so the
+    // first render of Q+1 never shows a stale elapsed time or records stale
+    // telemetry. questionStartTimeRef is a ref so it updates synchronously;
+    // setElapsedMs(0) batches with the other state setters under React 18
+    // automatic batching — no extra render, no one-frame flicker.
+    questionStartTimeRef.current = Date.now();
+    setElapsedMs(0);
     setCurrentIndex((current) => current + 1);
   }
 
