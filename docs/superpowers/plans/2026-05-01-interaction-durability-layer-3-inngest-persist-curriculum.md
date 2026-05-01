@@ -1468,7 +1468,7 @@ The push send is implemented as a separate `step.run('send-completion-push', ...
 cd apps/api && rg -nE "expo.*push|sendPush|notification" src/services/notifications.ts | head -10
 ```
 
-If `sendPushToProfile(profileId, payload)` doesn't exist, add a thin wrapper around the existing notification primitive. If no push-send primitive exists at all, treat Task 11 as deferred and document it in `docs/plans/2026-05-01-completion-push.md` — Layer 3 still ships without it because the AppState foreground refetch (Task 10) covers the recovery path.
+→ R3: The function is `sendPushNotification(db, { profileId, title, body, type })`. It EXISTS. The only change needed is adding `'interview_ready'` to the `NotificationPayload` type's `type` union. No wrapper needed.
 
 - [ ] **Step 2: Add the metric event schema**
 
@@ -1490,7 +1490,7 @@ This is the queryable signal CLAUDE requires for "Silent recovery without escala
 The push-step path is already covered by Task 5 unit tests. Add one assertion that the metric event is dispatched on push failure:
 
 ```typescript
-it('emits completion_push_failed event when sendPushToProfile throws', async () => {
+it('emits completion_push_failed event when sendPushNotification throws', async () => { // → R3
   mockSendPush.mockRejectedValueOnce(new Error('Expo down'));
   const sendSpy = jest.spyOn(require('../client').inngest, 'send');
   // ...

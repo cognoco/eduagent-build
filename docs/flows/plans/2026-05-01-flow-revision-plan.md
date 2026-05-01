@@ -430,27 +430,27 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 
 ## Batch 15 — Parent Dashboard & Drill-Downs
 
-**State required:** Slot H (parent, ≥ 2 children with active learning history). Demo dashboard tested in same batch.
+**State required:** Slot E (parent, 1 child Timmy, no learning history yet).
 **Estimated time:** 75 min.
 
 | ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| HOME-02 | Parent gateway home | 🚫 | Blocked | | | Needs Family plan account with children |
-| HOME-03 | Parent tabs and parent-mode navigation | 🚫 | Blocked | | | Needs Family plan account |
-| PARENT-01 | Parent dashboard (live + demo) | 🚫 | Blocked | | | Needs Family plan + children |
-| PARENT-02 | Multi-child dashboard | 🚫 | Blocked | | | Needs Family plan + 2+ children |
-| PARENT-03 | Child detail drill-down | 🚫 | Blocked | | | Needs Family plan + child |
-| PARENT-04 | Child subject → topic drill-down | 🚫 | Blocked | | | Needs Family plan + child |
-| PARENT-05 | Child session / transcript drill-down | 🚫 | Blocked | | | Needs Family plan + child |
-| PARENT-06 | Child monthly reports list + report detail | 🚫 | Blocked | | | Needs Family plan + child |
-| PARENT-07 | Parent library view | 🚫 | Blocked | | | Needs Family plan + child |
-| PARENT-08 | Subject raw-input audit | 🚫 | Blocked | | | Needs Family plan + child |
-| PARENT-09 | Guided label tooltip | 🚫 | Blocked | | | Needs Family plan + child |
-| PARENT-10 | Child-topic "Understanding" card + gated retention | 🚫 | Blocked | | | Needs Family plan + child |
-| PARENT-11 | Child-session recap (narrative + clipboard + chip) | 🚫 | Blocked | | | Needs Family plan + child |
-| PARENT-12 | Child-subject detail retention badges (data-gated) | 🚫 | Blocked | | | Needs Family plan + child |
-| CC-07 | Accommodation badge surfaces | 🚫 | Blocked | | | Needs Family plan + child |
-| CC-08 | Parent-facing metric vocabulary canon | 🚫 | Blocked | | | Needs Family plan + child |
+| HOME-02 | Parent gateway home | ✅ | Pass | | | "Hey, Solo Parent!" + profile switcher + "Check child's progress" card ("Timmy hasn't practiced this week") + "Learn something" card. |
+| HOME-03 | Parent tabs and parent-mode navigation | ✅ | Pass | | | All 4 tabs (Home, Library, Progress, More). Profile switcher shows Timmy (Student) + Solo Parent (Parent, active). |
+| PARENT-01 | Parent dashboard (live + demo) | ✅ | Pass | | | /dashboard: "Child progress" title, Timmy card with "0 sessions this week", data-gated message "After 4 more sessions..." |
+| PARENT-02 | Multi-child dashboard | 🚫 | Blocked | | | Only 1 child — needs 2+ children. Dashboard renders single-child correctly. |
+| PARENT-03 | Child detail drill-down | ✅ | Pass | | | /child/[id]: Timmy header, monthly reports (gated), recent growth (gated), subjects ("No subjects yet"), sessions ("No sessions yet"), mentor memory, accommodation radios, withdraw consent. |
+| PARENT-04 | Child subject → topic drill-down | 🚫 | Blocked | | | Timmy has no subjects — needs learning history |
+| PARENT-05 | Child session / transcript drill-down | 🚫 | Blocked | | | Timmy has no sessions — needs learning history |
+| PARENT-06 | Child monthly reports list + report detail | ✅ | Pass | | | "Monthly reports" button visible. "Your first report will appear after the first month of activity." (correct data-gate) |
+| PARENT-07 | Parent library view | 🚫 | Blocked | | | Needs child with subjects/books |
+| PARENT-08 | Subject raw-input audit | 🚫 | Blocked | | | Needs child with subjects |
+| PARENT-09 | Guided label tooltip | 🚫 | Blocked | | | Needs learning data |
+| PARENT-10 | Child-topic "Understanding" card + gated retention | ✅ | Pass | | | "Recent growth" section with correct data-gate: "Progress becomes easier to spot after a few more sessions." |
+| PARENT-11 | Child-session recap (narrative + clipboard + chip) | 🚫 | Blocked | | | "No sessions yet" — needs learning history |
+| PARENT-12 | Child-subject detail retention badges (data-gated) | 🚫 | Blocked | | | "No subjects yet" — needs learning history |
+| CC-07 | Accommodation badge surfaces | ✅ | Pass | | | Child detail shows Learning Accommodation radios: None (Active), Short-Burst, Audio-First, Predictable. |
+| CC-08 | Parent-facing metric vocabulary canon | 🚫 | Blocked | | | Needs learning data for metrics to appear |
 
 ---
 
@@ -463,12 +463,12 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | --- | --- | --- | --- | --- | --- | --- |
 | BILLING-01 | Subscription screen + current-plan details | ✅ | Pass | | | Plus plan active, 1/700 used, 0% progress bar, resets June 1, Free vs Plus comparison, Restore Purchases button |
 | BILLING-02 | Upgrade plan purchase flow | 🚫 | Blocked | | | Store purchasing not available on web — noted in UI |
-| BILLING-03 | Trial / plan usage / family-pool detail | ✅ | Pass | | | Usage bar with count, reset date, percentage — all rendered correctly |
+| BILLING-03 | Trial / plan usage / family-pool detail | ✅ | Pass | | | Usage bar with count, reset date, percentage. Family pool: "2 of 4 profiles connected", "1988 shared questions left", member list. |
 | BILLING-04 | Restore purchases | ✅ | Pass | | | Button present on subscription screen (not clicked — store-dependent) |
 | BILLING-05 | Manage billing deep link | ✅ | Pass | | | "Subscription is managed on your mobile device" message shown on web |
 | BILLING-06 | Child paywall + notify-parent | 🚫 | Blocked | | | Needs Family plan account with child at quota limit |
 | BILLING-07 | Daily quota exceeded paywall | 🚫 | Blocked | | | Needs quota-capped account — no way to exhaust quota in test session |
-| BILLING-08 | Family pool visibility | 🚫 | Blocked | | | Needs Family plan account |
+| BILLING-08 | Family pool visibility | ✅ | Pass | | | Family plan subscription screen: "FAMILY POOL" section with "2 of 4 profiles connected", "1988 shared questions left this cycle", member names "Timmy, Solo Parent (owner)". |
 | BILLING-09 | Top-up question credits | ✅ | Pass | | | "Buy 500 credits" button with "One-time purchase. Credits expire in 12 months." |
 | BILLING-10 | BYOK waitlist | ✅ | Pass | | | "Bring Your Own Key" section with waitlist description and Join button |
 | CC-06 | Top-up purchase confidence (two-stage polling) | 🚫 | Blocked | | | Needs active purchase flow (store-dependent) |
