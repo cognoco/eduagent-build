@@ -51,8 +51,9 @@ describe('stripEnvelopeJson', () => {
       );
     });
 
-    it('strips a minimal valid envelope', () => {
-      const envelope = '{"reply":"Hello there"}';
+    it('strips a minimal envelope that has reply + signals', () => {
+      // CR-PR129-M7: bare {"reply":"x"} is ambiguous; require a sibling key.
+      const envelope = '{"reply":"Hello there","signals":{}}';
       expect(stripEnvelopeJson(envelope)).toBe('Hello there');
     });
 
@@ -68,8 +69,9 @@ describe('stripEnvelopeJson', () => {
       expect(stripEnvelopeJson(envelope)).toBe('Hello world');
     });
 
-    it('strips an envelope wrapped in plain markdown code fence', () => {
-      const envelope = '```\n{"reply":"Hello world"}\n```';
+    it('strips an envelope wrapped in plain markdown code fence (with sibling key)', () => {
+      // CR-PR129-M7: bare {"reply":"x"} is ambiguous; require a sibling key.
+      const envelope = '```\n{"reply":"Hello world","signals":{}}\n```';
       expect(stripEnvelopeJson(envelope)).toBe('Hello world');
     });
 
@@ -91,8 +93,8 @@ describe('stripEnvelopeJson', () => {
     });
 
     it('decodes \\\\ in the reply to a single literal backslash', () => {
-      // Source JSON: {"reply":"path\\here"} (six chars after parse: p,a,t,h,\,h,e,r,e)
-      const envelope = '{"reply":"path\\\\here"}';
+      // Source JSON: {"reply":"path\\here","signals":{}} (with required sibling key)
+      const envelope = '{"reply":"path\\\\here","signals":{}}';
       expect(stripEnvelopeJson(envelope)).toBe('path\\here');
     });
   });
@@ -128,20 +130,44 @@ describe('stripEnvelopeJson', () => {
   });
 
   describe('schema-invalid but extractable envelope', () => {
-    it('extracts reply when envelope has unexpected extra keys', () => {
-      // Future signal/hint keys we haven't taught the projector about.
-      // Reply is still a string — pull it out.
+    it('returns original when envelope has unrecognised top-level keys [CR-PR129-M7]', () => {
+      // CR-PR129-M7: Unknown keys mean we cannot safely distinguish a leaked
+      // envelope from arbitrary JSON (e.g. a teaching example). Return raw.
       const envelope =
         '{"reply":"Still good","signals":{"partial_progress":false},"future_field":42}';
-      expect(stripEnvelopeJson(envelope)).toBe('Still good');
+      expect(stripEnvelopeJson(envelope)).toBe(envelope);
     });
 
     it('extracts reply when fluency_drill has invalid duration_s (zod min(15) violation)', () => {
       // Mirrors the BUG-934 leak path on the API side — structurally JSON
-      // with reply, but Zod rejects it. We still want the reply extracted.
+      // with reply, but Zod rejects it. We still want the reply extracted
+      // because all top-level keys (reply, ui_hints) are known envelope keys.
       const envelope =
         '{"reply":"Drill answer","ui_hints":{"fluency_drill":{"active":true,"duration_s":0,"score":{"correct":0,"total":0}}}}';
       expect(stripEnvelopeJson(envelope)).toBe('Drill answer');
+    });
+  });
+
+  describe('prose-containing-JSON passthrough [CR-PR129-M7]', () => {
+    it('does not strip prose that merely contains a JSON fragment with a reply field', () => {
+      // Lesson message teaching JSON format — must NOT be rewritten.
+      const text =
+        'Here is an example: {"reply": "hi"} — that is what an envelope looks like.';
+      expect(stripEnvelopeJson(text)).toBe(text);
+    });
+
+    it('does not strip a multi-paragraph message that includes a quoted JSON example', () => {
+      const text =
+        'When a language model returns an envelope, it looks like this:\n\n```\n{"reply":"Hello","signals":{}}\n```\n\nThe `reply` field holds the visible text.';
+      expect(stripEnvelopeJson(text)).toBe(text);
+    });
+
+    it('does not strip a bare JSON object whose only key is reply (could be any JSON)', () => {
+      // {"reply":"x"} with no sibling envelope keys is indistinguishable from
+      // arbitrary JSON — it does NOT have enough signal to confirm it is a
+      // leaked envelope, so we leave it alone.
+      const text = '{"reply":"Just a bare object with unknown purpose"}';
+      expect(stripEnvelopeJson(text)).toBe(text);
     });
   });
 });

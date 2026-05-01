@@ -18,7 +18,28 @@
 // Why a pre-check instead of always parsing: the mobile bubble re-renders
 // on every keystroke during streaming. Cheap-bail on `startsWith('{')` plus
 // `includes('"reply"')` keeps the hot path zero-allocation for normal text.
+//
+// CR-PR129-M7: The detection heuristic was tightened (2026-05-01) to avoid
+// silently rewriting legitimate assistant messages that happen to contain
+// JSON-shaped text with a `reply` field as part of prose. The parsed object
+// must contain ONLY keys from the known envelope vocabulary
+// (`reply`, `signals`, `ui_hints`). Any unrecognised key signals that the
+// JSON is arbitrary data (e.g. a teaching example), not a leaked envelope.
 // ---------------------------------------------------------------------------
+
+/**
+ * The exhaustive set of top-level keys produced by the LLM envelope schema
+ * (`llmResponseEnvelopeSchema` in `@eduagent/schemas`). Any parsed object
+ * whose key-set is not a strict subset of these is not an envelope.
+ */
+const KNOWN_ENVELOPE_KEYS = new Set(['reply', 'signals', 'ui_hints']);
+
+/**
+ * A confirmed envelope must contain `reply` PLUS at least one structural
+ * sibling key (`signals` or `ui_hints`). A lone `{"reply":"x"}` object is
+ * ambiguous — it could be arbitrary JSON — so it is treated as prose.
+ */
+const REQUIRED_ENVELOPE_SIBLINGS = new Set(['signals', 'ui_hints']);
 
 /**
  * Strip a leading/trailing markdown code fence from `text` if present.
@@ -71,7 +92,15 @@ export function stripEnvelopeJson(rawContent: string): string {
     parsed !== null &&
     !Array.isArray(parsed) &&
     typeof (parsed as { reply?: unknown }).reply === 'string' &&
-    (parsed as { reply: string }).reply.length > 0
+    (parsed as { reply: string }).reply.length > 0 &&
+    // CR-PR129-M7: Two-part strictness check:
+    // 1. Every key must belong to the known envelope vocabulary — any
+    //    unrecognised key means this is arbitrary JSON, not a leaked envelope.
+    // 2. At least one structural sibling (`signals` or `ui_hints`) must be
+    //    present alongside `reply`. A bare {"reply":"x"} object is ambiguous
+    //    and is returned verbatim rather than silently rewritten.
+    Object.keys(parsed as object).every((k) => KNOWN_ENVELOPE_KEYS.has(k)) &&
+    Object.keys(parsed as object).some((k) => REQUIRED_ENVELOPE_SIBLINGS.has(k))
   ) {
     return (parsed as { reply: string }).reply;
   }
