@@ -85,9 +85,9 @@ LIBRARY TOPICS: The learner is currently studying: Spanish present tense verbs, 
 
 CONSTRAINTS:
 - 6-10 sentences total
-- Sentence length: 7-14 words
+- Sentence length: 5-10 words
 - Target age-appropriate spelling patterns and vocabulary
-- Punctuation: commas and periods always. Question marks occasionally. Colons and semicolons sparingly.
+- Punctuation: commas and periods always. Question marks occasionally.
 - Sentences must sound natural when read aloud — good rhythm, no awkward constructions
 - Include 1-2 sentences that are slightly challenging (unusual spelling, tricky grammar)
 

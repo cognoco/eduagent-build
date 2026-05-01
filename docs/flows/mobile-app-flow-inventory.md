@@ -51,7 +51,7 @@ Three more changes reshape the inventory since the last snapshot:
 | AUTH-05 | Additional sign-in verification | `/(auth)/sign-in` email code / phone code / TOTP branches | Code-only |
 | AUTH-06 | Forgot password and reset password | `/(auth)/forgot-password` | `e2e/flows/auth/forgot-password.yaml`, `e2e/flows/auth/forgot-password-devclient.yaml` |
 | AUTH-07 | Auth screen navigation | Sign in -> sign up -> forgot password -> back to sign in | `e2e/flows/auth/sign-in-navigation.yaml`, `e2e/flows/auth/sign-in-navigation-devclient.yaml` |
-| AUTH-08 | OAuth sign in / sign up with Google, Apple, or OpenAI | `/(auth)/sign-in`, `/(auth)/sign-up`, `sso-callback.tsx` | Code-only |
+| AUTH-08 | OAuth sign in / sign up — platform-conditional: Google on Android/web, Apple on iOS only, OpenAI if Clerk strategy registered | `/(auth)/sign-in`, `/(auth)/sign-up`, `sso-callback.tsx` | Code-only |
 | AUTH-09 | SSO callback completion and fallback return to sign in | `/sso-callback` | Code-only |
 | AUTH-10 | Sign out | More screen sign-out button, consent gates sign-out buttons | Partial: setup uses `e2e/flows/_setup/sign-out.yaml`; no dedicated user-facing sign-out flow |
 | AUTH-11 | Session-expired forced sign-out | Root app auth-expiry handler in `_layout.tsx` | Code-only |

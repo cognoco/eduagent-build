@@ -104,3 +104,16 @@ export const profileSchema = z.object({
 });
 
 export type Profile = z.infer<typeof profileSchema>;
+
+/**
+ * Number of completed sessions before a learner is no longer considered "new".
+ * When session count is below this, the dashboard shows a "getting started"
+ * teaser and the mobile profile UI shows progressive disclosure scaffolding.
+ * Both must agree or the parent reads a contradictory summary (the API
+ * dashboard headline says "X sessions so far" while mobile shows "Y more
+ * sessions to unlock full progress"). [BUG-906]
+ *
+ * This is the single source of truth — the API (dashboard.ts) and mobile
+ * (progressive-disclosure.ts) both import from here so drift is impossible.
+ */
+export const NEW_LEARNER_SESSION_THRESHOLD = 4;

@@ -302,6 +302,20 @@
       "when": 1777485844178,
       "tag": "0042_session_filing_failed_notification_type",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1778457600000,
+      "tag": "0043_topic_dedup_unique_index",
+      "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1778500000000,
+      "tag": "0044_shelf_book_dedup_unique_indexes",
+      "breakpoints": true
     }
   ]
 }

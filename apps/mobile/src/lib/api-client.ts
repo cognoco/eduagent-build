@@ -217,7 +217,13 @@ export function useApiClient(): ApiClient {
               parsed.details as QuotaExceededDetails
             );
           }
-          // Fall through to generic handling for non-quota 402s
+          // [CR-API-402-04] Non-quota 402 — preserve status code so callers
+          // can branch on payment-required without parsing raw HTTP status.
+          throw new UpstreamError(
+            apiMessage ?? (errBody || res.statusText),
+            code ?? 'PAYMENT_REQUIRED',
+            402
+          );
         }
 
         // [EP15-I5] Classify 403 into typed ForbiddenError so screens can

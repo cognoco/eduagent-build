@@ -14,6 +14,21 @@ import {
 } from '@eduagent/database';
 import { SubjectNotFoundError } from '@eduagent/schemas';
 import { getProfileAge } from './profile';
+
+/**
+ * [BUG-SUBJ-LANG] Thrown when `configureLanguageSubject` is called on a
+ * subject that is not set up for language learning (i.e. pedagogyMode is not
+ * 'four_strands' or languageCode is absent). The route layer maps this to a
+ * 422 Unprocessable Entity via `instanceof` — the previous classification used
+ * a raw message-string comparison which silently breaks if the message text
+ * changes, matching the classify-before-format / typed-error-hierarchy rule.
+ */
+export class SubjectNotLanguageLearningError extends Error {
+  constructor() {
+    super('Subject is not configured for language learning');
+    this.name = 'SubjectNotLanguageLearningError';
+  }
+}
 import { createLogger } from './logger';
 
 const logger = createLogger();
@@ -298,7 +313,7 @@ export async function configureLanguageSubject(
     throw new SubjectNotFoundError();
   }
   if (subject.pedagogyMode !== 'four_strands' || !subject.languageCode) {
-    throw new Error('Subject is not configured for language learning');
+    throw new SubjectNotLanguageLearningError();
   }
 
   await setNativeLanguage(db, profileId, subjectId, input.nativeLanguage);

@@ -89,7 +89,7 @@ const mockIncrementQuota = jest.fn().mockResolvedValue(undefined);
 // mock proxies through mockIncrementQuota so existing assertions about
 // "refund happened with subscriptionId" still apply.
 const mockSafeRefundQuota = jest.fn(
-  async (db: unknown, subscriptionId: string) => {
+  async (db: unknown, subscriptionId: string, _context?: unknown) => {
     await mockIncrementQuota(db, subscriptionId);
     return { refunded: true };
   }
@@ -1153,6 +1153,11 @@ describe('session routes', () => {
 
       expect(res.status).toBe(200);
       expect(res.headers.get('content-type')).toContain('text/event-stream');
+      // [BUG-881] Content-Type must declare charset=utf-8 so React Native's
+      // XHR responseText decodes UTF-8 bytes correctly on language sessions
+      // (é, em-dash, smart quotes); without this header the client falls
+      // back to Latin-1 and produces mojibake.
+      expect(res.headers.get('content-type')).toContain('charset=utf-8');
     });
 
     it('streams chunks followed by done event', async () => {
@@ -1200,6 +1205,182 @@ describe('session routes', () => {
       );
 
       expect(res.status).toBe(401);
+    });
+
+    // [BUG-941] When onComplete returns a fallback (LLM response was empty or
+    // unparseable), the route must emit a `fallback` SSE frame — NOT a `done`
+    // frame — so the mobile client shows the recovery prompt rather than
+    // rendering raw envelope JSON in the chat bubble. Quota must also be
+    // refunded because the exchange was never persisted.
+    it('[BUG-941] emits fallback SSE frame and refunds quota when onComplete returns fallback', async () => {
+      mockIncrementQuota.mockClear();
+
+      (streamMessage as jest.Mock).mockResolvedValueOnce({
+        stream: (async function* () {
+          // Zero non-whitespace chunks — LLM produced nothing renderable.
+        })(),
+        onComplete: jest.fn().mockResolvedValue({
+          exchangeCount: 0,
+          escalationRung: 1,
+          expectedResponseMinutes: 0,
+          fallback: {
+            reason: 'malformed_envelope',
+            fallbackText: "I didn't have a reply — tap to try again.",
+          },
+        }),
+      });
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/stream`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'Spiega passo per passo' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.text();
+
+      // Route MUST emit a typed `fallback` frame (not `done` with raw JSON).
+      expect(body).toContain('"type":"fallback"');
+      expect(body).toContain('"reason":"malformed_envelope"');
+      expect(body).toContain('tap to try again');
+
+      // Route MUST refund quota since the exchange was not persisted.
+      expect(mockIncrementQuota).toHaveBeenCalledWith(
+        expect.anything(),
+        'sub-1'
+      );
+    });
+
+    // [BUG-941] Variant: empty_reply reason from a valid but empty-reply envelope.
+    it('[BUG-941] emits empty_reply fallback frame when onComplete reports empty_reply', async () => {
+      (streamMessage as jest.Mock).mockResolvedValueOnce({
+        stream: (async function* () {
+          yield* [];
+        })(),
+        onComplete: jest.fn().mockResolvedValue({
+          exchangeCount: 0,
+          escalationRung: 1,
+          expectedResponseMinutes: 0,
+          fallback: {
+            reason: 'empty_reply',
+            fallbackText: "I didn't have a reply — tap to try again.",
+          },
+        }),
+      });
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/stream`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'Hello' }),
+        },
+        TEST_ENV
+      );
+
+      const body = await res.text();
+      expect(body).toContain('"type":"fallback"');
+      expect(body).toContain('"reason":"empty_reply"');
+      // Must NOT contain a regular `done` frame — client must not count this
+      // as a successful exchange.
+      expect(body).not.toContain('"exchangeCount":1');
+    });
+
+    // [M-3] If safeRefundQuota itself throws in the BUG-941 fallback path,
+    // the fallback frame and done frame must still be emitted so the client
+    // is never left with a truncated stream.
+    it('[M-3] emits fallback and done frames even when safeRefundQuota throws in fallback path', async () => {
+      mockSafeRefundQuota.mockRejectedValueOnce(new Error('quota DB timeout'));
+      mockCaptureException.mockClear();
+
+      (streamMessage as jest.Mock).mockResolvedValueOnce({
+        stream: (async function* () {
+          yield* [];
+        })(),
+        onComplete: jest.fn().mockResolvedValue({
+          exchangeCount: 0,
+          escalationRung: 1,
+          expectedResponseMinutes: 0,
+          fallback: {
+            reason: 'malformed_envelope',
+            fallbackText: "I didn't have a reply — tap to try again.",
+          },
+        }),
+      });
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/stream`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'Hello' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.text();
+
+      // Fallback frame must be written regardless of the refund failure.
+      expect(body).toContain('"type":"fallback"');
+      expect(body).toContain('"reason":"malformed_envelope"');
+      // Done frame must follow.
+      expect(body).toContain('"type":"done"');
+      // The refund error must be escalated to Sentry.
+      expect(mockCaptureException).toHaveBeenCalled();
+
+      // Restore default mock so later tests are not affected.
+      mockSafeRefundQuota.mockImplementation(
+        async (db: unknown, subscriptionId: string) => {
+          await mockIncrementQuota(db, subscriptionId);
+          return { refunded: true };
+        }
+      );
+    });
+
+    // [M-3] If safeRefundQuota throws in the onComplete catch path, the SSE
+    // error frame must still be written.
+    it('[M-3] emits error frame even when safeRefundQuota throws in onComplete catch', async () => {
+      mockSafeRefundQuota.mockRejectedValueOnce(new Error('quota DB timeout'));
+      mockCaptureException.mockClear();
+
+      const onCompleteErr = new Error('envelope parse failed');
+      (streamMessage as jest.Mock).mockResolvedValueOnce({
+        stream: (async function* () {
+          yield 'partial ';
+        })(),
+        onComplete: jest.fn().mockRejectedValue(onCompleteErr),
+      });
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/stream`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'Hello' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.text();
+
+      // Error frame must be written regardless of the refund failure.
+      expect(body).toContain('"type":"error"');
+      // captureException should be called at least once (for the refund throw).
+      expect(mockCaptureException).toHaveBeenCalled();
+
+      // Restore default mock so later tests are not affected.
+      mockSafeRefundQuota.mockImplementation(
+        async (db: unknown, subscriptionId: string) => {
+          await mockIncrementQuota(db, subscriptionId);
+          return { refunded: true };
+        }
+      );
     });
   });
 
@@ -1331,6 +1512,50 @@ describe('session routes', () => {
         onCompleteErr,
         expect.objectContaining({
           extra: expect.objectContaining({ sessionId: SESSION_ID }),
+        })
+      );
+    });
+
+    // [BUG-866] Zero-token stream must escalate to Sentry so ops can query
+    // how often the failure mode fires — logger.warn alone is not queryable.
+    // The rule: "silent recovery without escalation is banned" (CLAUDE.md).
+    it('[BUG-866] captureException is called when the stream completes with zero tokens', async () => {
+      mockCaptureException.mockClear();
+
+      (streamMessage as jest.Mock).mockResolvedValueOnce({
+        stream: (async function* () {
+          // Yield only whitespace — should NOT increment chunkCount.
+          yield '   ';
+        })(),
+        onComplete: jest.fn().mockResolvedValue({
+          exchangeCount: 1,
+          escalationRung: 1,
+        }),
+      });
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/stream`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'Hello' }),
+        },
+        TEST_ENV
+      );
+
+      // SSE response still opens with 200 — the zero-token detection is
+      // a background escalation, not a client-visible error.
+      expect(res.status).toBe(200);
+      await res.text(); // drain body to ensure the callback ran
+
+      expect(mockCaptureException).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'Zero-token stream completed' }),
+        expect.objectContaining({
+          extra: expect.objectContaining({
+            surface: 'sessions.stream',
+            sessionId: SESSION_ID,
+            tokensReceived: 0,
+          }),
         })
       );
     });

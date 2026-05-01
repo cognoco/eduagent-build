@@ -17,6 +17,12 @@ jest.mock('../../services/notifications', () => ({
     mockFormatDailyReminderBody(...args),
 }));
 
+const mockGetRecentNotificationCount = jest.fn().mockResolvedValue(0);
+jest.mock('../../services/settings', () => ({
+  getRecentNotificationCount: (...args: unknown[]) =>
+    mockGetRecentNotificationCount(...args),
+}));
+
 jest.mock('../client', () => ({
   inngest: {
     createFunction: jest.fn((_config, _trigger, handler) => ({
@@ -164,5 +170,61 @@ describe('[FIX-INNGEST-4] daily-reminder-send idempotency', () => {
     // the same profile (next day's reminder) to collide with yesterday's.
     expect(opts.idempotency).toBe('event.id');
     expect(opts.idempotency).not.toBe('event.data.profileId');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [BUG-699-FOLLOWUP] 24h dedup gate break tests
+// ---------------------------------------------------------------------------
+
+describe('[BUG-699-FOLLOWUP] daily-reminder-send 24h push dedup', () => {
+  const mockDb = { query: {} };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockGetStepDatabase.mockReturnValue(mockDb);
+    mockFormatDailyReminderBody.mockReturnValue('Keep your streak going!');
+  });
+
+  it('skips sendPushNotification and returns dedup_24h when a daily_reminder was sent in last 24h', async () => {
+    mockGetRecentNotificationCount.mockResolvedValueOnce(1);
+
+    const { result } = await executeHandler({
+      profileId: 'p-dup',
+      streakDays: 5,
+    });
+
+    expect(mockGetRecentNotificationCount).toHaveBeenCalledWith(
+      mockDb,
+      'p-dup',
+      'daily_reminder',
+      24
+    );
+    expect(mockSendPushNotification).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      status: 'skipped',
+      reason: 'dedup_24h',
+      profileId: 'p-dup',
+    });
+  });
+
+  it('still sends when no recent daily_reminder notification exists', async () => {
+    mockGetRecentNotificationCount.mockResolvedValueOnce(0);
+    mockSendPushNotification.mockResolvedValueOnce({
+      sent: true,
+      ticketId: 'ticket-002',
+    });
+
+    const { result } = await executeHandler({
+      profileId: 'p-1',
+      streakDays: 3,
+    });
+
+    expect(mockSendPushNotification).toHaveBeenCalled();
+    expect(result).toEqual({
+      status: 'sent',
+      profileId: 'p-1',
+      ticketId: 'ticket-002',
+    });
   });
 });

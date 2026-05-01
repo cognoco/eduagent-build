@@ -58,4 +58,36 @@ describe('filing lifecycle Inngest event schemas', () => {
       })
     ).not.toThrow();
   });
+
+  it('accepts all filingResolvedEventSchema resolution variants including recovered_after_window', () => {
+    const allVariants = [
+      'late_completion',
+      'retry_succeeded',
+      'unrecoverable',
+      'recovered',
+      'recovered_after_window',
+    ] as const;
+
+    for (const resolution of allVariants) {
+      expect(() =>
+        filingResolvedEventSchema.parse({
+          profileId: validUuid,
+          sessionId: validUuid,
+          resolution,
+          timestamp: '2026-04-29T10:00:00.000Z',
+        })
+      ).not.toThrow();
+    }
+  });
+
+  it('rejects an unknown resolution variant in filingResolvedEventSchema', () => {
+    expect(() =>
+      filingResolvedEventSchema.parse({
+        profileId: validUuid,
+        sessionId: validUuid,
+        resolution: 'totally_unknown',
+        timestamp: '2026-04-29T10:00:00.000Z',
+      })
+    ).toThrow();
+  });
 });

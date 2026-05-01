@@ -168,7 +168,9 @@ export async function extractHomeworkSummary(
       eq(sessionEvents.sessionId, sessionId),
       eq(sessionEvents.profileId, profileId)
     ),
-    orderBy: asc(sessionEvents.createdAt),
+    // [BUG-913 sweep] Tie-break by id when created_at collides — see
+    // session-crud.ts getSessionTranscript for the full rationale.
+    orderBy: [asc(sessionEvents.createdAt), asc(sessionEvents.id)],
   });
 
   const transcript = events

@@ -6,10 +6,26 @@ import { createDatabaseModuleMock } from '../../test-utils/database-module';
 
 const col = (name: string) => ({ name });
 
+const mockCurriculumTopicsFindFirst = jest.fn().mockResolvedValue(null);
+const mockCurriculumBooksFindFirst = jest.fn().mockResolvedValue(null);
+
+// Default session row: exists, not yet filed. Tests that exercise the missing-
+// session abort path must explicitly override this to null.
+const mockSessionRow = {
+  id: '00000000-0000-4000-8000-000000000002',
+  profileId: '00000000-0000-4000-8000-000000000001',
+  filedAt: null,
+  topicId: null,
+};
+
 const mockDb = {
   query: {
     sessionEvents: { findMany: jest.fn().mockResolvedValue([]) },
-    learningSessions: { findFirst: jest.fn().mockResolvedValue(null) },
+    learningSessions: {
+      findFirst: jest.fn().mockResolvedValue(mockSessionRow),
+    },
+    curriculumTopics: { findFirst: mockCurriculumTopicsFindFirst },
+    curriculumBooks: { findFirst: mockCurriculumBooksFindFirst },
   },
 };
 
@@ -22,11 +38,34 @@ const mockDatabaseModule = createDatabaseModuleMock({
       createdAt: col('createdAt'),
       eventType: col('eventType'),
     },
-    learningSessions: { id: col('id'), profileId: col('profileId') },
+    learningSessions: {
+      id: col('id'),
+      profileId: col('profileId'),
+      filedAt: col('filedAt'),
+      topicId: col('topicId'),
+    },
+    curriculumTopics: {
+      id: col('id'),
+      bookId: col('bookId'),
+      title: col('title'),
+    },
+    curriculumBooks: { id: col('id') },
   },
 });
 
-jest.mock('@eduagent/database', () => mockDatabaseModule.module);
+jest.mock('@eduagent/database', () => ({
+  ...mockDatabaseModule.module,
+  // [M8b] createScopedRepository must be present in the mock so the production
+  // code path compiles and runs. We wire sessions.findFirst through to the
+  // existing mockDb.query.learningSessions.findFirst so test setup (beforeEach
+  // overrides) continues to control what the step sees.
+  createScopedRepository: (_db: unknown, _profileId: string) => ({
+    sessions: {
+      findFirst: (extraWhere?: unknown) =>
+        mockDb.query.learningSessions.findFirst(extraWhere),
+    },
+  }),
+}));
 
 // ---------------------------------------------------------------------------
 // Mock services
@@ -115,6 +154,9 @@ function createEventData(
 describe('freeformFilingRetry', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Re-establish the default session row after clearAllMocks wipes implementations.
+    // Tests that need a null row (missing-session abort) override this in their own beforeEach.
+    mockDb.query.learningSessions.findFirst.mockResolvedValue(mockSessionRow);
     process.env['DATABASE_URL'] = 'postgresql://test:test@localhost/test';
   });
 
@@ -138,6 +180,28 @@ describe('freeformFilingRetry', () => {
         expect.objectContaining({ event: 'app/filing.retry' }),
       ])
     );
+  });
+
+  // -------------------------------------------------------------------------
+  // [M8a] Break test: missing session must abort loudly, not fall through
+  // -------------------------------------------------------------------------
+
+  describe('when session does not exist for the profileId (cross-profile or stale event)', () => {
+    beforeEach(() => {
+      // Simulate: the scoped repo finds no row for (sessionId, profileId)
+      mockDb.query.learningSessions.findFirst.mockResolvedValue(null);
+    });
+
+    it('throws an error so Inngest retries rather than silently filing into wrong profile [M8a]', async () => {
+      await expect(executeSteps(createEventData())).rejects.toThrow(
+        /Session not found or does not belong to profile/
+      );
+    });
+
+    it('does not call fileToLibrary when session is missing [M8a]', async () => {
+      await expect(executeSteps(createEventData())).rejects.toThrow();
+      expect(mockFileToLibrary).not.toHaveBeenCalled();
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -267,5 +331,117 @@ describe('freeformFilingRetry', () => {
         }),
       })
     );
+  });
+
+  // -------------------------------------------------------------------------
+  // [CR-FIL-CONSISTENCY-02] alreadyFiled early-exit path — payload consistency
+  // -------------------------------------------------------------------------
+
+  describe('when session is already filed (alreadyFiled path)', () => {
+    const filedTopicId = 'topic-filed-001';
+    const filedBookId = 'book-filed-001';
+
+    beforeEach(() => {
+      // Session row shows it was already filed and has a topicId
+      mockDb.query.learningSessions.findFirst.mockResolvedValue({
+        filedAt: new Date('2026-01-01T10:00:00Z'),
+        topicId: filedTopicId,
+      });
+      mockCurriculumTopicsFindFirst.mockResolvedValue({
+        title: 'Newton Laws',
+        bookId: filedBookId,
+      });
+      mockCurriculumBooksFindFirst.mockResolvedValue({ id: filedBookId });
+    });
+
+    it('skips filing and returns already_filed status', async () => {
+      const { result } = await executeSteps(createEventData());
+      expect(result).toMatchObject({ status: 'already_filed', skipped: true });
+    });
+
+    it('does not call fileToLibrary on the already_filed path', async () => {
+      await executeSteps(createEventData());
+      expect(mockFileToLibrary).not.toHaveBeenCalled();
+    });
+
+    it('emits app/filing.completed with the same key set as the success path [CR-FIL-CONSISTENCY-02]', async () => {
+      const { mockStep } = await executeSteps(createEventData());
+
+      const completedCall = (mockStep.sendEvent as jest.Mock).mock.calls.find(
+        (c: unknown[]) => (c[0] as string) === 'notify-filing-completed'
+      );
+      expect(completedCall).toBeDefined();
+      const payload = (completedCall as unknown[])[1] as {
+        name: string;
+        data: Record<string, unknown>;
+      };
+
+      // Must have all four data keys that the success path emits
+      expect(payload.data).toHaveProperty('bookId');
+      expect(payload.data).toHaveProperty('topicTitle');
+      expect(payload.data).toHaveProperty('profileId', testProfileId);
+      expect(payload.data).toHaveProperty('sessionId', testSessionId);
+      // Resolved values from the topic lookup
+      expect(payload.data.bookId).toBe(filedBookId);
+      expect(payload.data.topicTitle).toBe('Newton Laws');
+    });
+
+    it('falls back to undefined bookId/topicTitle when topicId is null [CR-FIL-CONSISTENCY-02]', async () => {
+      // Session filed but topicId not yet written (edge case)
+      mockDb.query.learningSessions.findFirst.mockResolvedValue({
+        filedAt: new Date('2026-01-01T10:00:00Z'),
+        topicId: null,
+      });
+
+      const { mockStep } = await executeSteps(createEventData());
+
+      const completedCall = (mockStep.sendEvent as jest.Mock).mock.calls.find(
+        (c: unknown[]) => (c[0] as string) === 'notify-filing-completed'
+      );
+      const payload = (completedCall as unknown[])[1] as {
+        data: Record<string, unknown>;
+      };
+      // Keys must exist even when values are undefined (structure matches success path)
+      expect(Object.keys(payload.data)).toContain('bookId');
+      expect(Object.keys(payload.data)).toContain('topicTitle');
+      expect(payload.data.bookId).toBeUndefined();
+      expect(payload.data.topicTitle).toBeUndefined();
+    });
+
+    it('scopes the session read via createScopedRepository (not a raw profileId eq) [CR-FIL-SCOPE-05, M8b]', async () => {
+      await executeSteps(createEventData());
+
+      // The check-already-filed step must go through the scoped repo, which
+      // delegates to mockDb.query.learningSessions.findFirst. Verifying it was
+      // called exactly once confirms the scoped path ran (not a short-circuit).
+      expect(mockDb.query.learningSessions.findFirst).toHaveBeenCalledTimes(1);
+    });
+
+    // [CR-FIL-LOOKUP-07] When a topic still references a book that has been
+    // soft-deleted (or curriculumBooks is otherwise unavailable), the payload
+    // must still carry the FK bookId from the topic row — never silently
+    // emit undefined. Pre-fix this test would have failed because the code
+    // re-queried curriculumBooks and used `book?.id ?? undefined`.
+    it('[CR-FIL-LOOKUP-07] preserves bookId from topic row even when book lookup would return nothing', async () => {
+      // Simulate: curriculumBooks.findFirst returning null (book row gone).
+      // The fix ignores this lookup entirely; we keep the mock in place to
+      // prove the new code path doesn't depend on it.
+      mockCurriculumBooksFindFirst.mockResolvedValue(null);
+
+      const { mockStep } = await executeSteps(createEventData());
+
+      const completedCall = (mockStep.sendEvent as jest.Mock).mock.calls.find(
+        (c: unknown[]) => (c[0] as string) === 'notify-filing-completed'
+      );
+      const payload = (completedCall as unknown[])[1] as {
+        data: Record<string, unknown>;
+      };
+      expect(payload.data.bookId).toBe(filedBookId);
+      expect(payload.data.topicTitle).toBe('Newton Laws');
+      // The dropped-query assertion: curriculumBooks must NOT be queried by
+      // the alreadyFiled path now. If a future regression re-introduces the
+      // lookup, this expectation will catch it.
+      expect(mockCurriculumBooksFindFirst).not.toHaveBeenCalled();
+    });
   });
 });

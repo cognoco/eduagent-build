@@ -15,6 +15,7 @@ import {
   ERROR_CODES,
   filingRetryEventSchema,
   RateLimitedError,
+  streamFallbackFrameSchema,
 } from '@eduagent/schemas';
 import { learningSessions, type Database } from '@eduagent/database';
 import { and, eq, lt, sql } from 'drizzle-orm';
@@ -22,7 +23,7 @@ import { z } from 'zod';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
-import { streamSSE } from 'hono/streaming';
+import { streamSSEUtf8 } from '../services/streaming/sse-utf8';
 import { captureException } from '../services/sentry';
 import { createLogger } from '../services/logger';
 import {
@@ -313,10 +314,34 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
           { llmTier, voyageApiKey: c.env.VOYAGE_API_KEY }
         );
 
-        return streamSSE(c, async (sseStream) => {
+        return streamSSEUtf8(c, async (sseStream) => {
+          // [BUG-866] Track chunk count so we can detect zero-token streams.
+          let chunkCount = 0;
           for await (const chunk of stream) {
+            if (chunk.trim().length > 0) chunkCount++;
             await sseStream.writeSSE({
               data: JSON.stringify({ type: 'chunk', content: chunk }),
+            });
+          }
+
+          // [BUG-866] Structured metric on zero-token stream — "silent recovery
+          // without escalation is banned" (CLAUDE.md). logger.warn alone is not
+          // queryable; captureException makes this event discoverable in Sentry
+          // so ops can measure how often the failure mode fires in production.
+          if (chunkCount === 0) {
+            logger.warn('[sessions/stream] Zero-token stream completed', {
+              surface: 'sessions.stream',
+              sessionId,
+              profileId,
+              tokensReceived: 0,
+            });
+            captureException(new Error('Zero-token stream completed'), {
+              profileId,
+              extra: {
+                surface: 'sessions.stream',
+                sessionId,
+                tokensReceived: 0,
+              },
             });
           }
 
@@ -324,6 +349,58 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             // onComplete reads the raw envelope via rawResponsePromise internally —
             // the clean reply text from the stream is not needed.
             const result = await onComplete();
+
+            // [BUG-941] If the LLM response was empty or unparseable, emit a
+            // typed `fallback` SSE frame so the client shows a meaningful
+            // recovery prompt instead of raw envelope JSON. Refund quota because
+            // the exchange was not persisted.
+            if (result.fallback) {
+              const frame = streamFallbackFrameSchema.parse({
+                type: 'fallback',
+                reason: result.fallback.reason,
+                fallbackText: result.fallback.fallbackText,
+              });
+              // Refund quota before emitting frames. safeRefundQuota escalates
+              // internally, but if it throws we must still emit the SSE frames
+              // so the client is never left with a truncated stream. [M-3]
+              if (subscriptionId) {
+                try {
+                  await safeRefundQuota(db, subscriptionId, {
+                    route: 'sessions.stream.fallback',
+                    profileId,
+                    sessionId,
+                  });
+                } catch (refundErr) {
+                  captureException(refundErr, {
+                    profileId,
+                    extra: { sessionId, route: 'sessions.stream.fallback' },
+                  });
+                  logger.error(
+                    '[sessions/stream] safeRefundQuota threw in fallback path',
+                    {
+                      sessionId,
+                      error:
+                        refundErr instanceof Error
+                          ? refundErr.message
+                          : String(refundErr),
+                    }
+                  );
+                }
+              }
+              await sseStream.writeSSE({ data: JSON.stringify(frame) });
+              await sseStream.writeSSE({
+                data: JSON.stringify({
+                  type: 'done',
+                  // [CR-PR129-M1] Use the persisted session count — the failed
+                  // exchange was not saved, so this is the correct current total.
+                  exchangeCount: session.exchangeCount,
+                  escalationRung: result.escalationRung,
+                  expectedResponseMinutes: 0,
+                }),
+              });
+              return;
+            }
+
             await sseStream.writeSSE({
               data: JSON.stringify({
                 type: 'done',
@@ -345,14 +422,32 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
               error: err instanceof Error ? err.message : String(err),
             });
             captureException(err, { profileId, extra: { sessionId } });
-            // Refund quota — user should not be charged for a failed exchange
-            // [BUG-661 / A-21] safeRefundQuota escalates if the refund itself fails.
+            // Refund quota — user should not be charged for a failed exchange.
+            // Wrap in try/catch: if safeRefundQuota throws, the error frame
+            // must still be written so the client is never left hanging. [M-3]
             if (subscriptionId) {
-              await safeRefundQuota(db, subscriptionId, {
-                route: 'sessions.stream.onComplete',
-                profileId,
-                sessionId,
-              });
+              try {
+                await safeRefundQuota(db, subscriptionId, {
+                  route: 'sessions.stream.onComplete',
+                  profileId,
+                  sessionId,
+                });
+              } catch (refundErr) {
+                captureException(refundErr, {
+                  profileId,
+                  extra: { sessionId, route: 'sessions.stream.onComplete' },
+                });
+                logger.error(
+                  '[sessions/stream] safeRefundQuota threw in onComplete catch',
+                  {
+                    sessionId,
+                    error:
+                      refundErr instanceof Error
+                        ? refundErr.message
+                        : String(refundErr),
+                  }
+                );
+              }
             }
             await sseStream.writeSSE({
               data: JSON.stringify({

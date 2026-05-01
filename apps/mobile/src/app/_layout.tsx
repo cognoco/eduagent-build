@@ -256,6 +256,13 @@ function ThemedContent({ colorScheme }: { colorScheme: ColorScheme }) {
           }}
         />
         <Stack.Screen
+          name="session-transcript/[sessionId]"
+          options={{
+            presentation: 'fullScreenModal',
+            animation: 'slide_from_bottom',
+          }}
+        />
+        <Stack.Screen
           name="profiles"
           options={{
             presentation: 'fullScreenModal',

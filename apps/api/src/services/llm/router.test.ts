@@ -5,9 +5,15 @@ import {
   getRegisteredProviders,
   _clearProviders,
   _resetCircuits,
+  MIN_REPLY_MAX_TOKENS,
 } from './router';
 import { createMockProvider } from './providers/mock';
-import type { LLMProvider, ChatMessage, ChatResult } from './types';
+import type {
+  LLMProvider,
+  ChatMessage,
+  ChatResult,
+  ModelConfig,
+} from './types';
 
 // [IMP-1] Test helper — returns a ChatResult matching the LLMProvider
 // interface. Spies must not rely on the `normalizeChatResult` back-compat
@@ -123,6 +129,79 @@ describe('LLM Router', () => {
       const providers = getRegisteredProviders();
       expect(providers).toContain('gemini');
       expect(Array.isArray(providers)).toBe(true);
+    });
+  });
+
+  // [BUG-875] Regression: every rung/tier combination must request at least
+  // MIN_REPLY_MAX_TOKENS so a long teaching reply (with the envelope wrapper)
+  // does not get truncated mid-bullet — the symptom that produced "Ask
+  // yourself:" trailing into nothing on the fractions session.
+  describe('maxTokens floor (BUG-875)', () => {
+    function createCapturingProvider(id: string): LLMProvider & {
+      lastConfig: ModelConfig | null;
+    } {
+      let captured: ModelConfig | null = null;
+      const base = createMockProvider(id);
+      return {
+        ...base,
+        get lastConfig() {
+          return captured;
+        },
+        async chat(
+          messages: ChatMessage[],
+          config: ModelConfig
+        ): Promise<ChatResult> {
+          captured = config;
+          return base.chat(messages, config);
+        },
+      };
+    }
+
+    it('exports MIN_REPLY_MAX_TOKENS at or above 8192', () => {
+      // Pin the floor: anyone lowering this must update this assertion AND
+      // explain why a long step-by-step reply will fit in fewer tokens.
+      expect(MIN_REPLY_MAX_TOKENS).toBeGreaterThanOrEqual(8192);
+    });
+
+    it.each([
+      [1, 'standard'],
+      [2, 'standard'],
+      [3, 'standard'],
+      [5, 'standard'],
+      [1, 'flash'],
+      [3, 'flash'],
+      [1, 'premium'],
+      [3, 'premium'],
+    ])(
+      'rung %i / tier %s requests at least MIN_REPLY_MAX_TOKENS',
+      async (rung, tier) => {
+        _clearProviders();
+        const spy = createCapturingProvider('gemini');
+        registerProvider(spy);
+
+        await routeAndCall(
+          [
+            {
+              role: 'user',
+              content: 'Walk me through 1/2 + 1/3 step by step.',
+            },
+          ],
+          rung as 1 | 2 | 3 | 4 | 5,
+          { llmTier: tier as 'standard' | 'flash' | 'premium' }
+        );
+
+        expect(spy.lastConfig).not.toBeNull();
+        expect(spy.lastConfig?.maxTokens).toBeGreaterThanOrEqual(
+          MIN_REPLY_MAX_TOKENS
+        );
+      }
+    );
+
+    afterAll(() => {
+      // Restore the suite-level mock registration the other describe blocks
+      // rely on so test ordering remains independent.
+      _clearProviders();
+      registerProvider(createMockProvider('gemini'));
     });
   });
 

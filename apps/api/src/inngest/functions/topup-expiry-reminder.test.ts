@@ -229,4 +229,35 @@ describe('topupExpiryReminder', () => {
     expect(runCalls).toContain('find-credits-expiring-in-2-months');
     expect(runCalls).toContain('find-credits-expiring-today');
   });
+
+  it('[BUG-838] does not throw when system clock returns an invalid date', async () => {
+    // Break test for BUG-838: previously getExpiryWindowForMilestone called
+    // target.toISOString() unconditionally and the cron's final
+    // `timestamp: now.toISOString()` did the same — an Invalid Date would
+    // throw RangeError and abort the entire reminder batch (and all retries
+    // would re-throw against the same broken clock). The guarded version
+    // skips broken-clock milestones and falls back to epoch for the timestamp.
+    const originalDate = global.Date;
+    class BrokenDate extends originalDate {
+      constructor(...args: ConstructorParameters<typeof Date>) {
+        if (args.length === 0) {
+          super(NaN);
+          return;
+        }
+        super(...args);
+      }
+    }
+    // @ts-expect-error — temporarily override Date for the in-handler `new Date()`
+    global.Date = BrokenDate;
+
+    try {
+      mockFindExpiringTopUpCredits.mockResolvedValue([]);
+      const { result } = await executeSteps();
+      // Cron must still resolve cleanly even though the clock is invalid —
+      // not throw a RangeError up to Inngest.
+      expect((result as { status: string }).status).toBe('completed');
+    } finally {
+      global.Date = originalDate;
+    }
+  });
 });

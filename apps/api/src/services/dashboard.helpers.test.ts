@@ -52,6 +52,84 @@ describe('generateChildSummary', () => {
 
     expect(summary).toContain('down from 5');
   });
+
+  // [BUG-906] When the lifetime session count is below the new-learner
+  // threshold, the headline subtext must NOT use weekly cadence — that was
+  // what made "0 sessions this week" appear alongside the "After 2 more
+  // sessions" teaser and read as a contradiction. The lifetime framing keeps
+  // the two views consistent.
+  describe('new-learner framing [BUG-906]', () => {
+    it('uses "{N} sessions so far" when lifetime is below the threshold', () => {
+      const summary = generateChildSummary(
+        createDashboardInput({
+          sessionsThisWeek: 0,
+          sessionsLastWeek: 0,
+          totalSessions: 2,
+        })
+      );
+
+      expect(summary).toContain('2 sessions so far');
+      expect(summary).not.toContain('this week');
+      expect(summary).not.toContain('last week');
+    });
+
+    it('says "no sessions yet" for a brand-new learner with totalSessions=0', () => {
+      const summary = generateChildSummary(
+        createDashboardInput({
+          sessionsThisWeek: 0,
+          sessionsLastWeek: 0,
+          totalSessions: 0,
+        })
+      );
+
+      expect(summary).toContain('no sessions yet');
+      expect(summary).not.toContain('this week');
+    });
+
+    it('singularises "1 session so far"', () => {
+      const summary = generateChildSummary(
+        createDashboardInput({
+          sessionsThisWeek: 0,
+          sessionsLastWeek: 0,
+          totalSessions: 1,
+        })
+      );
+
+      expect(summary).toContain('1 session so far');
+      expect(summary).not.toContain('1 sessions');
+    });
+
+    it('switches to weekly cadence at the threshold (totalSessions=4)', () => {
+      // Break test: at 4 lifetime sessions the dashboard transitions to
+      // weekly cadence; if this boundary moves silently the parent will see
+      // either the contradiction (below threshold using cadence) or the
+      // opposite confusion (above threshold using lifetime).
+      const summary = generateChildSummary(
+        createDashboardInput({
+          sessionsThisWeek: 1,
+          sessionsLastWeek: 0,
+          totalSessions: 4,
+        })
+      );
+
+      expect(summary).toContain('1 session this week');
+      expect(summary).not.toContain('so far');
+    });
+
+    it('keeps weekly cadence for callers that omit totalSessions (back-compat)', () => {
+      // totalSessions is optional. Existing callers that have not yet adopted
+      // the new field continue to see the weekly framing — no regression.
+      const summary = generateChildSummary(
+        createDashboardInput({
+          sessionsThisWeek: 4,
+          sessionsLastWeek: 2,
+          // totalSessions intentionally omitted
+        })
+      );
+
+      expect(summary).toContain('4 sessions this week');
+    });
+  });
 });
 
 describe('calculateTrend', () => {

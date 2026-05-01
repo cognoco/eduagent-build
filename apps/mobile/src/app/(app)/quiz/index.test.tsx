@@ -55,6 +55,23 @@ jest.mock('../../../hooks/use-subjects', () => ({
   }),
 }));
 
+// [BUG-891] LanguageVocabCard calls useVocabulary(subjectId) so the menu
+// can switch the title to "<Lang> basics" when the learner has fewer than
+// PERSONAL_VOCAB_QUIZ_THRESHOLD personal entries. Default these tests to a
+// "personalised" state (>= 5 entries) so existing BUG-926 / per-language
+// stat tests still see the regular "Vocabulary: <lang>" framing; BUG-891-
+// specific cases override `mockVocabularyData` to an empty array.
+let mockVocabularyData: unknown[] | undefined = Array.from({ length: 5 }).map(
+  (_, i) => ({ id: `v-${i}` })
+);
+let mockVocabularyLoading = false;
+jest.mock('../../../hooks/use-vocabulary', () => ({
+  useVocabulary: () => ({
+    data: mockVocabularyData,
+    isLoading: mockVocabularyLoading,
+  }),
+}));
+
 jest.mock('../../../lib/theme', () => ({
   useThemeColors: () => ({
     primary: '#2563eb',
@@ -232,6 +249,73 @@ describe('QuizIndexScreen', () => {
       // Spanish stats must NOT bleed onto Italian card — there should be
       // exactly one "Best: 5/6" text node (on the Spanish card only).
       expect(screen.getAllByText(/Best: 5\/6 · Played: 3/).length).toBe(1);
+    });
+
+    // [BUG-891] When a language subject has no personal vocabulary entries
+    // recorded, the quiz pulls from a stock seed list. The card must say so
+    // ("<Lang> basics" / "Stock starter words…") instead of pretending it is
+    // personalised practice — the exact misframing the bug reproduced on a
+    // fresh Italian subject with empty curriculum.
+    describe('vocab-aware card framing (BUG-891)', () => {
+      beforeEach(() => {
+        mockSubjectsState = {
+          data: [
+            {
+              id: 'sub-it-fresh',
+              name: 'Italian',
+              pedagogyMode: 'four_strands',
+              languageCode: 'it',
+              status: 'active',
+            },
+          ],
+          isError: false,
+        };
+      });
+
+      it('uses "<Lang> basics" title and starter-words subtitle when vocab is empty', () => {
+        mockVocabularyData = [];
+        render(<QuizIndexScreen />);
+        expect(screen.getByText('Italian basics')).toBeTruthy();
+        expect(
+          screen.getByText(
+            /Stock starter words — record 5 of your own to unlock personalised rounds/
+          )
+        ).toBeTruthy();
+        // The misleading "Vocabulary: Italian" title must NOT appear.
+        expect(screen.queryByText('Vocabulary: Italian')).toBeNull();
+      });
+
+      it('keeps starter framing when vocab count is below the threshold', () => {
+        mockVocabularyData = [{ id: 'v-1' }, { id: 'v-2' }];
+        render(<QuizIndexScreen />);
+        expect(screen.getByText('Italian basics')).toBeTruthy();
+      });
+
+      it('switches to personalised framing once vocab >= threshold', () => {
+        mockVocabularyData = Array.from({ length: 5 }).map((_, i) => ({
+          id: `v-${i}`,
+        }));
+        render(<QuizIndexScreen />);
+        expect(screen.getByText('Vocabulary: Italian')).toBeTruthy();
+        expect(screen.queryByText('Italian basics')).toBeNull();
+      });
+
+      it('treats loading state as starter (does not lie about personalisation)', () => {
+        // While the count is loading we cannot claim the round is
+        // personalised — defaulting to starter framing matches the actual
+        // round that fires for a fresh subject. This is a break test for
+        // BUG-891 specifically: the original code surfaced "Vocabulary:
+        // <Lang>" unconditionally, which is what made the bug reproducible
+        // across empty subjects.
+        mockVocabularyData = undefined;
+        mockVocabularyLoading = true;
+        try {
+          render(<QuizIndexScreen />);
+          expect(screen.getByText('Italian basics')).toBeTruthy();
+        } finally {
+          mockVocabularyLoading = false;
+        }
+      });
     });
 
     it('renders a Vocabulary card per active four_strands language subject', () => {

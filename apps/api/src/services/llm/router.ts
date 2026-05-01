@@ -190,6 +190,19 @@ function withSafetyPreamble(
 // Model routing configuration (ARCH-9)
 // ---------------------------------------------------------------------------
 
+// [BUG-875] Minimum max_tokens budget for any teaching reply. The wrapping
+// envelope (reply + signals + ui_hints fields) consumes a non-trivial chunk
+// of tokens BEFORE the prose, and a long step-by-step explanation (e.g. the
+// reproduction case "Walk me through 1/2 + 1/3 step by step.") routinely
+// runs past 4096 — leaving the reply truncated mid-bullet ("Ask yourself:"
+// trailing into nothing). 8192 across all rungs/tiers gives the model
+// headroom while still bounding cost; long-tail replies that approach this
+// ceiling are the same ones we WANT the model to finish.
+//
+// Exported so the regression test can pin the floor without duplicating the
+// constant (drift between code and test would be silent).
+export const MIN_REPLY_MAX_TOKENS = 8192;
+
 function getModelConfig(
   rung: EscalationRung,
   llmTier: LLMTier = 'standard'
@@ -200,27 +213,44 @@ function getModelConfig(
     return {
       provider: 'anthropic',
       model: 'claude-sonnet-4-6',
-      maxTokens: rung <= 2 ? 4096 : 8192,
+      maxTokens: MIN_REPLY_MAX_TOKENS,
     };
   }
 
   // Flash tier: always use the cheapest model regardless of rung.
-  // Standard tier: Flash for light tasks (rung ≤ 2), Pro for heavy (rung > 2).
-  // Premium without Anthropic: same as standard (graceful degradation).
+  // Standard tier: Flash for light tasks; Pro for heavy. The maxTokens
+  // ceiling is the same in both; rung now only governs MODEL choice, not
+  // token budget. [BUG-875]
   const useGemini = providers.has('gemini');
   const isLight = llmTier === 'flash' || rung <= 2;
 
   if (isLight) {
     if (useGemini) {
-      return { provider: 'gemini', model: 'gemini-2.5-flash', maxTokens: 4096 };
+      return {
+        provider: 'gemini',
+        model: 'gemini-2.5-flash',
+        maxTokens: MIN_REPLY_MAX_TOKENS,
+      };
     }
-    return { provider: 'openai', model: 'gpt-4o-mini', maxTokens: 4096 };
+    return {
+      provider: 'openai',
+      model: 'gpt-4o-mini',
+      maxTokens: MIN_REPLY_MAX_TOKENS,
+    };
   }
 
   if (useGemini) {
-    return { provider: 'gemini', model: 'gemini-2.5-pro', maxTokens: 8192 };
+    return {
+      provider: 'gemini',
+      model: 'gemini-2.5-pro',
+      maxTokens: MIN_REPLY_MAX_TOKENS,
+    };
   }
-  return { provider: 'openai', model: 'gpt-4o', maxTokens: 8192 };
+  return {
+    provider: 'openai',
+    model: 'gpt-4o',
+    maxTokens: MIN_REPLY_MAX_TOKENS,
+  };
 }
 
 /**
@@ -241,10 +271,21 @@ function getFallbackConfig(
   // Don't fall back to the same provider (OpenAI-only deployment)
   if (primary.provider === 'openai') return null;
 
+  // [BUG-875] Fallback maxTokens matches the primary ceiling. Falling back
+  // to a smaller token budget would mean a primary that ran out of tokens
+  // continues to run out under the fallback — not a real fallback.
   if (rung <= 2) {
-    return { provider: 'openai', model: 'gpt-4o-mini', maxTokens: 4096 };
+    return {
+      provider: 'openai',
+      model: 'gpt-4o-mini',
+      maxTokens: MIN_REPLY_MAX_TOKENS,
+    };
   }
-  return { provider: 'openai', model: 'gpt-4o', maxTokens: 8192 };
+  return {
+    provider: 'openai',
+    model: 'gpt-4o',
+    maxTokens: MIN_REPLY_MAX_TOKENS,
+  };
 }
 
 // ---------------------------------------------------------------------------

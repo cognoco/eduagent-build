@@ -6,7 +6,14 @@
  * // SYNC: apps/api/src/services/snapshot-aggregation.ts computeProgressMetrics()
  */
 
-export const PROGRESSIVE_DISCLOSURE_THRESHOLD = 4;
+import { NEW_LEARNER_SESSION_THRESHOLD } from '@eduagent/schemas';
+
+/**
+ * Re-exported under the original name so callers within this module keep
+ * a readable name. The canonical value lives in @eduagent/schemas —
+ * importing from there is the single source of truth for both API and mobile.
+ */
+export const PROGRESSIVE_DISCLOSURE_THRESHOLD = NEW_LEARNER_SESSION_THRESHOLD;
 
 /**
  * Returns true if the learner has fewer than THRESHOLD completed sessions.

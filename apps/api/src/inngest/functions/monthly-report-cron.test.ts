@@ -398,6 +398,76 @@ describe('monthlyReportCron', () => {
       expect(secondCall).toHaveLength(1);
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // [BUG-850] Per-batch fan-out error escalation break test.
+  //
+  // A single failing sendEvent must not abort the remaining batches. The cron
+  // must capture to Sentry with context: 'monthly-report-cron-fan-out' and
+  // return `partial` with accurate queuedBatches/failedBatches counts.
+  // Mirrors the weekly-progress-push.test.ts break test for the same pattern.
+  // ---------------------------------------------------------------------------
+  describe('[BUG-850] monthly-report-cron fan-out error escalation', () => {
+    it('continues batching after a sendEvent failure and reports partial', async () => {
+      // 3 batches: 200 + 200 + 1. The middle batch rejects.
+      const links = Array.from({ length: 401 }, (_, i) => ({
+        parentProfileId: `parent-${i}`,
+        childProfileId: `child-${i}`,
+      }));
+      const activeRows = links.map((l) => ({
+        childProfileId: l.childProfileId,
+      }));
+
+      (
+        mockMonthlyReportDb.query.familyLinks.findMany as jest.Mock
+      ).mockResolvedValue(links);
+      mockSelectDistinctWhere.mockResolvedValue(activeRows);
+
+      let sendEventCalls = 0;
+      const mockStep = {
+        run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
+        sendEvent: jest.fn(async (label: string) => {
+          sendEventCalls += 1;
+          if (label === 'fan-out-monthly-reports-200') {
+            throw new Error('transient inngest 500');
+          }
+        }),
+        sleep: jest.fn(),
+      };
+
+      const handler = (monthlyReportCron as any).fn;
+      const result = (await handler({
+        event: { name: 'inngest/function.invoked' },
+        step: mockStep,
+      })) as {
+        status: string;
+        queuedPairs: number;
+        totalPairs: number;
+        queuedBatches: number;
+        failedBatches: number;
+      };
+
+      expect(sendEventCalls).toBe(3);
+      expect(result.status).toBe('partial');
+      expect(result.failedBatches).toBe(1);
+      expect(result.queuedBatches).toBe(2);
+      // Batches 0 (200 pairs) and 400 (1 pair) succeeded.
+      expect(result.queuedPairs).toBe(201);
+      expect(result.totalPairs).toBe(401);
+      expect(mockCaptureException).toHaveBeenCalledTimes(1);
+      expect(mockCaptureException).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({
+          extra: expect.objectContaining({
+            context: 'monthly-report-cron-fan-out',
+            batchIndex: 200,
+            batchSize: 200,
+            totalPairs: 401,
+          }),
+        })
+      );
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------

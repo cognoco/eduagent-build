@@ -2,6 +2,37 @@
 set -e
 pnpm exec lint-staged
 
+# Eval-harness guard: prompt-touching files require an accompanying snapshot
+# diff. Without this, prompt drift ships silently (the eval harness only
+# catches it post-hoc on the next manual run). See CLAUDE.md "When changing
+# LLM prompts, run the eval harness".
+#
+# Triggers on staged changes to:
+#   - apps/api/src/services/**/*-prompts.ts
+#   - apps/api/src/services/llm/*.ts (excluding tests)
+# Requires at least one staged file under apps/api/eval-llm/snapshots/.
+# Bypass with `git commit --no-verify` if the change is a pure refactor.
+PROMPT_CHANGED=$(git diff --cached --name-only --diff-filter=d \
+  | grep -E '(apps/api/src/services/.*-prompts\.ts$|apps/api/src/services/llm/[^/]+\.ts$)' \
+  | grep -vE '\.test\.ts$' || true)
+if [ -n "$PROMPT_CHANGED" ]; then
+  SNAPSHOT_CHANGED=$(git diff --cached --name-only \
+    | grep -E '^apps/api/eval-llm/snapshots/' || true)
+  if [ -z "$SNAPSHOT_CHANGED" ]; then
+    echo ""
+    echo "pre-commit: prompt-touching files staged without a snapshot diff."
+    echo ""
+    echo "Files that triggered the check:"
+    echo "$PROMPT_CHANGED" | sed 's/^/  /'
+    echo ""
+    echo "Run: pnpm eval:llm   (then re-stage the snapshot files)"
+    echo ""
+    echo "If this change cannot affect generation output (pure refactor,"
+    echo "rename, comment, type-only), pass --no-verify."
+    exit 1
+  fi
+fi
+
 # Full project-reference type-check (incremental via composite tsconfig).
 # Emits .d.ts to dist/ (gitignored) + .tsbuildinfo (gitignored) for incremental caching.
 # Skip if no .ts/.tsx files are staged — docs/config-only commits need no tsc.

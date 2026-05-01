@@ -9,6 +9,7 @@ import {
   formatDailyReminderBody,
   sendPushNotification,
 } from '../../services/notifications';
+import { getRecentNotificationCount } from '../../services/settings';
 
 export const dailyReminderSend = inngest.createFunction(
   {
@@ -24,6 +25,22 @@ export const dailyReminderSend = inngest.createFunction(
 
     const result = await step.run('send-daily-reminder', async () => {
       const db = getStepDatabase();
+
+      // [BUG-699-FOLLOWUP] 24h notification-log dedup. Inngest's idempotency
+      // key (event.id) covers exact-duplicate events within 24h, but an
+      // operator replay or a re-fire with a *new* event.id would bypass that
+      // guard and push the same recipient again. The notification-log check
+      // is belt-and-suspenders, consistent with all other cron-driven push
+      // paths in this codebase.
+      const recentCount = await getRecentNotificationCount(
+        db,
+        profileId,
+        'daily_reminder',
+        24
+      );
+      if (recentCount > 0) {
+        return { status: 'skipped' as const, reason: 'dedup_24h', profileId };
+      }
 
       const body = formatDailyReminderBody(streakDays);
 

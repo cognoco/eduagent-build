@@ -20,6 +20,7 @@ const mockCaptureException = jest.fn();
 const mockGetResendApiKey = jest.fn();
 const mockGetEmailFrom = jest.fn();
 const mockGetStepSupportEmail = jest.fn();
+const mockLoggerWarn = jest.fn();
 
 jest.mock('../../services/notifications', () => ({
   sendEmail: (...args: unknown[]) => mockSendEmail(...args),
@@ -27,6 +28,15 @@ jest.mock('../../services/notifications', () => ({
 
 jest.mock('../../services/sentry', () => ({
   captureException: (...args: unknown[]) => mockCaptureException(...args),
+}));
+
+jest.mock('../../services/logger', () => ({
+  createLogger: () => ({
+    debug: jest.fn(),
+    info: jest.fn(),
+    warn: (...args: unknown[]) => mockLoggerWarn(...args),
+    error: jest.fn(),
+  }),
 }));
 
 jest.mock('../helpers', () => ({
@@ -187,6 +197,124 @@ describe('feedback-delivery-failed Inngest function [BUG-767 / A-24]', () => {
         expect.stringContaining('retry-delivery')
       );
     });
+
+    // [CR-IDEMP-FALLBACK-08] When event.id is undefined, the code must fall
+    // back to a deterministic payload-hash key rather than `undefined`.
+    // Two retries of the same event (same profileId + category, no event.id)
+    // must receive the SAME idempotency key so Resend dedupes them.
+    it('[CR-IDEMP-FALLBACK-08] two retries with event.id absent receive the same deterministic hash key', async () => {
+      mockSendEmail.mockResolvedValue({ sent: true });
+
+      // Simulate first attempt (no eventId).
+      await executeHandler({ profileId: 'profile-no-id', category: 'bug' });
+      // Simulate second attempt (Inngest retry, same payload, still no eventId).
+      await executeHandler({ profileId: 'profile-no-id', category: 'bug' });
+
+      expect(mockSendEmail).toHaveBeenCalledTimes(2);
+      const keyFirst = (
+        mockSendEmail.mock.calls[0] as [unknown, { idempotencyKey?: string }]
+      )[1].idempotencyKey;
+      const keySecond = (
+        mockSendEmail.mock.calls[1] as [unknown, { idempotencyKey?: string }]
+      )[1].idempotencyKey;
+
+      // Both retries must produce the same non-undefined key.
+      expect(keyFirst).toBeDefined();
+      expect(keySecond).toBeDefined();
+      expect(keyFirst).toEqual(keySecond);
+
+      // Must NOT be the old collision fallback.
+      expect(keyFirst).not.toContain('no-event');
+    });
+
+    // [CR-IDEMP-FALLBACK-08] Two distinct payloads (different profileId) with
+    // no event.id must still produce different hash keys — no cross-event
+    // collision.
+    it('[CR-IDEMP-FALLBACK-08] distinct payloads with no event.id produce distinct hash keys', async () => {
+      mockSendEmail.mockResolvedValue({ sent: true });
+
+      await executeHandler({ profileId: 'profile-A', category: 'bug' });
+      await executeHandler({ profileId: 'profile-B', category: 'bug' });
+
+      expect(mockSendEmail).toHaveBeenCalledTimes(2);
+      const keyA = (
+        mockSendEmail.mock.calls[0] as [unknown, { idempotencyKey?: string }]
+      )[1].idempotencyKey;
+      const keyB = (
+        mockSendEmail.mock.calls[1] as [unknown, { idempotencyKey?: string }]
+      )[1].idempotencyKey;
+
+      expect(keyA).toBeDefined();
+      expect(keyB).toBeDefined();
+      expect(keyA).not.toEqual(keyB);
+    });
+
+    // [CR-MISSING-EVENT-ID-VISIBILITY] Break test: when event.id is absent the
+    // fallback path must emit a structured logger.warn and captureException so
+    // ops can count occurrences in log aggregation and Sentry dashboards.
+    // Per CLAUDE.md: "Silent recovery without escalation is banned."
+    it('[CR-MISSING-EVENT-ID-VISIBILITY] emits logger.warn and captureException with structured tags when event.id is missing', async () => {
+      mockSendEmail.mockResolvedValue({ sent: true });
+
+      // No eventId — simulates Inngest replay without an event id.
+      await executeHandler(
+        { profileId: 'profile-no-id-visibility', category: 'suggestion' },
+        undefined
+      );
+
+      // logger.warn must fire with the queryable surface + reason tags.
+      expect(mockLoggerWarn).toHaveBeenCalledTimes(1);
+      const [warnMsg, warnCtx] = mockLoggerWarn.mock.calls[0] as [
+        string,
+        Record<string, unknown>
+      ];
+      expect(warnMsg).toContain('event.id missing');
+      expect(warnCtx.surface).toBe('feedback-delivery-failed');
+      expect(warnCtx.reason).toBe('missing_event_id');
+      expect(warnCtx.profileId).toBe('profile-no-id-visibility');
+      expect(warnCtx.category).toBe('suggestion');
+
+      // captureException must also fire so Sentry can alert at volume.
+      expect(mockCaptureException).toHaveBeenCalledTimes(1);
+      const [sentryErr, sentryCtx] = mockCaptureException.mock.calls[0] as [
+        Error,
+        { extra: Record<string, unknown> }
+      ];
+      expect(sentryErr).toBeInstanceOf(Error);
+      expect(sentryCtx.extra.surface).toBe('feedback-delivery-failed');
+      expect(sentryCtx.extra.reason).toBe('missing_event_id');
+
+      // Delivery still proceeds (no silent drop).
+      expect(mockSendEmail).toHaveBeenCalledTimes(1);
+    });
+
+    // [CR-IDEMP-FALLBACK-08] Two distinct delivery failures for the same
+    // profile with distinct event IDs must produce distinct idempotency
+    // keys — pin the (profileId, eventId) coupling so a future refactor
+    // that drops eventId from the key can't silently collapse them.
+    it('[CR-IDEMP-FALLBACK-08] distinct event IDs produce distinct idempotency keys', async () => {
+      mockSendEmail.mockResolvedValue({ sent: true });
+
+      await executeHandler(
+        { profileId: 'profile-shared', category: 'bug' },
+        'evt-A'
+      );
+      await executeHandler(
+        { profileId: 'profile-shared', category: 'bug' },
+        'evt-B'
+      );
+
+      expect(mockSendEmail).toHaveBeenCalledTimes(2);
+      const keyA = (
+        mockSendEmail.mock.calls[0] as [unknown, { idempotencyKey?: string }]
+      )[1].idempotencyKey;
+      const keyB = (
+        mockSendEmail.mock.calls[1] as [unknown, { idempotencyKey?: string }]
+      )[1].idempotencyKey;
+      expect(keyA).toBeDefined();
+      expect(keyB).toBeDefined();
+      expect(keyA).not.toEqual(keyB);
+    });
   });
 
   describe('valid payload — retry behavior', () => {
@@ -194,7 +322,8 @@ describe('feedback-delivery-failed Inngest function [BUG-767 / A-24]', () => {
       mockSendEmail.mockResolvedValue({ sent: false, reason: 'rate_limited' });
 
       await expect(
-        executeHandler({ profileId: 'p-1', category: 'bug' })
+        // Pass an eventId so the missing-event-id visibility path doesn't fire.
+        executeHandler({ profileId: 'p-1', category: 'bug' }, 'evt-retry-1')
       ).rejects.toThrow(/feedback-delivery-failed retry unsuccessful/);
     });
 
@@ -205,7 +334,9 @@ describe('feedback-delivery-failed Inngest function [BUG-767 / A-24]', () => {
       });
 
       await expect(
-        executeHandler({ profileId: 'p-1', category: 'bug' })
+        // Pass an eventId so the missing-event-id visibility path doesn't fire,
+        // keeping captureException call count at exactly 1 (the retry failure).
+        executeHandler({ profileId: 'p-1', category: 'bug' }, 'evt-retry-2')
       ).rejects.toThrow();
 
       expect(mockCaptureException).toHaveBeenCalledTimes(1);

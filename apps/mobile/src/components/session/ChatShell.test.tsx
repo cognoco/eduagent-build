@@ -16,6 +16,15 @@ jest.mock('expo-router', () => ({
   }),
 }));
 
+// [BUG-886] ChatShell now reads useIsFocused so it can short-circuit Send
+// taps that land on a stale offscreen instance on RN Web. Tests default to
+// focused=true; the BUG-886 describe block flips this to false to verify
+// the dormant-instance behaviour.
+let mockIsFocused = true;
+jest.mock('@react-navigation/native', () => ({
+  useIsFocused: () => mockIsFocused,
+}));
+
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
@@ -797,6 +806,64 @@ describe('ChatShell', () => {
       }
     });
 
+    it('[BUG-938] does NOT show "Screen reader is on" banner on web even with voice enabled', async () => {
+      // BUG-938 is the user-visible symptom of BUG-928: the banner asserting
+      // a screen reader is on appears in headless Chrome despite no AT
+      // running. The BUG-928 fix prevents screenReaderEnabled from ever
+      // flipping true on web; this test pins the OBSERVABLE outcome (no
+      // banner in the rendered tree) so a future regression that bypasses
+      // the platform guard fails here, not in production.
+      const RN = require('react-native');
+      const originalPlatform = RN.Platform.OS;
+      Object.defineProperty(RN.Platform, 'OS', { get: () => 'web' });
+
+      try {
+        // Even if the platform misreports a screen reader, the banner must
+        // not render on web.
+        jest
+          .spyOn(AccessibilityInfo, 'isScreenReaderEnabled')
+          .mockResolvedValue(true);
+
+        renderChatShell({
+          verificationType: 'teach_back',
+          messages: [
+            { id: 'ai-1', role: 'assistant', content: 'Hello learner!' },
+          ],
+        });
+
+        await act(async () => {
+          await Promise.resolve();
+        });
+
+        // Toggle voice mode on so the banner condition (screenReaderEnabled
+        // && isVoiceEnabled) becomes the only gate; on web the first half is
+        // forced false, so the banner stays hidden.
+        const toggle = screen.queryByTestId('voice-toggle');
+        if (toggle) {
+          act(() => {
+            fireEvent.press(toggle);
+          });
+        }
+
+        await act(async () => {
+          await Promise.resolve();
+        });
+
+        // Break test: the literal banner copy must not appear in the rendered
+        // tree on web. If anyone reintroduces a path that flips
+        // screenReaderEnabled on web, this assertion will fail.
+        expect(
+          screen.queryByText(
+            'Screen reader is on, so voice mode keeps manual playback only.'
+          )
+        ).toBeNull();
+      } finally {
+        Object.defineProperty(RN.Platform, 'OS', {
+          get: () => originalPlatform,
+        });
+      }
+    });
+
     it('transitions from auto to manual TTS when screen reader detected', async () => {
       renderChatShell({
         verificationType: 'teach_back',
@@ -1045,6 +1112,159 @@ describe('ChatShell', () => {
       });
 
       expect(mockStartListening).toHaveBeenCalled();
+    });
+  });
+
+  // [BUG-886] On RN Web every Stack screen stays in the DOM, so a previous
+  // session's ChatShell can intercept the visible Send tap and POST to the
+  // wrong session. ChatShell now reads useIsFocused — when the screen is
+  // not focused, handleSend short-circuits, the input is non-editable, the
+  // Send Pressable is disabled, and the wrapping View is removed from the
+  // accessibility tree on web (pointerEvents='none', aria-hidden, tabIndex=-1).
+  describe('stale-instance Send guard (BUG-886)', () => {
+    afterEach(() => {
+      // Restore for the rest of the suite.
+      mockIsFocused = true;
+    });
+
+    it('does not call onSend when the screen is unfocused', async () => {
+      mockIsFocused = false;
+      const onSend = jest.fn();
+      renderChatShell({ onSend });
+
+      // Type something into the input. With editable={!isStreaming &&
+      // isFocused} the field is disabled while unfocused, but onChangeText
+      // still fires through fireEvent — that is fine; the test cares about
+      // whether the Send press triggers onSend.
+      await act(async () => {
+        fireEvent.changeText(screen.getByTestId('chat-input'), 'hello');
+      });
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('send-button'));
+      });
+
+      expect(onSend).not.toHaveBeenCalled();
+    });
+
+    it('disables the Send Pressable while unfocused, even with non-empty input', () => {
+      mockIsFocused = false;
+      renderChatShell({ onSend: jest.fn() });
+
+      const send = screen.getByTestId('send-button');
+      expect(send.props.accessibilityState).toMatchObject({ disabled: true });
+    });
+
+    it('marks the input row aria-hidden + pointerEvents=none on web when unfocused', () => {
+      const RN = require('react-native');
+      const originalPlatform = RN.Platform.OS;
+      Object.defineProperty(RN.Platform, 'OS', { get: () => 'web' });
+
+      try {
+        mockIsFocused = false;
+        renderChatShell({ onSend: jest.fn() });
+
+        // RNTL hides elements with aria-hidden by default. Pass
+        // includeHiddenElements so we can inspect the dormant row's props.
+        const row = screen.getByTestId('chat-input-row', {
+          includeHiddenElements: true,
+        });
+        expect(row).not.toBeNull();
+        expect(row?.props.pointerEvents).toBe('none');
+        expect(row?.props['aria-hidden']).toBe(true);
+        expect(row?.props.tabIndex).toBe(-1);
+      } finally {
+        Object.defineProperty(RN.Platform, 'OS', {
+          get: () => originalPlatform,
+        });
+      }
+    });
+
+    it('keeps the input row interactive on web when focused', () => {
+      const RN = require('react-native');
+      const originalPlatform = RN.Platform.OS;
+      Object.defineProperty(RN.Platform, 'OS', { get: () => 'web' });
+
+      try {
+        mockIsFocused = true;
+        renderChatShell({ onSend: jest.fn() });
+
+        const row = screen.getByTestId('chat-input-row');
+        expect(row?.props.pointerEvents).toBe('auto');
+        expect(row?.props['aria-hidden']).toBeUndefined();
+        expect(row?.props.tabIndex).toBeUndefined();
+      } finally {
+        Object.defineProperty(RN.Platform, 'OS', {
+          get: () => originalPlatform,
+        });
+      }
+    });
+
+    it('does not apply web-only AT shielding on native unfocused screens', () => {
+      // Native (iOS/Android) Stack only renders the focused screen, so the
+      // BUG-886 race does not exist there. The web-specific aria-hidden /
+      // tabIndex=-1 / pointerEvents='none' must not silently turn into
+      // accessibility regressions on native if a screen unfocuses for
+      // any reason.
+      const RN = require('react-native');
+      const originalPlatform = RN.Platform.OS;
+      Object.defineProperty(RN.Platform, 'OS', { get: () => 'ios' });
+
+      try {
+        mockIsFocused = false;
+        renderChatShell({ onSend: jest.fn() });
+
+        const row = screen.getByTestId('chat-input-row');
+        // pointerEvents falls back to 'auto', and aria-hidden is undefined
+        // on native — RN's parent stack handles real focus.
+        expect(row?.props.pointerEvents).toBe('auto');
+        expect(row?.props['aria-hidden']).toBeUndefined();
+      } finally {
+        Object.defineProperty(RN.Platform, 'OS', {
+          get: () => originalPlatform,
+        });
+      }
+    });
+
+    it('Send button does NOT use bg-primary styling when the instance is unfocused [BUG-886]', async () => {
+      // [BUG-886] The disabled prop on the Send Pressable already includes
+      // !isFocused, but the visual class (bg-primary) previously only checked
+      // input.trim() && !isStreaming — so the dormant instance on RN Web still
+      // rendered as a filled primary button, which looks interactive. This
+      // break test asserts the class condition also gates on isFocused.
+      mockIsFocused = false;
+      const onSend = jest.fn();
+      renderChatShell({ onSend });
+
+      // Inject text via fireEvent so the trimmed value is non-empty —
+      // that eliminates input.trim() as the reason for bg-surface-elevated
+      // and isolates the isFocused guard.
+      await act(async () => {
+        fireEvent.changeText(screen.getByTestId('chat-input'), 'hello');
+      });
+
+      const send = screen.getByTestId('send-button');
+      // className is a NativeWind prop available as props.className in RNTL.
+      const className: string = send.props.className ?? '';
+      expect(className).not.toContain('bg-primary');
+      expect(className).toContain('bg-surface-elevated');
+    });
+
+    it('still calls onSend when focused [break test for over-strict guard]', async () => {
+      // The simplest way for someone to break BUG-886 is to leave
+      // !isFocused logic active even on the focused instance. Catch that
+      // by asserting the happy path still works.
+      mockIsFocused = true;
+      const onSend = jest.fn();
+      renderChatShell({ onSend });
+
+      await act(async () => {
+        fireEvent.changeText(screen.getByTestId('chat-input'), 'hello');
+      });
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('send-button'));
+      });
+
+      expect(onSend).toHaveBeenCalledWith('hello');
     });
   });
 });

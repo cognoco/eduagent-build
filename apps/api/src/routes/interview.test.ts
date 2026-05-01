@@ -449,6 +449,11 @@ describe('interview routes', () => {
 
       expect(res.status).toBe(200);
       expect(res.headers.get('content-type')).toContain('text/event-stream');
+      // [BUG-881] Content-Type must declare charset=utf-8 so React Native's
+      // XHR responseText decodes UTF-8 bytes correctly. Without this, é,
+      // em-dash, and smart quotes render as mojibake on language-subject
+      // interview streams.
+      expect(res.headers.get('content-type')).toContain('charset=utf-8');
 
       const body = await res.text();
       expect(body).toContain('"type":"chunk"');

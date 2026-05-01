@@ -34,6 +34,7 @@ export const filingResolvedEventSchema = z.object({
     'retry_succeeded',
     'unrecoverable',
     'recovered',
+    'recovered_after_window',
   ]),
   timestamp: z.string().datetime(),
 });

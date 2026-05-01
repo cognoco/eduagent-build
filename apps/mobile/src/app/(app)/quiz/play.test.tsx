@@ -493,6 +493,277 @@ describe('QuizPlayScreen — shuffledOptions derived synchronously (BUG-STALE-OP
   });
 });
 
+// [BUG-929] Tap-to-continue must reset answerState SYNCHRONOUSLY in the same
+// React batch as setCurrentIndex. Without the synchronous reset, the first
+// commit of Q+1 still carried answerState='correct' (or 'wrong') from Q+0,
+// so every option Pressable rendered with `disabled={answerState !==
+// 'unanswered'}` === true. The reset only ran in the [currentIndex,
+// currentQuestion] useEffect AFTER that commit, leaving a window between
+// paint and the next render in which the user's first option tap landed on
+// a disabled Pressable and was silently dropped. The reported symptom: no
+// red/green animation, no /quiz/rounds/:id/check, and a second tap on the
+// same option then registered correctly.
+//
+// jsdom + RTL's act() flushes useEffects between fireEvents, so the original
+// race does not reproduce verbatim in unit tests. These tests instead pin
+// the *contract* the fix establishes:
+//   1. After advancing to Q+1, option Pressables expose
+//      accessibilityState.disabled === false in the rendered tree.
+//   2. A single fireEvent.press on option-0 of Q+1 records exactly one
+//      checkAnswer call against Q+1's options (no silent drop, no re-tap).
+// If the synchronous reset is ever reverted, web users will see the bug
+// again; if anyone removes the option's disabled binding from answerState,
+// (1) still locks down the externally visible state.
+describe('QuizPlayScreen — tap-to-continue synchronous reset (BUG-929)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('exposes option Pressables as enabled on the first render of Q+1', async () => {
+    const q1Options = ['Bratislava', 'Prague', 'Warsaw', 'Budapest'];
+    const q2Options = ['Paris', 'Lyon', 'Madrid', 'Rome'];
+    mockRound = {
+      id: 'round-929-a',
+      activityType: 'capitals' as const,
+      theme: 'Europe',
+      total: 2,
+      questions: [
+        {
+          type: 'capitals' as const,
+          country: 'Slovakia',
+          options: q1Options,
+          isLibraryItem: true,
+          freeTextEligible: false,
+        },
+        {
+          type: 'capitals' as const,
+          country: 'France',
+          options: q2Options,
+          isLibraryItem: true,
+          freeTextEligible: false,
+        },
+      ],
+    };
+
+    mockCheckAnswer.mockResolvedValueOnce({ correct: true });
+    render(<QuizPlayScreen />);
+
+    fireEvent.press(screen.getByTestId('quiz-option-0'));
+    await waitFor(() => expect(screen.getByText('Correct')).toBeTruthy());
+
+    // Wait past the 250ms continue gate, then tap the body to advance.
+    await new Promise((r) => setTimeout(r, 280));
+    fireEvent.press(screen.getByTestId('quiz-play-body'));
+
+    // Q2 is now showing. Every option Pressable must report disabled === false
+    // on this render. Before the fix, all four were disabled until the next
+    // render flushed the useEffect's setAnswerState('unanswered').
+    for (let i = 0; i < q2Options.length; i++) {
+      const opt = screen.getByTestId(`quiz-option-${i}`);
+      expect(opt.props.accessibilityState).toMatchObject({ disabled: false });
+    }
+  });
+
+  it('records a single option-tap on Q+1 immediately after continue [break test]', async () => {
+    const q1Options = ['Bratislava', 'Prague', 'Warsaw', 'Budapest'];
+    const q2Options = ['Paris', 'Lyon', 'Madrid', 'Rome'];
+    mockRound = {
+      id: 'round-929-b',
+      activityType: 'capitals' as const,
+      theme: 'Europe',
+      total: 2,
+      questions: [
+        {
+          type: 'capitals' as const,
+          country: 'Slovakia',
+          options: q1Options,
+          isLibraryItem: true,
+          freeTextEligible: false,
+        },
+        {
+          type: 'capitals' as const,
+          country: 'France',
+          options: q2Options,
+          isLibraryItem: true,
+          freeTextEligible: false,
+        },
+      ],
+    };
+
+    mockCheckAnswer.mockResolvedValueOnce({ correct: true }); // Q1 correct
+    render(<QuizPlayScreen />);
+
+    fireEvent.press(screen.getByTestId('quiz-option-0'));
+    await waitFor(() => expect(screen.getByText('Correct')).toBeTruthy());
+
+    await new Promise((r) => setTimeout(r, 280));
+    fireEvent.press(screen.getByTestId('quiz-play-body'));
+
+    // Single tap on Q+1's option-0 must record. No re-tap allowed.
+    mockCheckAnswer.mockResolvedValueOnce({
+      correct: false,
+      correctAnswer: 'Paris',
+    });
+    fireEvent.press(screen.getByTestId('quiz-option-0'));
+
+    await waitFor(() => {
+      expect(mockCheckAnswer).toHaveBeenCalledTimes(2);
+    });
+
+    const secondCall = mockCheckAnswer.mock.calls[1]?.[0];
+    expect(secondCall).toMatchObject({
+      roundId: 'round-929-b',
+      questionIndex: 1,
+      answerGiven: q2Options[0],
+      answerMode: 'multiple_choice',
+    });
+  });
+
+  it('does not surface the previous question banner on Q+1 first render', async () => {
+    // Symptom guard: line 821 renders 'Correct' / 'Not quite' / 'Tap anywhere
+    // to continue' only when answerState is correct/wrong. If reset is not
+    // synchronous, these banners briefly bleed into Q+1.
+    const q1Options = ['A', 'B', 'C', 'D'];
+    const q2Options = ['W', 'X', 'Y', 'Z'];
+    mockRound = {
+      id: 'round-929-c',
+      activityType: 'capitals' as const,
+      theme: 'Europe',
+      total: 2,
+      questions: [
+        {
+          type: 'capitals' as const,
+          country: 'Slovakia',
+          options: q1Options,
+          isLibraryItem: true,
+          freeTextEligible: false,
+        },
+        {
+          type: 'capitals' as const,
+          country: 'France',
+          options: q2Options,
+          isLibraryItem: true,
+          freeTextEligible: false,
+        },
+      ],
+    };
+
+    mockCheckAnswer.mockResolvedValueOnce({ correct: true });
+    render(<QuizPlayScreen />);
+
+    fireEvent.press(screen.getByTestId('quiz-option-0'));
+    await waitFor(() => expect(screen.getByText('Correct')).toBeTruthy());
+
+    await new Promise((r) => setTimeout(r, 280));
+    fireEvent.press(screen.getByTestId('quiz-play-body'));
+
+    expect(screen.queryByText('Correct')).toBeNull();
+    expect(screen.queryByText('Not quite')).toBeNull();
+    expect(screen.queryByText('Tap anywhere to continue')).toBeNull();
+  });
+
+  // [BUG-929] freeTextAnswer stale-text break test: after advancing from a
+  // free-text question, the next free-text input must render empty — not with
+  // the previous question's typed text. The [currentIndex, currentQuestion]
+  // useEffect also resets it, but only AFTER the commit, leaving a one-frame
+  // window. The synchronous reset in handleContinue closes that window.
+  it('free-text input renders empty on Q+1 after typing an answer on Q+0', async () => {
+    mockRound = {
+      id: 'round-929-ft',
+      activityType: 'capitals' as const,
+      theme: 'Europe',
+      total: 2,
+      questions: [
+        {
+          type: 'capitals' as const,
+          country: 'Slovakia',
+          options: ['Bratislava', 'Prague', 'Warsaw', 'Budapest'],
+          isLibraryItem: true,
+          freeTextEligible: true,
+        },
+        {
+          type: 'capitals' as const,
+          country: 'France',
+          options: ['Paris', 'Lyon', 'Madrid', 'Rome'],
+          isLibraryItem: true,
+          freeTextEligible: true,
+        },
+      ],
+    };
+
+    mockCheckAnswer.mockResolvedValueOnce({ correct: true });
+    render(<QuizPlayScreen />);
+
+    // Type an answer in Q1's free-text field and submit it.
+    fireEvent.changeText(
+      screen.getByTestId('quiz-free-text-field'),
+      'Bratislava'
+    );
+    fireEvent.press(screen.getByTestId('quiz-free-text-submit'));
+
+    await waitFor(() => expect(screen.getByText('Correct')).toBeTruthy());
+
+    // Advance to Q2.
+    await new Promise((r) => setTimeout(r, 280));
+    fireEvent.press(screen.getByTestId('quiz-play-body'));
+
+    // Q2 is now showing. The free-text field must be EMPTY — not 'Bratislava'.
+    const field = screen.getByTestId('quiz-free-text-field');
+    expect(field.props.value).toBe('');
+  });
+
+  // [CR-PR129-M4] Per-question timer must reset in the same batch as
+  // answerState so the first render of Q+1 shows 0s, not the stale elapsed
+  // time from Q+0. This is a break test: if setElapsedMs(0) /
+  // questionStartTimeRef reset are removed from handleContinue, the elapsed
+  // display will briefly show a non-zero value on Q+1's first render.
+  it('elapsed timer reads 0s on the first render of Q+1 after continue [CR-PR129-M4]', async () => {
+    const q1Options = ['Bratislava', 'Prague', 'Warsaw', 'Budapest'];
+    const q2Options = ['Paris', 'Lyon', 'Madrid', 'Rome'];
+    mockRound = {
+      id: 'round-929-timer',
+      activityType: 'capitals' as const,
+      theme: 'Europe',
+      total: 2,
+      questions: [
+        {
+          type: 'capitals' as const,
+          country: 'Slovakia',
+          options: q1Options,
+          isLibraryItem: true,
+          freeTextEligible: false,
+        },
+        {
+          type: 'capitals' as const,
+          country: 'France',
+          options: q2Options,
+          isLibraryItem: true,
+          freeTextEligible: false,
+        },
+      ],
+    };
+
+    mockCheckAnswer.mockResolvedValueOnce({ correct: true });
+    render(<QuizPlayScreen />);
+
+    // Answer Q1 correctly to reach the 'correct' answerState.
+    fireEvent.press(screen.getByTestId('quiz-option-0'));
+    await waitFor(() => expect(screen.getByText('Correct')).toBeTruthy());
+
+    // Elapsed time ticks — but we don't need to wait for an actual second
+    // since the timer only ticks on the setInterval (1000 ms). The critical
+    // check is that advancing resets the display immediately to 0s.
+    await new Promise((r) => setTimeout(r, 280));
+    fireEvent.press(screen.getByTestId('quiz-play-body'));
+
+    // Q2's first render — elapsed display must show 0s, not stale time.
+    // The Text renders as {Math.floor(elapsedMs / 1000)}s → children is [0, "s"].
+    // We assert via accessibilityLabel which interpolates both values cleanly.
+    const elapsedEl = screen.getByTestId('quiz-play-elapsed');
+    expect(elapsedEl.props.accessibilityLabel).toBe('Elapsed time: 0 seconds');
+  });
+});
+
 // [UX-DE-H1] When no round is loaded, render an error state with Retry and
 // Go Home so the user is never left on a dead plain-text screen.
 describe('QuizPlayScreen — no round loaded', () => {

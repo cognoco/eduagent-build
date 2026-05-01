@@ -19,6 +19,7 @@ import {
   onboardingPronounsPatchSchema,
   onboardingLanguagePatchSchema,
   profileUpdateSchema,
+  NEW_LEARNER_SESSION_THRESHOLD,
 } from './profiles.js';
 import {
   interestsArraySchema,
@@ -181,6 +182,16 @@ describe('interestsArraySchema forward-compat', () => {
     expect(() =>
       interestEntrySchema.parse({ label: 'chess', context: 'mixed' })
     ).toThrow();
+  });
+});
+
+describe('[BUG-906] NEW_LEARNER_SESSION_THRESHOLD contract', () => {
+  // This test pins the value so a future change must update it deliberately.
+  // Drift prevention comes from both the API (dashboard.ts) and mobile
+  // (progressive-disclosure.ts) importing this single constant — there is no
+  // longer a separate declaration that can diverge.
+  it('equals the documented product value of 4', () => {
+    expect(NEW_LEARNER_SESSION_THRESHOLD).toBe(4);
   });
 });
 

@@ -551,6 +551,37 @@ export default function QuizPlayScreen(): React.ReactElement {
       return;
     }
 
+    // [BUG-929] Reset answer state in the SAME React batch as setCurrentIndex.
+    // Without this, the first commit of Q+1 still carries answerState='correct'
+    // (or 'wrong') from Q+0, which means every option Pressable renders with
+    // `disabled={answerState !== 'unanswered'}` === true. The reset effect at
+    // [currentIndex, currentQuestion] only runs after that commit, leaving a
+    // window between paint and the next render in which a user tap lands on
+    // disabled Pressables and is silently dropped — exactly the symptom
+    // reported (no red/green animation, no /quiz/rounds/:id/check). Doing the
+    // reset here closes that window: the first render of Q+1 already shows
+    // enabled options. The downstream useEffect's setAnswerState('unanswered')
+    // then becomes a no-op (same-value bail-out) instead of a render trigger.
+    answerSubmittedRef.current = false;
+    correctAnswerCapturedRef.current = false;
+    setAnswerState('unanswered');
+    setSelectedAnswer(null);
+    setCorrectAnswer(null);
+    setShowContinueHint(false);
+    setAnswerCheckFailed(false);
+    // [BUG-929] Also reset freeTextAnswer and guessWhoCluesUsed in the same
+    // React batch so Q+1's first render never shows Q+0's stale typed text or
+    // clue count. The [currentIndex, currentQuestion] useEffect handles these
+    // too, but only runs AFTER the commit — this closes the one-frame window.
+    setFreeTextAnswer('');
+    setGuessWhoCluesUsed(1);
+    // [CR-PR129-M4] Reset the per-question timer in the same batch so the
+    // first render of Q+1 never shows a stale elapsed time or records stale
+    // telemetry. questionStartTimeRef is a ref so it updates synchronously;
+    // setElapsedMs(0) batches with the other state setters under React 18
+    // automatic batching — no extra render, no one-frame flicker.
+    questionStartTimeRef.current = Date.now();
+    setElapsedMs(0);
     setCurrentIndex((current) => current + 1);
   }
 

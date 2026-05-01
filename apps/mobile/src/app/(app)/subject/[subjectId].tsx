@@ -7,6 +7,7 @@ import {
   useAnalogyDomain,
   useUpdateAnalogyDomain,
 } from '../../../hooks/use-settings';
+import { useSubjects } from '../../../hooks/use-subjects';
 import type { AnalogyDomain } from '@eduagent/schemas';
 import { classifyApiError } from '../../../lib/format-api-error';
 import { platformAlert } from '../../../lib/platform-alert';
@@ -23,6 +24,15 @@ export default function SubjectSettingsScreen() {
   const { data: analogyDomain, isLoading } = useAnalogyDomain(safeSubjectId);
   const { mutate: updateAnalogyDomain, isPending } =
     useUpdateAnalogyDomain(safeSubjectId);
+  // [BUG-939] Hide Analogy Preference for language subjects (pedagogyMode
+  // 'four_strands'). The four-strands pedagogy teaches vocabulary directly via
+  // phonetic and usage examples, not via analogies — the picker would never
+  // influence those sessions, so showing it is misleading.
+  const { data: subjects, isLoading: isSubjectsLoading } = useSubjects({
+    includeInactive: true,
+  });
+  const activeSubject = subjects?.find((s) => s.id === safeSubjectId);
+  const isLanguageSubject = activeSubject?.pedagogyMode === 'four_strands';
 
   const handleSelect = (domain: AnalogyDomain | null): void => {
     // UX-DE-L9: surface mutation errors
@@ -77,23 +87,37 @@ export default function SubjectSettingsScreen() {
         className="flex-1 px-5"
         contentContainerStyle={{ paddingBottom: 24 }}
       >
-        {/* Analogy Domain Section */}
-        <View className="mt-2 mb-4">
-          <Text className="text-h3 font-semibold text-text-primary mb-1">
-            Analogy Preference
-          </Text>
-          <Text className="text-body-sm text-text-secondary mb-3">
-            Choose a domain for analogies. The tutor will prefer analogies from
-            this world when explaining concepts, but won't force them when a
-            direct explanation is clearer.
-          </Text>
-          <AnalogyDomainPicker
-            value={analogyDomain}
-            onSelect={handleSelect}
-            isLoading={isLoading}
-            disabled={isPending}
-          />
-        </View>
+        {isLanguageSubject ? (
+          <View
+            className="mt-6 items-center"
+            testID="subject-settings-language-empty"
+          >
+            <Text className="text-body-sm text-text-secondary text-center">
+              No subject-specific settings yet for language subjects. Your
+              tutor adapts vocabulary, listening, and writing practice
+              automatically based on your CEFR level and progress.
+            </Text>
+          </View>
+        ) : isSubjectsLoading && !activeSubject ? (
+          <View className="mt-6" testID="subject-settings-loading" />
+        ) : (
+          <View className="mt-2 mb-4">
+            <Text className="text-h3 font-semibold text-text-primary mb-1">
+              Analogy Preference
+            </Text>
+            <Text className="text-body-sm text-text-secondary mb-3">
+              Choose a domain for analogies. The tutor will prefer analogies
+              from this world when explaining concepts, but won't force them
+              when a direct explanation is clearer.
+            </Text>
+            <AnalogyDomainPicker
+              value={analogyDomain}
+              onSelect={handleSelect}
+              isLoading={isLoading}
+              disabled={isPending}
+            />
+          </View>
+        )}
       </ScrollView>
     </View>
   );

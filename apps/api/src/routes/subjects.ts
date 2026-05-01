@@ -17,6 +17,7 @@ import {
   configureLanguageSubject,
   getSubject,
   updateSubject,
+  SubjectNotLanguageLearningError,
 } from '../services/subject';
 import { resolveSubjectName } from '../services/subject-resolve';
 import { classifySubject } from '../services/subject-classify';
@@ -96,10 +97,8 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
         if (err instanceof SubjectNotFoundError) {
           return notFound(c, err.message);
         }
-        if (
-          err instanceof Error &&
-          err.message === 'Subject is not configured for language learning'
-        ) {
+        // [BUG-SUBJ-LANG] Typed error replaces message-string comparison.
+        if (err instanceof SubjectNotLanguageLearningError) {
           return apiError(c, 422, ERROR_CODES.VALIDATION_ERROR, err.message);
         }
         throw err;

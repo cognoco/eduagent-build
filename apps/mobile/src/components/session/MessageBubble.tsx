@@ -19,6 +19,7 @@ import Animated, {
 import Markdown from 'react-native-markdown-display';
 import { Ionicons } from '@expo/vector-icons';
 import { formatMathContent } from '../../lib/math-format';
+import { stripEnvelopeJson } from '../../lib/strip-envelope';
 import { useThemeColors } from '../../lib/theme';
 
 export type VerificationBadge = 'evaluate' | 'teach_back';
@@ -284,7 +285,18 @@ export function MessageBubble({
 }: MessageBubbleProps): React.ReactElement {
   const isAI = role === 'assistant';
   const colors = useThemeColors();
-  const displayContent = isAI ? formatMathContent(content) : content;
+  // [BUG-941] Render-boundary defense: any AI message whose content arrived
+  // shaped like a full LLM envelope (`{"reply":"...","signals":...}`) gets
+  // projected down to its `.reply` field before display. Plain prose passes
+  // through untouched. Mirrors the API-side projectAiResponseContent — this
+  // is defense-in-depth in case a non-streaming or future code path bypasses
+  // the existing two layers (parseExchangeEnvelope on persistence + transcript
+  // hydration projector). User-authored messages are never envelope-shaped,
+  // so the projection only runs for assistant content.
+  const projectedContent = isAI ? stripEnvelopeJson(content) : content;
+  const displayContent = isAI
+    ? formatMathContent(projectedContent)
+    : projectedContent;
   const escalation =
     isAI && escalationRung ? ESCALATION_STYLES[escalationRung] : undefined;
   const badge =

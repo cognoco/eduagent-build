@@ -11,6 +11,7 @@ import {
   formatReviewReminderBody,
   sendPushNotification,
 } from '../../services/notifications';
+import { getRecentNotificationCount } from '../../services/settings';
 
 export const reviewDueSend = inngest.createFunction(
   {
@@ -26,6 +27,19 @@ export const reviewDueSend = inngest.createFunction(
 
     const result = await step.run('send-review-reminder', async () => {
       const db = getStepDatabase();
+
+      // [BUG-699-FOLLOWUP] 24h notification-log dedup. Same pattern as the
+      // other cron-driven push paths: idempotency covers same-event.id
+      // replays; this covers new events for the same recipient within 24h.
+      const recentCount = await getRecentNotificationCount(
+        db,
+        profileId,
+        'review_reminder',
+        24
+      );
+      if (recentCount > 0) {
+        return { status: 'skipped' as const, reason: 'dedup_24h', profileId };
+      }
 
       // Resolve topic → curriculum → subject names for the push body
       let subjectNames: string[] = [];

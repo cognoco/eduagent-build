@@ -13,6 +13,7 @@ import {
   formatFilingFailedPush,
   sendPushNotification,
 } from '../../services/notifications';
+import { getRecentNotificationCount } from '../../services/settings';
 
 const logger = createLogger();
 const MAX_FILING_RETRIES = 3;
@@ -39,9 +40,11 @@ export const filingTimedOutObserve = inngest.createFunction(
         .select({ count: count() })
         .from(sessionEvents)
         .where(eq(sessionEvents.sessionId, sessionId));
+      // [BUG-913 sweep] Tie-break by id when created_at collides — see
+      // session-crud.ts getSessionTranscript for the full rationale.
       const lastEvent = await db.query.sessionEvents.findFirst({
         where: eq(sessionEvents.sessionId, sessionId),
-        orderBy: desc(sessionEvents.createdAt),
+        orderBy: [desc(sessionEvents.createdAt), desc(sessionEvents.id)],
       });
 
       return {
@@ -196,18 +199,101 @@ export const filingTimedOutObserve = inngest.createFunction(
       return { resolution: 'retry_succeeded' as const, snapshot };
     }
 
-    await step.run('mark-failed', async () => {
+    // [CR-FIL-RACE-01] CAS guard: only flip to filing_failed when the status is
+    // still filing_pending. If filing-completed-observe already set the status
+    // to filing_recovered (race: retry succeeded AFTER the waitForEvent window
+    // closed), the UPDATE will match 0 rows and we return early to avoid
+    // permanently corrupting the recovered state.
+    const markFailedResult = await step.run('mark-failed', async () => {
       const db = getStepDatabase();
-      await db
+      const result = await db
         .update(learningSessions)
         .set({ filingStatus: 'filing_failed', updatedAt: new Date() })
         .where(
           and(
             eq(learningSessions.id, sessionId),
-            eq(learningSessions.profileId, profileId)
+            eq(learningSessions.profileId, profileId),
+            eq(learningSessions.filingStatus, 'filing_pending')
           )
-        );
+        )
+        .returning({ id: learningSessions.id });
+      return result.length > 0;
     });
+
+    if (!markFailedResult) {
+      // The status was already advanced (e.g. to filing_recovered) by a
+      // concurrent filing-completed-observe run — the retry succeeded but
+      // app/filing.retry_completed arrived after the 60 s waitForEvent window.
+      // Do NOT overwrite the recovered state. Emit a structured event so ops
+      // can query "how many sessions recovered after the wait window closed?"
+      // against Inngest run history. [CR-FIL-SILENT-01]
+      logger.info(
+        '[filing-timed-out-observe] mark-failed no-op: status already advanced, treating as recovered_after_window',
+        { sessionId, profileId }
+      );
+
+      // [H-2] Wrap parse + sendEvent inside step.run so that a Zod parse error
+      // is contained within the step rather than escaping as a function-level
+      // throw that would trigger a full function retry. The CAS guard already
+      // fired and mark-failed returned 0 rows — retrying from scratch would
+      // re-enter this same branch and re-emit indefinitely. [CR-FIL-RACE-01]
+      //
+      // [line-243] Re-read the row inside this step to confirm the session is
+      // genuinely in filing_recovered before emitting 'filing.recovered_after_window'.
+      // The CAS no-op could also occur if the row was deleted or transitioned to
+      // some other terminal state — emitting 'recovered_after_window' in those
+      // cases would be incorrect.
+      await step.run('emit-resolved-recovered-after-window', async () => {
+        const db = getStepDatabase();
+        const currentRow = await db.query.learningSessions.findFirst({
+          where: and(
+            eq(learningSessions.id, sessionId),
+            eq(learningSessions.profileId, profileId)
+          ),
+        });
+
+        if (currentRow?.filingStatus !== 'filing_recovered') {
+          logger.warn(
+            '[filing-timed-out-observe] CAS no-op but row is not filing_recovered — skipping recovered_after_window emit',
+            {
+              sessionId,
+              profileId,
+              filingStatus: currentRow?.filingStatus ?? 'row_missing',
+            }
+          );
+          return { emitted: false, reason: 'not_recovered' };
+        }
+
+        try {
+          const payload = filingResolvedEventSchema.parse({
+            sessionId,
+            profileId,
+            resolution: 'recovered_after_window',
+            timestamp: new Date().toISOString(),
+          });
+          await step.sendEvent('emit-resolved-recovered-after-window', {
+            name: 'app/session.filing_resolved',
+            data: payload,
+          });
+          return { emitted: true };
+        } catch (parseErr) {
+          captureException(parseErr as Error, {
+            profileId,
+            extra: {
+              sessionId,
+              hint: 'filingResolvedEventSchema parse failed in recovered_after_window step',
+            },
+          });
+          logger.warn(
+            '[filing-timed-out-observe] filingResolvedEventSchema parse failed — recovered_after_window event not emitted',
+            { sessionId, profileId }
+          );
+          return { emitted: false, reason: 'parse_error' };
+        }
+      });
+
+      return { resolution: 'recovered_after_window' as const, snapshot };
+    }
 
     await step.sendEvent('emit-resolved', {
       name: 'app/session.filing_resolved',
@@ -221,13 +307,42 @@ export const filingTimedOutObserve = inngest.createFunction(
 
     await step.run('send-failure-push', async () => {
       const db = getStepDatabase();
-      const { title, body } = formatFilingFailedPush();
-      await sendPushNotification(db, {
+      // [BUG-699-FOLLOWUP] 24h notification-log dedup. A duplicate
+      // `app/session.filing_timed_out` event (operator re-fire, retry past
+      // the waitForEvent window) would otherwise re-push the same "filing
+      // failed" message to the user.
+      const recentCount = await getRecentNotificationCount(
+        db,
         profileId,
-        title,
-        body,
-        type: 'session_filing_failed',
-      });
+        'session_filing_failed',
+        24
+      );
+      if (recentCount > 0) {
+        return { sent: false, reason: 'dedup_24h' };
+      }
+      const { title, body } = formatFilingFailedPush();
+      // [line-278] Wrap sendPushNotification in try/catch so a notification
+      // failure does not propagate out of step.run and trigger a full function
+      // retry. The session is already permanently marked filing_failed at this
+      // point — a push failure is non-fatal.
+      try {
+        await sendPushNotification(db, {
+          profileId,
+          title,
+          body,
+          type: 'session_filing_failed',
+        });
+        return { sent: true };
+      } catch (pushErr) {
+        captureException(pushErr as Error, {
+          profileId,
+          extra: {
+            sessionId,
+            hint: 'sendPushNotification failed in send-failure-push step',
+          },
+        });
+        return { sent: false, reason: 'push_error' };
+      }
     });
 
     const escalation = new Error(

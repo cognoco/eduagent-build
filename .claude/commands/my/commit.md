@@ -42,10 +42,42 @@ This is the critical step: with nothing left unstaged, lint-staged cannot stash 
 Run `git diff --cached --stat` to see the staged summary. Use the stat output (file names + change counts) to draft the message — do not read the full line-by-line diff unless the stat is ambiguous.
 
 - First line: `<type>(<scope>): <summary>` (max 72 chars)
-- Types: feat, fix, chore, docs, refactor, test, style, perf, ci
+- Types: feat, fix, chore, docs, refactor, cfg, plan, zdx (this repo's commitlint type-enum — `test`/`style`/`perf`/`ci` are rejected; use `chore` for test-only or CI-only commits)
 - Body: 2-4 bullet points summarizing the changes
 - Footer: `Co-Authored-By: Claude <noreply@anthropic.com>`
 - Use a HEREDOC to pass the message (preserves formatting)
+
+#### Verified-By table for multi-ID commits
+
+If the staged diff references **3 or more distinct** `BUG-\d+` / `CR-...` / `PERF-\d+` IDs (count by scanning file paths, code comments, and the planned message), produce a structured table in the body — one row per ID:
+
+```
+| ID       | Files                                  | Verified By                                    |
+|----------|----------------------------------------|------------------------------------------------|
+| BUG-XXX  | apps/api/foo.ts, foo.test.ts           | test: foo.test.ts:"BUG-XXX break test"         |
+| BUG-YYY  | apps/mobile/bar.tsx                    | manual: walked through quiz screen on web      |
+| CR-ZZZ   | packages/database/baz.ts               | N/A: schema-only, drizzle-kit migrate verified |
+```
+
+Every row needs a non-empty `Verified By` cell — `test:`, `manual:`, or `N/A:` with reason. If you can't fill one, the fix is PARTIAL — split the commit so each commit covers what's actually verified.
+
+If the diff bundles 6+ IDs, prefer splitting into smaller commits (one per logical fix) over a long table. Bundles hide weak fixes among solid ones.
+
+#### Sweep-audit block
+
+If the message claims a sweep (extends to all remaining sites, fixes the same bug everywhere, completes a cascade), include a `Sweep audit:` block with the actual grep query and result count. The `commit-msg` hook enforces this:
+
+```
+Sweep audit:
+  rg 'sendPushNotification\(' apps/api/src/inngest/functions
+  -> 7 hits across 7 files; all 7 now reach getRecentNotificationCount gate.
+```
+
+If the keyword is incidental (e.g., "swept floor" in a chore commit) include the literal `(no-sweep)` anywhere in the message to bypass the check.
+
+#### Prompt + eval pairing
+
+If the commit touches `apps/api/src/services/**/*-prompts.ts` or `apps/api/src/services/llm/*.ts` (non-test), `apps/api/eval-llm/snapshots/**` must also be staged in the same commit. Run `pnpm eval:llm` and re-stage. The pre-commit hook enforces this. Bypass only for pure refactors (rename, comment, type-only) that cannot affect generation output.
 
 ### 5. Commit (let hooks run naturally)
 

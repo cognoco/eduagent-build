@@ -55,6 +55,7 @@ Respond with ONLY valid JSON in this exact shape — no prose before or after:
   "signals": { "ready_to_finish": <true only when you have wrapped up with a summary and transition; otherwise false> }
 }
 The "reply" field is what the learner sees — write it as a natural message, do not mention JSON or signals.
+For line breaks inside the "reply" string, use the JSON escape \n (backslash + n). NEVER write \\n (a literal backslash followed by n) — that shows up to the learner as visible "\n" instead of a real line break.
 Set "ready_to_finish" to true ONLY on the turn where your reply contains the wrap-up summary and transition to the first session.
 
 Subject: <subject_name>Mathematics</subject_name>

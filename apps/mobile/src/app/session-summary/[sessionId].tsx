@@ -895,6 +895,39 @@ export default function SessionSummaryScreen() {
           </Pressable>
         ) : null}
 
+        {/* [BUG-889] Returning learners had no path to the actual chat history.
+            The transcript exists server-side and powers session resume; this
+            link surfaces it in a read-only screen so the learner can scroll
+            back through what was discussed.
+            [CR-PR129-M5] Hide transcript in parent-proxy mode: parents have
+            read-only summary access only and must not see the full chat log. */}
+        {!isParentProxy && sessionId ? (
+          <Pressable
+            onPress={() => {
+              // [M-8] session-transcript is a sibling fullScreenModal in the
+              // root stack (see _layout.tsx), not a child of session-summary.
+              // Both are presented as fullScreenModal, so Expo Router pushes
+              // transcript on top of summary — router.back() inside the
+              // transcript screen returns here correctly via goBackOrReplace.
+              // No ancestor-chain push needed; the cast to `as never` was
+              // masking a false-positive — the object already satisfies
+              // HrefObject (pathname: string, params?: UnknownInputParams).
+              router.push({
+                pathname: '/session-transcript/[sessionId]',
+                params: { sessionId },
+              });
+            }}
+            className="bg-surface rounded-button py-3 items-center mb-4"
+            accessibilityRole="button"
+            accessibilityLabel="View full transcript"
+            testID="view-transcript-cta"
+          >
+            <Text className="text-text-primary text-body font-semibold">
+              View full transcript
+            </Text>
+          </Pressable>
+        ) : null}
+
         {persisted?.learnerRecap ? (
           <View
             className="bg-surface rounded-card p-4 mb-4"

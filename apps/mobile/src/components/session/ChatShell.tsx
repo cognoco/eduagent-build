@@ -16,6 +16,7 @@ import {
   Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useIsFocused } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MessageBubble, type VerificationBadge } from './MessageBubble';
@@ -169,6 +170,14 @@ export function ChatShell({
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
+  // [BUG-886] On RN Web the Stack mounts every screen simultaneously, so a
+  // prior session's ChatShell stays in the DOM with a clickable Send button.
+  // Tap-target geometry can route a click on the visually active screen to
+  // the offscreen instance and fire its `onSend` (still bound to the prior
+  // session's POST URL). useIsFocused returns false on the inactive instance
+  // — we use it both to short-circuit handleSend and to remove the dormant
+  // input + buttons from the accessibility tree on web.
+  const isFocused = useIsFocused();
   // [BUG-740 / PERF-10] FlatList ref so virtualization kicks in for long
   // sessions. ScrollView previously rendered every message bubble in the
   // tree, growing unbounded — students hit OOM after a few hundred turns.
@@ -176,6 +185,62 @@ export function ChatShell({
   const [input, setInput] = useState('');
   const [screenReaderEnabled, setScreenReaderEnabled] = useState(false);
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
+
+  // [PERF-10 safeguard] FlatList virtualisation only kicks in when its
+  // `data`, `renderItem`, and `keyExtractor` keep stable references across
+  // renders — otherwise React re-mounts every row, defeating the bounded-
+  // memory guarantee BUG-740 was filed to enforce. ChatShell re-renders on
+  // input changes, voice state toggles, screen-reader detection, etc., so
+  // we memoise these three explicitly. The filter expression matches the
+  // previous inline `messages.filter(...)` exactly — system prompts that
+  // have no `kind` are hidden, everything else is shown.
+  const visibleMessages = useMemo(
+    () => messages.filter((msg) => !(msg.isSystemPrompt && !msg.kind)),
+    [messages]
+  );
+  const keyExtractor = useCallback((item: ChatMessage) => item.id, []);
+  const renderMessageItem = useCallback(
+    ({ item: msg }: ListRenderItemInfo<ChatMessage>) => (
+      <View>
+        {msg.imageUri && !failedImages.has(msg.id) && (
+          <View className="self-end max-w-[85%] mb-1">
+            <Image
+              testID={`message-image-${msg.id}`}
+              source={{ uri: msg.imageUri }}
+              className="w-full aspect-[4/3] rounded-lg"
+              resizeMode="contain"
+              accessibilityLabel="Homework image"
+              onError={() => {
+                setFailedImages((prev) => new Set(prev).add(msg.id));
+              }}
+            />
+          </View>
+        )}
+        {msg.imageUri && failedImages.has(msg.id) && (
+          <View className="self-end max-w-[85%] mb-1">
+            <View
+              testID={`message-image-fallback-${msg.id}`}
+              className="w-full aspect-[4/3] rounded-lg bg-surface items-center justify-center"
+            >
+              <Ionicons name="camera-outline" size={32} color={colors.muted} />
+              <Text className="text-body-sm text-text-secondary mt-1">
+                Image no longer available
+              </Text>
+            </View>
+          </View>
+        )}
+        <MessageBubble
+          role={msg.role}
+          content={msg.content}
+          streaming={msg.streaming}
+          escalationRung={msg.escalationRung}
+          verificationBadge={msg.verificationBadge}
+          actions={renderMessageActions?.(msg)}
+        />
+      </View>
+    ),
+    [failedImages, colors.muted, renderMessageActions]
+  );
 
   // Voice toggle — explicit initialVoiceEnabled (from input mode toggle) takes precedence.
   // Falls back to teach_back detection. Session-scoped only — NOT a persistent preference.
@@ -338,6 +403,12 @@ export function ChatShell({
   );
 
   const handleSend = useCallback(() => {
+    // [BUG-886] Hard guard against stale-instance taps on RN Web. Without
+    // this, a prior screen's ChatShell still in the DOM can fire onSend
+    // bound to the prior session's POST URL when the user taps the visually
+    // active Send button. The accessibility-tree changes below are the
+    // primary defense; this is the belt-and-braces backstop.
+    if (!isFocused) return;
     if (!input.trim() || isStreaming) return;
     const text = input.trim();
     setInput('');
@@ -346,7 +417,7 @@ export function ChatShell({
     // if user switched to text mode while TTS was still playing (BUG-344)
     stopSpeaking();
     onSend(text);
-  }, [input, isStreaming, onDraftChange, onSend, stopSpeaking]);
+  }, [input, isFocused, isStreaming, onDraftChange, onSend, stopSpeaking]);
 
   // Voice record button toggle
   const handleVoicePress = useCallback(async () => {
@@ -568,8 +639,8 @@ export function ChatShell({
         className="flex-1 px-4 pt-4"
         testID={messagesTestID ?? 'chat-messages'}
         contentContainerStyle={{ paddingBottom: 16 }}
-        data={messages.filter((msg) => !(msg.isSystemPrompt && !msg.kind))}
-        keyExtractor={(item) => item.id}
+        data={visibleMessages}
+        keyExtractor={keyExtractor}
         // Virtualization knobs tuned for chat: keep recent context warm for
         // jump-to-bottom snappiness, drop offscreen older bubbles to bound
         // memory. removeClippedSubviews is intentionally true on Android
@@ -582,49 +653,7 @@ export function ChatShell({
         onContentSizeChange={() =>
           scrollRef.current?.scrollToEnd({ animated: false })
         }
-        renderItem={({ item: msg }: ListRenderItemInfo<ChatMessage>) => (
-          <View>
-            {msg.imageUri && !failedImages.has(msg.id) && (
-              <View className="self-end max-w-[85%] mb-1">
-                <Image
-                  testID={`message-image-${msg.id}`}
-                  source={{ uri: msg.imageUri }}
-                  className="w-full aspect-[4/3] rounded-lg"
-                  resizeMode="contain"
-                  accessibilityLabel="Homework image"
-                  onError={() => {
-                    setFailedImages((prev) => new Set(prev).add(msg.id));
-                  }}
-                />
-              </View>
-            )}
-            {msg.imageUri && failedImages.has(msg.id) && (
-              <View className="self-end max-w-[85%] mb-1">
-                <View
-                  testID={`message-image-fallback-${msg.id}`}
-                  className="w-full aspect-[4/3] rounded-lg bg-surface items-center justify-center"
-                >
-                  <Ionicons
-                    name="camera-outline"
-                    size={32}
-                    color={colors.muted}
-                  />
-                  <Text className="text-body-sm text-text-secondary mt-1">
-                    Image no longer available
-                  </Text>
-                </View>
-              </View>
-            )}
-            <MessageBubble
-              role={msg.role}
-              content={msg.content}
-              streaming={msg.streaming}
-              escalationRung={msg.escalationRung}
-              verificationBadge={msg.verificationBadge}
-              actions={renderMessageActions?.(msg)}
-            />
-          </View>
-        )}
+        renderItem={renderMessageItem}
         ListEmptyComponent={
           <View
             className="flex-1 items-center justify-center py-16"
@@ -811,6 +840,16 @@ export function ChatShell({
           <View
             className="flex-row items-end px-4 py-3 bg-surface border-t border-surface-elevated"
             style={{ paddingBottom: Math.max(insets.bottom, 8) }}
+            testID="chat-input-row"
+            // [BUG-886] On RN Web, mounted-but-unfocused screens stay in the
+            // DOM. Remove the input row from the AT tree, swallow pointer
+            // events, and skip tab order so a click on the visible screen
+            // cannot land on this dormant ChatShell's Send.
+            pointerEvents={
+              !isFocused && Platform.OS === 'web' ? 'none' : 'auto'
+            }
+            aria-hidden={!isFocused && Platform.OS === 'web' ? true : undefined}
+            tabIndex={!isFocused && Platform.OS === 'web' ? -1 : undefined}
           >
             <TextInput
               className="flex-1 bg-background rounded-input px-4 py-3 text-body text-text-primary me-2"
@@ -826,7 +865,11 @@ export function ChatShell({
               returnKeyType="send"
               autoCapitalize="sentences"
               blurOnSubmit={false}
-              editable={!isStreaming}
+              // [BUG-886] Disabling here is the second-line guard; the View
+              // wrapper above already removes the input from the AT tree on
+              // web. Native (iOS/Android) only renders the focused screen so
+              // !isFocused effectively never fires there.
+              editable={!isStreaming && isFocused}
               testID="chat-input"
               accessibilityLabel="Message input"
             />
@@ -843,9 +886,12 @@ export function ChatShell({
             )}
             <Pressable
               onPress={handleSend}
-              disabled={!input.trim() || isStreaming}
+              // [BUG-886] Pressable disabled state mirrors handleSend's
+              // guard — belt-and-braces against any path that bypasses the
+              // wrapping View's pointerEvents/aria-hidden treatment.
+              disabled={!input.trim() || isStreaming || !isFocused}
               className={`rounded-button px-5 py-3 min-h-[44px] min-w-[44px] items-center justify-center ${
-                input.trim() && !isStreaming
+                input.trim() && !isStreaming && isFocused
                   ? 'bg-primary'
                   : 'bg-surface-elevated'
               }`}

@@ -446,12 +446,89 @@ describe('SubscriptionScreen', () => {
       screen.getByText(/store purchasing isn't available on this device yet/i)
     ).toBeTruthy();
     // BUG-899: only Free and Plus are approved per pricing_dual_cap.md.
-    // Family and Pro static cards must not be shown — their store SKUs
-    // are not approved for public listing.
+    // Family and Pro static cards must not be shown to non-Family users —
+    // their store SKUs are not approved for public listing.
+    // (Default mockSubscription tier is 'free' — see beforeEach.)
     expect(screen.getByTestId('static-tier-free')).toBeTruthy();
     expect(screen.getByTestId('static-tier-plus')).toBeTruthy();
     expect(screen.queryByTestId('static-tier-family')).toBeNull();
     expect(screen.queryByTestId('static-tier-pro')).toBeNull();
+  });
+
+  // [BUG-917] When the user IS on Family, the static comparison must
+  // include a Family card so they can see their own entitlements next
+  // to lower tiers. Previous behavior collapsed Family users into the
+  // BUG-899 hide-all-non-public-tiers rule, leaving them with no plan
+  // comparison for the tier they actually pay for.
+  it('shows Family static card in PLANS comparison when user is on Family [BUG-917]', () => {
+    mockSubscription = { tier: 'family', status: 'active' };
+    mockFamilySubscription = {
+      tier: 'family',
+      status: 'active',
+      ownerProfileId: 'profile-1',
+      members: [{ profileId: 'profile-1', displayName: 'Alex', isOwner: true }],
+    };
+    mockOfferings = null; // force the no-offerings static fallback path
+
+    render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+    expect(screen.getByTestId('no-offerings')).toBeTruthy();
+    expect(screen.getByTestId('static-tier-free')).toBeTruthy();
+    expect(screen.getByTestId('static-tier-plus')).toBeTruthy();
+    // The fix:
+    expect(screen.getByTestId('static-tier-family')).toBeTruthy();
+    expect(
+      screen.getByText(/1,500 questions per month \(shared/i)
+    ).toBeTruthy();
+    // Pro is still hidden — it's not the user's tier and not approved
+    // for public listing.
+    expect(screen.queryByTestId('static-tier-pro')).toBeNull();
+  });
+
+  // [BUG-917] Verify a non-Family user does not see Family card even if
+  // RevenueCat returns no offerings — the BUG-899 rule still holds.
+  it('hides Family static card for Plus users [BUG-917 + BUG-899 regression]', () => {
+    mockSubscription = { tier: 'plus', status: 'active' };
+    mockOfferings = null;
+
+    render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+    expect(screen.getByTestId('static-tier-free')).toBeTruthy();
+    expect(screen.getByTestId('static-tier-plus')).toBeTruthy();
+    expect(screen.queryByTestId('static-tier-family')).toBeNull();
+  });
+
+  // [BUG-917] Pro-tier cascade: same issue as Family — a Pro user landing on
+  // the subscription screen saw only Free/Plus in the static comparison, with
+  // no card for their own Pro tier. Fix mirrors the Family fix exactly.
+  it('shows Pro static card in PLANS comparison when user is on Pro [BUG-917]', () => {
+    mockSubscription = { tier: 'pro', status: 'active' };
+    mockOfferings = null; // force the no-offerings static fallback path
+
+    render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+    expect(screen.getByTestId('no-offerings')).toBeTruthy();
+    expect(screen.getByTestId('static-tier-free')).toBeTruthy();
+    expect(screen.getByTestId('static-tier-plus')).toBeTruthy();
+    // The fix:
+    expect(screen.getByTestId('static-tier-pro')).toBeTruthy();
+    expect(screen.getByText(/3,000 questions per month/i)).toBeTruthy();
+    // Family is still hidden — it's not this user's tier and not approved
+    // for general public listing.
+    expect(screen.queryByTestId('static-tier-family')).toBeNull();
+  });
+
+  // [BUG-917] Verify a Pro user does not contaminate Family visibility.
+  it('hides Pro static card for Plus users [BUG-917 + BUG-899 regression]', () => {
+    mockSubscription = { tier: 'plus', status: 'active' };
+    mockOfferings = null;
+
+    render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+    expect(screen.getByTestId('static-tier-free')).toBeTruthy();
+    expect(screen.getByTestId('static-tier-plus')).toBeTruthy();
+    expect(screen.queryByTestId('static-tier-pro')).toBeNull();
+    expect(screen.queryByTestId('static-tier-family')).toBeNull();
   });
 
   // BUG-899 break test: Premium Mentor add-on advertises an unapproved

@@ -3,7 +3,7 @@
 // Pure business logic + DB-aware query functions, no Hono imports
 // ---------------------------------------------------------------------------
 
-import { eq, and, gte, inArray, desc, sum, sql } from 'drizzle-orm';
+import { eq, and, gte, ne, inArray, desc, sum, sql } from 'drizzle-orm';
 import {
   familyLinks,
   profiles,
@@ -19,6 +19,10 @@ import {
   applyStreakDecay,
   type Database,
 } from '@eduagent/database';
+import {
+  engagementSignalSchema,
+  NEW_LEARNER_SESSION_THRESHOLD,
+} from '@eduagent/schemas';
 import type {
   DashboardChild,
   EngagementSignal,
@@ -30,7 +34,6 @@ import type {
   SessionMetadata,
   TopicProgress,
 } from '@eduagent/schemas';
-import { engagementSignalSchema } from '@eduagent/schemas';
 import { getOverallProgress, getTopicProgressBatch } from './progress';
 import {
   buildKnowledgeInventory,
@@ -72,6 +75,13 @@ export interface DashboardInput {
   }>;
   guidedCount: number;
   totalProblemCount: number;
+  /**
+   * Lifetime session count (exchangeCount >= 1). Optional for backwards-compat
+   * with existing callers; when supplied, generateChildSummary uses lifetime
+   * framing for new learners (< NEW_LEARNER_SESSION_THRESHOLD) so the dashboard
+   * subtext stops contradicting the "After N more sessions" teaser. [BUG-906]
+   */
+  totalSessions?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -106,23 +116,44 @@ export function generateChildSummary(input: DashboardInput): string {
     parts.push(subjectParts.join(', '));
   }
 
-  // Session trend
-  const trend = calculateTrend(input.sessionsThisWeek, input.sessionsLastWeek);
-  const trendArrow =
-    trend === 'up' ? '\u2191' : trend === 'down' ? '\u2193' : '\u2192';
-  const trendWord =
-    trend === 'up'
-      ? `up from ${input.sessionsLastWeek}`
-      : trend === 'down'
-      ? `down from ${input.sessionsLastWeek}`
-      : 'same as';
-
   const sw = (n: number): string => (n === 1 ? 'session' : 'sessions');
-  parts.push(
-    `${input.sessionsThisWeek} ${sw(
-      input.sessionsThisWeek
-    )} this week (${trendArrow} ${trendWord} last week)`
-  );
+  const newLearner =
+    input.totalSessions != null &&
+    input.totalSessions < NEW_LEARNER_SESSION_THRESHOLD;
+
+  if (newLearner) {
+    // [BUG-906] Lifetime framing \u2014 matches the dashboard teaser. Specifically
+    // do NOT mention "this week" here. Saying "0 this week" alongside a
+    // "2 sessions completed" lifetime number reads as a contradiction even
+    // when both are individually correct; new-learner mode collapses to the
+    // single meaningful number until the cadence trend is statistically real.
+    const total = input.totalSessions ?? 0;
+    if (total === 0) {
+      parts.push('no sessions yet');
+    } else {
+      parts.push(`${total} ${sw(total)} so far`);
+    }
+  } else {
+    // Active-learner cadence. Trend arrow + up/down/same framing.
+    const trend = calculateTrend(
+      input.sessionsThisWeek,
+      input.sessionsLastWeek
+    );
+    const trendArrow =
+      trend === 'up' ? '\u2191' : trend === 'down' ? '\u2193' : '\u2192';
+    const trendWord =
+      trend === 'up'
+        ? `up from ${input.sessionsLastWeek}`
+        : trend === 'down'
+        ? `down from ${input.sessionsLastWeek}`
+        : 'same as';
+
+    parts.push(
+      `${input.sessionsThisWeek} ${sw(
+        input.sessionsThisWeek
+      )} this week (${trendArrow} ${trendWord} last week)`
+    );
+  }
 
   return `${input.displayName}: ${parts.join('. ')}.`;
 }
@@ -405,7 +436,11 @@ async function buildChildProgressSummary(
       .where(
         and(
           eq(learningSessions.profileId, childProfileId),
-          gte(learningSessions.exchangeCount, 1)
+          // "Completed session" = exchangeCount >= 1 AND status !== 'active'.
+          // SYNC: apps/mobile/src/lib/progressive-disclosure.ts
+          //       apps/api/src/services/snapshot-aggregation.ts computeProgressMetrics()
+          gte(learningSessions.exchangeCount, 1),
+          ne(learningSessions.status, 'active')
         )
       ),
   ]);
@@ -697,6 +732,8 @@ export async function getChildrenForParent(
       subjectRetentionData,
       guidedCount: guidedMetrics.guidedCount,
       totalProblemCount: guidedMetrics.totalProblemCount,
+      // totalSessions is filled in below once the per-child progress summary
+      // resolves (it owns the live count). [BUG-906]
     };
 
     prepared.push({
@@ -741,7 +778,12 @@ export async function getChildrenForParent(
     if (!progressSummary)
       throw new Error(`progressSummaries[${i}] is unexpectedly undefined`);
     const { progress, totalSessions } = progressSummary;
-    const summary = generateChildSummary(p.dashboardInput);
+    // [BUG-906] Inject lifetime count so generateChildSummary can pick the
+    // right framing (lifetime for new learners, weekly cadence otherwise).
+    const summary = generateChildSummary({
+      ...p.dashboardInput,
+      totalSessions,
+    });
     const trend = calculateTrend(p.sessionsThisWeek, p.sessionsLastWeek);
     const retentionTrend = calculateRetentionTrend(
       p.dashboardInput.subjectRetentionData,
@@ -930,6 +972,9 @@ export async function getChildDetail(
     subjectRetentionData,
     guidedCount: guidedMetrics.guidedCount,
     totalProblemCount: guidedMetrics.totalProblemCount,
+    // [BUG-906] Lifetime count routes generateChildSummary to lifetime framing
+    // for new learners — keeps the headline subtext aligned with the teaser.
+    totalSessions,
   };
 
   const summary = generateChildSummary(dashboardInput);

@@ -13,19 +13,13 @@ export function useRetryFiling() {
     }: {
       sessionId: string;
     }): Promise<{ session: LearningSession }> => {
-      const retryFilingClient = (
-        client.sessions[':sessionId'] as unknown as {
-          'retry-filing': {
-            $post: (args: {
-              param: { sessionId: string };
-            }) => Promise<Response>;
-          };
-        }
-      )['retry-filing'];
-      const res = await retryFilingClient.$post({
+      const res = await client.sessions[':sessionId']['retry-filing'].$post({
         param: { sessionId },
       });
       await assertOk(res);
+      // assertOk throws on non-2xx but is typed `Promise<void>`, not an
+      // `asserts` predicate, so TS cannot narrow the RPC response union here.
+      // The cast pins the success-shape and matches the function return type.
       return (await res.json()) as { session: LearningSession };
     },
     onSuccess: (_data, { sessionId }) => {

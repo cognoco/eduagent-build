@@ -174,7 +174,21 @@ export default function QuizRoundDetailScreen() {
               <Text className="text-on-surface mt-1">Translate: {q.term}</Text>
             )}
             {q.type === 'guess_who' && (
-              <Text className="text-on-surface mt-1">Guess Who</Text>
+              // [BUG-932] Render the first clue (truncated) as the row prompt
+              // so the collapsed view conveys *which* question this was.
+              // Previously every Guess Who row showed the literal string
+              // "Guess Who", repeating the activity name and forcing users
+              // to expand each row to identify the question. The full clue
+              // list still appears inside the expanded "Clues" panel.
+              <Text className="text-on-surface mt-1" numberOfLines={1}>
+                {(() => {
+                  const firstClue = q.clues?.[0];
+                  if (!firstClue) return 'Guess Who';
+                  return firstClue.length > 60
+                    ? `${firstClue.slice(0, 60)}…`
+                    : firstClue;
+                })()}
+              </Text>
             )}
             {result && (
               <Text className="text-on-surface-muted mt-1 text-sm">

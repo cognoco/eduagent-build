@@ -5,6 +5,7 @@ import {
   Pressable,
   ActivityIndicator,
   ScrollView,
+  TextInput,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/clerk-expo';
@@ -15,6 +16,12 @@ import { goBackOrReplace } from '../lib/navigation';
 import { formatApiError } from '../lib/format-api-error';
 import { platformAlert } from '../lib/platform-alert';
 
+// [BUG-910] The exact phrase a user must type to confirm. Kept as a constant
+// so tests and accessibility labels stay in sync.
+const DELETE_CONFIRMATION_PHRASE = 'DELETE';
+
+type Stage = 'initial' | 'confirming' | 'scheduled';
+
 export default function DeleteAccountScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -23,48 +30,53 @@ export default function DeleteAccountScreen() {
   const deleteAccount = useDeleteAccount();
   const cancelDeletion = useCancelDeletion();
 
+  const [stage, setStage] = useState<Stage>('initial');
+  const [confirmText, setConfirmText] = useState('');
   const [gracePeriodEnds, setGracePeriodEnds] = useState<string | null>(null);
   const [error, setError] = useState('');
-  // [BUG-820] Ref-based guard against double-submission. The outer Pressable
-  // is disabled while `deleteAccount.isPending`, but the alert button lives
-  // outside the React tree (native modal) and the mutation's isPending flips
-  // a tick after we call mutateAsync — so a fast double-tap on the alert's
-  // destructive button could fire two requests. A ref toggled synchronously
-  // around the mutation closes that race.
+  // [BUG-820] Ref-based guard against double-submission. The mutation's
+  // isPending flips a tick after we call mutateAsync — a fast double-tap on
+  // the destructive button could fire two requests. A ref toggled
+  // synchronously around the mutation closes that race.
   const submittingRef = useRef(false);
 
   const handleClose = useCallback(() => {
     goBackOrReplace(router, '/(app)/more');
   }, [router]);
 
-  const onDelete = useCallback(() => {
-    platformAlert(
-      'Delete account?',
-      'This action is irreversible. All your data will be permanently deleted.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            if (submittingRef.current) return;
-            submittingRef.current = true;
-            setError('');
-            try {
-              const result = await deleteAccount.mutateAsync();
-              setGracePeriodEnds(result.gracePeriodEnds);
-            } catch (err: unknown) {
-              setError(formatApiError(err));
-            } finally {
-              submittingRef.current = false;
-            }
-          },
-        },
-      ]
-    );
-  }, [deleteAccount]);
+  // Step 1: user taps "I understand…" — move to typed-confirmation step.
+  const onBeginConfirm = useCallback(() => {
+    setError('');
+    setConfirmText('');
+    setStage('confirming');
+  }, []);
 
-  const onCancel = useCallback(async () => {
+  // Step 2: user has typed DELETE and taps the destructive button — fire
+  // the mutation. The button is only enabled when the typed phrase
+  // matches exactly, so this is the final commit.
+  const onConfirmDelete = useCallback(async () => {
+    if (submittingRef.current) return;
+    if (confirmText !== DELETE_CONFIRMATION_PHRASE) return;
+    submittingRef.current = true;
+    setError('');
+    try {
+      const result = await deleteAccount.mutateAsync();
+      setGracePeriodEnds(result.gracePeriodEnds);
+      setStage('scheduled');
+    } catch (err: unknown) {
+      setError(formatApiError(err));
+    } finally {
+      submittingRef.current = false;
+    }
+  }, [deleteAccount, confirmText]);
+
+  const onBackToWarning = useCallback(() => {
+    setConfirmText('');
+    setError('');
+    setStage('initial');
+  }, []);
+
+  const onCancelDeletion = useCallback(async () => {
     setError('');
     try {
       await cancelDeletion.mutateAsync();
@@ -75,6 +87,10 @@ export default function DeleteAccountScreen() {
   }, [cancelDeletion, handleClose]);
 
   const isLoading = deleteAccount.isPending || cancelDeletion.isPending;
+  const canConfirm =
+    confirmText === DELETE_CONFIRMATION_PHRASE &&
+    !deleteAccount.isPending &&
+    !submittingRef.current;
 
   const formattedDate = gracePeriodEnds
     ? new Date(gracePeriodEnds).toLocaleDateString(undefined, {
@@ -121,7 +137,7 @@ export default function DeleteAccountScreen() {
           </View>
         )}
 
-        {gracePeriodEnds ? (
+        {stage === 'scheduled' ? (
           <View testID="delete-account-scheduled">
             <Text className="text-body text-text-primary mb-2">
               Your account is scheduled for deletion.
@@ -135,7 +151,7 @@ export default function DeleteAccountScreen() {
               Your account remains active until the grace period ends.
             </Text>
             <Pressable
-              onPress={onCancel}
+              onPress={() => void onCancelDeletion()}
               disabled={isLoading}
               className="bg-primary rounded-button py-3.5 items-center mb-3"
               testID="delete-account-keep"
@@ -181,6 +197,97 @@ export default function DeleteAccountScreen() {
               </Text>
             </Pressable>
           </View>
+        ) : stage === 'confirming' ? (
+          <View testID="delete-account-confirming">
+            {/* [BUG-910] Family pool consequences — parents need to know
+                that linked child profiles are deleted along with their account. */}
+            <View
+              className="bg-danger/10 rounded-card px-4 py-3 mb-4"
+              testID="delete-account-family-warning"
+            >
+              <Text className="text-body-sm font-semibold text-danger mb-1">
+                If you have linked child profiles
+              </Text>
+              <Text className="text-body-sm text-text-primary">
+                They will lose access to MentoMate. Their progress, learning
+                history, and consent records are permanently deleted along
+                with your account. The family link is not transferred.
+              </Text>
+            </View>
+
+            {/* [BUG-910] Active subscription advisory — store-billed plans
+                continue to charge unless the user cancels with the platform. */}
+            <View
+              className="bg-warning/10 rounded-card px-4 py-3 mb-6"
+              testID="delete-account-subscription-warning"
+            >
+              <Text className="text-body-sm font-semibold text-text-primary mb-1">
+                Cancel your subscription separately
+              </Text>
+              <Text className="text-body-sm text-text-secondary">
+                Your App Store or Play Store subscription is{' '}
+                <Text className="font-semibold">not</Text> automatically
+                cancelled. Open your device&apos;s subscription settings
+                before deleting your account, or you may continue to be billed.
+              </Text>
+            </View>
+
+            <Text className="text-body text-text-primary mb-2">
+              Type{' '}
+              <Text className="font-bold">{DELETE_CONFIRMATION_PHRASE}</Text>{' '}
+              below to confirm.
+            </Text>
+            <TextInput
+              testID="delete-account-confirm-input"
+              accessibilityLabel={`Type ${DELETE_CONFIRMATION_PHRASE} to confirm account deletion`}
+              value={confirmText}
+              onChangeText={setConfirmText}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              autoComplete="off"
+              autoFocus
+              className="bg-surface rounded-input border border-border px-4 py-3 mb-4 text-body text-text-primary"
+              placeholder={DELETE_CONFIRMATION_PHRASE}
+              placeholderTextColor={colors.muted}
+              editable={!deleteAccount.isPending}
+            />
+
+            <Pressable
+              onPress={() => void onConfirmDelete()}
+              disabled={!canConfirm}
+              className={`rounded-button py-3.5 items-center mb-3 ${
+                canConfirm ? 'bg-danger' : 'bg-danger/40'
+              }`}
+              testID="delete-account-confirm-final"
+              accessibilityRole="button"
+              accessibilityState={{ disabled: !canConfirm }}
+              accessibilityLabel="Permanently delete my account"
+            >
+              {deleteAccount.isPending ? (
+                <ActivityIndicator
+                  color={colors.textInverse}
+                  testID="delete-account-loading"
+                />
+              ) : (
+                <Text className="text-body font-semibold text-text-inverse">
+                  Permanently delete my account
+                </Text>
+              )}
+            </Pressable>
+
+            <Pressable
+              onPress={onBackToWarning}
+              disabled={deleteAccount.isPending}
+              className="bg-surface rounded-button py-3.5 items-center"
+              testID="delete-account-back-to-warning"
+              accessibilityRole="button"
+              accessibilityLabel="Go back"
+            >
+              <Text className="text-body font-semibold text-text-primary">
+                Go back
+              </Text>
+            </Pressable>
+          </View>
         ) : (
           <>
             <Text className="text-body text-text-secondary mb-4">
@@ -193,23 +300,16 @@ export default function DeleteAccountScreen() {
             </Text>
 
             <Pressable
-              onPress={onDelete}
+              onPress={onBeginConfirm}
               disabled={isLoading}
               className="bg-danger rounded-button py-3.5 items-center mb-3"
               testID="delete-account-confirm"
               accessibilityRole="button"
               accessibilityLabel="I understand, delete my account"
             >
-              {deleteAccount.isPending ? (
-                <ActivityIndicator
-                  color={colors.textInverse}
-                  testID="delete-account-loading"
-                />
-              ) : (
-                <Text className="text-body font-semibold text-text-inverse">
-                  I understand, delete my account
-                </Text>
-              )}
+              <Text className="text-body font-semibold text-text-inverse">
+                I understand, delete my account
+              </Text>
             </Pressable>
 
             <Pressable

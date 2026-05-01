@@ -69,7 +69,18 @@ export const subjects = pgTable(
     }),
     urgencyBoostReason: text('urgency_boost_reason'),
   },
-  (table) => [index('subjects_profile_id_idx').on(table.profileId)]
+  (table) => [
+    index('subjects_profile_id_idx').on(table.profileId),
+    // [CR-FIL-DEDUP-INDEX-12-FOLLOWUP] Concurrent-write dedup for shelf creation.
+    // Defined in migration 0044_shelf_book_dedup_unique_indexes.sql as
+    //   CREATE UNIQUE INDEX subjects_profile_name_lower_active_uq
+    //     ON subjects (profile_id, lower(name)) WHERE status = 'active'
+    // — drizzle's index() builder does not support expression-based indexes
+    // (lower(name)) with WHERE predicates, so this lives in raw SQL only.
+    // DO NOT add a uniqueIndex(...) here — it would be a different, weaker
+    // index and would not enforce the dedup contract. The migration is the
+    // source of truth; this comment is a pointer.
+  ]
 );
 
 export const curricula = pgTable(
@@ -126,6 +137,15 @@ export const curriculumBooks = pgTable(
       table.subjectId,
       table.sortOrder
     ),
+    // [CR-FIL-DEDUP-INDEX-12-FOLLOWUP] Concurrent-write dedup for book creation.
+    // Defined in migration 0044_shelf_book_dedup_unique_indexes.sql as
+    //   CREATE UNIQUE INDEX curriculum_books_subject_title_lower_uq
+    //     ON curriculum_books (subject_id, lower(title))
+    // — drizzle's index() builder does not support expression-based indexes
+    // (lower(title)), so this lives in raw SQL only. DO NOT add a
+    // uniqueIndex(...) here; it would be a different index and would not
+    // enforce the dedup contract. The migration is the source of truth;
+    // this comment is a pointer.
   ]
 );
 
@@ -172,6 +192,15 @@ export const curriculumTopics = pgTable(
       table.sortOrder
     ),
     index('curriculum_topics_book_id_idx').on(table.bookId),
+    // [CR-FIL-DEDUP-INDEX-12] Concurrent-write dedup. Defined in migration
+    // 0043_topic_dedup_unique_index.sql as
+    //   CREATE UNIQUE INDEX curriculum_topics_book_title_lower_uq
+    //     ON curriculum_topics (book_id, lower(title))
+    // — drizzle's index() builder does not support expression-based
+    // indexes (lower(title)), so this lives in raw SQL only. DO NOT add
+    // a uniqueIndex(...) here without the lower() expression; it would
+    // be a different index and would not enforce the dedup contract.
+    // The migration is the source of truth; this comment is a pointer.
   ]
 );
 
