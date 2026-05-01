@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { SessionTranscriptExchange } from '@eduagent/schemas';
 import { useSessionTranscript } from '../../hooks/use-sessions';
 import { goBackOrReplace } from '../../lib/navigation';
+import { stripEnvelopeJson } from '../../lib/strip-envelope';
 import { useThemeColors } from '../../lib/theme';
 import { ErrorFallback } from '../../components/common';
 import { formatApiError } from '../../lib/format-api-error';
@@ -206,7 +207,15 @@ export default function SessionTranscriptScreen() {
                   }`}
                   selectable
                 >
-                  {exchange.content}
+                  {/* [BUG-941] Defense-in-depth: strip any leaked LLM envelope
+                      JSON from assistant messages before rendering. The API
+                      already runs projectAiResponseContent server-side, but
+                      this mirrors the MessageBubble guard so no path can reach
+                      the user with a raw envelope. User content is never
+                      envelope-shaped, so we only strip for assistant rows. */}
+                  {isUser
+                    ? exchange.content
+                    : stripEnvelopeJson(exchange.content)}
                 </Text>
               </View>
             </View>
