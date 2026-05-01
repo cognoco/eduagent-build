@@ -1,10 +1,10 @@
 // ---------------------------------------------------------------------------
-// Daily Reminder Send — Tests
+// Review Due Send — Tests
 // ---------------------------------------------------------------------------
 
 const mockGetStepDatabase = jest.fn();
 const mockSendPushNotification = jest.fn();
-const mockFormatDailyReminderBody = jest.fn();
+const mockFormatReviewReminderBody = jest.fn();
 
 jest.mock('../helpers', () => ({
   getStepDatabase: () => mockGetStepDatabase(),
@@ -13,8 +13,8 @@ jest.mock('../helpers', () => ({
 jest.mock('../../services/notifications', () => ({
   sendPushNotification: (...args: unknown[]) =>
     mockSendPushNotification(...args),
-  formatDailyReminderBody: (...args: unknown[]) =>
-    mockFormatDailyReminderBody(...args),
+  formatReviewReminderBody: (...args: unknown[]) =>
+    mockFormatReviewReminderBody(...args),
 }));
 
 const mockGetRecentNotificationCount = jest.fn().mockResolvedValue(0);
@@ -34,7 +34,19 @@ jest.mock('../client', () => ({
   },
 }));
 
-import { dailyReminderSend } from './daily-reminder-send';
+// Mock drizzle-orm + database
+jest.mock('drizzle-orm', () => ({
+  eq: jest.fn(),
+  inArray: jest.fn(),
+}));
+
+jest.mock('@eduagent/database', () => ({
+  curriculumTopics: {},
+  curricula: {},
+  subjects: {},
+}));
+
+import { reviewDueSend } from './review-due-send';
 
 function createMockStep() {
   return {
@@ -44,82 +56,74 @@ function createMockStep() {
   };
 }
 
-async function executeHandler(
-  eventData: { profileId: string; streakDays: number },
-  eventId?: string
-) {
+async function executeHandler(eventData: {
+  profileId: string;
+  overdueCount: number;
+  topTopicIds: string[];
+}) {
   const mockStep = createMockStep();
-  const handler = (dailyReminderSend as any).fn;
+  const handler = (reviewDueSend as any).fn;
   const result = await handler({
-    event: { id: eventId ?? 'evt-daily-001', data: eventData },
+    event: { id: 'evt-review-001', data: eventData },
     step: mockStep,
   });
   return { result, mockStep };
 }
 
-describe('dailyReminderSend', () => {
-  const mockDb = { query: {} };
+describe('reviewDueSend', () => {
+  const mockSelectResult: unknown[] = [];
+  const mockDb = {
+    select: jest.fn().mockReturnValue({
+      from: jest.fn().mockReturnValue({
+        innerJoin: jest.fn().mockReturnValue({
+          innerJoin: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue(mockSelectResult),
+          }),
+        }),
+      }),
+    }),
+  };
 
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetStepDatabase.mockReturnValue(mockDb);
-    mockFormatDailyReminderBody.mockReturnValue('Keep your streak going!');
+    mockFormatReviewReminderBody.mockReturnValue(
+      'You have 2 topics to review.'
+    );
     mockSendPushNotification.mockResolvedValue({
       sent: true,
-      ticketId: 'ticket-001',
+      ticketId: 'ticket-review-001',
     });
   });
 
   describe('configuration', () => {
     it('is defined as an Inngest function', () => {
-      expect(dailyReminderSend).toBeDefined();
+      expect(reviewDueSend).toBeDefined();
     });
 
-    it('triggers on app/daily-reminder.send', () => {
-      const trigger = (dailyReminderSend as any)._trigger;
-      expect(trigger.event).toBe('app/daily-reminder.send');
+    it('triggers on app/retention.review-due', () => {
+      const trigger = (reviewDueSend as any)._trigger;
+      expect(trigger.event).toBe('app/retention.review-due');
     });
 
-    it('has the correct function id', () => {
-      const opts = (dailyReminderSend as any).opts;
-      expect(opts.id).toBe('daily-reminder-send');
-    });
-
-    // [FIX-INNGEST-4] Replay / operator re-fire must not push twice.
     it('[FIX-INNGEST-4] declares idempotency keyed on event.id', () => {
-      const opts = (dailyReminderSend as any).opts;
+      const opts = (reviewDueSend as any).opts;
       expect(opts.idempotency).toBe('event.id');
     });
   });
 
   describe('happy path', () => {
-    it('formats a reminder body with the streak count', async () => {
-      await executeHandler({ profileId: 'p-1', streakDays: 5 });
-
-      expect(mockFormatDailyReminderBody).toHaveBeenCalledWith(5);
-    });
-
-    it('sends a push notification with the correct profile and type', async () => {
-      await executeHandler({ profileId: 'p-1', streakDays: 3 });
-
-      expect(mockSendPushNotification).toHaveBeenCalledWith(mockDb, {
-        profileId: 'p-1',
-        title: 'Keep your streak!',
-        body: 'Keep your streak going!',
-        type: 'daily_reminder',
-      });
-    });
-
     it('returns status: sent with ticketId when push succeeds', async () => {
       const { result } = await executeHandler({
         profileId: 'p-1',
-        streakDays: 7,
+        overdueCount: 2,
+        topTopicIds: [],
       });
 
       expect(result).toEqual({
         status: 'sent',
         profileId: 'p-1',
-        ticketId: 'ticket-001',
+        ticketId: 'ticket-review-001',
       });
     });
 
@@ -131,7 +135,8 @@ describe('dailyReminderSend', () => {
 
       const { result } = await executeHandler({
         profileId: 'p-1',
-        streakDays: 1,
+        overdueCount: 1,
+        topTopicIds: [],
       });
 
       expect(result).toEqual({
@@ -140,36 +145,6 @@ describe('dailyReminderSend', () => {
         profileId: 'p-1',
       });
     });
-
-    it('falls back to daily_cap_reached when reason is absent', async () => {
-      mockSendPushNotification.mockResolvedValue({ sent: false });
-
-      const { result } = await executeHandler({
-        profileId: 'p-1',
-        streakDays: 2,
-      });
-
-      expect(result).toMatchObject({
-        status: 'skipped',
-        reason: 'daily_cap_reached',
-      });
-    });
-  });
-});
-
-// ---------------------------------------------------------------------------
-// [FIX-INNGEST-4] Idempotency break tests — push handlers
-// Daily reminder, recall nudge, and review due all use event.id so Inngest
-// replay / operator re-fire cannot deliver the same push notification twice.
-// ---------------------------------------------------------------------------
-
-describe('[FIX-INNGEST-4] daily-reminder-send idempotency', () => {
-  it('idempotency is set to event.id (not event.data.profileId)', () => {
-    const opts = (dailyReminderSend as any).opts;
-    // event.id is the correct key: profileId would allow a new event for
-    // the same profile (next day's reminder) to collide with yesterday's.
-    expect(opts.idempotency).toBe('event.id');
-    expect(opts.idempotency).not.toBe('event.data.profileId');
   });
 });
 
@@ -177,27 +152,38 @@ describe('[FIX-INNGEST-4] daily-reminder-send idempotency', () => {
 // [BUG-699-FOLLOWUP] 24h dedup gate break tests
 // ---------------------------------------------------------------------------
 
-describe('[BUG-699-FOLLOWUP] daily-reminder-send 24h push dedup', () => {
-  const mockDb = { query: {} };
+describe('[BUG-699-FOLLOWUP] review-due-send 24h push dedup', () => {
+  const mockDb = {
+    select: jest.fn().mockReturnValue({
+      from: jest.fn().mockReturnValue({
+        innerJoin: jest.fn().mockReturnValue({
+          innerJoin: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue([]),
+          }),
+        }),
+      }),
+    }),
+  };
 
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetStepDatabase.mockReturnValue(mockDb);
-    mockFormatDailyReminderBody.mockReturnValue('Keep your streak going!');
+    mockFormatReviewReminderBody.mockReturnValue('Topics fading');
   });
 
-  it('skips sendPushNotification and returns dedup_24h when a daily_reminder was sent in last 24h', async () => {
+  it('skips sendPushNotification and returns dedup_24h when a review_reminder was sent in last 24h', async () => {
     mockGetRecentNotificationCount.mockResolvedValueOnce(1);
 
     const { result } = await executeHandler({
       profileId: 'p-dup',
-      streakDays: 5,
+      overdueCount: 2,
+      topTopicIds: [],
     });
 
     expect(mockGetRecentNotificationCount).toHaveBeenCalledWith(
       mockDb,
       'p-dup',
-      'daily_reminder',
+      'review_reminder',
       24
     );
     expect(mockSendPushNotification).not.toHaveBeenCalled();
@@ -208,23 +194,24 @@ describe('[BUG-699-FOLLOWUP] daily-reminder-send 24h push dedup', () => {
     });
   });
 
-  it('still sends when no recent daily_reminder notification exists', async () => {
+  it('still sends when no recent review_reminder notification exists', async () => {
     mockGetRecentNotificationCount.mockResolvedValueOnce(0);
     mockSendPushNotification.mockResolvedValueOnce({
       sent: true,
-      ticketId: 'ticket-002',
+      ticketId: 'ticket-new',
     });
 
     const { result } = await executeHandler({
       profileId: 'p-1',
-      streakDays: 3,
+      overdueCount: 3,
+      topTopicIds: [],
     });
 
     expect(mockSendPushNotification).toHaveBeenCalled();
     expect(result).toEqual({
       status: 'sent',
       profileId: 'p-1',
-      ticketId: 'ticket-002',
+      ticketId: 'ticket-new',
     });
   });
 });

@@ -13,6 +13,7 @@ import {
   formatFilingFailedPush,
   sendPushNotification,
 } from '../../services/notifications';
+import { getRecentNotificationCount } from '../../services/settings';
 
 const logger = createLogger();
 const MAX_FILING_RETRIES = 3;
@@ -254,6 +255,19 @@ export const filingTimedOutObserve = inngest.createFunction(
 
     await step.run('send-failure-push', async () => {
       const db = getStepDatabase();
+      // [BUG-699-FOLLOWUP] 24h notification-log dedup. A duplicate
+      // `app/session.filing_timed_out` event (operator re-fire, retry past
+      // the waitForEvent window) would otherwise re-push the same "filing
+      // failed" message to the user.
+      const recentCount = await getRecentNotificationCount(
+        db,
+        profileId,
+        'session_filing_failed',
+        24
+      );
+      if (recentCount > 0) {
+        return { sent: false, reason: 'dedup_24h' };
+      }
       const { title, body } = formatFilingFailedPush();
       await sendPushNotification(db, {
         profileId,
@@ -261,6 +275,7 @@ export const filingTimedOutObserve = inngest.createFunction(
         body,
         type: 'session_filing_failed',
       });
+      return { sent: true };
     });
 
     const escalation = new Error(

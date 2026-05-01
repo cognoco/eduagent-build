@@ -7,6 +7,7 @@ import {
   formatRecallNudge,
   sendPushNotification,
 } from '../../services/notifications';
+import { getRecentNotificationCount } from '../../services/settings';
 
 export const recallNudgeSend = inngest.createFunction(
   {
@@ -22,6 +23,19 @@ export const recallNudgeSend = inngest.createFunction(
 
     const result = await step.run('send-nudge', async () => {
       const db = getStepDatabase();
+
+      // [BUG-699-FOLLOWUP] 24h notification-log dedup. Same pattern as the
+      // other cron-driven push paths: idempotency covers same-event.id
+      // replays; this covers new events for the same recipient within 24h.
+      const recentCount = await getRecentNotificationCount(
+        db,
+        profileId,
+        'recall_nudge',
+        24
+      );
+      if (recentCount > 0) {
+        return { status: 'skipped' as const, reason: 'dedup_24h', profileId };
+      }
 
       // Look up topic titles
       const topics =

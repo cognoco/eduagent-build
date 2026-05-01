@@ -47,6 +47,12 @@ jest.mock('../../services/notifications', () => ({
     mockSendPushNotification(...args),
 }));
 
+const mockGetRecentNotificationCount = jest.fn().mockResolvedValue(0);
+jest.mock('../../services/settings', () => ({
+  getRecentNotificationCount: (...args: unknown[]) =>
+    mockGetRecentNotificationCount(...args),
+}));
+
 jest.mock('../../services/logger', () => ({
   createLogger: () => ({
     info: jest.fn(),
@@ -234,7 +240,7 @@ describe('filing-timed-out-observe [CR-FIL-RACE-01]', () => {
 
     // send-failure-push step must NOT be invoked.
     const sendFailurePushCalls = mockStep.run.mock.calls.filter(
-      ([name]: [string]) => name === 'send-failure-push'
+      ([name]) => name === 'send-failure-push'
     );
     expect(sendFailurePushCalls).toHaveLength(0);
 
@@ -271,7 +277,7 @@ describe('filing-timed-out-observe [CR-FIL-RACE-01]', () => {
 
     // send-failure-push step MUST be invoked.
     const sendFailurePushCalls = mockStep.run.mock.calls.filter(
-      ([name]: [string]) => name === 'send-failure-push'
+      ([name]) => name === 'send-failure-push'
     );
     expect(sendFailurePushCalls).toHaveLength(1);
 
@@ -302,7 +308,7 @@ describe('filing-timed-out-observe [CR-FIL-RACE-01]', () => {
     expect(mockCaptureException).not.toHaveBeenCalled();
 
     const sendFailurePushCalls = mockStep.run.mock.calls.filter(
-      ([name]: [string]) => name === 'send-failure-push'
+      ([name]) => name === 'send-failure-push'
     );
     expect(sendFailurePushCalls).toHaveLength(0);
 
@@ -379,5 +385,62 @@ describe('filing-timed-out-observe [CR-FIL-RACE-01]', () => {
     expect(markFailedCalls).toHaveLength(0);
 
     expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [BUG-699-FOLLOWUP] 24h dedup gate break tests
+//
+// The send-failure-push step gates on getRecentNotificationCount so that a
+// duplicate `app/session.filing_timed_out` event (operator re-fire, replay)
+// does not push the same "filing failed" message twice.
+// ---------------------------------------------------------------------------
+
+describe('[BUG-699-FOLLOWUP] filing-timed-out-observe 24h push dedup', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    // Default: mark-failed returns true (0→failed transition succeeded),
+    // retry slot returns null (no retry claimed), so the function reaches
+    // send-failure-push.
+    mockGetRecentNotificationCount.mockResolvedValue(0);
+    mockFormatFilingFailedPush.mockReturnValue({
+      title: 'Filing failed',
+      body: 'We could not save your session.',
+    });
+  });
+
+  it('skips sendPushNotification when a session_filing_failed was sent in last 24h', async () => {
+    mockGetRecentNotificationCount.mockResolvedValueOnce(1);
+
+    // Override the mark-failed step to return true so we reach send-failure-push.
+    const markFailedReturnsTrue = async () => true;
+
+    const { result } = await executeHandler({
+      'mark-pending-and-claim-retry-slot': async () => null,
+      'mark-failed': markFailedReturnsTrue,
+    });
+
+    expect(result.resolution).toBe('unrecoverable');
+    // getRecentNotificationCount must have been called with the correct args.
+    expect(mockGetRecentNotificationCount).toHaveBeenCalledWith(
+      expect.anything(),
+      PROFILE_ID,
+      'session_filing_failed',
+      24
+    );
+    expect(mockSendPushNotification).not.toHaveBeenCalled();
+  });
+
+  it('sends the push when no recent session_filing_failed notification exists', async () => {
+    mockGetRecentNotificationCount.mockResolvedValueOnce(0);
+
+    const markFailedReturnsTrue = async () => true;
+
+    await executeHandler({
+      'mark-pending-and-claim-retry-slot': async () => null,
+      'mark-failed': markFailedReturnsTrue,
+    });
+
+    expect(mockSendPushNotification).toHaveBeenCalledTimes(1);
   });
 });
