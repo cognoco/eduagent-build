@@ -811,10 +811,14 @@ export const interviewPersistCurriculum = inngest.createFunction(
     // idempotent anyway, but doubling pushes is bad UX).
     await step.run('send-completion-push', async () => {
       try {
-        await sendPushToProfile(profileId, {
+        // → R3: correct signature is sendPushNotification(db, payload).
+        // The `type` field must be a literal from the NotificationPayload union.
+        const db = getStepDatabase();
+        await sendPushNotification(db, {
+          profileId,
           title: 'Your learning path is ready',
           body: `${subjectName} is set up — tap to review`,
-          data: { type: 'interview_ready', subjectId },
+          type: 'interview_ready', // → R3: must be added to NotificationPayload type union
         });
       } catch (err) {
         // Push failures are not user-blocking; the mobile poll path also
